@@ -1,5 +1,5 @@
 /**
- * Customer-room verbs (view / respond): STDIN in, customer-safe JSON out, reason codes only.
+ * Customer-room verbs (view / respond / attachment): STDIN in, customer-safe JSON out, reason codes only.
  * Part of scripts/customer_decision.ts (the entry point); see its header.
  */
 import { logger } from '@agent/core/core';
@@ -11,6 +11,7 @@ import {
   type DecisionLedgerLocation,
 } from '@agent/core/decision-ledger';
 import {
+  ATTACHMENT_ID_PATTERN,
   agendaAnswerState,
   buildResponseReceipt,
   findDuplicateReceipt,
@@ -18,6 +19,7 @@ import {
   newReceiptId,
   planCustomerResponse,
   readAgenda,
+  readAgendaAttachment,
   resolveAgendaEffective,
   verifyInviteToken,
   writeRespondJournal,
@@ -39,6 +41,7 @@ import {
   noteDealSwitches,
 } from './common.js';
 import { completeRespond, reconcileCase } from './reconcile.js';
+import { routeBoltReview } from './bolt-review.js';
 
 // ---------------------------------------------------------------------------
 // Customer-room verbs: STDIN in, customer-safe JSON out, reason codes only
@@ -97,7 +100,8 @@ function openInvite(
   opts: Record<string, string>,
   token: unknown,
   action: 'view' | 'respond',
-  now: string
+  now: string,
+  record = true
 ): {
   tenant: string;
   invite: CustomerDecisionInvite;
@@ -106,7 +110,7 @@ function openInvite(
 } {
   const tenant = opts.tenant;
   if (!tenant || typeof token !== 'string') throw new CustomerFacingError('invalid_link');
-  const verified = verifyInviteToken(tenant, token, { now, action });
+  const verified = verifyInviteToken(tenant, token, { now, action, record });
   if (verified.ok === false) {
     throw new CustomerFacingError(
       verified.reason === 'expired' ||
@@ -172,6 +176,20 @@ function runView(
           // The draft an `approval` entry asks the customer to approve (submit refuses one without).
           ...(entry.kind === 'approval' && entry.our_decision?.value !== undefined
             ? { draft: entry.our_decision.value }
+            : {}),
+          // CD-10: images (fetched one by one through `attachment`) and external links.
+          ...(entry.attachments?.length
+            ? {
+                attachments: entry.attachments.map((item) => ({
+                  id: item.id,
+                  name: item.name,
+                  media_type: item.media_type,
+                  bytes: item.bytes,
+                })),
+              }
+            : {}),
+          ...(entry.links?.length
+            ? { links: entry.links.map((link) => ({ label: link.label, url: link.url })) }
             : {}),
           requires_customer: entry.requires_customer,
           current: {
@@ -297,11 +315,41 @@ function runRespond(
     { tenantSlug: tenant, caseId: invite.case_id, location, agendaId: invite.agenda_id },
     { now }
   );
+  // CD-10: a bolt review's request_changes / reject goes to the backlog / the
+  // operator. Same rules as the sweep: short lock wait, never fails the
+  // response, retried by the next respond and by status.
+  routeBoltReview(tenant, location, invite.agenda_id, now);
   return result;
 }
 
+/**
+ * `attachment` (CD-10): one image of the invite's agenda, only when the id is
+ * listed on an entry of the approved revision the customer is shown. Any
+ * other id — unknown, of another agenda or tenant, or an agenda being
+ * updated — answers like an unknown link, so the verb is no oracle. Does not
+ * record a use of the invite (the page fetches each image after `view`).
+ */
+function runAttachment(
+  opts: Record<string, string>,
+  input: Record<string, unknown>,
+  now: string
+): unknown {
+  const attachmentId = input.attachment_id;
+  if (typeof attachmentId !== 'string' || !ATTACHMENT_ID_PATTERN.test(attachmentId))
+    throw new CustomerFacingError('invalid_link');
+  const { tenant, location, agenda } = openInvite(opts, input.token, 'view', now, false);
+  if (agendaAnswerState(agenda).ok === false) throw new CustomerFacingError('invalid_link');
+  const attachment = agenda.entries
+    .flatMap((entry) => entry.attachments ?? [])
+    .find((item) => item.id === attachmentId);
+  if (!attachment) throw new CustomerFacingError('invalid_link');
+  const bytes = asLedgerWriter(tenant, () => readAgendaAttachment(location, attachment));
+  if (!bytes) throw new CustomerFacingError('invalid_link');
+  return { ok: true, media_type: attachment.media_type, bytes_base64: bytes.toString('base64') };
+}
+
 export async function runCustomerFacing(
-  verb: 'view' | 'respond',
+  verb: 'view' | 'respond' | 'attachment',
   opts: Record<string, string>,
   io: CustomerDecisionIo,
   now: string
@@ -313,6 +361,7 @@ export async function runCustomerFacing(
     }
     const raw = io.stdin ?? (await readProcessStdin());
     const input = parseStdinObject(raw);
+    if (verb === 'attachment') return runAttachment(opts, input, now);
     return verb === 'view' ? runView(opts, input, now) : runRespond(opts, input, now);
   } catch (error) {
     if (error instanceof CustomerFacingError) {

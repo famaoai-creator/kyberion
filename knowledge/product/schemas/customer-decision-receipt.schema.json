@@ -49,7 +49,7 @@
           "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
           "choice": {
             "type": "string",
-            "enum": ["option", "keep", "free_text", "approve", "request_changes"]
+            "enum": ["option", "keep", "free_text", "approve", "request_changes", "reject"]
           },
           "value": {},
           "comment": { "type": "string", "maxLength": 10000 },

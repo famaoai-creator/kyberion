@@ -12,7 +12,8 @@
  *     must equal the approval hash, which must equal the agenda's current content;
  *   - every answer is validated against its entry (`option` ∈ the approved
  *     options by canonical JSON, `keep` only where something is in force,
- *     `approve` / `request_changes` only for `approval` entries, `free_text`
+ *     `approve` / `request_changes` / `reject` (CD-10; both need a comment and
+ *     are not approved) only for `approval` entries, `free_text`
  *     for `hearing` entries and as a comment-only answer elsewhere);
  *   - a contributor's answers are recorded in the receipt and never reach the ledger;
  *   - a decider's answer becomes a `customer-value` / `decided` ledger record that
@@ -133,6 +134,7 @@ const CHOICES: readonly ReceiptAnswerChoice[] = [
   'free_text',
   'approve',
   'request_changes',
+  'reject',
 ];
 
 function sameValue(a: unknown, b: unknown): boolean {
@@ -265,6 +267,15 @@ function validateAnswer(
       if (entry.kind !== 'approval') return { ok: false, error: 'choice_not_allowed' };
       if (!answer.comment) return { ok: false, error: 'text_required' };
       return { ok: true, value: { approved: false, comment: answer.comment }, commentOnly: false };
+    case 'reject':
+      // CD-10: not approved, like request_changes; routed to the operator, not the backlog.
+      if (entry.kind !== 'approval') return { ok: false, error: 'choice_not_allowed' };
+      if (!answer.comment) return { ok: false, error: 'text_required' };
+      return {
+        ok: true,
+        value: { approved: false, rejected: true, comment: answer.comment },
+        commentOnly: false,
+      };
     case 'free_text': {
       const text =
         typeof answer.value === 'string' && answer.value.trim()

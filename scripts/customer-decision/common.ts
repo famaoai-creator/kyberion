@@ -44,6 +44,8 @@ export interface ParsedArgs {
   verb: string;
   opts: Record<string, string>;
   flags: Set<string>;
+  /** Every value of an option given more than once (`--attach a.png --attach b.png`), in order. */
+  lists: Record<string, string[]>;
 }
 
 export interface CustomerDecisionIo {
@@ -51,12 +53,18 @@ export interface CustomerDecisionIo {
   stdin?: string;
   /** Clock override (tests). */
   now?: () => string;
+  /**
+   * The decision case a mission resolves to (tests); defaults to
+   * `resolveMissionDecisionCase` (the mission's project, else a deal listing it).
+   */
+  missionCase?: (missionId: string) => { tenantSlug: string; caseId: string } | null;
 }
 
 export function parseCustomerDecisionArgs(argv: readonly string[]): ParsedArgs {
   const [verb = 'help', ...rest] = argv;
   const opts: Record<string, string> = {};
   const flags = new Set<string>();
+  const lists: Record<string, string[]> = {};
   for (let index = 0; index < rest.length; index += 1) {
     const arg = rest[index];
     if (!arg.startsWith('--')) continue;
@@ -66,10 +74,11 @@ export function parseCustomerDecisionArgs(argv: readonly string[]): ParsedArgs {
       flags.add(name);
     } else {
       opts[name] = next;
+      (lists[name] ??= []).push(next);
       index += 1;
     }
   }
-  return { verb, opts, flags };
+  return { verb, opts, flags, lists };
 }
 
 export function usage(): string {
@@ -81,6 +90,7 @@ export function usage(): string {
     'pnpm kyberion customer-decision submit    --tenant <slug> --case <id> --agenda <id> --by user:<member> [--role owner|approver]',
     'pnpm kyberion customer-decision actor-add --tenant <slug> --case <id> --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>]',
     'pnpm kyberion customer-decision send      --tenant <slug> --case <id> --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]',
+    'pnpm kyberion customer-decision bolt-review --tenant <slug> --case <id> --mission <MSN> --customer <slug> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>] [--title <t>] [--from <text>] [--locale ja|en] [--project <id>] [--by user:<member>]',
     'pnpm kyberion customer-decision status    --tenant <slug> --case <id> [--agenda <id>]',
     'pnpm kyberion customer-decision confirm   --tenant <slug> --case <id> --agenda <id> --entry <entry_id> --by user:<member>',
     'pnpm kyberion customer-decision close     --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',
@@ -88,6 +98,7 @@ export function usage(): string {
     'pnpm kyberion customer-decision revoke    --tenant <slug> --case <id> --invite <id> --reason <text>',
     'pnpm kyberion customer-decision view      --tenant <slug> [--case <id>] --json   (stdin: {"token"})',
     'pnpm kyberion customer-decision respond   --tenant <slug> [--case <id>] --json   (stdin: {"token","content_hash","answers"})',
+    'pnpm kyberion customer-decision attachment --tenant <slug> [--case <id>] --json  (stdin: {"token","attachment_id"})',
     '',
     'send prints the invite link once; forward it to the customer yourself.',
     'Delivery through a bound customer channel (sendToCustomer) is not part of stage 1.',

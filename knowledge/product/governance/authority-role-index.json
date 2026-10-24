@@ -142,6 +142,14 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
+    "customer_decision_milestone_store": {
+      "description": "Customer decision bolt-review milestone storage (CD-10, libs/core/mission/mission-bolt-review.ts): when a mission starts, lists agendas/ of the bound tenant's decision case, reads the agenda files and writes only agendas/<agenda_id>.json (milestones_passed of open bolt-review agendas) under knowledge/confidential/<tenant>/decisions/<case>/. Requires an exact deny-only case capability (libs/core/foundation/customer-decision-milestone-capability.ts) naming every path before each operation; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). No ledger, receipt, switch, consumer, attachment, invite or customers/ authority.",
+      "default_persona": "unknown",
+      "write_scopes": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"],
+      "scope_classes": ["knowledge_core"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "cyber_security": {
       "description": "Security review authority for threat modeling, vulnerability analysis, and mission veto power.",
       "default_persona": "cyber_security",

@@ -13,6 +13,7 @@ import {
   type PlanCustomerResponseInput,
 } from './respond.js';
 import { resolveAgendaEffective } from './effective.js';
+import { approvalVerdict } from './bolt-review.js';
 
 const NOW = '2026-10-24T00:00:00.000Z';
 const ACTOR = 'customer:acme-cto';
@@ -234,6 +235,26 @@ describe('planCustomerResponse', () => {
     ).toMatchObject({ ok: false, errors: [{ error: 'text_required' }] });
     expect(
       planCustomerResponse(input({ answers: [{ entry_id: 'nfr.auth', choice: 'approve' }] }))
+    ).toMatchObject({ ok: false, errors: [{ error: 'choice_not_allowed' }] });
+  });
+
+  it('reject (CD-10) needs a comment, only on approval entries, and is not approved', () => {
+    const rejected = planCustomerResponse(
+      input({ answers: [{ entry_id: 'release', choice: 'reject', comment: 'wrong direction' }] })
+    );
+    expect(rejected.ok && rejected.plan.appends[0].value).toEqual({
+      approved: false,
+      rejected: true,
+      comment: 'wrong direction',
+    });
+    expect(rejected.ok && approvalVerdict(rejected.plan.appends[0].value)).toBe('rejected');
+    expect(
+      planCustomerResponse(input({ answers: [{ entry_id: 'release', choice: 'reject' }] }))
+    ).toMatchObject({ ok: false, errors: [{ error: 'text_required' }] });
+    expect(
+      planCustomerResponse(
+        input({ answers: [{ entry_id: 'nfr.auth', choice: 'reject', comment: 'no' }] })
+      )
     ).toMatchObject({ ok: false, errors: [{ error: 'choice_not_allowed' }] });
   });
 
