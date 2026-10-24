@@ -67,6 +67,12 @@
         ]
       }
     },
+    "general_question": {
+      "description": "CD-11: a question about the agenda as a whole (outside its entries), handed to the operator like a comment.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 10000
+    },
     "identity_assurance": { "type": "string", "enum": ["invite_link"] },
     "submitted_at": { "type": "string", "minLength": 1 },
     "decision_ids": {

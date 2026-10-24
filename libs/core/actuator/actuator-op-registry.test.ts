@@ -73,6 +73,7 @@ describe('actuator-op-registry', () => {
       'grant_voice_consent',
       'continuous_operations',
       'continuous_operations_report',
+      'customer_decision_reminders',
       'organization_operation_tick',
       'organization_record_run',
       'programmatic_tool_call',
@@ -105,7 +106,7 @@ describe('actuator-op-registry', () => {
     ];
     expect(captureOps).toHaveLength(13);
     expect(transformOps).toHaveLength(3);
-    expect(applyOps).toHaveLength(35);
+    expect(applyOps).toHaveLength(36);
     for (const op of captureOps) expect(determineActuatorStepType('core', op)).toBe('capture');
     for (const op of transformOps) expect(determineActuatorStepType('core', op)).toBe('transform');
     for (const op of applyOps) expect(determineActuatorStepType('core', op)).toBe('apply');
@@ -114,7 +115,7 @@ describe('actuator-op-registry', () => {
       ...(registeredCoreOps.capture || []),
       ...(registeredCoreOps.transform || []),
       ...(registeredCoreOps.apply || []),
-    ]).toHaveLength(51);
+    ]).toHaveLength(52);
   });
 
   it('prefers apply semantics when provider ops overlap', () => {

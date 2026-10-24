@@ -1,0 +1,31 @@
+{
+  "action": "pipeline",
+  "name": "customer-decision-reminders",
+  "version": "1.0.0",
+  "description": "CD-11 daily customer decision reminders for one tenant: answer reminders the day before and on an agenda's respond-by date, and override-closing notices two days before a date deadline, sent through each decider's bound channel (fixed templates via sendToCustomer and the outbound approval gate); deciders without a bound channel become operator inbox tasks. Install into a tenant with `pnpm kyberion customer-decision reminders --install --tenant <slug>`; Chronos runs it only after a human approves its project trust.",
+  "_refs": {
+    "plan": "docs/developer/improvement-plans-2026-10/CUSTOMER_DECISION_HEARING_PLAN_2026-10-24.ja.md",
+    "cli": "pnpm kyberion customer-decision remind --tenant <slug> [--dry-run]"
+  },
+  "schedule": {
+    "id": "customer-decision-reminders",
+    "cron": "30 9 * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": true
+  },
+  "steps": [
+    {
+      "id": "remind",
+      "role": "sink",
+      "op": "core:customer_decision_reminders",
+      "params": {
+        "export_as": "customer_decision_reminders"
+      },
+      "produces": {
+        "channel": "customer_decision_reminders",
+        "type": "CustomerDecisionReminderSweep",
+        "sensitive": true
+      }
+    }
+  ]
+}

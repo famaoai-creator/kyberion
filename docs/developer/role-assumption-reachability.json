@@ -180,6 +180,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/customer-decision/operator-handoff.ts#addOperatorTask",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2734,6 +2739,11 @@
     },
     {
       "site": "scripts/customer-decision/operator.ts#runGenerate",
+      "roles": ["decision_ledger"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#deliverReminder",
       "roles": ["decision_ledger"],
       "unresolved": []
     },

@@ -27,6 +27,19 @@
             }
           },
           "confirm_target": { "type": "string" },
+          "channel": {
+            "description": "CD-11: the bound customer channel reminders for this actor go to — a surface + channel_id that exists in customer/<tenant>/connections/channel-bindings.json (checked when it is set).",
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["surface", "channel_id"],
+            "properties": {
+              "surface": {
+                "type": "string",
+                "enum": ["slack", "telegram", "email", "imessage", "discord"]
+              },
+              "channel_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+            }
+          },
           "note": { "type": "string" }
         }
       }

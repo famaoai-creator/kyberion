@@ -13,6 +13,10 @@ import { getReasoningBackend } from './reasoning/reasoning-backend.js';
 import { enforceApprovalGate } from './governance/approval-gate.js';
 import { charterInputForCustomerOutbound } from './governance/charter-call-site.js';
 import {
+  isRenderedRoutineTemplate,
+  type CustomerRoutineTemplateRef,
+} from './customer-outbound-templates.js';
+import {
   composeAudienceFloor,
   evaluateAudienceEgress,
   loadEgressPolicy,
@@ -342,6 +346,12 @@ export interface SendToCustomerInput {
   title: string;
   body: string;
   correlationId?: string;
+  /**
+   * CD-11: the registered fixed template `body` was rendered from. The body
+   * counts as routine business only when it is exactly that rendering
+   * (`customer-outbound-templates.ts`); otherwise the field is ignored.
+   */
+  template?: CustomerRoutineTemplateRef;
   /** Trusted execution-boundary presence for the outbound approval gate. */
   hasHuman?: boolean;
   hasUI?: boolean;
@@ -438,11 +448,16 @@ function extractLinkHost(raw: string): string | null {
 }
 
 /**
- * Only a tiny, exact greeting vocabulary is eligible for unattended delivery.
+ * Only a tiny, exact greeting vocabulary, or the exact rendering of a
+ * registered fixed template (CD-11), is eligible for unattended delivery.
  * Trailing whitespace and sentence punctuation are stripped with a bounded
  * scan (no backtracking regex over caller-controlled text).
  */
-function classifyCustomerOutbound(body: string): 'routine_business' | 'unknown' {
+function classifyCustomerOutbound(
+  body: string,
+  template?: CustomerRoutineTemplateRef
+): 'routine_business' | 'unknown' {
+  if (isRenderedRoutineTemplate(String(body ?? ''), template)) return 'routine_business';
   let text = String(body ?? '');
   for (;;) {
     const next = trimEndChars(text.trimEnd(), '。.!！?？');
@@ -492,7 +507,7 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
       ? (() => {
           const charter = charterInputForCustomerOutbound({
             tenantSlug: input.binding.tenantSlug,
-            categories: [classifyCustomerOutbound(input.body)],
+            categories: [classifyCustomerOutbound(input.body, input.template)],
             attachmentCount: 0,
           });
           return charter ? { charter } : {};

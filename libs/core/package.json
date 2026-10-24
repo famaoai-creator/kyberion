@@ -1132,6 +1132,14 @@
       "types": "./dist/customer-decision.d.ts",
       "default": "./dist/customer-decision.js"
     },
+    "./customer-decision/operator-handoff": {
+      "types": "./dist/customer-decision/operator-handoff.d.ts",
+      "default": "./dist/customer-decision/operator-handoff.js"
+    },
+    "./customer-outbound-templates": {
+      "types": "./dist/customer-outbound-templates.d.ts",
+      "default": "./dist/customer-outbound-templates.js"
+    },
     "./customer-resolver": {
       "types": "./dist/customer-resolver.d.ts",
       "default": "./dist/customer-resolver.js"

@@ -38,6 +38,11 @@
     "locale": { "type": "string", "enum": ["ja", "en"] },
     "deal_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
+    "respond_by": {
+      "description": "CD-11: the date the customer is asked to answer by (a UTC calendar date). Shown to the customer; part of the content hash when present. Reminders go out the day before and on the day.",
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
     "entries": { "type": "array", "items": { "$ref": "#/definitions/entry" } },
     "status": {
       "type": "string",
@@ -117,6 +122,54 @@
           "work_item_id": { "type": "string", "minLength": 1, "maxLength": 200 },
           "notified_at": { "type": "string", "minLength": 1 },
           "inbox_entry_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "at": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "reminders": {
+      "description": "CD-11: customer reminders sent, held for approval, or handed to the operator to send by hand — one record per agenda × actor × kind × target date. Ids, dates and statuses only, outside the content hash.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["reminder_id", "kind", "actor_id", "target_date", "status", "at"],
+        "properties": {
+          "reminder_id": { "type": "string", "pattern": "^rmd-[a-f0-9]{16}$" },
+          "kind": { "type": "string", "enum": ["before_due", "due", "override_closing"] },
+          "actor_id": { "type": "string", "pattern": "^customer:[a-z][a-z0-9-]{0,60}$" },
+          "target_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+          "status": { "type": "string", "enum": ["sent", "approval_pending", "manual", "denied"] },
+          "reason": {
+            "type": "string",
+            "enum": ["no_channel", "binding_missing", "surface_unsupported"]
+          },
+          "approval_request_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "inbox_entry_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "at": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "handoffs": {
+      "description": "CD-11: customer answers handed to the operator (off-option answers, comments, a general question), one record per receipt. Ids and counts only, outside the content hash; the customer's text stays in the receipt.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "receipt_id",
+          "off_option",
+          "comments",
+          "general_question",
+          "inbox_entry_id",
+          "at"
+        ],
+        "properties": {
+          "receipt_id": { "type": "string", "pattern": "^rcp-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+          "off_option": { "type": "integer", "minimum": 0 },
+          "comments": { "type": "integer", "minimum": 0 },
+          "general_question": { "type": "integer", "minimum": 0, "maximum": 1 },
+          "inbox_entry_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "notified_at": { "type": "string", "minLength": 1 },
           "at": { "type": "string", "minLength": 1 }
         }
       }
