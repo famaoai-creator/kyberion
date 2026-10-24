@@ -294,7 +294,9 @@ export type OffboardTargetKind =
   /** The tenant's partition of the resource-usage ledger (one per tier). */
   | 'tenant_usage_ledger'
   /** The tenant's partition of the execution-metrics ledger (one per tier). */
-  | 'tenant_execution_metrics';
+  | 'tenant_execution_metrics'
+  /** The tenant's partition of the hybrid (audit) ledger (one per tier, D9). */
+  | 'tenant_ledger';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -369,6 +371,8 @@ export const USAGE_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.resour
 export const USAGE_LEDGER_LEGACY_REPO_PATH = 'work/metrics/resource-usage.jsonl';
 /** metrics.ts EXECUTION_METRICS_LEDGER_ROOT (`<root>/<tier>/<tenant>/execution-metrics.jsonl`). */
 export const EXECUTION_METRICS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.execution_metrics;
+/** ledger.ts TENANT_LEDGER_ROOT (`<root>/<tier>/<tenant>/ledger.jsonl`, D9). */
+export const TENANT_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger;
 /** The repo-wide (system) execution-metrics ledger; pre-partition rows are pruned like usage rows. */
 export const EXECUTION_METRICS_LEGACY_REPO_PATH = 'work/metrics/execution-metrics.jsonl';
 
@@ -837,6 +841,15 @@ export function collectScopeTargets(
         if (subtreePath && safeExistsSync(subtreePath)) {
           targets.push({ path: subtree, kind: ledger.target_kind });
         }
+      }
+    }
+    // D9: the tenant's hybrid-ledger partitions (tenant mission events). The
+    // system ledger holds no tenant rows, so there is nothing legacy to prune.
+    for (const tier of SCOPE_TIERS) {
+      const subtree = `${TENANT_LEDGER_REPO_SUBPATH}/${tier}/${id}`;
+      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+      if (subtreePath && safeExistsSync(subtreePath)) {
+        targets.push({ path: subtree, kind: 'tenant_ledger' });
       }
     }
   }

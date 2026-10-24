@@ -91,6 +91,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   autonomy_learning_store: 'worker',
   pipeline_journal_store: 'worker',
   audit_mirror_writer: 'worker',
+  tenant_ledger_store: 'worker',
   customer_decision_deal_note_writer: 'worker',
   service_actuator: 'worker',
   surface_runtime: 'worker',
@@ -715,6 +716,7 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'peer_responder_reader',
   'peer_task_artifact_writer',
   'scope_locale_reader',
+  'tenant_ledger_store',
   'workspace_tenant_registry_reader',
 ]);
 

@@ -59,6 +59,8 @@ const allowedCoreFsImports = [
   // Hermetic owner-scope resolution tests (temp KYBERION_ROOT).
   'libs/core/owner-scope.test.ts',
   'libs/core/mission/mission-seal.test.ts',
+  // D9: hermetic temp KYBERION_ROOT; raw fs seeds and inspects the fixture ledgers.
+  'libs/core/mission/mission-ledger-tenant-scope.test.ts',
   'libs/core/output-artifacts.test.ts',
   // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.
   'libs/core/mission/mission-maintenance.purge.test.ts',

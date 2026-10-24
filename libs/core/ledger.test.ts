@@ -6,13 +6,19 @@ import {
   loadForScope,
   normalizeLedgerRecord,
   record,
+  TENANT_LEDGER_ROOT,
+  tenantLedgerPath,
+  verifyAllLedgerIntegrity,
   verifyIntegrity,
   verifyLedgerIntegrityDetailed,
 } from './ledger.js';
+import * as pathResolver from './path-resolver.js';
 
 // Under Vitest the ledger resolves into the vitest-live sandbox (path-resolver),
 // never the operator's real active/audit/system-ledger.jsonl.
 const LEDGER_FILE = GLOBAL_LEDGER_PATH;
+// The tenant partitions are sandboxed the same way (VITEST_LIVE_SUBTREES).
+const TENANT_LEDGER_DIR = pathResolver.resolve(TENANT_LEDGER_ROOT);
 
 describe('ledger core', () => {
   let backupContent: string | null = null;
@@ -28,9 +34,11 @@ describe('ledger core', () => {
       fs.mkdirSync(path.dirname(LEDGER_FILE), { recursive: true });
     }
     fs.writeFileSync(LEDGER_FILE, '');
+    fs.rmSync(TENANT_LEDGER_DIR, { recursive: true, force: true });
   });
 
   afterEach(() => {
+    fs.rmSync(TENANT_LEDGER_DIR, { recursive: true, force: true });
     if (backupContent !== null) {
       fs.writeFileSync(LEDGER_FILE, backupContent);
     } else if (fs.existsSync(LEDGER_FILE)) {
@@ -118,6 +126,47 @@ describe('ledger core', () => {
     });
     expect(loadForScope({ tenant_slug: 'client-b' })).toHaveLength(0);
     expect(loadForScope({ scope_kind: 'system' })).toHaveLength(1);
+  });
+
+  it('never writes a tenant record to the system ledger (D9)', () => {
+    expect(TENANT_LEDGER_DIR.startsWith(pathResolver.rootDir())).toBe(true);
+    expect(TENANT_LEDGER_DIR).toContain('vitest-live');
+    record('TENANT_CONFIG', { tenant_slug: 'client-a', tier: 'confidential', data: 'a' });
+    // An unplaceable tier keeps the tenant (fails closed to confidential).
+    record('TENANT_ODD_TIER', { tenant_slug: 'client-a', tier: 'secret', data: 'b' });
+    record('PUBLIC_TENANT', { tenant_slug: 'client-c', tier: 'public', data: 'c' });
+    record('SYSTEM_EVENT', { data: 'system-wide' });
+
+    const system = fs.readFileSync(LEDGER_FILE, 'utf8');
+    expect(system).toContain('SYSTEM_EVENT');
+    expect(system).not.toContain('client-');
+
+    const confidential = fs.readFileSync(tenantLedgerPath('confidential', 'client-a'), 'utf8');
+    expect(confidential).toContain('TENANT_CONFIG');
+    expect(confidential).toContain('TENANT_ODD_TIER');
+    const publicTenant = fs.readFileSync(tenantLedgerPath('public', 'client-c'), 'utf8');
+    expect(publicTenant).toContain('PUBLIC_TENANT');
+
+    const all = verifyAllLedgerIntegrity();
+    expect(all.ok).toBe(true);
+    expect(all.ledgers.map((entry) => entry.tenant_slug ?? 'system').sort()).toEqual([
+      'client-a',
+      'client-c',
+      'system',
+    ]);
+    // (TENANT_ODD_TIER's payload contradicts its stored scope, so the scoped
+    // projection treats it as invalid — it is still on the chain above.)
+    expect(loadForScope({ tenant_slugs: 'all' }).map((entry) => entry.type)).toEqual(
+      expect.arrayContaining(['SYSTEM_EVENT', 'TENANT_CONFIG', 'PUBLIC_TENANT'])
+    );
+    expect(loadForScope({ tenant_slug: 'client-c' }).map((entry) => entry.type)).toEqual([
+      'PUBLIC_TENANT',
+    ]);
+  });
+
+  it('rejects a non-slug tenant ledger path', () => {
+    expect(() => tenantLedgerPath('confidential', 'shared')).toThrow('LEDGER_TENANT_INVALID');
+    expect(() => tenantLedgerPath('confidential', '../x')).toThrow('LEDGER_TENANT_INVALID');
   });
 
   it('rejects malformed persisted records before projection or verification', () => {

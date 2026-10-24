@@ -51,7 +51,7 @@ denied_actuators: [blockchain-actuator]
 ### Audit & Evidence
 
 - `cat evidence/audit/audit-$(date +%Y-%m-%d).jsonl 2>/dev/null | tail -20` — 本日の監査ログ
-- `cat active/audit/system-ledger.jsonl 2>/dev/null | tail -10` — システムレジャー
+- `cat active/audit/system-ledger.jsonl 2>/dev/null | tail -10` — システムレジャー（テナントを持たない記録だけ。テナントのミッションの記録はテナントごとの `active/shared/runtime/tenant-ledger/<tier>/<tenant>/ledger.jsonl` にあり、`pnpm audit:verify` で検証する）
 
 ### Agent Registry
 
