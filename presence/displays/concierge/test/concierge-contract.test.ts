@@ -202,6 +202,7 @@ describe('concierge surface contract', () => {
 
   it('exposes the personal-secretary onboarding controls', () => {
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    const readiness = safeReadFile(path.join(appDir, 'src/app/settings/settings-readiness.tsx'));
     // FD-06 file split (KP gate: max-file-lines): each card's JSX now lives
     // in its own file under settings/sections/ — the page still owns every
     // handler (getUserMedia/MediaRecorder/action:'save_management' below).
@@ -471,7 +472,10 @@ describe('concierge surface contract', () => {
     expect(setupRoute).toContain("type: 'navigate'");
     expect(setupRoute).toContain("target: '#setup-");
     // The page renders the checklist and attention items jump to their section.
-    expect(setupPage).toContain("t('setup.readiness_title')");
+    expect(setupPage).toContain('<SettingsReadiness');
+    expect(readiness).toContain("t('setup.readiness_title')");
+    expect(setupPage).toContain('const sectionOrder = SETTINGS_CARD_SECTION_ORDER');
+    expect(setupPage).not.toContain('orderSectionsForFirstRun(setup.diagnostics)');
     expect(setupPage).toContain('createSettingsNavigation');
     const navigation = safeReadFile(path.join(appDir, 'src/app/settings/settings-navigation.ts'), {
       encoding: 'utf8',
@@ -497,9 +501,9 @@ describe('concierge surface contract', () => {
     // Honest degradation: the reasoning backend has no in-app fix, so the
     // terminal command survives — as guidance-first, visually secondary copy.
     expect(setupRoute).toContain('pnpm reasoning:setup');
-    expect(setupPage).toContain("'setup.reasoning_guidance'");
-    expect(setupPage).toContain("t('setup.reasoning_command_hint'");
-    expect(setupPage).toContain('readiness-command');
+    expect(readiness).toContain("'setup.reasoning_guidance'");
+    expect(readiness).toContain("t('setup.reasoning_command_hint'");
+    expect(readiness).toContain('readiness-command');
     expect(messages).toContain('整備状況');
   });
 
