@@ -115,6 +115,12 @@ export interface DecisionAgenda {
   locale: 'ja' | 'en';
   deal_id?: string;
   project_id?: string;
+  /**
+   * CD-11: the date the customer is asked to answer by (`YYYY-MM-DD`, a UTC
+   * calendar date). Shown to the customer, so in the content hash when set.
+   * Reminders go out the day before and on the day.
+   */
+  respond_by?: string;
   entries: AgendaEntry[];
   status: AgendaStatus;
   approval?: {
@@ -158,8 +164,67 @@ export interface DecisionAgenda {
    * needs its own confirmation. Append-only through `customer-decision confirm`.
    */
   operator_confirmations?: OperatorConfirmation[];
+  /**
+   * CD-11: customer reminders sent or held for approval (one record per
+   * agenda × actor × kind × target date). Ids, dates and statuses only,
+   * outside the content hash (like `bolt_routing`); written by the facade's
+   * reminder sweep.
+   */
+  reminders?: AgendaReminderRecord[];
+  /**
+   * CD-11: answers handed to the operator (off-option answers, comments,
+   * general questions), one record per receipt. Ids and counts only, outside
+   * the content hash; the customer's text stays in the receipt.
+   */
+  handoffs?: AgendaHandoffRecord[];
   created_at: string;
   updated_at: string;
+}
+
+/** CD-11 reminder kinds: answer by `respond_by` (D-1, D0); an override window closing (D-2). */
+export type AgendaReminderKind = 'before_due' | 'due' | 'override_closing';
+export const AGENDA_REMINDER_KINDS: readonly AgendaReminderKind[] = [
+  'before_due',
+  'due',
+  'override_closing',
+];
+
+/**
+ * What became of one reminder: `sent` (delivered through the bound channel),
+ * `approval_pending` (held at the outbound approval gate; the next sweep
+ * retries with the same correlation id), `manual` (no usable bound channel:
+ * an operator inbox task to remind by hand), `denied` (the gate refused it).
+ * A `delivery_failed` attempt is not recorded, so the next sweep retries.
+ */
+export type AgendaReminderStatus = 'sent' | 'approval_pending' | 'manual' | 'denied';
+
+export interface AgendaReminderRecord {
+  /** `rmd-<hex16>` over agenda × actor × kind × target date. */
+  reminder_id: string;
+  kind: AgendaReminderKind;
+  actor_id: string;
+  /** The date the reminder is about (`respond_by`, or the override deadline), `YYYY-MM-DD` UTC. */
+  target_date: string;
+  status: AgendaReminderStatus;
+  /** `manual`: why no channel was used. */
+  reason?: 'no_channel' | 'binding_missing' | 'surface_unsupported';
+  approval_request_id?: string;
+  inbox_entry_id?: string;
+  at: string;
+}
+
+export interface AgendaHandoffRecord {
+  receipt_id: string;
+  /** Answers outside the offered options (comment-only free text). */
+  off_option: number;
+  /** Answers that carry a comment. */
+  comments: number;
+  /** 1 when the receipt carries a general question. */
+  general_question: number;
+  inbox_entry_id: string;
+  /** Set once the operator notification was accepted (a `retryable` push leaves it unset). */
+  notified_at?: string;
+  at: string;
 }
 
 export interface OperatorConfirmation {
@@ -237,6 +302,11 @@ export interface DecisionReceipt {
     /** Absent on receipts written before outcomes were recorded. */
     outcome?: ReceiptAnswerOutcome;
   }>;
+  /**
+   * CD-11: a question about the agenda as a whole (outside its entries),
+   * handed to the operator like a comment.
+   */
+  general_question?: string;
   identity_assurance: 'invite_link';
   submitted_at: string;
   decision_ids: string[];
@@ -311,6 +381,8 @@ export interface ConsumedDecisionLock {
 export const AGENDA_ID_PATTERN = /^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$/u;
 export const RECEIPT_ID_PATTERN = /^rcp-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$/u;
 export const SWITCH_ID_PATTERN = /^sw-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$/u;
+/** CD-11 `respond_by`: a calendar date (UTC), `YYYY-MM-DD`. */
+export const RESPOND_BY_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 /** Entry ids are local to one agenda. */
 export const AGENDA_ENTRY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/u;
 /**

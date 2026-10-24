@@ -15,7 +15,12 @@ vi.mock('./path-resolver.js', async () => {
 });
 
 import { pathResolver } from './path-resolver.js';
-import { listCustomerChannelBindings, resolveCustomerBinding } from './customer-channel-binding.js';
+import {
+  findTenantCustomerChannelBinding,
+  listCustomerChannelBindings,
+  readTenantCustomerChannelBindings,
+  resolveCustomerBinding,
+} from './customer-channel-binding.js';
 
 describe('customer-channel-binding', () => {
   let rootDir = '';
@@ -65,6 +70,29 @@ describe('customer-channel-binding', () => {
       tenantSlug: 'acme',
       binding: { mode: 'requirements_hearing' },
     });
+  });
+
+  it('reads one tenant only and finds an active binding by surface + channel (CD-11)', () => {
+    const write = (tenant: string, bindings: unknown[]) => {
+      const file = path.join(rootDir, 'customer', tenant, 'connections', 'channel-bindings.json');
+      fs.mkdirSync(path.dirname(file), { recursive: true });
+      fs.writeFileSync(file, JSON.stringify({ bindings }));
+    };
+    write('acme', [
+      { surface: 'slack', channel_id: 'C1' },
+      { surface: 'slack', channel_id: 'C2', active: false },
+    ]);
+    write('other', [{ surface: 'slack', channel_id: 'C9' }]);
+    expect(readTenantCustomerChannelBindings('acme', { rootDir })).toHaveLength(2);
+    expect(findTenantCustomerChannelBinding('acme', 'slack', 'C1', { rootDir })).toMatchObject({
+      tenantSlug: 'acme',
+      binding: { channel_id: 'C1' },
+    });
+    expect(findTenantCustomerChannelBinding('acme', 'slack', 'C2', { rootDir })).toBeNull();
+    expect(findTenantCustomerChannelBinding('acme', 'telegram', 'C1', { rootDir })).toBeNull();
+    // Another tenant's binding is never found through this tenant.
+    expect(findTenantCustomerChannelBinding('acme', 'slack', 'C9', { rootDir })).toBeNull();
+    expect(readTenantCustomerChannelBindings('../acme', { rootDir })).toEqual([]);
   });
 
   it('ignores schema-invalid binding files', () => {

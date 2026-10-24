@@ -4,6 +4,7 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { readTenantProfile, listTenantProfileSlugs } from './organization/tenant-registry.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeReaddir, safeStat } from './secure-io.js';
 import { logger } from './core.js';
+import { isValidTenantSlug } from './foundation/scope.js';
 
 /**
  * E2E-06 Task 1: channel → customer binding.
@@ -135,4 +136,38 @@ export function resolveCustomerBinding(
     return { tenantSlug: entry.tenantSlug, binding: entry.binding };
   }
   return null;
+}
+
+/**
+ * CD-11: one tenant's bindings only (`customer/<tenant>/connections/channel-bindings.json`),
+ * never a walk over other tenants. A file that cannot be read or does not
+ * validate is logged and yields no bindings.
+ */
+export function readTenantCustomerChannelBindings(
+  tenantSlug: string,
+  options: CustomerChannelBindingListOptions = {}
+): CustomerChannelBinding[] {
+  if (!isValidTenantSlug(tenantSlug)) return [];
+  const rootDir = path.resolve(options.rootDir ?? pathResolver.rootDir());
+  const filePath = path.join(
+    rootDir,
+    'customer',
+    tenantSlug,
+    'connections',
+    'channel-bindings.json'
+  );
+  return readBindingsFile(filePath, rootDir);
+}
+
+/** CD-11: the tenant's active binding for exactly this surface + channel, or null. */
+export function findTenantCustomerChannelBinding(
+  tenantSlug: string,
+  surface: string,
+  channelId: string,
+  options: CustomerChannelBindingListOptions = {}
+): ResolvedCustomerBinding | null {
+  const binding = readTenantCustomerChannelBindings(tenantSlug, options).find(
+    (item) => item.active !== false && item.surface === surface && item.channel_id === channelId
+  );
+  return binding ? { tenantSlug, binding } : null;
 }
