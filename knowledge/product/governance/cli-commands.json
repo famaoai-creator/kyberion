@@ -4289,6 +4289,17 @@
       "native_help": true
     },
     {
+      "id": "script.customer-channel",
+      "module": "scripts/customer_channel.ts",
+      "command": "customer-channel default",
+      "noun": "customer-channel",
+      "verb": "default",
+      "audience": "operator",
+      "description": "cli_cmd_script_customer_channel",
+      "group": "operate",
+      "native_help": true
+    },
+    {
       "id": "script.worktree.create",
       "module": "scripts/agent_worktree.ts",
       "command": "worktree create",

@@ -11,6 +11,7 @@
       "customer_decision_consumer_store",
       "customer_decision_invite_store",
       "customer_decision_milestone_store",
+      "deliverable_inbox_writer",
       "infrastructure_sentinel",
       "knowledge_steward",
       "memory_provenance_reader",
@@ -31,11 +32,12 @@
       "workspace_tenant_registry_index_reader",
       "workspace_tenant_registry_reader"
     ],
-    "rationale": "Narrow roles that libs/core modules assume internally on behalf of their callers to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh, the stimuli journal), audit_mirror_writer (write-only: the audit chain writes customer/<tenant>/logs/audit/ through the seam libs/core/authority.ts registers, bound to the entry's tenant, whatever the caller's role; every process that records a tenant-scoped audit entry can reach it), knowledge_steward (mission creation), scope_locale_reader (read-only: libs/core/locale.ts reads the tenant reply locale, knowledge/confidential/<tenant>/locale.json, bound to the turn's tenant, for every surface that renders a reply), peer_catalog_reader (read-only: libs/core/mesh/peer-conversation.ts reads the tenant peer transport catalog, knowledge/confidential/<tenant>/connections/peer-network.json, bound to the sending tenant, for every caller that sends a peer conversation message, and libs/core/mesh/peer-task-exchange.ts reads the tenant peer task catalog, knowledge/confidential/<tenant>/connections/peer-tasks.json, and checks the tenant profile knowledge/personal/tenants/<tenant>.json before an accepted task becomes a WorkItem, bound to the receiving tenant), peer_responder_reader (read-only: libs/core/mesh/peer-auto-reply.ts retrieves tenant knowledge for an opt-in peer auto reply, bound to the receiving tenant: that tenant profile, knowledge/confidential/<tenant>/ and customer/<tenant>/ only, never its connections/ peer secrets), peer_task_artifact_writer (write-only to its own paths: libs/core/mesh/peer-task-exchange.ts stores an accepted peer task's report and log under active/shared/artifacts/confidential/<tenant>/report/peer-tasks/ and appends that tenant's artifact index, bound to the receiving tenant), metrics_cap_reader (read-only: libs/core/metrics.ts aggregateMetricsForEnforcement reads the partitioned metrics ledgers, bound to the caller's tenant, so the spend guard, budget governor and generation-cost dedup reached from any surface count every tier; it returns numbers only; its grant names no tenant), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime; surface-coordination-store maps a surface to its role from a governed plus a personal-tier map, so any GovernedArtifactRole is reachable wherever it is used). scope_locale_reader, peer_catalog_reader, peer_responder_reader and peer_task_artifact_writer are tenant-bound roles (libs/core/authority.ts TENANT_BOUND_READER_ROLES): their assumption throws [ROLE_TENANT_SCOPE_REQUIRED] without a valid tenant and [ROLE_TENANT_SCOPE_MISMATCH] when the caller has an active tenant that differs from the requested one, so a caller-supplied tenant never broadens access; a process without an active tenant (operator CLI, a server configured for one tenant) binds its own. operational_learning_writer is deliberately restricted to the system roles that reach its learning path. The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them only where docs/developer/role-assumption-reachability.json reaches them. The report shows oauth_callback_surface and surface_runtime do not reach some shared roles; they stay shared because removing a shared role for one system role needs a policy-shape change (tracked as a follow-up). chronos_tenant_runner and organization_operator are reached through the agent-runtime supervisor daemon child process (resident-dot sweep): chronos_tenant_runner lists and reads knowledge/confidential/<tenant>/dots/ charters bound to that tenant (same rule as chronos tenant pipelines), and organization_operator runs scheduled organization operation pipelines bound to the operation's tenant/organization (DL-06). Both are assumed internally by libs/core / the governed operation executor on behalf of whichever surface started the daemon, never by the surface itself. autonomy_learning_store is tenant-bound and mediates only the exact tenant autonomy outcome and override files; caller callbacks and execution remain outside its IO scope. pipeline_journal_store is tenant-bound and mediates only one confidential library pipeline run journal of the caller's own active tenant (libs/core/pipeline/pipeline-run-journal.ts: the journal file, its writer lease and lease metrics, under an exact resource capability; the inter-process lock and every pipeline step stay under the caller's role), so a tenant-bound charter role can record its run without gaining any tenant knowledge write. customer_decision_invite_store is tenant-bound and mediates only the bound tenant's customer decision invite records (libs/core/customer-decision/invite.ts: one invite file, or a read-only listing of the tenant invite directory, under an exact resource capability), so the operator facade and the one-tenant customer room verify and record invite links without a confidential persona and without any tenant knowledge access. customer_decision_consumer_store (CD-09): libs/core/mission/mission-decision-lock.ts assumes it at mission task boundaries (worker dispatch, record-task, record-evidence) and after a customer response, bound to the case's tenant and always inside an exact deny-only case capability (libs/core/foundation/customer-decision-consumer-capability.ts) that names the case files read and the one consumer lock written; it never writes the ledger, an agenda or customers/. customer_decision_milestone_store (CD-10): libs/core/mission/mission-bolt-review.ts assumes it when a mission starts, bound to the mission's decision case tenant and always inside an exact deny-only case capability (libs/core/foundation/customer-decision-milestone-capability.ts) that names the agenda files read and the one agenda written, to mark the bolt-after:<mission> milestone passed on open bolt-review agendas; it never writes the ledger, a receipt, a consumer lock or customers/. tenant_ledger_store (D9) is tenant-bound and mediates only the bound tenant's partition of the hybrid ledger (libs/core/ledger.ts: active/shared/runtime/tenant-ledger/<personal|confidential>/<tenant>/, read for the hash-chain tail and verification, appended for tenant records and tenant mission metadata) which libs/core/ledger.ts assumes bound to the record's tenant; every process that records a tenant mission event or verifies ledgers can reach it."
+    "rationale": "Narrow roles that libs/core modules assume internally on behalf of their callers to write their own governed stores: infrastructure_sentinel (work coordination, peer messaging, mesh, the stimuli journal), audit_mirror_writer (write-only: the audit chain writes customer/<tenant>/logs/audit/ through the seam libs/core/authority.ts registers, bound to the entry's tenant, whatever the caller's role; every process that records a tenant-scoped audit entry can reach it), knowledge_steward (mission creation), scope_locale_reader (read-only: libs/core/locale.ts reads the tenant reply locale, knowledge/confidential/<tenant>/locale.json, bound to the turn's tenant, for every surface that renders a reply), peer_catalog_reader (read-only: libs/core/mesh/peer-conversation.ts reads the tenant peer transport catalog, knowledge/confidential/<tenant>/connections/peer-network.json, bound to the sending tenant, for every caller that sends a peer conversation message, and libs/core/mesh/peer-task-exchange.ts reads the tenant peer task catalog, knowledge/confidential/<tenant>/connections/peer-tasks.json, and checks the tenant profile knowledge/personal/tenants/<tenant>.json before an accepted task becomes a WorkItem, bound to the receiving tenant), peer_responder_reader (read-only: libs/core/mesh/peer-auto-reply.ts retrieves tenant knowledge for an opt-in peer auto reply, bound to the receiving tenant: that tenant profile, knowledge/confidential/<tenant>/ and customer/<tenant>/ only, never its connections/ peer secrets), peer_task_artifact_writer (write-only to its own paths: libs/core/mesh/peer-task-exchange.ts stores an accepted peer task's report and log under active/shared/artifacts/confidential/<tenant>/report/peer-tasks/ and appends that tenant's artifact index, bound to the receiving tenant), metrics_cap_reader (read-only: libs/core/metrics.ts aggregateMetricsForEnforcement reads the partitioned metrics ledgers, bound to the caller's tenant, so the spend guard, budget governor and generation-cost dedup reached from any surface count every tier; it returns numbers only; its grant names no tenant), and the GovernedArtifactRole set of artifact-store / surface stores (chronos_gateway, slack_bridge, surface_runtime; surface-coordination-store maps a surface to its role from a governed plus a personal-tier map, so any GovernedArtifactRole is reachable wherever it is used). scope_locale_reader, peer_catalog_reader, peer_responder_reader and peer_task_artifact_writer are tenant-bound roles (libs/core/authority.ts TENANT_BOUND_READER_ROLES): their assumption throws [ROLE_TENANT_SCOPE_REQUIRED] without a valid tenant and [ROLE_TENANT_SCOPE_MISMATCH] when the caller has an active tenant that differs from the requested one, so a caller-supplied tenant never broadens access; a process without an active tenant (operator CLI, a server configured for one tenant) binds its own. operational_learning_writer is deliberately restricted to the system roles that reach its learning path. The broad roles (ecosystem_architect, mission_controller, sovereign_concierge) are never shared: each system role lists them only where docs/developer/role-assumption-reachability.json reaches them. The report shows oauth_callback_surface and surface_runtime do not reach some shared roles; they stay shared because removing a shared role for one system role needs a policy-shape change (tracked as a follow-up). chronos_tenant_runner and organization_operator are reached through the agent-runtime supervisor daemon child process (resident-dot sweep): chronos_tenant_runner lists and reads knowledge/confidential/<tenant>/dots/ charters bound to that tenant (same rule as chronos tenant pipelines), and organization_operator runs scheduled organization operation pipelines bound to the operation's tenant/organization (DL-06). Both are assumed internally by libs/core / the governed operation executor on behalf of whichever surface started the daemon, never by the surface itself. autonomy_learning_store is tenant-bound and mediates only the exact tenant autonomy outcome and override files; caller callbacks and execution remain outside its IO scope. pipeline_journal_store is tenant-bound and mediates only one confidential library pipeline run journal of the caller's own active tenant (libs/core/pipeline/pipeline-run-journal.ts: the journal file, its writer lease and lease metrics, under an exact resource capability; the inter-process lock and every pipeline step stay under the caller's role), so a tenant-bound charter role can record its run without gaining any tenant knowledge write. customer_decision_invite_store is tenant-bound and mediates only the bound tenant's customer decision invite records (libs/core/customer-decision/invite.ts: one invite file, or a read-only listing of the tenant invite directory, under an exact resource capability), so the operator facade and the one-tenant customer room verify and record invite links without a confidential persona and without any tenant knowledge access. customer_decision_consumer_store (CD-09): libs/core/mission/mission-decision-lock.ts assumes it at mission task boundaries (worker dispatch, record-task, record-evidence) and after a customer response, bound to the case's tenant and always inside an exact deny-only case capability (libs/core/foundation/customer-decision-consumer-capability.ts) that names the case files read and the one consumer lock written; it never writes the ledger, an agenda or customers/. customer_decision_milestone_store (CD-10): libs/core/mission/mission-bolt-review.ts assumes it when a mission starts, bound to the mission's decision case tenant and always inside an exact deny-only case capability (libs/core/foundation/customer-decision-milestone-capability.ts) that names the agenda files read and the one agenda written, to mark the bolt-after:<mission> milestone passed on open bolt-review agendas; it never writes the ledger, a receipt, a consumer lock or customers/. tenant_ledger_store (D9) is tenant-bound and mediates only the bound tenant's partition of the hybrid ledger (libs/core/ledger.ts: active/shared/runtime/tenant-ledger/<personal|confidential>/<tenant>/, read for the hash-chain tail and verification, appended for tenant records and tenant mission metadata) which libs/core/ledger.ts assumes bound to the record's tenant; every process that records a tenant mission event or verifies ledgers can reach it. deliverable_inbox_writer (CD-10/CD-11 hardening) adds an operator task to the deliverable inbox only (libs/core/deliverable-inbox.ts addInboxEntry, from libs/core/mission/mission-bolt-review.ts and libs/core/customer-decision/operator-handoff.ts): the tier guard narrows its writes to active/shared/inbox/entries.jsonl and the inbox's own lock files, so the customer-triggered respond and the reminder sweep no longer borrow surface_runtime (which can write all of active/shared/runtime/). archived_mission_state_reader is not shared: it replaces mission_controller on the archived bolt state read of libs/core/mission/mission-decision-lock.ts and is listed per system role where the reachability report reaches it."
   },
   "system_roles": {
     "chronos_mirror_v2": {
       "may_assume": [
+        "archived_mission_state_reader",
         "chronos_localadmin",
         "chronos_operator",
         "chronos_token_registry_reader",
@@ -52,11 +54,17 @@
       "rationale": "dot_lifecycle_writer: only the authenticated, viewer-scoped /api/workspace/autonomy route calls controlWorkspaceAutonomy and the governed lifecycle facade after exact scope, state and readiness checks. This mutation capability is Chronos-specific; read-only executor operation-binding validation never assumes it. Chronos viewer-scoped routes assume chronos_localadmin / chronos_operator (withViewerExecutionContext*, plugin-host-boot tenant registry reads); chronos_token_registry_reader: lib/viewer-context.ts and lib/api-guard.ts read the chronos-access viewer token registry (its only grant), plus libs/core authn-providers (registry-token provider); generation_scheduler: the schedule quick action runs libs/core generation-scheduler in-process. reconcile_config_fallbacks (added by RN-03): the same quick action loads the media-generation actuator in-process, whose capture action runs system-actuator pipeline ops including reconcile-ops (libs/core/reconcile-ops.ts); Chronos can already assume ecosystem_architect, whose authority-role write scope (knowledge/, public and confidential tiers) covers the grant's allow_write paths, so this adds no effective authority. ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable. RN-01: the plugin-views E2E (surface-runtime mode) and the Chronos vitest suite under SYSTEM_ROLE=chronos_mirror_v2 observed chronos_gateway, chronos_localadmin, chronos_operator, chronos_token_registry_reader and mission_controller, all listed. discussion_request_store is a Chronos-only receipt mediator requiring a real selected tenant and an exact two-file request capability. Read-only recovery has no write or mkdir paths; it cannot access room logs, knowledge, other actors/scopes, or providers."
     },
     "computer_surface": {
-      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "may_assume": [
+        "archived_mission_state_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
       "rationale": "ecosystem_architect: presence/displays/computer-surface/server.ts (/api/identity) and libs/core deployment-adapter / storage-janitor; sovereign_concierge: libs/core authn-providers module providers. ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable. chronos_token_registry_reader is deliberately absent: computer-surface/auth.ts passes `registrations: null` (TR-01), recorded as reviewed-infeasible in the report."
     },
     "concierge": {
       "may_assume": [
+        "archived_mission_state_reader",
         "chronos_token_registry_reader",
         "concierge_localadmin",
         "concierge_management_reader",
@@ -79,7 +87,12 @@
       "rationale": "scripts/dev_oidc_idp.ts run as surface 'dev-idp': a loopback-only throw-away OIDC provider. sovereign_concierge: oidc-login-settings.ts stores OIDC settings and the browser session key via secret-guard; audit_mirror_writer: secret-guard writes emit audit records. The IdP itself serves HTTP on 127.0.0.1 only."
     },
     "discord_bridge": {
-      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "may_assume": [
+        "archived_mission_state_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "event_intake_surface": {
@@ -91,15 +104,26 @@
       "rationale": "Recurring generation-schedule tick service (surfaces/generation-schedule.json, launched by surface_runtime with SYSTEM_ROLE=generation_schedule, entry dist/scripts/run_generation_schedule_daemon.js). Each tick runs under the generation_scheduler authority via GENERATION_SCHEDULER_AUTHORITY (scripts/run_generation_schedule.ts, libs/core/generation-scheduler.ts), so the daemon assumes only that role and no broad role (ecosystem_architect, mission_controller, sovereign_concierge). Child processes spawned mid-tick follow the scheduler scope through buildExecutionEnv (DR-01), so they stay on generation_scheduler."
     },
     "imessage_bridge": {
-      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "may_assume": [
+        "archived_mission_state_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "mcp_server_cowork": {
-      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "may_assume": [
+        "archived_mission_state_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "nexus_daemon": {
       "may_assume": [
+        "archived_mission_state_reader",
         "ecosystem_architect",
         "ingest_commit",
         "mission_controller",
@@ -116,6 +140,7 @@
     },
     "operator_surface": {
       "may_assume": [
+        "archived_mission_state_reader",
         "chronos_token_registry_reader",
         "sovereign_concierge",
         "mission_controller",
@@ -126,6 +151,7 @@
     },
     "personal_pads": {
       "may_assume": [
+        "archived_mission_state_reader",
         "chronos_token_registry_reader",
         "ecosystem_architect",
         "mission_controller",
@@ -135,6 +161,7 @@
     },
     "presence_studio": {
       "may_assume": [
+        "archived_mission_state_reader",
         "decision_ledger",
         "ecosystem_architect",
         "mission_controller",
@@ -143,7 +170,12 @@
       "rationale": "Presence Studio routes assume ecosystem_architect directly (avatar, front-desk, hearing, hearing-mission, training, work-inventory routes, server.ts) and sovereign_concierge (server.ts ensureOwnerMember), mission_controller in hearing-mission-routes.ts. the same broad roles: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable. RN-01: the Presence Studio vitest suite and a hermetic smoke under SYSTEM_ROLE=presence_studio observed ecosystem_architect, mission_controller and sovereign_concierge. chronos_token_registry_reader is deliberately absent: presence-studio/security.ts passes `registrations: null` (TR-01), recorded as reviewed-infeasible in the report."
     },
     "slack_bridge": {
-      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "may_assume": [
+        "archived_mission_state_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "surface_runtime": {
@@ -152,6 +184,7 @@
     },
     "system_configurator": {
       "may_assume": [
+        "archived_mission_state_reader",
         "ecosystem_architect",
         "mission_controller",
         "operational_learning_writer",
@@ -160,7 +193,12 @@
       "rationale": "`pnpm config-mission` and its preset pipeline child (scripts/config_mission.ts, scripts/run_pipeline.ts) run with SYSTEM_ROLE=system_configurator; run_pipeline dispatches any actuator. operational_learning_writer is required by the baseline-check pipeline's operational-learning step and only writes the fixed state/learning suffix in its organization/tier paths. ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "telegram_bridge": {
-      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "may_assume": [
+        "archived_mission_state_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "terminal_bridge": {
@@ -169,6 +207,7 @@
     },
     "terminal_hud": {
       "may_assume": [
+        "archived_mission_state_reader",
         "ecosystem_architect",
         "mission_controller",
         "nhi_accountability_reader",
@@ -177,7 +216,12 @@
       "rationale": "Interactive terminal HUD (presence/displays/terminal-hud), operator-launched through surface_runtime with SYSTEM_ROLE=terminal_hud. ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned, ecosystem_architect via libs/core deployment-adapter, sovereign_concierge via libs/core authn-providers / surface-authn). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable."
     },
     "voice_hub": {
-      "may_assume": ["ecosystem_architect", "mission_controller", "sovereign_concierge"],
+      "may_assume": [
+        "archived_mission_state_reader",
+        "ecosystem_architect",
+        "mission_controller",
+        "sovereign_concierge"
+      ],
       "rationale": "ecosystem_architect, mission_controller, sovereign_concierge: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable. RN-01: voice_hub traces observed sovereign_concierge (libs/core tool-runtime-policy)."
     }
   }

@@ -12,8 +12,11 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
+  safeReadFile,
   safeWriteFile,
 } from './secure-io.js';
+import { resolveRole } from './authority.js';
+import { DELIVERABLE_INBOX_WRITER_ROLE } from './foundation/deliverable-inbox-writer-capability.js';
 
 export type DeliverableInboxStatus =
   'unread' | 'read' | 'accepted' | 'rejected' | 'changes_requested';
@@ -153,7 +156,12 @@ function writeInboxEntries(entries: DeliverableInboxEntry[]): void {
   const serialized = entries
     .map((entry) => JSON.stringify(catalog.validate(entry, filePath)))
     .join('\n');
-  safeWriteFile(filePath, serialized ? `${serialized}\n` : '');
+  writeInboxText(filePath, serialized ? `${serialized}\n` : '');
+}
+
+/** The inbox is a JSONL ledger (not JSON state): every whole-file write goes through here. */
+function writeInboxText(filePath: string, text: string): void {
+  safeWriteFile(filePath, text);
 }
 
 function normalizeStatusFilter(
@@ -241,30 +249,79 @@ export function addInboxEntry(input: {
   validateDeliverableRoleSections(entry);
 
   return withInboxLock(() => {
+    // The narrow inbox writer (a shared store, every tenant's entries) may only
+    // append: keep every existing byte, whatever an older or odd line holds.
+    if (resolveRole() === DELIVERABLE_INBOX_WRITER_ROLE) return appendInboxEntryRaw(entry, input);
     const entries = readInboxEntries();
     const existing =
       input.ifAbsent && input.entryId
         ? entries.find((item) => item.entry_id === input.entryId)
         : undefined;
     if (existing) {
-      if (
-        existing.title !== entry.title ||
-        existing.summary !== entry.summary ||
-        existing.kind !== entry.kind ||
-        existing.mission_id !== entry.mission_id ||
-        existing.tenant_slug !== entry.tenant_slug ||
-        JSON.stringify(existing.artifact_paths) !== JSON.stringify(entry.artifact_paths) ||
-        JSON.stringify(existing.role_sections) !== JSON.stringify(entry.role_sections) ||
-        existing.integrated_summary !== entry.integrated_summary
-      ) {
-        throw new Error('[DELIVERABLE_INBOX] idempotency identity conflicts with existing entry');
-      }
+      assertSameInboxIdentity(existing, entry);
       return existing;
     }
     entries.push(entry);
     writeInboxEntries(entries);
     return entry;
   });
+}
+
+function assertSameInboxIdentity(
+  existing: DeliverableInboxEntry,
+  entry: DeliverableInboxEntry
+): void {
+  if (
+    existing.title !== entry.title ||
+    existing.summary !== entry.summary ||
+    existing.kind !== entry.kind ||
+    existing.mission_id !== entry.mission_id ||
+    existing.tenant_slug !== entry.tenant_slug ||
+    JSON.stringify(existing.artifact_paths) !== JSON.stringify(entry.artifact_paths) ||
+    JSON.stringify(existing.role_sections) !== JSON.stringify(entry.role_sections) ||
+    existing.integrated_summary !== entry.integrated_summary
+  ) {
+    throw new Error('[DELIVERABLE_INBOX] idempotency identity conflicts with existing entry');
+  }
+}
+
+/**
+ * Append one schema-validated entry to the raw entries file, keeping every
+ * existing line verbatim (malformed or older-format lines included). An
+ * `ifAbsent` id is looked up tolerantly: only lines that parse are compared.
+ * Call holding the inbox lock.
+ */
+function appendInboxEntryRaw(
+  entry: DeliverableInboxEntry,
+  input: { entryId?: string; ifAbsent?: boolean }
+): DeliverableInboxEntry {
+  const filePath = inboxPath();
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    throw new Error(`[DELIVERABLE_INBOX] entries must be a regular file: ${filePath}`);
+  }
+  const raw = safeExistsSync(filePath)
+    ? (safeReadFile(filePath, { encoding: 'utf8' }) as string)
+    : '';
+  if (input.ifAbsent && input.entryId) {
+    for (const line of raw.split('\n')) {
+      if (!line.trim()) continue;
+      let parsed: DeliverableInboxEntry | null = null;
+      try {
+        parsed = normalizeEntry(JSON.parse(line));
+      } catch {
+        continue;
+      }
+      if (parsed?.entry_id !== input.entryId) continue;
+      assertSameInboxIdentity(parsed, entry);
+      return parsed;
+    }
+  }
+  const validated = inboxEntryCatalog(filePath).validate(entry, filePath);
+  ensureInboxDir();
+  const separator = raw === '' || raw.endsWith('\n') ? '' : '\n';
+  // Appended by rewriting the whole text: the writer-role guard compares full content with the file.
+  writeInboxText(filePath, `${raw}${separator}${JSON.stringify(validated)}\n`);
+  return validated;
 }
 
 /** Fail closed when a role section points to evidence outside this deliverable. */

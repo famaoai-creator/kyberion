@@ -603,7 +603,8 @@ describe('mission decision lock (CD-09)', () => {
       // The operator closes the agenda, then resumes the mission.
       writeAgenda({ dir }, { ...readAgenda({ dir }, 'agd-test0001')!, status: 'closed' });
       expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.pinned).toBe(true);
-      expect(lockNow()).not.toHaveProperty('hold');
+      // The hold is kept, resolved (a hold is never dropped: the guard refuses it).
+      expect(lockNow()?.hold?.resolved_at).toBeDefined();
       expect(proposalsNow()).toEqual([
         expect.objectContaining({
           agenda_id: 'agd-test0001',
@@ -834,7 +835,7 @@ describe('mission decision lock (CD-09)', () => {
         ).toHaveLength(1);
         writeAgenda({ dir }, releaseAgenda(true));
         pinTaskDecisions(task, { decisionCase, now: LATER });
-        expect(lockNow()).not.toHaveProperty('hold');
+        expect(lockNow()?.hold).toMatchObject({ work_item_id: 'WI-TASK', resolved_at: LATER });
         const rerun = recordTaskDecisionProposals(
           { ...task, requests: [] },
           { decisionCase, now: LATER }

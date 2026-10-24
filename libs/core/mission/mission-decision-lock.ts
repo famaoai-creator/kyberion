@@ -36,10 +36,11 @@ import {
   runInCustomerDecisionConsumerSweep,
   type CustomerDecisionConsumerAccess,
 } from '../foundation/customer-decision-consumer-capability.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import {
-  runInResourceAccessScope,
-  type ResourceAccessScope,
-} from '../foundation/resource-access-scope.js';
+  ARCHIVED_MISSION_STATE_READER_ROLE,
+  archivedMissionStateCapability,
+} from '../foundation/archived-mission-state-capability.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidCaseId, ledgerDir, readLedger } from '../decision-ledger/ledger.js';
 import {
@@ -296,11 +297,11 @@ function caseFor(
 }
 
 /**
- * Reads an archived tenant mission's state: the mission authority, never
- * outside the exact capability below (one `mission-state.json` plus the
- * product schema), bound to the tenant.
+ * Reads an archived tenant mission's state: the read-only archived mission
+ * state reader, never outside its exact capability (one `mission-state.json`
+ * plus the product schema), bound to the tenant.
  */
-const ARCHIVED_MISSION_STATE_READ_ROLE = 'mission_controller';
+const ARCHIVED_MISSION_STATE_READ_ROLE = ARCHIVED_MISSION_STATE_READER_ROLE;
 
 const ACCESS_DENIAL =
   /\[(SECURITY|RESOURCE_SCOPE_DENIED|POLICY_VIOLATION|ROLE_[A-Z_]+|TENANT_[A-Z_]+)\]/u;
@@ -313,23 +314,7 @@ function isAccessDenial(error: unknown): boolean {
 const TENANT_ARCHIVE_STATE =
   /^active\/archive\/missions\/(personal|confidential)\/([^/]+)\/[^/]+\/mission-state\.json$/u;
 
-/**
- * The exact deny-only capability of an archived mission state read: that one
- * `mission-state.json` (repo-relative) and the product schema, nothing else
- * in the mission folder or the tenant's archive.
- */
-export function archivedMissionStateCapability(
-  tenantSlug: string,
-  relativeStatePath: string
-): ResourceAccessScope {
-  return {
-    tenantSlug,
-    readExact: [relativeStatePath],
-    writeExact: [],
-    mkdirExact: [],
-    allowProductKnowledgeRead: true,
-  };
-}
+export { archivedMissionStateCapability };
 
 /**
  * The state of a mission for its decision case, active or archived (`finish`
@@ -471,12 +456,19 @@ export function pinTaskDecisions(
         ledger,
         now,
       });
-      const proposals = existing ? taskProposalsOf(existing) : [];
+      // A re-pin keeps what the lock recorded (the guard refuses to drop it):
+      // the task's proposals, its rework records and its hold.
+      const holds = taskProposalHolds(
+        { decisions: existing ? taskProposalsOf(existing) : [] },
+        agendas,
+        ledger,
+        now
+      );
+      const proposals = stampResolved(existing ? taskProposalsOf(existing) : [], holds, now);
       // An unresolved requires_customer proposal keeps the task held across a
       // re-pin (a resume before the operator confirmed the customer's decision).
-      const stillHeld = taskProposalHolds({ decisions: proposals }, agendas, ledger, now).some(
-        (hold) => !hold.resolved_decision_id
-      );
+      const stillHeld = holds.some((hold) => !hold.resolved_decision_id);
+      const hold = nextHold(existing?.hold, stillHeld, now);
       writeLock(decisionCase, {
         version: '1.0.0',
         ...lock,
@@ -486,16 +478,8 @@ export function pinTaskDecisions(
         mission_id: input.missionId.toUpperCase(),
         task_id: input.taskId,
         status: 'in_progress',
-        ...(stillHeld
-          ? {
-              hold: {
-                ...(existing?.hold?.work_item_id
-                  ? { work_item_id: existing.hold.work_item_id }
-                  : {}),
-                at: existing?.hold?.at ?? now,
-              },
-            }
-          : {}),
+        ...(existing?.rework?.length ? { rework: existing.rework } : {}),
+        ...(hold ? { hold } : {}),
       });
       return { consumer, pinned_count: lock.decisions.length, pinned: true };
     });
@@ -503,6 +487,47 @@ export function pinTaskDecisions(
     warnOnce(input.missionId, 'customer decision pin skipped', error, consumer);
     return null;
   }
+}
+
+/** Stamp `resolved` on the proposals whose confirmed customer decision `holds` found. */
+function stampResolved<T extends ConsumedDecisionLockRecord['decisions'][number]>(
+  decisions: readonly T[],
+  holds: ReturnType<typeof taskProposalHolds>,
+  now: string
+): T[] {
+  const resolved = new Map(
+    holds.flatMap((hold) =>
+      hold.resolved_decision_id ? [[hold.proposal_id, hold.resolved_decision_id] as const] : []
+    )
+  );
+  return decisions.map((entry) => {
+    const decisionId = isTaskProposalEntry(entry)
+      ? resolved.get(entry.proposal.proposal_id)
+      : undefined;
+    return decisionId && isTaskProposalEntry(entry) && !entry.proposal.resolved
+      ? {
+          ...entry,
+          proposal: { ...entry.proposal, resolved: { decision_id: decisionId, at: now } },
+        }
+      : entry;
+  });
+}
+
+/**
+ * The hold a lock write carries: a hold is never dropped (the guard refuses
+ * it). While the task waits it stays open (re-opened if it was resolved);
+ * once it no longer waits it is kept resolved.
+ */
+function nextHold(
+  previous: ConsumedDecisionLockRecord['hold'],
+  held: boolean,
+  now: string,
+  workItemId?: string
+): ConsumedDecisionLockRecord['hold'] {
+  const itemId = previous?.work_item_id ?? workItemId;
+  if (held) return { ...(itemId ? { work_item_id: itemId } : {}), at: previous?.at ?? now };
+  if (!previous) return undefined;
+  return { ...previous, resolved_at: previous.resolved_at ?? now };
 }
 
 /** Pinned decisions of a lock (task proposals are not pins of the case). */
@@ -617,7 +642,7 @@ export function recordTaskDecisionProposals(
         const unchanged =
           input.requests.length === 0 &&
           !newlyResolved &&
-          Boolean(previousHold) === pending.length > 0;
+          Boolean(previousHold && !previousHold.resolved_at) === pending.length > 0;
         if (unchanged) {
           return {
             case_found: true,
@@ -628,31 +653,11 @@ export function recordTaskDecisionProposals(
             hold_proposal_ids: pending,
           };
         }
+        const hold = nextHold(previousHold, pending.length > 0, now, input.workItemId);
         writeLock(decisionCase, {
           ...rest,
-          decisions: merged.decisions.map((entry) => {
-            const decisionId = isTaskProposalEntry(entry)
-              ? resolved.get(entry.proposal.proposal_id)
-              : undefined;
-            return decisionId && isTaskProposalEntry(entry) && !entry.proposal.resolved
-              ? {
-                  ...entry,
-                  proposal: { ...entry.proposal, resolved: { decision_id: decisionId, at: now } },
-                }
-              : entry;
-          }),
-          ...(pending.length > 0
-            ? {
-                hold: {
-                  ...(input.workItemId
-                    ? { work_item_id: input.workItemId }
-                    : previousHold?.work_item_id
-                      ? { work_item_id: previousHold.work_item_id }
-                      : {}),
-                  at: previousHold?.at ?? now,
-                },
-              }
-            : {}),
+          decisions: stampResolved(merged.decisions, holds, now),
+          ...(hold ? { hold } : {}),
         });
         return {
           case_found: true,

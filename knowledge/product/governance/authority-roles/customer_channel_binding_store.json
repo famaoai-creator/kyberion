@@ -1,0 +1,9 @@
+{
+  "role": "customer_channel_binding_store",
+  "description": "Customer channel binding storage (libs/core/foundation/customer-channel-binding-store-capability.ts): scripts/customer-channel/bindings.ts writeBindingChange (pnpm kyberion customer-channel bind|unbind) assumes it to read and write one tenant's customer/<tenant>/connections/channel-bindings.json; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). Its grant is the bound tenant's customer/<tenant>/connections/ directory; the tier guard narrows every write and mkdir to the bindings file and the directories leading to it. No connection secrets, no other customer/ file, no knowledge or runtime state (it replaces customer_create on that write).",
+  "default_persona": "unknown",
+  "write_scopes": ["customer/${KYBERION_TENANT}/connections/"],
+  "scope_classes": ["customer_overlay"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}

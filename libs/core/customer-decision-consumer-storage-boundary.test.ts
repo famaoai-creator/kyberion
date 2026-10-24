@@ -258,7 +258,10 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
     // The named consumer lock is writable.
     asStore(() => {
       io.safeMkdir(inCase(TENANT, 'consumers'), { recursive: true });
-      io.safeWriteFile(inCase(TENANT, 'consumers/mission-MSN-X.t.json'), '{}');
+      io.safeWriteFile(
+        inCase(TENANT, 'consumers/mission-MSN-X.t.json'),
+        JSON.stringify({ consumer: 'mission-MSN-X.t', status: 'in_progress', decisions: [] })
+      );
     });
     // No capability → the role is refused; a capability never names another tenant's case.
     expect(() =>
@@ -444,5 +447,215 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
       { decisionCase: decisionCase(), now: NOW }
     );
     expect(recorded).toMatchObject({ case_found: true, recorded: 1 });
+  });
+
+  describe('content rules at the guard (a direct secure-io write under the capability)', () => {
+    type LockEntry = { layer?: string; proposal?: Record<string, unknown> } & Record<
+      string,
+      unknown
+    >;
+    type LockJson = Record<string, unknown> & {
+      decisions: LockEntry[];
+      rework: unknown[];
+      hold?: Record<string, unknown>;
+    };
+    const consumer = 'mission-MSN-CD09-BOUNDARY.build';
+    const lockFile = `consumers/${consumer}.json`;
+    const inCase = (relative: string) => path.join(ROOT, caseDir(TENANT), relative);
+    const asConsumer = (access: { read: string[]; write?: string }, fn: () => unknown): unknown =>
+      resourceScope.runInResourceAccessScope(
+        capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), {
+          ...access,
+          owner: consumer,
+        }),
+        () =>
+          authority.withExecutionContext(
+            capability.CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+            fn,
+            undefined,
+            TENANT
+          )
+      );
+    const readLock = () =>
+      asConsumer({ read: [lockFile] }, () =>
+        JSON.parse(String(io.safeReadFile(inCase(lockFile), { encoding: 'utf8' })))
+      ) as LockJson;
+    const writeLock = (lock: unknown) =>
+      asConsumer({ read: [], write: lockFile }, () =>
+        io.safeWriteFile(inCase(lockFile), `${JSON.stringify(lock, null, 2)}\n`)
+      );
+
+    it('refuses dropping rework, rewriting a completed pin, appends and unlinks', () => {
+      seedCase(TENANT);
+      lockModule.pinTaskDecisions(task, { decisionCase: decisionCase(), now: NOW });
+      customerDecides(TENANT);
+      const settled = lockModule.reconcileTaskDecisions(task, {
+        decisionCase: decisionCase(),
+        now: LATER,
+      });
+      expect(settled.rework_work_item_ids).toHaveLength(1);
+      const lock = readLock();
+      expect(lock).toMatchObject({ status: 'completed' });
+      expect(lock.rework).toHaveLength(1);
+      const { rework: _dropped, ...withoutRework } = lock;
+      void _dropped;
+      expect(() => writeLock(withoutRework)).toThrow(
+        /CUSTOMER_DECISION_CONSUMER_WRITE_REFUSED\] rework records are append-only/u
+      );
+      expect(() =>
+        writeLock({
+          ...lock,
+          decisions: lock.decisions.map((entry: object) => ({ ...entry, value: 'sso' })),
+        })
+      ).toThrow(/pinned decisions of a completed consumer lock may not change/u);
+      expect(() => writeLock({ ...lock, completed_at: NOW })).toThrow(/keeps its completed_at/u);
+      expect(() => writeLock({ ...lock, mission_id: 'MSN-OTHER' })).toThrow(
+        /mission_id may not change/u
+      );
+      expect(() =>
+        asConsumer({ read: [], write: lockFile }, () =>
+          io.safeAppendFileSync(inCase(lockFile), ' ')
+        )
+      ).toThrow(/CUSTOMER_DECISION_WRITE_CONTENT_REQUIRED/u);
+      expect(() =>
+        asConsumer({ read: [], write: lockFile }, () => io.safeUnlinkSync(inCase(lockFile)))
+      ).toThrow(/CUSTOMER_DECISION_WRITE_CONTENT_REQUIRED/u);
+      // What the store itself does still passes: a recorded check, an appended rework record.
+      writeLock({
+        ...lock,
+        last_check: { at: LATER, checked: 1, stale_count: 0 },
+        rework: [
+          ...lock.rework,
+          { work_item_id: 'WI-CDR-0123456789ABCDEF', refs: ['D-0001'], at: LATER },
+        ],
+      });
+      expect(readLock().rework).toHaveLength(2);
+    });
+
+    it('refuses releasing a held task by editing its lock', () => {
+      seedCase(TENANT);
+      lockModule.pinTaskDecisions(task, { decisionCase: decisionCase(), now: NOW });
+      const held = lockModule.recordTaskDecisionProposals(
+        {
+          ...task,
+          requests: [
+            {
+              question: 'May we release?',
+              item: 'RELEASE',
+              key: 'release.go',
+              requires_customer: true,
+            },
+          ],
+          workItemId: 'WI-TASK',
+        },
+        { decisionCase: decisionCase(), now: NOW }
+      );
+      expect(held.hold_proposal_ids).toHaveLength(1);
+      const lock = readLock();
+      expect(lock.hold).toMatchObject({ work_item_id: 'WI-TASK', at: NOW });
+      const pins = lock.decisions.filter((entry: LockEntry) => entry.layer !== 'task_proposal');
+      expect(() => writeLock({ ...lock, decisions: pins })).toThrow(
+        /task proposals may not be removed/u
+      );
+      const { hold: _hold, ...withoutHold } = lock;
+      void _hold;
+      expect(() => writeLock(withoutHold)).toThrow(/a hold may not be removed/u);
+      expect(() => writeLock({ ...lock, hold: { ...lock.hold, resolved_at: LATER } })).toThrow(
+        /every requires_customer proposal is resolved/u
+      );
+      const forged = lock.decisions.map((entry: LockEntry) =>
+        entry.layer === 'task_proposal'
+          ? {
+              ...entry,
+              agenda_id: 'agd-boundary01',
+              entry_id: 'nfr.auth',
+              proposal: { ...entry.proposal, resolved: { decision_id: 'D-0001', at: LATER } },
+            }
+          : entry
+      );
+      expect(() => writeLock({ ...lock, decisions: forged })).toThrow(
+        /resolved only by a customer decision the operator confirmed/u
+      );
+      expect(() =>
+        writeLock({
+          ...lock,
+          decisions: lock.decisions.map((entry: LockEntry) =>
+            entry.layer === 'task_proposal'
+              ? { ...entry, proposal: { ...entry.proposal, requires_customer: false } }
+              : entry
+          ),
+        })
+      ).toThrow(/never loses requires_customer/u);
+      expect(
+        lockModule.isTaskAwaitingCustomerDecision(task, {
+          decisionCase: decisionCase(),
+          now: LATER,
+        })
+      ).toBe(true);
+    });
+
+    it('a new lock starts in progress without rework', () => {
+      seedCase(TENANT);
+      const fresh = {
+        version: '1.0.0',
+        case_id: CASE,
+        consumer,
+        mission_id: task.missionId,
+        task_id: task.taskId,
+        status: 'completed',
+        locked_at: NOW,
+        decisions: [],
+      };
+      expect(() =>
+        asConsumer({ read: [], write: lockFile }, () => {
+          io.safeMkdir(inCase('consumers'), { recursive: true });
+          io.safeWriteFile(inCase(lockFile), JSON.stringify(fresh));
+        })
+      ).toThrow(/a new consumer lock starts in progress/u);
+    });
+
+    it('the milestone store may only append to milestones_passed', async () => {
+      seedCase(TENANT);
+      const milestone = await import('./foundation/customer-decision-milestone-capability.js');
+      const agendaFile = 'agendas/agd-boundary01.json';
+      const asMilestone = (fn: () => unknown) =>
+        resourceScope.runInResourceAccessScope(
+          milestone.customerDecisionMilestoneCapability(TENANT, caseDir(TENANT), {
+            read: [agendaFile],
+            write: agendaFile,
+          }),
+          () =>
+            authority.withExecutionContext(
+              milestone.CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
+              fn,
+              undefined,
+              TENANT
+            )
+        );
+      const current = asMilestone(() =>
+        JSON.parse(String(io.safeReadFile(inCase(agendaFile), { encoding: 'utf8' })))
+      ) as Record<string, unknown>;
+      const write = (agendaRecord: unknown) =>
+        asMilestone(() => io.safeWriteFile(inCase(agendaFile), JSON.stringify(agendaRecord)));
+      expect(() => write({ ...current, title: 'Rewritten' })).toThrow(
+        /CUSTOMER_DECISION_MILESTONE_WRITE_REFUSED/u
+      );
+      expect(() =>
+        write({
+          ...current,
+          operator_confirmations: [
+            { entry_id: 'nfr.auth', decision_id: 'D-0001', by: 'user:x', at: LATER },
+          ],
+          milestones_passed: ['bolt-after:MSN-A'],
+        })
+      ).toThrow(/may change only milestones_passed and updated_at/u);
+      write({ ...current, milestones_passed: ['bolt-after:MSN-A'], updated_at: LATER });
+      expect(() => write({ ...current, milestones_passed: [], updated_at: LATER })).toThrow(
+        /may only append to milestones_passed/u
+      );
+      expect(() => asMilestone(() => io.safeAppendFileSync(inCase(agendaFile), ' '))).toThrow(
+        /CUSTOMER_DECISION_WRITE_CONTENT_REQUIRED/u
+      );
+    });
   });
 });

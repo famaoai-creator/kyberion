@@ -196,6 +196,15 @@
         "active/shared/runtime/",
         "active/shared/observability/"
       ]
+    },
+    "deliverable_inbox_writer": {
+      "allow": ["active/shared/inbox/", "active/shared/runtime/locks/"]
+    },
+    "archived_mission_state_reader": {
+      "allow": []
+    },
+    "customer_channel_binding_store": {
+      "allow": ["customer/${KYBERION_TENANT}/connections/"]
     }
   }
 }

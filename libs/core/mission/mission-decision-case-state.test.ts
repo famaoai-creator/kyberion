@@ -162,7 +162,7 @@ describe('loadDecisionCaseMissionState (archived confidential tenant mission)', 
     const run = <T>(fn: () => T): T =>
       resourceScope.runInResourceAccessScope(
         lockModule.archivedMissionStateCapability(TENANT, statePath),
-        () => authority.withExecutionContext('mission_controller', fn, undefined, TENANT)
+        () => authority.withExecutionContext('archived_mission_state_reader', fn, undefined, TENANT)
       );
     expect(
       String(run(() => io.safeReadFile(path.join(ROOT, statePath), { encoding: 'utf8' })))
@@ -174,6 +174,56 @@ describe('loadDecisionCaseMissionState (archived confidential tenant mission)', 
         })
       )
     ).toThrow(/RESOURCE_SCOPE_DENIED/u);
+  });
+
+  it('the reader role is read-only, needs its exact capability and is tenant-bound', () => {
+    const role = 'archived_mission_state_reader';
+    const statePath = `active/archive/missions/confidential/${TENANT}/${MISSION}/mission-state.json`;
+    const capability = lockModule.archivedMissionStateCapability(TENANT, statePath);
+    // No capability, or one bound to another tenant: refused at assumption.
+    expect(() => authority.withExecutionContext(role, () => undefined, undefined, TENANT)).toThrow(
+      /RESOURCE_SCOPE_REQUIRED/u
+    );
+    expect(() =>
+      resourceScope.runInResourceAccessScope(capability, () =>
+        authority.withExecutionContext(role, () => undefined, undefined, OTHER)
+      )
+    ).toThrow(/RESOURCE_SCOPE_REQUIRED|ROLE_TENANT_SCOPE/u);
+    expect(() =>
+      resourceScope.runInResourceAccessScope(capability, () =>
+        authority.withExecutionContext(role, () => undefined)
+      )
+    ).toThrow(/ROLE_TENANT_SCOPE_REQUIRED/u);
+    // The capability names only a tenant's own archived mission-state.json.
+    expect(() =>
+      lockModule.archivedMissionStateCapability(
+        TENANT,
+        `active/archive/missions/confidential/${OTHER}/${MISSION}/mission-state.json`
+      )
+    ).toThrow(/RESOURCE_SCOPE_INVALID/u);
+    expect(() =>
+      lockModule.archivedMissionStateCapability(
+        TENANT,
+        `active/missions/confidential/${TENANT}/${MISSION}/mission-state.json`
+      )
+    ).toThrow(/RESOURCE_SCOPE_INVALID/u);
+    expect(() =>
+      lockModule.archivedMissionStateCapability(
+        TENANT,
+        `active/archive/missions/confidential/${TENANT}/${MISSION}/evidence.md`
+      )
+    ).toThrow(/RESOURCE_SCOPE_INVALID/u);
+    // Never a write, even of the file it may read.
+    expect(() =>
+      resourceScope.runInResourceAccessScope(capability, () =>
+        authority.withExecutionContext(
+          role,
+          () => io.safeWriteFile(path.join(ROOT, statePath), state(MISSION, TENANT)),
+          undefined,
+          TENANT
+        )
+      )
+    ).toThrow(/RESOURCE_SCOPE_REQUIRED|RESOURCE_SCOPE_DENIED/u);
   });
 
   it('a requested tenant never overrides the bound tenant (distinct error)', () => {

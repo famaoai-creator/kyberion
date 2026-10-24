@@ -1,0 +1,9 @@
+{
+  "role": "deliverable_inbox_writer",
+  "description": "Deliverable inbox writer (libs/core/foundation/deliverable-inbox-writer-capability.ts): libs/core assumes it only to add an operator task to the deliverable inbox (active/shared/inbox/entries.jsonl, libs/core/deliverable-inbox.ts addInboxEntry) on behalf of a caller with no inbox grant: the CD-10 bolt-review rejection (libs/core/mission/mission-bolt-review.ts) and the CD-11 operator hand-off / manual reminder tasks (libs/core/customer-decision/operator-handoff.ts). Its grant is the inbox and the shared lock directory; the tier guard narrows every write and mkdir to the inbox entries file, its directory and the inbox's own deliverable-inbox-<sha256>.lock files. No other active/shared/runtime/ path, no knowledge, mission, approval or surface state.",
+  "default_persona": "unknown",
+  "write_scopes": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+  "scope_classes": ["operations_runtime"],
+  "allowed_actuators": [],
+  "tier_access": ["public"]
+}
