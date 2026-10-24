@@ -159,6 +159,13 @@ export function buildDelegationInput(now: Date) {
     mode: 'grant' as const,
     renew_existing: true,
     grants,
+    // Delegable business decision types (charter-decision-vocabulary.json):
+    // each maps to forbid | allow_with_review | allow. Remove rows to keep
+    // them undelegated; the human reviews this file before preview/request.
+    delegated_decisions: {
+      meeting_scheduling: 'allow_with_review' as const,
+      internal_document_approval: 'allow_with_review' as const,
+    },
     expires_at: new Date(now.getTime() + 90 * 86_400_000).toISOString(),
   };
 }
