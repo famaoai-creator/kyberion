@@ -43,3 +43,49 @@ export function deliverableInboxWriterPathAllowed(
     INBOX_LOCK.test(path.posix.basename(relativePath))
   );
 }
+
+/** The repo-relative inbox entries file (content-checked for the writer role). */
+export const DELIVERABLE_INBOX_ENTRIES_PATH = INBOX_FILE;
+
+const lines = (text: string) => text.split('\n').filter((line) => line.trim().length > 0);
+
+/**
+ * The guard-side content rule of an inbox writer write of the entries file:
+ * the inbox is shared by every tenant, so the role may only append. Every
+ * existing line stays byte-identical and in place; each new line is a JSON
+ * object with a new string `entry_id` (the store validates it against the
+ * entry schema before writing). Returns the refusal reason, or null.
+ */
+export function deliverableInboxWriteProblem(
+  previous: string | undefined,
+  next: string
+): string | null {
+  const refused = (why: string) => `[DELIVERABLE_INBOX_WRITE_REFUSED] ${why}`;
+  const before = lines(previous ?? '');
+  const after = lines(next);
+  if (after.length < before.length || before.some((line, index) => after[index] !== line))
+    return refused('the inbox writer may only append entries');
+  const ids = new Set<string>();
+  for (const line of before) {
+    try {
+      const id = (JSON.parse(line) as { entry_id?: unknown }).entry_id;
+      if (typeof id === 'string') ids.add(id);
+    } catch {
+      // An unreadable existing line stays as it is.
+    }
+  }
+  for (const line of after.slice(before.length)) {
+    let entry: unknown;
+    try {
+      entry = JSON.parse(line);
+    } catch {
+      return refused('a new inbox entry is not JSON');
+    }
+    const id = (entry as { entry_id?: unknown } | null)?.entry_id;
+    if (!entry || typeof entry !== 'object' || Array.isArray(entry) || typeof id !== 'string')
+      return refused('a new inbox entry needs an entry_id');
+    if (ids.has(id)) return refused('a new inbox entry may not reuse an entry_id');
+    ids.add(id);
+  }
+  return null;
+}

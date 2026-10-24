@@ -31,6 +31,7 @@ import {
   readCustomerOutboundContent,
   readCustomerQuestion,
 } from '@agent/core/customer-conversation';
+import { boundTenant } from '@agent/core/owner-scope';
 import {
   currentProcessArgv,
   defineScript,
@@ -88,9 +89,25 @@ function requireOpt(opts: Record<string, string>, key: string): string {
   return value;
 }
 
+/**
+ * `--tenant`, which never overrides the tenant this process is bound to
+ * (`KYBERION_TENANT`): a mismatch is refused, like the mission state readers.
+ */
+function tenantOpt(opts: Record<string, string>): string {
+  const requested = requireOpt(opts, 'tenant').trim();
+  const bound = boundTenant();
+  if (bound && requested.toLowerCase() !== bound) {
+    throw new ScriptExitError(
+      2,
+      `[CUSTOMER_CHANNEL_TENANT_MISMATCH] --tenant ${requested} differs from the bound tenant ${bound}`
+    );
+  }
+  return requested;
+}
+
 function change(opts: Record<string, string>): CustomerChannelBindingChange {
   return {
-    tenantSlug: requireOpt(opts, 'tenant'),
+    tenantSlug: tenantOpt(opts),
     surface: requireOpt(opts, 'surface'),
     channelId: requireOpt(opts, 'channel'),
     ...(opts.name !== undefined ? { name: opts.name } : {}),
@@ -135,11 +152,11 @@ export function runCustomerChannel(argv: readonly string[]): unknown {
       return result;
     }
     case 'list': {
-      const tenant = requireOpt(opts, 'tenant');
+      const tenant = tenantOpt(opts);
       return { tenant_slug: tenant, bindings: readTenantCustomerChannelBindings(tenant) };
     }
     case 'outbound': {
-      const tenant = requireOpt(opts, 'tenant');
+      const tenant = tenantOpt(opts);
       const source = requireOpt(opts, 'source');
       const expected = opts.sha256?.toLowerCase();
       if (expected !== undefined && !/^[a-f0-9]{64}$/u.test(expected)) {
@@ -168,7 +185,7 @@ export function runCustomerChannel(argv: readonly string[]): unknown {
       };
     }
     case 'question': {
-      const tenant = requireOpt(opts, 'tenant');
+      const tenant = tenantOpt(opts);
       const dealId = requireOpt(opts, 'deal');
       const sha256 = requireOpt(opts, 'sha256').toLowerCase();
       if (!/^[a-f0-9]{64}$/u.test(sha256)) throw usageError('--sha256 must be 64 hex characters');

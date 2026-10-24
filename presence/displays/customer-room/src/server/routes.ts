@@ -229,7 +229,9 @@ function limiter(limit: number) {
  * The image route's own guard: a fixed window per client address (socket
  * address only, forwarded headers are not trusted) plus a cap on facade runs
  * in flight. The window refuses new addresses when full instead of evicting,
- * so churning addresses cannot reset a limited caller's bucket.
+ * so churning addresses cannot reset a limited caller's bucket. A slot is
+ * held until the facade run settles, not until the client goes away: a
+ * dropped connection does not stop the child, so it must keep its slot.
  */
 function attachmentGuard(options: CustomerRoomRouteOptions) {
   const limit = options.attachmentLimitPerMinute ?? DEFAULT_ATTACHMENT_LIMIT_PER_MINUTE;
@@ -245,26 +247,29 @@ function attachmentGuard(options: CustomerRoomRouteOptions) {
     res.setHeader('Retry-After', String(retryAfterSeconds));
     res.status(429).json(failure('unavailable'));
   };
-  return (req: express.Request, res: express.Response, next: express.NextFunction): void => {
-    const decision = window.take(req.socket.remoteAddress ?? 'unknown', limit);
-    if ('retryAfterMs' in decision) {
-      refuse(res, Math.max(1, Math.ceil(decision.retryAfterMs / 1000)));
-      return;
-    }
-    if (inFlight >= concurrency) {
-      refuse(res, 1);
-      return;
-    }
-    inFlight += 1;
-    let released = false;
-    const release = (): void => {
-      if (released) return;
-      released = true;
-      inFlight -= 1;
-    };
-    res.once('finish', release);
-    res.once('close', release);
-    next();
+  return {
+    /** Per-address budget, before the body is read. */
+    window: (req: express.Request, res: express.Response, next: express.NextFunction): void => {
+      const decision = window.take(req.socket.remoteAddress ?? 'unknown', limit);
+      if ('retryAfterMs' in decision) {
+        refuse(res, Math.max(1, Math.ceil(decision.retryAfterMs / 1000)));
+        return;
+      }
+      next();
+    },
+    /** Run `handler` holding an in-flight slot until it settles, or refuse with 429. */
+    async run(res: express.Response, handler: () => Promise<void>): Promise<void> {
+      if (inFlight >= concurrency) {
+        refuse(res, 1);
+        return;
+      }
+      inFlight += 1;
+      try {
+        await handler();
+      } finally {
+        inFlight -= 1;
+      }
+    },
   };
 }
 
@@ -399,8 +404,8 @@ export function registerCustomerRoomRoutes(
   app.post('/api/respond', apiLimiter, jsonBody, (req, res, next) => {
     void handleApi('respond')(req, res).catch(next);
   });
-  app.post('/api/attachment', attachmentLimiter, jsonBody, (req, res, next) => {
-    void handleApi('attachment')(req, res).catch(next);
+  app.post('/api/attachment', attachmentLimiter.window, jsonBody, (req, res, next) => {
+    void attachmentLimiter.run(res, () => handleApi('attachment')(req, res)).catch(next);
   });
 
   // Body-parser failures (too large, malformed) and anything unexpected: a plain reason code.

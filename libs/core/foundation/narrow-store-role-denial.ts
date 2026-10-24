@@ -13,14 +13,17 @@ import {
   customerChannelBindingStorePathAllowed,
 } from './customer-channel-binding-store-capability.js';
 import {
+  DELIVERABLE_INBOX_ENTRIES_PATH,
   DELIVERABLE_INBOX_WRITER_ROLE,
+  deliverableInboxWriteProblem,
   deliverableInboxWriterPathAllowed,
 } from './deliverable-inbox-writer-capability.js';
 
 /**
  * Tier-guard rules of the narrow store roles added by the customer decision
  * hardening (deny-only; the policy grant still applies after them):
- *   - `deliverable_inbox_writer`: writes / mkdirs only the inbox and its lock;
+ *   - `deliverable_inbox_writer`: writes / mkdirs only the inbox and its lock,
+ *     and may only append to the shared entries file;
  *   - `archived_mission_state_reader`: reads only under its exact capability;
  *   - `customer_channel_binding_store`: writes / mkdirs only the bindings file;
  *   - content-checked roles (consumer / milestone store): every write is
@@ -43,6 +46,23 @@ export function narrowStoreRoleDenial(input: {
     !deliverableInboxWriterPathAllowed(relativePath, operation)
   )
     return '[DELIVERABLE_INBOX_WRITER_SCOPE] The inbox writer writes only the deliverable inbox and its own lock';
+  if (
+    role === DELIVERABLE_INBOX_WRITER_ROLE &&
+    operation === 'write' &&
+    relativePath === DELIVERABLE_INBOX_ENTRIES_PATH
+  ) {
+    if (input.content === undefined)
+      return '[DELIVERABLE_INBOX_WRITE_REFUSED] the inbox writer writes only whole entries files whose content the guard checks';
+    let previous: string | undefined;
+    try {
+      previous = input.readRepoFile(relativePath);
+    } catch {
+      return '[DELIVERABLE_INBOX_WRITE_REFUSED] the inbox on disk could not be read for the content check';
+    }
+    const next = typeof input.content === 'string' ? input.content : input.content.toString('utf8');
+    const problem = deliverableInboxWriteProblem(previous, next);
+    if (problem) return problem;
+  }
   if (
     role === CUSTOMER_CHANNEL_BINDING_STORE_ROLE &&
     !customerChannelBindingStorePathAllowed(relativePath, operation)

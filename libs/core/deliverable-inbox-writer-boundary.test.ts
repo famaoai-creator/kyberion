@@ -132,6 +132,41 @@ describe('deliverable_inbox_writer on the real tier guard', () => {
     });
   });
 
+  it('may only append to the shared inbox: a forged rewrite is refused', () => {
+    const file = path.join(ROOT, 'active/shared/inbox/entries.jsonl');
+    const current = asWriter(() => String(io.safeReadFile(file, { encoding: 'utf8' })));
+    const existing = current.split('\n').filter(Boolean);
+    expect(existing.length).toBeGreaterThan(0);
+    const refused = /DELIVERABLE_INBOX_WRITE_REFUSED/u;
+    // Dropping another tenant's entry.
+    expect(() =>
+      asWriter(() => io.safeWriteFile(file, `${existing.slice(1).join('\n')}\n`))
+    ).toThrow(refused);
+    // Rewriting one in place.
+    const forged = { ...JSON.parse(existing[0]!), title: 'forged', tenant_slug: 'other' };
+    expect(() =>
+      asWriter(() =>
+        io.safeWriteFile(file, [JSON.stringify(forged), ...existing.slice(1)].join('\n') + '\n')
+      )
+    ).toThrow(refused);
+    // Re-adding an existing id, or a line that is not an entry.
+    expect(() => asWriter(() => io.safeWriteFile(file, `${current}${existing[0]}\n`))).toThrow(
+      refused
+    );
+    expect(() => asWriter(() => io.safeWriteFile(file, `${current}[1]\n`))).toThrow(refused);
+    expect(() => asWriter(() => io.safeAppendFileSync(file, '{}\n'))).toThrow(refused);
+    // The store's own append still works.
+    const added = asWriter(() =>
+      inbox.addInboxEntry({
+        title: 'Appended',
+        tenantSlug: TENANT,
+        kind: 'customer_decision_handoff',
+      })
+    );
+    expect(entries().map((entry) => entry.entry_id)).toContain(added.entry_id);
+    expect(String(asWriter(() => io.safeReadFile(file, { encoding: 'utf8' })))).toContain(current);
+  });
+
   it('cannot write active/shared/runtime/ beyond the inbox lock, nor other shared stores', () => {
     const denied = /DELIVERABLE_INBOX_WRITER_SCOPE/u;
     expect(() =>

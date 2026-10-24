@@ -4,7 +4,9 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { readTextFile, trimEndChars } from './foundation/text.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from './secure-io.js';
+import { readJsonIfPresent, writeJson } from './foundation/json.js';
+import { nowIso } from './foundation/time.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { logger } from './core.js';
 import { resolveLocale } from './locale.js';
 import { normalizeLocale } from './locale-normalize.js';
@@ -261,8 +263,17 @@ export async function runCustomerConversation(
     // Ids only: operator notifications and ops alerts are not tenant-partitioned,
     // so neither the customer's message nor the model's question goes there. The
     // operator reads the message in the tenant's deal record by its hash.
+    const question = replyText.split(ESCALATION_MARKER)[1]?.trim() || input.text.slice(0, 200);
     const stored = input.text.slice(0, DEAL_NOTE_MAX_CHARS);
     const messageSha256 = createHash('sha256').update(stored, 'utf8').digest('hex');
+    // Kept outside the capped deal notes, so the hash in the notification
+    // always finds the message, the model's question and the hold reply.
+    recordEscalation(tenantSlug, deal.deal_id, messageSha256, {
+      at: nowIso(),
+      message: stored,
+      operator_question: question.slice(0, DEAL_NOTE_MAX_CHARS),
+      reply: customerText.slice(0, DEAL_NOTE_MAX_CHARS),
+    });
     const command = `pnpm kyberion customer-channel question --tenant ${tenantSlug} --deal ${deal.deal_id} --sha256 ${messageSha256}`;
     const ids = {
       tenant: tenantSlug,
@@ -532,12 +543,12 @@ export function findAudienceFloorViolations(body: string, floor: AudienceEgressF
 
 /** Tenant-relative shape of a durable outbound copy the approver may read. */
 const OUTBOUND_CONTENT_SOURCE_PATTERN =
-  /^deals\/[A-Za-z0-9][A-Za-z0-9_-]{2,127}\/(?:quote|contract)-v[1-9][0-9]{0,5}\.md$/u;
+  /^deals\/[A-Za-z0-9][A-Za-z0-9_-]{2,127}\/(?:(?:quote|contract)-v[1-9][0-9]{0,5}\.md|quote-unquotable\.json)$/u;
 
 /**
  * The file of a tenant outbound content source (`customer/<tenant>/<source>`),
  * or null when the tenant slug or the source is not one an approver may read
- * (only a deal's quote / contract documents; no other customer/ area).
+ * (only a deal's quote / contract documents and its unquotable list; no other customer/ area).
  */
 export function resolveCustomerOutboundContentPath(
   tenantSlug: string,
@@ -589,10 +600,18 @@ export function readCustomerQuestion(input: {
   tenantSlug: string;
   dealId: string;
   sha256: string;
-}): { deal_id: string; at: string; message: string; reply?: string } | null {
-  if (!isValidTenantSlug(input.tenantSlug)) return null;
+}): {
+  deal_id: string;
+  at: string;
+  message: string;
+  operator_question?: string;
+  reply?: string;
+} | null {
+  if (!isValidTenantSlug(input.tenantSlug) || !/^[a-f0-9]{64}$/u.test(input.sha256)) return null;
   const deal = getDeal(input.tenantSlug, input.dealId);
   if (!deal) return null;
+  const recorded = readEscalation(input.tenantSlug, deal.deal_id, input.sha256);
+  if (recorded) return { deal_id: deal.deal_id, ...recorded };
   const notes = deal.notes;
   for (let index = notes.length - 1; index >= 0; index -= 1) {
     const note = notes[index];
@@ -607,6 +626,62 @@ export function readCustomerQuestion(input: {
     };
   }
   return null;
+}
+
+interface EscalationRecord {
+  at: string;
+  message: string;
+  operator_question?: string;
+  reply?: string;
+}
+
+/** `customer/<tenant>/deals/<deal>/escalations/<sha256>.json` (tenant-side, not capped). */
+function escalationPath(tenantSlug: string, dealId: string, sha256: string): string | null {
+  if (!isValidTenantSlug(tenantSlug) || !/^[A-Za-z0-9][A-Za-z0-9_-]{2,127}$/u.test(dealId)) {
+    return null;
+  }
+  if (!/^[a-f0-9]{64}$/u.test(sha256)) return null;
+  return assertSafeRepositoryPath(
+    pathResolver.rootResolve(
+      path.join('customer', tenantSlug, 'deals', dealId, 'escalations', `${sha256}.json`)
+    ),
+    { allowMissingLeaf: true }
+  );
+}
+
+function recordEscalation(
+  tenantSlug: string,
+  dealId: string,
+  sha256: string,
+  record: EscalationRecord
+): void {
+  try {
+    const filePath = escalationPath(tenantSlug, dealId, sha256);
+    if (!filePath) return;
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    writeJson(filePath, record);
+  } catch (err) {
+    // The notification still goes out; the reader falls back to the deal notes.
+    logger.warn(
+      `[customer-conversation] escalation record failed for ${dealId}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+}
+
+function readEscalation(
+  tenantSlug: string,
+  dealId: string,
+  sha256: string
+): EscalationRecord | null {
+  try {
+    const filePath = escalationPath(tenantSlug, dealId, sha256);
+    const record = filePath ? readJsonIfPresent<EscalationRecord>(filePath) : null;
+    return record && typeof record.message === 'string' && typeof record.at === 'string'
+      ? record
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**

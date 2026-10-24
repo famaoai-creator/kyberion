@@ -510,6 +510,44 @@ describe('customer-room attachment route', () => {
     expect((await fourth).status).toBe(200);
   });
 
+  it('keeps the slot of a dropped request until its facade run settles', async () => {
+    await start(100, { perMinute: 100, concurrency: 1 });
+    let settle: (() => void) | undefined;
+    next = () =>
+      new Promise<FacadeOutcome>((resolve) => {
+        settle = () =>
+          resolve({
+            status: 0,
+            stdout: JSON.stringify({
+              ok: true,
+              media_type: 'image/png',
+              bytes_base64: PNG.toString('base64'),
+            }),
+            aborted: false,
+          });
+      });
+    let closed = 0;
+    server.on('connection', (socket) => socket.once('close', () => (closed += 1)));
+    const controller = new AbortController();
+    const dropped = fetch(`${base}/api/attachment`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${TOKEN}` },
+      body: JSON.stringify({ attachment_id: ID }),
+      signal: controller.signal,
+    }).catch(() => null);
+    await expect.poll(() => settle !== undefined).toBe(true);
+    controller.abort();
+    await dropped;
+    // The server saw the client go away (its socket closed) before the next request.
+    await expect.poll(() => closed).toBeGreaterThan(0);
+    // The child still runs: the cap holds even though the client went away.
+    expect((await fetchImage({ attachment_id: ID })).status).toBe(429);
+    expect(calls).toHaveLength(1);
+    settle?.();
+    next = () => image('image/png', PNG);
+    await expect.poll(async () => (await fetchImage({ attachment_id: ID })).status).toBe(200);
+  });
+
   it('does not count refused requests against the in-flight cap', async () => {
     await start(100, { perMinute: 100, concurrency: 1 });
     for (let i = 0; i < 3; i += 1) {
