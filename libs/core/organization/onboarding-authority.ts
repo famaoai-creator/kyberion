@@ -353,7 +353,10 @@ export function requestOnboardingAuthority(
     return deny('verified receiving execution identity required for delegation proposal');
   const requesterId = installed.agentId;
   if (expected.digest !== digest || expected.base_hash !== plan.base_hash)
-    return deny('review changed; preview again');
+    return deny(
+      'review changed; preview again — the digest binds the reviewed statement to the requesting identity and base charter. ' +
+        'Re-run `pnpm onboarding authority preview --file <plan> --out <profile-path>` yourself and request with the fresh envelope.'
+    );
   const correlationId = `onboarding-authority:${digest}`;
   const prior = listApprovalRequests({ storageChannels: [ONBOARDING_AUTHORITY_CHANNEL] }).find(
     (r) => r.correlationId === correlationId && !isApprovalRequestExpired(r)
