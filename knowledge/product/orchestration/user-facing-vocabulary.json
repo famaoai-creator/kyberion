@@ -8288,6 +8288,11 @@
         "ja": "決定台帳を操作",
         "qps-ploc": "⟦Ẇőřķ ẇïŧħ ŧħė ḓėƈïşïőñ ŀėḓɠėř ŀőřėɱ ïṗş⟧"
       },
+      "cli_cmd_script_customer_decision": {
+        "en": "Prepare, approve and send customer decision agendas, and track the answers",
+        "ja": "顧客との調整セットを作成・承認・送付し、回答を確認",
+        "qps-ploc": "⟦Ṗřėṗȧřė, ȧṗṗřőṽė ȧñḓ şėñḓ ƈůşŧőɱėř ḓėƈïşïőñ ȧɠėñḓȧş, ȧñḓ ŧřȧƈķ ŧħė ȧñşẇėřş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
       "cli_cmd_script_pipeline_promote": {
         "en": "Promote a successful one-off run into the public pipeline catalog, or a tenant catalog with --tenant",
         "ja": "成功した単発実行をパイプラインに昇格（公開カタログ、--tenant 指定時はテナントのカタログ）",
@@ -33404,6 +33409,46 @@
         "en": "Scope can be the widest.",
         "ja": "範囲を最も広く取れます。",
         "qps-ploc": "⟦Şƈőṗė ƈȧñ ƀė ŧħė ẇïḓėşŧ. ŀőřėɱ ï⟧"
+      },
+      "draft_rationale_org_default": {
+        "en": "Organization default.",
+        "ja": "組織の既定値です。",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ḓėƒȧůŀŧ. ŀőřėɱ ⟧"
+      },
+      "brief_decision_confirmed": {
+        "en": "Decided: {question} — {value}",
+        "ja": "決定済み: {question} — {value}",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ: {question} — {value} ŀőřėɱ ïṗş⟧"
+      },
+      "brief_decision_provisional": {
+        "en": "Provisional (not yet confirmed): {question} — {value}",
+        "ja": "暫定（未確定）: {question} — {value}",
+        "qps-ploc": "⟦Ṗřőṽïşïőñȧŀ (ñőŧ ẏėŧ ƈőñƒïřɱėḓ): {question} — {value} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "brief_open_awaiting": {
+        "en": "Awaiting the customer's decision: {question}",
+        "ja": "お客様の決定待ち: {question}",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ŧħė ƈůşŧőɱėř'ş ḓėƈïşïőñ: {question} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "brief_open_undecided": {
+        "en": "Undecided: {question}",
+        "ja": "未決定: {question}",
+        "qps-ploc": "⟦Ůñḓėƈïḓėḓ: {question} ŀőřėɱ ⟧"
+      },
+      "deal_note_value_changed": {
+        "en": "The customer's decision changed \"{item}\" from {from} to {to}.",
+        "ja": "お客様の決定で「{item}」が {from} から {to} に変わりました。",
+        "qps-ploc": "⟦Ŧħė ƈůşŧőɱėř'ş ḓėƈïşïőñ ƈħȧñɠėḓ \"{item}\" ƒřőɱ {from} ŧő {to}. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "deal_note_confirmed": {
+        "en": "The customer confirmed \"{item}\": {to}.",
+        "ja": "お客様が「{item}」を {to} で確定しました。",
+        "qps-ploc": "⟦Ŧħė ƈůşŧőɱėř ƈőñƒïřɱėḓ \"{item}\": {to}. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "value_not_set": {
+        "en": "not set",
+        "ja": "未設定",
+        "qps-ploc": "⟦ñőŧ şėŧ ŀőř⟧"
       }
     }
   }

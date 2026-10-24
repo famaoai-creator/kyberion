@@ -2688,6 +2688,21 @@
       "unresolved": []
     },
     {
+      "site": "scripts/customer_decision.ts#asLedgerWriter",
+      "roles": ["decision_ledger"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer_decision.ts#runGenerate",
+      "roles": ["decision_ledger"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer_decision.ts#runRespond",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/daemon_watchdog.ts#requestDaemonRecovery",
       "roles": ["daemon_watchdog"],
       "unresolved": []

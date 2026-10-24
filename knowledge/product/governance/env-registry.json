@@ -1194,6 +1194,15 @@
       "subsystem": "tenancy"
     },
     {
+      "name": "KYBERION_CUSTOMER_ROOM_PUBLIC_URL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Public origin of the customer-room display (e.g. the Tailscale Funnel URL). `pnpm kyberion customer-decision send` builds invite links as <origin>/r#t=<token>. Defaults to http://127.0.0.1:3046.",
+      "documented": true,
+      "subsystem": "surfaces"
+    },
+    {
       "name": "KYBERION_DELEGATED_ROLE",
       "category": "runtime",
       "type": "string",
