@@ -41,6 +41,7 @@ export {
 } from './i18n.js';
 export { KB_ICON_NAMES, KbIcon, type KbIconProps } from './icons.js';
 export { safeHref } from './safety.js';
+export { SettingsNav, type SettingsNavProps } from './forms/settings-nav.js';
 export {
   ActionRefButton,
   Button,

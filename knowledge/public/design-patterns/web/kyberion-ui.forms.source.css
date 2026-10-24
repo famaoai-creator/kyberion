@@ -457,6 +457,137 @@ legend.kb-field__label {
 
 /* ---------------------------------------------------- settings layout -- */
 
+/* Section navigation: native links, readable hierarchy, and a quiet current marker. */
+.kb-settings-nav {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-5);
+  min-width: 0;
+}
+
+.kb-settings-nav__group {
+  min-width: 0;
+}
+
+.kb-settings-nav__group-label {
+  margin: 0 0 var(--kb-ui-space-2);
+  padding-inline: var(--kb-ui-space-3);
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.kb-settings-nav__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.kb-settings-nav__link {
+  display: flex;
+  align-items: center;
+  gap: var(--kb-ui-space-3);
+  min-height: 44px;
+  min-width: 0;
+  padding: var(--kb-ui-space-3);
+  border: 1px solid transparent;
+  border-radius: var(--kb-ui-radius-md);
+  color: var(--kb-ui-text-muted);
+  text-decoration: none;
+}
+
+.kb-settings-nav__link[href]:hover {
+  background: var(--kb-ui-surface-sunken);
+  color: var(--kb-ui-text);
+}
+
+.kb-settings-nav__link[aria-current='location'] {
+  background: var(--kb-ui-accent-soft);
+  color: var(--kb-ui-accent-text);
+  box-shadow: inset 3px 0 0 var(--kb-ui-accent-text);
+}
+
+.kb-settings-nav__link:focus-visible {
+  outline: 2px solid var(--kb-ui-accent-text);
+  outline-offset: 2px;
+}
+
+.kb-settings-nav__link[aria-disabled='true'] {
+  opacity: 0.55;
+}
+
+.kb-settings-nav__icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+
+.kb-settings-nav__text {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  min-width: 0;
+}
+
+.kb-settings-nav__label {
+  font-size: var(--kb-ui-font-size-sm);
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.kb-settings-nav__description {
+  font-size: var(--kb-ui-font-size-xs);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.kb-settings-nav__badge {
+  padding: 0 var(--kb-ui-space-2);
+  border-radius: var(--kb-ui-radius-sm);
+  background: var(--kb-ui-surface);
+  color: var(--kb-ui-text);
+  font-size: var(--kb-ui-font-size-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 720px) {
+  .kb-settings-nav {
+    gap: var(--kb-ui-space-3);
+  }
+
+  .kb-settings-nav__list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--kb-ui-space-2);
+  }
+
+  .kb-settings-nav__link {
+    height: 100%;
+    gap: var(--kb-ui-space-2);
+    padding: var(--kb-ui-space-2) var(--kb-ui-space-3);
+    border-color: var(--kb-ui-border);
+    flex-wrap: wrap;
+  }
+
+  .kb-settings-nav__description {
+    display: none;
+  }
+
+  .kb-settings-nav__link > .kb-status-pill {
+    flex-shrink: 0;
+    max-width: 100%;
+  }
+
+  .kb-settings-nav__link .kb-status-pill__label {
+    white-space: normal;
+  }
+}
+
 .kb-settings-group {
   display: flex;
   flex-direction: column;
@@ -485,6 +616,8 @@ legend.kb-field__label {
 }
 
 .kb-settings-group__rows {
+  container-type: inline-size;
+  container-name: kb-settings;
   display: flex;
   flex-direction: column;
   background: var(--kb-ui-surface);
@@ -509,6 +642,7 @@ legend.kb-field__label {
 }
 
 .kb-setting-row__label {
+  display: block;
   margin: 0;
   font-weight: 600;
   color: var(--kb-ui-text);
@@ -532,6 +666,36 @@ legend.kb-field__label {
 
 .kb-setting-row__control > .kb-field {
   width: min(320px, 100%);
+}
+
+/* Long-form settings need a reading and editing measure, not a switch-sized column. */
+.kb-setting-row[data-layout='stacked'] {
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+}
+
+.kb-setting-row[data-layout='stacked'] .kb-setting-row__control {
+  justify-content: flex-start;
+}
+
+.kb-setting-row[data-layout='stacked'] .kb-setting-row__control > .kb-field {
+  width: 100%;
+}
+
+/* A settings card may be narrow even on a desktop with multiple navigation rails. */
+@container kb-settings (max-width: 36rem) {
+  .kb-setting-row {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .kb-setting-row__control {
+    justify-content: flex-start;
+  }
+
+  .kb-setting-row__control > .kb-field {
+    width: 100%;
+  }
 }
 
 .kb-setting-row__control

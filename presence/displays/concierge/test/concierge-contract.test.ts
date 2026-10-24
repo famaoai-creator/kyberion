@@ -462,6 +462,7 @@ describe('concierge surface contract', () => {
   it('renders actionable setup diagnostics that jump to in-page sections (CS-03)', () => {
     const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
+    const readiness = safeReadFile(path.join(appDir, 'src/app/settings/settings-readiness.tsx'));
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -471,7 +472,10 @@ describe('concierge surface contract', () => {
     expect(setupRoute).toContain("type: 'navigate'");
     expect(setupRoute).toContain("target: '#setup-");
     // The page renders the checklist and attention items jump to their section.
-    expect(setupPage).toContain("t('setup.readiness_title')");
+    expect(setupPage).toContain('<SettingsReadiness');
+    expect(readiness).toContain("t('setup.readiness_title')");
+    expect(setupPage).toContain('const sectionOrder = SETTINGS_CARD_SECTION_ORDER');
+    expect(setupPage).not.toContain('orderSectionsForFirstRun(setup.diagnostics)');
     expect(setupPage).toContain('createSettingsNavigation');
     const navigation = safeReadFile(path.join(appDir, 'src/app/settings/settings-navigation.ts'), {
       encoding: 'utf8',
@@ -497,9 +501,9 @@ describe('concierge surface contract', () => {
     // Honest degradation: the reasoning backend has no in-app fix, so the
     // terminal command survives — as guidance-first, visually secondary copy.
     expect(setupRoute).toContain('pnpm reasoning:setup');
-    expect(setupPage).toContain("'setup.reasoning_guidance'");
-    expect(setupPage).toContain("t('setup.reasoning_command_hint'");
-    expect(setupPage).toContain('readiness-command');
+    expect(readiness).toContain("'setup.reasoning_guidance'");
+    expect(readiness).toContain("t('setup.reasoning_command_hint'");
+    expect(readiness).toContain('readiness-command');
     expect(messages).toContain('整備状況');
   });
 

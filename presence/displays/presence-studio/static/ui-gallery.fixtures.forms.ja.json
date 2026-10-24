@@ -3,6 +3,98 @@
   "catalog": "kyberion-base",
   "sections": [
     {
+      "id": "settings-policy",
+      "title": "秘書の判断方針 ui:setting-row layout=stacked",
+      "description": "長文を書きやすい幅の入力欄です。画面上のラベル、入力の説明、文字数表示を備えています。",
+      "components": [
+        {
+          "id": "policy-group",
+          "type": "ui:settings-group",
+          "props": {
+            "title": "秘書の働き方",
+            "description": "日々の判断で大切にしてほしいことを伝えます。"
+          },
+          "children": ["policy-row"]
+        },
+        {
+          "id": "policy-row",
+          "type": "ui:setting-row",
+          "props": {
+            "label": "判断の方針",
+            "control_id": "policy-input",
+            "layout": "stacked"
+          },
+          "children": ["policy-input"]
+        },
+        {
+          "id": "policy-input",
+          "type": "ui:textarea",
+          "props": {
+            "name": "profile.policy",
+            "label": "判断の方針",
+            "hide_label": true,
+            "help": "優先することや、実行する前に確認してほしいことを書いてください。",
+            "value": "午前中は集中する時間を確保してください。急ぎの依頼は要点をまとめ、顧客へのメッセージ送信前には確認してください。",
+            "rows": 5,
+            "maxlength": 1200
+          }
+        }
+      ]
+    },
+    {
+      "id": "settings-navigation",
+      "title": "設定ナビゲーション ui:settings-nav",
+      "description": "グループ別のリンクで現在地と設定状況を示します。ブラウザ本来のリンク操作も保ちます。",
+      "components": [
+        {
+          "id": "settings-navigation-example",
+          "type": "ui:settings-nav",
+          "props": {
+            "label": "設定項目",
+            "active": "profile",
+            "groups": [
+              {
+                "id": "personal",
+                "label": "あなたの設定",
+                "items": [
+                  {
+                    "id": "profile",
+                    "label": "プロフィール",
+                    "description": "名前と基本設定",
+                    "icon": "user",
+                    "href": "#profile",
+                    "action": { "id": "settings.open", "payload": { "section": "profile" } }
+                  },
+                  {
+                    "id": "notifications",
+                    "label": "通知",
+                    "description": "連絡方法とタイミング",
+                    "icon": "bell",
+                    "href": "#notifications",
+                    "badge": "2"
+                  }
+                ]
+              },
+              {
+                "id": "connections",
+                "label": "連携",
+                "items": [
+                  {
+                    "id": "services",
+                    "label": "サービス",
+                    "description": "接続したアカウント",
+                    "icon": "plug",
+                    "href": "#services",
+                    "status": "needs_setup"
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "form-settings",
       "title": "設定 ui:settings-group ui:setting-row ui:switch ui:segmented",
       "description": "見出し付きの設定のまとまり。左に名前と説明、右に操作を 1 つ置きます。狭い画面では縦に並びます。",

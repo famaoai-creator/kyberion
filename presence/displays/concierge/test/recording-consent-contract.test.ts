@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { createSettingsMenu } from '../src/app/settings/settings-menu';
 
 const appDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const repoRoot = path.resolve(appDir, '../../..');
@@ -38,7 +39,12 @@ describe('concierge recording-consent settings contract', () => {
     );
     expect(page).toContain("case 'recording':");
     expect(page).toContain('<RecordingConsentSection');
-    expect(page).toContain("recording: 'settings_nav_recording'");
+    expect(page).toContain('createSettingsMenu(locale');
+    const recording = createSettingsMenu('en', {})
+      .flatMap((group) => group.items)
+      .find((item) => item.id === 'recording');
+    expect(recording?.label).toBe(vocabulary.domains.front_desk.settings_nav_recording.en);
+    expect(recording?.href).toBe('#settings-recording');
   });
 
   it('every front_desk:settings_recording_* key the section references exists with en+ja text', () => {

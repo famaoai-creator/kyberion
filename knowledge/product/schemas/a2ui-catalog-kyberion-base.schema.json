@@ -32,6 +32,7 @@
         "ui:button",
         "ui:disclosure",
         "ui:display-controls",
+        "ui:settings-nav",
         "ui:settings-group",
         "ui:setting-row",
         "ui:switch",
@@ -79,6 +80,10 @@
   "required": ["type", "props"],
   "additionalProperties": false,
   "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "ui:settings-nav" } }, "required": ["type"] },
+      "then": { "properties": { "props": { "$ref": "#/$defs/props:ui:settings-nav" } } }
+    },
     {
       "if": {
         "properties": {
@@ -1984,6 +1989,50 @@
       "required": ["id", "name", "status"],
       "additionalProperties": false
     },
+    "props:ui:settings-nav": {
+      "type": "object",
+      "description": "Grouped settings section navigation using native anchor links, never tab roles.",
+      "properties": {
+        "label": { "$ref": "#/$defs/text" },
+        "active": { "$ref": "#/$defs/id" },
+        "groups": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "$ref": "#/$defs/id" },
+              "label": { "$ref": "#/$defs/text" },
+              "items": {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 30,
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "$ref": "#/$defs/id" },
+                    "label": { "$ref": "#/$defs/text" },
+                    "description": { "$ref": "#/$defs/long-text" },
+                    "icon": { "type": "string", "maxLength": 80 },
+                    "href": { "$ref": "#/$defs/href" },
+                    "badge": { "$ref": "#/$defs/text" },
+                    "status": { "$ref": "#/$defs/status" },
+                    "action": { "$ref": "#/$defs/action" }
+                  },
+                  "required": ["id", "label", "href"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["id", "items"],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": ["label", "groups"],
+      "additionalProperties": false
+    },
     "props:ui:settings-group": {
       "type": "object",
       "description": "Titled group of settings. Children: ui:setting-row (or any component).",
@@ -2000,7 +2049,7 @@
     },
     "props:ui:setting-row": {
       "type": "object",
-      "description": "One setting: label + description on the left, one control (child) on the right.",
+      "description": "One setting: label + description and a child control. control_id refers to the A2UI component id (not its DOM id) of a single labelable text-field, textarea, select, switch, checkbox or slider. It is not for radio-group/segmented multi-input controls. The child's own help supplies accessible instructions. Stacked layout gives long text the full row width.",
       "properties": {
         "label": {
           "$ref": "#/$defs/text"
@@ -2010,6 +2059,12 @@
         },
         "tone": {
           "enum": ["neutral", "danger"]
+        },
+        "control_id": {
+          "$ref": "#/$defs/id"
+        },
+        "layout": {
+          "enum": ["inline", "stacked"]
         }
       },
       "required": ["label"],

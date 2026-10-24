@@ -148,6 +148,54 @@ describe('React form components: static markup contract', () => {
     expect(saving).toContain('disabled="" data-action-id="s" aria-busy="true">Save</button>');
   });
 
+  it('groups without catalog IDs have distinct accessible headings in one React tree', () => {
+    const out = html(
+      <>
+        <SettingsGroup title="Connection authority" />
+        <SettingsGroup title="Governance" />
+      </>
+    );
+    const headingIds = [...out.matchAll(/<h2[^>]* id="([^"]+)"/g)].map((match) => match[1]);
+    const labelledBy = [...out.matchAll(/aria-labelledby="([^"]+)"/g)].map((match) => match[1]);
+    expect(headingIds).toHaveLength(2);
+    expect(new Set(headingIds).size).toBe(2);
+    expect(labelledBy).toEqual(headingIds);
+  });
+
+  it('a stacked policy row exposes a visible label for the child field, preserving its help', () => {
+    const out = html(
+      <SettingRow id="policy-row" label="Secretary policy" control_id="policy" layout="stacked">
+        <Textarea
+          id="policy"
+          name="profile.policy"
+          label="Secretary policy"
+          hide_label
+          help="Describe your priorities."
+          value="Keep mornings free."
+        />
+      </SettingRow>
+    );
+    expect(out).toContain('data-layout="stacked"');
+    expect(out).toContain(
+      '<label class="kb-setting-row__label" id="kbf-policy-row-label" for="kbf-policy">Secretary policy</label>'
+    );
+    expect(out).toMatch(/<textarea[^>]* id="kbf-policy"[^>]* aria-describedby="kbf-policy-help"/);
+    expect(out).toContain('aria-labelledby="kbf-policy-row-label"');
+    expect(out).toContain('id="kbf-policy-help">Describe your priorities.</p>');
+  });
+
+  it('a row names only its declared field, leaving other nested fields independently labelled', () => {
+    const out = html(
+      <SettingRow id="row" label="Primary name" control_id="primary">
+        <TextField id="primary" name="primary" label="Name" hide_label />
+        <TextField id="secondary" name="secondary" label="Alias" />
+      </SettingRow>
+    );
+    const inputs = [...out.matchAll(/<input[^>]+>/g)].map((match) => match[0]);
+    expect(inputs[0]).toContain('aria-labelledby="kbf-row-label"');
+    expect(inputs[1]).not.toContain('aria-labelledby');
+  });
+
   it('secret field has no value attribute, no name and never renders a stored secret', () => {
     const out = html(
       <SecretField id="k" name="openai" label="Key" action={{ id: 'secret.introduce' }} />
