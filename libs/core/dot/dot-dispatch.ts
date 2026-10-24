@@ -116,6 +116,7 @@ import { resolveTenant } from '../organization/tenant-registry.js';
 import {
   DOT_ACTION_IDS,
   DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE,
+  proposalActionIdentity,
   type DotDecisionLevel,
   type DotProposal,
   type DotWorkShape,
@@ -1184,7 +1185,9 @@ function dispatchDotProposalsUnlocked(
               },
             }
           : {}),
-        source: { agentId: actor },
+        // actionId = action class + stable target, so same-signal re-proposals
+        // supersede while different asks keep their own pending request.
+        source: { agentId: actor, actionId: proposalActionIdentity(proposal) },
         ...(accountability ? { accountability } : {}),
         dedupeKey: `${charter.dot_id}-${hash}${charter.work_binding ? '-' + dotAdmissionScopeHash(charter) : ''}${proposal.continuous_work ? '-' + base.action_ref : ''}`,
         notificationRoute: dotNotificationRoute(charter),

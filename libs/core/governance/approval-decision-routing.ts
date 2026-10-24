@@ -12,6 +12,7 @@ import {
 } from './approval-decision-card.js';
 import { recordAutonomousActionNotice } from './approval-digest.js';
 import {
+  cancelApprovalRequestsBySource,
   createApprovalRequest,
   listApprovalRequests,
   type ApprovalRequestRecord,
@@ -209,6 +210,18 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
           now + (input.expiresInMinutes ?? DEFAULT_DECISION_EXPIRY_MINUTES) * 60_000
         ).toISOString()
       : undefined;
+
+  // Same-identity re-asks supersede this requester's still-pending asks —
+  // titles used to claim "supersedes" but nothing cancelled them, so
+  // undecided requests stacked unbounded (repo-guardian triage spam).
+  if (input.source?.actionId) {
+    cancelApprovalRequestsBySource(input.role, {
+      source: { agentId: input.source.agentId, actionId: input.source.actionId },
+      storageChannels: [AUTONOMY_APPROVAL_CHANNEL],
+      cancelledBy: input.requestedBy,
+      reason: 'superseded by a newer request of the same action',
+    });
+  }
 
   let record: ApprovalRequestRecord = createApprovalRequest(input.role, {
     channel: deliveredVia?.target ?? 'operator',
