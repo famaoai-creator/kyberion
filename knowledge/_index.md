@@ -224,6 +224,7 @@
 - [Audio Route Resource Lifecycle and Configuration Abstraction](./product/governance/audio-route-resource-lifecycle.md) (public | ecosystem_architect)
 - [Audit ledger recovery and canonical location](./product/governance/audit-ledger-recovery.md) (public | Unknown)
 - [Authority, Role & Persona Model (v3.0)](./product/governance/AUTHORITY_MODEL.md) (public | Unknown)
+- [Browser onboarding runbook (Concierge web flow)](./product/governance/browser-onboarding-runbook.md) (public | Unknown)
 - [Claude に聞く効率チェック質問リスト](./product/governance/agent-efficiency-questions.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
 - [Delegated Agent Operations Runbook](./product/governance/delegated-agent-operations-runbook.md) (public | Unknown)
