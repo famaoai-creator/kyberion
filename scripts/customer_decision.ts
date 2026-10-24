@@ -179,18 +179,6 @@ function asLedgerWriter<T>(tenant: string, fn: () => T): T {
   return withExecutionContext(LEDGER_ROLE, fn, undefined, tenant);
 }
 
-/**
- * Invite records (`active/shared/runtime/customer-decision-invites/confidential/<tenant>/`).
- * The tier guard checks a tier-partitioned runtime record as its knowledge
- * mirror (`knowledge/confidential/<tenant>/…`), which no narrow store role is
- * granted yet, so invite I/O runs in the caller's own identity (the operator's
- * confidential persona) and never inside another assumed role. `invite.ts`
- * validates the tenant partition itself. Must not be nested in `asLedgerWriter`.
- */
-function asInviteStore<T>(_tenant: string, fn: () => T): T {
-  return fn();
-}
-
 function audit(
   tenant: string,
   operation: string,
@@ -292,10 +280,21 @@ function runDraft(opts: Record<string, string>, now: string): unknown {
       : current.entries.map(editableEntry);
     assertUniqueEntries(entries);
     const frozen = current.status === 'approved' || current.status === 'sent';
-    const { approval: _approval, ...rest } = current;
+    const { approval: _approval, in_force: _inForce, ...rest } = current;
     void _approval;
+    void _inForce;
+    // The edit is not approved, but what was approved stays in force until it is.
+    const inForce: DecisionAgenda['in_force'] =
+      current.approval && current.approval.content_hash === agendaContentHash(current)
+        ? {
+            content_hash: current.approval.content_hash,
+            approved_at: current.approval.approved_at,
+            pinned_ids: [...approvedOurDecisionIds(current)],
+          }
+        : current.in_force;
     const next: DecisionAgenda = {
       ...rest,
+      ...(inForce ? { in_force: inForce } : {}),
       title: typeof incoming.title === 'string' ? incoming.title : current.title,
       entries,
       revision: frozen ? current.revision + 1 : current.revision,
@@ -548,6 +547,8 @@ function runSubmit(opts: Record<string, string>, now: string): unknown {
         throw new Error(`[CUSTOMER_DECISION_PIN_FAILED] pinned decision ${id} is not in force`);
       }
     }
+    // Survives later edits (which drop `approval`) until the next approval.
+    approved.in_force = { content_hash: hash, approved_at: approvedAt, pinned_ids: [...inForce] };
     const written = writeAgenda(location, approved);
     auditChain.record({
       agentId: AUDIT_AGENT,
@@ -652,17 +653,16 @@ function runSend(opts: Record<string, string>, now: string): unknown {
   if (!Number.isFinite(ttlDays) || ttlDays <= 0)
     throw usageError('--ttl-days must be a positive number');
   const createdBy = opts.by ? memberActorId(opts.by) : 'operator:cli';
-  const { invite, token } = asInviteStore(tenant, () =>
-    issueInvite({
-      tenantSlug: tenant,
-      caseId: agenda.case_id,
-      agendaId: agenda.agenda_id,
-      participant: { name, role: participantRole, actor_id: actorId },
-      createdBy,
-      now,
-      ttlMs: ttlDays * 24 * 60 * 60 * 1000,
-    })
-  );
+  // Invite I/O runs inside invite.ts as the tenant-bound invite store role.
+  const { invite, token } = issueInvite({
+    tenantSlug: tenant,
+    caseId: agenda.case_id,
+    agendaId: agenda.agenda_id,
+    participant: { name, role: participantRole, actor_id: actorId },
+    createdBy,
+    now,
+    ttlMs: ttlDays * 24 * 60 * 60 * 1000,
+  });
   if (agenda.status !== 'sent') {
     asLedgerWriter(tenant, () =>
       writeAgenda(location, { ...agenda, status: 'sent', updated_at: now })
@@ -712,9 +712,7 @@ function runStatus(opts: Record<string, string>, now: string): unknown {
   const caseId = requireOpt(opts, 'case');
   const location = locationOf(opts, caseId);
   const agenda = loadAgenda(location, tenant, requireOpt(opts, 'agenda'));
-  const invites = asInviteStore(tenant, () =>
-    listInvites(tenant, { agendaId: agenda.agenda_id, caseId: agenda.case_id })
-  );
+  const invites = listInvites(tenant, { agendaId: agenda.agenda_id, caseId: agenda.case_id });
   return asLedgerWriter(tenant, () => {
     const ledger = readLedger(location);
     const effective = resolveAgendaEffective(agenda, ledger, { now });
@@ -724,6 +722,7 @@ function runStatus(opts: Record<string, string>, now: string): unknown {
       ...agendaSummary(agenda),
       approval: agenda.approval ?? null,
       approval_current: agenda.approval?.content_hash === hash,
+      in_force: agenda.in_force ?? null,
       effective: effective.map((decision) => ({
         entry_id: decision.entry_id,
         item: decision.item,
@@ -757,11 +756,9 @@ function runRevoke(opts: Record<string, string>, now: string): unknown {
   const caseId = requireOpt(opts, 'case');
   const inviteId = requireOpt(opts, 'invite');
   const reason = requireOpt(opts, 'reason');
-  const revoked = asInviteStore(tenant, () => {
-    const invite = listInvites(tenant, { caseId }).find((item) => item.invite_id === inviteId);
-    if (!invite) throw new ScriptExitError(2, `invite ${inviteId} not found for case ${caseId}`);
-    return revokeInvite(tenant, inviteId, { now, reason });
-  });
+  const invite = listInvites(tenant, { caseId }).find((item) => item.invite_id === inviteId);
+  if (!invite) throw new ScriptExitError(2, `invite ${inviteId} not found for case ${caseId}`);
+  const revoked = revokeInvite(tenant, inviteId, { now, reason });
   audit(tenant, 'invite_revoke', {
     invite_id: revoked.invite_id,
     agenda_id: revoked.agenda_id,
@@ -837,10 +834,12 @@ function openInvite(
 } {
   const tenant = opts.tenant;
   if (!tenant || typeof token !== 'string') throw new CustomerFacingError('invalid_link');
-  const verified = asInviteStore(tenant, () => verifyInviteToken(tenant, token, { now, action }));
+  const verified = verifyInviteToken(tenant, token, { now, action });
   if (verified.ok === false) {
     throw new CustomerFacingError(
-      verified.reason === 'expired' || verified.reason === 'revoked'
+      verified.reason === 'expired' ||
+        verified.reason === 'revoked' ||
+        verified.reason === 'unavailable'
         ? verified.reason
         : 'invalid_link'
     );

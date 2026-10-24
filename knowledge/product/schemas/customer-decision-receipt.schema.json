@@ -52,7 +52,12 @@
             "enum": ["option", "keep", "free_text", "approve", "request_changes"]
           },
           "value": {},
-          "comment": { "type": "string", "maxLength": 10000 }
+          "comment": { "type": "string", "maxLength": 10000 },
+          "outcome": {
+            "description": "What the answer did: decided (a ledger record was appended), unchanged (the customer had already decided this value), change_request (override window closed, value differs; no ledger write), opinion (contributor or comment-only answer; receipt only).",
+            "type": "string",
+            "enum": ["decided", "unchanged", "change_request", "opinion"]
+          }
         },
         "allOf": [
           {

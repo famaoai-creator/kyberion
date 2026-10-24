@@ -175,6 +175,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/customer-decision/invite.ts#asInviteStore",
+      "roles": ["customer_decision_invite_store"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -5194,6 +5199,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_invite_store",
         "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -5652,6 +5658,7 @@
       "policy_roles_not_reachable": [
         "autonomy_learning_store",
         "chronos_gateway",
+        "customer_decision_invite_store",
         "knowledge_steward",
         "metrics_cap_reader",
         "notification_preferences_reader",
@@ -5860,6 +5867,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_invite_store",
         "knowledge_steward",
         "organization_operator",
         "peer_catalog_reader",
@@ -7374,6 +7382,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_invite_store",
         "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -9126,6 +9135,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_invite_store",
         "knowledge_steward",
         "metrics_cap_reader",
         "mission_controller",

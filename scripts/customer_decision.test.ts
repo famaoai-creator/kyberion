@@ -7,6 +7,7 @@ import { ScriptExitError } from '@agent/core/script-harness';
 import { readLedger } from '@agent/core/decision-ledger';
 import {
   agendaContentHash,
+  listReceipts,
   readAgenda,
   readSwitches,
   type AgendaEntry,
@@ -427,6 +428,14 @@ describe('customer-decision facade', () => {
         change_requests: 1,
       },
     });
+    // Each receipt answer records what it did.
+    expect(
+      listReceipts({ dir })[0].answers.map((answer) => [answer.entry_id, answer.outcome])
+    ).toEqual([
+      ['nfr.auth', 'decided'],
+      ['nfr.locale', 'decided'],
+      ['data.retention', 'change_request'],
+    ]);
     const ledger = readLedger({ dir });
     const decided = ledger.filter((record) => record.state === 'decided');
     expect(decided.map((record) => [record.key, record.value, record.supersedes])).toEqual([
@@ -632,6 +641,62 @@ describe('customer-decision facade', () => {
       status: 'confirmed',
       layer: 'customer',
       value: 'password',
+    });
+  });
+  it('keeps the approved decisions in force while an edit awaits re-approval', async () => {
+    const { agendaId, token } = await approvedAndSent();
+    const before = (await run(['status', ...base(), '--agenda', agendaId])) as Record<
+      string,
+      unknown
+    >;
+    expect(pick(before.effective, 'nfr.auth')).toMatchObject({
+      layer: 'ours',
+      value: 'sso',
+      decision_id: 'D-0001',
+    });
+    const approved = agendaOf(agendaId);
+    expect(approved.in_force).toEqual({
+      content_hash: approved.approval?.content_hash,
+      approved_at: NOW,
+      pinned_ids: ['D-0001', 'D-0002'],
+    });
+
+    // Edit our decision for nfr.auth; the edit is not approved yet.
+    const file = path.join(dir, 'edit-ours.json');
+    const entries = ENTRIES.map((entry) =>
+      entry.entry_id === 'nfr.auth'
+        ? { ...entry, our_decision: { value: 'password', rationale: 'cheaper' } }
+        : entry
+    );
+    safeWriteFile(file, JSON.stringify({ entries }), { encoding: 'utf8' });
+    await run(['draft', ...base(), '--agenda', agendaId, '--file', file]);
+    const edited = agendaOf(agendaId);
+    expect(edited.approval).toBeUndefined();
+    expect(edited.in_force).toEqual(approved.in_force);
+    expect((await customerRun('view', { token })).out).toMatchObject({ state: 'updating' });
+
+    // What was approved stays in force: no fallback to the org default, no switch.
+    const after = (await run(['status', ...base(), '--agenda', agendaId])) as Record<
+      string,
+      unknown
+    >;
+    expect(after.effective).toEqual(before.effective);
+    expect(after.approval_current).toBe(false);
+    expect(readSwitches({ dir })).toEqual([]);
+
+    // Re-approval pins the edited decision and replaces what is in force.
+    approveNext('apr-2');
+    await run(['submit', ...base(), '--agenda', agendaId, '--by', 'user:alice']);
+    const reapproved = agendaOf(agendaId);
+    expect(reapproved.in_force?.pinned_ids).toEqual(['D-0003', 'D-0004']);
+    const status = (await run(['status', ...base(), '--agenda', agendaId])) as Record<
+      string,
+      unknown
+    >;
+    expect(pick(status.effective, 'nfr.auth')).toMatchObject({
+      layer: 'ours',
+      value: 'password',
+      decision_id: 'D-0003',
     });
   });
 });

@@ -23726,6 +23726,16 @@
         "en": "managed runtime access",
         "ja": "管理された実行画面へのアクセス",
         "qps-ploc": "⟦ɱȧñȧɠėḓ řůñŧïɱė ȧƈƈėşş ŀőřėɱ ï⟧"
+      },
+      "surface_notes_customer_room": {
+        "en": "Customer-facing decision screen. Start it only when you are ready to expose it through the public ingress; one process serves one tenant.",
+        "ja": "お客様向けの決定画面です。公開 ingress から出す準備ができたときだけ起動します。1 つのプロセスが扱うテナントは 1 つです。",
+        "qps-ploc": "⟦Ƈůşŧőɱėř-ƒȧƈïñɠ ḓėƈïşïőñ şƈřėėñ. Şŧȧřŧ ïŧ őñŀẏ ẇħėñ ẏőů ȧřė řėȧḓẏ ŧő ėẋṗőşė ïŧ ŧħřőůɠħ ŧħė ṗůƀŀïƈ ïñɠřėşş; őñė ṗřőƈėşş şėřṽėş őñė ŧėñȧñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "surface_best_for_customer_room": {
+        "en": "asking a customer to decide or confirm items",
+        "ja": "お客様への確認・ご決定のお願い",
+        "qps-ploc": "⟦ȧşķïñɠ ȧ ƈůşŧőɱėř ŧő ḓėƈïḓė őř ƈőñƒïřɱ ïŧėɱş ŀőřėɱ ïṗşůɱ ḓő⟧"
       }
     },
     "computer_surface": {
@@ -33449,6 +33459,358 @@
         "en": "not set",
         "ja": "未設定",
         "qps-ploc": "⟦ñőŧ şėŧ ŀőř⟧"
+      }
+    },
+    "customer_room": {
+      "page_title": {
+        "en": "Items for your decision",
+        "ja": "ご確認・ご決定のお願い",
+        "qps-ploc": "⟦Ïŧėɱş ƒőř ẏőůř ḓėƈïşïőñ ŀőřėɱ ï⟧"
+      },
+      "loading": {
+        "en": "Loading…",
+        "ja": "読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "participant_line": {
+        "en": "Responding as {name}",
+        "ja": "{name} さんとして回答します",
+        "qps-ploc": "⟦Řėşṗőñḓïñɠ ȧş {name} ŀőřėɱ ⟧"
+      },
+      "role_decider": {
+        "en": "You decide on these items. Your answers become the decision.",
+        "ja": "これらの事項はあなたが決定します。回答がそのまま決定として記録されます。",
+        "qps-ploc": "⟦Ẏőů ḓėƈïḓė őñ ŧħėşė ïŧėɱş. Ẏőůř ȧñşẇėřş ƀėƈőɱė ŧħė ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "role_contributor": {
+        "en": "Your answers are recorded as opinions. The person who decides will confirm them.",
+        "ja": "あなたの回答は意見として記録されます。最終的には決定者が確認します。",
+        "qps-ploc": "⟦Ẏőůř ȧñşẇėřş ȧřė řėƈőřḓėḓ ȧş őṗïñïőñş. Ŧħė ṗėřşőñ ẇħő ḓėƈïḓėş ẇïŀŀ ƈőñƒïřɱ ŧħėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "remaining": {
+        "en": "{count} to go",
+        "ja": "あと {count} 件",
+        "qps-ploc": "⟦{count} ŧő ɠő ŀőřė⟧"
+      },
+      "remaining_done": {
+        "en": "All items answered",
+        "ja": "すべての事項に回答しました",
+        "qps-ploc": "⟦Ȧŀŀ ïŧėɱş ȧñşẇėřėḓ ŀőřėɱ⟧"
+      },
+      "needs_decision": {
+        "en": "Needs your decision",
+        "ja": "ご決定が必要です",
+        "qps-ploc": "⟦Ñėėḓş ẏőůř ḓėƈïşïőñ ŀőřėɱ ⟧"
+      },
+      "item_position": {
+        "en": "Item {index} of {total}",
+        "ja": "{index} / {total} 件目",
+        "qps-ploc": "⟦Ïŧėɱ {index} őƒ {total} ŀőřėɱ ï⟧"
+      },
+      "current_heading": {
+        "en": "Currently proceeding with",
+        "ja": "現在の進め方",
+        "qps-ploc": "⟦Ƈůřřėñŧŀẏ ṗřőƈėėḓïñɠ ẇïŧħ ŀőřėɱ ïṗ⟧"
+      },
+      "current_line": {
+        "en": "{value} ({source})",
+        "ja": "{value}（{source}）",
+        "qps-ploc": "⟦{value} ({source}) ŀőřėɱ⟧"
+      },
+      "current_none": {
+        "en": "Nothing has been decided yet.",
+        "ja": "まだ決まっていません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ħȧş ƀėėñ ḓėƈïḓėḓ ẏėŧ. ŀőřėɱ ïṗş⟧"
+      },
+      "source_ours": {
+        "en": "our proposal",
+        "ja": "当社の提案",
+        "qps-ploc": "⟦őůř ṗřőṗőşȧŀ ŀőř⟧"
+      },
+      "source_org_default": {
+        "en": "standard setting",
+        "ja": "標準の設定",
+        "qps-ploc": "⟦şŧȧñḓȧřḓ şėŧŧïñɠ ŀőřėɱ⟧"
+      },
+      "source_customer": {
+        "en": "your decision",
+        "ja": "お客様のご決定",
+        "qps-ploc": "⟦ẏőůř ḓėƈïşïőñ ŀőřė⟧"
+      },
+      "source_awaiting": {
+        "en": "needs your decision",
+        "ja": "ご決定待ち",
+        "qps-ploc": "⟦ñėėḓş ẏőůř ḓėƈïşïőñ ŀőřėɱ ⟧"
+      },
+      "options_heading": {
+        "en": "Options",
+        "ja": "選択肢",
+        "qps-ploc": "⟦Őṗŧïőñş ŀőř⟧"
+      },
+      "impact_cost": {
+        "en": "Cost",
+        "ja": "費用",
+        "qps-ploc": "⟦Ƈőşŧ ŀőř⟧"
+      },
+      "impact_schedule": {
+        "en": "Schedule",
+        "ja": "スケジュール",
+        "qps-ploc": "⟦Şƈħėḓůŀė ŀőř⟧"
+      },
+      "impact_scope": {
+        "en": "Scope",
+        "ja": "範囲",
+        "qps-ploc": "⟦Şƈőṗė ŀőř⟧"
+      },
+      "impact_rework": {
+        "en": "Rework",
+        "ja": "手戻り",
+        "qps-ploc": "⟦Řėẇőřķ ŀőř⟧"
+      },
+      "choice_keep": {
+        "en": "Keep as is",
+        "ja": "このままでよい",
+        "qps-ploc": "⟦Ķėėṗ ȧş ïş ŀőř⟧"
+      },
+      "choice_keep_with": {
+        "en": "Keep as is: {value}",
+        "ja": "このままでよい：{value}",
+        "qps-ploc": "⟦Ķėėṗ ȧş ïş: {value} ŀőřėɱ ⟧"
+      },
+      "answer_comment_label": {
+        "en": "Comment (optional)",
+        "ja": "コメント（任意）",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ (őṗŧïőñȧŀ) ŀőřėɱ⟧"
+      },
+      "comment_required_label": {
+        "en": "Comment (required)",
+        "ja": "コメント（必須）",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ (řėɋůïřėḓ) ŀőřėɱ⟧"
+      },
+      "comment_placeholder": {
+        "en": "Add a note for our team",
+        "ja": "担当者へのメモがあれば記入してください",
+        "qps-ploc": "⟦Ȧḓḓ ȧ ñőŧė ƒőř őůř ŧėȧɱ ŀőřėɱ ï⟧"
+      },
+      "hearing_label": {
+        "en": "Your answer",
+        "ja": "ご回答",
+        "qps-ploc": "⟦Ẏőůř ȧñşẇėř ŀőř⟧"
+      },
+      "approve": {
+        "en": "Approve",
+        "ja": "承認する",
+        "qps-ploc": "⟦Ȧṗṗřőṽė ŀőř⟧"
+      },
+      "request_changes": {
+        "en": "Request changes",
+        "ja": "修正を依頼する",
+        "qps-ploc": "⟦Řėɋůėşŧ ƈħȧñɠėş ŀőřė⟧"
+      },
+      "request_changes_hint": {
+        "en": "Tell us what to change.",
+        "ja": "直してほしい点を書いてください。",
+        "qps-ploc": "⟦Ŧėŀŀ ůş ẇħȧŧ ŧő ƈħȧñɠė. ŀőřėɱ ï⟧"
+      },
+      "ranking_hint": {
+        "en": "Select in order of priority. Select again to remove.",
+        "ja": "優先したい順に選んでください。もう一度選ぶと外れます。",
+        "qps-ploc": "⟦Şėŀėƈŧ ïñ őřḓėř őƒ ṗřïőřïŧẏ. Şėŀėƈŧ ȧɠȧïñ ŧő řėɱőṽė. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ranking_position": {
+        "en": "Priority {position}",
+        "ja": "優先 {position}",
+        "qps-ploc": "⟦Ṗřïőřïŧẏ {position} ŀőřėɱ ⟧"
+      },
+      "value_approved": {
+        "en": "Approved",
+        "ja": "承認済み",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŀőř⟧"
+      },
+      "value_changes_requested": {
+        "en": "Changes requested",
+        "ja": "修正依頼",
+        "qps-ploc": "⟦Ƈħȧñɠėş řėɋůėşŧėḓ ŀőřėɱ⟧"
+      },
+      "answered_mark": {
+        "en": "Answered",
+        "ja": "回答済み",
+        "qps-ploc": "⟦Ȧñşẇėřėḓ ŀőř⟧"
+      },
+      "review_button": {
+        "en": "Review answers",
+        "ja": "回答を確認する",
+        "qps-ploc": "⟦Řėṽïėẇ ȧñşẇėřş ŀőřė⟧"
+      },
+      "review_heading": {
+        "en": "Please confirm",
+        "ja": "内容のご確認",
+        "qps-ploc": "⟦Ṗŀėȧşė ƈőñƒïřɱ ŀőřė⟧"
+      },
+      "review_lead_decider": {
+        "en": "These answers will be recorded as your decision.",
+        "ja": "次の内容をご決定として記録します。",
+        "qps-ploc": "⟦Ŧħėşė ȧñşẇėřş ẇïŀŀ ƀė řėƈőřḓėḓ ȧş ẏőůř ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "review_lead_contributor": {
+        "en": "These answers will be recorded as your opinions.",
+        "ja": "次の内容をご意見として記録します。",
+        "qps-ploc": "⟦Ŧħėşė ȧñşẇėřş ẇïŀŀ ƀė řėƈőřḓėḓ ȧş ẏőůř őṗïñïőñş. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "review_empty": {
+        "en": "Answer at least one item to continue.",
+        "ja": "1 件以上回答してから進んでください。",
+        "qps-ploc": "⟦Ȧñşẇėř ȧŧ ŀėȧşŧ őñė ïŧėɱ ŧő ƈőñŧïñůė. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "review_comment": {
+        "en": "Comment: {text}",
+        "ja": "コメント：{text}",
+        "qps-ploc": "⟦Ƈőɱɱėñŧ: {text} ŀőřė⟧"
+      },
+      "back": {
+        "en": "Back",
+        "ja": "戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŀőř⟧"
+      },
+      "submit": {
+        "en": "Submit",
+        "ja": "送信する",
+        "qps-ploc": "⟦Şůƀɱïŧ ŀőř⟧"
+      },
+      "submitting": {
+        "en": "Submitting…",
+        "ja": "送信しています…",
+        "qps-ploc": "⟦Şůƀɱïŧŧïñɠ… ŀőř⟧"
+      },
+      "previous_submission": {
+        "en": "You already answered on {date}. You can answer again to update.",
+        "ja": "{date} に回答済みです。変更する場合は、もう一度回答できます。",
+        "qps-ploc": "⟦Ẏőů ȧŀřėȧḓẏ ȧñşẇėřėḓ őñ {date}. Ẏőů ƈȧñ ȧñşẇėř ȧɠȧïñ ŧő ůṗḓȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "receipt_title": {
+        "en": "Thank you",
+        "ja": "ありがとうございました",
+        "qps-ploc": "⟦Ŧħȧñķ ẏőů ŀőř⟧"
+      },
+      "receipt_decider": {
+        "en": "Your decisions have been recorded.",
+        "ja": "ご決定を記録しました。",
+        "qps-ploc": "⟦Ẏőůř ḓėƈïşïőñş ħȧṽė ƀėėñ řėƈőřḓėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "receipt_contributor": {
+        "en": "Your opinions have been recorded. The person who decides will confirm them.",
+        "ja": "ご意見を記録しました。決定者が確認します。",
+        "qps-ploc": "⟦Ẏőůř őṗïñïőñş ħȧṽė ƀėėñ řėƈőřḓėḓ. Ŧħė ṗėřşőñ ẇħő ḓėƈïḓėş ẇïŀŀ ƈőñƒïřɱ ŧħėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "receipt_changes": {
+        "en": "{count} change request(s) were passed to our team.",
+        "ja": "修正のご依頼 {count} 件を担当者に伝えました。",
+        "qps-ploc": "⟦{count} ƈħȧñɠė řėɋůėşŧ(ş) ẇėřė ṗȧşşėḓ ŧő őůř ŧėȧɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "receipt_duplicate": {
+        "en": "These answers were already recorded.",
+        "ja": "この内容はすでに記録されています。",
+        "qps-ploc": "⟦Ŧħėşė ȧñşẇėřş ẇėřė ȧŀřėȧḓẏ řėƈőřḓėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "receipt_again": {
+        "en": "Answer again",
+        "ja": "もう一度回答する",
+        "qps-ploc": "⟦Ȧñşẇėř ȧɠȧïñ ŀőř⟧"
+      },
+      "state_updating_title": {
+        "en": "This page is being updated",
+        "ja": "内容を更新しています",
+        "qps-ploc": "⟦Ŧħïş ṗȧɠė ïş ƀėïñɠ ůṗḓȧŧėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "state_updating_body": {
+        "en": "Please check back a little later.",
+        "ja": "しばらくしてからもう一度ご確認ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ƈħėƈķ ƀȧƈķ ȧ ŀïŧŧŀė ŀȧŧėř. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "state_expired_title": {
+        "en": "This link has expired",
+        "ja": "このリンクは期限が切れました",
+        "qps-ploc": "⟦Ŧħïş ŀïñķ ħȧş ėẋṗïřėḓ ŀőřėɱ ⟧"
+      },
+      "state_expired_body": {
+        "en": "Please ask your contact for a new link.",
+        "ja": "担当者に新しいリンクをご依頼ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ȧşķ ẏőůř ƈőñŧȧƈŧ ƒőř ȧ ñėẇ ŀïñķ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "state_revoked_title": {
+        "en": "This link is no longer available",
+        "ja": "このリンクは使えなくなりました",
+        "qps-ploc": "⟦Ŧħïş ŀïñķ ïş ñő ŀőñɠėř ȧṽȧïŀȧƀŀė ŀőřėɱ ïṗşů⟧"
+      },
+      "state_revoked_body": {
+        "en": "Please contact your representative.",
+        "ja": "担当者にご連絡ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ƈőñŧȧƈŧ ẏőůř řėṗřėşėñŧȧŧïṽė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "state_invalid_link_title": {
+        "en": "This link cannot be opened",
+        "ja": "このリンクは開けません",
+        "qps-ploc": "⟦Ŧħïş ŀïñķ ƈȧññőŧ ƀė őṗėñėḓ ŀőřėɱ ïṗ⟧"
+      },
+      "state_invalid_link_body": {
+        "en": "Please check the link, or ask your contact to send it again.",
+        "ja": "リンクをご確認いただくか、担当者に再送をご依頼ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ƈħėƈķ ŧħė ŀïñķ, őř ȧşķ ẏőůř ƈőñŧȧƈŧ ŧő şėñḓ ïŧ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "state_closed_title": {
+        "en": "This request has been closed",
+        "ja": "この依頼は締め切られました",
+        "qps-ploc": "⟦Ŧħïş řėɋůėşŧ ħȧş ƀėėñ ƈŀőşėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "state_closed_body": {
+        "en": "No more answers are needed. Please contact your representative with any questions.",
+        "ja": "これ以上のご回答は不要です。ご不明な点は担当者にご連絡ください。",
+        "qps-ploc": "⟦Ñő ɱőřė ȧñşẇėřş ȧřė ñėėḓėḓ. Ṗŀėȧşė ƈőñŧȧƈŧ ẏőůř řėṗřėşėñŧȧŧïṽė ẇïŧħ ȧñẏ ɋůėşŧïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "state_unavailable_title": {
+        "en": "Something went wrong on our side",
+        "ja": "こちらで問題が起きました",
+        "qps-ploc": "⟦Şőɱėŧħïñɠ ẇėñŧ ẇřőñɠ őñ őůř şïḓė ŀőřėɱ ïṗşů⟧"
+      },
+      "state_unavailable_body": {
+        "en": "Please try again in a little while.",
+        "ja": "しばらくしてからもう一度お試しください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ŧřẏ ȧɠȧïñ ïñ ȧ ŀïŧŧŀė ẇħïŀė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "state_stale_title": {
+        "en": "This page was updated",
+        "ja": "内容が更新されました",
+        "qps-ploc": "⟦Ŧħïş ṗȧɠė ẇȧş ůṗḓȧŧėḓ ŀőřėɱ ⟧"
+      },
+      "state_stale_body": {
+        "en": "Reload to see the latest items. Your unsent answers were not saved.",
+        "ja": "最新の内容を読み込み直してください。送信前の回答は保存されていません。",
+        "qps-ploc": "⟦Řėŀőȧḓ ŧő şėė ŧħė ŀȧŧėşŧ ïŧėɱş. Ẏőůř ůñşėñŧ ȧñşẇėřş ẇėřė ñőŧ şȧṽėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "state_not_entitled_title": {
+        "en": "This link cannot record decisions",
+        "ja": "このリンクでは決定を記録できません",
+        "qps-ploc": "⟦Ŧħïş ŀïñķ ƈȧññőŧ řėƈőřḓ ḓėƈïşïőñş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "state_not_entitled_body": {
+        "en": "Please contact your representative.",
+        "ja": "担当者にご連絡ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ƈőñŧȧƈŧ ẏőůř řėṗřėşėñŧȧŧïṽė. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "answers_invalid": {
+        "en": "Some answers could not be recorded. Please check them and try again.",
+        "ja": "記録できない回答がありました。内容を確認して、もう一度お試しください。",
+        "qps-ploc": "⟦Şőɱė ȧñşẇėřş ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ṗŀėȧşė ƈħėƈķ ŧħėɱ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "reload": {
+        "en": "Reload",
+        "ja": "読み込み直す",
+        "qps-ploc": "⟦Řėŀőȧḓ ŀőř⟧"
+      },
+      "retry_action": {
+        "en": "Try again",
+        "ja": "もう一度試す",
+        "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
       }
     }
   }

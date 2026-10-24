@@ -357,6 +357,49 @@ describe('resolveAgendaEffective', () => {
     expect(resolveAgendaEffective(edited, ledger, { now: NOW })[0].layer).toBe('none');
   });
 
+  it('keeps the last approved pins in force after an unapproved edit, without a switch', () => {
+    const approved = approve(agenda());
+    const inForce = {
+      content_hash: approved.approval!.content_hash,
+      approved_at: NOW,
+      pinned_ids: ['D-0001'],
+    };
+    // The facade's edit drops `approval` and the entry pins, and keeps `in_force`.
+    const { approval: _approval, ...rest } = approved;
+    void _approval;
+    const edited: DecisionAgenda = {
+      ...rest,
+      status: 'draft',
+      in_force: inForce,
+      entries: approved.entries.map((e) =>
+        e.entry_id === 'e1' ? { ...e, our_decision: { value: 'password' } } : e
+      ),
+    };
+    expect([...approvedOurDecisionIds(edited)]).toEqual(['D-0001']);
+    const before = resolveAgendaEffective(approved, ledger, { now: NOW });
+    const after = resolveAgendaEffective(edited, ledger, { now: NOW });
+    expect(after[0]).toMatchObject({ layer: 'ours', value: 'sso', decision_id: 'D-0001' });
+    expect(
+      detectSwitches(before, after, {
+        case_id: 'case-a',
+        agenda_id: edited.agenda_id,
+        now: NOW,
+        newId: () => 'sw-test0001',
+      })
+    ).toEqual([]);
+    // A current approval's own pins win over a stale in_force.
+    const reapproved = approve({
+      ...edited,
+      in_force: inForce,
+      entries: edited.entries.map((e) =>
+        e.entry_id === 'e1'
+          ? { ...e, our_decision: { value: 'password', decision_id: 'D-0002' } }
+          : e
+      ),
+    });
+    expect([...approvedOurDecisionIds(reapproved)]).toEqual(['D-0002']);
+  });
+
   it('uses the agenda milestones unless the caller overrides them', () => {
     const a = approve(agenda({ milestones_passed: ['release'] }));
     expect(resolveAgendaEffective(a, ledger, { now: NOW })[1].overridable).toBe(false);

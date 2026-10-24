@@ -7,6 +7,10 @@ import {
   isPipelineJournalCapability,
   PIPELINE_JOURNAL_STORE_ROLE,
 } from './foundation/pipeline-journal-capability.js';
+import {
+  isCustomerDecisionInviteCapability,
+  CUSTOMER_DECISION_INVITE_STORE_ROLE,
+} from './foundation/customer-decision-invite-capability.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -687,6 +691,7 @@ interface PreparedExecutionContext {
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'autonomy_learning_store',
+  CUSTOMER_DECISION_INVITE_STORE_ROLE,
   DISCUSSION_REQUEST_STORAGE_ROLE,
   PIPELINE_JOURNAL_STORE_ROLE,
   'peer_catalog_reader',
@@ -753,6 +758,14 @@ function prepareExecutionContext(
   )
     throw new Error(
       '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability'
+    );
+  if (
+    normalizedRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
+    (!isCustomerDecisionInviteCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  )
+    throw new Error(
+      '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability'
     );
   if (normalizedRole === 'concierge_management_reader') {
     const resource = currentResourceAccessScope();

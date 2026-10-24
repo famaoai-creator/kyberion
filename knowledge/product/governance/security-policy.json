@@ -911,6 +911,14 @@
         "active/shared/runtime/discussion-create-requests/confidential/${KYBERION_TENANT}/"
       ]
     },
+    "customer_decision_invite_store": {
+      "allow_read": [
+        "active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/"
+      ]
+    },
     "autonomy_learning_store": {
       "allow_read": [
         "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}",

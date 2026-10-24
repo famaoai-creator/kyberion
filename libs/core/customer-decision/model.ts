@@ -90,6 +90,16 @@ export interface DecisionAgenda {
     approved_at: string;
     approved_by: string;
   };
+  /**
+   * Our decisions in force: the pins of the last approval. Editing the agenda
+   * removes `approval` but keeps this, so the approved ledger records stay in
+   * force (the unapproved edit itself is not) until the edit is re-approved.
+   */
+  in_force?: {
+    content_hash: string;
+    approved_at: string;
+    pinned_ids: string[];
+  };
   milestones_passed?: string[];
   created_at: string;
   updated_at: string;
@@ -113,6 +123,14 @@ export interface EffectiveDecision {
 
 export type ReceiptAnswerChoice = 'option' | 'keep' | 'free_text' | 'approve' | 'request_changes';
 
+/**
+ * What a receipt answer did: `decided` (a ledger record was appended),
+ * `unchanged` (the customer had already decided this value), `change_request`
+ * (override window closed and the value differs; no ledger write), `opinion`
+ * (contributor or comment-only answer; receipt only).
+ */
+export type ReceiptAnswerOutcome = 'decided' | 'unchanged' | 'change_request' | 'opinion';
+
 export interface DecisionReceipt {
   version: '1.0.0';
   receipt_id: string;
@@ -128,6 +146,8 @@ export interface DecisionReceipt {
     choice: ReceiptAnswerChoice;
     value?: unknown;
     comment?: string;
+    /** Absent on receipts written before outcomes were recorded. */
+    outcome?: ReceiptAnswerOutcome;
   }>;
   identity_assurance: 'invite_link';
   submitted_at: string;

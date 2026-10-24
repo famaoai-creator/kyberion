@@ -12,15 +12,40 @@
  * — a registered tier/tenant-partitioned runtime state root
  * (`PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites`). Every read
  * and write is schema-validated; an invalid stored file is treated as unknown.
+ *
+ * All invite I/O runs as the narrow `customer_decision_invite_store` role bound
+ * to the tenant, inside an exact resource capability for one invite record (or
+ * a read-only listing of the tenant directory), so it needs no confidential
+ * persona and never touches another tenant or any knowledge path. A store
+ * that cannot be read (permission or I/O failure) is reported as
+ * `unavailable`, never as an unknown invite.
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
+import { withExecutionContext } from '../authority.js';
+import {
+  CUSTOMER_DECISION_INVITE_STORE_ROLE,
+  customerDecisionInviteCapability,
+} from '../foundation/customer-decision-invite-capability.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
+import { withLockSync } from '../foundation/lock-utils.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
+import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeReaddir } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeReaddir,
+  safeWriteFile,
+} from '../secure-io.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS, storagePartitionSegments } from '../storage-layout.js';
 import { CASE_ID_PATTERN, CUSTOMER_ACTOR_ID_PATTERN } from '../decision-ledger/model.js';
+import { AGENDA_ID_PATTERN } from './model.js';
+
+const logger = createLogger('customer-decision-invite');
 
 export interface CustomerDecisionInviteParticipant {
   name: string;
@@ -46,14 +71,15 @@ export interface CustomerDecisionInvite {
   uses: Array<{ at: string; action: 'view' | 'respond' }>;
 }
 
-export type InviteVerifyFailure = 'malformed' | 'unknown' | 'mismatch' | 'expired' | 'revoked';
+/** `unavailable`: the invite store could not be read (permission or I/O failure). */
+export type InviteVerifyFailure =
+  'malformed' | 'unknown' | 'mismatch' | 'expired' | 'revoked' | 'unavailable';
 
 export const DEFAULT_INVITE_TTL_MS = 14 * 24 * 60 * 60 * 1000;
 export const MAX_INVITE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
 export const MAX_INVITE_USES = 50;
 
 const INVITE_ID_PATTERN = /^inv-[a-f0-9]{16}$/u;
-const AGENDA_ID_PATTERN = /^agd-[a-z0-9]{8,40}$/u;
 const TOKEN_PATTERN = /^(inv-[a-f0-9]{16})\.([A-Za-z0-9_-]{43})$/u;
 const INVITE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/customer-decision-invite.schema.json'
@@ -72,12 +98,30 @@ function inviteDir(tenantSlug: string): string {
   );
 }
 
-function inviteCatalog(tenantSlug: string, inviteId: string) {
+function inviteFilePath(tenantSlug: string, inviteId: string): string {
   if (!isValidTenantSlug(tenantSlug)) throw new Error('[CD_INVITE_MALFORMED] tenant');
   if (!INVITE_ID_PATTERN.test(inviteId)) throw new Error('[CD_INVITE_MALFORMED] invite id');
-  const filePath = assertSafeRepositoryPath(path.join(inviteDir(tenantSlug), `${inviteId}.json`), {
+  return assertSafeRepositoryPath(path.join(inviteDir(tenantSlug), `${inviteId}.json`), {
     allowMissingLeaf: true,
   });
+}
+
+/**
+ * Run `fn` as the invite store role bound to `tenantSlug`, inside the exact
+ * capability for `target` (one invite file, or the tenant directory for a listing).
+ */
+function asInviteStore<T>(tenantSlug: string, target: string, write: boolean, fn: () => T): T {
+  const capability = customerDecisionInviteCapability(
+    tenantSlug,
+    pathResolver.toRepoRelative(target),
+    write
+  );
+  return runInResourceAccessScope(capability, () =>
+    withExecutionContext(CUSTOMER_DECISION_INVITE_STORE_ROLE, fn, undefined, tenantSlug)
+  );
+}
+
+function inviteCatalog(filePath: string) {
   return defineCatalog<CustomerDecisionInvite>({
     id: 'customer-decision-invite',
     path: filePath,
@@ -85,23 +129,78 @@ function inviteCatalog(tenantSlug: string, inviteId: string) {
   });
 }
 
-/** Null when missing, unreadable, schema-invalid or stored under another tenant/id. */
-function readInvite(tenantSlug: string, inviteId: string): CustomerDecisionInvite | null {
+type InviteRead =
+  | { kind: 'found'; invite: CustomerDecisionInvite; generation: string }
+  | { kind: 'missing' }
+  | { kind: 'invalid' }
+  | { kind: 'unavailable' };
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * `missing` when no record exists, `invalid` when the stored file is not a
+ * schema-valid invite of this tenant/id, `unavailable` when the store cannot
+ * be read (permission or I/O failure; logged).
+ */
+function readInvite(tenantSlug: string, inviteId: string): InviteRead {
+  const filePath = inviteFilePath(tenantSlug, inviteId);
+  let generation: string | null;
+  let raw: string;
   try {
-    const catalog = inviteCatalog(tenantSlug, inviteId);
-    if (catalog.generation() === null) return null;
-    const invite = catalog.load();
-    if (invite.invite_id !== inviteId || invite.tenant_slug !== tenantSlug) return null;
-    return invite;
+    ({ generation, raw } = asInviteStore(tenantSlug, filePath, false, () => {
+      const current = inviteCatalog(filePath).generation();
+      return {
+        generation: current,
+        raw: current === null ? '' : (safeReadFile(filePath, { encoding: 'utf8' }) as string),
+      };
+    }));
+  } catch (error) {
+    logger.warn(
+      `customer decision invite store unreadable — ${errorText(error)} | ` +
+        `check the customer_decision_invite_store grant and the store directory permissions | ` +
+        `tenant=${tenantSlug} invite=${inviteId}`
+    );
+    return { kind: 'unavailable' };
+  }
+  if (generation === null) return { kind: 'missing' };
+  try {
+    const invite = inviteCatalog(filePath).validate(JSON.parse(raw), filePath);
+    if (invite.invite_id !== inviteId || invite.tenant_slug !== tenantSlug) {
+      return { kind: 'invalid' };
+    }
+    return { kind: 'found', invite, generation };
   } catch {
-    return null;
+    return { kind: 'invalid' };
   }
 }
 
+/**
+ * Optimistic publication: the write only lands when the record still has the
+ * generation the caller read. The inter-process lock is taken under the
+ * caller's own identity (lock files are not invite records); only the
+ * generation check and the record write run inside the invite capability.
+ */
 function writeInvite(invite: CustomerDecisionInvite, expectedGeneration: string | null): void {
-  const catalog = inviteCatalog(invite.tenant_slug, invite.invite_id);
-  safeMkdir(path.dirname(catalog.path()), { recursive: true });
-  catalog.publish(invite, expectedGeneration);
+  const filePath = inviteFilePath(invite.tenant_slug, invite.invite_id);
+  const catalog = inviteCatalog(filePath);
+  const serialized = `${JSON.stringify(catalog.validate(invite, filePath), null, 2)}\n`;
+  // The store root itself is an unprotected runtime directory (the caller may
+  // create it); only the tier/tenant directories below it need the capability.
+  safeMkdir(path.dirname(path.dirname(path.dirname(filePath))), { recursive: true });
+  withLockSync(`customer-decision-invite-${invite.tenant_slug}-${invite.invite_id}`, () =>
+    asInviteStore(invite.tenant_slug, filePath, true, () => {
+      const current = catalog.generation();
+      if (current !== expectedGeneration) {
+        throw new Error(
+          `[CD_INVITE_CONFLICT] invite ${invite.invite_id} changed: expected generation ${expectedGeneration ?? 'missing'}, current ${current ?? 'missing'}`
+        );
+      }
+      safeMkdir(path.dirname(filePath), { recursive: true });
+      safeWriteFile(filePath, serialized, { encoding: 'utf8' });
+    })
+  );
 }
 
 /** Optimistic read-modify-write; retried because use logging races with revoke. */
@@ -112,12 +211,13 @@ function updateInvite(
 ): CustomerDecisionInvite {
   let lastError: unknown;
   for (let attempt = 0; attempt < 5; attempt++) {
-    const generation = inviteCatalog(tenantSlug, inviteId).generation();
     const current = readInvite(tenantSlug, inviteId);
-    if (!current) throw new Error('[CD_INVITE_UNKNOWN] invite not found');
-    const next = mutate(structuredClone(current));
+    if (current.kind === 'unavailable')
+      throw new Error('[CD_INVITE_UNAVAILABLE] invite store unavailable');
+    if (current.kind !== 'found') throw new Error('[CD_INVITE_UNKNOWN] invite not found');
+    const next = mutate(structuredClone(current.invite));
     try {
-      writeInvite(next, generation);
+      writeInvite(next, current.generation);
       return next;
     } catch (error) {
       lastError = error;
@@ -200,8 +300,10 @@ export function verifyInviteToken(
     return { ok: false, reason: 'malformed' };
   }
   const [, inviteId, secret] = match;
-  const invite = readInvite(tenantSlug, inviteId);
-  if (!invite) return { ok: false, reason: 'unknown' };
+  const read = readInvite(tenantSlug, inviteId);
+  if (read.kind === 'unavailable') return { ok: false, reason: 'unavailable' };
+  if (read.kind !== 'found') return { ok: false, reason: 'unknown' };
+  const invite = read.invite;
 
   const expected = Buffer.from(invite.secret_sha256, 'hex');
   const actual = Buffer.from(sha256Hex(secret), 'hex');
@@ -244,17 +346,23 @@ export function listInvites(
 ): CustomerDecisionInvite[] {
   if (!isValidTenantSlug(tenantSlug)) throw new Error('[CD_INVITE_MALFORMED] tenant');
   const dir = inviteDir(tenantSlug);
-  if (!safeExistsSync(dir)) return [];
-  return safeReaddir(dir)
+  const names = asInviteStore(tenantSlug, dir, false, () =>
+    safeExistsSync(dir) ? safeReaddir(dir) : []
+  );
+  const invites: CustomerDecisionInvite[] = [];
+  for (const id of names
     .filter((name) => name.endsWith('.json'))
     .map((name) => name.slice(0, -'.json'.length))
     .filter((id) => INVITE_ID_PATTERN.test(id))
-    .sort()
-    .map((id) => readInvite(tenantSlug, id))
-    .filter((invite): invite is CustomerDecisionInvite => invite !== null)
-    .filter(
-      (invite) =>
-        (!filter.agendaId || invite.agenda_id === filter.agendaId) &&
-        (!filter.caseId || invite.case_id === filter.caseId)
-    );
+    .sort()) {
+    const read = readInvite(tenantSlug, id);
+    if (read.kind === 'unavailable')
+      throw new Error(`[CD_INVITE_UNAVAILABLE] invite store unavailable (${id})`);
+    if (read.kind === 'found') invites.push(read.invite);
+  }
+  return invites.filter(
+    (invite) =>
+      (!filter.agendaId || invite.agenda_id === filter.agendaId) &&
+      (!filter.caseId || invite.case_id === filter.caseId)
+  );
 }

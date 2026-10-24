@@ -42,6 +42,7 @@ import {
   type DecisionReceipt,
   type EffectiveDecision,
   type ReceiptAnswerChoice,
+  type ReceiptAnswerOutcome,
 } from './model.js';
 
 export interface RespondAnswer {
@@ -422,6 +423,17 @@ export function planCustomerResponse(input: PlanCustomerResponseInput): RespondP
   return { ok: true, plan };
 }
 
+function receiptOutcome(outcome: RespondOutcome): ReceiptAnswerOutcome {
+  return outcome === 'recorded' ? 'opinion' : outcome;
+}
+
+/** A receipt answer without its outcome (what the customer sent, for duplicate checks). */
+function sentAnswer(answer: DecisionReceipt['answers'][number]): RespondAnswer {
+  const { outcome: _outcome, ...sent } = answer;
+  void _outcome;
+  return sent;
+}
+
 /** The immutable receipt for a planned response, once the ledger assigned the decision ids. */
 export function buildResponseReceipt(
   plan: RespondPlan,
@@ -444,7 +456,10 @@ export function buildResponseReceipt(
       role: invite.participant.role,
       actor_id: invite.participant.actor_id,
     },
-    answers: plan.answers.map((item) => item.answer),
+    answers: plan.answers.map((item) => ({
+      ...item.answer,
+      outcome: receiptOutcome(item.outcome),
+    })),
     identity_assurance: 'invite_link',
     submitted_at: now,
     decision_ids: [...appendedIds],
@@ -468,14 +483,17 @@ export function findDuplicateReceipt(
       (receipt) =>
         receipt.invite_id === invite.invite_id &&
         receipt.content_hash === plan.content_hash &&
-        canonicalJson(receipt.answers) === answers
+        canonicalJson(receipt.answers.map(sentAnswer)) === answers
     );
 }
 
 /**
- * Change requests still open: a decider's answer whose value is not what the
- * work follows now. Derived from receipts + the current resolution, so an
+ * Change requests still open: a decider's latest answer per entry whose
+ * recorded outcome is `change_request` and whose value is still not what the
+ * work follows now. A later `decided` / `unchanged` answer closes it, and an
  * answer the customer later re-decided, or an operator applied, drops out.
+ * Receipts written before outcomes were recorded fall back to inferring a
+ * candidate from any decider answer with a value.
  */
 export function openChangeRequests(
   agenda: DecisionAgenda,
@@ -491,8 +509,18 @@ export function openChangeRequests(
   for (const receipt of receipts) {
     if (receipt.participant.role !== 'decider') continue;
     for (const answer of receipt.answers) {
+      if (answer.outcome === 'opinion') continue;
+      if (answer.outcome === 'decided' || answer.outcome === 'unchanged') {
+        latest.delete(answer.entry_id);
+        continue;
+      }
       if (answer.value === undefined) continue;
-      if (answer.choice === 'free_text' && kinds.get(answer.entry_id) !== 'hearing') continue;
+      if (
+        answer.outcome === undefined &&
+        answer.choice === 'free_text' &&
+        kinds.get(answer.entry_id) !== 'hearing'
+      )
+        continue;
       latest.set(answer.entry_id, {
         receipt_id: receipt.receipt_id,
         entry_id: answer.entry_id,

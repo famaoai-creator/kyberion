@@ -167,18 +167,24 @@ export function resolveEffectiveDecision(
 }
 
 /**
- * Our decision ids the agenda's approval pins. An agenda without an approval, or
- * whose content no longer matches the approved hash (edited after approval, not
- * re-approved), pins nothing — its "our decisions" are not in force.
+ * Our decision ids in force for an agenda:
+ *   - approved and unchanged since (approval hash = current content): the pins
+ *     of that approval (each entry's `our_decision.decision_id`);
+ *   - otherwise (edited after approval, not re-approved yet): the pins of the
+ *     last approval (`in_force`) — those ledger records were approved; the
+ *     unapproved edit itself is not in force;
+ *   - never approved: nothing.
  */
 export function approvedOurDecisionIds(agenda: DecisionAgenda): Set<string> {
   const ids = new Set<string>();
-  if (!agenda.approval) return ids;
-  if (agenda.approval.content_hash !== agendaContentHash(agenda)) return ids;
-  for (const entry of agenda.entries) {
-    const id = entry.our_decision?.decision_id;
-    if (id) ids.add(id);
+  if (agenda.approval && agenda.approval.content_hash === agendaContentHash(agenda)) {
+    for (const entry of agenda.entries) {
+      const id = entry.our_decision?.decision_id;
+      if (id) ids.add(id);
+    }
+    return ids;
   }
+  for (const id of agenda.in_force?.pinned_ids ?? []) ids.add(id);
   return ids;
 }
 

@@ -23,7 +23,7 @@
     "invite_id": { "type": "string", "pattern": "^inv-[a-f0-9]{16}$" },
     "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
     "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
-    "agenda_id": { "type": "string", "pattern": "^agd-[a-z0-9]{8,40}$" },
+    "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
     "participant": {
       "type": "object",
       "additionalProperties": false,

@@ -48,6 +48,21 @@
         "approved_by": { "type": "string", "minLength": 1 }
       }
     },
+    "in_force": {
+      "description": "Our decisions in force: the pins of the last approval. Kept when the agenda is edited (which removes `approval`), so those approved ledger records stay in force until the edit is re-approved.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["content_hash", "approved_at", "pinned_ids"],
+      "properties": {
+        "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "approved_at": { "type": "string", "minLength": 1 },
+        "pinned_ids": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
+          "uniqueItems": true
+        }
+      }
+    },
     "milestones_passed": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },

@@ -426,6 +426,10 @@ describe('receipts, duplicates and change requests', () => {
       content_hash: agenda.approval?.content_hash,
       decision_ids: [],
     });
+    expect(receipt.answers.map((answer) => [answer.entry_id, answer.outcome])).toEqual([
+      ['retention', 'change_request'],
+      ['nfr.auth', 'opinion'],
+    ]);
     expect(findDuplicateReceipt(result.plan, invite(), [receipt])).toBe(receipt);
     expect(
       findDuplicateReceipt(result.plan, { invite_id: 'inv-ffffffffffffffff' }, [receipt])
@@ -434,6 +438,54 @@ describe('receipts, duplicates and change requests', () => {
     expect(openChangeRequests(agenda, [receipt], effective)).toEqual([
       { receipt_id: receipt.receipt_id, entry_id: 'retention', value: 90, at: NOW },
     ]);
+  });
+
+  it('lists change requests from recorded outcomes, not from answer values', () => {
+    const agenda = baseAgenda();
+    const effective = resolveAgendaEffective(agenda, ledger, { now: NOW });
+    const receipt = (
+      answers: DecisionReceipt['answers'],
+      id = 'rcp-0000000000000001'
+    ): DecisionReceipt => ({
+      version: '1.0.0',
+      receipt_id: id,
+      tenant_slug: agenda.tenant_slug,
+      case_id: agenda.case_id,
+      agenda_id: agenda.agenda_id,
+      agenda_revision: agenda.revision,
+      content_hash: agenda.approval!.content_hash,
+      invite_id: invite().invite_id,
+      participant: { name: 'Hanako', role: 'decider', actor_id: 'customer:acme-cto' },
+      answers,
+      identity_assurance: 'invite_link',
+      submitted_at: NOW,
+      decision_ids: [],
+    });
+    // A decided answer whose value is not in force (e.g. an operator applied ours later)
+    // is not a change request.
+    expect(
+      openChangeRequests(
+        agenda,
+        [receipt([{ entry_id: 'retention', choice: 'option', value: 90, outcome: 'decided' }])],
+        effective
+      )
+    ).toEqual([]);
+    // A later decided answer closes an earlier change request.
+    expect(
+      openChangeRequests(
+        agenda,
+        [
+          receipt([
+            { entry_id: 'retention', choice: 'option', value: 90, outcome: 'change_request' },
+          ]),
+          receipt(
+            [{ entry_id: 'retention', choice: 'option', value: 90, outcome: 'decided' }],
+            'rcp-0000000000000002'
+          ),
+        ],
+        effective
+      )
+    ).toEqual([]);
   });
 
   it('derives the invitee actor id from the invite id', () => {
