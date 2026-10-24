@@ -372,16 +372,58 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
         return [];
       }
       // Capability-projection candidacy: a provider that cannot structurally
-      // project this team role's KD-05 tier is excluded here (so a fallback
-      // candidate can win) rather than refused later at dispatch.
+      // project this team role's KD-05 tier must not win this slot — but the
+      // candidate is only dropped when no fallback provider can either. A
+      // fixed/requested provider that cannot project is never substituted.
       if (
         resolvedTarget.provider &&
         !providerCanProjectProfile(resolvedTarget.provider, requiredTier)
       ) {
-        blockedReasons.add(
-          `Provider "${resolvedTarget.provider}" cannot project the "${requiredTier}" capability tier.`
-        );
-        return [];
+        const failedProvider = resolvedTarget.provider;
+        if (fixedSelection || explicitSelection) {
+          blockedReasons.add(
+            `Provider "${failedProvider}" cannot project the "${requiredTier}" capability tier.`
+          );
+          return [];
+        }
+        const alternates = [
+          ...new Set(
+            [...(profile.fallback_providers || []), ...providerConfig.default_priority].filter(
+              (alt): alt is string =>
+                typeof alt === 'string' && alt !== failedProvider && alt !== resolvedTarget.provider
+            )
+          ),
+        ];
+        let recovered = false;
+        for (const alt of alternates) {
+          if (!providerCanProjectProfile(alt, requiredTier)) continue;
+          try {
+            const retry = resolveAgentProviderTarget(
+              {
+                preferredProvider: alt,
+                preferredModelId: undefined,
+                providerStrategy:
+                  providerPreference?.strategy || profile.provider_strategy || 'adaptive',
+                fallbackProviders: [],
+                requiredCapabilities: profile.capabilities,
+              },
+              discoveredProviders
+            );
+            if (retry.provider && retry.strategy !== 'unresolved') {
+              resolvedTarget = retry;
+              recovered = true;
+              break;
+            }
+          } catch {
+            // Try the next alternate; resolution failures here are not fatal.
+          }
+        }
+        if (!recovered) {
+          blockedReasons.add(
+            `No provider can project the "${requiredTier}" capability tier for this candidate.`
+          );
+          return [];
+        }
       }
       const capabilityHits = Array.from(requiredCapabilities).filter((capability) =>
         profileCapabilities.has(capability)
