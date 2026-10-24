@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-CUSTOMER-DECISION-CD10-20261024-2026_10_24",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Lifecycle hooks: read archived state after finish, test the real transition, validate outward content at the store",
+  "summary": "Lessons from CD-10 bolt reviews: finish archives a mission, so later hooks must read archive-inclusive state; injected loaders hide that; outward-facing content checks belong at the store write; a live check against built artifacts finds mocked-away permission bugs.",
+  "candidate_id": "mem-MSN-CUSTOMER-DECISION-CD10-20261024-2026_10_24",
+  "evidence_refs": [
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD10-20261024/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD10-20261024/evidence/retrospective.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD10-20261024/evidence/test-report.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD10-20261024/evidence/delivery-report.md"
+  ],
+  "created_at": "2026-10-24T09:38:50.398Z",
+  "applicability": ["mission", "mission:MSN-CUSTOMER-DECISION-CD10-20261024"],
+  "reusable_steps": [
+    "Lessons from CD-10 bolt reviews: finish archives a mission, so later hooks must read archive-inclusive state; injected loaders hide that; outward-facing content checks belong at the store write; a live check against built artifacts finds mocked-away permission bugs"
+  ],
+  "expected_outcome": "Applies when code reacts to mission lifecycle transitions or sends content to an external party.\n\n1. finishMission archives the mission directory (status archived). Code that runs later (next mission start, operator commands) must load state with loadMissionStateIncludingArchive and treat completed and archived as finished, like prerequisites do.\n2. Cover a lifecycle hook with one real integration test (finish A, act on A, start B) instead of injecting the state loader; injected loaders hide archive-path bugs.\n3. Validate outward-facing content (customer links: https only, no localhost, private, link-local, NAT64/6to4, .local/.internal) at the store write and at submit/send, not only at the command that first creates it.\n4. A shared narrow role whose content rule lives in the store is a coding rule, not a guard; record it and narrow the role reach or check content at the guard.\n5. Run one live check against the real server and built facade per surface wave: it finds permission denials that unit tests mock away (e.g. an inbox write under the wrong role).",
+  "source_branch": "feat/customer-decision-cd10-20261024",
+  "source_commit": "055c3a3ba9e4249494afbcd13d72b35c0ba498ed"
+}

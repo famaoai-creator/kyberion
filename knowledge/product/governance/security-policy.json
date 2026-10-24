@@ -927,6 +927,10 @@
         "active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/"
       ]
     },
+    "customer_decision_milestone_store": {
+      "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"],
+      "allow_write": ["knowledge/confidential/${KYBERION_TENANT}/decisions/"]
+    },
     "autonomy_learning_store": {
       "allow_read": [
         "active/shared/runtime/autonomy-learning/confidential/${KYBERION_TENANT}",

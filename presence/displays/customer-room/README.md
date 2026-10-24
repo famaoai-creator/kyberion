@@ -41,8 +41,9 @@ Routes — everything else is a plain 404:
 | `GET /js/app/<name>.js` | the page's compiled modules (no tests, no source maps)             |
 | `POST /api/view`        | `Authorization: Bearer <token>`                                    |
 | `POST /api/respond`     | `Authorization: Bearer <token>`, body `{content_hash, answers}`    |
+| `POST /api/attachment`  | `Authorization: Bearer <token>`, body `{attachment_id}` (64 hex)   |
 
-- `view` / `respond` run `dist/scripts/customer_decision.js view|respond --tenant <tenant> --json`
+- `view` / `respond` / `attachment` run `dist/scripts/customer_decision.js <verb> --tenant <tenant> --json`
   as a child process (`src/server/facade.ts`), request on STDIN, with a time
   and output-size limit. The tenant comes only from the process environment;
   a `tenant`/`case`/`dir` in a body or query string is ignored (and the facade
@@ -60,6 +61,13 @@ Routes — everything else is a plain 404:
 - Facade reason codes map to HTTP statuses (`invalid_link` 404, `expired`/`revoked`/`closed` 410,
   `updating`/`stale_version` 409, `invalid_answers` 422, `not_entitled` 403, anything else 503).
   The page shows plain messages, never codes or ids.
+- `attachment` (CD-10) answers the image bytes of one id listed on the invite's
+  agenda: the type comes from a fixed list (png / jpeg / webp) and must match the
+  leading bytes, at most 512 KB, `X-Content-Type-Options: nosniff`,
+  `Content-Disposition: inline`, `Cache-Control: no-store`. Anything else answers
+  like `view` (`invalid_link` 404 for an id not on the agenda). The page fetches
+  each image with the token header and shows it from a `blob:` URL (the CSP allows
+  `blob:` for `img-src` only); external links open with `rel="noopener noreferrer"`.
 - No operator `ViewerContext`, no other Kyberion API, no proxying. 64 KB body limit,
   per-IP rate limit, strict CSP (no inline script), `Referrer-Policy: no-referrer`,
   `Cache-Control: no-store`, `X-Frame-Options: DENY`.
@@ -81,7 +89,7 @@ src/server/routes.ts      the route table, headers, limits, reason mapping
 src/server/facade.ts      the child-process door to customer_decision.js
 src/server/page.ts        page template + vocabulary embedding
 src/app/model.ts          fragment, drafts -> answers, wording, failure screens (no DOM)
-src/app/api.ts            the two calls (token in the header only)
+src/app/api.ts            the calls (token in the header only)
 src/app/main.ts           the page
 static/                   index.html, app.css, generated kyberion-ui(.tokens).css
 ```

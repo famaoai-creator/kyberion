@@ -119,3 +119,57 @@ body {
   margin: 0;
   padding-left: var(--kb-ui-space-4);
 }
+
+/* CD-10: images and links shown with an item. */
+.cr-background {
+  white-space: pre-line;
+}
+
+.cr-attachment {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+}
+
+.cr-attachment__frame {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 8rem;
+  overflow: hidden;
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface-sunken);
+}
+
+.cr-attachment__frame[data-state='shown'] {
+  min-height: 0;
+}
+
+.cr-attachment__frame .kb-text {
+  margin: 0;
+  padding: var(--kb-ui-space-3);
+  text-align: center;
+}
+
+.cr-attachment__image {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cr-links .kb-list {
+  margin: 0;
+}
+
+.cr-link {
+  color: var(--kb-ui-accent-text);
+  text-decoration: underline;
+  overflow-wrap: anywhere;
+}
+
+.cr-link:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+}

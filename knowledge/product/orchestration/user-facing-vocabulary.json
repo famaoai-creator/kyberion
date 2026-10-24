@@ -33484,6 +33484,51 @@
         "en": "Decisions that came up during the work",
         "ja": "作業の中で決めていただきたいこと",
         "qps-ploc": "⟦Ḓėƈïşïőñş ŧħȧŧ ƈȧɱė ůṗ ḓůřïñɠ ŧħė ẇőřķ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "template_bolt_review_title": {
+        "en": "Review of the latest results",
+        "ja": "今回の成果のご確認",
+        "qps-ploc": "⟦Řėṽïėẇ őƒ ŧħė ŀȧŧėşŧ řėşůŀŧş ŀőřėɱ ïṗş⟧"
+      },
+      "bolt_review_question": {
+        "en": "Do you accept the results of this bolt?",
+        "ja": "この bolt の成果を受け入れますか。",
+        "qps-ploc": "⟦Ḓő ẏőů ȧƈƈėṗŧ ŧħė řėşůŀŧş őƒ ŧħïş ƀőŀŧ? ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "bolt_review_background": {
+        "en": "What changed in this bolt:",
+        "ja": "この bolt で変わった点:",
+        "qps-ploc": "⟦Ẇħȧŧ ƈħȧñɠėḓ ïñ ŧħïş ƀőŀŧ: ŀőřėɱ ïṗ⟧"
+      },
+      "bolt_review_preview_link_label": {
+        "en": "Preview",
+        "ja": "プレビュー",
+        "qps-ploc": "⟦Ṗřėṽïėẇ ŀőř⟧"
+      },
+      "bolt_review_work_item_title": {
+        "en": "Customer requested changes: bolt {missionId}",
+        "ja": "顧客からの修正依頼: bolt {missionId}",
+        "qps-ploc": "⟦Ƈůşŧőɱėř řėɋůėşŧėḓ ƈħȧñɠėş: ƀőŀŧ {missionId} ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "bolt_review_work_item_description": {
+        "en": "The customer requested changes to bolt {missionId} (agenda {agendaId}, entry {entryId}, decision {ref}). The request is in the confidential decision case {caseId}. Plan the changes for a following bolt.",
+        "ja": "顧客から bolt {missionId} への修正依頼がありました（調整セット {agendaId}、項目 {entryId}、決定 {ref}）。依頼の内容は confidential の決定案件 {caseId} にあります。後続の bolt で対応を計画してください。",
+        "qps-ploc": "⟦Ŧħė ƈůşŧőɱėř řėɋůėşŧėḓ ƈħȧñɠėş ŧő ƀőŀŧ {missionId} (ȧɠėñḓȧ {agendaId}, ėñŧřẏ {entryId}, ḓėƈïşïőñ {ref}). Ŧħė řėɋůėşŧ ïş ïñ ŧħė ƈőñƒïḓėñŧïȧŀ ḓėƈïşïőñ ƈȧşė {caseId}. Ṗŀȧñ ŧħė ƈħȧñɠėş ƒőř ȧ ƒőŀŀőẇïñɠ ƀőŀŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "bolt_review_rejected_title": {
+        "en": "Customer rejected bolt {missionId}",
+        "ja": "顧客が bolt {missionId} を却下しました",
+        "qps-ploc": "⟦Ƈůşŧőɱėř řėĵėƈŧėḓ ƀőŀŧ {missionId} ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "bolt_review_rejected_body": {
+        "en": "Agenda {agendaId}, entry {entryId}, decision {ref} in decision case {caseId}. Read the customer's comment in the case and follow up with the customer.",
+        "ja": "決定案件 {caseId} の調整セット {agendaId}、項目 {entryId}、決定 {ref}。案件にある顧客のコメントを確認し、顧客と調整してください。",
+        "qps-ploc": "⟦Ȧɠėñḓȧ {agendaId}, ėñŧřẏ {entryId}, ḓėƈïşïőñ {ref} ïñ ḓėƈïşïőñ ƈȧşė {caseId}. Řėȧḓ ŧħė ƈůşŧőɱėř'ş ƈőɱɱėñŧ ïñ ŧħė ƈȧşė ȧñḓ ƒőŀŀőẇ ůṗ ẇïŧħ ŧħė ƈůşŧőɱėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀő⟧"
+      },
+      "bolt_review_next_step": {
+        "en": "Next: draft a bolt review for the customer with: {command}",
+        "ja": "次の一手: 顧客に送る bolt レビューの下書きを作る: {command}",
+        "qps-ploc": "⟦Ñėẋŧ: ḓřȧƒŧ ȧ ƀőŀŧ řėṽïėẇ ƒőř ŧħė ƈůşŧőɱėř ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       }
     },
     "customer_room": {
@@ -33876,6 +33921,61 @@
         "en": "Try again",
         "ja": "もう一度試す",
         "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
+      },
+      "reject": {
+        "en": "Reject",
+        "ja": "却下する",
+        "qps-ploc": "⟦Řėĵėƈŧ ŀőř⟧"
+      },
+      "reject_hint": {
+        "en": "Tell us why. Our representative will contact you.",
+        "ja": "理由を書いてください。担当者からご連絡します。",
+        "qps-ploc": "⟦Ŧėŀŀ ůş ẇħẏ. Őůř řėṗřėşėñŧȧŧïṽė ẇïŀŀ ƈőñŧȧƈŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "reject_reason_missing": {
+        "en": "Please write why you are rejecting.",
+        "ja": "却下の理由をご記入ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ẇřïŧė ẇħẏ ẏőů ȧřė řėĵėƈŧïñɠ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "value_rejected": {
+        "en": "Rejected",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "draft_accept": {
+        "en": "Accept these results as delivered.",
+        "ja": "この成果をそのまま受け入れます。",
+        "qps-ploc": "⟦Ȧƈƈėṗŧ ŧħėşė řėşůŀŧş ȧş ḓėŀïṽėřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "attachments_heading": {
+        "en": "Screens",
+        "ja": "画面",
+        "qps-ploc": "⟦Şƈřėėñş ŀőř⟧"
+      },
+      "attachment_loading": {
+        "en": "Loading image…",
+        "ja": "画像を読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ïɱȧɠė… ŀőřė⟧"
+      },
+      "attachment_failed": {
+        "en": "This image could not be shown.",
+        "ja": "この画像は表示できませんでした。",
+        "qps-ploc": "⟦Ŧħïş ïɱȧɠė ƈőůŀḓ ñőŧ ƀė şħőẇñ. ŀőřėɱ ïṗşů⟧"
+      },
+      "attachment_caption": {
+        "en": "{name} ({size})",
+        "ja": "{name}（{size}）",
+        "qps-ploc": "⟦{name} ({size}) ŀőřė⟧"
+      },
+      "links_heading": {
+        "en": "Links",
+        "ja": "リンク",
+        "qps-ploc": "⟦Ŀïñķş ŀőř⟧"
+      },
+      "link_host": {
+        "en": "Opens {host} in a new tab",
+        "ja": "{host} を新しいタブで開きます",
+        "qps-ploc": "⟦Őṗėñş {host} ïñ ȧ ñėẇ ŧȧƀ ŀőřėɱ ïṗ⟧"
       }
     }
   }

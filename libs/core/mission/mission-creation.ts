@@ -767,6 +767,13 @@ export async function startMission(args: {
       }
     }
 
+    // CD-10: this bolt's start closes the override window of earlier bolts'
+    // reviews in the same decision case (best-effort; never blocks the start).
+    if (activated) {
+      const { passBoltReviewMilestones } = await import('./mission-bolt-review.js');
+      passBoltReviewMilestones(upperId);
+    }
+
     await emitMissionLifecycleIntentSnapshot({
       missionId: upperId,
       stage: 'intake',
