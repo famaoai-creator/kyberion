@@ -452,7 +452,10 @@ export default function ConciergePage() {
     async (item: ConciergeSummary['approval_queue'][number], decision: 'approved' | 'rejected') => {
       setBusyId(item.id);
       try {
-        if (item.min_assurance === 'A3') {
+        // Human-proof floor: A2+ requests need a verified human signature —
+        // the plain POST session method cannot prove it, so passkey (A3)
+        // decides them. A0/A1 requests keep the plain card decision.
+        if (item.min_assurance === 'A3' || item.min_assurance === 'A2') {
           await decideWithPasskey({
             requestId: item.id,
             decision,
