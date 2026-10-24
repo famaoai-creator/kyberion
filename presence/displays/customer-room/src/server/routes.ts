@@ -6,7 +6,7 @@
  *   GET  /assets/<f>    the page's stylesheets
  *   GET  /js/app/*.js   the page's compiled modules
  *   POST /api/view      Authorization: Bearer <token>            -> facade `view`
- *   POST /api/respond   Authorization: Bearer <token>, {content_hash, answers} -> facade `respond`
+ *   POST /api/respond   Authorization: Bearer <token>, {content_hash, answers, general_question?} -> facade `respond`
  *   POST /api/attachment Authorization: Bearer <token>, {attachment_id}       -> facade `attachment`
  *                        (the image bytes; png / jpeg / webp only, nosniff, no-store)
  *
@@ -290,12 +290,14 @@ export function registerCustomerRoomRoutes(
         }
         input = { token, attachment_id: body.attachment_id };
       } else {
-        // Only these two fields are forwarded; a `tenant` (or anything else) in the body is dropped.
+        // Only these fields are forwarded; a `tenant` (or anything else) in the body is dropped.
+        // `general_question` goes through untouched: the facade owns its validation.
         if (typeof body.content_hash !== 'string' || !Array.isArray(body.answers)) {
           res.status(400).json(failure('invalid_request'));
           return;
         }
         input = { token, content_hash: body.content_hash, answers: body.answers };
+        if (body.general_question !== undefined) input.general_question = body.general_question;
       }
       const outcome = await options.spawner(verb, input).catch(() => null);
       let result: { status: number; body: Record<string, unknown>; diagnostic?: string } =
