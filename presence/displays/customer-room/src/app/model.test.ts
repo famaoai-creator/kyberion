@@ -10,8 +10,13 @@ import {
   emptyDraft,
   entryAttachments,
   entryLinks,
+  formatRespondBy,
   formatSize,
+  GENERAL_QUESTION_MAX,
   isPendingCustomer,
+  isRespondByPast,
+  localCalendarDate,
+  normalizeGeneralQuestion,
   issueMessageKey,
   keepAvailable,
   needsOurConfirmation,
@@ -317,6 +322,45 @@ describe('attachments and links in the view', () => {
     expect(formatSize(2048, 'en')).toBe('2 kB');
     expect(formatSize(10, 'en')).toBe('1 kB');
     expect(formatSize(300 * 1024, 'ja')).toContain('300');
+  });
+});
+
+describe('answer target date', () => {
+  it('formats the value as a calendar date without any timezone shift', () => {
+    expect(formatRespondBy('2026-10-30', 'ja', 2026)).toBe('10月30日');
+    expect(formatRespondBy('2026-10-30', 'en', 2026)).toBe('October 30');
+    expect(formatRespondBy('2026-01-01', 'en', 2026)).toBe('January 1');
+    // The year is added only when it is not the current one.
+    expect(formatRespondBy('2027-01-05', 'ja', 2026)).toBe('2027年1月5日');
+  });
+  it('shows nothing for a missing or malformed value', () => {
+    for (const bad of [undefined, null, '', '2026-02-30', '2026-13-01', '20261030', 5]) {
+      expect(formatRespondBy(bad, 'en', 2026)).toBeNull();
+    }
+  });
+  it('is past only on a later calendar day, never on the day itself', () => {
+    expect(isRespondByPast('2026-10-30', '2026-10-30')).toBe(false);
+    expect(isRespondByPast('2026-10-30', '2026-10-29')).toBe(false);
+    expect(isRespondByPast('2026-10-30', '2026-10-31')).toBe(true);
+    expect(isRespondByPast('bad', '2026-10-31')).toBe(false);
+  });
+  it('reads the viewer calendar date in local time', () => {
+    expect(localCalendarDate(new Date(2026, 9, 5, 23, 59))).toBe('2026-10-05');
+  });
+});
+
+describe('general question', () => {
+  it('trims, treats blank as none and keeps line breaks inside', () => {
+    expect(normalizeGeneralQuestion('  a\nb  ')).toEqual({ question: 'a\nb' });
+    expect(normalizeGeneralQuestion('  \n ')).toEqual({});
+  });
+  it('accepts exactly the limit and flags one more', () => {
+    expect(normalizeGeneralQuestion('x'.repeat(GENERAL_QUESTION_MAX))).toEqual({
+      question: 'x'.repeat(GENERAL_QUESTION_MAX),
+    });
+    expect(normalizeGeneralQuestion('x'.repeat(GENERAL_QUESTION_MAX + 1))).toEqual({
+      issue: 'general_too_long',
+    });
   });
 });
 

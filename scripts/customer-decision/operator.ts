@@ -9,11 +9,14 @@ import { auditChain } from '@agent/core/governance/audit-chain';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { installReasoningBackendsForService } from '@agent/core/reasoning/reasoning-bootstrap';
-import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import * as path from 'node:path';
+import { logger } from '@agent/core/core';
+import { assertSafeRepositoryPath, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
 import {
   CUSTOMER_ACTOR_ID_PATTERN,
   CUSTOMER_SLUG_PATTERN,
   appendDecisions,
+  customerActorsPath,
   readCustomerActors,
   readLedger,
   writeCustomerActors,
@@ -59,7 +62,9 @@ import {
   editableEntry,
   assertUniqueEntries,
   assertNoOpenAgendaOverlap,
+  parseRespondBy,
 } from './common.js';
+import { findTenantCustomerChannelBinding } from '@agent/core/customer-channel-binding';
 import { reconcileCase } from './reconcile.js';
 
 // ---------------------------------------------------------------------------
@@ -85,11 +90,23 @@ function draftLocked(
     if (current.status === 'closed' || current.status === 'withdrawn') {
       throw new ScriptExitError(2, `agenda ${current.agenda_id} is ${current.status}`);
     }
-    const incoming = readJson<Partial<DecisionAgenda>>(
-      assertSafeRepositoryPath(requireOpt(opts, 'file'))
-    );
+    const respondByOpt = parseRespondBy(opts['respond-by'], now);
+    // `--respond-by` alone edits only the date; anything else comes from --file.
+    const incoming =
+      opts.file !== undefined || respondByOpt === undefined
+        ? readJson<Partial<DecisionAgenda>>(assertSafeRepositoryPath(requireOpt(opts, 'file')))
+        : {};
     if (!incoming || typeof incoming !== 'object')
       throw new ScriptExitError(2, '--file must hold an agenda object');
+    const incomingRespondBy =
+      'respond_by' in incoming
+        ? parseRespondBy(
+            incoming.respond_by === null || incoming.respond_by === undefined
+              ? 'none'
+              : String(incoming.respond_by),
+            now
+          )
+        : undefined;
     const entries = Array.isArray(incoming.entries)
       ? incoming.entries.map(editableEntry)
       : current.entries.map(editableEntry);
@@ -108,12 +125,19 @@ function draftLocked(
             pinned_ids: [...approvedOurDecisionIds(current)],
           }
         : current.in_force;
-    const { from: currentFrom, ...restWithoutFrom } = rest;
+    const { from: currentFrom, respond_by: currentRespondBy, ...restWithoutFrom } = rest;
     const from = typeof incoming.from === 'string' ? incoming.from.trim() : currentFrom;
+    const respondBy =
+      respondByOpt !== undefined
+        ? respondByOpt
+        : incomingRespondBy !== undefined
+          ? incomingRespondBy
+          : (currentRespondBy ?? null);
     const next: DecisionAgenda = {
       ...restWithoutFrom,
       ...(inForce ? { in_force: inForce } : {}),
       ...(from ? { from } : {}),
+      ...(respondBy ? { respond_by: respondBy } : {}),
       title: typeof incoming.title === 'string' ? incoming.title : current.title,
       entries,
       revision: frozen ? current.revision + 1 : current.revision,
@@ -134,8 +158,9 @@ function draftLocked(
   if (!CUSTOMER_SLUG_PATTERN.test(customer)) throw usageError('--customer must be a customer slug');
   // i18n-exempt: validates the --locale flag against the agenda schema's ja|en enum, not a UI branch
   const locale = opts.locale === 'en' ? 'en' : 'ja';
+  const respondBy = parseRespondBy(opts['respond-by'], now);
   const template = loadDecisionTemplate(opts.template ?? DEFAULT_TEMPLATE);
-  const agenda = instantiateTemplate(template, {
+  const instantiated = instantiateTemplate(template, {
     agendaId: newAgendaId(),
     tenantSlug: tenant,
     caseId,
@@ -147,6 +172,9 @@ function draftLocked(
     ...(opts.deal ? { dealId: opts.deal } : {}),
     ...(opts.project ? { projectId: opts.project } : {}),
   });
+  const agenda: DecisionAgenda = respondBy
+    ? { ...instantiated, respond_by: respondBy }
+    : instantiated;
   assertUniqueEntries(agenda.entries);
   assertNoOpenAgendaOverlap(location, tenant, agenda.agenda_id, agenda.entries);
   const written = asLedgerWriter(tenant, () => writeAgenda(location, agenda));
@@ -472,18 +500,32 @@ export function runActorAdd(opts: Record<string, string>): unknown {
   const actorId = requireOpt(opts, 'actor');
   if (!CUSTOMER_ACTOR_ID_PATTERN.test(actorId)) throw usageError('--actor must be customer:<id>');
   const name = requireOpt(opts, 'name');
+  const channel = parseActorChannel(tenant, opts.channel);
   // The registry is shared by every case of the customer: serialize read → write.
   return withCustomerActorsLock(tenant, customer, () =>
     asLedgerWriter(tenant, () => {
       const actors = readCustomerActors(location, customer);
       const existing = actors.find((actor) => actor.id === actorId);
+      const { channel: existingChannel, ...existingRest } = existing ?? {};
+      const kept = channel === undefined ? existingChannel : (channel ?? undefined);
       const actor: DecisionCustomerActor = {
-        ...(existing ?? {}),
+        ...existingRest,
         id: actorId,
         name,
         decides: [...new Set([...(existing?.decides ?? []), 'customer-value' as const])],
         ...(opts['confirm-target'] ? { confirm_target: opts['confirm-target'] } : {}),
+        ...(kept ? { channel: kept } : {}),
       };
+      // Channel bindings name no customer, so a channel can be linked to
+      // another customer's decider by mistake: warn when another customer's
+      // actor already uses it (the reminder would reach that customer's chat).
+      const sharedWith = actor.channel
+        ? customersSharingChannel(location, tenant, customer, actor.channel)
+        : [];
+      if (sharedWith.length)
+        logger.warn(
+          `customer decision actor channel is also used by another customer — check that ${actor.channel?.surface}:${actor.channel?.channel_id} is ${customer}'s chat | customers=${sharedWith.join(',')} | actor=${actorId}`
+        );
       const registry = writeCustomerActors(location, {
         version: '1.0.0',
         tenant_slug: tenant,
@@ -501,11 +543,78 @@ export function runActorAdd(opts: Record<string, string>): unknown {
           actor_id: actorId,
           decides: actor.decides,
           updated: Boolean(existing),
+          ...(actor.channel ? { channel_surface: actor.channel.surface } : {}),
+          ...(sharedWith.length ? { channel_shared_with_customers: sharedWith } : {}),
         },
       });
-      return { customer, actor, actors: registry.actors.length };
+      return {
+        customer,
+        actor,
+        actors: registry.actors.length,
+        ...(sharedWith.length
+          ? {
+              warnings: sharedWith.map((other) => `channel_shared_with_customer:${other}`),
+            }
+          : {}),
+      };
     })
   );
+}
+
+const CHANNEL_SURFACES = ['slack', 'telegram', 'email', 'imessage', 'discord'] as const;
+
+/**
+ * Other customers of the tenant with an actor on this channel (call as the
+ * ledger role). A scratch `--dir` case has one actor file, so nothing to compare.
+ */
+function customersSharingChannel(
+  location: DecisionLedgerLocation,
+  tenant: string,
+  customer: string,
+  channel: NonNullable<DecisionCustomerActor['channel']>
+): string[] {
+  if ('dir' in location) return [];
+  const root = path.dirname(path.dirname(customerActorsPath(tenant, customer)));
+  if (!safeExistsSync(root)) return [];
+  return safeReaddir(root)
+    .filter((name) => name !== customer && CUSTOMER_SLUG_PATTERN.test(name))
+    .filter((other) =>
+      readCustomerActors(location, other).some(
+        (item) =>
+          item.channel?.surface === channel.surface &&
+          item.channel.channel_id === channel.channel_id
+      )
+    )
+    .sort();
+}
+
+/**
+ * CD-11 `--channel <surface>:<channel_id>`: a channel the tenant has bound
+ * (`customer/<tenant>/connections/channel-bindings.json`, active) — reminders
+ * for the actor go there. `none` clears it (null); undefined when absent.
+ */
+function parseActorChannel(
+  tenant: string,
+  value: string | undefined
+): DecisionCustomerActor['channel'] | null | undefined {
+  if (value === undefined) return undefined;
+  const raw = value.trim();
+  if (raw === 'none') return null;
+  const separator = raw.indexOf(':');
+  const surface = separator > 0 ? raw.slice(0, separator) : '';
+  const channelId = separator > 0 ? raw.slice(separator + 1).trim() : '';
+  const known = CHANNEL_SURFACES.find((item) => item === surface);
+  if (!known || !channelId || channelId.length > 200)
+    throw usageError(
+      `--channel must be <surface>:<channel_id> (${CHANNEL_SURFACES.join('|')}) or none`
+    );
+  if (!findTenantCustomerChannelBinding(tenant, known, channelId)) {
+    throw new ScriptExitError(
+      2,
+      `channel ${known}:${channelId} is not an active binding of tenant ${tenant} (customer/${tenant}/connections/channel-bindings.json); bind it first`
+    );
+  }
+  return { surface: known, channel_id: channelId };
 }
 
 function assertSendable(agenda: DecisionAgenda): void {

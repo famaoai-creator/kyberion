@@ -526,3 +526,52 @@ describe('receipts, duplicates and change requests', () => {
     expect(inviteeActorId(invite())).toBe('user:inv-0123456789abcdef');
   });
 });
+
+describe('general question (CD-11)', () => {
+  it('records a general question in the receipt, alone or with answers', () => {
+    const alone = planCustomerResponse(input({ answers: [], general_question: '  Hosting?  ' }));
+    expect(alone.ok).toBe(true);
+    if (!alone.ok) return;
+    expect(alone.plan.general_question).toBe('Hosting?');
+    expect(alone.plan.appends).toEqual([]);
+    const receipt = buildResponseReceipt(alone.plan, baseAgenda(), invite(), [], NOW);
+    expect(receipt.general_question).toBe('Hosting?');
+    const both = planCustomerResponse(
+      input({
+        answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+        general_question: 'And SLAs?',
+      })
+    );
+    expect(both.ok && both.plan.general_question).toBe('And SLAs?');
+  });
+
+  it("keeps today's requests valid and refuses a malformed question", () => {
+    // No question: empty answers stay invalid, a blank question is no question.
+    expect(planCustomerResponse(input({ answers: [] }))).toMatchObject({ ok: false });
+    expect(planCustomerResponse(input({ answers: [], general_question: '   ' }))).toMatchObject({
+      ok: false,
+      reason: 'invalid_answers',
+    });
+    const plain = planCustomerResponse(
+      input({ answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }] })
+    );
+    expect(plain.ok && 'general_question' in plain.plan).toBe(false);
+    expect(planCustomerResponse(input({ answers: [], general_question: 42 }))).toMatchObject({
+      ok: false,
+      reason: 'invalid_answers',
+    });
+    expect(
+      planCustomerResponse(input({ answers: [], general_question: 'x'.repeat(10001) }))
+    ).toMatchObject({ ok: false, errors: [{ entry_id: '', error: 'comment_too_long' }] });
+  });
+
+  it('a resubmit with another question is not a duplicate', () => {
+    const first = planCustomerResponse(input({ answers: [], general_question: 'A?' }));
+    if (!first.ok) throw new Error('planned');
+    const receipt = buildResponseReceipt(first.plan, baseAgenda(), invite(), [], NOW);
+    expect(findDuplicateReceipt(first.plan, invite(), [receipt])).toBe(receipt);
+    const second = planCustomerResponse(input({ answers: [], general_question: 'B?' }));
+    if (!second.ok) throw new Error('planned');
+    expect(findDuplicateReceipt(second.plan, invite(), [receipt])).toBeUndefined();
+  });
+});

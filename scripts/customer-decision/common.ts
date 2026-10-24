@@ -14,6 +14,8 @@ import {
   agendaContentHash,
   dealNoteForSwitches,
   entryLayersProblem,
+  isCalendarDate,
+  utcDate,
   listAgendas,
   readAgenda,
   withCustomerDecisionCaseLock,
@@ -83,12 +85,12 @@ export function parseCustomerDecisionArgs(argv: readonly string[]): ParsedArgs {
 
 export function usage(): string {
   return [
-    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>]',
-    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --agenda <id> --file <agenda.json>',
+    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>]',
+    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --agenda <id> [--file <agenda.json>] [--respond-by <YYYY-MM-DD>|none]',
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --from-tasks [--agenda <draft id>] [--customer <slug>] [--title <t>] [--locale ja|en]',
     'pnpm kyberion customer-decision generate  --tenant <slug> --case <id> --agenda <id> --intent-file <path> [--grounding-file <path>]',
     'pnpm kyberion customer-decision submit    --tenant <slug> --case <id> --agenda <id> --by user:<member> [--role owner|approver]',
-    'pnpm kyberion customer-decision actor-add --tenant <slug> --case <id> --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>]',
+    'pnpm kyberion customer-decision actor-add --tenant <slug> --case <id> --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>] [--channel <surface>:<channel_id>|none]',
     'pnpm kyberion customer-decision send      --tenant <slug> --case <id> --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]',
     'pnpm kyberion customer-decision bolt-review --tenant <slug> --case <id> --mission <MSN> --customer <slug> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>] [--title <t>] [--from <text>] [--locale ja|en] [--project <id>] [--by user:<member>]',
     'pnpm kyberion customer-decision status    --tenant <slug> --case <id> [--agenda <id>]',
@@ -96,13 +98,30 @@ export function usage(): string {
     'pnpm kyberion customer-decision close     --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',
     'pnpm kyberion customer-decision withdraw  --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',
     'pnpm kyberion customer-decision revoke    --tenant <slug> --case <id> --invite <id> --reason <text>',
+    'pnpm kyberion customer-decision remind    --tenant <slug> [--case <id>] [--dry-run] [--now <iso>]',
+    'pnpm kyberion customer-decision reminders --tenant <slug> --install [--force] [--dry-run]',
     'pnpm kyberion customer-decision view      --tenant <slug> [--case <id>] --json   (stdin: {"token"})',
-    'pnpm kyberion customer-decision respond   --tenant <slug> [--case <id>] --json   (stdin: {"token","content_hash","answers"})',
+    'pnpm kyberion customer-decision respond   --tenant <slug> [--case <id>] --json   (stdin: {"token","content_hash","answers","general_question"?})',
     'pnpm kyberion customer-decision attachment --tenant <slug> [--case <id>] --json  (stdin: {"token","attachment_id"})',
     '',
     'send prints the invite link once; forward it to the customer yourself.',
-    'Delivery through a bound customer channel (sendToCustomer) is not part of stage 1.',
+    "Reminders (remind / the daily tenant pipeline) go through the decider's bound channel via sendToCustomer.",
   ].join('\n');
+}
+
+/**
+ * CD-11 `--respond-by`: a real `YYYY-MM-DD` date, not before today (UTC);
+ * `none` clears it (null). Undefined when the option is absent.
+ */
+export function parseRespondBy(value: string | undefined, now: string): string | null | undefined {
+  if (value === undefined) return undefined;
+  const date = value.trim();
+  if (date === 'none') return null;
+  if (!isCalendarDate(date)) throw usageError('--respond-by must be a date (YYYY-MM-DD) or none');
+  const today = utcDate(now);
+  if (today && date < today)
+    throw usageError(`--respond-by ${date} is in the past (today is ${today} UTC)`);
+  return date;
 }
 
 export function usageError(message: string): ScriptExitError {
@@ -190,6 +209,7 @@ export function agendaSummary(agenda: DecisionAgenda): Record<string, unknown> {
     revision: agenda.revision,
     status: agenda.status,
     ...(agenda.from ? { from: agenda.from } : {}),
+    ...(agenda.respond_by ? { respond_by: agenda.respond_by } : {}),
     content_hash: agendaContentHash(agenda),
     entries: agenda.entries.length,
   };

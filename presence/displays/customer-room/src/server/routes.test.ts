@@ -168,6 +168,43 @@ describe('customer-room routes', () => {
     expect(calls).toHaveLength(1);
   });
 
+  it('forwards general_question untouched (the facade validates it) and allows an empty answer list', async () => {
+    await start();
+    next = () => out({ ok: true, receipt_id: 'rcp-1', switches: 0, change_requests: 0 });
+    const ok = await post('/api/respond', {
+      body: { content_hash: 'h', answers: [], general_question: '予算の上限は?', tenant: 'evil' },
+    });
+    expect(ok.status).toBe(200);
+    expect(calls[0]).toEqual({
+      verb: 'respond',
+      input: { token: TOKEN, content_hash: 'h', answers: [], general_question: '予算の上限は?' },
+    });
+    // A non-string question still reaches the facade, which rejects it.
+    next = () =>
+      out({
+        ok: false,
+        reason: 'invalid_answers',
+        errors: [{ entry_id: '', error: 'choice_invalid' }],
+      });
+    const bad = await post('/api/respond', {
+      body: { content_hash: 'h', answers: [], general_question: 42 },
+    });
+    expect(bad.status).toBe(422);
+    expect(calls[1].input).toMatchObject({ general_question: 42 });
+  });
+
+  it('accepts the largest allowed question inside the body cap', async () => {
+    await start();
+    next = () => out({ ok: true, receipt_id: 'rcp-1', switches: 0, change_requests: 0 });
+    // 10000 Japanese characters are about 30 KB of UTF-8, well inside 64 KB.
+    const question = 'あ'.repeat(10000);
+    const response = await post('/api/respond', {
+      body: { content_hash: 'h', answers: [], general_question: question },
+    });
+    expect(response.status).toBe(200);
+    expect(calls[0].input).toMatchObject({ general_question: question });
+  });
+
   it.each([
     ['invalid_link', 404],
     ['expired', 410],
