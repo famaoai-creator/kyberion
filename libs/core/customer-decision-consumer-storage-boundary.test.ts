@@ -336,4 +336,88 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
     expect(rework()).toEqual([]);
     warn.mockRestore();
   });
+
+  it('finds the case after one existence check of the tenant decisions root, as the narrow role', () => {
+    seedCase(TENANT);
+    const listTenantDeals = vi.fn(() => []);
+    const state = (tenant: string) => () =>
+      ({
+        mission_id: task.missionId,
+        tenant_slug: tenant,
+        relationships: { project: { project_id: CASE, relationship_type: 'belongs_to' } },
+      }) as never;
+    expect(
+      lockModule.resolveMissionDecisionCase(task.missionId, {
+        loadMissionState: state(TENANT),
+        listTenantDeals,
+      })
+    ).toMatchObject({ tenantSlug: TENANT, caseId: CASE, source: 'project' });
+    // A tenant with no decisions root: no deal scan at all.
+    expect(
+      lockModule.resolveMissionDecisionCase(task.missionId, {
+        loadMissionState: state('cd-consumer-none'),
+        listTenantDeals,
+      })
+    ).toBeNull();
+    expect(listTenantDeals).not.toHaveBeenCalled();
+    // The root capability allows existence only.
+    expect(() =>
+      capability.customerDecisionConsumerCapability(
+        TENANT,
+        capability.customerDecisionsRootDir(TENANT),
+        { read: ['decisions.jsonl'] }
+      )
+    ).toThrow(/RESOURCE_SCOPE_INVALID/u);
+    expect(() =>
+      capability.customerDecisionConsumerCapability(
+        TENANT,
+        capability.customerDecisionsRootDir(OTHER),
+        {
+          read: [],
+        }
+      )
+    ).toThrow(/RESOURCE_SCOPE_INVALID/u);
+  });
+
+  it('a task boundary touches only its own consumer lock; the sweep may touch any', () => {
+    const own = 'mission-MSN-X.t';
+    const bound = (access: { read: string[]; write?: string }) =>
+      capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), {
+        ...access,
+        owner: own,
+      });
+    expect(() => bound({ read: [], write: `consumers/${own}.json` })).not.toThrow();
+    expect(() => bound({ read: [`consumers/${own}.json`, 'agendas'] })).not.toThrow();
+    expect(() => bound({ read: [], write: 'consumers/mission-MSN-X.other.json' })).toThrow(
+      /RESOURCE_SCOPE_INVALID/u
+    );
+    expect(() => bound({ read: ['consumers/mission-MSN-X.other.json'] })).toThrow(
+      /RESOURCE_SCOPE_INVALID/u
+    );
+    expect(() => bound({ read: ['consumers'] })).toThrow(/RESOURCE_SCOPE_INVALID/u);
+    expect(() =>
+      capability.customerDecisionConsumerCapability(TENANT, caseDir(TENANT), {
+        read: ['consumers', 'consumers/mission-MSN-X.other.json'],
+        write: 'consumers/mission-MSN-X.other.json',
+      })
+    ).not.toThrow();
+    // Task proposals go through the same own-lock path on the real guard.
+    seedCase(TENANT);
+    const recorded = lockModule.recordTaskDecisionProposals(
+      {
+        ...task,
+        requests: [
+          {
+            question: 'Which theme?',
+            item: 'UX',
+            key: 'ui.theme',
+            proposed_value: 'dark',
+            requires_customer: false,
+          },
+        ],
+      },
+      { decisionCase: decisionCase(), now: NOW }
+    );
+    expect(recorded).toMatchObject({ case_found: true, recorded: 1 });
+  });
 });

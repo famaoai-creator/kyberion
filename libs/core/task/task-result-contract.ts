@@ -128,3 +128,39 @@ export function extractTaskResultBlocks(raw: string): {
     taskResultRepairRequiresReview,
   };
 }
+
+const CUSTOMER_DECISIONS_MARK = 'customer_decisions';
+
+/**
+ * CD-09: a worker reply as it may be quoted back in a prompt (the task-result
+ * retry excerpt is recorded as mission-visible, public by default): every
+ * `customer_decisions` field is taken out of the task_result blocks, a block
+ * that cannot be parsed but mentions them is replaced, and a reply that still
+ * mentions them outside a block is not quoted at all (empty string).
+ */
+export function redactCustomerDecisionsForPrompt(raw: string): string {
+  let omitted = 0;
+  const text = replaceFencedBlocks(raw, (lang, content, block) => {
+    if (lang.toLowerCase() !== 'task_result' || !content.includes(CUSTOMER_DECISIONS_MARK))
+      return block;
+    try {
+      const parsed = parseSafeJsonInput(content.trim(), 'task_result block');
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        const { customer_decisions: decisions, ...rest } = parsed as Record<string, unknown>;
+        omitted += Array.isArray(decisions) ? decisions.length : 1;
+        const rendered = JSON.stringify(rest);
+        if (!rendered.includes(CUSTOMER_DECISIONS_MARK)) {
+          return ['```task_result', rendered, '```'].join('\n');
+        }
+      }
+    } catch {
+      // fall through: an unparseable block is not quoted
+    }
+    omitted += 1;
+    return '```task_result\n[omitted: the block carried customer_decisions]\n```';
+  });
+  if (text.includes(CUSTOMER_DECISIONS_MARK)) return '';
+  return omitted > 0
+    ? `${text}\n(customer_decisions omitted from this excerpt: ${omitted}; return them again if they still apply)`
+    : text;
+}

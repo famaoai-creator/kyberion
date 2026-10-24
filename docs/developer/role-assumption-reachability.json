@@ -906,6 +906,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-decision-lock.ts#defaultDecisionsRootExists",
+      "roles": ["customer_decision_consumer_store"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-decision-lock.ts#fileDecisionReworkWorkItem",
       "roles": ["workspace_tenant_registry_reader"],
       "unresolved": []

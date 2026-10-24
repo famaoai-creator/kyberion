@@ -13,6 +13,7 @@ import {
   type DeliveredKnowledgeRef,
 } from '../knowledge/knowledge-feedback-loop.js';
 import type { ContextSecurityScope } from '../context-security-scope.js';
+import { redactCustomerDecisionsForPrompt } from '../task/task-result-contract.js';
 import type { PlannedNextTask, TaskResultBlock } from './mission-orchestration-worker-contracts.js';
 
 export interface MissionVisiblePromptInput {
@@ -164,6 +165,8 @@ export async function obtainTaskResultResponse(
   let parseErrors = parsed.parseErrors;
   let surfaceParseErrors = parsed.surfaceParseErrors;
   const needsRetry = !taskResult || parseErrors.length > 0 || (taskResult.needs || []).length > 0;
+  // CD-09: a retry that omits the first attempt's customer decisions keeps them.
+  const firstCustomerDecisions = taskResult?.customer_decisions;
 
   if (needsRetry) {
     if (taskResult?.needs?.length)
@@ -186,7 +189,8 @@ export async function obtainTaskResultResponse(
     const retryPrompt = deps.buildTaskResultRetryPrompt({
       missionId: input.missionId,
       taskId: input.task.task_id,
-      previousResponse: String(response.payload?.text || ''),
+      // CD-09: the excerpt is mission-visible; customer decisions stay out of it.
+      previousResponse: redactCustomerDecisionsForPrompt(String(response.payload?.text || '')),
       parseErrors: [
         ...(taskResult?.needs?.length ? [`needs unresolved: ${taskResult.needs.join('; ')}`] : []),
         ...parseErrors,
@@ -256,6 +260,9 @@ export async function obtainTaskResultResponse(
     });
     parsed = deps.parseTaskResultResponse(String(response.payload?.text || ''));
     taskResult = parsed.taskResult;
+    if (firstCustomerDecisions?.length && taskResult && !taskResult.customer_decisions) {
+      taskResult.customer_decisions = firstCustomerDecisions;
+    }
     parseErrors = parsed.parseErrors;
     surfaceParseErrors = parsed.surfaceParseErrors;
     if (!taskResult) notes.push('task_result missing after retry');

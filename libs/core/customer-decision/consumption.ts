@@ -28,7 +28,7 @@ import {
   type TaskDecisionProposal,
 } from './model.js';
 import type { ConsumedDecisionLockRecord } from './store.js';
-import type { DecisionRecord } from '../decision-ledger/model.js';
+import { canonicalJson, type DecisionRecord } from '../decision-ledger/model.js';
 import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 
 const SAFE_TASK_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
@@ -92,10 +92,15 @@ export function buildConsumedDecisionLock(input: {
 export function currentDecisionRef(
   agendaId: string | undefined,
   entryId: string | undefined,
-  current: Pick<EffectiveDecision, 'decision_id' | 'layer'> | undefined
+  current: Pick<EffectiveDecision, 'decision_id' | 'layer' | 'value'> | undefined
 ): string {
   if (current?.decision_id) return current.decision_id;
-  return `${agendaId ?? 'agenda'}/${entryId ?? 'entry'}:${current?.layer ?? 'gone'}`;
+  const base = `${agendaId ?? 'agenda'}/${entryId ?? 'entry'}:${current?.layer ?? 'gone'}`;
+  // No ledger id: the value tells one draft edit from the next (A → B → C
+  // files a second rework), as a short hash so no value is spelled out.
+  return current && current.value !== undefined
+    ? `${base}:${shortHash(canonicalJson(current.value), 12)}`
+    : base;
 }
 
 export interface StaleConsumedDecision {
@@ -277,17 +282,25 @@ export function taskProposalsOf(
   return lock.decisions.filter(isTaskProposalEntry);
 }
 
-/** The open agenda entry that already asks this item × key, if any. */
+/**
+ * The open agenda entry that already asks this item × key and may carry the
+ * question. A `requires_customer` question never links to an entry that is
+ * not `requires_customer` (that entry would let our decision stand in for
+ * the customer's); it stays pending for `customer-decision draft --from-tasks`.
+ */
 function openEntryFor(
   agendas: readonly DecisionAgenda[],
   item: string,
-  key: string
+  key: string,
+  requiresCustomer: boolean
 ): { agenda_id: string; entry_id: string } | undefined {
   for (const agenda of openAgendas(agendas)) {
     const entry = agenda.entries.find(
       (candidate) => candidate.item === item && candidate.key === key
     );
-    if (entry) return { agenda_id: agenda.agenda_id, entry_id: entry.entry_id };
+    if (!entry) continue;
+    if (requiresCustomer && !entry.requires_customer) return undefined;
+    return { agenda_id: agenda.agenda_id, entry_id: entry.entry_id };
   }
   return undefined;
 }
@@ -316,7 +329,12 @@ export function mergeTaskProposals(input: {
       proposalIds.push(proposalId);
       continue;
     }
-    const linked = openEntryFor(input.agendas, request.item, request.key);
+    const linked = openEntryFor(
+      input.agendas,
+      request.item,
+      request.key,
+      request.requires_customer
+    );
     const proposal: TaskDecisionProposal = {
       proposal_id: proposalId,
       question: request.question,

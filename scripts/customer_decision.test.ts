@@ -1800,5 +1800,77 @@ describe('customer-decision facade', () => {
         /adds to a draft agenda only/u
       );
     });
+
+    describe('a requires_customer question never rides on an entry our decision settles', () => {
+      const ask = (taskId: string, requires: boolean, now: string) =>
+        import('@agent/core/mission/mission-decision-lock').then(
+          ({ recordTaskDecisionProposals }) =>
+            recordTaskDecisionProposals(
+              {
+                missionId: 'MSN-CD09-REQ',
+                taskId,
+                requests: [
+                  {
+                    question: 'Which sign-in method?',
+                    item: 'NFR',
+                    key: 'auth.method',
+                    requires_customer: requires,
+                    ...(requires ? {} : { proposed_value: 'sso' }),
+                  },
+                ],
+              },
+              { decisionCase: decisionCase(), now }
+            )
+        );
+      const collect = async () =>
+        (await run(['draft', ...base(), '--from-tasks', '--customer', 'acme'])) as {
+          agenda_id: string | null;
+          collected: number;
+          promoted: number;
+          conflicts?: Array<{ proposal_id: string; agenda_id: string }>;
+        };
+      const authEntry = (agendaId: string) =>
+        agendaOf(agendaId).entries.find((entry) => entry.key === 'auth.method');
+
+      it('ours first, then requires_customer (one collect): the entry is promoted', async () => {
+        await ask('a', false, NOW);
+        await ask('b', true, '2026-10-24T01:00:00.000Z');
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 2, promoted: 1 });
+        const entry = authEntry(collected.agenda_id!);
+        expect(entry).toMatchObject({ requires_customer: true });
+        expect(entry).not.toHaveProperty('our_decision');
+      });
+
+      it('requires_customer first, then ours: the entry stays requires_customer', async () => {
+        await ask('a', true, NOW);
+        await ask('b', false, '2026-10-24T01:00:00.000Z');
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 2, promoted: 0 });
+        expect(authEntry(collected.agenda_id!)).toMatchObject({ requires_customer: true });
+        expect(authEntry(collected.agenda_id!)).not.toHaveProperty('our_decision');
+      });
+
+      it('an entry of another draft agenda is promoted and linked', async () => {
+        const draftId = await draftAgenda();
+        await ask('a', true, NOW);
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 1, promoted: 1, agenda_id: null });
+        expect(authEntry(draftId)).toMatchObject({ requires_customer: true });
+        expect(authEntry(draftId)).not.toHaveProperty('our_decision');
+      });
+
+      it('a sent agenda asking it without requires_customer leaves the question pending', async () => {
+        const { agendaId } = await approvedAndSent();
+        const recorded = await ask('a', true, NOW);
+        const collected = await collect();
+        expect(collected).toMatchObject({ collected: 0, promoted: 0 });
+        expect(collected.conflicts).toEqual([
+          { proposal_id: recorded.proposal_ids[0], agenda_id: agendaId, entry_id: 'nfr.auth' },
+        ]);
+        expect(authEntry(agendaId)).toMatchObject({ requires_customer: false });
+        expect((await taskStatus()).pending.count).toBe(1);
+      });
+    });
   });
 });

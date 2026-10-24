@@ -61,6 +61,17 @@ function readLocks(location: DecisionLedgerLocation): ConsumedDecisionLockRecord
   );
 }
 
+/**
+ * An entry that must wait for the customer: `requires_customer`, and (per the
+ * agenda schema) no decision of ours and no organization default under it.
+ */
+function requireCustomer(entry: AgendaEntry): AgendaEntry {
+  const { our_decision: _ours, org_default: _default, ...rest } = entry;
+  void _ours;
+  void _default;
+  return { ...rest, requires_customer: true };
+}
+
 interface PendingProposal {
   lock: ConsumedDecisionLockRecord;
   entry: TaskProposalLockEntry;
@@ -108,34 +119,66 @@ function collectLocked(
     return { case_id: caseId, agenda_id: target?.agenda_id ?? null, collected: 0, added: 0 };
   }
   const agendaId = target?.agenda_id ?? newAgendaId();
-  const others = openAgendas(listAgendas(location)).filter(
-    (agenda) => agenda.agenda_id !== agendaId
+  const others = new Map(
+    openAgendas(listAgendas(location))
+      .filter((agenda) => agenda.agenda_id !== agendaId)
+      .map((agenda) => [agenda.agenda_id, agenda] as const)
   );
+  const promotedAgendas = new Set<string>();
   const entries: AgendaEntry[] = [...(target?.entries ?? [])];
   const links = new Map<string, { agenda_id: string; entry_id: string }>();
+  const conflicts: Array<{ proposal_id: string; agenda_id: string; entry_id: string }> = [];
   let added = 0;
   let linkedExisting = 0;
+  let promoted = 0;
+  let targetChanged = false;
   for (const { entry } of pending) {
     const pair = itemKey(entry);
-    const elsewhere = others
+    const requires = entry.proposal.requires_customer;
+    const elsewhere = [...others.values()]
       .map((agenda) => ({
         agenda,
         asked: agenda.entries.find((candidate) => itemKey(candidate) === pair),
       }))
       .find((candidate) => candidate.asked);
     if (elsewhere?.asked) {
+      const { agenda, asked } = elsewhere;
+      if (requires && !asked.requires_customer) {
+        // A requires_customer question never rides on an entry our decision
+        // could settle: promote a draft entry, else leave it for the operator.
+        if (agenda.status !== 'draft') {
+          conflicts.push({
+            proposal_id: entry.proposal.proposal_id,
+            agenda_id: agenda.agenda_id,
+            entry_id: asked.entry_id,
+          });
+          continue;
+        }
+        others.set(agenda.agenda_id, {
+          ...agenda,
+          entries: agenda.entries.map((candidate) =>
+            candidate === asked ? requireCustomer(candidate) : candidate
+          ),
+        });
+        promotedAgendas.add(agenda.agenda_id);
+        promoted += 1;
+      }
       links.set(entry.proposal.proposal_id, {
-        agenda_id: elsewhere.agenda.agenda_id,
-        entry_id: elsewhere.asked.entry_id,
+        agenda_id: agenda.agenda_id,
+        entry_id: asked.entry_id,
       });
       linkedExisting += 1;
       continue;
     }
-    const here = entries.find((candidate) => itemKey(candidate) === pair);
+    const index = entries.findIndex((candidate) => itemKey(candidate) === pair);
+    const here = index >= 0 ? entries[index] : undefined;
     if (!here) {
-      const created = taskProposalAgendaEntry(entry);
-      entries.push(created);
+      entries.push(taskProposalAgendaEntry(entry));
       added += 1;
+    } else if (requires && !here.requires_customer) {
+      entries[index] = requireCustomer(here);
+      targetChanged = true;
+      promoted += 1;
     }
     links.set(entry.proposal.proposal_id, {
       agenda_id: agendaId,
@@ -143,8 +186,13 @@ function collectLocked(
     });
   }
 
+  for (const id of promotedAgendas) {
+    const agenda = others.get(id)!;
+    assertUniqueEntries(agenda.entries);
+    writeAgenda(location, { ...agenda, updated_at: now });
+  }
   let written: DecisionAgenda | undefined = target;
-  if (added > 0) {
+  if (added > 0 || targetChanged) {
     assertUniqueEntries(entries);
     if (target) {
       written = writeAgenda(location, { ...target, entries, updated_at: now });
@@ -202,6 +250,8 @@ function collectLocked(
     proposal_ids: proposalIds,
     added,
     linked_existing: linkedExisting,
+    promoted,
+    conflicts: conflicts.length,
     consumers,
     ...(written ? { content_hash: agendaContentHash(written) } : {}),
   });
@@ -210,7 +260,15 @@ function collectLocked(
     collected: links.size,
     added,
     linked_existing: linkedExisting,
+    promoted,
     proposal_ids: proposalIds,
+    ...(conflicts.length > 0
+      ? {
+          conflicts,
+          conflict_note:
+            'requires_customer questions on an item an approved or sent agenda asks without requires_customer: edit that agenda (draft --file) or withdraw it, then collect again',
+        }
+      : {}),
     ...(written && added > 0
       ? {
           next: `pnpm kyberion customer-decision submit --tenant ${tenant} --case ${caseId} --agenda ${written.agenda_id} --by user:<member>`,

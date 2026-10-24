@@ -291,6 +291,8 @@ function runRespond(
   // get a rework WorkItem. After the case lock (the sweep takes it itself);
   // best-effort and idempotent over every recorded switch of the agenda, so a
   // failure never fails the customer's response and the next one retries it.
+  // Its lock wait is short (SWEEP_LOCK_TIMEOUT_MS), so respond stays inside
+  // the customer room's facade timeout even when the case is busy.
   sweepDecisionConsumers(
     { tenantSlug: tenant, caseId: invite.case_id, location, agendaId: invite.agenda_id },
     { now }

@@ -523,3 +523,61 @@ describe('task proposals (CD-09 実装中の判断を顧客に回す)', () => {
     }
   });
 });
+
+describe('CD-09 review fixes', () => {
+  const consumer = 'mission-MSN-CD09.impl';
+  const empty = { consumer, decisions: [] };
+
+  it('a requires_customer question never links to an entry our decision could settle; the reverse links', () => {
+    const asksAuth = (requires: boolean) => ({
+      question: 'Which sign-in method?',
+      item: 'NFR',
+      key: 'auth.method',
+      requires_customer: requires,
+      ...(requires ? {} : { proposed_value: 'sso' }),
+    });
+    // agenda(): nfr.auth is not requires_customer.
+    const strict = mergeTaskProposals({
+      lock: empty,
+      requests: [asksAuth(true)],
+      agendas: [agenda()],
+      now: NOW,
+    });
+    expect(pendingTaskProposals(strict)).toHaveLength(1);
+    const requiresAgenda = agenda({
+      entries: [{ ...agenda().entries[0], org_default: undefined, requires_customer: true }],
+    });
+    for (const requires of [true, false]) {
+      const linked = mergeTaskProposals({
+        lock: empty,
+        requests: [asksAuth(requires)],
+        agendas: [requiresAgenda],
+        now: NOW,
+      });
+      expect(taskProposalsOf(linked)[0]).toMatchObject({
+        agenda_id: 'agd-test0001',
+        entry_id: 'nfr.auth',
+      });
+    }
+  });
+
+  it('a ref without a ledger id carries a value hash: A → B → C are three refs, no value spelled out', () => {
+    const refOf = (value: unknown) =>
+      currentDecisionRef('agd-test0001', 'nfr.auth', { layer: 'ours', value });
+    const refs = [refOf('A-secret'), refOf('B-secret'), refOf('C-secret')];
+    expect(new Set(refs).size).toBe(3);
+    expect(refs[0]).toMatch(/^agd-test0001\/nfr\.auth:ours:[a-f0-9]{12}$/u);
+    expect(refs.join(' ')).not.toMatch(/secret/u);
+    expect(refOf({ b: 1, a: 2 })).toBe(refOf({ a: 2, b: 1 }));
+    expect(currentDecisionRef('agd-test0001', 'nfr.auth', { layer: 'none' })).toBe(
+      'agd-test0001/nfr.auth:none'
+    );
+    expect(
+      currentDecisionRef('agd-test0001', 'nfr.auth', {
+        layer: 'customer',
+        decision_id: 'D-0002',
+        value: 'x',
+      })
+    ).toBe('D-0002');
+  });
+});

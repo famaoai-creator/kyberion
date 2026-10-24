@@ -8,6 +8,7 @@ import type { DealRecord } from '../deal-store.js';
 import type { DecisionAgenda } from '../customer-decision/model.js';
 import {
   customerDecisionPaths,
+  withCustomerDecisionCaseLock,
   readAgenda,
   readConsumedDecisionLock,
   writeAgenda,
@@ -26,6 +27,7 @@ import {
   recordTaskDecisionProposals,
   resolveMissionDecisionCase,
   sweepDecisionConsumers,
+  SWEEP_LOCK_TIMEOUT_MS,
   type MissionDecisionCase,
 } from './mission-decision-lock.js';
 import type { MissionState } from './mission-types.js';
@@ -167,6 +169,7 @@ describe('mission decision lock (CD-09)', () => {
       const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
       const broken = {
         loadMissionState: () => state(),
+        decisionsRootExists: () => true,
         listTenantDeals: () => {
           throw new Error('[DEAL_SCOPE] unreadable');
         },
@@ -175,6 +178,30 @@ describe('mission decision lock (CD-09)', () => {
       expect(reconcileTaskDecisions(task, broken)).toMatchObject({ checked: 0, stale_count: 0 });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('DEAL_SCOPE'));
       expect(reworkItems()).toEqual([]);
+      // Each boundary of the mission meets the same failure: warned once per message.
+      const warned = warn.mock.calls.length;
+      pinTaskDecisions({ ...task, taskId: 'other' }, broken);
+      reconcileTaskDecisions({ ...task, taskId: 'other' }, broken);
+      expect(warn.mock.calls.length).toBe(warned);
+    });
+
+    it('stops at one existence check when the tenant has no decisions root', () => {
+      const listTenantDeals = vi.fn(() => []);
+      const loadMissionState = () =>
+        ({ mission_id: MISSION, tenant_slug: 'no-cases-tenant' }) as MissionState;
+      // The real check, under the narrow role's existence-only capability.
+      expect(pinTaskDecisions(task, { loadMissionState, listTenantDeals })).toBeNull();
+      expect(listTenantDeals).not.toHaveBeenCalled();
+      const rootExists = vi.fn(() => false);
+      expect(
+        resolveMissionDecisionCase(MISSION, {
+          loadMissionState,
+          listTenantDeals,
+          decisionsRootExists: rootExists,
+        })
+      ).toBeNull();
+      expect(rootExists).toHaveBeenCalledWith('no-cases-tenant');
+      expect(listTenantDeals).not.toHaveBeenCalled();
     });
   });
 
@@ -473,6 +500,164 @@ describe('mission decision lock (CD-09)', () => {
       expect(JSON.stringify(noted)).not.toMatch(leaks);
       // Released once.
       expect(sweep()).toEqual({ stale_consumers: [], rework_work_item_ids: [] });
+    });
+  });
+
+  describe('re-pins and the sweep budget (CD-09 review)', () => {
+    const releaseEntry = {
+      entry_id: 'release',
+      item: 'RELEASE',
+      key: 'release.go',
+      kind: 'approval' as const,
+      question: 'May we release?',
+      requires_customer: true,
+    };
+    const askRelease = {
+      question: 'May we release?',
+      item: 'RELEASE',
+      key: 'release.go',
+      requires_customer: true,
+    };
+    const decide = (item: string, key: string, value: unknown, at = LATER) =>
+      appendDecisions(
+        { dir },
+        [
+          {
+            item,
+            key,
+            level: 'customer-value',
+            state: 'decided',
+            value,
+            basis: [{ ref: 'agenda:agd-test0001', version: 'h' }],
+            origin: 'facade',
+            decided_by: {
+              kind: 'human',
+              id: 'user:inv-1',
+              on_behalf_of: { actor_id: 'customer:acme-cto', evidence: 'rcp-0001' },
+            },
+            decided_at: at,
+          },
+        ],
+        { caseId: 'case-a' }
+      );
+    const lockNow = () => readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')!;
+    const proposalsNow = () =>
+      lockNow().decisions.filter((entry) => entry.layer === 'task_proposal');
+
+    it('a resumed held task keeps its answered proposal even after the agenda closed: no new question, no hold', () => {
+      writeAgenda(
+        { dir },
+        {
+          ...agenda(),
+          entries: [...agenda().entries, releaseEntry],
+          status: 'sent',
+          approval: { content_hash: 'a'.repeat(64), approved_at: NOW, approved_by: 'user:boss' },
+        }
+      );
+      pinTaskDecisions(task, { decisionCase, now: NOW });
+      expect(
+        recordTaskDecisionProposals({ ...task, requests: [askRelease] }, { decisionCase, now: NOW })
+          .hold_proposal_ids
+      ).toHaveLength(1);
+      decide('RELEASE', 'release.go', { approved: true });
+      const current = readAgenda({ dir }, 'agd-test0001')!;
+      writeAgenda(
+        { dir },
+        {
+          ...current,
+          operator_confirmations: [
+            { entry_id: 'release', decision_id: 'D-0001', by: 'user:boss', at: LATER },
+          ],
+        }
+      );
+      sweepDecisionConsumers(
+        { tenantSlug: TENANT, caseId: 'case-a', location: { dir } },
+        { now: LATER }
+      );
+      // The operator closes the agenda, then resumes the mission.
+      writeAgenda({ dir }, { ...readAgenda({ dir }, 'agd-test0001')!, status: 'closed' });
+      expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.pinned).toBe(true);
+      expect(lockNow()).not.toHaveProperty('hold');
+      expect(proposalsNow()).toEqual([
+        expect.objectContaining({
+          agenda_id: 'agd-test0001',
+          entry_id: 'release',
+          proposal: expect.objectContaining({ resolved: { decision_id: 'D-0001', at: LATER } }),
+        }),
+      ]);
+      // The re-run asks again: answered, so no pending proposal and no hold.
+      const again = recordTaskDecisionProposals(
+        { ...task, requests: [askRelease] },
+        { decisionCase, now: LATER }
+      );
+      expect(again.hold_proposal_ids).toEqual([]);
+      expect(proposalsNow()).toHaveLength(1);
+      expect(proposalsNow()[0].agenda_id).toBe('agd-test0001');
+    });
+
+    it('an uncollected proposal survives the re-pin of a new run', () => {
+      pinTaskDecisions(task, { decisionCase, now: NOW });
+      recordTaskDecisionProposals(
+        {
+          ...task,
+          requests: [
+            {
+              question: 'Theme?',
+              item: 'UX',
+              key: 'ui.theme',
+              proposed_value: 'dark',
+              requires_customer: false,
+            },
+          ],
+        },
+        { decisionCase, now: NOW }
+      );
+      reconcileTaskDecisions(task, { decisionCase, now: NOW });
+      pinTaskDecisions(task, { decisionCase, now: LATER });
+      expect(proposalsNow()).toEqual([expect.objectContaining({ item: 'UX', value: 'dark' })]);
+      expect(proposalsNow()[0]).not.toHaveProperty('agenda_id');
+    });
+
+    it('every dispatch attempt re-pins, so a retry after a switch files no rework', () => {
+      pinTaskDecisions(task, { decisionCase, now: NOW });
+      // The first attempt fails / blocks; the customer decides meanwhile.
+      decide('NFR', 'auth.method', 'sso-secret-value');
+      expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.pinned).toBe(true);
+      expect(reconcileTaskDecisions(task, { decisionCase, now: LATER })).toMatchObject({
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      expect(reworkItems()).toEqual([]);
+    });
+
+    it('a pin on an agenda withdrawn later is reconciled against what that agenda resolves to', () => {
+      pinTaskDecisions(task, { decisionCase, now: NOW });
+      writeAgenda({ dir }, { ...agenda(), status: 'withdrawn' });
+      expect(reconcileTaskDecisions(task, { decisionCase, now: LATER })).toMatchObject({
+        checked: 1,
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      // A later re-pin no longer pins the withdrawn agenda's decisions.
+      expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.pinned_count).toBe(0);
+    });
+
+    it('the sweep waits only briefly for a held case lock and skips with a warning', () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const started = Date.now();
+      const result = withCustomerDecisionCaseLock({ dir }, () =>
+        sweepDecisionConsumers(
+          { tenantSlug: TENANT, caseId: 'case-a', location: { dir } },
+          { now: LATER }
+        )
+      );
+      // The default budget (what respond uses) stays well inside the room's 15 s facade timeout.
+      expect(SWEEP_LOCK_TIMEOUT_MS).toBeLessThanOrEqual(2_000);
+      expect(Date.now() - started).toBeLessThan(SWEEP_LOCK_TIMEOUT_MS + 2_000);
+      expect(result).toEqual({ stale_consumers: [], rework_work_item_ids: [] });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringContaining('customer decision consumer sweep skipped')
+      );
     });
   });
 });

@@ -197,9 +197,9 @@ status: active
 **実装中の判断を顧客に回す**: worker の結果に、文字列の `needs` とは別の構造化した `customer_decisions`（問い・item・key・こちらの案・選択肢・`requires_customer`・理由・話題）を足す（`TaskResultBlock`、`TaskCustomerDecisionRequest`）。形の崩れた項目は警告を出して捨て、結果全体は失敗にしない。question-resolution に「顧客判断」（`customer_judgment`）の分類を足す。技術の選択はこちらで決め、顧客に見える製品の選択は顧客判断としてこちらの案で進め、金額・契約・リリース・変更要求は `requires_customer` にする（policy の `customer_judgment.requires_customer_topics` に当たる話題は、worker が何と言っても `requires_customer` になる）。
 
 - **worker に調整セットを書く権限を与えない**。worker は結果を記録する前に `customer_decisions` を取り除き、そのタスク自身の固定（`consumers/<consumer>.json`）に `task_proposal` の層の項目として記録する（狭い `customer_decision_consumer_store` 権限のまま）。ミッションの evidence・タスクのイベント・`NEXT_TASKS.json`・WorkItem には、問いや値を書かず、提案の id（`tp-<hash>`）と件数だけを書く。
-- **調整セットへの取り込みは運用者が行う**。`pnpm kyberion customer-decision draft --tenant <t> --case <c> --from-tasks --customer <slug>`（既存の下書きに足すときは `--agenda <id>`）が、まだ調整セットに載っていない提案を下書きの項目にする。選択肢があれば `choice`、なければ `approval` で、こちらの決定はタスクの案にする。`requires_customer` の問いは schema の規則どおりこちらの決定を持たない。同じ item × key を別の開いている調整セットが聞いていれば、項目を足さずにその項目に結び付ける。取り込んだ提案には固定の側に調整セットと項目の id を書き戻すので、2 回目の取り込みでは何も足さない。承認と送付は既存の `submit` / `send` で行う。`status`（`--agenda` は省略できる）は、取り込み待ちの提案と、顧客の判断を待っているタスクを id と件数で出す。
+- **調整セットへの取り込みは運用者が行う**。`pnpm kyberion customer-decision draft --tenant <t> --case <c> --from-tasks --customer <slug>`（既存の下書きに足すときは `--agenda <id>`）が、まだ調整セットに載っていない提案を下書きの項目にする。選択肢があれば `choice`、なければ `approval` で、こちらの決定はタスクの案にする。`requires_customer` の問いは schema の規則どおりこちらの決定を持たない。同じ item × key を別の開いている調整セットが聞いていれば、項目を足さずにその項目に結び付ける。ただし `requires_customer` の問いは、`requires_customer` でない項目には結び付けない。その項目が下書きなら `requires_customer` に上げ（こちらの決定と組織の既定値を外す）、承認済み・送付済みなら取り込まずに衝突として出す。取り込んだ提案には固定の側に調整セットと項目の id を書き戻すので、2 回目の取り込みでは何も足さない。承認と送付は既存の `submit` / `send` で行う。`status`（`--agenda` は省略できる）は、取り込み待ちの提案と、顧客の判断を待っているタスクを id と件数で出す。
 - **タスクはこちらの案で完了する**。固定に提案の値が残るので、顧客が後から違う値に決めると、回答時の照合が手戻りの WorkItem を 1 件起票する。取り込む前の提案と、誰もまだ決めていない提案は照合しない。
-- **`requires_customer` の問いだけはタスクを判断待ちにする**。WorkItem は `blocked`（`blocked_reason: awaiting_customer_decision`）、タスクは `blocked` で、`evidence/task-clarification-<task>.json` には id と件数だけを書く。顧客の決定を運用者が確認すると（`confirm` の後の照合）、固定に解決を記録し、WorkItem の `metadata.customer_decision_hold` に解決した決定の id を書く。タスクの再実行は既存の再開（`pnpm mission resume <MISSION_ID>`、blocked のタスクを planned に戻す）で行い、再実行の開始時に固定を作り直す。
+- **`requires_customer` の問いだけはタスクを判断待ちにする**。WorkItem は `blocked`（`blocked_reason: awaiting_customer_decision`）、タスクは `blocked` で、`evidence/task-clarification-<task>.json` には id と件数だけを書く。顧客の決定を運用者が確認すると（`confirm` の後の照合）、固定に解決を記録し、WorkItem の `metadata.customer_decision_hold` に解決した決定の id を書く。タスクの再実行は既存の再開（`pnpm mission resume <MISSION_ID>`、blocked のタスクを planned に戻す）で行う。worker はタスクを渡すたびに固定を作り直すが、タスク自身の提案（取り込み済み・解決済みを含む）は引き継ぐので、調整セットが閉じられた後でも同じ問いを聞き直さない。
 - **決定の案件がないミッション**では台帳に何も書かず、診断の警告を出す。`requires_customer` の問いは通常の `needs` として扱い（`needs_input` で止まる）、それ以外はこちらの案で進める。
 
 ## 未決事項
@@ -255,6 +255,7 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - 商談メモの項目名を問いの全文ではなく短いラベルにする（テンプレートに `label_key` を足す）。
 - CD-09: ミッションの実行器に、タスク境界での照合（`checkDecisionFreshness`）を組み込む。（実装済み。「CD-09 の実装設計」の節）
 - CD-09 の残り: 判断待ちから再開したタスクの指示に、確定した顧客の決定の値を渡していない（値は confidential なので、渡し方を決めてから入れる）。
+- CD-09 の残り: 判断待ちの解除（`confirm` の後の照合）を、実際の運用者の identity で動かす結合テストを足す（今のテストは facade の関数を直接呼ぶ）。
 - 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
 - 招待リンクの公開 URL をテナントごとに持つ（段階 1 は `KYBERION_CUSTOMER_ROOM_PUBLIC_URL` が 1 つで、顧客向け画面を 1 テナント分だけ公開する前提）。
 - 回答の復旧時に監査の重複を確かめる処理が監査チェーン全体を読む。受領 id で引ける索引か冪等キーにする（復旧時だけ通る経路）。

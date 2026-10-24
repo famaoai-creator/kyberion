@@ -26,6 +26,21 @@ export interface CustomerDecisionConsumerAccess {
   read: readonly string[];
   /** Case-relative consumer lock to write (`consumers/<consumer>.json`). */
   write?: string;
+  /**
+   * A task's own boundary (pin / reconcile / proposals): the only consumer
+   * lock it may read or write is `consumers/<owner>.json`, and it may not list
+   * `consumers/`. Omitted only by the response / confirm sweep, which
+   * reconciles every consumer of the case.
+   */
+  owner?: string;
+}
+
+/** The tenant's decisions root: existence checks only (no reads, no writes). */
+const DECISIONS_ROOT = /^knowledge\/confidential\/([a-z][a-z0-9-]{1,30})\/decisions$/u;
+
+/** The repo-relative decisions root of a tenant (`knowledge/confidential/<tenant>/decisions`). */
+export function customerDecisionsRootDir(tenantSlug: string): string {
+  return `knowledge/confidential/${tenantSlug}/decisions`;
 }
 
 function caseDirValid(tenantSlug: string, caseDir: string): boolean {
@@ -51,10 +66,38 @@ export function customerDecisionConsumerCapability(
   caseDir: string,
   access: CustomerDecisionConsumerAccess
 ): ResourceAccessScope {
+  const root = caseDir.match(DECISIONS_ROOT);
+  if (root) {
+    // Existence of the tenant's decisions root only: a mission with no case
+    // at all is left alone after one stat.
+    if (root[1] !== tenantSlug || access.read.length > 0 || access.write)
+      throw new Error('[RESOURCE_SCOPE_INVALID] Invalid customer decision consumer path');
+    return {
+      tenantSlug,
+      metadataExact: [caseDir],
+      readExact: [],
+      writeExact: [],
+      mkdirExact: [],
+      allowProductKnowledgeRead: true,
+    };
+  }
   if (!isValidTenantSlug(tenantSlug) || !caseDirValid(tenantSlug, caseDir))
     throw new Error('[RESOURCE_SCOPE_INVALID] Invalid customer decision consumer case');
   if (!access.read.every(readable) || (access.write && !CONSUMER_FILE.test(access.write)))
     throw new Error('[RESOURCE_SCOPE_INVALID] Invalid customer decision consumer path');
+  if (access.owner !== undefined) {
+    const own = `consumers/${access.owner}.json`;
+    const foreign = (relative: string) =>
+      relative === 'consumers' || (CONSUMER_FILE.test(relative) && relative !== own);
+    if (
+      !CONSUMER_FILE.test(own) ||
+      access.read.some(foreign) ||
+      (access.write && foreign(access.write))
+    )
+      throw new Error(
+        '[RESOURCE_SCOPE_INVALID] A task boundary may only touch its own customer decision consumer lock'
+      );
+  }
   const inCase = (relative: string) => `${caseDir}/${relative}`;
   const read = [...new Set([...access.read, ...(access.write ? [access.write] : [])])].sort();
   return {

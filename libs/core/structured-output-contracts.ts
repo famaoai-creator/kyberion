@@ -88,14 +88,32 @@ export const TaskResultProvenanceSchema: z.ZodType<TaskResultProvenance> = z
 // CD-09: a customer-judgment question (see TaskCustomerDecisionRequest in
 // channel-surface-types.ts). Additive-only; an invalid entry is dropped by
 // repairTaskResult with a warning, never failing the whole task_result.
+/** Serialized size limit of a proposed / option value (2 KB): a decision value, not a payload. */
+export const CUSTOMER_DECISION_VALUE_MAX_BYTES = 2048;
+function boundedDecisionValue(value: unknown): boolean {
+  if (value === undefined) return true;
+  try {
+    const serialized = JSON.stringify(value);
+    return (
+      serialized !== undefined &&
+      new TextEncoder().encode(serialized).length <= CUSTOMER_DECISION_VALUE_MAX_BYTES
+    );
+  } catch {
+    return false;
+  }
+}
+const DecisionValueSchema = z.unknown().refine(boundedDecisionValue, {
+  message: `value must serialize to at most ${CUSTOMER_DECISION_VALUE_MAX_BYTES} bytes`,
+});
+
 export const TaskCustomerDecisionRequestSchema: z.ZodType<TaskCustomerDecisionRequest> = z
   .object({
     question: z.string().min(1).max(2000),
     item: z.string().min(1).max(200),
     key: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/u),
-    proposed_value: z.unknown().optional(),
+    proposed_value: DecisionValueSchema.optional(),
     options: z
-      .array(z.object({ value: z.unknown(), label: z.string().min(1).max(300) }).strict())
+      .array(z.object({ value: DecisionValueSchema, label: z.string().min(1).max(300) }).strict())
       .max(20)
       .optional(),
     requires_customer: z.boolean(),

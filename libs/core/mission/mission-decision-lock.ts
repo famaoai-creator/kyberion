@@ -32,6 +32,7 @@ import { listDeals, type DealRecord } from '../deal-store.js';
 import {
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   customerDecisionConsumerCapability,
+  customerDecisionsRootDir,
   type CustomerDecisionConsumerAccess,
 } from '../foundation/customer-decision-consumer-capability.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
@@ -43,6 +44,7 @@ import {
   findStaleConsumersForSwitches,
   isTaskProposalEntry,
   mergeTaskProposals,
+  taskProposalsOf,
   missionTaskConsumerId,
   reconcileConsumedDecisionLock,
   taskProposalHolds,
@@ -90,6 +92,10 @@ export interface MissionDecisionLockOptions {
   loadMissionState?: (missionId: string) => MissionState | null;
   listTenantDeals?: (tenantSlug: string) => DealRecord[];
   caseExists?: (decisionCase: MissionDecisionCase) => boolean;
+  /** Does `knowledge/confidential/<tenant>/decisions/` exist (tests)? */
+  decisionsRootExists?: (tenantSlug: string) => boolean;
+  /** Case lock wait of the sweep (default {@link SWEEP_LOCK_TIMEOUT_MS}). */
+  lockTimeoutMs?: number;
   /** Work coordination root (tests). */
   workItemRootDir?: string;
 }
@@ -126,6 +132,22 @@ function warn(what: string, error: unknown, evidence: string): void {
   );
 }
 
+const warnedMissions = new Set<string>();
+
+/**
+ * {@link warn} at most once per mission and message per process (every task
+ * boundary of a mission meets the same failure); later ones go to debug.
+ */
+function warnOnce(missionId: string, what: string, error: unknown, evidence: string): void {
+  const key = `${missionId.toUpperCase()}\u0000${what}`;
+  if (warnedMissions.has(key)) {
+    logger.debug(`${what} — ${diagnosticCode(error)} | ${evidence}`);
+    return;
+  }
+  warnedMissions.add(key);
+  warn(what, error, evidence);
+}
+
 /**
  * Run `fn` as the narrow consumer store role bound to the case's tenant,
  * inside the exact deny-only capability for `access` (case-relative paths).
@@ -156,31 +178,35 @@ interface CaseSnapshot {
 }
 
 /**
- * Read what a boundary needs from the case: list `agendas/` and `consumers/`,
- * then read the ledger, switches, every agenda and the wanted consumer locks
- * (`all`, or the named ones that exist), each under its exact capability.
+ * Read what a boundary needs from the case: list `agendas/`, then read the
+ * ledger, switches, every agenda and the wanted consumer locks, each under
+ * its exact capability. A task boundary (`{ owner }`) reads only its own lock
+ * and never lists `consumers/`; the sweep (`'all'`) lists and reads them all.
  */
 function readCase(
   decisionCase: MissionDecisionCase,
-  consumers: 'all' | readonly string[],
+  consumers: 'all' | { owner: string },
   onInvalidLock: (consumer: string, error: unknown) => void = () => undefined
 ): CaseSnapshot {
   const { tenantSlug, location } = decisionCase;
-  const listed = asConsumerStore(tenantSlug, location, { read: ['agendas', 'consumers'] }, () => ({
-    agendaIds: listAgendaIds(location),
-    consumerIds: listConsumedDecisionLockIds(location),
-  }));
-  const wanted =
-    consumers === 'all'
-      ? listed.consumerIds
-      : listed.consumerIds.filter((id) => consumers.includes(id));
+  const owner = consumers === 'all' ? undefined : consumers.owner;
+  const listed = asConsumerStore(
+    tenantSlug,
+    location,
+    owner ? { read: ['agendas'], owner } : { read: ['agendas', 'consumers'] },
+    () => ({
+      agendaIds: listAgendaIds(location),
+      consumerIds: owner ? [owner] : listConsumedDecisionLockIds(location),
+    })
+  );
+  const wanted = listed.consumerIds;
   const read = [
     'decisions.jsonl',
     'switches.jsonl',
     ...listed.agendaIds.map((id) => `agendas/${id}.json`),
     ...wanted.map(consumerFile),
   ];
-  return asConsumerStore(tenantSlug, location, { read }, () => {
+  return asConsumerStore(tenantSlug, location, { read, ...(owner ? { owner } : {}) }, () => {
     const locks: ConsumedDecisionLockRecord[] = [];
     for (const id of wanted) {
       try {
@@ -201,12 +227,36 @@ function readCase(
   });
 }
 
-function writeLock(decisionCase: MissionDecisionCase, lock: ConsumedDecisionLockRecord): void {
+/** Write a lock: a task boundary only its own (`owner`), the sweep any consumer's. */
+function writeLock(
+  decisionCase: MissionDecisionCase,
+  lock: ConsumedDecisionLockRecord,
+  sweep = false
+): void {
   asConsumerStore(
     decisionCase.tenantSlug,
     decisionCase.location,
-    { read: [], write: consumerFile(lock.consumer) },
+    {
+      read: [],
+      write: consumerFile(lock.consumer),
+      ...(sweep ? {} : { owner: lock.consumer }),
+    },
     () => writeConsumedDecisionLock(decisionCase.location, lock)
+  );
+}
+
+/** The tenant's decisions root, checked as the narrow store role (existence only). */
+function defaultDecisionsRootExists(tenantSlug: string): boolean {
+  const root = customerDecisionsRootDir(tenantSlug);
+  return runInResourceAccessScope(
+    customerDecisionConsumerCapability(tenantSlug, root, { read: [] }),
+    () =>
+      withExecutionContext(
+        CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+        () => safeExistsSync(pathResolver.rootResolve(root)),
+        undefined,
+        tenantSlug
+      )
   );
 }
 
@@ -238,6 +288,11 @@ export function resolveMissionDecisionCase(
   const state = (options.loadMissionState ?? loadState)(missionId.toUpperCase());
   const tenantSlug = state?.tenant_slug;
   if (!state || !tenantSlug || !isValidTenantSlug(tenantSlug)) return null;
+  // One existence check for the tenant's decisions root before any deal scan:
+  // a tenant with no decision case at all costs one stat per boundary.
+  const rootExists =
+    options.decisionsRootExists ?? (options.caseExists ? () => true : defaultDecisionsRootExists);
+  if (!rootExists(tenantSlug)) return null;
   const exists = options.caseExists ?? defaultCaseExists;
   const projectId = state.relationships?.project?.project_id;
   if (projectId) {
@@ -257,11 +312,16 @@ export function resolveMissionDecisionCase(
 
 /**
  * Task start: pin the case's effective decisions for this task.
- *   - `start` (worker dispatch): keeps a lock still in progress (a redispatch
- *     of the same run), re-pins a completed one (a new run);
+ *   - `start` (worker dispatch): every dispatch attempt re-pins on the
+ *     current decisions (a retry after a failed or blocked attempt starts on
+ *     what is in force now, so it never files rework for a switch it saw);
  *   - `if_absent` (record-task): keeps any existing lock, so a record-task
  *     written after completion never moves the pin.
- * Null when the mission has no decision case, or on failure (logged).
+ * A re-pin keeps the task's own proposals (`task_proposal` entries, in every
+ * state): a question already asked — collected, answered, even on an agenda
+ * closed since — is not asked again, and an uncollected one still waits to be
+ * collected. The hold is dropped: the new attempt decides again whether it
+ * waits. Null when the mission has no decision case, or on failure (logged).
  */
 export function pinTaskDecisions(
   input: { missionId: string; taskId: string; mode?: 'start' | 'if_absent' },
@@ -274,14 +334,9 @@ export function pinTaskDecisions(
     const now = options.now ?? nowIso();
     const mode = input.mode ?? 'start';
     return withCustomerDecisionCaseLock(decisionCase.location, () => {
-      const { agendas, ledger, locks } = readCase(decisionCase, [consumer]);
+      const { agendas, ledger, locks } = readCase(decisionCase, { owner: consumer });
       const existing = locks[0];
-      // A held task (waiting for the customer) re-runs on the current
-      // decisions once it is resumed: a start re-pins it like a new run.
-      if (
-        existing &&
-        (mode === 'if_absent' || (existing.status === 'in_progress' && !existing.hold))
-      ) {
+      if (existing && mode === 'if_absent') {
         return { consumer, pinned_count: pinCount(existing), pinned: false };
       }
       const lock = buildConsumedDecisionLock({
@@ -294,6 +349,7 @@ export function pinTaskDecisions(
       writeLock(decisionCase, {
         version: '1.0.0',
         ...lock,
+        decisions: [...lock.decisions, ...(existing ? taskProposalsOf(existing) : [])],
         ...('dir' in decisionCase.location ? {} : { tenant_slug: decisionCase.tenantSlug }),
         mission_id: input.missionId.toUpperCase(),
         task_id: input.taskId,
@@ -302,7 +358,7 @@ export function pinTaskDecisions(
       return { consumer, pinned_count: lock.decisions.length, pinned: true };
     });
   } catch (error) {
-    warn('customer decision pin skipped', error, consumer);
+    warnOnce(input.missionId, 'customer decision pin skipped', error, consumer);
     return null;
   }
 }
@@ -369,7 +425,7 @@ export function recordTaskDecisionProposals(
     }
     const now = options.now ?? nowIso();
     return withCustomerDecisionCaseLock(decisionCase.location, () => {
-      const { agendas, ledger, locks } = readCase(decisionCase, [consumer]);
+      const { agendas, ledger, locks } = readCase(decisionCase, { owner: consumer });
       const base: ConsumedDecisionLockRecord = locks[0] ?? {
         version: '1.0.0',
         ...buildConsumedDecisionLock({
@@ -494,21 +550,25 @@ function releaseResolvedHolds(
       if (complete) {
         noteHoldResolved(decisionCase, lock, [...new Set(resolved.values())], now, options);
       }
-      writeLock(decisionCase, {
-        ...lock,
-        decisions: lock.decisions.map((entry) => {
-          const decisionId = isTaskProposalEntry(entry)
-            ? resolved.get(entry.proposal.proposal_id)
-            : undefined;
-          return decisionId && isTaskProposalEntry(entry) && !entry.proposal.resolved
-            ? {
-                ...entry,
-                proposal: { ...entry.proposal, resolved: { decision_id: decisionId, at: now } },
-              }
-            : entry;
-        }),
-        hold: { ...lock.hold, ...(complete ? { resolved_at: now } : {}) },
-      });
+      writeLock(
+        decisionCase,
+        {
+          ...lock,
+          decisions: lock.decisions.map((entry) => {
+            const decisionId = isTaskProposalEntry(entry)
+              ? resolved.get(entry.proposal.proposal_id)
+              : undefined;
+            return decisionId && isTaskProposalEntry(entry) && !entry.proposal.resolved
+              ? {
+                  ...entry,
+                  proposal: { ...entry.proposal, resolved: { decision_id: decisionId, at: now } },
+                }
+              : entry;
+          }),
+          hold: { ...lock.hold, ...(complete ? { resolved_at: now } : {}) },
+        },
+        true
+      );
       if (complete) released.push(lock.consumer);
     } catch (error) {
       warn('customer decision hold release skipped', error, lock.consumer);
@@ -629,7 +689,7 @@ function settleLock(
     last_check: { at: now, checked: result.checked, stale_count: result.stale.length },
     ...(rework.length > 0 ? { rework } : {}),
   };
-  writeLock(decisionCase, next);
+  writeLock(decisionCase, next, !complete);
   return {
     consumer: lock.consumer,
     checked: result.checked,
@@ -654,17 +714,25 @@ export function reconcileTaskDecisions(
     if (!decisionCase) return { ...NOTHING_CHECKED };
     const now = options.now ?? nowIso();
     return withCustomerDecisionCaseLock(decisionCase.location, () => {
-      const { agendas, ledger, locks } = readCase(decisionCase, [consumer]);
+      const { agendas, ledger, locks } = readCase(decisionCase, { owner: consumer });
       const lock = locks[0];
       if (!lock) return { ...NOTHING_CHECKED };
       const result = reconcileConsumedDecisionLock(lock, agendas, ledger, now);
       return settleLock(decisionCase, lock, result, now, options, true);
     });
   } catch (error) {
-    warn('customer decision reconciliation skipped', error, consumer);
+    warnOnce(input.missionId, 'customer decision reconciliation skipped', error, consumer);
     return { ...NOTHING_CHECKED, consumer };
   }
 }
+
+/**
+ * The sweep runs after a customer's response (inside the customer room's
+ * facade budget) and after the operator's confirm: it waits briefly for the
+ * case lock and otherwise skips with a warning. Nothing is lost — the next
+ * respond, confirm or task completion check runs it again.
+ */
+export const SWEEP_LOCK_TIMEOUT_MS = 1_500;
 
 export interface DecisionConsumerSweepResult {
   stale_consumers: string[];
@@ -701,43 +769,47 @@ export function sweepDecisionConsumers(
       source: 'project',
       location: input.location,
     };
-    withCustomerDecisionCaseLock(input.location, () => {
-      const snapshot = readCase(decisionCase, 'all', (consumer, error) =>
-        warn('customer decision consumer lock unreadable', error, consumer)
-      );
-      const switches =
-        input.switches ??
-        snapshot.switches.filter((item) => !input.agendaId || item.agenda_id === input.agendaId);
-      const findings =
-        switches.length === 0
-          ? []
-          : findStaleConsumersForSwitches({
-              locks: snapshot.locks,
-              switches,
-              agendas: snapshot.agendas,
-              ledger: snapshot.ledger,
+    withCustomerDecisionCaseLock(
+      input.location,
+      () => {
+        const snapshot = readCase(decisionCase, 'all', (consumer, error) =>
+          warn('customer decision consumer lock unreadable', error, consumer)
+        );
+        const switches =
+          input.switches ??
+          snapshot.switches.filter((item) => !input.agendaId || item.agenda_id === input.agendaId);
+        const findings =
+          switches.length === 0
+            ? []
+            : findStaleConsumersForSwitches({
+                locks: snapshot.locks,
+                switches,
+                agendas: snapshot.agendas,
+                ledger: snapshot.ledger,
+                now,
+              });
+        for (const finding of findings) {
+          try {
+            const settled = settleLock(
+              decisionCase,
+              finding.lock,
+              { checked: finding.checked, stale: finding.stale },
               now,
-            });
-      for (const finding of findings) {
-        try {
-          const settled = settleLock(
-            decisionCase,
-            finding.lock,
-            { checked: finding.checked, stale: finding.stale },
-            now,
-            options,
-            false
-          );
-          // Findings only hold entries no rework item covered yet.
-          result.stale_consumers.push(finding.lock.consumer);
-          result.rework_work_item_ids.push(...settled.rework_work_item_ids);
-        } catch (error) {
-          warn('customer decision rework filing skipped', error, finding.lock.consumer);
+              options,
+              false
+            );
+            // Findings only hold entries no rework item covered yet.
+            result.stale_consumers.push(finding.lock.consumer);
+            result.rework_work_item_ids.push(...settled.rework_work_item_ids);
+          } catch (error) {
+            warn('customer decision rework filing skipped', error, finding.lock.consumer);
+          }
         }
-      }
-      const released = releaseResolvedHolds(decisionCase, snapshot, now, options);
-      if (released.length > 0) result.released_holds = released.sort();
-    });
+        const released = releaseResolvedHolds(decisionCase, snapshot, now, options);
+        if (released.length > 0) result.released_holds = released.sort();
+      },
+      options.lockTimeoutMs ?? SWEEP_LOCK_TIMEOUT_MS
+    );
   } catch (error) {
     warn('customer decision consumer sweep skipped', error, `case ${input.caseId}`);
   }

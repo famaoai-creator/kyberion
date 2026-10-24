@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { extractTaskResultBlocks, validateTaskResult } from './task-result-contract.js';
+import {
+  extractTaskResultBlocks,
+  repairTaskResult,
+  validateTaskResult,
+} from './task-result-contract.js';
 
 // KP-05: task_result gained an optional `knowledge_feedback` field. These
 // tests pin two things: (1) every pre-KP-05 (old-format) task_result keeps
@@ -280,5 +284,32 @@ describe('TaskResultSchema — customer_decisions (CD-09)', () => {
     const none = extractTaskResultBlocks(block(baseTaskResult({ customer_decisions: 'oops' })));
     expect(none.taskResultErrors).toEqual([]);
     expect(none.taskResults[0]).not.toHaveProperty('customer_decisions');
+  });
+
+  it('repairTaskResult keeps the valid entries of a mixed list and drops a non-array', () => {
+    const big = 'x'.repeat(2100);
+    const mixed = repairTaskResult(
+      baseTaskResult({
+        customer_decisions: [
+          proposal,
+          { ...proposal, proposed_value: big },
+          { ...proposal, options: [{ value: big, label: 'Huge' }] },
+          { ...proposal, requires_customer: 'yes' },
+          null,
+        ],
+      })
+    );
+    expect(mixed.value?.customer_decisions).toEqual([proposal]);
+    expect(mixed.repairs).toEqual(['customer_decisions: 4 invalid entries dropped']);
+    expect(mixed.requiresReview).toBe(false);
+    const nonArray = repairTaskResult(baseTaskResult({ customer_decisions: { question: 'q' } }));
+    expect(nonArray.value).toBeDefined();
+    expect(nonArray.value).not.toHaveProperty('customer_decisions');
+    expect(nonArray.repairs).toEqual(['customer_decisions: 1 invalid entries dropped']);
+    // A value at the limit is accepted.
+    const atLimit = validateTaskResult(
+      baseTaskResult({ customer_decisions: [{ ...proposal, proposed_value: 'y'.repeat(2046) }] })
+    );
+    expect(atLimit.valid).toBe(true);
   });
 });
