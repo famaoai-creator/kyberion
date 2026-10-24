@@ -12,7 +12,7 @@
  *     while an entry with that deadline still follows our side (layer `ours`
  *     or `org_default`). Starting two days early lets a missed daily run
  *     catch up; the record key keeps it to one notice per deadline.
- * Only a `sent` agenda whose approval matches its content gets reminders
+ * Only an agenda with invites whose approval matches its content gets reminders
  * (closed, withdrawn and edited-but-not-re-approved agendas get none).
  *
  * One record per agenda × actor × kind × target date (`reminder_id`), kept
@@ -224,7 +224,9 @@ export function scheduleAgendaReminders(input: ReminderPlanInput): PlannedRemind
   const { agenda, now } = input;
   const nowMs = Date.parse(now);
   const today = utcDate(now);
-  if (!today || agenda.status !== 'sent' || agendaAnswerState(agenda).ok === false) return [];
+  // Sent (or re-approved after an edit: status `approved`, invites still
+  // out) and answerable in its current revision.
+  if (!today || agendaAnswerState(agenda).ok === false) return [];
   const deciders = validDeciders(agenda, input.invites, nowMs);
   if (deciders.size === 0) return [];
   const hash = agendaContentHash(agenda);

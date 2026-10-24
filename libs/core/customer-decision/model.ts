@@ -208,7 +208,12 @@ export interface AgendaReminderRecord {
   target_date: string;
   status: AgendaReminderStatus;
   /** `manual`: why no channel was used. */
-  reason?: 'no_channel' | 'binding_missing' | 'surface_unsupported' | 'template_refused';
+  reason?:
+    | 'no_channel'
+    | 'binding_missing'
+    | 'surface_unsupported'
+    | 'template_refused'
+    | 'approval_unreachable';
   approval_request_id?: string;
   inbox_entry_id?: string;
   at: string;
