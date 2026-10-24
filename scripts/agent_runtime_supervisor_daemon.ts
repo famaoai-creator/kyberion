@@ -51,6 +51,7 @@ import {
 } from '@agent/core/dot/dot-runtime';
 import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from '@agent/core/dot/dot-followups';
 import { evaluateDotEventTriggers } from '@agent/core/dot/dot-event-intake';
+import { evaluateDotFeedTriggers } from '@agent/core/dot/dot-feed-source';
 import {
   installReasoningBackends,
   reselectReasoningBackends,
@@ -449,17 +450,37 @@ export async function runDotSweepOnce(
       }
       let due: DueDotTrigger[];
       try {
+        const serviceCall = (input: {
+          service_id: string;
+          action: string;
+          params?: Record<string, unknown>;
+        }) =>
+          executeServicePreset(input.service_id, input.action, input.params ?? {}, 'secret-guard');
+        // Pull feeds first: a fresh item must be able to wake the dot in the
+        // same sweep through its ordinary event trigger.
+        const feedPolls = await evaluateDotFeedTriggers(loaded.charter, {
+          now: () => now,
+          serviceCall,
+        });
+        if (feedPolls.length > 0) {
+          recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+            status: 'running',
+            details: {
+              dot_id: loaded.charter.dot_id,
+              trigger: 'feed',
+              feeds: feedPolls.map((poll) => ({
+                source: poll.source,
+                status: poll.status,
+                ingested: poll.ingested,
+              })),
+            },
+          });
+        }
         due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
         due = due.concat(
           await evaluateDotProbeTriggers(loaded.charter, {
             now: () => now,
-            serviceCall: (input) =>
-              executeServicePreset(
-                input.service_id,
-                input.action,
-                input.params ?? {},
-                'secret-guard'
-              ),
+            serviceCall,
           })
         );
         due = due.concat(

@@ -294,6 +294,26 @@
               {
                 "type": "object",
                 "additionalProperties": false,
+                "required": ["kind", "source", "service_id", "action"],
+                "properties": {
+                  "kind": { "const": "feed" },
+                  "source": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
+                  "service_id": { "type": "string", "minLength": 1 },
+                  "action": { "type": "string", "minLength": 1 },
+                  "params": { "type": "object" },
+                  "items_path": { "type": "string", "minLength": 1 },
+                  "item_id_path": { "type": "string", "minLength": 1 },
+                  "cursor_path": { "type": "string", "minLength": 1 },
+                  "event_type": { "type": "string", "minLength": 1, "maxLength": 200 },
+                  "every_s": { "type": "integer", "minimum": 30 },
+                  "max_items": { "type": "integer", "minimum": 1, "maximum": 200 },
+                  "on_first_poll": { "enum": ["baseline", "emit"] },
+                  "overlap_s": { "type": "integer", "minimum": 0, "maximum": 3600 }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
                 "required": ["kind", "sources"],
                 "properties": {
                   "kind": { "const": "event" },
