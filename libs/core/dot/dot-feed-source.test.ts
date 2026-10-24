@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { safeRmSync } from '../secure-io.js';
 import { validateDotCharter, type DotCharter, type DotFeedTrigger } from './dot-charter.js';
@@ -266,6 +266,25 @@ describe('feed polling', () => {
     const afterTwo = readDotFeedCoverage(failing, { rootDir: TEST_ROOT }, at(80));
     expect(afterTwo[0]).toMatchObject({ state: 'stalled', consecutive_failures: 2 });
     expect(afterTwo[0].detail).toMatch(/blind/);
+  });
+
+  it('reports a wedged provider as a timeout, not a malformed result', async () => {
+    vi.useFakeTimers();
+    try {
+      const hanging = charter();
+      const pending = evaluateDotFeedTriggers(
+        hanging,
+        deps([], at(0), { serviceCall: () => new Promise<never>(() => {}) })
+      );
+      await vi.advanceTimersByTimeAsync(25_000);
+      const polls = await pending;
+      expect(polls[0]).toMatchObject({ status: 'failed' });
+      expect(polls[0].error).toMatch(/timed out/);
+      const coverage = readDotFeedCoverage(hanging, { rootDir: TEST_ROOT }, at(30));
+      expect(coverage[0].last_error).toMatch(/timed out/);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('recovers and clears the failure streak on the next good poll', async () => {
