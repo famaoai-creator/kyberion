@@ -843,8 +843,10 @@ export function collectScopeTargets(
         }
       }
     }
-    // D9: the tenant's hybrid-ledger partitions (tenant mission events). The
-    // system ledger holds no tenant rows, so there is nothing legacy to prune.
+    // D9: the tenant's hybrid-ledger partitions (tenant mission events). New
+    // records never reach the system ledger, but rows written before D9 still
+    // hold tenant mission ids (and some tenant slugs) there; that hash-chained
+    // file is append-only, so offboarding leaves those rows (not pruned).
     for (const tier of SCOPE_TIERS) {
       const subtree = `${TENANT_LEDGER_REPO_SUBPATH}/${tier}/${id}`;
       const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));

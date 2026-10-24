@@ -644,13 +644,11 @@
     "tenant_ledger_store": {
       "allow_read": [
         "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
-        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/",
-        "active/shared/runtime/tenant-ledger/public/${KYBERION_TENANT}/"
+        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
       ],
       "allow_write": [
         "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
-        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/",
-        "active/shared/runtime/tenant-ledger/public/${KYBERION_TENANT}/"
+        "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
       ]
     },
     "generation_scheduler": {
