@@ -1884,65 +1884,67 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
         route_reason: 'phase_kind=mechanical -> small/low',
       },
     }));
-    mocks.route.mockImplementation(async (envelope: any) => {
-      const taskId = String(envelope?.payload?.context?.task_id || '');
-      const prompt = String(envelope?.payload?.text || '');
-      if (taskId === 'task-1' && prompt.includes('## Review findings to address')) {
+    mocks.route.mockImplementation(
+      async (envelope: { payload?: { text?: string; context?: { task_id?: string } } }) => {
+        const taskId = String(envelope?.payload?.context?.task_id || '');
+        const prompt = String(envelope?.payload?.text || '');
+        if (taskId === 'task-1' && prompt.includes('## Review findings to address')) {
+          return {
+            payload: {
+              text: makeTaskResultText({
+                summary: 'Reworked the implementation.',
+                artifacts: [{ path: 'deliverables/task-a.md', kind: 'markdown' }],
+                verification_done: ['Addressed the reviewer findings.'],
+                gaps: [],
+                needs: [],
+              }),
+            },
+          };
+        }
+        if (taskId === 'task-1') {
+          return {
+            payload: {
+              text: makeTaskResultText({
+                summary: 'Completed the base implementation.',
+                artifacts: [{ path: 'deliverables/task-a.md', kind: 'markdown' }],
+                verification_done: ['Confirmed the base implementation.'],
+                gaps: [],
+                needs: [],
+              }),
+            },
+          };
+        }
+        if (taskId === 'task-2' && prompt.includes('Review findings to address')) {
+          return {
+            payload: {
+              text: makeTaskResultText({
+                summary: 'The implementation now passes review.',
+                artifacts: [{ path: 'deliverables/REVIEW-task-1.md', kind: 'markdown' }],
+                verification_done: ['Confirmed the revised implementation.'],
+                gaps: [],
+                needs: [],
+              }),
+            },
+          };
+        }
         return {
           payload: {
             text: makeTaskResultText({
-              summary: 'Reworked the implementation.',
-              artifacts: [{ path: 'deliverables/task-a.md', kind: 'markdown' }],
-              verification_done: ['Addressed the reviewer findings.'],
-              gaps: [],
-              needs: [],
-            }),
-          },
-        };
-      }
-      if (taskId === 'task-1') {
-        return {
-          payload: {
-            text: makeTaskResultText({
-              summary: 'Completed the base implementation.',
-              artifacts: [{ path: 'deliverables/task-a.md', kind: 'markdown' }],
-              verification_done: ['Confirmed the base implementation.'],
-              gaps: [],
-              needs: [],
-            }),
-          },
-        };
-      }
-      if (taskId === 'task-2' && prompt.includes('Review findings to address')) {
-        return {
-          payload: {
-            text: makeTaskResultText({
-              summary: 'The implementation now passes review.',
+              summary: 'Review found one must-fix issue.',
               artifacts: [{ path: 'deliverables/REVIEW-task-1.md', kind: 'markdown' }],
-              verification_done: ['Confirmed the revised implementation.'],
-              gaps: [],
+              verification_done: ['Reviewed the target work.'],
+              gaps: ['Clarify the implementation heading hierarchy.'],
               needs: [],
             }),
           },
         };
       }
-      return {
-        payload: {
-          text: makeTaskResultText({
-            summary: 'Review found one must-fix issue.',
-            artifacts: [{ path: 'deliverables/REVIEW-task-1.md', kind: 'markdown' }],
-            verification_done: ['Reviewed the target work.'],
-            gaps: ['Clarify the implementation heading hierarchy.'],
-            needs: [],
-          }),
-        },
-      };
-    });
+    );
 
     await dispatchMissionNextTasks('MSN-FOLLOWUP');
 
     const prompts = mocks.route.mock.calls.map((call) =>
-      String((call[0] as any)?.payload?.text || '')
+      String((call[0] as { payload?: { text?: string } } | undefined)?.payload?.text || '')
     );
     expect(prompts[2]).toContain('## Review findings to address');
     expect(prompts[2]).toContain('must_fix @ task-1');
