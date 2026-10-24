@@ -25,6 +25,7 @@ import {
   needsOurConfirmation,
   parseFragmentToken,
   pickLocale,
+  roleBannerKey,
   screenForReason,
   sourceKey,
   type AnswerPayload,
@@ -37,6 +38,7 @@ import {
   type ViewAttachment,
   type ViewReceipt,
 } from './model.js';
+import { createCallout, type CalloutTone } from './callout.js';
 
 type Bundle = Record<string, string>;
 type Vocabulary = Record<RoomLocale, Bundle>;
@@ -239,7 +241,7 @@ function focusHeading(): void {
 // Plain states
 // ---------------------------------------------------------------------------
 
-const STATE_KEYS: Record<ScreenState, { title: string; body: string; tone: string }> = {
+const STATE_KEYS: Record<ScreenState, { title: string; body: string; tone: CalloutTone }> = {
   updating: { title: 'state_updating_title', body: 'state_updating_body', tone: 'info' },
   closed: { title: 'state_closed_title', body: 'state_closed_body', tone: 'info' },
   expired: { title: 'state_expired_title', body: 'state_expired_body', tone: 'warning' },
@@ -266,10 +268,9 @@ function showState(state: ScreenState): void {
   releaseImages();
   clear();
   const keys = STATE_KEYS[state];
-  const card = el('section', 'kb-callout cr-state');
-  card.dataset.tone = keys.tone;
+  const { box: card, content } = createCallout(document, 'section', 'cr-state', keys.tone);
   card.setAttribute('role', state === 'unavailable' ? 'alert' : 'status');
-  card.append(el('h1', 'kb-callout__title', t(keys.title)), el('p', 'kb-text', t(keys.body)));
+  content.append(el('h1', 'kb-callout__title', t(keys.title)), el('p', 'kb-text', t(keys.body)));
   if (state === 'stale' || state === 'unavailable') {
     const actionKey: 'reload' | 'retry_action' = state === 'stale' ? 'reload' : 'retry_action';
     const button = el('button', 'kb-btn kb-btn--primary', t(actionKey));
@@ -277,7 +278,7 @@ function showState(state: ScreenState): void {
     button.addEventListener('click', () => {
       void start();
     });
-    card.append(button);
+    content.append(button);
   }
   root.append(card);
   focusHeading();
@@ -358,17 +359,16 @@ function currentLine(entry: ViewEntry): string {
 function draftBlock(entry: ViewEntry): HTMLElement | null {
   const view = describeDraft(entry.draft);
   if (view.kind === 'none') return null;
-  const box = el('div', 'kb-callout cr-draft');
-  box.dataset.tone = 'neutral';
-  box.append(el('p', 'kb-text kb-text--caption', t('draft_heading')));
+  const { box, content } = createCallout(document, 'div', 'cr-draft', 'neutral');
+  content.append(el('p', 'kb-text kb-text--caption', t('draft_heading')));
   if (view.kind === 'accept') {
-    box.append(el('p', 'kb-text', t('draft_accept')));
+    content.append(el('p', 'kb-text', t('draft_accept')));
   } else if (view.kind === 'text') {
-    box.append(el('p', 'kb-text', view.text));
+    content.append(el('p', 'kb-text', view.text));
   } else if (view.kind === 'list') {
     const list = el('ul', 'cr-draft__list');
     for (const item of view.items) list.append(el('li', 'kb-text', item));
-    box.append(list);
+    content.append(list);
   } else {
     const list = el('dl', 'kb-kv cr-impact');
     for (const [label, value] of view.pairs) {
@@ -376,7 +376,7 @@ function draftBlock(entry: ViewEntry): HTMLElement | null {
       row.append(el('dt', 'kb-kv__label', label), el('dd', 'kb-kv__value', value));
       list.append(row);
     }
-    box.append(list);
+    content.append(list);
   }
   return box;
 }
@@ -430,9 +430,13 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
   const links = linksBlock(entry);
   if (links) card.append(links);
 
-  const current = el('div', 'kb-callout cr-current');
-  current.dataset.tone = 'info';
-  current.append(
+  const { box: current, content: currentContent } = createCallout(
+    document,
+    'div',
+    'cr-current',
+    'info'
+  );
+  currentContent.append(
     el('p', 'kb-text kb-text--caption', t('current_heading')),
     el('p', 'kb-text', currentLine(entry))
   );
@@ -686,11 +690,8 @@ function showForm(): void {
   header.append(titles);
   root.append(header);
 
-  const role = el('div', 'kb-callout', undefined);
-  role.dataset.tone = 'info';
-  role.append(
-    el('p', 'kb-text', t(view.participant.role === 'decider' ? 'role_decider' : 'role_contributor'))
-  );
+  const { box: role, content: roleContent } = createCallout(document, 'div', '', 'info');
+  roleContent.append(el('p', 'kb-text', t(roleBannerKey(view.participant.role, view.entries))));
   root.append(role);
 
   const last = latestReceipt(view.receipts);
@@ -855,9 +856,8 @@ function showReview(): void {
   }
   root.append(list);
   if (general.question) {
-    const box = el('section', 'kb-callout cr-review-general');
-    box.dataset.tone = 'neutral';
-    box.append(
+    const { box, content } = createCallout(document, 'section', 'cr-review-general', 'neutral');
+    content.append(
       el('h2', 'kb-text kb-text--caption', t('review_general_heading')),
       el('p', 'kb-text cr-question', general.question)
     );
@@ -915,10 +915,9 @@ function showReceipt(body: Record<string, unknown>): void {
   releaseImages();
   clear();
   const decider = session?.view.participant.role === 'decider';
-  const card = el('section', 'kb-callout cr-state');
-  card.dataset.tone = 'success';
+  const { box: card, content } = createCallout(document, 'section', 'cr-state', 'success');
   card.setAttribute('role', 'status');
-  card.append(
+  content.append(
     el('h1', 'kb-callout__title', t('receipt_title')),
     el(
       'p',
@@ -933,10 +932,10 @@ function showReceipt(body: Record<string, unknown>): void {
     )
   );
   const changes = typeof body.change_requests === 'number' ? body.change_requests : 0;
-  if (changes > 0) card.append(el('p', 'kb-text', t('receipt_changes', { count: changes })));
-  if (body.duplicate === true) card.append(el('p', 'kb-text', t('receipt_duplicate')));
+  if (changes > 0) content.append(el('p', 'kb-text', t('receipt_changes', { count: changes })));
+  if (body.duplicate === true) content.append(el('p', 'kb-text', t('receipt_duplicate')));
   if (session?.sentQuestion) {
-    card.append(
+    content.append(
       el('p', 'kb-text', t('receipt_general')),
       el('p', 'kb-text kb-text--muted cr-question', session.sentQuestion)
     );
@@ -946,7 +945,7 @@ function showReceipt(body: Record<string, unknown>): void {
   again.addEventListener('click', () => {
     void restart();
   });
-  card.append(again);
+  content.append(again);
   root.append(card);
   focusHeading();
 }

@@ -2075,7 +2075,7 @@ describe('customer-decision facade', () => {
         item: `bolt:${MISSION_ID}`,
         key: 'bolt.acceptance',
         kind: 'approval',
-        question: 'Do you accept the results of this bolt?',
+        question: 'Do you accept the results of this round of work?',
         our_decision: { value: { approved: true } },
         override_until: { kind: 'milestone', milestone: `bolt-after:${MISSION_ID}` },
         links: [{ label: 'Preview', url: 'https://preview.example.com/b1' }],
