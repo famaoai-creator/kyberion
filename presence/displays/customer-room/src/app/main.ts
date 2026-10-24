@@ -132,7 +132,8 @@ function showImage(frame: HTMLElement, attachment: ViewAttachment): void {
       return;
     }
     const img = el('img', 'cr-attachment__image');
-    img.alt = attachment.name;
+    // The caption already names the image; a file name is not a useful description.
+    img.alt = '';
     img.decoding = 'async';
     img.addEventListener('error', () => {
       frame.replaceChildren(el('p', 'kb-text kb-text--muted', t('attachment_failed')));
