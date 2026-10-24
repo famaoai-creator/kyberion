@@ -57,9 +57,70 @@ const TIME_PARAM = /^\d{2}:\d{2}$/u;
 const ZONE_PARAMS: ReadonlySet<string> = new Set(['UTC', 'JST']);
 /** Control, format (bidi, zero-width), line and paragraph separators. */
 const INVISIBLE_OR_BREAK = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
-/** A host name: labels joined by dots ending in a letter TLD (`acme.com`, `a.b.co`). */
-const BARE_DOMAIN =
-  /(?:^|[^\p{L}\p{N}_-])[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(?![\p{L}\p{N}_-])/u;
+/**
+ * Top-level domains chat bridges auto-link without a scheme (Slack, Discord
+ * and Telegram link `acme.com` but not `Node.js`). Generic and the common
+ * country codes; a title with one of them after a dot is refused (fail safe:
+ * the operator reminds by hand), any other dotted word passes.
+ */
+const AUTOLINK_TLDS = [
+  'com',
+  'net',
+  'org',
+  'info',
+  'biz',
+  'io',
+  'co',
+  'ai',
+  'app',
+  'dev',
+  'me',
+  'tv',
+  'xyz',
+  'site',
+  'online',
+  'link',
+  'page',
+  'cloud',
+  'tech',
+  'shop',
+  'store',
+  'blog',
+  'news',
+  'jp',
+  'us',
+  'uk',
+  'de',
+  'fr',
+  'cn',
+  'kr',
+  'tw',
+  'hk',
+  'sg',
+  'au',
+  'ca',
+  'in',
+  'eu',
+  'ru',
+  'br',
+  'nl',
+  'it',
+  'es',
+  'ch',
+  'se',
+  'ly',
+  'gl',
+  'gg',
+  'to',
+  'sh',
+  'ws',
+  'cc',
+];
+/** `label(.label)*.<tld>` ending at a word boundary or a path / port. */
+const BARE_DOMAIN = new RegExp(
+  `(?:^|[^a-z0-9-])[a-z0-9-]+(?:\\.[a-z0-9-]+)*\\.(?:${AUTOLINK_TLDS.join('|')})(?=$|[^a-z0-9-])`,
+  'u'
+);
 /** Chat mention / broadcast syntax (Slack, Discord, Telegram). */
 const MENTION = /<[!@#]|@(?:everyone|here|channel)\b/iu;
 

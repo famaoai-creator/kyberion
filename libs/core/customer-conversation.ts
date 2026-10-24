@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { t } from './t.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
@@ -368,6 +369,14 @@ export interface SendToCustomerInput {
    * scope's approvers. Default unchanged (no scope).
    */
   requestScope?: EventScopeInput;
+  /**
+   * CD-11: the approval request's summary instead of the message itself, for
+   * a body that must not be copied into the shared approval store (it is not
+   * tenant-partitioned). Ids only. When set, the request's payload hash binds
+   * the body (sha256) and the channel, so the approval covers exactly that
+   * text to that channel. Default unchanged (the summary quotes the body).
+   */
+  approvalSummary?: string;
   /** Delivery function supplied by the calling bridge (channel-specific). */
   deliver: (text: string) => Promise<unknown>;
 }
@@ -529,9 +538,20 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
           return charter ? { charter } : {};
         })()
       : {}),
+    // CD-11: an ids-only summary keeps the message out of the shared approval
+    // store; the approval then binds the exact body and channel by hash.
+    ...(input.approvalSummary !== undefined
+      ? {
+          payload: {
+            body_sha256: createHash('sha256').update(input.body, 'utf8').digest('hex'),
+            surface: input.binding.binding.surface,
+            channel_id: input.binding.binding.channel_id,
+          },
+        }
+      : {}),
     draft: {
       title: floorViolations.length > 0 ? `⚠ ${input.title}` : input.title,
-      summary: `${violationNote}${input.body.slice(0, 400)}`,
+      summary: `${violationNote}${input.approvalSummary ?? input.body.slice(0, 400)}`,
       severity: 'high',
     },
   });

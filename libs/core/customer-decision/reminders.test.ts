@@ -225,7 +225,13 @@ describe('dueAgendaReminders', () => {
 
   it('sends nothing for closed, withdrawn, unsent or edited-but-not-re-approved agendas', () => {
     const now = '2026-10-30T09:00:00.000Z';
-    for (const status of ['closed', 'withdrawn', 'approved', 'draft'] as const) {
+    // Re-approved after an edit (status `approved`, invites still out): reminded.
+    expect(dueAgendaReminders(input(agenda({ status: 'approved' }), now))).toHaveLength(1);
+    // Approved but never sent: no invites, nobody to remind.
+    expect(dueAgendaReminders(input(agenda({ status: 'approved' }), now, { invites: [] }))).toEqual(
+      []
+    );
+    for (const status of ['closed', 'withdrawn', 'draft'] as const) {
       expect(dueAgendaReminders(input(agenda({ status }), now))).toEqual([]);
     }
     const edited = { ...agenda(), title: 'Edited after approval' };

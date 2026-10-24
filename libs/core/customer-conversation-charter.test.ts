@@ -114,6 +114,12 @@ describe('sendToCustomer × accountability charter', () => {
     expect(
       renderCustomerRoutineTemplate({ ...base, params: { title: 'T', date: '2026-10-30' } })
     ).toBeTypeOf('string');
+    // Dotted words chat bridges do not auto-link are ordinary titles.
+    for (const title of ['Node.js migration', 'v2.0 release', 'next.config tweaks', 'e.g. scope']) {
+      expect(
+        renderCustomerRoutineTemplate({ ...base, params: { title, date: '2026-10-30' } })
+      ).toBeTypeOf('string');
+    }
     // A long (≤ 300, the agenda title limit), punctuated, Japanese title is fine.
     expect(
       renderCustomerRoutineTemplate({
@@ -149,7 +155,9 @@ describe('sendToCustomer × accountability charter', () => {
       { title: 'a\u2028b', date: '2026-10-30' },
       { title: 'a\u0085b', date: '2026-10-30' },
       // Bare domains and fullwidth link syntax.
-      { title: 'visit evil.example now', date: '2026-10-30' },
+      { title: 'visit evil.com now', date: '2026-10-30' },
+      { title: 'see acme.co.jp/path', date: '2026-10-30' },
+      { title: 'ＡＣＭＥ．ＣＯＭ', date: '2026-10-30' },
       { title: 'https：／／evil', date: '2026-10-30' },
       // Mention / broadcast syntax.
       { title: '<!channel> hi', date: '2026-10-30' },

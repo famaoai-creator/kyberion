@@ -33550,6 +33550,11 @@
         "ja": "調整セット {agendaId} の顧客へのリマインド {reminderId}",
         "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñ řėɱïñḓėř {reminderId} ƒőř ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
+      "reminder_outbound_summary": {
+        "en": "Reminder {reminderId} ({kind}, {date}) of agenda {agendaId} in decision case {caseId}, fixed template {templateId}. The message is not copied here; read it with: {command}",
+        "ja": "決定案件 {caseId} の調整セット {agendaId} のリマインド {reminderId}（{kind}、{date}）、定型文 {templateId}。文面はここには写しません。次のコマンドで確認してください: {command}",
+        "qps-ploc": "⟦Řėɱïñḓėř {reminderId} ({kind}, {date}) őƒ ȧɠėñḓȧ {agendaId} ïñ ḓėƈïşïőñ ƈȧşė {caseId}, ƒïẋėḓ ŧėɱṗŀȧŧė {templateId}. Ŧħė ɱėşşȧɠė ïş ñőŧ ƈőṗïėḓ ħėřė; řėȧḓ ïŧ ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
+      },
       "reminder_manual_title": {
         "en": "Remind the customer yourself: agenda {agendaId}",
         "ja": "顧客に手でリマインドしてください: 調整セット {agendaId}",

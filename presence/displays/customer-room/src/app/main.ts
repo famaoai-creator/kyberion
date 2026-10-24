@@ -622,6 +622,7 @@ function generalQuestionBlock(): HTMLElement {
   const area = el('textarea', 'kb-input kb-textarea');
   area.id = 'general-question';
   area.rows = 3;
+  area.maxLength = GENERAL_QUESTION_MAX;
   area.value = session?.generalQuestion ?? '';
   area.setAttribute('aria-label', t('general_heading'));
   area.setAttribute('aria-describedby', hint.id);

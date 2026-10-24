@@ -15,6 +15,8 @@ import * as initialIO from '@agent/core/secure-io';
 const mocks = vi.hoisted(() => ({
   realGate: undefined as undefined | ((params: { operationId?: string }) => unknown),
   load: vi.fn(),
+  /** When set, the outbound gate's answer (simulates a hold no human can decide). */
+  outbound: undefined as undefined | Record<string, unknown>,
 }));
 vi.mock('@agent/core/governance/approval-gate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/governance/approval-gate')>();
@@ -23,7 +25,9 @@ vi.mock('@agent/core/governance/approval-gate', async (importOriginal) => {
     enforceApprovalGate: (params: Parameters<typeof actual.enforceApprovalGate>[0]) =>
       params.operationId === 'customer_decision:agenda_approve'
         ? { allowed: true, status: 'approved', requestId: 'apr-agenda' }
-        : actual.enforceApprovalGate(params),
+        : params.operationId === 'customer:outbound' && mocks.outbound
+          ? mocks.outbound
+          : actual.enforceApprovalGate(params),
   };
 });
 vi.mock('@agent/core/governance/approval-store', async (importOriginal) => ({
@@ -316,6 +320,13 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
   let plain: { agendaId: string; tokens: string[] };
 
   it('dry-run writes nothing; a real run holds the reminder at the gate and hands the unbound decider to the operator', async () => {
+    // Everything the approval path emits on the shared worker-event stream.
+    const { getDefaultWorkerEventStream } =
+      await import('@agent/core/workforce/worker-event-stream');
+    const streamed: string[] = [];
+    const unsubscribe = getDefaultWorkerEventStream().subscribe((event) => {
+      streamed.push(JSON.stringify(event));
+    });
     plain = await sendAgenda(TENANT);
     const before = readAgendaFile(TENANT, plain.agendaId);
     const inboxBefore = (await inbox()).length;
@@ -389,18 +400,47 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
       ]),
     });
 
+    // Shared readers never see the agenda title or the message: an unscoped
+    // listing of the approval store and the worker-event stream carry ids only.
+    const leaks = (text: string) => text.includes(TITLE) || text.includes('Please open it');
+    expect(leaks(JSON.stringify(requests()))).toBe(false);
+    expect(streamed.some((line) => line.includes(String(held.approval_request_id)))).toBe(true);
+    expect(streamed.some(leaks)).toBe(false);
+    expect(String(opened[0].summary)).toContain(`customer-decision status --tenant ${TENANT}`);
+
+    // An edited title is new text: a new request (the approval binds the body),
+    // and the earlier pending request is cancelled, not left to pile up.
+    const retitle = path.join(ROOT, 'active/shared/tmp', 'retitle.json');
+    io.safeWriteFile(retitle, JSON.stringify({ title: `${TITLE} v2` }));
+    await run(['draft', ...base(TENANT), '--agenda', plain.agendaId, '--file', retitle]);
+    await run(['submit', ...base(TENANT), '--agenda', plain.agendaId, '--by', 'user:alice']);
+    const retitled = await run(['remind', '--tenant', TENANT, '--now', D_MINUS_1]);
+    expect(retitled.counts).toEqual({ approval_pending: 1 });
+    const fresh = String((retitled.reminders as Out[])[0].approval_request_id);
+    expect(fresh).not.toBe(held.approval_request_id);
+    const byId = (id: string) => requests().find((request) => request.id === id);
+    expect(byId(String(held.approval_request_id))?.status).toBe('cancelled');
+    expect(byId(fresh)?.status).toBe('pending');
+    expect(byId(fresh)?.accountability?.payloadHash).not.toBe(
+      opened[0].accountability?.payloadHash
+    );
+    expect(streamed.some(leaks)).toBe(false);
+    unsubscribe();
+    // The rest of the file keeps the original title in its leak checks.
+    const current = byId(fresh)!;
+
     // A human rejects it: the next run records it denied and stops asking.
     const { decideApprovalRequest } = await import('@agent/core/governance/approval-store');
     decideApprovalRequest('mission_controller', {
       channel: 'slack',
-      requestId: String(held.approval_request_id),
+      requestId: current.id,
       decision: 'rejected',
       decidedBy: 'user:boss',
       decidedByType: 'human',
       authenticated: true,
       authMethod: 'surface_session',
-      payloadHash: opened[0].accountability?.payloadHash,
-      effectBinding: opened[0].accountability?.effectBinding,
+      payloadHash: current.accountability?.payloadHash,
+      effectBinding: current.accountability?.effectBinding,
     });
     const third = await run(['remind', '--tenant', TENANT, '--now', D_MINUS_1]);
     expect(third.counts).toEqual({ denied: 1 });
@@ -706,5 +746,23 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     ]);
     expect(again).not.toHaveProperty('warnings');
     expect(again.actor).not.toHaveProperty('channel');
+  }, 60_000);
+
+  it('a hold that reaches no human (charter stop, no request) becomes one manual task, not a silent retry', async () => {
+    mocks.outbound = { allowed: false, status: 'pending', message: '[CHARTER_STOP] tripwire' };
+    try {
+      const d0 = '2026-10-30T01:00:00.000Z';
+      const first = await run(['remind', '--tenant', CHARTERED, '--now', d0]);
+      const bound = (first.reminders as Out[]).find((item) => item.actor_id === ACTOR) as Out;
+      expect(bound).toMatchObject({ kind: 'due', outcome: 'manual' });
+      const entries = await inbox({ entryId: String(bound.inbox_entry_id) });
+      expect(entries).toEqual([
+        expect.objectContaining({ kind: 'customer_decision_manual_reminder' }),
+      ]);
+      expect(JSON.stringify(entries)).not.toContain(TITLE);
+      expect((await run(['remind', '--tenant', CHARTERED, '--now', d0])).counts).toEqual({});
+    } finally {
+      mocks.outbound = undefined;
+    }
   }, 60_000);
 });

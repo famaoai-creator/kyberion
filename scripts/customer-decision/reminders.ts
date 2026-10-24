@@ -30,7 +30,8 @@
 import { createHash } from 'node:crypto';
 import { logger } from '@agent/core/core';
 import { t } from '@agent/core/t';
-import { withExecutionContextAsync } from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { cancelApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   readLedger,
   readCustomerActors,
@@ -73,6 +74,9 @@ import {
   usageError,
 } from './common.js';
 
+/** The approval store's shared writer (the role surfaces decide requests under). */
+const APPROVAL_STORE_ROLE = 'surface_runtime';
+
 /** Surfaces whose outbox a bridge drains (`sendToCustomer`'s `deliver`). */
 const OUTBOX_SURFACES = new Set(['slack', 'telegram', 'imessage', 'discord']);
 type OutboxSurface = 'slack' | 'telegram' | 'imessage' | 'discord';
@@ -86,6 +90,7 @@ export type ReminderOutcome =
   | 'would_send'
   | 'would_remind_manually'
   | 'delivery_failed'
+  | 'unreachable'
   | 'failed';
 
 export interface ReminderSweepResult {
@@ -170,6 +175,18 @@ async function deliverReminder(
           agendaId: agenda.agenda_id,
         }),
         body,
+        // Ids only: the approval store is shared, so neither the agenda title
+        // nor the message goes into the request; the approver reads it in the
+        // tenant-scoped status. The request binds the body and channel by hash.
+        approvalSummary: t('customer_decision:reminder_outbound_summary', {
+          reminderId: reminder.reminder_id,
+          kind: reminder.kind,
+          date: reminder.target_date,
+          templateId: reminder.template.id,
+          agendaId: agenda.agenda_id,
+          caseId: agenda.case_id,
+          command: `pnpm kyberion customer-decision status --tenant ${tenant} --case ${agenda.case_id} --agenda ${agenda.agenda_id}`,
+        }),
         template: reminder.template,
         correlationId,
         nonInteractive: true,
@@ -209,7 +226,9 @@ async function deliverReminder(
         : result.status === 'approval_pending'
           ? result.approvalRequestId && result.approvalRequestStatus !== 'human_required'
             ? 'approval_pending'
-            : 'failed'
+            : // Held with no request a human can decide (a charter stop, no
+              // request opened): never retried silently — a manual task.
+              'unreachable'
           : 'delivery_failed';
   return {
     outcome,
@@ -229,6 +248,37 @@ export function reminderCorrelationId(
     .digest('hex')
     .slice(0, 16);
   return `customer-decision-reminder:${tenant}:${reminder.reminder_id}:${digest}`;
+}
+
+/**
+ * A reminder whose text changed (an edited title) gets a new correlation id
+ * and so a new request: cancel the request the earlier attempt left pending,
+ * so stale requests do not pile up. Best-effort.
+ */
+function supersedeHeldRequest(
+  agenda: DecisionAgenda,
+  reminder: Pick<PlannedReminder, 'reminder_id'>,
+  currentRequestId: string | undefined,
+  surface: string
+): void {
+  const previous = (agenda.reminders ?? []).find(
+    (record) => record.reminder_id === reminder.reminder_id && record.status === 'approval_pending'
+  )?.approval_request_id;
+  if (!previous || previous === currentRequestId) return;
+  try {
+    withExecutionContext(APPROVAL_STORE_ROLE, () =>
+      cancelApprovalRequest(APPROVAL_STORE_ROLE, {
+        channel: surface,
+        requestId: previous,
+        cancelledBy: 'customer-decision',
+        reason: 'superseded: the reminder text changed',
+      })
+    );
+  } catch (error) {
+    logger.warn(
+      `customer decision reminder: earlier approval request not cancelled — ${diagnosticCode(error)} | cancel it by hand | request=${previous} reminder=${reminder.reminder_id}`
+    );
+  }
 }
 
 function mergeReminders(
@@ -342,6 +392,27 @@ async function sweepAgenda(
             ...(delivered.approval_request_id
               ? { approval_request_id: delivered.approval_request_id }
               : {}),
+          };
+          supersedeHeldRequest(
+            state.agenda,
+            reminder,
+            delivered.approval_request_id,
+            channel.surface
+          );
+        } else if (outcome === 'unreachable') {
+          const notice = notifyManualReminder({
+            tenantSlug: tenant,
+            caseId,
+            agendaId,
+            reminder,
+            reason: 'approval_unreachable',
+          });
+          outcome = 'manual';
+          record = {
+            ...recordBase,
+            status: 'manual',
+            reason: 'approval_unreachable',
+            inbox_entry_id: notice.inbox_entry_id,
           };
         }
       }
