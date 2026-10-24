@@ -251,6 +251,55 @@ export function resolveProviderPermissionArgs(
   return resolution;
 }
 
+/**
+ * Candidacy check for dispatch/staffing: refuses (throws) when the named
+ * provider cannot structurally project the required KD-05 capability tier
+ * — the "a CLI that cannot project the read-only surface must not be a
+ * delegation candidate" rule from delegated-autonomous-loop.
+ *
+ * `identifier` may be a reasoning mode (`claude-cli`), a backend alias, or a
+ * provider id (`claude`) — resolution goes through
+ * {@link resolveReasoningProviderDescriptor}, which is the governed
+ * registry. Unknown identifiers fail closed: dispatch asked for a provider
+ * it cannot verify, so the delegation is refused. Identifiers that resolve
+ * to a descriptor WITHOUT a `cli` block (pure API/text adapters) are a
+ * no-op — they do not execute tools, so there is nothing to project.
+ */
+export function assertProviderCanProjectProfile(
+  identifier: string | undefined | null,
+  profileName: string
+): void {
+  if (!identifier) return;
+  const descriptor = resolveReasoningProviderDescriptor(identifier);
+  if (!descriptor) {
+    throw new Error(
+      `[PROVIDER_PROFILE_REFUSED] Provider "${identifier}" is not in the governed reasoning-provider registry; refusing ${profileName} delegation.`
+    );
+  }
+  if (!descriptor.cli) return;
+  const resolution = resolveProviderPermissionArgs(profileName, descriptor.provider as ProviderId);
+  if (resolution.kind === 'refused') {
+    throw new Error(
+      `[PROVIDER_PROFILE_REFUSED] Provider "${descriptor.provider}" cannot project the "${profileName}" tier: ${resolution.reason}`
+    );
+  }
+}
+
+/**
+ * Non-throwing companion to {@link assertProviderCanProjectProfile} for the
+ * ambient-backend case: returns the governed descriptor only when the
+ * identifier resolves AND the adapter is a local CLI (the only kind with a
+ * tool surface to project). Unknown identifiers and pure API adapters
+ * return `undefined`, letting callers skip the check instead of refusing —
+ * the ambient backend (e.g. the offline `stub`) is not a staffing choice.
+ */
+export function resolveCliProviderDescriptorOrNull(
+  identifier: string | undefined | null
+): ReturnType<typeof resolveReasoningProviderDescriptor> {
+  const descriptor = resolveReasoningProviderDescriptor(identifier);
+  return descriptor?.cli ? descriptor : undefined;
+}
+
 // --------------------------------------------------------------------------
 // Child-process env minimization (HA-04 type, generalized across providers)
 // --------------------------------------------------------------------------

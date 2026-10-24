@@ -11,7 +11,9 @@ import {
   getSubagentCapabilityProfile,
   isOpAllowedForProfile,
   listSubagentCapabilityProfileNames,
+  narrowestCapabilityProfile,
   resolveCapabilityProfileForTeamRole,
+  resolveDelegationCapabilityProfile,
 } from './subagent-capability-profiles.js';
 import {
   getDefaultWorkerEventStream,
@@ -247,5 +249,42 @@ describe('subagent-capability-profiles (KD-05)', () => {
         ).toBe(true);
       }
     }
+  });
+});
+
+describe('resolveDelegationCapabilityProfile', () => {
+  it('keeps a reviewer role read-only even for implementation purpose', () => {
+    expect(
+      resolveDelegationCapabilityProfile({ teamRole: 'reviewer', purpose: 'implementation' })
+    ).toBe('explorer');
+  });
+
+  it('caps an implementer role at read-only when the purpose is review', () => {
+    expect(resolveDelegationCapabilityProfile({ teamRole: 'implementer', purpose: 'review' })).toBe(
+      'explorer'
+    );
+  });
+
+  it('lets an implementer role keep write access for implementation purpose', () => {
+    expect(
+      resolveDelegationCapabilityProfile({ teamRole: 'implementer', purpose: 'implementation' })
+    ).toBe('implementer');
+  });
+
+  it('projects coordination roles to the no-exec tier', () => {
+    expect(
+      resolveDelegationCapabilityProfile({ teamRole: 'orchestrator', purpose: 'implementation' })
+    ).toBe('planner');
+  });
+
+  it('falls back to the purpose ceiling when no team role is given', () => {
+    expect(resolveDelegationCapabilityProfile({ purpose: 'review' })).toBe('explorer');
+    expect(resolveDelegationCapabilityProfile({ purpose: 'implementation' })).toBe('implementer');
+    expect(resolveDelegationCapabilityProfile({})).toBe('implementer');
+  });
+
+  it('fails closed on an unknown tier name passed to narrowestCapabilityProfile', () => {
+    expect(narrowestCapabilityProfile('nonexistent-tier', 'implementer')).toBe('planner');
+    expect(narrowestCapabilityProfile()).toBe('planner');
   });
 });

@@ -193,6 +193,54 @@ export function resolveCapabilityProfileForTeamRole(teamRole: string): string {
 }
 
 /**
+ * Least-privilege ordering of the KD-05 tiers. The actual set each tier
+ * allows lives in {@link SUBAGENT_CAPABILITY_PROFILES}; this order is only
+ * about which tier is "narrower" when two bounds must be combined.
+ */
+const CAPABILITY_TIER_RANK: Readonly<Record<string, number>> = {
+  planner: 0,
+  explorer: 1,
+  implementer: 2,
+};
+
+/**
+ * Combine two independent bounds — e.g. the team role's projection and the
+ * dispatch purpose floor — by keeping the narrower tier. Roles project
+ * through {@link resolveCapabilityProfileForTeamRole}; purposes declare a
+ * ceiling (a 'review' purpose must never widen a reviewer into implementer,
+ * and an implementer role running a review task must not widen the task's
+ * read-only floor either). Unknown names fail closed to `planner`.
+ */
+export function narrowestCapabilityProfile(...tiers: readonly string[]): string {
+  if (tiers.length === 0) return 'planner';
+  let narrowest = 'implementer';
+  for (const tier of tiers) {
+    const name = PROFILE_BY_NAME.has(tier) ? tier : 'planner';
+    if ((CAPABILITY_TIER_RANK[name] ?? 0) < (CAPABILITY_TIER_RANK[narrowest] ?? 0)) {
+      narrowest = name;
+    }
+  }
+  return narrowest;
+}
+
+/**
+ * Resolve the capability tier a delegation must run under: the narrower of
+ * the team role's projection (when a role is given) and the purpose ceiling.
+ * `purpose` today distinguishes review delegations (read-only ceiling) from
+ * implementation delegations.
+ */
+export function resolveDelegationCapabilityProfile(input: {
+  teamRole?: string;
+  purpose?: 'implementation' | 'review';
+}): string {
+  const purposeCeiling = input.purpose === 'review' ? 'explorer' : 'implementer';
+  const roleTier = input.teamRole
+    ? resolveCapabilityProfileForTeamRole(input.teamRole)
+    : 'implementer';
+  return narrowestCapabilityProfile(roleTier, purposeCeiling);
+}
+
+/**
  * Dynamic catalog text. Dispatch-side tool descriptions embed this so the
  * model always sees the current, live tier list rather than a description
  * frozen at the time the tool was authored (KD-05 acceptance criterion 2).
