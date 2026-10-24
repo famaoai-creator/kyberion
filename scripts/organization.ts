@@ -63,6 +63,16 @@ export async function main(
     await executeOrganizationOperation(args.slice(3));
     return;
   }
+  if (args[0] === 'doctrine' && args[1] === 'issue') {
+    const { issueOrganizationDoctrine } = await import('./organization_doctrine.js');
+    issueOrganizationDoctrine(args.slice(2), print);
+    return;
+  }
+  if (args[0] === 'doctrine' && args[1] === 'publish') {
+    const { publishOrganizationDoctrine } = await import('./organization_doctrine.js');
+    await publishOrganizationDoctrine(args.slice(2), print);
+    return;
+  }
   if (args[0] === 'objective' && args[1] === 'kr' && args[2] === 'measure') {
     const { measureOrganizationObjectives } = await import('./organization_objective_measure.js');
     await measureOrganizationObjectives(args.slice(3), print);
