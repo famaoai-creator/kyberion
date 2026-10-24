@@ -1194,6 +1194,34 @@
       "subsystem": "tenancy"
     },
     {
+      "name": "KYBERION_CUSTOMER_ROOM_PORT",
+      "category": "runtime",
+      "type": "number",
+      "required": false,
+      "default": "3046",
+      "subsystem": "customer-room",
+      "description": "Loopback port for the customer-facing decision room (presence/displays/customer-room); public exposure is the public ingress provider's job.",
+      "documented": true
+    },
+    {
+      "name": "KYBERION_CUSTOMER_ROOM_PUBLIC_URL",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "description": "Public origin of the customer-room display (e.g. the Tailscale Funnel URL). `pnpm kyberion customer-decision send` builds invite links as <origin>/r#t=<token>. Defaults to http://127.0.0.1:3046.",
+      "documented": true,
+      "subsystem": "surfaces"
+    },
+    {
+      "name": "KYBERION_CUSTOMER_ROOM_TENANT",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "subsystem": "customer-room",
+      "description": "Tenant slug the customer-facing decision room serves; one process serves one tenant and the room refuses to start without it (not required by other commands). Never taken from a request.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_DELEGATED_ROLE",
       "category": "runtime",
       "type": "string",

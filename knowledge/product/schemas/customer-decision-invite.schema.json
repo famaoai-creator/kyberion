@@ -1,0 +1,57 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/customer-decision-invite.schema.json",
+  "title": "Customer Decision Invite (CD-06)",
+  "description": "An invite link for one customer decision agenda. Stored at active/shared/runtime/customer-decision-invites/confidential/<tenant>/<invite_id>.json. Only the SHA-256 of the secret is persisted; the token is shown once at issue time and never stored or logged.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "invite_id",
+    "tenant_slug",
+    "case_id",
+    "agenda_id",
+    "participant",
+    "secret_sha256",
+    "created_at",
+    "expires_at",
+    "created_by",
+    "uses"
+  ],
+  "properties": {
+    "version": { "const": "1.0.0" },
+    "invite_id": { "type": "string", "pattern": "^inv-[a-f0-9]{16}$" },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+    "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+    "participant": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "role", "actor_id"],
+      "properties": {
+        "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "role": { "enum": ["decider", "contributor"] },
+        "actor_id": { "type": "string", "pattern": "^customer:[a-z][a-z0-9-]{0,60}$" }
+      }
+    },
+    "secret_sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "created_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "created_by": { "type": "string", "minLength": 1 },
+    "revoked_at": { "type": "string", "format": "date-time" },
+    "revoked_reason": { "type": "string", "minLength": 1, "maxLength": 500 },
+    "uses": {
+      "type": "array",
+      "maxItems": 50,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["at", "action"],
+        "properties": {
+          "at": { "type": "string", "format": "date-time" },
+          "action": { "enum": ["view", "respond"] }
+        }
+      }
+    }
+  }
+}

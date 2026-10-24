@@ -1,0 +1,11 @@
+{
+  "role": "customer_decision_invite_store",
+  "description": "Customer decision invite record storage (libs/core/customer-decision/invite.ts): reads and writes only the bound tenant's active/shared/runtime/customer-decision-invites/confidential/<tenant>/ records. Requires an exact deny-only tenant capability for one invite record (or a read-only listing of the tenant directory) before every operation. No knowledge, decision ledger, agenda, receipt or deployment authority.",
+  "default_persona": "unknown",
+  "write_scopes": [
+    "active/shared/runtime/customer-decision-invites/confidential/${KYBERION_TENANT}/"
+  ],
+  "scope_classes": ["operations_runtime"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}

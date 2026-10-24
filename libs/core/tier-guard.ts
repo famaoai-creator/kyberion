@@ -13,6 +13,10 @@ import {
   isPipelineJournalCapability,
   PIPELINE_JOURNAL_STORE_ROLE,
 } from './foundation/pipeline-journal-capability.js';
+import {
+  isCustomerDecisionInviteCapability,
+  CUSTOMER_DECISION_INVITE_STORE_ROLE,
+} from './foundation/customer-decision-invite-capability.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -665,6 +669,13 @@ function isScopedStructuralMkdir(
         PARTITIONED_RUNTIME_STATE_ROOTS.pipeline_library_runs + '/confidential'
     )
       return false;
+  } else if (access.role === CUSTOMER_DECISION_INVITE_STORE_ROLE) {
+    if (
+      !isCustomerDecisionInviteCapability(currentResourceAccessScope()) ||
+      normalizePath(protectedPrefix) !==
+        PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites + '/confidential'
+    )
+      return false;
   } else if (access.role !== 'concierge_management_writer') return false;
   const resource = currentResourceAccessScope();
   if (
@@ -1044,6 +1055,15 @@ function requestResourceDenial(
         '[RESOURCE_SCOPE_REQUIRED] Pipeline journal access requires its exact tenant journal capability',
     };
   if (
+    normalizedRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
+    !isCustomerDecisionInviteCapability(currentResourceAccessScope())
+  )
+    return {
+      allowed: false,
+      reason:
+        '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability',
+    };
+  if (
     normalizedRole === 'concierge_management_reader' &&
     (!currentResourceAccessScope() || operation === 'write' || operation === 'mkdir')
   ) {
@@ -1135,6 +1155,8 @@ export function validateWritePermission(
     if (
       (currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
         isDiscussionRequestCapability(currentResourceAccessScope())) ||
+      (currentRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
+        isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
       (currentRole === PR_PUBLICATION_STORE_ROLE &&
         prPublicationResourceAllowed(relativePath, operation))
     )
@@ -1299,6 +1321,8 @@ export function validateReadPermission(
         if (
           ((identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
             isDiscussionRequestCapability(currentResourceAccessScope())) ||
+            (identity.role === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
+              isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
             (identity.role === PR_PUBLICATION_STORE_ROLE &&
               prPublicationResourceAllowed(relativePath, operation))) &&
           loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(

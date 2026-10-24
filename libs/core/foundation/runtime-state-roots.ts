@@ -15,6 +15,8 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   discussion_create_requests: 'active/shared/runtime/discussion-create-requests',
   /** PG-03 standing grants (governance/grant-store.ts). */
   grants: 'active/shared/runtime/grants',
+  /** CD-06 customer decision invite links (hashes only; customer-decision/invite.ts). */
+  customer_decision_invites: 'active/shared/runtime/customer-decision-invites',
 } as const;
 
 /** Logical names preserve existing layouts; registration never grants access. */

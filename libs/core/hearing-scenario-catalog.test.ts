@@ -9,12 +9,13 @@ import {
 } from './hearing-scenario-catalog.js';
 
 describe('hearing scenario catalog', () => {
-  it('loads the web_app_build, work_inventory and process_improvement scenarios through the governed catalog', () => {
+  it('loads the web_app_build, work_inventory, process_improvement and aidlc_inception scenarios through the governed catalog', () => {
     const catalog = loadHearingScenarios();
     expect(catalog.scenarios.map((scenario) => scenario.id)).toEqual([
       'web_app_build',
       'work_inventory',
       'process_improvement',
+      'aidlc_inception',
     ]);
     expect(defaultHearingScenario().id).toBe('web_app_build');
   });
@@ -32,6 +33,15 @@ describe('hearing scenario catalog', () => {
       ['purpose', 2],
       ['shape', 3],
       ['limits', 2],
+    ]);
+    expect(
+      findHearingScenario('aidlc_inception')?.phases?.map((p) => [p.id, p.requirement_ids.length])
+    ).toEqual([
+      ['intent', 3],
+      ['elaboration', 2],
+      ['nfr', 4],
+      ['units', 2],
+      ['constraints', 2],
     ]);
   });
 

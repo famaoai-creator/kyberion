@@ -14,13 +14,25 @@
  * under `pathResolver.sharedTmp()`); it is still constrained to the
  * repository root by `assertSafeRepositoryPath`.
  *
+ * Every ledger write (`appendDecisions`, `applyPromotions`) runs under one
+ * inter-process lock per ledger ({@link withDecisionLedgerLock}), taken inside
+ * the write functions themselves so no writer — the `decisions` facade, the
+ * customer-decision facade or a future one — can forget it. The lock is
+ * re-entrant within a process, so a caller that must read → plan → write
+ * across several calls (customer-decision `respond` pre-assigns ids) holds it
+ * around the whole sequence. Lock order: a caller's own coarser lock (e.g. the
+ * customer-decision case lock) first, then this one; the ledger lock never
+ * takes another lock, so the order cannot invert.
+ *
  * Validation on append is the same four refusals the tenant-side PoC
  * established: unknown level, missing basis on a decided record, an active
  * record for the same item/key without `supersedes`, and a `supersedes`
  * that names nothing active.
  */
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -279,6 +291,61 @@ export class DecisionLedgerError extends Error {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Ledger lock (inter-process, one per ledger; re-entrant within a process)
+// ---------------------------------------------------------------------------
+
+/** Long enough to queue behind a customer respond, short of the customer room's 15 s child limit. */
+export const DECISION_LEDGER_LOCK_TIMEOUT_MS = 10_000;
+
+/** The lock resource of a ledger: tenant + case, or a hash of a test `dir`. */
+export function decisionLedgerLockId(location: DecisionLedgerLocation): string {
+  const dir = ledgerDir(location); // validates the tenant slug and case id
+  if ('dir' in location) {
+    return `decision-ledger-dir-${createHash('sha256').update(dir).digest('hex').slice(0, 24)}`;
+  }
+  return `decision-ledger-${location.tenantSlug}-${location.caseId}`;
+}
+
+/** Ledger locks this process holds, with their nesting depth (withLockSync is not re-entrant). */
+const heldLedgerLocks = new Map<string, number>();
+
+/**
+ * Run `fn` holding the ledger's inter-process lock. Re-entrant for the same
+ * ledger in this process (nested calls run inside the outer hold), so callers
+ * may wrap a read → plan → write sequence around `appendDecisions`, which
+ * takes it again. The lock file lives under `active/shared/runtime/locks/`
+ * (security-policy default_allow).
+ */
+export function withDecisionLedgerLock<T>(
+  location: DecisionLedgerLocation,
+  fn: () => T,
+  timeoutMs = DECISION_LEDGER_LOCK_TIMEOUT_MS
+): T {
+  const id = decisionLedgerLockId(location);
+  const depth = heldLedgerLocks.get(id) ?? 0;
+  if (depth > 0) {
+    heldLedgerLocks.set(id, depth + 1);
+    try {
+      return fn();
+    } finally {
+      heldLedgerLocks.set(id, depth);
+    }
+  }
+  return withLockSync(
+    id,
+    () => {
+      heldLedgerLocks.set(id, 1);
+      try {
+        return fn();
+      } finally {
+        heldLedgerLocks.delete(id);
+      }
+    },
+    timeoutMs
+  );
+}
+
 export interface DecisionAppendResult {
   appended: DecisionRecord[];
   superseded: string[];
@@ -289,6 +356,14 @@ export function appendDecisions(
   location: DecisionLedgerLocation,
   records: readonly DecisionAppendInput[],
   options: { dryRun?: boolean; caseId?: string } = {}
+): DecisionAppendResult {
+  return withDecisionLedgerLock(location, () => appendDecisionsLocked(location, records, options));
+}
+
+function appendDecisionsLocked(
+  location: DecisionLedgerLocation,
+  records: readonly DecisionAppendInput[],
+  options: { dryRun?: boolean; caseId?: string }
 ): DecisionAppendResult {
   const existing = readLedger(location);
   const caseId =
@@ -352,6 +427,15 @@ export function applyPromotions(
     customerActors?: readonly DecisionCustomerActor[];
     policy?: DecisionAuthorityPolicy;
   }
+): DecisionApplyPromotionsResult {
+  // Read → promote → append under one hold: the targets cannot move in between.
+  return withDecisionLedgerLock(location, () => applyPromotionsLocked(location, requests, options));
+}
+
+function applyPromotionsLocked(
+  location: DecisionLedgerLocation,
+  requests: readonly DecisionPromotionRequest[],
+  options: Parameters<typeof applyPromotions>[2]
 ): DecisionApplyPromotionsResult {
   const existing = readLedger(location);
   const inputs: DecisionAppendInput[] = [];

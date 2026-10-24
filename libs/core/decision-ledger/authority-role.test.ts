@@ -59,6 +59,15 @@ describe('decision_ledger authority role', () => {
     expect(validateWritePermission(path.join(ROOT, 'knowledge/product/x.md')).allowed).toBe(false);
   });
 
+  it('may take the ledger lock it takes inside appendDecisions / applyPromotions', () => {
+    process.env.KYBERION_TENANT = 'acme-corp';
+    expect(
+      validateWritePermission(
+        path.join(ROOT, 'active/shared/runtime/locks/decision-ledger-acme-corp-case-1.lock')
+      )
+    ).toEqual({ allowed: true });
+  });
+
   it('gets no grant at all without a tenant', () => {
     expect(validateWritePermission(ledgerFile('acme-corp')).allowed).toBe(false);
   });

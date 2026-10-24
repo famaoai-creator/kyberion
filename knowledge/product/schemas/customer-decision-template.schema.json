@@ -1,0 +1,90 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "customer-decision-template.schema.json",
+  "title": "Customer Decision Template",
+  "description": "CD-03: a template of customer decision entries (question, background, options with impact text, organization default) for one engagement phase. All *_key fields are user-facing-vocabulary keys (customer_decision:*), never raw display text. Impact texts are generic guidance, never concrete prices.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "template_id", "phase", "title_key", "entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "string", "minLength": 1 },
+    "template_id": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,80}$" },
+    "phase": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,80}$" },
+    "title_key": { "$ref": "#/definitions/vocabulary_key" },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entry_id",
+          "item",
+          "key",
+          "kind",
+          "question_key",
+          "background_key",
+          "requires_customer"
+        ],
+        "properties": {
+          "entry_id": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,80}$" },
+          "item": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._#:@+-]{0,120}$" },
+          "key": { "type": "string", "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)*$" },
+          "kind": { "enum": ["choice", "approval", "ranking", "hearing"] },
+          "question_key": { "$ref": "#/definitions/vocabulary_key" },
+          "background_key": { "$ref": "#/definitions/vocabulary_key" },
+          "options": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["value", "label_key", "impact_keys"],
+              "properties": {
+                "value": {},
+                "label_key": { "$ref": "#/definitions/vocabulary_key" },
+                "impact_keys": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["cost", "schedule", "scope"],
+                  "properties": {
+                    "cost": { "$ref": "#/definitions/vocabulary_key" },
+                    "schedule": { "$ref": "#/definitions/vocabulary_key" },
+                    "scope": { "$ref": "#/definitions/vocabulary_key" }
+                  }
+                }
+              }
+            }
+          },
+          "org_default": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "source"],
+            "properties": {
+              "value": {},
+              "source": { "type": "string", "minLength": 1 }
+            }
+          },
+          "requires_customer": { "type": "boolean" }
+        },
+        "allOf": [
+          {
+            "if": {
+              "properties": { "requires_customer": { "const": true } },
+              "required": ["requires_customer"]
+            },
+            "then": { "not": { "required": ["org_default"] } }
+          }
+        ]
+      }
+    }
+  },
+  "definitions": {
+    "vocabulary_key": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*:[a-z][a-z0-9_]*$",
+      "description": "A user-facing-vocabulary key (domain:key)."
+    }
+  }
+}
