@@ -3,7 +3,9 @@ import {
   DEFAULT_LEARNING_THRESHOLDS,
   buildDecisionLearningMetrics,
   buildLearningSuggestions,
+  isMaterialEvidenceChange,
   learningCandidateId,
+  standingLearningSuggestions,
   type LearningCaseInput,
 } from './learning.js';
 import type { AgendaEntry, DecisionAgenda, DecisionReceipt, DecisionSwitch } from './model.js';
@@ -163,6 +165,7 @@ describe('buildDecisionLearningMetrics (CD-12)', () => {
       ],
       // Free text is counted, never shown.
       other_values: 1,
+      current_org_default: 30,
     });
     expect(metrics.overturn_by_item_key).toEqual([
       expect.objectContaining({
@@ -366,5 +369,141 @@ describe('buildLearningSuggestions (CD-12)', () => {
     expect(
       learningCandidateId('acme-corp', 'revise_options:NFR/auth.method', '2026-11-01')
     ).not.toBe(id);
+  });
+});
+
+describe('learning review fixes (CD-12)', () => {
+  it('counts the latest answer per decider and revision once, and a new revision separately', () => {
+    const a = agenda(1);
+    const answer = (outcome: 'change_request' | 'decided', value: unknown) => ({
+      entry_id: 'auth',
+      choice: 'option' as const,
+      value,
+      outcome,
+    });
+    const metrics = buildDecisionLearningMetrics([
+      {
+        case_id: a.case_id,
+        agendas: [a],
+        switches: [],
+        receipts: [
+          receipt(a, [answer('change_request', 'password')], {
+            receipt_id: 'rcp-r1-first',
+            submitted_at: '2026-10-20T01:00:00.000Z',
+          }),
+          // The same decider re-submits revision 1: replaces the first answer.
+          receipt(a, [answer('change_request', 'password')], {
+            receipt_id: 'rcp-r1-second',
+            submitted_at: '2026-10-20T02:00:00.000Z',
+          }),
+          // Revision 2 is a new question to the decider.
+          receipt(a, [answer('decided', 'sso')], {
+            receipt_id: 'rcp-r2-first',
+            agenda_revision: 2,
+            submitted_at: '2026-10-21T00:00:00.000Z',
+          }),
+        ],
+      },
+    ]);
+    expect(
+      metrics.change_requests_by_entry.find((stat) => stat.key === 'auth.method')
+    ).toMatchObject({ answers: 2, change_requests: 1, rate: 0.5 });
+  });
+
+  it('takes option membership from the answered revision, not only the current options', () => {
+    // Revision 1 offered 'passkey'; the current revision no longer does.
+    const a = agenda(1);
+    const metrics = buildDecisionLearningMetrics([
+      {
+        case_id: a.case_id,
+        agendas: [a],
+        switches: [
+          {
+            ...sw(a, RETENTION, 'value_changed', { layer: 'org_default', value: 30 }, 180),
+            cause_receipt_id: 'rcp-old-rev',
+          },
+        ],
+        receipts: [
+          receipt(
+            a,
+            [
+              { entry_id: 'retention', choice: 'option', value: 180, outcome: 'decided' },
+              { entry_id: 'auth', choice: 'option', value: 'passkey', outcome: 'change_request' },
+            ],
+            { receipt_id: 'rcp-old-rev', agenda_revision: 1 }
+          ),
+        ],
+      },
+    ]);
+    expect(metrics.overturn_by_template_entry[0]).toMatchObject({
+      customer_values: [{ value: 180, count: 1 }],
+      other_values: 0,
+    });
+    expect(
+      metrics.change_requests_by_entry.find((stat) => stat.key === 'auth.method')?.requested_values
+    ).toEqual([{ value: 'passkey', count: 1 }]);
+  });
+
+  it('compares with the default in force, so an applied change is not suggested again', () => {
+    const cases = overturnCases([90, 90, 90, 365], 1);
+    // The newest agenda already carries the changed default (applied).
+    const applied = agenda(999, [
+      { ...RETENTION, org_default: { value: 90, source: 'template:aidlc-inception' } },
+    ]);
+    applied.updated_at = '2026-10-25T00:00:00.000Z';
+    cases.push({ case_id: applied.case_id, agendas: [applied], receipts: [], switches: [] });
+    const metrics = buildDecisionLearningMetrics(cases);
+    expect(metrics.overturn_by_template_entry[0]).toMatchObject({ current_org_default: 90 });
+    expect(buildLearningSuggestions(metrics)).toEqual([]);
+    // The product template's current default wins over the agendas'.
+    const fromTemplate = buildLearningSuggestions(
+      metrics,
+      {},
+      {
+        currentDefaults: new Map([['aidlc-inception#retention', 30]]),
+      }
+    );
+    expect(fromTemplate).toEqual([
+      expect.objectContaining({ current_org_default: 30, suggested_org_default: 90 }),
+    ]);
+  });
+
+  it('treats a suggestion as new only when the evidence materially changed', () => {
+    const next = { suggested_org_default: 90, evidence: { samples: 6, count: 5 } };
+    expect(isMaterialEvidenceChange(undefined, next)).toBe(true);
+    expect(
+      isMaterialEvidenceChange({ suggested_org_default: 90, evidence: { count: 4 } }, next)
+    ).toBe(false);
+    expect(
+      isMaterialEvidenceChange({ suggested_org_default: 365, evidence: { count: 4 } }, next)
+    ).toBe(true);
+    expect(
+      isMaterialEvidenceChange({ suggested_org_default: 90, evidence: { count: 2 } }, next)
+    ).toBe(true);
+    expect(isMaterialEvidenceChange({ suggested_org_default: 90 }, next)).toBe(true);
+  });
+});
+
+describe('standingLearningSuggestions (CD-12)', () => {
+  it('keeps the latest queued entry per suggestion key across reports, skipping failed ones', () => {
+    const entry = (learningId: string, candidate?: 'created' | 'existing' | 'failed') => ({
+      item: 'NFR',
+      key: 'auth.method',
+      template_id: null,
+      entry_id: null,
+      suggestion_key: 'revise_options:NFR/auth.method',
+      kind: 'revise_options' as const,
+      evidence: { samples: 4, count: 3 },
+      learning_id: learningId,
+      ...(candidate ? { candidate } : {}),
+    });
+    const standing = standingLearningSuggestions([
+      { report_date: '2026-10-31', suggestions: [entry('cdl-0000000000000003', 'failed')] },
+      { report_date: '2026-10-17', suggestions: [entry('cdl-0000000000000001')] },
+      { report_date: '2026-10-24', suggestions: [entry('cdl-0000000000000002', 'existing')] },
+    ]);
+    expect(standing.get('revise_options:NFR/auth.method')?.learning_id).toBe(
+      'cdl-0000000000000002'
+    );
   });
 });

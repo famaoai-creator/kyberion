@@ -3,7 +3,7 @@
  * gaining any reach into `knowledge/confidential/<tenant>/decisions/`.
  *
  * Chronos never reads the case stores itself. It runs the built governed
- * facade (`dist/scripts/customer_decision.js overview --tenant <t> --json`)
+ * facade (`dist/scripts/customer_decision.js overview --tenant <t> --summary --json`)
  * as a child process, bound to the resolved viewer tenant, exactly as the
  * customer room does (presence/displays/customer-room/src/server/facade.ts):
  * a minimal env on top of the secure-io exec allowlist with the ambient role,
@@ -77,7 +77,16 @@ export type OverviewChildRunner = (tenant: string) => Promise<OverviewChildOutco
 export const runOverviewChild: OverviewChildRunner = async (tenant) => {
   const result = await safeExecResultAsync(
     process.execPath,
-    [pathResolver.rootResolve(OVERVIEW_FACADE_SCRIPT), 'overview', '--tenant', tenant, '--json'],
+    [
+      pathResolver.rootResolve(OVERVIEW_FACADE_SCRIPT),
+      'overview',
+      '--tenant',
+      tenant,
+      // Summary form: no entry rows and a capped attention list (with
+      // totals.attention_total), so a large tenant stays within the output cap.
+      '--summary',
+      '--json',
+    ],
     {
       cwd: pathResolver.rootDir(),
       env: overviewChildEnv(tenant),

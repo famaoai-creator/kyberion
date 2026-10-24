@@ -19,6 +19,7 @@
       "role": "sink",
       "op": "core:customer_decision_learning",
       "params": {
+        "window_days": 90,
         "export_as": "customer_decision_learning"
       },
       "produces": {

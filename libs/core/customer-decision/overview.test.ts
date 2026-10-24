@@ -7,6 +7,7 @@ import {
   OVERVIEW_ATTENTION_ORDER,
   buildCaseOverview,
   buildCustomerDecisionOverview,
+  summarizeCustomerDecisionOverview,
   type CaseOverviewInput,
 } from './overview.js';
 import type { ConsumedDecisionLockRecord } from './store.js';
@@ -461,6 +462,30 @@ describe('buildCustomerDecisionOverview (CD-12)', () => {
     // Within one reason, the soonest first.
     const awaiting = overview.attention.filter((item) => item.reason === 'awaiting_customer');
     expect(awaiting.map((item) => item.case_id)).toEqual(['case-a', 'case-b']);
+  });
+
+  it('the summary form drops entries, caps attention and keeps the full count', () => {
+    const many = Array.from({ length: 30 }, (_, index) =>
+      buildCaseOverview(
+        caseInput({
+          case_id: `case-${String(index).padStart(2, '0')}`,
+          agendas: [agenda({ case_id: `case-${String(index).padStart(2, '0')}` })],
+          invites: [invite({ case_id: `case-${String(index).padStart(2, '0')}` })],
+        })
+      )
+    );
+    const full = buildCustomerDecisionOverview({ tenant_slug: 'acme-corp', cases: many, now: NOW });
+    expect(full.attention.length).toBeGreaterThan(50);
+    expect(full.totals).not.toHaveProperty('attention_total');
+    expect(full.cases[0].agendas[0].entries).toHaveLength(ENTRIES.length);
+    const summary = summarizeCustomerDecisionOverview(full);
+    expect(summary.attention).toEqual(full.attention.slice(0, 50));
+    expect(summary.totals).toEqual({ ...full.totals, attention_total: full.attention.length });
+    expect(summary.cases[0].agendas[0]).not.toHaveProperty('entries');
+    expect(summary.cases[0].agendas[0].counts).toEqual(full.cases[0].agendas[0].counts);
+    expect(JSON.stringify(summary)).not.toContain('Which sign-in method?');
+    // The full form is left as it was.
+    expect(full.cases[0].agendas[0].entries).toHaveLength(ENTRIES.length);
   });
 
   it('refuses a now that is not a timestamp', () => {

@@ -61,7 +61,8 @@
         "overturn_rate": { "$ref": "#/definitions/rate" },
         "proposed_values": { "$ref": "#/definitions/values" },
         "customer_values": { "$ref": "#/definitions/values" },
-        "other_values": { "$ref": "#/definitions/count" }
+        "other_values": { "$ref": "#/definitions/count" },
+        "current_org_default": {}
       }
     }
   },
@@ -193,7 +194,11 @@
               "rate": { "$ref": "#/definitions/rate" }
             }
           },
-          "learning_id": { "type": "string", "pattern": "^cdl-[a-f0-9]{16}$" }
+          "learning_id": { "type": "string", "pattern": "^cdl-[a-f0-9]{16}$" },
+          "candidate": {
+            "type": "string",
+            "enum": ["created", "existing", "refused", "failed"]
+          }
         }
       }
     }

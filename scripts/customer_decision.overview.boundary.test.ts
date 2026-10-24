@@ -328,6 +328,22 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     );
     const text = JSON.stringify(out);
     for (const secret of SECRETS) expect(text).not.toContain(secret);
+    // The summary form (the Chronos card): no entries, capped attention, full count.
+    const summary = await run([
+      'overview',
+      '--tenant',
+      TENANT,
+      '--summary',
+      '--now',
+      '2026-10-25T00:00:00.000Z',
+    ]);
+    expect(snapshot(STORES)).toEqual(before);
+    expect((summary.totals as Out).attention_total).toBe((out.attention as unknown[]).length);
+    expect(summary.attention).toEqual(out.attention);
+    const summaryAgenda = ((summary.cases as Out[])[0].agendas as Out[])[0];
+    expect(summaryAgenda).not.toHaveProperty('entries');
+    expect(summaryAgenda.counts).toEqual(agenda.counts);
+    expect(out.totals).not.toHaveProperty('attention_total');
     // One case only.
     const one = await run(['overview', '--tenant', TENANT, '--case', DRAFT_CASE]);
     expect((one.cases as Out[]).map((item) => item.case_id)).toEqual([DRAFT_CASE]);
@@ -446,6 +462,27 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     expect(again).toMatchObject({ counts: { created: 0, existing: 1 } });
     expect(read()).toBe(first);
     expect(candidateFiles()).toHaveLength(1);
+    // A week later, or for another organization: the same suggestion with the
+    // same evidence is not queued again (one standing candidate per tenant).
+    const nextWeek = await run(['learning', '--tenant', TENANT], '2026-10-31T00:00:00.000Z');
+    expect(nextWeek).toMatchObject({
+      report_date: '2026-10-31',
+      counts: { created: 0, existing: 1 },
+      suggestions: [
+        expect.objectContaining({ learning_id: suggestion.learning_id, candidate: 'existing' }),
+      ],
+    });
+    const otherOrg = await run(['learning', '--tenant', TENANT, '--organization-id', 'other-org']);
+    expect(otherOrg).toMatchObject({ counts: { created: 0, existing: 1 } });
+    expect(candidateFiles()).toHaveLength(1);
+    expect(read()).toBe(first);
+    // The later report names the candidate that stands.
+    const later = JSON.parse(
+      initialContext('ecosystem_architect', () =>
+        String(io.safeReadFile(reportFile.replace(REPORT_DATE, '2026-10-31'), { encoding: 'utf8' }))
+      )
+    ) as { suggestions: Out[] };
+    expect(later.suggestions[0].learning_id).toBe(suggestion.learning_id);
     // The report directory is never a case.
     const overview = await run(['overview', '--tenant', TENANT]);
     expect((overview.cases as Out[]).map((item) => item.case_id)).toEqual([CASE, DRAFT_CASE]);
@@ -501,7 +538,13 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
         expect(dry.learning_ids).toHaveLength(1);
         // A real run in the child: the candidate already exists.
         const real = await runCustomerDecisionLearningOp({ now: NOW, scriptPath });
-        expect(real).toMatchObject({ dry_run: false, created: 0, existing: 1 });
+        expect(real).toMatchObject({
+          dry_run: false,
+          created: 0,
+          existing: 1,
+          // The weekly default window: the last 90 days.
+          since: '2026-07-26T00:00:00.000Z',
+        });
         await expect(
           runCustomerDecisionLearningOp({ tenant: OTHER, now: NOW, scriptPath })
         ).rejects.toThrow(/TENANT_MISMATCH/u);

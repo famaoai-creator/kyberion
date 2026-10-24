@@ -16,10 +16,27 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResultAsync } from '@agent/core/secure-io';
 import { REMINDER_FACADE_SCRIPT, reminderFacadeEnv } from './reminder-op.js';
 
-export const LEARNING_FACADE_TIMEOUT_MS = 5 * 60 * 1000;
-
 function refuse(code: string, message: string): never {
   throw new Error(`[${code}] ${message}`);
+}
+
+export const LEARNING_FACADE_TIMEOUT_MS = 5 * 60 * 1000;
+/**
+ * The weekly run counts the last 90 days: older evidence ages out, so a
+ * suggestion already acted on stops being re-counted from stale history.
+ */
+export const LEARNING_DEFAULT_WINDOW_DAYS = 90;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** `now` minus `days` (a positive integer), as an ISO timestamp. */
+export function learningWindowStart(now: string, days = LEARNING_DEFAULT_WINDOW_DAYS): string {
+  const ms = Date.parse(now);
+  if (!Number.isFinite(ms) || !Number.isInteger(days) || days < 1 || days > 3650)
+    refuse(
+      'CUSTOMER_DECISION_LEARNING_WINDOW_INVALID',
+      'window_days must be 1..3650 and now an ISO timestamp'
+    );
+  return new Date(ms - days * DAY_MS).toISOString();
 }
 
 /** The bound tenant of the run; another requested tenant is refused. */
@@ -44,6 +61,8 @@ export interface LearningOpResult {
   tenant: string;
   dry_run: boolean;
   report_date: string;
+  /** Start of the counted window. */
+  since: string;
   cases: number;
   case_failures: number;
   suggestions: number;
@@ -74,10 +93,13 @@ export async function runCustomerDecisionLearningOp(input: {
   tenant?: string;
   dryRun?: boolean;
   now: string;
+  /** Days of history counted (default {@link LEARNING_DEFAULT_WINDOW_DAYS}). */
+  windowDays?: number;
   /** Test seam: where the facade script is resolved from. */
   scriptPath?: string;
 }): Promise<LearningOpResult> {
   const tenant = learningOpTenant(input.tenant);
+  const since = learningWindowStart(input.now, input.windowDays ?? LEARNING_DEFAULT_WINDOW_DAYS);
   const script = input.scriptPath ?? pathResolver.rootResolve(REMINDER_FACADE_SCRIPT);
   const result = await safeExecResultAsync(
     process.execPath,
@@ -88,6 +110,8 @@ export async function runCustomerDecisionLearningOp(input: {
       tenant,
       '--now',
       input.now,
+      '--since',
+      since,
       '--json',
       ...(input.dryRun ? ['--dry-run'] : []),
     ],
@@ -112,6 +136,7 @@ export async function runCustomerDecisionLearningOp(input: {
     tenant,
     dry_run: run.dry_run === true,
     report_date: typeof run.report_date === 'string' ? run.report_date : '',
+    since: typeof run.since === 'string' ? run.since : since,
     cases: count(run.cases),
     case_failures: Array.isArray(run.case_failures) ? run.case_failures.length : 0,
     suggestions: count(counts.suggestions),

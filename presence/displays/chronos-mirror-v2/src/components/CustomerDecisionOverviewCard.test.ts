@@ -2,12 +2,15 @@ import { createElement } from 'react';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeReadFile } from '@agent/core/secure-io';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   CUSTOMER_DECISION_ATTENTION_LIMIT,
   CustomerDecisionOverviewPanel,
   customerDecisionAttentionRows,
   customerDecisionCaseSummary,
+  customerDecisionHiddenAttention,
+  createLatestRequestGuard,
+  fetchCustomerDecisionOverview,
   customerDecisionCommands,
   customerDecisionDaysLabel,
   type CustomerDecisionOverviewState,
@@ -63,6 +66,7 @@ function overview(over: Partial<CustomerDecisionOverviewView> = {}): CustomerDec
       reminders_due: 0,
       held_tasks: 3,
       pending_task_proposals: 0,
+      attention_total: 2,
     },
     attention: [
       {
@@ -82,6 +86,7 @@ function overview(over: Partial<CustomerDecisionOverviewView> = {}): CustomerDec
         draft_only: false,
         tasks: { pending_proposals: 0, held: 3, ready_to_resume: 0 },
         agendas: [agenda],
+        agendas_total: 1,
       },
     ],
     case_failures: [],
@@ -239,5 +244,71 @@ describe('CustomerDecisionOverviewCard (CD-12)', () => {
     const rule = css.slice(css.indexOf('@container (max-width: 720px)'));
     expect(rule).toMatch(/\.chronos-cd-rows__wide \{\s*display: none;/u);
     expect(rule).toMatch(/\.chronos-cd-rows__stacked \{\s*display: grid;/u);
+  });
+
+  it('counts hidden attention items from attention_total past the facade cap', () => {
+    const shown = Array.from({ length: 50 }, (_, index) => ({
+      reason: 'awaiting_customer' as const,
+      case_id: `case-${index}`,
+      count: 1,
+    }));
+    const value = overview({
+      attention: shown,
+      totals: { ...overview().totals, attention_total: 120 },
+    });
+    expect(customerDecisionHiddenAttention(value)).toBe(120 - CUSTOMER_DECISION_ATTENTION_LIMIT);
+    expect(render({ kind: 'ready', overview: value })).toContain(
+      `${120 - CUSTOMER_DECISION_ATTENTION_LIMIT} more in the CLI`
+    );
+  });
+
+  it('says how many cases and agenda sets were cut off', () => {
+    const value = overview({
+      totals: { ...overview().totals, cases: 205 },
+      cases: [{ ...overview().cases[0], agendas_total: 130 }],
+    });
+    const html = render({ kind: 'ready', overview: value });
+    expect(html).toContain('204 more in the CLI');
+    expect(html).toContain('case-a · 130 agenda sets · 1 sent');
+  });
+
+  it('drops a response that lands after a newer request (tenant switch)', async () => {
+    const guard = createLatestRequestGuard();
+    const first = guard.begin();
+    const second = guard.begin();
+    expect(first.signal.aborted).toBe(true);
+    expect(first.isCurrent()).toBe(false);
+    expect(second.isCurrent()).toBe(true);
+    guard.cancel();
+    expect(second.signal.aborted).toBe(true);
+    expect(second.isCurrent()).toBe(false);
+  });
+
+  it('fetches one tenant and ignores a stale or foreign response', async () => {
+    const respond = (body: unknown, status = 200) =>
+      vi.fn(async () => new Response(JSON.stringify(body), { status })) as unknown as typeof fetch;
+    const ok = await fetchCustomerDecisionOverview('acme', {
+      fetch: respond({ overview: overview() }),
+    });
+    expect(ok).toMatchObject({ kind: 'ready', overview: { tenant_slug: 'acme' } });
+    // An overview of another tenant is never shown for this one.
+    const foreign = await fetchCustomerDecisionOverview('globex', {
+      fetch: respond({ overview: overview() }),
+    });
+    expect(foreign).toEqual({ kind: 'error', message: 'customer decisions 200' });
+    const failed = await fetchCustomerDecisionOverview('acme', {
+      fetch: respond({ error: 'took too long' }, 504),
+    });
+    expect(failed).toEqual({ kind: 'error', message: 'took too long' });
+    // A request aborted by a tenant switch resolves to null (no state update).
+    const controller = new AbortController();
+    const pending = fetchCustomerDecisionOverview('acme', {
+      fetch: vi.fn(async () => {
+        controller.abort();
+        return new Response(JSON.stringify({ overview: overview() }));
+      }) as unknown as typeof fetch,
+      signal: controller.signal,
+    });
+    expect(await pending).toBeNull();
   });
 });
