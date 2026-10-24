@@ -1,0 +1,8 @@
+---
+category: Security
+---
+
+- **Customer outbound approvals carry ids only** — every `sendToCustomer` caller (deal quote/contract sends, CD-11 reminders) now opens approval requests whose title and summary name ids, length and the body's sha256 only; the body and channel are bound by hash in the approval payload, and an audience-floor violation is flagged by count. The approver reads the pending message from the tenant's own tree with `pnpm kyberion customer-channel outbound --tenant <t> --source deals/<deal>/<quote|contract>-v<n>.md --sha256 <hash>` (`matches_approval` shows whether it is the approved text).
+- **Governed customer channel bindings (D8)** — `pnpm kyberion customer-channel bind|unbind|list` creates, updates, deactivates and lists `customer/<tenant>/connections/channel-bindings.json` for a registered, active tenant only, validated against the schema, refusing a channel already bound to another tenant or an existing file that does not validate, and audited per change.
+- **Customer room image budget** — `POST /api/attachment` no longer spends the shared 60/min API budget: it has its own per-address fixed window (120/min, the shared `fixedWindowLimiter`, refusing new addresses rather than evicting a limited one) and at most 4 facade runs in flight.
+- **`customer-decision generate` honors `KYBERION_REASONING_BACKEND` (D10)** — with an explicit backend the draft goes to exactly that mode (`buildReasoningBackendForMode`, one candidate) or to organization defaults, never to another provider through failover; the result and audit record `reasoning_backend: {requested, used}`.

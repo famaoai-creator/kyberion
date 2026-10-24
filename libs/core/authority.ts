@@ -23,6 +23,10 @@ import {
   isCustomerDecisionMilestoneCapability,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
 } from './foundation/customer-decision-milestone-capability.js';
+import {
+  isArchivedMissionStateCapability,
+  ARCHIVED_MISSION_STATE_READER_ROLE,
+} from './foundation/archived-mission-state-capability.js';
 import * as path from 'node:path';
 // Identity resolution must not depend on policy-enforced IO: secure-io's
 // guards consult the identity this module computes, so importing secure-io
@@ -709,6 +713,8 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   CUSTOMER_DECISION_INVITE_STORE_ROLE,
   CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
+  ARCHIVED_MISSION_STATE_READER_ROLE,
+  'customer_channel_binding_store',
   'customer_decision_deal_note_writer',
   DISCUSSION_REQUEST_STORAGE_ROLE,
   PIPELINE_JOURNAL_STORE_ROLE,
@@ -815,6 +821,14 @@ function prepareExecutionContext(
   )
     throw new Error(
       '[RESOURCE_SCOPE_REQUIRED] Customer decision milestone access requires its exact case capability'
+    );
+  if (
+    normalizedRole === ARCHIVED_MISSION_STATE_READER_ROLE &&
+    (!isArchivedMissionStateCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  )
+    throw new Error(
+      '[RESOURCE_SCOPE_REQUIRED] Archived mission state reads require their exact read-only capability'
     );
   if (normalizedRole === 'concierge_management_reader') {
     const resource = currentResourceAccessScope();

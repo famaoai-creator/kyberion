@@ -26,6 +26,12 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
  */
 export const TENANT_LEDGER_ROOT_PATH = 'active/shared/runtime/tenant-ledger';
 
+/**
+ * The shared inter-process lock directory (foundation/lock-utils.ts LOCK_ROOT);
+ * narrow store roles that take a store lock name it from here.
+ */
+export const RUNTIME_LOCK_ROOT_PATH = 'active/shared/runtime/locks';
+
 /** Logical names preserve existing layouts; registration never grants access. */
 export const RUNTIME_STATE_PATHS = {
   'dot.wakeLedger': 'active/shared/runtime/dot-wake-ledger.jsonl',

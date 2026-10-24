@@ -9,6 +9,8 @@
  *   POST /api/respond   Authorization: Bearer <token>, {content_hash, answers, general_question?} -> facade `respond`
  *   POST /api/attachment Authorization: Bearer <token>, {attachment_id}       -> facade `attachment`
  *                        (the image bytes; png / jpeg / webp only, nosniff, no-store)
+ *                        Own per-address budget and an in-flight cap, separate from the
+ *                        view/respond budget: every image costs one facade child process.
  *
  * One process serves one tenant, fixed at start; nothing in a request can
  * change it. The token is read from the Authorization header only, handed to
@@ -17,6 +19,7 @@
 import type express from 'express';
 import expressModule from 'express';
 import { rateLimit } from 'express-rate-limit';
+import { fixedWindowLimiter } from '@agent/core/rate-limit';
 import * as path from 'node:path';
 import type { FacadeSpawner, FacadeVerb } from './facade.js';
 
@@ -101,7 +104,17 @@ export interface CustomerRoomRouteOptions {
   log?: (message: string) => void;
   apiLimitPerMinute?: number;
   pageLimitPerMinute?: number;
+  /** Image fetches per client address per minute (not counted against `apiLimitPerMinute`). */
+  attachmentLimitPerMinute?: number;
+  /** Image fetches (facade child processes) in flight at once, across every caller. */
+  attachmentConcurrency?: number;
+  /** Client addresses tracked by the image budget; beyond it new addresses wait, none is evicted. */
+  attachmentMaxKeys?: number;
 }
+
+export const DEFAULT_ATTACHMENT_LIMIT_PER_MINUTE = 120;
+export const DEFAULT_ATTACHMENT_CONCURRENCY = 4;
+export const DEFAULT_ATTACHMENT_MAX_KEYS = 1024;
 
 interface Failure {
   ok: false;
@@ -212,6 +225,49 @@ function limiter(limit: number) {
   });
 }
 
+/**
+ * The image route's own guard: a fixed window per client address (socket
+ * address only, forwarded headers are not trusted) plus a cap on facade runs
+ * in flight. The window refuses new addresses when full instead of evicting,
+ * so churning addresses cannot reset a limited caller's bucket.
+ */
+function attachmentGuard(options: CustomerRoomRouteOptions) {
+  const limit = options.attachmentLimitPerMinute ?? DEFAULT_ATTACHMENT_LIMIT_PER_MINUTE;
+  const concurrency = options.attachmentConcurrency ?? DEFAULT_ATTACHMENT_CONCURRENCY;
+  const window = fixedWindowLimiter({
+    windowMs: 60_000,
+    maxKeys: options.attachmentMaxKeys ?? DEFAULT_ATTACHMENT_MAX_KEYS,
+    eviction: 'deny',
+  });
+  let inFlight = 0;
+  const refuse = (res: express.Response, retryAfterSeconds: number): void => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.setHeader('Retry-After', String(retryAfterSeconds));
+    res.status(429).json(failure('unavailable'));
+  };
+  return (req: express.Request, res: express.Response, next: express.NextFunction): void => {
+    const decision = window.take(req.socket.remoteAddress ?? 'unknown', limit);
+    if ('retryAfterMs' in decision) {
+      refuse(res, Math.max(1, Math.ceil(decision.retryAfterMs / 1000)));
+      return;
+    }
+    if (inFlight >= concurrency) {
+      refuse(res, 1);
+      return;
+    }
+    inFlight += 1;
+    let released = false;
+    const release = (): void => {
+      if (released) return;
+      released = true;
+      inFlight -= 1;
+    };
+    res.once('finish', release);
+    res.once('close', release);
+    next();
+  };
+}
+
 export function registerCustomerRoomRoutes(
   app: express.Express,
   options: CustomerRoomRouteOptions
@@ -219,6 +275,7 @@ export function registerCustomerRoomRoutes(
   const log = options.log ?? (() => {});
   const apiLimiter = limiter(options.apiLimitPerMinute ?? 60);
   const pageLimiter = limiter(options.pageLimitPerMinute ?? 120);
+  const attachmentLimiter = attachmentGuard(options);
 
   app.disable('x-powered-by');
   app.use(securityHeaders);
@@ -342,7 +399,7 @@ export function registerCustomerRoomRoutes(
   app.post('/api/respond', apiLimiter, jsonBody, (req, res, next) => {
     void handleApi('respond')(req, res).catch(next);
   });
-  app.post('/api/attachment', apiLimiter, jsonBody, (req, res, next) => {
+  app.post('/api/attachment', attachmentLimiter, jsonBody, (req, res, next) => {
     void handleApi('attachment')(req, res).catch(next);
   });
 
