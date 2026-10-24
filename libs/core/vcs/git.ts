@@ -204,9 +204,30 @@ export function gitPush(
     throw new Error('[VCS_GIT_INVALID] Push requires one local branch ref');
   const branch = source.replace(/^refs\/heads\//, '');
   const destination = `refs/heads/${branch}`;
+  const repoVisibility = (pushUrl: string): string => {
+    try {
+      const https = pushUrl.startsWith('git@')
+        ? `https://${pushUrl.slice(4).replace(/:/, '/')}`
+        : pushUrl.startsWith('ssh://')
+          ? pushUrl.replace(/^ssh:\/\/(?:git@)?/, 'https://')
+          : pushUrl;
+      const parsed = new URL(https);
+      const slug = parsed.pathname.replace(/\.git$/, '').replace(/^\//, '');
+      if (!/^[\w.-]+\/[\w.-]+$/.test(slug)) return 'unknown';
+      const info = run('gh', ['api', `repos/${slug}`, '--hostname', parsed.host], { cwd });
+      if (info.error || info.status !== 0) return 'unknown';
+      const json = JSON.parse(info.stdout) as { private?: boolean; visibility?: string };
+      return json.private === true || json.visibility === 'private'
+        ? 'private'
+        : (json.visibility ?? 'unknown');
+    } catch {
+      return 'unknown';
+    }
+  };
   const snapshot = () => ({
     remote,
     url: read(['remote', 'get-url', '--push', remote]),
+    repository_visibility: repoVisibility(read(['remote', 'get-url', '--push', remote])),
     source,
     head: read(['rev-parse', '--verify', `refs/heads/${branch}^{commit}`]),
     destination,
