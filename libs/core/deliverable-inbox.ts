@@ -156,7 +156,12 @@ function writeInboxEntries(entries: DeliverableInboxEntry[]): void {
   const serialized = entries
     .map((entry) => JSON.stringify(catalog.validate(entry, filePath)))
     .join('\n');
-  safeWriteFile(filePath, serialized ? `${serialized}\n` : '');
+  writeInboxText(filePath, serialized ? `${serialized}\n` : '');
+}
+
+/** The inbox is a JSONL ledger (not JSON state): every whole-file write goes through here. */
+function writeInboxText(filePath: string, text: string): void {
+  safeWriteFile(filePath, text);
 }
 
 function normalizeStatusFilter(
@@ -314,9 +319,8 @@ function appendInboxEntryRaw(
   const validated = inboxEntryCatalog(filePath).validate(entry, filePath);
   ensureInboxDir();
   const separator = raw === '' || raw.endsWith('\n') ? '' : '\n';
-  // A JSONL append written whole: the writer-role guard compares the full content with the file.
-  const line = JSON.stringify(validated);
-  safeWriteFile(filePath, `${raw}${separator}${line}\n`);
+  // Appended by rewriting the whole text: the writer-role guard compares full content with the file.
+  writeInboxText(filePath, `${raw}${separator}${JSON.stringify(validated)}\n`);
   return validated;
 }
 
