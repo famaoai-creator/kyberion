@@ -754,6 +754,12 @@
       "note": "Tier/tenant-partitioned execution-metrics ledgers (libs/core/metrics.ts EXECUTION_METRICS_LEDGER_ROOT): <tier>/<tenant|shared>/execution-metrics.jsonl for MetricsCollector.record rows whose scope carries a tenant or a personal/confidential tier; untenanted public rows stay in work/metrics/execution-metrics.jsonl. Append-only latency/token/cost evidence read by cost reports, budget and spend guards, mission retrospectives and health regressions, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes and follow the knowledge-tier persona read rules; tenant offboarding exports and soft-deletes a tenant's partitions."
     },
     {
+      "path": "active/shared/runtime/tenant-ledger",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions."
+    },
+    {
       "path": "active/shared/runtime/discussions",
       "artifact_class": "log",
       "action": "review_required",
