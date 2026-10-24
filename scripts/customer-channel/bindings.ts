@@ -32,6 +32,8 @@ import {
 // libs/core/foundation/customer-channel-binding-store-capability.ts CUSTOMER_CHANNEL_BINDING_STORE_ROLE
 export const CUSTOMER_CHANNEL_BINDING_WRITE_ROLE = 'customer_channel_binding_store';
 
+const CUSTOMER_CHANNEL_BINDINGS_LOCK = 'customer-channel-bindings';
+
 export const CUSTOMER_BINDING_SURFACES: readonly CustomerBindingSurface[] = [
   'slack',
   'telegram',
@@ -147,10 +149,14 @@ function writeBindingChange(
     bindings: CustomerChannelBinding[];
     binding: CustomerChannelBinding | null;
     change: CustomerChannelBindingWriteResult['change'];
-  }
+  },
+  precheck?: () => void
 ): CustomerChannelBindingWriteResult | null {
   const { tenantSlug, rootDir } = target;
-  return withLockSync(`customer-channel-bindings-${tenantSlug}`, () => {
+  // One lock for every tenant's bindings: the cross-tenant channel check and
+  // the write are one step, so two tenants cannot bind the same channel at once.
+  return withLockSync(CUSTOMER_CHANNEL_BINDINGS_LOCK, () => {
+    precheck?.();
     // The store role writes the bindings file only; the audit record (its own
     // lock and chain) is written under the caller's identity.
     const written = withExecutionContext(
@@ -207,17 +213,28 @@ function writeBindingChange(
  * Another registered, active tenant with this channel bound and active, or
  * null. Each tenant is checked through its own tenant-bound read
  * (`readTenantCustomerChannelBindings`), so the scan needs no personal-tier
- * persona.
+ * persona. A customer/ tree that cannot be listed is refused (fails closed).
  */
+function listCustomerTenantDirs(rootDir: string): string[] {
+  const customerRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
+    rootDir,
+    allowMissingLeaf: true,
+  });
+  return safeExistsSync(customerRoot) ? safeReaddir(customerRoot) : [];
+}
+
+/** Test seam: how the cross-tenant check lists customer/ (default: the live tree). */
+export const customerTenantLister = { list: listCustomerTenantDirs };
+
 function otherTenantBindingChannel(target: ReturnType<typeof validatedTarget>): string | null {
   let slugs: string[];
   try {
-    const customerRoot = assertSafeRepositoryPath(path.join(target.rootDir, 'customer'), {
-      rootDir: target.rootDir,
-    });
-    slugs = safeExistsSync(customerRoot) ? safeReaddir(customerRoot) : [];
-  } catch {
-    return null;
+    slugs = customerTenantLister.list(target.rootDir);
+  } catch (err) {
+    throw bindingError(
+      'CUSTOMER_BINDING_CONFLICT_CHECK',
+      `cannot list customer/ to check the channel against other tenants (${err instanceof Error ? err.message : String(err)})`
+    );
   }
   for (const slug of slugs.sort()) {
     if (slug === target.tenantSlug || !isValidTenantSlug(slug)) continue;
@@ -256,48 +273,54 @@ export function bindCustomerChannel(
       `--mode must be one of ${BINDING_MODES.join('|')}`
     );
   }
-  const elsewhere = otherTenantBindingChannel(target);
-  if (elsewhere) {
-    throw bindingError(
-      'CUSTOMER_BINDING_CONFLICT',
-      `${target.surface}:${target.channelId} is already bound to another tenant; unbind it there first`
-    );
-  }
-  const result = writeBindingChange(target, 'bind', (bindings) => {
-    const index = bindings.findIndex(
-      (item) => item.surface === target.surface && item.channel_id === target.channelId
-    );
-    const existing = index >= 0 ? bindings[index] : undefined;
-    const counterpart =
-      name !== undefined || org !== undefined
-        ? {
-            ...existing?.counterpart,
-            ...(name !== undefined ? { name } : {}),
-            ...(org !== undefined ? { org } : {}),
-          }
-        : existing?.counterpart;
-    const { active: _active, ...rest } = existing ?? {};
-    const binding: CustomerChannelBinding = {
-      ...rest,
-      surface: target.surface,
-      channel_id: target.channelId,
-      ...(counterpart ? { counterpart } : {}),
-      ...(language !== undefined ? { language } : {}),
-      ...(mode ? { mode } : {}),
-      active: true,
-    };
-    const change: CustomerChannelBindingWriteResult['change'] = !existing
-      ? 'created'
-      : existing.active === false
-        ? 'reactivated'
-        : JSON.stringify(existing) === JSON.stringify(binding)
-          ? 'unchanged'
-          : 'updated';
-    const next = [...bindings];
-    if (index >= 0) next[index] = binding;
-    else next.push(binding);
-    return { bindings: next, binding, change };
-  });
+  const refuseConflict = (): void => {
+    if (otherTenantBindingChannel(target)) {
+      throw bindingError(
+        'CUSTOMER_BINDING_CONFLICT',
+        `${target.surface}:${target.channelId} is already bound to another tenant; unbind it there first`
+      );
+    }
+  };
+  const result = writeBindingChange(
+    target,
+    'bind',
+    (bindings) => {
+      const index = bindings.findIndex(
+        (item) => item.surface === target.surface && item.channel_id === target.channelId
+      );
+      const existing = index >= 0 ? bindings[index] : undefined;
+      const counterpart =
+        name !== undefined || org !== undefined
+          ? {
+              ...existing?.counterpart,
+              ...(name !== undefined ? { name } : {}),
+              ...(org !== undefined ? { org } : {}),
+            }
+          : existing?.counterpart;
+      const { active: _active, ...rest } = existing ?? {};
+      const binding: CustomerChannelBinding = {
+        ...rest,
+        surface: target.surface,
+        channel_id: target.channelId,
+        ...(counterpart ? { counterpart } : {}),
+        ...(language !== undefined ? { language } : {}),
+        ...(mode ? { mode } : {}),
+        active: true,
+      };
+      const change: CustomerChannelBindingWriteResult['change'] = !existing
+        ? 'created'
+        : existing.active === false
+          ? 'reactivated'
+          : JSON.stringify(existing) === JSON.stringify(binding)
+            ? 'unchanged'
+            : 'updated';
+      const next = [...bindings];
+      if (index >= 0) next[index] = binding;
+      else next.push(binding);
+      return { bindings: next, binding, change };
+    },
+    refuseConflict
+  );
   return result!;
 }
 

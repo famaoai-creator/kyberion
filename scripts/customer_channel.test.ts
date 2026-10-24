@@ -98,6 +98,14 @@ afterAll(() => {
 });
 
 type Out = Record<string, unknown>;
+/** Each test binds the channels it needs (bind is idempotent: created or unchanged). */
+const ensureBound = (tenant: string, channel: string): void => {
+  run(['bind', '--tenant', tenant, '--surface', 'slack', '--channel', channel]);
+};
+const readTenantBindingIds = (tenant: string): string[] =>
+  io.safeExistsSync(bindingsFile(tenant))
+    ? readBindings(tenant).bindings.map((item) => String(item.channel_id))
+    : [];
 const run = (argv: string[]) => cli.runCustomerChannel(argv) as Out;
 const exitOf = (argv: string[]): string => {
   try {
@@ -237,6 +245,30 @@ describe('customer-channel bind / unbind / list (D8, real paths)', () => {
     record.mockRestore();
   });
 
+  it('refuses a bind when other tenants cannot be checked, and checks them under one global lock', async () => {
+    const writer = await import('./customer-channel/bindings.js');
+    // customer/ cannot be listed: the cross-tenant check cannot run, so no bind.
+    const list = vi.spyOn(writer.customerTenantLister, 'list').mockImplementation(() => {
+      throw new Error('EACCES');
+    });
+    try {
+      expect(() =>
+        writer.bindCustomerChannel({ tenantSlug: TENANT, surface: 'slack', channelId: 'C-ALT' })
+      ).toThrow(/CUSTOMER_BINDING_CONFLICT_CHECK/u);
+    } finally {
+      list.mockRestore();
+    }
+    expect(readTenantBindingIds(TENANT).includes('C-ALT')).toBe(false);
+    // While another writer holds the global bindings lock, a bind cannot run.
+    const { withLockSync } = await import('@agent/core/foundation/lock-utils');
+    expect(() =>
+      withLockSync('customer-channel-bindings', () =>
+        writer.bindCustomerChannel({ tenantSlug: OTHER, surface: 'slack', channelId: 'C-LOCK' })
+      )
+    ).toThrow();
+    expect(readTenantBindingIds(OTHER).includes('C-LOCK')).toBe(false);
+  }, 30_000);
+
   it('refuses to overwrite a bindings file that does not validate', () => {
     initialContext('mission_controller', () =>
       io.safeWriteFile(bindingsFile(OTHER), JSON.stringify({ bindings: [{ surface: 'fax' }] }))
@@ -254,6 +286,7 @@ describe('customer_channel_binding_store on the real guard', () => {
     const role = 'customer_channel_binding_store';
     const asStore = (fn: () => unknown, tenant = TENANT) =>
       authority.withExecutionContext(role, fn, undefined, tenant);
+    ensureBound(TENANT, 'C-ACME');
     // The bound tenant's bindings file is writable (rewritten unchanged).
     const current = JSON.stringify(readBindings(TENANT));
     asStore(() => io.safeWriteFile(bindingsFile(TENANT), current));
@@ -294,6 +327,7 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
       streamed.push(JSON.stringify(event));
     });
 
+    ensureBound(TENANT, 'C-ACME');
     const binding = core.findTenantCustomerChannelBinding(TENANT, 'slack', 'C-ACME')!;
     expect(binding).not.toBeNull();
     const deal = initialContext(
@@ -396,6 +430,32 @@ describe('customer outbound approvals carry ids only (B2, real gate)', () => {
     expect(deliver).toHaveBeenCalledWith(body);
     expect(JSON.stringify(requests())).not.toContain(BODY_MARKER);
     expect(streamed.some((line) => line.includes(BODY_MARKER))).toBe(false);
+
+    // The same quote to a second channel is a new approval for that channel,
+    // not a refusal against the first channel's approval.
+    run(['bind', '--tenant', TENANT, '--surface', 'slack', '--channel', 'C-ACME-2']);
+    const second = core.findTenantCustomerChannelBinding(TENANT, 'slack', 'C-ACME-2')!;
+    const deliverSecond = vi.fn(async () => undefined);
+    const toSecond = await initialContext(
+      'mission_controller',
+      () =>
+        sendDealDocumentToCustomer({
+          binding: second,
+          dealId: deal.deal_id,
+          kind: 'quote',
+          version: 1,
+          hasHuman: true,
+          deliver: deliverSecond,
+        }),
+      undefined,
+      TENANT
+    );
+    expect(toSecond).toMatchObject({ sent: false, status: 'approval_pending' });
+    const secondId = (toSecond as { approvalRequestId?: string }).approvalRequestId;
+    expect(secondId).toEqual(expect.any(String));
+    expect(secondId).not.toBe(heldId);
+    expect(requests().find((item) => item.id === secondId)?.status).toBe('pending');
+    expect(deliverSecond).not.toHaveBeenCalled();
     unsubscribe();
   }, 60_000);
 });
@@ -419,6 +479,7 @@ describe('customer escalations carry ids only (real notifyOperator / ops alert)'
     try {
       const core = await import('@agent/core/customer-channel-binding');
       const { runCustomerConversation } = await import('@agent/core/customer-conversation');
+      ensureBound(TENANT, 'C-ACME');
       const binding = core.findTenantCustomerChannelBinding(TENANT, 'slack', 'C-ACME')!;
       const text = `Can you tell us about ${MARKER}?`;
       const result = await initialContext(
@@ -458,7 +519,49 @@ describe('customer escalations carry ids only (real notifyOperator / ops alert)'
       expect(body).toContain(command);
       expect(
         run(['question', '--tenant', TENANT, '--deal', result.deal.deal_id, '--sha256', sha])
-      ).toMatchObject({ message: text, reply: 'We will confirm.' });
+      ).toMatchObject({
+        message: text,
+        operator_question: `Customer asks about ${MARKER}`,
+        reply: 'We will confirm.',
+      });
+      // Not evicted by the 50-note cap of the deal record.
+      const { appendDealNote } = await import('@agent/core/deal-store');
+      initialContext(
+        'mission_controller',
+        () => {
+          for (let index = 0; index < 60; index += 1) {
+            appendDealNote({
+              tenantSlug: TENANT,
+              dealId: result.deal.deal_id,
+              role: 'customer',
+              text: `filler ${index}`,
+            });
+          }
+        },
+        undefined,
+        TENANT
+      );
+      expect(
+        run(['question', '--tenant', TENANT, '--deal', result.deal.deal_id, '--sha256', sha])
+      ).toMatchObject({ message: text, operator_question: `Customer asks about ${MARKER}` });
+      // A process bound to one tenant cannot read another tenant's message.
+      process.env.KYBERION_TENANT = OTHER;
+      try {
+        expect(
+          exitOf(['question', '--tenant', TENANT, '--deal', result.deal.deal_id, '--sha256', sha])
+        ).toMatch(/CUSTOMER_CHANNEL_TENANT_MISMATCH/u);
+        expect(
+          exitOf([
+            'outbound',
+            '--tenant',
+            TENANT,
+            '--source',
+            `deals/${result.deal.deal_id}/quote-v1.md`,
+          ])
+        ).toMatch(/CUSTOMER_CHANNEL_TENANT_MISMATCH/u);
+      } finally {
+        delete process.env.KYBERION_TENANT;
+      }
       expect(
         exitOf(['question', '--tenant', OTHER, '--deal', result.deal.deal_id, '--sha256', sha])
       ).toMatch(/no customer message/u);
