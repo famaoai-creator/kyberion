@@ -940,6 +940,39 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     });
   });
 
+  it("exports and removes the tenant's hybrid-ledger partitions (D9), never another tenant's", () => {
+    const partition = (tier: string, tenant: string) =>
+      `active/shared/runtime/tenant-ledger/${tier}/${tenant}`;
+    writeJsonl(`${partition('confidential', TENANT)}/ledger.jsonl`, [
+      { type: 'MISSION_EVENT:MISSION_CREATE', mission_id: 'MSN-OFF-A' },
+    ]);
+    writeJsonl(`${partition('confidential', 'tenant-beta')}/ledger.jsonl`, [
+      { type: 'MISSION_EVENT:MISSION_CREATE', mission_id: 'MSN-OFF-B' },
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([{ path: partition('confidential', TENANT), kind: 'tenant_ledger' }])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(
+      partition('confidential', 'tenant-beta')
+    );
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(fs.existsSync(abs(partition('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('confidential', 'tenant-beta')))).toBe(true);
+    expect(
+      fs.existsSync(abs(`${result.export_path}/${partition('confidential', TENANT)}/ledger.jsonl`))
+    ).toBe(true);
+  });
+
   it("purges the tenant's execution-metrics partitions and legacy rows through the same ceremony", () => {
     const partition = (tier: string, tenant: string) =>
       `active/shared/runtime/execution-metrics/${tier}/${tenant}`;

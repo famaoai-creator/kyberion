@@ -10,7 +10,11 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeWriteFile } from './secure-io.js';
 import { auditChain } from './governance/audit-chain.js';
-import { GLOBAL_LEDGER_PATH, verifyLedgerIntegrityDetailed } from './ledger.js';
+import {
+  GLOBAL_LEDGER_PATH,
+  verifyAllLedgerIntegrity,
+  verifyLedgerIntegrityDetailed,
+} from './ledger.js';
 import {
   listMemoryPromotionCandidates,
   type MemoryCandidate,
@@ -38,7 +42,13 @@ export interface AuditVerifyCliReport {
     total: number;
     corrupted: string[];
     missingKey: boolean;
+    missing?: boolean;
+    /** Set for a tenant ledger partition (D9). */
+    tier?: string;
+    tenant_slug?: string;
   }>;
+  /** Tenant ledger partitions this process may not verify (another tenant of a bound caller). */
+  tenantLedgersWithheld?: number;
   tenantMirrors: {
     ok: boolean;
     findings: string[];
@@ -62,7 +72,7 @@ export function collectAuditVerifyReport(
   const ledgerPaths = [GLOBAL_LEDGER_PATH, ...(input.ledgers ?? [])].filter(
     (item, index, all) => all.indexOf(item) === index
   );
-  const ledgers = ledgerPaths.map((ledgerPath) => {
+  const ledgers: AuditVerifyCliReport['ledgers'] = ledgerPaths.map((ledgerPath) => {
     const report = verifyLedgerIntegrityDetailed(ledgerPath);
     return {
       path: ledgerPath,
@@ -73,6 +83,22 @@ export function collectAuditVerifyReport(
       ...(safeExistsSync(ledgerPath) ? {} : { missing: true }),
     };
   });
+  // D9: tenant mission events live in the tenant ledger partitions — one hash
+  // chain per file, each verified as the tenant-bound store role. Partitions of
+  // another tenant than a bound caller's are withheld (counted, never read).
+  const scopedLedgers = verifyAllLedgerIntegrity();
+  for (const tenantLedger of scopedLedgers.ledgers) {
+    if (!tenantLedger.tenant_slug || ledgerPaths.includes(tenantLedger.path)) continue;
+    ledgers.push({
+      path: tenantLedger.path,
+      ok: tenantLedger.ok,
+      total: tenantLedger.total,
+      corrupted: tenantLedger.corrupted,
+      missingKey: tenantLedger.missingKey,
+      tier: tenantLedger.tier,
+      tenant_slug: tenantLedger.tenant_slug,
+    });
+  }
   const tenantMirrors = auditChain.verifyTenantMirrors();
   const auditEntries =
     typeof (auditChain as any).loadAll === 'function' ? (auditChain as any).loadAll() : [];
@@ -117,6 +143,7 @@ export function collectAuditVerifyReport(
       promotionQueue.ok,
     audit,
     ledgers,
+    ...(scopedLedgers.withheld > 0 ? { tenantLedgersWithheld: scopedLedgers.withheld } : {}),
     tenantMirrors,
     promotionQueue,
   };
@@ -134,7 +161,8 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
   }
   for (const ledger of report.ledgers) {
     lines.push(
-      `Ledger: ${ledger.ok ? 'ok' : 'failed'}; entries=${ledger.total}; path=${ledger.path}`
+      `Ledger: ${ledger.ok ? 'ok' : 'failed'}; entries=${ledger.total}; path=${ledger.path}` +
+        (ledger.tenant_slug ? `; tenant=${ledger.tenant_slug}; tier=${ledger.tier}` : '')
     );
     if (ledger.corrupted.length > 0) {
       lines.push(`  - findings: ${ledger.corrupted.join(', ')}`);
@@ -142,6 +170,11 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
     if (ledger.missingKey) {
       lines.push('  - missing HMAC key for one or more ledger entries');
     }
+  }
+  if (report.tenantLedgersWithheld) {
+    lines.push(
+      `  - tenant ledgers withheld: ${report.tenantLedgersWithheld} (another tenant than this process's; verify from an unbound operator process)`
+    );
   }
   lines.push(`Tenant mirrors: ${report.tenantMirrors.ok ? 'ok' : 'failed'}`);
   if (report.tenantMirrors.findings.length > 0) {

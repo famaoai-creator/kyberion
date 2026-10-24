@@ -1350,7 +1350,10 @@ vi.mock('@agent/core/video/video-frame-archive', async () => ({
 }));
 vi.mock('@agent/core/ledger', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/ledger')),
-  ledger: { verifyIntegrity: vi.fn(() => true) },
+  ledger: {
+    verifyIntegrity: vi.fn(() => true),
+    verifyAllLedgerIntegrity: vi.fn(() => ({ ok: true, ledgers: [], withheld: 0 })),
+  },
 }));
 vi.mock('@agent/core/project/project-registry', async () => ({
   ...(await vi.importActual<Record<string, unknown>>('@agent/core/project/project-registry')),

@@ -1,5 +1,8 @@
 import * as path from 'node:path';
-import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
+import {
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  TENANT_LEDGER_ROOT_PATH,
+} from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
 import { rootDir } from './path-resolver.js';
 import { isReservedScopeName, isValidTenantSlug } from './foundation/scope.js';
@@ -204,6 +207,12 @@ export function protectedStorageFloorPrefixes(): string[] {
 export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   resource_usage: 'active/shared/runtime/usage-ledger',
   execution_metrics: 'active/shared/runtime/execution-metrics',
+  /**
+   * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
+   * `<tier>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
+   * Tenant records and tenant mission metadata never reach the system ledger.
+   */
+  tenant_ledger: TENANT_LEDGER_ROOT_PATH,
 } as const;
 
 /** Knowledge permission path corresponding to a registered runtime state path. */

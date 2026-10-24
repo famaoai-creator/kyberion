@@ -1,0 +1,13 @@
+{
+  "role": "tenant_ledger_store",
+  "description": "D9: tenant-bound store role of the hybrid ledger's tenant partitions (libs/core/ledger.ts). libs/core/ledger.ts assumes it (withExecutionContext) for every tenant partition read and append, always bound to the record's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/tenant-ledger/<tier>/<tenant>/ partition: it reads the hash-chain tail, appends tenant records and tenant mission metadata, and verifies the chain. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it. No knowledge, mission, system-ledger or customer/ grant.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
+    "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/",
+    "active/shared/runtime/tenant-ledger/public/${KYBERION_TENANT}/"
+  ],
+  "scope_classes": ["audit"],
+  "allowed_actuators": [],
+  "tier_access": ["public", "confidential", "personal"]
+}
