@@ -178,7 +178,7 @@ describe('personal feedback storage boundary', () => {
       refs: [{ path: 'knowledge/personal/private-procedure.md' }],
     });
     expect(delivery?.deliveryRecordPath).toContain(personalOwnerRoot + '/feedback-loop/');
-    expect(delivery?.deliveryRecordPath).not.toContain('/active/shared/');
+    expect(delivery?.deliveryRecordPath).not.toContain(pathResolver.shared(''));
     const gap = recordKnowledgeGap({
       topic: 'private procedure',
       sourceRef: 'mission:MSN-PRIVATE-FEEDBACK',
