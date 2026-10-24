@@ -351,6 +351,15 @@ export function keepPipelinePromotedAtWhenUnchanged<T extends { promotion?: unkn
     : next;
 }
 
+/**
+ * The promotion itself, for governed callers that install a known template
+ * into a tenant catalog (`customer-decision reminders --install`, CD-11).
+ * Same argv as the CLI; throws `ScriptExitError` on refusal.
+ */
+export async function promotePipelineAdf(args: string[]): Promise<PipelinePromotionResult> {
+  return main(args);
+}
+
 async function main(args: string[] = []): Promise<PipelinePromotionResult> {
   const argv = args;
   const inputPath = getFlag(argv, '--input');

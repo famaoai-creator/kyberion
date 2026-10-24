@@ -33529,6 +33529,51 @@
         "en": "Next: draft a bolt review for the customer with: {command}",
         "ja": "次の一手: 顧客に送る bolt レビューの下書きを作る: {command}",
         "qps-ploc": "⟦Ñėẋŧ: ḓřȧƒŧ ȧ ƀőŀŧ řėṽïėẇ ƒőř ŧħė ƈůşŧőɱėř ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "reminder_before_due": {
+        "en": "Reminder: please answer “{title}” by {date}. Please open it from the link we sent you.",
+        "ja": "「{title}」へのご回答は {date} までにお願いいたします。お送りしたリンクから開いてください。",
+        "qps-ploc": "⟦Řėɱïñḓėř: ṗŀėȧşė ȧñşẇėř “{title}” ƀẏ {date}. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "reminder_due": {
+        "en": "Today ({date}) is the answer date for “{title}”. Please open it from the link we sent you.",
+        "ja": "本日（{date}）は「{title}」へのご回答の目安日です。お送りしたリンクから開いてください。",
+        "qps-ploc": "⟦Ŧőḓȧẏ ({date}) ïş ŧħė ȧñşẇėř ḓȧŧė ƒőř “{title}”. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "reminder_override_closing": {
+        "en": "You can still change your answers to “{title}” until {date} {time} ({zone}). After that, the items you have not decided follow our proposal. Please open it from the link we sent you.",
+        "ja": "「{title}」のご回答は {date} {time}（{zone}）まで変更できます。それ以降、まだお決めいただいていない項目はこちらの案で進めます。お送りしたリンクから開いてください。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şŧïŀŀ ƈħȧñɠė ẏőůř ȧñşẇėřş ŧő “{title}” ůñŧïŀ {date} {time} ({zone}). Ȧƒŧėř ŧħȧŧ, ŧħė ïŧėɱş ẏőů ħȧṽė ñőŧ ḓėƈïḓėḓ ƒőŀŀőẇ őůř ṗřőṗőşȧŀ. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "reminder_outbound_title": {
+        "en": "Customer decision reminder {reminderId} for agenda {agendaId}",
+        "ja": "調整セット {agendaId} の顧客へのリマインド {reminderId}",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñ řėɱïñḓėř {reminderId} ƒőř ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "reminder_outbound_summary": {
+        "en": "Reminder {reminderId} ({kind}, {date}) of agenda {agendaId} in decision case {caseId}, fixed template {templateId}. The message is not copied here; read it with: {command}",
+        "ja": "決定案件 {caseId} の調整セット {agendaId} のリマインド {reminderId}（{kind}、{date}）、定型文 {templateId}。文面はここには写しません。次のコマンドで確認してください: {command}",
+        "qps-ploc": "⟦Řėɱïñḓėř {reminderId} ({kind}, {date}) őƒ ȧɠėñḓȧ {agendaId} ïñ ḓėƈïşïőñ ƈȧşė {caseId}, ƒïẋėḓ ŧėɱṗŀȧŧė {templateId}. Ŧħė ɱėşşȧɠė ïş ñőŧ ƈőṗïėḓ ħėřė; řėȧḓ ïŧ ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
+      },
+      "reminder_manual_title": {
+        "en": "Remind the customer yourself: agenda {agendaId}",
+        "ja": "顧客に手でリマインドしてください: 調整セット {agendaId}",
+        "qps-ploc": "⟦Řėɱïñḓ ŧħė ƈůşŧőɱėř ẏőůřşėŀƒ: ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "reminder_manual_body": {
+        "en": "Reminder {reminderId} ({kind}, {date}) for {actorId} in decision case {caseId} has no bound channel to use ({reason}). Remind the customer yourself, or set a channel with customer-decision actor-add --channel.",
+        "ja": "決定案件 {caseId} の {actorId} へのリマインド {reminderId}（{kind}、{date}）は、使える紐付け済みのチャネルがありません（{reason}）。顧客に手でリマインドするか、customer-decision actor-add --channel でチャネルを設定してください。",
+        "qps-ploc": "⟦Řėɱïñḓėř {reminderId} ({kind}, {date}) ƒőř {actorId} ïñ ḓėƈïşïőñ ƈȧşė {caseId} ħȧş ñő ƀőůñḓ ƈħȧññėŀ ŧő ůşė ({reason}). Řėɱïñḓ ŧħė ƈůşŧőɱėř ẏőůřşėŀƒ, őř şėŧ ȧ ƈħȧññėŀ ẇïŧħ ƈůşŧőɱėř-ḓėƈïşïőñ ȧƈŧőř-ȧḓḓ --ƈħȧññėŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "handoff_title": {
+        "en": "Customer answers to follow up: agenda {agendaId}",
+        "ja": "対応が必要な顧客の回答: 調整セット {agendaId}",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ȧñşẇėřş ŧő ƒőŀŀőẇ ůṗ: ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "handoff_body": {
+        "en": "Receipt {receiptId} in decision case {caseId}: {offOption} answer(s) outside the options, {comments} comment(s), {questions} general question(s). Read them in the case and follow up with the customer.",
+        "ja": "決定案件 {caseId} の決定記録 {receiptId}: 選択肢の外の回答 {offOption} 件、コメント {comments} 件、全体への質問 {questions} 件。案件で内容を確認し、顧客と調整してください。",
+        "qps-ploc": "⟦Řėƈėïṗŧ {receiptId} ïñ ḓėƈïşïőñ ƈȧşė {caseId}: {offOption} ȧñşẇėř(ş) őůŧşïḓė ŧħė őṗŧïőñş, {comments} ƈőɱɱėñŧ(ş), {questions} ɠėñėřȧŀ ɋůėşŧïőñ(ş). Řėȧḓ ŧħėɱ ïñ ŧħė ƈȧşė ȧñḓ ƒőŀŀőẇ ůṗ ẇïŧħ ŧħė ƈůşŧőɱėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       }
     },
     "customer_room": {
@@ -33911,6 +33956,46 @@
         "en": "Some answers could not be recorded. Please check them and try again.",
         "ja": "記録できない回答がありました。内容を確認して、もう一度お試しください。",
         "qps-ploc": "⟦Şőɱė ȧñşẇėřş ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ṗŀėȧşė ƈħėƈķ ŧħėɱ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "respond_by_line": {
+        "en": "Please answer by {date} if you can.",
+        "ja": "回答の目安: {date}",
+        "qps-ploc": "⟦Ṗŀėȧşė ȧñşẇėř ƀẏ {date} ïƒ ẏőů ƈȧñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "respond_by_past": {
+        "en": "The target date was {date}. You can still answer.",
+        "ja": "回答の目安は {date} でした。今からでも回答できます。",
+        "qps-ploc": "⟦Ŧħė ŧȧřɠėŧ ḓȧŧė ẇȧş {date}. Ẏőů ƈȧñ şŧïŀŀ ȧñşẇėř. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "general_heading": {
+        "en": "Anything else you'd like to ask?",
+        "ja": "ほかに確認したいこと",
+        "qps-ploc": "⟦Ȧñẏŧħïñɠ ėŀşė ẏőů'ḓ ŀïķė ŧő ȧşķ? ŀőřėɱ ïṗşů⟧"
+      },
+      "general_hint": {
+        "en": "Optional. Our team will reply to you separately.",
+        "ja": "任意です。担当者からあらためてご返信します。",
+        "qps-ploc": "⟦Őṗŧïőñȧŀ. Őůř ŧėȧɱ ẇïŀŀ řėṗŀẏ ŧő ẏőů şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "general_too_long": {
+        "en": "This is too long. Please keep it within {max} characters.",
+        "ja": "長すぎます。{max} 文字以内でお書きください。",
+        "qps-ploc": "⟦Ŧħïş ïş ŧőő ŀőñɠ. Ṗŀėȧşė ķėėṗ ïŧ ẇïŧħïñ {max} ƈħȧřȧƈŧėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "review_general_heading": {
+        "en": "Your question for our team",
+        "ja": "担当者への確認",
+        "qps-ploc": "⟦Ẏőůř ɋůėşŧïőñ ƒőř őůř ŧėȧɱ ŀőřėɱ ïṗ⟧"
+      },
+      "receipt_general": {
+        "en": "We received your question. Our team will reply to you separately.",
+        "ja": "ご質問を受け取りました。担当者からあらためてご返信します。",
+        "qps-ploc": "⟦Ẇė řėƈėïṽėḓ ẏőůř ɋůėşŧïőñ. Őůř ŧėȧɱ ẇïŀŀ řėṗŀẏ ŧő ẏőů şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "previous_question": {
+        "en": "Your earlier question: {text}",
+        "ja": "前回お送りいただいた確認事項: {text}",
+        "qps-ploc": "⟦Ẏőůř ėȧřŀïėř ɋůėşŧïőñ: {text} ŀőřėɱ ïṗş⟧"
       },
       "reload": {
         "en": "Reload",

@@ -9,12 +9,12 @@
  * `view` / `respond` and never touches the stores itself.
  *
  * Operator verbs (all take --tenant <slug> --case <id>; --json for machine output):
- *   draft    --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>]
+ *   draft    --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>]
  *   draft    --agenda <id> --file <agenda.json>        replace title/from/entries (an approved/sent agenda becomes a new revision)
  *   draft    --from-tasks [--agenda <draft id>] [--customer <slug>]   collect mission tasks' customer-judgment proposals (CD-09) into a draft agenda
  *   generate --agenda <id> --intent-file <path> [--grounding-file <path>]
  *   submit   --agenda <id> --by user:<member> [--role owner|approver]
- *   actor-add --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>]
+ *   actor-add --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>] [--channel <surface>:<channel_id>]
  *   send     --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]
  *   bolt-review --mission <MSN> --customer <slug> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>]
  *            draft the review agenda of a finished mission (CD-10): one approval entry, open until the next bolt starts
@@ -24,11 +24,16 @@
  *   close    --agenda <id> --by user:<member> [--reason <text>]   stop taking answers; links answer `closed`
  *   withdraw --agenda <id> --by user:<member> [--reason <text>]   revoke the agenda's open invites and withdraw it
  *   revoke   --invite <id> --reason <text>
+ *   remind   [--case <id>] [--dry-run] [--now <iso>]   send the reminders due today (CD-11): respond-by D-1 / D0,
+ *            override-closing D-2; through the decider's bound channel (sendToCustomer, fixed template),
+ *            else an operator inbox task; --dry-run writes nothing
+ *   reminders --install [--force]                       install the daily tenant reminder pipeline (pipeline:promote)
  *
  * Customer-room verbs (token on STDIN only, never argv; --case is optional and
  * must match the invite when given):
  *   view     --tenant <slug>    stdin {"token"}
- *   respond  --tenant <slug>    stdin {"token","content_hash","answers":[...]}
+ *   respond  --tenant <slug>    stdin {"token","content_hash","answers":[...],"general_question"?}
+ *            (CD-11: a general question may come alone, with "answers": [])
  *   attachment --tenant <slug>  stdin {"token","attachment_id"}  → {ok, media_type, bytes_base64}
  *            only ids listed on the approved agenda the invite opens; anything else is `invalid_link`
  *
@@ -88,6 +93,7 @@ import {
 import { runCustomerFacing } from './customer-decision/customer-facing.js';
 import { runCollectTaskProposals } from './customer-decision/task-proposals.js';
 import { runBoltReview } from './customer-decision/bolt-review.js';
+import { runRemind, runRemindersInstall } from './customer-decision/reminders.js';
 
 export {
   AGENDA_APPROVE_OPERATION,
@@ -123,6 +129,10 @@ export async function runCustomerDecision(
       return runBoltReview(opts, lists, io, now);
     case 'status':
       return runStatus(opts, now);
+    case 'remind':
+      return runRemind(opts, flags, now);
+    case 'reminders':
+      return runRemindersInstall(opts, flags);
     case 'confirm':
       return runConfirm(opts, now);
     case 'close':

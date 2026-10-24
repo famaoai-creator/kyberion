@@ -16,6 +16,8 @@
  *     are not approved) only for `approval` entries, `free_text`
  *     for `hearing` entries and as a comment-only answer elsewhere);
  *   - a contributor's answers are recorded in the receipt and never reach the ledger;
+ *   - CD-11: an optional `general_question` (a question about the agenda as a
+ *     whole) is recorded in the receipt and may come with no answers at all;
  *   - a decider's answer becomes a `customer-value` / `decided` ledger record that
  *     supersedes the active record — unless the customer already decided the same
  *     value (idempotent double submit), or the override window closed and the value
@@ -103,6 +105,8 @@ export interface RespondPlan {
   /** Effective decisions before any write (for switch detection). */
   before: EffectiveDecision[];
   change_requests: Array<{ entry_id: string; value?: unknown; comment?: string }>;
+  /** CD-11: the customer's question about the agenda as a whole, when given. */
+  general_question?: string;
 }
 
 export type RespondPlanResult =
@@ -120,6 +124,8 @@ export interface PlanCustomerResponseInput {
   /** Raw, untrusted request fields. */
   content_hash: unknown;
   answers: unknown;
+  /** CD-11: an optional question about the agenda as a whole (untrusted). */
+  general_question?: unknown;
   customerActors: readonly DecisionCustomerActor[];
   receiptId: string;
   now: string;
@@ -180,10 +186,26 @@ export function agendaAnswerState(
   return { ok: true, content_hash: hash };
 }
 
-function parseAnswers(
+/**
+ * CD-11: the general question of a response — absent (undefined / null /
+ * blank), a trimmed string, or invalid (not a string, too long).
+ */
+function parseGeneralQuestion(
   raw: unknown
+): { ok: true; question?: string } | { ok: false; error: RespondAnswerError } {
+  if (raw === undefined || raw === null) return { ok: true };
+  if (typeof raw !== 'string') return { ok: false, error: 'choice_invalid' };
+  const question = raw.trim();
+  if (!question) return { ok: true };
+  if (question.length > MAX_COMMENT) return { ok: false, error: 'comment_too_long' };
+  return { ok: true, question };
+}
+
+function parseAnswers(
+  raw: unknown,
+  allowEmpty = false
 ): { ok: true; answers: RespondAnswer[] } | { ok: false; entry_id: string } {
-  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_ANSWERS) {
+  if (!Array.isArray(raw) || (raw.length === 0 && !allowEmpty) || raw.length > MAX_ANSWERS) {
     return { ok: false, entry_id: '' };
   }
   const answers: RespondAnswer[] = [];
@@ -306,7 +328,16 @@ export function planCustomerResponse(input: PlanCustomerResponseInput): RespondP
   if (state.ok === false) return { ok: false, reason: state.reason };
   if (input.content_hash !== state.content_hash) return { ok: false, reason: 'stale_version' };
 
-  const parsed = parseAnswers(input.answers);
+  const question = parseGeneralQuestion(input.general_question);
+  if (question.ok === false) {
+    return {
+      ok: false,
+      reason: 'invalid_answers',
+      errors: [{ entry_id: '', error: question.error }],
+    };
+  }
+  // A general question may be sent on its own (no answers).
+  const parsed = parseAnswers(input.answers ?? [], question.question !== undefined);
   if (parsed.ok === false) {
     return {
       ok: false,
@@ -373,6 +404,7 @@ export function planCustomerResponse(input: PlanCustomerResponseInput): RespondP
     appends: [],
     before,
     change_requests: [],
+    ...(question.question !== undefined ? { general_question: question.question } : {}),
   };
   for (const { answer, entry, current, value, commentOnly } of validated) {
     const receiptAnswer: RespondAnswer = {
@@ -487,6 +519,7 @@ export function buildResponseReceipt(
       ...item.answer,
       outcome: receiptOutcome(item.outcome),
     })),
+    ...(plan.general_question !== undefined ? { general_question: plan.general_question } : {}),
     identity_assurance: 'invite_link',
     submitted_at: now,
     decision_ids: [...appendedIds],
@@ -510,6 +543,7 @@ export function findDuplicateReceipt(
       (receipt) =>
         receipt.invite_id === invite.invite_id &&
         receipt.content_hash === plan.content_hash &&
+        receipt.general_question === plan.general_question &&
         canonicalJson(receipt.answers.map(sentAnswer)) === answers
     );
 }

@@ -1,8 +1,8 @@
 /**
  * Content hash of a decision agenda (CD-05 version pinning, used by CD-01/02).
  *
- * The hash binds what the customer is shown — title, `from` (when set), phase,
- * locale, customer
+ * The hash binds what the customer is shown — title, `from` (when set),
+ * `respond_by` (CD-11, when set), phase, locale, customer
  * and the entries (questions, options, impacts, layers, our decision, org
  * default, `requires_customer`, `override_until`). It deliberately excludes
  * the lifecycle fields (status, approval, revision, timestamps) and each
@@ -17,7 +17,7 @@ export type AgendaHashInput = Pick<
   DecisionAgenda,
   'title' | 'phase' | 'locale' | 'customer' | 'entries'
 > &
-  Partial<Pick<DecisionAgenda, 'from'>>;
+  Partial<Pick<DecisionAgenda, 'from' | 'respond_by'>>;
 
 function hashableEntry(entry: AgendaEntry): AgendaEntry {
   if (!entry.our_decision) return entry;
@@ -32,6 +32,8 @@ export function agendaContentHash(agenda: AgendaHashInput): string {
     title: agenda.title,
     // Only when set, so agendas without a sender keep their approved hash.
     ...(agenda.from !== undefined ? { from: agenda.from } : {}),
+    // CD-11: same rule — an agenda without a respond-by date keeps its hash.
+    ...(agenda.respond_by !== undefined ? { respond_by: agenda.respond_by } : {}),
     phase: agenda.phase,
     locale: agenda.locale,
     customer: agenda.customer,

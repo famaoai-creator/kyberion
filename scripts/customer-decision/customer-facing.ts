@@ -42,6 +42,7 @@ import {
 } from './common.js';
 import { completeRespond, reconcileCase } from './reconcile.js';
 import { routeBoltReview } from './bolt-review.js';
+import { routeHandoffs } from './reminders.js';
 
 // ---------------------------------------------------------------------------
 // Customer-room verbs: STDIN in, customer-safe JSON out, reason codes only
@@ -156,6 +157,8 @@ function runView(
       agenda: {
         title: agenda.title,
         ...(agenda.from ? { from: agenda.from } : {}),
+        // CD-11: the date the customer is asked to answer by (UTC calendar date).
+        ...(agenda.respond_by ? { respond_by: agenda.respond_by } : {}),
         locale: agenda.locale,
         revision: agenda.revision,
       },
@@ -206,6 +209,7 @@ function runView(
         submitted_at: receipt.submitted_at,
         revision: receipt.agenda_revision,
         answers: receipt.answers,
+        ...(receipt.general_question ? { general_question: receipt.general_question } : {}),
       })),
     };
   });
@@ -231,6 +235,7 @@ function runRespond(
         invite,
         content_hash: input.content_hash,
         answers: input.answers,
+        general_question: input.general_question,
         customerActors: readCustomerActors(location, agenda.customer),
         receiptId,
         now,
@@ -319,6 +324,10 @@ function runRespond(
   // operator. Same rules as the sweep: short lock wait, never fails the
   // response, retried by the next respond and by status.
   routeBoltReview(tenant, location, invite.agenda_id, now);
+  // CD-11: answers outside the options, comments and a general question go
+  // to the operator (ids and counts only). Same rules: short lock wait, never
+  // fails the response, retried by the next respond and by status.
+  routeHandoffs(tenant, location, invite.agenda_id, now);
   return result;
 }
 

@@ -45,6 +45,7 @@ import {
 import { reconcileCase, unreconciledDecisions } from './reconcile.js';
 import { taskProposalStatus } from './task-proposals.js';
 import { boltReviewStatus, routeBoltReview } from './bolt-review.js';
+import { reminderStatus, routeHandoffs } from './reminders.js';
 
 function effectiveView(decision: EffectiveDecision): Record<string, unknown> {
   return {
@@ -77,6 +78,8 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
   if (agendaId) {
     early = withCaseLock(location, () => reconcileCase(tenant, location, now));
     routeBoltReview(tenant, location, agendaId, now);
+    // CD-11: retry hand-offs a respond could not finish.
+    routeHandoffs(tenant, location, agendaId, now);
   }
   return withCaseLock(location, () => {
     const reconciled = early ?? reconcileCase(tenant, location, now);
@@ -124,6 +127,7 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
           submitted_at: receipt.submitted_at,
           answers: receipt.answers,
           decision_ids: receipt.decision_ids,
+          ...(receipt.general_question ? { general_question: receipt.general_question } : {}),
           identity_assurance: receipt.identity_assurance,
         })),
         change_requests: openChangeRequests(agenda, receipts, effective),
@@ -137,6 +141,16 @@ export function runStatus(opts: Record<string, string>, now: string): unknown {
         ),
         task_proposals: taskProposalStatus(tenant, agenda.case_id, location, now),
         ...(agenda.bolt_mission_id ? { bolt_review: boltReviewStatus(agenda) } : {}),
+        reminders: reminderStatus(agenda, invites, receipts, effective, now),
+        handoffs: (agenda.handoffs ?? []).map((record) => ({
+          receipt_id: record.receipt_id,
+          off_option: record.off_option,
+          comments: record.comments,
+          general_question: record.general_question,
+          inbox_entry_id: record.inbox_entry_id,
+          notified: Boolean(record.notified_at),
+          at: record.at,
+        })),
       };
     });
   });

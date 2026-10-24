@@ -175,8 +175,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/customer-channel-binding.ts#isActiveTenant",
+      "roles": ["workspace_tenant_registry_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/customer-decision/invite.ts#asInviteStore",
       "roles": ["customer_decision_invite_store"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/customer-decision/operator-handoff.ts#addOperatorTask",
+      "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
@@ -2764,6 +2774,26 @@
     {
       "site": "scripts/customer-decision/operator.ts#runGenerate",
       "roles": ["decision_ledger"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#deliverReminder",
+      "roles": ["decision_ledger"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["surface_runtime"],
       "unresolved": []
     },
     {

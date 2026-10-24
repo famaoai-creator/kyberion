@@ -4,7 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVars } from '@agent/core/logic-utils';
 import { safeExecResult, safeMkdir, safeRmSync } from '@agent/core/secure-io';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
-import { getRegisteredEnvText, parseSafeJsonInput } from '@agent/core/foundation';
+import { getRegisteredEnvText, nowIso, parseSafeJsonInput } from '@agent/core/foundation';
 import type { PipelineAdfStep } from '@agent/core/pipeline/pipeline-contract';
 import { validateProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import { parseSafeJsonObjectInput, parseSafeJsonObjectValue } from './lib/json-input.js';
@@ -1078,6 +1078,29 @@ export function runInlineAccountabilityReport(
     },
     ctx
   );
+}
+
+/**
+ * core:customer_decision_reminders (CD-11) — the daily reminder sweep of the
+ * tenant the run is bound to (a tenant pipeline installed with
+ * `customer-decision reminders --install`): runs `customer-decision remind
+ * --tenant <t>` as a facade child without SYSTEM_ROLE (reminder-op.ts).
+ * `params.tenant`, when given, must be the bound tenant; `dry_run: true`
+ * writes nothing. Returns ids and counts.
+ */
+export async function runInlineCustomerDecisionReminders(
+  step: PipelineAdfStep,
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const requested = String(resolveVars(params.tenant ?? '', ctx)).trim();
+  const { runCustomerDecisionReminderOp } = await import('./customer-decision/reminder-op.js');
+  const result = await runCustomerDecisionReminderOp({
+    ...(requested ? { tenant: requested } : {}),
+    dryRun: resolveVars(params.dry_run ?? false, ctx) === true,
+    now: nowIso(),
+  });
+  return exportValue(params, step, result, ctx);
 }
 
 /**

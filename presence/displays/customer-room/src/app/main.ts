@@ -13,8 +13,13 @@ import {
   emptyDraft,
   entryAttachments,
   entryLinks,
+  formatRespondBy,
   formatSize,
+  GENERAL_QUESTION_MAX,
   isPendingCustomer,
+  isRespondByPast,
+  localCalendarDate,
+  normalizeGeneralQuestion,
   issueMessageKey,
   keepAvailable,
   needsOurConfirmation,
@@ -296,6 +301,12 @@ interface Session {
   issues: Map<string, DraftIssue>;
   /** Set on submit: some answer needs our team's confirmation. */
   pendingConfirmation?: boolean;
+  /** The "anything else you'd like to ask" text as typed. */
+  generalQuestion: string;
+  /** Inline problem with the question, found when the person tried to review. */
+  generalIssue?: 'general_too_long';
+  /** The question that was sent, for the thank-you screen. */
+  sentQuestion?: string;
 }
 
 let session: Session | null = null;
@@ -594,10 +605,57 @@ function updateProgress(): void {
   progressNode.textContent =
     remaining > 0 ? t('remaining', { count: remaining }) : t('remaining_done');
   // An incomplete answer (e.g. reject without a reason) keeps the button usable:
-  // pressing it shows what is missing next to the item.
-  const reviewable = answered > 0 || built.issues.length > 0;
+  // pressing it shows what is missing next to the item. A question alone is enough too.
+  const reviewable =
+    answered > 0 || built.issues.length > 0 || session.generalQuestion.trim().length > 0;
   if (reviewButton) reviewButton.disabled = !reviewable;
   if (reviewHint) reviewHint.hidden = reviewable;
+}
+
+/** The optional, agenda-wide question at the end of the form. */
+function generalQuestionBlock(): HTMLElement {
+  const card = el('section', 'kb-section cr-general');
+  card.append(el('h2', 'kb-section__title', t('general_heading')));
+  const field = el('label', 'kb-field');
+  const hint = el('span', 'kb-field__help', t('general_hint'));
+  hint.id = 'general-hint';
+  const area = el('textarea', 'kb-input kb-textarea');
+  area.id = 'general-question';
+  area.rows = 3;
+  area.maxLength = GENERAL_QUESTION_MAX;
+  area.value = session?.generalQuestion ?? '';
+  area.setAttribute('aria-label', t('general_heading'));
+  area.setAttribute('aria-describedby', hint.id);
+  const problem = el(
+    'span',
+    'kb-field__help cr-field-error',
+    t('general_too_long', { max: GENERAL_QUESTION_MAX })
+  );
+  problem.id = 'general-error';
+  problem.setAttribute('role', 'alert');
+  const showIssue = (shown: boolean): void => {
+    problem.hidden = !shown;
+    if (shown) {
+      area.setAttribute('aria-invalid', 'true');
+      area.setAttribute('aria-describedby', `${hint.id} ${problem.id}`);
+    } else {
+      area.removeAttribute('aria-invalid');
+      area.setAttribute('aria-describedby', hint.id);
+    }
+  };
+  showIssue(session?.generalIssue !== undefined);
+  area.addEventListener('input', () => {
+    if (!session) return;
+    session.generalQuestion = area.value;
+    if (session.generalIssue && !('issue' in normalizeGeneralQuestion(area.value))) {
+      session.generalIssue = undefined;
+      showIssue(false);
+    }
+    updateProgress();
+  });
+  field.append(hint, area, problem);
+  card.append(field);
+  return card;
 }
 
 function showForm(): void {
@@ -613,6 +671,18 @@ function showForm(): void {
   titles.append(
     el('p', 'kb-page-header__subtitle', t('participant_line', { name: view.participant.name }))
   );
+  const target = formatRespondBy(view.agenda.respond_by, locale, new Date().getFullYear());
+  if (target) {
+    // A calendar date, shown in neutral wording; answers stay open after it.
+    const past = isRespondByPast(view.agenda.respond_by, localCalendarDate(new Date()));
+    titles.append(
+      el(
+        'p',
+        'kb-page-header__subtitle cr-respond-by',
+        t(past ? 'respond_by_past' : 'respond_by_line', { date: target })
+      )
+    );
+  }
   header.append(titles);
   root.append(header);
 
@@ -636,6 +706,11 @@ function showForm(): void {
       )
     );
     root.append(note);
+    if (last.general_question) {
+      root.append(
+        el('p', 'kb-text kb-text--muted', t('previous_question', { text: last.general_question }))
+      );
+    }
   }
 
   progressNode = el('p', 'kb-status-pill cr-progress');
@@ -648,7 +723,7 @@ function showForm(): void {
   view.entries.forEach((entry, index) => {
     list.append(renderEntry(entry, index, view.entries.length));
   });
-  root.append(list);
+  root.append(list, generalQuestionBlock());
 
   const bar = el('div', 'cr-actions');
   reviewButton = el('button', 'kb-btn kb-btn--primary', t('review_button'));
@@ -705,6 +780,17 @@ function showReview(): void {
   if (!session) return;
   const { view, drafts } = session;
   const built = buildAnswers(view.entries, drafts);
+  const general = normalizeGeneralQuestion(session.generalQuestion);
+  if ('issue' in general) {
+    session.generalIssue = general.issue;
+    const card = root.querySelector('.cr-general');
+    card?.replaceWith(generalQuestionBlock());
+    const area = root.querySelector<HTMLElement>('#general-question');
+    area?.scrollIntoView({ block: 'center' });
+    area?.focus();
+    return;
+  }
+  session.generalIssue = undefined;
   if (built.issues.length > 0) {
     // Cards re-render in place; their images come from the cache.
     session.issues = new Map(built.issues.map((item) => [item.entry_id, item.issue]));
@@ -747,7 +833,7 @@ function showReview(): void {
   error.dataset.tone = 'danger';
   error.setAttribute('role', 'alert');
   error.hidden = true;
-  if (built.answers.length === 0) {
+  if (built.answers.length === 0 && !general.question) {
     root.append(el('p', 'kb-text', t('review_empty')));
   }
   const list = el('ol', 'kb-list cr-review');
@@ -767,7 +853,17 @@ function showReview(): void {
     row.append(body);
     list.append(row);
   }
-  root.append(list, error);
+  root.append(list);
+  if (general.question) {
+    const box = el('section', 'kb-callout cr-review-general');
+    box.dataset.tone = 'neutral';
+    box.append(
+      el('h2', 'kb-text kb-text--caption', t('review_general_heading')),
+      el('p', 'kb-text cr-question', general.question)
+    );
+    root.append(box);
+  }
+  root.append(error);
 
   const bar = el('div', 'cr-actions');
   const back = el('button', 'kb-btn kb-btn--secondary', t('back'));
@@ -775,9 +871,9 @@ function showReview(): void {
   back.addEventListener('click', showForm);
   const submit = el('button', 'kb-btn kb-btn--primary', t('submit'));
   submit.type = 'button';
-  submit.disabled = built.answers.length === 0;
+  submit.disabled = built.answers.length === 0 && !general.question;
   submit.addEventListener('click', () => {
-    void send(built.answers, submit, back, error);
+    void send(built.answers, general.question, submit, back, error);
   });
   bar.append(back, submit);
   root.append(bar);
@@ -786,6 +882,7 @@ function showReview(): void {
 
 async function send(
   answers: AnswerPayload[],
+  question: string | undefined,
   submit: HTMLButtonElement,
   back: HTMLButtonElement,
   error: HTMLElement
@@ -795,9 +892,10 @@ async function send(
   back.disabled = true;
   submit.textContent = t('submitting');
   error.hidden = true;
-  const result = await respond(fetchFn, token, session.view.content_hash, answers);
+  const result = await respond(fetchFn, token, session.view.content_hash, answers, question);
   const body = result.body;
   if (body && body.ok === true) {
+    session.sentQuestion = question;
     showReceipt(body);
     return;
   }
@@ -837,6 +935,12 @@ function showReceipt(body: Record<string, unknown>): void {
   const changes = typeof body.change_requests === 'number' ? body.change_requests : 0;
   if (changes > 0) card.append(el('p', 'kb-text', t('receipt_changes', { count: changes })));
   if (body.duplicate === true) card.append(el('p', 'kb-text', t('receipt_duplicate')));
+  if (session?.sentQuestion) {
+    card.append(
+      el('p', 'kb-text', t('receipt_general')),
+      el('p', 'kb-text kb-text--muted cr-question', session.sentQuestion)
+    );
+  }
   const again = el('button', 'kb-btn kb-btn--secondary', t('receipt_again'));
   again.type = 'button';
   again.addEventListener('click', () => {
@@ -874,7 +978,7 @@ async function load(): Promise<void> {
   if (state === 'open') {
     const view = body as unknown as ViewOpen;
     setLocale(pickLocale(view.agenda.locale, navigator.languages ?? [navigator.language]));
-    session = { view, drafts: new Map(), issues: new Map() };
+    session = { view, drafts: new Map(), issues: new Map(), generalQuestion: '' };
     showForm();
     return;
   }

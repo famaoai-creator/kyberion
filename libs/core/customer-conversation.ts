@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { t } from './t.js';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
@@ -10,8 +11,13 @@ import { normalizeLocale } from './locale-normalize.js';
 import { matchesIntentPhrase } from './intent/intent-phrase-lexicon.js';
 import { renderVocabularyText } from './ux-vocabulary.js';
 import { getReasoningBackend } from './reasoning/reasoning-backend.js';
-import { enforceApprovalGate } from './governance/approval-gate.js';
+import { enforceApprovalGate, type ApprovalGateResult } from './governance/approval-gate.js';
+import type { EventScopeInput } from './event-scope.js';
 import { charterInputForCustomerOutbound } from './governance/charter-call-site.js';
+import {
+  isRenderedRoutineTemplate,
+  type CustomerRoutineTemplateRef,
+} from './customer-outbound-templates.js';
 import {
   composeAudienceFloor,
   evaluateAudienceEgress,
@@ -342,10 +348,35 @@ export interface SendToCustomerInput {
   title: string;
   body: string;
   correlationId?: string;
+  /**
+   * CD-11: the registered fixed template `body` was rendered from. The body
+   * counts as routine business only when it is exactly that rendering
+   * (`customer-outbound-templates.ts`); otherwise the field is ignored.
+   */
+  template?: CustomerRoutineTemplateRef;
   /** Trusted execution-boundary presence for the outbound approval gate. */
   hasHuman?: boolean;
   hasUI?: boolean;
   nonInteractive?: boolean;
+  /**
+   * CD-11: open a durable approval request even on a non-interactive boundary
+   * (a scheduled sweep), so a human is actually asked. Default unchanged.
+   */
+  enqueueRequest?: boolean;
+  /**
+   * CD-11: the viewer scope of the approval request (e.g. the tenant), so the
+   * request — whose summary carries the message — is listed only to that
+   * scope's approvers. Default unchanged (no scope).
+   */
+  requestScope?: EventScopeInput;
+  /**
+   * CD-11: the approval request's summary instead of the message itself, for
+   * a body that must not be copied into the shared approval store (it is not
+   * tenant-partitioned). Ids only. When set, the request's payload hash binds
+   * the body (sha256) and the channel, so the approval covers exactly that
+   * text to that channel. Default unchanged (the summary quotes the body).
+   */
+  approvalSummary?: string;
   /** Delivery function supplied by the calling bridge (channel-specific). */
   deliver: (text: string) => Promise<unknown>;
 }
@@ -354,6 +385,8 @@ export interface SendToCustomerResult {
   sent: boolean;
   status: 'sent' | 'approval_pending' | 'denied' | 'delivery_failed';
   approvalRequestId?: string;
+  /** The gate's reason for a held message (`created`, `pending`, `rejected`, `expired`, …). */
+  approvalRequestStatus?: ApprovalGateResult['requestStatus'];
   reason?: string;
 }
 
@@ -438,11 +471,16 @@ function extractLinkHost(raw: string): string | null {
 }
 
 /**
- * Only a tiny, exact greeting vocabulary is eligible for unattended delivery.
+ * Only a tiny, exact greeting vocabulary, or the exact rendering of a
+ * registered fixed template (CD-11), is eligible for unattended delivery.
  * Trailing whitespace and sentence punctuation are stripped with a bounded
  * scan (no backtracking regex over caller-controlled text).
  */
-function classifyCustomerOutbound(body: string): 'routine_business' | 'unknown' {
+function classifyCustomerOutbound(
+  body: string,
+  template?: CustomerRoutineTemplateRef
+): 'routine_business' | 'unknown' {
+  if (isRenderedRoutineTemplate(String(body ?? ''), template)) return 'routine_business';
   let text = String(body ?? '');
   for (;;) {
     const next = trimEndChars(text.trimEnd(), '。.!！?？');
@@ -487,20 +525,33 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
     ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
     ...(input.nonInteractive !== undefined ? { nonInteractive: input.nonInteractive } : {}),
+    ...(input.enqueueRequest !== undefined ? { enqueueRequest: input.enqueueRequest } : {}),
+    ...(input.requestScope ? { requestScope: input.requestScope } : {}),
     // A message that breaches the audience egress floor always goes to a human.
     ...(floorViolations.length === 0
       ? (() => {
           const charter = charterInputForCustomerOutbound({
             tenantSlug: input.binding.tenantSlug,
-            categories: [classifyCustomerOutbound(input.body)],
+            categories: [classifyCustomerOutbound(input.body, input.template)],
             attachmentCount: 0,
           });
           return charter ? { charter } : {};
         })()
       : {}),
+    // CD-11: an ids-only summary keeps the message out of the shared approval
+    // store; the approval then binds the exact body and channel by hash.
+    ...(input.approvalSummary !== undefined
+      ? {
+          payload: {
+            body_sha256: createHash('sha256').update(input.body, 'utf8').digest('hex'),
+            surface: input.binding.binding.surface,
+            channel_id: input.binding.binding.channel_id,
+          },
+        }
+      : {}),
     draft: {
       title: floorViolations.length > 0 ? `⚠ ${input.title}` : input.title,
-      summary: `${violationNote}${input.body.slice(0, 400)}`,
+      summary: `${violationNote}${input.approvalSummary ?? input.body.slice(0, 400)}`,
       severity: 'high',
     },
   });
@@ -509,6 +560,7 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
       sent: false,
       status: approval.status === 'pending' ? 'approval_pending' : 'denied',
       approvalRequestId: approval.requestId,
+      ...(approval.requestStatus ? { approvalRequestStatus: approval.requestStatus } : {}),
       reason: approval.message,
     };
   }

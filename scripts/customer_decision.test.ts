@@ -296,6 +296,39 @@ describe('customer-decision facade', () => {
     ).toEqual({ attach: ['a.png', 'b.png'] });
   });
 
+  it('sets, edits and clears respond_by; on a sent agenda a new date is a new revision (CD-11)', async () => {
+    const { agendaId, token } = await approvedAndSent();
+    const sentHash = agendaContentHash(agendaOf(agendaId));
+    const edited = (await run([
+      'draft',
+      ...base(),
+      '--agenda',
+      agendaId,
+      '--respond-by',
+      '2026-10-30',
+    ])) as Record<string, unknown>;
+    expect(edited).toMatchObject({ respond_by: '2026-10-30', revision: 2, status: 'draft' });
+    expect(edited.content_hash).not.toBe(sentHash);
+    // The customer sees the agenda as updating until the new date is approved.
+    expect((await customerRun('view', { token })).out).toMatchObject({ state: 'updating' });
+    approveNext('apr-2');
+    await run(['submit', ...base(), '--agenda', agendaId, '--by', 'user:alice']);
+    expect((await customerRun('view', { token })).out).toMatchObject({
+      state: 'open',
+      agenda: { respond_by: '2026-10-30' },
+    });
+    // --file keeps the date unless the file names one; none clears it.
+    const file = path.join(dir, 'keep.json');
+    safeWriteFile(file, JSON.stringify({ title: 'Inception v2' }), { encoding: 'utf8' });
+    await run(['draft', ...base(), '--agenda', agendaId, '--file', file]);
+    expect(agendaOf(agendaId).respond_by).toBe('2026-10-30');
+    await run(['draft', ...base(), '--agenda', agendaId, '--respond-by', 'none']);
+    expect(agendaOf(agendaId)).not.toHaveProperty('respond_by');
+    await expect(
+      run(['draft', ...base(), '--agenda', agendaId, '--respond-by', '2026-02-30'])
+    ).rejects.toThrow(/YYYY-MM-DD/u);
+  });
+
   it('drafts from the template, then edits the draft in place', async () => {
     const drafted = (await run(['draft', ...base(), '--customer', 'acme'])) as {
       agenda_id: string;

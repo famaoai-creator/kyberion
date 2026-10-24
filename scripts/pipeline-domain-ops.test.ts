@@ -3,6 +3,7 @@ import { buildProductivityTaskPlan } from '@agent/core/productivity-task-plan';
 import {
   parseInlineOnboardingInput,
   runInlineApprovalStoreHygiene,
+  runInlineCustomerDecisionReminders,
   runInlineDecisionDigest,
   runInlineProductivityDryRunValidation,
   runInlineProposalBriefParse,
@@ -87,5 +88,19 @@ describe('decision loop pipeline ops', () => {
   it('reports the hygiene sweep as a dry run unless apply is true and skips fixtures', () => {
     const result = runInlineApprovalStoreHygiene({ id: 'hygiene' } as never, {}, {});
     expect(result.last_transform).toMatchObject({ dry_run: true, fixtures_trashed: 0 });
+  });
+});
+
+describe('core:customer_decision_reminders (CD-11)', () => {
+  it('refuses to run outside a tenant-bound run, before reading any store', async () => {
+    const saved = process.env.KYBERION_TENANT;
+    delete process.env.KYBERION_TENANT;
+    try {
+      await expect(
+        runInlineCustomerDecisionReminders({ id: 'remind' } as never, {}, {})
+      ).rejects.toThrow('CUSTOMER_DECISION_REMINDERS_TENANT_REQUIRED');
+    } finally {
+      if (saved !== undefined) process.env.KYBERION_TENANT = saved;
+    }
   });
 });
