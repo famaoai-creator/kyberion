@@ -12,7 +12,18 @@ import {
   AUTONOMY_OUTCOMES_PATH,
   AUTONOMY_OVERRIDES_PATH,
   recordAutonomyExecution,
+  autonomyOverridesLockId,
 } from './autonomy-action-state.js';
+
+describe('autonomyOverridesLockId', () => {
+  it('stays a short, stable, per-file id however long the root is', () => {
+    const deep = path.join('/', 'x'.repeat(200), 'y'.repeat(200), 'autonomy-action-overrides.json');
+    const id = autonomyOverridesLockId(deep);
+    expect(id).toMatch(/^autonomy-learning-[0-9a-f]{64}$/u);
+    expect(autonomyOverridesLockId(deep)).toBe(id);
+    expect(autonomyOverridesLockId(`${deep}.other`)).not.toBe(id);
+  });
+});
 
 const TEST_ROOT = 'active/shared/tmp/autonomy-action-state-tests';
 const abs = (rel: string) => path.join(pathResolver.rootDir(), TEST_ROOT, rel);

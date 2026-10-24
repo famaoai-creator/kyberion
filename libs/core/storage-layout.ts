@@ -209,7 +209,7 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   execution_metrics: 'active/shared/runtime/execution-metrics',
   /**
    * Hash-chained tenant partitions of the hybrid ledger (`libs/core/ledger.ts`):
-   * `<tier>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
+   * `<personal|confidential>/<tenant>/ledger.jsonl`, written and verified as `tenant_ledger_store`.
    * Tenant records and tenant mission metadata never reach the system ledger.
    */
   tenant_ledger: TENANT_LEDGER_ROOT_PATH,

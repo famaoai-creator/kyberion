@@ -20,7 +20,7 @@
  * (default zero), forcing 'approve' until the configured cooldown lapses.
  */
 import * as path from 'node:path';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -345,6 +345,11 @@ export interface AutonomySweepResult {
   held: string[];
 }
 
+/** Stable per-file lock id for an overrides file (fixed length, like ledger.ts). */
+export function autonomyOverridesLockId(overridesPath: string): string {
+  return `autonomy-learning-${createHash('sha256').update(path.resolve(overridesPath)).digest('hex')}`;
+}
+
 /**
  * Recompute per-action overrides from the ledger. Called periodically (the
  * daemon watchdog sweeps at end of run). Promotion and demotion are
@@ -359,7 +364,9 @@ export function sweepAutonomyActionStates(
   if (!policy.enabled) return { promoted: [], demoted: [], held: [...actionIds] };
   // Serialize read/modify/write sweeps per physical partition. A concurrent
   // sweep must not overwrite a demotion observed by another writer.
-  return withLockSync(`autonomy-learning:${filePath(deps, AUTONOMY_OVERRIDES_PATH)}`, () => {
+  // The lock id hashes the absolute path: lock-utils URL-encodes the id into one
+  // file name, which a raw path overflows (ENAMETOOLONG) under a long root.
+  return withLockSync(autonomyOverridesLockId(filePath(deps, AUTONOMY_OVERRIDES_PATH)), () => {
     const state = loadOverrides(deps);
     const now = deps.now?.() ?? new Date();
     const result: AutonomySweepResult = { promoted: [], demoted: [], held: [] };
