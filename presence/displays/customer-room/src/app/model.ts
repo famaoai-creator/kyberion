@@ -4,7 +4,7 @@
  * (`main.ts`) renders these; the unit tests drive them directly.
  */
 
-export type Locale = 'ja' | 'en';
+export type RoomLocale = 'ja' | 'en';
 export type EntryKind = 'choice' | 'approval' | 'ranking' | 'hearing';
 export type AnswerChoice = 'option' | 'keep' | 'free_text' | 'approve' | 'request_changes';
 
@@ -47,7 +47,7 @@ export interface ViewReceipt {
 export interface ViewOpen {
   ok: true;
   state: 'open';
-  agenda: { title: string; locale: Locale; revision: number; from?: string };
+  agenda: { title: string; locale: RoomLocale; revision: number; from?: string };
   participant: ViewParticipant;
   content_hash: string;
   entries: ViewEntry[];
@@ -106,14 +106,14 @@ export function parseFragmentToken(hash: string): string | null {
 // Language
 // ---------------------------------------------------------------------------
 
-export const LOCALES: readonly Locale[] = ['en', 'ja'];
+export const LOCALES: readonly RoomLocale[] = ['en', 'ja'];
 
-function supportedLocale(value: string | undefined): Locale | undefined {
+function supportedLocale(value: string | undefined): RoomLocale | undefined {
   return LOCALES.find((locale) => locale === value);
 }
 
 /** The first supported language among the browser's, else English. */
-export function localeFromBrowser(languages: readonly string[] | undefined): Locale {
+export function localeFromBrowser(languages: readonly string[] | undefined): RoomLocale {
   for (const language of languages ?? []) {
     const found = supportedLocale(language.toLowerCase().split('-')[0]);
     if (found) return found;
@@ -124,7 +124,7 @@ export function localeFromBrowser(languages: readonly string[] | undefined): Loc
 export function pickLocale(
   agendaLocale: string | undefined,
   languages: readonly string[] | undefined
-): Locale {
+): RoomLocale {
   return supportedLocale(agendaLocale) ?? localeFromBrowser(languages);
 }
 

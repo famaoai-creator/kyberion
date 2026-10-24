@@ -22,7 +22,7 @@ import {
   type AnswerPayload,
   type Draft,
   type DraftIssue,
-  type Locale,
+  type RoomLocale,
   type ScreenState,
   type ViewEntry,
   type ViewOpen,
@@ -30,7 +30,7 @@ import {
 } from './model.js';
 
 type Bundle = Record<string, string>;
-type Vocabulary = Record<Locale, Bundle>;
+type Vocabulary = Record<RoomLocale, Bundle>;
 
 function readVocabulary(): Vocabulary {
   const node = document.getElementById('cr-vocabulary');
@@ -43,7 +43,7 @@ function readVocabulary(): Vocabulary {
 }
 
 const vocabulary = readVocabulary();
-let locale: Locale = pickLocale(undefined, navigator.languages ?? [navigator.language]);
+let locale: RoomLocale = pickLocale(undefined, navigator.languages ?? [navigator.language]);
 
 function t(key: string, params: Record<string, string | number> = {}): string {
   // Never show a raw key: fall back to English, then to nothing.
@@ -64,7 +64,7 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function setLocale(next: Locale): void {
+function setLocale(next: RoomLocale): void {
   locale = next;
   document.documentElement.lang = next;
   document.title = t('page_title');

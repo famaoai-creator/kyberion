@@ -28,6 +28,7 @@ import {
   customerDecisionInviteCapability,
 } from '../foundation/customer-decision-invite-capability.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
+import { writeJson } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
@@ -39,7 +40,6 @@ import {
   safeMkdir,
   safeReadFile,
   safeReaddir,
-  safeWriteFile,
 } from '../secure-io.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS, storagePartitionSegments } from '../storage-layout.js';
 import { CASE_ID_PATTERN, CUSTOMER_ACTOR_ID_PATTERN } from '../decision-ledger/model.js';
@@ -181,11 +181,13 @@ function readInvite(tenantSlug: string, inviteId: string): InviteRead {
  * generation the caller read. The inter-process lock is taken under the
  * caller's own identity (lock files are not invite records); only the
  * generation check and the record write run inside the invite capability.
+ * Not `openJsonState`: it takes its lock inside the same scope as the write,
+ * and the one-record capability denies the lock directory.
  */
 function writeInvite(invite: CustomerDecisionInvite, expectedGeneration: string | null): void {
   const filePath = inviteFilePath(invite.tenant_slug, invite.invite_id);
   const catalog = inviteCatalog(filePath);
-  const serialized = `${JSON.stringify(catalog.validate(invite, filePath), null, 2)}\n`;
+  const validated = catalog.validate(invite, filePath);
   // The store root itself is an unprotected runtime directory (the caller may
   // create it); only the tier/tenant directories below it need the capability.
   safeMkdir(path.dirname(path.dirname(path.dirname(filePath))), { recursive: true });
@@ -198,7 +200,7 @@ function writeInvite(invite: CustomerDecisionInvite, expectedGeneration: string 
         );
       }
       safeMkdir(path.dirname(filePath), { recursive: true });
-      safeWriteFile(filePath, serialized, { encoding: 'utf8' });
+      writeJson(filePath, validated);
     })
   );
 }

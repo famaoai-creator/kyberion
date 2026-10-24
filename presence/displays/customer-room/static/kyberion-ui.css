@@ -1171,141 +1171,141 @@ a.kb-list__title:hover {
   content: var(--kb-ui-pill-icon, '\25CB');
 }
 
-.kb-status-pill[data-tone='success'],
-.kb-status-pill[data-status='available'],
-.kb-status-pill[data-status='completed'],
-.kb-status-pill[data-status='connected'],
-.kb-status-pill[data-status='done'],
-.kb-status-pill[data-status='fully_automatable'],
-.kb-status-pill[data-status='ready'],
-.kb-status-pill[data-status='recovered'],
-.kb-status-pill[data-status='running'] {
+.kb-status-pill[data-tone="success"],
+.kb-status-pill[data-status="available"],
+.kb-status-pill[data-status="completed"],
+.kb-status-pill[data-status="connected"],
+.kb-status-pill[data-status="done"],
+.kb-status-pill[data-status="fully_automatable"],
+.kb-status-pill[data-status="ready"],
+.kb-status-pill[data-status="recovered"],
+.kb-status-pill[data-status="running"] {
   --kb-ui-pill-fg: var(--kb-ui-success-fg);
   --kb-ui-pill-bg: var(--kb-ui-success-bg);
   --kb-ui-pill-border: var(--kb-ui-success-border);
-  --kb-ui-pill-icon: '\2713';
+  --kb-ui-pill-icon: "\2713";
 }
 
-.kb-status-pill[data-tone='info'],
-.kb-status-pill[data-status='active'],
-.kb-status-pill[data-status='busy'],
-.kb-status-pill[data-status='connecting'],
-.kb-status-pill[data-status='distilling'],
-.kb-status-pill[data-status='review'],
-.kb-status-pill[data-status='validating'],
-.kb-status-pill[data-status='working'] {
+.kb-status-pill[data-tone="info"],
+.kb-status-pill[data-status="active"],
+.kb-status-pill[data-status="busy"],
+.kb-status-pill[data-status="connecting"],
+.kb-status-pill[data-status="distilling"],
+.kb-status-pill[data-status="review"],
+.kb-status-pill[data-status="validating"],
+.kb-status-pill[data-status="working"] {
   --kb-ui-pill-fg: var(--kb-ui-info-fg);
   --kb-ui-pill-bg: var(--kb-ui-info-bg);
   --kb-ui-pill-border: var(--kb-ui-info-border);
-  --kb-ui-pill-icon: '\25CF';
+  --kb-ui-pill-icon: "\25CF";
 }
 
-.kb-status-pill[data-tone='warning'],
-.kb-status-pill[data-status='degraded'],
-.kb-status-pill[data-status='fallback'],
-.kb-status-pill[data-status='missing_runtime_prerequisites'],
-.kb-status-pill[data-status='needs_assets'],
-.kb-status-pill[data-status='needs_clarification'],
-.kb-status-pill[data-status='needs_external_assets'],
-.kb-status-pill[data-status='needs_runtime_prerequisites'],
-.kb-status-pill[data-status='needs_setup'],
-.kb-status-pill[data-status='paused'],
-.kb-status-pill[data-status='pending'],
-.kb-status-pill[data-status='stale'] {
+.kb-status-pill[data-tone="warning"],
+.kb-status-pill[data-status="degraded"],
+.kb-status-pill[data-status="fallback"],
+.kb-status-pill[data-status="missing_runtime_prerequisites"],
+.kb-status-pill[data-status="needs_assets"],
+.kb-status-pill[data-status="needs_clarification"],
+.kb-status-pill[data-status="needs_external_assets"],
+.kb-status-pill[data-status="needs_runtime_prerequisites"],
+.kb-status-pill[data-status="needs_setup"],
+.kb-status-pill[data-status="paused"],
+.kb-status-pill[data-status="pending"],
+.kb-status-pill[data-status="stale"] {
   --kb-ui-pill-fg: var(--kb-ui-warning-fg);
   --kb-ui-pill-bg: var(--kb-ui-warning-bg);
   --kb-ui-pill-border: var(--kb-ui-warning-border);
-  --kb-ui-pill-icon: '!';
+  --kb-ui-pill-icon: "!";
 }
 
-.kb-status-pill[data-tone='danger'],
-.kb-status-pill[data-status='blocked'],
-.kb-status-pill[data-status='disconnected'],
-.kb-status-pill[data-status='error'],
-.kb-status-pill[data-status='failed'],
-.kb-status-pill[data-status='missing'],
-.kb-status-pill[data-status='offline'],
-.kb-status-pill[data-status='unavailable'] {
+.kb-status-pill[data-tone="danger"],
+.kb-status-pill[data-status="blocked"],
+.kb-status-pill[data-status="disconnected"],
+.kb-status-pill[data-status="error"],
+.kb-status-pill[data-status="failed"],
+.kb-status-pill[data-status="missing"],
+.kb-status-pill[data-status="offline"],
+.kb-status-pill[data-status="unavailable"] {
   --kb-ui-pill-fg: var(--kb-ui-danger-fg);
   --kb-ui-pill-bg: var(--kb-ui-danger-bg);
   --kb-ui-pill-border: var(--kb-ui-danger-border);
-  --kb-ui-pill-icon: '\2715';
+  --kb-ui-pill-icon: "\2715";
 }
 
-.kb-status-pill[data-tone='neutral'],
-.kb-status-pill[data-status='archived'],
-.kb-status-pill[data-status='n/a'],
-.kb-status-pill[data-status='planned'],
-.kb-status-pill[data-status='stopped'] {
+.kb-status-pill[data-tone="neutral"],
+.kb-status-pill[data-status="archived"],
+.kb-status-pill[data-status="n/a"],
+.kb-status-pill[data-status="planned"],
+.kb-status-pill[data-status="stopped"] {
   --kb-ui-pill-fg: var(--kb-ui-text-muted);
   --kb-ui-pill-bg: var(--kb-ui-surface-sunken);
   --kb-ui-pill-border: var(--kb-ui-border);
-  --kb-ui-pill-icon: '\25CB';
+  --kb-ui-pill-icon: "\25CB";
 }
 
 /* status family: done */
-.kb-status-pill[data-status='available'],
-.kb-status-pill[data-status='completed'],
-.kb-status-pill[data-status='connected'],
-.kb-status-pill[data-status='done'],
-.kb-status-pill[data-status='fully_automatable'],
-.kb-status-pill[data-status='ready'],
-.kb-status-pill[data-status='recovered'] {
-  --kb-ui-pill-icon: '\2713';
+.kb-status-pill[data-status="available"],
+.kb-status-pill[data-status="completed"],
+.kb-status-pill[data-status="connected"],
+.kb-status-pill[data-status="done"],
+.kb-status-pill[data-status="fully_automatable"],
+.kb-status-pill[data-status="ready"],
+.kb-status-pill[data-status="recovered"] {
+  --kb-ui-pill-icon: "\2713";
 }
 
 /* status family: running */
-.kb-status-pill[data-status='active'],
-.kb-status-pill[data-status='busy'],
-.kb-status-pill[data-status='connecting'],
-.kb-status-pill[data-status='distilling'],
-.kb-status-pill[data-status='running'],
-.kb-status-pill[data-status='validating'],
-.kb-status-pill[data-status='working'] {
-  --kb-ui-pill-icon: '\25D0';
+.kb-status-pill[data-status="active"],
+.kb-status-pill[data-status="busy"],
+.kb-status-pill[data-status="connecting"],
+.kb-status-pill[data-status="distilling"],
+.kb-status-pill[data-status="running"],
+.kb-status-pill[data-status="validating"],
+.kb-status-pill[data-status="working"] {
+  --kb-ui-pill-icon: "\25D0";
 }
 
 /* status family: waiting */
-.kb-status-pill[data-status='missing_runtime_prerequisites'],
-.kb-status-pill[data-status='needs_assets'],
-.kb-status-pill[data-status='needs_clarification'],
-.kb-status-pill[data-status='needs_external_assets'],
-.kb-status-pill[data-status='needs_runtime_prerequisites'],
-.kb-status-pill[data-status='needs_setup'],
-.kb-status-pill[data-status='pending'],
-.kb-status-pill[data-status='review'] {
-  --kb-ui-pill-icon: '!';
+.kb-status-pill[data-status="missing_runtime_prerequisites"],
+.kb-status-pill[data-status="needs_assets"],
+.kb-status-pill[data-status="needs_clarification"],
+.kb-status-pill[data-status="needs_external_assets"],
+.kb-status-pill[data-status="needs_runtime_prerequisites"],
+.kb-status-pill[data-status="needs_setup"],
+.kb-status-pill[data-status="pending"],
+.kb-status-pill[data-status="review"] {
+  --kb-ui-pill-icon: "!";
 }
 
 /* status family: paused */
-.kb-status-pill[data-status='paused'] {
-  --kb-ui-pill-icon: '\2016';
+.kb-status-pill[data-status="paused"] {
+  --kb-ui-pill-icon: "\2016";
 }
 
 /* status family: degraded */
-.kb-status-pill[data-status='degraded'],
-.kb-status-pill[data-status='fallback'],
-.kb-status-pill[data-status='stale'] {
-  --kb-ui-pill-icon: '\25B2';
+.kb-status-pill[data-status="degraded"],
+.kb-status-pill[data-status="fallback"],
+.kb-status-pill[data-status="stale"] {
+  --kb-ui-pill-icon: "\25B2";
 }
 
 /* status family: failed */
-.kb-status-pill[data-status='blocked'],
-.kb-status-pill[data-status='disconnected'],
-.kb-status-pill[data-status='error'],
-.kb-status-pill[data-status='failed'],
-.kb-status-pill[data-status='missing'],
-.kb-status-pill[data-status='offline'],
-.kb-status-pill[data-status='unavailable'] {
-  --kb-ui-pill-icon: '\2715';
+.kb-status-pill[data-status="blocked"],
+.kb-status-pill[data-status="disconnected"],
+.kb-status-pill[data-status="error"],
+.kb-status-pill[data-status="failed"],
+.kb-status-pill[data-status="missing"],
+.kb-status-pill[data-status="offline"],
+.kb-status-pill[data-status="unavailable"] {
+  --kb-ui-pill-icon: "\2715";
 }
 
 /* status family: idle */
-.kb-status-pill[data-status='archived'],
-.kb-status-pill[data-status='n/a'],
-.kb-status-pill[data-status='planned'],
-.kb-status-pill[data-status='stopped'] {
-  --kb-ui-pill-icon: '\25CB';
+.kb-status-pill[data-status="archived"],
+.kb-status-pill[data-status="n/a"],
+.kb-status-pill[data-status="planned"],
+.kb-status-pill[data-status="stopped"] {
+  --kb-ui-pill-icon: "\25CB";
 }
 
 /* --------------------------------------------------------------- badge -- */
