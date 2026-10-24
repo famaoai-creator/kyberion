@@ -178,6 +178,25 @@ export interface MissionContextPackPruningSummary {
   rollup_summary: string;
 }
 
+export interface MissionContextPackOrganizationIntent {
+  organization_id: string;
+  name?: string;
+  purpose: string;
+  approval_state: 'draft' | 'pending_approval' | 'approved' | 'superseded';
+  objectives?: Array<{
+    objective_id: string;
+    title: string;
+    status?: string;
+    key_results?: Array<{
+      kr_id: string;
+      title: string;
+      target: number;
+      direction: string;
+      unit?: string;
+    }>;
+  }>;
+}
+
 export interface MissionContextPackMissionSummary {
   mission_id: string;
   mission_type?: string;
@@ -275,6 +294,7 @@ export interface MissionContextPack {
   };
   recipient: MissionContextPackRecipient;
   mission: MissionContextPackMissionSummary;
+  organization_intent?: MissionContextPackOrganizationIntent;
   project?: MissionContextPackProjectSummary;
   track?: MissionContextPackTrackSummary;
   task_session?: MissionContextPackTaskSessionSummary;

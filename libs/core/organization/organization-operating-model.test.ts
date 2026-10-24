@@ -47,7 +47,7 @@ import {
   listOrganizationOperationStates,
   listOrganizationOperations,
 } from './organization-operating-model-operations.js';
-import { saveProjectRecord } from '../project/project-registry.js';
+import { saveProjectRecord, projectRecordPath } from '../project/project-registry.js';
 import { saveProjectOperationalState } from '../project/project-operational-state-registry.js';
 import {
   type OrganizationCapabilityRecord,
@@ -64,6 +64,7 @@ import {
 import { t } from '../t.js';
 import { nowIso } from '../foundation/index.js';
 import { pathResolver } from '@agent/core/path-resolver';
+import { orgKrLedgerPath } from '../dot/dot-state-paths.js';
 import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 
 const organizationId = 'org-operating-model-test';
@@ -1608,5 +1609,105 @@ describe('organization operating model', () => {
     });
     expect(staleView.control_plane.outcome_accounting.services[0]?.health).toBe('unknown');
     expect(staleView.control_plane.accounting.healthy_services).toBe(0);
+  });
+
+  it('rolls objectives up to linked projects, missions, and KR progress', () => {
+    const ledgerFile = path.resolve(
+      pathResolver.rootDir(),
+      orgKrLedgerPath({ tenantSlug, organizationId })
+    );
+    try {
+      saveOrganizationPurpose({
+        version: '1.0.0',
+        organization_id: organizationId,
+        name: 'Rollup Org',
+        purpose: 'Roll objectives up to delivery.',
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        owner_role: 'organization_owner',
+        approval_state: 'approved',
+        updated_at: '2026-10-24T00:00:00.000Z',
+        objectives: [
+          {
+            objective_id: 'obj-rollup',
+            title: 'Objective with measurement',
+            key_results: [
+              {
+                kr_id: 'kr-rollup',
+                title: 'Roll-up KR',
+                metric: { source: 'manual' },
+                target: 100,
+                direction: 'increase',
+              },
+            ],
+          },
+          { objective_id: 'obj-other', title: 'Unlinked objective' },
+        ],
+      });
+      saveOrganizationOperationalState({
+        organization_id: organizationId,
+        name: 'Rollup Org',
+        tier: 'confidential',
+        tenant_slug: tenantSlug,
+        status: 'active',
+        active_project_ids: ['prj-rollup-linked'],
+        updated_at: '2026-10-24T00:00:00.000Z',
+      });
+      saveProjectRecord({
+        project_id: 'prj-rollup-linked',
+        name: 'Rollup project',
+        summary: 'Advances obj-rollup.',
+        status: 'active',
+        tier: 'confidential',
+        organization_id: organizationId,
+        tenant_slug: tenantSlug,
+        objective_ids: ['obj-rollup'],
+        active_missions: ['MSN-ROLLUP-1'],
+      });
+      safeMkdir(path.dirname(ledgerFile), { recursive: true });
+      safeWriteFile(
+        ledgerFile,
+        JSON.stringify({
+          scope: 'org',
+          organization_id: organizationId,
+          objective_id: 'obj-rollup',
+          kr_id: 'kr-rollup',
+          value: 60,
+          progress: 0.75,
+          measured_at: '2026-10-24T01:00:00.000Z',
+        }) + '\n'
+      );
+
+      const view = buildOrganizationManagementView({
+        organizationId,
+        tier: 'confidential',
+        tenantSlug,
+      });
+      const entry = view.control_plane.outcome_accounting.objectives.find(
+        (objective) => objective.objective_id === 'obj-rollup'
+      );
+      expect(entry?.progress).toBe(0.75);
+      expect(entry?.key_results).toEqual([
+        expect.objectContaining({
+          kr_id: 'kr-rollup',
+          progress: 0.75,
+          measured_at: '2026-10-24T01:00:00.000Z',
+        }),
+      ]);
+      expect(entry?.projects).toEqual([
+        expect.objectContaining({
+          project_id: 'prj-rollup-linked',
+          mission_ids: ['MSN-ROLLUP-1'],
+        }),
+      ]);
+      const other = view.control_plane.outcome_accounting.objectives.find(
+        (objective) => objective.objective_id === 'obj-other'
+      );
+      expect(other?.projects).toEqual([]);
+      expect(other?.key_results).toEqual([]);
+    } finally {
+      safeRmSync(path.dirname(ledgerFile), { recursive: true, force: true });
+      safeRmSync(projectRecordPath('prj-rollup-linked'), { force: true });
+    }
   });
 });

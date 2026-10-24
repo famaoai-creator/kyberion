@@ -532,6 +532,19 @@ export interface OrganizationManagementView {
         title: string;
         coverage: 'linked' | 'unlinked';
         refs: string[];
+        progress?: number;
+        key_results: Array<{
+          kr_id: string;
+          title: string;
+          progress?: number;
+          measured_at?: string;
+        }>;
+        projects: Array<{
+          project_id: string;
+          name: string;
+          status: string;
+          mission_ids: string[];
+        }>;
       }>;
       services: Array<{
         service_id: string;

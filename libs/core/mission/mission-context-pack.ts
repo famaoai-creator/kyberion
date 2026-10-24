@@ -33,6 +33,9 @@ import {
 } from './mission-team-plan-composer.js';
 import { getWorkItem, type WorkItem } from '../workforce/work-coordination.js';
 import { loadTaskSession, validateTaskSession, type TaskSession } from '../task/task-session.js';
+import { loadOrganizationPurpose } from '../organization/organization-operating-model.js';
+import { loadProjectRecord } from '../project/project-registry.js';
+import { withExecutionContext } from '../authority.js';
 import { slugify } from '../foundation/text.js';
 import { compileScopedContextPack, type ContextSecurityScope } from '../context-security-scope.js';
 import { resolveFacets, type ResolvedFacets } from '../facet-registry.js';
@@ -62,6 +65,7 @@ import type {
   MissionContextPackFacets,
   MissionContextPackKnowledgeHint,
   MissionContextPackMissionSummary,
+  MissionContextPackOrganizationIntent,
   MissionContextPackRecipient,
   MissionContextPackScope,
   MissionContextPackSource,
@@ -80,6 +84,7 @@ export type {
   MissionContextPackFacets,
   MissionContextPackKnowledgeHint,
   MissionContextPackMissionSummary,
+  MissionContextPackOrganizationIntent,
   MissionContextPackPruningSummary,
   MissionContextPackProjectSummary,
   MissionContextPackRecipient,
@@ -931,6 +936,80 @@ function loadArtifactHintsIfPossible(input: {
   }));
 }
 
+const ORG_INTENT_MAX_OBJECTIVES = 5;
+const ORG_INTENT_MAX_KEY_RESULTS = 4;
+
+function loadScopedOrganizationIntent(input: {
+  organizationId: string;
+  missionTier: MissionTier;
+  tenantSlug?: string;
+  projectId?: string;
+  rootDir?: string;
+}): MissionContextPackOrganizationIntent | undefined {
+  const tierOrder: MissionTier[] =
+    input.missionTier === 'public'
+      ? ['public']
+      : input.missionTier === 'confidential'
+        ? ['confidential', 'public']
+        : ['personal', 'public'];
+  const purpose = withExecutionContext(
+    'organization_operator',
+    () =>
+      tierOrder
+        .map((tier) =>
+          loadOrganizationPurpose(input.organizationId, {
+            tier,
+            tenantSlug: input.tenantSlug || 'shared',
+            ...(input.rootDir ? { rootDir: input.rootDir } : {}),
+          })
+        )
+        .find((record) => record),
+    undefined,
+    input.tenantSlug,
+    input.organizationId
+  );
+  if (!purpose) return undefined;
+  const projectRecord = input.projectId
+    ? loadProjectRecord(input.projectId, {
+        ...(input.rootDir ? { rootDir: input.rootDir } : {}),
+      })
+    : null;
+  const recordMatchesScope = Boolean(
+    projectRecord &&
+    projectRecord.tier === input.missionTier &&
+    (!input.tenantSlug || projectRecord.tenant_slug === input.tenantSlug)
+  );
+  const linkedObjectiveIds = new Set(
+    (recordMatchesScope ? projectRecord?.objective_ids : undefined) || []
+  );
+  const objectives = (purpose.objectives || [])
+    .filter((objective) => linkedObjectiveIds.has(objective.objective_id))
+    .slice(0, ORG_INTENT_MAX_OBJECTIVES)
+    .map((objective) => ({
+      objective_id: objective.objective_id,
+      title: objective.title,
+      ...(objective.status ? { status: objective.status } : {}),
+      ...(objective.key_results?.length
+        ? {
+            key_results: objective.key_results.slice(0, ORG_INTENT_MAX_KEY_RESULTS).map((kr) => ({
+              kr_id: kr.kr_id,
+              title: kr.title,
+              target: kr.target,
+              direction: kr.direction,
+              ...(kr.unit ? { unit: kr.unit } : {}),
+            })),
+          }
+        : {}),
+    }));
+  return {
+    organization_id: purpose.organization_id,
+    ...(purpose.name ? { name: purpose.name } : {}),
+    purpose: purpose.purpose.slice(0, 1200),
+    approval_state: purpose.approval_state,
+    ...(objectives.length ? { objectives } : {}),
+  };
+}
+
 export function buildMissionContextPack(input: BuildMissionContextPackInput): MissionContextPack {
   const missionStateValidate = ensureMissionStateValidator();
   if (!missionStateValidate(input.missionState)) {
@@ -1201,6 +1280,28 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     knowledgeHints: input.knowledgeHints,
     skillResources,
   });
+  let organizationIntent: MissionContextPackOrganizationIntent | undefined;
+  if (organizationId) {
+    try {
+      organizationIntent = loadScopedOrganizationIntent({
+        organizationId,
+        missionTier,
+        tenantSlug: input.missionState.tenant_slug,
+        projectId,
+        rootDir: input.tenantKnowledgeRootDir,
+      });
+    } catch {
+      organizationIntent = undefined;
+    }
+  }
+  if (organizationIntent) {
+    sources.push({
+      kind: 'other',
+      ref: `organization-purpose:${organizationId}`,
+      summary: `Organization purpose for ${organizationId}`,
+      captured_at: nowIso(),
+    });
+  }
   const summary = missionContextSummary({
     missionId: input.missionState.mission_id,
     teamRole: input.teamRole,
@@ -1260,6 +1361,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
       : {}),
     recipient,
     mission,
+    ...(organizationIntent ? { organization_intent: organizationIntent } : {}),
     ...(project ? { project } : {}),
     ...(track ? { track } : {}),
     ...(taskSession ? { task_session: taskSession } : {}),
@@ -1423,6 +1525,24 @@ export function renderMissionContextPack(pack: MissionContextPack): string {
     `- Recipient: ${pack.recipient.kind}${pack.recipient.team_role ? ` / role=${pack.recipient.team_role}` : ''}${pack.recipient.agent_id ? ` / agent=${pack.recipient.agent_id}` : ''}${pack.recipient.authority_role ? ` / authority=${pack.recipient.authority_role}` : ''}`,
     `- Mission: ${pack.mission.mission_id} | ${pack.mission.status}${pack.mission.mission_type ? ` | type=${pack.mission.mission_type}` : ''}${pack.mission.assigned_persona ? ` | persona=${pack.mission.assigned_persona}` : ''}`,
   ];
+
+  if (pack.organization_intent) {
+    const intent = pack.organization_intent;
+    lines.push(
+      `- Organization intent: ${intent.organization_id}${intent.name ? ` | ${intent.name}` : ''} | ${intent.approval_state}`,
+      `  - Purpose: ${summarizeText(intent.purpose, 320) || intent.purpose}`
+    );
+    for (const objective of intent.objectives || []) {
+      lines.push(
+        `  - Objective: ${objective.objective_id} | ${objective.title}${objective.status ? ` | ${objective.status}` : ''}`
+      );
+      for (const kr of objective.key_results || []) {
+        lines.push(
+          `    - KR ${kr.kr_id}: ${kr.title} -> ${kr.direction} ${kr.target}${kr.unit ? ` ${kr.unit}` : ''}`
+        );
+      }
+    }
+  }
 
   if (pack.project) {
     lines.push(
