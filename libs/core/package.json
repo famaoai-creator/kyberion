@@ -1428,6 +1428,10 @@
       "types": "./dist/dot/dot-feedback.d.ts",
       "default": "./dist/dot/dot-feedback.js"
     },
+    "./dot/dot-feed-source": {
+      "types": "./dist/dot/dot-feed-source.d.ts",
+      "default": "./dist/dot/dot-feed-source.js"
+    },
     "./dot/dot-followups": {
       "types": "./dist/dot/dot-followups.d.ts",
       "default": "./dist/dot/dot-followups.js"
@@ -1435,6 +1439,10 @@
     "./dot/dot-inbox": {
       "types": "./dist/dot/dot-inbox.d.ts",
       "default": "./dist/dot/dot-inbox.js"
+    },
+    "./dot/dot-intake-plan": {
+      "types": "./dist/dot/dot-intake-plan.d.ts",
+      "default": "./dist/dot/dot-intake-plan.js"
     },
     "./dot/dot-key-results": {
       "types": "./dist/dot/dot-key-results.d.ts",

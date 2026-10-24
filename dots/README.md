@@ -10,17 +10,17 @@ and loaded via `@agent/core/dot/dot-charter`.
 
 ## What a charter declares
 
-| Section        | Meaning                                                                                                                                                                                                                                                                                                   |
-| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `purpose`      | The standing responsibility (what this dot owns, continuously)                                                                                                                                                                                                                                            |
-| `scope`        | Data tier + optional tenant/org/project — the context chain it operates inside                                                                                                                                                                                                                            |
-| `goal`         | Durable goal text + optional per-wake budgets (turns, wall-clock, tokens)                                                                                                                                                                                                                                 |
-| `attention`    | Triggers: `cron` (scheduled wake), `watch` (file/event), `wake` (inbound channel/surface signals), `probe` (declarative external-state watch: `file` or `service_preset`, evaluated each sweep against `dot-probe-state.json` fingerprints — `changed` expectations fire only after the baseline differs) |
-| `authority`    | An **existing** authority role from `security-policy.json` — a charter never grants authority                                                                                                                                                                                                             |
-| `decisions`    | Floor for `autonomous-ops-gate` outcomes (`auto`/`notify`/`approve`) + veto window + `decision_expiry_minutes` (default 1440) + escalate chan                                                                                                                                                             |
-| `notification` | `deliver_to` (slack/telegram/discord/imessage) + optional digest cron + quiet hours                                                                                                                                                                                                                       |
-| `runtime`      | `heartbeat_id` watched by `daemon-watchdog`, optional reasoning backend                                                                                                                                                                                                                                   |
-| `team`         | Exclusive `responsibilities` keys (activation refused on overlap), `accepts_handoffs_from` (dots allowed to hand work here), `goal_ref` (organization goal), `owns` (target patterns this dot owns) and `priority` (0-100, arbitration)                                                                   |
+| Section        | Meaning                                                                                                                                                                                                                                                                                                                                                                                                        |
+| -------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `purpose`      | The standing responsibility (what this dot owns, continuously)                                                                                                                                                                                                                                                                                                                                                 |
+| `scope`        | Data tier + optional tenant/org/project — the context chain it operates inside                                                                                                                                                                                                                                                                                                                                 |
+| `goal`         | Durable goal text + optional per-wake budgets (turns, wall-clock, tokens)                                                                                                                                                                                                                                                                                                                                      |
+| `attention`    | Triggers: `cron` (scheduled wake), `watch` (file/event), `wake` (inbound channel/surface signals), `probe` (declarative external-state watch: `file` or `service_preset`, evaluated each sweep against `dot-probe-state.json` fingerprints — `changed` expectations fire only after the baseline differs), `feed` (pull-side source adapter: polls a read-only service preset and ingests new items as events) |
+| `authority`    | An **existing** authority role from `security-policy.json` — a charter never grants authority                                                                                                                                                                                                                                                                                                                  |
+| `decisions`    | Floor for `autonomous-ops-gate` outcomes (`auto`/`notify`/`approve`) + veto window + `decision_expiry_minutes` (default 1440) + escalate chan                                                                                                                                                                                                                                                                  |
+| `notification` | `deliver_to` (slack/telegram/discord/imessage) + optional digest cron + quiet hours                                                                                                                                                                                                                                                                                                                            |
+| `runtime`      | `heartbeat_id` watched by `daemon-watchdog`, optional reasoning backend                                                                                                                                                                                                                                                                                                                                        |
+| `team`         | Exclusive `responsibilities` keys (activation refused on overlap), `accepts_handoffs_from` (dots allowed to hand work here), `goal_ref` (organization goal), `owns` (target patterns this dot owns) and `priority` (0-100, arbitration)                                                                                                                                                                        |
 
 `goal.signal_probes` makes `success_signals` measurable (a signal is healthy
 while its probe matches). `notification.delivery_mode` is `inbox` by default;
@@ -39,6 +39,7 @@ optional; the full design is in
 | `goal.outcome_settle_minutes`        | Minutes after completion before an action's KR effect is judged (default 60)                                              |
 | `authority.allowed_pipelines`        | Repo-relative pipelines the executor may run for `pipeline`-shaped work                                                   |
 | `attention.triggers[].kind: "event"` | Wake on an authenticated inbound event (`sources`, `types`, `match`)                                                      |
+| `attention.triggers[].kind: "feed"`  | Poll a read-only service preset and ingest new items as events (`source` must have a matching `event` trigger)            |
 | `memory` / `followups`               | Working memory (`max_bytes`) and self-scheduled follow-ups (`max_pending`, default 3)                                     |
 | `autonomy`                           | `initial_level` / `min_level` / `max_level`, L0-L4 (default L2, ceiling L3)                                               |
 | `team.owns` / `team.priority`        | Arbitration inputs when two dots target the same resource                                                                 |
@@ -238,7 +239,8 @@ role still exists before any work runs.
 
 Each wake attempt lands in `active/shared/runtime/dot-wake-ledger.jsonl`
 keyed by a stable trigger key (`cron:<expr>@<minute>`, `watch:<path>@<stat>`,
-`wake:<inbox-row>`, `probe:<spec>:<fingerprint>`, `manual:<iso>`). Outcomes:
+`wake:<inbox-row>`, `probe:<spec>:<fingerprint>`, `event:<event_id>`,
+`manual:<iso>`). Outcomes:
 `delivered` consumes the key;
 `rejected` consumes it (policy wedges must not hot-loop); `failed` retries
 after a 5-minute backoff; `skipped` (paused mid-flight or token cap) leaves
@@ -264,6 +266,50 @@ A `probe` trigger example — wake when a GitHub PR leaves `open`:
   }
 }
 ```
+
+### Pulling sources that cannot push
+
+Use a `feed` trigger when the source has no webhook you can rely on (Slack
+keyword search, a ticket query, a search result set). A feed never wakes the
+dot by itself: it polls a **read-only** service preset, keeps a durable cursor
+plus a bounded seen-key ring, and ingests newly observed items as normal intake
+events. The charter's `event` trigger does the waking, so dedupe, tenant
+binding, budget, the wake ledger and the autonomy gate are unchanged.
+
+```json
+{
+  "kind": "feed",
+  "source": "slack",
+  "service_id": "slack",
+  "action": "search_messages",
+  "params": { "query": "deploy failed in:#ops", "sort": "timestamp", "count": 20 },
+  "items_path": "messages.matches",
+  "item_id_path": "ts",
+  "cursor_path": "ts",
+  "event_type": "slack_message",
+  "every_s": 300,
+  "max_items": 20,
+  "on_first_poll": "baseline"
+},
+{ "kind": "event", "sources": ["slack"], "types": ["slack_message"] }
+```
+
+- `on_first_poll: "baseline"` (default) records the cursor and emits nothing, so
+  activating a watcher never wakes the dot on the backlog. `"emit"` is for
+  one-shot catch-up.
+- `overlap_s` tolerates late indexing (a late item whose cursor is older than
+  the watermark). Keep it small; the seen ring is the real duplicate guard.
+- The source must be declared in the intake policy and bound to the charter's
+  same tenant. A feed refuses to run otherwise rather than writing into another
+  tenant's ledger.
+- `max_items` keeps the **newest** window. If a poll returns more than that,
+  older unseen items are dropped and `capped_polls` increments — keep the
+  cadence short enough that this does not happen.
+
+`pnpm kyberion dot intake` is the activation table: per charter it shows the
+source, whether it can wake the dot right now, the authority/shape/decision
+that bounds it, and the last successful poll for each feed. Read it before
+enabling a source; a row that says `stalled` is a blind watcher.
 
 ## Adding a dot
 
