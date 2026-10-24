@@ -24,31 +24,29 @@ const ALLOWLIST: Record<string, string> = {
     'Existing host profile manager outside governed repository storage',
 };
 
-function usesRawFs(source: string): boolean {
-  const file = ts.createSourceFile('boundary.mjs', source, ts.ScriptTarget.Latest, true);
-  let found = false;
+function usesRawFs(source: string, fileName = 'boundary.mjs'): boolean {
+  const file = ts.createSourceFile(fileName, source, ts.ScriptTarget.Latest, false);
   const raw = (node: ts.Node | undefined) =>
     node && ts.isStringLiteralLike(node) && /^(?:node:)?fs(?:\/promises)?$/.test(node.text);
-  const visit = (node: ts.Node) => {
+  const visit = (node: ts.Node): true | undefined => {
     if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && raw(node.moduleSpecifier))
-      found = true;
+      return true;
     if (
       ts.isImportEqualsDeclaration(node) &&
       ts.isExternalModuleReference(node.moduleReference) &&
       raw(node.moduleReference.expression)
     )
-      found = true;
+      return true;
     if (
       ts.isCallExpression(node) &&
       (node.expression.kind === ts.SyntaxKind.ImportKeyword ||
         (ts.isIdentifier(node.expression) && node.expression.text === 'require')) &&
       raw(node.arguments[0])
     )
-      found = true;
-    ts.forEachChild(node, visit);
+      return true;
+    return ts.forEachChild(node, visit);
   };
-  visit(file);
-  return found;
+  return visit(file) === true;
 }
 
 function collectProductionTsFiles(dir: string): string[] {
@@ -72,29 +70,32 @@ function collectProductionTsFiles(dir: string): string[] {
   return files;
 }
 
+const PRODUCTION_ROOTS = ['libs', 'scripts', 'presence', 'satellites'];
+
 describe('security boundary contract', () => {
-  it('keeps raw fs imports confined to reviewed low-level boundaries', () => {
+  it('keeps every reviewed boundary inside an audited production root', () => {
+    expect(
+      Object.keys(ALLOWLIST).filter(
+        (file) => !PRODUCTION_ROOTS.some((root) => file.startsWith(`${root}/`))
+      )
+    ).toEqual([]);
+  });
+
+  it.each(PRODUCTION_ROOTS)('confines raw fs in %s to reviewed low-level boundaries', (root) => {
     const repoRoot = pathResolver.rootDir();
-    const candidates = [
-      ...collectProductionTsFiles(`${repoRoot}/libs`),
-      ...collectProductionTsFiles(`${repoRoot}/scripts`),
-      ...collectProductionTsFiles(`${repoRoot}/presence`),
-      ...collectProductionTsFiles(`${repoRoot}/satellites`),
-    ];
+    const candidates = collectProductionTsFiles(`${repoRoot}/${root}`);
 
-    const offenders = candidates.filter((filePath) => {
-      const source = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-      if (!usesRawFs(source)) return false;
-      return !(filePath.slice(repoRoot.length + 1) in ALLOWLIST);
-    });
-
-    expect(offenders).toEqual([]);
+    // One fresh read/parse per candidate: coverage-on CI previously spent more
+    // than its test deadline repeating this scan for allowlist freshness.
     const rawFiles = new Set(
       candidates
-        .filter((file) => usesRawFs(String(safeReadFile(file, { encoding: 'utf8' }))))
+        .filter((file) => usesRawFs(String(safeReadFile(file, { encoding: 'utf8' })), file))
         .map((file) => file.slice(repoRoot.length + 1))
     );
-    expect(Object.keys(ALLOWLIST).filter((file) => !rawFiles.has(file))).toEqual([]);
+    expect([...rawFiles].filter((file) => !(file in ALLOWLIST))).toEqual([]);
+    expect(
+      Object.keys(ALLOWLIST).filter((file) => file.startsWith(`${root}/`) && !rawFiles.has(file))
+    ).toEqual([]);
   });
 
   it('detects static, dynamic and CommonJS fs including promises in JavaScript', () => {
@@ -108,6 +109,29 @@ describe('security boundary contract', () => {
       expect(usesRawFs(source)).toBe(true);
     expect(usesRawFs("// import fs from 'fs'\nconst text = \"require('fs')\";")).toBe(false);
   });
+
+  it('detects decoded specifiers and TypeScript import-equals', () => {
+    for (const source of [
+      String.raw`import fs from '\x66s'`,
+      String.raw`export * from 'node:\u0066s/promises'`,
+      String.raw`require('\u0066s')`,
+      String.raw`import('node:\x66s')`,
+      "import fs = require('fs')",
+    ])
+      expect(usesRawFs(source, 'boundary.ts')).toBe(true);
+    expect(usesRawFs("import fs from 'fs-extra'", 'boundary.ts')).toBe(false);
+  });
+
+  it.each(['boundary.tsx', 'boundary.jsx'])(
+    'distinguishes JSX text from executable imports in %s',
+    (fileName) => {
+      expect(usesRawFs("const view = <div>require('fs')</div>", fileName)).toBe(false);
+      expect(usesRawFs("const view = <div>{require('fs')}</div>", fileName)).toBe(true);
+      expect(usesRawFs("const view = <div>{import('node:fs/promises')}</div>", fileName)).toBe(
+        true
+      );
+    }
+  );
 
   it('lets only secure-io.ts import its permission guards (secure-io-path-guard)', () => {
     const repoRoot = pathResolver.rootDir();
