@@ -1915,6 +1915,17 @@
       "group": "operate"
     },
     {
+      "id": "script.dot.intake",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot intake",
+      "args": ["intake"],
+      "noun": "dot",
+      "verb": "intake",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_intake",
+      "group": "inspect"
+    },
+    {
       "id": "script.dot.kr",
       "module": "scripts/dot_charters.ts",
       "command": "dot kr",

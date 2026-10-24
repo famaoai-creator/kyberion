@@ -14,6 +14,7 @@
  *   pnpm kyberion dot release <dot_id> <work_item_id> --reason "<text>" [--by <requester>]
  *                                                # request a human-approved release of a quarantined item
  *   pnpm kyberion dot event ingest --source <s> --file <json> [--type <t>]   # local test event
+ *   pnpm kyberion dot intake [--json]            # which source wakes which dot, and what it may do
  *   pnpm kyberion dot inbox append --channel <ch> [--dot-id <id>] [--text <s>]
  *                                                # append a wake-lane row (manual/testing)
  *
@@ -42,7 +43,9 @@ import {
 } from '@agent/core/dot/dot-autonomy';
 import { dotOutcomeStats, readDotOutcomes } from '@agent/core/dot/dot-outcomes';
 import { readDotWorkResults, requestDotWorkItemRelease } from '@agent/core/dot/dot-executor';
-import { ingestLocalEvent } from '@agent/core/dot/dot-event-intake';
+import { ingestLocalEvent, loadEventIntakePolicy } from '@agent/core/dot/dot-event-intake';
+import { describeDotIntakePlan, type DotIntakePlan } from '@agent/core/dot/dot-intake-plan';
+import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { safeReadFile } from '@agent/core/secure-io';
 import { parseSafeJsonObjectInput } from '@agent/core/foundation';
 import {
@@ -81,6 +84,7 @@ const SUBCOMMANDS = [
   'outcomes',
   'work',
   'event',
+  'intake',
   'release',
 ] as const;
 type Subcommand = (typeof SUBCOMMANDS)[number];
@@ -444,6 +448,23 @@ function reportEvent(argv: string[]) {
   return { ok: true, ingested: result };
 }
 
+/** `dot intake` — read-only activation table derived from charters, policy and feed state. */
+function reportIntake(): { ok: true; intake: DotIntakePlan; schema_errors: string[] } {
+  const errors: DotCharterLoadError[] = [];
+  const charters = listDotCharters(undefined, { errors }).map((entry) => entry.charter);
+  const policy = loadEventIntakePolicy({ tenantOverlays: true });
+  const intake = describeDotIntakePlan({
+    charters,
+    policy,
+    hostOptIn: getRegisteredEnvText('KYBERION_EVENT_INTAKE_SOURCES'),
+  });
+  return {
+    ok: true,
+    intake,
+    schema_errors: errors.map((error) => `${error.path}: ${error.error}`),
+  };
+}
+
 async function main(argv: string[]): Promise<Record<string, unknown>> {
   const [sub, ...rest] = argv;
   const subcommand = (SUBCOMMANDS as readonly string[]).includes(sub)
@@ -504,6 +525,8 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
       return reportView(subcommand, args);
     case 'event':
       return reportEvent(args);
+    case 'intake':
+      return reportIntake();
     case 'release':
       return reportRelease(args);
     case 'list':
@@ -519,6 +542,35 @@ function compact(value: unknown, max = 240): string {
     )
     .join(' ');
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
+}
+
+function printIntake(intake: DotIntakePlan, print: (line: string) => void): void {
+  const pad = (value: string, width: number) => value.padEnd(width).slice(0, width);
+  print(
+    `${pad('SOURCE', 20)} ${pad('MODE', 4)} ${pad('DOT', 22)} ${pad('ARMED', 5)} ${pad('TYPES', 34)} AUTHORITY / SHAPE / DECISION`
+  );
+  for (const row of intake.rows) {
+    print(
+      `${pad(row.source, 20)} ${pad(row.mode, 4)} ${pad(row.dot_id, 22)} ${pad(row.armed ? 'yes' : 'no', 5)} ${pad(
+        row.types.join(',') || '(all)',
+        34
+      )} ${row.authority_role} / ${row.work_shapes.join('|')} / ${row.decision}`
+    );
+    print(
+      `  ${row.mode === 'pull' ? `feed ${row.feed?.service_id}:${row.feed?.action} every ${row.feed?.every_s}s — ${row.feed?.coverage.state}: ${row.feed?.coverage.detail}` : `enablement: ${row.enabled_by}`}`
+    );
+    if (row.goal) print(`  goal: ${row.goal.slice(0, 160)}`);
+    for (const warning of row.warnings) print(`  ! ${warning}`);
+  }
+  if (intake.rows.length === 0) print('no charter declares an event or feed trigger');
+  print('declared sources:');
+  for (const source of intake.declared_sources) {
+    print(
+      `  ${source.id}: ${source.enabled ? 'enabled' : 'disabled'}${source.local_only ? ' (tenant-local)' : ''}${source.tenant_slug ? ` tenant=${source.tenant_slug}` : ''}`
+    );
+  }
+  for (const warning of intake.warnings) print(`! ${warning}`);
+  for (const note of intake.notes) print(`- ${note}`);
 }
 
 function printReport(report: Record<string, unknown>, print: (line: string) => void): void {
@@ -621,7 +673,9 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
     print(`${result.dot_id}  schema=ok  activation=${gate}`);
   }
   const view = report.view as Record<string, unknown> | undefined;
-  if (view) {
+  if (report.intake) {
+    printIntake(report.intake as DotIntakePlan, print);
+  } else if (view) {
     print(`${view.kind} ${view.dot_id}`);
     for (const [key, value] of Object.entries(view)) {
       if (key === 'kind' || key === 'dot_id') continue;

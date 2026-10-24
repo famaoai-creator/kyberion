@@ -273,6 +273,14 @@ match?}` wakes on an authenticated inbound event. The loopback-only
   that check retains its existing 24-hour, 2,000-row / 4 MiB tail bounds. The
   tenant comes from `event-intake-policy.json`, never the payload. Every
   source ships disabled.
+- **Pull feeds (DL-12)**: a source that cannot push (Slack keyword search, a
+  ticket query) is declared as `{kind: 'feed'}`. The supervisor polls the
+  read-only service preset on a bounded cadence, keeps a durable cursor and a
+  bounded seen ring under `feed/<specId>.json`, and ingests new items as normal
+  intake events — the matching `event` trigger wakes the dot. A feed never wakes
+  a dot by itself, refuses a source bound to another tenant, baselines the first
+  poll, and reports stalled coverage through `pnpm kyberion dot intake`. See
+  [event-feed-intake](./event-feed-intake.md).
 - **Budget governor (DL-07)**: `org-budget-governor` aggregates daily token
   usage per tenant/organization (`spend-policy.json` `org_budget`): `soft`
   (80 %) forces proposals to `approve` (propose-only), `hard` (100 %) stops

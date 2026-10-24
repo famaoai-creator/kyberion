@@ -38,6 +38,8 @@ export const DOT_OUTCOMES_FILE = 'outcomes.jsonl';
 export const DOT_OUTCOME_PENDING_FILE = 'outcome-pending.jsonl';
 export const DOT_FOLLOWUPS_FILE = 'followups.jsonl';
 export const DOT_EVENTS_FILE = 'events.jsonl';
+/** Per-feed cursor/seen state: `feed/<specId>.json` under the dot state domain. */
+export const DOT_FEED_DIR = 'feed';
 export const DOT_MEMORY_DIR = 'memory';
 export const DOT_MEMORY_DISTILL_FILE = 'memory-distill.jsonl';
 export const DOT_AUTONOMY_DIR = 'autonomy';
