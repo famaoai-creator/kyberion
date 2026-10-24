@@ -1520,4 +1520,60 @@ describe('customer-decision facade', () => {
     await run(['draft', ...base(), '--agenda', secondId, '--file', file]);
     expect(agendaOf(secondId).entries.map((entry) => entry.entry_id)).toEqual(['again']);
   });
+
+  it('files one rework WorkItem for a completed task that pinned a decision the customer switched (CD-09)', async () => {
+    const { pinTaskDecisions, reconcileTaskDecisions } =
+      await import('@agent/core/mission/mission-decision-lock');
+    const coordination = await import('@agent/core/workforce/work-coordination');
+    coordination.setWorkCoordinationNamespace(`customer-decision-cd09-${process.pid}`);
+    coordination.clearWorkCoordinationStore();
+    try {
+      const { token, agendaId } = await approvedAndSent();
+      const decisionCase = {
+        tenantSlug: TENANT,
+        caseId: CASE,
+        source: 'project' as const,
+        location: { dir },
+      };
+      const task = { missionId: 'MSN-CD09-FACADE', taskId: 'build' };
+      expect(pinTaskDecisions(task, { decisionCase, now: NOW })?.pinned_count).toBe(4);
+      // The task finishes before the customer answers: fresh, nothing filed.
+      expect(reconcileTaskDecisions(task, { decisionCase, now: NOW })).toMatchObject({
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      const rework = () =>
+        coordination.listWorkItems({}).filter((item) => item.item_id.startsWith('WI-CDR-'));
+      expect(rework()).toEqual([]);
+
+      const view = await customerRun('view', { token });
+      const body = {
+        token,
+        content_hash: view.out.content_hash,
+        answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+      };
+      const response = await customerRun('respond', body);
+      // The customer's response is unchanged by the sweep.
+      expect(response.out).toMatchObject({ ok: true, switches: 1 });
+      const items = rework();
+      expect(items).toHaveLength(1);
+      expect(items[0]).toMatchObject({
+        status: 'backlog',
+        context: { tenant_slug: TENANT, mission_id: 'MSN-CD09-FACADE' },
+        metadata: { case_id: CASE, consumer: 'mission-MSN-CD09-FACADE.build', stale_count: 1 },
+      });
+      // The shared WorkItem store gets no decision content.
+      expect(JSON.stringify(items[0])).not.toMatch(/password|auth\.method|nfr\.auth|"NFR"/u);
+      // A double submit and the completion check both find the same single item.
+      await customerRun('respond', body);
+      expect(reconcileTaskDecisions(task, { decisionCase, now: NOW }).rework_work_item_ids).toEqual(
+        [items[0].item_id]
+      );
+      expect(rework().map((item) => item.item_id)).toEqual([items[0].item_id]);
+      expect(agendaOf(agendaId).status).toBe('sent');
+    } finally {
+      coordination.clearWorkCoordinationStore();
+      coordination.clearWorkCoordinationNamespace();
+    }
+  });
 });

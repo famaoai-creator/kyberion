@@ -60,6 +60,7 @@ import {
   loadAllNextTasks,
 } from './mission-orchestration-worker-part-results.js';
 import { registerMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
+import { pinTaskDecisions, reconcileTaskDecisions } from './mission-decision-lock.js';
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -103,6 +104,12 @@ export async function dispatchPlannedMissionTaskCore(
       task_id: input.task.task_id,
       mission_id: input.missionId,
     },
+  });
+  // CD-09: pin the customer decisions this task starts on (no-op without a decision case).
+  const decisionPin = pinTaskDecisions({
+    missionId: input.missionId,
+    taskId: input.task.task_id,
+    mode: 'start',
   });
   const claimed = claimWorkItem({
     itemId: workItem.item_id,
@@ -843,6 +850,12 @@ export async function dispatchPlannedMissionTaskCore(
     };
   }
 
+  // CD-09: reconcile the pin at the task boundary. A stale result still
+  // completes; the rework WorkItem carries the follow-up.
+  const decisionCheck = reconcileTaskDecisions({
+    missionId: input.missionId,
+    taskId: input.task.task_id,
+  });
   updateWorkItem({
     itemId: claimed.item.item_id,
     expectedVersion: claimed.item.version,
@@ -901,6 +914,17 @@ export async function dispatchPlannedMissionTaskCore(
           }
         : {}),
       ...(prRef ? { pr_ref: prRef } : {}),
+      ...(decisionCheck.consumer
+        ? {
+            customer_decision_lock: {
+              consumer: decisionCheck.consumer,
+              ...(decisionPin ? { pinned_count: decisionPin.pinned_count } : {}),
+              checked: decisionCheck.checked,
+              stale_count: decisionCheck.stale_count,
+              rework_work_item_ids: decisionCheck.rework_work_item_ids,
+            },
+          }
+        : {}),
       ...taskResultObservability,
     },
   });

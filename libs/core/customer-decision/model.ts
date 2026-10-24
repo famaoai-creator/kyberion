@@ -198,17 +198,27 @@ export interface DecisionSwitch {
   cause_receipt_id?: string;
 }
 
+/**
+ * The layer a consumed decision came from. `task_proposal` is reserved for a
+ * decision the task itself proposed while the customer has not decided yet
+ * (CD-09 "実装中の判断を顧客に回す"); nothing writes it yet.
+ */
+export type ConsumedDecisionLayer = DecisionLayerName | 'none' | 'task_proposal';
+
 /** What a task consumed at its start (same shape idea as the SSOD `DecisionLock`). */
 export interface ConsumedDecisionLock {
   case_id: string;
   consumer: string;
   locked_at: string;
   decisions: Array<{
+    /** The agenda entry the decision was resolved from (absent on hand-built locks). */
+    agenda_id?: string;
+    entry_id?: string;
     item: string;
     key: string;
     decision_id?: string;
     value?: unknown;
-    layer: DecisionLayerName | 'none';
+    layer: ConsumedDecisionLayer;
   }>;
 }
 
@@ -221,6 +231,12 @@ export const RECEIPT_ID_PATTERN = /^rcp-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$/u;
 export const SWITCH_ID_PATTERN = /^sw-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$/u;
 /** Entry ids are local to one agenda. */
 export const AGENDA_ENTRY_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$/u;
+/**
+ * A decision consumer (CD-09): one mission task, `mission-<MISSION_ID>.<task>`.
+ * Safe as a file name (no separators, never `.` / `..`); see `missionTaskConsumerId`.
+ */
+export const CONSUMER_ID_PATTERN =
+  /^mission-[A-Za-z0-9][A-Za-z0-9_-]{0,100}\.[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
 
 /** Sub-paths under the SSOD case directory (`knowledge/confidential/<tenant>/decisions/<case>/`). */
 export const CUSTOMER_DECISION_LAYOUT = {
@@ -230,6 +246,8 @@ export const CUSTOMER_DECISION_LAYOUT = {
   briefInputDir: 'brief-input',
   /** Write-ahead records of `respond` runs in flight: `respond-journal/<receipt_id>.json`. */
   respondJournalDir: 'respond-journal',
+  /** CD-09: what each task consumed at its start: `consumers/<consumer>.json`. */
+  consumersDir: 'consumers',
   files: {
     switches: 'switches.jsonl',
   },
@@ -241,6 +259,10 @@ export function isAgendaId(value: unknown): value is string {
 
 export function isReceiptId(value: unknown): value is string {
   return typeof value === 'string' && RECEIPT_ID_PATTERN.test(value);
+}
+
+export function isConsumerId(value: unknown): value is string {
+  return typeof value === 'string' && CONSUMER_ID_PATTERN.test(value);
 }
 
 export function isSwitchId(value: unknown): value is string {

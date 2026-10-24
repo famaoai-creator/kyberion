@@ -33469,6 +33469,16 @@
         "en": "not set",
         "ja": "未設定",
         "qps-ploc": "⟦ñőŧ şėŧ ŀőř⟧"
+      },
+      "rework_work_item_title": {
+        "en": "Check rework: {missionId} / {taskId} used customer decisions that changed",
+        "ja": "手戻りの確認: {missionId} / {taskId} は変わった顧客の決定を使っていました",
+        "qps-ploc": "⟦Ƈħėƈķ řėẇőřķ: {missionId} / {taskId} ůşėḓ ƈůşŧőɱėř ḓėƈïşïőñş ŧħȧŧ ƈħȧñɠėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "rework_work_item_description": {
+        "en": "Task {taskId} of mission {missionId} finished on decisions that are no longer in force ({count, plural, one {# decision} other {# decisions}}). The decisions and their values are in the confidential decision case {caseId}, lock {consumer}. Decide whether the result needs rework.",
+        "ja": "ミッション {missionId} のタスク {taskId} は、今は効いていない決定（{count} 件）に基づいて完了しました。決定と値は confidential の決定案件 {caseId}（固定 {consumer}）にあります。成果の手戻りが要るかを判断してください。",
+        "qps-ploc": "⟦Ŧȧşķ {taskId} őƒ ɱïşşïőñ {missionId} ƒïñïşħėḓ őñ ḓėƈïşïőñş ŧħȧŧ ȧřė ñő ŀőñɠėř ïñ ƒőřƈė ({count, plural, one {# decision} other {# decisions}}). Ŧħė ḓėƈïşïőñş ȧñḓ ŧħėïř ṽȧŀůėş ȧřė ïñ ŧħė ƈőñƒïḓėñŧïȧŀ ḓėƈïşïőñ ƈȧşė {caseId}, ŀőƈķ {consumer}. Ḓėƈïḓė ẇħėŧħėř ŧħė řėşůŀŧ ñėėḓş řėẇőřķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
       }
     },
     "customer_room": {

@@ -6,6 +6,7 @@
  *   knowledge/confidential/<tenant>/decisions/<case>/receipts/<receipt_id>.json   immutable
  *   knowledge/confidential/<tenant>/decisions/<case>/switches.jsonl               append-only
  *   knowledge/confidential/<tenant>/decisions/<case>/respond-journal/<receipt_id>.json  write-ahead, removed when done
+ *   knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json    CD-09 task decision locks
  *
  * Every read-plan-write sequence on a case (agenda edits, approval pins, sends,
  * responses, confirmations, close / withdraw) runs under one inter-process
@@ -52,8 +53,10 @@ import {
 } from '../decision-ledger/ledger.js';
 import {
   AGENDA_ID_PATTERN,
+  CONSUMER_ID_PATTERN,
   CUSTOMER_DECISION_LAYOUT,
   RECEIPT_ID_PATTERN,
+  type ConsumedDecisionLock,
   type DecisionAgenda,
   type DecisionReceipt,
   type DecisionSwitch,
@@ -68,6 +71,7 @@ const SCHEMA_FILES = {
   receipt: 'knowledge/product/schemas/customer-decision-receipt.schema.json',
   switch: 'knowledge/product/schemas/customer-decision-switch.schema.json',
   journal: 'knowledge/product/schemas/customer-decision-respond-journal.schema.json',
+  consumer: 'knowledge/product/schemas/customer-decision-consumer-lock.schema.json',
 } as const;
 
 type SchemaName = keyof typeof SCHEMA_FILES;
@@ -106,6 +110,7 @@ export function customerDecisionPaths(location: CustomerDecisionLocation) {
     agendas: path.join(dir, CUSTOMER_DECISION_LAYOUT.agendasDir),
     receipts: path.join(dir, CUSTOMER_DECISION_LAYOUT.receiptsDir),
     respondJournal: path.join(dir, CUSTOMER_DECISION_LAYOUT.respondJournalDir),
+    consumers: path.join(dir, CUSTOMER_DECISION_LAYOUT.consumersDir),
     switches: path.join(dir, CUSTOMER_DECISION_LAYOUT.files.switches),
   };
 }
@@ -182,6 +187,11 @@ export function writeAgenda(
   assertBelongs(location, validated, 'agenda');
   writeJson(prepareWrite(agendaPath(location, validated.agenda_id)), validated);
   return validated;
+}
+
+/** Agenda ids of a case (a listing of `agendas/`, no record is read). */
+export function listAgendaIds(location: CustomerDecisionLocation): string[] {
+  return listJsonIds(customerDecisionPaths(location).agendas, AGENDA_ID_PATTERN);
 }
 
 export function listAgendas(location: CustomerDecisionLocation): DecisionAgenda[] {
@@ -424,4 +434,77 @@ export function removeRespondJournal(location: CustomerDecisionLocation, receipt
     allowMissingLeaf: true,
   });
   safeRmSync(file, { force: true });
+}
+
+// ---------------------------------------------------------------------------
+// Consumer locks (CD-09: what a mission task consumed at its start)
+// ---------------------------------------------------------------------------
+
+/** A task's lock is open while it runs and completed once its result was checked. */
+export type ConsumedDecisionLockStatus = 'in_progress' | 'completed';
+
+/** The stored form of a {@link ConsumedDecisionLock} (`consumers/<consumer>.json`). */
+export interface ConsumedDecisionLockRecord extends ConsumedDecisionLock {
+  version: '1.0.0';
+  tenant_slug?: string;
+  mission_id: string;
+  task_id: string;
+  status: ConsumedDecisionLockStatus;
+  completed_at?: string;
+  /** The last reconciliation: counts only. */
+  last_check?: { at: string; checked: number; stale_count: number };
+  /** Rework WorkItems filed for this consumer and the current decisions each one names. */
+  rework?: Array<{ work_item_id: string; refs: string[]; at: string }>;
+}
+
+function consumerPath(location: CustomerDecisionLocation, consumer: string): string {
+  if (!CONSUMER_ID_PATTERN.test(consumer))
+    throw new Error('[CUSTOMER_DECISION_CONSUMER_ID_INVALID] invalid consumer id');
+  return path.join(customerDecisionPaths(location).consumers, `${consumer}.json`);
+}
+
+export function readConsumedDecisionLock(
+  location: CustomerDecisionLocation,
+  consumer: string
+): ConsumedDecisionLockRecord | undefined {
+  const raw = readRecord(consumerPath(location, consumer));
+  if (raw === undefined) return undefined;
+  const lock = validate<ConsumedDecisionLockRecord>('consumer', raw);
+  if (lock.consumer !== consumer)
+    throw new Error('[CUSTOMER_DECISION_CONSUMER_MISMATCH] consumer id does not match its file');
+  assertBelongs(location, lock, 'consumer lock');
+  return lock;
+}
+
+/** Write (or replace) a consumer lock. Call holding the case lock. */
+export function writeConsumedDecisionLock(
+  location: CustomerDecisionLocation,
+  lock: ConsumedDecisionLockRecord
+): ConsumedDecisionLockRecord {
+  const validated = validate<ConsumedDecisionLockRecord>('consumer', lock);
+  assertBelongs(location, validated, 'consumer lock');
+  writeJson(prepareWrite(consumerPath(location, validated.consumer)), validated);
+  return validated;
+}
+
+/** Consumer ids of a case (a listing of `consumers/`, no record is read). */
+export function listConsumedDecisionLockIds(location: CustomerDecisionLocation): string[] {
+  return listJsonIds(customerDecisionPaths(location).consumers, CONSUMER_ID_PATTERN);
+}
+
+/** Every consumer lock of a case. A record that cannot be read is reported and skipped. */
+export function listConsumedDecisionLocks(
+  location: CustomerDecisionLocation,
+  onInvalid: (consumer: string, error: unknown) => void = () => undefined
+): ConsumedDecisionLockRecord[] {
+  const locks: ConsumedDecisionLockRecord[] = [];
+  for (const id of listConsumedDecisionLockIds(location)) {
+    try {
+      const lock = readConsumedDecisionLock(location, id);
+      if (lock) locks.push(lock);
+    } catch (error) {
+      onInvalid(id, error);
+    }
+  }
+  return locks;
 }

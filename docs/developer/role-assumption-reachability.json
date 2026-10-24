@@ -901,6 +901,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-decision-lock.ts#asConsumerStore",
+      "roles": ["customer_decision_consumer_store"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission/mission-decision-lock.ts#fileDecisionReworkWorkItem",
+      "roles": ["workspace_tenant_registry_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-dispatch-io.ts#appendJsonLine",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -3842,6 +3852,18 @@
             "libs/core/authn-providers.ts#loadRegistrations"
           ]
         },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
         "discussion_request_store": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/discussions/route.ts#POST",
@@ -4194,6 +4216,23 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -4932,6 +4971,18 @@
             "presence/displays/concierge/src/lib/outcome-files.ts#readAsViewer"
           ]
         },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -5184,6 +5235,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_consumer_store",
         "customer_decision_invite_store",
         "infrastructure_sentinel",
         "knowledge_steward",
@@ -5230,6 +5282,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_consumer_store",
         "customer_decision_invite_store",
         "infrastructure_sentinel",
         "knowledge_steward",
@@ -5352,6 +5405,21 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -5689,6 +5757,7 @@
       "policy_roles_not_reachable": [
         "autonomy_learning_store",
         "chronos_gateway",
+        "customer_decision_consumer_store",
         "customer_decision_invite_store",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -5898,6 +5967,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_consumer_store",
         "customer_decision_invite_store",
         "knowledge_steward",
         "organization_operator",
@@ -6018,6 +6088,23 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -6449,6 +6536,21 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -6938,6 +7040,21 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -7413,6 +7530,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_consumer_store",
         "customer_decision_invite_store",
         "infrastructure_sentinel",
         "knowledge_steward",
@@ -7569,6 +7687,21 @@
             "libs/core/surface/surface-authn.ts#<module>",
             "libs/core/authn-providers.ts#<module>",
             "libs/core/authn-providers.ts#loadRegistrations"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -7998,6 +8131,23 @@
             "libs/core/surface/surface-authn.ts#<module>",
             "libs/core/authn-providers.ts#<module>",
             "libs/core/authn-providers.ts#loadRegistrations"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -8453,6 +8603,19 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
         "decision_ledger": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -8821,6 +8984,22 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -9166,6 +9345,7 @@
         "autonomy_learning_store",
         "chronos_gateway",
         "chronos_tenant_runner",
+        "customer_decision_consumer_store",
         "customer_decision_invite_store",
         "knowledge_steward",
         "metrics_cap_reader",
@@ -9259,6 +9439,21 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -9640,6 +9835,21 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#recordTask",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {
@@ -10056,6 +10266,21 @@
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
           ]
         },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/terminal-hud/src/index.ts#<module>",
@@ -10439,6 +10664,21 @@
             "libs/core/dot/dot-charter.ts#listDotCharters",
             "libs/core/dot/dot-charter.ts#listDotCharterSources",
             "libs/core/dot/dot-charter.ts#listTenantDotCharterSources"
+          ]
+        },
+        "customer_decision_consumer_store": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-core.ts#dispatchPlannedMissionTaskCore",
+            "libs/core/mission/mission-decision-lock.ts#pinTaskDecisions",
+            "libs/core/mission/mission-decision-lock.ts#readCase",
+            "libs/core/mission/mission-decision-lock.ts#asConsumerStore"
           ]
         },
         "ecosystem_architect": {

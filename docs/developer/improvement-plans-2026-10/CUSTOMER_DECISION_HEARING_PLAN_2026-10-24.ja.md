@@ -176,6 +176,26 @@ status: active
 - `presence/displays/customer-room/`: 独立したプロセス。1 プロセスは 1 テナントだけを扱う（`KYBERION_CUSTOMER_ROOM_TENANT`）。招待トークンは URL のフラグメントで渡し、画面からはヘッダで送る（サーバのアクセスログに残さない）。読み書きとも facade の子プロセスを通し、ライブラリから台帳を直接触らない。
 - 段階 1 では、`hearing` 種別の事項は自由記述で受ける。画面内の対話（`requirements_hearing` モード）は段階 1 の後の改善で入れる。
 
+## CD-09 の実装設計（2026-10-24）
+
+**何を固定するか**: タスクの開始時に、そのミッションの案件で効いているすべての決定（閉じていない調整セットの全項目の有効な決定）を固定する。タスクがどの決定を使ったかは分からないため、案件の全体を保守的に固定する。手戻りの WorkItem には変わった項目だけを並べ、要否は担当者が判断する。
+
+**案件の見つけ方**: ミッションの `tenant_slug` と `relationships.project.project_id` を使う。無ければ `mission_ids` にそのミッションを含む商談の deal id を使う。どちらにも決定台帳の案件ディレクトリが無ければ、何もしない（顧客の決定と無関係なミッションの動作は変えない）。
+
+**固定の置き場**: `knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json`（`ConsumedDecisionLock`、schema つき）。値は顧客のデータなので案件と同じ tier・テナントに置き、`decision_ledger` 権限で読み書きする。ミッションの evidence（public）には固定の件数と照合の結果（古いかどうか、起票した WorkItem の id）だけを書き、項目名や値は書かない。
+
+**照合する場所**（実行中のタスクには割り込まない）:
+
+| 時点         | 場所                                                                                                       |
+| ------------ | ---------------------------------------------------------------------------------------------------------- |
+| タスクの開始 | worker: `dispatchPlannedMissionTaskCore` の WorkItem 取り込みの直後。CLI: `recordTask`                     |
+| タスクの完了 | worker: 成功の確定（WorkItem を `done` にする）の直前。CLI: `recordEvidence` が台帳に記録する直前          |
+| 顧客の回答   | `customer-decision respond` が切り替わりを記録した後。切り替わった項目を固定している完了済みのタスクを探す |
+
+古い決定に基づく成果は、タスクを止めずに完了させ、手戻りの WorkItem を起票する（`createWorkItemIfAbsent`、id はミッション・タスク・切り替わった決定から決めるので、完了時と回答時の両方で見つけても 1 件になる）。
+
+**実装中の判断を顧客に回す**: worker の結果に、文字列の `needs` とは別の構造化した `customer_decisions`（問い・item・key・こちらの案・`requires_customer`）を足す。question-resolution に「顧客判断」（`customer_judgment`）の分類を足す。該当する問いは、案件の「実装中の判断」の下書きの調整セットに項目として足し、タスクの固定にはこちらの案を「タスクの案」として記録する（調整セットの承認と送付は運用者が既存の `submit` / `send` で行う）。タスクはこちらの案で先に進め、`requires_customer` の問いだけは WorkItem を `blocked`（`blocked_reason: awaiting_customer_decision`）にして判断を待つ。
+
 ## 未決事項
 
 - 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）の入れ方（段階 1 の後）。

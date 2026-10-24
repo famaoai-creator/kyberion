@@ -71,6 +71,7 @@ import { retireIdentitiesForScopeBestEffort } from '../nhi-lifecycle-governance.
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
 import { recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
+import { pinTaskDecisions, reconcileTaskDecisions } from './mission-decision-lock.js';
 import {
   assertApprovalUsable,
   computeApprovalPayloadHash,
@@ -865,6 +866,16 @@ export async function recordTask(
     await saveState(upperId, state, { alreadyLocked: true });
   });
 
+  // CD-09: a record-task naming a task pins the customer decisions it starts
+  // on (once: a later record-task for the same task keeps the pin).
+  if (typeof detailRecord.task_id === 'string' && detailRecord.task_id.trim()) {
+    pinTaskDecisions({
+      missionId: upperId,
+      taskId: detailRecord.task_id.trim(),
+      mode: 'if_absent',
+    });
+  }
+
   logger.info(`📝 [FlightRecorder] Intention recorded: ${description}`);
 }
 
@@ -912,6 +923,11 @@ export async function recordEvidence(args: {
     }
   })();
 
+  // CD-09: reconcile the task's pinned customer decisions before the evidence
+  // is recorded. A stale result does not block it; it files a rework WorkItem.
+  // Only counts, the consumer id and WorkItem ids reach the (public) ledger.
+  const decisionCheck = reconcileTaskDecisions({ missionId: upperId, taskId: args.taskId });
+
   await withLock(`mission-${upperId}`, async () => {
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,
@@ -935,6 +951,7 @@ export async function recordEvidence(args: {
               ),
             }
           : {}),
+        ...(decisionCheck.consumer ? { customer_decision_lock: decisionCheck } : {}),
       },
     });
 
