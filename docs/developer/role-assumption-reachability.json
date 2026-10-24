@@ -195,6 +195,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -214,6 +226,18 @@
     {
       "site": "libs/core/dot/dot-charter.ts#loadDotCharterSource",
       "roles": ["chronos_tenant_runner"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposalsUnlocked (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
       "unresolved": []
     },
     {
@@ -2521,6 +2545,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2740,6 +2769,11 @@
     {
       "site": "scripts/daemon_watchdog.ts#requestDaemonRecovery",
       "roles": ["daemon_watchdog"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
