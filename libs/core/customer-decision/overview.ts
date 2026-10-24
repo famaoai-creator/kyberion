@@ -137,7 +137,8 @@ export interface AgendaOverview {
     pending_approval: number;
     manual: number;
   };
-  entries: OverviewEntry[];
+  /** Omitted in the summary form (`overview --summary`). */
+  entries?: OverviewEntry[];
 }
 
 export interface CaseOverview {
@@ -178,6 +179,11 @@ export interface CustomerDecisionOverview {
     reminders_due: number;
     held_tasks: number;
     pending_task_proposals: number;
+    /**
+     * Summary form only (`overview --summary`): how many attention items
+     * there are in full, before `attention` was capped.
+     */
+    attention_total?: number;
   };
   /** Sorted by {@link OVERVIEW_ATTENTION_ORDER}, then `days` (soonest first), then ids. */
   attention: OverviewAttentionItem[];
@@ -461,7 +467,7 @@ export function buildCustomerDecisionOverview(input: {
       totals.agendas += 1;
       if (isLive(agenda)) totals.open_agendas += 1;
       if (agenda.status !== 'withdrawn') {
-        totals.entries += agenda.entries.length;
+        totals.entries += Object.values(agenda.counts).reduce((sum, value) => sum + value, 0);
         for (const key of Object.keys(counts) as OverviewEntryStatus[])
           counts[key] += agenda.counts[key];
       }
@@ -484,5 +490,32 @@ export function buildCustomerDecisionOverview(input: {
     case_failures: [...(input.case_failures ?? [])].sort((a, b) =>
       a.case_id.localeCompare(b.case_id)
     ),
+  };
+}
+
+/** Attention items kept in the summary form. */
+export const OVERVIEW_SUMMARY_ATTENTION_LIMIT = 50;
+
+/**
+ * The summary form (`overview --summary`, the Chronos card): the same
+ * overview without `cases[].agendas[].entries`, `attention` capped at
+ * {@link OVERVIEW_SUMMARY_ATTENTION_LIMIT} (most urgent first), and
+ * `totals.attention_total` the full count. Everything else is unchanged.
+ */
+export function summarizeCustomerDecisionOverview(
+  overview: CustomerDecisionOverview,
+  limit = OVERVIEW_SUMMARY_ATTENTION_LIMIT
+): CustomerDecisionOverview {
+  return {
+    ...overview,
+    totals: { ...overview.totals, attention_total: overview.attention.length },
+    attention: overview.attention.slice(0, limit),
+    cases: overview.cases.map((item) => ({
+      ...item,
+      agendas: item.agendas.map(({ entries: _entries, ...agenda }) => {
+        void _entries;
+        return agenda;
+      }),
+    })),
   };
 }

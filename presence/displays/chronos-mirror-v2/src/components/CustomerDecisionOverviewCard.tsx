@@ -91,6 +91,15 @@ export function customerDecisionCommands(tenant: string): string[] {
   ];
 }
 
+/**
+ * Attention items not in the table: the full count (`totals.attention_total`,
+ * which counts past the facade's 50-item cap) minus the rows shown.
+ */
+export function customerDecisionHiddenAttention(overview: CustomerDecisionOverviewView): number {
+  const shown = Math.min(overview.attention.length, CUSTOMER_DECISION_ATTENTION_LIMIT);
+  return Math.max(0, Math.max(overview.totals.attention_total, overview.attention.length) - shown);
+}
+
 export function customerDecisionAttentionRows(
   overview: CustomerDecisionOverviewView,
   locale: SupportedLocale,
@@ -168,9 +177,10 @@ const AGENDA_STATUS_ORDER: readonly OverviewAgendaStatus[] = [
  * "not sent yet" only when none of them was sent or approved.
  */
 export function customerDecisionCaseSummary(
-  item: Pick<CaseOverviewView, 'case_id' | 'agendas'>,
+  item: Pick<CaseOverviewView, 'case_id' | 'agendas'> & { agendas_total?: number },
   locale: SupportedLocale
 ): string {
+  const total = Math.max(item.agendas_total ?? 0, item.agendas.length);
   const statuses = AGENDA_STATUS_ORDER.flatMap((status) => {
     const count = item.agendas.filter((agenda) => agenda.status === status).length;
     return count > 0
@@ -189,12 +199,7 @@ export function customerDecisionCaseSummary(
   );
   return [
     item.case_id,
-    uxMessage(
-      'chronos_cd_case_summary',
-      { count: item.agendas.length },
-      `${item.agendas.length} agenda sets`,
-      locale
-    ),
+    uxMessage('chronos_cd_case_summary', { count: total }, `${total} agenda sets`, locale),
     ...statuses,
     ...(!reached && item.agendas.length > 0 ? [uxText('chronos_cd_case_draft_only', locale)] : []),
   ].join(' · ');
@@ -313,9 +318,8 @@ export function CustomerDecisionOverviewPanel({
 }) {
   const overview = state.kind === 'ready' ? state.overview : null;
   const counts = overview?.totals.counts;
-  const hidden = overview
-    ? Math.max(0, overview.attention.length - CUSTOMER_DECISION_ATTENTION_LIMIT)
-    : 0;
+  const hidden = overview ? customerDecisionHiddenAttention(overview) : 0;
+  const hiddenCases = overview ? Math.max(0, overview.totals.cases - overview.cases.length) : 0;
   return (
     <div className="chronos-cd">
       <Section
@@ -458,6 +462,16 @@ export function CustomerDecisionOverviewPanel({
                   {overview.cases.map((item) => (
                     <CaseRows key={item.case_id} item={item} locale={locale} />
                   ))}
+                  {hiddenCases > 0 ? (
+                    <ChronosMeta>
+                      {uxMessage(
+                        'chronos_cd_attention_more',
+                        { count: hiddenCases },
+                        `${hiddenCases} more`,
+                        locale
+                      )}
+                    </ChronosMeta>
+                  ) : null}
                 </Section>
               ) : null}
 
@@ -474,41 +488,85 @@ export function CustomerDecisionOverviewPanel({
   );
 }
 
+/**
+ * One overview request of `tenant` → the card state. An aborted request
+ * resolves to null (the caller keeps whatever newer state it has).
+ */
+export async function fetchCustomerDecisionOverview(
+  tenant: string,
+  options: { fetch?: typeof fetch; signal?: AbortSignal } = {}
+): Promise<CustomerDecisionOverviewState | null> {
+  const doFetch = options.fetch ?? fetch;
+  try {
+    const response = await doFetch(
+      `/api/customer-decisions/overview?${new URLSearchParams({ tenant }).toString()}`,
+      { cache: 'no-store', signal: options.signal }
+    );
+    const raw: unknown = await response.json().catch(() => null);
+    if (options.signal?.aborted) return null;
+    const overview = response.ok ? parseCustomerDecisionOverviewResponse(raw, tenant) : undefined;
+    if (overview) return { kind: 'ready', overview };
+    const message =
+      raw && typeof raw === 'object' && 'error' in raw && typeof raw.error === 'string'
+        ? raw.error
+        : `customer decisions ${response.status}`;
+    return { kind: 'error', message };
+  } catch (error) {
+    if (options.signal?.aborted) return null;
+    return { kind: 'error', message: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
+ * Only the latest request may update the card: starting a request aborts the
+ * previous one, and a response that lands after a newer request (or after
+ * the tenant changed / the card unmounted) is dropped.
+ */
+export function createLatestRequestGuard() {
+  let controller: AbortController | null = null;
+  let generation = 0;
+  return {
+    begin(): { signal: AbortSignal; isCurrent: () => boolean } {
+      controller?.abort();
+      controller = new AbortController();
+      const mine = ++generation;
+      return { signal: controller.signal, isCurrent: () => mine === generation };
+    },
+    cancel(): void {
+      controller?.abort();
+      controller = null;
+      generation += 1;
+    },
+  };
+}
+
 /** The card: fetches the viewer-scoped overview of `tenant` and refreshes it. */
 export function CustomerDecisionOverviewCard({ tenant }: { tenant: string }) {
   const locale = useChronosLocale();
   const [state, setState] = React.useState<CustomerDecisionOverviewState>({ kind: 'loading' });
   const [busy, setBusy] = React.useState(false);
 
+  const guard = React.useMemo(() => createLatestRequestGuard(), []);
+
   const refresh = React.useCallback(async () => {
+    const request = guard.begin();
     setBusy(true);
-    try {
-      const response = await fetch(
-        `/api/customer-decisions/overview?${new URLSearchParams({ tenant }).toString()}`,
-        { cache: 'no-store' }
-      );
-      const raw: unknown = await response.json().catch(() => null);
-      const overview = response.ok ? parseCustomerDecisionOverviewResponse(raw, tenant) : undefined;
-      if (!overview) {
-        const message =
-          raw && typeof raw === 'object' && 'error' in raw && typeof raw.error === 'string'
-            ? raw.error
-            : `customer decisions ${response.status}`;
-        throw new Error(message);
-      }
-      setState({ kind: 'ready', overview });
-    } catch (error) {
-      setState({ kind: 'error', message: error instanceof Error ? error.message : String(error) });
-    } finally {
-      setBusy(false);
-    }
-  }, [tenant]);
+    const next = await fetchCustomerDecisionOverview(tenant, { signal: request.signal });
+    // A response for a previous tenant or an older refresh never lands.
+    if (!request.isCurrent()) return;
+    if (next) setState(next);
+    setBusy(false);
+  }, [tenant, guard]);
 
   React.useEffect(() => {
+    setState({ kind: 'loading' });
     void refresh();
     const timer = setInterval(() => void refresh(), REFRESH_MS);
-    return () => clearInterval(timer);
-  }, [refresh]);
+    return () => {
+      clearInterval(timer);
+      guard.cancel();
+    };
+  }, [refresh, guard]);
 
   return (
     <CustomerDecisionOverviewPanel

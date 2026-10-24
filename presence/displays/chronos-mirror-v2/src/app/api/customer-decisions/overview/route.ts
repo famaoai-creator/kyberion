@@ -1,10 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
+import { resolveCompany } from '@agent/core/company';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
   strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds,
   strictViewerScopeProjectIds,
+  strictViewerTier,
   viewerErrorResponse,
   withViewerExecutionContext,
   ViewerContextError,
@@ -59,6 +62,13 @@ export async function GET(req: NextRequest) {
     if (!registeredTenants.includes(tenant)) {
       throw new ViewerContextError(403, `tenant is not registered: ${tenant}`);
     }
+    // The child reads the confidential decision stores under its own
+    // tenant-bound roles, so the viewer's own reach is checked here: the
+    // confidential tier, and the tenant's organization (as the organization
+    // model route resolves it). All of this runs before the cached read.
+    strictViewerTier(viewer, 'confidential');
+    const company = resolveCompany(tenant);
+    strictViewerScopeOrganizationIds(viewer, company.company_id);
     const result = await readCustomerDecisionOverview(tenant);
     // `in` narrows the result under this app's non-strict tsconfig as well.
     if ('error' in result)

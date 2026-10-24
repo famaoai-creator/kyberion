@@ -88,6 +88,8 @@ export interface CaseOverviewView {
   draft_only: boolean;
   tasks: { pending_proposals: number; held: number; ready_to_resume: number };
   agendas: AgendaOverviewView[];
+  /** Agenda sets of the case before truncation. */
+  agendas_total: number;
 }
 
 export interface CustomerDecisionOverviewView {
@@ -106,6 +108,8 @@ export interface CustomerDecisionOverviewView {
     reminders_due: number;
     held_tasks: number;
     pending_task_proposals: number;
+    /** Attention items before any cap (`--summary` caps the list at 50). */
+    attention_total: number;
   };
   attention: OverviewAttentionItemView[];
   cases: CaseOverviewView[];
@@ -114,7 +118,18 @@ export interface CustomerDecisionOverviewView {
 
 type JsonRecord = Record<string, unknown>;
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
-const ARRAY_LIMIT = 500;
+/**
+ * Hard caps: an oversized list is truncated, never rejected, so a large
+ * tenant still gets an overview (the totals stay exact; the card says how many
+ * more there are and points to the CLI). The facade's `--summary` form
+ * already caps `attention` at 50 and reports `totals.attention_total`.
+ */
+export const OVERVIEW_LIMITS = {
+  attention: 50,
+  cases: 200,
+  agendas_per_case: 100,
+  case_failures: 50,
+} as const;
 
 class Invalid extends Error {}
 
@@ -163,9 +178,14 @@ function oneOf<T extends string>(source: JsonRecord, key: string, values: readon
   return value as T;
 }
 
-function list<T>(value: unknown, parse: (entry: unknown) => T): T[] {
-  if (!Array.isArray(value) || value.length > ARRAY_LIMIT) throw new Invalid();
-  return value.map(parse);
+function list<T>(value: unknown, parse: (entry: unknown) => T, cap: number): T[] {
+  if (!Array.isArray(value)) throw new Invalid();
+  return value.slice(0, cap).map(parse);
+}
+
+function lengthOf(value: unknown): number {
+  if (!Array.isArray(value)) throw new Invalid();
+  return value.length;
 }
 
 function counts(value: unknown): OverviewStatusCounts {
@@ -240,7 +260,8 @@ function caseOverview(value: unknown): CaseOverviewView {
       held: count(tasks, 'held'),
       ready_to_resume: count(tasks, 'ready_to_resume'),
     },
-    agendas: list(source.agendas, agenda),
+    agendas: list(source.agendas, agenda, OVERVIEW_LIMITS.agendas_per_case),
+    agendas_total: lengthOf(source.agendas),
   };
 }
 
@@ -274,16 +295,24 @@ export function parseCustomerDecisionOverview(
         reminders_due: count(totals, 'reminders_due'),
         held_tasks: count(totals, 'held_tasks'),
         pending_task_proposals: count(totals, 'pending_task_proposals'),
+        attention_total:
+          totals.attention_total === undefined
+            ? lengthOf(source.attention)
+            : count(totals, 'attention_total'),
       },
-      attention: list(source.attention, attention),
-      cases: list(source.cases, caseOverview),
-      case_failures: list(source.case_failures, (entry) => {
-        const failure = record(entry);
-        return {
-          case_id: text(failure, 'case_id'),
-          diagnostic_code: text(failure, 'diagnostic_code'),
-        };
-      }),
+      attention: list(source.attention, attention, OVERVIEW_LIMITS.attention),
+      cases: list(source.cases, caseOverview, OVERVIEW_LIMITS.cases),
+      case_failures: list(
+        source.case_failures,
+        (entry) => {
+          const failure = record(entry);
+          return {
+            case_id: text(failure, 'case_id'),
+            diagnostic_code: text(failure, 'diagnostic_code'),
+          };
+        },
+        OVERVIEW_LIMITS.case_failures
+      ),
     };
   } catch (error) {
     if (error instanceof Invalid) return undefined;
