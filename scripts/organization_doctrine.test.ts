@@ -79,6 +79,8 @@ function approvePending(requestId: string): void {
     deciderIdentitySource: 'server_resolved',
     deciderPrincipal: {
       actor: { kind: 'human', id: 'user:' + memberId },
+      principalId: 'user:' + memberId,
+      source: 'token',
       provider: 'browser-session',
     },
     presentedDigest: approvals.computeApprovalPresentedDigest(record),

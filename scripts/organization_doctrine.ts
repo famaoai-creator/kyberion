@@ -79,7 +79,7 @@ function doctrineSummary(body: string): string {
 }
 
 export function issueOrganizationDoctrine(args: string[], print: Print): void {
-  if (args.includes('--help')) return print(ISSUE_USAGE);
+  if (args.some((arg) => arg === '--help')) return print(ISSUE_USAGE);
   const required = requireArgs(
     args,
     ['organization-id', 'tier', 'tenant-slug', 'file'],
@@ -164,7 +164,7 @@ export function issueOrganizationDoctrine(args: string[], print: Print): void {
 }
 
 export async function publishOrganizationDoctrine(args: string[], print: Print): Promise<void> {
-  if (args.includes('--help')) return print(PUBLISH_USAGE);
+  if (args.some((arg) => arg === '--help')) return print(PUBLISH_USAGE);
   const required = requireArgs(
     args,
     ['organization-id', 'tier', 'tenant-slug', 'candidate-id', 'expected-payload-digest'],
