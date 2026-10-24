@@ -61,12 +61,21 @@ export interface ViewReceipt {
   receipt_id: string;
   submitted_at: string;
   revision: number;
+  /** The agenda-wide question sent with that submission, when there was one. */
+  general_question?: string;
 }
 
 export interface ViewOpen {
   ok: true;
   state: 'open';
-  agenda: { title: string; locale: RoomLocale; revision: number; from?: string };
+  agenda: {
+    title: string;
+    locale: RoomLocale;
+    revision: number;
+    from?: string;
+    /** UTC calendar date (YYYY-MM-DD) our team would like the answers by; only when set. */
+    respond_by?: string;
+  };
   participant: ViewParticipant;
   content_hash: string;
   entries: ViewEntry[];
@@ -451,6 +460,75 @@ export function buildAnswers(
     else issues.push({ entry_id: entry.entry_id, issue: built.issue });
   }
   return { answers, issues };
+}
+
+// ---------------------------------------------------------------------------
+// Answer target date
+// ---------------------------------------------------------------------------
+
+const CALENDAR_DATE = /^(\d{4})-(\d{2})-(\d{2})$/u;
+
+/** The year, month and day of a real `YYYY-MM-DD` date, or null. */
+function parseCalendarDate(value: unknown): { year: number; month: number; day: number } | null {
+  if (typeof value !== 'string') return null;
+  const match = CALENDAR_DATE.exec(value);
+  if (!match) return null;
+  const [year, month, day] = [Number(match[1]), Number(match[2]), Number(match[3])];
+  const probe = new Date(Date.UTC(year, month - 1, day));
+  return probe.getUTCFullYear() === year &&
+    probe.getUTCMonth() === month - 1 &&
+    probe.getUTCDate() === day
+    ? { year, month, day }
+    : null;
+}
+
+/**
+ * The target date as a calendar date in the page language ("October 30" /
+ * "10月30日"). It is a date, not a moment: no timezone shift is applied. The
+ * year is added only when it is not the current one. Null when malformed.
+ */
+export function formatRespondBy(
+  value: unknown,
+  locale: RoomLocale,
+  currentYear: number
+): string | null {
+  const parts = parseCalendarDate(value);
+  if (!parts) return null;
+  const moment = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
+  return new Intl.DateTimeFormat(locale, {
+    timeZone: 'UTC',
+    ...(parts.year === currentYear ? {} : { year: 'numeric' }),
+    month: 'long',
+    day: 'numeric',
+  }).format(moment);
+}
+
+/** True when the target date is before `today` (both `YYYY-MM-DD`, compared as calendar dates). */
+export function isRespondByPast(value: unknown, today: string): boolean {
+  return parseCalendarDate(value) !== null && parseCalendarDate(today) !== null
+    ? (value as string) < today
+    : false;
+}
+
+/** The viewer's own calendar date (`YYYY-MM-DD`). */
+export function localCalendarDate(now: Date): string {
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+
+// ---------------------------------------------------------------------------
+// General question (anything else the person wants to ask)
+// ---------------------------------------------------------------------------
+
+export const GENERAL_QUESTION_MAX = 10000;
+
+/** The trimmed question to send, or why it cannot be sent; blank means none. */
+export function normalizeGeneralQuestion(
+  text: string
+): { question?: string } | { issue: 'general_too_long' } {
+  const question = text.trim();
+  if (question.length > GENERAL_QUESTION_MAX) return { issue: 'general_too_long' };
+  return question ? { question } : {};
 }
 
 // ---------------------------------------------------------------------------

@@ -62,9 +62,14 @@ export function respond(
   fetchFn: FetchFn,
   token: string,
   contentHash: string,
-  answers: AnswerPayload[]
+  answers: AnswerPayload[],
+  generalQuestion?: string
 ): Promise<ApiResult> {
-  return post(fetchFn, '/api/respond', token, { content_hash: contentHash, answers });
+  return post(fetchFn, '/api/respond', token, {
+    content_hash: contentHash,
+    answers,
+    ...(generalQuestion ? { general_question: generalQuestion } : {}),
+  });
 }
 
 /**

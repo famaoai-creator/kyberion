@@ -73,6 +73,7 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
       phase: 'inception',
       revision: 1,
       locale: 'en',
+      respond_by: '2026-10-30',
       entries: [
         {
           entry_id: 'auth.method',
@@ -249,6 +250,37 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
       status: 'confirmed',
       value: 'password',
     });
+  }, 30_000);
+
+  it('shows the answer target date as a calendar date', async () => {
+    const body = (await (await post('/api/view', {})).json()) as {
+      agenda: Record<string, unknown>;
+    };
+    expect(body.agenda.respond_by).toBe('2026-10-30');
+  }, 30_000);
+
+  it('accepts a question without answers and keeps it on the receipt', async () => {
+    const question = '予算の上限は変えられますか?\n来月の見積りも見たいです。';
+    const response = await post('/api/respond', {
+      content_hash: hash,
+      answers: [],
+      general_question: `  ${question}  `,
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ ok: true });
+    const view = (await (await post('/api/view', {})).json()) as {
+      receipts: Array<{ general_question?: string }>;
+    };
+    expect(view.receipts.some((receipt) => receipt.general_question === question)).toBe(true);
+    // Neither answers nor a question is still refused; a non-string question is invalid.
+    const nothing = await post('/api/respond', { content_hash: hash, answers: [] });
+    expect(nothing.status).toBe(422);
+    const wrongType = await post('/api/respond', {
+      content_hash: hash,
+      answers: [],
+      general_question: 42,
+    });
+    expect(wrongType.status).toBe(422);
   }, 30_000);
 
   it('answers a stale page with stale_version and a wrong link with invalid_link', async () => {
