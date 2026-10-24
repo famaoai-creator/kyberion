@@ -108,12 +108,15 @@ export interface CustomerRoomRouteOptions {
   attachmentLimitPerMinute?: number;
   /** Image fetches (facade child processes) in flight at once, across every caller. */
   attachmentConcurrency?: number;
+  /** Image fetches in flight at once from one client address (so one cannot take every slot). */
+  attachmentConcurrencyPerAddress?: number;
   /** Client addresses tracked by the image budget; beyond it new addresses wait, none is evicted. */
   attachmentMaxKeys?: number;
 }
 
 export const DEFAULT_ATTACHMENT_LIMIT_PER_MINUTE = 120;
 export const DEFAULT_ATTACHMENT_CONCURRENCY = 4;
+export const DEFAULT_ATTACHMENT_CONCURRENCY_PER_ADDRESS = 2;
 export const DEFAULT_ATTACHMENT_MAX_KEYS = 1024;
 
 interface Failure {
@@ -241,7 +244,11 @@ function attachmentGuard(options: CustomerRoomRouteOptions) {
     maxKeys: options.attachmentMaxKeys ?? DEFAULT_ATTACHMENT_MAX_KEYS,
     eviction: 'deny',
   });
+  const perAddressConcurrency =
+    options.attachmentConcurrencyPerAddress ?? DEFAULT_ATTACHMENT_CONCURRENCY_PER_ADDRESS;
   let inFlight = 0;
+  // Only addresses with a run in flight are kept (at most `concurrency` entries).
+  const perAddress = new Map<string, number>();
   const refuse = (res: express.Response, retryAfterSeconds: number): void => {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Retry-After', String(retryAfterSeconds));
@@ -258,16 +265,26 @@ function attachmentGuard(options: CustomerRoomRouteOptions) {
       next();
     },
     /** Run `handler` holding an in-flight slot until it settles, or refuse with 429. */
-    async run(res: express.Response, handler: () => Promise<void>): Promise<void> {
-      if (inFlight >= concurrency) {
+    async run(
+      req: express.Request,
+      res: express.Response,
+      handler: () => Promise<void>
+    ): Promise<void> {
+      const address = req.socket.remoteAddress ?? 'unknown';
+      const mine = perAddress.get(address) ?? 0;
+      if (inFlight >= concurrency || mine >= perAddressConcurrency) {
         refuse(res, 1);
         return;
       }
       inFlight += 1;
+      perAddress.set(address, mine + 1);
       try {
         await handler();
       } finally {
         inFlight -= 1;
+        const left = (perAddress.get(address) ?? 1) - 1;
+        if (left > 0) perAddress.set(address, left);
+        else perAddress.delete(address);
       }
     },
   };
@@ -405,7 +422,7 @@ export function registerCustomerRoomRoutes(
     void handleApi('respond')(req, res).catch(next);
   });
   app.post('/api/attachment', attachmentLimiter.window, jsonBody, (req, res, next) => {
-    void attachmentLimiter.run(res, () => handleApi('attachment')(req, res)).catch(next);
+    void attachmentLimiter.run(req, res, () => handleApi('attachment')(req, res)).catch(next);
   });
 
   // Body-parser failures (too large, malformed) and anything unexpected: a plain reason code.

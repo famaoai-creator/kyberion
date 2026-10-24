@@ -347,7 +347,6 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
   - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: `deliverable_inbox_writer`（共有の core 役割）を用意した。CD-10 の却下と、CD-11 の引き継ぎ・手動リマインドの受信箱への記録は、この役割で書く。guard が書き込みを `active/shared/inbox/entries.jsonl` と、受信箱自身のロックファイルだけに絞る。
 - CD-10 の残り: 画像 1 枚ごとに facade の子プロセスを 1 つ起動し、API 全体の回数制限（60 回/分）を使う。公開 ingress の背後では全顧客で共有になるため、画像の取得には別の制限か同時実行の上限を設ける。（対応済み、ブランチ `fix/customer-decision-hardening-20261025`: `/api/attachment` は API 全体の回数制限を使わず、接続元ごとの固定窓（120 回/分、`libs/core/foundation/rate-limit.ts` の `fixedWindowLimiter`、表が満杯なら新しい接続元を断り、制限中の接続元を追い出さない）と、facade の子プロセスの同時実行の上限（4）を持つ）
 - CD-10 の残り: 招待の置き場の tier ディレクトリができた後は、未登録のテナントも自分の招待ディレクトリを作れる。テナントの登録をそこでも求めるかは、ガバナンスの判断として決める。
-- ハードニングの残り: `deliverable_inbox_writer` は受信箱への追記だけを許す。受信箱のファイルに壊れた行があると、その行を直すまでこの役割の書き込み（却下の通知・引き継ぎ）がすべて拒否される。壊れた行を隔離して追記を続ける修復手順を用意する。
 - ハードニングの残り: 承認の置き場をテナントごとに物理的に分ける（今は id だけの要約とスコープの絞り込みで守っている）。
 - E2E の残り: 終わった bolt の状態は `mission_controller` を 1 ファイルの capability の中で借りて読む。読み取り専用の、アーカイブ済みミッションの状態だけを読む役割を用意する。
   - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: `archived_mission_state_reader`（テナントに縛る、読み取り専用）を用意した。自分のテナントのアーカイブにある `mission-state.json` 1 つだけを指す capability がないと引き受けられない。共有の役割にはせず、到達性レポートで届くシステム役割にだけ載せた。
