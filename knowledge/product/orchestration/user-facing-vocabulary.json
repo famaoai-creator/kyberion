@@ -33496,14 +33496,14 @@
         "qps-ploc": "⟦Řėṽïėẇ őƒ ŧħė ŀȧŧėşŧ řėşůŀŧş ŀőřėɱ ïṗş⟧"
       },
       "bolt_review_question": {
-        "en": "Do you accept the results of this bolt?",
-        "ja": "この bolt の成果を受け入れますか。",
-        "qps-ploc": "⟦Ḓő ẏőů ȧƈƈėṗŧ ŧħė řėşůŀŧş őƒ ŧħïş ƀőŀŧ? ŀőřėɱ ïṗşůɱ ḓ⟧"
+        "en": "Do you accept the results of this round of work?",
+        "ja": "今回の作業分の成果を受け入れますか。",
+        "qps-ploc": "⟦Ḓő ẏőů ȧƈƈėṗŧ ŧħė řėşůŀŧş őƒ ŧħïş řőůñḓ őƒ ẇőřķ? ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "bolt_review_background": {
-        "en": "What changed in this bolt:",
-        "ja": "この bolt で変わった点:",
-        "qps-ploc": "⟦Ẇħȧŧ ƈħȧñɠėḓ ïñ ŧħïş ƀőŀŧ: ŀőřėɱ ïṗ⟧"
+        "en": "What changed in this round of work:",
+        "ja": "今回の作業分で変わった点:",
+        "qps-ploc": "⟦Ẇħȧŧ ƈħȧñɠėḓ ïñ ŧħïş řőůñḓ őƒ ẇőřķ: ŀőřėɱ ïṗşůɱ⟧"
       },
       "bolt_review_preview_link_label": {
         "en": "Preview",
@@ -33606,6 +33606,11 @@
         "en": "You decide on these items. Your answers become the decision.",
         "ja": "これらの事項はあなたが決定します。回答がそのまま決定として記録されます。",
         "qps-ploc": "⟦Ẏőů ḓėƈïḓė őñ ŧħėşė ïŧėɱş. Ẏőůř ȧñşẇėřş ƀėƈőɱė ŧħė ḓėƈïşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "role_decider_with_confirmation": {
+        "en": "You decide on these items. Your answers become the decision, except on items marked “Needs your decision”: those answers become final once our representative confirms them.",
+        "ja": "これらの事項はあなたが決定します。回答はそのまま決定として記録されます。ただし「ご決定が必要です」と表示された事項の回答は、担当者が確認すると確定します。",
+        "qps-ploc": "⟦Ẏőů ḓėƈïḓė őñ ŧħėşė ïŧėɱş. Ẏőůř ȧñşẇėřş ƀėƈőɱė ŧħė ḓėƈïşïőñ, ėẋƈėṗŧ őñ ïŧėɱş ɱȧřķėḓ “Ñėėḓş ẏőůř ḓėƈïşïőñ”: ŧħőşė ȧñşẇėřş ƀėƈőɱė ƒïñȧŀ őñƈė őůř řėṗřėşėñŧȧŧïṽė ƈőñƒïřɱş ŧħėɱ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
       },
       "role_contributor": {
         "en": "Your answers are recorded as opinions. The person who decides will confirm them.",

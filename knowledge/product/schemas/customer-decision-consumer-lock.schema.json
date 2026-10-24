@@ -19,6 +19,11 @@
     "version": { "type": "string", "enum": ["1.0.0"] },
     "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
     "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "project_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$",
+      "description": "The mission's project (relationships.project.project_id): the typed context of a rework WorkItem filed for this consumer."
+    },
     "consumer": {
       "type": "string",
       "pattern": "^mission-[A-Za-z0-9][A-Za-z0-9_-]{0,100}\\.[A-Za-z0-9][A-Za-z0-9._-]{0,120}$"

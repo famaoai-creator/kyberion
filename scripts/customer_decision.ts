@@ -27,7 +27,8 @@
  *   remind   [--case <id>] [--dry-run] [--now <iso>]   send the reminders due today (CD-11): respond-by D-1 / D0,
  *            override-closing D-2; through the decider's bound channel (sendToCustomer, fixed template),
  *            else an operator inbox task; --dry-run writes nothing
- *   reminders --install [--force]                       install the daily tenant reminder pipeline (pipeline:promote)
+ *   reminders --install --by user:<member> [--force]    install the daily tenant reminder pipeline (pipeline:promote);
+ *            --by is the asset ledger's ingested_by (no identity env needed)
  *
  * Customer-room verbs (token on STDIN only, never argv; --case is optional and
  * must match the invite when given):

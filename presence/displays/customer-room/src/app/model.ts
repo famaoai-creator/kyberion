@@ -275,6 +275,22 @@ export function describeDraft(draft: unknown): DraftView {
 }
 
 /** True when a submitted answer to an item that needs the customer still needs our confirmation. */
+/**
+ * The banner under the title: a contributor's answers are opinions; a
+ * decider's answers are the decision — except on items marked "needs your
+ * decision" (`requires_customer`), which stay provisional until our
+ * representative confirms them.
+ */
+export function roleBannerKey(
+  role: 'decider' | 'contributor' | string,
+  entries: readonly Pick<ViewEntry, 'requires_customer'>[]
+): 'role_contributor' | 'role_decider' | 'role_decider_with_confirmation' {
+  if (role !== 'decider') return 'role_contributor';
+  return entries.some((entry) => entry.requires_customer)
+    ? 'role_decider_with_confirmation'
+    : 'role_decider';
+}
+
 export function needsOurConfirmation(
   entries: readonly ViewEntry[],
   answers: readonly AnswerPayload[]

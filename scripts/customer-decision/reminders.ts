@@ -70,6 +70,7 @@ import {
   audit,
   diagnosticCode,
   locationOf,
+  memberActorId,
   tenantOf,
   usageError,
 } from './common.js';
@@ -539,11 +540,13 @@ export async function runRemind(
 }
 
 /**
- * `reminders --install --tenant <t> [--force]`: promote the daily reminder
+ * `reminders --install --tenant <t> --by user:<member> [--force]`: promote the daily reminder
  * pipeline template into the tenant's pipeline catalog through
  * `pipeline:promote` (the governed tenant catalog write: `asset_promoter`
  * bound to the tenant, the tenant asset ledger, the catalog row). Chronos
- * runs it only after a human approves its project trust.
+ * runs it only after a human approves its project trust. `--by` names the
+ * operator for the tenant asset ledger (`ingested_by`): a tenant asset is
+ * never landed anonymously, and the operator CLI needs no identity env.
  */
 export async function runRemindersInstall(
   opts: Record<string, string>,
@@ -553,17 +556,21 @@ export async function runRemindersInstall(
   if (!flags.has('install')) {
     throw usageError('reminders needs --install (customer-decision remind sends them by hand)');
   }
-  const result = await promotePipelineAdf([
-    '--input',
-    REMINDER_PIPELINE_TEMPLATE,
-    '--tenant',
-    tenant,
-    '--name',
-    REMINDER_PIPELINE_NAME,
-    '--no-llm',
-    ...(flags.has('force') ? ['--force'] : []),
-    ...(flags.has('dry-run') ? ['--dry-run'] : []),
-  ]);
+  const by = memberActorId(opts.by);
+  const result = await promotePipelineAdf(
+    [
+      '--input',
+      REMINDER_PIPELINE_TEMPLATE,
+      '--tenant',
+      tenant,
+      '--name',
+      REMINDER_PIPELINE_NAME,
+      '--no-llm',
+      ...(flags.has('force') ? ['--force'] : []),
+      ...(flags.has('dry-run') ? ['--dry-run'] : []),
+    ],
+    { ingestedBy: by }
+  );
   return {
     tenant,
     installed: result.target,

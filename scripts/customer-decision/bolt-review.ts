@@ -46,7 +46,6 @@ import {
   fileBoltReviewWorkItem,
   notifyBoltReviewRejected,
 } from '@agent/core/mission/mission-bolt-review';
-import { loadMissionStateIncludingArchive } from '@agent/core/mission/mission-state';
 import { ScriptExitError } from '../lib/harness.js';
 import {
   type CustomerDecisionIo,
@@ -101,19 +100,38 @@ function previewLinks(opts: Record<string, string>, locale: 'ja' | 'en'): Agenda
   ];
 }
 
-/** The mission must exist and belong to this tenant's case. */
+/**
+ * The mission must exist and belong to this tenant's case. Returns the
+ * mission's project (the agenda's and the bolt WorkItem's project), if any.
+ */
 function assertMissionInCase(
   io: CustomerDecisionIo,
   missionId: string,
   tenant: string,
   caseId: string
-): void {
-  const resolved = io.missionCase
-    ? io.missionCase(missionId)
-    : // A finished bolt is archived by `finish`: resolve from the archive too.
-      resolveMissionDecisionCase(missionId, {
-        loadMissionState: (id) => loadMissionStateIncludingArchive(id, { tenantSlug: tenant }),
-      });
+): string | undefined {
+  let resolved: { tenantSlug: string; caseId: string; projectId?: string } | null;
+  try {
+    resolved = io.missionCase
+      ? io.missionCase(missionId)
+      : // A finished bolt is archived by `finish`: the library reads the
+        // archive too, bound to this tenant.
+        resolveMissionDecisionCase(missionId, { tenantSlug: tenant });
+  } catch (error) {
+    if (diagnosticCode(error) === 'MISSION_STATE_TENANT_MISMATCH') {
+      throw new ScriptExitError(
+        2,
+        `mission ${missionId}: --tenant ${tenant} differs from the tenant this process is bound to (KYBERION_TENANT); run it for the bound tenant`
+      );
+    }
+    if (diagnosticCode(error) === 'MISSION_STATE_ACCESS_DENIED') {
+      throw new ScriptExitError(
+        1,
+        `mission ${missionId}: its state exists but could not be read for tenant ${tenant} (access denied, not "not found") — see the warning above`
+      );
+    }
+    throw error;
+  }
   if (!resolved) {
     throw new ScriptExitError(
       2,
@@ -123,11 +141,12 @@ function assertMissionInCase(
   if (resolved.tenantSlug !== tenant || resolved.caseId !== caseId) {
     throw new ScriptExitError(2, `mission ${missionId} does not belong to case ${caseId}`);
   }
+  return resolved.projectId;
 }
 
 /**
  * `bolt-review`: a draft agenda from the `bolt-review` template — one
- * `approval` entry ("do you accept the results of this bolt?"), the summary
+ * `approval` entry ("do you accept the results of this round of work?"), the summary
  * as its background, our decision "accept", the override window open until
  * the next bolt starts (`bolt-after:<MISSION>`), the images and the preview
  * link. Submit and send it as any agenda.
@@ -156,7 +175,16 @@ export function runBoltReview(
     throw usageError(`at most ${MAX_ATTACHMENTS_PER_ENTRY} --attach images`);
   const links = previewLinks(opts, locale);
   const by = opts.by ? memberActorId(opts.by) : undefined;
-  assertMissionInCase(io, missionId, tenant, caseId);
+  const missionProject = assertMissionInCase(io, missionId, tenant, caseId);
+  // The review belongs to the mission's own project: `--project` may only
+  // restate it (its WorkItems carry it as their typed context).
+  const requestedProject = opts.project?.trim();
+  if (requestedProject && requestedProject !== missionProject) {
+    throw usageError(
+      `--project ${requestedProject} is not the project of mission ${missionId}${missionProject ? ` (${missionProject})` : ' (it has none)'}; omit --project`
+    );
+  }
+  const projectId = missionProject;
   const images = files.map(readAttachmentFile);
 
   return withCaseLock(location, () => {
@@ -185,7 +213,7 @@ export function runBoltReview(
       now,
       ...(opts.title ? { title: opts.title } : {}),
       ...(opts.from?.trim() ? { from: opts.from.trim() } : {}),
-      ...(opts.project ? { projectId: opts.project } : {}),
+      ...(projectId ? { projectId } : {}),
     });
     const entries = drafted.entries.map((entry): AgendaEntry =>
       entry.entry_id !== BOLT_REVIEW_ENTRY_ID
