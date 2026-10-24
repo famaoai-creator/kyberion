@@ -52,20 +52,20 @@ pnpm check -- --changed     # pr gate 全部 + 変更パスに該当する full-
 # 5. PR 全体を表すタイトルを決めて検査する
 pnpm check:pr-title -- --title "<type>(<scope>): <summary>"
 
-# 6. 本文をテンプレートから作る（一時ファイルは active/shared/tmp/ に置く）
-cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/pr-body-<topic>.md
+# 6. 本文をテンプレートから作る（一時ファイルは public partition に置く）
+cp .github/PULL_REQUEST_TEMPLATE.md active/shared/tmp/public/shared/pr-body-<topic>.md
 #    → Summary / Type / Area / Test plan（実行したコマンドと結果）/ Knowledge / 該当チェック欄を埋める
 
 # 6.5 push 前に preflight を通す（PR は作らない。title 検査 + `check --changed` + Knowledge 検査）
 pnpm kyberion pr preflight \
   --title "<type>(<scope>): <summary>" \
-  --body-file active/shared/tmp/pr-body-<topic>.md
+  --body-file active/shared/tmp/public/shared/pr-body-<topic>.md
 
 # 7. push してから作成する（`pr create` も同じ readiness gate を実行する）
 git push -u origin <branch>
 pnpm kyberion pr create \
   --title "<type>(<scope>): <summary>" \
-  --body-file active/shared/tmp/pr-body-<topic>.md \
+  --body-file active/shared/tmp/public/shared/pr-body-<topic>.md \
   --no-draft            # レビュー可能な場合。作業途中なら付けずに draft のまま
 
 # 8. CI を最後まで見る
@@ -79,9 +79,14 @@ gh pr checks <number> --watch
 - **`--title` を必ず渡す**。省略すると HEAD commit の件名がタイトルになり、最後の小さな修正 commit が
   PR 名になる。
 - **`--body-file` を必ず渡す**。省略すると `gh --fill` で commit 一覧が本文になり、テンプレートの
-  Test plan やチェック欄が抜ける。**パスは checkout 内の repo 相対パスにする**
-  （`active/shared/tmp/pr-body-<topic>.md` など）。`/tmp/body.md` のような checkout 外の絶対パスは
-  secure-io に拒否され、readiness gate を通ったあとで失敗する。
+  Test plan やチェック欄が抜ける。**パスは checkout 内で、かつ `public` と明示された partition に置く**
+  — `active/shared/tmp/public/shared/<job>/pr-body.md`（推奨）または `active/shared/artifacts/public/…`
+  / `knowledge/public/…`。`body_source_tier` はファイルの置き場所で判定され、plain な
+  `active/shared/tmp/` やその他の floor では `protected_or_unknown` となり、charter の
+  `vcs:pr_create` grant への委任が不可能になって必ず人間承認が要る（
+  [onboarding-action-authority.md](../orchestration/onboarding-action-authority.md) 参照）。内容が
+  公開可能であることの確認は置き場所とは別に必ず行う。`/tmp/body.md` のような checkout 外の
+  絶対パスは secure-io に拒否され、readiness gate を通ったあとで失敗する。
 - **`## Knowledge` 欄を必ず埋める**。Mission ID を書いた PR は、そのミッションの学びの候補を全件
   `promoted` / `rejected` / `routed` のどれかで宣言する。ミッションなしの PR は `none — <理由>`。
   宣言行の形式は `- promoted: <candidate_id> → <promoted record path>`（`routed:` は
@@ -97,7 +102,8 @@ gh pr checks <number> --watch
   フルパス（`active/missions/<tier>/<ID>/evidence/...`）だけを書く（`evidence/x.md` のような短縮形は
   拒否される）。手順は phases/execution.md の「Ship the learnings in the same PR as the code」。
 - **`[EXTERNAL_APPROVAL_REQUIRED]` は失敗ではなく正常な終点**。公開操作は人間ゲートで止まるのが
-  設計どおりで、body ファイルの置き場所は承認要否を変えない。表示された依頼 ID を人間が
+  設計どおり（`vcs:pr_create` の charter grant がある場合は本文が public floor 上にあるときだけ
+  委任され、人間承認を省略できる）。表示された依頼 ID を人間が
   `pnpm kyberion approvals --approve <id>` で承認したあと、**同じ `pr create` コマンドを再実行する**
   （その時点で `gh pr create` が走る）。
 - **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
