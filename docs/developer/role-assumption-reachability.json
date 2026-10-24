@@ -2693,17 +2693,17 @@
       "unresolved": []
     },
     {
-      "site": "scripts/customer_decision.ts#asLedgerWriter",
+      "site": "scripts/customer-decision/common.ts#asLedgerWriter",
       "roles": ["decision_ledger"],
       "unresolved": []
     },
     {
-      "site": "scripts/customer_decision.ts#noteDealSwitches",
+      "site": "scripts/customer-decision/common.ts#noteDealSwitches",
       "roles": ["customer_decision_deal_note_writer"],
       "unresolved": []
     },
     {
-      "site": "scripts/customer_decision.ts#runGenerate",
+      "site": "scripts/customer-decision/operator.ts#runGenerate",
       "roles": ["decision_ledger"],
       "unresolved": []
     },

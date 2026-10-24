@@ -27,6 +27,12 @@
     "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
     "customer": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,60}$" },
     "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+    "from": {
+      "description": "Who the request is from, as the customer sees it (e.g. the vendor's trade name or the account team). Part of the content hash when present.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
     "phase": { "type": "string", "minLength": 1, "maxLength": 120 },
     "revision": { "type": "integer", "minimum": 1 },
     "locale": { "type": "string", "enum": ["ja", "en"] },
@@ -74,7 +80,12 @@
           "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
           "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
           "by": { "type": "string", "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$" },
-          "at": { "type": "string", "minLength": 1 }
+          "at": { "type": "string", "minLength": 1 },
+          "request_id": {
+            "description": "The approval request (operation customer_decision:operator_confirm) that authorized the confirmation.",
+            "type": "string",
+            "minLength": 1
+          }
         }
       }
     },

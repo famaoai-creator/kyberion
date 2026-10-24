@@ -144,6 +144,10 @@ status: active
   - タスクの完了時（evidence を記録する前）に、固定した値と今の有効な決定を照合する。違っていれば、そのタスクの成果を「古い決定に基づく」とし、手戻りを変更の WorkItem として起票する。
   - 実行中のタスクには割り込まない。途中で止めると成果が中途半端に残り、どこまでが古い決定に基づくかが分からなくなるためである。bolt は数時間〜数日と短く、境界での照合で十分に早い。
   - 段階 1 では、照合の純関数と切り替わりの記録（`switches.jsonl`）までを作る。ミッションの実行器への組み込みは CD-09 で行う。
+- **運用者の確認は customer-decision の層の概念とする**（2026-10-24 第 2 回レビュー）。`requires_customer` の項目で顧客が決めた値は、台帳では `state: decided` の記録のまま変えない。確認は承認ゲート（`customer_decision:operator_confirm`、相関 id `<agenda>:<entry>:<decision_id>`）を通り、調整セットの `operator_confirmations` に記録する。`--by` は依頼者で、権限そのものではない。確認済みかどうかを知る読み手は、台帳の `state` ではなく有効な決定の解決（`resolveAgendaEffective`）を使う。
+- **台帳への書き込みはすべて台帳ごとのロックで直列化する**。ロックは `appendDecisions` / `applyPromotions` の中で取り（書き手が取り忘れない）、同じプロセス内では入れ子にできる。customer-decision は案件ロック → 台帳ロックの順で取り、respond の id の事前割り当てから台帳への追記までを包む。`pnpm decisions` は台帳ロックだけを取るので、順序が逆になることはない。
+- **respond の先行記録（`respond-journal/`）は台帳の隣に置く**。先行記録は台帳に書く決定の id を前もって割り当てて守るものなので、その決定と同じ `decision_ledger` 権限・同じテナント範囲・同じロックの下で読み書きする。中身（決定記録）も同じ confidential のデータである。完了すると消し、残っているものは reconcile が完了させる途中の実行であって、作り直せるキャッシュではない。
+- **顧客が答えられない項目は送らない**。`submit` は、案（`our_decision.value`）のない `approval` の項目と、選択肢のない `ranking` の項目があれば、項目を列挙して拒否する。`requires_customer` の `approval` は schema でこちらの決定を持てないため対象外で、問いそのものを承認してもらう。
 
 ## 段階 1 の実装設計
 
@@ -191,6 +195,15 @@ status: active
 | CD-07 | 完了（対話ヒアリングは未） | `presence/displays/customer-room/`。`hearing` 種別は自由記述で受ける                                                                       |
 | CD-08 | 完了                       | `libs/core/customer-decision/{respond,reflect}.ts`、`customer-decision respond`（台帳 → 決定記録 → 切り替わり → brief 入力・商談メモ）     |
 
+第 2 回レビューの対応（2026-10-24）:
+
+- 台帳ロック: `libs/core/decision-ledger/ledger.ts` の `withDecisionLedgerLock`。`pnpm decisions` と customer respond を別プロセスで同時に走らせても、どちらの記録も失われない（`scripts/customer_decision.test.ts`）。
+- reconcile は先行記録ごとに失敗を受け止め、`status` の `reconciled.stuck` に診断コードつきで出し、`respond_reconcile` の失敗として監査に残す。1 件の壊れた記録が案件や `status` を止めない。
+- 監査の冪等性: 先行記録に `auditing` の段を足した。監査の追記の前後で止まった実行は、監査チェーンにその決定記録の `respond completed` があれば書き足さない。
+- `confirm` は承認ゲートを通る。`close` / `withdraw`（`--agenda <id> --by user:<member> [--reason]`）を足した。`withdraw` は未失効の招待をすべて失効させる。どちらも同じ item × key を別の調整セットで聞けるようにする。
+- 顧客向け `view` の追加: 項目ごとの `current.status` / `current.awaiting_operator_confirmation`、`agenda.from`（設定時のみ）、`approval` の項目の `draft`。`from` は `draft --from` / `draft --file` で設定し、内容ハッシュに含める（未設定の調整セットのハッシュは変わらない）。
+- `scripts/customer_decision.ts` は入口だけにし、本体を `scripts/customer-decision/`（`common` / `operator` / `operator-lifecycle` / `reconcile` / `customer-facing`）に分けた。
+
 使い方（運用者）:
 
 ```bash
@@ -200,6 +213,9 @@ pnpm kyberion customer-decision submit --tenant <t> --case <case> --agenda <id> 
 pnpm kyberion customer-decision actor-add --tenant <t> --case <case> --customer <c> --actor customer:<id> --name <name>
 pnpm kyberion customer-decision send --tenant <t> --case <case> --agenda <id> --name <name> --role decider --actor customer:<id>
 pnpm kyberion customer-decision status --tenant <t> --case <case> --agenda <id>
+pnpm kyberion customer-decision confirm --tenant <t> --case <case> --agenda <id> --entry <entry_id> --by user:<member>
+pnpm kyberion customer-decision close --tenant <t> --case <case> --agenda <id> --by user:<member>
+pnpm kyberion customer-decision withdraw --tenant <t> --case <case> --agenda <id> --by user:<member> --reason <text>
 KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/server.js   # 公開 ingress の背後で動かす
 ```
 
@@ -212,3 +228,5 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - CD-09: ミッションの実行器に、タスク境界での照合（`checkDecisionFreshness`）を組み込む。
 - 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
 - 招待リンクの公開 URL をテナントごとに持つ（段階 1 は `KYBERION_CUSTOMER_ROOM_PUBLIC_URL` が 1 つで、顧客向け画面を 1 テナント分だけ公開する前提）。
+- 回答の復旧時に監査の重複を確かめる処理が監査チェーン全体を読む。受領 id で引ける索引か冪等キーにする（復旧時だけ通る経路）。
+- `generate` で `ranking` 項目の選択肢（AI-DLC Unit の候補）も作る。今は運用者が `draft --file` で入れる必要がある。

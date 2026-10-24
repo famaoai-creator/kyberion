@@ -14,6 +14,7 @@ import {
   listReceipts,
   listRespondJournals,
   removeRespondJournal,
+  withCustomerActorsLock,
   withCustomerDecisionCaseLock,
   writeRespondJournal,
   type RespondJournalRecord,
@@ -304,6 +305,24 @@ describe('customer decision store', () => {
     expect(inner).toMatch(/LOCK_TIMEOUT/u);
     // Released afterwards; another case was never blocked.
     expect(withCustomerDecisionCaseLock({ dir }, () => 'again')).toBe('again');
+  });
+
+  it('serializes a customer actor registry shared by all of its cases', () => {
+    const inner = withCustomerActorsLock('acme-corp', 'acme', () => {
+      try {
+        withCustomerActorsLock('acme-corp', 'acme', () => 'second', 150);
+        return 'entered';
+      } catch (error) {
+        return (error as Error).message;
+      }
+    });
+    expect(inner).toMatch(/LOCK_TIMEOUT/u);
+    expect(withCustomerActorsLock('acme-corp', 'other', () => 'other customer')).toBe(
+      'other customer'
+    );
+    expect(() => withCustomerActorsLock('acme-corp', '../x', () => 'never')).toThrow(
+      /ACTORS_LOCK_INVALID/u
+    );
   });
 
   it('writes, advances, lists and removes respond journal records', () => {

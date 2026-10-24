@@ -1,8 +1,15 @@
+import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { ScriptExitError } from '@agent/core/script-harness';
 import { readLedger } from '@agent/core/decision-ledger';
 import {
@@ -23,9 +30,12 @@ const mocks = vi.hoisted(() => ({
   // Fault injection: pass through to the real store unless a test says otherwise.
   writeReceipt: vi.fn(),
   appendSwitches: vi.fn(),
+  writeRespondJournal: vi.fn(),
+  loadAll: vi.fn(() => [] as unknown[]),
   real: {} as {
     writeReceipt?: (...args: unknown[]) => unknown;
     appendSwitches?: (...args: unknown[]) => unknown;
+    writeRespondJournal?: (...args: unknown[]) => unknown;
   },
   getDeal: vi.fn(),
   appendDealNote: vi.fn(),
@@ -38,7 +48,10 @@ vi.mock('@agent/core/governance/approval-store', async (importOriginal) => ({
 }));
 vi.mock('@agent/core/governance/audit-chain', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/governance/audit-chain')>();
-  return { ...actual, auditChain: { ...actual.auditChain, record: mocks.audit } };
+  return {
+    ...actual,
+    auditChain: { ...actual.auditChain, record: mocks.audit, loadAll: mocks.loadAll },
+  };
 });
 vi.mock('@agent/core/reasoning/reasoning-bootstrap', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/reasoning/reasoning-bootstrap')>()),
@@ -48,10 +61,12 @@ vi.mock('@agent/core/customer-decision', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@agent/core/customer-decision')>();
   mocks.real.writeReceipt = actual.writeReceipt as never;
   mocks.real.appendSwitches = actual.appendSwitches as never;
+  mocks.real.writeRespondJournal = actual.writeRespondJournal as never;
   return {
     ...actual,
     writeReceipt: (...args: unknown[]) => mocks.writeReceipt(...args),
     appendSwitches: (...args: unknown[]) => mocks.appendSwitches(...args),
+    writeRespondJournal: (...args: unknown[]) => mocks.writeRespondJournal(...args),
   };
 });
 vi.mock('@agent/core/deal-store', async (importOriginal) => ({
@@ -66,6 +81,15 @@ const TENANT = 'cd-facade-test';
 const CASE = 'case-cd';
 const NOW = '2026-10-24T00:00:00.000Z';
 const ACTOR = 'customer:acme-cto';
+const STORIES: AgendaEntry = {
+  entry_id: 'stories',
+  item: 'INCEPTION',
+  key: 'user_stories',
+  kind: 'approval',
+  question: 'Approve these user stories?',
+  our_decision: { value: ['As a sales rep I enter an order once'] },
+  requires_customer: false,
+};
 
 const ENTRIES: AgendaEntry[] = [
   {
@@ -173,6 +197,12 @@ describe('customer-decision facade', () => {
     mocks.appendSwitches.mockImplementation((...args: unknown[]) =>
       mocks.real.appendSwitches!(...args)
     );
+    mocks.writeRespondJournal.mockReset();
+    mocks.writeRespondJournal.mockImplementation((...args: unknown[]) =>
+      mocks.real.writeRespondJournal!(...args)
+    );
+    mocks.loadAll.mockReset();
+    mocks.loadAll.mockReturnValue([]);
     mocks.getDeal.mockReset();
     mocks.getDeal.mockReturnValue(null);
     mocks.appendDealNote.mockReset();
@@ -291,11 +321,98 @@ describe('customer-decision facade', () => {
     const agenda = agendaOf(drafted.agenda_id);
     expect(agenda.status).toBe('draft');
 
+    // Without inference the approval drafts stay empty; replace the entries to submit.
+    const file = path.join(dir, 'edit.json');
+    safeWriteFile(file, JSON.stringify({ entries: ENTRIES }), { encoding: 'utf8' });
+    await run(['draft', ...base(), '--agenda', drafted.agenda_id, '--file', file]);
     approveNext();
     await run(['submit', ...base(), '--agenda', drafted.agenda_id, '--by', 'user:alice']);
     await expect(
       run(['generate', ...base(), '--agenda', drafted.agenda_id, '--intent-file', intent])
     ).rejects.toThrow(/generate only fills a draft/u);
+  });
+
+  it('refuses to submit entries the customer cannot answer, listing them', async () => {
+    const { our_decision: _ours, ...storiesWithoutDraft } = STORIES;
+    void _ours;
+    const agendaId = await draftAgenda([
+      ENTRIES[0],
+      // A requires_customer approval (the schema forbids ours on it) asks the question itself.
+      ENTRIES[3],
+      storiesWithoutDraft,
+      {
+        entry_id: 'mvp',
+        item: 'MVP',
+        key: 'mvp.order',
+        kind: 'ranking',
+        question: 'Which first?',
+        requires_customer: false,
+      },
+    ]);
+    await expect(
+      run(['submit', ...base(), '--agenda', agendaId, '--by', 'user:alice'])
+    ).rejects.toThrow(
+      /cannot answer: stories \(approval: no draft in our_decision.value\), mvp \(ranking: no options\)/u
+    );
+    expect(mocks.gate).not.toHaveBeenCalled();
+    expect(agendaOf(agendaId).status).toBe('draft');
+  });
+
+  it('sets who the request is from at draft and on edit, and shows it to the customer', async () => {
+    const drafted = (await run([
+      'draft',
+      ...base(),
+      '--customer',
+      'acme',
+      '--title',
+      'Inception',
+      '--from',
+      'Example Systems',
+    ])) as { agenda_id: string; content_hash: string; from: string };
+    expect(drafted.from).toBe('Example Systems');
+    expect(agendaOf(drafted.agenda_id).from).toBe('Example Systems');
+    const file = path.join(dir, 'edit.json');
+    safeWriteFile(
+      file,
+      JSON.stringify({ from: 'Example Systems / Sales', entries: [...ENTRIES, STORIES] }),
+      { encoding: 'utf8' }
+    );
+    const edited = (await run([
+      'draft',
+      ...base(),
+      '--agenda',
+      drafted.agenda_id,
+      '--file',
+      file,
+    ])) as { content_hash: string };
+    expect(agendaOf(drafted.agenda_id).from).toBe('Example Systems / Sales');
+    // The sender is part of what the customer is shown, so it is in the content hash.
+    const { from: _from, ...withoutFrom } = agendaOf(drafted.agenda_id);
+    void _from;
+    expect(agendaContentHash(withoutFrom)).not.toBe(edited.content_hash);
+    approveNext();
+    await run(['submit', ...base(), '--agenda', drafted.agenda_id, '--by', 'user:alice']);
+    await run(['actor-add', ...base(), '--customer', 'acme', '--actor', ACTOR, '--name', 'CTO']);
+    const sent = (await run([
+      'send',
+      ...base(),
+      '--agenda',
+      drafted.agenda_id,
+      '--name',
+      'Hanako',
+      '--role',
+      'decider',
+      '--actor',
+      ACTOR,
+    ])) as { link: string };
+    const view = await customerRun('view', { token: sent.link.split('#t=')[1] });
+    expect(view.out.agenda).toMatchObject({ title: 'Inception', from: 'Example Systems / Sales' });
+    // An approval entry shows the draft being approved; a requires_customer one has none.
+    expect(pick(view.out.entries, 'stories')).toMatchObject({
+      kind: 'approval',
+      draft: ['As a sales rep I enter an order once'],
+    });
+    expect(pick(view.out.entries, 'release')).not.toHaveProperty('draft');
   });
 
   it('submit waits for the approval gate, then pins our decisions', async () => {
@@ -432,12 +549,18 @@ describe('customer-decision facade', () => {
         { label: 'SSO', value: 'sso', impact: { cost: '+10%', schedule: '+3d' } },
       ],
       requires_customer: false,
-      current: { status: 'provisional', layer: 'ours', value: 'sso' },
+      current: {
+        status: 'provisional',
+        layer: 'ours',
+        value: 'sso',
+        awaiting_operator_confirmation: false,
+      },
       overridable: true,
     });
     expect(entries.find((entry) => entry.entry_id === 'release')?.current).toEqual({
       status: 'awaiting_customer',
       layer: 'none',
+      awaiting_operator_confirmation: false,
     });
     // No internal fields leak into the customer projection.
     expect(JSON.stringify(view.out)).not.toMatch(
@@ -550,6 +673,7 @@ describe('customer-decision facade', () => {
       status: 'provisional',
       layer: 'customer',
       value: { approved: true },
+      awaiting_operator_confirmation: true,
     });
     expect(after.out.receipts).toHaveLength(1);
     const decisionId = readLedger({ dir }).find((record) => record.key === 'release.go')?.id;
@@ -572,6 +696,41 @@ describe('customer-decision facade', () => {
 
     await expect(run(confirmArgs)).rejects.toThrow(/--by user:<member> is required/u);
     const hashBefore = agendaContentHash(agendaOf(agendaId));
+    // --by alone is not the authority: the approval gate decides.
+    mocks.gate.mockReturnValueOnce({
+      allowed: false,
+      status: 'pending',
+      requestId: 'apr-c1',
+      requestStatus: 'created',
+    });
+    const pending = (await run([...confirmArgs, '--by', 'user:alice'])) as Record<string, unknown>;
+    expect(pending).toMatchObject({
+      entry_id: 'release',
+      decision_id: decisionId,
+      approval_request_id: 'apr-c1',
+      status: 'provisional',
+      next: expect.stringContaining('pnpm kyberion approvals --approve apr-c1'),
+    });
+    expect(mocks.gate).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        requireApproval: true,
+        operationId: 'customer_decision:operator_confirm',
+        correlationId: `${agendaId}:release:${decisionId}`,
+        requestScope: { tenant_slug: TENANT },
+      })
+    );
+    expect(agendaOf(agendaId).operator_confirmations ?? []).toEqual([]);
+    mocks.gate.mockReturnValueOnce({
+      allowed: false,
+      status: 'denied',
+      requestId: 'apr-c1',
+      requestStatus: 'rejected',
+    });
+    await expect(run([...confirmArgs, '--by', 'user:alice'])).rejects.toBeInstanceOf(
+      ScriptExitError
+    );
+    expect(agendaOf(agendaId).operator_confirmations ?? []).toEqual([]);
+    approveNext('apr-c2');
     const confirmed = (await run([...confirmArgs, '--by', 'user:alice'])) as Record<
       string,
       unknown
@@ -580,14 +739,26 @@ describe('customer-decision facade', () => {
       entry_id: 'release',
       decision_id: decisionId,
       confirmed_by: 'user:alice',
+      approval_request_id: 'apr-c2',
       status: 'confirmed',
       already_confirmed: false,
       switches: 1,
     });
     const agenda = agendaOf(agendaId);
     expect(agenda.operator_confirmations).toEqual([
-      { entry_id: 'release', decision_id: decisionId, by: 'user:alice', at: NOW },
+      {
+        entry_id: 'release',
+        decision_id: decisionId,
+        by: 'user:alice',
+        at: NOW,
+        request_id: 'apr-c2',
+      },
     ]);
+    // The ledger record stays the customer's `decided` record; confirmation lives on the agenda.
+    expect(readLedger({ dir }).find((record) => record.id === decisionId)).toMatchObject({
+      state: 'decided',
+      status: 'active',
+    });
     // The confirmation leaves the approved content (and so the customer's link) intact.
     expect(agendaContentHash(agenda)).toBe(hashBefore);
     expect((await customerRun('view', { token })).out.state).toBe('open');
@@ -595,6 +766,7 @@ describe('customer-decision facade', () => {
       status: 'confirmed',
       layer: 'customer',
       value: { approved: true },
+      awaiting_operator_confirmation: false,
     });
     expect(readSwitches({ dir }).at(-1)).toMatchObject({
       kind: 'confirmed',
@@ -608,8 +780,11 @@ describe('customer-decision facade', () => {
         metadata: expect.objectContaining({ decision_id: decisionId, confirmed_by: 'user:alice' }),
       })
     );
+    const gateCalls = mocks.gate.mock.calls.length;
     const again = (await run([...confirmArgs, '--by', 'user:alice'])) as Record<string, unknown>;
     expect(again).toMatchObject({ already_confirmed: true, switches: 0 });
+    // Re-confirming the same decision writes nothing new and asks no approval.
+    expect(mocks.gate.mock.calls.length).toBe(gateCalls);
     expect(agendaOf(agendaId).operator_confirmations).toHaveLength(1);
     const after2 = (await run(['status', ...base(), '--agenda', agendaId])) as Record<
       string,
@@ -750,6 +925,7 @@ describe('customer-decision facade', () => {
       status: 'confirmed',
       layer: 'customer',
       value: 'password',
+      awaiting_operator_confirmation: false,
     });
   });
   it('keeps the approved decisions in force while an edit awaits re-approval', async () => {
@@ -926,6 +1102,247 @@ describe('customer-decision facade', () => {
     >;
     expect(status.reconciled).toEqual({ completed: [], abandoned: [], stuck: [] });
   });
+
+  it('records one respond audit entry when a run is cut off around the audit append', async () => {
+    const { agendaId, token } = await approvedAndSent();
+    const view = await customerRun('view', { token });
+    const respondAudits = () =>
+      mocks.audit.mock.calls.filter(
+        ([entry]) => entry.operation === 'respond' && entry.result === 'completed'
+      );
+    // The audit append lands in the chain, then the process dies before the journal says so.
+    const chain: unknown[] = [];
+    mocks.audit.mockImplementation((entry: Record<string, unknown>) => {
+      if (entry.operation === 'respond' && entry.result === 'completed' && chain.length === 0) {
+        chain.push({ ...entry, tenantSlug: TENANT });
+        throw new Error('[TEST_CRASH_AFTER_AUDIT] simulated');
+      }
+    });
+    mocks.loadAll.mockImplementation(() => chain);
+    const failed = await customerRun('respond', {
+      token,
+      content_hash: view.out.content_hash,
+      answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+    });
+    expect(failed.out).toMatchObject({ diagnostic_code: 'TEST_CRASH_AFTER_AUDIT' });
+    expect(respondAudits()).toHaveLength(1);
+    const status = (await run(['status', ...base(), '--agenda', agendaId])) as Record<
+      string,
+      unknown
+    >;
+    const [receipt] = listReceipts({ dir });
+    expect(status.reconciled).toEqual({
+      completed: [receipt.receipt_id],
+      abandoned: [],
+      stuck: [],
+    });
+    // The chain already held it: no second `respond completed` entry.
+    expect(respondAudits()).toHaveLength(1);
+    expect(mocks.loadAll).toHaveBeenCalled();
+    expect(readSwitches({ dir }).map((item) => item.entry_id)).toEqual(['nfr.auth']);
+  });
+
+  it('records the respond audit on recovery when the chain does not hold it', async () => {
+    const { agendaId, token } = await approvedAndSent();
+    const view = await customerRun('view', { token });
+    let thrown = false;
+    mocks.audit.mockImplementation((entry: Record<string, unknown>) => {
+      if (entry.operation === 'respond' && entry.result === 'completed' && !thrown) {
+        thrown = true;
+        throw new Error('[TEST_AUDIT_LOST] simulated');
+      }
+    });
+    await customerRun('respond', {
+      token,
+      content_hash: view.out.content_hash,
+      answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+    });
+    mocks.audit.mockClear();
+    await run(['status', ...base(), '--agenda', agendaId]);
+    expect(
+      mocks.audit.mock.calls.filter(
+        ([entry]) => entry.operation === 'respond' && entry.result === 'completed'
+      )
+    ).toEqual([
+      [expect.objectContaining({ metadata: expect.objectContaining({ recovered: true }) })],
+    ]);
+  });
+
+  it('reports a journal record that cannot be completed and keeps the case working', async () => {
+    const { agendaId, token } = await approvedAndSent();
+    const view = await customerRun('view', { token });
+    mocks.writeReceipt.mockImplementationOnce(() => {
+      throw new Error('[TEST_CRASH_AFTER_LEDGER] simulated');
+    });
+    await customerRun('respond', {
+      token,
+      content_hash: view.out.content_hash,
+      answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+    });
+    const stuckId = readLedger({ dir }).find((record) => record.state === 'decided')?.decided_by
+      ?.on_behalf_of?.evidence as string;
+    // Completion of that record fails again; status still answers and reports it.
+    mocks.audit.mockClear();
+    mocks.writeReceipt.mockImplementationOnce(() => {
+      throw new Error('[TEST_RECONCILE_BROKEN] simulated');
+    });
+    const status = (await run(['status', ...base(), '--agenda', agendaId])) as Record<
+      string,
+      unknown
+    >;
+    expect(status.reconciled).toEqual({
+      completed: [],
+      abandoned: [],
+      stuck: [{ receipt_id: stuckId, reason: 'TEST_RECONCILE_BROKEN' }],
+    });
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'respond_reconcile',
+        result: 'failed',
+        reason: 'TEST_RECONCILE_BROKEN',
+        metadata: expect.objectContaining({ receipt_id: stuckId }),
+      })
+    );
+    // A new respond is not blocked by the bad record (whose completion fails once more).
+    mocks.writeReceipt.mockImplementationOnce(() => {
+      throw new Error('[TEST_RECONCILE_BROKEN] simulated');
+    });
+    const second = await customerRun('respond', {
+      token,
+      content_hash: view.out.content_hash,
+      answers: [{ entry_id: 'nfr.locale', choice: 'option', value: ['ja'] }],
+    });
+    expect(second.out).toMatchObject({ ok: true });
+    // Once the store recovers, the record completes.
+    const healed = (await run(['status', ...base(), '--agenda', agendaId])) as Record<
+      string,
+      unknown
+    >;
+    expect(healed.reconciled).toEqual({ completed: [stuckId], abandoned: [], stuck: [] });
+  });
+
+  it('closes or withdraws an agenda, ending its links and the overlap block', async () => {
+    const { agendaId, token, inviteId } = await approvedAndSent();
+    const end = (verb: 'close' | 'withdraw', id: string, extra: string[] = []) =>
+      run([verb, ...base(), '--agenda', id, ...extra]);
+    await expect(end('close', agendaId)).rejects.toThrow(/--by user:<member> is required/u);
+    const closed = (await end('close', agendaId, ['--by', 'user:alice'])) as Record<
+      string,
+      unknown
+    >;
+    expect(closed).toMatchObject({ status: 'closed', revoked_invites: [] });
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'agenda_close',
+        metadata: expect.objectContaining({ agenda_id: agendaId, by: 'user:alice' }),
+      })
+    );
+    expect((await customerRun('view', { token })).out).toMatchObject({ ok: true, state: 'closed' });
+    expect(await end('close', agendaId, ['--by', 'user:alice'])).toMatchObject({ already: true });
+    await expect(end('withdraw', agendaId, ['--by', 'user:alice'])).rejects.toThrow(
+      /already closed/u
+    );
+
+    // The same item × key may be asked again once the agenda is closed.
+    const next = await draftAgenda();
+    approveNext('apr-2');
+    await run(['submit', ...base(), '--agenda', next, '--by', 'user:alice']);
+    const sent = (await run([
+      'send',
+      ...base(),
+      '--agenda',
+      next,
+      '--name',
+      'Hanako',
+      '--role',
+      'decider',
+      '--actor',
+      ACTOR,
+    ])) as { link: string; invite_id: string };
+    const withdrawn = (await end('withdraw', next, [
+      '--by',
+      'user:alice',
+      '--reason',
+      'scope changed',
+    ])) as Record<string, unknown>;
+    expect(withdrawn).toMatchObject({ status: 'withdrawn', revoked_invites: [sent.invite_id] });
+    expect((await customerRun('view', { token: sent.link.split('#t=')[1] })).out).toMatchObject({
+      ok: false,
+      reason: 'revoked',
+    });
+    expect(mocks.audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'agenda_withdraw',
+        metadata: expect.objectContaining({
+          reason: 'scope changed',
+          revoked_invites: [sent.invite_id],
+        }),
+      })
+    );
+    expect(inviteId).not.toBe(sent.invite_id);
+    await draftAgenda();
+  });
+
+  // Spawns the built `decisions` facade (another process), like the customer-room integration suite.
+  const decisionsScript = pathResolver.rootResolve('dist/scripts/decisions.js');
+  it.skipIf(!safeExistsSync(decisionsScript))(
+    'serializes a concurrent pnpm decisions writer with a customer respond (nothing lost)',
+    async () => {
+      const { token } = await approvedAndSent();
+      const view = await customerRun('view', { token });
+      let child: ReturnType<typeof spawn> | undefined;
+      let childOut = '';
+      // Right after the respond pre-assigned its ledger ids (journal written,
+      // ledger not yet), an operator `pnpm decisions propose` runs in another process.
+      mocks.writeRespondJournal.mockImplementationOnce((...args: unknown[]) => {
+        const written = mocks.real.writeRespondJournal!(...args);
+        child = spawn(
+          process.execPath,
+          [
+            decisionsScript,
+            'propose',
+            '--dir',
+            dir,
+            '--case',
+            CASE,
+            '--item',
+            'OPS',
+            '--key',
+            'ops.note',
+            '--level',
+            'customer-value',
+            '--value',
+            '"from the operator"',
+            '--json',
+          ],
+          { cwd: pathResolver.rootDir(), stdio: ['ignore', 'pipe', 'pipe'] }
+        );
+        child.stdout?.on('data', (chunk) => (childOut += String(chunk)));
+        // Give the child ample time to start and reach the ledger (it runs in ~0.2 s unblocked).
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 2500);
+        return written;
+      });
+      const response = await customerRun('respond', {
+        token,
+        content_hash: view.out.content_hash,
+        answers: [{ entry_id: 'nfr.auth', choice: 'option', value: 'password' }],
+      });
+      expect(response.out).toMatchObject({ ok: true });
+      const code = await new Promise<number | null>((resolve) => child!.on('close', resolve));
+      expect(code).toBe(0);
+      const ledger = readLedger({ dir });
+      const [receipt] = listReceipts({ dir });
+      // The respond's planned ids landed as planned, and the operator record too.
+      expect(
+        receipt.decision_ids.map((id) => ledger.find((record) => record.id === id)?.key)
+      ).toEqual(['auth.method']);
+      expect(ledger.filter((record) => record.key === 'ops.note')).toHaveLength(1);
+      expect(JSON.parse(childOut).appended[0].id).toBe(ledger.at(-1)?.id);
+      const ids = ledger.map((record) => record.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    },
+    30_000
+  );
 
   it('notes switches on the deal as the narrow deal-note writer, best-effort, quoting customer text', async () => {
     const entries: AgendaEntry[] = [

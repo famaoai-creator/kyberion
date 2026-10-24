@@ -8,15 +8,20 @@ import { respond, viewAgenda, type ApiResult, type FetchFn } from './api.js';
 import {
   answeredCount,
   buildAnswers,
+  describeDraft,
   describeValue,
   emptyDraft,
+  isPendingCustomer,
+  issueMessageKey,
   keepAvailable,
+  needsOurConfirmation,
   parseFragmentToken,
   pickLocale,
   screenForReason,
   sourceKey,
   type AnswerPayload,
   type Draft,
+  type DraftIssue,
   type Locale,
   type ScreenState,
   type ViewEntry,
@@ -41,7 +46,8 @@ const vocabulary = readVocabulary();
 let locale: Locale = pickLocale(undefined, navigator.languages ?? [navigator.language]);
 
 function t(key: string, params: Record<string, string | number> = {}): string {
-  const template = vocabulary[locale][key] ?? vocabulary.en[key] ?? key;
+  // Never show a raw key: fall back to English, then to nothing.
+  const template = vocabulary[locale][key] ?? vocabulary.en[key] ?? '';
   return template.replace(/\{(\w+)\}/gu, (_match, name: string) =>
     name in params ? String(params[name]) : `{${name}}`
   );
@@ -77,6 +83,16 @@ function clear(): void {
   root.replaceChildren();
 }
 
+/** After a screen change: the new heading takes focus and the page starts at the top. */
+function focusHeading(): void {
+  const heading = root.querySelector('h1');
+  if (heading) {
+    heading.setAttribute('tabindex', '-1');
+    heading.focus({ preventScroll: true });
+  }
+  window.scrollTo(0, 0);
+}
+
 // ---------------------------------------------------------------------------
 // Plain states
 // ---------------------------------------------------------------------------
@@ -109,14 +125,11 @@ function showState(state: ScreenState): void {
   const keys = STATE_KEYS[state];
   const card = el('section', 'kb-callout cr-state');
   card.dataset.tone = keys.tone;
-  card.setAttribute('role', 'status');
+  card.setAttribute('role', state === 'unavailable' ? 'alert' : 'status');
   card.append(el('h1', 'kb-callout__title', t(keys.title)), el('p', 'kb-text', t(keys.body)));
   if (state === 'stale' || state === 'unavailable') {
-    const button = el(
-      'button',
-      'kb-btn kb-btn--primary',
-      t(state === 'stale' ? 'reload' : 'retry_action')
-    );
+    const actionKey: 'reload' | 'retry_action' = state === 'stale' ? 'reload' : 'retry_action';
+    const button = el('button', 'kb-btn kb-btn--primary', t(actionKey));
     button.type = 'button';
     button.addEventListener('click', () => {
       void start();
@@ -124,6 +137,7 @@ function showState(state: ScreenState): void {
     card.append(button);
   }
   root.append(card);
+  focusHeading();
 }
 
 function showLoading(): void {
@@ -140,6 +154,10 @@ function showLoading(): void {
 interface Session {
   view: ViewOpen;
   drafts: Map<string, Draft>;
+  /** Inline problems found when the person tried to review. */
+  issues: Map<string, DraftIssue>;
+  /** Set on submit: some answer needs our team's confirmation. */
+  pendingConfirmation?: boolean;
 }
 
 let session: Session | null = null;
@@ -173,16 +191,41 @@ function impactBlock(option: ViewEntry['options'][number]): HTMLElement | null {
 function currentLine(entry: ViewEntry): string {
   const wording = describeValue(entry, entry.current.value);
   const source = t(sourceKey(entry.current));
+  const line = isPendingCustomer(entry.current) ? 'current_line_pending' : 'current_line';
   switch (wording.kind) {
     case 'text':
-      return t('current_line', { value: wording.text, source });
+      return t(line, { value: wording.text, source });
     case 'approved':
-      return t('current_line', { value: t('value_approved'), source });
+      return t(line, { value: t('value_approved'), source });
     case 'changes_requested':
-      return t('current_line', { value: t('value_changes_requested'), source });
+      return t(line, { value: t('value_changes_requested'), source });
     default:
       return entry.requires_customer ? t('source_awaiting') : t('current_none');
   }
+}
+
+function draftBlock(entry: ViewEntry): HTMLElement | null {
+  const view = describeDraft(entry.draft);
+  if (view.kind === 'none') return null;
+  const box = el('div', 'kb-callout cr-draft');
+  box.dataset.tone = 'neutral';
+  box.append(el('p', 'kb-text kb-text--caption', t('draft_heading')));
+  if (view.kind === 'text') {
+    box.append(el('p', 'kb-text', view.text));
+  } else if (view.kind === 'list') {
+    const list = el('ul', 'cr-draft__list');
+    for (const item of view.items) list.append(el('li', 'kb-text', item));
+    box.append(list);
+  } else {
+    const list = el('dl', 'kb-kv cr-impact');
+    for (const [label, value] of view.pairs) {
+      const row = el('div', 'cr-impact__row');
+      row.append(el('dt', 'kb-kv__label', label), el('dd', 'kb-kv__value', value));
+      list.append(row);
+    }
+    box.append(list);
+  }
+  return box;
 }
 
 function radio(
@@ -211,6 +254,7 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
   card.dataset.entry = entry.entry_id;
   if (entry.requires_customer) card.dataset.tone = 'accent';
   const rerender = (): void => {
+    session?.issues.delete(entry.entry_id);
     const next = renderEntry(entry, index, total);
     card.replaceWith(next);
     updateProgress();
@@ -237,7 +281,9 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
   card.append(current);
 
   const name = `choice-${entry.entry_id}`;
-  const group = el('div', 'kb-choice-group');
+  const issue = session?.issues.get(entry.entry_id);
+  const group = el('fieldset', 'kb-choice-group cr-group');
+  group.append(el('legend', 'cr-sr-only', entry.question));
   const options = el('div', 'kb-choice-group__options');
   group.append(options);
 
@@ -258,6 +304,8 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
       );
     });
   } else if (entry.kind === 'approval') {
+    const draftNode = draftBlock(entry);
+    if (draftNode) card.append(draftNode);
     options.append(
       radio(name, t('approve'), draft.choice === 'approve', () => {
         draft.choice = 'approve';
@@ -269,7 +317,7 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
       })
     );
   } else if (entry.kind === 'ranking') {
-    card.append(el('p', 'kb-text kb-text--caption', t('ranking_hint')));
+    group.insertBefore(el('p', 'kb-text kb-text--caption', t('ranking_hint')), options);
     entry.options.forEach((option, optionIndex) => {
       const position = draft.ranking.indexOf(optionIndex);
       const wrap = el('label', 'kb-check cr-choice');
@@ -321,7 +369,16 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
       })
     );
   }
-  if (entry.kind !== 'hearing') card.append(group);
+  if (entry.kind !== 'hearing') {
+    if (issue === 'selection_invalid') {
+      const problem = el('p', 'kb-field__help cr-field-error', t('selection_invalid'));
+      problem.id = `err-${entry.entry_id}`;
+      group.setAttribute('aria-invalid', 'true');
+      group.setAttribute('aria-describedby', problem.id);
+      group.append(problem);
+    }
+    card.append(group);
+  }
 
   const needsComment = draft.choice === 'request_changes';
   const commentField = el('label', 'kb-field');
@@ -339,16 +396,39 @@ function renderEntry(entry: ViewEntry, index: number, total: number): HTMLElemen
   comment.placeholder = t('comment_placeholder');
   comment.addEventListener('input', () => {
     draft.comment = comment.value;
+    if (session?.issues.delete(entry.entry_id)) {
+      comment.removeAttribute('aria-invalid');
+      if (needsComment) comment.setAttribute('aria-describedby', `hint-${entry.entry_id}`);
+      else comment.removeAttribute('aria-describedby');
+      commentField.querySelector('.cr-field-error')?.remove();
+    }
     updateProgress();
   });
   commentField.append(comment);
-  if (needsComment) commentField.append(el('span', 'kb-field__help', t('request_changes_hint')));
+  if (needsComment) {
+    const hint = el('span', 'kb-field__help', t('request_changes_hint'));
+    hint.id = `hint-${entry.entry_id}`;
+    commentField.append(hint);
+    comment.setAttribute('aria-describedby', hint.id);
+  }
+  if (issue === 'comment_required') {
+    const problem = el('span', 'kb-field__help cr-field-error', t(issueMessageKey(issue)));
+    problem.id = `err-${entry.entry_id}`;
+    problem.setAttribute('role', 'alert');
+    comment.setAttribute('aria-invalid', 'true');
+    comment.setAttribute(
+      'aria-describedby',
+      [comment.getAttribute('aria-describedby'), problem.id].filter(Boolean).join(' ')
+    );
+    commentField.append(problem);
+  }
   card.append(commentField);
   return card;
 }
 
 let progressNode: HTMLElement | null = null;
 let reviewButton: HTMLButtonElement | null = null;
+let reviewHint: HTMLElement | null = null;
 
 function updateProgress(): void {
   if (!session || !progressNode) return;
@@ -358,6 +438,7 @@ function updateProgress(): void {
   progressNode.textContent =
     remaining > 0 ? t('remaining', { count: remaining }) : t('remaining_done');
   if (reviewButton) reviewButton.disabled = answered === 0;
+  if (reviewHint) reviewHint.hidden = answered > 0;
 }
 
 function showForm(): void {
@@ -366,15 +447,18 @@ function showForm(): void {
   clear();
   const header = el('header', 'kb-page-header cr-header');
   const titles = el('div', 'kb-page-header__titles');
+  titles.append(el('h1', 'kb-page-header__title', view.agenda.title));
+  if (view.agenda.from) {
+    titles.append(el('p', 'kb-page-header__subtitle', t('from_line', { from: view.agenda.from })));
+  }
   titles.append(
-    el('h1', 'kb-page-header__title', view.agenda.title),
     el('p', 'kb-page-header__subtitle', t('participant_line', { name: view.participant.name }))
   );
   header.append(titles);
   root.append(header);
 
   const role = el('div', 'kb-callout', undefined);
-  role.dataset.tone = view.participant.role === 'decider' ? 'info' : 'warning';
+  role.dataset.tone = 'info';
   role.append(
     el('p', 'kb-text', t(view.participant.role === 'decider' ? 'role_decider' : 'role_contributor'))
   );
@@ -385,7 +469,12 @@ function showForm(): void {
     const note = el(
       'p',
       'kb-text kb-text--muted',
-      t('previous_submission', { date: formatDate(last.submitted_at) })
+      t(
+        view.participant.role === 'decider'
+          ? 'previous_submission'
+          : 'previous_submission_contributor',
+        { date: formatDate(last.submitted_at) }
+      )
     );
     root.append(note);
   }
@@ -406,9 +495,13 @@ function showForm(): void {
   reviewButton = el('button', 'kb-btn kb-btn--primary', t('review_button'));
   reviewButton.type = 'button';
   reviewButton.addEventListener('click', showReview);
-  bar.append(reviewButton);
+  reviewHint = el('p', 'kb-text kb-text--caption', t('review_disabled_hint'));
+  reviewHint.id = 'review-hint';
+  reviewButton.setAttribute('aria-describedby', reviewHint.id);
+  bar.append(reviewButton, reviewHint);
   root.append(bar);
   updateProgress();
+  focusHeading();
 }
 
 function latestReceipt(receipts: readonly ViewReceipt[]): ViewReceipt | undefined {
@@ -452,18 +545,39 @@ function showReview(): void {
   const { view, drafts } = session;
   const built = buildAnswers(view.entries, drafts);
   if (built.issues.length > 0) {
+    session.issues = new Map(built.issues.map((item) => [item.entry_id, item.issue]));
+    for (const item of built.issues) {
+      const card = root.querySelector(`[data-entry="${item.entry_id}"]`);
+      const entry = view.entries.find((candidate) => candidate.entry_id === item.entry_id);
+      if (card && entry) {
+        const index = view.entries.indexOf(entry);
+        card.replaceWith(renderEntry(entry, index, view.entries.length));
+      }
+    }
     const first = built.issues[0];
-    const target = root.querySelector(`[data-entry="${first.entry_id}"]`);
-    target?.scrollIntoView({ block: 'center' });
+    const invalid = root.querySelector<HTMLElement>(
+      `[data-entry="${first.entry_id}"] [aria-invalid="true"]`
+    );
+    invalid?.scrollIntoView({ block: 'center' });
+    invalid?.focus();
     return;
   }
+  session.issues.clear();
+  session.pendingConfirmation =
+    view.participant.role === 'decider' && needsOurConfirmation(view.entries, built.answers);
   clear();
   root.append(el('h1', 'kb-page-header__title', t('review_heading')));
   root.append(
     el(
       'p',
       'kb-text',
-      t(view.participant.role === 'decider' ? 'review_lead_decider' : 'review_lead_contributor')
+      t(
+        view.participant.role !== 'decider'
+          ? 'review_lead_contributor'
+          : session.pendingConfirmation
+            ? 'review_lead_pending'
+            : 'review_lead_decider'
+      )
     )
   );
   const error = el('p', 'kb-callout cr-error');
@@ -473,14 +587,15 @@ function showReview(): void {
   if (built.answers.length === 0) {
     root.append(el('p', 'kb-text', t('review_empty')));
   }
-  const list = el('ul', 'kb-list cr-review');
+  const list = el('ol', 'kb-list cr-review');
+  let rowNumber = 0;
   for (const answer of built.answers) {
     const entry = view.entries.find((item) => item.entry_id === answer.entry_id);
     if (!entry) continue;
     const row = el('li', 'kb-list__item');
     const body = el('div', 'kb-list__body');
     body.append(
-      el('p', 'kb-list__title', entry.question),
+      el('p', 'kb-list__title', `${(rowNumber += 1)}. ${entry.question}`),
       el('p', 'kb-text', answerSummary(entry, answer))
     );
     if (answer.comment) {
@@ -503,6 +618,7 @@ function showReview(): void {
   });
   bar.append(back, submit);
   root.append(bar);
+  focusHeading();
 }
 
 async function send(
@@ -542,7 +658,17 @@ function showReceipt(body: Record<string, unknown>): void {
   card.setAttribute('role', 'status');
   card.append(
     el('h1', 'kb-callout__title', t('receipt_title')),
-    el('p', 'kb-text', t(decider ? 'receipt_decider' : 'receipt_contributor'))
+    el(
+      'p',
+      'kb-text',
+      t(
+        !decider
+          ? 'receipt_contributor'
+          : session?.pendingConfirmation
+            ? 'receipt_pending'
+            : 'receipt_decider'
+      )
+    )
   );
   const changes = typeof body.change_requests === 'number' ? body.change_requests : 0;
   if (changes > 0) card.append(el('p', 'kb-text', t('receipt_changes', { count: changes })));
@@ -554,6 +680,7 @@ function showReceipt(body: Record<string, unknown>): void {
   });
   card.append(again);
   root.append(card);
+  focusHeading();
 }
 
 // ---------------------------------------------------------------------------
@@ -582,7 +709,7 @@ async function load(): Promise<void> {
   if (state === 'open') {
     const view = body as unknown as ViewOpen;
     setLocale(pickLocale(view.agenda.locale, navigator.languages ?? [navigator.language]));
-    session = { view, drafts: new Map() };
+    session = { view, drafts: new Map(), issues: new Map() };
     showForm();
     return;
   }

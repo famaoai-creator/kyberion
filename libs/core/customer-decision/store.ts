@@ -8,10 +8,22 @@
  *   knowledge/confidential/<tenant>/decisions/<case>/respond-journal/<receipt_id>.json  write-ahead, removed when done
  *
  * Every read-plan-write sequence on a case (agenda edits, approval pins, sends,
- * responses, confirmations) runs under one inter-process lock per tenant +
- * case ({@link withCustomerDecisionCaseLock}), so two concurrent responses
- * can never lose a decision, assign the same ledger id twice or both write a
- * receipt for one double submit.
+ * responses, confirmations, close / withdraw) runs under one inter-process
+ * lock per tenant + case ({@link withCustomerDecisionCaseLock}), so two
+ * concurrent responses can never lose a decision or both write a receipt for
+ * one double submit. The case lock also holds the decision ledger's own lock
+ * (`withDecisionLedgerLock`, taken inside every ledger write) for the whole
+ * sequence, so a concurrent `pnpm decisions` writer — which takes only the
+ * ledger lock — queues behind it and cannot invalidate the decision ids a
+ * respond pre-assigns in its journal. Lock order is always case → ledger;
+ * the ledger lock never takes the case lock, so the order cannot invert.
+ *
+ * The respond journal stays beside the ledger (not on the runtime floor): it
+ * guards the ledger records it pre-assigns, so it is written and read under
+ * the same `decision_ledger` role, the same tenant scope and the same locks
+ * as those records, and it holds the same confidential data (the receipt).
+ * It is removed when the run completes; a leftover record is a run that
+ * `reconcileCase` must still finish, never stale cache.
  *
  * Nothing goes under `system/`. All I/O goes through secure-io, every record is
  * schema-validated on write and on read, and the location reuses the ledger's
@@ -22,6 +34,7 @@ import * as path from 'node:path';
 import { logger } from '../core.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { withLockSync } from '../foundation/lock-utils.js';
+import { isValidTenantSlug } from '../foundation/scope.js';
 import { appendJsonLine, readJsonIfPresent, readJsonLines, writeJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
 import {
@@ -31,7 +44,12 @@ import {
   safeReaddir,
   safeRmSync,
 } from '../secure-io.js';
-import { ledgerDir, type DecisionLedgerLocation } from '../decision-ledger/ledger.js';
+import { CUSTOMER_SLUG_PATTERN } from '../decision-ledger/model.js';
+import {
+  ledgerDir,
+  withDecisionLedgerLock,
+  type DecisionLedgerLocation,
+} from '../decision-ledger/ledger.js';
 import {
   AGENDA_ID_PATTERN,
   CUSTOMER_DECISION_LAYOUT,
@@ -262,8 +280,12 @@ export function readSwitches(
 // Case lock (inter-process; one per tenant + case)
 // ---------------------------------------------------------------------------
 
-/** Long enough to queue behind a respond, short of the customer room's 15 s child limit. */
-export const CUSTOMER_DECISION_CASE_LOCK_TIMEOUT_MS = 10_000;
+/**
+ * Total wait for both locks (case, then ledger): long enough to queue behind a
+ * respond, leaving room for the work itself inside the customer room's 15 s
+ * child limit.
+ */
+export const CUSTOMER_DECISION_CASE_LOCK_TIMEOUT_MS = 8_000;
 
 /** The lock resource of a case: tenant + case, or a hash of a test `dir`. */
 export function customerDecisionCaseLockId(location: CustomerDecisionLocation): string {
@@ -277,25 +299,56 @@ export function customerDecisionCaseLockId(location: CustomerDecisionLocation): 
 }
 
 /**
- * Run `fn` holding the case lock. The lock file lives under
- * `active/shared/runtime/locks/` (security-policy default_allow), so take it
- * under the caller's own identity, OUTSIDE any narrow store role, and do all
- * reads, planning and writes of the sequence inside `fn`. Not re-entrant.
+ * Run `fn` holding the case lock, then the case's ledger lock (order: case →
+ * ledger). The lock files live under `active/shared/runtime/locks/`
+ * (security-policy default_allow), so take it under the caller's own
+ * identity, OUTSIDE any narrow store role, and do all reads, planning and
+ * writes of the sequence inside `fn`. The case lock is not re-entrant; the
+ * ledger lock is (ledger writes inside `fn` re-enter it).
  */
 export function withCustomerDecisionCaseLock<T>(
   location: CustomerDecisionLocation,
   fn: () => T,
   timeoutMs = CUSTOMER_DECISION_CASE_LOCK_TIMEOUT_MS
 ): T {
-  return withLockSync(customerDecisionCaseLockId(location), fn, timeoutMs);
+  // One deadline for both waits: the ledger lock gets whatever the case lock left.
+  const deadline = Date.now() + timeoutMs;
+  return withLockSync(
+    customerDecisionCaseLockId(location),
+    () => withDecisionLedgerLock(location, fn, Math.max(1, deadline - Date.now())),
+    timeoutMs
+  );
+}
+
+/**
+ * Run `fn` holding the lock of a customer's actor registry
+ * (`customers/<customer>/actors.json`), which every case of that customer
+ * shares, so the case lock does not cover it. Same identity rule as the case
+ * lock: take it outside the store role and re-read the registry inside `fn`.
+ */
+export function withCustomerActorsLock<T>(
+  tenantSlug: string,
+  customer: string,
+  fn: () => T,
+  timeoutMs = CUSTOMER_DECISION_CASE_LOCK_TIMEOUT_MS
+): T {
+  if (!isValidTenantSlug(tenantSlug) || !CUSTOMER_SLUG_PATTERN.test(customer)) {
+    throw new Error('[CUSTOMER_DECISION_ACTORS_LOCK_INVALID] invalid tenant or customer slug');
+  }
+  return withLockSync(`customer-decision-actors-${tenantSlug}-${customer}`, fn, timeoutMs);
 }
 
 // ---------------------------------------------------------------------------
 // Respond journal (write-ahead record of one respond run)
 // ---------------------------------------------------------------------------
 
-/** The last step of a respond run known to be done. */
-export type RespondJournalStage = 'planned' | 'ledger_written' | 'receipt_written' | 'audited';
+/**
+ * The last step of a respond run known to be done. `auditing` is written just
+ * before the audit entry: a run found there may or may not have recorded it,
+ * so completion checks the audit chain first (never a second entry).
+ */
+export type RespondJournalStage =
+  'planned' | 'ledger_written' | 'receipt_written' | 'auditing' | 'audited';
 
 export interface RespondJournalRecord {
   version: '1.0.0';

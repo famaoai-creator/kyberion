@@ -24,9 +24,9 @@
     "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
     "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
     "stage": {
-      "description": "The last step known to be done: planned (nothing written yet), ledger_written, receipt_written, audited.",
+      "description": "The last step known to be done: planned (nothing written yet), ledger_written, receipt_written, auditing (the audit entry may or may not be recorded: completion checks the audit chain before recording it), audited.",
       "type": "string",
-      "enum": ["planned", "ledger_written", "receipt_written", "audited"]
+      "enum": ["planned", "ledger_written", "receipt_written", "auditing", "audited"]
     },
     "receipt": {
       "description": "The receipt this run writes (validated against customer-decision-receipt.schema.json on its own).",

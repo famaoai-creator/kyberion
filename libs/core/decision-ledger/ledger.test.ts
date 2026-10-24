@@ -7,12 +7,14 @@ import {
   appendDecisions,
   applyPromotions,
   customerActorsPath,
+  decisionLedgerLockId,
   ledgerDir,
   nextDecisionId,
   readCustomerActors,
   readLedger,
   readObserved,
   validateAppend,
+  withDecisionLedgerLock,
   writeConformance,
   writeCustomerActors,
   writeObserved,
@@ -20,6 +22,7 @@ import {
   type DecisionAppendInput,
 } from './ledger.js';
 import { buildLock, checkConformance } from './conformance.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { hearingAnswersToProductConcept } from './product-concept.js';
 
 const NOW = '2026-09-14T00:00:00.000Z';
@@ -253,5 +256,29 @@ describe('decision ledger', () => {
     );
     const file = writeProductConcept({ dir }, concept);
     expect(file).toContain('/concepts/PC-sess-9.json');
+  });
+
+  it('serializes ledger writes under one re-entrant lock per ledger', () => {
+    expect(decisionLedgerLockId({ tenantSlug: 'acme-corp', caseId: 'case-a' })).toBe(
+      'decision-ledger-acme-corp-case-a'
+    );
+    expect(decisionLedgerLockId({ dir })).toMatch(/^decision-ledger-dir-[a-f0-9]{24}$/u);
+    const id = decisionLedgerLockId({ dir });
+    const appended = withDecisionLedgerLock({ dir }, () => {
+      // Held: another acquirer of this ledger's lock (a second process) cannot get in.
+      expect(() => withLockSync(id, () => 'in', 100)).toThrow(/LOCK_TIMEOUT/u);
+      // Re-entrant in this process: the append inside takes it again without waiting.
+      const started = Date.now();
+      const result = appendDecisions({ dir }, [proposal()]);
+      expect(Date.now() - started).toBeLessThan(2000);
+      return result.appended;
+    });
+    expect(appended.map((record) => record.id)).toEqual(['D-0001']);
+    // Released afterwards, also when the inner write throws.
+    expect(withLockSync(id, () => 'free', 100)).toBe('free');
+    expect(() => appendDecisions({ dir }, [proposal({ level: 'nope' as never })])).toThrow(
+      DecisionLedgerError
+    );
+    expect(withLockSync(id, () => 'free again', 100)).toBe('free again');
   });
 });

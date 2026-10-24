@@ -21,8 +21,16 @@ export interface ViewEntry {
   background?: string;
   options: ViewOption[];
   requires_customer: boolean;
-  current: { status: string; layer: string; value?: unknown };
+  current: {
+    status: string;
+    layer: string;
+    value?: unknown;
+    /** Set when a customer answer is recorded but our team has not confirmed it yet. */
+    awaiting_operator_confirmation?: boolean;
+  };
   overridable: boolean;
+  /** Approval entries: the draft value being approved. */
+  draft?: unknown;
 }
 
 export interface ViewParticipant {
@@ -39,7 +47,7 @@ export interface ViewReceipt {
 export interface ViewOpen {
   ok: true;
   state: 'open';
-  agenda: { title: string; locale: Locale; revision: number };
+  agenda: { title: string; locale: Locale; revision: number; from?: string };
   participant: ViewParticipant;
   content_hash: string;
   entries: ViewEntry[];
@@ -125,11 +133,27 @@ export function pickLocale(
 // ---------------------------------------------------------------------------
 
 export type SourceKey =
-  'source_ours' | 'source_org_default' | 'source_customer' | 'source_awaiting';
+  | 'source_ours'
+  | 'source_org_default'
+  | 'source_customer'
+  | 'source_customer_pending'
+  | 'source_awaiting';
+
+/** Whether the value in force is a customer answer our team has not confirmed yet. */
+export function isPendingCustomer(current: ViewEntry['current']): boolean {
+  return (
+    current.layer === 'customer' &&
+    (current.awaiting_operator_confirmation === true || current.status === 'provisional')
+  );
+}
 
 export function sourceKey(current: ViewEntry['current']): SourceKey {
-  if (current.value === undefined) return 'source_awaiting';
-  if (current.layer === 'customer') return 'source_customer';
+  if (current.value === undefined || current.status === 'awaiting_customer') {
+    return 'source_awaiting';
+  }
+  if (current.layer === 'customer') {
+    return isPendingCustomer(current) ? 'source_customer_pending' : 'source_customer';
+  }
   if (current.layer === 'ours') return 'source_ours';
   if (current.layer === 'org_default') return 'source_org_default';
   return 'source_awaiting';
@@ -184,6 +208,46 @@ export function describeValue(entry: ViewEntry, value: unknown): ValueWording {
   return { kind: 'none' };
 }
 
+export type DraftView =
+  | { kind: 'text'; text: string }
+  | { kind: 'list'; items: string[] }
+  | { kind: 'pairs'; pairs: Array<[string, string]> }
+  | { kind: 'none' };
+
+function plain(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  if (value === null || value === undefined) return '';
+  return JSON.stringify(value);
+}
+
+/** How an approval's draft is shown: a sentence, a list, or label/value rows. */
+export function describeDraft(draft: unknown): DraftView {
+  if (draft === undefined || draft === null) return { kind: 'none' };
+  if (Array.isArray(draft)) {
+    const items = draft.map(plain).filter((item) => item.trim());
+    return items.length > 0 ? { kind: 'list', items } : { kind: 'none' };
+  }
+  if (typeof draft === 'object') {
+    const pairs = Object.entries(draft as Record<string, unknown>)
+      .map(([key, value]): [string, string] => [key, plain(value)])
+      .filter(([, value]) => value.trim());
+    return pairs.length > 0 ? { kind: 'pairs', pairs } : { kind: 'none' };
+  }
+  const text = plain(draft);
+  return text.trim() ? { kind: 'text', text } : { kind: 'none' };
+}
+
+/** True when a submitted answer to an item that needs the customer still needs our confirmation. */
+export function needsOurConfirmation(
+  entries: readonly ViewEntry[],
+  answers: readonly AnswerPayload[]
+): boolean {
+  return answers.some(
+    (answer) => entries.find((entry) => entry.entry_id === answer.entry_id)?.requires_customer
+  );
+}
+
 export function keepAvailable(entry: ViewEntry): boolean {
   return (
     entry.current.value !== undefined && describeValue(entry, entry.current.value).kind !== 'none'
@@ -199,6 +263,11 @@ export type DraftIssue = 'comment_required' | 'selection_invalid';
 export interface BuiltAnswers {
   answers: AnswerPayload[];
   issues: Array<{ entry_id: string; issue: DraftIssue }>;
+}
+
+/** Vocabulary key of the inline help for a draft issue. */
+export function issueMessageKey(issue: DraftIssue): 'comment_missing' | 'selection_invalid' {
+  return issue === 'comment_required' ? 'comment_missing' : 'selection_invalid';
 }
 
 function withComment(answer: AnswerPayload, comment: string): AnswerPayload {

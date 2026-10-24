@@ -91,3 +91,31 @@ body {
     min-width: 10rem;
   }
 }
+
+.cr-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.cr-group {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+.cr-field-error {
+  color: var(--kb-ui-danger-fg, currentColor);
+}
+
+.cr-draft__list {
+  margin: 0;
+  padding-left: var(--kb-ui-space-4);
+}

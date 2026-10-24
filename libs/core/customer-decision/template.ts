@@ -78,6 +78,8 @@ export interface InstantiateTemplateOptions {
   locale: 'ja' | 'en';
   now: string;
   title?: string;
+  /** Who the request is from, as the customer sees it. */
+  from?: string;
   dealId?: string;
   projectId?: string;
   resolveText?: TemplateTextResolver;
@@ -99,6 +101,7 @@ export function instantiateTemplate(
     case_id: opts.caseId,
     customer: opts.customer,
     title: opts.title ?? text(template.title_key, locale),
+    ...(opts.from ? { from: opts.from } : {}),
     phase: template.phase,
     revision: 1,
     locale,

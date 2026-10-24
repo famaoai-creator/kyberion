@@ -77,6 +77,8 @@ export interface DecisionAgenda {
   case_id: string;
   customer: string;
   title: string;
+  /** Who the request is from, as the customer sees it. In the content hash when present. */
+  from?: string;
   phase: string;
   revision: number;
   locale: 'ja' | 'en';
@@ -123,6 +125,8 @@ export interface OperatorConfirmation {
   /** `user:<member>` */
   by: string;
   at: string;
+  /** The approval request (`customer_decision:operator_confirm`) that authorized it. */
+  request_id?: string;
 }
 
 export type EffectiveDecisionStatus =
