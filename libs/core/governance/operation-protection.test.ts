@@ -33,6 +33,13 @@ describe('live operation interface and argument-origin protection', () => {
         'calendar:create_event',
         'service:slack:preset:post_message',
         'tenant:attest_provider',
+        'network:fetch',
+        'network:a2a_send',
+        'deployment:deploy_release',
+        'voice:speak',
+        'voice:record_sample',
+        'media:image:fixture:generate',
+        'media:video:fixture:submit',
       ]) {
         const binding = defaultOperationInterface(op);
         expect(binding?.tool).toBe(op);

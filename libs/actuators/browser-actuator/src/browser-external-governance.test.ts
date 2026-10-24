@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Page } from '@playwright/test';
 
@@ -160,7 +161,11 @@ describe('browser external governance', () => {
   });
 
   it('binds actual page/tab/target and executes one trusted human-approved click', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const resolver = vi.fn(() => authority);
     await withExternalOperationAuthority(resolver, () =>
       opApply('click', { selector: '#submit' }, runtime, { tenant_slug: 'forged' }, resolve)
@@ -184,7 +189,11 @@ describe('browser external governance', () => {
   });
 
   it('never retries a timed-out mutation even with explicit retry params', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     vi.mocked(page.click).mockRejectedValue(new Error('timeout after possible click'));
     await expect(
       withExternalOperationAuthority(
@@ -200,7 +209,11 @@ describe('browser external governance', () => {
   });
 
   it('executes the exact resolved target that admission reviewed', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     let selector = '#reviewed';
     await withExternalOperationAuthority(
       () => {
@@ -216,7 +229,11 @@ describe('browser external governance', () => {
   });
 
   it('rejects a page change between admission and execution', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await expect(
       withExternalOperationAuthority(
         () => {
@@ -230,7 +247,11 @@ describe('browser external governance', () => {
   });
 
   it('does not try another fill strategy after attempting the first fill', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     vi.mocked(page.fill).mockRejectedValue(new Error('fill timeout'));
     await expect(
       withExternalOperationAuthority(
@@ -243,7 +264,11 @@ describe('browser external governance', () => {
   });
 
   it('retains secret and missing-ref floors after admission', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await expect(
       withExternalOperationAuthority(
         () => authority,
@@ -333,3 +358,12 @@ describe('browser external governance', () => {
     ).toBe(Infinity);
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

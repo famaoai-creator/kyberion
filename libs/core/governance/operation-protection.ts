@@ -108,8 +108,12 @@ export function defaultOperationInterface(
     browser: 'libs/actuators/browser-actuator/manifest.json',
     email: 'libs/actuators/email-actuator/manifest.json',
     meeting: 'libs/actuators/meeting-actuator/manifest.json',
-    calendar: 'libs/actuators/meeting-actuator/manifest.json',
+    calendar: 'libs/actuators/calendar-actuator/manifest.json',
     vcs: 'libs/actuators/vcs-actuator/manifest.json',
+    network: 'libs/actuators/network-actuator/manifest.json',
+    deployment: 'libs/actuators/deployment-actuator/manifest.json',
+    voice: 'libs/actuators/voice-actuator/manifest.json',
+    media: 'libs/actuators/media-generation-actuator/manifest.json',
   };
   if (operationId === 'tenant:attest_provider')
     return operationInterfaceResolver({
