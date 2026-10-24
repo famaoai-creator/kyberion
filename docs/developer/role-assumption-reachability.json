@@ -1132,6 +1132,31 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/nhi-session-admission.ts#applyNhiSessionAdmission",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/nhi-session-admission.ts#applyNhiSessionAdmission (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/nhi-session-admission.ts#applyNhiSessionAdmission (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/nhi-session-admission.ts#requestNhiSessionAdmission (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/nhi-session-admission.ts#revokeNhiSessionAdmission",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -3144,6 +3169,11 @@
     },
     {
       "site": "scripts/onboarding_llm.ts#show",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/onboarding_nhi_session.ts#main",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },

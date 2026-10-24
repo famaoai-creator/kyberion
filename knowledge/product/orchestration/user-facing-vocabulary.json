@@ -6991,7 +6991,7 @@
       "cli_cmd_script_onboarding_nhi_session": {
         "en": "Request, apply, list and revoke human-approved NHI session admissions",
         "ja": "人間が承認した NHI セッション admission の要求・適用・一覧・取り消しを行います",
-        "qps-ploc": "⟦Řėɋůėşŧ, ȧṗṗŀẏ, ŀïşŧ ȧñḓ řėṽőķė ħůɱȧñ-ȧṗṗřőṽėḓ ŃĦÏ şėşşïőñ ȧḓɱïşşïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+        "qps-ploc": "⟦Řėɋůėşŧ, ȧṗṗŀẏ, ŀïşŧ ȧñḓ řėṽőķė ħůɱȧñ-ȧṗṗřőṽėḓ ÑĦÏ şėşşïőñ ȧḓɱïşşïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "cli_readiness": {
         "en": "Readiness",
