@@ -189,15 +189,17 @@ async function executeOrganizationOperationLocked(input: {
           operation_run_id: runId,
         },
       });
-    const result = scheduled
-      ? await withExecutionContextAsync(
-          SCHEDULED_OPERATION_ROLE,
-          runPipeline,
-          undefined,
-          tenantSlug,
-          organizationId
-        )
-      : await runPipeline();
+    // Bind tenant/organization so scoped cadence ops (standup/retro) list
+    // `active/organizations/<tier>/<tenant>/` instead of the protected tier
+    // parent. Scheduled ticks run as organization_operator; attended CLI keeps
+    // sovereign so customer-stance traces remain writable.
+    const result = await withExecutionContextAsync(
+      scheduled ? SCHEDULED_OPERATION_ROLE : 'sovereign',
+      runPipeline,
+      scheduled ? undefined : 'sovereign',
+      tenantSlug,
+      organizationId
+    );
     evidenceRefs = [`trace:${result.trace.traceId}`];
     if (result.results.some((step) => step.status === 'failed')) {
       status = 'failed';

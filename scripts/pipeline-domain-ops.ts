@@ -47,12 +47,16 @@ import { runRegisterAvatar } from './register_avatar.js';
 import { runOAuthSetupForService } from './setup_oauth.js';
 import { runOrganizationDigest } from '@agent/core/organization/organization-digest';
 import { persistOrganizationDigest } from '@agent/core/organization/organization-digest-artifacts';
-import { runOrganizationOperationTick } from '@agent/core/organization/organization-cadence';
+import {
+  runOrganizationOperationTick,
+  type OrganizationCadenceScope,
+} from '@agent/core/organization/organization-cadence';
 import {
   runOrganizationStandup,
   type CadencePersistence,
 } from '@agent/core/organization/organization-standup';
 import { runOrganizationRetro } from '@agent/core/organization/organization-retro';
+import type { OrganizationTier } from '@agent/core/organization/organization-operating-model';
 import { runAccountabilityDigest } from '@agent/core/governance/accountability-digest';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import {
@@ -968,6 +972,35 @@ function cadenceNumber(value: unknown, ctx: Record<string, unknown>): number | u
 }
 
 /**
+ * When a pipeline carries organization identity (operation execute / scoped
+ * cadence), pass it through so standup/retro list only that tenant path.
+ * Cross-tenant discovery readdir's `active/organizations/<tier>/`, which the
+ * tenant-scope guard rejects — scoped mode is the operable path under a bound
+ * tenant.
+ */
+function cadenceScopeFromContext(
+  params: Record<string, unknown>,
+  ctx: Record<string, unknown>
+): OrganizationCadenceScope | undefined {
+  const organizationId = String(
+    resolveVars(params.organization_id ?? ctx.organization_id ?? '', ctx)
+  ).trim();
+  const tierRaw = String(resolveVars(params.tier ?? ctx.tier ?? '', ctx)).trim();
+  const tenantSlug = String(resolveVars(params.tenant_slug ?? ctx.tenant_slug ?? '', ctx)).trim();
+  if (!organizationId) return undefined;
+  if (tierRaw !== 'public' && tierRaw !== 'confidential' && tierRaw !== 'personal') {
+    return undefined;
+  }
+  const tier = tierRaw as OrganizationTier;
+  if (tier !== 'public' && !tenantSlug) return undefined;
+  return {
+    organizationId,
+    tier,
+    ...(tenantSlug ? { tenantSlug } : {}),
+  };
+}
+
+/**
  * core:organization_operation_tick — sovereign-only sweep that runs every due
  * scheduled organization operation (and recovers interrupted runs) across
  * tenants. `apply: false` reports what is due without running it.
@@ -993,7 +1026,7 @@ export async function runInlineOrganizationOperationTick(
   return result;
 }
 
-/** core:organization_standup — sovereign-only standup per organization (filed + notified). */
+/** core:organization_standup — scoped when ctx has org identity; else sovereign cross-tenant. */
 export function runInlineOrganizationStandup(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
@@ -1001,7 +1034,9 @@ export function runInlineOrganizationStandup(
 ): Record<string, unknown> {
   const timezone = String(resolveVars(params.timezone ?? '', ctx)).trim() || undefined;
   const locale = cadenceLocale('organization_standup', params, ctx);
+  const scope = cadenceScopeFromContext(params, ctx);
   const result = runOrganizationStandup({
+    ...(scope ? { scope } : {}),
     ...(timezone ? { timezone } : {}),
     ...(locale ? { locale } : {}),
     sinceHours: cadenceNumber(params.since_hours, ctx),
@@ -1018,7 +1053,7 @@ export function runInlineOrganizationStandup(
   );
 }
 
-/** core:organization_retro — sovereign-only weekly retro per organization (filed + notified). */
+/** core:organization_retro — scoped when ctx has org identity; else sovereign cross-tenant. */
 export function runInlineOrganizationRetro(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
@@ -1026,7 +1061,9 @@ export function runInlineOrganizationRetro(
 ): Record<string, unknown> {
   const timezone = String(resolveVars(params.timezone ?? '', ctx)).trim() || undefined;
   const locale = cadenceLocale('organization_retro', params, ctx);
+  const scope = cadenceScopeFromContext(params, ctx);
   const result = runOrganizationRetro({
+    ...(scope ? { scope } : {}),
     ...(timezone ? { timezone } : {}),
     ...(locale ? { locale } : {}),
     sinceDays: cadenceNumber(params.since_days, ctx),
