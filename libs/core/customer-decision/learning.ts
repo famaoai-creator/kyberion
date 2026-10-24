@@ -600,9 +600,13 @@ export interface CustomerDecisionLearningReport {
 export type LearningCandidateOutcome = 'created' | 'existing' | 'refused' | 'failed';
 
 /**
- * The suggestions earlier reports stand for, by suggestion key: the latest
- * report entry whose candidate was queued (`created` / `existing`, or no
- * recorded outcome). `reports` in any order.
+ * The suggestions earlier reports stand for, by suggestion key, with the
+ * evidence each standing candidate was QUEUED with: the report entry that
+ * queued it (`created`, or no recorded outcome). A later `existing` entry for
+ * the same candidate records that week's evidence and never replaces it, so
+ * the material-change check always compares against the queueing baseline
+ * (3 queued → 5 → 9 re-queues at 9, not never). An `existing` entry naming a
+ * candidate no report queued is taken as is. `reports` in any order.
  */
 export function standingLearningSuggestions(
   reports: readonly Pick<CustomerDecisionLearningReport, 'report_date' | 'suggestions'>[]
@@ -611,6 +615,9 @@ export function standingLearningSuggestions(
   for (const report of [...reports].sort((a, b) => a.report_date.localeCompare(b.report_date))) {
     for (const suggestion of report.suggestions) {
       if (suggestion.candidate === 'refused' || suggestion.candidate === 'failed') continue;
+      const current = standing.get(suggestion.suggestion_key);
+      if (suggestion.candidate === 'existing' && current?.learning_id === suggestion.learning_id)
+        continue;
       standing.set(suggestion.suggestion_key, suggestion);
     }
   }
