@@ -3,9 +3,17 @@
 import { frontDeskFetch as fetch } from '../../lib/front-desk-fetch';
 
 import * as React from 'react';
-import { Button, Callout, SaveBar, Skeleton } from '@agent/shared-ui';
+import {
+  Button,
+  Callout,
+  SaveBar,
+  SettingRow,
+  SettingsGroup,
+  Skeleton,
+  StatusPill,
+} from '@agent/shared-ui';
 import { useConciergeI18n } from '../../lib/use-concierge-i18n';
-import { frontDeskText, type FrontDeskMessageKey } from '../../lib/i18n';
+import { frontDeskText, type ConciergeMessageKey, type FrontDeskMessageKey } from '../../lib/i18n';
 import { parseSetupResponse, type Setup as SetupPayload } from '../../lib/setup-response';
 import { parseConciergeMutationResponse } from '../../lib/mutation-response';
 import {
@@ -14,7 +22,7 @@ import {
   parsePluginListResponse,
 } from '../../lib/setup-auxiliary-response';
 import {
-  SETTINGS_CARD_SECTION_ORDER,
+  orderSectionsForFirstRun,
   resolveSelectedServices,
   SETTINGS_SECTION_ORDER,
   type SettingsSectionId,
@@ -66,7 +74,6 @@ import {
 } from '../../lib/tenant-context';
 import { createSettingsNavigation, SETTINGS_SECTION_ELEMENT_ID } from './settings-navigation';
 import './settings.css';
-import { SettingsReadiness } from './settings-readiness';
 
 /**
  * FD-06 (設定): `/setup` and the companion `/onboarding` wizard fold into
@@ -96,6 +103,21 @@ const sameProfile = (a: ProfileDraft, b: ProfileDraft) =>
   a.primary_domain === b.primary_domain &&
   a.vision === b.vision &&
   a.agent_id === b.agent_id;
+
+const DIAG_LABELS: Record<string, ConciergeMessageKey> = {
+  profile: 'setup.diag.profile',
+  avatar: 'setup.diag.avatar',
+  voice: 'setup.diag.voice',
+  services: 'setup.diag.services',
+  notifications: 'setup.diag.notifications',
+  reasoning: 'setup.diag.reasoning',
+};
+
+// Items with no in-app fix degrade to polite guidance (never a raw command
+// printout as the primary copy — the command stays visually secondary).
+const DIAG_GUIDANCE: Record<string, ConciergeMessageKey> = {
+  reasoning: 'setup.reasoning_guidance',
+};
 
 /** Section heading label (front_desk:settings_nav_*), in the fixed sub-nav order. */
 const SETTINGS_NAV_LABEL_KEYS: Record<SettingsSectionId, FrontDeskMessageKey> = {
@@ -1125,8 +1147,7 @@ export default function SettingsPage() {
   const channelDisplayName = (surface: string) =>
     notifChannels.find((channel) => channel.surface === surface)?.display_name || surface;
   const firstRun = !setup.diagnostics.every((item) => item.status === 'ok');
-  // Keep the body in menu order as diagnostics arrive or change after saving.
-  const sectionOrder = SETTINGS_CARD_SECTION_ORDER;
+  const sectionOrder = orderSectionsForFirstRun(setup.diagnostics);
 
   const setSectionRef = (id: SettingsSectionId) => (element: HTMLElement | null) => {
     sectionRefs.current[id] = element;
@@ -1332,7 +1353,58 @@ export default function SettingsPage() {
         </p>
       ) : null}
 
-      <SettingsReadiness diagnostics={setup.diagnostics} t={t} onNavigate={jumpToSection} />
+      <SettingsGroup
+        id="settings-readiness"
+        title={t('setup.readiness_title')}
+        description={t('setup.readiness_description')}
+      >
+        {setup.diagnostics.map((item) => {
+          const labelKey = DIAG_LABELS[item.id];
+          const guidanceKey = DIAG_GUIDANCE[item.id];
+          const showGuidance = item.status !== 'ok' && !item.action && guidanceKey;
+          return (
+            <div className="settings-row-group" key={item.id}>
+              <SettingRow label={labelKey ? t(labelKey) : item.id}>
+                <div className="settings-inline-actions">
+                  <StatusPill
+                    status={
+                      item.status === 'ok'
+                        ? 'completed'
+                        : item.status === 'error'
+                          ? 'error'
+                          : 'needs_setup'
+                    }
+                    label={
+                      item.status === 'ok'
+                        ? t('setup.completed')
+                        : item.status === 'error'
+                          ? t('setup.diag_error')
+                          : t('setup.incomplete')
+                    }
+                  />
+                  {item.status !== 'ok' && item.action?.type === 'navigate' ? (
+                    <Button
+                      label={t('setup.fix_here')}
+                      variant="secondary"
+                      onClick={() => jumpToSection(item.action!.target)}
+                    />
+                  ) : null}
+                </div>
+              </SettingRow>
+              {showGuidance ? (
+                <div className="settings-row-block">
+                  <p className="kb-text kb-text--muted">{t(guidanceKey)}</p>
+                  {item.command ? (
+                    <p className="kb-text kb-text--caption readiness-command">
+                      {t('setup.reasoning_command_hint', { value: item.command })}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
+      </SettingsGroup>
 
       {notice ? (
         <div role="status" aria-live="polite">
@@ -1345,7 +1417,7 @@ export default function SettingsPage() {
       ) : null}
 
       <div className="settings-layout">
-        <nav className="settings-subnav" aria-label={frontDeskText('nav_settings', locale)}>
+        <nav className="settings-subnav" aria-label="Settings sections">
           <ul>
             {SETTINGS_SECTION_ORDER.map((id) => (
               <li key={id}>

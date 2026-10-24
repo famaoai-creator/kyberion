@@ -20,32 +20,6 @@
   min-width: 0;
 }
 
-.settings-readiness > .kb-disclosure {
-  margin: 0;
-}
-
-.settings-readiness .kb-disclosure__body > p {
-  margin: 0 0 var(--kb-ui-space-3);
-}
-
-.settings-readiness-rows {
-  border: 1px solid var(--kb-ui-border);
-  border-radius: var(--kb-ui-radius-md);
-  overflow: hidden;
-}
-
-.settings-subnav-item:focus-visible {
-  outline: 2px solid var(--kb-ui-accent-text);
-  outline-offset: 2px;
-}
-
-/* Keep focus rings visible inside the horizontal menu on small screens. */
-@media (max-width: 720px) {
-  .settings-subnav ul {
-    padding: var(--kb-ui-space-1);
-  }
-}
-
 /* Full-width content inside a group's row card (lists, pickers, notes). */
 .settings-row-block {
   display: flex;
