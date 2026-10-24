@@ -237,6 +237,25 @@ describe('planCustomerResponse', () => {
     ).toMatchObject({ ok: false, errors: [{ error: 'choice_not_allowed' }] });
   });
 
+  it('reject (CD-10) needs a comment, only on approval entries, and is not approved', () => {
+    const rejected = planCustomerResponse(
+      input({ answers: [{ entry_id: 'release', choice: 'reject', comment: 'wrong direction' }] })
+    );
+    expect(rejected.ok && rejected.plan.appends[0].value).toEqual({
+      approved: false,
+      rejected: true,
+      comment: 'wrong direction',
+    });
+    expect(
+      planCustomerResponse(input({ answers: [{ entry_id: 'release', choice: 'reject' }] }))
+    ).toMatchObject({ ok: false, errors: [{ error: 'text_required' }] });
+    expect(
+      planCustomerResponse(
+        input({ answers: [{ entry_id: 'nfr.auth', choice: 'reject', comment: 'no' }] })
+      )
+    ).toMatchObject({ ok: false, errors: [{ error: 'choice_not_allowed' }] });
+  });
+
   it('approve adopts the approved draft value when the entry carries one', () => {
     const agenda = baseAgenda();
     agenda.entries[1] = { ...agenda.entries[1], our_decision: { value: { stories: 3 } } };

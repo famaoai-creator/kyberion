@@ -7,6 +7,7 @@
  *   knowledge/confidential/<tenant>/decisions/<case>/switches.jsonl               append-only
  *   knowledge/confidential/<tenant>/decisions/<case>/respond-journal/<receipt_id>.json  write-ahead, removed when done
  *   knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json    CD-09 task decision locks
+ *   knowledge/confidential/<tenant>/decisions/<case>/attachments/<sha256>.<ext>   CD-10 entry images, immutable
  *
  * Every read-plan-write sequence on a case (agenda edits, approval pins, sends,
  * responses, confirmations, close / withdraw) runs under one inter-process
@@ -42,20 +43,33 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeMkdir,
+  safePublishExclusiveFileSync,
+  safeReadFile,
   safeReaddir,
   safeRmSync,
 } from '../secure-io.js';
-import { CUSTOMER_SLUG_PATTERN } from '../decision-ledger/model.js';
+import { resolveRole } from '../authority.js';
+import { CUSTOMER_DECISION_MILESTONE_STORE_ROLE } from '../foundation/customer-decision-milestone-capability.js';
+import { CUSTOMER_SLUG_PATTERN, canonicalJson } from '../decision-ledger/model.js';
 import {
   ledgerDir,
   withDecisionLedgerLock,
   type DecisionLedgerLocation,
 } from '../decision-ledger/ledger.js';
 import {
+  ATTACHMENT_ID_PATTERN,
+  MAX_ATTACHMENT_BYTES,
+  attachmentExtension,
+  checkAttachmentBytes,
+  linkProblem,
+} from './bolt-review.js';
+import {
   AGENDA_ID_PATTERN,
   CONSUMER_ID_PATTERN,
   CUSTOMER_DECISION_LAYOUT,
   RECEIPT_ID_PATTERN,
+  type AgendaAttachment,
+  type AgendaAttachmentMediaType,
   type ConsumedDecisionLock,
   type DecisionAgenda,
   type DecisionReceipt,
@@ -111,6 +125,7 @@ export function customerDecisionPaths(location: CustomerDecisionLocation) {
     receipts: path.join(dir, CUSTOMER_DECISION_LAYOUT.receiptsDir),
     respondJournal: path.join(dir, CUSTOMER_DECISION_LAYOUT.respondJournalDir),
     consumers: path.join(dir, CUSTOMER_DECISION_LAYOUT.consumersDir),
+    attachments: path.join(dir, CUSTOMER_DECISION_LAYOUT.attachmentsDir),
     switches: path.join(dir, CUSTOMER_DECISION_LAYOUT.files.switches),
   };
 }
@@ -179,14 +194,87 @@ export function readAgenda(
   return agenda;
 }
 
+/**
+ * Every entry link must be one a customer may be sent (CD-10): public https
+ * only, never an internal host. Checked on every agenda write, so neither
+ * `draft --file` nor a hand-edited record can carry one to submit / send.
+ */
+export function assertAgendaLinks(agenda: Pick<DecisionAgenda, 'entries'>): void {
+  for (const entry of agenda.entries) {
+    for (const link of entry.links ?? []) {
+      const problem = linkProblem(link.url);
+      if (problem)
+        throw new Error(
+          `[CUSTOMER_DECISION_LINK_REFUSED] entry ${entry.entry_id}: ${problem} — only a public https URL may be shown to a customer`
+        );
+    }
+  }
+}
+
+/** The agenda without the fields a milestone write may change. */
+function withoutMilestones(
+  agenda: DecisionAgenda
+): Omit<DecisionAgenda, 'milestones_passed' | 'updated_at'> {
+  const { milestones_passed: _passed, updated_at: _updated, ...rest } = agenda;
+  void _passed;
+  void _updated;
+  return rest;
+}
+
+/**
+ * Is `next` exactly `previous` plus milestones appended to `milestones_passed`
+ * (and a new `updated_at`)? The only agenda change the milestone store role
+ * may make (CD-10).
+ */
+export function isMilestoneOnlyChange(previous: DecisionAgenda, next: DecisionAgenda): boolean {
+  const before = previous.milestones_passed ?? [];
+  const after = next.milestones_passed ?? [];
+  return (
+    after.length > before.length &&
+    before.every((milestone, index) => after[index] === milestone) &&
+    canonicalJson(withoutMilestones(previous)) === canonicalJson(withoutMilestones(next))
+  );
+}
+
 export function writeAgenda(
   location: CustomerDecisionLocation,
   agenda: DecisionAgenda
 ): DecisionAgenda {
   const validated = validate<DecisionAgenda>('agenda', agenda);
   assertBelongs(location, validated, 'agenda');
-  writeJson(prepareWrite(agendaPath(location, validated.agenda_id)), validated);
+  assertAgendaLinks(validated);
+  const file = agendaPath(location, validated.agenda_id);
+  if (resolveRole() === CUSTOMER_DECISION_MILESTONE_STORE_ROLE) {
+    // The milestone role (a shared core role) may only append milestones to an
+    // existing agenda: re-read it here and refuse any other change.
+    const previous = readAgenda(location, validated.agenda_id);
+    if (!previous || !isMilestoneOnlyChange(previous, validated))
+      throw new Error(
+        '[CUSTOMER_DECISION_MILESTONE_WRITE_REFUSED] the milestone store may only append to milestones_passed'
+      );
+  }
+  writeJson(prepareWrite(file), validated);
   return validated;
+}
+
+/**
+ * CD-10: append a milestone to an agenda's `milestones_passed` — the write
+ * path of the milestone store role. Re-reads the agenda (call holding the
+ * case lock); null when the agenda is missing or already has the milestone.
+ */
+export function markAgendaMilestonePassed(
+  location: CustomerDecisionLocation,
+  agendaId: string,
+  milestone: string,
+  now: string
+): DecisionAgenda | null {
+  const current = readAgenda(location, agendaId);
+  if (!current || (current.milestones_passed ?? []).includes(milestone)) return null;
+  return writeAgenda(location, {
+    ...current,
+    milestones_passed: [...(current.milestones_passed ?? []), milestone],
+    updated_at: now,
+  });
 }
 
 /** Agenda ids of a case (a listing of `agendas/`, no record is read). */
@@ -201,6 +289,76 @@ export function listAgendas(location: CustomerDecisionLocation): DecisionAgenda[
     if (agenda) agendas.push(agenda);
   }
   return agendas;
+}
+
+// ---------------------------------------------------------------------------
+// Attachments (CD-10; immutable, content-addressed: the id is the sha256)
+// ---------------------------------------------------------------------------
+
+function attachmentPath(
+  location: CustomerDecisionLocation,
+  id: string,
+  mediaType: AgendaAttachmentMediaType
+): string {
+  if (!ATTACHMENT_ID_PATTERN.test(id))
+    throw new Error('[CUSTOMER_DECISION_ATTACHMENT_ID_INVALID] invalid attachment id');
+  return path.join(
+    customerDecisionPaths(location).attachments,
+    `${id}.${attachmentExtension(mediaType)}`
+  );
+}
+
+/**
+ * Store an entry image after checking it (size, png / jpeg / webp, the name's
+ * type matches the bytes). Content-addressed: storing the same bytes again
+ * returns the same record without a write. Throws `[CUSTOMER_DECISION_ATTACHMENT_*]`.
+ */
+export function writeAgendaAttachment(
+  location: CustomerDecisionLocation,
+  name: string,
+  bytes: Uint8Array
+): AgendaAttachment {
+  const checked = checkAttachmentBytes(name, bytes);
+  if (checked.ok === false)
+    throw new Error(
+      `[CUSTOMER_DECISION_ATTACHMENT_${checked.problem.toUpperCase()}] attachment refused: ${checked.problem}`
+    );
+  const file = prepareWrite(attachmentPath(location, checked.id, checked.media_type));
+  if (!safeExistsSync(file)) {
+    try {
+      safePublishExclusiveFileSync(file, Buffer.from(bytes));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+    }
+  }
+  return {
+    id: checked.id,
+    name: path.basename(name).slice(0, 200),
+    media_type: checked.media_type,
+    bytes: bytes.length,
+  };
+}
+
+/**
+ * The bytes of a stored attachment, re-checked against its id and type, or
+ * undefined when it is missing or does not match.
+ */
+export function readAgendaAttachment(
+  location: CustomerDecisionLocation,
+  attachment: Pick<AgendaAttachment, 'id' | 'media_type'>
+): Buffer | undefined {
+  const file = assertSafeRepositoryPath(
+    attachmentPath(location, attachment.id, attachment.media_type),
+    { allowMissingLeaf: true }
+  );
+  if (!safeExistsSync(file)) return undefined;
+  const bytes = safeReadFile(file, {
+    encoding: null,
+    maxSizeMB: MAX_ATTACHMENT_BYTES / (1024 * 1024),
+  }) as Buffer;
+  const checked = checkAttachmentBytes(`a.${attachmentExtension(attachment.media_type)}`, bytes);
+  if (checked.ok === false || checked.id !== attachment.id) return undefined;
+  return bytes;
 }
 
 // ---------------------------------------------------------------------------
