@@ -343,6 +343,7 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - CD-10 の残り: 却下の受信箱への記録は `surface_runtime` で書く（`addInboxEntry` 1 回だけ）。`surface_runtime` は `active/shared/runtime/` にも書けるので、受信箱だけに絞った役割を用意する。
 - CD-10 の残り: 画像 1 枚ごとに facade の子プロセスを 1 つ起動し、API 全体の回数制限（60 回/分）を使う。公開 ingress の背後では全顧客で共有になるため、画像の取得には別の制限か同時実行の上限を設ける。
 - CD-10 の残り: 招待の置き場の tier ディレクトリができた後は、未登録のテナントも自分の招待ディレクトリを作れる。テナントの登録をそこでも求めるかは、ガバナンスの判断として決める。
+- E2E の残り: 終わった bolt の状態は `mission_controller` を 1 ファイルの capability の中で借りて読む。読み取り専用の、アーカイブ済みミッションの状態だけを読む役割を用意する。
 - CD-11 の残り: 決定者の紐付けが別の surface に移ると、前の保留中の承認依頼は取り消せずに残る（警告だけ）。surface をまたいで同じリマインドの依頼を探して取り消す。
 - CD-11 の残り: `sendToCustomer` のほかの呼び出し元は、承認依頼の要約に本文を写したまま（CD-11 より前から）。共有の承認の置き場に顧客の文面を置かないよう、id だけの要約にそろえる。
 - 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
