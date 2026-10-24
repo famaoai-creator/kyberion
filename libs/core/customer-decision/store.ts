@@ -455,6 +455,11 @@ export interface ConsumedDecisionLockRecord extends ConsumedDecisionLock {
   last_check?: { at: string; checked: number; stale_count: number };
   /** Rework WorkItems filed for this consumer and the current decisions each one names. */
   rework?: Array<{ work_item_id: string; refs: string[]; at: string }>;
+  /**
+   * The task waits for the customer (a `requires_customer` task proposal);
+   * `resolved_at` once every held proposal has a confirmed customer decision.
+   */
+  hold?: { work_item_id?: string; at: string; resolved_at?: string };
 }
 
 function consumerPath(location: CustomerDecisionLocation, consumer: string): string {

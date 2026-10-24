@@ -20,13 +20,16 @@ import { createHash } from 'node:crypto';
 import { checkDecisionFreshness, resolveAgendaEffective } from './effective.js';
 import {
   isConsumerId,
+  type AgendaEntry,
   type ConsumedDecisionLock,
   type DecisionAgenda,
   type DecisionSwitch,
   type EffectiveDecision,
+  type TaskDecisionProposal,
 } from './model.js';
 import type { ConsumedDecisionLockRecord } from './store.js';
 import type { DecisionRecord } from '../decision-ledger/model.js';
+import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 
 const SAFE_TASK_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,120}$/u;
 const SAFE_MISSION_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9_-]{0,100}$/u;
@@ -141,11 +144,23 @@ export function reconcileConsumedDecisionLock(
   };
   const stale: StaleConsumedDecision[] = [];
   for (const locked of lock.decisions) {
+    // A task proposal is a pin only once it is on an agenda and carries a
+    // value (a requires_customer proposal is a hold, not a pin); it turns
+    // stale only when a decided value in force differs from it.
+    if (locked.layer === 'task_proposal' && (!locked.agenda_id || locked.value === undefined)) {
+      continue;
+    }
     const current = currentFor(locked.agenda_id).filter((decision) =>
       locked.entry_id !== undefined
         ? decision.entry_id === locked.entry_id
         : decision.item === locked.item && decision.key === locked.key
     );
+    if (
+      locked.layer === 'task_proposal' &&
+      current.every((decision) => decision.layer === 'none' || decision.value === undefined)
+    ) {
+      continue;
+    }
     const freshness = checkDecisionFreshness({ ...lock, decisions: [locked] }, current);
     if (freshness.fresh) continue;
     const inForce = freshness.stale[0]?.current;
@@ -234,4 +249,179 @@ export function findStaleConsumersForSwitches(input: {
     findings.push({ lock, checked: result.checked, stale });
   }
   return findings;
+}
+
+// ---------------------------------------------------------------------------
+// Task proposals (CD-09 "実装中の判断を顧客に回す")
+// ---------------------------------------------------------------------------
+
+type LockEntry = ConsumedDecisionLock['decisions'][number];
+/** A `task_proposal` lock entry: always carries its proposal. */
+export type TaskProposalLockEntry = LockEntry & { proposal: TaskDecisionProposal };
+
+export const TASK_PROPOSAL_ID_PATTERN = /^tp-[a-f0-9]{16}$/u;
+
+/** The proposal id of one consumer's question on an item × key (also its agenda entry id). */
+export function taskProposalId(consumer: string, item: string, key: string): string {
+  return `tp-${shortHash([consumer, item, key].join('\u0000'))}`;
+}
+
+export function isTaskProposalEntry(entry: LockEntry): entry is TaskProposalLockEntry {
+  return entry.layer === 'task_proposal' && entry.proposal !== undefined;
+}
+
+/** The task proposals of a lock. */
+export function taskProposalsOf(
+  lock: Pick<ConsumedDecisionLock, 'decisions'>
+): TaskProposalLockEntry[] {
+  return lock.decisions.filter(isTaskProposalEntry);
+}
+
+/** The open agenda entry that already asks this item × key, if any. */
+function openEntryFor(
+  agendas: readonly DecisionAgenda[],
+  item: string,
+  key: string
+): { agenda_id: string; entry_id: string } | undefined {
+  for (const agenda of openAgendas(agendas)) {
+    const entry = agenda.entries.find(
+      (candidate) => candidate.item === item && candidate.key === key
+    );
+    if (entry) return { agenda_id: agenda.agenda_id, entry_id: entry.entry_id };
+  }
+  return undefined;
+}
+
+/**
+ * Add a task's customer-judgment questions to its lock. A question on an
+ * item × key replaces the same task's earlier proposal for it unless that one
+ * is already collected (it stays the one on the agenda). A question an open
+ * agenda already asks is linked to that entry at once, so it is reconciled
+ * against what the customer decides there and never collected twice.
+ */
+export function mergeTaskProposals(input: {
+  lock: Pick<ConsumedDecisionLock, 'consumer' | 'decisions'>;
+  requests: readonly TaskCustomerDecisionRequest[];
+  agendas: readonly DecisionAgenda[];
+  now: string;
+}): { decisions: ConsumedDecisionLock['decisions']; proposal_ids: string[] } {
+  const decisions = [...input.lock.decisions];
+  const proposalIds: string[] = [];
+  for (const request of input.requests) {
+    const proposalId = taskProposalId(input.lock.consumer, request.item, request.key);
+    const existing = decisions.findIndex(
+      (entry) => isTaskProposalEntry(entry) && entry.proposal.proposal_id === proposalId
+    );
+    if (existing >= 0 && decisions[existing].agenda_id) {
+      proposalIds.push(proposalId);
+      continue;
+    }
+    const linked = openEntryFor(input.agendas, request.item, request.key);
+    const proposal: TaskDecisionProposal = {
+      proposal_id: proposalId,
+      question: request.question,
+      requires_customer: request.requires_customer,
+      ...(request.options?.length
+        ? { options: request.options.map((option) => ({ ...option })) }
+        : {}),
+      ...(request.rationale ? { rationale: request.rationale } : {}),
+      ...(request.topic ? { topic: request.topic } : {}),
+      proposed_at: input.now,
+      ...(linked ? { collected_at: input.now } : {}),
+    };
+    const entry: TaskProposalLockEntry = {
+      ...(linked ?? {}),
+      item: request.item,
+      key: request.key,
+      layer: 'task_proposal',
+      ...(!request.requires_customer && request.proposed_value !== undefined
+        ? { value: request.proposed_value }
+        : {}),
+      proposal,
+    };
+    if (existing >= 0) decisions[existing] = entry;
+    else decisions.push(entry);
+    proposalIds.push(proposalId);
+  }
+  return { decisions, proposal_ids: [...new Set(proposalIds)] };
+}
+
+/** Proposals no agenda entry carries yet. */
+export function pendingTaskProposals(
+  lock: Pick<ConsumedDecisionLock, 'decisions'>
+): TaskProposalLockEntry[] {
+  return taskProposalsOf(lock).filter((entry) => !entry.agenda_id);
+}
+
+/**
+ * The agenda entry a collected proposal becomes: a `choice` when it has
+ * options, else an `approval`; our decision is the proposal, except on a
+ * `requires_customer` question (the agenda schema forbids lower layers there,
+ * so the customer approves the question itself).
+ */
+export function taskProposalAgendaEntry(entry: TaskProposalLockEntry): AgendaEntry {
+  const { proposal } = entry;
+  return {
+    entry_id: proposal.proposal_id,
+    item: entry.item,
+    key: entry.key,
+    kind: proposal.options?.length ? 'choice' : 'approval',
+    question: proposal.question,
+    ...(proposal.options?.length
+      ? {
+          options: proposal.options.map((option) => ({ value: option.value, label: option.label })),
+        }
+      : {}),
+    ...(!proposal.requires_customer && entry.value !== undefined
+      ? {
+          our_decision: {
+            value: entry.value,
+            ...(proposal.rationale ? { rationale: proposal.rationale } : {}),
+          },
+        }
+      : {}),
+    requires_customer: proposal.requires_customer,
+  };
+}
+
+export interface TaskProposalHold {
+  proposal_id: string;
+  collected: boolean;
+  /** The confirmed customer decision on the proposal's agenda entry, once there is one. */
+  resolved_decision_id?: string;
+}
+
+/**
+ * The `requires_customer` proposals a lock holds on and whether each one has
+ * a customer decision in force that the operator confirmed (a customer
+ * decision on a `requires_customer` entry stays provisional until then).
+ */
+export function taskProposalHolds(
+  lock: Pick<ConsumedDecisionLock, 'decisions'>,
+  agendas: readonly DecisionAgenda[],
+  ledger: readonly DecisionRecord[],
+  now: string
+): TaskProposalHold[] {
+  const byId = new Map(agendas.map((agenda) => [agenda.agenda_id, agenda]));
+  return taskProposalsOf(lock)
+    .filter((entry) => entry.proposal.requires_customer)
+    .map((entry) => {
+      const hold: TaskProposalHold = {
+        proposal_id: entry.proposal.proposal_id,
+        collected: Boolean(entry.agenda_id),
+      };
+      if (entry.proposal.resolved) {
+        return { ...hold, resolved_decision_id: entry.proposal.resolved.decision_id };
+      }
+      const agenda = entry.agenda_id ? byId.get(entry.agenda_id) : undefined;
+      if (!agenda) return hold;
+      const current = resolveAgendaEffective(agenda, ledger, { now }).find(
+        (decision) => decision.entry_id === entry.entry_id
+      );
+      return current?.layer === 'customer' &&
+        current.decision_id &&
+        !current.awaiting_operator_confirmation
+        ? { ...hold, resolved_decision_id: current.decision_id }
+        : hold;
+    });
 }

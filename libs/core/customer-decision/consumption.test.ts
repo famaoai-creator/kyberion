@@ -10,8 +10,14 @@ import {
   decisionReworkWorkItemId,
   findStaleConsumersForSwitches,
   missionTaskConsumerId,
+  mergeTaskProposals,
   openAgendas,
+  pendingTaskProposals,
   reconcileConsumedDecisionLock,
+  taskProposalAgendaEntry,
+  taskProposalHolds,
+  taskProposalId,
+  taskProposalsOf,
   unreworkedStale,
 } from './consumption.js';
 import { CONSUMER_ID_PATTERN, type DecisionAgenda, type DecisionSwitch } from './model.js';
@@ -300,5 +306,220 @@ describe('customer decision consumption (CD-09)', () => {
         writeConsumedDecisionLock({ tenantSlug: 'acme-corp', caseId: 'case-b' }, lock)
       ).toThrow(/CUSTOMER_DECISION_CASE_MISMATCH/u);
     });
+  });
+});
+
+describe('task proposals (CD-09 実装中の判断を顧客に回す)', () => {
+  const consumer = 'mission-MSN-CD09.impl';
+  const proposeLocale = {
+    question: 'Which languages should the portal offer?',
+    item: 'NFR',
+    key: 'ui.locale',
+    proposed_value: ['ja', 'en'],
+    options: [
+      { value: ['ja'], label: 'Japanese' },
+      { value: ['ja', 'en'], label: 'Japanese + English' },
+    ],
+    requires_customer: false,
+    rationale: 'overseas branch',
+  };
+  const askRelease = {
+    question: 'May we release on 11/1?',
+    item: 'RELEASE',
+    key: 'release.go',
+    requires_customer: true,
+    topic: 'release',
+  };
+  const empty = { consumer, decisions: [] };
+
+  it('records proposals with stable ids, replaces an uncollected one, keeps a collected one', () => {
+    const first = mergeTaskProposals({
+      lock: empty,
+      requests: [proposeLocale, askRelease],
+      agendas: [],
+      now: NOW,
+    });
+    const id = taskProposalId(consumer, 'NFR', 'ui.locale');
+    expect(id).toMatch(/^tp-[a-f0-9]{16}$/u);
+    expect(first.proposal_ids).toEqual([id, taskProposalId(consumer, 'RELEASE', 'release.go')]);
+    const [locale, release] = taskProposalsOf(first);
+    expect(locale).toMatchObject({
+      item: 'NFR',
+      key: 'ui.locale',
+      layer: 'task_proposal',
+      value: ['ja', 'en'],
+      proposal: { proposal_id: id, requires_customer: false, proposed_at: NOW },
+    });
+    expect(locale).not.toHaveProperty('agenda_id');
+    // A requires_customer question carries no value: it is a hold, not a pin.
+    expect(release).not.toHaveProperty('value');
+    expect(pendingTaskProposals(first)).toHaveLength(2);
+
+    const replaced = mergeTaskProposals({
+      lock: { consumer, decisions: first.decisions },
+      requests: [{ ...proposeLocale, proposed_value: ['ja'] }],
+      agendas: [],
+      now: LATER,
+    });
+    expect(taskProposalsOf(replaced)).toHaveLength(2);
+    expect(taskProposalsOf(replaced)[0].value).toEqual(['ja']);
+
+    const collected = replaced.decisions.map((entry) =>
+      entry.proposal?.proposal_id === id
+        ? { ...entry, agenda_id: 'agd-test0002', entry_id: id }
+        : entry
+    );
+    const kept = mergeTaskProposals({
+      lock: { consumer, decisions: collected },
+      requests: [{ ...proposeLocale, proposed_value: ['en'] }],
+      agendas: [],
+      now: LATER,
+    });
+    expect(taskProposalsOf(kept)[0]).toMatchObject({ agenda_id: 'agd-test0002', value: ['ja'] });
+  });
+
+  it('links a question an open agenda already asks to that entry at once', () => {
+    const merged = mergeTaskProposals({
+      lock: empty,
+      requests: [{ ...proposeLocale, item: 'NFR', key: 'auth.method', proposed_value: 'sso' }],
+      agendas: [agenda(), agenda({ agenda_id: 'agd-closed01', status: 'closed' })],
+      now: NOW,
+    });
+    expect(taskProposalsOf(merged)[0]).toMatchObject({
+      agenda_id: 'agd-test0001',
+      entry_id: 'nfr.auth',
+      proposal: { collected_at: NOW },
+    });
+    expect(pendingTaskProposals(merged)).toEqual([]);
+  });
+
+  it('builds the agenda entry: our decision is the proposal; requires_customer carries none', () => {
+    const merged = mergeTaskProposals({
+      lock: empty,
+      requests: [proposeLocale, askRelease],
+      agendas: [],
+      now: NOW,
+    });
+    const [locale, release] = taskProposalsOf(merged);
+    expect(taskProposalAgendaEntry(locale)).toEqual({
+      entry_id: locale.proposal.proposal_id,
+      item: 'NFR',
+      key: 'ui.locale',
+      kind: 'choice',
+      question: proposeLocale.question,
+      options: proposeLocale.options,
+      our_decision: { value: ['ja', 'en'], rationale: 'overseas branch' },
+      requires_customer: false,
+    });
+    expect(taskProposalAgendaEntry(release)).toEqual({
+      entry_id: release.proposal.proposal_id,
+      item: 'RELEASE',
+      key: 'release.go',
+      kind: 'approval',
+      question: askRelease.question,
+      requires_customer: true,
+    });
+  });
+
+  it('a proposal is stale only once collected and a different decided value is in force', () => {
+    const sso = { ...proposeLocale, item: 'NFR', key: 'auth.method', proposed_value: 'sso' };
+    const uncollected = mergeTaskProposals({ lock: empty, requests: [sso], agendas: [], now: NOW });
+    const lockOf = (decisions: typeof uncollected.decisions) =>
+      record({ case_id: 'case-a', consumer, locked_at: NOW, decisions });
+    // Not on an agenda yet: not checked against anything.
+    expect(
+      reconcileConsumedDecisionLock(lockOf(uncollected.decisions), [agenda()], [], NOW).stale
+    ).toEqual([]);
+    const collected = mergeTaskProposals({
+      lock: empty,
+      requests: [sso],
+      agendas: [agenda()],
+      now: NOW,
+    }).decisions;
+    // Collected, the customer has not decided (org default only): not stale.
+    const undecided = agenda({
+      entries: [{ ...agenda().entries[0], org_default: undefined }],
+    });
+    expect(reconcileConsumedDecisionLock(lockOf(collected), [undecided], [], NOW).stale).toEqual(
+      []
+    );
+    // The customer decided the same value: fresh; a different one: stale.
+    const same = [customerDecision('D-0001', 'auth.method', 'NFR', 'sso')];
+    expect(reconcileConsumedDecisionLock(lockOf(collected), [agenda()], same, NOW).stale).toEqual(
+      []
+    );
+    const other = [customerDecision('D-0001', 'auth.method', 'NFR', 'password')];
+    expect(
+      reconcileConsumedDecisionLock(lockOf(collected), [agenda()], other, NOW).stale
+    ).toMatchObject([{ agenda_id: 'agd-test0001', entry_id: 'nfr.auth', ref: 'D-0001' }]);
+  });
+
+  it('a hold resolves only on an operator-confirmed customer decision', () => {
+    const releaseEntry = {
+      entry_id: 'release',
+      item: 'RELEASE',
+      key: 'release.go',
+      kind: 'approval' as const,
+      question: 'May we release?',
+      requires_customer: true,
+    };
+    const withRelease = (confirmed: boolean) =>
+      agenda({
+        entries: [releaseEntry],
+        ...(confirmed
+          ? {
+              operator_confirmations: [
+                { entry_id: 'release', decision_id: 'D-0001', by: 'user:boss', at: NOW },
+              ],
+            }
+          : {}),
+      });
+    const lock = {
+      decisions: mergeTaskProposals({
+        lock: empty,
+        requests: [askRelease],
+        agendas: [withRelease(false)],
+        now: NOW,
+      }).decisions,
+    };
+    const id = taskProposalId(consumer, 'RELEASE', 'release.go');
+    expect(taskProposalHolds(lock, [withRelease(false)], [], NOW)).toEqual([
+      { proposal_id: id, collected: true },
+    ]);
+    const decided = [customerDecision('D-0001', 'release.go', 'RELEASE', { approved: true })];
+    // Decided but provisional until the operator confirms it.
+    expect(taskProposalHolds(lock, [withRelease(false)], decided, NOW)[0]).not.toHaveProperty(
+      'resolved_decision_id'
+    );
+    expect(taskProposalHolds(lock, [withRelease(true)], decided, NOW)).toEqual([
+      { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+    ]);
+  });
+
+  it('stores task proposals through the lock schema', () => {
+    const dir = pathResolver.sharedTmp(`consumption-proposals-${randomUUID()}`);
+    safeMkdir(dir, { recursive: true });
+    try {
+      const merged = mergeTaskProposals({
+        lock: empty,
+        requests: [proposeLocale, askRelease],
+        agendas: [],
+        now: NOW,
+      });
+      const lock = record(
+        { case_id: 'case-a', consumer, locked_at: NOW, decisions: merged.decisions },
+        { hold: { work_item_id: 'WI-1', at: NOW } }
+      );
+      writeConsumedDecisionLock({ dir }, lock);
+      expect(readConsumedDecisionLock({ dir }, consumer)).toEqual(lock);
+      // A task_proposal entry must carry its proposal, and only it may.
+      const broken = {
+        ...lock,
+        decisions: [{ item: 'NFR', key: 'ui.locale', layer: 'task_proposal' as const }],
+      };
+      expect(() => writeConsumedDecisionLock({ dir }, broken)).toThrow();
+    } finally {
+      safeRmSync(dir, { recursive: true, force: true });
+    }
   });
 });

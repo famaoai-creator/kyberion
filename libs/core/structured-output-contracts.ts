@@ -7,6 +7,7 @@ import type {
   PlanningPacket,
   PlanningPacketTask,
   TaskAcceptanceEvidence,
+  TaskCustomerDecisionRequest,
   TaskResultBlock,
   TaskResultArtifact,
   TaskResultKnowledgeFeedback,
@@ -84,6 +85,28 @@ export const TaskResultProvenanceSchema: z.ZodType<TaskResultProvenance> = z
   })
   .strict();
 
+// CD-09: a customer-judgment question (see TaskCustomerDecisionRequest in
+// channel-surface-types.ts). Additive-only; an invalid entry is dropped by
+// repairTaskResult with a warning, never failing the whole task_result.
+export const TaskCustomerDecisionRequestSchema: z.ZodType<TaskCustomerDecisionRequest> = z
+  .object({
+    question: z.string().min(1).max(2000),
+    item: z.string().min(1).max(200),
+    key: z.string().regex(/^[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)*$/u),
+    proposed_value: z.unknown().optional(),
+    options: z
+      .array(z.object({ value: z.unknown(), label: z.string().min(1).max(300) }).strict())
+      .max(20)
+      .optional(),
+    requires_customer: z.boolean(),
+    rationale: z.string().min(1).max(2000).optional(),
+    topic: z.string().min(1).max(60).optional(),
+  })
+  .strict()
+  .refine((entry) => entry.requires_customer || entry.proposed_value !== undefined, {
+    message: 'proposed_value is required unless requires_customer',
+  });
+
 export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
   .object({
     summary: z.string().min(1).max(800),
@@ -95,6 +118,7 @@ export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
     review_findings: z.array(TaskReviewFindingSchema).optional(),
     knowledge_feedback: TaskResultKnowledgeFeedbackSchema.optional(),
     provenance: TaskResultProvenanceSchema.optional(),
+    customer_decisions: z.array(TaskCustomerDecisionRequestSchema).max(20).optional(),
   })
   .strict();
 

@@ -1,4 +1,9 @@
-import { TaskResultSchema, formatZodIssues } from '../structured-output-contracts.js';
+import { logger } from '../core.js';
+import {
+  TaskCustomerDecisionRequestSchema,
+  TaskResultSchema,
+  formatZodIssues,
+} from '../structured-output-contracts.js';
 import type { TaskResultBlock } from '../surface/channel-surface-types.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { replaceFencedBlocks } from '../foundation/text.js';
@@ -46,6 +51,25 @@ export function repairTaskResult(value: unknown): TaskResultRepairResult {
       requiresReview = true;
       return { ...current, status: 'failed' };
     });
+  }
+  // CD-09: a malformed customer-judgment question is dropped (never the whole
+  // result). The warning carries counts only — the entries may hold customer data.
+  if ('customer_decisions' in candidate) {
+    const entries = Array.isArray(candidate.customer_decisions) ? candidate.customer_decisions : [];
+    const kept = entries
+      .slice(0, 20)
+      .filter((entry) => TaskCustomerDecisionRequestSchema.safeParse(entry).success);
+    const dropped = Array.isArray(candidate.customer_decisions)
+      ? candidate.customer_decisions.length - kept.length
+      : 1;
+    if (dropped > 0) {
+      logger.warn(
+        `task_result customer_decisions: ${dropped} invalid entr${dropped === 1 ? 'y' : 'ies'} dropped — not a valid customer decision request | the task goes on without forwarding them; return question, item, key, requires_customer and proposed_value | kept=${kept.length}`
+      );
+      repairs.push(`customer_decisions: ${dropped} invalid entries dropped`);
+    }
+    if (kept.length > 0) candidate.customer_decisions = kept;
+    else delete candidate.customer_decisions;
   }
   const validation = validateTaskResult(candidate);
   return validation.valid && validation.value

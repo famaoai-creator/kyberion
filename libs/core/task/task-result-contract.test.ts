@@ -227,3 +227,58 @@ describe('TaskResultSchema — provenance (XP-05)', () => {
     expect(result.valid).toBe(false);
   });
 });
+
+describe('TaskResultSchema — customer_decisions (CD-09)', () => {
+  const block = (value: unknown) => ['```task_result', JSON.stringify(value), '```'].join('\n');
+  const proposal = {
+    question: 'Which sign-in method should the customer portal use?',
+    item: 'NFR',
+    key: 'auth.method',
+    proposed_value: 'sso',
+    options: [
+      { value: 'sso', label: 'SSO' },
+      { value: 'password', label: 'Password' },
+    ],
+    requires_customer: false,
+    rationale: 'Enterprise users',
+  };
+
+  it('accepts a valid proposal and a requires_customer question without a value', () => {
+    const result = validateTaskResult(
+      baseTaskResult({
+        customer_decisions: [
+          proposal,
+          {
+            question: 'Release on 11/1?',
+            item: 'RELEASE',
+            key: 'release.go',
+            requires_customer: true,
+          },
+        ],
+      })
+    );
+    expect(result.valid).toBe(true);
+    expect(result.value?.customer_decisions).toHaveLength(2);
+  });
+
+  it('drops invalid entries without failing the task_result', () => {
+    const parsed = extractTaskResultBlocks(
+      block(
+        baseTaskResult({
+          customer_decisions: [
+            proposal,
+            { ...proposal, proposed_value: undefined },
+            { ...proposal, key: 'Not A Key' },
+            'not an object',
+          ],
+        })
+      )
+    );
+    expect(parsed.taskResultErrors).toEqual([]);
+    expect(parsed.taskResults[0]?.customer_decisions).toEqual([proposal]);
+    expect(parsed.taskResultRepairs).toEqual(['customer_decisions: 3 invalid entries dropped']);
+    const none = extractTaskResultBlocks(block(baseTaskResult({ customer_decisions: 'oops' })));
+    expect(none.taskResultErrors).toEqual([]);
+    expect(none.taskResults[0]).not.toHaveProperty('customer_decisions');
+  });
+});

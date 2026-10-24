@@ -8,7 +8,12 @@
  *   - complete: reconcile the pin against the current decisions; a stale
  *               result still completes, and a rework WorkItem is filed;
  *   - respond:  after a customer response, completed consumers that pinned a
- *               switched entry are reconciled the same way.
+ *               switched entry are reconciled the same way;
+ *   - propose:  a task result's customer-judgment questions are kept on the
+ *               task's own lock (layer `task_proposal`) for the operator to
+ *               collect (`customer-decision draft --from-tasks`); a
+ *               `requires_customer` one holds the task until the operator
+ *               confirms the customer's decision (released by the sweep).
  *
  * A running task is never interrupted. The case is found from the mission's
  * `tenant_slug` and `relationships.project.project_id`, else a deal whose
@@ -36,11 +41,16 @@ import {
   buildConsumedDecisionLock,
   decisionReworkWorkItemId,
   findStaleConsumersForSwitches,
+  isTaskProposalEntry,
+  mergeTaskProposals,
   missionTaskConsumerId,
   reconcileConsumedDecisionLock,
+  taskProposalHolds,
+  taskProposalId,
   unreworkedStale,
   type StaleConsumedDecision,
 } from '../customer-decision/consumption.js';
+import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 import type { DecisionAgenda, DecisionSwitch } from '../customer-decision/model.js';
 import {
   listAgendaIds,
@@ -58,7 +68,11 @@ import { nowIso } from '../foundation/time.js';
 import { safeExistsSync } from '../secure-io.js';
 import { t } from '../t.js';
 import { WorkCoordinationError } from '../workforce/work-coordination-error.js';
-import { createWorkItemIfAbsent, getWorkItem } from '../workforce/work-coordination.js';
+import {
+  createWorkItemIfAbsent,
+  getWorkItem,
+  updateWorkItem,
+} from '../workforce/work-coordination.js';
 import { loadState } from './mission-state.js';
 import type { MissionState } from './mission-types.js';
 
@@ -262,8 +276,13 @@ export function pinTaskDecisions(
     return withCustomerDecisionCaseLock(decisionCase.location, () => {
       const { agendas, ledger, locks } = readCase(decisionCase, [consumer]);
       const existing = locks[0];
-      if (existing && (mode === 'if_absent' || existing.status === 'in_progress')) {
-        return { consumer, pinned_count: existing.decisions.length, pinned: false };
+      // A held task (waiting for the customer) re-runs on the current
+      // decisions once it is resumed: a start re-pins it like a new run.
+      if (
+        existing &&
+        (mode === 'if_absent' || (existing.status === 'in_progress' && !existing.hold))
+      ) {
+        return { consumer, pinned_count: pinCount(existing), pinned: false };
       }
       const lock = buildConsumedDecisionLock({
         caseId: decisionCase.caseId,
@@ -286,6 +305,216 @@ export function pinTaskDecisions(
     warn('customer decision pin skipped', error, consumer);
     return null;
   }
+}
+
+/** Pinned decisions of a lock (task proposals are not pins of the case). */
+function pinCount(lock: Pick<ConsumedDecisionLockRecord, 'decisions'>): number {
+  return lock.decisions.filter((entry) => entry.layer !== 'task_proposal').length;
+}
+
+export interface TaskDecisionProposalResult {
+  /** false: the mission has no decision case and nothing was recorded. */
+  case_found: boolean;
+  consumer: string;
+  case_id?: string;
+  /** Proposals now on the task's lock from this result. */
+  recorded: number;
+  proposal_ids: string[];
+  /** `requires_customer` proposals without a confirmed customer decision: the task waits on them. */
+  hold_proposal_ids: string[];
+  /** Recording failed (logged): the caller still holds on every `requires_customer` question. */
+  failed?: boolean;
+}
+
+/**
+ * Task result (CD-09 "実装中の判断を顧客に回す"): record the task's
+ * customer-judgment questions on its own consumer lock (layer
+ * `task_proposal`), for the operator to collect into an agenda
+ * (`customer-decision draft --from-tasks`). A `requires_customer` question
+ * without a confirmed customer decision puts a hold on the lock; the caller
+ * blocks the task. The worker never gets agenda-write authority: it writes
+ * its own lock under the narrow consumer store role.
+ *
+ * No decision case: nothing is recorded (a diagnostic warning); the caller
+ * treats `requires_customer` questions as ordinary clarification needs.
+ * Never throws. The result carries ids and counts only.
+ */
+export function recordTaskDecisionProposals(
+  input: {
+    missionId: string;
+    taskId: string;
+    requests: readonly TaskCustomerDecisionRequest[];
+    /** The task's WorkItem, recorded on a hold so its release can note the decision. */
+    workItemId?: string;
+  },
+  options: MissionDecisionLockOptions = {}
+): TaskDecisionProposalResult {
+  const consumer = missionTaskConsumerId(input.missionId, input.taskId);
+  const requestedHolds = [
+    ...new Set(
+      input.requests
+        .filter((request) => request.requires_customer)
+        .map((request) => taskProposalId(consumer, request.item, request.key))
+    ),
+  ];
+  const nothing = { consumer, recorded: 0, proposal_ids: [], hold_proposal_ids: [] };
+  if (input.requests.length === 0) return { case_found: false, ...nothing };
+  try {
+    const decisionCase = resolveMissionDecisionCase(input.missionId, options);
+    if (!decisionCase) {
+      logger.warn(
+        `customer decision proposals not recorded — the mission has no decision case | requires_customer questions become clarification needs, the others go on with the proposal; create the case to collect them | ${consumer} count=${input.requests.length}`
+      );
+      return { case_found: false, ...nothing };
+    }
+    const now = options.now ?? nowIso();
+    return withCustomerDecisionCaseLock(decisionCase.location, () => {
+      const { agendas, ledger, locks } = readCase(decisionCase, [consumer]);
+      const base: ConsumedDecisionLockRecord = locks[0] ?? {
+        version: '1.0.0',
+        ...buildConsumedDecisionLock({
+          caseId: decisionCase.caseId,
+          consumer,
+          agendas,
+          ledger,
+          now,
+        }),
+        ...('dir' in decisionCase.location ? {} : { tenant_slug: decisionCase.tenantSlug }),
+        mission_id: input.missionId.toUpperCase(),
+        task_id: input.taskId,
+        status: 'in_progress',
+      };
+      const merged = mergeTaskProposals({ lock: base, requests: input.requests, agendas, now });
+      const holds = taskProposalHolds({ decisions: merged.decisions }, agendas, ledger, now).filter(
+        (hold) => requestedHolds.includes(hold.proposal_id)
+      );
+      const resolved = new Map(
+        holds.flatMap((hold) =>
+          hold.resolved_decision_id ? [[hold.proposal_id, hold.resolved_decision_id] as const] : []
+        )
+      );
+      const pending = holds
+        .filter((hold) => !hold.resolved_decision_id)
+        .map((hold) => hold.proposal_id);
+      const { hold: _previousHold, ...rest } = base;
+      void _previousHold;
+      writeLock(decisionCase, {
+        ...rest,
+        decisions: merged.decisions.map((entry) => {
+          const decisionId = isTaskProposalEntry(entry)
+            ? resolved.get(entry.proposal.proposal_id)
+            : undefined;
+          return decisionId && isTaskProposalEntry(entry) && !entry.proposal.resolved
+            ? {
+                ...entry,
+                proposal: { ...entry.proposal, resolved: { decision_id: decisionId, at: now } },
+              }
+            : entry;
+        }),
+        ...(pending.length > 0
+          ? { hold: { ...(input.workItemId ? { work_item_id: input.workItemId } : {}), at: now } }
+          : {}),
+      });
+      return {
+        case_found: true,
+        consumer,
+        case_id: decisionCase.caseId,
+        recorded: merged.proposal_ids.length,
+        proposal_ids: merged.proposal_ids,
+        hold_proposal_ids: pending,
+      };
+    });
+  } catch (error) {
+    logger.warn(
+      `customer decision proposals not recorded — ${diagnosticCode(error)} | the task waits on its requires_customer questions and goes on with the others; resume the mission to retry | ${consumer}`
+    );
+    return { case_found: true, ...nothing, hold_proposal_ids: requestedHolds, failed: true };
+  }
+}
+
+/**
+ * Note on a held task's WorkItem that its hold is resolved (ids only: the
+ * work-coordination store is not tenant-partitioned). The WorkItem stays
+ * `blocked`; `mission resume` re-runs the task, which re-pins its lock.
+ */
+function noteHoldResolved(
+  decisionCase: MissionDecisionCase,
+  lock: ConsumedDecisionLockRecord,
+  decisionIds: readonly string[],
+  now: string,
+  options: Pick<MissionDecisionLockOptions, 'workItemRootDir'>
+): void {
+  const itemId = lock.hold?.work_item_id;
+  if (!itemId) return;
+  const rootDir = options.workItemRootDir;
+  const item = getWorkItem(itemId, rootDir ? { rootDir } : {});
+  if (!item) return;
+  updateWorkItem({
+    itemId,
+    expectedVersion: item.version,
+    ...(rootDir ? { rootDir } : {}),
+    metadata: {
+      ...(item.metadata ?? {}),
+      customer_decision_hold: {
+        status: 'resolved',
+        case_id: decisionCase.caseId,
+        consumer: lock.consumer,
+        decision_ids: [...decisionIds].sort(),
+        resolved_at: now,
+        next: `pnpm mission resume ${lock.mission_id}`,
+      },
+    },
+  });
+}
+
+/**
+ * Held tasks whose `requires_customer` proposals all have a confirmed
+ * customer decision now: mark the proposals and the hold resolved on the
+ * lock and note it on the WorkItem. Holding the case lock.
+ */
+function releaseResolvedHolds(
+  decisionCase: MissionDecisionCase,
+  snapshot: Pick<CaseSnapshot, 'agendas' | 'ledger' | 'locks'>,
+  now: string,
+  options: MissionDecisionLockOptions
+): string[] {
+  const released: string[] = [];
+  for (const lock of snapshot.locks) {
+    if (!lock.hold || lock.hold.resolved_at) continue;
+    try {
+      const holds = taskProposalHolds(lock, snapshot.agendas, snapshot.ledger, now);
+      const resolved = new Map(
+        holds.flatMap((hold) =>
+          hold.resolved_decision_id ? [[hold.proposal_id, hold.resolved_decision_id] as const] : []
+        )
+      );
+      if (resolved.size === 0) continue;
+      const complete = holds.every((hold) => hold.resolved_decision_id);
+      // WorkItem first: if the lock write then fails, the next sweep notes it again.
+      if (complete) {
+        noteHoldResolved(decisionCase, lock, [...new Set(resolved.values())], now, options);
+      }
+      writeLock(decisionCase, {
+        ...lock,
+        decisions: lock.decisions.map((entry) => {
+          const decisionId = isTaskProposalEntry(entry)
+            ? resolved.get(entry.proposal.proposal_id)
+            : undefined;
+          return decisionId && isTaskProposalEntry(entry) && !entry.proposal.resolved
+            ? {
+                ...entry,
+                proposal: { ...entry.proposal, resolved: { decision_id: decisionId, at: now } },
+              }
+            : entry;
+        }),
+        hold: { ...lock.hold, ...(complete ? { resolved_at: now } : {}) },
+      });
+      if (complete) released.push(lock.consumer);
+    } catch (error) {
+      warn('customer decision hold release skipped', error, lock.consumer);
+    }
+  }
+  return released;
 }
 
 /**
@@ -440,6 +669,8 @@ export function reconcileTaskDecisions(
 export interface DecisionConsumerSweepResult {
   stale_consumers: string[];
   rework_work_item_ids: string[];
+  /** Held tasks whose customer decisions are now confirmed (present when any). */
+  released_holds?: string[];
 }
 
 /**
@@ -447,7 +678,9 @@ export interface DecisionConsumerSweepResult {
  * completed consumers of the case that pinned a switched entry with a value
  * no longer in force get a rework WorkItem. `switches` defaults to every
  * recorded switch of the agenda (or case), so the sweep is idempotent and the
- * next response retries one that failed. Never throws.
+ * next response retries one that failed. It also releases held tasks whose
+ * `requires_customer` proposals now have a confirmed customer decision (run
+ * after `respond` and after the operator's `confirm`). Never throws.
  */
 export function sweepDecisionConsumers(
   input: {
@@ -502,6 +735,8 @@ export function sweepDecisionConsumers(
           warn('customer decision rework filing skipped', error, finding.lock.consumer);
         }
       }
+      const released = releaseResolvedHolds(decisionCase, snapshot, now, options);
+      if (released.length > 0) result.released_holds = released.sort();
     });
   } catch (error) {
     warn('customer decision consumer sweep skipped', error, `case ${input.caseId}`);

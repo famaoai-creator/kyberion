@@ -38,6 +38,7 @@ import {
   taskClarificationFilePath,
   summarizeTaskResultObservability,
   buildTaskClarificationPacket,
+  takeTaskCustomerDecisions,
   evaluateTaskAcceptanceGate,
   requestIndependentAcceptanceReview,
 } from './mission-orchestration-worker-part-context.js';
@@ -60,7 +61,11 @@ import {
   loadAllNextTasks,
 } from './mission-orchestration-worker-part-results.js';
 import { registerMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
-import { pinTaskDecisions, reconcileTaskDecisions } from './mission-decision-lock.js';
+import {
+  pinTaskDecisions,
+  reconcileTaskDecisions,
+  recordTaskDecisionProposals,
+} from './mission-decision-lock.js';
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -240,8 +245,32 @@ export async function dispatchPlannedMissionTaskCore(
       ...(delegationChain ? { delegation_chain: delegationChain } : {}),
     },
   });
+  // CD-09: customer-judgment questions leave the result here, before any of it
+  // is stored, and go to the task's own lock in the confidential decision
+  // case. The task goes on with its proposals; a requires_customer question
+  // holds it. Without a decision case they are ordinary questions: the
+  // requires_customer ones become needs, the others go on with the proposal.
+  const customerDecisionRequests = takeTaskCustomerDecisions(response.taskResult);
+  const decisionProposals =
+    customerDecisionRequests.length > 0
+      ? recordTaskDecisionProposals({
+          missionId: input.missionId,
+          taskId: input.task.task_id,
+          requests: customerDecisionRequests,
+          workItemId: claimed.item.item_id,
+        })
+      : null;
+  if (decisionProposals && !decisionProposals.case_found && response.taskResult) {
+    const heldQuestions = customerDecisionRequests
+      .filter((request) => request.requires_customer)
+      .map((request) => request.question);
+    if (heldQuestions.length > 0) {
+      response.taskResult.needs = [...(response.taskResult.needs || []), ...heldQuestions];
+    }
+  }
   const taskResultNeeds = response.taskResult?.needs || [];
   const dispatchCanonicalTeamRole = canonicalizeTeamRole(input.teamRole);
+  const reviewTarget = resolveReviewTargetForTask(input.task);
   const reviewFindings = normalizeReviewFindings(
     response.taskResult?.review_findings ||
       (dispatchCanonicalTeamRole === 'reviewer' || dispatchCanonicalTeamRole === 'qa'
@@ -403,7 +432,85 @@ export async function dispatchPlannedMissionTaskCore(
     };
   }
 
-  const reviewTarget = resolveReviewTargetForTask(input.task);
+  // CD-09: a requires_customer question holds the task until the customer
+  // decides (the needs → blocked path). Public evidence: ids and counts only.
+  if (decisionProposals?.case_found && decisionProposals.hold_proposal_ids.length > 0) {
+    const hold = {
+      consumer: decisionProposals.consumer,
+      ...(decisionProposals.case_id ? { case_id: decisionProposals.case_id } : {}),
+      recorded_count: decisionProposals.recorded,
+      hold_count: decisionProposals.hold_proposal_ids.length,
+      hold_proposal_ids: decisionProposals.hold_proposal_ids,
+      ...(decisionProposals.failed ? { recorded: false } : {}),
+    };
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary: 'Task waits for a customer decision',
+        blocked_reason: 'awaiting_customer_decision',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        customer_decision_hold: { status: 'awaiting', ...hold },
+      },
+    });
+    const holdPath = taskClarificationFilePath(input.missionId, input.task.task_id);
+    writeProvisionedJson({
+      missionId: input.missionId,
+      filePath: holdPath,
+      targetPath: `evidence/task-clarification-${input.task.task_id}.json`,
+      missionPathHint: path.dirname(path.dirname(holdPath)),
+      provisioned: provisionMissionEntry({
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        status: 'awaiting_customer_decision',
+        customer_decision_hold: hold,
+        written_at: nowIso(),
+      }),
+    });
+    input.task.status = 'blocked';
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'Task waits for a customer decision (requires_customer) before it can complete.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: input.task.deliverable ? [String(input.task.deliverable)] : [],
+      payload: {
+        description: input.task.description,
+        deliverable: input.task.deliverable,
+        clarification_packet_path: holdPath,
+        customer_decision_hold: hold,
+        ...taskResultObservability,
+      },
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step:
+        'collect the task proposals into an agenda (customer-decision draft --from-tasks), send it, and resume the mission once the customer decision is confirmed',
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+      execution_mode: response.executionMode,
+      context_pack_id: dispatchContext.missionContextPackId,
+      context_pack_path: dispatchContext.missionContextPackPath,
+      context_pack_summary: dispatchContext.missionContextPackSummary,
+      context_pack_pruning_summary: dispatchContext.missionContextPackPruningSummary,
+      ...taskResultObservability,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...taskResultObservability,
+    };
+  }
+
   const isArtifactReview =
     dispatchCanonicalTeamRole === 'reviewer' || dispatchCanonicalTeamRole === 'qa';
   const targetTask =
@@ -922,6 +1029,15 @@ export async function dispatchPlannedMissionTaskCore(
               checked: decisionCheck.checked,
               stale_count: decisionCheck.stale_count,
               rework_work_item_ids: decisionCheck.rework_work_item_ids,
+            },
+          }
+        : {}),
+      ...(decisionProposals?.case_found && decisionProposals.recorded > 0
+        ? {
+            customer_decision_proposals: {
+              consumer: decisionProposals.consumer,
+              recorded_count: decisionProposals.recorded,
+              proposal_ids: decisionProposals.proposal_ids,
             },
           }
         : {}),

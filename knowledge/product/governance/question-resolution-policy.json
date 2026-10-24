@@ -6,6 +6,10 @@
     "min_confidence_to_skip": 0.55,
     "always_ask_for": ["goal_or_target", "approval_boundary", "execution_scope"]
   },
+  "customer_judgment": {
+    "requires_customer_topics": ["money", "contract", "release", "change_request"],
+    "rationale": "CD-09: a question raised while executing is the customer's to decide when the customer would see or pay for the answer. Money, contract, release and change requests wait for the customer (requires_customer); other customer-visible product choices go on with our proposal; technical choices are ours."
+  },
   "intent_rules": [
     {
       "id": "meeting-operations-core",

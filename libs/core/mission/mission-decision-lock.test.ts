@@ -8,12 +8,14 @@ import type { DealRecord } from '../deal-store.js';
 import type { DecisionAgenda } from '../customer-decision/model.js';
 import {
   customerDecisionPaths,
+  readAgenda,
   readConsumedDecisionLock,
   writeAgenda,
 } from '../customer-decision/store.js';
 import {
   clearWorkCoordinationNamespace,
   clearWorkCoordinationStore,
+  createWorkItem,
   getWorkItem,
   listWorkItems,
   setWorkCoordinationNamespace,
@@ -21,6 +23,7 @@ import {
 import {
   pinTaskDecisions,
   reconcileTaskDecisions,
+  recordTaskDecisionProposals,
   resolveMissionDecisionCase,
   sweepDecisionConsumers,
   type MissionDecisionCase,
@@ -296,5 +299,180 @@ describe('mission decision lock (CD-09)', () => {
     ).toEqual({ stale_consumers: [], rework_work_item_ids: [] });
     expect(safeExistsSync(customerDecisionPaths({ dir }).consumers)).toBe(true);
     expect(reworkItems()).toEqual([]);
+  });
+
+  describe('task proposals (CD-09 実装中の判断を顧客に回す)', () => {
+    const askLocale = {
+      question: 'Which languages should the secret portal offer?',
+      item: 'NFR',
+      key: 'ui.locale',
+      proposed_value: ['ja', 'secret-en'],
+      requires_customer: false,
+    };
+    const askRelease = {
+      question: 'May we release the secret build?',
+      item: 'RELEASE',
+      key: 'release.go',
+      requires_customer: true,
+    };
+    const leaks = /secret|ui\.locale|release\.go|NFR|RELEASE/u;
+
+    it('records nothing without a decision case and says so', () => {
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      const result = recordTaskDecisionProposals(
+        { ...task, requests: [askLocale, askRelease] },
+        { loadMissionState: () => null }
+      );
+      expect(result).toEqual({
+        case_found: false,
+        consumer: 'mission-MSN-CD09-LOCK.impl',
+        recorded: 0,
+        proposal_ids: [],
+        hold_proposal_ids: [],
+      });
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('no decision case'));
+      expect(JSON.stringify(warn.mock.calls)).not.toMatch(leaks);
+    });
+
+    it('records proposals on the task lock and holds on requires_customer, ids only out', () => {
+      expect(pinTaskDecisions(task, { decisionCase, now: NOW })?.pinned_count).toBe(1);
+      const result = recordTaskDecisionProposals(
+        { ...task, requests: [askLocale, askRelease], workItemId: 'WI-TASK' },
+        { decisionCase, now: NOW }
+      );
+      expect(result).toMatchObject({ case_found: true, case_id: 'case-a', recorded: 2 });
+      expect(result.hold_proposal_ids).toHaveLength(1);
+      expect(JSON.stringify(result)).not.toMatch(leaks);
+      const lock = readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')!;
+      expect(lock.status).toBe('in_progress');
+      expect(lock.hold).toEqual({ work_item_id: 'WI-TASK', at: NOW });
+      expect(lock.decisions.map((entry) => entry.layer)).toEqual([
+        'org_default',
+        'task_proposal',
+        'task_proposal',
+      ]);
+      // The proposal is not a pin of the case: a redispatch of the held task re-pins.
+      const repinned = pinTaskDecisions(task, { decisionCase, now: LATER });
+      expect(repinned).toEqual({
+        consumer: 'mission-MSN-CD09-LOCK.impl',
+        pinned_count: 1,
+        pinned: true,
+      });
+      expect(readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')).not.toHaveProperty(
+        'hold'
+      );
+    });
+
+    it('completes on our proposal while nobody decided it: no rework', () => {
+      pinTaskDecisions(task, { decisionCase, now: NOW });
+      const result = recordTaskDecisionProposals(
+        { ...task, requests: [askLocale] },
+        { decisionCase, now: NOW }
+      );
+      expect(result.hold_proposal_ids).toEqual([]);
+      expect(reconcileTaskDecisions(task, { decisionCase, now: NOW })).toMatchObject({
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      expect(reworkItems()).toEqual([]);
+    });
+
+    it('releases a hold once the customer decision is confirmed, noting it on the WorkItem', () => {
+      writeAgenda(
+        { dir },
+        {
+          ...agenda(),
+          entries: [
+            ...agenda().entries,
+            {
+              entry_id: 'release',
+              item: 'RELEASE',
+              key: 'release.go',
+              kind: 'approval',
+              question: 'May we release the secret build?',
+              requires_customer: true,
+            },
+          ],
+          status: 'sent',
+          approval: { content_hash: 'a'.repeat(64), approved_at: NOW, approved_by: 'user:boss' },
+        }
+      );
+      const workItem = createWorkItem({
+        title: 'impl',
+        description: 'impl',
+        status: 'blocked',
+        metadata: { blocked_reason: 'awaiting_customer_decision', task_id: 'impl' },
+      });
+      pinTaskDecisions(task, { decisionCase, now: NOW });
+      const held = recordTaskDecisionProposals(
+        { ...task, requests: [askRelease], workItemId: workItem.item_id },
+        { decisionCase, now: NOW }
+      );
+      expect(held.hold_proposal_ids).toHaveLength(1);
+      const sweep = () =>
+        sweepDecisionConsumers(
+          { tenantSlug: TENANT, caseId: 'case-a', location: { dir } },
+          { now: LATER }
+        );
+      // Not decided yet: still held.
+      expect(sweep()).toEqual({ stale_consumers: [], rework_work_item_ids: [] });
+      appendDecisions(
+        { dir },
+        [
+          {
+            item: 'RELEASE',
+            key: 'release.go',
+            level: 'customer-value',
+            state: 'decided',
+            value: { approved: true },
+            basis: [{ ref: 'agenda:agd-test0001', version: 'h' }],
+            origin: 'facade',
+            decided_by: {
+              kind: 'human',
+              id: 'user:inv-1',
+              on_behalf_of: { actor_id: 'customer:acme-cto', evidence: 'rcp-0001' },
+            },
+            decided_at: LATER,
+          },
+        ],
+        { caseId: 'case-a' }
+      );
+      // Decided, but provisional until the operator confirms it.
+      expect(sweep()).toEqual({ stale_consumers: [], rework_work_item_ids: [] });
+      const current = readAgenda({ dir }, 'agd-test0001')!;
+      writeAgenda(
+        { dir },
+        {
+          ...current,
+          operator_confirmations: [
+            { entry_id: 'release', decision_id: 'D-0001', by: 'user:boss', at: LATER },
+          ],
+        }
+      );
+      expect(sweep()).toEqual({
+        stale_consumers: [],
+        rework_work_item_ids: [],
+        released_holds: ['mission-MSN-CD09-LOCK.impl'],
+      });
+      const lock = readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')!;
+      expect(lock.hold).toMatchObject({ resolved_at: LATER });
+      expect(
+        lock.decisions.find((entry) => entry.layer === 'task_proposal')?.proposal
+      ).toMatchObject({ resolved: { decision_id: 'D-0001', at: LATER } });
+      const noted = getWorkItem(workItem.item_id)!;
+      expect(noted.status).toBe('blocked');
+      expect(noted.metadata).toMatchObject({
+        blocked_reason: 'awaiting_customer_decision',
+        customer_decision_hold: {
+          status: 'resolved',
+          case_id: 'case-a',
+          decision_ids: ['D-0001'],
+          next: 'pnpm mission resume MSN-CD09-LOCK',
+        },
+      });
+      expect(JSON.stringify(noted)).not.toMatch(leaks);
+      // Released once.
+      expect(sweep()).toEqual({ stale_consumers: [], rework_work_item_ids: [] });
+    });
   });
 });

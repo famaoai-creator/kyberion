@@ -225,6 +225,30 @@ export interface TaskResultProvenance {
   failover?: boolean;
 }
 
+/**
+ * CD-09 (CUSTOMER_DECISION_HEARING_PLAN "実装中の判断を顧客に回す"): a
+ * question the worker met that is the customer's to decide
+ * (question-resolution class `customer_judgment`). Unlike `needs`, the task
+ * goes on with `proposed_value` (our proposal) unless `requires_customer`
+ * (money, contract, release, change request), which holds the task until the
+ * customer decides. The worker strips this field from the result before any
+ * of it is stored: the question and the values stay in the confidential
+ * decision case; public evidence carries ids and counts only.
+ */
+export interface TaskCustomerDecisionRequest {
+  question: string;
+  /** Decision ledger item × key (e.g. `NFR` / `auth.method`). */
+  item: string;
+  key: string;
+  /** Our proposal; required unless `requires_customer`. */
+  proposed_value?: unknown;
+  options?: Array<{ value: unknown; label: string }>;
+  requires_customer: boolean;
+  rationale?: string;
+  /** Question topic (`money`, `contract`, `release`, `change_request`, …); policy may force `requires_customer`. */
+  topic?: string;
+}
+
 export interface TaskResultBlock {
   summary: string;
   artifacts: TaskResultArtifact[];
@@ -235,6 +259,7 @@ export interface TaskResultBlock {
   review_findings?: TaskReviewFinding[];
   knowledge_feedback?: TaskResultKnowledgeFeedback;
   provenance?: TaskResultProvenance;
+  customer_decisions?: TaskCustomerDecisionRequest[];
 }
 
 export interface A2ATaskContext {

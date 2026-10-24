@@ -52,6 +52,22 @@ export interface QuestionResolutionQuestion {
   impact?: string;
   source: 'policy' | 'execution_brief' | 'intent_requirement' | 'supplemental' | 'profile';
   blocking: boolean;
+  /** CD-09: who answers it. Absent means ours (a clarification Kyberion's side answers). */
+  decision_class?: QuestionDecisionClass;
+}
+
+/**
+ * CD-09 (question-resolution-playbook "Whose question is it"): `ours` for
+ * technical choices and clarifications our side answers; `customer_judgment`
+ * for a choice the customer sees or pays for. A customer judgment goes on
+ * with our proposal unless `requires_customer` (money, contract, release,
+ * change request), which waits for the customer.
+ */
+export type QuestionDecisionClass = 'ours' | 'customer_judgment';
+
+export interface QuestionDecisionClassification {
+  decision_class: QuestionDecisionClass;
+  requires_customer: boolean;
 }
 
 interface QuestionLike {
@@ -89,6 +105,8 @@ export interface QuestionResolutionPolicyFile {
     min_confidence_to_skip: number;
     always_ask_for: string[];
   };
+  /** CD-09: topics of a customer judgment that always wait for the customer. */
+  customer_judgment?: { requires_customer_topics: string[]; rationale?: string };
   intent_rules: QuestionResolutionRule[];
 }
 
@@ -612,6 +630,35 @@ export function resolveQuestionInteractionPacket(
     input.executionBrief?.user_facing_summary || input.executionBrief?.summary,
     clampConfidence(input.confidence, 0.5)
   );
+}
+
+/** The policy's requires_customer topics; the plan's defaults when the policy has none. */
+const DEFAULT_REQUIRES_CUSTOMER_TOPICS = ['money', 'contract', 'release', 'change_request'];
+
+/**
+ * CD-09: classify a question raised while executing. A question the worker
+ * marked as the customer's (`customerVisible`) is a customer judgment; it
+ * waits for the customer when the worker said so or its topic is one the
+ * policy reserves for the customer. Anything else is ours. The policy can
+ * only add `requires_customer`, never lift it.
+ */
+export function classifyQuestionDecision(input: {
+  customerVisible: boolean;
+  requiresCustomer?: boolean;
+  topic?: string;
+}): QuestionDecisionClassification {
+  if (!input.customerVisible) return { decision_class: 'ours', requires_customer: false };
+  const topics =
+    loadPolicyFile().customer_judgment?.requires_customer_topics ??
+    DEFAULT_REQUIRES_CUSTOMER_TOPICS;
+  const topic = input.topic
+    ?.trim()
+    .toLowerCase()
+    .replace(/[\s-]+/gu, '_');
+  return {
+    decision_class: 'customer_judgment',
+    requires_customer: Boolean(input.requiresCustomer) || Boolean(topic && topics.includes(topic)),
+  };
 }
 
 export function getQuestionResolutionPolicyPath(): string {

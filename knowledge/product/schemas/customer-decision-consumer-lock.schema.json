@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "customer-decision-consumer-lock.schema.json",
   "title": "Customer Decision Consumer Lock",
-  "description": "What one mission task consumed at its start (CD-09): every effective decision of the case's open agendas, pinned at the task boundary and reconciled at task completion and after each customer response. Stored at knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json under the narrow customer_decision_consumer_store role (exact per-case capability); it holds customer values, so it never leaves the case's tier and tenant.",
+  "description": "What one mission task consumed at its start (CD-09): every effective decision of the case's open agendas, pinned at the task boundary and reconciled at task completion and after each customer response. It also keeps the customer-judgment questions the task raised (layer task_proposal, CD-09 実装中の判断を顧客に回す) until the operator collects them into an agenda. Stored at knowledge/confidential/<tenant>/decisions/<case>/consumers/<consumer>.json under the narrow customer_decision_consumer_store role (exact per-case capability); it holds customer values, so it never leaves the case's tier and tenant.",
   "type": "object",
   "additionalProperties": false,
   "required": [
@@ -44,8 +44,28 @@
           "layer": {
             "type": "string",
             "enum": ["customer", "ours", "org_default", "none", "task_proposal"]
+          },
+          "proposal": { "$ref": "#/definitions/proposal" }
+        },
+        "allOf": [
+          {
+            "$comment": "A task_proposal entry carries its proposal; no other entry does.",
+            "if": { "properties": { "layer": { "const": "task_proposal" } } },
+            "then": { "required": ["proposal"] },
+            "else": { "not": { "required": ["proposal"] } }
           }
-        }
+        ]
+      }
+    },
+    "hold": {
+      "description": "The task waits for the customer (a requires_customer task proposal): its WorkItem is blocked with blocked_reason awaiting_customer_decision. resolved_at is set once every held proposal has a confirmed customer decision; the task then re-runs through mission resume, which re-pins the lock.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["at"],
+      "properties": {
+        "work_item_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "at": { "type": "string", "minLength": 1 },
+        "resolved_at": { "type": "string", "minLength": 1 }
       }
     },
     "last_check": {
@@ -73,6 +93,45 @@
             "items": { "type": "string", "minLength": 1, "maxLength": 200 }
           },
           "at": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "proposal": {
+      "description": "CD-09: a customer-judgment question the task raised (TaskDecisionProposal). The proposed value is the entry's value; a requires_customer proposal has none. collected_at is set when the operator collected it into an agenda (the entry's agenda_id / entry_id name that agenda entry).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proposal_id", "question", "requires_customer", "proposed_at"],
+      "properties": {
+        "proposal_id": { "type": "string", "pattern": "^tp-[a-f0-9]{16}$" },
+        "question": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "requires_customer": { "type": "boolean" },
+        "options": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["value", "label"],
+            "properties": {
+              "value": {},
+              "label": { "type": "string", "minLength": 1, "maxLength": 300 }
+            }
+          }
+        },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 2000 },
+        "topic": { "type": "string", "minLength": 1, "maxLength": 60 },
+        "proposed_at": { "type": "string", "minLength": 1 },
+        "collected_at": { "type": "string", "minLength": 1 },
+        "resolved": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["decision_id", "at"],
+          "properties": {
+            "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
+            "at": { "type": "string", "minLength": 1 }
+          }
         }
       }
     }

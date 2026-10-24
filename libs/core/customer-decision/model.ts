@@ -199,11 +199,32 @@ export interface DecisionSwitch {
 }
 
 /**
- * The layer a consumed decision came from. `task_proposal` is reserved for a
- * decision the task itself proposed while the customer has not decided yet
- * (CD-09 "実装中の判断を顧客に回す"); nothing writes it yet.
+ * The layer a consumed decision came from. `task_proposal` is a decision the
+ * task itself proposed while the customer has not decided yet (CD-09
+ * "実装中の判断を顧客に回す"): the entry carries a {@link TaskDecisionProposal}
+ * and, once collected into an agenda, that agenda entry's ids.
  */
 export type ConsumedDecisionLayer = DecisionLayerName | 'none' | 'task_proposal';
+
+/**
+ * A customer-judgment question a task raised (CD-09), kept on the task's own
+ * consumer lock. The proposal value is the entry's `value` (absent when
+ * `requires_customer`: the task waits for the customer instead).
+ */
+export interface TaskDecisionProposal {
+  /** `tp-<hex16>`, derived from the consumer, item and key; doubles as the agenda entry id. */
+  proposal_id: string;
+  question: string;
+  requires_customer: boolean;
+  options?: Array<{ value: unknown; label: string }>;
+  rationale?: string;
+  topic?: string;
+  proposed_at: string;
+  /** When the proposal was linked to an agenda entry (the entry's `agenda_id` / `entry_id`). */
+  collected_at?: string;
+  /** `requires_customer`: the confirmed customer decision that released the hold. */
+  resolved?: { decision_id: string; at: string };
+}
 
 /** What a task consumed at its start (same shape idea as the SSOD `DecisionLock`). */
 export interface ConsumedDecisionLock {
@@ -219,6 +240,8 @@ export interface ConsumedDecisionLock {
     decision_id?: string;
     value?: unknown;
     layer: ConsumedDecisionLayer;
+    /** Present exactly on `task_proposal` entries. */
+    proposal?: TaskDecisionProposal;
   }>;
 }
 
