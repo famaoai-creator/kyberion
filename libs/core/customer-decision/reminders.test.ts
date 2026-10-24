@@ -7,7 +7,9 @@ import type { CustomerDecisionInvite } from './invite.js';
 import type { DecisionAgenda, DecisionReceipt } from './model.js';
 import {
   addUtcDays,
+  displayClosingMoment,
   dueAgendaReminders,
+  hasAnsweredAll,
   handoffInboxEntryId,
   handoffTargets,
   isCalendarDate,
@@ -386,5 +388,139 @@ describe('handoffTargets', () => {
     expect(
       isHandoffDone({ receipt_id: record.receipt_id }, [{ ...record, notified_at: CREATED }])
     ).toBe(true);
+  });
+});
+
+describe('hasAnsweredAll (CD-11 review)', () => {
+  const two = agenda({
+    entries: [
+      ...agenda().entries,
+      {
+        entry_id: 'locale',
+        item: 'NFR',
+        key: 'ui.locale',
+        kind: 'choice',
+        question: 'Languages?',
+        options: [{ value: ['ja'], label: 'ja' }],
+        requires_customer: false,
+      },
+      {
+        entry_id: 'closed',
+        item: 'DATA',
+        key: 'retention',
+        kind: 'choice',
+        question: 'Retention?',
+        options: [{ value: 30, label: '30' }],
+        requires_customer: false,
+        override_until: { kind: 'date', at: '2026-10-01T00:00:00.000Z' },
+      },
+    ],
+  });
+  const hash = agendaContentHash(two);
+  const now = '2026-10-30T09:00:00.000Z';
+  const r = (
+    id: string,
+    answers: DecisionReceipt['answers'],
+    over: Partial<DecisionReceipt> = {}
+  ) => receipt(two, ACTOR, { receipt_id: id, answers, ...over });
+
+  it('needs every open entry answered with a decision; closed entries do not count', () => {
+    const auth = {
+      entry_id: 'auth',
+      choice: 'option' as const,
+      value: 'sso',
+      outcome: 'decided' as const,
+    };
+    const locale = {
+      entry_id: 'locale',
+      choice: 'option' as const,
+      value: ['ja'],
+      outcome: 'unchanged' as const,
+    };
+    // Partial: one of two open entries.
+    expect(hasAnsweredAll(two, [r('rcp-0000000000000011', [auth])], ACTOR, hash, now)).toBe(false);
+    // Spread over two receipts of the same actor: answered ('closed' is past its window).
+    expect(
+      hasAnsweredAll(
+        two,
+        [r('rcp-0000000000000011', [auth]), r('rcp-0000000000000012', [locale])],
+        ACTOR,
+        hash,
+        now
+      )
+    ).toBe(true);
+    // A general question alone, or comment-only opinions, are not answers.
+    expect(
+      hasAnsweredAll(
+        two,
+        [r('rcp-0000000000000013', [], { general_question: 'Hosting?' })],
+        ACTOR,
+        hash,
+        now
+      )
+    ).toBe(false);
+    const opinion = {
+      entry_id: 'locale',
+      choice: 'free_text' as const,
+      comment: 'hmm',
+      outcome: 'opinion' as const,
+    };
+    expect(
+      hasAnsweredAll(two, [r('rcp-0000000000000014', [auth, opinion])], ACTOR, hash, now)
+    ).toBe(false);
+    // Another actor's or an older revision's receipts do not count.
+    expect(
+      hasAnsweredAll(
+        two,
+        [r('rcp-0000000000000015', [auth, locale], { content_hash: 'c'.repeat(64) })],
+        ACTOR,
+        hash,
+        now
+      )
+    ).toBe(false);
+    expect(
+      hasAnsweredAll(two, [receipt(two, OTHER, { answers: [auth, locale] })], ACTOR, hash, now)
+    ).toBe(false);
+  });
+
+  it('keeps reminding a decider who answered only part of the agenda', () => {
+    const partial = r('rcp-0000000000000016', [
+      { entry_id: 'auth', choice: 'option', value: 'sso', outcome: 'decided' },
+    ]);
+    expect(kinds(dueAgendaReminders(input(two, now, { receipts: [partial] })))).toEqual(['due']);
+  });
+});
+
+describe('override_closing closing moment (CD-11 review)', () => {
+  it('shows the closing moment in the agenda display zone, not the UTC date', () => {
+    // A 00:00Z close is 09:00 on the same day in Japan, and the end of the
+    // previous day in UTC is the last full day open.
+    expect(displayClosingMoment('2026-11-05T00:00:00.000Z', 'ja')).toEqual({
+      date: '2026-11-05',
+      time: '09:00',
+      zone: 'JST',
+    });
+    expect(displayClosingMoment('2026-11-05T00:00:00.000Z', 'en')).toEqual({
+      date: '2026-11-05',
+      time: '00:00',
+      zone: 'UTC',
+    });
+    // 20:00Z on the 4th is already the 5th in Japan.
+    expect(displayClosingMoment('2026-11-04T20:00:00.000Z', 'ja')).toEqual({
+      date: '2026-11-05',
+      time: '05:00',
+      zone: 'JST',
+    });
+  });
+
+  it('puts the closing moment into the override notice template', () => {
+    const a = agenda({ respond_by: undefined, locale: 'ja' });
+    const [notice] = dueAgendaReminders(input(a, '2026-11-03T00:00:00.000Z'));
+    expect(notice.template).toEqual({
+      id: 'customer_decision.reminder.override_closing',
+      params: { title: 'Inception decisions', date: '2026-11-05', time: '18:00', zone: 'JST' },
+      locale: 'ja',
+    });
+    expect(renderCustomerRoutineTemplate(notice.template)).toEqual(expect.any(String));
   });
 });

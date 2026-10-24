@@ -18,7 +18,11 @@ import { t, type VocabularyKey } from './t.js';
 
 interface CustomerRoutineTemplate {
   key: VocabularyKey;
-  /** Parameter names; `date` must be a `YYYY-MM-DD` calendar date. */
+  /**
+   * Parameter names. `date` must be `YYYY-MM-DD`, `time` `HH:MM`, `zone` a
+   * known zone label; any other parameter is free text checked by
+   * {@link routineParamProblem}.
+   */
   params: readonly string[];
 }
 
@@ -33,7 +37,7 @@ export const CUSTOMER_ROUTINE_TEMPLATES: Readonly<Record<string, CustomerRoutine
   },
   'customer_decision.reminder.override_closing': {
     key: 'customer_decision:reminder_override_closing',
-    params: ['title', 'date'],
+    params: ['title', 'date', 'time', 'zone'],
   },
 };
 
@@ -46,18 +50,38 @@ export interface CustomerRoutineTemplateRef {
 
 /** The agenda locales a template renders in (the agenda schema's `locale` enum). */
 const TEMPLATE_LOCALES: ReadonlySet<string> = new Set(['ja', 'en']);
-const MAX_PARAM_LENGTH = 200;
+/** Same as the agenda schema's `title` limit. */
+export const MAX_ROUTINE_PARAM_LENGTH = 300;
 const DATE_PARAM = /^\d{4}-\d{2}-\d{2}$/u;
+const TIME_PARAM = /^\d{2}:\d{2}$/u;
+const ZONE_PARAMS: ReadonlySet<string> = new Set(['UTC', 'JST']);
+/** Control, format (bidi, zero-width), line and paragraph separators. */
+const INVISIBLE_OR_BREAK = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/u;
+/** A host name: labels joined by dots ending in a letter TLD (`acme.com`, `a.b.co`). */
+const BARE_DOMAIN =
+  /(?:^|[^\p{L}\p{N}_-])[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)*\.\p{L}{2,}(?![\p{L}\p{N}_-])/u;
+/** Chat mention / broadcast syntax (Slack, Discord, Telegram). */
+const MENTION = /<[!@#]|@(?:everyone|here|channel)\b/iu;
 
-function paramProblem(name: string, value: unknown): boolean {
-  if (typeof value !== 'string' || !value.trim() || value.length > MAX_PARAM_LENGTH) return true;
-  if (name === 'date') return !DATE_PARAM.test(value);
-  for (const char of value) {
-    const code = char.codePointAt(0) ?? 0;
-    if (code < 0x20 || code === 0x7f) return true;
-  }
-  const lower = value.toLowerCase();
-  return lower.includes('://') || lower.includes('www.') || lower.includes('//');
+/**
+ * Why a free-text parameter cannot go into an unattended customer message,
+ * or null: empty, too long, invisible / line-breaking characters, a link, a
+ * bare domain or mention syntax — checked after NFKC folding, so fullwidth
+ * `：／／` counts as `://`.
+ */
+export function routineParamProblem(name: string, value: unknown): string | null {
+  if (typeof value !== 'string' || !value.trim()) return 'empty';
+  if (value.length > MAX_ROUTINE_PARAM_LENGTH) return 'too_long';
+  if (name === 'date') return DATE_PARAM.test(value) ? null : 'not_a_date';
+  if (name === 'time') return TIME_PARAM.test(value) ? null : 'not_a_time';
+  if (name === 'zone') return ZONE_PARAMS.has(value) ? null : 'unknown_zone';
+  if (INVISIBLE_OR_BREAK.test(value)) return 'invisible_or_break';
+  const folded = value.normalize('NFKC').toLowerCase();
+  if (INVISIBLE_OR_BREAK.test(folded)) return 'invisible_or_break';
+  if (folded.includes('//') || folded.includes(':/') || folded.includes('www.')) return 'link';
+  if (BARE_DOMAIN.test(folded)) return 'domain';
+  if (MENTION.test(folded)) return 'mention';
+  return null;
 }
 
 /**
@@ -74,7 +98,7 @@ export function renderCustomerRoutineTemplate(ref: CustomerRoutineTemplateRef): 
   if (
     names.length !== template.params.length ||
     !template.params.every(
-      (name) => Object.hasOwn(params, name) && !paramProblem(name, params[name])
+      (name) => Object.hasOwn(params, name) && routineParamProblem(name, params[name]) === null
     )
   )
     return null;
