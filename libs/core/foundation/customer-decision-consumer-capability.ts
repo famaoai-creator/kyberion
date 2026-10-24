@@ -296,9 +296,12 @@ const IDENTITY_FIELDS = ['version', 'case_id', 'consumer', 'mission_id', 'task_i
  * therefore not undo what the lock records:
  *   - identity (case, consumer, mission, task, tenant, project) never changes;
  *   - a lock that stays completed keeps its `completed_at` and its pinned
- *     decisions (the response sweep checks them); `status` goes back to
- *     `in_progress` only as the re-pin of a new worker run, which keeps every
- *     record below;
+ *     decisions (the response sweep checks them). `status` may go back to
+ *     `in_progress` (a new worker run re-pins the task) with new pins, keeping
+ *     every record below. The guard cannot tell that re-pin from a forged
+ *     "re-run": a holder of the capability can re-pin and complete again
+ *     (completed → in_progress → completed) to replace a completed lock's
+ *     pins. Known limit (plan, CD-09 の残り);
  *   - `rework` is append-only;
  *   - `task_proposal` entries are never removed, never lose
  *     `requires_customer`, never lose `resolved`; a collected one changes only
@@ -337,8 +340,8 @@ export function customerDecisionConsumerWriteProblem(
         return refused(`the consumer lock ${field} may not change`);
     if (before.project_id !== undefined && after.project_id !== before.project_id)
       return refused('the consumer lock project_id may not change');
-    // A completed lock is re-pinned only by a new worker run of its task
-    // (status back to in_progress, reconciled again at that run's completion).
+    // A completed lock may go back to in_progress (a worker re-run re-pins it);
+    // the guard cannot prove that run is real (see the docstring).
     if (before.status === 'completed' && after.status === 'completed') {
       if (after.completed_at !== before.completed_at)
         return refused('a completed consumer lock keeps its completed_at');

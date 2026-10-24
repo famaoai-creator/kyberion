@@ -591,6 +591,11 @@ describe('customer dialogue (E2E-06)', () => {
     expect(md).toContain('360,000');
     const approvalNotify = notify.mock.calls.find((call) => call[0] === 'approval_required');
     expect(approvalNotify).toBeTruthy();
+    // Operator notifications are shared: the total (tenant pricing) stays in the document.
+    const readyBody = String((approvalNotify![1] as { body?: string }).body);
+    expect(readyBody).not.toContain('360,000');
+    expect(readyBody).not.toContain('360000');
+    expect(readyBody).toContain(`--source deals/${deal.deal_id}/quote-v1.md`);
 
     // unquotable work goes to the operator and never advances the stage
     const bad = core.generateQuoteForDeal({
@@ -599,7 +604,22 @@ describe('customer dialogue (E2E-06)', () => {
       requests: [{ task_kind: 'quantum_reactor' }],
     });
     expect(bad.ok).toBe(false);
-    expect(notify.mock.calls.some((call) => call[0] === 'question')).toBe(true);
+    const question = notify.mock.calls.find((call) => call[0] === 'question');
+    expect(question).toBeTruthy();
+    // A count only; the task kinds (maybe customer words) stay in the tenant's deal folder.
+    expect(JSON.stringify(question)).not.toContain('quantum_reactor');
+    expect(String((question![1] as { body?: string }).body)).toContain(
+      `--source deals/${deal.deal_id}/quote-unquotable.json`
+    );
+    const unquotable = JSON.parse(
+      fs.readFileSync(
+        path.join(tmpRoot, 'customer', SLUG, 'deals', deal.deal_id, 'quote-unquotable.json'),
+        'utf8'
+      )
+    );
+    expect(unquotable.unquotable).toEqual([
+      { task_kind: 'quantum_reactor', reason: 'no_estimate_rule' },
+    ]);
     expect(core.getDeal(SLUG, deal.deal_id)!.stage).toBe('quote');
   });
 
