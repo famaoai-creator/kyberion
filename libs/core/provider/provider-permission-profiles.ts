@@ -300,6 +300,29 @@ export function resolveCliProviderDescriptorOrNull(
   return descriptor?.cli ? descriptor : undefined;
 }
 
+/**
+ * Non-throwing candidacy predicate for staffing-time exclusion. Returns
+ * false only when the identifier resolves to a governed CLI adapter whose
+ * declared `cli.permission_profiles` cannot project `profileName` at all —
+ * a refused cell or a missing mapping. Cells that merely gate on ambient
+ * sandbox enforcement stay candid: whether this environment can enforce
+ * them is dispatch-time truth, not a staffing property, and
+ * {@link assertProviderCanProjectProfile} remains the fail-closed guard.
+ * Unknown identifiers and non-CLI adapters return true — selection-time
+ * filtering must not drop candidates over a registry gap.
+ */
+export function providerCanProjectProfile(
+  identifier: string | undefined | null,
+  profileName: string
+): boolean {
+  if (!identifier) return true;
+  const descriptor = resolveReasoningProviderDescriptor(identifier);
+  if (!descriptor?.cli) return true;
+  const cell = descriptor.cli.permission_profiles?.[profileName];
+  if (!cell || typeof cell !== 'object') return false;
+  return !('refused' in cell && cell.refused);
+}
+
 // --------------------------------------------------------------------------
 // Child-process env minimization (HA-04 type, generalized across providers)
 // --------------------------------------------------------------------------
