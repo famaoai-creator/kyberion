@@ -79,12 +79,27 @@ gh pr checks <number> --watch
 - **`--title` を必ず渡す**。省略すると HEAD commit の件名がタイトルになり、最後の小さな修正 commit が
   PR 名になる。
 - **`--body-file` を必ず渡す**。省略すると `gh --fill` で commit 一覧が本文になり、テンプレートの
-  Test plan やチェック欄が抜ける。
+  Test plan やチェック欄が抜ける。**パスは checkout 内の repo 相対パスにする**
+  （`active/shared/tmp/pr-body-<topic>.md` など）。`/tmp/body.md` のような checkout 外の絶対パスは
+  secure-io に拒否され、readiness gate を通ったあとで失敗する。
 - **`## Knowledge` 欄を必ず埋める**。Mission ID を書いた PR は、そのミッションの学びの候補を全件
   `promoted` / `rejected` / `routed` のどれかで宣言する。ミッションなしの PR は `none — <理由>`。
+  宣言行の形式は `- promoted: <candidate_id> → <promoted record path>`（`routed:` は
+  `→ organization|personal`、`rejected:` と `none` は `— <理由>`）。ID とパスは裸のトークンとして
+  書く。前後の backtick・引用符と、パス後の半角スペース以降の注記はパーサが取り除くが、
+  パスは `promoted_ref` と完全一致させること。
   `pr create` は、未解決・未宣言の候補、diff に入っていない昇格記録、`knowledge/confidential/`・`knowledge/personal/`
   配下へのファイル追加（既に追跡済みのファイルの変更は対象外）があると PR を作らない。この検査は `--skip-readiness` でも迂回できない。ミッションの記録が
   main checkout にある場合は、主 worktree を自動で探す（明示するなら `--mission-root <path>`）。
+- **ミッション候補を `queued` / `hold` のままにしない**。未キュレーションの候補は
+  `unresolved_candidate` で `pr create` が止まる。`memory-approve` の `--curation-json` には
+  `{"title","summary","content","evidence_refs"}` が必須で、`evidence_refs` には候補の元 evidence の
+  フルパス（`active/missions/<tier>/<ID>/evidence/...`）だけを書く（`evidence/x.md` のような短縮形は
+  拒否される）。手順は phases/execution.md の「Ship the learnings in the same PR as the code」。
+- **`[EXTERNAL_APPROVAL_REQUIRED]` は失敗ではなく正常な終点**。公開操作は人間ゲートで止まるのが
+  設計どおりで、body ファイルの置き場所は承認要否を変えない。表示された依頼 ID を人間が
+  `pnpm kyberion approvals --approve <id>` で承認したあと、**同じ `pr create` コマンドを再実行する**
+  （その時点で `gh pr create` が走る）。
 - **`pnpm kyberion pr create --help` を実行しない**。ヘルプは表示されず、そのまま readiness gate と
   PR 作成が走る。オプションはこの文書で確認する。
 - **push を先に行う**。`pr create` は push しない。未 push だと `No commits between main and <branch>` で失敗する。
