@@ -25256,6 +25256,76 @@
         "ja": "あなたのこと",
         "qps-ploc": "⟦Ȧƀőůŧ ẏőů ŀőř⟧"
       },
+      "settings_intro": {
+        "en": "Make your companion work the way you do. Manage your profile, connections and conversations here.",
+        "ja": "プロフィールや連携先、相棒とのやり取りを設定できます。",
+        "qps-ploc": "⟦Ɱȧķė ẏőůř ƈőɱṗȧñïőñ ẇőřķ ŧħė ẇȧẏ ẏőů ḓő. Ɱȧñȧɠė ẏőůř ṗřőƒïŀė, ƈőññėƈŧïőñş ȧñḓ ƈőñṽėřşȧŧïőñş ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "settings_group_people": {
+        "en": "You and your team",
+        "ja": "あなたとチーム",
+        "qps-ploc": "⟦Ẏőů ȧñḓ ẏőůř ŧėȧɱ ŀőřėɱ⟧"
+      },
+      "settings_group_companion": {
+        "en": "Your companion",
+        "ja": "相棒の働き方",
+        "qps-ploc": "⟦Ẏőůř ƈőɱṗȧñïőñ ŀőřė⟧"
+      },
+      "settings_group_manage": {
+        "en": "Extensions and administration",
+        "ja": "拡張と管理",
+        "qps-ploc": "⟦Ėẋŧėñşïőñş ȧñḓ ȧḓɱïñïşŧřȧŧïőñ ŀőřėɱ ïṗş⟧"
+      },
+      "settings_desc_profile": {
+        "en": "Name, priorities and sign-in",
+        "ja": "名前・優先事項・サインイン",
+        "qps-ploc": "⟦Ñȧɱė, ṗřïőřïŧïėş ȧñḓ şïɠñ-ïñ ŀőřėɱ ïṗş⟧"
+      },
+      "settings_desc_display": {
+        "en": "Language and appearance",
+        "ja": "言語・画面の見え方",
+        "qps-ploc": "⟦Ŀȧñɠůȧɠė ȧñḓ ȧṗṗėȧřȧñƈė ŀőřėɱ ï⟧"
+      },
+      "settings_desc_members": {
+        "en": "People and access",
+        "ja": "メンバー・アクセス権",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ ȧƈƈėşş ŀőřėɱ⟧"
+      },
+      "settings_desc_services": {
+        "en": "Accounts and integrations",
+        "ja": "アカウント・外部サービス",
+        "qps-ploc": "⟦Ȧƈƈőůñŧş ȧñḓ ïñŧėɠřȧŧïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "settings_desc_voice": {
+        "en": "Voice, microphone and avatar",
+        "ja": "声・マイク・アバター",
+        "qps-ploc": "⟦Ṽőïƈė, ɱïƈřőṗħőñė ȧñḓ ȧṽȧŧȧř ŀőřėɱ ïṗş⟧"
+      },
+      "settings_desc_notifications": {
+        "en": "Where and when to reach you",
+        "ja": "届け先・通知する時間帯",
+        "qps-ploc": "⟦Ẇħėřė ȧñḓ ẇħėñ ŧő řėȧƈħ ẏőů ŀőřėɱ ïṗ⟧"
+      },
+      "settings_desc_recording": {
+        "en": "Consent and captured activity",
+        "ja": "記録への同意・記録内容の確認",
+        "qps-ploc": "⟦Ƈőñşėñŧ ȧñḓ ƈȧṗŧůřėḓ ȧƈŧïṽïŧẏ ŀőřėɱ ïṗş⟧"
+      },
+      "settings_desc_plugins": {
+        "en": "Review added capabilities",
+        "ja": "追加機能の確認・承認",
+        "qps-ploc": "⟦Řėṽïėẇ ȧḓḓėḓ ƈȧṗȧƀïŀïŧïėş ŀőřėɱ ïṗ⟧"
+      },
+      "settings_desc_advanced": {
+        "en": "Agent and system configuration",
+        "ja": "エージェント・システムの管理",
+        "qps-ploc": "⟦Ȧɠėñŧ ȧñḓ şẏşŧėɱ ƈőñƒïɠůřȧŧïőñ ŀőřėɱ ïṗşů⟧"
+      },
+      "settings_unsaved_badge": {
+        "en": "Unsaved",
+        "ja": "未保存",
+        "qps-ploc": "⟦Ůñşȧṽėḓ ŀőř⟧"
+      },
       "settings_nav_display": {
         "en": "Display",
         "ja": "表示",

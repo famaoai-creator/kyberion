@@ -42,6 +42,7 @@ export const A2UI_BASE_COMPONENT_TYPES = [
   'ui:disclosure',
   'ui:display-controls',
   // UI-01c settings & forms (SURFACE_UI_UNIFICATION_PLAN §3.3)
+  'ui:settings-nav',
   'ui:settings-group',
   'ui:setting-row',
   'ui:switch',
@@ -560,6 +561,7 @@ export interface KyberionBasePropsByType {
   'ui:button': KbButtonProps;
   'ui:disclosure': KbDisclosureProps;
   'ui:display-controls': KbDisplayControlsProps;
+  'ui:settings-nav': KbSettingsNavProps;
   'ui:settings-group': KbSettingsGroupProps;
   'ui:setting-row': KbSettingRowProps;
   'ui:switch': KbSwitchProps;
@@ -644,6 +646,25 @@ export interface KbFieldOption {
   disabled?: boolean;
 }
 
+export interface KbSettingsNavItem {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  href: string;
+  badge?: string;
+  status?: KbStatus;
+  action?: KbAction;
+}
+
+export interface KbSettingsNavProps {
+  /** Accessible name of this navigation landmark. */
+  label: string;
+  groups: Array<{ id: string; label?: string; items: KbSettingsNavItem[] }>;
+  /** Current section id; links retain their native keyboard semantics. */
+  active?: string;
+}
+
 export interface KbSettingsGroupProps {
   title: string;
   description?: string;
@@ -652,6 +673,14 @@ export interface KbSettingsGroupProps {
 export interface KbSettingRowProps {
   label: string;
   description?: string;
+  /**
+   * Single labelable child control's A2UI component id: text-field, textarea,
+   * select, switch, checkbox or slider. Not radio-group/segmented, which have
+   * several inputs. Connects the visible label to that input and its accessible name.
+   */
+  control_id?: string;
+  /** Stack prose fields at full width; inline remains suitable for compact controls. */
+  layout?: 'inline' | 'stacked';
   /** Visual separation for dangerous settings (delete, reset). */
   tone?: 'neutral' | 'danger';
 }

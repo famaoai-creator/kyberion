@@ -20,6 +20,80 @@
   min-width: 0;
 }
 
+.settings-readiness > .kb-disclosure {
+  margin: 0;
+}
+
+.settings-readiness .kb-disclosure__body > p {
+  margin: 0 0 var(--kb-ui-space-3);
+}
+
+.settings-readiness-rows {
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  overflow: hidden;
+}
+
+.settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--kb-ui-space-4);
+}
+
+.settings-heading h1 {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-xl);
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.settings-heading p {
+  margin: var(--kb-ui-space-2) 0 0;
+  color: var(--kb-ui-text-muted);
+  font-size: var(--kb-ui-font-size-sm);
+  line-height: 1.6;
+  max-width: 65ch;
+}
+
+/* Shared A2UI navigation owns its appearance; only page geometry lives here. */
+.settings-page .settings-layout {
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  gap: var(--kb-ui-space-6);
+}
+
+.settings-navigation {
+  position: sticky;
+  top: var(--kb-ui-space-4);
+  max-height: calc(100dvh - var(--kb-ui-space-6));
+  overflow-y: auto;
+  padding: var(--kb-ui-space-1);
+  scrollbar-width: thin;
+}
+
+.settings-navigation--compact {
+  display: none;
+}
+
+.settings-navigation--compact > .kb-disclosure {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .settings-page .settings-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-navigation--desktop {
+    display: none;
+  }
+
+  .settings-navigation--compact {
+    display: block;
+  }
+}
+
 /* Full-width content inside a group's row card (lists, pickers, notes). */
 .settings-row-block {
   display: flex;
@@ -164,21 +238,6 @@
   border-radius: var(--kb-ui-radius-sm);
   overflow-wrap: anywhere;
 }
-.settings-member-admin label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--kb-ui-space-2);
-}
-.settings-member-admin select,
-.settings-member-admin input {
-  color: var(--kb-ui-text);
-  background: var(--kb-ui-surface);
-  border: 1px solid var(--kb-ui-border);
-  border-radius: var(--kb-ui-radius-sm);
-  padding: var(--kb-ui-space-2);
-  max-width: 100%;
-}
-
 @media (max-width: 720px) {
   .settings-row-block,
   .settings-row-actions {

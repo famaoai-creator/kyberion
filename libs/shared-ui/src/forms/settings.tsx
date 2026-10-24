@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import type {
   KbActionRef,
   KbIntegrationItemProps,
@@ -17,7 +17,7 @@ import {
   KB_SAVE_BAR_MESSAGE_KEYS,
   formFieldIds,
 } from '../../vanilla/forms.js';
-import { IconWrap, type KbFormComponentId } from './shared.js';
+import { IconWrap, SettingRowLabelContext, type KbFormComponentId } from './shared.js';
 
 /** `ui:settings-group` → `section.kb-settings-group` (header + `__rows` of children). */
 export function SettingsGroup({
@@ -26,7 +26,10 @@ export function SettingsGroup({
   description,
   children,
 }: KbSettingsGroupProps & KbFormComponentId & { children?: ReactNode }) {
-  const ids = formFieldIds(id, 'group');
+  // Direct React consumers may omit the catalog id. Each group still needs
+  // its own accessible heading; A2UI ids retain deterministic renderer parity.
+  const fallbackId = useId();
+  const ids = formFieldIds(id || `group-${fallbackId}`, 'group');
   return (
     <section className="kb-settings-group" aria-labelledby={ids.title}>
       <header className="kb-settings-group__header">
@@ -42,18 +45,39 @@ export function SettingsGroup({
 
 /** `ui:setting-row` → `.kb-setting-row` (text left, one control right). */
 export function SettingRow({
+  id,
   label,
   description,
   tone,
+  control_id,
+  layout,
   children,
 }: KbSettingRowProps & KbFormComponentId & { children?: ReactNode }) {
+  const controlId = typeof control_id === 'string' && control_id ? control_id : undefined;
+  const fallbackId = useId();
+  const labelId = formFieldIds(id || `row-${fallbackId}`, 'row').label;
+  const inputId = controlId ? formFieldIds(controlId, '').input : undefined;
   return (
-    <div className="kb-setting-row" data-tone={tone === 'danger' ? 'danger' : undefined}>
+    <div
+      className="kb-setting-row"
+      data-tone={tone === 'danger' ? 'danger' : undefined}
+      data-layout={layout === 'stacked' ? 'stacked' : undefined}
+    >
       <div className="kb-setting-row__text">
-        <p className="kb-setting-row__label">{label}</p>
+        {controlId ? (
+          <label className="kb-setting-row__label" id={labelId} htmlFor={inputId}>
+            {label}
+          </label>
+        ) : (
+          <p className="kb-setting-row__label">{label}</p>
+        )}
         {description ? <p className="kb-setting-row__description">{description}</p> : null}
       </div>
-      <div className="kb-setting-row__control">{children}</div>
+      <div className="kb-setting-row__control">
+        <SettingRowLabelContext.Provider value={inputId ? { inputId, labelId } : null}>
+          {children}
+        </SettingRowLabelContext.Provider>
+      </div>
     </div>
   );
 }

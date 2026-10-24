@@ -44,6 +44,7 @@ import {
   actionPayload,
 } from './forms-core.js';
 import { toFile, cropImageToSquare, createCameraController } from './forms-camera.js';
+import { KB_STATUS_MESSAGE_KEYS } from './kyberion-ui-vocabulary.js';
 
 // Public surface: the constants / pure helpers and the camera helpers live in
 // sibling modules (served next to this one) and are re-exported unchanged.
@@ -103,6 +104,7 @@ const SVG_NS = 'http://www.w3.org/2000/svg';
  *   appendChildren: (ctx: any, parent: any, component: any, depth: number) => void,
  *   safeHref: (value: unknown) => string | null,
  *   iconPaths: Readonly<Record<string, readonly string[]>>,
+ *   isPlainActivation: (event: any) => boolean,
  * }} FormRendererHelpers
  */
 
@@ -1070,6 +1072,68 @@ export function createFormRenderers(h) {
   // -- settings layout, slider, integration, save bar ----------------------
 
   return {
+    'ui:settings-nav'(ctx, p, c) {
+      const root = el(ctx, 'nav', 'kb-settings-nav');
+      root.setAttribute('aria-label', typeof p.label === 'string' ? p.label : '');
+      const groups = Array.isArray(p.groups) ? p.groups : [];
+      for (const group of groups) {
+        if (!isRecord(group) || !Array.isArray(group.items)) continue;
+        const section = el(ctx, 'div', 'kb-settings-nav__group');
+        if (typeof group.label === 'string' && group.label)
+          section.appendChild(el(ctx, 'p', 'kb-settings-nav__group-label', group.label));
+        const list = el(ctx, 'ul', 'kb-settings-nav__list');
+        if (typeof group.label === 'string' && group.label)
+          list.setAttribute('aria-label', group.label);
+        for (const item of group.items) {
+          if (!isRecord(item) || typeof item.label !== 'string') continue;
+          const href = h.safeHref(item.href);
+          const action = formAction(item.action, '');
+          const row = el(ctx, 'li');
+          const link = el(ctx, href ? 'a' : 'span', 'kb-settings-nav__link');
+          setData(link, 'nav-id', item.id);
+          if (href) {
+            link.setAttribute('href', href);
+            if (item.id === p.active) link.setAttribute('aria-current', 'location');
+            if (action.id) {
+              setData(link, 'action-id', action.id);
+              listen(link, 'click', (event) => {
+                if (
+                  event?.defaultPrevented ||
+                  !h.isPlainActivation(event) ||
+                  typeof ctx.onAction !== 'function'
+                )
+                  return;
+                event?.preventDefault?.();
+                ctx.onAction(action, c);
+              });
+            }
+          } else link.setAttribute('aria-disabled', 'true');
+          if (typeof item.icon === 'string' && item.icon) {
+            const icon = iconWrap(ctx, 'kb-settings-nav__icon', item.icon);
+            if (icon) link.appendChild(icon);
+          }
+          const text = el(ctx, 'span', 'kb-settings-nav__text');
+          text.appendChild(el(ctx, 'span', 'kb-settings-nav__label', item.label));
+          if (typeof item.description === 'string' && item.description)
+            text.appendChild(el(ctx, 'span', 'kb-settings-nav__description', item.description));
+          link.appendChild(text);
+          if (typeof item.badge === 'string' && item.badge)
+            link.appendChild(el(ctx, 'span', 'kb-settings-nav__badge', item.badge));
+          if (
+            typeof item.status === 'string' &&
+            Object.prototype.hasOwnProperty.call(KB_STATUS_MESSAGE_KEYS, item.status)
+          ) {
+            link.appendChild(h.statusPill(ctx, item.status));
+          }
+          row.appendChild(link);
+          list.appendChild(row);
+        }
+        section.appendChild(list);
+        root.appendChild(section);
+      }
+      return root;
+    },
+
     'ui:settings-group'(ctx, p, c, depth) {
       const ids = formFieldIds(c.id, 'group');
       const root = el(ctx, 'section', 'kb-settings-group');
@@ -1090,13 +1154,32 @@ export function createFormRenderers(h) {
     'ui:setting-row'(ctx, p, c, depth) {
       const root = el(ctx, 'div', 'kb-setting-row');
       if (p.tone === 'danger') setData(root, 'tone', 'danger');
+      if (p.layout === 'stacked') setData(root, 'layout', 'stacked');
       const text = el(ctx, 'div', 'kb-setting-row__text');
-      text.appendChild(el(ctx, 'p', 'kb-setting-row__label', p.label));
+      const controlId = typeof p.control_id === 'string' && p.control_id;
+      const labelId = formFieldIds(c.id, 'row').label;
+      const label = el(ctx, controlId ? 'label' : 'p', 'kb-setting-row__label', p.label);
+      if (controlId) {
+        label.setAttribute('id', labelId);
+        label.setAttribute('for', formFieldIds(controlId, '').input);
+      }
+      text.appendChild(label);
       if (p.description)
         text.appendChild(el(ctx, 'p', 'kb-setting-row__description', p.description));
       root.appendChild(text);
       const control = el(ctx, 'div', 'kb-setting-row__control');
       h.appendChildren(ctx, control, c, depth);
+      if (controlId) {
+        const inputId = formFieldIds(controlId, '').input;
+        // Explicit naming avoids speaking both the visible row label and a
+        // field's visually hidden native label. Other controls keep their names.
+        const labelTarget = (node) => {
+          if ((node.getAttribute('class') || '').split(/\s+/).includes('kb-setting-row')) return;
+          if (node.getAttribute('id') === inputId) node.setAttribute('aria-labelledby', labelId);
+          for (const child of Array.from(node.children || [])) labelTarget(child);
+        };
+        labelTarget(control);
+      }
       root.appendChild(control);
       return root;
     },
