@@ -407,6 +407,42 @@ describe('evaluatePrKnowledgeReadiness', () => {
     ]);
   });
 
+  it('accepts a promoted line with backtick-wrapped id/path and a trailing note', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE(
+      'promoted: `MEM-P` → `knowledge/public/generated/MEM-P.md` (pr_review channel)'
+    );
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-P',
+      status: 'promoted',
+      knowledge_domain: 'product',
+      promoted_ref: 'knowledge/public/generated/MEM-P.md',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [
+        changed('A', 'knowledge/public/generated/MEM-P.md'),
+        changed('A', 'knowledge/public/generated/MEM-P.json'),
+      ],
+    });
+    expect(result.violations).toEqual([]);
+  });
+
+  it('accepts a rejected line with a backtick-wrapped id', () => {
+    const body = KNOWLEDGE_SECTION_TEMPLATE('rejected: `MEM-ORG-R` — nothing reusable');
+    const candidate = baseCandidate({
+      candidate_id: 'MEM-ORG-R',
+      status: 'rejected',
+      knowledge_domain: 'organization',
+    });
+    const result = evaluatePrKnowledgeReadiness({
+      body,
+      candidates: [candidate],
+      changedFiles: [],
+    });
+    expect(result.violations).toEqual([]);
+  });
+
   it('flags declaration_mismatch when a promoted candidate is declared as rejected', () => {
     const body = KNOWLEDGE_SECTION_TEMPLATE('rejected: MEM-P — not needed after all');
     const candidate = baseCandidate({

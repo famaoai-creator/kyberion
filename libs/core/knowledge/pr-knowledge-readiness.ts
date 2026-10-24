@@ -123,8 +123,8 @@ const KNOWLEDGE_LINE_PATTERNS: ReadonlyArray<{
   kind: KnowledgeLineKind;
   pattern: RegExp;
 }> = [
-  { kind: 'promoted', pattern: /^promoted:\s*(\S+)\s*(?:→|->)\s*(.+)$/iu },
-  { kind: 'routed', pattern: /^routed:\s*(\S+)\s*(?:→|->)\s*(organization|personal)\s*$/iu },
+  { kind: 'promoted', pattern: /^promoted:\s*(\S+)\s*(?:→|->)\s*(\S+)(?:\s.*)?$/iu },
+  { kind: 'routed', pattern: /^routed:\s*(\S+)\s*(?:→|->)\s*`?(organization|personal)`?\s*$/iu },
   { kind: 'rejected', pattern: /^rejected:\s*(\S+)\s*(?:—|--)\s*(.+)$/iu },
   { kind: 'none', pattern: /^none\s*(?:—|--)\s*(.+)$/iu },
 ];
@@ -143,18 +143,28 @@ function parseKnowledgeLine(rawLine: string): KnowledgeLine | null {
     const match = stripped.match(pattern);
     if (!match) continue;
     if (kind === 'promoted') {
-      return { kind, candidateId: match[1], path: (match[2] || '').trim(), raw: rawLine };
+      return {
+        kind,
+        candidateId: stripMissionIdDecoration(match[1] || ''),
+        path: stripMissionIdDecoration(match[2] || ''),
+        raw: rawLine,
+      };
     }
     if (kind === 'routed') {
       return {
         kind,
-        candidateId: match[1],
+        candidateId: stripMissionIdDecoration(match[1] || ''),
         domain: (match[2] || '').toLowerCase() as 'organization' | 'personal',
         raw: rawLine,
       };
     }
     if (kind === 'rejected') {
-      return { kind, candidateId: match[1], reason: (match[2] || '').trim(), raw: rawLine };
+      return {
+        kind,
+        candidateId: stripMissionIdDecoration(match[1] || ''),
+        reason: (match[2] || '').trim(),
+        raw: rawLine,
+      };
     }
     return { kind: 'none', reason: (match[1] || '').trim(), raw: rawLine };
   }
