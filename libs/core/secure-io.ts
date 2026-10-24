@@ -10,7 +10,7 @@ import {
   type SpawnOptions,
 } from 'node:child_process';
 export type { ChildProcess, SpawnOptions };
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath } from './path-resolver.js';
 import {
@@ -482,10 +482,7 @@ function boundedTemporarySibling(
   const basename = path.basename(target);
   return Buffer.byteLength(basename + suffix, 'utf8') <= 255
     ? target + suffix
-    : path.join(
-        path.dirname(target),
-        `@${purpose}-` + createHash('sha256').update(basename).digest('hex') + suffix
-      );
+    : path.join(path.dirname(target), `@${purpose}-${randomUUID()}${suffix}`);
 }
 
 export function safeWriteFile(

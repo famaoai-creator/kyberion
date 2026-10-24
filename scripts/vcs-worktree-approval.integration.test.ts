@@ -129,6 +129,8 @@ function prepareFixture(legacyWithoutPerson: boolean) {
   first = path.join(root, 'worktrees/first');
   second = path.join(root, 'worktrees/second');
   seedFirstJobTestRoot(pathResolver.rootDir(), root);
+  const manifest = 'libs/actuators/vcs-actuator/manifest.json';
+  safeWriteFile(path.join(root, manifest), safeReadFile(pathResolver.rootResolve(manifest)));
   // Exact checked-in catalogs, rather than a latest-policy fixture, reproduce
   // a primary installation whose deployment predates the trusted source host.
   originalCatalogs = new Map();

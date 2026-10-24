@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 const mocks = vi.hoisted(() => ({
@@ -128,7 +129,11 @@ describe('calendar external effect boundary', () => {
   });
 
   it('forwards one admitted GWS action through the real workflow without another gate', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mocks.send.mockResolvedValue({
       id: 'event',
       summary: 'review',
@@ -145,7 +150,11 @@ describe('calendar external effect boundary', () => {
   });
 
   it('never retries a JXA mutation', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mocks.exec.mockResolvedValueOnce(JSON.stringify({ status: 'success', title: 'review' }));
     await new JxaCalendarBackend().createEvent(params);
     expect(mocks.retry).toHaveBeenCalledWith(expect.any(Function), { maxRetries: 0 });
@@ -153,7 +162,11 @@ describe('calendar external effect boundary', () => {
   });
 
   it('admits trusted authority and binds selected backend/actual effect', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await createEvent(params, registry, { externalAuthority: authority });
     expect(adapter.createEvent).toHaveBeenCalledTimes(1);
     expect(mocks.gate).toHaveBeenCalledWith(
@@ -165,7 +178,11 @@ describe('calendar external effect boundary', () => {
   });
 
   it('admits composite scheduling only once for its concrete selected slot', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await expect(
       scheduleInFirstSlot({ ...params, duration_minutes: 60 }, registry, {
         externalAuthority: authority,
@@ -226,7 +243,11 @@ describe('calendar external effect boundary', () => {
   });
 
   it('records ambiguous transport failure without replay or backend fallback', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     vi.mocked(adapter.createEvent).mockRejectedValueOnce(new Error('lost response after create'));
     await expect(createEvent(params, registry, { externalAuthority: authority })).rejects.toThrow(
       'lost response after create'
@@ -241,7 +262,11 @@ describe('calendar external effect boundary', () => {
     ['error', 'failed'],
     ['queued', 'unknown'],
   ])('classifies provider status %s as %s', async (status, outcome) => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     vi.mocked(adapter.updateEvent!).mockResolvedValueOnce({ status, title: 'review' });
     await updateEvent(params, registry, { externalAuthority: authority });
     expect(mocks.audit).toHaveBeenCalledWith(
@@ -249,3 +274,12 @@ describe('calendar external effect boundary', () => {
     );
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

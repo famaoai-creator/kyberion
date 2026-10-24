@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -42,8 +43,16 @@ const dispatch = () => handleDeploymentAction({ action: 'deploy_release', params
 describe('deployment external governance', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.legacy.mockReturnValue({ allowed: true, status: 'approved' });
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.legacy.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mocks.deploy.mockResolvedValue({ adapter: 'test', status: 'triggered', started_at: 'test' });
   });
 
@@ -114,3 +123,12 @@ describe('deployment external governance', () => {
     expect(mocks.deploy).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

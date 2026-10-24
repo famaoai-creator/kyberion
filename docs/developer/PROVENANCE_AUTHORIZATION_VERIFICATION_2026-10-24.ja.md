@@ -1,7 +1,7 @@
 ---
 title: '来歴・実行認可・記憶・回復性の実装と検証'
 tags: [security, provenance, authorization, memory, verification]
-last_updated: 2026-10-24
+last_updated: 2026-10-25
 ---
 
 # 来歴・実行認可・記憶・回復性の実装と検証
@@ -103,6 +103,34 @@ PR標準gate一式と、変更パスに対応するfull-scopeの24 gateを含む
 - 上流のNHI admission・charter・action supersessionも含む207ファイル・2,391テストが成功した。
 - `CI=true pnpm check -- --changed --base origin/main --jobs 2`は79 gate全件成功（失敗0）。
 - canonical generatorの12工程が成功し、生成物のdriftと未解決競合はない。
+
+## PRで検出した一時名の指摘
+
+PR #1253のCodeQL集約チェックは、長い一時ファイル名を短縮するための
+`SHA-256(basename)`をパスワード用hashとして検出した。
+一時名は対象パスからの導出が不要なので、暗号学的なUUIDへ置き換えた。
+既存のlock identity、検査済みディレクトリ、排他的open、原子的な置換と後片付けは維持する。
+
+clockと弱いrandom suffixを固定しても一時名を再利用しない実ファイル回帰を追加し、
+secure-io／lockの5ファイル・137テスト、変更TSのESLintが成功した。
+独立レビューのmust_fixはない。ローカルCodeQL CLIは未導入のため、
+新しいコミットのGitHub CodeQL結果で指摘の解消を確認する。
+
+## 全体CIで見つけた回帰への対応
+
+対象を広げた初回CIでは、上記のHigh指摘に加え、ローカルの最初の対象外だった
+直接API・fixture・層の検査で失敗した。保護を解除せず、以下を修正した。
+
+- network／deployment／voice／mediaの直接APIも、実際のmanifestとschemaから現行fingerprintを得る。calendarはcanonicalなcalendar-actuatorを参照する。
+- 承認モックは実payloadからexact proofを生成する。最小installation fixtureにも実際のVCS manifestを配置する。
+- 未出所のtargetを広いcharterだけで承認しない負例と、host由来の引数証拠を備えた正例を分ける。
+- tenantの実行主体を認証文脈へ結び付け、query scopeだけで権限を与えない。別rootのscanner fixtureは来歴判定を分離し、実publication e2eでは来歴まで確認する。
+- capabilityの保存先解決はdomain層へ移し、foundationからdomainへの不正な依存を取り除く。権限検査と保存先は変えない。
+- 修復・transport単体試験と、移動済みの承認creator／readerのmockを実際の呼び出し境界へ合わせる。
+
+失敗した21ファイルと関連境界をまとめた再実行は28ファイル・344テスト全件成功。
+strict leak警告はなく、変更TSのESLintも成功した。直接APIの対応表とcapability移動は
+独立レビューでmust_fixなし。以降のGitHub CI結果はPR #1253の最新headで確認する。
 
 ## 解釈上の制限
 

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
+import { resolveMemoryEligibility } from '../knowledge/memory-provenance.js';
 import * as path from 'node:path';
 const transport = vi.hoisted(() => ({ route: vi.fn() }));
 vi.mock('../mesh/a2a-bridge.js', () => ({ a2aBridge: { route: transport.route } }));
@@ -78,6 +79,8 @@ describe('approved scoped learning reaches later task execution', () => {
         vi.stubEnv('KYBERION_DISABLE_EMBEDDINGS', '1');
         const suffix = randomUUID().slice(0, 8);
         const tenant = 'e2e-learning-' + suffix;
+        // Bind the runtime reader identity; a query scope only narrows access.
+        vi.stubEnv('KYBERION_TENANT', tenant);
         const memberId = 'e2e-reviewer-' + suffix;
         const scope = {
           tier: 'confidential' as const,
@@ -174,12 +177,21 @@ describe('approved scoped learning reaches later task execution', () => {
         });
         const publication = verifyScopedLearningPublication(promoted.candidate)!;
         expect(publication).toBeDefined();
+        expect(
+          resolveMemoryEligibility({
+            documentPath: promoted.promotedRef,
+            sha256: publication.markdown_sha256,
+            scope,
+            consumerScope: { ...scope, mission_id: missionId, task_id: 'T1' },
+          })
+        ).toMatchObject({ eligible: true });
         const hits = await queryTenantKnowledge({
           tenantSlug: tenant,
           scope: { ...scope, mission_id: missionId, task_id: 'T1' },
           topic: 'Quasar reconciliation evidence',
           limit: 10,
         });
+        expect(hits.map((hit) => hit.path)).toContain(promoted.promotedRef);
         expect(hits.find((hit) => hit.path === promoted.promotedRef)).toMatchObject({
           source_sha256: publication.markdown_sha256,
           learning_publication: publication,
