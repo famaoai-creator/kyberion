@@ -148,6 +148,10 @@ const agentRuntimeInstanceSchema = z
     provider: z.string().optional(),
     model_id: z.string().optional(),
     bound_at: z.string(),
+    /** Session-admission expiry (ISO). Absent = bound until released. */
+    expires_at: z.string().optional(),
+    /** Tenant scope the binding was approved for (session admissions). */
+    tenant_slug: z.string().optional(),
   })
   .strict();
 
@@ -255,6 +259,8 @@ const instanceBoundPayloadSchema = z
     provider: z.string().optional(),
     model_id: z.string().optional(),
     bound_at: z.string(),
+    expires_at: z.string().optional(),
+    tenant_slug: z.string().optional(),
   })
   .strict();
 
@@ -337,6 +343,14 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.identitySuspended, {
     if (!existing || existing.lifecycle_status === 'suspended') return state;
     if (existing.lifecycle_status === 'retired') return state;
     const suspended: AgentIdentityRecord = { ...existing, lifecycle_status: 'suspended' };
+    // Suspension kills session-admission bindings ('nhi-session:' prefix is the
+    // admission-ceremony convention): reactivation must never resurrect a
+    // token issued before the incident — re-admission requires fresh approval.
+    const sessions = (existing.runtime_instances ?? []).filter(
+      (entry) => !entry.instance_id.startsWith('nhi-session:')
+    );
+    if (sessions.length > 0) suspended.runtime_instances = sessions;
+    else delete suspended.runtime_instances;
     return { identities: { ...state.identities, [payload.nhi_id]: suspended } };
   },
 });
@@ -373,6 +387,8 @@ agentIdentityKernel.defineOp(AGENT_IDENTITY_OPS.instanceBound, {
       ...(payload.session_id ? { session_id: payload.session_id } : {}),
       ...(payload.provider ? { provider: payload.provider } : {}),
       ...(payload.model_id ? { model_id: payload.model_id } : {}),
+      ...(payload.expires_at ? { expires_at: payload.expires_at } : {}),
+      ...(payload.tenant_slug ? { tenant_slug: payload.tenant_slug } : {}),
     };
     const current = existing.runtime_instances || [];
     const priorIndex = current.findIndex((entry) => entry.instance_id === payload.instance_id);
@@ -947,6 +963,10 @@ export interface BindRuntimeInstanceParams {
   sessionId?: string;
   provider?: string;
   modelId?: string;
+  /** Session-admission expiry (ISO); absent binds until released. */
+  expiresAt?: string;
+  /** Tenant scope the binding was approved for (session admissions). */
+  tenantSlug?: string;
 }
 
 /**
@@ -976,6 +996,8 @@ export function bindRuntimeInstance(params: BindRuntimeInstanceParams): AgentIde
     ...(params.sessionId ? { session_id: params.sessionId } : {}),
     ...(params.provider ? { provider: params.provider } : {}),
     ...(params.modelId ? { model_id: params.modelId } : {}),
+    ...(params.expiresAt ? { expires_at: params.expiresAt } : {}),
+    ...(params.tenantSlug ? { tenant_slug: params.tenantSlug } : {}),
     bound_at: nowIso(),
   });
   return requireIdentity(params.nhiId);
