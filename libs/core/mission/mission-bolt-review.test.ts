@@ -16,7 +16,9 @@ vi.mock('../surface/operator-notifications.js', async (importOriginal) => ({
 
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeMkdir, safeRmSync } from '../secure-io.js';
+import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { withExecutionContext } from '../authority.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import type { DecisionAgenda } from '../customer-decision/model.js';
 import {
   readAgenda,
@@ -25,6 +27,7 @@ import {
 } from '../customer-decision/store.js';
 import { boltMilestone } from '../customer-decision/bolt-review.js';
 import {
+  CUSTOMER_DECISION_MILESTONE_STORE_ROLE,
   customerDecisionMilestoneCapability,
   isCustomerDecisionMilestoneCapability,
 } from '../foundation/customer-decision-milestone-capability.js';
@@ -168,6 +171,64 @@ describe('mission bolt review (CD-10)', () => {
         .filter((line) => !line.includes('[locale]'));
       expect(ours.some((line) => line.startsWith('bolt review milestone skipped'))).toBe(true);
       expect(milestonesOf('agd-review0001')).toEqual([]);
+    });
+
+    it('accepts archived (finished) bolts, as a prerequisite would', () => {
+      writeAgenda({ dir }, review('agd-review0001', BOLT_1));
+      statuses[BOLT_1] = 'archived';
+      expect(passBoltReviewMilestones(BOLT_2, options())?.passed_agenda_ids).toEqual([
+        'agd-review0001',
+      ]);
+    });
+
+    it('one unreadable agenda never skips the others', () => {
+      statuses[BOLT_1] = 'completed';
+      writeAgenda({ dir }, review('agd-review0002', BOLT_1));
+      safeWriteFile(`${dir}/agendas/agd-review0001.json`, '{"not":"an agenda"}');
+      const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+      expect(passBoltReviewMilestones(BOLT_2, options())?.passed_agenda_ids).toEqual([
+        'agd-review0002',
+      ]);
+      const ours = warn.mock.calls
+        .map((call) => String(call[0]))
+        .filter((line) => !line.includes('[locale]'));
+      expect(ours.some((line) => line.includes('agenda=agd-review0001'))).toBe(true);
+    });
+
+    it('the milestone role may only append milestones, never change an agenda', () => {
+      writeAgenda({ dir }, review('agd-review0001', BOLT_1));
+      const file = 'agendas/agd-review0001.json';
+      const asMilestoneRole = <T>(fn: () => T): T =>
+        runInResourceAccessScope(
+          customerDecisionMilestoneCapability(TENANT, pathResolver.toRepoRelative(dir), {
+            read: [],
+            write: file,
+          }),
+          () => withExecutionContext(CUSTOMER_DECISION_MILESTONE_STORE_ROLE, fn, undefined, TENANT)
+        );
+      const current = readAgenda({ dir }, 'agd-review0001') as DecisionAgenda;
+      for (const changed of [
+        { ...current, title: 'Changed' },
+        { ...current, approval: { ...current.approval!, content_hash: 'b'.repeat(64) } },
+        { ...current, milestones_passed: ['x'], title: 'Changed' },
+        { ...current, updated_at: 'later' },
+      ])
+        expect(() => asMilestoneRole(() => writeAgenda({ dir }, changed))).toThrow(
+          /MILESTONE_WRITE_REFUSED/u
+        );
+      expect(readAgenda({ dir }, 'agd-review0001')).toEqual(current);
+      asMilestoneRole(() =>
+        writeAgenda(
+          { dir },
+          { ...current, milestones_passed: ['bolt-after:X'], updated_at: 'later' }
+        )
+      );
+      expect(milestonesOf('agd-review0001')).toEqual(['bolt-after:X']);
+      // Removing a milestone is not an append either.
+      const passed = readAgenda({ dir }, 'agd-review0001') as DecisionAgenda;
+      expect(() =>
+        asMilestoneRole(() => writeAgenda({ dir }, { ...passed, milestones_passed: [] }))
+      ).toThrow(/MILESTONE_WRITE_REFUSED/u);
     });
 
     it('the milestone capability is exact: agenda files only, one write', () => {

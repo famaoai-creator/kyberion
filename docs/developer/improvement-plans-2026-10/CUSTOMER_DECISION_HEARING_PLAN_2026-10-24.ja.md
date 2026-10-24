@@ -224,6 +224,14 @@ status: active
 
 行き先への反映は respond の後に行い、失敗しても顧客の回答は失敗させない（次の respond・`status` で再試行する）。
 
+**実装の補足（第 1 回レビューの対応）**:
+
+- 完了したミッションは `finish` で archive に移る（状態 `archived`）。`bolt-review` の確認と次の bolt の着手での判定は、archive も読み、前提条件と同じく `completed` と `archived` を完了とみなす。
+- 下書きや未送付の bolt レビューも、次の bolt の着手で締め切りが過ぎる（着手は顧客の回答を待たない）。送付後の回答は変更要求になる。
+- リンクの検査は調整セットの書き込みのたびに行う（`draft --file`・手で直した記録も `submit` / `send` の前に拒否する）。IPv4 を埋め込んだ IPv6（`::/80`、`::ffff:`、NAT64 `64:ff9b::/96`、6to4 `2002::/16`、Teredo）も拒否する。名前解決で内部の IP を返す名前（nip.io など、DNS rebinding）は対象外（顧客の画面はリンクを外部リンクとして開くだけで、サーバーは取得しない）。
+- 権限 `customer_decision_milestone_store` は共有の core 役割なので、store の書き込みはこの役割のとき「`milestones_passed` への追記（と `updated_at`）だけ」の変更しか受け付けない（`isMilestoneOnlyChange`）。
+- 却下の通知が `retryable` で終わったときは通知済みにせず、次の respond・`status` で送り直す。
+
 ## 未決事項
 
 - 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）の入れ方（段階 1 の後）。
@@ -282,6 +290,7 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - CD-09 の残り: 判断待ちから再開したタスクの指示に、確定した顧客の決定の値を渡していない（値は confidential なので、渡し方を決めてから入れる）。
 - CD-09 の残り: 判断待ちの解除（`confirm` の後の照合）を、実際の運用者の identity で動かす結合テストを足す（今のテストは facade の関数を直接呼ぶ）。
 - CD-09 の残り: 1 つの固定ファイルだけを対象にする capability は、照合（sweep）とタスクの境界とで同じ形になり、guard では区別できない。タスク境界の呼び出し元が自分の固定ファイルだけに書けることを、capability の中の owner で guard が確かめるようにする。
+- CD-09 の残り（CD-10 のレビューで判明）: `customer_decision_consumer_store` も共有の core 役割で、capability の作り方が公開されているため、SYSTEM_ROLE の任意のプロセスが任意の consumer の固定ファイルを書き換えられる（`rework` の記録や `hold` を消して手戻りの WorkItem を作り直させる、保留中のタスクを解除させる、など）。milestone と同じく、store の書き込みで変更の形（`rework` と `hold` と `task_proposal` は消さず追記だけ、`status` は `in_progress → completed` だけ）を確かめるようにする。
 - 顧客の決定で、商談の `requirements_ref` と `agreed.scope` も更新する（段階 1 では商談メモへの追記と brief 入力への反映まで）。
 - 招待リンクの公開 URL をテナントごとに持つ（段階 1 は `KYBERION_CUSTOMER_ROOM_PUBLIC_URL` が 1 つで、顧客向け画面を 1 テナント分だけ公開する前提）。
 - 回答の復旧時に監査の重複を確かめる処理が監査チェーン全体を読む。受領 id で引ける索引か冪等キーにする（復旧時だけ通る経路）。

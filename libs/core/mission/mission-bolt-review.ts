@@ -37,9 +37,9 @@ import {
 import type { DecisionAgenda } from '../customer-decision/model.js';
 import {
   listAgendaIds,
+  markAgendaMilestonePassed,
   readAgenda,
   withCustomerDecisionCaseLock,
-  writeAgenda,
 } from '../customer-decision/store.js';
 import { addInboxEntry } from '../deliverable-inbox.js';
 import { notifyOperatorWithReceiptSync } from '../surface/operator-notifications.js';
@@ -52,7 +52,10 @@ import {
   type MissionDecisionCase,
   type MissionDecisionLockOptions,
 } from './mission-decision-lock.js';
-import { loadState } from './mission-state.js';
+import {
+  loadMissionStateIncludingArchive,
+  SATISFIED_PREREQUISITE_STATUSES,
+} from './mission-state.js';
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
@@ -117,37 +120,39 @@ export function passBoltReviewMilestones(
     const decisionCase = resolveMissionDecisionCase(upper, options);
     if (!decisionCase) return null;
     const now = options.now ?? nowIso();
-    const load = options.loadMissionState ?? loadState;
-    const isCompleted = (id: string) => load(id.toUpperCase())?.status === 'completed';
+    // A finished bolt is archived by `finish`: read the archive too, and
+    // accept the statuses that satisfy a prerequisite (completed, archived).
+    const load =
+      options.loadMissionState ??
+      ((id: string) =>
+        loadMissionStateIncludingArchive(id, { tenantSlug: decisionCase.tenantSlug }));
+    const isCompleted = (id: string) =>
+      SATISFIED_PREREQUISITE_STATUSES.has(load(id.toUpperCase())?.status ?? '');
     return withCustomerDecisionCaseLock(
       decisionCase.location,
       () => {
         const ids = asMilestoneStore(decisionCase, { read: ['agendas'] }, () =>
           listAgendaIds(decisionCase.location)
         );
-        const agendas = asMilestoneStore(
-          decisionCase,
-          { read: ids.map((id) => `agendas/${id}.json`) },
-          () =>
-            ids
-              .map((id) => readAgenda(decisionCase.location, id))
-              .filter((agenda): agenda is DecisionAgenda => Boolean(agenda))
-        );
         const passed: string[] = [];
-        for (const agenda of agendas) {
-          if (!awaitsNextBolt(agenda, upper, isCompleted)) continue;
-          const milestone = boltMilestone(agenda.bolt_mission_id as string);
-          asMilestoneStore(
-            decisionCase,
-            { read: [], write: `agendas/${agenda.agenda_id}.json` },
-            () =>
-              writeAgenda(decisionCase.location, {
-                ...agenda,
-                milestones_passed: [...(agenda.milestones_passed ?? []), milestone],
-                updated_at: now,
-              })
-          );
-          passed.push(agenda.agenda_id);
+        // One agenda that cannot be read or written never skips the others.
+        for (const id of ids) {
+          const file = `agendas/${id}.json`;
+          try {
+            const agenda = asMilestoneStore(decisionCase, { read: [file] }, () =>
+              readAgenda(decisionCase.location, id)
+            );
+            if (!agenda || !awaitsNextBolt(agenda, upper, isCompleted)) continue;
+            const milestone = boltMilestone(agenda.bolt_mission_id as string);
+            const written = asMilestoneStore(decisionCase, { read: [], write: file }, () =>
+              markAgendaMilestonePassed(decisionCase.location, id, milestone, now)
+            );
+            if (written) passed.push(id);
+          } catch (error) {
+            logger.warn(
+              `bolt review milestone skipped for one agenda — ${diagnosticCode(error)} | the mission starts anyway; check the agenda with customer-decision status | mission=${upper} agenda=${id}`
+            );
+          }
         }
         return {
           case_id: decisionCase.caseId,

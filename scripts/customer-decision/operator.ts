@@ -26,6 +26,7 @@ import {
   agendaAnswerState,
   agendaContentHash,
   approvedOurDecisionIds,
+  assertAgendaLinks,
   generateAgendaDraft,
   instantiateTemplate,
   issueInvite,
@@ -314,6 +315,8 @@ function submitLocked(
   }
   assertUniqueEntries(agenda.entries);
   assertAnswerable(agenda);
+  // Before the gate and the ledger pins: an internal link never gets approved.
+  assertAgendaLinks(agenda);
   const correlationId = `${agenda.agenda_id}:${hash}`;
   const gate = enforceApprovalGate({
     requireApproval: true,
@@ -506,6 +509,7 @@ export function runActorAdd(opts: Record<string, string>): unknown {
 }
 
 function assertSendable(agenda: DecisionAgenda): void {
+  assertAgendaLinks(agenda);
   const state = agendaAnswerState(agenda);
   if (state.ok === false) {
     throw new ScriptExitError(

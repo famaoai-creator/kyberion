@@ -159,13 +159,21 @@ function ipv4Private(host: string): boolean | null {
 
 function ipv6Private(literal: string): boolean {
   const host = literal.toLowerCase();
-  if (host === '::' || host === '::1') return true;
-  // IPv4-mapped / -compatible addresses (`::ffff:7f00:1`, `::ffff:127.0.0.1`).
-  if (host.startsWith('::ffff:') || /^::[0-9.]+$/u.test(host)) return true;
-  const first = Number.parseInt(host.split(':')[0] || '0', 16);
-  if (Number.isNaN(first)) return true;
-  // fc00::/7 unique local, fe80::/10 link-local, fec0::/10 site-local, ff00::/8 multicast.
+  // `::`, `::1` and every address in ::/80 — IPv4-compatible (`::7f00:1`,
+  // the normalized `::127.0.0.1`) and IPv4-mapped (`::ffff:…`): never public.
+  if (host.startsWith('::')) return true;
+  const groups = host.split(':');
+  const first = Number.parseInt(groups[0] || '0', 16);
+  const second = Number.parseInt(groups[1] || '0', 16);
+  if (Number.isNaN(first) || Number.isNaN(second)) return true;
   return (
+    first === 0 ||
+    // NAT64 64:ff9b::/96 and its local-use 64:ff9b:1::/48 embed an IPv4 address.
+    (first === 0x64 && second === 0xff9b) ||
+    // 6to4 2002::/16 and Teredo 2001:0::/32 tunnel to an embedded IPv4 address.
+    first === 0x2002 ||
+    (first === 0x2001 && second === 0) ||
+    // fc00::/7 unique local, fe80::/10 link-local, fec0::/10 site-local, ff00::/8 multicast.
     (first & 0xfe00) === 0xfc00 ||
     (first & 0xffc0) === 0xfe80 ||
     (first & 0xffc0) === 0xfec0 ||
@@ -187,7 +195,7 @@ export function linkProblem(raw: unknown): LinkProblem | null {
   }
   if (url.protocol !== 'https:') return 'not_https';
   if (url.username || url.password) return 'credentials';
-  const hostname = url.hostname.replace(/\.$/u, '').toLowerCase();
+  const hostname = url.hostname.replace(/\.+$/u, '').toLowerCase();
   if (!hostname) return 'invalid_url';
   if (hostname.startsWith('[') && hostname.endsWith(']')) {
     return ipv6Private(hostname.slice(1, -1)) ? 'private_address' : null;
@@ -203,17 +211,6 @@ export function linkProblem(raw: unknown): LinkProblem | null {
 // ---------------------------------------------------------------------------
 // Answers and routing
 // ---------------------------------------------------------------------------
-
-/** The customer's verdict an approval value stands for (reject is not approved, like request_changes). */
-export function approvalVerdict(
-  value: unknown
-): 'approved' | 'changes_requested' | 'rejected' | null {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
-  const record = value as Record<string, unknown>;
-  if (record.approved === true) return 'approved';
-  if (record.approved !== false) return null;
-  return record.rejected === true ? 'rejected' : 'changes_requested';
-}
 
 export interface BoltRoutingTarget {
   entry_id: string;
