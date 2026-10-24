@@ -329,3 +329,17 @@ export function dotProposalInstructions(mode: 'tool' | 'fence'): string {
     'For pipeline work set pipeline_ref (it must be one your charter allows). Set expected_effect (kr_id or signal, direction) so the outcome is measured, and target + intent so conflicting proposals from other dots are arbitrated.',
   ].join('\n');
 }
+
+/**
+ * Approval-supersession identity for a proposal: the action class plus its
+ * stable discriminator (target / pipeline ref). Two proposals with the same
+ * identity are the same ask re-stated — the newer one cancels the older's
+ * pending approval. Payload details (offsets, counts, wording) are
+ * deliberately excluded.
+ */
+export function proposalActionIdentity(
+  proposal: Pick<DotProposal, 'action_id' | 'target' | 'pipeline_ref'>
+): string {
+  const discriminator = proposal.target ?? proposal.pipeline_ref ?? '';
+  return discriminator ? `${proposal.action_id}#${discriminator}` : proposal.action_id;
+}
