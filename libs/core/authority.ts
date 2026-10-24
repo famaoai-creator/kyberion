@@ -4,6 +4,10 @@ import {
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
+  MEMORY_PROVENANCE_READER_ROLE,
+  currentMemoryProvenanceReadCapability,
+} from './knowledge/memory-provenance-capability.js';
+import {
   isPipelineJournalCapability,
   PIPELINE_JOURNAL_STORE_ROLE,
 } from './foundation/pipeline-journal-capability.js';
@@ -76,6 +80,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_localadmin: 'worker',
   chronos_token_registry_reader: 'worker',
   scope_locale_reader: 'worker',
+  memory_provenance_reader: 'worker',
   workspace_tenant_registry_reader: 'worker',
   workspace_tenant_registry_index_reader: 'worker',
   person_charter_store: 'worker',
@@ -746,6 +751,20 @@ function prepareExecutionContext(
   const normalizedRole = normalizeRoleName(role.trim());
   assertRoleAssumptionAllowed(normalizedRole);
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
+  if (normalizedRole === MEMORY_PROVENANCE_READER_ROLE) {
+    const capability = currentMemoryProvenanceReadCapability();
+    const activeTenant = resolveIdentityContext().tenantSlug;
+    if (
+      !capability ||
+      capability.tenant_slug !== tenantSlug ||
+      (capability.tier === 'confidential' && (!activeTenant || activeTenant !== tenantSlug)) ||
+      (capability.tier === 'personal' &&
+        getRegisteredEnvText('KYBERION_NHI_ID') !== capability.owner_nhi)
+    )
+      throw new Error(
+        '[MEMORY_PROVENANCE_READ_SCOPE] Exact current tenant/owner read capability required'
+      );
+  }
   if (
     normalizedRole === 'autonomy_learning_store' &&
     (!isAutonomyLearningCapability(currentResourceAccessScope()) ||

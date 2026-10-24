@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 
@@ -124,7 +125,11 @@ describe('network external governance', () => {
   });
 
   it('attempts approved mutations once and records timeout as unknown', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     vi.mocked(secureFetch).mockRejectedValue(new Error('timeout after server accepted mutation'));
     const result = await trusted(() => handleAction(fetchAction('PATCH')));
     expect(result.status).toBe('failed');
@@ -155,7 +160,11 @@ describe('network external governance', () => {
   });
 
   it('keeps the existing disabled-shell policy ahead of any common approval', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const denied = await trusted(() =>
       handleAction({
         action: 'pipeline',
@@ -184,7 +193,11 @@ describe('network external governance', () => {
         'EXTERNAL_APPROVAL_REQUIRED'
       );
       expect(send).not.toHaveBeenCalled();
-      vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+      vi.mocked(enforceApprovalGate).mockReturnValue({
+        allowed: true,
+        status: 'approved',
+        requestId: 'exact-fixture-approval',
+      });
       vi.mocked(enforceApprovalGate).mockClear();
       const result = await trusted(() =>
         handleAction({
@@ -201,7 +214,11 @@ describe('network external governance', () => {
   });
 
   it('rejects an inner mutation batch or repeated mutation loop before its first effect', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const step = fetchAction('POST').steps[0]!;
     await expect(
       withExternalOperationPipelineRun('run', () =>
@@ -234,7 +251,11 @@ describe('network external governance', () => {
   });
 
   it('permits mutually exclusive single-effect branches under one production checkpoint', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const step = fetchAction('POST').steps[0]!;
     const result = await withExternalOperationPipelineRun('branch-run', () =>
       trusted(() =>
@@ -255,3 +276,12 @@ describe('network external governance', () => {
     expect(secureFetch).toHaveBeenCalledTimes(1);
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

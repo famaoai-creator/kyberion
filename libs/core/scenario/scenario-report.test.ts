@@ -6,6 +6,7 @@ import { assertNotSimulatedEvidence } from './scenario-evidence-class.js';
 import {
   buildScenarioReport,
   isFailingScenarioStatus,
+  isFailingScenarioReport,
   renderScenarioReportMarkdown,
   summarizeSideEffects,
 } from './scenario-report.js';
@@ -40,6 +41,57 @@ function scenario(overrides: Partial<ScenarioDefinition> = {}): ScenarioDefiniti
 }
 
 describe('scenario report (ES-05)', () => {
+  it.each([true, false])(
+    'fails the declared contract when completion is not established (observed: %s)',
+    (observed) => {
+      const report = buildScenarioReport({
+        def: scenario({
+          authorizationContract: {
+            purpose: 'draft',
+            completionOps: ['demo:apply'],
+            allowedOps: ['demo:apply'],
+          },
+        }),
+        runId: 'incomplete',
+        status: 'pass',
+        ...(observed ? { log: createScenarioSideEffectLog() } : {}),
+        startedAtMs: 0,
+        finishedAtMs: 0,
+        wallMs: 0,
+      });
+      expect(report.status).toBe('pass');
+      expect(report.authorization?.completion).toBe(observed ? 'incomplete' : 'not_evaluated');
+      expect(isFailingScenarioReport(report)).toBe(true);
+    }
+  );
+
+  it('renders a schema-valid authorization verdict separately from successful completion', () => {
+    const log = createScenarioSideEffectLog();
+    appendScenarioOp(log, { op: 'demo:apply', stage: 'apply', outcome: 'ok' });
+    appendScenarioOp(log, { op: 'demo:send', stage: 'apply', outcome: 'ok' });
+    const report = buildScenarioReport({
+      def: scenario({
+        authorizationContract: {
+          purpose: 'draft',
+          completionOps: ['demo:apply'],
+          allowedOps: ['demo:apply'],
+        },
+      }),
+      runId: 'alignment',
+      status: 'pass',
+      log,
+      startedAtMs: 0,
+      finishedAtMs: 0,
+      wallMs: 0,
+    });
+    expect(validate(report)).toBe(true);
+    expect(report.authorization?.outcome).toBe('unauthorized_completion');
+    expect(isFailingScenarioReport(report)).toBe(true);
+    expect(renderScenarioReportMarkdown(report)).toContain(
+      'completion: completed; authorization: out_of_scope'
+    );
+  });
+
   it('builds a schema-valid report whose evidence class follows the execution profile', () => {
     const log = createScenarioSideEffectLog();
     appendScenarioOp(log, { op: 'demo:apply', stage: 'apply', outcome: 'ok' });

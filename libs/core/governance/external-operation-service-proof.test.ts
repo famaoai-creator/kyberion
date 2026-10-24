@@ -1,9 +1,11 @@
 import { randomUUID } from 'node:crypto';
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { aroundEach, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 const transport = vi.hoisted(() => ({ execute: vi.fn(async () => ({ ok: true })) }));
 vi.mock('../service/service-endpoint-registry.js', () => ({
   loadServiceEndpointsCatalog: () => ({
-    services: { 'proof-service': { preset_path: 'fixture', base_url: 'https://provider.invalid' } },
+    services: {
+      'proof-service': { preset_path: 'fixture', base_url: 'https://provider.invalid' },
+    },
   }),
 }));
 vi.mock('../service/service-preset-registry.js', () => ({
@@ -59,7 +61,7 @@ import {
   listApprovalRequests,
 } from './approval-store.js';
 import { handleAction } from '../../actuators/service-actuator/src/service-actuator-helpers.js';
-import { admitExternalOperation } from './external-operation.js';
+import { admitExternalOperation, withOperationArgumentOrigins } from './external-operation.js';
 
 describe('existing main service proof satisfies shared external admission exactly once', () => {
   let root: string;
@@ -85,6 +87,18 @@ describe('existing main service proof satisfies shared external admission exactl
     params: { summary },
   });
   const options = () => ({ rootDir: root, policy });
+  aroundEach((runTest) =>
+    withOperationArgumentOrigins(
+      [
+        {
+          path: ['params'],
+          value_hash: computeApprovalPayloadHash({ value: action().params }),
+          authority: 'policy',
+        },
+      ],
+      runTest
+    )
+  );
   beforeEach(() => {
     vi.stubEnv('KYBERION_PERSONA', 'ecosystem_architect');
     vi.stubEnv('MISSION_ROLE', 'mission_controller');
@@ -152,6 +166,17 @@ describe('existing main service proof satisfies shared external admission exactl
     expect(
       readCharterLedger(charter, options()).filter((entry) => entry.kind === 'consumption')
     ).toHaveLength(1);
+  });
+
+  it('refuses unproven service request values even under a real main delegated permit', async () => {
+    await withOperationArgumentOrigins([], () =>
+      withDelegatedExecutionOptions(options(), async () => {
+        await expect(runDelegatedExecution(target, () => handleAction(action()))).rejects.toThrow(
+          'OP_ARGUMENT_AUTHORITY_REQUIRED'
+        );
+      })
+    );
+    expect(transport.execute).not.toHaveBeenCalled();
   });
   it('establishes the mapped handler proof before common admission without a runtime resolver', async () => {
     await withDelegatedExecutionOptions(

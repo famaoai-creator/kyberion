@@ -27,6 +27,20 @@ const RUNTIME_ROOTS = [
 ];
 const TEST_ROOTS = ['tests'];
 const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
+  // Cross-boundary provenance probe must share source-module ALS and the mocked
+  // approval store with the real retrieval/commit implementations under test.
+  [
+    'tests/provenance-authorization.integration.test.ts',
+    [
+      '../libs/core/authority.js',
+      '../libs/core/path-resolver.js',
+      '../libs/core/secure-io.js',
+      '../libs/core/knowledge/memory-provenance.js',
+      '../libs/core/governance/external-operation.js',
+      '../libs/core/governance/approval-store.js',
+      '../libs/core/knowledge/knowledge-index.js',
+    ],
+  ],
   // The source-only compiler bootstrap must be exercised before package dist exists.
   ['tests/build-repository.test.ts', ['../libs/core/secure-io.js']],
   [

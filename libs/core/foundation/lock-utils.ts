@@ -11,6 +11,7 @@
  * namespace. Live cleaner tombs are never swept, even after a long suspension.
  */
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { createLogger } from '../logger.js';
 import { nowIso } from './time.js';
 import { pathResolver } from '../path-resolver.js';
@@ -91,11 +92,29 @@ function lockPath(resourceId: string): string {
   // Resource IDs are logical keys, not paths. Escape '%' as well so keys such
   // as 'path:abc' and 'path%3Aabc' cannot accidentally share a mutex.
   let filename = encodeURIComponent(resourceId);
+  // Preserve every legacy main-lock name that can exist on a 255-byte
+  // component filesystem. Auxiliary names are bounded separately below.
+  // '@' never occurs literally in encodeURIComponent output, so a short
+  // logical key cannot alias this namespace by spelling a hash-looking key.
   // Windows reserves device names even when they have a file extension.
   if (/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(filename)) {
     filename = `%${filename.charCodeAt(0).toString(16).toUpperCase()}${filename.slice(1)}`;
   }
+  if (filename.length + '.lock'.length > 255) {
+    filename = '@sha256-' + createHash('sha256').update(resourceId).digest('hex');
+  }
   return path.join(LOCK_ROOT, `${filename}.lock`);
+}
+
+function hashedAuxiliaryStem(file: string, purpose: 'reclaim' | 'tomb'): string {
+  return `@${purpose}-` + createHash('sha256').update(path.basename(file)).digest('hex');
+}
+
+function cleanupGuardPath(file: string): string {
+  const legacy = file + '.reclaim';
+  return Buffer.byteLength(path.basename(legacy), 'utf8') <= 255
+    ? legacy
+    : path.join(path.dirname(file), hashedAuxiliaryStem(file, 'reclaim') + '.lock.reclaim');
 }
 
 function ownerRecord(resourceId: string): string {
@@ -231,9 +250,12 @@ function loadLockRecord<T>(io: LockIo, file: string): T {
     const sameFile = io.sameFile;
     if (!message.includes('hard link') || !io.readdir || !sameFile) throw error;
     const dir = path.dirname(file);
-    const prefix = `${path.basename(file)}.stale-`;
+    const prefixes = [
+      `${path.basename(file)}.stale-`,
+      hashedAuxiliaryStem(file, 'tomb') + '.stale-',
+    ];
     for (const name of io.readdir(dir)) {
-      if (!name.startsWith(prefix) || !TOMB_PATTERN.test(name)) continue;
+      if (!prefixes.some((prefix) => name.startsWith(prefix)) || !TOMB_PATTERN.test(name)) continue;
       const tomb = path.join(dir, name);
       try {
         // Only a tomb that is this record's own inode (a leftover tomb from an
@@ -325,7 +347,10 @@ let tombCounter = 0;
 
 /** Tomb names embed the cleaner PID and creation time so housekeeping can age them. */
 function tombPath(file: string): string {
-  return `${file}.stale-${process.pid}-${Date.now()}-${++tombCounter}`;
+  const suffix = `.stale-${process.pid}-${Date.now()}-${++tombCounter}`;
+  return Buffer.byteLength(path.basename(file) + suffix, 'utf8') <= 255
+    ? file + suffix
+    : path.join(path.dirname(file), hashedAuxiliaryStem(file, 'tomb') + suffix);
 }
 
 function bestEffortUnlink(io: LockIo, file: string): void {
@@ -391,7 +416,8 @@ function removeIfUnchanged(
 }
 
 const TOMB_PATTERN = /\.stale-(\d+)-(\d+)-\d+$/;
-const PUBLISH_TEMP_PATTERN = /\.lock(?:\.reclaim)?\.\d+\.[0-9a-f]{12}\.tmp$/;
+const PUBLISH_TEMP_PATTERN =
+  /(?:\.lock(?:\.reclaim)?|^@publish-[0-9a-f]{64})\.\d+\.[0-9a-f]{12}\.tmp$/;
 
 function pidAlive(pid: number): boolean {
   try {
@@ -451,7 +477,7 @@ function reclaimStaleLock(lockFile: string): { retry: boolean; pending?: string 
   if (!lockReclaimable(initial))
     return { retry: false, ...(initial.state === 'unknown' ? { pending: lockFile } : {}) };
   const io = requireLockIo();
-  const guard = lockFile + '.reclaim';
+  const guard = cleanupGuardPath(lockFile);
   const mine = {
     pid: process.pid,
     ts: nowIso(),
@@ -508,7 +534,7 @@ export function inspectLockRecovery(resourceId: string): LockRecoveryState | und
   const lockFile = lockPath(resourceId);
   const candidates: Array<[string, LockRecoveryState['kind']]> = [
     [lockFile, 'lock_record'],
-    [lockFile + '.reclaim', 'cleanup_guard'],
+    [cleanupGuardPath(lockFile), 'cleanup_guard'],
   ];
   for (const [file, kind] of candidates) {
     const view = inspectRecord(file);

@@ -41,6 +41,11 @@ import { physicalScopedPath } from '../physical-namespace.js';
 import type { ScopeContext } from '../scope-context.js';
 import { currentScope } from '../scope-context.js';
 import { segmentWords } from '../locale-normalize.js';
+import {
+  createMemoryEligibilityResolver,
+  resolveMemoryEligibility,
+  selectIndependentMemory,
+} from './memory-provenance.js';
 
 /**
  * Reactive Knowledge Index v3.0
@@ -1324,6 +1329,40 @@ function _aggregateByDocument(ranked: KnowledgeHint[]): KnowledgeHint[] {
 
 // ─── Query (lexical) ─────────────────────────────────────────────────────────
 
+function memoryEligibility(
+  hint: KnowledgeHint,
+  consumerScope?: ScopeContext,
+  resolve = resolveMemoryEligibility
+) {
+  const source = (hint.parentSource || hint.source).split('#chunk', 1)[0];
+  const documentPath = source.startsWith('../') ? source.slice(3) : 'knowledge/' + source;
+  const tenant =
+    documentPath.match(/^knowledge\/confidential\/([^/]+)\//)?.[1] ||
+    documentPath.match(/^customer\/([^/]+)\//)?.[1];
+  return resolve({
+    documentPath,
+    sha256: hint.source_sha256,
+    scope: documentPath.startsWith('knowledge/personal/')
+      ? { tier: 'personal', owner_nhi: consumerScope?.nhi_id || consumerScope?.viewer_principal }
+      : tenant && tenant !== 'common'
+        ? { tier: 'confidential', tenant_slug: tenant }
+        : { tier: 'public' },
+    ...(consumerScope ? { consumerScope } : {}),
+  });
+}
+function independentHints(
+  ranked: KnowledgeHint[],
+  scope?: ScopeContext,
+  resolve = resolveMemoryEligibility
+): KnowledgeHint[] {
+  return selectIndependentMemory(
+    ranked,
+    (hint) =>
+      memoryEligibility(hint, scope, resolve).source_families ||
+      (hint.source_sha256 ? ['content:' + hint.source_sha256] : [])
+  );
+}
+
 const SPACELESS_SCRIPT_PATTERN = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}]/u;
 const KANA_ONLY_PATTERN = /^[\p{Script=Hiragana}ー]+$/u;
 const HAN_PATTERN = /^\p{Script=Han}+$/u;
@@ -1360,12 +1399,13 @@ export function queryKnowledge(
 ): KnowledgeHint[] {
   const maxResults = options.maxResults ?? 5;
   const queryWords = knowledgeQueryWords(topic);
+  const resolve = createMemoryEligibilityResolver();
 
   if (queryWords.length === 0) return [];
 
   const scored: Array<{ hint: KnowledgeHint; score: number }> = [];
 
-  for (const hint of _filteredHints(index, options)) {
+  for (const hint of _filteredHints(index, options, resolve)) {
     const searchable = [
       hint.topic.toLowerCase(),
       (hint.tags ?? []).join(' ').toLowerCase(),
@@ -1404,7 +1444,10 @@ export function queryKnowledge(
   const ranked = options.includeScores
     ? scored.map((s) => ({ ...s.hint, score: s.score }))
     : scored.map((s) => s.hint);
-  return _aggregateByDocument(ranked).slice(0, maxResults);
+  return independentHints(_aggregateByDocument(ranked), options.scopeContext, resolve).slice(
+    0,
+    maxResults
+  );
 }
 
 // ─── Query (hybrid — lexical + semantic via RRF) ──────────────────────────────
@@ -1429,7 +1472,7 @@ export async function queryKnowledgeHybrid(
 
   if (queryWords.length === 0) return [];
 
-  const pool = _filteredHints(index, options);
+  const pool = _filteredHints(index, options, createMemoryEligibilityResolver());
 
   // ── Lexical ranking ─────────────────────────────────────────────────────
   const lexicalScored: Array<{ hint: KnowledgeHint; score: number }> = [];
@@ -1515,7 +1558,14 @@ export async function queryKnowledgeHybrid(
 
   // Degraded-mode visibility (KM-02 Task 2): callers can tell whether the
   // "semantic" leg was real (mlx) or the hash-bucket approximation.
-  const results = _aggregateByDocument(fused)
+  const finalResolve = createMemoryEligibilityResolver();
+  const results = independentHints(
+    _aggregateByDocument(fused).filter(
+      (hint) => memoryEligibility(hint, options.scopeContext, finalResolve).eligible
+    ),
+    options.scopeContext,
+    finalResolve
+  )
     .slice(0, maxResults)
     .map((h) => ({ ...h, embeddingBackend: backend.name }));
 
@@ -1526,9 +1576,11 @@ export async function queryKnowledgeHybrid(
 
 function _filteredHints(
   index: KnowledgeHintIndex,
-  options: KnowledgeQueryOptions
+  options: KnowledgeQueryOptions,
+  resolve = resolveMemoryEligibility
 ): KnowledgeHint[] {
   return index.hints.filter((hint) => {
+    if (!memoryEligibility(hint, options.scopeContext, resolve).eligible) return false;
     if (options.actuator && hint.tags) {
       if (!hint.tags.some((t) => t.toLowerCase() === options.actuator!.toLowerCase())) return false;
     }

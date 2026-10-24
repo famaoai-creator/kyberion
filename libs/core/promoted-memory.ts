@@ -53,6 +53,7 @@ import {
   type WorktreeFileWriter,
 } from './knowledge/memory-promotion-git.js';
 import { logger } from './core.js';
+import { registerMemoryProvenance, type MemoryOriginRef } from './knowledge/memory-provenance.js';
 const validatorCache = new Map<string, ValidateFunction>();
 // Test isolation (env override): the distill E2E rewrites HINTS.md, and a
 // parallel catalog-integrity test can observe the mid-test dirty state.
@@ -605,6 +606,14 @@ export function savePromotedMemoryRecord(
         scope: candidate.scope,
       });
       const baseName = record.record_id;
+      const protectedLineage =
+        record.tier === 'public' ||
+        (record.tier === 'confidential' && !!candidate.scope?.tenant_slug) ||
+        (record.tier === 'personal' && !!candidate.scope?.owner_nhi);
+      if (!protectedLineage)
+        logger.debug(
+          `[memory-provenance] ${record.record_id}: legacy ${record.tier} publication has no authenticated tenant/owner; protected lineage was not minted`
+        );
       if (externalTargetRoot) {
         // The queue/distill state stays in this checkout; only the record files
         // go to the target worktree. logicalDir is repo-relative for product
@@ -655,11 +664,51 @@ export function savePromotedMemoryRecord(
             '[LEARNING_PUBLICATION_CONFLICT] Existing Markdown differs from approved record'
           );
         if (!safeExistsSync(mdPath)) safeWriteFile(mdPath, expectedMarkdown);
+        if (protectedLineage)
+          registerMemoryProvenance({
+            scope: candidate.scope || { tier: record.tier },
+            documentPath: mdPath,
+          });
         return { logicalPath: logicalDir + '/' + baseName + '.md', record: prior };
       }
       safeWriteFile(jsonPath, JSON.stringify(record, null, 2));
       const markdown = buildPromotedMemoryMarkdown(record);
       safeWriteFile(mdPath, markdown);
+      // Legacy personal/tenantless confidential publications lack an authenticated
+      // partition. Preserve their workflow without inventing an owner or tenant.
+      if (protectedLineage) {
+        const memoryScope = candidate.scope || { tier: record.tier };
+        const origins: MemoryOriginRef[] = [];
+        const sourceRefs: string[] = [];
+        const unverifiedRefs: string[] = [];
+        for (const evidence of record.evidence_refs || []) {
+          if (evidence.includes(':')) {
+            sourceRefs.push(evidence);
+            continue;
+          }
+          if (
+            !safeExistsSync(pathResolver.rootResolve(evidence)) ||
+            !safeLstat(pathResolver.rootResolve(evidence)).isFile()
+          ) {
+            unverifiedRefs.push(evidence);
+            continue;
+          }
+          origins.push(registerMemoryProvenance({ scope: memoryScope, documentPath: evidence }));
+        }
+        if (!origins.length && !sourceRefs.length && !unverifiedRefs.length) {
+          if (candidate.mission_id) sourceRefs.push('mission:' + candidate.mission_id);
+          if (candidate.task_session_id)
+            sourceRefs.push('task_session:' + candidate.task_session_id);
+          sourceRefs.push(...(candidate.artifact_ids || []).map((id) => 'artifact:' + id));
+        }
+        registerMemoryProvenance({
+          scope: memoryScope,
+          documentPath: mdPath,
+          origins,
+          sourceRefs,
+          unverifiedRefs,
+        });
+      }
       backlinkSupersededRecord(record);
       if (record.kind === 'knowledge_hint' && record.knowledge_domain === 'organization') {
         appendGovernanceHintRecord(record, candidate.scope);

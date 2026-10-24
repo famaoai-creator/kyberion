@@ -10,7 +10,7 @@ import {
   type SpawnOptions,
 } from 'node:child_process';
 export type { ChildProcess, SpawnOptions };
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { assertSafeRepositoryPath } from './path-resolver.js';
 import {
@@ -473,6 +473,18 @@ let _policyCheckInProgress = false;
 /**
  * Write a file safely using atomic operations (write to temp -> rename).
  */
+/** Auxiliary publication names must fit even when the checked target fills NAME_MAX. */
+function boundedTemporarySibling(
+  target: string,
+  suffix: string,
+  purpose: 'write' | 'publish'
+): string {
+  const basename = path.basename(target);
+  return Buffer.byteLength(basename + suffix, 'utf8') <= 255
+    ? target + suffix
+    : path.join(path.dirname(target), `@${purpose}-${randomUUID()}${suffix}`);
+}
+
 export function safeWriteFile(
   filePath: string,
   data: string | Buffer,
@@ -552,7 +564,11 @@ export function safeWriteFile(
     const checked = captureCheckedDir(path.dirname(canonical));
     const target = path.join(checked.dir, path.basename(canonical));
     const ns = process.hrtime.bigint().toString();
-    const tempPath = `${target}.tmp.${ns}.${Math.random().toString(36).substring(2)}`;
+    const tempPath = boundedTemporarySibling(
+      target,
+      `.tmp.${ns}.${Math.random().toString(36).substring(2)}`,
+      'write'
+    );
     let fd: number | null = null;
     try {
       // Apply the requested mode at creation time. Applying it only through
@@ -884,10 +900,13 @@ export function safePublishExclusiveFileSync(filePath: string, data: string | Bu
   const { resolved, canonical } = guardWritePath(filePath);
   const dir = path.dirname(resolved);
   if (!fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
-  const temp = `${resolved}.${process.pid}.${createHash('sha256')
+  const suffix = `.${process.pid}.${createHash('sha256')
     .update(`${Date.now()}:${Math.random()}`)
     .digest('hex')
     .slice(0, 12)}.tmp`;
+  // A target basename can fit NAME_MAX while its publication sibling does not.
+  // Only impossible auxiliary names change; existing target names stay exact.
+  const temp = boundedTemporarySibling(resolved, suffix, 'publish');
   const fd = fs.openSync(temp, 'wx');
   try {
     try {

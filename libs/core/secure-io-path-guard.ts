@@ -1,6 +1,7 @@
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { assertSensitivePathAllowed } from './sensitive-path-policy.js';
 import { validateReadPermission, validateWritePermission } from './tier-guard.js';
@@ -1106,8 +1107,23 @@ function isLockTombPair(canonical: string, stat: fs.Stats): boolean {
   const tombOf = STALE_TOMB.exec(path.basename(canonical));
   if (!tombOf) return false;
   try {
-    const base = fs.lstatSync(path.join(dir, tombOf[1]));
-    return base.dev === stat.dev && base.ino === stat.ino;
+    const hashed = /^@tomb-([0-9a-f]{64})$/.exec(tombOf[1]);
+    // Oversized tombs cannot carry their entire original basename. Match its
+    // digest within the same lock directory, then require the same inode as
+    // before; a digest alone is never a hard-link read permission.
+    const candidates = hashed
+      ? fs
+          .readdirSync(dir)
+          .filter(
+            (name) =>
+              /\.lock(?:\.reclaim)?$/.test(name) &&
+              createHash('sha256').update(name).digest('hex') === hashed[1]
+          )
+      : [tombOf[1]];
+    return candidates.some((name) => {
+      const base = fs.lstatSync(path.join(dir, name));
+      return base.dev === stat.dev && base.ino === stat.ino;
+    });
   } catch {
     return false;
   }

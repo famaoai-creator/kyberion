@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
@@ -213,7 +214,11 @@ describe('voice external operation boundaries', () => {
   it('protects public native speech before process creation', async () => {
     await expect(speak('sensitive speech')).rejects.toThrow('EXTERNAL_APPROVAL_REQUIRED');
     expect(processMocks.spawn).not.toHaveBeenCalled();
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await expect(trusted(() => speak('sensitive speech'))).resolves.toMatchObject({ ok: true });
     expect(processMocks.spawn).toHaveBeenCalledTimes(1);
     expect(JSON.stringify(vi.mocked(auditChain.record).mock.calls)).not.toContain(
@@ -222,7 +227,11 @@ describe('voice external operation boundaries', () => {
   });
 
   it('awaits native speech errors without detached throws or audible retries', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     processMocks.spawn.mockImplementationOnce(() => {
       const child = Object.assign(new EventEmitter(), {
         stderr: new EventEmitter(),
@@ -248,7 +257,11 @@ describe('voice external operation boundaries', () => {
       const adapter = resolveVoicePlaybackPlatformAdapter('custom-test');
       await expect(adapter.speak!('hello', 100)).rejects.toThrow('EXTERNAL_APPROVAL_REQUIRED');
       expect(speakAdapter).not.toHaveBeenCalled();
-      vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+      vi.mocked(enforceApprovalGate).mockReturnValue({
+        allowed: true,
+        status: 'approved',
+        requestId: 'exact-fixture-approval',
+      });
       await expect(trusted(() => adapter.speak!('hello', 100))).rejects.toMatchObject({
         adfControlFlow: 'preflight',
       });
@@ -262,7 +275,11 @@ describe('voice external operation boundaries', () => {
     const platform = process.platform;
     Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
     try {
-      vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+      vi.mocked(enforceApprovalGate).mockReturnValue({
+        allowed: true,
+        status: 'approved',
+        requestId: 'exact-fixture-approval',
+      });
       await trusted(() =>
         performPlayback(
           'hello',
@@ -399,7 +416,7 @@ describe('voice external operation boundaries', () => {
       const oldHash = vi.mocked(enforceApprovalGate).mock.calls[0]![0].payload!.effect_hash;
       vi.mocked(enforceApprovalGate).mockImplementation((input) =>
         input.payload!.effect_hash === oldHash
-          ? { allowed: true, status: 'approved' }
+          ? { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' }
           : { allowed: false, status: 'pending', message: 'effect_mismatch' }
       );
       processMocks.audioBytes = 'replaced pending audio';
@@ -424,7 +441,11 @@ describe('voice external operation boundaries', () => {
     try {
       const bridge = getSpeechToTextBridges().find((b) => b.name === 'frozen-input')!;
       const input = { audioPath: 'active/shared/tmp/audio.wav', language: 'en' };
-      vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+      vi.mocked(enforceApprovalGate).mockReturnValue({
+        allowed: true,
+        status: 'approved',
+        requestId: 'exact-fixture-approval',
+      });
       await withExternalOperationAuthority(
         () => {
           input.audioPath = 'active/shared/tmp/replaced.wav';
@@ -482,7 +503,7 @@ describe('voice external operation boundaries', () => {
   it('refuses bytes changed during admission before physical output or artifact opening', async () => {
     vi.mocked(enforceApprovalGate).mockImplementation(() => {
       processMocks.audioBytes = 'changed while admission was checked';
-      return { allowed: true, status: 'approved' };
+      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
     });
     const platform = process.platform;
     Object.defineProperty(process, 'platform', { configurable: true, value: 'darwin' });
@@ -520,7 +541,11 @@ describe('voice external operation boundaries', () => {
     try {
       await expect(recordVoiceSample(request, {})).rejects.toThrow('EXTERNAL_APPROVAL_REQUIRED');
       expect(processMocks.captureStream).not.toHaveBeenCalled();
-      vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+      vi.mocked(enforceApprovalGate).mockReturnValue({
+        allowed: true,
+        status: 'approved',
+        requestId: 'exact-fixture-approval',
+      });
       await expect(trusted(() => recordVoiceSample(request, {}))).resolves.toMatchObject({
         status: 'succeeded',
         selected_input_device: 'Governed Microphone',
@@ -548,13 +573,17 @@ describe('voice external operation boundaries', () => {
     expect(processMocks.cameraStart).not.toHaveBeenCalled();
     vi.mocked(enforceApprovalGate).mockImplementation(() => {
       processMocks.audioBytes = 'changed video';
-      return { allowed: true, status: 'approved' };
+      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
     });
     await expect(trusted(() => outputToVirtualCamera(input))).rejects.toThrow(
       'VOICE_VIDEO_CHANGED'
     );
     expect(processMocks.cameraStart).not.toHaveBeenCalled();
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     processMocks.cameraStart.mockRejectedValue(new Error('unknown after camera started'));
     await expect(trusted(() => outputToVirtualCamera(input))).rejects.toMatchObject({
       adfControlFlow: 'preflight',
@@ -608,7 +637,11 @@ describe('voice external operation boundaries', () => {
   it('does not report a synthetic remote transcript as confirmed speech while allowing empty silence text', async () => {
     const transcribe = vi.fn(async () => ({ text: '', backend: 'remote', synthetic: true }));
     const unregister = registerSpeechToTextBridge({ name: 'receipt-test', transcribe });
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     try {
       const bridge = getSpeechToTextBridges().find((b) => b.name === 'receipt-test')!;
       await expect(
@@ -637,7 +670,7 @@ describe('voice external operation boundaries', () => {
     };
     vi.mocked(enforceApprovalGate).mockImplementation(() => {
       options.voice = 'mutated-voice';
-      return { allowed: true, status: 'approved' };
+      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
     });
     vi.mocked(safeExec).mockReturnValue('1');
     try {
@@ -655,7 +688,11 @@ describe('voice external operation boundaries', () => {
   });
 
   it('does not accept a zero-exit microphone shell command that leaves the sample unchanged', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await expect(
       trusted(() =>
         recordVoiceSample(
@@ -681,3 +718,12 @@ describe('voice external operation boundaries', () => {
     expect(safeExec).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

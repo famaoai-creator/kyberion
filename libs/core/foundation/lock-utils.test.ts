@@ -35,6 +35,93 @@ afterEach(() => {
 });
 
 describe('lock utilities', () => {
+  it('bounds a device-name escape that pushes the final component beyond NAME_MAX', async () => {
+    const resource = 'CON.' + 'a'.repeat(246);
+    try {
+      await expect(acquireLock(resource, 0)).resolves.toBe(true);
+      await expect(acquireLock(resource, 0)).resolves.toBe(false);
+    } finally {
+      releaseLock(resource);
+    }
+  });
+
+  it('honors a live legacy 229-character lock rather than remapping its existing resource', async () => {
+    const resource = `legacy-${process.pid}-`.padEnd(229, 'x');
+    createdLockIds.push(resource);
+    safeMkdir(lockRoot, { recursive: true });
+    safeWriteFile(
+      lockPath(resource),
+      JSON.stringify({ pid: process.pid, ts: new Date().toISOString(), id: resource }),
+      { createOnly: true }
+    );
+    await expect(acquireLock(resource, 0)).resolves.toBe(false);
+    expect(inspectLockRecovery(resource)).toBeUndefined();
+    releaseLock(resource);
+    await expect(acquireLock(resource, 0)).resolves.toBe(true);
+    expect(safeExistsSync(lockPath(resource))).toBe(true);
+    releaseLock(resource);
+  });
+
+  it('keeps a maximal 255-byte legacy main path through publication and stale cleanup', async () => {
+    const resource = `maximal-${process.pid}-`.padEnd(250, 'x');
+    createdLockIds.push(resource);
+    await expect(acquireLock(resource, 0)).resolves.toBe(true);
+    expect(safeExistsSync(lockPath(resource))).toBe(true);
+    await expect(acquireLock(resource, 0)).resolves.toBe(false);
+    releaseLock(resource);
+    safeWriteFile(
+      lockPath(resource),
+      JSON.stringify({ pid: 2 ** 31 - 1, ts: new Date(0).toISOString(), id: resource }),
+      { createOnly: true }
+    );
+    await expect(acquireLock(resource, 500)).resolves.toBe(true);
+    releaseLock(resource);
+  });
+
+  it('bounds long encoded resources while preserving contention and distinct logical identities', async () => {
+    const prefix = `autonomy-learning:${pathResolver.rootDir()}/${process.pid}/${'deep/記憶/'.repeat(40)}`;
+    const first = prefix + 'tenant-a.json';
+    const second = prefix + 'tenant-b.json';
+    const ownedKeys = new Set([first, second]);
+    const newNames = () =>
+      safeReaddir(lockRoot).filter((name) => {
+        if (!name.endsWith('.lock')) return false;
+        try {
+          return ownedKeys.has(JSON.parse(String(safeReadFile(path.join(lockRoot, name)))).id);
+        } catch {
+          return false;
+        }
+      });
+    try {
+      await expect(acquireLock(first, 0)).resolves.toBe(true);
+      await expect(acquireLock(first, 0)).resolves.toBe(false);
+      expect(() => withLockSync(first, () => undefined, 0)).toThrow('[LOCK_TIMEOUT]');
+      const [firstName] = newNames();
+      expect(firstName).toBeDefined();
+      expect(firstName!.length).toBeLessThan(160);
+      expect(JSON.parse(String(safeReadFile(path.join(lockRoot, firstName!)))).id).toBe(first);
+      // Literal spelling of the hashed basename is a different logical key.
+      const looksLikeHash = firstName!.slice(0, -'.lock'.length);
+      ownedKeys.add(looksLikeHash);
+      await expect(acquireLock(looksLikeHash, 0)).resolves.toBe(true);
+      await expect(acquireLock(second, 0)).resolves.toBe(true);
+      expect(newNames()).toHaveLength(3);
+      for (const name of newNames()) {
+        createdLockIds.push(name.slice(0, -'.lock'.length));
+        expect(Buffer.byteLength(name, 'utf8')).toBeLessThan(200);
+      }
+      releaseLock(first);
+      expect(withLockSync(first, () => 'reacquired')).toBe('reacquired');
+      releaseLock(second);
+      releaseLock(looksLikeHash);
+      expect(newNames()).toHaveLength(0);
+    } finally {
+      releaseLock(first);
+      releaseLock(second);
+      for (const name of newNames()) safeUnlinkSync(path.join(lockRoot, name));
+    }
+  });
+
   it.each([
     ['writer-lease-path:abc', 'writer-lease-path%3Aabc'],
     ['../nested\\key', '..%2Fnested%5Ckey'],

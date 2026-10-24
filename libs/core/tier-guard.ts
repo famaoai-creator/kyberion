@@ -10,6 +10,11 @@ import {
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
+  MEMORY_PROVENANCE_READER_ROLE,
+  memoryProvenanceReadAllowed,
+  isMemoryProvenanceStatePath,
+} from './knowledge/memory-provenance-capability.js';
+import {
   isPipelineJournalCapability,
   PIPELINE_JOURNAL_STORE_ROLE,
 } from './foundation/pipeline-journal-capability.js';
@@ -1013,6 +1018,23 @@ function requestResourceDenial(
     getRegisteredEnvText('SYSTEM_ROLE') ||
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
+  if (
+    normalizedRole === MEMORY_PROVENANCE_READER_ROLE &&
+    !memoryProvenanceReadAllowed(relativePath, operation)
+  )
+    return {
+      allowed: false,
+      reason: '[MEMORY_PROVENANCE_READ_SCOPE] Read-only exact lineage capability required',
+    };
+  if (
+    (operation === 'write' || operation === 'mkdir') &&
+    isMemoryProvenanceStatePath(relativePath) &&
+    !['mission_controller', 'knowledge_steward', 'chronos_gateway'].includes(normalizedRole || '')
+  )
+    return {
+      allowed: false,
+      reason: '[MEMORY_PROVENANCE_AUTHORITY] Lineage is outside worker-mutable state',
+    };
   if (
     normalizedRole === PR_PUBLICATION_STORE_ROLE &&
     !denyCandidatePaths(relativePath).every((target) =>

@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../tests/helpers/external-approval-fixture.js';
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { sharedTmp } from '../path-resolver.js';
@@ -97,7 +98,11 @@ describe('canonical VCS external governance', () => {
     expect(sent()).toEqual([]);
   });
   it('pins push to approved remote URL and commit SHA, then sets upstream locally', () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     trusted(() => gitPush('/fixture', { ref: 'feature', setUpstream: true }, run));
     expect(sent()[0].args).toEqual(['push', '--', remote, `${sha}:refs/heads/feature`]);
     expect(
@@ -111,7 +116,7 @@ describe('canonical VCS external governance', () => {
     mocks.gate.mockImplementation(() => {
       if (field === 'sha') sha = 'b'.repeat(40);
       else remote = 'https://github.com/evil/repo.git';
-      return { allowed: true, status: 'approved' };
+      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
     });
     expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
       'VCS_SNAPSHOT_CHANGED'
@@ -119,7 +124,11 @@ describe('canonical VCS external governance', () => {
     expect(sent()).toEqual([]);
   });
   it('captures body file in PR approval and sends immutable content to explicit repository', () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     trusted(() =>
       ghPrCreate(
         {
@@ -137,7 +146,11 @@ describe('canonical VCS external governance', () => {
     expect(sent()[0].args).not.toContain('--body-file');
   });
   it('keeps frozen inline PR bytes and their protected worktree provenance', () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const resolver = vi.fn(() => ({ agentId: 'owner', invocationId: 'frozen-body' }));
     const body = '\n  protected review text  \n';
     withExternalOperationAuthority(resolver, () =>
@@ -153,7 +166,11 @@ describe('canonical VCS external governance', () => {
     expect(sent()[0].args).toContain(body);
   });
   it('never lets a transport provenance context declassify a protected body file', () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const resolver = vi.fn(() => ({ agentId: 'owner', invocationId: 'file-body' }));
     withExternalOperationAuthority(resolver, () =>
       withPrPublicationBodySource('public', () =>
@@ -169,7 +186,7 @@ describe('canonical VCS external governance', () => {
   it('rejects edited PR review body after approval', () => {
     mocks.gate.mockImplementation(() => {
       mocks.body = 'changed';
-      return { allowed: true, status: 'approved' };
+      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
     });
     expect(() =>
       trusted(() =>
@@ -179,7 +196,11 @@ describe('canonical VCS external governance', () => {
     expect(sent()).toEqual([]);
   });
   it('uses PR head commit compare-and-swap for merge', () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     trusted(() => ghPrMerge({ cwd: '/fixture', ref: '7' }, run));
     expect(sent()[0].args).toEqual(
       expect.arrayContaining([
@@ -193,13 +214,17 @@ describe('canonical VCS external governance', () => {
   it('rejects changed PR head before merge', () => {
     mocks.gate.mockImplementation(() => {
       prSha = 'b'.repeat(40);
-      return { allowed: true, status: 'approved' };
+      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
     });
     expect(() => trusted(() => ghPrMerge({ ref: '7' }, run))).toThrow('VCS_SNAPSHOT_CHANGED');
     expect(sent()).toEqual([]);
   });
   it('never retries an ambiguous push and records unknown', () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     mutationStatus = 1;
     trusted(() => gitPush('/fixture', { ref: 'feature' }, run));
     expect(sent()).toHaveLength(1);
@@ -235,3 +260,12 @@ describe('canonical VCS external governance', () => {
     expect(mocks.gate).not.toHaveBeenCalled();
   });
 });
+
+vi.mock('../governance/approval-store.js', async (original) => ({
+  ...(await original<typeof import('../governance/approval-store.js')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

@@ -109,6 +109,7 @@ export async function attemptAutonomousRepair(request: AutonomousRepairRequest):
       failure,
       trustResolved,
       projectTrustApprovalId,
+      postRepairValidation: validate,
       delegationOptions: policy
         ? ({ effort: policy.effort, budget: policy.budget } as ReasoningCallOptions)
         : undefined,
@@ -120,16 +121,6 @@ export async function attemptAutonomousRepair(request: AutonomousRepairRequest):
       return false;
     }
 
-    if (validate) {
-      try {
-        await validate();
-      } catch (validationErr: any) {
-        logger.warn(
-          `  ${prefix} Canonical ADF repair completed but caller validation failed: ${validationErr.message}`
-        );
-        return false;
-      }
-    }
     logger.info(`  ${prefix} Canonical ADF repair succeeded for ${pipelinePath}.`);
     return true;
   } catch (err: any) {

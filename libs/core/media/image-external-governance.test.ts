@@ -1,3 +1,4 @@
+import { externalApprovalFixture } from '../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => ({
   gate: vi.fn(),
@@ -106,7 +107,11 @@ describe('image generation external boundary', () => {
   });
 
   it('records a failed remote receipt as unknown and does not try another provider', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const first = provider();
     vi.mocked(first.generate).mockResolvedValue({
       status: 'failed',
@@ -132,7 +137,11 @@ describe('image generation external boundary', () => {
   });
 
   it('keeps consent independent of common admission', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     await expect(
       new GeminiFastImageGenerationProvider().generate({
         prompt: 'one',
@@ -147,7 +156,7 @@ describe('image generation external boundary', () => {
     const remote = { ...provider(), supportsReferenceImages: true };
     mocks.gate.mockImplementation(() => {
       mocks.referenceBytes = 'replaced-image';
-      return { allowed: true, status: 'approved' };
+      return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
     });
     await expect(
       new AdaptivePolicyRouter([remote]).generateWithFallback({
@@ -166,7 +175,11 @@ describe('image generation external boundary', () => {
   });
 
   it('preserves a stable invocation and blocks replay before a second call', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'approved' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: 'exact-fixture-approval',
+    });
     const seen = new Set<string>();
     mocks.reserve.mockImplementation(({ invocationId }) => {
       if (seen.has(invocationId)) throw new Error('EXTERNAL_EXECUTION_ALREADY_RESERVED');
@@ -187,3 +200,12 @@ describe('image generation external boundary', () => {
     mocks.reserve.mockReset();
   });
 });
+
+vi.mock('../governance/approval-store.js', async (original) => ({
+  ...(await original<typeof import('../governance/approval-store.js')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));

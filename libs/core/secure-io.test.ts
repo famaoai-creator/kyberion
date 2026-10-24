@@ -38,6 +38,8 @@ import {
   safeRealpath,
   safeStatfs,
   safeWriteFile,
+  safePublishExclusiveFileSync,
+  safeReaddir,
   sanitizePath,
   validateUrl,
 } from './secure-io.js';
@@ -55,6 +57,48 @@ describe('secure-io core', () => {
     if (fs.existsSync(tmpDir)) {
       fs.rmSync(tmpDir, { recursive: true, force: true });
     }
+  });
+
+  it('publishes a maximal existing basename through a bounded exclusive temp sibling', () => {
+    const name = 'x'.repeat(250);
+    const target = path.join(tmpDir, name);
+    safePublishExclusiveFileSync(target, 'complete original bytes');
+    expect(String(safeReadFile(target))).toBe('complete original bytes');
+    expect(() => safePublishExclusiveFileSync(target, 'must not overwrite')).toThrow(
+      expect.objectContaining({ code: 'EEXIST' })
+    );
+    expect(String(safeReadFile(target))).toBe('complete original bytes');
+    safeWriteFile(target, 'atomic replacement bytes');
+    expect(String(safeReadFile(target))).toBe('atomic replacement bytes');
+    expect(safeReaddir(tmpDir)).toEqual([name]);
+  });
+
+  it('keeps long-name write siblings unique even with a repeated clock and weak random suffix', () => {
+    const name = 's'.repeat(250);
+    const target = path.join(tmpDir, name);
+    const start = vi.mocked(fs.openSync).mock.calls.length;
+    const clock = vi.spyOn(process.hrtime, 'bigint').mockReturnValue(1n);
+    const weakRandom = vi.spyOn(Math, 'random').mockReturnValue(0.5);
+    try {
+      safeWriteFile(target, 'first');
+      safeWriteFile(target, 'second');
+    } finally {
+      clock.mockRestore();
+      weakRandom.mockRestore();
+    }
+    const siblings = vi
+      .mocked(fs.openSync)
+      .mock.calls.slice(start)
+      .filter(
+        ([file, flags]) =>
+          typeof file === 'string' && path.dirname(file) === tmpDir && flags === 'wx'
+      )
+      .map(([file]) => String(file));
+    expect(siblings).toHaveLength(2);
+    expect(new Set(siblings).size).toBe(2);
+    expect(siblings.every((file) => Buffer.byteLength(path.basename(file)) <= 255)).toBe(true);
+    expect(String(safeReadFile(target))).toBe('second');
+    expect(safeReaddir(tmpDir)).toEqual([name]);
   });
 
   describe('validateFileSize', () => {

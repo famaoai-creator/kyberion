@@ -291,10 +291,6 @@
       "reason": "Generic pipeline step `write_artifact` (also registered by code, file, modeling, system and wisdom) that the network runner accepts inside actuator-scoped ADFs; no ADF or network test addresses this domain's copy, and the shared bare name cannot be attributed. Kept: dropping it would make network ADFs reject a standard step. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },
     {
-      "id": "service:mcp",
-      "reason": "MCP apply op of service-actuator (executeMcp); advertised in the op catalog but no ADF or dispatch test uses it \u2014 reachable only through hand-written service ADFs. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
-    },
-    {
       "id": "wisdom:audit_speaker_fairness",
       "reason": "Forwarding alias wisdom \u2192 meeting:audit_speaker_fairness (FORWARD_TARGETS in the wisdom op-catalog), kept so ADFs written against the pre-split wisdom catalog keep running; new callers use meeting:audit_speaker_fairness. Surfaced 2026-10-01 when OW-07 stopped counting name collisions (review S2)."
     },

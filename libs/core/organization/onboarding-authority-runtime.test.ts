@@ -1,6 +1,13 @@
-import { expect, it, vi } from 'vitest';
+import { beforeAll, expect, it, vi } from 'vitest';
 import { useOnboardingAuthorityFixture } from '../../../tests/helpers/onboarding-authority-fixture.js';
+import { safeReadFile, safeWriteFile } from '../secure-io.js';
 
+// The minimal installation fixture also needs the real reviewed VCS contract.
+// Seed it before its helper switches the process to the isolated root.
+beforeAll(() => {
+  const manifest = 'libs/actuators/vcs-actuator/manifest.json';
+  safeWriteFile(f.root + '/' + manifest, safeReadFile(manifest));
+});
 const f = useOnboardingAuthorityFixture();
 
 it('uses installed owner consent for a real standalone PR boundary and respects revocation', async () => {

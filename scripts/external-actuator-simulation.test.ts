@@ -7,8 +7,14 @@ vi.mock('@agent/core/surface/operator-notifications', () => ({ notifyOperator: v
 import { safeWriteFile } from '@agent/core/secure-io';
 import { rootResolve } from '@agent/core/path-resolver';
 import { humanActor } from '@agent/core/actor';
-import { withExternalOperationAuthority } from '@agent/core/governance/external-operation';
-import { loadApprovalRequest } from '@agent/core/governance/approval-store';
+import {
+  withExternalOperationAuthority,
+  withOperationArgumentOrigins,
+} from '@agent/core/governance/external-operation';
+import {
+  loadApprovalRequest,
+  computeApprovalPayloadHash,
+} from '@agent/core/governance/approval-store';
 import {
   acceptCharter,
   findActiveCharter,
@@ -208,7 +214,7 @@ describe('external calendar actuator real governance simulation', () => {
       pathOptions
     );
     expect(charterInput).toBeDefined();
-    const run = () =>
+    const runUnattested = () =>
       withExternalOperationAuthority(
         () => ({
           ...simulationAuthority('calendar-charter', tenant),
@@ -217,7 +223,22 @@ describe('external calendar actuator real governance simulation', () => {
         }),
         () => registry.get('simulation').createEvent(params)
       );
+    // This fixture host selected both the backend and the reviewed calendar
+    // parameters. A decision-type charter alone cannot supply their origins.
+    const run = () =>
+      withOperationArgumentOrigins(
+        [
+          {
+            path: [],
+            value_hash: computeApprovalPayloadHash({ value: { backend: 'simulation', params } }),
+            authority: 'policy',
+          },
+        ],
+        runUnattested
+      );
     const before = transport.mock.calls.length;
+    await expect(runUnattested()).rejects.toThrow('EXTERNAL_APPROVAL_REQUIRED');
+    expect(transport).toHaveBeenCalledTimes(before);
     await expect(run()).resolves.toMatchObject({ status: 'success' });
     transport.mockResolvedValueOnce({
       status: 'error',
