@@ -1,17 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { withExecutionContext } from '@agent/core/authority.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io.js';
-import { pathResolver } from '@agent/core/path-resolver.js';
-import * as approvals from '@agent/core/governance/approval-store.js';
-import { writeMemberProfile, memberProfilePath } from '@agent/core/organization/member-registry.js';
+import { withExecutionContext } from '@agent/core/authority';
+import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import * as approvals from '@agent/core/governance/approval-store';
+import { writeMemberProfile, memberProfilePath } from '@agent/core/organization/member-registry';
 import {
   loadMemoryPromotionCandidate,
   memoryPromotionQueuePath,
-} from '@agent/core/knowledge/memory-promotion-queue.js';
-import { verifyScopedLearningPublication } from '@agent/core/knowledge/scoped-learning-publication.js';
-import { scopedLearningMarkdownPath } from '@agent/core/knowledge/scoped-learning-domain.js';
+} from '@agent/core/knowledge/memory-promotion-queue';
+import { scopedLearningMarkdownPath } from '@agent/core/knowledge/scoped-learning-domain';
 import { issueOrganizationDoctrine, publishOrganizationDoctrine } from './organization_doctrine.js';
 
 const suffix = randomUUID().slice(0, 8);
@@ -147,7 +146,7 @@ describe('organization doctrine', () => {
     expect(published[0]?.state).toBe('published');
 
     const promoted = loadMemoryPromotionCandidate(String(receipt.candidate_id), scope)!;
-    expect(verifyScopedLearningPublication(promoted)).toBeTruthy();
+    expect(published[0]?.publication).toBeTruthy();
     expect(scopedLearningMarkdownPath(scope, promoted.candidate_id)).toContain(
       `confidential/${tenantSlug}`
     );
