@@ -8,3 +8,4 @@ export * from './template.js';
 export * from './draft.js';
 export * from './reflect.js';
 export * from './respond.js';
+export * from './consumption.js';

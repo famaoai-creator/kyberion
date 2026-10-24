@@ -11,11 +11,12 @@
  * Operator verbs (all take --tenant <slug> --case <id>; --json for machine output):
  *   draft    --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>]
  *   draft    --agenda <id> --file <agenda.json>        replace title/from/entries (an approved/sent agenda becomes a new revision)
+ *   draft    --from-tasks [--agenda <draft id>] [--customer <slug>]   collect mission tasks' customer-judgment proposals (CD-09) into a draft agenda
  *   generate --agenda <id> --intent-file <path> [--grounding-file <path>]
  *   submit   --agenda <id> --by user:<member> [--role owner|approver]
  *   actor-add --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>]
  *   send     --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]
- *   status   --agenda <id>                              also completes interrupted responses
+ *   status   [--agenda <id>]                            also completes interrupted responses; lists task proposals and held tasks
  *   confirm  --agenda <id> --entry <entry_id> --by user:<member>   confirm a customer decision on a requires_customer entry (approval gate)
  *   close    --agenda <id> --by user:<member> [--reason <text>]   stop taking answers; links answer `closed`
  *   withdraw --agenda <id> --by user:<member> [--reason <text>]   revoke the agenda's open invites and withdraw it
@@ -38,7 +39,8 @@
  * Modules: `scripts/customer-decision/` — `common.ts` (arguments, roles,
  * audit, agenda helpers), `operator.ts` (draft … send), `operator-lifecycle.ts`
  * (status, confirm, close / withdraw, revoke), `reconcile.ts` (respond
- * completion and recovery), `customer-facing.ts` (view / respond). This file
+ * completion and recovery), `customer-facing.ts` (view / respond),
+ * `task-proposals.ts` (draft --from-tasks, the task part of status). This file
  * is the entry point; the room spawns `dist/scripts/customer_decision.js`.
  *
  * Consistency: every read → plan → write sequence on a case runs under the
@@ -78,6 +80,7 @@ import {
   runRevoke,
 } from './customer-decision/operator-lifecycle.js';
 import { runCustomerFacing } from './customer-decision/customer-facing.js';
+import { runCollectTaskProposals } from './customer-decision/task-proposals.js';
 
 export {
   AGENDA_APPROVE_OPERATION,
@@ -92,7 +95,7 @@ export async function runCustomerDecision(
   argv: readonly string[],
   io: CustomerDecisionIo = {}
 ): Promise<unknown> {
-  const { verb, opts } = parseCustomerDecisionArgs(argv);
+  const { verb, opts, flags } = parseCustomerDecisionArgs(argv);
   const now = io.now ? io.now() : nowIso();
   switch (verb) {
     case 'help':
@@ -100,7 +103,7 @@ export async function runCustomerDecision(
     case '-h':
       return usage();
     case 'draft':
-      return runDraft(opts, now);
+      return flags.has('from-tasks') ? runCollectTaskProposals(opts, now) : runDraft(opts, now);
     case 'generate':
       return runGenerate(opts, now);
     case 'submit':

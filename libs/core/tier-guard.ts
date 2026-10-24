@@ -17,6 +17,10 @@ import {
   isCustomerDecisionInviteCapability,
   CUSTOMER_DECISION_INVITE_STORE_ROLE,
 } from './foundation/customer-decision-invite-capability.js';
+import {
+  isCustomerDecisionConsumerCapability,
+  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+} from './foundation/customer-decision-consumer-capability.js';
 /**
  * TypeScript version of the Knowledge Tier Guard.
  * v2.2 - POLICY-AS-CODE (ADF DRIVEN) with Persona Integration
@@ -1062,6 +1066,15 @@ function requestResourceDenial(
       allowed: false,
       reason:
         '[RESOURCE_SCOPE_REQUIRED] Customer decision invite access requires its exact tenant invite capability',
+    };
+  if (
+    normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
+    !isCustomerDecisionConsumerCapability(currentResourceAccessScope())
+  )
+    return {
+      allowed: false,
+      reason:
+        '[RESOURCE_SCOPE_REQUIRED] Customer decision consumer lock access requires its exact case capability',
     };
   if (
     normalizedRole === 'concierge_management_reader' &&

@@ -585,7 +585,14 @@ export function isTaskDeliverableSatisfied(
  */
 export function tryAutoCompleteTaskFromEvidence(
   missionDir: string,
-  taskId: string
+  taskId: string,
+  options: {
+    /**
+     * CD-09: a task waiting for a customer decision (unresolved
+     * requires_customer hold) is never auto-completed, nor cascaded.
+     */
+    isHeld?: (taskId: string) => boolean;
+  } = {}
 ): { completed: boolean; reason: string; cascaded: string[] } {
   const nextTasks = readMissionNextTasks(missionDir);
   const statusByTaskId = new Map(
@@ -607,6 +614,9 @@ export function tryAutoCompleteTaskFromEvidence(
       reason: 'deliverable file missing or a dependency is not yet completed',
       cascaded: [],
     };
+  }
+  if (options.isHeld?.(taskId)) {
+    return { completed: false, reason: 'awaiting a customer decision', cascaded: [] };
   }
 
   task.status = 'completed';
@@ -636,7 +646,10 @@ export function tryAutoCompleteTaskFromEvidence(
           String(entry.status || 'planned').toLowerCase(),
         ])
       );
-      if (isTaskDeliverableSatisfied(missionDir, candidate, refreshedStatuses)) {
+      if (
+        isTaskDeliverableSatisfied(missionDir, candidate, refreshedStatuses) &&
+        !options.isHeld?.(candidateId)
+      ) {
         candidate.status = 'completed';
         cascaded.push(candidateId);
         progressed = true;

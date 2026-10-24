@@ -76,11 +76,12 @@ export function usage(): string {
   return [
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>]',
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --agenda <id> --file <agenda.json>',
+    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --from-tasks [--agenda <draft id>] [--customer <slug>] [--title <t>] [--locale ja|en]',
     'pnpm kyberion customer-decision generate  --tenant <slug> --case <id> --agenda <id> --intent-file <path> [--grounding-file <path>]',
     'pnpm kyberion customer-decision submit    --tenant <slug> --case <id> --agenda <id> --by user:<member> [--role owner|approver]',
     'pnpm kyberion customer-decision actor-add --tenant <slug> --case <id> --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>]',
     'pnpm kyberion customer-decision send      --tenant <slug> --case <id> --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]',
-    'pnpm kyberion customer-decision status    --tenant <slug> --case <id> --agenda <id>',
+    'pnpm kyberion customer-decision status    --tenant <slug> --case <id> [--agenda <id>]',
     'pnpm kyberion customer-decision confirm   --tenant <slug> --case <id> --agenda <id> --entry <entry_id> --by user:<member>',
     'pnpm kyberion customer-decision close     --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',
     'pnpm kyberion customer-decision withdraw  --tenant <slug> --case <id> --agenda <id> --by user:<member> [--reason <text>]',

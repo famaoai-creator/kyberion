@@ -72,6 +72,11 @@ import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { generateMissionWorkReconciliationScaffold } from './mission-work-reconciliation.js';
 import { recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
 import {
+  isTaskAwaitingCustomerDecision,
+  pinTaskDecisions,
+  reconcileTaskDecisions,
+} from './mission-decision-lock.js';
+import {
   assertApprovalUsable,
   computeApprovalPayloadHash,
   isApprovalRequestExpired,
@@ -865,6 +870,16 @@ export async function recordTask(
     await saveState(upperId, state, { alreadyLocked: true });
   });
 
+  // CD-09: a record-task naming a task pins the customer decisions it starts
+  // on (once: a later record-task for the same task keeps the pin).
+  if (typeof detailRecord.task_id === 'string' && detailRecord.task_id.trim()) {
+    pinTaskDecisions({
+      missionId: upperId,
+      taskId: detailRecord.task_id.trim(),
+      mode: 'if_absent',
+    });
+  }
+
   logger.info(`📝 [FlightRecorder] Intention recorded: ${description}`);
 }
 
@@ -912,6 +927,11 @@ export async function recordEvidence(args: {
     }
   })();
 
+  // CD-09: reconcile the task's pinned customer decisions before the evidence
+  // is recorded. A stale result does not block it; it files a rework WorkItem.
+  // Only counts, the consumer id and WorkItem ids reach the (public) ledger.
+  const decisionCheck = reconcileTaskDecisions({ missionId: upperId, taskId: args.taskId });
+
   await withLock(`mission-${upperId}`, async () => {
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,
@@ -935,6 +955,7 @@ export async function recordEvidence(args: {
               ),
             }
           : {}),
+        ...(decisionCheck.consumer ? { customer_decision_lock: decisionCheck } : {}),
       },
     });
 
@@ -945,7 +966,21 @@ export async function recordEvidence(args: {
     // deliverable is in place. Gated on this explicit, task_id-scoped call so
     // a bare file-existence check is never trusted without an agent
     // deliberately asserting the work for THAT task is done.
-    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId);
+    // CD-09: a task waiting for a customer decision keeps its evidence but is
+    // not closed (nor any cascade candidate that is itself held).
+    const heldIds = decisionCheck.held_proposal_ids ?? [];
+    if (heldIds.length > 0) {
+      logger.warn(
+        `task ${args.taskId} not completed — it waits for a customer decision (requires_customer) | the evidence is recorded; confirm the customer decision (customer-decision confirm), then resume the mission | mission=${upperId} consumer=${decisionCheck.consumer ?? ''} proposals=${heldIds.join(',')}`
+      );
+    }
+    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId, {
+      // The task's own check re-reads its lock too, so a failed reconcile never
+      // lets a held task close (the hold check fails closed).
+      isHeld: (taskId) =>
+        (taskId === args.taskId && heldIds.length > 0) ||
+        isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
+    });
     if (autoComplete.completed) {
       logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
       recordDirectCliTaskUsage({ ...args, ...autoComplete, state, event: 'record_evidence' });
