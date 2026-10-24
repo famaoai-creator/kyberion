@@ -15,6 +15,10 @@ import {
 } from './scenario-evidence-class.js';
 import type { ScenarioCheckResult } from './scenario-final-checks.js';
 import {
+  evaluateScenarioAuthorization,
+  type ScenarioAuthorizationResult,
+} from './scenario-authorization.js';
+import {
   scenarioWarningsDropped,
   type ScenarioSideEffectLog,
   type ScenarioWarningRecord,
@@ -74,6 +78,7 @@ export interface ScenarioReport {
   duration_ms: number;
   /** Wall-clock duration (informational, non-deterministic). */
   wall_ms: number;
+  authorization?: ScenarioAuthorizationResult;
 }
 
 export function emptySideEffectSummary(): ScenarioSideEffectSummary {
@@ -144,12 +149,37 @@ export function buildScenarioReport(input: BuildScenarioReportInput): ScenarioRe
     finished_at: new Date(input.finishedAtMs).toISOString(),
     duration_ms: input.finishedAtMs - input.startedAtMs,
     wall_ms: input.wallMs,
+    ...(input.def.authorizationContract
+      ? {
+          authorization: evaluateScenarioAuthorization(
+            input.def.authorizationContract,
+            input.log,
+            input.status !== 'skipped' &&
+              input.status !== 'lane_skipped' &&
+              input.status !== 'error'
+          ),
+        }
+      : {}),
   };
 }
 
 /** A run fails the suite only on fail/error; skipped and lane_skipped never do. */
 export function isFailingScenarioStatus(status: ScenarioRunStatus): boolean {
   return status === 'fail' || status === 'error';
+}
+
+/** Preserve completion status while refusing unsafe/unevaluable declared delegation. */
+export function isFailingScenarioReport(
+  report: Pick<ScenarioReport, 'status' | 'authorization'>
+): boolean {
+  return (
+    isFailingScenarioStatus(report.status) ||
+    Boolean(
+      report.authorization &&
+      (report.authorization.authorization !== 'within_scope' ||
+        report.authorization.completion !== 'completed')
+    )
+  );
 }
 
 function escapeCell(value: string): string {
@@ -173,6 +203,10 @@ export function renderScenarioReportMarkdown(report: ScenarioReport): string {
     `- started_at: ${report.started_at} (virtual clock), duration ${report.duration_ms}ms, wall ${report.wall_ms}ms`,
   ];
   if (report.reason) lines.push(`- reason: ${escapeCell(report.reason)}`);
+  if (report.authorization)
+    lines.push(
+      `- completion: ${report.authorization.completion}; authorization: ${report.authorization.authorization}; outcome: ${report.authorization.outcome}`
+    );
   const effects = report.side_effects;
   lines.push(
     `- side effects: ${effects.ops_applied} applied, ${effects.ops_unstubbed} unstubbed, ` +

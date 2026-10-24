@@ -374,6 +374,8 @@ export async function runScenario(
           scenarioId: def.id,
           runId: ctx.runId,
           evidenceClass: evidenceClassForProfile(def.executionProfile),
+          authorizationContract: def.authorizationContract,
+          observable: status !== 'error',
         })
       );
     }

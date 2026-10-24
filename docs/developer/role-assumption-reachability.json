@@ -510,6 +510,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/knowledge/memory-provenance.ts#load",
+      "roles": ["memory_provenance_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/knowledge/scoped-learning-approval-verifier.ts#findScopedLearningApprovalRequest",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -4039,6 +4044,14 @@
             "libs/core/mission/mission-creation.ts#createMission"
           ]
         },
+        "memory_provenance_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
+            "libs/core/promoted-memory.ts#savePromotedMemoryRecord",
+            "libs/core/knowledge/memory-provenance.ts#registerMemoryProvenance",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
         "metrics_cap_reader": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/chronos-quick-action-helpers.ts#runScheduleQuickAction",
@@ -4428,6 +4441,23 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#buildNeedsKnowledgeReinforcementLines",
+            "libs/core/knowledge/distill-knowledge-injector.ts#findRelevantDistilledKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -5175,6 +5205,22 @@
             "libs/core/mission/mission-creation.ts#createMission"
           ]
         },
+        "memory_provenance_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/message/route.ts#POST",
+            "libs/core/surface/front-desk-request-service.ts#runFrontDeskRequest",
+            "libs/core/surface/surface-mission-proposals.ts#issueChronosMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#buildNeedsKnowledgeReinforcementLines",
+            "libs/core/knowledge/distill-knowledge-injector.ts#findRelevantDistilledKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
         "metrics_cap_reader": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -5392,6 +5438,7 @@
         "customer_decision_milestone_store",
         "infrastructure_sentinel",
         "knowledge_steward",
+        "memory_provenance_reader",
         "metrics_cap_reader",
         "notification_preferences_reader",
         "organization_operator",
@@ -5440,6 +5487,7 @@
         "customer_decision_milestone_store",
         "infrastructure_sentinel",
         "knowledge_steward",
+        "memory_provenance_reader",
         "metrics_cap_reader",
         "notification_preferences_reader",
         "organization_operator",
@@ -5630,6 +5678,17 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#<module>",
+            "libs/core/surface/channel-surface.ts#<module>",
+            "libs/core/surface/surface-runtime-orchestrator.ts#<module>",
+            "libs/core/surface/surface-runtime-conversation-data.ts#handleSurfaceQueryRoute",
+            "libs/core/knowledge/knowledge-index.ts#queryKnowledgeHybrid",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -5929,6 +5988,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "knowledge_steward",
+        "memory_provenance_reader",
         "metrics_cap_reader",
         "notification_preferences_reader",
         "organization_operator",
@@ -5989,6 +6049,27 @@
             "libs/core/governance/external-operation.ts#runExternalOperation",
             "libs/core/governance/external-operation.ts#admitExternalOperation",
             "libs/core/governance/approval-gate.ts#enforceApprovalGate"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handlePromptBasedGeneration",
+            "libs/actuators/media-generation-actuator/src/media-generation-helpers.ts#executePreparedGeneration",
+            "libs/core/governance/external-operation.ts#runExternalOperation",
+            "libs/core/governance/external-operation.ts#admitExternalOperation",
+            "libs/core/governance/external-operation.ts#protectionFor",
+            "libs/core/governance/operation-protection.ts#evaluateOperationArguments",
+            "libs/core/knowledge/memory-provenance.ts#verifyMemoryOrigin",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -6339,6 +6420,17 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "libs/core/surface/channel-surface.ts#<module>",
+            "libs/core/surface/surface-runtime-orchestrator.ts#<module>",
+            "libs/core/surface/surface-runtime-conversation-data.ts#handleSurfaceQueryRoute",
+            "libs/core/knowledge/knowledge-index.ts#queryKnowledgeHybrid",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -6805,6 +6897,17 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#searchKnowledge",
+            "libs/core/knowledge/knowledge-index.ts#queryKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -7347,6 +7450,26 @@
             "libs/core/mission/mission-creation.ts#createMission"
           ]
         },
+        "memory_provenance_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/wisdom-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/wisdom-actuator/src/wisdom-pipeline-helpers.ts#handleAction",
+            "libs/actuators/wisdom-actuator/src/wisdom-pipeline-helpers.ts#performReconcile",
+            "libs/actuators/wisdom-actuator/src/wisdom-pipeline-helpers.ts#opCapture",
+            "libs/core/knowledge/knowledge-index.ts#queryKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
         "metrics_cap_reader": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -7717,6 +7840,61 @@
             "libs/core/authority.ts#<module>"
           ]
         },
+        "infrastructure_sentinel": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternative",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
+            "libs/core/service/service-engine-execution.ts#executeRemoteMcp",
+            "libs/core/service/service-mcp-execution.ts#executeGovernedMcpTool",
+            "libs/core/governance/external-operation.ts#runExternalOperation",
+            "libs/core/governance/external-operation.ts#admitExternalOperation",
+            "libs/core/governance/approval-gate.ts#enforceApprovalGate"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternative",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
+            "libs/core/service/service-engine-execution.ts#executeRemoteMcp",
+            "libs/core/service/service-mcp-execution.ts#executeGovernedMcpTool",
+            "libs/core/governance/external-operation.ts#runExternalOperation",
+            "libs/core/governance/external-operation.ts#admitExternalOperation",
+            "libs/core/governance/external-operation.ts#protectionFor",
+            "libs/core/governance/operation-protection.ts#evaluateOperationArguments",
+            "libs/core/knowledge/memory-provenance.ts#verifyMemoryOrigin",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
+        "notification_preferences_reader": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternative",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
+            "libs/core/service/service-engine-execution.ts#executeRemoteMcp",
+            "libs/core/service/service-mcp-execution.ts#executeGovernedMcpTool",
+            "libs/core/governance/external-operation.ts#runExternalOperation",
+            "libs/core/governance/external-operation.ts#admitExternalOperation",
+            "libs/core/governance/approval-gate.ts#enforceApprovalGate",
+            "libs/core/surface/operator-notifications.ts#notifyOperator",
+            "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
+            "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
+            "libs/core/surface/operator-notifications.ts#loadNotificationPreferences"
+          ]
+        },
         "person_charter_store": {
           "example_path": [
             "scripts/oauth_callback_surface.ts#<module>",
@@ -7728,6 +7906,29 @@
             "libs/core/governance/delegated-execution.ts#previous",
             "libs/core/governance/accountability-charter-registry.ts#listCharterIds",
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
+          ]
+        },
+        "pipeline_journal_store": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternative",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
+            "libs/core/service/service-engine-execution.ts#executeRemoteMcp",
+            "libs/core/service/service-mcp-execution.ts#executeGovernedMcpTool",
+            "libs/core/governance/external-operation.ts#runExternalOperation",
+            "libs/core/governance/external-operation.ts#admitExternalOperation",
+            "libs/core/governance/approval-gate.ts#enforceApprovalGate",
+            "libs/core/governance/approval-store.ts#expireApprovalRequest",
+            "libs/core/governance/approval-store.ts#expireApprovalRequestUnlocked",
+            "libs/core/governance/approval-store.ts#schedulePipelineApprovalResume",
+            "libs/core/pipeline/pipeline-approval-resume.ts#resumePipelineRunAfterApproval",
+            "libs/core/pipeline/pipeline-run-journal.ts#loadPipelineRunJournal",
+            "libs/core/pipeline/pipeline-run-journal.ts#withJournalStore",
+            "libs/core/pipeline/pipeline-run-journal.ts#journalStoreAccess"
           ]
         },
         "pr_publication_store": {
@@ -7743,8 +7944,50 @@
             "libs/core/governance/accountability-charter-registry.ts#scopedCharterIo"
           ]
         },
+        "scope_locale_reader": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternative",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
+            "libs/core/service/service-engine-execution.ts#executeRemoteMcp",
+            "libs/core/service/service-mcp-execution.ts#executeGovernedMcpTool",
+            "libs/core/governance/external-operation.ts#runExternalOperation",
+            "libs/core/governance/external-operation.ts#admitExternalOperation",
+            "libs/core/governance/approval-gate.ts#enforceApprovalGate",
+            "libs/core/surface/operator-notifications.ts#notifyOperator",
+            "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
+            "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
+            "libs/core/surface/operator-notifications.ts#formatNotificationText",
+            "libs/core/surface/operator-notifications.ts#eventLabel",
+            "libs/core/t.ts#t",
+            "libs/core/locale.ts#resolveLocale",
+            "libs/core/locale.ts#resolveWithoutExplicit",
+            "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
         "surface_runtime": {
-          "example_path": ["scripts/oauth_callback_surface.ts#<module>"]
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternative",
+            "libs/core/service/service-engine-execution.ts#executeServicePresetAlternativeOnce",
+            "libs/core/service/service-engine-execution.ts#executeRemoteMcp",
+            "libs/core/service/service-mcp-execution.ts#executeGovernedMcpTool",
+            "libs/core/governance/external-operation.ts#runExternalOperation",
+            "libs/core/governance/external-operation.ts#admitExternalOperation",
+            "libs/core/governance/approval-gate.ts#enforceApprovalGate",
+            "libs/core/surface/operator-notifications.ts#notifyOperator",
+            "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
+            "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
+            "libs/core/surface/operator-notifications.ts#deliver"
+          ]
         }
       },
       "unresolved_sites": [],
@@ -7755,16 +7998,12 @@
         "customer_decision_consumer_store",
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
-        "infrastructure_sentinel",
         "knowledge_steward",
         "metrics_cap_reader",
-        "notification_preferences_reader",
         "organization_operator",
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
-        "pipeline_journal_store",
-        "scope_locale_reader",
         "slack_bridge",
         "sovereign_concierge",
         "tool_runtime_policy_reader",
@@ -7990,6 +8229,21 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#buildNeedsKnowledgeReinforcementLines",
+            "libs/core/knowledge/distill-knowledge-injector.ts#findRelevantDistilledKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -8461,6 +8715,23 @@
             "libs/core/mission/mission-creation.ts#createMission"
           ]
         },
+        "memory_provenance_reader": {
+          "example_path": [
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#buildNeedsKnowledgeReinforcementLines",
+            "libs/core/knowledge/distill-knowledge-injector.ts#findRelevantDistilledKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
         "metrics_cap_reader": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -8925,6 +9196,24 @@
             "libs/core/mission/mission-creation.ts#createMission"
           ]
         },
+        "memory_provenance_reader": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/hearing-mission-routes.ts#registerHearingMissionRoutes",
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#buildNeedsKnowledgeReinforcementLines",
+            "libs/core/knowledge/distill-knowledge-injector.ts#findRelevantDistilledKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
         "metrics_cap_reader": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -9329,6 +9618,17 @@
             "libs/core/mission/mission-creation.ts#createMission"
           ]
         },
+        "memory_provenance_reader": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "libs/core/surface/channel-surface.ts#<module>",
+            "libs/core/surface/surface-runtime-orchestrator.ts#<module>",
+            "libs/core/surface/surface-runtime-conversation-data.ts#handleSurfaceQueryRoute",
+            "libs/core/knowledge/knowledge-index.ts#queryKnowledgeHybrid",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
         "metrics_cap_reader": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -9633,6 +9933,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "knowledge_steward",
+        "memory_provenance_reader",
         "metrics_cap_reader",
         "mission_controller",
         "notification_preferences_reader",
@@ -9800,6 +10101,21 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#buildNeedsKnowledgeReinforcementLines",
+            "libs/core/knowledge/distill-knowledge-injector.ts#findRelevantDistilledKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -10209,6 +10525,17 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#<module>",
+            "libs/core/surface/channel-surface.ts#<module>",
+            "libs/core/surface/surface-runtime-orchestrator.ts#<module>",
+            "libs/core/surface/surface-runtime-conversation-data.ts#handleSurfaceQueryRoute",
+            "libs/core/knowledge/knowledge-index.ts#queryKnowledgeHybrid",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {
@@ -10659,6 +10986,21 @@
             "libs/core/mission/mission-creation.ts#createMission"
           ]
         },
+        "memory_provenance_reader": {
+          "example_path": [
+            "scripts/run_mission_orchestration_event_worker.ts#main",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#processMissionOrchestrationEventPath",
+            "libs/core/mission/mission-orchestration-lifecycle-handlers.ts#handleMissionIssueRequested",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#buildNeedsKnowledgeReinforcementLines",
+            "libs/core/knowledge/distill-knowledge-injector.ts#findRelevantDistilledKnowledge",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
+          ]
+        },
         "metrics_cap_reader": {
           "example_path": [
             "presence/displays/terminal-hud/src/index.ts#<module>",
@@ -11071,6 +11413,17 @@
             "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#createMission"
+          ]
+        },
+        "memory_provenance_reader": {
+          "example_path": [
+            "satellites/voice-hub/server.ts#<module>",
+            "libs/core/surface/channel-surface.ts#<module>",
+            "libs/core/surface/surface-runtime-orchestrator.ts#<module>",
+            "libs/core/surface/surface-runtime-conversation-data.ts#handleSurfaceQueryRoute",
+            "libs/core/knowledge/knowledge-index.ts#queryKnowledgeHybrid",
+            "libs/core/knowledge/memory-provenance.ts#createMemoryEligibilityResolver",
+            "libs/core/knowledge/memory-provenance.ts#load"
           ]
         },
         "metrics_cap_reader": {

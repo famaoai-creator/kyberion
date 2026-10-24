@@ -152,6 +152,10 @@ describe('attemptAutonomousRepair (AR-01 Task 4)', () => {
   });
 
   it('returns false when post-repair validation still fails', async () => {
+    validateAndRepairAdfMock.mockImplementation(async (_path, _schema, options) => {
+      await options.postRepairValidation?.();
+      return { repaired: true };
+    });
     const repaired = await attemptAutonomousRepair({
       step: { op: 'file:write_file' },
       failure: { category: 'validation_error' },

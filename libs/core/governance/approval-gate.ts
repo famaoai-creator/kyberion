@@ -536,11 +536,9 @@ export function enforceApprovalGate(
 
     const expectedPayloadHash = computeApprovalPayloadHash(payload);
     const bindingMismatch =
-      matched.accountability?.finalDecision === 'human_only' &&
-      ((matched.accountability.payloadHash &&
-        matched.accountability.payloadHash !== expectedPayloadHash) ||
-        (matched.accountability.effectBinding &&
-          matched.accountability.effectBinding !== operationId));
+      (params.requireApproval === true || matched.accountability?.finalDecision === 'human_only') &&
+      (matched.accountability?.payloadHash !== expectedPayloadHash ||
+        matched.accountability?.effectBinding !== operationId);
 
     if (matched.status === 'approved' && !approvalExpired && !bindingMismatch) {
       auditChain.record({
@@ -579,7 +577,12 @@ export function enforceApprovalGate(
       operation: operationId,
       result: 'denied',
       reason: `Existing request is ${effectiveStatus}`,
-      metadata: { correlationId, intentId, requestId: matched.id, requestStatus: effectiveStatus },
+      metadata: {
+        correlationId,
+        intentId,
+        requestId: matched.id,
+        requestStatus: effectiveStatus,
+      },
     });
     trace?.addEvent('approval.blocked', {
       operation_id: operationId,
