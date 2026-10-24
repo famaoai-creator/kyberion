@@ -1,7 +1,17 @@
 /** Explicit targets signed by the accountable human; no wildcard matching. */
 export type ExternalOperationGrant =
-  | { operation_id: 'vcs:pr_create'; repository: string }
-  | { operation_id: 'vcs:pr_merge' | 'vcs:push'; repository: string; branch: string }
+  | {
+      operation_id: 'vcs:pr_create';
+      repository: string;
+      /** When 'private', confidential-tier runs may delegate to this verified-private repo. */
+      visibility?: 'private';
+    }
+  | {
+      operation_id: 'vcs:pr_merge' | 'vcs:push';
+      repository: string;
+      branch: string;
+      visibility?: 'private';
+    }
   | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string }
   | {
       operation_id: 'tenant:attest_provider';
@@ -23,10 +33,17 @@ export type ExternalOperationGrant =
 export interface DelegationTargetSpec {
   /** Canonical grant fields besides `operation_id` (sorted order in grants). */
   readonly fields: readonly string[];
+  /** Grant fields that may be present or absent (exact-match still applies when present). */
+  readonly optionalFields?: readonly string[];
   /** Normalize an effect into the raw grant object to match, or undefined. */
   readonly buildTarget: (effect: Record<string, unknown>) => unknown;
   /** Reputational class stamped on the delegated charter action. */
   readonly reputational_class: 'A' | 'B';
+}
+
+/** Verified-private repo markers flow from the effect into the grant target. */
+function privateVisibility(effect: Record<string, unknown>): { visibility: 'private' } | undefined {
+  return effect.repository_visibility === 'private' ? { visibility: 'private' } : undefined;
 }
 
 export function normalizeRepositoryTarget(rawUrl: string): string | undefined {
@@ -54,6 +71,7 @@ function normalizeBranch(raw: unknown): string | undefined {
 export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec> = {
   'vcs:pr_create': {
     fields: ['repository'],
+    optionalFields: ['visibility'],
     buildTarget: (effect) => {
       if (effect.body_source_tier !== 'public' && effect.body_source_tier !== 'inline')
         return undefined;
@@ -70,6 +88,7 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
         return {
           operation_id: 'vcs:pr_create',
           repository: `${url.origin}${url.pathname.replace(/\/$/, '')}`,
+          ...privateVisibility(effect),
         };
       } catch {
         return undefined;
@@ -79,6 +98,7 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
   },
   'vcs:pr_merge': {
     fields: ['repository', 'branch'],
+    optionalFields: ['visibility'],
     buildTarget: (effect) => {
       const repository = effect.repository as
         { url?: unknown; host?: unknown; slug?: unknown } | undefined;
@@ -95,6 +115,7 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
           operation_id: 'vcs:pr_merge',
           repository: `${url.origin}${url.pathname.replace(/\/$/, '')}`,
           branch: effect.baseRefName,
+          ...privateVisibility(effect),
         };
       } catch {
         return undefined;
@@ -104,13 +125,14 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
   },
   'vcs:push': {
     fields: ['repository', 'branch'],
+    optionalFields: ['visibility'],
     buildTarget: (effect) => {
       if (typeof effect.url !== 'string' || typeof effect.destination !== 'string')
         return undefined;
       const repository = normalizeRepositoryTarget(effect.url);
       const branch = normalizeBranch(effect.destination);
       if (!repository || !branch) return undefined;
-      return { operation_id: 'vcs:push', repository, branch };
+      return { operation_id: 'vcs:push', repository, branch, ...privateVisibility(effect) };
     },
     reputational_class: 'A',
   },
@@ -222,26 +244,31 @@ export function parseExternalOperationGrant(raw: unknown): ExternalOperationGran
   if (typeof op !== 'string') return undefined;
   const spec = EXTERNAL_OPERATION_DELEGATION[op];
   if (!spec) return undefined;
-  if (Object.keys(value).sort().join(',') !== ['operation_id', ...spec.fields].sort().join(','))
+  const allowed = new Set(['operation_id', ...spec.fields, ...(spec.optionalFields ?? [])]);
+  const keys = Object.keys(value);
+  if (keys.some((key) => !allowed.has(key)) || spec.fields.some((f) => !(f in value)))
     return undefined;
-  for (const field of spec.fields) {
+  for (const field of [...spec.fields, ...(spec.optionalFields ?? [])]) {
     const v = value[field];
+    if (v === undefined) continue;
     if (typeof v !== 'string' || v.includes('*') || v !== v.trim()) return undefined;
   }
   // URL/host-shaped fields normalize; literal claim fields (provider, plan,
   // basis, attested_by, tenant_slug, training_use) must match verbatim —
   // the grant is bound to one exact statement, not a family of claims.
   const normalized: Record<string, string | undefined> = {};
-  for (const field of spec.fields) {
-    const v = value[field] as string;
+  for (const field of [...spec.fields, ...(spec.optionalFields ?? [])]) {
+    const raw = value[field] as string | undefined;
+    if (raw === undefined) continue;
+    if (field === 'visibility' && raw !== 'private') return undefined;
     normalized[field] =
       field === 'repository'
-        ? normalizeRepositoryUrl(v)
+        ? normalizeRepositoryUrl(raw)
         : field === 'branch'
-          ? normalizeBranch(v)
+          ? normalizeBranch(raw)
           : field === 'origin'
-            ? normalizeOrigin(v)
-            : v;
+            ? normalizeOrigin(raw)
+            : raw;
   }
   if (Object.values(normalized).some((v) => !v)) return undefined;
   if (op === 'tenant:attest_provider' && normalized.training_use !== 'none') return undefined;
