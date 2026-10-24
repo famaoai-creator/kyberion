@@ -2,6 +2,17 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
+// Transport mechanics are isolated here; exact schema/approval admission is
+// exercised against a fake SDK client in service-mcp-execution.test.ts.
+vi.mock('./service-mcp-execution.js', () => ({
+  connectGovernedMcpServer: (_server: unknown, connect: () => Promise<unknown>) => connect(),
+  executeGovernedMcpTool: (
+    client: { callTool: (request: unknown) => Promise<unknown> },
+    _server: unknown,
+    name: string,
+    args: unknown
+  ) => client.callTool({ name, arguments: args }),
+}));
 
 // Matches the "overlay exists" branch of the fixture paths below. Declared
 // via vi.hoisted so the vi.mock factories can close over it.
@@ -278,7 +289,9 @@ describe('executeServicePreset', () => {
         },
         notion: { preset_path: 'p.json', base_url: 'https://api.notion.com/v1' },
         canva: { preset_path: 'canva.json', base_url: 'https://api.canva.com/rest/v1' },
-        youtube: { preset_path: 'knowledge/product/orchestration/service-presets/youtube.json' },
+        youtube: {
+          preset_path: 'knowledge/product/orchestration/service-presets/youtube.json',
+        },
         xapi: {
           preset_path: 'knowledge/product/orchestration/service-presets/xapi.json',
           allow_unsafe_cli: true,
@@ -300,7 +313,12 @@ describe('executeServicePreset', () => {
               type: 'auto',
               alternatives: [
                 { type: 'cli', command: 'missing-cli', args: ['run'] },
-                { type: 'api', path: 'action', method: 'GET', output_mapping: { res: 'data.id' } },
+                {
+                  type: 'api',
+                  path: 'action',
+                  method: 'GET',
+                  output_mapping: { res: 'data.id' },
+                },
               ],
             },
           },
@@ -364,7 +382,9 @@ describe('executeServicePreset', () => {
       'outcome is unknown'
     );
     expect(mocks.secureFetch).toHaveBeenCalledTimes(1);
-    expect(mocks.retry).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { maxRetries: 0 });
+    expect(mocks.retry).toHaveBeenCalledExactlyOnceWith(expect.any(Function), {
+      maxRetries: 0,
+    });
   });
 
   it('never retries an opaque CLI operation even with read metadata', async () => {
@@ -390,14 +410,18 @@ describe('executeServicePreset', () => {
       'transport closed'
     );
     expect(mocks.safeExec).toHaveBeenCalledTimes(1);
-    expect(mocks.retry).toHaveBeenCalledExactlyOnceWith(expect.any(Function), { maxRetries: 0 });
+    expect(mocks.retry).toHaveBeenCalledExactlyOnceWith(expect.any(Function), {
+      maxRetries: 0,
+    });
   });
 
   it('withholds provider secrets when propagating ambiguous authenticated mutations', async () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) =>
       filePath.includes('mock/path.json')
-        ? JSON.stringify({ operations: { send: { type: 'api', path: 'send', method: 'POST' } } })
+        ? JSON.stringify({
+            operations: { send: { type: 'api', path: 'send', method: 'POST' } },
+          })
         : ''
     );
     mocks.resolveServiceBinding.mockReturnValue({
@@ -417,7 +441,9 @@ describe('executeServicePreset', () => {
     const { executeServicePreset } = await import('./service-engine.js');
     mocks.safeReadFile.mockImplementation((filePath: string) =>
       filePath.includes('mock/path.json')
-        ? JSON.stringify({ operations: { read: { type: 'api', path: 'items', method: 'GET' } } })
+        ? JSON.stringify({
+            operations: { read: { type: 'api', path: 'items', method: 'GET' } },
+          })
         : ''
     );
     mocks.secureFetch
@@ -1292,7 +1318,10 @@ describe('executeServicePreset', () => {
     });
     mocks.checkBinary.mockResolvedValue(true);
     mocks.safeExec.mockReturnValue(
-      JSON.stringify({ name: 'spaces/abc123', meetingUri: 'https://meet.google.com/abc-defg-hij' })
+      JSON.stringify({
+        name: 'spaces/abc123',
+        meetingUri: 'https://meet.google.com/abc-defg-hij',
+      })
     );
 
     await expect(

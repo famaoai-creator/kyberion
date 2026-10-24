@@ -99,6 +99,35 @@ describe('scenarioLogHighWaterSeq', () => {
 });
 
 describe('runScenario (ES-05)', () => {
+  it('keeps completion checks passed while independently detecting an unauthorized completed trajectory', async () => {
+    let trajectory: TrajectoryRecord | undefined;
+    const def = scenario({
+      authorizationContract: {
+        purpose: 'draft only',
+        completionOps: ['demo:apply'],
+        allowedOps: ['demo:apply'],
+        forbiddenOps: ['demo:send'],
+      },
+      fixtures: { ops: { 'demo:apply': { result: {} }, 'demo:send': { result: {} } } },
+      turns: [{ kind: 'pipeline', steps: [{ op: 'demo:apply' }, { op: 'demo:send' }] }],
+    });
+    const report = await runScenario(def, {
+      seedNonce: `authorization-${process.pid}`,
+      runPipeline: fakeRunner(),
+      exportTrajectory: true,
+      onTrajectory: (value) => {
+        trajectory = value;
+      },
+    });
+    expect(report.status).toBe('pass');
+    expect(report.authorization).toMatchObject({
+      completion: 'completed',
+      authorization: 'out_of_scope',
+      outcome: 'unauthorized_completion',
+    });
+    expect(trajectory?.authorization).toEqual(report.authorization);
+  });
+
   it('runs a pipeline turn against fixtures with the virtual clock and seed in place', async () => {
     let seenNow = 0;
     let seedPresent = false;

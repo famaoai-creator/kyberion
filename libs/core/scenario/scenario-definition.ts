@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { compileSchema } from '../foundation/ajv.js';
 import { readJson } from '../foundation/json.js';
 import { pathResolver } from '../path-resolver.js';
+import type { ScenarioAuthorizationContract } from './scenario-authorization.js';
 
 const SCENARIO_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/kyberion-scenario.schema.json'
@@ -190,6 +191,8 @@ export interface ScenarioDefinition {
   fixtures: ScenarioFixtures;
   turns: readonly ScenarioTurn[];
   finalChecks: readonly ScenarioFinalCheck[];
+  /** Evaluation scope only; never an execution grant. */
+  authorizationContract?: ScenarioAuthorizationContract;
 }
 
 /** Raw, not-yet-defaulted shape as read off disk — `lane` may be absent. */

@@ -1,8 +1,13 @@
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { aroundEach, beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { randomUUID } from 'node:crypto';
 import { resetOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { ExternalOperationAuthority } from '@agent/core/governance/external-operation';
-import { withExternalOperationPipelineRun } from '@agent/core/governance/external-operation';
+import {
+  withExternalOperationPipelineRun,
+  withOperationArgumentOrigins,
+} from '@agent/core/governance/external-operation';
+import { computeApprovalPayloadHash } from '@agent/core/governance/approval-presentation';
+import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 
 const mocks = vi.hoisted(() => ({
   gate: vi.fn(),
@@ -11,6 +16,14 @@ const mocks = vi.hoisted(() => ({
   binding: vi.fn(),
 }));
 vi.mock('@agent/core/governance/approval-gate', () => ({ enforceApprovalGate: mocks.gate }));
+vi.mock('@agent/core/governance/approval-store', async (original) => ({
+  ...(await original<typeof import('@agent/core/governance/approval-store')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = mocks.gate.mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
 vi.mock('@agent/core/governance/audit-chain', () => ({ auditChain: { record: mocks.audit } }));
 vi.mock('@agent/core/service/service-binding-registry', async (original) => ({
   ...(await original<typeof import('@agent/core/service/service-binding-registry')>()),
@@ -75,6 +88,18 @@ const action = (name = 'write') => ({
 });
 
 describe('service shared external admission', () => {
+  aroundEach((runTest) =>
+    withOperationArgumentOrigins(
+      [
+        {
+          path: ['params'],
+          value_hash: computeApprovalPayloadHash({ value: {} }),
+          authority: 'policy',
+        },
+      ],
+      runTest
+    )
+  );
   it('rejects resumable nested calls including binding-gated reads before partial execution', async () => {
     mocks.execute.mockClear();
     const step = { op: 'preset', params: { service_id: 'github', action: 'write', params: {} } };
@@ -94,6 +119,7 @@ describe('service shared external admission', () => {
   });
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubEnv('KYBERION_ALLOW_UNSAFE_CLI', 'false');
     authority.invocationId = randomUUID();
     delete process.env.MISSION_ID;
     mocks.gate.mockReturnValue({ allowed: false, status: 'human_required' });
@@ -101,7 +127,10 @@ describe('service shared external admission', () => {
     mocks.binding.mockReset();
     mocks.binding.mockReturnValue({ bindingId: 'binding-acme', approvalRequired: true });
   });
-  afterEach(() => resetOpPreflight());
+  afterEach(() => {
+    resetOpPreflight();
+    vi.unstubAllEnvs();
+  });
 
   it('blocks writes with no authority and ignores forged params and context', async () => {
     for (const forged of [
@@ -120,7 +149,11 @@ describe('service shared external admission', () => {
   });
 
   it('forwards trusted tenant-bound charter authority', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'delegated' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     await handleAction(action(), undefined, { externalAuthority: () => authority });
     expect(mocks.gate).toHaveBeenCalledWith(
       expect.objectContaining({ agentId: 'worker', charter: authority.charter })
@@ -128,13 +161,20 @@ describe('service shared external admission', () => {
     expect(mocks.execute).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps opaque MCP and destructive operations outside charter delegation', async () => {
-    for (const input of [action('delete'), { ...action(), mode: 'MCP' as const }]) {
-      await expect(
-        handleAction(input, undefined, { externalAuthority: () => authority })
-      ).rejects.toThrow('EXTERNAL_APPROVAL_REQUIRED');
-    }
+  it('keeps destructive operations outside charter delegation', async () => {
+    await expect(
+      handleAction(action('delete'), undefined, { externalAuthority: () => authority })
+    ).rejects.toThrow('EXTERNAL_APPROVAL_REQUIRED');
     expect(mocks.gate.mock.calls.every(([input]) => !input.charter)).toBe(true);
+    expect(mocks.execute).not.toHaveBeenCalled();
+  });
+  it('preserves the CLI startup floor before the guarded inner MCP transport', async () => {
+    await expect(
+      handleAction({ ...action(), mode: 'MCP' as const }, undefined, {
+        externalAuthority: () => authority,
+      })
+    ).rejects.toThrow('CLI execution disabled');
+    expect(mocks.gate).not.toHaveBeenCalled();
     expect(mocks.execute).not.toHaveBeenCalled();
   });
 
@@ -153,7 +193,11 @@ describe('service shared external admission', () => {
     [{ ok: false }, 'failed'],
     [{ issue_id: 42 }, 'unknown'],
   ] as const)('records outcome %s as %s', async (result, outcome) => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'delegated' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     mocks.execute.mockResolvedValue(result);
     await handleAction(action(), undefined, { externalAuthority: () => authority });
     expect(mocks.audit).toHaveBeenCalledWith(
@@ -162,7 +206,11 @@ describe('service shared external admission', () => {
   });
 
   it('resolves trusted authority for each pipeline step and never replays an ambiguous effect', async () => {
-    mocks.gate.mockReturnValue({ allowed: true, status: 'delegated' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     mocks.execute
       .mockResolvedValueOnce({ ok: true })
       .mockRejectedValueOnce(new Error('connection lost after send'));
@@ -202,7 +250,11 @@ describe('service shared external admission', () => {
 
   it('uses common admission to satisfy binding approval and issues an opaque engine capability', async () => {
     process.env.MISSION_ID = 'mission-binding';
-    mocks.gate.mockReturnValue({ allowed: true, status: 'delegated' });
+    mocks.gate.mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     await handleAction(boundAction(), undefined, { externalAuthority: () => authority });
     expect(mocks.gate).toHaveBeenCalledWith(
       expect.objectContaining({ charter: authority.charter })

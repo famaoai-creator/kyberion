@@ -26,6 +26,15 @@ vi.mock('../pipeline/op-preflight.js', async (original) => ({
 vi.mock('../pipeline/op-preflight-defaults.js', () => ({ ensureDefaultOpPreflight: vi.fn() }));
 
 import { enforceApprovalGate } from '../governance/approval-gate.js';
+import { externalApprovalFixture } from '../../../tests/helpers/external-approval-fixture.js';
+vi.mock('../governance/approval-store.js', async (original) => ({
+  ...(await original<typeof import('../governance/approval-store.js')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
 import { auditChain } from '../governance/audit-chain.js';
 import { reserveExternalOperation } from '../governance/external-operation-store.js';
 import { runOpPreflight } from '../pipeline/op-preflight.js';
@@ -129,7 +138,11 @@ describe('email external governance at provider boundaries', () => {
       'EXTERNAL_APPROVAL_REQUIRED'
     );
     expect(send).not.toHaveBeenCalled();
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     await withExternalOperationAuthority(
       () => authority,
       () => sendEmail({ ...message, backend: 'governed-custom' })
@@ -138,7 +151,11 @@ describe('email external governance at provider boundaries', () => {
   });
 
   it('records SMTP recipient refusal as unknown and never retries the partial send', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     vi.mocked(spawn).mockImplementation(() => {
       const child = Object.assign(new EventEmitter(), {
         stdin: Object.assign(new EventEmitter(), { end: vi.fn() }),
@@ -170,7 +187,11 @@ describe('email external governance at provider boundaries', () => {
   });
 
   it('uses configured backend/account defaults and executes one admitted send', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     const resolver = vi.fn(() => authority);
     const result = await withExternalOperationAuthority(resolver, () => sendEmail(message));
     expect(result.status).toBe('succeeded');
@@ -193,7 +214,11 @@ describe('email external governance at provider boundaries', () => {
   });
 
   it('records ambiguous transport failure without retrying or fabricating actuator success', async () => {
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
     vi.mocked(spawn).mockImplementation(() => {
       const child = Object.assign(new EventEmitter(), {
         stdin: Object.assign(new EventEmitter(), { end: vi.fn() }),

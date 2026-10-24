@@ -1,5 +1,6 @@
 import { assertNoHumanClaim, withExecutionIdentityLock } from './execution-claim-fence.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { currentOperationInterface, operationInterfaceResolver } from './operation-protection.js';
 import { createHash, createHmac } from 'node:crypto';
 import { resolveAuditChainKey } from '../chain-integrity.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -140,9 +141,18 @@ function hash(value: unknown): string {
 }
 export function delegatedExecutionBindingHash(target: DelegatedExecutionTarget): string {
   const normalized = normalizeDelegatedTarget(target);
+  const operationInterface =
+    currentOperationInterface() ??
+    (normalized.operationId.startsWith('service:preset:')
+      ? operationInterfaceResolver({
+          op: 'service:preset',
+          manifestPath: 'libs/actuators/service-actuator/manifest.json',
+        })()
+      : undefined);
   return hash({
     target: normalized,
     effectConfigurationHash: delegatedExecutionEffectConfigurationHash(normalized),
+    ...(operationInterface ? { interface: operationInterface } : {}),
   });
 }
 
@@ -416,7 +426,10 @@ function evaluate(
   const now = options.now ?? new Date();
   const { mapping, charter: facts, mappingHash } = resolveFacts(target, options);
   const charter = findActiveCharter(scope(target), now, options)!;
-  const policy = resolveApprovalPolicy({ intentId: target.operationId, payload: target.params });
+  const policy = resolveApprovalPolicy({
+    intentId: target.operationId,
+    payload: target.params,
+  });
   if (!isCharterEligiblePolicy(policy)) throw new Error('hardened approval floor');
   const matrix = evaluateDecisionRights(resolveDecisionRightsMatrix(target.tenantSlug), {
     decisionType: mapping.decision_type,
@@ -443,7 +456,7 @@ function evaluate(
       prior.charter.charter_id !== charter.charter_id ||
       prior.permit.charter_sha256 !== hash(charter) ||
       prior.permit.mapping_sha256 !== mappingHash ||
-      prior.permit.binding_hash !== hash(target) ||
+      prior.permit.binding_hash !== delegatedExecutionBindingHash(target) ||
       Date.parse(prior.permit.expires_at) <= now.getTime() ||
       reservations.length !== 1
     )
@@ -460,7 +473,10 @@ function evaluate(
     charter,
     action: facts.action,
     usage,
-    availability: options.availability ?? { accountable_available: false, available_deputies: [] },
+    availability: options.availability ?? {
+      accountable_available: false,
+      available_deputies: [],
+    },
     now,
   });
   if (!['allow', 'allow_notify'].includes(decision.decision))
@@ -495,7 +511,7 @@ export function authorizeDelegatedExecution(
             kind: 'delegated_execution',
             ts: now.toISOString(),
             permit_id: id(target),
-            binding_hash: hash(target),
+            binding_hash: delegatedExecutionBindingHash(target),
             charter_sha256: hash(charter),
             mapping_sha256: mappingHash,
             operation_id: target.operationId,

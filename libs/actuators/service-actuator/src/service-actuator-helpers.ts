@@ -24,7 +24,11 @@ import { resolveServiceBinding } from '@agent/core/service/service-binding';
 import { authorizeTenantServiceBinding } from './service-actuator-tenant-binding.js';
 import * as pathResolver from '@agent/core/path-resolver';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
-import { executeServicePreset, executeMcp } from '@agent/core/service/service-engine';
+import {
+  executeServicePreset,
+  executeMcp,
+  type McpApprovalContinuation,
+} from '@agent/core/service/service-engine';
 import { ServiceEffectOutcomeUnknownError } from '@agent/core/service/service-engine-helpers';
 import { issueTenantServiceEngineAdmission } from '@agent/core/service/service-engine-admission';
 import {
@@ -67,6 +71,9 @@ import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import {
   admitExternalOperation,
+  assertExternalOperationCommit,
+  operationInterfaceResolver,
+  withExternalOperationAuthority,
   assertExternalOperationBatchResumable,
   recordExternalOperationOutcome,
   type ExternalOperation,
@@ -106,6 +113,8 @@ export interface ServiceAction {
 }
 
 export interface ServiceActionExecutionOptions {
+  /** Trusted host-only bounded same-client approval continuation. */
+  mcpApprovalContinuation?: McpApprovalContinuation;
   /** Trusted embedding boundary; never populated from params/context. */
   externalAuthority?: (input: ServiceAction) => ExternalOperationAuthority | undefined;
   /** Trusted caller-side presence signal for approval-gated service actions. */
@@ -480,6 +489,10 @@ async function handleSingleAction(
     requiresApproval: effectDescription.requiresApproval || bindingAuthorization.approvalRequired,
     ...(scope ? { tenantSlug: resolveTenantAlias(scope) } : {}),
     authority: options.externalAuthority?.(input),
+    interface: operationInterfaceResolver({
+      op: `service:${input.mode.toLowerCase()}`,
+      manifestPath: 'libs/actuators/service-actuator/manifest.json',
+    }),
   };
   // Scope/introduction/egress validation happens before consuming a charter budget.
   logger.info(
@@ -556,11 +569,16 @@ async function handleSingleAction(
         assertUnsafeCliAllowed();
         const mcpCmd = String(input.params.command || 'npx');
         const mcpArgs = Array.isArray(input.params.args) ? input.params.args.map(String) : [];
-        return await executeMcp(mcpCmd, mcpArgs, {
-          action: input.params.mcp_action || 'call_tool',
-          name: input.action,
-          arguments: input.params.arguments || input.params,
-        });
+        return await executeMcp(
+          mcpCmd,
+          mcpArgs,
+          {
+            action: input.params.mcp_action || 'call_tool',
+            name: input.action,
+            arguments: input.params.arguments || input.params,
+          },
+          options.mcpApprovalContinuation
+        );
 
       case 'OAUTH':
         if (input.action === 'begin')
@@ -593,7 +611,9 @@ async function handleSingleAction(
   const invoke = async () => {
     // Main's delegated wrapper must establish the real exact execution proof
     // before the shared external boundary can reuse it without a second gate.
-    admitExternalOperation(external);
+    // MCP's connected-client boundary owns process startup and exact live
+    // tool admission. The generic service envelope cannot authorize callTool.
+    if (input.mode !== 'MCP') admitExternalOperation(external);
     if (bindingAuthorization.bindingId) {
       input = {
         ...input,
@@ -604,7 +624,12 @@ async function handleSingleAction(
         },
       };
     }
-    return egressContext ? await withEgressPayloadContext(egressContext, execute) : await execute();
+    if (input.mode !== 'MCP') assertExternalOperationCommit(external);
+    const executeScoped = () =>
+      egressContext ? withEgressPayloadContext(egressContext, execute) : execute();
+    return input.mode === 'MCP' && external.authority
+      ? await withExternalOperationAuthority(() => external.authority, executeScoped)
+      : await executeScoped();
   };
   let result: unknown;
   try {

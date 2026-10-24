@@ -41,6 +41,15 @@ import { currentScopeEnvelope } from '../scope-envelope.js';
 import { writeScopedArtifact } from '../workforce/artifact-store.js';
 import { findActiveCharter } from './accountability-charter-registry.js';
 import { enforceApprovalGate } from './approval-gate.js';
+import { externalApprovalFixture } from '../../../tests/helpers/external-approval-fixture.js';
+vi.mock('./approval-store.js', async (original) => ({
+  ...(await original<typeof import('./approval-store.js')>()),
+  evaluateApprovalUsability: () => null,
+  loadApprovalRequest: (_channel: string, id: string) => {
+    const params = vi.mocked(enforceApprovalGate).mock.calls.at(-1)?.[0];
+    return params ? externalApprovalFixture(params, id) : null;
+  },
+}));
 import {
   withExternalOperationAuthority,
   admitExternalOperation,
@@ -82,7 +91,11 @@ describe('trusted external authority at production pipeline dispatch', () => {
     vi.clearAllMocks();
     vi.mocked(currentScopeEnvelope).mockReturnValue(undefined);
     vi.mocked(findActiveCharter).mockReturnValue(null);
-    vi.mocked(enforceApprovalGate).mockReturnValue({ allowed: true, status: 'approved' });
+    vi.mocked(enforceApprovalGate).mockReturnValue({
+      allowed: true,
+      status: 'approved',
+      requestId: '00000000-0000-4000-8000-000000000001',
+    });
   });
 
   it('requires replay-stable identity only at a trusted resumable run boundary', () => {

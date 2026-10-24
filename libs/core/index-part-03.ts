@@ -230,7 +230,12 @@ export { transform, getValueByPath } from './transformer.js';
 
 export * as serviceEngine from './service/service-engine.js';
 
-export { executeServicePreset, executeMcp } from './service/service-engine.js';
+export {
+  executeServicePreset,
+  executeMcp,
+  withMcpStartupAttempt,
+} from './service/service-engine.js';
+export type { McpApprovalContinuation } from './service/service-engine.js';
 
 export * from './service/service-preset-registry.js';
 
