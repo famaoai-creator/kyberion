@@ -560,6 +560,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/ledger.ts#asTenantLedgerStore",
+      "roles": ["tenant_ledger_store"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/locale.ts#resolveScopedLocale",
       "roles": ["scope_locale_reader"],
       "unresolved": []
@@ -4173,6 +4178,14 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_ledger_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-control-data.ts#recordRuntimeRemediationArtifacts",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
+          ]
+        },
         "tool_runtime_policy_reader": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts#POST",
@@ -4673,6 +4686,30 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -5351,6 +5388,15 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_ledger_store": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/secrets/apply/route.ts#<module>",
+            "libs/core/secret/secret-introduction.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
+          ]
+        },
         "tool_runtime_policy_reader": {
           "example_path": [
             "presence/displays/concierge/src/app/api/me/route.ts#GET",
@@ -5456,6 +5502,7 @@
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime",
+        "tenant_ledger_store",
         "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
@@ -5479,6 +5526,16 @@
             "libs/core/surface/oidc-login-settings.ts#saveOidcLoginSettings",
             "libs/core/surface/oidc-login-settings.ts#ensureBrowserSessionKey",
             "libs/core/authn-browser-session-key.ts#browserSessionKey"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/dev_oidc_idp.ts#<module>",
+            "libs/core/surface/oidc-login-settings.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         }
       },
@@ -5864,6 +5921,25 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_ledger_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
+          ]
+        },
         "tool_runtime_policy_reader": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -5982,6 +6058,16 @@
             "libs/core/workforce/work-coordination.ts#<module>",
             "libs/core/workforce/work-coordination.ts#appendLeaseSnapshot",
             "libs/core/workforce/work-coordination.ts#appendJsonl"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/event_intake_surface.ts#<module>",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         }
       },
@@ -6178,6 +6264,21 @@
             "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
             "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
             "libs/core/surface/operator-notifications.ts#deliver"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#<module> [child process]",
+            "libs/core/governance.ts#<module>",
+            "libs/core/governance/approval-human-decision.ts#<module>",
+            "libs/core/agent-execution-context.ts#<module>",
+            "libs/core/reasoning/reasoning-provider-registry.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -6625,6 +6726,27 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -7092,6 +7214,20 @@
             "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/core/cowork-surface.ts#deliverToCowork"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -7728,6 +7864,15 @@
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
           ]
         },
+        "tenant_ledger_store": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
+          ]
+        },
         "tool_runtime_policy_reader": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -7992,6 +8137,16 @@
             "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
             "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
             "libs/core/surface/operator-notifications.ts#deliver"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         }
       },
@@ -8412,6 +8567,16 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "presence/displays/operator-surface/src/app/surfaces/page.tsx#SurfacesPage",
+            "libs/core/surface/surface-ux.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -8935,6 +9100,30 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
+          ]
+        },
         "tool_runtime_policy_reader": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -9359,6 +9548,16 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "libs/core/surface/surface-ux.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -9813,6 +10012,26 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_ledger_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
+          ]
+        },
         "tool_runtime_policy_reader": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -9926,6 +10145,16 @@
             "libs/core/locale.ts#resolveLocale",
             "libs/core/locale.ts#resolveWithoutExplicit",
             "libs/core/locale.ts#resolveScopedLocale"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/surface_runtime.ts#startSurfaceById",
+            "libs/core/pfc/ServiceValidator.ts#inspectServiceAuth",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         }
       },
@@ -10276,6 +10505,16 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -10711,6 +10950,25 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_ledger_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
+          ]
+        },
         "tool_runtime_policy_reader": {
           "example_path": [
             "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
@@ -10813,10 +11071,19 @@
             "libs/core/chronos-access-registry.ts#<module>",
             "libs/core/secret/secret-guard.ts#<module>",
             "libs/core/ledger.ts#<module>",
-            "libs/core/scope-migration.ts#<module>",
-            "libs/core/tool/runtime-scope.ts#<module>",
-            "libs/core/agent/agent-identity.ts#<module>",
             "libs/core/authority.ts#<module>"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "presence/bridge/terminal/server.ts#<module>",
+            "presence/bridge/terminal/auth.ts#<module>",
+            "libs/core/surface/surface-mutation-guard.ts#<module>",
+            "libs/core/chronos-access-registry.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         }
       },
@@ -11168,6 +11435,21 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#listAgentRuntimesViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
@@ -11593,6 +11875,22 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_ledger_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "libs/core/dot/dot-event-intake.ts#<module>",
+            "libs/core/secret/secret-guard.ts#<module>",
+            "libs/core/ledger.ts#<module>",
+            "libs/core/ledger.ts#record",
+            "libs/core/ledger.ts#asTenantLedgerStore"
           ]
         },
         "tool_runtime_policy_reader": {
