@@ -120,10 +120,45 @@ the KL-03 knowledge gate, then a **human external-publication approval**.
   candidate first (`pnpm kyberion memory promotion-queue`,
   `pnpm mission memory-reject <candidate-id> --tenant-slug <t> --note …
 --decided-by user:owner`) or declare it in `## Knowledge`.
-- `vcs:pr_create`/`vcs:pr_merge`/`vcs:push` are registry-delegable, but the
-  grant binds the _installed NHI in a public execution scope_ — a Devin/CLI
-  session (`agent:devin`) is a different actor and still hits the human gate
-  by design.
+- `vcs:pr_create`/`vcs:pr_merge`/`vcs:push` are registry-delegable. Org-scope
+  delegation is consumed only through an **admitted session** (below); a bare
+  `agent:devin`/`pipeline:<hash>` actor or a `KYBERION_NHI_ID` env claim still
+  hits the human gate by design.
+- `vcs:pr_create` additionally requires the PR body to carry **public
+  provenance**: an inline `--body` or a `--body-file` under `knowledge/public/`
+  or a `public` storage floor (e.g. `active/shared/artifacts/public/…`). A
+  body file in `active/shared/tmp/` resolves to `protected_or_unknown` and the
+  grant is never consulted — the destination grant must never declassify
+  source content.
+
+## 5a. NHI session admission (operator session → org NHI)
+
+The ceremony that lets a signed-in operator session (Devin CLI, terminal)
+execute delegated org-scope operations _as_ the tenant NHI:
+
+```bash
+# 1) request (org owner session; produces a human_only approval)
+pnpm onboarding nhi-session request --tenant <tenant> --nhi <nhi_id> [--ttl-hours 8]
+
+# 2) human approval — CLI or concierge passkey
+pnpm kyberion approvals --approve <request-id>
+
+# 3) apply → binds a session token to the NHI in the governed journal
+pnpm onboarding nhi-session apply --tenant <tenant> --request-id <id>
+#    prints: KYBERION_NHI_ACTOR=<nhi_id> KYBERION_NHI_SESSION=kns1.…
+
+# 4) export both vars for the session; delegated ops now attribute to the NHI
+export KYBERION_NHI_ACTOR=<nhi_id> KYBERION_NHI_SESSION=kns1.…
+```
+
+- Inspect: `pnpm onboarding nhi-session list --tenant <tenant>`; revoke:
+  `… revoke --tenant <t> --nhi <id> [--instance|--session <id>]` (no approval
+  needed — revocation is the safe direction; the journal records it).
+- Admission requires: registered NHI, `accountable_human_id` = the admitting
+  owner, affiliation to the tenant's organization, live (unexpired,
+  unreleased) binding. Expired/revoked bindings fail closed to the human gate.
+- `KYBERION_NHI_SESSION` is propagated through the PR-governance child host
+  (`governance-host.ts`); it selects a governed record — it cannot create one.
 
 ## 6. Mission close-out (direct work)
 

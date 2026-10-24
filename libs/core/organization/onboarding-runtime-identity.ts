@@ -6,7 +6,9 @@ import { resolveActiveProfileRoot } from '../profile-root.js';
 import { loadPersonalAgentIdentityAtPath } from '../personal-identity-state.js';
 import { getAgentIdentity, deriveAgentNhiId } from '../agent/agent-identity.js';
 import { parseNhiId } from '../nhi-id.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
+import { findLiveSessionAdmission, NHI_SESSION_ENV } from './nhi-session-admission.js';
 import { resolveMemberByPrincipal } from './member-registry.js';
 import type { CharterScope } from '../governance/accountability-charter.js';
 
@@ -64,6 +66,36 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
         !owner.memberships.some((m) => m.tenant_slug === scope.tenant_slug && m.role === 'owner')
       )
         return { ready: false, reason: 'operator_tenant_owner_required' };
+      if (scope.kind === 'organization') {
+        // Org-scoped delegated operations run under an admitted session, never
+        // the ambient personal profile: the process must claim an nhi_id that
+        // carries a live, governed runtime-instance binding for the claimed
+        // session token (issued by the nhi-session admission ceremony).
+        const claimedNhi = getRegisteredEnvText('KYBERION_NHI_ACTOR')?.trim();
+        const sessionId = getRegisteredEnvText(NHI_SESSION_ENV)?.trim();
+        if (!claimedNhi || !parseNhiId(claimedNhi) || !sessionId)
+          return { ready: false, reason: 'session_admission_required' };
+        const admitted = getAgentIdentity(claimedNhi);
+        if (!admitted || !['active', 'provisioned'].includes(admitted.lifecycle_status))
+          return { ready: false, reason: 'registered_non_suspended_agent_required' };
+        const binding = findLiveSessionAdmission(claimedNhi, sessionId, scope.tenant_slug);
+        if (!binding) return { ready: false, reason: 'session_admission_required' };
+        const ownerId = `user:${owner.member_id}`;
+        if (admitted.accountable_human_id !== ownerId)
+          return { ready: false, reason: 'agent_accountability_mismatch' };
+        if (
+          admitted.affiliation.tenant_slug !== scope.tenant_slug &&
+          admitted.affiliation.organization_id !== scope.tenant_slug
+        )
+          return { ready: false, reason: 'agent_tenant_mismatch' };
+        return {
+          ready: true,
+          ownerId,
+          agentId: admitted.nhi_id,
+          agentActive: admitted.lifecycle_status === 'active',
+          scope: structuredClone(scope),
+        };
+      }
       const profile = loadPersonalAgentIdentityAtPath(
         path.join(resolveActiveProfileRoot(), 'agent-identity.json')
       );
@@ -82,11 +114,8 @@ export function inspectInstalledOnboardingRuntime(scope: CharterScope): Installe
       const ownerId = `user:${owner.member_id}`;
       if (agent.accountable_human_id !== ownerId)
         return { ready: false, reason: 'agent_accountability_mismatch' };
-      if (
-        agent.affiliation.tenant_slug &&
-        (scope.kind !== 'organization' || agent.affiliation.tenant_slug !== scope.tenant_slug)
-      )
-        return { ready: false, reason: 'agent_tenant_mismatch' };
+      // Person scope admits only agents without a tenant affiliation.
+      if (agent.affiliation.tenant_slug) return { ready: false, reason: 'agent_tenant_mismatch' };
       return {
         ready: true,
         ownerId,

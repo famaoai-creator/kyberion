@@ -4160,6 +4160,10 @@
       "types": "./dist/organization/onboarding-runtime-identity.d.ts",
       "default": "./dist/organization/onboarding-runtime-identity.js"
     },
+    "./organization/nhi-session-admission": {
+      "types": "./dist/organization/nhi-session-admission.d.ts",
+      "default": "./dist/organization/nhi-session-admission.js"
+    },
     "./personal-identity-state": {
       "types": "./dist/personal-identity-state.d.ts",
       "default": "./dist/personal-identity-state.js"
