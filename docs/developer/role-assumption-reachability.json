@@ -1880,17 +1880,17 @@
     },
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
-      "roles": ["chronos_gateway"],
+      "roles": ["nhi_accountability_reader"],
       "unresolved": []
     },
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
-      "roles": ["chronos_gateway"],
+      "roles": ["chronos_localadmin"],
       "unresolved": []
     },
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["chronos_gateway"],
+      "roles": ["chronos_gateway", "chronos_localadmin"],
       "unresolved": []
     },
     {
@@ -3284,7 +3284,7 @@
     },
     {
       "site": "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked",
-      "roles": ["organization_operator"],
+      "roles": ["organization_operator", "sovereign"],
       "unresolved": []
     },
     {
@@ -3981,7 +3981,7 @@
         },
         "chronos_localadmin": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/lib/distill-candidate-scope.ts#listDistillCandidatesForViewer"
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>"
           ]
         },
         "chronos_operator": {
@@ -4198,6 +4198,20 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
@@ -4723,6 +4737,32 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
@@ -5456,6 +5496,24 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "sovereign": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "presence/displays/concierge/src/lib/first-run-server.ts#oidcRedirectUris",
@@ -6001,6 +6059,27 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
@@ -6838,6 +6917,29 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "sovereign": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "satellites/imessage-bridge/src/index.ts#<module>",
@@ -7370,6 +7472,20 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
@@ -8044,6 +8160,31 @@
             "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
             "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "scripts/run_baseline_check.ts#maybeSubmitJanitorMaintenanceJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
@@ -8798,6 +8939,24 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "sovereign": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "presence/displays/operator-surface/src/lib/surface-auth-route.ts#handleOperatorAuthRoute",
@@ -9348,6 +9507,32 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "sovereign": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "scripts/personal-pads/server.ts#<module>",
@@ -9826,6 +10011,20 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "sovereign": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
+            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
+            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "presence/displays/presence-studio/server.ts#<module>",
@@ -10301,6 +10500,28 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
@@ -10847,6 +11068,16 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "sovereign": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#<module>",
+            "scripts/pipeline-execution-part-control.ts#domainOps",
+            "scripts/pipeline-domain-ops.ts#runInlineOrganizationOperationTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "scripts/run_pipeline.ts#<module>",
@@ -11306,6 +11537,27 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
@@ -11841,6 +12093,23 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "sovereign": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#listAgentRuntimesViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
+          ]
+        },
         "sovereign_concierge": {
           "example_path": [
             "presence/displays/terminal-hud/src/index.ts#<module>",
@@ -12314,6 +12583,24 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "sovereign": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/dot_supervisor_extensions.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#<module>",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceStep",
+            "scripts/dot_org_cadence_step.ts#runDotOrgCadenceForCharter",
+            "scripts/dot_org_cadence_step.ts#defaultTick",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperation",
+            "scripts/organization_operation_execute.ts#executeOrganizationOperationLocked"
           ]
         },
         "sovereign_concierge": {
