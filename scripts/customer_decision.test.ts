@@ -1,4 +1,3 @@
-import { spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -8,6 +7,7 @@ import {
   safeMkdir,
   safeReadFile,
   safeRmSync,
+  safeSpawn,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { ScriptExitError } from '@agent/core/script-harness';
@@ -1290,13 +1290,13 @@ describe('customer-decision facade', () => {
     async () => {
       const { token } = await approvedAndSent();
       const view = await customerRun('view', { token });
-      let child: ReturnType<typeof spawn> | undefined;
+      let child: ReturnType<typeof safeSpawn> | undefined;
       let childOut = '';
       // Right after the respond pre-assigned its ledger ids (journal written,
       // ledger not yet), an operator `pnpm decisions propose` runs in another process.
       mocks.writeRespondJournal.mockImplementationOnce((...args: unknown[]) => {
         const written = mocks.real.writeRespondJournal!(...args);
-        child = spawn(
+        child = safeSpawn(
           process.execPath,
           [
             decisionsScript,
