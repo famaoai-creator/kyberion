@@ -33921,6 +33921,61 @@
         "en": "Try again",
         "ja": "もう一度試す",
         "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
+      },
+      "reject": {
+        "en": "Reject",
+        "ja": "却下する",
+        "qps-ploc": "⟦Řėĵėƈŧ ŀőř⟧"
+      },
+      "reject_hint": {
+        "en": "Tell us why. Our representative will contact you.",
+        "ja": "理由を書いてください。担当者からご連絡します。",
+        "qps-ploc": "⟦Ŧėŀŀ ůş ẇħẏ. Őůř řėṗřėşėñŧȧŧïṽė ẇïŀŀ ƈőñŧȧƈŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "reject_reason_missing": {
+        "en": "Please write why you are rejecting.",
+        "ja": "却下の理由をご記入ください。",
+        "qps-ploc": "⟦Ṗŀėȧşė ẇřïŧė ẇħẏ ẏőů ȧřė řėĵėƈŧïñɠ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "value_rejected": {
+        "en": "Rejected",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "draft_accept": {
+        "en": "Accept these results as delivered.",
+        "ja": "この成果をそのまま受け入れます。",
+        "qps-ploc": "⟦Ȧƈƈėṗŧ ŧħėşė řėşůŀŧş ȧş ḓėŀïṽėřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "attachments_heading": {
+        "en": "Screens",
+        "ja": "画面",
+        "qps-ploc": "⟦Şƈřėėñş ŀőř⟧"
+      },
+      "attachment_loading": {
+        "en": "Loading image…",
+        "ja": "画像を読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ïɱȧɠė… ŀőřė⟧"
+      },
+      "attachment_failed": {
+        "en": "This image could not be shown.",
+        "ja": "この画像は表示できませんでした。",
+        "qps-ploc": "⟦Ŧħïş ïɱȧɠė ƈőůŀḓ ñőŧ ƀė şħőẇñ. ŀőřėɱ ïṗşů⟧"
+      },
+      "attachment_caption": {
+        "en": "{name} ({size})",
+        "ja": "{name}（{size}）",
+        "qps-ploc": "⟦{name} ({size}) ŀőřė⟧"
+      },
+      "links_heading": {
+        "en": "Links",
+        "ja": "リンク",
+        "qps-ploc": "⟦Ŀïñķş ŀőř⟧"
+      },
+      "link_host": {
+        "en": "Opens {host} in a new tab",
+        "ja": "{host} を新しいタブで開きます",
+        "qps-ploc": "⟦Őṗėñş {host} ïñ ȧ ñėẇ ŧȧƀ ŀőřėɱ ïṗ⟧"
       }
     }
   }
