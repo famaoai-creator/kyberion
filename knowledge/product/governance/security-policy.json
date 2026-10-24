@@ -1038,6 +1038,21 @@
         "active/shared/runtime/external-operations/personal/shared/",
         "active/shared/tmp/personal/shared/vitest-external-operations/"
       ]
+    },
+    "deliverable_inbox_writer": {
+      "allow_read": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+      "allow_write": ["active/shared/inbox/", "active/shared/runtime/locks/"]
+    },
+    "archived_mission_state_reader": {
+      "allow_read": [
+        "active/archive/missions/confidential/${KYBERION_TENANT}/",
+        "active/archive/missions/personal/${KYBERION_TENANT}/"
+      ],
+      "allow_write": []
+    },
+    "customer_channel_binding_store": {
+      "allow_read": ["customer/${KYBERION_TENANT}/connections/channel-bindings.json"],
+      "allow_write": ["customer/${KYBERION_TENANT}/connections/"]
     }
   },
   "authority_permissions": {

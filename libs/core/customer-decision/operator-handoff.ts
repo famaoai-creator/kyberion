@@ -12,8 +12,9 @@
  * so they carry ids and counts only; the customer's text stays in the
  * confidential case (the receipt). Same identity rule as the CD-10 bolt
  * rejection (`mission/mission-bolt-review.ts`): the inbox is written as the
- * inbox store's own shared core writer (`surface_runtime`), because neither
- * the facade nor a tenant pipeline run has an inbox grant.
+ * inbox's own narrow writer (`deliverable_inbox_writer`: the inbox and its
+ * lock only), because neither the facade nor a tenant pipeline run has an
+ * inbox grant.
  *
  * Not exported from the customer-decision barrel: it pulls in the operator
  * notification stack, which the pure modules must not.
@@ -21,6 +22,7 @@
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { addInboxEntry, listInboxEntries } from '../deliverable-inbox.js';
+import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
 import { notifyOperatorWithReceiptSync } from '../surface/operator-notifications.js';
 import { t } from '../t.js';
 import type { AgendaReminderRecord } from './model.js';
@@ -31,8 +33,8 @@ import {
   type PlannedReminder,
 } from './reminders.js';
 
-/** Writes `active/shared/inbox/` (shared core role; the local-inbox delivery of operator-notifications.ts). */
-const INBOX_WRITER_ROLE = 'surface_runtime';
+/** Writes only the deliverable inbox and its lock (narrow shared core role). */
+const INBOX_WRITER_ROLE = DELIVERABLE_INBOX_WRITER_ROLE;
 
 export interface OperatorTaskNotice {
   inbox_entry_id: string;

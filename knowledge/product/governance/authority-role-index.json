@@ -2,6 +2,14 @@
   "$schema": "../schemas/authority-role-index.schema.json",
   "version": "1.0.0",
   "authority_roles": {
+    "archived_mission_state_reader": {
+      "description": "Archived mission state reader (libs/core/foundation/archived-mission-state-capability.ts): read-only, tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). libs/core/mission/mission-decision-lock.ts loadDecisionCaseMissionState assumes it to read one archived tenant mission's active/archive/missions/<personal|confidential>/<tenant>/<id>/mission-state.json, always inside an exact read-only capability naming that file (plus product schemas). No write, no other file of the mission folder or archive, no mission lifecycle authority (it replaces the borrowed mission_controller role on that read).",
+      "default_persona": "unknown",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["personal", "confidential"]
+    },
     "audit_mirror_writer": {
       "description": "G17 follow-up: dedicated store-writer of the audit chain's per-tenant mirror (customer/<tenant>/logs/audit/). libs/core/authority.ts registers it as the audit chain's tenant mirror writer context, always bound to the entry's tenant, so the grant resolves through ${KYBERION_TENANT} to that one tenant's mirror directory. Its only role grant is that write (no role read grant). Like every narrow store-writer role it runs with persona worker, so it also keeps the paths every worker identity has (security-policy default_allow and worker persona grants, e.g. active/shared/tmp/ and the current mission's evidence); it adds nothing else. Nothing else assumes it (resident dots and coordination store writers run as infrastructure_sentinel, which has no customer/ grant).",
       "default_persona": "worker",
@@ -116,6 +124,14 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
+    "customer_channel_binding_store": {
+      "description": "Customer channel binding storage (libs/core/foundation/customer-channel-binding-store-capability.ts): scripts/customer-channel/bindings.ts writeBindingChange (pnpm kyberion customer-channel bind|unbind) assumes it to read and write one tenant's customer/<tenant>/connections/channel-bindings.json; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). Its grant is the bound tenant's customer/<tenant>/connections/ directory; the tier guard narrows every write and mkdir to the bindings file and the directories leading to it. No connection secrets, no other customer/ file, no knowledge or runtime state (it replaces customer_create on that write).",
+      "default_persona": "unknown",
+      "write_scopes": ["customer/${KYBERION_TENANT}/connections/"],
+      "scope_classes": ["customer_overlay"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "customer_decision_consumer_store": {
       "description": "Customer decision consumer lock storage (CD-09, libs/core/mission/mission-decision-lock.ts): reads the bound tenant's decision case (decisions.jsonl, switches.jsonl, agendas/, consumers/) and writes only consumers/<consumer>.json under knowledge/confidential/<tenant>/decisions/<case>/. Requires an exact deny-only case capability (libs/core/foundation/customer-decision-consumer-capability.ts) naming every path before each operation; tenant-bound (libs/core/authority.ts TENANT_BOUND_READER_ROLES). No ledger, agenda, receipt, switch, invite or customers/ write authority.",
       "default_persona": "unknown",
@@ -182,6 +198,14 @@
       "scope_classes": ["knowledge_core"],
       "allowed_actuators": ["artifact-actuator"],
       "tier_access": ["confidential"]
+    },
+    "deliverable_inbox_writer": {
+      "description": "Deliverable inbox writer (libs/core/foundation/deliverable-inbox-writer-capability.ts): libs/core assumes it only to add an operator task to the deliverable inbox (active/shared/inbox/entries.jsonl, libs/core/deliverable-inbox.ts addInboxEntry) on behalf of a caller with no inbox grant: the CD-10 bolt-review rejection (libs/core/mission/mission-bolt-review.ts) and the CD-11 operator hand-off / manual reminder tasks (libs/core/customer-decision/operator-handoff.ts). Its grant is the inbox and the shared lock directory; the tier guard narrows every write and mkdir to the inbox entries file, its directory and the inbox's own deliverable-inbox-<sha256>.lock files. No other active/shared/runtime/ path, no knowledge, mission, approval or surface state.",
+      "default_persona": "unknown",
+      "write_scopes": ["active/shared/inbox/", "active/shared/runtime/locks/"],
+      "scope_classes": ["operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["public"]
     },
     "designer": {
       "description": "Visual identity and UX authority for interaction design and design-system stewardship.",

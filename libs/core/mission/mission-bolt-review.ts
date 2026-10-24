@@ -25,6 +25,7 @@ import {
   customerDecisionMilestoneCapability,
   type CustomerDecisionMilestoneAccess,
 } from '../foundation/customer-decision-milestone-capability.js';
+import { DELIVERABLE_INBOX_WRITER_ROLE } from '../foundation/deliverable-inbox-writer-capability.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { nowIso } from '../foundation/time.js';
 import { pathResolver } from '../path-resolver.js';
@@ -57,8 +58,8 @@ import { SATISFIED_PREREQUISITE_STATUSES } from './mission-state.js';
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
-/** Writes `active/shared/inbox/` (shared core role; the local-inbox delivery of operator-notifications.ts). */
-const INBOX_WRITER_ROLE = 'surface_runtime';
+/** Writes only the deliverable inbox and its lock (narrow shared core role). */
+const INBOX_WRITER_ROLE = DELIVERABLE_INBOX_WRITER_ROLE;
 
 function diagnosticCode(error: unknown): string {
   if (error instanceof WorkCoordinationError) return error.code;
@@ -286,8 +287,8 @@ export function notifyBoltReviewRejected(input: BoltRoutingInput): BoltRejectNot
   };
   const title = t('customer_decision:bolt_review_rejected_title', params);
   const body = t('customer_decision:bolt_review_rejected_body', params);
-  // The inbox store's own governed writer, as operator-notifications.ts writes
-  // the local inbox: the facade (customer-triggered respond) has no inbox grant.
+  // The inbox's own narrow writer: the facade (customer-triggered respond) has
+  // no inbox grant, and this role can write nothing else.
   withExecutionContext(INBOX_WRITER_ROLE, () =>
     addInboxEntry({
       entryId,

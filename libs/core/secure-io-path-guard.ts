@@ -4,7 +4,11 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
 import { assertSensitivePathAllowed } from './sensitive-path-policy.js';
-import { validateReadPermission, validateWritePermission } from './tier-guard.js';
+import {
+  validateReadPermission,
+  validateWritePermission,
+  type WriteContent,
+} from './tier-guard.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { vaultTargetIdentity } from './secret/vault-mount.js';
 
@@ -340,12 +344,13 @@ export function assertCanonicalWritable(
   resolved: string,
   displayPath: string,
   mode: CanonicalMode = 'follow',
-  operation: 'write' | 'mkdir' = 'write'
+  operation: 'write' | 'mkdir' = 'write',
+  content?: WriteContent
 ): string {
   const canonical = canonicalGuardPath(resolved, mode);
   if (canonical === path.resolve(resolved)) return canonical;
   assertSensitivePathAllowed(canonical, 'write', mediationProbe());
-  const guard = validateWritePermission(canonical, operation);
+  const guard = validateWritePermission(canonical, operation, content);
   if (!guard.allowed) {
     throw new Error(
       `[SECURITY] Write through symbolic link denied: ${displayPath} resolves to a location outside the caller's write scope${denialCode(guard.reason)}`
@@ -394,11 +399,23 @@ export function guardWritePath(
   return { resolved, canonical };
 }
 
-/** The literal half of guardWritePath, for callers that run the canonical check later. */
-export function guardLiteralWritePath(filePath: string, operation = 'write'): string {
+/**
+ * The literal half of guardWritePath, for callers that run the canonical check
+ * later. `content` is the whole new file (safeWriteFile): roles whose store
+ * rules are content rules are checked against it (tier-guard).
+ */
+export function guardLiteralWritePath(
+  filePath: string,
+  operation = 'write',
+  content?: WriteContent
+): string {
   assertSensitivePathAllowed(filePath, operation, mediationProbe());
   const resolved = pathResolver.resolve(filePath);
-  const guard = validateWritePermission(resolved, operation === 'mkdir' ? 'mkdir' : 'write');
+  const guard = validateWritePermission(
+    resolved,
+    operation === 'mkdir' ? 'mkdir' : 'write',
+    content
+  );
   if (!guard.allowed) throw new Error(guard.reason);
   return resolved;
 }

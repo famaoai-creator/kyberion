@@ -1,5 +1,17 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+
+const served = vi.hoisted(() => ({
+  defaultPrompt: vi.fn(async (): Promise<string> => '{"entries":[]}'),
+  last: null as null | { mode: string; provider?: string; failover: boolean },
+}));
+vi.mock('../reasoning/reasoning-backend.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../reasoning/reasoning-backend.js')>()),
+  getReasoningBackend: () => ({ name: 'installed-chain', prompt: served.defaultPrompt }),
+  getLastServedReasoningMode: () => served.last,
+}));
+
 import { generateAgendaDraft } from './draft.js';
+import { buildReasoningBackendForMode } from '../reasoning/reasoning-bootstrap.js';
 import type { DecisionAgenda } from './model.js';
 
 const NOW = '2026-10-24T01:00:00.000Z';
@@ -173,5 +185,54 @@ describe('generateAgendaDraft', () => {
       backend: fake('', 'stub'),
     });
     expect(out.agenda.entries[0].our_decision?.rationale).toBe('組織の既定値です。');
+  });
+});
+
+describe('generateAgendaDraft backend selection (D10)', () => {
+  const answer = JSON.stringify({
+    entries: [{ entry_id: 'perf', our_decision: { value: 'fast' } }],
+  });
+
+  it('sends the draft to the explicitly requested backend only, and records it', async () => {
+    served.defaultPrompt.mockClear();
+    const build = vi.fn((mode: string) => ({ backend: fake(answer, `shell-${mode}`), mode }));
+    const out = await generateAgendaDraft(agenda(), {
+      intentText: 'x',
+      now: NOW,
+      requestedBackend: 'claude-cli',
+      buildBackendForMode: build,
+    });
+    expect(build).toHaveBeenCalledWith('claude-cli');
+    expect(served.defaultPrompt).not.toHaveBeenCalled();
+    expect(out.generated).toBe(true);
+    expect(out.reasoning_backend).toEqual({ requested: 'claude-cli', used: 'claude-cli' });
+  });
+
+  it('uses no other provider when the requested backend is not available', async () => {
+    served.defaultPrompt.mockClear();
+    const out = await generateAgendaDraft(agenda(), {
+      intentText: 'x',
+      now: NOW,
+      requestedBackend: 'claude-cli',
+      buildBackendForMode: () => null,
+    });
+    expect(served.defaultPrompt).not.toHaveBeenCalled();
+    expect(out.generated).toBe(false);
+    expect(out.agenda.entries[0].our_decision?.value).toBe('standard');
+    expect(out.notes.some((note) => note.includes('claude-cli was requested'))).toBe(true);
+    expect(out.reasoning_backend).toEqual({ requested: 'claude-cli', used: null });
+  });
+
+  it('records the mode that actually served the installed chain (a failover shows)', async () => {
+    served.defaultPrompt.mockResolvedValueOnce(answer);
+    served.last = { mode: 'codex-cli', provider: 'codex', failover: true };
+    const out = await generateAgendaDraft(agenda(), { intentText: 'x', now: NOW });
+    served.last = null;
+    expect(out.reasoning_backend).toEqual({ used: 'codex-cli' });
+  });
+
+  it('builds no backend for a mode the policy does not know', () => {
+    expect(buildReasoningBackendForMode('no-such-backend')).toBeNull();
+    expect(buildReasoningBackendForMode('stub')).toBeNull();
   });
 });

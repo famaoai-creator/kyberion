@@ -380,6 +380,9 @@ export async function sendDealDocumentToCustomer(input: {
     binding: input.binding,
     title: `${input.kind === 'quote' ? 'お見積書' : '契約書ドラフト'} (${input.dealId} v${input.version})`, // i18n-exempt: Japanese quote/contract documents (QUOTE_DOCUMENT_LOCALE ja-JP) are a deliberate fixed-locale deliverable
     body,
+    // The approver reads the document in the tenant's deal folder; the shared
+    // approval store gets ids only (sendToCustomer).
+    contentSource: `deals/${input.dealId}/${input.kind}-v${input.version}.md`,
     correlationId: `${input.dealId}:${input.kind}-v${input.version}`,
     ...(input.hasHuman !== undefined ? { hasHuman: input.hasHuman } : {}),
     ...(input.hasUI !== undefined ? { hasUI: input.hasUI } : {}),
