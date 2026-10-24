@@ -33529,6 +33529,46 @@
         "en": "Next: draft a bolt review for the customer with: {command}",
         "ja": "次の一手: 顧客に送る bolt レビューの下書きを作る: {command}",
         "qps-ploc": "⟦Ñėẋŧ: ḓřȧƒŧ ȧ ƀőŀŧ řėṽïėẇ ƒőř ŧħė ƈůşŧőɱėř ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "reminder_before_due": {
+        "en": "Reminder: please answer “{title}” by {date}. Please open it from the link we sent you.",
+        "ja": "「{title}」へのご回答は {date} までにお願いいたします。お送りしたリンクから開いてください。",
+        "qps-ploc": "⟦Řėɱïñḓėř: ṗŀėȧşė ȧñşẇėř “{title}” ƀẏ {date}. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
+      "reminder_due": {
+        "en": "Today ({date}) is the answer date for “{title}”. Please open it from the link we sent you.",
+        "ja": "本日（{date}）は「{title}」へのご回答の目安日です。お送りしたリンクから開いてください。",
+        "qps-ploc": "⟦Ŧőḓȧẏ ({date}) ïş ŧħė ȧñşẇėř ḓȧŧė ƒőř “{title}”. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "reminder_override_closing": {
+        "en": "You can still change your answers to “{title}” until {date}. After that, the items you have not decided follow our proposal. Please open it from the link we sent you.",
+        "ja": "「{title}」のご回答は {date} まで変更できます。それ以降、まだお決めいただいていない項目はこちらの案で進めます。お送りしたリンクから開いてください。",
+        "qps-ploc": "⟦Ẏőů ƈȧñ şŧïŀŀ ƈħȧñɠė ẏőůř ȧñşẇėřş ŧő “{title}” ůñŧïŀ {date}. Ȧƒŧėř ŧħȧŧ, ŧħė ïŧėɱş ẏőů ħȧṽė ñőŧ ḓėƈïḓėḓ ƒőŀŀőẇ őůř ṗřőṗőşȧŀ. Ṗŀėȧşė őṗėñ ïŧ ƒřőɱ ŧħė ŀïñķ ẇė şėñŧ ẏőů. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ï⟧"
+      },
+      "reminder_outbound_title": {
+        "en": "Customer decision reminder {reminderId} for agenda {agendaId}",
+        "ja": "調整セット {agendaId} の顧客へのリマインド {reminderId}",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñ řėɱïñḓėř {reminderId} ƒőř ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "reminder_manual_title": {
+        "en": "Remind the customer yourself: agenda {agendaId}",
+        "ja": "顧客に手でリマインドしてください: 調整セット {agendaId}",
+        "qps-ploc": "⟦Řėɱïñḓ ŧħė ƈůşŧőɱėř ẏőůřşėŀƒ: ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "reminder_manual_body": {
+        "en": "Reminder {reminderId} ({kind}, {date}) for {actorId} in decision case {caseId} has no bound channel to use ({reason}). Remind the customer yourself, or set a channel with customer-decision actor-add --channel.",
+        "ja": "決定案件 {caseId} の {actorId} へのリマインド {reminderId}（{kind}、{date}）は、使える紐付け済みのチャネルがありません（{reason}）。顧客に手でリマインドするか、customer-decision actor-add --channel でチャネルを設定してください。",
+        "qps-ploc": "⟦Řėɱïñḓėř {reminderId} ({kind}, {date}) ƒőř {actorId} ïñ ḓėƈïşïőñ ƈȧşė {caseId} ħȧş ñő ƀőůñḓ ƈħȧññėŀ ŧő ůşė ({reason}). Řėɱïñḓ ŧħė ƈůşŧőɱėř ẏőůřşėŀƒ, őř şėŧ ȧ ƈħȧññėŀ ẇïŧħ ƈůşŧőɱėř-ḓėƈïşïőñ ȧƈŧőř-ȧḓḓ --ƈħȧññėŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "handoff_title": {
+        "en": "Customer answers to follow up: agenda {agendaId}",
+        "ja": "対応が必要な顧客の回答: 調整セット {agendaId}",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ȧñşẇėřş ŧő ƒőŀŀőẇ ůṗ: ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "handoff_body": {
+        "en": "Receipt {receiptId} in decision case {caseId}: {offOption} answer(s) outside the options, {comments} comment(s), {questions} general question(s). Read them in the case and follow up with the customer.",
+        "ja": "決定案件 {caseId} の決定記録 {receiptId}: 選択肢の外の回答 {offOption} 件、コメント {comments} 件、全体への質問 {questions} 件。案件で内容を確認し、顧客と調整してください。",
+        "qps-ploc": "⟦Řėƈėïṗŧ {receiptId} ïñ ḓėƈïşïőñ ƈȧşė {caseId}: {offOption} ȧñşẇėř(ş) őůŧşïḓė ŧħė őṗŧïőñş, {comments} ƈőɱɱėñŧ(ş), {questions} ɠėñėřȧŀ ɋůėşŧïőñ(ş). Řėȧḓ ŧħėɱ ïñ ŧħė ƈȧşė ȧñḓ ƒőŀŀőẇ ůṗ ẇïŧħ ŧħė ƈůşŧőɱėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       }
     },
     "customer_room": {
