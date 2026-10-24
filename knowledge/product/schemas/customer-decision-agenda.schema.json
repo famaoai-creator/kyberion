@@ -94,6 +94,33 @@
       "items": { "type": "string", "minLength": 1 },
       "uniqueItems": true
     },
+    "bolt_mission_id": {
+      "description": "CD-10: the mission (bolt) this agenda reviews (customer-decision bolt-review). Outside the content hash. The next mission of the case passes the bolt-after:<id> milestone when it starts.",
+      "type": "string",
+      "pattern": "^[A-Z0-9][A-Z0-9_-]{2,63}$"
+    },
+    "bolt_routing": {
+      "description": "CD-10: where the customer's bolt-review answers went (request_changes: a backlog WorkItem; reject: an operator notification). Ids only, outside the content hash.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["entry_id", "ref", "outcome", "at"],
+        "properties": {
+          "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+          "ref": {
+            "description": "The ledger decision id, or the receipt id of a change request.",
+            "type": "string",
+            "pattern": "^(D-[0-9]{4,}|rcp-[A-Za-z0-9][A-Za-z0-9_-]{3,80})$"
+          },
+          "outcome": { "type": "string", "enum": ["request_changes", "reject"] },
+          "work_item_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "notified_at": { "type": "string", "minLength": 1 },
+          "inbox_entry_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "at": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "created_at": { "type": "string", "minLength": 1 },
     "updated_at": { "type": "string", "minLength": 1 }
   },
@@ -190,6 +217,36 @@
               }
             }
           ]
+        },
+        "attachments": {
+          "description": "CD-10: images shown with the entry (bytes in the case under attachments/<id>.<ext>). In the content hash.",
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "name", "media_type", "bytes"],
+            "properties": {
+              "id": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "media_type": { "type": "string", "enum": ["image/png", "image/jpeg", "image/webp"] },
+              "bytes": { "type": "integer", "minimum": 1, "maximum": 524288 }
+            }
+          }
+        },
+        "links": {
+          "description": "CD-10: external links shown with the entry (public https URLs only; the facade refuses internal hosts). In the content hash.",
+          "type": "array",
+          "maxItems": 6,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["label", "url"],
+            "properties": {
+              "label": { "type": "string", "minLength": 1, "maxLength": 200 },
+              "url": { "type": "string", "pattern": "^https://", "maxLength": 2000 }
+            }
+          }
         }
       },
       "allOf": [

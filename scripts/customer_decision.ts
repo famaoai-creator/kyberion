@@ -16,7 +16,10 @@
  *   submit   --agenda <id> --by user:<member> [--role owner|approver]
  *   actor-add --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>]
  *   send     --agenda <id> --name <participant> --role decider|contributor --actor customer:<id> [--ttl-days 14] [--by user:<member>]
- *   status   [--agenda <id>]                            also completes interrupted responses; lists task proposals and held tasks
+ *   bolt-review --mission <MSN> --customer <slug> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>]
+ *            draft the review agenda of a finished mission (CD-10): one approval entry, open until the next bolt starts
+ *   status   [--agenda <id>]                            also completes interrupted responses; lists task proposals and held tasks;
+ *            retries the routing of bolt-review answers (request_changes → backlog WorkItem, reject → operator)
  *   confirm  --agenda <id> --entry <entry_id> --by user:<member>   confirm a customer decision on a requires_customer entry (approval gate)
  *   close    --agenda <id> --by user:<member> [--reason <text>]   stop taking answers; links answer `closed`
  *   withdraw --agenda <id> --by user:<member> [--reason <text>]   revoke the agenda's open invites and withdraw it
@@ -26,6 +29,8 @@
  * must match the invite when given):
  *   view     --tenant <slug>    stdin {"token"}
  *   respond  --tenant <slug>    stdin {"token","content_hash","answers":[...]}
+ *   attachment --tenant <slug>  stdin {"token","attachment_id"}  → {ok, media_type, bytes_base64}
+ *            only ids listed on the approved agenda the invite opens; anything else is `invalid_link`
  *
  * `send` prints the invite link once on stdout; the token is never written to
  * disk, logs or the audit chain. Delivering the link through a bound customer
@@ -39,8 +44,9 @@
  * Modules: `scripts/customer-decision/` — `common.ts` (arguments, roles,
  * audit, agenda helpers), `operator.ts` (draft … send), `operator-lifecycle.ts`
  * (status, confirm, close / withdraw, revoke), `reconcile.ts` (respond
- * completion and recovery), `customer-facing.ts` (view / respond),
- * `task-proposals.ts` (draft --from-tasks, the task part of status). This file
+ * completion and recovery), `customer-facing.ts` (view / respond / attachment),
+ * `task-proposals.ts` (draft --from-tasks, the task part of status),
+ * `bolt-review.ts` (CD-10 bolt-review draft and answer routing). This file
  * is the entry point; the room spawns `dist/scripts/customer_decision.js`.
  *
  * Consistency: every read → plan → write sequence on a case runs under the
@@ -81,6 +87,7 @@ import {
 } from './customer-decision/operator-lifecycle.js';
 import { runCustomerFacing } from './customer-decision/customer-facing.js';
 import { runCollectTaskProposals } from './customer-decision/task-proposals.js';
+import { runBoltReview } from './customer-decision/bolt-review.js';
 
 export {
   AGENDA_APPROVE_OPERATION,
@@ -95,7 +102,7 @@ export async function runCustomerDecision(
   argv: readonly string[],
   io: CustomerDecisionIo = {}
 ): Promise<unknown> {
-  const { verb, opts, flags } = parseCustomerDecisionArgs(argv);
+  const { verb, opts, flags, lists } = parseCustomerDecisionArgs(argv);
   const now = io.now ? io.now() : nowIso();
   switch (verb) {
     case 'help':
@@ -112,6 +119,8 @@ export async function runCustomerDecision(
       return runActorAdd(opts);
     case 'send':
       return runSend(opts, now);
+    case 'bolt-review':
+      return runBoltReview(opts, lists, io, now);
     case 'status':
       return runStatus(opts, now);
     case 'confirm':
@@ -123,6 +132,7 @@ export async function runCustomerDecision(
       return runRevoke(opts, now);
     case 'view':
     case 'respond':
+    case 'attachment':
       return runCustomerFacing(verb, opts, io, now);
     default:
       throw usageError(`unknown verb '${verb}'`);

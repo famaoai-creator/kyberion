@@ -202,6 +202,28 @@ status: active
 - **`requires_customer` の問いだけはタスクを判断待ちにする**。WorkItem は `blocked`（`blocked_reason: awaiting_customer_decision`）、タスクは `blocked` で、`evidence/task-clarification-<task>.json` には id と件数だけを書く。顧客の決定を運用者が確認すると（`confirm` の後の照合）、固定に解決を記録し、WorkItem の `metadata.customer_decision_hold` に解決した決定の id を書く。タスクの再実行は既存の再開（`pnpm mission resume <MISSION_ID>`、blocked のタスクを planned に戻す）で行う。worker はタスクを渡すたびに固定を作り直すが、タスク自身の提案（取り込み済み・解決済みを含む）は引き継ぐので、調整セットが閉じられた後でも同じ問いを聞き直さない。
 - **決定の案件がないミッション**では台帳に何も書かず、診断の警告を出す。`requires_customer` の問いは通常の `needs` として扱い（`needs_input` で止まる）、それ以外はこちらの案で進める。
 
+## CD-10 の実装設計（2026-10-24）
+
+**始め方**: bolt（ミッション）の完了で自動では送らない。顧客に見せる画面と要約は担当者が選ぶ（ミッションの evidence には社内の情報が混じるため）。`finish` は、ミッションに決定台帳の案件があれば、bolt レビューの下書きを作るコマンドを次の一手として示す。担当者は `customer-decision bolt-review --tenant <t> --case <case> --mission <MSN> --summary-file <path> [--attach <png|jpeg|webp>]... [--preview-url <https URL>] --customer <c>` で下書きを作り、既存の `submit`（承認ゲート）と `send` で送る。
+
+**調整セット**: ひな形 `bolt-review` の `approval` 項目 1 つ。問いは「この bolt の成果を受け入れますか」、背景が変更点の要約、こちらの決定は「受け入れ」。上書きの締め切りは `{kind: milestone, milestone: "bolt-after:<MSN>"}`。
+
+**次の bolt の着手**: `startMission` は、そのミッションの案件にある未完了の bolt レビューのうち、別の完了済みミッションの分について `bolt-after:<MSN>` を `milestones_passed` に足す（案件ロックの下）。着手は顧客の回答を待たない（こちらの決定で先に進む）。締め切りの後の顧客の回答は、既存の変更要求として扱う。
+
+**添付**: 項目の `attachments`（`{id: sha256, name, media_type, bytes}`）と `links`（`{label, url}`）。どちらも内容ハッシュに入る（顧客は見た物そのものを承認する）。画像は `decisions/<case>/attachments/<sha256>.<ext>` に置き、png・jpeg・webp だけ、1 枚 512 KB まで、1 項目 6 枚まで。リンクは https だけで、localhost・プライベート IP・`.local`・`.internal` は拒否する（社内の環境を公開しない）。
+
+**顧客向け画面**: 画像は facade の新しい動詞 `attachment`（招待トークンを stdin で受け、送付済みの調整セットの項目に載っている id だけを返す）を通して配る。画面は Bearer ヘッダつきで取得して `blob:` URL で表示する（`img-src` に `blob:` を足す、`nosniff`）。リンクは外部リンクとして `rel="noopener noreferrer"` で開く。
+
+**回答の行き先**: `approval` 項目に「却下」（`reject`、コメント必須）を足す。
+
+| 回答                          | 行き先                                                                                                                                                   |
+| ----------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 受け入れ（`approve`）         | 有効な決定になる。次の bolt はそのまま進む                                                                                                               |
+| 修正依頼（`request_changes`） | バックログの WorkItem を起票する（id は調整セット・項目・決定の id から決め、1 件にする）。WorkItem には id と件数だけを書き、顧客の文面は案件の側に残す |
+| 却下（`reject`）              | 担当者に知らせる（`notifyOperator` と受信箱）。WorkItem は作らない                                                                                       |
+
+行き先への反映は respond の後に行い、失敗しても顧客の回答は失敗させない（次の respond・`status` で再試行する）。
+
 ## 未決事項
 
 - 顧客向け画面内の対話ヒアリング（`requirements_hearing` モード）の入れ方（段階 1 の後）。
@@ -210,17 +232,18 @@ status: active
 
 段階 1（CD-01〜08）を実装した（ブランチ `feat/customer-decision-20261024`、ミッション `MSN-CUSTOMER-DECISION-20261024`）。
 
-| ID    | 状況                       | 実装の位置                                                                                                                                                                                                                              |
-| ----- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| CD-01 | 完了                       | `libs/core/customer-decision/{model,store,hash}.ts`、`customer-decision-{agenda,receipt,switch}.schema.json`                                                                                                                            |
-| CD-02 | 完了                       | `libs/core/customer-decision/effective.ts`（有効な決定・切り替わり・照合・上書きの可否）。承認済みの決定は編集中も `in_force` で効力を保つ                                                                                              |
-| CD-03 | 完了                       | `hearing-scenarios.json` の `aidlc_inception`、`customer-decision-templates/aidlc-inception.json`、語彙 `customer_decision:*`                                                                                                           |
-| CD-04 | 完了                       | `libs/core/customer-decision/{template,draft}.ts`、`customer-decision generate`。推論が使えないときは組織の既定値を案にする                                                                                                             |
-| CD-05 | 完了                       | `customer-decision submit`（承認ゲート、内容ハッシュ、こちらの決定を台帳の proposed として固定）                                                                                                                                        |
-| CD-06 | 完了                       | `libs/core/customer-decision/invite.ts`、権限 `customer_decision_invite_store`（招待の置き場だけに絞った capability）                                                                                                                   |
-| CD-07 | 完了（対話ヒアリングは未） | `presence/displays/customer-room/`。`hearing` 種別は自由記述で受ける                                                                                                                                                                    |
-| CD-08 | 完了                       | `libs/core/customer-decision/{respond,reflect}.ts`、`customer-decision respond`（台帳 → 決定記録 → 切り替わり → brief 入力・商談メモ）                                                                                                  |
-| CD-09 | 完了                       | `libs/core/customer-decision/consumption.ts`、`libs/core/mission/mission-decision-lock.ts`、`customer-decision draft --from-tasks`（ブランチ `feat/customer-decision-cd09-20261024`、ミッション `MSN-CUSTOMER-DECISION-CD09-20261024`） |
+| ID    | 状況                                 | 実装の位置                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| ----- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| CD-01 | 完了                                 | `libs/core/customer-decision/{model,store,hash}.ts`、`customer-decision-{agenda,receipt,switch}.schema.json`                                                                                                                                                                                                                                                                                                                                                         |
+| CD-02 | 完了                                 | `libs/core/customer-decision/effective.ts`（有効な決定・切り替わり・照合・上書きの可否）。承認済みの決定は編集中も `in_force` で効力を保つ                                                                                                                                                                                                                                                                                                                           |
+| CD-03 | 完了                                 | `hearing-scenarios.json` の `aidlc_inception`、`customer-decision-templates/aidlc-inception.json`、語彙 `customer_decision:*`                                                                                                                                                                                                                                                                                                                                        |
+| CD-04 | 完了                                 | `libs/core/customer-decision/{template,draft}.ts`、`customer-decision generate`。推論が使えないときは組織の既定値を案にする                                                                                                                                                                                                                                                                                                                                          |
+| CD-05 | 完了                                 | `customer-decision submit`（承認ゲート、内容ハッシュ、こちらの決定を台帳の proposed として固定）                                                                                                                                                                                                                                                                                                                                                                     |
+| CD-06 | 完了                                 | `libs/core/customer-decision/invite.ts`、権限 `customer_decision_invite_store`（招待の置き場だけに絞った capability）                                                                                                                                                                                                                                                                                                                                                |
+| CD-07 | 完了（対話ヒアリングは未）           | `presence/displays/customer-room/`。`hearing` 種別は自由記述で受ける                                                                                                                                                                                                                                                                                                                                                                                                 |
+| CD-08 | 完了                                 | `libs/core/customer-decision/{respond,reflect}.ts`、`customer-decision respond`（台帳 → 決定記録 → 切り替わり → brief 入力・商談メモ）                                                                                                                                                                                                                                                                                                                               |
+| CD-09 | 完了                                 | `libs/core/customer-decision/consumption.ts`、`libs/core/mission/mission-decision-lock.ts`、`customer-decision draft --from-tasks`（ブランチ `feat/customer-decision-cd09-20261024`、ミッション `MSN-CUSTOMER-DECISION-CD09-20261024`）                                                                                                                                                                                                                              |
+| CD-10 | 第 1 波完了（顧客向け画面は第 2 波） | `libs/core/customer-decision/bolt-review.ts`（添付の検査・リンクの検査・回答の行き先）、`libs/core/mission/mission-bolt-review.ts`（次の bolt の着手で `bolt-after:<MSN>`、`finish` の次の一手、WorkItem・担当者への通知）、権限 `customer_decision_milestone_store`（調整セットのファイルだけに絞った capability）、`customer-decision bolt-review` / `attachment`、ひな形 `bolt-review`、`approval` の `reject`（ブランチ `feat/customer-decision-cd10-20261024`） |
 
 第 2 回レビューの対応（2026-10-24）:
 
@@ -242,6 +265,7 @@ pnpm kyberion customer-decision send --tenant <t> --case <case> --agenda <id> --
 pnpm kyberion customer-decision status --tenant <t> --case <case> --agenda <id>
 pnpm kyberion customer-decision status --tenant <t> --case <case>   # タスクの提案と判断待ちのタスク（CD-09）
 pnpm kyberion customer-decision draft --tenant <t> --case <case> --from-tasks --customer <c>
+pnpm kyberion customer-decision bolt-review --tenant <t> --case <case> --mission <MSN> --customer <c> --summary-file <path> [--attach <png>]... [--preview-url <https URL>]   # CD-10
 pnpm kyberion customer-decision confirm --tenant <t> --case <case> --agenda <id> --entry <entry_id> --by user:<member>
 pnpm kyberion customer-decision close --tenant <t> --case <case> --agenda <id> --by user:<member>
 pnpm kyberion customer-decision withdraw --tenant <t> --case <case> --agenda <id> --by user:<member> --reason <text>
