@@ -361,6 +361,26 @@ function toCoreAttestation(input: ProviderAttestationInput) {
   };
 }
 
+/** The exact charter grant that delegates this claim via `pnpm onboarding authority`. */
+export function attestationDelegationGrant(
+  input: ProviderAttestationInput
+): Record<string, unknown> | undefined {
+  if (input.training_use !== 'none' || !input.plan || !input.basis || !input.attested_by)
+    return undefined;
+  return {
+    operation_id: 'tenant:attest_provider',
+    tenant_slug: input.tenant,
+    provider: input.provider,
+    training_use: 'none',
+    plan: input.plan.trim(),
+    basis: input.basis.trim(),
+    attested_by: input.attested_by.trim(),
+  };
+}
+
+const DELEGATION_HINT =
+  'To let the installed agent apply this exact claim (including renewals), grant it to a charter: put delegation_grant into {scope_kind:"person",mode:"grant",grants:[…]} and run `pnpm onboarding authority preview --file <plan>` → request → approve → apply.';
+
 /** Open (or reuse) the human approval a `training_use: none` attestation needs. */
 export function requestProviderAttestationApproval(
   input: ProviderAttestationInput
@@ -533,10 +553,16 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     ]
       .map(shellQuoteArg)
       .join(' ');
+    const delegationGrant = attestationDelegationGrant(input);
     print(
       json
         ? JSON.stringify(
-            { ...request, apply_command: applyCommand, apply_command_shell: 'posix' },
+            {
+              ...request,
+              apply_command: applyCommand,
+              apply_command_shell: 'posix',
+              ...(delegationGrant ? { delegation_grant: delegationGrant } : {}),
+            },
             null,
             2
           )
@@ -544,6 +570,9 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
             `${request.created ? 'Opened' : 'Reusing'} approval request ${request.request_id} (${request.status}${request.expires_at ? `, expires ${request.expires_at}` : ''})`,
             `A human decides with: ${request.approve_command}`,
             `Then apply with the same values (POSIX shell: sh/bash/zsh): ${applyCommand}`,
+            ...(delegationGrant
+              ? [DELEGATION_HINT, `delegation_grant: ${JSON.stringify(delegationGrant)}`]
+              : []),
           ].join('\n')
     );
     return;
@@ -580,6 +609,7 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
 
   const recorded = applyProviderAttestation(input);
   const availability = availabilityFor(tenant, options);
+  const delegationGrant = attestationDelegationGrant(input);
   const output = {
     applied: true,
     tenant,
@@ -587,6 +617,8 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
     attestation: recorded.attestation,
     profile_path: recorded.profile_path,
     ...(recorded.approval ? { approval: recorded.approval } : {}),
+    ...(recorded.delegation ? { delegation: recorded.delegation } : {}),
+    ...(delegationGrant && !recorded.delegation ? { delegation_grant: delegationGrant } : {}),
     availability,
   };
   print(
@@ -594,7 +626,8 @@ function attest(argv: readonly string[], print: Print, options: OnboardingLlmOpt
       ? JSON.stringify(output, null, 2)
       : [
           `Attested tenant=${tenant} provider=${provider} training_use=${recorded.attestation.training_use}${recorded.attestation.expires_at ? ` (expires ${recorded.attestation.expires_at})` : ''}`,
-          `Recorded in ${recorded.profile_path}; audit action tenant.attest_provider${recorded.approval ? ` (approved by ${recorded.approval.approved_by}, request ${recorded.approval.request_id})` : ''}`,
+          `Recorded in ${recorded.profile_path}; audit action tenant.attest_provider${recorded.approval ? ` (approved by ${recorded.approval.approved_by}, request ${recorded.approval.request_id})` : ''}${recorded.delegation ? ` (delegated via charter ${recorded.delegation.charter_id}, ${recorded.delegation.scope_kind} scope)` : ''}`,
+          ...(delegationGrant && !recorded.delegation ? [DELEGATION_HINT] : []),
           ...formatAvailability(availability),
         ].join('\n')
   );
