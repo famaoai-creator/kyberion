@@ -33952,6 +33952,46 @@
         "ja": "記録できない回答がありました。内容を確認して、もう一度お試しください。",
         "qps-ploc": "⟦Şőɱė ȧñşẇėřş ƈőůŀḓ ñőŧ ƀė řėƈőřḓėḓ. Ṗŀėȧşė ƈħėƈķ ŧħėɱ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
+      "respond_by_line": {
+        "en": "Please answer by {date} if you can.",
+        "ja": "回答の目安: {date}",
+        "qps-ploc": "⟦Ṗŀėȧşė ȧñşẇėř ƀẏ {date} ïƒ ẏőů ƈȧñ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "respond_by_past": {
+        "en": "The target date was {date}. You can still answer.",
+        "ja": "回答の目安は {date} でした。今からでも回答できます。",
+        "qps-ploc": "⟦Ŧħė ŧȧřɠėŧ ḓȧŧė ẇȧş {date}. Ẏőů ƈȧñ şŧïŀŀ ȧñşẇėř. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "general_heading": {
+        "en": "Anything else you'd like to ask?",
+        "ja": "ほかに確認したいこと",
+        "qps-ploc": "⟦Ȧñẏŧħïñɠ ėŀşė ẏőů'ḓ ŀïķė ŧő ȧşķ? ŀőřėɱ ïṗşů⟧"
+      },
+      "general_hint": {
+        "en": "Optional. Our team will reply to you separately.",
+        "ja": "任意です。担当者からあらためてご返信します。",
+        "qps-ploc": "⟦Őṗŧïőñȧŀ. Őůř ŧėȧɱ ẇïŀŀ řėṗŀẏ ŧő ẏőů şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "general_too_long": {
+        "en": "This is too long. Please keep it within {max} characters.",
+        "ja": "長すぎます。{max} 文字以内でお書きください。",
+        "qps-ploc": "⟦Ŧħïş ïş ŧőő ŀőñɠ. Ṗŀėȧşė ķėėṗ ïŧ ẇïŧħïñ {max} ƈħȧřȧƈŧėřş. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "review_general_heading": {
+        "en": "Your question for our team",
+        "ja": "担当者への確認",
+        "qps-ploc": "⟦Ẏőůř ɋůėşŧïőñ ƒőř őůř ŧėȧɱ ŀőřėɱ ïṗ⟧"
+      },
+      "receipt_general": {
+        "en": "We received your question. Our team will reply to you separately.",
+        "ja": "ご質問を受け取りました。担当者からあらためてご返信します。",
+        "qps-ploc": "⟦Ẇė řėƈėïṽėḓ ẏőůř ɋůėşŧïőñ. Őůř ŧėȧɱ ẇïŀŀ řėṗŀẏ ŧő ẏőů şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "previous_question": {
+        "en": "Your earlier question: {text}",
+        "ja": "前回お送りいただいた確認事項: {text}",
+        "qps-ploc": "⟦Ẏőůř ėȧřŀïėř ɋůėşŧïőñ: {text} ŀőřėɱ ïṗş⟧"
+      },
       "reload": {
         "en": "Reload",
         "ja": "読み込み直す",
