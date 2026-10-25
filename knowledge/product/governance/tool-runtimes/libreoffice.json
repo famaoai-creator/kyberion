@@ -1,0 +1,26 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "libreoffice",
+      "display_name": "LibreOffice Document Converter",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "toolsets": ["document_review"],
+      "trial_backend": { "kind": "system", "command": "soffice", "args": ["--version"] },
+      "install_backend_platform_overrides": {
+        "darwin": {
+          "kind": "brew",
+          "command": "brew",
+          "args": ["install", "--cask", "libreoffice"]
+        }
+      },
+      "installed_backend": { "kind": "system", "command": "soffice", "args": ["--version"] },
+      "managed_env_subpath": "tool-runtimes/libreoffice",
+      "notes": "Optional document visual review dependency. Host package; runtime state records provenance, not binary ownership. Linux: operator installs libreoffice."
+    }
+  ]
+}

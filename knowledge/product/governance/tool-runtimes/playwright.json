@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "playwright",
+      "toolsets": ["browser"],
       "display_name": "Playwright Chromium Runtime",
       "ecosystem": "node",
       "status": "active",
