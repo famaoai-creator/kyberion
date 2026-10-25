@@ -206,20 +206,34 @@ export class ConfidentialTaskDecisionValues {
     return `[customer decisions ${this.decisionIds.join(', ')}]`;
   }
 
-  /** The prompt section carrying the values (empty when there is nothing to say). */
-  promptLines(): string[] {
+  /**
+   * The prompt section carrying the values (empty when there is nothing to
+   * say). `proposalIds: false` (a mission the tier gate would not give the
+   * values to) names the unconfirmed proposals by count only: a proposal id
+   * is a hash of the consumer, item and key, so a reader could confirm a
+   * guessed item × key against it.
+   */
+  promptLines(options: { proposalIds?: boolean } = {}): string[] {
     if (this.isEmpty) return [];
+    const withIds = options.proposalIds !== false;
+    const unconfirmedCount = this.unconfirmedProposalIds.length;
     return [
       CONFIRMED_CUSTOMER_DECISIONS_HEADING,
       ...this.#items.map((item) => {
         const label = item.option_label ? ` (option: ${item.option_label})` : '';
         return `- [${item.decision_id}] ${item.question} (${item.item} / ${item.key}) → ${JSON.stringify(item.value)}${label}`;
       }),
-      ...this.#unconfirmed.map((item) =>
-        item.reason === 'changed_after_completion'
-          ? `- The decision for ${item.proposal_id} changed after this task completed and is not confirmed; do not assume a value (put it in needs if the work depends on it).`
-          : `- The decision for ${item.proposal_id} is no longer recorded; do not assume a value (put it in needs if the work depends on it).`
-      ),
+      ...(withIds
+        ? this.#unconfirmed.map((item) =>
+            item.reason === 'changed_after_completion'
+              ? `- The decision for ${item.proposal_id} changed after this task completed and is not confirmed; do not assume a value (put it in needs if the work depends on it).`
+              : `- The decision for ${item.proposal_id} is no longer recorded; do not assume a value (put it in needs if the work depends on it).`
+          )
+        : unconfirmedCount > 0
+          ? [
+              `- ${unconfirmedCount} of this task's customer decisions changed after it completed or are no longer recorded, and are not confirmed; do not assume their values (put them in needs if the work depends on them).`,
+            ]
+          : []),
       ...(this.#items.length > 0
         ? [
             'These are the customer’s confirmed answers to the questions this task asked; build on them. Refer to a decision only by its id in summary, needs and gaps.',

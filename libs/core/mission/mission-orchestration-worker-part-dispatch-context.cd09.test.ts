@@ -212,6 +212,25 @@ describe('buildTaskDispatchContext CD-09 tier gate', { timeout: 60_000 }, () => 
     });
   });
 
+  it('unconfirmed proposals only: ids where the gate passes, a count where it would refuse', async () => {
+    const notesOnly = () =>
+      new ConfidentialTaskDecisionValues(
+        { tenantSlug: TENANT, caseId: 'case-a', consumer: `mission-${MISSION}.task-1` },
+        [],
+        [{ proposal_id: 'tp-0123456789abcdef', reason: 'changed_after_completion' }]
+      );
+    const confidential = await build({ decisionValues: notesOnly() });
+    expect(confidential.prompt).toContain('tp-0123456789abcdef');
+    const publicMission = await build({
+      securityScope: scope({ write_tier: 'public', read_tiers: ['public'] }),
+      decisionValues: notesOnly(),
+    });
+    // Not blocked (no value), but no proposal id either.
+    expect(publicMission.customerDecisionDelivery).toMatchObject({ status: 'delivered' });
+    expect(publicMission.prompt).toContain("1 of this task's customer decisions");
+    expect(publicMission.prompt).not.toMatch(/tp-[a-f0-9]/u);
+  });
+
   it('a task without decisions gets no section and no delivery record', async () => {
     const context = await build({});
     expect(context).not.toHaveProperty('customerDecisionDelivery');

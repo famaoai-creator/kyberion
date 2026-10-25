@@ -215,6 +215,10 @@ describe('ConfidentialTaskDecisionValues (CD-09)', () => {
     expect(text).toContain('tp-aaaaaaaaaaaaaaaa changed after this task completed');
     expect(text).toContain('tp-bbbbbbbbbbbbbbbb is no longer recorded');
     expect(text).not.toContain('confirmed answers to the questions');
+    // Where the tier gate would refuse values: a count, no proposal id.
+    const counted = values.promptLines({ proposalIds: false }).join('\n');
+    expect(counted).toContain("2 of this task's customer decisions changed after it completed");
+    expect(counted).not.toMatch(/tp-[a-f0-9]/u);
     expect(values.knowledgeRefs()).toEqual([
       'customer-decision:case-a#tp-aaaaaaaaaaaaaaaa',
       'customer-decision:case-a#tp-bbbbbbbbbbbbbbbb',
