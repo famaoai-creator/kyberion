@@ -32,8 +32,12 @@ export function daemonInstanceFromCanonicalRoot(
       '[DAEMON_INSTANCE_ROOT_INVALID] An absolute canonical checkout root is required'
     );
   const normalized = paths.normalize(canonicalRoot);
-  const root =
-    normalized === paths.parse(normalized).root ? normalized : normalized.replace(/[\\/]+$/, '');
+  let root = normalized;
+  if (normalized !== paths.parse(normalized).root) {
+    let end = normalized.length;
+    while (end > 0 && (normalized[end - 1] === '/' || normalized[end - 1] === '\\')) end--;
+    root = normalized.slice(0, end);
+  }
   // Native realpath handles case-insensitive aliases. Directory spelling may
   // still distinguish case-sensitive Windows/WSL trees; only drive letters fold.
   const identityRoot =

@@ -17,6 +17,19 @@ import type { DaemonRenderContext } from './service-manager.js';
 const fixture = pathResolver.sharedTmp(`daemon-instance-test-${process.pid}-${randomUUID()}`);
 afterEach(() => safeRmSync(fixture, { recursive: true, force: true }));
 describe('checkout daemon identity', () => {
+  it('handles long separator suffixes without changing the canonical identity', () => {
+    const separators = '/'.repeat(100_000);
+    expect(daemonInstanceFromCanonicalRoot(`/repos/prod${separators}`, 'linux')).toEqual(
+      daemonInstanceFromCanonicalRoot('/repos/prod', 'linux')
+    );
+    expect(daemonInstanceFromCanonicalRoot(`/repos/prod${'\\'.repeat(100_000)}`, 'linux')).toEqual(
+      daemonInstanceFromCanonicalRoot('/repos/prod', 'linux')
+    );
+    expect(daemonInstanceFromCanonicalRoot(`C:/Repos/Prod${separators}`, 'win32')).toEqual(
+      daemonInstanceFromCanonicalRoot('C:/Repos/Prod', 'win32')
+    );
+    expect(daemonInstanceFromCanonicalRoot(separators, 'linux').repoRoot).toBe('/');
+  });
   it('keeps different physical roots distinct and normalizes trailing separators', () => {
     safeMkdir(path.join(fixture, 'physical'), { recursive: true });
     safeMkdir(path.join(fixture, 'other'), { recursive: true });

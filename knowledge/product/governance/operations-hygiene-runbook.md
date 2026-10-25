@@ -2215,6 +2215,12 @@ closed socket without a complete response. Keep daemon results consistent with
 the public client contract. Gates: canonical A2A validation parity, prewarm
 failure propagation and real headless Node IPC process tests.
 
+Treat provider diagnostics and checkout roots as uncontrolled-length inputs.
+Use literal searches or a single traversal for ordered diagnostic tokens and
+trailing path separators; avoid unanchored repetitions that backtrack over the
+same suffix. Preserve newline, ordering and root semantics. Gates: CodeQL plus
+long repeated-prefix and separator regressions in task routing and daemon identity.
+
 Public shared tasks must not acquire a fabricated tenant. Preserve the canonical
 standalone public project in authority projections even without an organization;
 private and tenant-bound parent requirements remain enforced. Contract, scope
