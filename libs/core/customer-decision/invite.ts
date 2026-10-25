@@ -23,6 +23,7 @@
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
+import { isActiveCustomerTenant } from '../customer-channel-binding.js';
 import {
   CUSTOMER_DECISION_INVITE_STORE_ROLE,
   customerDecisionInviteCapability,
@@ -320,6 +321,14 @@ export function issueInvite(input: {
   return { invite, token: `${inviteId}.${secret}` };
 }
 
+/**
+ * The invite id of a well-formed token, else undefined. Format only — the
+ * invite is not looked up or verified (for ids-only audit of a refusal).
+ */
+export function inviteIdOfToken(token: unknown): string | undefined {
+  return typeof token === 'string' ? TOKEN_PATTERN.exec(token)?.[1] : undefined;
+}
+
 export function verifyInviteToken(
   tenantSlug: string,
   token: string,
@@ -336,6 +345,10 @@ export function verifyInviteToken(
   ) {
     return { ok: false, reason: 'malformed' };
   }
+  // CD-10: the invites of a tenant that is not registered and active stop
+  // working on every path (a quiet `record: false` check too) — the same
+  // `unavailable` as a store failure, so the registration state is not revealed.
+  if (!isActiveCustomerTenant(tenantSlug)) return { ok: false, reason: 'unavailable' };
   const [, inviteId, secret] = match;
   const read = readInvite(tenantSlug, inviteId);
   if (read.kind === 'unavailable') return { ok: false, reason: 'unavailable' };

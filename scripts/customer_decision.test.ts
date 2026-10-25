@@ -1057,6 +1057,16 @@ describe('customer-decision facade', () => {
         })
       );
       expect(JSON.stringify(mocks.audit.mock.calls)).not.toContain(token);
+      // A malformed token answers invalid_link exactly as for an active tenant
+      // (the answer never reveals the registration state), and is not audited.
+      mocks.audit.mockClear();
+      for (const bad of ['nope', `${inviteId}.short`, `${inviteId}`]) {
+        expect(await customerRun('view', { token: bad })).toEqual({
+          code: 1,
+          out: { ok: false, reason: 'invalid_link' },
+        });
+      }
+      expect(mocks.audit).not.toHaveBeenCalled();
       const revoked = (await run([
         'revoke',
         ...base(),
