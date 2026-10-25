@@ -740,11 +740,62 @@ describe('resolvedTaskProposalDecisions (CD-09 values for resumed tasks)', () =>
       { proposal_id: id, collected: true },
     ]);
     expect(resolvedTaskProposalDecisions(stamped, agendas, changed, NOW)).toEqual([]);
-    // An agenda that is gone keeps the release it recorded (nothing to deliver).
-    expect(taskProposalHolds(stamped, [], changed, NOW)[0]).toMatchObject({
-      resolved_decision_id: 'D-0001',
-    });
-    expect(resolvedTaskProposalDecisions(stamped, [], changed, NOW)).toEqual([]);
+    // The agenda is closed (or withdrawn, or gone) before the operator
+    // confirmed D-0002: the last confirmed decision (the release's) stands.
+    for (const agendasNow of [
+      [{ ...agendas[0], status: 'closed' as const }],
+      [{ ...agendas[0], status: 'withdrawn' as const }],
+      [],
+    ]) {
+      expect(taskProposalHolds(stamped, agendasNow, changed, NOW)).toEqual([
+        { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+      ]);
+      expect(resolvedTaskProposalDecisions(stamped, agendasNow, changed, NOW)).toMatchObject([
+        { decision_id: 'D-0001', value: 'date-alpha-sentinel' },
+      ]);
+    }
+    // No confirmed decision is left (never released, or the ledger lost it):
+    // unresolvable — held for good, never released.
+    const closed = [{ ...agendas[0], status: 'closed' as const }];
+    const unstamped = lockFor(agendas);
+    expect(taskProposalHolds(unstamped, closed, changed, NOW)).toEqual([
+      { proposal_id: id, collected: true, unresolvable: true },
+    ]);
+    expect(taskProposalHolds(stamped, [], [], NOW)).toEqual([
+      { proposal_id: id, collected: true, unresolvable: true },
+    ]);
+    expect(resolvedTaskProposalDecisions(stamped, [], [], NOW)).toEqual([]);
+  });
+
+  it('a lock that completed once trusts its release: a later change is not a new hold', () => {
+    const agendas = [withRelease(['D-0001'])];
+    const id = taskProposalId(consumer, 'RELEASE', 'release.date');
+    const first = customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel');
+    const stamped = lockFor(agendas).decisions.map((entry) =>
+      entry.proposal?.proposal_id === id
+        ? {
+            ...entry,
+            proposal: { ...entry.proposal, resolved: { decision_id: 'D-0001', at: NOW } },
+          }
+        : entry
+    );
+    const changed = [
+      { ...first, status: 'superseded' as const },
+      customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel'),
+    ];
+    for (const lock of [
+      { decisions: stamped, status: 'completed' as const, completed_at: NOW },
+      // Re-pinned for a new run after completion: still completed once.
+      { decisions: stamped, status: 'in_progress' as const, completed_at: NOW },
+    ]) {
+      expect(taskProposalHolds(lock, agendas, changed, NOW)).toEqual([
+        { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+      ]);
+    }
+    // Never completed: the change re-opens the hold.
+    expect(
+      taskProposalHolds({ decisions: stamped, status: 'in_progress' }, agendas, changed, NOW)
+    ).toEqual([{ proposal_id: id, collected: true }]);
   });
 
   it('holds and the resolver read the same entry when the lock has no entry id', () => {
