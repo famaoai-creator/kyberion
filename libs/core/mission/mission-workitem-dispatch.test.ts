@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as nodePath from 'node:path';
 import { readJsonLines } from '../foundation/json.js';
+import { validateA2ATaskContract } from '../mesh/a2a-task-contract.js';
 import * as dispatchLifecycle from './mission-dispatch-lifecycle.js';
 
 import {
@@ -913,7 +914,11 @@ describe('mission work item dispatch', () => {
           ],
         })
       );
-      const routeA2A = vi.fn(async () => {
+      const routeA2A = vi.fn(async (envelope) => {
+        const validation = validateA2ATaskContract(envelope.payload);
+        expect(validation.valid, JSON.stringify(validation.errors)).toBe(true);
+        expect(validation.value?.context.security_scope?.tenant_slug).toBeUndefined();
+        expect(validation.value?.context.security_scope?.tenant_id).toBeUndefined();
         throw new AgentRuntimeApprovalPendingError('planner-approval');
       });
       const delegateTask = vi.fn();

@@ -408,18 +408,23 @@ async function dispatchMissionWorkItemsRound(
     const granteeNhiId = assigneePeerId
       ? deriveAgentNhiId(assigneePeerId, item.context?.organization_id)
       : null;
-    if (grantTaskId && granteeNhiId) {
+    const grantTenant = item.context?.tenant_slug || state.tenant_slug || state.tenant_id;
+    if (grantTaskId && granteeNhiId && grantTenant) {
       const taskGrant = issueTaskGrantBestEffort({
         granteeNhiId,
         audience: { missionId, taskId: grantTaskId },
         scope: {
-          ...(item.context?.tenant_slug ? { tenant_slug: item.context.tenant_slug } : {}),
+          tenant_slug: grantTenant,
         },
         issuedBy: 'workitem-dispatch',
       });
       if (taskGrant) {
         record.notes.push(`task grant issued: ${taskGrant.grant_id}`);
       }
+    } else if (grantTaskId && granteeNhiId && state.tier === 'public') {
+      logger.debug(
+        '[task-scoped-grants] Public shared task has no tenant grant; governed task lease and capability binding remain required'
+      );
     }
 
     let response: Awaited<ReturnType<typeof obtainTaskResultResponse>>;
