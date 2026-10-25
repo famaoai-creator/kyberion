@@ -134,6 +134,24 @@ export interface PinTaskDecisionsResult {
    * the tier gate of `buildTaskDispatchContext`.
    */
   decision_values?: ConfidentialTaskDecisionValues;
+  /**
+   * The lock holds the task: its own `requires_customer` proposals that have
+   * no confirmed customer decision in force (ids only). The worker does not
+   * dispatch it (it waits, `awaiting_customer_decision`).
+   */
+  held?: PinnedTaskHold;
+}
+
+export interface PinnedTaskHold {
+  case_id: string;
+  tenant_slug: string;
+  proposal_ids: string[];
+  /**
+   * `decision_not_in_force`: a proposal released before has lost its
+   * confirmed decision (the customer changed the answer, now awaiting the
+   * operator's confirmation); `awaiting_customer_decision`: never released.
+   */
+  reason: 'decision_not_in_force' | 'awaiting_customer_decision';
 }
 
 export interface TaskDecisionReconciliation {
@@ -477,14 +495,22 @@ export function pinTaskDecisions(
       const proposals = stampResolved(existing ? taskProposalsOf(existing) : [], holds, now);
       // An unresolved requires_customer proposal keeps the task held across a
       // re-pin (a resume before the operator confirmed the customer's decision).
-      const stillHeld = holds.some((hold) => !hold.resolved_decision_id);
+      // The values a resumed task receives, from the snapshot just read
+      // (nothing new is written to the lock): every one of its own
+      // requires_customer proposals must have a confirmed decision in force.
+      const resolvedValues = existing?.hold
+        ? resolvedTaskProposalDecisions(existing, agendas, ledger, now)
+        : [];
+      const delivered = new Set(resolvedValues.map((value) => value.proposal_id));
+      const ownRequired = existing
+        ? taskProposalsOf(existing).filter((entry) => entry.proposal.requires_customer)
+        : [];
+      const missing = existing?.hold
+        ? ownRequired.filter((entry) => !delivered.has(entry.proposal.proposal_id))
+        : [];
+      const stillHeld = holds.some((hold) => !hold.resolved_decision_id) || missing.length > 0;
+      // A hold released before re-opens when its decision is no longer in force.
       const hold = nextHold(existing?.hold, stillHeld, now);
-      // The values a resumed task receives: only once the hold it had is resolved,
-      // from the snapshot just read (nothing new is written to the lock).
-      const resolvedValues =
-        existing?.hold && !stillHeld
-          ? resolvedTaskProposalDecisions(existing, agendas, ledger, now)
-          : [];
       writeLock(decisionCase, {
         version: '1.0.0',
         ...lock,
@@ -501,7 +527,19 @@ export function pinTaskDecisions(
         consumer,
         pinned_count: lock.decisions.length,
         pinned: true,
-        ...(resolvedValues.length > 0
+        ...(missing.length > 0
+          ? {
+              held: {
+                case_id: decisionCase.caseId,
+                tenant_slug: decisionCase.tenantSlug,
+                proposal_ids: missing.map((entry) => entry.proposal.proposal_id).sort(),
+                reason: missing.some((entry) => entry.proposal.resolved)
+                  ? ('decision_not_in_force' as const)
+                  : ('awaiting_customer_decision' as const),
+              },
+            }
+          : {}),
+        ...(missing.length === 0 && resolvedValues.length > 0
           ? {
               decision_values: new ConfidentialTaskDecisionValues(
                 {
@@ -533,13 +571,22 @@ export type TaskDecisionDeliveryOperation = 'task_decisions_delivered' | 'task_d
  * failure logs a diagnostic warning.
  */
 export function auditTaskDecisionDelivery(input: {
-  values: ConfidentialTaskDecisionValues;
+  /** The case and consumer (the values holder, or a pinned hold's ids). */
+  values: Pick<
+    ConfidentialTaskDecisionValues,
+    'tenantSlug' | 'caseId' | 'consumer' | 'decisionIds'
+  >;
   missionId: string;
   taskId: string;
   operation: TaskDecisionDeliveryOperation;
   reason?: string;
+  /** Proposals withheld for (ids only). */
+  proposalIds?: readonly string[];
 }): void {
   const tenantSlug = input.values.tenantSlug;
+  // Best-effort by design: the chain itself does not report a failed master
+  // write (audit-chain appendToFile logs and goes on), so a delivery that was
+  // recorded here may still be missing from the master chain.
   try {
     auditChain.record({
       agentId: 'customer-decision',
@@ -553,6 +600,7 @@ export function auditTaskDecisionDelivery(input: {
         mission_id: input.missionId.toUpperCase(),
         task_id: input.taskId,
         decision_ids: input.values.decisionIds,
+        ...(input.proposalIds?.length ? { proposal_ids: [...input.proposalIds] } : {}),
         ...(input.reason ? { reason: input.reason } : {}),
       },
     });

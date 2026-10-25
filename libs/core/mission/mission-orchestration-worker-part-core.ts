@@ -52,8 +52,7 @@ import {
   attachDeliveredKnowledgeRefs,
   CUSTOMER_DECISION_TIER_MISMATCH,
 } from './mission-orchestration-worker-part-dispatch-context.js';
-import type { ConfidentialTaskDecisionValues } from '../customer-decision/task-decision-values.js';
-import type { TaskResultBlock } from './mission-orchestration-worker-contracts.js';
+import { scrubTaskResponseValues } from '../customer-decision/task-decision-values.js';
 import type { DispatchPlannedMissionTaskInput } from './mission-orchestration-worker-part-dispatch-context.js';
 import {
   obtainTaskResultResponse,
@@ -72,32 +71,6 @@ import {
   recordTaskDecisionProposals,
   CUSTOMER_DECISION_BLOCKED_REASONS,
 } from './mission-decision-lock.js';
-
-/**
- * CD-09: replace echoed customer decision values in the worker's own words
- * (summary, needs, gaps, verification, review instructions, notes) before
- * any copy of them reaches a store that is not tenant-partitioned.
- */
-function scrubTaskResultValues(
-  values: ConfidentialTaskDecisionValues,
-  taskResult: TaskResultBlock | undefined,
-  notes: string[] | undefined
-): void {
-  if (notes) notes.splice(0, notes.length, ...notes.map((note) => values.scrub(note)));
-  if (!taskResult) return;
-  const scrubList = (list: string[] | undefined) =>
-    Array.isArray(list) ? list.map((entry) => values.scrub(String(entry))) : list;
-  taskResult.summary = values.scrub(String(taskResult.summary || ''));
-  taskResult.needs = scrubList(taskResult.needs) ?? [];
-  taskResult.gaps = scrubList(taskResult.gaps) ?? [];
-  taskResult.verification_done = scrubList(taskResult.verification_done) ?? [];
-  if (Array.isArray(taskResult.review_findings)) {
-    taskResult.review_findings = taskResult.review_findings.map((finding) => ({
-      ...finding,
-      instruction: values.scrub(String(finding.instruction || '')),
-    }));
-  }
-}
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -165,9 +138,77 @@ export async function dispatchPlannedMissionTaskCore(
       estimated_scope: input.task.estimated_scope,
     },
   });
+  // CD-09: a resumed task whose own requires_customer question has no
+  // confirmed decision in force waits (the hold re-opens if the customer
+  // changed an answer after the release); it is not dispatched.
+  const pinnedHold = decisionPin?.held;
+  if (pinnedHold) {
+    auditTaskDecisionDelivery({
+      values: {
+        tenantSlug: pinnedHold.tenant_slug,
+        caseId: pinnedHold.case_id,
+        consumer: decisionPin.consumer,
+        decisionIds: [],
+      },
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      operation: 'task_decisions_withheld',
+      reason: pinnedHold.reason,
+      proposalIds: pinnedHold.proposal_ids,
+    });
+    const hold = {
+      status: 'awaiting',
+      consumer: decisionPin.consumer,
+      case_id: pinnedHold.case_id,
+      hold_count: pinnedHold.proposal_ids.length,
+      hold_proposal_ids: pinnedHold.proposal_ids,
+      reason: pinnedHold.reason,
+    };
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary: 'Task waits for a customer decision',
+        blocked_reason: 'awaiting_customer_decision',
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        customer_decision_hold: hold,
+      },
+    });
+    input.task.status = 'blocked';
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'Task waits for a confirmed customer decision (requires_customer) before it can run.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: [],
+      payload: { customer_decision_hold: hold },
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step:
+        'resume the mission once the operator confirmed the customer decision (customer-decision confirm)',
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...summarizeTaskResultObservability({ parseErrors: [] }),
+    };
+  }
   // CD-09: a resumed task's confirmed customer decisions (held in memory only).
   const decisionValues = decisionPin?.decision_values;
-  let decisionsAudited = false;
+  /** CD-09: replace echoed values in any text bound for a shared store. */
+  const scrubText = (text: string) => (decisionValues ? decisionValues.scrub(text) : text);
   let dispatchContext;
   let response;
   const buildContext = (forceContextCompaction?: boolean) =>
@@ -256,11 +297,12 @@ export async function dispatchPlannedMissionTaskCore(
       }),
     };
   };
-  /** CD-09: audit (once) and record, ids only, that the values went into the prompt. */
+  /**
+   * CD-09: audit and record, ids only, that the values went into the prompt
+   * of a dispatch that reached the agent (called after a successful route).
+   */
   const noteDecisionsDelivered = (context: BuiltDispatchContext) => {
     if (!decisionValues || context.customerDecisionDelivery?.status !== 'delivered') return;
-    if (decisionsAudited) return;
-    decisionsAudited = true;
     auditTaskDecisionDelivery({
       values: decisionValues,
       missionId: input.missionId,
@@ -271,7 +313,9 @@ export async function dispatchPlannedMissionTaskCore(
       recordMissionVisiblePrompt({
         missionId: input.missionId,
         taskId: input.task.task_id,
-        content: decisionValues.promptLines().join('\n'),
+        // Ids only: a plain hash of the section would let its few likely
+        // values be guessed back, so the record describes the decisions.
+        content: decisionValues.knowledgeRefs().join('\n'),
         form: 'customer_decision_values',
         ...(context.missionContextPackId ? { contextPackId: context.missionContextPackId } : {}),
         knowledgeRefs: decisionValues.knowledgeRefs().map((ref) => ({ path: ref })),
@@ -284,7 +328,6 @@ export async function dispatchPlannedMissionTaskCore(
     }
   };
   const dispatchOnce = (context: BuiltDispatchContext) => {
-    noteDecisionsDelivered(context);
     const dispatchArgs = {
       missionId: input.missionId,
       task: input.task,
@@ -307,7 +350,11 @@ export async function dispatchPlannedMissionTaskCore(
       delegationChain,
     };
     return isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
-      ? obtainBestOfTaskResultResponse(dispatchArgs)
+      ? obtainBestOfTaskResultResponse({
+          ...dispatchArgs,
+          // CD-09: best-of-N scrubs each candidate before it stores the loser.
+          ...(decisionValues ? { customerDecisionValues: decisionValues } : {}),
+        })
       : obtainTaskResultResponse(dispatchArgs);
   };
   try {
@@ -358,8 +405,12 @@ export async function dispatchPlannedMissionTaskCore(
     }
     throw err;
   }
-  // CD-09: echoed customer decision values never leave in the worker's words.
-  if (decisionValues) scrubTaskResultValues(decisionValues, response.taskResult, response.notes);
+  // CD-09: the route returned, so the values reached the agent; echoed
+  // values never leave in the worker's words (every string of the result).
+  if (decisionValues) {
+    noteDecisionsDelivered(dispatchContext);
+    scrubTaskResponseValues(decisionValues, response);
+  }
   // KP-05: report what buildTaskDispatchContext's context pack actually
   // delivered onto this dispatch's trace span.
   attachDeliveredKnowledgeRefs(traceCtx, dispatchContext.deliveredKnowledgeRefs);
@@ -961,6 +1012,16 @@ export async function dispatchPlannedMissionTaskCore(
       workerTeamRole: input.teamRole,
       securityScope: dispatchContext.securityScope,
     });
+    if (independentReview && decisionValues) {
+      // The reviewer saw the (scrubbed) result but may restate a value itself.
+      independentReview = {
+        ...independentReview,
+        gaps: independentReview.gaps.map(scrubText),
+        ...(independentReview.rationale
+          ? { rationale: scrubText(independentReview.rationale) }
+          : {}),
+      };
+    }
     if (independentReview && !independentReview.approve) {
       acceptance.passed = false;
       acceptance.reasons = [
@@ -972,6 +1033,8 @@ export async function dispatchPlannedMissionTaskCore(
     }
   }
 
+  // CD-09: gate reasons go into WorkItems, events and the operator notification.
+  if (decisionValues) acceptance.reasons = acceptance.reasons.map(scrubText);
   if (!acceptance.passed) {
     const currentReworkCount = Number(input.task.rework_count || 0);
     const nextReworkCount = currentReworkCount + 1;

@@ -22,6 +22,8 @@ const mocks = vi.hoisted(() => ({
   auditTaskDecisionDelivery: vi.fn(),
   provisionTaskKnowledge: vi.fn(),
   recordMissionVisiblePrompt: vi.fn(),
+  requestIndependentAcceptanceReview: vi.fn(),
+  notifyOperator: vi.fn(),
   /** Set per test: the security scope the (real) context pack is given. */
   packScope: { value: undefined as Record<string, unknown> | undefined },
 }));
@@ -107,6 +109,9 @@ vi.mock('./mission-orchestration-worker-part-context.js', async (importOriginal)
     ...actual,
     recordMissionVisiblePrompt: (...args: Parameters<typeof actual.recordMissionVisiblePrompt>) =>
       mocks.recordMissionVisiblePrompt(...args),
+    requestIndependentAcceptanceReview: (
+      ...args: Parameters<typeof actual.requestIndependentAcceptanceReview>
+    ) => mocks.requestIndependentAcceptanceReview(...args),
     // The fixture scope (confidential, tenant-bound) does not match the public
     // fixture mission's directory; the compactor (cached per mission) places
     // its own records by that scope, so it keeps the mission's real one.
@@ -118,6 +123,11 @@ vi.mock('./mission-orchestration-worker-part-context.js', async (importOriginal)
       ),
   };
 });
+
+vi.mock('../surface/operator-notifications.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../surface/operator-notifications.js')>()),
+  notifyOperator: (...args: unknown[]) => mocks.notifyOperator(...args),
+}));
 
 vi.mock('./mission-decision-lock.js', () => ({
   auditTaskDecisionDelivery: mocks.auditTaskDecisionDelivery,
@@ -173,6 +183,10 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
         typeof import('./mission-orchestration-worker-part-context.js')
       >('./mission-orchestration-worker-part-context.js');
       mocks.recordMissionVisiblePrompt.mockImplementation(context.recordMissionVisiblePrompt);
+      mocks.requestIndependentAcceptanceReview.mockImplementation(
+        context.requestIndependentAcceptanceReview
+      );
+      mocks.notifyOperator.mockResolvedValue(undefined);
     }
     process.env.MISSION_ROLE = 'mission_controller';
     const { missionDir, pathResolver } = await import('../path-resolver.js');
@@ -435,6 +449,222 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       for (const root of new Set(roots)) walk(root);
       return hits;
     }
+
+    const confidentialScope = () => ({
+      tenant_slug: 'acme-corp',
+      tenant_id: 'acme-corp',
+      mission_id: MISSION_ID,
+      read_tiers: ['public', 'confidential'],
+      write_tier: 'confidential',
+      purpose: 'implementer',
+      external_egress: 'deny',
+    });
+    async function storedWorkItems(): Promise<string> {
+      const { listWorkItems } = await vi.importActual<
+        typeof import('../workforce/work-coordination.js')
+      >('../workforce/work-coordination.js');
+      return JSON.stringify(listWorkItems({}));
+    }
+
+    it('a resumed task whose decision is no longer in force waits, undispatched (ids only)', async () => {
+      await useRealStores();
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 1,
+        pinned: true,
+        held: {
+          case_id: 'case-a',
+          tenant_slug: 'acme-corp',
+          proposal_ids: ['tp-0123456789abcdef'],
+          reason: 'decision_not_in_force',
+        },
+      });
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION_ID);
+      expect(mocks.route).not.toHaveBeenCalled();
+      expect(mocks.provisionTaskKnowledge).not.toHaveBeenCalled();
+      const blocked = mocks.updateWorkItem.mock.calls
+        .map((call) => call[0] as { status?: string; metadata?: Record<string, unknown> })
+        .find((update) => update.status === 'blocked');
+      expect(blocked?.metadata).toMatchObject({
+        blocked_reason: 'awaiting_customer_decision',
+        customer_decision_hold: {
+          status: 'awaiting',
+          consumer: CONSUMER,
+          case_id: 'case-a',
+          hold_proposal_ids: ['tp-0123456789abcdef'],
+          reason: 'decision_not_in_force',
+        },
+      });
+      expect(mocks.auditTaskDecisionDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'task_decisions_withheld',
+          reason: 'decision_not_in_force',
+          proposalIds: ['tp-0123456789abcdef'],
+        })
+      );
+    });
+
+    it('a value restated in acceptance evidence and a reviewer gap reaches no WorkItem or notification', async () => {
+      await useRealStores();
+      const values = await decisionValues();
+      mocks.packScope.value = confidentialScope();
+      mocks.recordMissionVisiblePrompt.mockImplementation(() => undefined);
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 1,
+        pinned: true,
+        decision_values: values,
+      });
+      // At the rework limit: the rejection blocks the task and notifies the operator.
+      const { missionDir } = await import('../path-resolver.js');
+      const { safeWriteFile } = await import('../secure-io.js');
+      safeWriteFile(
+        `${missionDir(MISSION_ID, 'public')}/NEXT_TASKS.json`,
+        JSON.stringify([
+          {
+            task_id: 'task-1',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the widget procedure',
+            deliverable: 'deliverables/widget.md',
+            rework_count: 5,
+          },
+        ])
+      );
+      mocks.requestIndependentAcceptanceReview.mockResolvedValue({
+        approve: false,
+        gaps: [`the release note must say ${SENTINEL}`],
+        rationale: `rejected: ${SENTINEL} missing`,
+        reviewerAgentId: 'independent-reviewer',
+      });
+      mocks.route.mockResolvedValueOnce({
+        payload: {
+          text: [
+            '```task_result',
+            JSON.stringify({
+              summary: 'Released per D-0001.',
+              artifacts: [],
+              verification_done: ['checked'],
+              gaps: [],
+              needs: [],
+              acceptance_evidence: [
+                {
+                  criterion: `release says ${SENTINEL}`,
+                  status: 'passed',
+                  evidence: `note reads ${SENTINEL}`,
+                },
+              ],
+            }),
+            '```',
+          ].join('\n'),
+        },
+      });
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION_ID);
+
+      expect(mocks.requestIndependentAcceptanceReview).toHaveBeenCalled();
+      // The reviewer got the scrubbed result.
+      expect(JSON.stringify(mocks.requestIndependentAcceptanceReview.mock.calls)).not.toContain(
+        SENTINEL
+      );
+      const blocked = mocks.updateWorkItem.mock.calls
+        .map((call) => call[0] as { status?: string; metadata?: Record<string, unknown> })
+        .find((update) => update.status === 'blocked');
+      expect(String(blocked?.metadata?.blocked_reason)).toContain('[customer decision D-0001]');
+      expect(mocks.notifyOperator).toHaveBeenCalled();
+      expect(
+        JSON.stringify([
+          mocks.updateWorkItem.mock.calls,
+          mocks.notifyOperator.mock.calls,
+          mocks.emitMissionTaskEvent.mock.calls,
+        ])
+      ).not.toContain(SENTINEL);
+      expect(await storedWorkItems()).not.toContain(SENTINEL);
+      expect(await filesContaining(SENTINEL)).toEqual([]);
+      // The values went out, so the delivery is audited once.
+      expect(mocks.auditTaskDecisionDelivery).toHaveBeenCalledTimes(1);
+    });
+
+    it('best-of-N: the losing candidate and the judge verdict are stored scrubbed', async () => {
+      await useRealStores();
+      const values = await decisionValues();
+      mocks.packScope.value = confidentialScope();
+      mocks.recordMissionVisiblePrompt.mockImplementation(() => undefined);
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 1,
+        pinned: true,
+        decision_values: values,
+      });
+      mocks.reconcileTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        checked: 1,
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      const { missionDir } = await import('../path-resolver.js');
+      const { safeWriteFile } = await import('../secure-io.js');
+      safeWriteFile(
+        `${missionDir(MISSION_ID, 'public')}/NEXT_TASKS.json`,
+        JSON.stringify([
+          {
+            task_id: 'task-1',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the widget procedure',
+            deliverable: 'deliverables/widget.md',
+            risk: 'high',
+          },
+        ])
+      );
+      mocks.route
+        .mockResolvedValueOnce({
+          payload: { text: makeTaskResultText({ summary: `A ships ${SENTINEL}` }) },
+        })
+        .mockResolvedValueOnce({
+          payload: { text: makeTaskResultText({ summary: `B ships ${SENTINEL}` }) },
+        })
+        .mockResolvedValueOnce({
+          payload: {
+            text: JSON.stringify({
+              winner: 'A',
+              rationale: `A keeps ${SENTINEL}`,
+              merge_hints: [`mention ${SENTINEL}`],
+            }),
+          },
+        });
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION_ID);
+      expect(mocks.route).toHaveBeenCalledTimes(3);
+      // The judge saw the candidates scrubbed.
+      expect(
+        String((mocks.route.mock.calls[2][0] as { payload: { text: string } }).payload.text)
+      ).not.toContain(SENTINEL);
+      expect(
+        JSON.stringify([mocks.updateWorkItem.mock.calls, mocks.emitMissionTaskEvent.mock.calls])
+      ).not.toContain(SENTINEL);
+      expect(await filesContaining(SENTINEL)).toEqual([]);
+    });
+
+    it('an agent that is busy got nothing: no delivery is audited', async () => {
+      await useRealStores();
+      const values = await decisionValues();
+      mocks.packScope.value = confidentialScope();
+      mocks.recordMissionVisiblePrompt.mockImplementation(() => undefined);
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 1,
+        pinned: true,
+        decision_values: values,
+      });
+      const { AgentBusyError } = await import('../mesh/a2a-bridge.js');
+      mocks.route.mockRejectedValueOnce(new AgentBusyError('implementation-architect is busy'));
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION_ID);
+      expect(mocks.route).toHaveBeenCalled();
+      expect(mocks.auditTaskDecisionDelivery).not.toHaveBeenCalled();
+    });
 
     it('a public mission: the WorkItem is blocked as a tier mismatch and nothing is sent', async () => {
       await useRealStores();

@@ -14,7 +14,7 @@
  */
 import type { ResolvedTaskProposalDecision } from './consumption.js';
 
-/** Shorter string forms are not scrubbed (they would rewrite ordinary words and numbers). */
+/** Shorter forms are scrubbed only as words of their own (see `scrub`). */
 export const TASK_DECISION_SCRUB_MIN_LENGTH = 4;
 
 export const CONFIRMED_CUSTOMER_DECISIONS_HEADING =
@@ -37,6 +37,48 @@ export interface TaskDecisionValuesSummary {
 
 function escapeRegExp(text: string): string {
   return text.replace(/[.*+?^${}()|[\]\\/]/gu, '\\$&');
+}
+
+const TOKEN_OPEN = '\uE000';
+const TOKEN_CLOSE = '\uE001';
+const TOKEN_INDEX_BASE = 0xe100;
+const TOKEN_PATTERN = /\uE000([\uE100-\uF8FF])\uE001/gu;
+
+/** Character classes that make one word: CJK scripts each on their own, else letters and digits. */
+const WORD_CLASSES = [
+  '\\p{Script=Han}',
+  '\\p{Script=Hiragana}',
+  '\\p{Script=Katakana}',
+  '(?:(?![\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}])[\\p{L}\\p{N}_])',
+];
+
+function wordClassOf(char: string | undefined): string | null {
+  if (!char) return null;
+  return WORD_CLASSES.find((cls) => new RegExp(`^${cls}$`, 'u').test(char)) ?? null;
+}
+
+/** `needle` as a word of its own: no neighbor of the same word class as its edge character. */
+function wordPattern(needle: string): string {
+  const chars = [...needle];
+  const before = wordClassOf(chars[0]);
+  const after = wordClassOf(chars[chars.length - 1]);
+  return `${before ? `(?<!${before})` : ''}${escapeRegExp(needle)}${after ? `(?!${after})` : ''}`;
+}
+
+function scrubDeep(
+  value: unknown,
+  scrub: (text: string) => string,
+  skipKeys: ReadonlySet<string>,
+  depth: number
+): unknown {
+  if (typeof value === 'string') return scrub(value);
+  if (depth > 16 || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((item) => scrubDeep(item, scrub, skipKeys, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(value)) {
+    out[key] = skipKeys.has(key) ? item : scrubDeep(item, scrub, skipKeys, depth + 1);
+  }
+  return out;
 }
 
 /** String and number leaves of a decision value (objects and arrays walked). */
@@ -118,10 +160,18 @@ export class ConfidentialTaskDecisionValues {
     ];
   }
 
-  /** Replace echoed values (string / number forms, option labels) with their decision id. */
+  /**
+   * Replace echoed values (string / number forms, option labels, JSON forms)
+   * with their decision id. A form of {@link TASK_DECISION_SCRUB_MIN_LENGTH}
+   * characters or more is replaced wherever it appears (case-insensitive); a
+   * shorter one ("yes", "A", "5%", "はい") only as a word of its own, so it
+   * never rewrites part of a longer word ("yesterday", "Apple", "15%",
+   * "はいけい"). A replacement is never matched again.
+   */
   scrub(text: string): string {
     if (!text || this.#items.length === 0) return text;
-    const needles: Array<{ needle: string; id: string }> = [];
+    const long: Array<{ needle: string; id: string }> = [];
+    const short: Array<{ needle: string; id: string }> = [];
     for (const item of this.#items) {
       const forms: string[] = [];
       scalarLeaves(item.value, forms);
@@ -135,22 +185,74 @@ export class ConfidentialTaskDecisionValues {
       }
       for (const form of forms) {
         const trimmed = form.trim();
-        if (trimmed.length >= TASK_DECISION_SCRUB_MIN_LENGTH) {
-          needles.push({ needle: trimmed, id: item.decision_id });
-        }
+        if (!trimmed) continue;
+        (trimmed.length >= TASK_DECISION_SCRUB_MIN_LENGTH ? long : short).push({
+          needle: trimmed,
+          id: item.decision_id,
+        });
       }
     }
-    if (needles.length === 0) return text;
-    // One pass, longest first: a replacement is never matched again.
-    needles.sort((a, b) => b.needle.length - a.needle.length);
-    const idOf = new Map<string, string>();
-    for (const { needle, id } of needles) {
-      if (!idOf.has(needle.toLowerCase())) idOf.set(needle.toLowerCase(), id);
+    if (long.length === 0 && short.length === 0) return text;
+    // Matches become private-use tokens first (no needle can match one), and
+    // the ids are put in at the end.
+    const ids: string[] = [];
+    const token = (id: string) => {
+      ids.push(id);
+      return `${TOKEN_OPEN}${String.fromCharCode(TOKEN_INDEX_BASE + ids.length - 1)}${TOKEN_CLOSE}`;
+    };
+    let result = text;
+    if (long.length > 0) {
+      long.sort((a, b) => b.needle.length - a.needle.length);
+      const idOf = new Map<string, string>();
+      for (const { needle, id } of long) {
+        if (!idOf.has(needle.toLowerCase())) idOf.set(needle.toLowerCase(), id);
+      }
+      const pattern = new RegExp(long.map(({ needle }) => escapeRegExp(needle)).join('|'), 'giu');
+      result = result.replace(pattern, (match) => token(idOf.get(match.toLowerCase()) ?? 'id'));
     }
-    const pattern = new RegExp(needles.map(({ needle }) => escapeRegExp(needle)).join('|'), 'giu');
-    return text.replace(
-      pattern,
-      (match) => `[customer decision ${idOf.get(match.toLowerCase()) ?? 'id'}]`
-    );
+    if (short.length > 0) {
+      short.sort((a, b) => b.needle.length - a.needle.length);
+      const idOf = new Map<string, string>();
+      for (const { needle, id } of short) if (!idOf.has(needle)) idOf.set(needle, id);
+      const pattern = new RegExp(short.map(({ needle }) => wordPattern(needle)).join('|'), 'gu');
+      result = result.replace(pattern, (match) => token(idOf.get(match) ?? 'id'));
+    }
+    return result.replace(TOKEN_PATTERN, (_match, index: string) => {
+      const id = ids[index.charCodeAt(0) - TOKEN_INDEX_BASE] ?? 'id';
+      return `[customer decision ${id}]`;
+    });
+  }
+
+  /**
+   * A deep copy of `value` with {@link scrub} applied to every string in it
+   * (keys are kept). Objects under a key in `skipKeys` are copied unchanged.
+   */
+  scrubValue<T>(value: T, skipKeys: readonly string[] = []): T {
+    return scrubDeep(value, (text) => this.scrub(text), new Set(skipKeys), 0) as T;
+  }
+}
+
+/**
+ * Scrub a worker response in place before any copy of it is stored: every
+ * free-text string of the task result (the `customer_decisions` the worker
+ * proposes stay as they are — they go to the confidential decision lock),
+ * the notes and the parse errors.
+ */
+export function scrubTaskResponseValues(
+  values: ConfidentialTaskDecisionValues,
+  response: {
+    taskResult?: object;
+    notes?: string[];
+    parseErrors?: string[];
+    surfaceParseErrors?: string[];
+  }
+): void {
+  if (response.taskResult) {
+    response.taskResult = values.scrubValue(response.taskResult, ['customer_decisions']);
+  }
+  for (const key of ['notes', 'parseErrors', 'surfaceParseErrors'] as const) {
+    const list = response[key];
+    if (Array.isArray(list))
+      list.splice(0, list.length, ...list.map((entry) => values.scrub(String(entry))));
   }
 }

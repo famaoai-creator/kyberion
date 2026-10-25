@@ -93,17 +93,25 @@ export function isCustomerDecisionMilestoneCapability(
   }
 }
 
-/** Stable JSON for value comparison (key order never makes two equal values differ). */
+/**
+ * Stable JSON for value comparison (key order never makes two equal values
+ * differ). Every own key is kept as data — a `"__proto__"` key from parsed
+ * content is defined, never assigned, so it cannot drop out of the comparison.
+ * Shared by the content-checked guards (milestone, consumer, invite revoke).
+ */
 export function caseRecordCanonicalJson(value: unknown): string {
   const sortKeys = (input: unknown): unknown => {
     if (Array.isArray(input)) return input.map(sortKeys);
     if (input && typeof input === 'object') {
-      return Object.keys(input as Record<string, unknown>)
-        .sort()
-        .reduce<Record<string, unknown>>((acc, key) => {
-          acc[key] = sortKeys((input as Record<string, unknown>)[key]);
-          return acc;
-        }, {});
+      const sorted: Record<string, unknown> = Object.create(null);
+      for (const key of Object.keys(input as Record<string, unknown>).sort())
+        Object.defineProperty(sorted, key, {
+          value: sortKeys((input as Record<string, unknown>)[key]),
+          enumerable: true,
+          writable: true,
+          configurable: true,
+        });
+      return sorted;
     }
     return input;
   };

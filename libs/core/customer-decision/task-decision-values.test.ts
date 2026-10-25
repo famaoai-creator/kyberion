@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CONFIRMED_CUSTOMER_DECISIONS_HEADING,
   ConfidentialTaskDecisionValues,
+  scrubTaskResponseValues,
 } from './task-decision-values.js';
 
 const SENTINEL = 'release-on-nov-first-SENTINEL';
@@ -85,5 +86,70 @@ describe('ConfidentialTaskDecisionValues (CD-09)', () => {
     expect(scrubbed).toContain('true, ok');
     // Nothing to scrub: the text is unchanged.
     expect(holder().scrub('Completed the widget.')).toBe('Completed the widget.');
+  });
+
+  const shortValues = (...values: unknown[]) =>
+    new ConfidentialTaskDecisionValues(
+      { tenantSlug: 'acme-corp', caseId: 'case-a', consumer: 'c' },
+      values.map((value, index) => ({
+        proposal_id: `tp-${index}`,
+        agenda_id: 'agd-test0001',
+        entry_id: `e${index}`,
+        item: 'I',
+        key: `k${index}`,
+        question: 'Q?',
+        decision_id: `D-000${index + 1}`,
+        value,
+      }))
+    );
+
+  it('scrubs short values only as words of their own (Latin, numbers, Japanese)', () => {
+    const values = shortValues('yes', 'A', '5%', 'はい', '承認');
+    expect(values.scrub('The answer was yes, plan A at 5% — はい、承認です')).toBe(
+      'The answer was [customer decision D-0001], plan [customer decision D-0002] at [customer decision D-0003] — [customer decision D-0004]、[customer decision D-0005]です'
+    );
+    // Never inside a longer word or number.
+    const kept = 'yesterday an Apple rose 15% はいけい 承認者';
+    expect(values.scrub(kept)).toBe(kept);
+    // A replacement is never scrubbed again (D, decision, customer are not values here).
+    expect(shortValues('D').scrub('pick D now')).toBe('pick [customer decision D-0001] now');
+  });
+
+  it('scrubs every string of a task result except the proposals it makes', () => {
+    const values = holder();
+    const response = {
+      taskResult: {
+        summary: `done ${SENTINEL}`,
+        artifacts: [{ path: `out/${SENTINEL}.md`, kind: 'doc' }],
+        verification_done: ['ok'],
+        gaps: [],
+        needs: [],
+        acceptance_evidence: [
+          {
+            criterion: `ship ${SENTINEL}`,
+            status: 'passed' as const,
+            evidence: `said ${SENTINEL}`,
+          },
+        ],
+        review_findings: [{ severity: 'nit' as const, location: SENTINEL, instruction: 'x' }],
+        knowledge_feedback: { used: [SENTINEL], not_used: [], missing_topics: [SENTINEL] },
+        customer_decisions: [
+          {
+            question: 'Q?',
+            item: 'I',
+            key: 'k',
+            proposed_value: SENTINEL,
+            requires_customer: false,
+          },
+        ],
+      },
+      notes: [`note ${SENTINEL}`],
+      parseErrors: [`bad ${SENTINEL}`],
+      surfaceParseErrors: [],
+    };
+    scrubTaskResponseValues(values, response);
+    const { customer_decisions, ...rest } = response.taskResult;
+    expect(JSON.stringify([rest, response.notes, response.parseErrors])).not.toContain(SENTINEL);
+    expect(customer_decisions[0].proposed_value).toBe(SENTINEL);
   });
 });

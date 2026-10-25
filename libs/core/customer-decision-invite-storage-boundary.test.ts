@@ -81,7 +81,16 @@ function setProfile(tenant: string, status: string | null): void {
   process.env.KYBERION_PERSONA = 'sovereign';
   try {
     if (status === null) io.safeRmSync(file, { force: true });
-    else io.safeWriteFile(file, JSON.stringify({ tenant_slug: tenant, status }));
+    else
+      io.safeWriteFile(
+        file,
+        JSON.stringify({
+          tenant_slug: tenant,
+          display_name: tenant,
+          status,
+          assigned_role: 'owner',
+        })
+      );
   } finally {
     delete process.env.KYBERION_PERSONA;
   }
@@ -239,11 +248,11 @@ describe('customer decision invite store on the real tier/tenant guard', () => {
     const { invite: issued, token } = invite.issueInvite(base());
     const { invite: second } = invite.issueInvite(base());
     setProfile(TENANT, 'suspended');
-    // The use record is refused, so the invite stops working.
-    expect(invite.verifyInviteToken(TENANT, token, { now: NOW, action: 'view' })).toEqual({
-      ok: false,
-      reason: 'unavailable',
-    });
+    // The invite stops working, with or without a use record.
+    for (const record of [true, false])
+      expect(invite.verifyInviteToken(TENANT, token, { now: NOW, action: 'view', record })).toEqual(
+        { ok: false, reason: 'unavailable' }
+      );
     expect(readRaw(TENANT, issued.invite_id).uses).toEqual([]);
     // No new invite.
     expect(() => invite.issueInvite(base())).toThrow(/\[CD_INVITE_TENANT_NOT_REGISTERED\]/u);

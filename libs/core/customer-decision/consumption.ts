@@ -419,7 +419,7 @@ export function taskProposalHolds(
   ledger: readonly DecisionRecord[],
   now: string
 ): TaskProposalHold[] {
-  const byId = new Map(agendas.map((agenda) => [agenda.agenda_id, agenda]));
+  const inForce = inForceResolver(agendas, ledger, now);
   return taskProposalsOf(lock)
     .filter((entry) => entry.proposal.requires_customer)
     .map((entry) => {
@@ -427,20 +427,60 @@ export function taskProposalHolds(
         proposal_id: entry.proposal.proposal_id,
         collected: Boolean(entry.agenda_id),
       };
-      if (entry.proposal.resolved) {
-        return { ...hold, resolved_decision_id: entry.proposal.resolved.decision_id };
+      const found = inForce(entry);
+      if (found === 'agenda_missing') {
+        // The agenda is gone: the release it recorded is all that is left.
+        return entry.proposal.resolved
+          ? { ...hold, resolved_decision_id: entry.proposal.resolved.decision_id }
+          : hold;
       }
-      const agenda = entry.agenda_id ? byId.get(entry.agenda_id) : undefined;
-      if (!agenda) return hold;
-      const current = resolveAgendaEffective(agenda, ledger, { now }).find(
-        (decision) => decision.entry_id === entry.entry_id
-      );
-      return current?.layer === 'customer' &&
-        current.decision_id &&
-        !current.awaiting_operator_confirmation
-        ? { ...hold, resolved_decision_id: current.decision_id }
-        : hold;
+      // A release is not forever: once the customer changes the answer (now
+      // awaiting the operator's confirmation) the task waits again.
+      return found ? { ...hold, resolved_decision_id: found.decisionId } : hold;
     });
+}
+
+/** The agenda entry id a task proposal is answered on (the proposal id doubles as it). */
+export function taskProposalEntryId(entry: TaskProposalLockEntry): string {
+  return entry.entry_id ?? entry.proposal.proposal_id;
+}
+
+/**
+ * The customer decision in force on a proposal's agenda entry, confirmed by
+ * the operator (layer customer, a ledger id, a value, not awaiting
+ * confirmation). `'agenda_missing'` when the proposal names an agenda that is
+ * not in `agendas`; undefined when it is uncollected or nothing is in force.
+ */
+function inForceResolver(
+  agendas: readonly DecisionAgenda[],
+  ledger: readonly DecisionRecord[],
+  now: string
+): (
+  entry: TaskProposalLockEntry
+) =>
+  | { agenda: DecisionAgenda; decision: EffectiveDecision; decisionId: string }
+  | 'agenda_missing'
+  | undefined {
+  const byId = new Map(agendas.map((agenda) => [agenda.agenda_id, agenda]));
+  const resolved = new Map<string, EffectiveDecision[]>();
+  return (entry) => {
+    if (!entry.agenda_id) return undefined;
+    const agenda = byId.get(entry.agenda_id);
+    if (!agenda) return 'agenda_missing';
+    let effective = resolved.get(agenda.agenda_id);
+    if (!effective) {
+      effective = resolveAgendaEffective(agenda, ledger, { now });
+      resolved.set(agenda.agenda_id, effective);
+    }
+    const entryId = taskProposalEntryId(entry);
+    const current = effective.find((decision) => decision.entry_id === entryId);
+    return current?.layer === 'customer' &&
+      current.decision_id &&
+      !current.awaiting_operator_confirmation &&
+      current.value !== undefined
+      ? { agenda, decision: current, decisionId: current.decision_id }
+      : undefined;
+  };
 }
 
 /** A confirmed customer decision on one of the task's own `requires_customer` proposals. */
@@ -473,28 +513,14 @@ export function resolvedTaskProposalDecisions(
   ledger: readonly DecisionRecord[],
   now: string
 ): ResolvedTaskProposalDecision[] {
-  const byId = new Map(agendas.map((agenda) => [agenda.agenda_id, agenda]));
-  const resolved = new Map<string, EffectiveDecision[]>();
+  const inForce = inForceResolver(agendas, ledger, now);
   const out: ResolvedTaskProposalDecision[] = [];
   for (const entry of taskProposalsOf(lock)) {
-    if (!entry.proposal.requires_customer || !entry.agenda_id) continue;
-    const agenda = byId.get(entry.agenda_id);
-    if (!agenda) continue;
-    const entryId = entry.entry_id ?? entry.proposal.proposal_id;
-    let effective = resolved.get(agenda.agenda_id);
-    if (!effective) {
-      effective = resolveAgendaEffective(agenda, ledger, { now });
-      resolved.set(agenda.agenda_id, effective);
-    }
-    const current = effective.find((decision) => decision.entry_id === entryId);
-    if (
-      current?.layer !== 'customer' ||
-      !current.decision_id ||
-      current.awaiting_operator_confirmation ||
-      current.value === undefined
-    ) {
-      continue;
-    }
+    if (!entry.proposal.requires_customer) continue;
+    const found = inForce(entry);
+    if (!found || found === 'agenda_missing') continue;
+    const { agenda, decision: current } = found;
+    const entryId = taskProposalEntryId(entry);
     const agendaEntry = agenda.entries.find((candidate) => candidate.entry_id === entryId);
     const picked = agendaEntry?.options?.find(
       (option) => canonicalJson(option.value) === canonicalJson(current.value)
@@ -506,7 +532,7 @@ export function resolvedTaskProposalDecisions(
       item: entry.item,
       key: entry.key,
       question: entry.proposal.question,
-      decision_id: current.decision_id,
+      decision_id: found.decisionId,
       value: current.value,
       ...(picked?.label ? { option_label: picked.label } : {}),
     });
