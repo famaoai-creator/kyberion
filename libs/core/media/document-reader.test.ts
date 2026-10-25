@@ -179,6 +179,21 @@ describe('document-reader', () => {
     expect(result.warnings.join(' ')).toMatch(/not OCR/);
   });
 
+  it('prefers OOXML File Properties title over the first pptx shape', async () => {
+    const zip = new AdmZip(pptxFixture());
+    zip.addFile(
+      'docProps/core.xml',
+      Buffer.from(
+        '<?xml version="1.0"?><cp:coreProperties xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Board Pack 2026</dc:title></cp:coreProperties>',
+        'utf8'
+      )
+    );
+    const result = await readDocument(zip.toBuffer(), 'pptx');
+    expect(result.title).toBe('Board Pack 2026');
+    expect(result.markdown.startsWith('# Board Pack 2026')).toBe(true);
+    expect(result.markdown).toContain('## Slide 1: Board Meeting');
+  });
+
   it('reads docx headings, line breaks and tables', async () => {
     const result = await readDocument(docxFixture(), 'docx');
     expect(result.title).toBe('Incident Report');
@@ -186,11 +201,67 @@ describe('document-reader', () => {
     expect(result.markdown).toContain('| 0:32 | Stopped |');
   });
 
+  it('prefers OOXML File Properties title over the first docx heading', async () => {
+    const zip = new AdmZip(docxFixture());
+    zip.addFile(
+      'docProps/core.xml',
+      Buffer.from(
+        '<?xml version="1.0"?><cp:coreProperties xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>File Properties Title</dc:title></cp:coreProperties>',
+        'utf8'
+      )
+    );
+    const result = await readDocument(zip.toBuffer(), 'docx');
+    expect(result.title).toBe('File Properties Title');
+    expect(result.markdown.startsWith('# File Properties Title')).toBe(true);
+    expect(result.markdown).toContain('# Incident Report');
+  });
+
+  it('reads a docx File Properties title when the body has no heading', async () => {
+    const zip = new AdmZip();
+    zip.addFile(
+      '[Content_Types].xml',
+      Buffer.from(
+        '<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>'
+      )
+    );
+    zip.addFile(
+      '_rels/.rels',
+      Buffer.from(
+        `<?xml version="1.0"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${REL}/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>`
+      )
+    );
+    zip.addFile(
+      'docProps/core.xml',
+      Buffer.from(
+        '<?xml version="1.0"?><cp:coreProperties xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>取締役会資料</dc:title></cp:coreProperties>'
+      )
+    );
+    zip.addFile(
+      'word/document.xml',
+      Buffer.from(
+        '<?xml version="1.0"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>本文だけの段落。</w:t></w:r></w:p></w:body></w:document>'
+      )
+    );
+    const result = await readDocument(zip.toBuffer(), 'docx');
+    expect(result.title).toBe('取締役会資料');
+    expect(result.markdown.startsWith('# 取締役会資料')).toBe(true);
+  });
+
   it('reads xlsx sheets as tables and reports hidden sheets', async () => {
     const result = await readDocument(await xlsxFixture(), 'xlsx');
     expect(result.tables.map((table) => table.name)).toEqual(['Deals']);
     expect(result.markdown).toContain('| Alpha | 100 |');
     expect(result.warnings).toEqual(['hidden sheets not read: Scratch']);
+  });
+
+  it('reads an xlsx workbook title from File Properties', async () => {
+    const workbook = new ExcelJS.Workbook();
+    workbook.title = 'Quarterly Numbers';
+    workbook.addWorksheet('Data').addRow(['Metric', 'Value'], ['Alpha', 1]);
+    const result = await readDocument(Buffer.from(await workbook.xlsx.writeBuffer()), 'xlsx');
+    expect(result.title).toBe('Quarterly Numbers');
+    expect(result.markdown.startsWith('# Quarterly Numbers')).toBe(true);
+    expect(result.markdown).toContain('## Data');
   });
 
   it('renders xlsx numbers with their number formats', async () => {
