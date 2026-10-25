@@ -3,6 +3,7 @@ import * as nodePath from 'node:path';
 import { readJsonLines } from '../foundation/json.js';
 import { validateA2ATaskContract } from '../mesh/a2a-task-contract.js';
 import { resolveRuntimeScope } from '../tool/runtime-scope.js';
+import * as routingJudgment from '../task/task-routing-judgment.js';
 import * as dispatchLifecycle from './mission-dispatch-lifecycle.js';
 
 import {
@@ -294,6 +295,70 @@ afterEach(() => {
 });
 
 describe('mission work item dispatch', () => {
+  it.each([
+    'A2A task contract validation failed: /context Unrecognized keys lease_id',
+    '[EVENT_SCOPE_LINEAGE_CONFLICT] project_id differs from authoritative mission',
+    'invalid_supervisor_response: malformed refresh response',
+  ])(
+    'keeps pre-model failure out of tier escalation and model-failure labels: %s',
+    async (reason) => {
+      const item = createWorkItem({
+        title: 'Validate a bounded public contract',
+        description: 'Do not retry a broken dispatch contract',
+        status: 'ready',
+        projectId: missionId,
+        assigneePeerId: 'sovereign-brain',
+        labels: [`mission:${missionId}`, 'team_role:planner'],
+        context: { mission_id: missionId, task_id: 'preflight-task' },
+        metadata: {
+          team_role: 'planner',
+          phase_kind: 'implement',
+          estimated_scope: 'S',
+          risk: 'low',
+          execution_surface: 'agent_runtime',
+          routing_minimum_tier: 'small',
+          deliverable: 'evidence/preflight.md',
+        },
+      });
+      const recordOutcome = vi
+        .spyOn(routingJudgment, 'recordRoutingOutcome')
+        .mockImplementation(() => undefined);
+      const routeA2A = vi.fn(async () => {
+        throw new Error(reason);
+      });
+      try {
+        const manifest = await dispatchMissionWorkItems(
+          makeMissionState(),
+          { mode: 'agent', statuses: ['ready'] },
+          { routeA2A }
+        );
+        expect(routeA2A, JSON.stringify(manifest.records)).toHaveBeenCalledTimes(1);
+        expect(manifest.records[0]).toMatchObject({
+          status: 'failed',
+          work_item_status_after: 'blocked',
+        });
+        expect(getWorkItem(item.item_id)?.metadata?.routing_minimum_tier).toBe('small');
+        expect(recordOutcome).toHaveBeenCalledWith(
+          expect.objectContaining({
+            ...(reason.startsWith('invalid_supervisor_response')
+              ? {
+                  outcome: 'unknown',
+                  unknown_reason: expect.any(String),
+                }
+              : { outcome: 'not_attempted', not_attempted_reason: expect.any(String) }),
+            succeeded: false,
+          }),
+          expect.anything()
+        );
+        expect(recordOutcome.mock.calls.some(([outcome]) => outcome.outcome === 'attempted')).toBe(
+          false
+        );
+      } finally {
+        recordOutcome.mockRestore();
+      }
+    }
+  );
+
   it('fails closed for malformed independent reviewer verdict shapes', () => {
     expect(parseIndependentReviewerVerdict('{"approved":[],"refuted":false}')).toMatchObject({
       approved: false,

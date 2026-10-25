@@ -94,11 +94,17 @@ vi.mock('./a2a-conversation-store.js', () => ({
   rehydrateConversation: mocks.rehydrateConversation,
 }));
 
-vi.mock('../agent/agent-runtime-supervisor-client.js', () => ({
+vi.mock('../agent/agent-runtime-supervisor-client.js', async () => ({
+  ...(await vi.importActual<typeof import('../agent/agent-runtime-supervisor-client.js')>(
+    '../agent/agent-runtime-supervisor-client.js'
+  )),
   ensureAgentRuntimeViaDaemon: mocks.ensureAgentRuntimeViaDaemon,
   createSupervisorBackedAgentHandle: mocks.createSupervisorBackedAgentHandle,
   askAgentRuntimeViaDaemon: mocks.askAgentRuntimeViaDaemon,
   shutdownAgentRuntimeViaDaemon: mocks.shutdownAgentRuntimeViaDaemon,
+  refreshAgentRuntimeViaDaemon: vi.fn(async () => {
+    throw new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED');
+  }),
   toSupervisorEnsurePayload: mocks.toSupervisorEnsurePayload,
 }));
 
@@ -302,6 +308,7 @@ describe('a2a-bridge', () => {
         })
       );
       expect(mocks.reserveMissionTeamSelectionDispatch).toHaveBeenCalledWith({
+        executionRoute: 'agent_runtime',
         missionId: 'MSN-SELECTION-TEST',
         teamRole: 'planner',
         agentId: 'planner-agent',
@@ -647,7 +654,9 @@ describe('a2a-bridge', () => {
     mocks.askAgentRuntime.mockImplementation(
       async (_agentId: string, prompt: string) => `echo:${prompt}`
     );
-    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+      new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+    );
     mocks.get.mockImplementation((agentId: string) => {
       if (agentId === 'sender-x') return { status: 'ready' };
       if (agentId === 'codex-nerve') return { status: 'ready' };
@@ -708,7 +717,9 @@ describe('a2a-bridge', () => {
     mocks.askAgentRuntime.mockImplementation(
       async (_agentId: string, prompt: string) => `echo:${prompt}`
     );
-    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+      new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+    );
     mocks.get.mockImplementation((agentId: string) =>
       agentId === 'sender-x' || agentId === 'codex-nerve' ? { status: 'ready' } : undefined
     );
@@ -747,7 +758,9 @@ describe('a2a-bridge', () => {
       agentId === 'nerve-agent' ? handle : null
     );
     mocks.askAgentRuntime.mockResolvedValue('ok');
-    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+      new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+    );
     mocks.get.mockImplementation((agentId: string) => {
       if (agentId === 'sender-x' || agentId === 'nerve-agent') return { status: 'ready' };
       return undefined;
@@ -833,7 +846,9 @@ describe('a2a-bridge', () => {
     mocks.ensureAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
     mocks.getAgentRuntimeHandle.mockReturnValue(null);
     mocks.askAgentRuntime.mockResolvedValue('ok');
-    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+      new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+    );
     mocks.get.mockReturnValue(undefined);
 
     await a2aBridge.route({
@@ -929,7 +944,9 @@ describe('a2a-bridge', () => {
       agentId === 'nerve-agent' ? handle : null
     );
     mocks.askAgentRuntime.mockResolvedValue('ok');
-    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+      new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+    );
     mocks.get.mockReturnValue(undefined);
 
     await a2aBridge.route({
@@ -977,7 +994,9 @@ describe('a2a-bridge', () => {
       agentId === 'agent-y' ? handle : null
     );
     mocks.askAgentRuntime.mockResolvedValue('ok');
-    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+    mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+      new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+    );
 
     await expect(
       a2aBridge.route({
@@ -1054,6 +1073,56 @@ describe('a2a-bridge', () => {
     expect(mocks.ensureAgentRuntime).not.toHaveBeenCalled();
     expect(result.payload).toEqual({ text: 'daemon-ok' });
   });
+
+  it.each(['uncertain', 'remote-output-failure'] as const)(
+    'never retries an accepted or uncertain daemon ask through a local provider: %s',
+    async (kind) => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const { restoreSupervisorError } = await vi.importActual<
+        typeof import('../agent/agent-runtime-supervisor-client.js')
+      >('../agent/agent-runtime-supervisor-client.js');
+      const original =
+        kind === 'uncertain'
+          ? new Error('supervisor_response_closed')
+          : restoreSupervisorError(
+              '[TASK_TOOL_OUTPUT_UNVERIFIED] Actual task output has not been verified'
+            );
+      const daemonHandle = { ask: vi.fn(async () => 'must not retry') };
+      mocks.getAgentManifest.mockReturnValue({
+        provider: 'gemini',
+        modelId: 'gemini-2.5-pro',
+        systemPrompt: 'agent',
+        capabilities: ['delegate'],
+      });
+      mocks.ensureAgentRuntimeViaDaemon.mockResolvedValue({
+        agent_id: 'nerve-agent',
+        provider: 'gemini',
+        model_id: 'gemini-2.5-pro',
+        status: 'ready',
+        session_id: 'session-unknown',
+      });
+      mocks.createSupervisorBackedAgentHandle.mockReturnValue(daemonHandle);
+      mocks.askAgentRuntimeViaDaemon.mockRejectedValue(original);
+      mocks.get.mockImplementation((id: string) =>
+        ['sender-x', 'nerve-agent'].includes(id) ? { status: 'ready' } : undefined
+      );
+      await expect(
+        a2aBridge.route({
+          a2a_version: '1.0',
+          header: {
+            msg_id: 'MSG-UNKNOWN',
+            sender: 'sender-x',
+            receiver: 'nerve-agent',
+            performative: 'request',
+          },
+          payload: { text: 'single remote attempt' },
+        })
+      ).rejects.toBe(original);
+      expect(mocks.askAgentRuntimeViaDaemon).toHaveBeenCalledTimes(1);
+      expect(daemonHandle.ask).not.toHaveBeenCalled();
+      expect(mocks.askAgentRuntime).not.toHaveBeenCalled();
+    }
+  );
 
   it('forwards a mission dispatch budget to the supervisor ask transport', async () => {
     const { a2aBridge } = await import('./a2a-bridge.js');
@@ -1190,7 +1259,9 @@ describe('a2a-bridge', () => {
         id === agentId ? handle : null
       );
       mocks.askAgentRuntime.mockResolvedValue('ok');
-      mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+      mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+        new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+      );
       mocks.get.mockReturnValue({ status: 'ready' });
     }
 
@@ -1354,7 +1425,9 @@ describe('a2a-bridge', () => {
         id === agentId ? handle : null
       );
       mocks.askAgentRuntime.mockResolvedValue('ok');
-      mocks.askAgentRuntimeViaDaemon.mockRejectedValue(new Error('offline'));
+      mocks.askAgentRuntimeViaDaemon.mockRejectedValue(
+        new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED')
+      );
       mocks.get.mockReturnValue({ status: 'ready' });
     }
 

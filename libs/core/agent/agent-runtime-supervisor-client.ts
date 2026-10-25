@@ -40,6 +40,11 @@ class SupervisorRemoteError extends Error {
   }
 }
 
+/** The supervisor accepted and answered this request; it is not local transport unavailability. */
+export function isSupervisorRemoteError(error: unknown): error is SupervisorRemoteError {
+  return error instanceof SupervisorRemoteError;
+}
+
 /** Preserve suspension across JSON-RPC instead of collapsing it to a failure. */
 export function restoreSupervisorError(message: string, detail?: Record<string, unknown>): Error {
   if (detail?.code === 'AGENT_APPROVAL_PENDING' && typeof detail.approval_request_id === 'string')
@@ -449,6 +454,7 @@ async function sendSupervisorRequest<TPayload, TResult>(
     const socket = net.createConnection(targetSocket);
     let buffer = '';
     let settled = false;
+    let submitted = false;
 
     const finish = (fn: () => void) => {
       if (settled) return;
@@ -456,9 +462,18 @@ async function sendSupervisorRequest<TPayload, TResult>(
       socket.destroy();
       fn();
     };
+    const tagRequestPhase = (error: Error) => {
+      const preAsk = !submitted || !['ask', 'delegated_enqueue'].includes(request.method);
+      error.message = `${preAsk ? '[SUPERVISOR_PREASK_FAILED] ' : ''}method=${request.method} ${error.message}`;
+      return Object.assign(error, { supervisorMethod: request.method, submitted });
+    };
+    const failTransport = (message: string) => {
+      finish(() => reject(tagRequestPhase(new Error(message))));
+    };
 
     socket.setTimeout(timeoutMs);
     socket.once('connect', () => {
+      submitted = true;
       socket.write(`${JSON.stringify(request)}\n`);
     });
     socket.on('data', (chunk) => {
@@ -475,17 +490,19 @@ async function sendSupervisorRequest<TPayload, TResult>(
             response.error || 'supervisor_request_failed',
             response.errorDetail
           );
-          return finish(() => reject(err));
+          return finish(() => reject(tagRequestPhase(err)));
         }
-        return finish(() => resolve(parseResult(response.result)));
+        // Parse while rejection is still possible. Settling/destroying the
+        // socket first would strand the promise if the endpoint parser throws.
+        const result = parseResult(response.result);
+        return finish(() => resolve(result));
       } catch (error: unknown) {
-        return finish(() =>
-          reject(new Error(`invalid_supervisor_response: ${errorMessage(error)}`))
-        );
+        return failTransport(`invalid_supervisor_response: ${errorMessage(error)}`);
       }
     });
-    socket.once('timeout', () => finish(() => reject(new Error('supervisor_request_timeout'))));
-    socket.once('error', (error) => finish(() => reject(error)));
+    socket.once('timeout', () => failTransport('supervisor_request_timeout'));
+    socket.once('error', (error) => failTransport(errorMessage(error)));
+    socket.once('close', () => failTransport('supervisor_response_closed'));
   });
 }
 

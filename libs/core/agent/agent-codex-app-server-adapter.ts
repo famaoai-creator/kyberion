@@ -38,9 +38,21 @@ const logger = createLogger('codex-app-server-adapter');
 const PROJECT_ROOT = pathResolver.rootDir();
 /** Local generated protocol/schema + startup flag probe covers these versions. */
 export const CODEX_GOVERNED_TOOL_PROTOCOL_VERSIONS = ['0.164'] as const;
-export const CODEX_GOVERNED_DISABLED_FEATURES = CODEX_ISOLATED_EXEC_FLAGS.flatMap(
-  (value, index, flags) => (value === '--disable' ? [flags[index + 1]!] : [])
-);
+export const CODEX_TASK_TOOL_NAMESPACE = 'kyberion';
+/** Codex concatenates a leading '_' directly to the namespace in VM tool names. */
+function codexTaskToolWireName(name: string): string {
+  return name.startsWith(`${CODEX_TASK_TOOL_NAMESPACE}_`)
+    ? name.slice(CODEX_TASK_TOOL_NAMESPACE.length)
+    : name;
+}
+export const CODEX_GOVERNED_DISABLED_FEATURES = [
+  ...CODEX_ISOLATED_EXEC_FLAGS.flatMap((value, index, flags) =>
+    value === '--disable' ? [flags[index + 1]!] : []
+  ).filter((feature) => feature !== 'code_mode_host'),
+  // Model-catalog code-mode-only sessions otherwise override direct namespace
+  // exposure and defer dynamic tools away from their fixed task namespace.
+  'code_mode_only_strict_3p_tools',
+];
 
 /** Effective config is merged by Codex: `mcp_servers={}` does not remove inherited keys. */
 export function resolveCodexTaskIsolationArgs(
@@ -75,7 +87,20 @@ export function resolveCodexTaskIsolationArgs(
     return parsed as Array<{ name: string; enabled?: boolean }>;
   };
   const configured = readServers([]);
-  const args = ['-c', 'web_search=disabled'];
+  const args = [
+    '-c',
+    'web_search=disabled',
+    // 0.164 starts the bare V8 dispatcher even for direct-only model tools.
+    // Its VM has no ambient OS/network APIs; native I/O features stay disabled.
+    '--enable',
+    'code_mode_host',
+    '-c',
+    'features.code_mode.enabled=false',
+    '-c',
+    'features.code_mode.direct_only_tool_namespaces=[]',
+    '-c',
+    'features.code_mode.excluded_tool_namespaces=["functions"]',
+  ];
   for (const name of new Set(configured.map((entry) => entry.name)))
     args.push('-c', `mcp_servers.${name}.enabled=false`);
   for (const feature of CODEX_GOVERNED_DISABLED_FEATURES) args.push('--disable', feature);
@@ -91,10 +116,16 @@ export function assertCodexTaskIsolationConfig(response: unknown): void {
   const config = isRecord(response) && isRecord(response.config) ? response.config : undefined;
   const features = config && isRecord(config.features) ? config.features : undefined;
   const servers = config?.mcp_servers;
+  const codeMode = features && isRecord(features.code_mode) ? features.code_mode : undefined;
   if (
     !config ||
     !features ||
     config.web_search !== 'disabled' ||
+    features.code_mode_host !== true ||
+    !codeMode ||
+    codeMode.enabled !== false ||
+    JSON.stringify(codeMode.direct_only_tool_namespaces) !== '[]' ||
+    JSON.stringify(codeMode.excluded_tool_namespaces) !== JSON.stringify(['functions']) ||
     CODEX_GOVERNED_DISABLED_FEATURES.some((feature) => features[feature] !== false) ||
     (servers !== undefined &&
       (!isRecord(servers) ||
@@ -361,7 +392,16 @@ export class CodexAppServerAdapter implements AgentAdapter {
   private codexVersion = 'unknown';
 
   constructor(options?: CodexAppServerAdapterOptions) {
-    this.options = options || {};
+    const model = options?.model?.trim();
+    // Catalog aliases choose the account's native default, not a literal
+    // server model named "codex". Exact model identifiers remain unchanged.
+    this.options = {
+      ...options,
+      model:
+        model && !['codex', 'codex-cli', 'default', 'auto'].includes(model.toLowerCase())
+          ? model
+          : undefined,
+    };
     this.addEnhancer(new CodexExecutionEnhancer());
   }
 
@@ -504,10 +544,18 @@ export class CodexAppServerAdapter implements AgentAdapter {
         persistExtendedHistory: false,
         ...(this.options.taskToolRuntime
           ? {
-              dynamicTools: this.options.taskToolRuntime.definitions.map((tool) => ({
-                ...tool,
-                type: 'function',
-              })),
+              dynamicTools: [
+                {
+                  type: 'namespace',
+                  name: CODEX_TASK_TOOL_NAMESPACE,
+                  description: 'Governed tools bound to the current Kyberion task.',
+                  tools: this.options.taskToolRuntime.definitions.map((tool) => ({
+                    ...tool,
+                    name: codexTaskToolWireName(tool.name),
+                    type: 'function',
+                  })),
+                },
+              ],
             }
           : {}),
       },
@@ -702,6 +750,8 @@ export class CodexAppServerAdapter implements AgentAdapter {
       lastNativeSubagent: this.lastNativeSubagentInfo,
       supportsNativeSubagents: this.nativeMultiAgentMode !== null,
       supportsSoftRefresh: true,
+      governedTaskToolCount: this.options.taskToolRuntime?.definitions.length ?? 0,
+      governedTaskToolNamespace: this.options.taskToolRuntime ? CODEX_TASK_TOOL_NAMESPACE : null,
     };
   }
 
@@ -724,10 +774,18 @@ export class CodexAppServerAdapter implements AgentAdapter {
         persistExtendedHistory: false,
         ...(this.options.taskToolRuntime
           ? {
-              dynamicTools: this.options.taskToolRuntime.definitions.map((tool) => ({
-                ...tool,
-                type: 'function',
-              })),
+              dynamicTools: [
+                {
+                  type: 'namespace',
+                  name: CODEX_TASK_TOOL_NAMESPACE,
+                  description: 'Governed tools bound to the current Kyberion task.',
+                  tools: this.options.taskToolRuntime.definitions.map((tool) => ({
+                    ...tool,
+                    name: codexTaskToolWireName(tool.name),
+                    type: 'function',
+                  })),
+                },
+              ],
             }
           : {}),
       },
@@ -848,7 +906,9 @@ export class CodexAppServerAdapter implements AgentAdapter {
         turn?.status === 'failed' || turn?.status === 'interrupted' ? turn.status : 'completed';
       const stopReason =
         status === 'failed' ? 'error' : status === 'interrupted' ? 'interrupted' : 'completed';
-      const finalText = this.accumulatedText;
+      const finalText =
+        this.accumulatedText ||
+        (status === 'failed' ? (readNestedString(turn, 'error', 'message') ?? '') : '');
       this.logBuffer.push({ ts: Date.now(), type: 'agent', content: finalText.slice(0, 500) });
       if (this.logBuffer.length > 200) this.logBuffer = this.logBuffer.slice(-200);
       const result = { text: finalText, stopReason };
@@ -913,7 +973,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
           return context(async () => {
             runtime.assertCurrent();
             if (
-              params?.namespace != null ||
+              params?.namespace !== CODEX_TASK_TOOL_NAMESPACE ||
               (params?.threadId &&
                 this.activeThreadId &&
                 params.threadId !== this.activeThreadId) ||
@@ -922,9 +982,13 @@ export class CodexAppServerAdapter implements AgentAdapter {
               throw new Error(
                 '[TASK_TOOL_DENIED] Tool request does not belong to the active task turn'
               );
-            const name = readString(params?.tool) ?? readString(params?.name);
-            if (!name || !runtime.definitions.some((definition) => definition.name === name))
-              throw new Error('[TASK_TOOL_DENIED] Tool is not installed for this task');
+            const wireName = readString(params?.tool) ?? readString(params?.name);
+            const installed = runtime.definitions.filter(
+              (definition) => codexTaskToolWireName(definition.name) === wireName
+            );
+            if (installed.length !== 1)
+              throw new Error('[TASK_TOOL_DENIED] Tool is not installed uniquely for this task');
+            const name = installed[0]!.name;
             const args =
               typeof params?.arguments === 'string'
                 ? parseSafeJsonInput(params.arguments, 'task tool arguments')

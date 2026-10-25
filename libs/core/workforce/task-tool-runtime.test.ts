@@ -98,11 +98,52 @@ function harness(profile = 'implementer', canonicalRole = 'implementer') {
 }
 
 describe('claimed task tool runtime', () => {
+  it('lets a planner read back only its current-lease fixed declared deliverable', async () => {
+    const h = harness('planner', 'planner');
+    const names = h.runtime.definitions.map((entry) => entry.name);
+    expect(names).toContain('kyberion_task_read_deliverable');
+    expect(names).not.toContain('kyberion_task_read_file');
+    await expect(
+      h.runtime.execute({ name: 'kyberion_task_read_deliverable', arguments: {} })
+    ).rejects.toThrow('TASK_TOOL_OUTPUT_UNVERIFIED');
+    const content = 'Declared planner result — verified bytes';
+    await h.runtime.execute({ name: 'kyberion_task_write_deliverable', arguments: { content } });
+    expect(
+      await h.runtime.execute({ name: 'kyberion_task_read_deliverable', arguments: {} })
+    ).toMatchObject({ content, sha256: expect.stringMatching(/^[a-f0-9]{64}$/) });
+    await expect(
+      h.runtime.execute({
+        name: 'kyberion_task_read_deliverable',
+        arguments: { path: 'knowledge/personal/private.md' },
+      })
+    ).rejects.toThrow('accepts no arguments');
+    h.setOutput('Changed outside the current write proof');
+    await expect(
+      h.runtime.execute({ name: 'kyberion_task_read_deliverable', arguments: {} })
+    ).rejects.toThrow('TASK_TOOL_OUTPUT_UNVERIFIED');
+    h.setOutput(content);
+    h.setLease({ expires_at: '2000-01-01T00:00:00Z' });
+    await expect(
+      h.runtime.execute({ name: 'kyberion_task_read_deliverable', arguments: {} })
+    ).rejects.toThrow('TASK_TOOL_LEASE_LOST');
+  });
+  it('does not grant deliverable read-back to a non-owning explorer or an unclaimed task', async () => {
+    const h = harness('explorer');
+    await expect(
+      h.runtime.execute({ name: 'kyberion_task_read_deliverable', arguments: {} })
+    ).rejects.toThrow('TASK_TOOL_DENIED');
+    const owner = harness('planner', 'planner');
+    owner.setItem({ status: 'ready', lease_id: undefined });
+    await expect(
+      owner.runtime.execute({ name: 'kyberion_task_read_deliverable', arguments: {} })
+    ).rejects.toThrow('TASK_TOOL_LEASE_LOST');
+  });
   it('binds to live task scope and emits provider-safe names', async () => {
     const h = harness();
     expect(h.runtime.binding.taskId).toBe(scope.task_id);
     expect(h.runtime.definitions.map((entry) => entry.name)).toEqual([
       'kyberion_task_read_file',
+      'kyberion_task_read_deliverable',
       'kyberion_task_write_deliverable',
       'kyberion_task_write_artifact',
       'kyberion_task_record_evidence',
