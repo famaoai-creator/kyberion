@@ -418,6 +418,7 @@ export interface SendToCustomerInput {
 export interface SendToCustomerResult {
   sent: boolean;
   status: 'sent' | 'approval_pending' | 'denied' | 'delivery_failed';
+  /** The held request, or — on `sent` — the approval that authorized it (when one did). */
   approvalRequestId?: string;
   /** The gate's reason for a held message (`created`, `pending`, `rejected`, `expired`, …). */
   approvalRequestStatus?: ApprovalGateResult['requestStatus'];
@@ -776,7 +777,12 @@ export async function sendToCustomer(input: SendToCustomerInput): Promise<SendTo
   }
   try {
     await input.deliver(input.body);
-    return { sent: true, status: 'sent' };
+    // The approval that authorized the send (absent when none was needed).
+    return {
+      sent: true,
+      status: 'sent',
+      ...(approval.requestId ? { approvalRequestId: approval.requestId } : {}),
+    };
   } catch (err) {
     const detail = err instanceof Error ? err.message : String(err);
     logger.error(`[customer-conversation] delivery failed: ${detail}`);

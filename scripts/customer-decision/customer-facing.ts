@@ -39,6 +39,7 @@ import {
   diagnosticCode,
   auditFailure,
   noteDealSwitches,
+  tenantOf,
 } from './common.js';
 import { completeRespond, reconcileCase } from './reconcile.js';
 import { routeBoltReview } from './bolt-review.js';
@@ -109,8 +110,9 @@ function openInvite(
   location: DecisionLedgerLocation;
   agenda: DecisionAgenda;
 } {
-  const tenant = opts.tenant;
-  if (!tenant || typeof token !== 'string') throw new CustomerFacingError('invalid_link');
+  if (!opts.tenant || typeof token !== 'string') throw new CustomerFacingError('invalid_link');
+  // The bound-tenant check before the token is verified (and recorded).
+  const tenant = tenantOf(opts);
   const verified = verifyInviteToken(tenant, token, { now, action, record });
   if (verified.ok === false) {
     throw new CustomerFacingError(

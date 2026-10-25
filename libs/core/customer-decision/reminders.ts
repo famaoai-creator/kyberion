@@ -18,7 +18,12 @@
  * One record per agenda × actor × kind × target date (`reminder_id`), kept
  * on the agenda outside the content hash (`agenda.reminders`). A record in
  * `approval_pending` is planned again (the sweep re-asks the gate with the
- * same correlation id); every other status is final.
+ * same correlation id), also after its send day (an approval granted after
+ * the day's sweep) for at most `REMINDER_CARRY_OVER_DAYS` and never after the
+ * date it is about; a held reminder no longer due is `lapsed` (dropped, its
+ * request withdrawn, nothing sent) and planned again only if it becomes due
+ * again. Every other status is final. A `due` reminder is not sent on a day a
+ * carried-over `before_due` already went out to the same decider.
  *
  * Hand-offs: after a response, the answers the operator must read — free
  * text outside a hearing entry (an answer outside the offered options),
@@ -87,6 +92,11 @@ export interface PlannedReminder {
   target_date: string;
   /** The day this reminder is (or was) due to go out. */
   send_on: string;
+  /**
+   * A held (`approval_pending`) `before_due` / `due` reminder planned after
+   * its send day: the approval came after that day's sweep.
+   */
+  carried_over?: true;
   /** The decider's valid invites (ids only). */
   invite_ids: string[];
   /**
@@ -275,27 +285,98 @@ export function scheduleAgendaReminders(input: ReminderPlanInput): PlannedRemind
   return reminders;
 }
 
-/** Recorded with a final status (anything but `approval_pending`). */
+/**
+ * How many days after its send day a held `before_due` / `due` reminder may
+ * still go out once approved — and never after the date it is about (so in
+ * practice a `before_due` on the due day; a `due` never: its text says
+ * "today"). Older ones lapse instead of being sent.
+ */
+export const REMINDER_CARRY_OVER_DAYS = 1;
+
+/** Recorded with a final status (anything but `approval_pending` or `lapsed`). */
 function isSettled(reminder: PlannedReminder, records: readonly AgendaReminderRecord[]): boolean {
   return records.some(
-    (record) => record.reminder_id === reminder.reminder_id && record.status !== 'approval_pending'
+    (record) =>
+      record.reminder_id === reminder.reminder_id &&
+      record.status !== 'approval_pending' &&
+      record.status !== 'lapsed'
+  );
+}
+
+function isHeld(reminder: PlannedReminder, records: readonly AgendaReminderRecord[]): boolean {
+  return records.some(
+    (record) => record.reminder_id === reminder.reminder_id && record.status === 'approval_pending'
+  );
+}
+
+/** A held reminder planned after its send day, within the carry-over limit. */
+function isCarriedOver(
+  reminder: PlannedReminder,
+  records: readonly AgendaReminderRecord[],
+  today: string
+): boolean {
+  return (
+    reminder.send_on < today &&
+    today <= reminder.target_date &&
+    today <= addUtcDays(reminder.send_on, REMINDER_CARRY_OVER_DAYS) &&
+    isHeld(reminder, records)
+  );
+}
+
+/**
+ * One message a day per decider and respond-by date: a `due` whose decider
+ * already got that date's `before_due` on (or after) the date — a carried-over
+ * one — and a `before_due` (only ever carried over, on the date) whose
+ * decider already got that date's `due`, whichever approval came first.
+ */
+export function isCoveredByEarlierReminder(
+  reminder: Pick<PlannedReminder, 'kind' | 'actor_id' | 'target_date'>,
+  records: readonly AgendaReminderRecord[]
+): boolean {
+  if (reminder.kind === 'override_closing') return false;
+  const other = reminder.kind === 'due' ? 'before_due' : 'due';
+  return records.some(
+    (record) =>
+      record.kind === other &&
+      record.status === 'sent' &&
+      record.actor_id === reminder.actor_id &&
+      record.target_date === reminder.target_date &&
+      (utcDate(record.at) ?? '') >= reminder.target_date
   );
 }
 
 /**
  * The reminders due at `now` that are not settled yet: `before_due` and
- * `due` on their exact day, `override_closing` from two days before the
+ * `due` on their exact day (or a held one carried over, see
+ * `REMINDER_CARRY_OVER_DAYS`), `override_closing` from two days before the
  * deadline while the window is open. Sorted for a stable sweep.
  */
 export function dueAgendaReminders(input: ReminderPlanInput): PlannedReminder[] {
   const today = utcDate(input.now);
   if (!today) return [];
   const records = input.agenda.reminders ?? [];
-  return scheduleAgendaReminders(input)
-    .filter((reminder) =>
-      reminder.kind === 'override_closing' ? reminder.send_on <= today : reminder.send_on === today
-    )
-    .filter((reminder) => !isSettled(reminder, records))
+  const due: PlannedReminder[] = [];
+  for (const reminder of scheduleAgendaReminders(input)) {
+    if (isSettled(reminder, records) || isCoveredByEarlierReminder(reminder, records)) continue;
+    if (reminder.kind === 'override_closing') {
+      if (reminder.send_on <= today) due.push(reminder);
+    } else if (reminder.send_on === today) due.push(reminder);
+    else if (isCarriedOver(reminder, records, today)) due.push({ ...reminder, carried_over: true });
+  }
+  return due.sort((a, b) => a.reminder_id.localeCompare(b.reminder_id));
+}
+
+/**
+ * The held (`approval_pending`) records not due at `now` any more — the send
+ * day and carry-over passed, the decider answered, the agenda was closed or
+ * changed, the invites lapsed, a carried-over `before_due` covered the `due`:
+ * the sweep withdraws their requests and records them `lapsed`, never sends them.
+ */
+export function lapsedAgendaReminders(input: ReminderPlanInput): AgendaReminderRecord[] {
+  if (!utcDate(input.now)) return [];
+  const due = new Set(dueAgendaReminders(input).map((reminder) => reminder.reminder_id));
+  return (input.agenda.reminders ?? [])
+    .filter((record) => record.status === 'approval_pending' && !due.has(record.reminder_id))
     .sort((a, b) => a.reminder_id.localeCompare(b.reminder_id));
 }
 
