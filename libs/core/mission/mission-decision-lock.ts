@@ -136,10 +136,15 @@ export interface PinTaskDecisionsResult {
   decision_values?: ConfidentialTaskDecisionValues;
   /**
    * The lock holds the task: its own `requires_customer` proposals that have
-   * no confirmed customer decision in force (ids only). The worker does not
-   * dispatch it (it waits, `awaiting_customer_decision`).
+   * no confirmed customer decision (ids only). The worker does not dispatch it.
    */
   held?: PinnedTaskHold;
+  /**
+   * The pin could not be made (finding or reading the case failed). The
+   * worker blocks the task (`customer_decision_check_failed`) when the case
+   * is known or the task was already held; it never runs on a guess.
+   */
+  failed?: { case_found: boolean; case_id?: string };
 }
 
 export interface PinnedTaskHold {
@@ -148,10 +153,12 @@ export interface PinnedTaskHold {
   proposal_ids: string[];
   /**
    * `decision_not_in_force`: a proposal released before has lost its
-   * confirmed decision (the customer changed the answer, now awaiting the
-   * operator's confirmation); `awaiting_customer_decision`: never released.
+   * confirmed decision on an open agenda (the customer changed the answer,
+   * now awaiting the operator's confirmation); `awaiting_customer_decision`:
+   * never released; `customer_decision_unresolvable`: its agenda is closed,
+   * withdrawn or gone with no confirmed decision left — nothing releases it.
    */
-  reason: 'decision_not_in_force' | 'awaiting_customer_decision';
+  reason: 'decision_not_in_force' | 'awaiting_customer_decision' | 'customer_decision_unresolvable';
 }
 
 export interface TaskDecisionReconciliation {
@@ -466,9 +473,11 @@ export function pinTaskDecisions(
   options: MissionDecisionLockOptions = {}
 ): PinTaskDecisionsResult | null {
   const consumer = missionTaskConsumerId(input.missionId, input.taskId);
+  let caseId: string | undefined;
   try {
     const decisionCase = resolveMissionDecisionCase(input.missionId, options);
     if (!decisionCase) return null;
+    caseId = decisionCase.caseId;
     const now = options.now ?? nowIso();
     const mode = input.mode ?? 'start';
     return withCustomerDecisionCaseLock(decisionCase.location, () => {
@@ -485,32 +494,34 @@ export function pinTaskDecisions(
         now,
       });
       // A re-pin keeps what the lock recorded (the guard refuses to drop it):
-      // the task's proposals, its rework records and its hold.
-      const holds = taskProposalHolds(
-        { decisions: existing ? taskProposalsOf(existing) : [] },
-        agendas,
-        ledger,
-        now
-      );
+      // the task's proposals, its rework records, its hold and — once it
+      // completed — its completion time (a completed task is never re-held).
+      const judged = existing
+        ? {
+            decisions: taskProposalsOf(existing),
+            status: existing.status,
+            ...(existing.completed_at ? { completed_at: existing.completed_at } : {}),
+          }
+        : { decisions: [] };
+      const holds = taskProposalHolds(judged, agendas, ledger, now);
       const proposals = stampResolved(existing ? taskProposalsOf(existing) : [], holds, now);
-      // An unresolved requires_customer proposal keeps the task held across a
-      // re-pin (a resume before the operator confirmed the customer's decision).
-      // The values a resumed task receives, from the snapshot just read
-      // (nothing new is written to the lock): every one of its own
-      // requires_customer proposals must have a confirmed decision in force.
-      const resolvedValues = existing?.hold
-        ? resolvedTaskProposalDecisions(existing, agendas, ledger, now)
-        : [];
-      const delivered = new Set(resolvedValues.map((value) => value.proposal_id));
-      const ownRequired = existing
-        ? taskProposalsOf(existing).filter((entry) => entry.proposal.requires_customer)
-        : [];
-      const missing = existing?.hold
-        ? ownRequired.filter((entry) => !delivered.has(entry.proposal.proposal_id))
-        : [];
-      const stillHeld = holds.some((hold) => !hold.resolved_decision_id) || missing.length > 0;
-      // A hold released before re-opens when its decision is no longer in force.
+      // The task waits while any of its own requires_customer proposals has
+      // no confirmed customer decision (a resume before the operator
+      // confirmed, or a release whose decision is no longer in force).
+      const missing = holds.filter((item) => !item.resolved_decision_id);
+      const stillHeld = missing.length > 0;
       const hold = nextHold(existing?.hold, stillHeld, now);
+      // The values a resumed task receives, from the snapshot just read
+      // (nothing new is written to the lock).
+      const resolvedValues =
+        existing?.hold && !stillHeld
+          ? resolvedTaskProposalDecisions(judged, agendas, ledger, now)
+          : [];
+      const released = new Set(
+        (existing ? taskProposalsOf(existing) : [])
+          .filter((entry) => entry.proposal.resolved)
+          .map((entry) => entry.proposal.proposal_id)
+      );
       writeLock(decisionCase, {
         version: '1.0.0',
         ...lock,
@@ -520,6 +531,7 @@ export function pinTaskDecisions(
         mission_id: input.missionId.toUpperCase(),
         task_id: input.taskId,
         status: 'in_progress',
+        ...(existing?.completed_at ? { completed_at: existing.completed_at } : {}),
         ...(existing?.rework?.length ? { rework: existing.rework } : {}),
         ...(hold ? { hold } : {}),
       });
@@ -527,19 +539,21 @@ export function pinTaskDecisions(
         consumer,
         pinned_count: lock.decisions.length,
         pinned: true,
-        ...(missing.length > 0
+        ...(existing?.hold && missing.length > 0
           ? {
               held: {
                 case_id: decisionCase.caseId,
                 tenant_slug: decisionCase.tenantSlug,
-                proposal_ids: missing.map((entry) => entry.proposal.proposal_id).sort(),
-                reason: missing.some((entry) => entry.proposal.resolved)
-                  ? ('decision_not_in_force' as const)
-                  : ('awaiting_customer_decision' as const),
+                proposal_ids: missing.map((item) => item.proposal_id).sort(),
+                reason: missing.some((item) => item.unresolvable)
+                  ? ('customer_decision_unresolvable' as const)
+                  : missing.some((item) => released.has(item.proposal_id))
+                    ? ('decision_not_in_force' as const)
+                    : ('awaiting_customer_decision' as const),
               },
             }
           : {}),
-        ...(missing.length === 0 && resolvedValues.length > 0
+        ...(resolvedValues.length > 0
           ? {
               decision_values: new ConfidentialTaskDecisionValues(
                 {
@@ -555,8 +569,15 @@ export function pinTaskDecisions(
       };
     });
   } catch (error) {
+    // Not "no case": the caller must not run a task that may be held without
+    // knowing (it blocks: customer_decision_check_failed).
     warnOnce(input.missionId, 'customer decision pin skipped', error, consumer);
-    return null;
+    return {
+      consumer,
+      pinned_count: 0,
+      pinned: false,
+      failed: { case_found: caseId !== undefined, ...(caseId ? { case_id: caseId } : {}) },
+    };
   }
 }
 
@@ -743,7 +764,16 @@ export function recordTaskDecisionProposals(
         const merged = mergeTaskProposals({ lock: base, requests: input.requests, agendas, now });
         // Every requires_customer proposal of the task holds it until resolved,
         // whether or not this result repeats the question.
-        const holds = taskProposalHolds({ decisions: merged.decisions }, agendas, ledger, now);
+        const holds = taskProposalHolds(
+          {
+            decisions: merged.decisions,
+            status: base.status,
+            ...(base.completed_at ? { completed_at: base.completed_at } : {}),
+          },
+          agendas,
+          ledger,
+          now
+        );
         const resolved = new Map(
           holds.flatMap((hold) =>
             hold.resolved_decision_id
@@ -1041,6 +1071,7 @@ export const CUSTOMER_DECISION_BLOCKED_REASONS: readonly string[] = [
   'awaiting_customer_decision',
   'customer_decision_check_failed',
   'customer_decision_tier_mismatch',
+  'customer_decision_unresolvable',
 ];
 
 /**
