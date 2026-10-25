@@ -1,12 +1,11 @@
 import { isOperationsHalted } from './operations-halt.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import {
-  appendGovernedArtifactJsonl,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
+  appendLocatedApprovalEvent,
+  locateApprovalRequest,
+  writeLocatedApprovalRequest,
+} from './approval-store-location.js';
 import {
-  approvalEventLogicalPath,
-  approvalRequestLogicalPath,
   decideApprovalRequest,
   listApprovalRequests,
   loadApprovalRequest,
@@ -149,21 +148,23 @@ export function evaluateVetoWindow(veto: ApprovalVetoWindow, now = Date.now()): 
   return veto.shadow ? 'elapsed_shadow' : 'elapsed';
 }
 
-function writeRecord(role: GovernedArtifactRole, record: ApprovalRequestRecord): void {
-  writeGovernedArtifactJson(
-    role,
-    approvalRequestLogicalPath(record.storageChannel, record.id),
-    record
-  );
-}
-
-function appendEvent(
+/**
+ * Write the updated record back to where it is stored (system tree or its
+ * tenant partition, approval-store-location.ts) and append the event to that
+ * location's log.
+ */
+function persistWithEvent(
   role: GovernedArtifactRole,
   record: ApprovalRequestRecord,
   event: string,
   extra: Record<string, unknown> = {}
 ): void {
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(record.storageChannel), {
+  const located = locateApprovalRequest(record.storageChannel, record.id, { scope: record.scope });
+  if (!located) {
+    throw new Error(`Approval request not found: ${record.storageChannel}/${record.id}`);
+  }
+  writeLocatedApprovalRequest(role, located, record);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event,
     request_id: record.id,
@@ -211,8 +212,7 @@ export function markApprovalNotificationDelivered(
     },
   };
   if (!proceedsAt) return fallBackToDecision(role, updated);
-  writeRecord(role, updated);
-  appendEvent(role, updated, 'notification_delivered', {
+  persistWithEvent(role, updated, 'notification_delivered', {
     delivered_at: updated.veto?.deliveredAt,
     proceeds_at: updated.veto?.proceedsAt,
   });
@@ -228,8 +228,7 @@ function fallBackToDecision(
     ...record,
     veto: { ...record.veto, fallback: 'undelivered' },
   };
-  writeRecord(role, updated);
-  appendEvent(role, updated, 'veto_window_fallback', { reason: 'undelivered' });
+  persistWithEvent(role, updated, 'veto_window_fallback', { reason: 'undelivered' });
   return updated;
 }
 
@@ -298,8 +297,7 @@ export function tickVetoWindows(
           ...record,
           veto: { ...veto, shadowElapsedAt: new Date(now).toISOString() },
         };
-        writeRecord(role, updated);
-        appendEvent(role, updated, 'veto_window_elapsed_shadow', {
+        persistWithEvent(role, updated, 'veto_window_elapsed_shadow', {
           proceeds_at: veto.proceedsAt,
         });
         result.shadowElapsed.push(updated);

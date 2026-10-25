@@ -1,0 +1,9 @@
+{
+  "role": "tenant_approval_partition_index_reader",
+  "description": "Read-only index reader of the per-tenant approval store partitions (libs/core/governance/approval-store-location.ts listApprovalPartitions). Assumed only by a process without an active tenant to enumerate the tenant directory names under active/shared/runtime/tenant-approvals/<personal|confidential>/; descendant reads are explicitly denied, so it never reads a record. Each listed tenant is then read as the tenant-bound tenant_approval_store. No write authority.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["confidential", "personal"]
+}

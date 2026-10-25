@@ -10,8 +10,10 @@
  * exactly what the decider was shown, for one request and one decision,
  * before a short deadline.
  *
- * Each challenge is stored beside the request it binds (the approval store's
- * coordination root) and moves through `issued → claimed → verified →
+ * Each challenge is stored beside the request it binds — the system tree's
+ * coordination root, or the request's tenant partition
+ * (approval-store-location.ts), read and written there with the same role
+ * rules as the request — and moves through `issued → claimed → verified →
  * consumed`, each step at most once: the verifier claims it before checking
  * the assertion (so a challenge is presented once, whatever the outcome), and
  * the approval store consumes it under the request lock when it records the
@@ -21,12 +23,15 @@
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { withLockSync } from '../lock-utils.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import {
-  readGovernedArtifactJson,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
-import { approvalStoreRoots } from './approval-store-paths.js';
+  approvalPasskeyChallengesLogicalDirAt,
+  locateApprovalRequest,
+  readApprovalJsonAt,
+  SYSTEM_APPROVAL_PARTITION,
+  writeApprovalJsonAt,
+  type ApprovalPartition,
+} from './approval-store-location.js';
 import {
   approvalPresentedDigestMatches,
   computeApprovalPresentedDigest,
@@ -96,9 +101,35 @@ function channelSegment(storageChannel: string): string {
   return channel;
 }
 
-function challengeLogicalPath(storageChannel: string, challengeId: string): string {
+/** Where a challenge lives: beside its request (a request this process cannot find → system tree). */
+interface ChallengeLocation {
+  partition: ApprovalPartition;
+  storageChannel: string;
+}
+
+function challengeLocation(storageChannel: string, requestId: string): ChallengeLocation {
+  const channel = channelSegment(storageChannel);
+  // A malformed request id cannot name a stored request; the expectation check refuses it.
+  const located = UUID_PATTERN.test(requestId) ? locateApprovalRequest(channel, requestId) : null;
+  return { partition: located?.partition ?? SYSTEM_APPROVAL_PARTITION, storageChannel: channel };
+}
+
+function challengeLogicalPath(location: ChallengeLocation, challengeId: string): string {
   if (!UUID_PATTERN.test(challengeId)) refuse('invalid challenge id', challengeId);
-  return `${approvalStoreRoots().coordination}/${channelSegment(storageChannel)}/approvals/passkey-challenges/${challengeId.toLowerCase()}.json`;
+  return `${approvalPasskeyChallengesLogicalDirAt(location.partition, location.storageChannel)}/${challengeId.toLowerCase()}.json`;
+}
+
+function writeChallenge(
+  role: GovernedArtifactRole,
+  location: ChallengeLocation,
+  record: ApprovalPasskeyChallengeRecord
+): void {
+  writeApprovalJsonAt(
+    role,
+    location.partition,
+    challengeLogicalPath(location, record.challenge_id),
+    record
+  );
 }
 
 function withChallengeLock<T>(storageChannel: string, challengeId: string, fn: () => T): T {
@@ -109,11 +140,12 @@ function withChallengeLock<T>(storageChannel: string, challengeId: string, fn: (
 }
 
 function readChallenge(
-  storageChannel: string,
+  location: ChallengeLocation,
   challengeId: string
 ): ApprovalPasskeyChallengeRecord {
-  const record = readGovernedArtifactJson<ApprovalPasskeyChallengeRecord>(
-    challengeLogicalPath(storageChannel, challengeId)
+  const record = readApprovalJsonAt<ApprovalPasskeyChallengeRecord>(
+    location.partition,
+    challengeLogicalPath(location, challengeId)
   );
   if (!record || record.version !== 1 || record.challenge_id !== challengeId.toLowerCase()) {
     refuse('unknown challenge', challengeId);
@@ -221,11 +253,7 @@ export function issueApprovalPasskeyChallenge(
     issued_at: now.toISOString(),
     ...binding,
   };
-  writeGovernedArtifactJson(
-    role,
-    challengeLogicalPath(params.storageChannel, challenge.challenge_id),
-    challenge
-  );
+  writeChallenge(role, challengeLocation(params.storageChannel, record.id), challenge);
   return challenge;
 }
 
@@ -235,15 +263,12 @@ export function claimApprovalPasskeyChallenge(
   expected: ChallengeExpectation
 ): ApprovalPasskeyChallengeRecord {
   return withChallengeLock(expected.storageChannel, expected.challengeId, () => {
-    const record = readChallenge(expected.storageChannel, expected.challengeId);
+    const location = challengeLocation(expected.storageChannel, expected.requestId);
+    const record = readChallenge(location, expected.challengeId);
     if (record.claimed_at) refuse('challenge was already used', `claimed_at ${record.claimed_at}`);
     assertExpectation(record, expected);
     const claimed = { ...record, claimed_at: (expected.now ?? new Date()).toISOString() };
-    writeGovernedArtifactJson(
-      role,
-      challengeLogicalPath(expected.storageChannel, expected.challengeId),
-      claimed
-    );
+    writeChallenge(role, location, claimed);
     return claimed;
   });
 }
@@ -256,16 +281,13 @@ export function markApprovalPasskeyChallengeVerified(
   now: Date = new Date()
 ): ApprovalPasskeyChallengeRecord {
   return withChallengeLock(claimed.storage_channel, claimed.challenge_id, () => {
-    const record = readChallenge(claimed.storage_channel, claimed.challenge_id);
+    const location = challengeLocation(claimed.storage_channel, claimed.request_id);
+    const record = readChallenge(location, claimed.challenge_id);
     if (!record.claimed_at || record.claimed_at !== claimed.claimed_at || record.verified_at) {
       refuse('challenge changed during verification', claimed.challenge_id);
     }
     const verified = { ...record, verified_at: now.toISOString(), credential_id: credentialId };
-    writeGovernedArtifactJson(
-      role,
-      challengeLogicalPath(claimed.storage_channel, claimed.challenge_id),
-      verified
-    );
+    writeChallenge(role, location, verified);
     return verified;
   });
 }
@@ -295,7 +317,8 @@ export function consumeApprovalPasskeyChallenge(
     refuse('a passkey decision must be recorded for a member', params.decidedBy);
   }
   return withChallengeLock(params.storageChannel, challengeId, () => {
-    const record = readChallenge(params.storageChannel, challengeId);
+    const location = challengeLocation(params.storageChannel, params.requestId);
+    const record = readChallenge(location, challengeId);
     assertExpectation(record, {
       storageChannel: params.storageChannel,
       challengeId,
@@ -311,11 +334,7 @@ export function consumeApprovalPasskeyChallenge(
       refuse('decision does not carry the digest the passkey signed', challengeId);
     }
     const consumed = { ...record, consumed_at: (params.now ?? new Date()).toISOString() };
-    writeGovernedArtifactJson(
-      role,
-      challengeLogicalPath(params.storageChannel, challengeId),
-      consumed
-    );
+    writeChallenge(role, location, consumed);
     return consumed;
   });
 }

@@ -162,6 +162,9 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/feedback-loop/',
   'shared/runtime/tenants/',
   'shared/runtime/tenant-ledger/',
+  // Per-tenant approval store partitions (governance/approval-store-location.ts); a
+  // safety net — approvalStoreRoots() already isolates them per Vitest run and pool.
+  'shared/runtime/tenant-approvals/',
   'shared/runtime/service-receipts/',
   'shared/logs/traces/',
   'shared/coordination/orchestration/',
@@ -236,6 +239,15 @@ export const VITEST_LIVE_SANDBOX_ROOT = 'active/shared/runtime/vitest-live';
  * the shared `metrics` collector appends to from many code paths.
  */
 const VITEST_LIVE_REPO_SUBTREES = ['work/metrics/'];
+
+/**
+ * Whether the project root (KYBERION_ROOT / cwd) is the checkout this code runs
+ * from. A fixture root (a temp tree) is already isolated, so Vitest sandbox
+ * remaps (vitestLivePath, approvalStoreRoots' tenant partitions) skip it.
+ */
+export function isCodeRepositoryRoot(): boolean {
+  return PROJECT_ROOT_DIR === CODE_REPOSITORY_ROOT;
+}
 
 /** Map an absolute path inside a live subtree to the Vitest sandbox; other paths pass through. */
 export function vitestLivePath(absolutePath: string): string {

@@ -35,6 +35,10 @@ import {
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  approvalRequestLogicalPathAt,
+  approvalStoreRoots,
+  locateApprovalRequest,
+  writeApprovalJsonAt,
   computeApprovalPresentedDigest,
   computeApprovalPayloadHash,
   decideApprovalRequest,
@@ -42,7 +46,6 @@ import {
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from '../governance/approval-store.js';
-import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
 import { collectOperatorHomeSummary } from '../surface/operator-home-summary.js';
 import { composeCeoSurfaceSummary } from '../ceo-surface-summary.js';
 import { readTenantProfile, recordTenantProviderAttestation } from './tenant-registry.js';
@@ -268,6 +271,18 @@ describe('training_use none attestations go through the human approval gate', ()
     record.mockClear();
   });
 
+  /** Overwrite a stored request where it lives (system tree or its tenant partition). */
+  function rewriteInPlace(id: string, value: ApprovalRequestRecord): void {
+    const located = locateApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id);
+    if (!located) throw new Error(`fixture request ${id} not found`);
+    writeApprovalJsonAt(
+      'mission_controller',
+      located.partition,
+      approvalRequestLogicalPathAt(located.partition, PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id),
+      value
+    );
+  }
+
   afterEach(() => {
     record.mockRestore();
     for (const id of requestIds.splice(0)) {
@@ -276,6 +291,17 @@ describe('training_use none attestations go through the human approval gate', ()
       });
     }
     safeRmSync(approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), { force: true });
+    // Tenant-scoped requests live in their tenant's approval partition.
+    for (const tier of ['personal', 'confidential'])
+      for (const tenant of ['beta', 'gamma'])
+        withExecutionContext('mission_controller', () =>
+          safeRmSync(
+            pathResolver.rootResolve(
+              `${approvalStoreRoots().tenantApprovals}/${tier}/${tenant}/${PROVIDER_ATTESTATION_APPROVAL_CHANNEL}`
+            ),
+            { recursive: true, force: true }
+          )
+        );
     safeRmSync(rootDir, { recursive: true, force: true });
   });
 
@@ -365,11 +391,7 @@ describe('training_use none attestations go through the human approval gate', ()
       const old = { ...loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, oldId)! };
       if (scope) old.scope = scope;
       else delete old.scope;
-      writeGovernedArtifactJson(
-        'mission_controller',
-        approvalRequestLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, oldId),
-        old
-      );
+      rewriteInPlace(oldId, old);
       const newId = requestApproval();
       expect(newId).not.toBe(oldId);
       expect(loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, oldId)).toEqual(old);
@@ -492,11 +514,7 @@ describe('training_use none attestations go through the human approval gate', ()
         stages: [],
         approvals: [{ role: 'sovereign', status: 'pending' }],
       };
-      writeGovernedArtifactJson(
-        'mission_controller',
-        approvalRequestLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id),
-        old
-      );
+      rewriteInPlace(id, old);
       if (status === 'approved') decide(id, 'approved');
       const unchanged = loadApprovalRequest(PROVIDER_ATTESTATION_APPROVAL_CHANNEL, id);
       expect(requestApproval()).not.toBe(id);

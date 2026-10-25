@@ -464,7 +464,12 @@ export function enforceApprovalGate(
   }
 
   // --- Step 2: Search for an existing request matching this correlationId ---
-  const existing = listApprovalRequests({ storageChannels: [channel] });
+  // The request scope narrows the lookup to its own tenant's partition
+  // (approval-store-location.ts) instead of probing every tenant.
+  const existing = listApprovalRequests({
+    storageChannels: [channel],
+    ...(params.requestScope ? { scope: params.requestScope } : {}),
+  });
   const sameCorrelation = existing.filter(
     (r: ApprovalRequestRecord) => r.correlationId === correlationId
   );
