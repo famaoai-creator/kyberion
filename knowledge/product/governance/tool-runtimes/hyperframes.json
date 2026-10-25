@@ -1,0 +1,38 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "hyperframes",
+      "display_name": "HyperFrames Video Renderer",
+      "ecosystem": "node",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "toolsets": ["video_composition", "render"],
+      "healthcheck_backend": {
+        "kind": "pnpm",
+        "command": "pnpm",
+        "args": ["exec", "hyperframes", "--version"]
+      },
+      "trial_backend": {
+        "kind": "pnpm",
+        "command": "pnpm",
+        "args": ["exec", "hyperframes", "--version"]
+      },
+      "install_backend": {
+        "kind": "pnpm",
+        "command": "pnpm",
+        "args": ["install", "--frozen-lockfile"],
+        "description": "Restore the workspace-pinned HyperFrames dependency from the lockfile."
+      },
+      "installed_backend": {
+        "kind": "pnpm",
+        "command": "pnpm",
+        "args": ["exec", "hyperframes", "--version"]
+      },
+      "managed_env_subpath": "tool-runtimes/hyperframes",
+      "notes": "Workspace dependency: package.json and pnpm-lock.yaml own its version; tool runtime records lifecycle, not a second package installation."
+    }
+  ]
+}
