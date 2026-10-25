@@ -59,6 +59,7 @@ import {
   storageFloorTierInPath,
 } from './storage-layout.js';
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
+import { tenantStorePartitionWriteDecision } from './tier-guard-tenant-store-partitions.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
 import {
@@ -1230,6 +1231,14 @@ export function validateWritePermission(
       return personaTierWriteDecision(policy, relativePath, identity, operation);
     return personaTierWriteDecision(policy, stateKnowledgePath, identity, operation);
   }
+
+  // Dedicated-store tenant partitions skip runtime defaults (tier-guard-tenant-store-partitions.ts).
+  const storeDecision = tenantStorePartitionWriteDecision(policy, relativePath, identity, {
+    operation,
+    sudoAllows: (scope) => hasScopedSudoAccess(relativePath, scope),
+    matches: (p) => policyPathMatches(relativePath, p, currentMission, tenantSlug),
+  });
+  if (storeDecision) return storeDecision;
 
   if (
     (policy.default_allow || []).some((p: string) =>

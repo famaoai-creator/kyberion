@@ -29,6 +29,7 @@ vi.mock('./approval-store.js', async (importOriginal) => ({
   evaluateApprovalUsability: vi.fn(() => null),
   isSeparationOfDutiesEnabled: vi.fn(() => false),
   loadApprovalRequest: vi.fn(),
+  resolveSessionCacheSeed: vi.fn(() => ({ status: 'missing' })),
   computeApprovalPayloadHash: (payload: Record<string, unknown> | undefined) =>
     JSON.stringify(payload || {}),
 }));
@@ -139,6 +140,11 @@ describe('enforceApprovalGate', () => {
       requestScope,
     });
     expect(result).toMatchObject({ allowed: false, status: 'pending', requestStatus: 'created' });
+    // The correlation lookup probes only the request scope's tenant partition.
+    expect(mockListRequests).toHaveBeenCalledWith({
+      storageChannels: ['terminal'],
+      scope: requestScope,
+    });
     expect(mockCreateRequest).toHaveBeenCalledWith(
       expect.anything(),
       expect.objectContaining({

@@ -27,6 +27,16 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
 export const TENANT_LEDGER_ROOT_PATH = 'active/shared/runtime/tenant-ledger';
 
 /**
+ * Root of the per-tenant approval store partitions
+ * (`libs/core/governance/approval-store-location.ts`):
+ * `<personal|confidential>/<tenant>/<channel>/{requests,passkey-challenges}/` and
+ * `<channel>/approvals.jsonl`. Registered in storage-layout.ts
+ * PARTITIONED_RUNTIME_LEDGER_ROOTS — not a state root (and distinct from the older
+ * runtime `approvals` store).
+ */
+export const TENANT_APPROVAL_ROOT_PATH = 'active/shared/runtime/tenant-approvals';
+
+/**
  * The shared inter-process lock directory (foundation/lock-utils.ts LOCK_ROOT);
  * narrow store roles that take a store lock name it from here.
  */

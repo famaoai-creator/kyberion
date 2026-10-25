@@ -1,11 +1,20 @@
 import { withApprovalRecordLock } from './approval-apply-claim.js';
 import {
   normalizeApprovalChannel,
-  approvalRequestLogicalPath,
-  loadApprovalRequest,
   listApprovalRequests,
   isApprovalRequestExpired,
 } from './approval-store-reader.js';
+import {
+  appendLocatedApprovalEvent,
+  approvalRequestLogicalPathAt,
+  locateApprovalRequest,
+  mayBindApprovalTenant,
+  readApprovalJsonAt,
+  SYSTEM_APPROVAL_PARTITION,
+  writeLocatedApprovalRequest,
+  type ApprovalPartition,
+  type LocatedApprovalRequest,
+} from './approval-store-location.js';
 export {
   approvalRequestLogicalPath,
   loadApprovalRequest,
@@ -38,11 +47,7 @@ import type * as assurance from './approval-assurance.js';
 export * from './approval-assurance.js';
 import { computeApprovalPayloadHash } from './approval-presentation.js';
 export * from './approval-presentation.js';
-import {
-  appendGovernedArtifactJsonl,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { nowIso } from '../foundation/time.js';
 import type { RejectionReasonCategory } from '../rejection-reason.js';
 import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
@@ -326,6 +331,13 @@ export interface SessionApprovalCacheEntry {
   effectBinding: string;
   /** Optional mission/task scope; when present it must match on lookup. */
   source?: ApprovalRequestSource;
+  /**
+   * Where the seed request was stored when it was decided (system tree or its
+   * tenant partition, approval-store-location.ts); the seed is re-read there.
+   */
+  seedPartition?: ApprovalPartition;
+  /** The seed's tenant: the grant is usable only by a process that may bind it. */
+  tenantSlug?: string;
 }
 
 export interface SessionApprovalCacheLookupContext {
@@ -373,6 +385,8 @@ export function lookupSessionApprovalCache(
   ) {
     return null;
   }
+  // A tenant's grant never serves a process bound to another tenant.
+  if (entry.tenantSlug && !mayBindApprovalTenant(entry.tenantSlug)) return null;
   // A scoped request must never consume an unscoped cache entry, and a
   // scoped seed must only be reused by the same source scope.
   if (Boolean(entry.source) !== Boolean(context.source)) return null;
@@ -385,6 +399,61 @@ export function lookupSessionApprovalCache(
     return null;
   }
   return entry;
+}
+
+export type SessionCacheSeedResolution =
+  | { status: 'found'; record: ApprovalRequestRecord }
+  /** A system-tree seed that no longer exists (legacy grants keep their SoD-off behaviour). */
+  | { status: 'missing' }
+  /** The seed cannot be trusted: a tenant seed that is missing or unreadable, or an ambiguous id. */
+  | { status: 'unusable'; reason: string };
+
+/**
+ * Re-read the request that seeded a session-cache grant where it was stored.
+ * A tenant seed that cannot be found or read makes the grant unusable (it
+ * may have been revoked in its partition); only a system-tree seed may be
+ * reported missing.
+ */
+export function resolveSessionCacheSeed(
+  entry: SessionApprovalCacheEntry
+): SessionCacheSeedResolution {
+  if (entry.tenantSlug && !mayBindApprovalTenant(entry.tenantSlug)) {
+    return { status: 'unusable', reason: 'the seed belongs to a tenant this process may not bind' };
+  }
+  try {
+    if (entry.seedPartition?.kind === 'tenant') {
+      const record = readApprovalJsonAt<ApprovalRequestRecord>(
+        entry.seedPartition,
+        approvalRequestLogicalPathAt(
+          entry.seedPartition,
+          entry.storageChannel,
+          entry.grantedByRequestId
+        )
+      );
+      return record
+        ? { status: 'found', record }
+        : {
+            status: 'unusable',
+            reason: 'the tenant seed request is not readable in its partition',
+          };
+    }
+    const located = locateApprovalRequest(entry.storageChannel, entry.grantedByRequestId);
+    if (!located) {
+      // A tenant seed (e.g. a legacy system-tree record since migrated into its
+      // partition) that cannot be found may have been revoked there: never trust it.
+      return entry.tenantSlug
+        ? { status: 'unusable', reason: 'the tenant seed request cannot be found' }
+        : { status: 'missing' };
+    }
+    if (located.partition.kind === 'tenant' || located.record.scope?.tenant_slug) {
+      // Stored as untenanted but now found tenant-scoped: never trust it silently.
+      if (!entry.tenantSlug)
+        return { status: 'unusable', reason: 'the seed moved to a tenant partition' };
+    }
+    return { status: 'found', record: located.record };
+  } catch (err) {
+    return { status: 'unusable', reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export function clearSessionApprovalCache(): void {
@@ -408,7 +477,14 @@ export function recordSessionCacheAutoApproval(
     correlationId: string;
   }
 ): void {
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.entry.storageChannel), {
+  // The event goes to the log of the location the seed request was stored in
+  // when it was decided; a tenant seed's event never reaches the system log
+  // (a write the caller may not make there throws instead).
+  const seedLocation: Pick<LocatedApprovalRequest, 'partition' | 'storageChannel'> = {
+    partition: params.entry.seedPartition ?? SYSTEM_APPROVAL_PARTITION,
+    storageChannel: normalizeApprovalChannel(params.entry.storageChannel),
+  };
+  appendLocatedApprovalEvent(role, seedLocation, {
     ts: nowIso(),
     event: 'auto_approved_via_session_cache',
     request_id: params.entry.grantedByRequestId,
@@ -459,7 +535,7 @@ function enforceSeparationOfDutiesOnDecision(
   role: GovernedArtifactRole,
   params: {
     record: ApprovalRequestRecord;
-    storageChannel: string;
+    located: LocatedApprovalRequest;
     decidedBy: unknown;
     identitySource?: ApprovalDeciderIdentitySource;
   }
@@ -475,7 +551,7 @@ function enforceSeparationOfDutiesOnDecision(
   const decidedBy = typeof params.decidedBy === 'string' ? params.decidedBy : '';
   const reason = `Separation of duties: approval refused because ${SEPARATION_OF_DUTIES_MESSAGES[violation]}`;
   auditSeparationOfDutiesRefusal({ record, violation, decidedBy, stage: 'decide', reason });
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.storageChannel), {
+  appendLocatedApprovalEvent(role, params.located, {
     ts: nowIso(),
     event: 'separation_of_duties_refused',
     request_id: record.id,
@@ -493,9 +569,48 @@ function enforceSeparationOfDutiesOnDecision(
 }
 
 export { approvalStoreRoots, VITEST_APPROVAL_STORE_ROOT } from './approval-store-paths.js';
+export {
+  TENANT_APPROVAL_STORE_ROLE,
+  TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE,
+  TENANT_ACTIVATION_STORAGE_CHANNEL,
+  TENANT_ACTIVATION_REQUEST_KIND,
+  SYSTEM_APPROVAL_PARTITION,
+  approvalPartitionForScope,
+  approvalPartitionsForTenant,
+  locateApprovalRequest,
+  listApprovalPartitions,
+  listApprovalChannelsAt,
+  mayBindApprovalTenant,
+  systemRecordVisibleToThisProcess,
+  tenantApprovalPartitionTier,
+  tenantApprovalPartitionLogicalRoot,
+  tenantApprovalRequestsLogicalDir,
+  tenantApprovalRequestLogicalPath,
+  tenantApprovalEventLogicalPath,
+  tenantApprovalPasskeyChallengesLogicalDir,
+  approvalRequestsLogicalDirAt,
+  approvalRequestLogicalPathAt,
+  approvalEventLogicalPathAt,
+  approvalPasskeyChallengesLogicalDirAt,
+  asTenantApprovalStore,
+  readApprovalJsonAt,
+  listApprovalDirAt,
+  ensureApprovalDirAt,
+  writeApprovalJsonAt,
+  appendApprovalJsonlAt,
+  approvalFileExistsAt,
+  removeApprovalFileAt,
+  readApprovalJsonlAt,
+  assertApprovalLocationAgrees,
+  writeLocatedApprovalRequest,
+  appendLocatedApprovalEvent,
+  type ApprovalPartition,
+  type ApprovalPartitionTier,
+  type ApprovalTenantPartition,
+  type LocatedApprovalRequest,
+} from './approval-store-location.js';
 
 import {
-  approvalEventLogicalPath,
   projectApprovalWorkerEvent,
   approvalWorkerEventSource,
 } from './approval-request-create.js';
@@ -526,13 +641,15 @@ function expireApprovalRequestUnlocked(
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  const record = loadApprovalRequest(storageChannel, params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   if (record.status !== 'pending') return record;
 
   const updated: ApprovalRequestRecord = { ...record, status: 'expired' };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: 'expired',
     request_id: updated.id,
@@ -575,13 +692,15 @@ function cancelApprovalRequestUnlocked(
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  const record = loadApprovalRequest(storageChannel, params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   if (record.status !== 'pending') return record;
 
   const updated: ApprovalRequestRecord = { ...record, status: 'cancelled' };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: 'cancelled',
     request_id: updated.id,
@@ -665,6 +784,15 @@ export function cancelApprovalRequestsBySource(
  */
 export function annotateApprovalRejectionReason(
   role: GovernedArtifactRole,
+  params: Parameters<typeof annotateApprovalRejectionReasonUnlocked>[1]
+): ApprovalRequestRecord {
+  // Under the record lock, on a fresh read: a concurrent transition is never overwritten.
+  return withApprovalRecordLock(role, params, () =>
+    annotateApprovalRejectionReasonUnlocked(role, params)
+  );
+}
+function annotateApprovalRejectionReasonUnlocked(
+  role: GovernedArtifactRole,
   params: {
     channel: string;
     storageChannel?: string;
@@ -675,8 +803,10 @@ export function annotateApprovalRejectionReason(
   }
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
-  const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   const workflow = record.workflow
     ? {
         ...record.workflow,
@@ -692,8 +822,8 @@ export function annotateApprovalRejectionReason(
       }
     : undefined;
   const updated: ApprovalRequestRecord = { ...record, workflow };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: 'rejection_reason_captured',
     request_id: updated.id,
@@ -712,6 +842,17 @@ export function decideApprovalRequest(
   params: Parameters<typeof decideApprovalRequestUnlocked>[1]
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => decideApprovalRequestUnlocked(role, params));
+}
+/**
+ * {@link decideApprovalRequest} for a caller that already holds
+ * `withApprovalRecordLock` for this record (a lock-held read-evaluate-decide
+ * step such as the veto-window tick). Never call it without the lock.
+ */
+export function decideApprovalRequestUnderLock(
+  role: GovernedArtifactRole,
+  params: Parameters<typeof decideApprovalRequestUnlocked>[1]
+): ApprovalRequestRecord {
+  return decideApprovalRequestUnlocked(role, params);
 }
 function decideApprovalRequestUnlocked(
   role: GovernedArtifactRole,
@@ -770,8 +911,10 @@ function decideApprovalRequestUnlocked(
     }
   }
   const storageChannel = params.storageChannel || params.channel;
-  const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
 
   if (
     params.expectedRecordHash !== undefined &&
@@ -838,7 +981,7 @@ function decideApprovalRequestUnlocked(
   if (params.decision === 'approved') {
     enforceSeparationOfDutiesOnDecision(role, {
       record,
-      storageChannel,
+      located,
       decidedBy: params.decidedBy,
       identitySource: params.deciderIdentitySource,
     });
@@ -943,8 +1086,8 @@ function decideApprovalRequestUnlocked(
     workflow,
   };
 
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: params.decision,
     request_id: updated.id,
@@ -1001,9 +1144,15 @@ function decideApprovalRequestUnlocked(
       payloadHash: updated.accountability!.payloadHash!,
       effectBinding: updated.accountability!.effectBinding!,
       ...(updated.source ? { source: updated.source } : {}),
+      seedPartition: located.partition,
+      ...(located.partition.kind === 'tenant'
+        ? { tenantSlug: located.partition.tenant_slug }
+        : updated.scope?.tenant_slug
+          ? { tenantSlug: updated.scope.tenant_slug }
+          : {}),
     };
     sessionApprovalCache.set(key, entry);
-    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    appendLocatedApprovalEvent(role, located, {
       ts: nowIso(),
       event: 'session_cache_written',
       request_id: updated.id,
@@ -1246,8 +1395,10 @@ function recordApprovalApplyResultUnlocked(
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  const record = loadApprovalRequest(storageChannel, params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   if (record.applyClaim && params.claimId !== record.applyClaim.claimId) {
     throw new Error('[POLICY_VIOLATION] Approval apply claim does not match');
   }
@@ -1273,8 +1424,8 @@ function recordApprovalApplyResultUnlocked(
     status: nextStatus,
     applyResult: params.applyResult,
   };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: params.applyResult.result === 'success' ? 'applied' : 'apply_failed',
     request_id: updated.id,

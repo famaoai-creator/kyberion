@@ -25,6 +25,7 @@ import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   listApprovalRequests,
 } from '@agent/core/governance/approval-store';
 import { PROVIDER_ATTESTATION_APPROVAL_CHANNEL } from '@agent/core/organization/tenant-governance';
@@ -135,6 +136,8 @@ describe('onboarding wizard: provider attestation step', () => {
       });
     }
     safeRmSync(approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), { force: true });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(approvalStoreRoots().tenantApprovals, { recursive: true, force: true });
     vi.restoreAllMocks();
     safeRmSync(ROOT, { recursive: true, force: true });
   });

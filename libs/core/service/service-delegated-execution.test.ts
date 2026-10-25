@@ -165,6 +165,11 @@ describe('real service engine delegated admission', () => {
         force: true,
       });
     }
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(path.resolve(pathResolver.rootDir(), roots.tenantApprovals), {
+      recursive: true,
+      force: true,
+    });
     safeRmSync(root, { recursive: true, force: true });
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = savedPersona;

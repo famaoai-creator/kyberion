@@ -436,6 +436,11 @@ export interface ExecutePluginViewActionContext {
   now?: number;
 }
 
+/**
+ * Plugin view action requests are created without a tenant scope (see
+ * createApprovalRequest above), so they always live in the system approval
+ * tree, never a tenant partition (approval-store-location.ts).
+ */
 function actionApprovalExists(approvalRequestId: string): boolean {
   try {
     return safeExistsSync(

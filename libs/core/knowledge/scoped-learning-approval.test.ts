@@ -18,6 +18,7 @@ import {
   computeApprovalPresentedDigest,
   approvalRequestLogicalPath,
   approvalEventLogicalPath,
+  approvalStoreRoots,
   cancelApprovalRequest,
 } from '../governance/approval-store.js';
 const memberId = 'sop-reviewer-' + process.pid;
@@ -101,6 +102,11 @@ afterEach(() => {
       });
     }
     safeRmSync(pathResolver.rootResolve(approvalEventLogicalPath('terminal')), { force: true });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(pathResolver.rootResolve(approvalStoreRoots().tenantApprovals), {
+      recursive: true,
+      force: true,
+    });
   });
   withExecutionContext('sovereign_concierge', () =>
     safeRmSync(memberProfilePath(memberId), { force: true })

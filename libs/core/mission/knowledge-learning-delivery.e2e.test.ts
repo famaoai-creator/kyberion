@@ -63,6 +63,11 @@ afterEach(() => {
   withExecutionContext('mission_controller', () => {
     for (const root of Object.values(approvalStoreRoots()))
       safeRmSync(pathResolver.rootResolve(root + '/terminal'), { recursive: true, force: true });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(pathResolver.rootResolve(approvalStoreRoots().tenantApprovals), {
+      recursive: true,
+      force: true,
+    });
   });
   cleanup.clear();
   resetReasoningBackend();

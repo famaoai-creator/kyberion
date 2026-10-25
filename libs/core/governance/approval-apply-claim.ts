@@ -1,27 +1,18 @@
 import { randomUUID } from 'node:crypto';
-import { withExecutionContext } from '../authority.js';
+import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { withLockSync } from '../lock-utils.js';
+import { isApprovalRequestExpired } from './approval-store-reader.js';
+import { normalizeApprovalChannel, normalizeApprovalRequestId } from './approval-store-paths.js';
 import {
-  normalizeApprovalChannel,
-  normalizeApprovalRequestId,
-  loadApprovalRequest,
-  isApprovalRequestExpired,
-  approvalRequestLogicalPath,
-} from './approval-store-reader.js';
-import { approvalStoreRoots } from './approval-store-paths.js';
+  appendLocatedApprovalEvent,
+  locateApprovalRequest,
+  writeLocatedApprovalRequest,
+} from './approval-store-location.js';
 import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { assertApprovalUsable } from './approval-separation-of-duties.js';
-import {
-  appendGovernedArtifactJsonl,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { nowIso } from '../foundation/time.js';
-import { safeFsyncFile } from '../secure-io.js';
 import type { ApprovalRequestRecord, ApprovalApplyClaim } from './approval-store.js';
-function approvalEventLogicalPath(channel: string): string {
-  return `${approvalStoreRoots().observability}/${normalizeApprovalChannel(channel)}/approvals.jsonl`;
-}
 export function withApprovalRecordLock<T>(
   role: GovernedArtifactRole,
   params: { channel: string; storageChannel?: string; requestId: string },
@@ -29,8 +20,15 @@ export function withApprovalRecordLock<T>(
 ): T {
   const channel = normalizeApprovalChannel(params.storageChannel || params.channel);
   const id = normalizeApprovalRequestId(params.requestId);
-  return withExecutionContext(role, () =>
-    withLockSync('approval-record-' + channel + '-' + id, fn)
+  // Keep the caller's tenant binding inside the assumed role, so a caller bound
+  // to one tenant still cannot find (or decide) another tenant's partitioned
+  // record (approval-store-location.ts).
+  const callerTenant = resolveIdentityContext().tenantSlug || undefined;
+  return withExecutionContext(
+    role,
+    () => withLockSync('approval-record-' + channel + '-' + id, fn),
+    undefined,
+    callerTenant
   );
 }
 export function claimApprovalApply(
@@ -47,8 +45,9 @@ export function claimApprovalApply(
 ): ApprovalRequestRecord & { applyClaim: ApprovalApplyClaim } {
   return withApprovalRecordLock(role, params, () => {
     const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-    const record = loadApprovalRequest(storageChannel, params.requestId);
-    if (!record) throw new Error('[POLICY_VIOLATION] Approval request not found');
+    const located = locateApprovalRequest(storageChannel, params.requestId);
+    const record = located?.record;
+    if (!located || !record) throw new Error('[POLICY_VIOLATION] Approval request not found');
     if (params.expectedRecordHash !== computeApprovalPayloadHash({ record })) {
       throw new Error('[POLICY_VIOLATION] Approval request changed before apply');
     }
@@ -71,14 +70,9 @@ export function claimApprovalApply(
       ...record,
       applyClaim: { claimId: randomUUID(), startedAt: nowIso(), startedBy: params.appliedBy },
     };
-    const claimPath = writeGovernedArtifactJson(
-      role,
-      approvalRequestLogicalPath(storageChannel, record.id),
-      updated
-    );
     // The side effect must not start until the claim is flushed successfully.
-    safeFsyncFile(claimPath);
-    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    writeLocatedApprovalRequest(role, located, updated, { fsync: true });
+    appendLocatedApprovalEvent(role, located, {
       ts: nowIso(),
       event: 'apply_started',
       request_id: record.id,

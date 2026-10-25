@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-24
+last_updated: 2026-10-25
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -362,6 +362,49 @@ never recorded as `public` or untenanted.
   that names tenants (`tenant_slug`, `tenant_slugs`), those tenants'
   partitions under the reader's own tier-guard decision — a client-supplied
   tenant only narrows; a partition the reader may not see is skipped.
+
+### Approval store (system tree, tenant partitions)
+
+Approval requests are addressed by `(storageChannel, id)` everywhere; where
+the record is stored follows its scope
+(`libs/core/governance/approval-store-location.ts`):
+
+| Record                                                               | Request / passkey challenges                                                                                            | Event log                                                                                       |
+| -------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| untenanted (Slack, plugin, operator), or a pre-activation tenant one | `active/shared/coordination/channels/<ch>/approvals/{requests,passkey-challenges}/<id>.json`                            | `active/shared/observability/channels/<ch>/approvals.jsonl`                                     |
+| `scope.tenant_slug` set (any tier)                                   | `active/shared/runtime/tenant-approvals/<personal\|confidential>/<tenant>/<ch>/{requests,passkey-challenges}/<id>.json` | `active/shared/runtime/tenant-approvals/<personal\|confidential>/<tenant>/<ch>/approvals.jsonl` |
+
+- **Exception**: a `tenant-activation` request for a tenant that is not yet
+  active (`isTenantActivationActive`) stays in the system tree.
+- As for the ledgers, a `public` tenant record is stored in the tenant's
+  `confidential` partition and keeps tier `public` in its scope. The partition
+  tiers are `tenant_scope.protected_prefixes`.
+- A partition is read and written as the tenant-bound `tenant_approval_store`
+  role, bound to the record's tenant. The `tenant_approval_partition_index_reader`
+  role lists tenant directory names only (descendants denied), so an unbound
+  process can enumerate partitions without reading them.
+- **Lookup**: the system tree first (it still holds legacy tenant records),
+  then the partitions this process may bind — only its own tenant when it is
+  bound to one, every tenant otherwise. A process bound to tenant A never
+  finds tenant B's record. An id found in two places fails
+  `[APPROVAL_LOCATION_AMBIGUOUS]`. Mutators write back to where the record was
+  found, never to a caller-derived location.
+- **Legacy records**: tenant records written to the system tree before the
+  partitions existed stay readable and writable in place.
+  `node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions`
+  lists them (dry run); add `--apply` to move each one under its record lock
+  (write + fsync + read-back, move the request's passkey challenges the same
+  way, remove the system copy, audit-chain entry `migrate_tenant_partition`).
+  The run is idempotent and refuses (`[APPROVAL_MIGRATION_CONFLICT]`) when the
+  partition already holds the id with different content. A reader that does
+  not take the record lock may briefly see `[APPROVAL_LOCATION_AMBIGUOUS]`
+  while a record is between its two copies; if the process crashes in that
+  gap, re-running `--apply` resolves it. Old `approvals.jsonl` lines stay in the system log
+  as history. The regular hygiene report counts the records still to move.
+- The hygiene sweeps (expired passkey challenges, fixture purge) and the
+  learning-signal rejection reader cover the partitions too. Retention is
+  `review_required`; tenant offboarding exports and soft-deletes the tenant's
+  partitions (target kind `tenant_approvals`).
 
 ## 3. Surface visibility
 

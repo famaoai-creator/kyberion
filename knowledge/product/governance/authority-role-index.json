@@ -555,6 +555,25 @@
       "allowed_actuators": ["service-actuator", "voice-actuator", "file-actuator"],
       "tier_access": ["public", "confidential"]
     },
+    "tenant_approval_partition_index_reader": {
+      "description": "Read-only index reader of the per-tenant approval store partitions (libs/core/governance/approval-store-location.ts listApprovalPartitions). Assumed only by a process without an active tenant to enumerate the tenant directory names under active/shared/runtime/tenant-approvals/<personal|confidential>/; descendant reads are explicitly denied, so it never reads a record. Each listed tenant is then read as the tenant-bound tenant_approval_store. No write authority.",
+      "default_persona": "worker",
+      "write_scopes": [],
+      "scope_classes": [],
+      "allowed_actuators": [],
+      "tier_access": ["confidential", "personal"]
+    },
+    "tenant_approval_store": {
+      "description": "Tenant-bound store role of the per-tenant approval store partitions (libs/core/governance/approval-store-location.ts). The approval store assumes it (withExecutionContext) for every tenant partition read and write, always bound to the record's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/tenant-approvals/<personal|confidential>/<tenant>/ partition (public tenant records are stored in the confidential partition): it reads, writes and lists request records, reads and writes passkey challenges and appends the channel's approval event log. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never finds another tenant's approvals. No knowledge, mission, system approval tree or customer/ grant.",
+      "default_persona": "worker",
+      "write_scopes": [
+        "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/"
+      ],
+      "scope_classes": ["audit"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential", "personal"]
+    },
     "tenant_ledger_store": {
       "description": "D9: tenant-bound store role of the hybrid ledger's tenant partitions (libs/core/ledger.ts). libs/core/ledger.ts assumes it (withExecutionContext) for every tenant partition read and append, always bound to the record's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/tenant-ledger/<personal|confidential>/<tenant>/ partition (public tenant records are stored in the confidential partition): it reads the hash-chain tail, appends tenant records and tenant mission metadata, and verifies the chain. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it. No knowledge, mission, system-ledger or customer/ grant.",
       "default_persona": "worker",

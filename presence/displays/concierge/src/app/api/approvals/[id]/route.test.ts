@@ -228,6 +228,8 @@ describe('provider attestation through the real decision store', () => {
     safeRmSync(store.approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), {
       force: true,
     });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(store.approvalStoreRoots().tenantApprovals, { recursive: true, force: true });
     safeRmSync(rootDir, { recursive: true, force: true });
   });
 

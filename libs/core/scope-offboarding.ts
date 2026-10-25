@@ -296,7 +296,9 @@ export type OffboardTargetKind =
   /** The tenant's partition of the execution-metrics ledger (one per tier). */
   | 'tenant_execution_metrics'
   /** The tenant's partition of the hybrid (audit) ledger (one per tier, D9). */
-  | 'tenant_ledger';
+  | 'tenant_ledger'
+  /** The tenant's approval store partition (requests, passkey challenges, event logs; one per tier). */
+  | 'tenant_approvals';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -373,6 +375,8 @@ export const USAGE_LEDGER_LEGACY_REPO_PATH = 'work/metrics/resource-usage.jsonl'
 export const EXECUTION_METRICS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.execution_metrics;
 /** ledger.ts TENANT_LEDGER_ROOT (`<root>/<tier>/<tenant>/ledger.jsonl`, D9). */
 export const TENANT_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger;
+/** approval-store-location.ts tenant partitions (`<root>/<tier>/<tenant>/<channel>/…`). */
+export const TENANT_APPROVALS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals;
 /** The repo-wide (system) execution-metrics ledger; pre-partition rows are pruned like usage rows. */
 export const EXECUTION_METRICS_LEGACY_REPO_PATH = 'work/metrics/execution-metrics.jsonl';
 
@@ -852,6 +856,17 @@ export function collectScopeTargets(
       const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
       if (subtreePath && safeExistsSync(subtreePath)) {
         targets.push({ path: subtree, kind: 'tenant_ledger' });
+      }
+    }
+    // The tenant's approval store partitions. Tenant records written before
+    // the partition existed may still sit in the system approval tree until
+    // the hygiene migration moves them (approval_store_hygiene
+    // --migrate-tenant-partitions); their append-only event-log lines stay.
+    for (const tier of SCOPE_TIERS) {
+      const subtree = `${TENANT_APPROVALS_REPO_SUBPATH}/${tier}/${id}`;
+      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+      if (subtreePath && safeExistsSync(subtreePath)) {
+        targets.push({ path: subtree, kind: 'tenant_approvals' });
       }
     }
   }

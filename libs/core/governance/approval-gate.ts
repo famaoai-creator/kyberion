@@ -22,9 +22,9 @@ import {
   isApprovalRequestExpired,
   isSeparationOfDutiesEnabled,
   listApprovalRequests,
-  loadApprovalRequest,
   lookupSessionApprovalCache,
   recordSessionCacheAutoApproval,
+  resolveSessionCacheSeed,
   type ApprovalActionDescriptor,
   type ApprovalRequestRecord,
   type ApprovalRequestSource,
@@ -464,7 +464,12 @@ export function enforceApprovalGate(
   }
 
   // --- Step 2: Search for an existing request matching this correlationId ---
-  const existing = listApprovalRequests({ storageChannels: [channel] });
+  // The request scope narrows the lookup to its own tenant's partition
+  // (approval-store-location.ts) instead of probing every tenant.
+  const existing = listApprovalRequests({
+    storageChannels: [channel],
+    ...(params.requestScope ? { scope: params.requestScope } : {}),
+  });
   const sameCorrelation = existing.filter(
     (r: ApprovalRequestRecord) => r.correlationId === correlationId
   );
@@ -638,9 +643,12 @@ export function enforceApprovalGate(
   const cachedUsable =
     cached !== null &&
     (() => {
-      const seed = loadApprovalRequest(cached.storageChannel, cached.grantedByRequestId);
-      if (!seed) return !isSeparationOfDutiesEnabled();
-      return !approvalUsabilityRefusal(seed, 'approval_gate_session_cache');
+      // A tenant seed that cannot be found or read where it was stored is
+      // unusable; only a vanished system-tree seed keeps the legacy rule.
+      const seed = resolveSessionCacheSeed(cached);
+      if (seed.status === 'unusable') return false;
+      if (seed.status === 'missing') return !isSeparationOfDutiesEnabled();
+      return !approvalUsabilityRefusal(seed.record, 'approval_gate_session_cache');
     })();
   if (cached && cachedUsable) {
     auditChain.record({

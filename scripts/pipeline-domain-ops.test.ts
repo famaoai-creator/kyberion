@@ -88,7 +88,11 @@ describe('decision loop pipeline ops', () => {
 
   it('reports the hygiene sweep as a dry run unless apply is true and skips fixtures', () => {
     const result = runInlineApprovalStoreHygiene({ id: 'hygiene' } as never, {}, {});
-    expect(result.last_transform).toMatchObject({ dry_run: true, fixtures_trashed: 0 });
+    expect(result.last_transform).toMatchObject({
+      dry_run: true,
+      fixtures_trashed: 0,
+      tenant_records_in_system_tree: expect.any(Number),
+    });
   });
 });
 

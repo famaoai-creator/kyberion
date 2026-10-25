@@ -97,6 +97,14 @@ import {
 /** The approval store's shared writer (the role surfaces decide requests under). */
 const APPROVAL_STORE_ROLE = 'surface_runtime';
 
+/**
+ * The role that may write a surface's approval channel (the same split as
+ * surface-approval-ui.ts): only slack_bridge holds the slack channel grant.
+ */
+function approvalWriterRoleFor(surface: string): 'slack_bridge' | typeof APPROVAL_STORE_ROLE {
+  return surface === 'slack' ? 'slack_bridge' : APPROVAL_STORE_ROLE;
+}
+
 /** Surfaces whose outbox a bridge drains (`sendToCustomer`'s `deliver`). */
 const OUTBOX_SURFACES = new Set(['slack', 'telegram', 'imessage', 'discord']);
 type OutboxSurface = 'slack' | 'telegram' | 'imessage' | 'discord';
@@ -369,8 +377,11 @@ function withdrawHeldRequests(
         : 'surface_changed'
       : otherReason;
     try {
-      const updated = withExecutionContext(APPROVAL_STORE_ROLE, () =>
-        cancelApprovalRequest(APPROVAL_STORE_ROLE, {
+      // The request is written under its channel's own role, as the surface
+      // that created it (surface-approval-ui.ts): slack → slack_bridge.
+      const writerRole = approvalWriterRoleFor(surface);
+      const updated = withExecutionContext(writerRole, () =>
+        cancelApprovalRequest(writerRole, {
           channel: record.channel,
           storageChannel: surface,
           requestId: record.id,

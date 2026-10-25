@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import {
+  safeExistsSync,
   safeMkdir,
   safeWriteFile,
   safeRmSync,
@@ -17,6 +18,10 @@ import {
 import type { MissionState } from './mission-types.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import { buildArtifactReviewReceipt, hashArtifactForReview } from '../workforce/artifact-review.js';
+import { createApprovalRequest } from '../governance/approval-request-create.js';
+import { approvalStoreRoots } from '../governance/approval-store-paths.js';
+import { tenantApprovalRequestLogicalPath } from '../governance/approval-store-location.js';
+import { withExecutionContext } from '../authority.js';
 
 const missionId = 'MSN-FLOW-UNIT';
 const dir = pathResolver.sharedTmp(`mission-flow-projection/${missionId}`);
@@ -483,5 +488,52 @@ describe('approval observation projection (in-memory, no approval store writes)'
       appliedAt: '2000-01-01T00:00:00Z',
     } as ApprovalRequestRecord['applyResult'];
     expect(projectMissionApprovalBlockers(state, [applied], Date.now())).toEqual([]);
+  });
+});
+
+describe('approval observation evidence for tenant-partitioned records', () => {
+  const tenant = `mfp-${process.pid}`;
+  const channel = `mission-flow-${process.pid}`;
+  afterEach(() => {
+    withExecutionContext('mission_controller', () => {
+      const roots = approvalStoreRoots();
+      for (const dir of [
+        `${roots.coordination}/${channel}`,
+        `${roots.observability}/${channel}`,
+        `${roots.tenantApprovals}/confidential/${tenant}`,
+      ]) {
+        const abs = pathResolver.rootResolve(dir);
+        if (safeExistsSync(abs)) safeRmSync(abs, { recursive: true, force: true });
+      }
+    });
+  });
+
+  it('points the blocker evidence at the tenant partition the record lives in', () => {
+    const scope = {
+      scope_kind: 'mission' as const,
+      tier: 'confidential' as const,
+      tenant_slug: tenant,
+      mission_id: missionId,
+    };
+    const created = createApprovalRequest('mission_controller', {
+      channel,
+      threadTs: '1',
+      correlationId: 'mission-flow-tenant',
+      requestedBy: 'operator',
+      draft: { title: 'tenant blocker', summary: 'mission-flow-projection test' },
+      scope,
+    });
+    const [blocker] = projectMissionApprovalBlockers(
+      { ...state, tier: 'confidential', tenant_slug: tenant },
+      [created],
+      Date.now()
+    );
+    expect(blocker.evidence_refs).toEqual([
+      tenantApprovalRequestLogicalPath(
+        { kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
+        channel,
+        created.id
+      ),
+    ]);
   });
 });

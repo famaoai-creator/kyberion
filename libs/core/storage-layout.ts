@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
+  TENANT_APPROVAL_ROOT_PATH,
   TENANT_LEDGER_ROOT_PATH,
 } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
@@ -213,7 +214,62 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
    * Tenant records and tenant mission metadata never reach the system ledger.
    */
   tenant_ledger: TENANT_LEDGER_ROOT_PATH,
+  /**
+   * Per-tenant approval store partitions (`libs/core/governance/approval-store-location.ts`):
+   * `<personal|confidential>/<tenant>/<channel>/` request records, passkey challenges and the
+   * channel's `approvals.jsonl` event log, read and written as `tenant_approval_store`.
+   * Untenanted records (and pre-activation tenant requests) stay in the system tree.
+   */
+  tenant_approvals: TENANT_APPROVAL_ROOT_PATH,
 } as const;
+
+/**
+ * Partitioned ledger roots whose tenant partitions belong to one dedicated,
+ * tenant-bound store role (`<root>/<tier>/<tenant>/…`, every tier including
+ * `public`, which the stores never use but must not leave open). These
+ * partitions are authority evidence (hash-chained audit entries, approval
+ * decisions), so tier-guard does not let broad runtime defaults or other roles'
+ * grants write them: only SUDO, a persona grant, or the store role's own grant
+ * (bound to that tenant) may. The metrics ledgers are deliberately absent.
+ */
+export const TENANT_STORE_LEDGER_ROOTS = {
+  tenant_ledger: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger,
+    storeRole: 'tenant_ledger_store',
+  },
+  tenant_approvals: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
+    storeRole: 'tenant_approval_store',
+  },
+} as const;
+
+export interface TenantStoreLedgerPartition {
+  root: string;
+  storeRole: string;
+  tier: StorageDataTier;
+  /** Empty for the bare tier directory itself (`<root>/<tier>`). */
+  tenant: string;
+}
+
+/**
+ * The tenant partition of a dedicated-store ledger root a repo-relative (or
+ * absolute, under this root) path lies in — the tenant directory itself or
+ * anything below it, in any storage tier — or undefined. The bare tier
+ * directory (`<root>/<tier>`) is reported with an empty `tenant`.
+ */
+export function tenantStoreLedgerPartitionOf(
+  filePath: string
+): TenantStoreLedgerPartition | undefined {
+  const relative = toPosixRelative(filePath);
+  for (const { root, storeRole } of Object.values(TENANT_STORE_LEDGER_ROOTS)) {
+    if (!relative.startsWith(root + '/')) continue;
+    const [tier, tenant = ''] = relative.slice(root.length + 1).split('/');
+    if (STORAGE_DATA_TIERS.includes(tier as StorageDataTier)) {
+      return { root, storeRole, tier: tier as StorageDataTier, tenant };
+    }
+  }
+  return undefined;
+}
 
 /** Knowledge permission path corresponding to a registered runtime state path. */
 export function partitionedRuntimeStateKnowledgePath(filePath: string): string | undefined {

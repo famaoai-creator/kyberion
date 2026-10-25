@@ -57,6 +57,8 @@ describe('protected library execution approval continuation', () => {
             recursive: true,
             force: true,
           });
+        // Tenant-scoped requests live in the tenant approval partitions.
+        safeRmSync(roots.tenantApprovals, { recursive: true, force: true });
       },
       'ecosystem_architect',
       'pipeline-delegation'
