@@ -133,8 +133,8 @@ export const approvalRejectionSource: LearningSignalSource = {
     // (approval-store-location.ts), read as that tenant's store role.
     for (const partition of listApprovalPartitions()) {
       for (const channel of safeApprovalChannels(partition)) {
-        // Confined like any approval read: the caller's own channel grant, then
-        // the tenant-bound store role (approval-store-location.ts).
+        // Read as the tenant-bound store role (approval-store-location.ts); a
+        // tenant this process may not bind yields nothing.
         let events: Row[];
         try {
           events = readApprovalJsonlAt<Row>(
@@ -143,7 +143,7 @@ export const approvalRejectionSource: LearningSignalSource = {
             tenantApprovalEventLogicalPath(partition, channel)
           );
         } catch {
-          continue; // a channel this caller may not read contributes nothing
+          continue; // an unreadable log contributes nothing
         }
         observations.push(...approvalRejectionObservations(events, channel, window, partition));
       }

@@ -438,7 +438,13 @@ export function resolveSessionCacheSeed(
           };
     }
     const located = locateApprovalRequest(entry.storageChannel, entry.grantedByRequestId);
-    if (!located) return { status: 'missing' };
+    if (!located) {
+      // A tenant seed (e.g. a legacy system-tree record since migrated into its
+      // partition) that cannot be found may have been revoked there: never trust it.
+      return entry.tenantSlug
+        ? { status: 'unusable', reason: 'the tenant seed request cannot be found' }
+        : { status: 'missing' };
+    }
     if (located.partition.kind === 'tenant' || located.record.scope?.tenant_slug) {
       // Stored as untenanted but now found tenant-scoped: never trust it silently.
       if (!entry.tenantSlug)
@@ -836,6 +842,17 @@ export function decideApprovalRequest(
   params: Parameters<typeof decideApprovalRequestUnlocked>[1]
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => decideApprovalRequestUnlocked(role, params));
+}
+/**
+ * {@link decideApprovalRequest} for a caller that already holds
+ * `withApprovalRecordLock` for this record (a lock-held read-evaluate-decide
+ * step such as the veto-window tick). Never call it without the lock.
+ */
+export function decideApprovalRequestUnderLock(
+  role: GovernedArtifactRole,
+  params: Parameters<typeof decideApprovalRequestUnlocked>[1]
+): ApprovalRequestRecord {
+  return decideApprovalRequestUnlocked(role, params);
 }
 function decideApprovalRequestUnlocked(
   role: GovernedArtifactRole,

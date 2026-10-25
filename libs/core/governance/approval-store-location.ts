@@ -38,7 +38,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { storagePartitionSegments } from '../storage-layout.js';
-import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import { validateWritePermission } from '../tier-guard.js';
 import type { EventScope, EventScopeInput } from '../event-scope.js';
 import {
   ensureRegularGovernedArtifactFile,
@@ -302,30 +302,28 @@ function liveSystemPathFor(partition: ApprovalTenantPartition, logicalPath: stri
 }
 
 /**
- * Per-channel role confinement for tenant records: before the store role
- * touches a tenant partition, the caller (its `role` for writes, its ambient
- * identity for reads) must hold the grant the same operation needs on the
- * live system-tree path of that channel — so `slack_bridge` decides a tenant
- * record on the slack channel exactly as it would a system one, and no other.
+ * Per-channel role confinement for tenant record WRITES: before the store role
+ * writes a tenant partition, the caller's `role` must hold the write grant the
+ * same operation needs on the live system-tree path of that channel — so
+ * `slack_bridge` decides a tenant record on the slack channel exactly as it
+ * would a system one, and no other.
+ *
+ * Reads are not role-confined, the same as in the system tree: tier-guard
+ * admits every read of the (untiered) channel paths, so a read check here
+ * would be a no-op. What confines tenant reads is the tenant binding
+ * (mayBindApprovalTenant) and the tenant-bound store role.
  */
-function assertCallerChannelAccess(
-  access: 'read' | 'write' | 'mkdir',
+function assertCallerChannelWrite(
+  access: 'write' | 'mkdir',
   partition: ApprovalTenantPartition,
   logicalPath: string,
-  role?: GovernedArtifactRole
+  role: GovernedArtifactRole
 ): void {
   const live = liveSystemPathFor(partition, logicalPath);
-  const decision =
-    access === 'read'
-      ? role
-        ? withExecutionContext(role, () => validateReadPermission(live))
-        : validateReadPermission(live)
-      : role
-        ? withExecutionContext(role, () => validateWritePermission(live, access))
-        : validateWritePermission(live, access);
+  const decision = withExecutionContext(role, () => validateWritePermission(live, access));
   if (!decision.allowed) {
     throw new Error(
-      `[POLICY_VIOLATION] approval ${access} refused — the caller may not ${access === 'read' ? 'read' : 'write'} this channel's approvals | ` +
+      `[POLICY_VIOLATION] approval ${access} refused — the caller may not write this channel's approvals | ` +
         `next: use the role that owns the channel | evidence: ${decision.reason ?? 'denied'}`
     );
   }
@@ -345,7 +343,7 @@ function asPartitionWriter<T>(
 ): T {
   if (partition.kind === 'system') return withExecutionContext(role, fn);
   assertMayBindApprovalTenant(partition.tenant_slug);
-  assertCallerChannelAccess(access, partition, logicalPath, role);
+  assertCallerChannelWrite(access, partition, logicalPath, role);
   return asTenantApprovalStore(partition.tenant_slug, fn);
 }
 
@@ -362,7 +360,6 @@ function prepareGovernedFile(logicalPath: string): string {
 export function readApprovalJsonAt<T>(partition: ApprovalPartition, logicalPath: string): T | null {
   if (partition.kind === 'system') return readGovernedArtifactJson<T>(logicalPath);
   if (!mayBindApprovalTenant(partition.tenant_slug)) return null;
-  assertCallerChannelAccess('read', partition, logicalPath);
   return asTenantApprovalStore(partition.tenant_slug, () =>
     readGovernedArtifactJson<T>(logicalPath)
   );
@@ -376,7 +373,6 @@ export function listApprovalDirAt(partition: ApprovalPartition, logicalDir: stri
   };
   if (partition.kind === 'system') return list();
   if (!mayBindApprovalTenant(partition.tenant_slug)) return [];
-  assertCallerChannelAccess('read', partition, logicalDir);
   return asTenantApprovalStore(partition.tenant_slug, list);
 }
 
@@ -424,10 +420,10 @@ export function appendApprovalJsonlAt(
 }
 
 /**
- * Whether a file exists in a location. A tenant partition is probed as its
- * store role after the binding and per-channel read checks (`role` = the
- * caller's role; omitted = the ambient identity); a tenant this process may
- * not bind reports false.
+ * Whether a file exists in a location. The system tree is probed as `role`
+ * (omitted = the ambient identity); a tenant partition as its store role,
+ * after the binding check — reads are not role-confined, as in the system
+ * tree. A tenant this process may not bind reports false.
  */
 export function approvalFileExistsAt(
   role: GovernedArtifactRole | undefined,
@@ -437,7 +433,6 @@ export function approvalFileExistsAt(
   const exists = (): boolean => safeExistsSync(resolveGovernedArtifactPath(logicalPath));
   if (partition.kind === 'system') return role ? withExecutionContext(role, exists) : exists();
   if (!mayBindApprovalTenant(partition.tenant_slug)) return false;
-  assertCallerChannelAccess('read', partition, logicalPath, role);
   return asTenantApprovalStore(partition.tenant_slug, exists);
 }
 
@@ -463,8 +458,8 @@ export function removeApprovalFileAt(
 
 /**
  * Read an append-only JSONL log (a channel's `approvals.jsonl`) in a location;
- * malformed lines are skipped, an absent log is empty. Confined like
- * {@link approvalFileExistsAt}.
+ * malformed lines are skipped, an absent log is empty. Read like
+ * {@link approvalFileExistsAt} (tenant binding, then the store role).
  */
 export function readApprovalJsonlAt<T = Record<string, unknown>>(
   role: GovernedArtifactRole | undefined,
@@ -479,7 +474,6 @@ export function readApprovalJsonlAt<T = Record<string, unknown>>(
   };
   if (partition.kind === 'system') return role ? withExecutionContext(role, read) : read();
   if (!mayBindApprovalTenant(partition.tenant_slug)) return [];
-  assertCallerChannelAccess('read', partition, logicalPath, role);
   return asTenantApprovalStore(partition.tenant_slug, read);
 }
 

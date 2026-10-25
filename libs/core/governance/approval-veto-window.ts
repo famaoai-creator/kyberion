@@ -7,7 +7,7 @@ import {
 } from './approval-store-location.js';
 import {
   withApprovalRecordLock,
-  decideApprovalRequest,
+  decideApprovalRequestUnderLock,
   listApprovalRequests,
   type ApprovalRequestRecord,
 } from './approval-store.js';
@@ -306,43 +306,58 @@ export function tickVetoWindows(
   });
   for (const record of pending) {
     if (!record.veto) continue;
-    const veto = record.veto;
     try {
-      const state = evaluateVetoWindow(veto, now);
+      // The listing is only a pre-filter: the window is re-evaluated on the
+      // fresh record under its lock, and an elapsed window is decided in that
+      // same locked step — a fallback or decision recorded in between wins.
+      const listed = evaluateVetoWindow(record.veto, now);
+      if (listed !== 'undelivered' && listed !== 'elapsed_shadow' && listed !== 'elapsed') continue;
       const ref = { storageChannel: record.storageChannel, requestId: record.id };
-      if (state === 'undelivered' && !veto.fallback) {
-        const fellBack = withLockedVetoRecord(role, ref, (located) =>
-          fallBackToDecisionUnlocked(role, located, located.record)
-        );
-        if (fellBack) result.fellBack.push(fellBack);
-      } else if (state === 'elapsed_shadow' && !veto.shadowElapsedAt) {
-        const updated = withLockedVetoRecord(role, ref, (located) => {
+      const outcome = withLockedVetoRecord(
+        role,
+        ref,
+        (
+          located
+        ): {
+          kind: keyof Omit<VetoWindowTickResult, 'errors'>;
+          record: ApprovalRequestRecord;
+        } | null => {
           const fresh = located.record;
-          if (fresh.status !== 'pending' || !fresh.veto || fresh.veto.shadowElapsedAt) return null;
-          const next: ApprovalRequestRecord = {
-            ...fresh,
-            veto: { ...fresh.veto, shadowElapsedAt: new Date(now).toISOString() },
-          };
-          persistWithEvent(role, located, next, 'veto_window_elapsed_shadow', {
-            proceeds_at: fresh.veto.proceedsAt,
-          });
-          return next;
-        });
-        if (updated) result.shadowElapsed.push(updated);
-      } else if (state === 'elapsed') {
-        result.proceeded.push(
-          decideApprovalRequest(role, {
-            channel: record.channel,
-            storageChannel: record.storageChannel,
-            requestId: record.id,
-            decision: 'approved',
-            decidedBy: VETO_WINDOW_DECIDER,
-            decidedByType: 'service',
-            authenticated: false,
-            note: `no objection within ${veto.windowMinutes} active minutes after delivery`,
-          })
-        );
-      }
+          if (fresh.status !== 'pending' || !fresh.veto) return null;
+          const veto = fresh.veto;
+          const state = evaluateVetoWindow(veto, now);
+          if (state === 'undelivered' && !veto.fallback) {
+            return { kind: 'fellBack', record: fallBackToDecisionUnlocked(role, located, fresh) };
+          }
+          if (state === 'elapsed_shadow' && !veto.shadowElapsedAt) {
+            const next: ApprovalRequestRecord = {
+              ...fresh,
+              veto: { ...veto, shadowElapsedAt: new Date(now).toISOString() },
+            };
+            persistWithEvent(role, located, next, 'veto_window_elapsed_shadow', {
+              proceeds_at: veto.proceedsAt,
+            });
+            return { kind: 'shadowElapsed', record: next };
+          }
+          if (state === 'elapsed') {
+            return {
+              kind: 'proceeded',
+              record: decideApprovalRequestUnderLock(role, {
+                channel: fresh.channel,
+                storageChannel: fresh.storageChannel,
+                requestId: fresh.id,
+                decision: 'approved',
+                decidedBy: VETO_WINDOW_DECIDER,
+                decidedByType: 'service',
+                authenticated: false,
+                note: `no objection within ${veto.windowMinutes} active minutes after delivery`,
+              }),
+            };
+          }
+          return null;
+        }
+      );
+      if (outcome) result[outcome.kind].push(outcome.record);
     } catch (error) {
       result.errors.push({
         requestId: record.id,
