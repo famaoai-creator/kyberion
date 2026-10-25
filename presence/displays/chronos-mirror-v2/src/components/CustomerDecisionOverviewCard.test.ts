@@ -19,6 +19,7 @@ import type {
   AgendaOverviewView,
   CustomerDecisionOverviewView,
 } from '../lib/customer-decision-overview-response';
+import { customerDecisionHrefs } from '../lib/customer-decision-navigation';
 
 const counts = (over: Partial<AgendaOverviewView['counts']> = {}) => ({
   confirmed: 0,
@@ -310,5 +311,28 @@ describe('CustomerDecisionOverviewCard (CD-12)', () => {
       signal: controller.signal,
     });
     expect(await pending).toBeNull();
+  });
+
+  it('links attention and case rows into the drill-down and offers the learning view', () => {
+    const hrefs = customerDecisionHrefs('/', new URLSearchParams('tenant=acme'));
+    const html = renderToStaticMarkup(
+      createElement(CustomerDecisionOverviewPanel, {
+        state: { kind: 'ready', overview: overview() },
+        tenant: 'acme',
+        locale: 'en',
+        hrefs,
+      })
+    );
+    const agendaHref = `/?tenant=acme&amp;cd_view=case&amp;cd_case=case-a&amp;cd_agenda=${agenda.agenda_id}`;
+    // The overdue item (an agenda set) and the held-tasks item (a case) are rows that open.
+    expect(html).toContain(`data-href="${agendaHref}"`);
+    expect(html).toContain('data-href="/?tenant=acme&amp;cd_view=case&amp;cd_case=case-a"');
+    expect(html).toContain(`href="${agendaHref}"`);
+    expect(html).toContain('Open case case-a');
+    expect(html).toContain('href="/?tenant=acme&amp;cd_view=learning"');
+    expect(html).toContain('Open learning');
+    expect(html).toContain('<caption>Agenda sets of case-a</caption>');
+    // Without hrefs (the previous card) nothing links.
+    expect(render({ kind: 'ready', overview: overview() })).not.toContain('data-href=');
   });
 });

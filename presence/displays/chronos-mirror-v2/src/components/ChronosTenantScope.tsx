@@ -5,6 +5,7 @@ import { changeWorkspaceSelection } from '@agent/core/surface/workspace-query';
 import { Building2, ShieldCheck } from 'lucide-react';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { useChronosLocale } from '../lib/hooks';
+import { clearCustomerDecisionSelection } from '../lib/customer-decision-navigation';
 import { uxText } from '../lib/ux-vocabulary';
 import {
   normalizeChronosTenantScopePayload,
@@ -121,6 +122,9 @@ export function ChronosTenantScope({ compact = false }: { compact?: boolean }) {
     organizationOption?: ChronosOrganizationOption
   ) => {
     let params = changeWorkspaceSelection(new URLSearchParams(searchParams.toString()), key, value);
+    // CD-12: a customer-decision drill-down (cd_*) belongs to one tenant.
+    if (key === 'tenant' || key === 'organization_id')
+      params = clearCustomerDecisionSelection(params);
     if (
       key === 'organization_id' &&
       organizationOption &&
