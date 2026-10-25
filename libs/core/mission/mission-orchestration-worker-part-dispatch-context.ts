@@ -318,18 +318,21 @@ export async function buildTaskDispatchContext(input: {
   // CD-09: the values go into the prompt only past the tier gate; they are
   // never passed to the compaction step or into any other section.
   const decisionValues =
-    input.customerDecisionValues && input.customerDecisionValues.count > 0
+    input.customerDecisionValues && !input.customerDecisionValues.isEmpty
       ? input.customerDecisionValues
       : undefined;
-  const decisionWithheld = decisionValues
-    ? customerDecisionTierGate({
-        securityScope: missionContextPack ? missionContextPack.security_scope : undefined,
-        missionId: String(missionState.mission_id || input.missionId),
-        tenantSlug: decisionValues.tenantSlug,
-        caseId: decisionValues.caseId,
-        ...(decisionValues.projectId ? { projectId: decisionValues.projectId } : {}),
-      })
-    : null;
+  // Only confidential values pass the gate; a section that carries just the
+  // ids of unconfirmed proposals is no tenant data and goes to any mission.
+  const decisionWithheld =
+    decisionValues && decisionValues.count > 0
+      ? customerDecisionTierGate({
+          securityScope: missionContextPack ? missionContextPack.security_scope : undefined,
+          missionId: String(missionState.mission_id || input.missionId),
+          tenantSlug: decisionValues.tenantSlug,
+          caseId: decisionValues.caseId,
+          ...(decisionValues.projectId ? { projectId: decisionValues.projectId } : {}),
+        })
+      : null;
   const customerDecisionDelivery: CustomerDecisionDelivery | undefined = decisionValues
     ? {
         status: decisionWithheld ? 'withheld' : 'delivered',

@@ -54,6 +54,7 @@ import {
   missionTaskConsumerId,
   reconcileConsumedDecisionLock,
   resolvedTaskProposalDecisions,
+  unconfirmedTaskProposals,
   taskProposalHolds,
   taskProposalId,
   unreworkedStale,
@@ -129,8 +130,9 @@ export interface PinTaskDecisionsResult {
   pinned: boolean;
   /**
    * A resumed task whose hold is resolved: the confirmed customer decisions on
-   * its own `requires_customer` questions. Present only when there are any;
-   * serialized it shows ids only. The prompt receives the values only past
+   * its own `requires_customer` questions, and the ids of those a completed
+   * task has no confirmed value for any more (told so in the prompt).
+   * Present only when there is either; serialized it shows ids only. The prompt receives the values only past
    * the tier gate of `buildTaskDispatchContext`.
    */
   decision_values?: ConfidentialTaskDecisionValues;
@@ -517,6 +519,9 @@ export function pinTaskDecisions(
         existing?.hold && !stillHeld
           ? resolvedTaskProposalDecisions(judged, agendas, ledger, now)
           : [];
+      // A completed task's release that no longer stands: told, never silent.
+      const unconfirmed =
+        existing?.hold && !stillHeld ? unconfirmedTaskProposals(judged, agendas, ledger, now) : [];
       const released = new Set(
         (existing ? taskProposalsOf(existing) : [])
           .filter((entry) => entry.proposal.resolved)
@@ -553,7 +558,7 @@ export function pinTaskDecisions(
               },
             }
           : {}),
-        ...(resolvedValues.length > 0
+        ...(resolvedValues.length > 0 || unconfirmed.length > 0
           ? {
               decision_values: new ConfidentialTaskDecisionValues(
                 {
@@ -562,7 +567,8 @@ export function pinTaskDecisions(
                   consumer,
                   ...(decisionCase.projectId ? { projectId: decisionCase.projectId } : {}),
                 },
-                resolvedValues
+                resolvedValues,
+                unconfirmed
               ),
             }
           : {}),

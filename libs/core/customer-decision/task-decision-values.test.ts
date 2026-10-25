@@ -194,4 +194,30 @@ describe('ConfidentialTaskDecisionValues (CD-09)', () => {
       '[customer decision D-0001], [customer decision D-0002] — yesterday, okay'
     );
   });
+
+  it('names unconfirmed proposals by id only, and serializes them as ids', () => {
+    const values = new ConfidentialTaskDecisionValues(
+      { tenantSlug: 'acme-corp', caseId: 'case-a', consumer: 'c' },
+      [],
+      [
+        { proposal_id: 'tp-bbbbbbbbbbbbbbbb', reason: 'decision_not_recorded' },
+        { proposal_id: 'tp-aaaaaaaaaaaaaaaa', reason: 'changed_after_completion' },
+      ]
+    );
+    expect(values.isEmpty).toBe(false);
+    expect(values.count).toBe(0);
+    expect(JSON.parse(JSON.stringify(values))).toEqual({
+      count: 0,
+      decision_ids: [],
+      unconfirmed_proposal_ids: ['tp-aaaaaaaaaaaaaaaa', 'tp-bbbbbbbbbbbbbbbb'],
+    });
+    const text = values.promptLines().join('\n');
+    expect(text).toContain('tp-aaaaaaaaaaaaaaaa changed after this task completed');
+    expect(text).toContain('tp-bbbbbbbbbbbbbbbb is no longer recorded');
+    expect(text).not.toContain('confirmed answers to the questions');
+    expect(values.knowledgeRefs()).toEqual([
+      'customer-decision:case-a#tp-aaaaaaaaaaaaaaaa',
+      'customer-decision:case-a#tp-bbbbbbbbbbbbbbbb',
+    ]);
+  });
 });

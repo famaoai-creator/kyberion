@@ -923,23 +923,22 @@ describe('mission decision lock (CD-09)', () => {
         const closeAgenda = (status: 'closed' | 'withdrawn' = 'closed') =>
           writeAgenda({ dir }, { ...readAgenda({ dir }, 'agd-test0001')!, status });
 
-        it('released, then changed by the customer, then closed unconfirmed: the last confirmed answer is delivered', () => {
+        it('confirmed A, the customer answers B, the agenda closes unconfirmed: A is never delivered (unresolvable)', () => {
           confirmRelease();
           expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.decision_values?.count).toBe(
             1
           );
-          // The customer changes the answer (D-0003, provisional); the operator
-          // closes the agenda without confirming it.
+          // The customer changes the answer (D-0003 supersedes D-0001, provisional);
+          // the operator closes the agenda without confirming it.
           decide('RELEASE', 'release.go', { approved: false }, LATER, 'D-0001');
           expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.held?.reason).toBe(
             'decision_not_in_force'
           );
           closeAgenda();
           const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
-          expect(resumed).not.toHaveProperty('held');
-          expect(resumed?.decision_values?.decisionIds).toEqual(['D-0001']);
-          expect(resumed!.decision_values!.promptLines().join('\n')).toContain(SENTINEL);
-          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(false);
+          expect(resumed).not.toHaveProperty('decision_values');
+          expect(resumed?.held?.reason).toBe('customer_decision_unresolvable');
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
         });
 
         it('closed with no confirmed answer: held as unresolvable at every boundary, never released', () => {
@@ -970,6 +969,21 @@ describe('mission decision lock (CD-09)', () => {
           expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(false);
           const rerun = pinTaskDecisions(task, { decisionCase, now: LATER });
           expect(rerun).not.toHaveProperty('held');
+          // The superseded value is not delivered; the task is told so, ids only.
+          const values = rerun?.decision_values;
+          expect(values?.count).toBe(0);
+          expect(values?.unconfirmedProposalIds).toHaveLength(1);
+          expect(values?.unconfirmedReasons).toEqual(['changed_after_completion']);
+          const text = values!.promptLines().join('\n');
+          expect(text).toContain('changed after this task completed and is not confirmed');
+          expect(text).not.toContain(SENTINEL);
+          expect(JSON.parse(JSON.stringify(rerun))).toMatchObject({
+            decision_values: {
+              count: 0,
+              decision_ids: [],
+              unconfirmed_proposal_ids: values!.unconfirmedProposalIds,
+            },
+          });
           // The re-pin keeps the completion, so the next boundaries agree.
           expect(lockNow()).toMatchObject({ status: 'in_progress', completed_at: LATER });
           expect(
