@@ -29,6 +29,7 @@ const {
   mockLoadApprovalRequest,
   mockComputeApprovalPayloadHash,
   mockExecuteServicePreset,
+  mockLoadActuatorOpDiscovery,
   registeredTools,
 } = vi.hoisted(() => {
   const registeredTools = new Map<
@@ -62,6 +63,7 @@ const {
     mockLoadApprovalRequest: vi.fn(),
     mockComputeApprovalPayloadHash: vi.fn().mockReturnValue('payload-hash'),
     mockExecuteServicePreset: vi.fn(),
+    mockLoadActuatorOpDiscovery: vi.fn(),
     registeredTools,
   };
 });
@@ -138,6 +140,10 @@ vi.mock('@agent/core/governance/approval-cowork-adapter', () => ({
 
 vi.mock('@agent/core/cowork-knowledge-bridge.js', () => ({
   runCoworkKnowledgeSync: mockRunCoworkKnowledgeSync,
+}));
+
+vi.mock('@agent/core/actuator/actuator-op-discovery', () => ({
+  loadActuatorOpDiscoveryAtPath: mockLoadActuatorOpDiscovery,
 }));
 
 vi.mock('@agent/core/service/service-engine', async () => {
@@ -276,6 +282,7 @@ function setupCommonMocks() {
     isDirectory: () => true,
   });
   mockSafeReadFile.mockReturnValue(FAKE_CATALOG);
+  mockLoadActuatorOpDiscovery.mockReturnValue({ v: '1', actuators: [] });
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -725,6 +732,55 @@ describe('createKyberionMcpServer()', () => {
       expect(JSON.parse(result.content[0].text)).toEqual([
         { actuator: 'unsafe-actuator', ops: [] },
         { actuator: 'mixed-actuator', ops: ['read'] },
+      ]);
+    });
+
+    it('merges fine-grained discovery ops behind the manifest ops', async () => {
+      mockLoadActuatorOpDiscovery.mockReturnValue({
+        v: '1',
+        actuators: [
+          {
+            n: 'file-actuator',
+            path: 'libs/actuators/file-actuator',
+            source: 'describeOps',
+            ops: [{ op: 'exists' }, { op: 'read' }, { op: 'pipeline' }],
+          },
+        ],
+      });
+      mockSafeReaddir.mockReturnValue(['file-actuator']);
+      mockSafeReadFile
+        .mockReturnValueOnce(FAKE_CATALOG)
+        .mockReturnValueOnce(
+          JSON.stringify({ actuator_id: 'file-actuator', capabilities: [{ op: 'pipeline' }] })
+        );
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.capability.list')!.handler;
+      const result = await handler({});
+
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        { actuator: 'file-actuator', ops: ['pipeline', 'exists', 'read'] },
+      ]);
+    });
+
+    it('degrades to the manifest-only listing when the discovery catalog fails to load', async () => {
+      mockLoadActuatorOpDiscovery.mockImplementation(() => {
+        throw new Error('catalog missing');
+      });
+      mockSafeReaddir.mockReturnValue(['file-actuator']);
+      mockSafeReadFile
+        .mockReturnValueOnce(FAKE_CATALOG)
+        .mockReturnValueOnce(
+          JSON.stringify({ actuator_id: 'file-actuator', capabilities: [{ op: 'pipeline' }] })
+        );
+
+      createKyberionMcpServer();
+      const handler = registeredTools.get('kyberion.capability.list')!.handler;
+      const result = await handler({});
+
+      expect(result.isError).toBeFalsy();
+      expect(JSON.parse(result.content[0].text)).toEqual([
+        { actuator: 'file-actuator', ops: ['pipeline'] },
       ]);
     });
   });
