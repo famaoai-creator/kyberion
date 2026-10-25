@@ -10,10 +10,14 @@ import {
   customerDecisionHrefs,
   readCustomerDecisionSelection,
   type CustomerDecisionHrefs,
+  type CustomerDecisionSelection,
 } from '../lib/customer-decision-navigation';
 import { useCustomerDecisionView } from '../lib/customer-decision-view-client';
 import { CustomerDecisionOverviewBody } from './CustomerDecisionOverviewCard';
-import { CustomerDecisionCasePanel } from './CustomerDecisionCaseDetail';
+import {
+  CustomerDecisionCasePanel,
+  CustomerDecisionFocusOnOpen,
+} from './CustomerDecisionCaseDetail';
 import { CustomerDecisionAgendaPanel } from './CustomerDecisionAgendaDetail';
 import {
   CustomerDecisionLearningPanel,
@@ -81,19 +85,99 @@ function CustomerDecisionLink({ href, children, ...rest }: A2UILinkProps) {
   );
 }
 
-/** The drill-down target an activated link or row opens, if any. */
-function drillDownTarget(target: EventTarget | null, container: HTMLElement): string | null {
-  if (!(target instanceof Element)) return null;
-  const opener = target.closest('a[href], tr[data-href]');
-  if (!opener || !container.contains(opener)) return null;
-  return opener.getAttribute('href') ?? opener.getAttribute('data-href');
+/** The DOM a drill-down opener needs (an `Element`; duck-typed so it is testable without a DOM). */
+export interface DrillDownElement {
+  getAttribute(name: string): string | null;
+  closest(selector: string): DrillDownElement | null;
+}
+
+export const DRILL_DOWN_OPENER_SELECTOR = 'a[href], tr[data-href]';
+
+function openerHref(element: DrillDownElement): string | null {
+  return element.getAttribute('href') ?? element.getAttribute('data-href');
+}
+
+/** The href an activated link or row inside `container` opens, if any. */
+export function drillDownTarget(
+  target: unknown,
+  container: { contains: (node: never) => boolean }
+): string | null {
+  if (!target || typeof (target as DrillDownElement).closest !== 'function') return null;
+  const opener = (target as DrillDownElement).closest(DRILL_DOWN_OPENER_SELECTOR);
+  const contains = container.contains.bind(container) as (node: unknown) => boolean;
+  if (!opener || !contains(opener)) return null;
+  return openerHref(opener);
+}
+
+/** Focuses the link or row in `container` that opens `href`; false when it is not there (yet). */
+export function focusDrillDownOpener(
+  container: {
+    querySelectorAll(selector: string): ArrayLike<DrillDownElement & { focus(): void }>;
+  },
+  href: string
+): boolean {
+  const opener = Array.from(container.querySelectorAll(DRILL_DOWN_OPENER_SELECTOR)).find(
+    (element) => openerHref(element) === href
+  );
+  opener?.focus();
+  return Boolean(opener);
+}
+
+/**
+ * Whether the card shows a view the viewer navigated to inside the page (the
+ * query differs from the one the page loaded with); a direct load or a
+ * refresh does not move focus.
+ */
+export function isInAppNavigation(initialQuery: string, query: string): boolean {
+  return initialQuery !== query;
+}
+
+/** The view a selection shows (rendered statically in tests). */
+export function CustomerDecisionSelectionView({
+  selection,
+  tenant,
+  organizationId,
+  learningCandidates,
+  locale,
+  hrefs,
+}: {
+  selection: CustomerDecisionSelection;
+  tenant: string;
+  organizationId?: string;
+  learningCandidates?: readonly CustomerDecisionLearningCandidate[];
+  locale: SupportedLocale;
+  hrefs: CustomerDecisionHrefs;
+}) {
+  if (selection.view === 'case')
+    return (
+      <CustomerDecisionCaseDetail
+        tenant={tenant}
+        caseId={selection.caseId}
+        agendaId={selection.agendaId}
+        locale={locale}
+        hrefs={hrefs}
+      />
+    );
+  if (selection.view === 'learning')
+    return (
+      <CustomerDecisionLearningPanel
+        tenant={tenant}
+        organizationId={organizationId || tenant}
+        date={selection.date}
+        locale={locale}
+        hrefs={hrefs}
+        candidates={learningCandidates}
+      />
+    );
+  return <CustomerDecisionOverviewBody tenant={tenant} locale={locale} hrefs={hrefs} />;
 }
 
 /**
  * The card: the overview of `tenant`, or — from the address bar (`cd_view`,
  * `cd_case`, `cd_agenda`, `cd_date`) — a case, one of its agenda sets, or the
  * learning report. Drill-down links navigate in place (router push, scroll
- * kept); Back returns focus to the row or link that opened the view.
+ * kept); after an in-app navigation the opened view's heading takes focus,
+ * and Back returns focus to the row or link that opened the view.
  */
 export function CustomerDecisionCard({
   tenant,
@@ -111,6 +195,8 @@ export function CustomerDecisionCard({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const query = searchParams.toString();
+  const initialQuery = React.useRef(query);
+  const focusOnOpen = isInAppNavigation(initialQuery.current, query);
   const parent = useA2UIActions();
   const selection = React.useMemo(
     () => readCustomerDecisionSelection(new URLSearchParams(query)),
@@ -137,19 +223,10 @@ export function CustomerDecisionCard({
     const container = containerRef.current;
     if (selection.view !== 'overview' || !href || !container) return;
     openerRef.current = null;
-    const restore = (): boolean => {
-      const opener = Array.from(
-        container.querySelectorAll<HTMLElement>('a[href], tr[data-href]')
-      ).find(
-        (element) => (element.getAttribute('href') ?? element.getAttribute('data-href')) === href
-      );
-      opener?.focus();
-      return Boolean(opener);
-    };
-    if (restore()) return;
+    if (focusDrillDownOpener(container, href)) return;
     // The overview loads again after Back: focus the opener once its row is there.
     const observer = new MutationObserver(() => {
-      if (restore()) observer.disconnect();
+      if (focusDrillDownOpener(container, href)) observer.disconnect();
     });
     observer.observe(container, { childList: true, subtree: true });
     const timer = setTimeout(() => observer.disconnect(), FOCUS_RESTORE_WAIT_MS);
@@ -159,46 +236,31 @@ export function CustomerDecisionCard({
     };
   }, [selection]);
 
-  let body: React.ReactNode;
-  if (selection.view === 'case')
-    body = (
-      <CustomerDecisionCaseDetail
-        tenant={tenant}
-        caseId={selection.caseId}
-        agendaId={selection.agendaId}
-        locale={locale}
-        hrefs={hrefs}
-      />
-    );
-  else if (selection.view === 'learning')
-    body = (
-      <CustomerDecisionLearningPanel
-        tenant={tenant}
-        organizationId={organizationId || tenant}
-        date={selection.date}
-        locale={locale}
-        hrefs={hrefs}
-        candidates={learningCandidates}
-      />
-    );
-  else body = <CustomerDecisionOverviewBody tenant={tenant} locale={locale} hrefs={hrefs} />;
-
   return (
     <A2UIActionProvider
       onAction={parent.onAction}
       linkComponent={CustomerDecisionLink}
       navigate={navigate}
     >
-      <div
-        ref={containerRef}
-        className="chronos-cd-host"
-        onClickCapture={(event) => remember(event.target)}
-        onKeyDownCapture={(event) => {
-          if (event.key === 'Enter') remember(event.target);
-        }}
-      >
-        {body}
-      </div>
+      <CustomerDecisionFocusOnOpen.Provider value={focusOnOpen}>
+        <div
+          ref={containerRef}
+          className="chronos-cd-host"
+          onClickCapture={(event) => remember(event.target)}
+          onKeyDownCapture={(event) => {
+            if (event.key === 'Enter') remember(event.target);
+          }}
+        >
+          <CustomerDecisionSelectionView
+            selection={selection}
+            tenant={tenant}
+            organizationId={organizationId}
+            learningCandidates={learningCandidates}
+            locale={locale}
+            hrefs={hrefs}
+          />
+        </div>
+      </CustomerDecisionFocusOnOpen.Provider>
     </A2UIActionProvider>
   );
 }

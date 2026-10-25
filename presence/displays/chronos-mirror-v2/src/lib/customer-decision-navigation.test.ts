@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   clearCustomerDecisionSelection,
   customerDecisionHrefs,
+  keepCustomerDecisionSelectionFor,
   readCustomerDecisionSelection,
 } from './customer-decision-navigation';
 import {
@@ -66,6 +67,20 @@ describe('customer-decision drill-down navigation (CD-12)', () => {
       ).toString()
     ).toBe('tenant=acme');
   });
+
+  it('keeps cd_* only while the tenant and organization stay the same (a project pick may switch both)', () => {
+    const before = q('tenant=acme&organization_id=acme&cd_view=case&cd_case=c');
+    const sameScope = q('tenant=acme&organization_id=acme&project_id=P&cd_view=case&cd_case=c');
+    expect(keepCustomerDecisionSelectionFor(before, sameScope).get('cd_case')).toBe('c');
+    const otherTenant = q(
+      'tenant=globex&organization_id=globex&project_id=P&cd_view=case&cd_case=c'
+    );
+    expect(keepCustomerDecisionSelectionFor(before, otherTenant).toString()).toBe(
+      'tenant=globex&organization_id=globex&project_id=P'
+    );
+    const otherOrganization = q('tenant=acme&organization_id=acme-2&cd_view=learning');
+    expect(keepCustomerDecisionSelectionFor(before, otherOrganization).has('cd_view')).toBe(false);
+  });
 });
 
 describe('customer-decision view client (CD-12)', () => {
@@ -114,16 +129,18 @@ describe('customer-decision view client (CD-12)', () => {
   });
 
   it.each([
-    [401, 'forbidden'],
-    [403, 'forbidden'],
-    [404, 'not_found'],
-    [503, 'not_built'],
-    [504, 'error'],
-    [502, 'error'],
-  ] as const)('maps HTTP %i to %s', async (status, kind) => {
+    [401, 'forbidden', undefined],
+    [403, 'forbidden', undefined],
+    [404, 'not_found', undefined],
+    [503, 'not_built', 'not_built'],
+    // A busy server (queue full) is retryable, not "not built".
+    [503, 'error', 'busy'],
+    [504, 'error', undefined],
+    [502, 'error', undefined],
+  ] as const)('maps HTTP %i to %s (reason %s)', async (status, kind, reason) => {
     expect(
       await fetchCustomerDecisionView('case', 'acme', 'case-a', {
-        fetch: respond({ error: 'fixed message' }, status),
+        fetch: respond({ error: 'fixed message', ...(reason ? { reason } : {}) }, status),
       })
     ).toEqual({ kind, message: 'fixed message' });
   });

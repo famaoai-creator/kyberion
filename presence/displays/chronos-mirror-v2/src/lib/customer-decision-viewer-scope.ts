@@ -68,3 +68,13 @@ export function resolveCustomerDecisionTenant(
   strictViewerScopeOrganizationIds(viewer, tenant);
   return { tenant };
 }
+
+/**
+ * Marks a customer-decision route answer `Cache-Control: no-store` — the
+ * data, the scope refusals (400 / 401 / 403) and the mapped facade errors
+ * alike, so no shared cache keeps one viewer's answer for another.
+ */
+export function customerDecisionNoStore<T extends Response>(response: T): T {
+  response.headers.set('Cache-Control', 'no-store');
+  return response;
+}

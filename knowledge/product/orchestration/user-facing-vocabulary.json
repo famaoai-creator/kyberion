@@ -1181,6 +1181,11 @@
         "ja": "週次の学習が作成します。pnpm kyberion customer-decision learning --tenant {tenant} --install --by user:<member> で設定してください。",
         "qps-ploc": "⟦Ŧħė ẇėėķŀẏ ŀėȧřñïñɠ řůñ ẇřïŧėş őñė. Ïñşŧȧŀŀ ïŧ ẇïŧħ ṗñṗɱ ķẏƀėřïőñ ƈůşŧőɱėř-ḓėƈïşïőñ ŀėȧřñïñɠ --ŧėñȧñŧ {tenant} --ïñşŧȧŀŀ --ƀẏ ůşėř:<ɱėɱƀėř>. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
       },
+      "chronos_cd_learning_report_date": {
+        "en": "Report {date}",
+        "ja": "レポート {date}",
+        "qps-ploc": "⟦Řėṗőřŧ {date} ŀőřė⟧"
+      },
       "chronos_cd_learning_report": {
         "en": "Report {date} · since {since}",
         "ja": "レポート {date} · 対象期間の開始 {since}",

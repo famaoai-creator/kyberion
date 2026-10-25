@@ -60,8 +60,16 @@ export function CustomerDecisionBreadcrumb({
 }
 
 /**
- * The view's heading, focused when the view opens (and when `focusKey`
- * changes) so keyboard and screen-reader users land on what they opened.
+ * True once the viewer has navigated inside the card (the drill-down router
+ * provides it). A view opened by a direct load or a refresh does not move
+ * focus; one opened from the card does.
+ */
+export const CustomerDecisionFocusOnOpen = React.createContext(false);
+
+/**
+ * The view's heading. After an in-app navigation it is focused when the view
+ * opens (and when `focusKey` changes), without scrolling, so keyboard and
+ * screen-reader users land on what they opened.
  */
 export function CustomerDecisionDetailHeading({
   title,
@@ -71,9 +79,10 @@ export function CustomerDecisionDetailHeading({
   focusKey: string;
 }) {
   const ref = React.useRef<HTMLHeadingElement>(null);
+  const focusOnOpen = React.useContext(CustomerDecisionFocusOnOpen);
   React.useEffect(() => {
-    ref.current?.focus();
-  }, [focusKey]);
+    if (focusOnOpen) ref.current?.focus({ preventScroll: true });
+  }, [focusKey, focusOnOpen]);
   return (
     <h3 ref={ref} className="chronos-cd-detail__title" tabIndex={-1}>
       {title}

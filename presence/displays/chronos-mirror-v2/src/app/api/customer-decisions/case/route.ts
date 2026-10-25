@@ -6,7 +6,10 @@ import {
   ViewerContextError,
 } from '../../../../lib/viewer-context';
 import { readChronosOptionalStringParam } from '../../../../lib/request-input';
-import { resolveCustomerDecisionTenant } from '../../../../lib/customer-decision-viewer-scope';
+import {
+  customerDecisionNoStore,
+  resolveCustomerDecisionTenant,
+} from '../../../../lib/customer-decision-viewer-scope';
 import { readCustomerDecisionFacade } from '../../../../lib/customer-decision-overview-facade';
 import { isCustomerDecisionCaseId } from '../../../../lib/customer-decision-case-response';
 
@@ -20,7 +23,7 @@ import { isCustomerDecisionCaseId } from '../../../../lib/customer-decision-case
  * facade child bound to the tenant — never a decision value, rationale,
  * option, comment or participant name.
  */
-export async function GET(req: NextRequest) {
+async function read(req: NextRequest): Promise<Response> {
   const denied = guardRequest(req);
   if (denied) return denied;
   const accessDenied = requireChronosAccess(req, 'readonly');
@@ -41,10 +44,18 @@ export async function GET(req: NextRequest) {
     }
     const result = await readCustomerDecisionFacade('case', scope.tenant, caseId);
     if ('error' in result)
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json(
+        { error: result.error, ...(result.reason ? { reason: result.reason } : {}) },
+        { status: result.status }
+      );
     return NextResponse.json({ case: result.value }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (error) {
     if (error instanceof ViewerContextError) return viewerErrorResponse(error);
     return viewerErrorResponse(error, 500);
   }
+}
+
+/** Every answer — data, refusals and errors alike — is `Cache-Control: no-store`. */
+export async function GET(req: NextRequest) {
+  return customerDecisionNoStore(await read(req));
 }

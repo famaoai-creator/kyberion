@@ -48,6 +48,10 @@ export const OVERVIEW_CACHE_TTL_MS = 15_000;
 const OVERVIEW_CACHE_LIMIT = 64;
 /** Facade children running at once, across every view kind and tenant. */
 export const FACADE_CHILD_CONCURRENCY = 4;
+/** Requests waiting for a child slot; past it the route answers 503 (busy). */
+export const FACADE_QUEUE_LIMIT = 16;
+/** A not-found answer is kept this long (a typo'd or stale link is not re-forked per request). */
+export const NOT_FOUND_CACHE_TTL_MS = 5_000;
 
 /**
  * Allowlisted keys (secure-io SAFE_EXEC_ENV_ALLOWLIST) the child must not
@@ -141,7 +145,13 @@ export const runOverviewChild: OverviewChildRunner = async (tenant, args) => {
 
 export type FacadeResult<K extends CustomerDecisionFacadeKind> =
   | { ok: true; value: CustomerDecisionFacadeValues[K] }
-  | { ok: false; status: 404 | 502 | 503 | 504; error: string };
+  | {
+      ok: false;
+      status: 404 | 502 | 503 | 504;
+      error: string;
+      /** Why a 503: the facade is not built, or the child queue is full (retry). */
+      reason?: 'not_built' | 'busy';
+    };
 
 export const OVERVIEW_ERRORS = {
   not_built:
@@ -152,6 +162,7 @@ export const OVERVIEW_ERRORS = {
   invalid: 'Customer decisions returned an unexpected format.',
   case_not_found: 'This case has no customer decisions, or it no longer exists.',
   report_not_found: 'There is no learning report for this date.',
+  busy: 'Customer decisions are busy on this server. Try again shortly.',
 } as const;
 
 /** Facade diagnostic codes that mean "nothing there" (404), not a failure. */
@@ -190,11 +201,18 @@ export async function readFacadeView<K extends CustomerDecisionFacadeKind>(
   scriptExists: () => boolean = () =>
     safeExistsSync(pathResolver.rootResolve(OVERVIEW_FACADE_SCRIPT))
 ): Promise<FacadeResult<K>> {
-  if (!scriptExists()) return { ok: false, status: 503, error: OVERVIEW_ERRORS.not_built };
+  if (!scriptExists())
+    return { ok: false, status: 503, error: OVERVIEW_ERRORS.not_built, reason: 'not_built' };
   let outcome: OverviewChildOutcome;
   try {
     outcome = await run(tenant, facadeArgs(kind, tenant, arg));
   } catch (error) {
+    if (error instanceof FacadeBusyError) {
+      logger.warn(
+        `customer-decision ${kind} request refused — the child queue is full | the view shows busy; retry shortly | tenant=${tenant}`
+      );
+      return { ok: false, status: 503, error: OVERVIEW_ERRORS.busy, reason: 'busy' };
+    }
     logger.warn(
       `customer-decision ${kind} child did not start — ${error instanceof Error ? error.name : 'error'} | the view shows an error; check the server build | tenant=${tenant}`
     );
@@ -225,12 +243,26 @@ export async function readFacadeView<K extends CustomerDecisionFacadeKind>(
   return { ok: true, value };
 }
 
-/** At most `limit` tasks run at once; the rest wait in arrival order. */
-export function createConcurrencyLimit(limit: number) {
+/** The child queue is full: the request is refused instead of waiting. */
+export class FacadeBusyError extends Error {
+  constructor() {
+    super('customer-decision facade queue is full');
+    this.name = 'FacadeBusyError';
+  }
+}
+
+/**
+ * At most `limit` tasks run at once; up to `maxWaiting` more wait in arrival
+ * order, and any further one is rejected with {@link FacadeBusyError}.
+ */
+export function createConcurrencyLimit(limit: number, maxWaiting = FACADE_QUEUE_LIMIT) {
   let active = 0;
   const waiting: Array<() => void> = [];
   return async function limited<T>(task: () => Promise<T>): Promise<T> {
-    if (active >= limit) await new Promise<void>((resolve) => waiting.push(resolve));
+    if (active >= limit) {
+      if (waiting.length >= maxWaiting) throw new FacadeBusyError();
+      await new Promise<void>((resolve) => waiting.push(resolve));
+    }
     active += 1;
     try {
       return await task();
@@ -244,6 +276,8 @@ export function createConcurrencyLimit(limit: number) {
 interface CacheEntry {
   /** When the run settled; undefined while it is pending. */
   at?: number;
+  /** How long the settled result is reused. */
+  ttl?: number;
   result: Promise<FacadeResult<CustomerDecisionFacadeKind>>;
 }
 
@@ -255,42 +289,66 @@ export type CustomerDecisionFacadeReader = <K extends CustomerDecisionFacadeKind
 
 /**
  * Per-view cache of the child's result, keyed `kind:tenant:arg`. A pending
- * run is shared; a successful result is reused for {@link OVERVIEW_CACHE_TTL_MS};
- * a failure (a not-found included) is dropped as soon as it settles so the
- * next request retries. At most `concurrency` children run at once.
+ * run is shared; a successful result is reused for {@link OVERVIEW_CACHE_TTL_MS}
+ * and a not-found for {@link NOT_FOUND_CACHE_TTL_MS}; any other failure is
+ * dropped as soon as it settles so the next request retries. When the cache
+ * is full the oldest settled entry goes first (a pending run stays shared).
+ * At most `concurrency` children run at once and `maxWaiting` wait; past
+ * that the answer is a fixed 503 (busy).
  */
 export function createFacadeReader(
   options: {
     run?: OverviewChildRunner;
     scriptExists?: () => boolean;
     ttlMs?: number;
+    notFoundTtlMs?: number;
     now?: () => number;
     concurrency?: number;
+    maxWaiting?: number;
+    cacheLimit?: number;
   } = {}
 ): CustomerDecisionFacadeReader {
   const cache = new Map<string, CacheEntry>();
   const ttl = options.ttlMs ?? OVERVIEW_CACHE_TTL_MS;
+  const notFoundTtl = Math.min(ttl, options.notFoundTtlMs ?? NOT_FOUND_CACHE_TTL_MS);
+  const cacheLimit = options.cacheLimit ?? OVERVIEW_CACHE_LIMIT;
   const now = options.now ?? Date.now;
-  const limited = createConcurrencyLimit(options.concurrency ?? FACADE_CHILD_CONCURRENCY);
+  const limited = createConcurrencyLimit(
+    options.concurrency ?? FACADE_CHILD_CONCURRENCY,
+    options.maxWaiting ?? FACADE_QUEUE_LIMIT
+  );
   const runChild = options.run ?? runOverviewChild;
   const run: OverviewChildRunner = (tenant, args) => limited(() => runChild(tenant, args));
+  const evictOne = () => {
+    let victim: string | undefined;
+    for (const [key, entry] of cache) {
+      if (entry.at !== undefined) {
+        victim = key;
+        break;
+      }
+    }
+    victim ??= cache.keys().next().value;
+    if (victim !== undefined) cache.delete(victim);
+  };
   return <K extends CustomerDecisionFacadeKind>(kind: K, tenant: string, arg?: string) => {
     const key = `${kind}:${tenant}:${arg ?? ''}`;
     const hit = cache.get(key);
-    if (hit && (hit.at === undefined || now() - hit.at < ttl))
+    if (hit && (hit.at === undefined || now() - hit.at < (hit.ttl ?? ttl)))
       return hit.result as Promise<FacadeResult<K>>;
-    if (cache.size >= OVERVIEW_CACHE_LIMIT) {
-      const oldest = cache.keys().next().value;
-      if (oldest !== undefined) cache.delete(oldest);
-    }
+    cache.delete(key);
+    if (cache.size >= cacheLimit) evictOne();
     const result = readFacadeView(kind, tenant, arg, run, options.scriptExists);
     const entry: CacheEntry = { result };
-    cache.delete(key);
     cache.set(key, entry);
     void result.then((settled) => {
       if (cache.get(key) !== entry) return;
-      if (settled.ok) entry.at = now();
-      else cache.delete(key);
+      if (settled.ok) {
+        entry.at = now();
+        entry.ttl = ttl;
+      } else if ('status' in settled && settled.status === 404) {
+        entry.at = now();
+        entry.ttl = notFoundTtl;
+      } else cache.delete(key);
     });
     return result;
   };

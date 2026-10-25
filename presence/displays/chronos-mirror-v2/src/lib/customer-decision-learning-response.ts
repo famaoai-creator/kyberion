@@ -29,9 +29,17 @@ export const SUPPORTED_CUSTOMER_DECISION_LEARNING_VIEW_VERSION = '1.0.0';
 
 const REPORT_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/u;
 
-/** A learning report date (`YYYY-MM-DD`), as the route and facade accept it. */
+/**
+ * A learning report date: `YYYY-MM-DD` and a real calendar day (`2026-02-30`
+ * is not), so the route answers 400 instead of letting the facade fail.
+ */
 export function isLearningReportDate(value: string): boolean {
-  return REPORT_DATE_PATTERN.test(value);
+  if (!REPORT_DATE_PATTERN.test(value)) return false;
+  const [year, month, day] = value.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return (
+    date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+  );
 }
 
 export const LEARNING_VIEW_LIMITS = {

@@ -183,4 +183,24 @@ describe('CustomerDecisionLearningPanel (CD-12 drill-down)', () => {
       customerDecisionLearningCommands('acme', 'acme', learning({ suggestions: [] }))[0]
     ).toContain('--learning-id <learning_id>');
   });
+
+  it('prints one pasteable transition line per status', () => {
+    const [approve, reject] = customerDecisionLearningCommands('acme', 'acme', learning());
+    expect(approve).toMatch(/--record-status approved --dry-run$/u);
+    expect(reject).toMatch(/--record-status rejected --dry-run$/u);
+    for (const line of customerDecisionLearningCommands('acme', 'acme', learning()))
+      expect(line).not.toContain('|');
+  });
+
+  it('leaves "since" out of the header when the report has no start', () => {
+    expect(render({ kind: 'ready', value: learning() })).toContain(
+      'Report 2026-10-24 · since 2026-07-26'
+    );
+    const html = render({ kind: 'ready', value: learning({ since: null }) });
+    expect(html).toContain('Report 2026-10-24');
+    expect(html).not.toContain('since');
+    expect(render({ kind: 'ready', value: learning({ since: null }) }, 'ja')).not.toContain(
+      '対象期間の開始'
+    );
+  });
 });

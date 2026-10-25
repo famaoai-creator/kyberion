@@ -205,7 +205,16 @@ describe('customer-decision learning view projection (CD-12 drill-down)', () => 
     expect(parseCustomerDecisionLearningResponse({ learning: real() }, 'acme')).toBeDefined();
     expect(parseCustomerDecisionLearningResponse({ case: real() }, 'acme')).toBeUndefined();
     expect(isLearningReportDate('2026-10-24')).toBe(true);
-    for (const bad of ['2026-1-24', 'latest', '2026-10-24T00:00', '../2026-10-24'])
+    expect(isLearningReportDate('2028-02-29')).toBe(true);
+    for (const bad of [
+      '2026-1-24',
+      'latest',
+      '2026-10-24T00:00',
+      '../2026-10-24',
+      '2026-02-30',
+      '2026-13-01',
+      '2025-02-29',
+    ])
       expect(isLearningReportDate(bad)).toBe(false);
   });
 });
