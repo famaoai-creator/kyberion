@@ -763,6 +763,16 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/work-effect-release-request.ts#requestWorkEffectReleaseApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/work-effect-release-request.ts#requestWorkEffectReleaseApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/history-search-index.ts#rebuildMissionHistorySearchIndex",
       "roles": ["mission_controller"],
       "unresolved": []
