@@ -2842,17 +2842,22 @@
       "unresolved": []
     },
     {
-      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest",
+      "site": "scripts/customer-decision/reminders.ts#pendingReminderRequests",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
-      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
     {
-      "site": "scripts/customer-decision/reminders.ts#supersedeHeldRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
-import { resolveCompany } from '@agent/core/company';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
@@ -67,8 +66,10 @@ export async function GET(req: NextRequest) {
     // confidential tier, and the tenant's organization (as the organization
     // model route resolves it). All of this runs before the cached read.
     strictViewerTier(viewer, 'confidential');
-    const company = resolveCompany(tenant);
-    strictViewerScopeOrganizationIds(viewer, company.company_id);
+    // A tenant's organization id is its slug: `resolveCompany` sets
+    // `company_id` to the tenant slug (libs/core/company.ts), so the whole
+    // company aggregate is not loaded just to read it back.
+    strictViewerScopeOrganizationIds(viewer, tenant);
     const result = await readCustomerDecisionOverview(tenant);
     // `in` narrows the result under this app's non-strict tsconfig as well.
     if ('error' in result)

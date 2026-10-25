@@ -11,7 +11,7 @@ const mocks = vi.hoisted(() => ({
   strictViewerScopeProjectIds: vi.fn(),
   strictViewerScopeOrganizationIds: vi.fn(),
   strictViewerTier: vi.fn(),
-  resolveCompany: vi.fn((tenant: string) => ({ company_id: `org-${tenant}`, tenant_slug: tenant })),
+  resolveCompany: vi.fn(),
   withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
   viewerErrorResponse: vi.fn(
     (error: Error, status?: number) => new Response(error.message, { status: status ?? 403 })
@@ -72,18 +72,15 @@ describe('customer-decisions overview route (CD-12)', () => {
     mocks.readCustomerDecisionOverview.mockResolvedValue({ ok: true, overview: OVERVIEW });
     mocks.strictViewerTier.mockReturnValue('confidential');
     mocks.strictViewerScopeOrganizationIds.mockReturnValue('all');
-    mocks.resolveCompany.mockImplementation((tenant: string) => ({
-      company_id: `org-${tenant}`,
-      tenant_slug: tenant,
-    }));
   });
 
   it('checks the confidential tier and the tenant organization before reading', async () => {
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
     expect(response.status).toBe(200);
     expect(mocks.strictViewerTier).toHaveBeenCalledWith(ALL_VIEWER, 'confidential');
-    expect(mocks.resolveCompany).toHaveBeenCalledWith('acme');
-    expect(mocks.strictViewerScopeOrganizationIds).toHaveBeenCalledWith(ALL_VIEWER, 'org-acme');
+    // The organization id is the tenant slug; the company aggregate is not loaded.
+    expect(mocks.strictViewerScopeOrganizationIds).toHaveBeenCalledWith(ALL_VIEWER, 'acme');
+    expect(mocks.resolveCompany).not.toHaveBeenCalled();
     const order = (mock: { mock: { invocationCallOrder: number[] } }) =>
       mock.mock.invocationCallOrder[0];
     expect(order(mocks.strictViewerTier)).toBeLessThan(order(mocks.readCustomerDecisionOverview));
@@ -177,6 +174,32 @@ describe('customer-decisions overview route (CD-12)', () => {
     expect(response.status).toBe(403);
     expect(mocks.resolveViewerContextForRequest).not.toHaveBeenCalled();
     expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+  });
+
+  it('runs every authorization check on every request', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(200);
+    }
+    expect(mocks.strictViewerScopeTenantSlugs).toHaveBeenCalledTimes(3);
+    expect(mocks.listTenantProfileSlugs).toHaveBeenCalledTimes(3);
+    expect(mocks.strictViewerTier).toHaveBeenCalledTimes(3);
+    expect(mocks.strictViewerScopeOrganizationIds).toHaveBeenCalledTimes(3);
+    // A previous allowed request does not let another viewer past the organization scope …
+    mocks.strictViewerScopeOrganizationIds.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer organization scope denied');
+    });
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(403);
+    // … nor past the tier, nor a tenant that left the registry.
+    mocks.strictViewerScopeOrganizationIds.mockReturnValue('all');
+    mocks.strictViewerTier.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer tier scope denied');
+    });
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(403);
+    mocks.strictViewerTier.mockReturnValue('confidential');
+    mocks.listTenantProfileSlugs.mockReturnValue(['globex']);
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(403);
+    expect(mocks.readCustomerDecisionOverview).toHaveBeenCalledTimes(3);
+    expect(mocks.resolveCompany).not.toHaveBeenCalled();
   });
 
   it('returns the viewer resolution response as is', async () => {

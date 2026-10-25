@@ -52,6 +52,20 @@ describe('sendToCustomer × accountability charter', () => {
     expect(r.status).toBe('sent');
   });
 
+  it('a sent message names the approval that authorized it (none when none was needed)', async () => {
+    charterFor.mockReturnValue(undefined);
+    gate.mockReturnValueOnce({
+      allowed: true,
+      status: 'approved',
+      requestId: 'apr-granted',
+      message: 'Approved by user:boss',
+    });
+    const approved = await sendToCustomer(input('Hello'));
+    expect(approved).toEqual({ sent: true, status: 'sent', approvalRequestId: 'apr-granted' });
+    const unattended = await sendToCustomer(input('Hello'));
+    expect(unattended).toEqual({ sent: true, status: 'sent' });
+  });
+
   it('classifies an exact routine greeting separately from arbitrary customer content', async () => {
     charterFor.mockReturnValue(CHARTER);
     await sendToCustomer(input('こんにちは。'));

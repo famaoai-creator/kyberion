@@ -7,6 +7,10 @@
  * after `pnpm run build:repo`. Binds loopback only. Configuration:
  *   KYBERION_CUSTOMER_ROOM_TENANT  (required) the tenant whose agendas this room opens
  *   KYBERION_CUSTOMER_ROOM_PORT    (default 3046)
+ *   KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES (default empty = trust nobody) IPs / CIDRs of
+ *                                  the reverse proxy in front; only from these peers is the
+ *                                  client address read from X-Forwarded-For (the proxy
+ *                                  must append to it; RFC 7239 Forwarded is never read)
  */
 import express from 'express';
 import { createServer } from 'node:http';
@@ -16,6 +20,7 @@ import { getRegisteredEnvText } from '@agent/core/foundation';
 import { loadVocabularyCatalog } from '@agent/core/knowledge/vocabulary-catalog';
 import { pathResolver } from '@agent/core/path-resolver';
 import { installProcessGuards } from '@agent/core/process-guards';
+import { parseTrustedProxies, type TrustedProxies } from '@agent/core/rate-limit';
 import { safeReadFile } from '@agent/core/secure-io';
 import { createFacadeSpawner } from './src/server/facade.js';
 import { buildBundles, renderCustomerRoomPage } from './src/server/page.js';
@@ -29,7 +34,10 @@ export function resolveRoomTenant(raw: string | undefined): string | null {
   return TENANT_SLUG_PATTERN.test(value) ? value : null;
 }
 
-export function createCustomerRoomApp(tenant: string): express.Express {
+export function createCustomerRoomApp(
+  tenant: string,
+  trustedProxies?: TrustedProxies
+): express.Express {
   const app = express();
   const staticDir = pathResolver.rootResolve('presence/displays/customer-room/static');
   const template = String(
@@ -41,6 +49,7 @@ export function createCustomerRoomApp(tenant: string): express.Express {
     staticDir,
     jsDir: pathResolver.rootResolve('dist/presence/displays/customer-room/src/app'),
     renderPage: (acceptLanguage) => renderCustomerRoomPage(template, bundles, acceptLanguage),
+    trustedProxies,
     // A facade failure carries a diagnostic code: a warning, so it survives the default level.
     log: (message) =>
       message.includes('(diagnostic:') ? logger.warn(message) : logger.info(message),
@@ -58,10 +67,22 @@ function main(): void {
     process.exitCode = 1;
     return;
   }
+  const proxies = parseTrustedProxies(
+    getRegisteredEnvText('KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES')
+  );
+  if (proxies.invalid.length > 0) {
+    logger.error(
+      `[customer-room] not started — KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES has entries that are not an IP or CIDR (${proxies.invalid.join(', ')}) | list only the reverse proxy's addresses, e.g. 127.0.0.1,::1 | presence/displays/customer-room/README.md`
+    );
+    process.exitCode = 1;
+    return;
+  }
   const port = Number(getRegisteredEnvText('KYBERION_CUSTOMER_ROOM_PORT') || 3046);
-  const server = createServer(createCustomerRoomApp(tenant));
+  const server = createServer(createCustomerRoomApp(tenant, proxies.proxies));
   server.listen(port, '127.0.0.1', () => {
-    logger.info(`[customer-room] listening on http://127.0.0.1:${port} (tenant: ${tenant})`);
+    logger.info(
+      `[customer-room] listening on http://127.0.0.1:${port} (tenant: ${tenant}, trusted proxies: ${proxies.proxies.size})`
+    );
   });
 }
 

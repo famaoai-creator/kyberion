@@ -56,7 +56,17 @@
         "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "request_id": { "type": "string", "minLength": 1 },
         "approved_at": { "type": "string", "minLength": 1 },
-        "approved_by": { "type": "string", "minLength": 1 }
+        "approved_by": {
+          "description": "The decider of the approval request (decidedBy), never the CLI's unverified --by.",
+          "type": "string",
+          "minLength": 1
+        },
+        "approved_by_type": { "type": "string", "enum": ["human", "ai_agent", "service"] },
+        "submitted_by": {
+          "description": "The member submit was run as (--by user:<member>, unverified).",
+          "type": "string",
+          "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$"
+        }
       }
     },
     "in_force": {
@@ -84,7 +94,18 @@
         "properties": {
           "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
           "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
-          "by": { "type": "string", "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "by": {
+            "description": "The decider of the approval request that authorized the confirmation (decidedBy), never the CLI's unverified --by.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "by_type": { "type": "string", "enum": ["human", "ai_agent", "service"] },
+          "requested_by": {
+            "description": "The member the confirm was run as (--by user:<member>, unverified).",
+            "type": "string",
+            "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
           "at": { "type": "string", "minLength": 1 },
           "request_id": {
             "description": "The approval request (operation customer_decision:operator_confirm) that authorized the confirmation.",
@@ -138,7 +159,10 @@
           "kind": { "type": "string", "enum": ["before_due", "due", "override_closing"] },
           "actor_id": { "type": "string", "pattern": "^customer:[a-z][a-z0-9-]{0,60}$" },
           "target_date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
-          "status": { "type": "string", "enum": ["sent", "approval_pending", "manual", "denied"] },
+          "status": {
+            "type": "string",
+            "enum": ["sent", "approval_pending", "manual", "denied", "lapsed"]
+          },
           "reason": {
             "type": "string",
             "enum": [
@@ -150,6 +174,31 @@
             ]
           },
           "approval_request_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "superseded_requests": {
+            "description": "Earlier pending approval requests of this reminder the sweep withdrew (cancelled through the approval store), with why. Ids only.",
+            "type": "array",
+            "maxItems": 50,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["request_id", "surface", "reason", "at"],
+              "properties": {
+                "request_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+                "surface": { "type": "string", "pattern": "^[a-z][a-z0-9-]{0,63}$" },
+                "reason": {
+                  "type": "string",
+                  "enum": [
+                    "surface_changed",
+                    "content_changed",
+                    "channel_unusable",
+                    "no_longer_due",
+                    "covered_by_earlier_reminder"
+                  ]
+                },
+                "at": { "type": "string", "minLength": 1 }
+              }
+            }
+          },
           "inbox_entry_id": { "type": "string", "minLength": 1, "maxLength": 200 },
           "at": { "type": "string", "minLength": 1 }
         }

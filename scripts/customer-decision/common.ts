@@ -3,7 +3,11 @@
  * Part of scripts/customer_decision.ts (the entry point); see its header.
  */
 import { humanActor } from '@agent/core/actor';
-import { withExecutionContext } from '@agent/core/authority';
+import {
+  isBoundTenantInvalid,
+  resolveIdentityContext,
+  withExecutionContext,
+} from '@agent/core/authority';
 import { getRegisteredEnvText, isVitestProcess } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { auditChain } from '@agent/core/governance/audit-chain';
@@ -140,8 +144,50 @@ export function requireOpt(opts: Record<string, string>, name: string): string {
   return value.trim();
 }
 
+/**
+ * `--tenant`, refused when this process is bound to another tenant (its
+ * identity's bound tenant: `KYBERION_TENANT`, a mission's tenant, an execution
+ * scope): the facade assumes its ledger roles for the named tenant itself, so
+ * without this check a process bound to one tenant could read and write
+ * another tenant's case (e.g. `confirm` releasing its held tasks). A
+ * bound tenant that is set but not a valid slug fails closed (the identity
+ * resolver drops it, which would otherwise look unbound). An unbound operator
+ * CLI names the tenant with `--tenant`.
+ */
 export function tenantOf(opts: Record<string, string>): string {
-  return requireOpt(opts, 'tenant');
+  const tenant = requireOpt(opts, 'tenant');
+  if (isBoundTenantInvalid()) {
+    throw new ScriptExitError(
+      2,
+      `[CUSTOMER_DECISION_TENANT_MISMATCH] the bound tenant of this process is not a valid tenant slug; refusing --tenant ${tenant}`
+    );
+  }
+  const bound = resolveIdentityContext().tenantSlug?.trim();
+  if (bound && bound !== tenant) {
+    throw new ScriptExitError(
+      2,
+      `[CUSTOMER_DECISION_TENANT_MISMATCH] --tenant ${tenant} differs from the bound tenant of this process; run it for the bound tenant`
+    );
+  }
+  return tenant;
+}
+
+/**
+ * The scope of an approval request the facade opens. The approval store is
+ * shared (not tenant-partitioned), so requests carry ids only and name the
+ * tenant's confidential scope explicitly.
+ */
+export function tenantApprovalScope(tenant: string): {
+  scope_kind: 'tenant';
+  tier: 'confidential';
+  tenant_slug: string;
+} {
+  return { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant };
+}
+
+/** The tenant-scoped command that shows an agenda's details (for approval summaries). */
+export function statusCommand(tenant: string, caseId: string, agendaId: string): string {
+  return `pnpm kyberion customer-decision status --tenant ${tenant} --case ${caseId} --agenda ${agendaId}`;
 }
 
 /** `--dir` (a scratch case directory) exists for hermetic tests only. */

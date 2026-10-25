@@ -7,6 +7,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { resolveRoomTenant } from '../../server.js';
 import type { FacadeOutcome, FacadeSpawner, FacadeVerb } from './facade.js';
+import { parseTrustedProxies } from '@agent/core/rate-limit';
 import { CONTENT_SECURITY_POLICY, MAX_BODY_BYTES, registerCustomerRoomRoutes } from './routes.js';
 
 const TOKEN = 'inv-0123456789abcdef.AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-_AbCdE';
@@ -31,7 +32,9 @@ describe('customer-room routes', () => {
   const out = (body: unknown, status = 0): Promise<FacadeOutcome> =>
     Promise.resolve({ status, stdout: JSON.stringify(body), aborted: false });
 
-  async function start(limits: { api?: number; page?: number } = {}): Promise<void> {
+  async function start(
+    limits: { api?: number; page?: number; trustedProxies?: string } = {}
+  ): Promise<void> {
     const app = express();
     registerCustomerRoomRoutes(app, {
       spawner,
@@ -41,18 +44,31 @@ describe('customer-room routes', () => {
       log: (message) => logs.push(message),
       apiLimitPerMinute: limits.api,
       pageLimitPerMinute: limits.page,
+      trustedProxies:
+        limits.trustedProxies === undefined
+          ? undefined
+          : parseTrustedProxies(limits.trustedProxies).proxies,
     });
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   }
 
-  const post = (path: string, init: { token?: string | null; body?: unknown; raw?: string } = {}) =>
+  const post = (
+    path: string,
+    init: {
+      token?: string | null;
+      body?: unknown;
+      raw?: string;
+      headers?: Record<string, string>;
+    } = {}
+  ) =>
     fetch(`${base}${path}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(init.token === null ? {} : { Authorization: `Bearer ${init.token ?? TOKEN}` }),
+        ...init.headers,
       },
       body: init.raw ?? JSON.stringify(init.body ?? {}),
     });
@@ -282,6 +298,66 @@ describe('customer-room routes', () => {
     expect((await fetch(`${base}/health`)).status).toBe(200);
   });
 
+  it('ignores forwarded headers by default, so a spoofed address cannot mint a fresh bucket', async () => {
+    await start({ api: 2 });
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const headers = { 'X-Forwarded-For': `198.51.100.${i}`, Forwarded: `for=192.0.2.${i}` };
+      statuses.push((await post('/api/view', { headers })).status);
+    }
+    expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+
+  it('ignores forwarded headers from a peer that is not a declared proxy', async () => {
+    await start({ api: 2, trustedProxies: '10.0.0.0/8' });
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      statuses.push(
+        (await post('/api/view', { headers: { 'X-Forwarded-For': `198.51.100.${i}` } })).status
+      );
+    }
+    expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+
+  it('behind a declared proxy, keys each customer on the rightmost untrusted hop', async () => {
+    await start({ api: 2, trustedProxies: '127.0.0.1,::1' });
+    const as = async (forwardedFor: string) =>
+      (await post('/api/view', { headers: { 'X-Forwarded-For': forwardedFor } })).status;
+    // A client-supplied leftmost value does not change the bucket.
+    expect([await as('6.6.6.1, 203.0.113.7'), await as('6.6.6.2, 203.0.113.7')]).toEqual([
+      200, 200,
+    ]);
+    expect(await as('6.6.6.3, 203.0.113.7')).toBe(429);
+    // Another customer behind the same proxy has its own budget.
+    expect(await as('203.0.113.8')).toBe(200);
+    expect(await as('[2001:db8::9]:443')).toBe(200);
+    // A chain that names no client shares the proxy's bucket.
+    expect([await as('garbage'), await as('unknown'), await as('garbage')]).toEqual([
+      200, 200, 429,
+    ]);
+  });
+
+  it('behind a declared proxy, never reads a client-supplied Forwarded header', async () => {
+    await start({ api: 2, trustedProxies: '127.0.0.1,::1' });
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const headers = { Forwarded: `for=198.51.100.${i}` };
+      statuses.push((await post('/api/view', { headers })).status);
+    }
+    // Every request keys on the proxy itself: one shared bucket.
+    expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+
+  it('groups an IPv6 client by its /56, so rotating addresses does not mint buckets', async () => {
+    await start({ api: 2, trustedProxies: '127.0.0.1' });
+    const statuses: number[] = [];
+    for (const suffix of ['1', '2', 'ff:3', 'aa:bb:4']) {
+      const headers = { 'X-Forwarded-For': `2001:db8:0:1::${suffix}` };
+      statuses.push((await post('/api/view', { headers })).status);
+    }
+    expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+
   it('never logs or echoes the token', async () => {
     await start();
     next = () => out({ ok: false, reason: 'expired' }, 1);
@@ -344,7 +420,12 @@ describe('customer-room attachment route', () => {
   });
   async function start(
     apiLimitPerMinute = 100,
-    attachment: { perMinute?: number; concurrency?: number; perAddress?: number } = {}
+    attachment: {
+      perMinute?: number;
+      concurrency?: number;
+      perAddress?: number;
+      trustedProxies?: string;
+    } = {}
   ): Promise<void> {
     const app = express();
     registerCustomerRoomRoutes(app, {
@@ -360,6 +441,10 @@ describe('customer-room attachment route', () => {
       attachmentLimitPerMinute: attachment.perMinute,
       attachmentConcurrency: attachment.concurrency,
       attachmentConcurrencyPerAddress: attachment.perAddress,
+      trustedProxies:
+        attachment.trustedProxies === undefined
+          ? undefined
+          : parseTrustedProxies(attachment.trustedProxies).proxies,
     });
     server = createServer(app);
     await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -369,12 +454,18 @@ describe('customer-room attachment route', () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
   });
 
-  const fetchImage = (body: unknown, token: string | null = TOKEN, query = '') =>
+  const fetchImage = (
+    body: unknown,
+    token: string | null = TOKEN,
+    query = '',
+    headers: Record<string, string> = {}
+  ) =>
     fetch(`${base}/api/attachment${query}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...(token === null ? {} : { Authorization: `Bearer ${token}` }),
+        ...headers,
       },
       body: JSON.stringify(body),
     });
@@ -456,6 +547,26 @@ describe('customer-room attachment route', () => {
     expect(logs.at(-2)).toBe(
       '[customer-room] attachment -> 503 unavailable (diagnostic: attachment_not_servable)'
     );
+  });
+
+  it('keys the image budget on the trusted-proxy client address only', async () => {
+    const fetchAs = (forwardedFor: string) =>
+      fetchImage({ attachment_id: ID }, TOKEN, '', { 'X-Forwarded-For': forwardedFor });
+    await start(100, { perMinute: 1 });
+    expect([
+      (await fetchAs('198.51.100.1')).status,
+      (await fetchAs('198.51.100.2')).status,
+    ]).toEqual([200, 429]);
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+    await start(100, { perMinute: 1, trustedProxies: '127.0.0.1' });
+    expect([
+      (await fetchAs('6.6.6.6, 198.51.100.1')).status,
+      (await fetchAs('7.7.7.7, 198.51.100.1')).status,
+      (await fetchAs('198.51.100.2')).status,
+      // IPv6 callers share their /56 in the image window too.
+      (await fetchAs('2001:db8:0:1::1')).status,
+      (await fetchAs('2001:db8:0:1:aa::2')).status,
+    ]).toEqual([200, 429, 200, 200, 429]);
   });
 
   it('has its own per-address budget, separate from the view/respond budget', async () => {
