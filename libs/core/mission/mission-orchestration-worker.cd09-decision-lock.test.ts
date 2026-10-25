@@ -744,7 +744,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       warn.mockRestore();
     });
 
-    it('a completed task whose decision changed is told, never silent: ids-only note, any mission, audited', async () => {
+    it('a completed task whose decision changed is told, never silent: a count on a public mission, ids in the audit', async () => {
       await useRealStores();
       const { ConfidentialTaskDecisionValues } =
         await import('../customer-decision/task-decision-values.js');
@@ -774,9 +774,11 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       const prompt = String(
         (mocks.route.mock.calls[0][0] as { payload: { text: string } }).payload.text
       );
+      // A public mission: the gate would refuse values, so the note is a count, no proposal id.
       expect(prompt).toContain(
-        'The decision for tp-0123456789abcdef changed after this task completed and is not confirmed; do not assume a value'
+        "1 of this task's customer decisions changed after it completed or are no longer recorded, and are not confirmed; do not assume their values"
       );
+      expect(prompt).not.toMatch(/tp-[a-f0-9]/u);
       expect(blockedUpdate()).toBeUndefined();
       expect(mocks.auditTaskDecisionDelivery).toHaveBeenCalledWith(
         expect.objectContaining({
