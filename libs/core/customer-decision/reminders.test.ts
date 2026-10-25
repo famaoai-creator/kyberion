@@ -4,7 +4,7 @@ import { renderCustomerRoutineTemplate } from '../customer-outbound-templates.js
 import { resolveAgendaEffective } from './effective.js';
 import { agendaContentHash } from './hash.js';
 import type { CustomerDecisionInvite } from './invite.js';
-import type { DecisionAgenda, DecisionReceipt } from './model.js';
+import type { AgendaReminderRecord, DecisionAgenda, DecisionReceipt } from './model.js';
 import {
   addUtcDays,
   displayClosingMoment,
@@ -13,7 +13,10 @@ import {
   handoffInboxEntryId,
   handoffTargets,
   isCalendarDate,
+  isCoveredByEarlierReminder,
   isHandoffDone,
+  lapsedAgendaReminders,
+  REMINDER_CARRY_OVER_DAYS,
   reminderId,
   scheduleAgendaReminders,
   upcomingAgendaReminders,
@@ -528,5 +531,94 @@ describe('override_closing closing moment (CD-11 review)', () => {
       locale: 'ja',
     });
     expect(renderCustomerRoutineTemplate(notice.template)).toEqual(expect.any(String));
+  });
+});
+
+describe('held reminders after their day (CD-11 follow-up: approval after the sweep)', () => {
+  const D_MINUS_1 = '2026-10-29T10:00:00.000Z';
+  const D0 = '2026-10-30T01:00:00.000Z';
+  const D_PLUS_1 = '2026-10-31T01:00:00.000Z';
+  const held = (
+    kind: 'before_due' | 'due',
+    status: AgendaReminderRecord['status'] = 'approval_pending',
+    at = D_MINUS_1
+  ): AgendaReminderRecord => ({
+    reminder_id: reminderId('agd-0123456789abcdef', ACTOR, kind, '2026-10-30'),
+    kind,
+    actor_id: ACTOR,
+    target_date: '2026-10-30',
+    status,
+    approval_request_id: 'apr-1',
+    at,
+  });
+
+  it('carries a held before_due to the due day under its original key, and no further', () => {
+    expect(REMINDER_CARRY_OVER_DAYS).toBe(1);
+    const a = agenda({ reminders: [held('before_due')] });
+    const due = dueAgendaReminders(input(a, D0));
+    expect(due.map((item) => [item.kind, item.carried_over ?? false]).sort()).toEqual([
+      ['before_due', true],
+      ['due', false],
+    ]);
+    // The original key and text: an approval of that exact text still matches.
+    const carried = due.find((item) => item.kind === 'before_due')!;
+    expect(carried.reminder_id).toBe(held('before_due').reminder_id);
+    expect(carried.template.params).toEqual({ title: 'Inception decisions', date: '2026-10-30' });
+    expect(lapsedAgendaReminders(input(a, D0))).toEqual([]);
+    // Without a hold nothing is carried: a before_due never asked is not sent late.
+    expect(kinds(dueAgendaReminders(input(agenda(), D0)))).toEqual(['due']);
+    // The day after the date it is about: dropped, not sent.
+    expect(dueAgendaReminders(input(a, D_PLUS_1))).toEqual([]);
+    expect(lapsedAgendaReminders(input(a, D_PLUS_1))).toEqual([held('before_due')]);
+  });
+
+  it('never carries a due reminder (its text says today): a held due lapses the next day', () => {
+    const a = agenda({ reminders: [held('due', 'approval_pending', D0)] });
+    expect(kinds(dueAgendaReminders(input(a, D0)))).toEqual(['due']);
+    expect(dueAgendaReminders(input(a, D_PLUS_1))).toEqual([]);
+    expect(lapsedAgendaReminders(input(a, D_PLUS_1)).map((item) => item.kind)).toEqual(['due']);
+  });
+
+  it("a carried-over before_due sent on the due day covers that decider's due", () => {
+    const sentOnTheDay = agenda({ reminders: [held('before_due', 'sent', D0)] });
+    expect(dueAgendaReminders(input(sentOnTheDay, D0))).toEqual([]);
+    // A held due of the same day is lapsed instead of being asked again.
+    const both = agenda({
+      reminders: [held('before_due', 'sent', D0), held('due', 'approval_pending', D0)],
+    });
+    expect(lapsedAgendaReminders(input(both, D0)).map((item) => item.kind)).toEqual(['due']);
+    // A before_due sent on its own day does not cover the due.
+    const onTime = agenda({ reminders: [held('before_due', 'sent', D_MINUS_1)] });
+    expect(kinds(dueAgendaReminders(input(onTime, D0)))).toEqual(['due']);
+  });
+
+  it('a due sent first covers the carried-over before_due (either approval order)', () => {
+    const dueSent = agenda({
+      reminders: [held('before_due'), held('due', 'sent', D0)],
+    });
+    expect(dueAgendaReminders(input(dueSent, D0))).toEqual([]);
+    expect(lapsedAgendaReminders(input(dueSent, D0)).map((item) => item.kind)).toEqual([
+      'before_due',
+    ]);
+    expect(isCoveredByEarlierReminder(held('before_due'), [held('due', 'sent', D0)])).toBe(true);
+    expect(isCoveredByEarlierReminder(held('before_due'), [held('due')])).toBe(false);
+  });
+
+  it('a held reminder no longer due (the decider answered, the agenda closed) lapses', () => {
+    const a = agenda({ reminders: [held('before_due')] });
+    expect(lapsedAgendaReminders(input(a, D_MINUS_1))).toEqual([]);
+    expect(lapsedAgendaReminders(input(a, D_MINUS_1, { receipts: [receipt(a, ACTOR)] }))).toEqual([
+      held('before_due'),
+    ]);
+    const closed = agenda({ status: 'closed', reminders: [held('before_due')] });
+    expect(lapsedAgendaReminders(input(closed, D_MINUS_1))).toEqual([held('before_due')]);
+  });
+
+  it('lapsed is not final: due again on its day, planned again (with a new request)', () => {
+    const a = agenda({ reminders: [held('before_due', 'lapsed')] });
+    expect(kinds(dueAgendaReminders(input(a, D_MINUS_1)))).toEqual(['before_due']);
+    // But never carried over: only an approval_pending record carries.
+    expect(kinds(dueAgendaReminders(input(a, D0)))).toEqual(['due']);
+    expect(lapsedAgendaReminders(input(a, D_PLUS_1))).toEqual([]);
   });
 });

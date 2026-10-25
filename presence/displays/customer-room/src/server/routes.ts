@@ -18,8 +18,13 @@
  */
 import type express from 'express';
 import expressModule from 'express';
-import { rateLimit } from 'express-rate-limit';
-import { fixedWindowLimiter } from '@agent/core/rate-limit';
+import { ipKeyGenerator, rateLimit } from 'express-rate-limit';
+import {
+  fixedWindowLimiter,
+  parseTrustedProxies,
+  resolveClientAddress,
+  type TrustedProxies,
+} from '@agent/core/rate-limit';
 import * as path from 'node:path';
 import type { FacadeSpawner, FacadeVerb } from './facade.js';
 
@@ -112,6 +117,11 @@ export interface CustomerRoomRouteOptions {
   attachmentConcurrencyPerAddress?: number;
   /** Client addresses tracked by the image budget; beyond it new addresses wait, none is evicted. */
   attachmentMaxKeys?: number;
+  /**
+   * Reverse proxies (public ingress) whose forwarded headers name the client.
+   * Default: nobody, so every limit keys on the socket address.
+   */
+  trustedProxies?: TrustedProxies;
 }
 
 export const DEFAULT_ATTACHMENT_LIMIT_PER_MINUTE = 120;
@@ -212,13 +222,32 @@ function outcomeDiagnostic(outcome: { status: number | null; aborted: boolean } 
   return outcome.status === null ? 'child_not_run' : `child_exit_${outcome.status}_no_output`;
 }
 
-function limiter(limit: number) {
+/**
+ * The key every per-client limit uses: the socket address, or — only when
+ * that peer is a declared proxy — the rightmost `X-Forwarded-For` hop that is
+ * not itself a declared proxy (`Forwarded` is never read). IPv6 callers share
+ * their /56 (`ipKeyGenerator`), so one cannot rotate through its own range.
+ * Express `trust proxy` stays off.
+ */
+function clientAddressOf(trustedProxies: TrustedProxies) {
+  return (req: express.Request): string =>
+    ipKeyGenerator(
+      resolveClientAddress({
+        peer: req.socket.remoteAddress,
+        forwardedFor: req.headers['x-forwarded-for'],
+        trustedProxies,
+      })
+    );
+}
+
+function limiter(limit: number, clientAddress: (req: express.Request) => string) {
   return rateLimit({
     windowMs: 60_000,
     limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    // The client address is taken from the socket; forwarded headers are not trusted here.
+    keyGenerator: (req) => clientAddress(req),
+    // Forwarded headers are read by clientAddress alone, never by Express.
     validate: { xForwardedForHeader: false, trustProxy: false },
     handler: (_req, res) => {
       res.setHeader('Cache-Control', 'no-store');
@@ -229,14 +258,17 @@ function limiter(limit: number) {
 }
 
 /**
- * The image route's own guard: a fixed window per client address (socket
- * address only, forwarded headers are not trusted) plus a cap on facade runs
+ * The image route's own guard: a fixed window per client address (see
+ * `clientAddressOf`) plus a cap on facade runs
  * in flight. The window refuses new addresses when full instead of evicting,
  * so churning addresses cannot reset a limited caller's bucket. A slot is
  * held until the facade run settles, not until the client goes away: a
  * dropped connection does not stop the child, so it must keep its slot.
  */
-function attachmentGuard(options: CustomerRoomRouteOptions) {
+function attachmentGuard(
+  options: CustomerRoomRouteOptions,
+  clientAddress: (req: express.Request) => string
+) {
   const limit = options.attachmentLimitPerMinute ?? DEFAULT_ATTACHMENT_LIMIT_PER_MINUTE;
   const concurrency = options.attachmentConcurrency ?? DEFAULT_ATTACHMENT_CONCURRENCY;
   const window = fixedWindowLimiter({
@@ -257,7 +289,7 @@ function attachmentGuard(options: CustomerRoomRouteOptions) {
   return {
     /** Per-address budget, before the body is read. */
     window: (req: express.Request, res: express.Response, next: express.NextFunction): void => {
-      const decision = window.take(req.socket.remoteAddress ?? 'unknown', limit);
+      const decision = window.take(clientAddress(req), limit);
       if ('retryAfterMs' in decision) {
         refuse(res, Math.max(1, Math.ceil(decision.retryAfterMs / 1000)));
         return;
@@ -270,7 +302,7 @@ function attachmentGuard(options: CustomerRoomRouteOptions) {
       res: express.Response,
       handler: () => Promise<void>
     ): Promise<void> {
-      const address = req.socket.remoteAddress ?? 'unknown';
+      const address = clientAddress(req);
       const mine = perAddress.get(address) ?? 0;
       if (inFlight >= concurrency || mine >= perAddressConcurrency) {
         refuse(res, 1);
@@ -295,9 +327,10 @@ export function registerCustomerRoomRoutes(
   options: CustomerRoomRouteOptions
 ): void {
   const log = options.log ?? (() => {});
-  const apiLimiter = limiter(options.apiLimitPerMinute ?? 60);
-  const pageLimiter = limiter(options.pageLimitPerMinute ?? 120);
-  const attachmentLimiter = attachmentGuard(options);
+  const clientAddress = clientAddressOf(options.trustedProxies ?? parseTrustedProxies('').proxies);
+  const apiLimiter = limiter(options.apiLimitPerMinute ?? 60, clientAddress);
+  const pageLimiter = limiter(options.pageLimitPerMinute ?? 120, clientAddress);
+  const attachmentLimiter = attachmentGuard(options, clientAddress);
 
   app.disable('x-powered-by');
   app.use(securityHeaders);

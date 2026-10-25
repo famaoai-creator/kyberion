@@ -127,7 +127,12 @@ export interface DecisionAgenda {
     content_hash: string;
     request_id?: string;
     approved_at: string;
+    /** The decider of the approval request (`decidedBy`), never the CLI's unverified `--by`. */
     approved_by: string;
+    /** The approval decider's type (`decidedByType`), when the approval records it. */
+    approved_by_type?: 'human' | 'ai_agent' | 'service';
+    /** The member `submit` was run as (`--by user:<member>`, unverified). */
+    submitted_by?: string;
   };
   /**
    * Our decisions in force: the pins of the last approval. Editing the agenda
@@ -194,10 +199,36 @@ export const AGENDA_REMINDER_KINDS: readonly AgendaReminderKind[] = [
  * `approval_pending` (held at the outbound approval gate; the next sweep
  * retries with the same correlation id), `manual` (no usable bound channel,
  * or a title the fixed template refuses: an operator inbox task to remind by
- * hand), `denied` (the gate refused it, or the approval was rejected or lapsed).
+ * hand), `denied` (the gate refused it, or the approval was rejected or lapsed),
+ * `lapsed` (held for approval, but no longer due — its day and the carry-over
+ * day passed, the decider answered, the agenda changed; its pending request is
+ * withdrawn and nothing is sent; planned again only if it becomes due again).
  * A `delivery_failed` attempt is not recorded, so the next sweep retries.
  */
-export type AgendaReminderStatus = 'sent' | 'approval_pending' | 'manual' | 'denied';
+export type AgendaReminderStatus = 'sent' | 'approval_pending' | 'manual' | 'denied' | 'lapsed';
+
+/**
+ * Why the sweep withdrew a reminder's earlier pending approval request:
+ * the decider's channel moved to another surface, the channel id / text /
+ * agenda revision changed (a new request binds the new content), the channel
+ * is no longer usable (the reminder became a manual task), the reminder is no
+ * longer due, or an earlier reminder (`before_due`) already went out that day.
+ */
+export type AgendaReminderSupersedeReason =
+  | 'surface_changed'
+  | 'content_changed'
+  | 'channel_unusable'
+  | 'no_longer_due'
+  | 'covered_by_earlier_reminder';
+
+/** One withdrawn approval request of a reminder (ids only). */
+export interface AgendaReminderSupersededRequest {
+  request_id: string;
+  /** The approval store channel (surface) the request was held on. */
+  surface: string;
+  reason: AgendaReminderSupersedeReason;
+  at: string;
+}
 
 export interface AgendaReminderRecord {
   /** `rmd-<hex16>` over agenda × actor × kind × target date. */
@@ -215,6 +246,8 @@ export interface AgendaReminderRecord {
     | 'template_refused'
     | 'approval_unreachable';
   approval_request_id?: string;
+  /** Earlier pending approval requests of this reminder the sweep withdrew (cancelled). */
+  superseded_requests?: AgendaReminderSupersededRequest[];
   inbox_entry_id?: string;
   at: string;
 }
@@ -237,8 +270,12 @@ export interface OperatorConfirmation {
   entry_id: string;
   /** The customer decision (ledger id) the operator confirmed. */
   decision_id: string;
-  /** `user:<member>` */
+  /** Who confirmed: the decider of the approval request (`decidedBy`), never the CLI's unverified `--by`. */
   by: string;
+  /** The approval decider's type (`decidedByType`), when the approval records it. */
+  by_type?: 'human' | 'ai_agent' | 'service';
+  /** The member the confirm was run as (`--by user:<member>`, unverified). */
+  requested_by?: string;
   at: string;
   /** The approval request (`customer_decision:operator_confirm`) that authorized it. */
   request_id?: string;
