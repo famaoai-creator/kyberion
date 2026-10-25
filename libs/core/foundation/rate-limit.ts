@@ -204,7 +204,17 @@ export function parseTrustedProxies(raw: string | undefined | null): {
       list.addAddress(address, family);
     } else {
       const bits = entry.slice(slash + 1);
-      const prefix = /^\d{1,3}$/u.test(bits) ? Number(bits) : Number.NaN;
+      let prefix = /^\d{1,3}$/u.test(bits) ? Number(bits) : Number.NaN;
+      // An IPv4-mapped IPv6 network (`::ffff:10.0.0.0/104`) was unwrapped to
+      // IPv4 above, so its prefix counts the 96 mapping bits too.
+      const mapped = family === 'ipv4' && entry.slice(0, slash).includes(':');
+      if (mapped && prefix >= 0 && prefix <= 128) {
+        if (prefix < 96) {
+          invalid.push(`${entry} (an IPv4-mapped network needs a prefix of /96 or longer)`);
+          continue;
+        }
+        prefix -= 96;
+      }
       if (!(prefix >= 0 && prefix <= (family === 'ipv6' ? 128 : 32))) {
         invalid.push(entry);
         continue;
