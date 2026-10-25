@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { GENERATION_QUOTA_COUNTER_REPO_SUBPATH } from '@agent/core/generation-quota';
 import { isValidTenantSlug } from '@agent/core/foundation/scope';
@@ -719,7 +720,7 @@ export function createBackup(options: BackupCliOptions): {
 
   safeMkdir(path.dirname(outPath));
   // The temp dir holds plaintext (payload, mission bundles): removed on every path.
-  return withPlaintextTempDir(`backup-${stamp()}`, (tempDir) => {
+  return withPlaintextTempDir(`backup-${stamp()}-${randomUUID().slice(0, 8)}`, (tempDir) => {
     const manifestPath = path.join(tempDir, 'manifest.json');
     const includeListPath = path.join(tempDir, 'include.txt');
     const plainArchivePath = options.encrypt ? path.join(tempDir, 'payload.tar.gz') : outPath;
@@ -1259,7 +1260,7 @@ export function restoreBackup(options: BackupCliOptions): {
   }
 
   // Decrypted payload and staged partitions are plaintext: removed on every path.
-  return withPlaintextTempDir(`restore-${stamp()}`, (tempDir) => {
+  return withPlaintextTempDir(`restore-${stamp()}-${randomUUID().slice(0, 8)}`, (tempDir) => {
     const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
     if (archive.endsWith('.enc')) {
       const passphrase = requirePassphrase(options.passphraseEnv);

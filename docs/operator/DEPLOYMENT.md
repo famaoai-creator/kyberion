@@ -472,6 +472,9 @@ partitioned state roots). The manifest lists them under
   undetectable rollback. Restore into an empty target and reconcile there.
   This check is the rollback guard: a hash chain has no head anchor, so a
   chain cut short at an earlier entry still verifies.
+- A `--force` restore into a live checkout requires every Kyberion service
+  and daemon to be stopped first: the restore's checks cannot tell a live
+  writer's change from its own extraction.
 - The check covers tenant partitions only. An `all`-scope `--force` restore
   over a live checkout can still roll back the system ledger
   (`active/audit/system-ledger.jsonl`), the `<tier>/shared` partitions and

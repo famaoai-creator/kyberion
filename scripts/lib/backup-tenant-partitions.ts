@@ -4,6 +4,7 @@
  * restored-chain verification (D2) and the revocable-state quarantine (D1).
  * See knowledge/product/architecture/runtime-storage-layout.md.
  */
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { getAuditChainKeyId } from '@agent/core/chain-integrity';
@@ -22,6 +23,7 @@ import {
   safeRmSync,
   safeLstat,
   safeMkdir,
+  safeMoveSync,
   safeReadFile,
   safeReaddir,
   safeWriteFile,
@@ -405,65 +407,72 @@ export function quarantineStagedRevocableState(
   return { quarantinePaths, moved };
 }
 
-/** Every regular file under the given partitions of `root` (repo paths → bytes). */
-function snapshotPartitions(root: string, partitions: string[]): Map<string, Buffer> {
-  const files = new Map<string, Buffer>();
-  const walk = (dir: string, depth: number): void => {
-    if (depth > 12 || !safeExistsSync(dir)) return;
-    const stat = safeLstat(dir);
-    if (stat.isDirectory()) {
-      for (const child of safeReaddir(dir)) walk(path.join(dir, child), depth + 1);
-    } else {
-      files.set(
-        dir,
-        asPartitionStore(dir, () => safeReadFile(dir, { encoding: null }) as Buffer)
-      );
-    }
-  };
-  for (const partition of partitions) walk(path.join(root, partition), 0);
-  return files;
+/** Archive file members that lie in one of the staged partitions. */
+function stagedMemberPaths(members: string[], partitions: string[]): string[] {
+  return members.filter((member) =>
+    partitions.some((partition) => member === partition || member.startsWith(`${partition}/`))
+  );
 }
 
 /**
- * `--exclude` is fail-open, so prove it held: an append-only partition the
- * conflict check found empty must still hold no file, and a revocable
- * partition must be byte-identical to its pre-extraction state. On a breach
- * the partitions are put back (extracted files removed, originals rewritten)
- * and the restore fails.
+ * sha256 of each staged member path as it is in `target` now (undefined when
+ * absent, a directory, or a symlink, which is never followed).
  */
-function assertExclusionsHeld(
-  target: string,
-  staged: StagedRestorePartitions,
-  revocableBefore: Map<string, Buffer>
-): void {
-  const breached: string[] = [];
-  for (const partition of staged.appendOnly) {
-    for (const file of snapshotPartitions(target, [partition]).keys()) {
-      asPartitionStore(file, () => safeRmSync(file, { force: true }));
-      breached.push(file);
-    }
-  }
-  const revocableAfter = snapshotPartitions(target, staged.revocable);
-  for (const [file, content] of revocableAfter) {
-    const before = revocableBefore.get(file);
-    if (before && before.equals(content)) continue;
-    if (before) safeWriteFile(file, before);
-    else safeRmSync(file, { force: true });
-    breached.push(file);
-  }
-  for (const [file, content] of revocableBefore) {
-    if (revocableAfter.has(file)) continue;
-    safeWriteFile(file, content);
-    breached.push(file);
-  }
-  if (breached.length > 0) {
-    throw new Error(
-      `[BACKUP_RESTORE_EXCLUDE_FAILED] the main extraction wrote into staged partitions — they were put back; other archive members are already in the target | next: roll the target back, then restore with a tar that honours --exclude | evidence: ${breached
-        .slice(0, 5)
-        .map((file) => path.relative(target, file))
-        .join(', ')}`
+function memberDigests(target: string, memberPaths: string[]): Map<string, string | undefined> {
+  const digests = new Map<string, string | undefined>();
+  for (const member of memberPaths) {
+    const file = path.join(target, member);
+    digests.set(
+      member,
+      asPartitionStore(file, () => {
+        if (!safeExistsSync(file) || !safeLstat(file).isFile()) return undefined;
+        const content = safeReadFile(file, { encoding: null }) as Buffer;
+        return createHash('sha256').update(content).digest('hex');
+      })
     );
   }
+  return digests;
+}
+
+/**
+ * `--exclude` is fail-open, so prove it held: no ARCHIVE member of a staged
+ * partition may have been written in place by the main extraction (absent or
+ * unchanged since just before it). A breached member is moved aside into
+ * `<partition>/.restore-quarantine/<stamp>/exclude-breach/` as the
+ * partition's store role and the restore fails; nothing is rewritten or
+ * deleted, and files that are not archive members (live writers) are never
+ * touched.
+ */
+export function assertExclusionsHeld(
+  target: string,
+  staged: StagedRestorePartitions,
+  memberPaths: string[],
+  before: Map<string, string | undefined>,
+  stampId: string
+): void {
+  const breached = [...memberDigests(target, memberPaths)]
+    .filter(([member, digest]) => digest !== undefined && digest !== before.get(member))
+    .map(([member]) => member);
+  if (breached.length === 0) return;
+  for (const member of breached) {
+    const partition = [...staged.appendOnly, ...staged.revocable].find((candidate) =>
+      member.startsWith(`${candidate}/`)
+    );
+    if (!partition) continue;
+    const quarantineRoot = path.join(target, partition, RESTORE_QUARANTINE_DIR);
+    const breachDir = path.join(quarantineRoot, stampId, 'exclude-breach');
+    const source = path.join(target, member);
+    const dest = path.join(breachDir, member.slice(partition.length + 1));
+    assertNotSymlinked(path.join(target, partition), quarantineRoot, path.dirname(breachDir));
+    asPartitionStore(source, () => {
+      safeMkdir(path.dirname(dest), { recursive: true });
+      assertNotSymlinked(breachDir);
+      safeMoveSync(source, dest);
+    });
+  }
+  throw new Error(
+    `[BACKUP_RESTORE_EXCLUDE_FAILED] the main extraction wrote archive members into staged partitions — they were moved aside into .restore-quarantine/${stampId}/exclude-breach/; other archive members are already in the target | next: stop services, roll the target back, then restore with a tar that honours --exclude | evidence: ${breached.slice(0, 10).join(', ')}${breached.length > 10 ? ', …' : ''}`
+  );
 }
 
 /** Refuse to place records through a symlinked partition or quarantine directory. */
@@ -522,7 +531,8 @@ export function extractWithStagedPartitions(input: {
     ledgerVerification = verifyRestoredTenantLedgers(staging, members, input.archiveChainKeyId);
   }
   safeMkdir(target, { recursive: true });
-  const revocableBefore = snapshotPartitions(target, staged.revocable);
+  const memberPaths = stagedMemberPaths(members, stagedPaths);
+  const before = memberDigests(target, memberPaths);
   runTar(
     [
       ...stagedPaths.flatMap((partition) => ['--exclude', partition]),
@@ -533,7 +543,7 @@ export function extractWithStagedPartitions(input: {
     ],
     'backup restore extraction failed'
   );
-  assertExclusionsHeld(target, staged, revocableBefore);
+  assertExclusionsHeld(target, staged, memberPaths, before, input.stampId);
   placeStagedAppendOnlyPartitions(staging, target, staged.appendOnly);
   const quarantinePaths = input.tenant
     ? quarantineStagedRevocableState(staging, target, staged.revocable, input.tenant, input.stampId)

@@ -27,6 +27,8 @@ import {
   getAuditChainKeyId,
 } from '@agent/core/chain-integrity';
 import { TENANT_RUNTIME_PARTITION_ROOTS } from '@agent/core/storage-layout';
+import { createHash } from 'node:crypto';
+import { assertExclusionsHeld } from './lib/backup-tenant-partitions.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('backup-test');
 
@@ -834,6 +836,43 @@ describe('tenant runtime partitions in backup and restore', () => {
       safeReadFile(`${target}/${grantQuarantine}/grant-a.json`, { encoding: 'utf8' })
     ).toContain('"active"');
     expect(safeExistsSync(`${target}/${grantQuarantine}/grant-b.json`)).toBe(false);
+  });
+
+  it('on an exclusion breach moves only tar-written archive members aside, never live files', () => {
+    const target = `${FIXTURE_DIR}/breach-target`;
+    const partition = 'active/shared/runtime/grants/confidential/acme';
+    const written = `${partition}/grant-a.json`;
+    const unchanged = `${partition}/grant-b.json`;
+    const liveOnly = `${partition}/grant-live.json`;
+    safeWriteFile(`${target}/${written}`, '{"grant_id":"grant-a","status":"active"}\n');
+    safeWriteFile(`${target}/${unchanged}`, '{"grant_id":"grant-b"}\n');
+    safeWriteFile(`${target}/${liveOnly}`, '{"grant_id":"grant-live"}\n');
+    const digest = (text: string) => createHash('sha256').update(text).digest('hex');
+    const before = new Map<string, string | undefined>([
+      [written, undefined],
+      [unchanged, digest('{"grant_id":"grant-b"}\n')],
+    ]);
+    expect(() =>
+      assertExclusionsHeld(
+        target,
+        { appendOnly: [], revocable: [partition] },
+        [written, unchanged],
+        before,
+        'stamp-1'
+      )
+    ).toThrow(/BACKUP_RESTORE_EXCLUDE_FAILED.*grant-a\.json/u);
+    expect(safeExistsSync(`${target}/${written}`)).toBe(false);
+    expect(
+      safeExistsSync(
+        `${target}/${partition}/.restore-quarantine/stamp-1/exclude-breach/grant-a.json`
+      )
+    ).toBe(true);
+    expect(safeReadFile(`${target}/${unchanged}`, { encoding: 'utf8' })).toBe(
+      '{"grant_id":"grant-b"}\n'
+    );
+    expect(safeReadFile(`${target}/${liveOnly}`, { encoding: 'utf8' })).toBe(
+      '{"grant_id":"grant-live"}\n'
+    );
   });
 
   it('quarantines restored customer decision invites and standing grants (D1)', () => {
