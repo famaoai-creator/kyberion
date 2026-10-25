@@ -9,7 +9,8 @@
  *   KYBERION_CUSTOMER_ROOM_PORT    (default 3046)
  *   KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES (default empty = trust nobody) IPs / CIDRs of
  *                                  the reverse proxy in front; only from these peers is the
- *                                  client address read from X-Forwarded-For / Forwarded
+ *                                  client address read from X-Forwarded-For (the proxy
+ *                                  must append to it; RFC 7239 Forwarded is never read)
  */
 import express from 'express';
 import { createServer } from 'node:http';
