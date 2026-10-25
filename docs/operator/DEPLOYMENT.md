@@ -475,7 +475,9 @@ partitioned state roots). The manifest lists them under
 - The check covers tenant partitions only. An `all`-scope `--force` restore
   over a live checkout can still roll back the system ledger
   (`active/audit/system-ledger.jsonl`), the `<tier>/shared` partitions and
-  mission evidence ledgers; restore `all` scope into an empty target.
+  mission evidence ledgers; restore `all` scope into an empty target. An
+  `all`-scope restore does not quarantine grants or invites: re-run every
+  grant and invite revocation made after the backup was taken.
 - Append-only partitions (and, for a tenant restore, invites and grants) are
   never extracted in place: they are extracted into a staging directory
   first. A torn last line (one that does not parse as JSON) of a staged
