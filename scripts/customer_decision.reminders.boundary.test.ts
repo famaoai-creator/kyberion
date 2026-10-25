@@ -45,6 +45,10 @@ const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/cd-reminders-boundary-' +
 const TENANT = 'cd-remind-plain';
 /** A charter that delegates routine customer outbound. */
 const CHARTERED = 'cd-remind-charter';
+/** No charter; the decider's channel moves from Slack to Telegram (CD-11 follow-up). */
+const MOVE = 'cd-remind-move';
+/** No charter; approvals that come too late or for an older agenda revision. */
+const LATE = 'cd-remind-late';
 const CASE = 'case-cd';
 const NOW = '2026-10-24T00:00:00.000Z';
 const D_MINUS_1 = '2026-10-29T01:00:00.000Z';
@@ -142,7 +146,7 @@ beforeAll(async () => {
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
   process.env.KYBERION_PERSONA = 'sovereign';
-  for (const tenant of [TENANT, CHARTERED]) {
+  for (const tenant of [TENANT, CHARTERED, MOVE, LATE]) {
     writeFixtureJson(`knowledge/personal/tenants/${tenant}.json`, {
       tenant_slug: tenant,
       display_name: tenant,
@@ -150,7 +154,10 @@ beforeAll(async () => {
       assigned_role: 'owner',
     });
     writeFixtureJson(`customer/${tenant}/connections/channel-bindings.json`, {
-      bindings: [{ surface: 'slack', channel_id: 'C-ACME', active: true }],
+      bindings: [
+        { surface: 'slack', channel_id: 'C-ACME', active: true },
+        ...(tenant === MOVE ? [{ surface: 'telegram', channel_id: 'T-ACME', active: true }] : []),
+      ],
     });
   }
   for (const key of keys) delete process.env[key];
@@ -776,6 +783,224 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
     expect(again).not.toHaveProperty('warnings');
     expect(again.actor).not.toHaveProperty('channel');
   }, 60_000);
+
+  describe('held requests across surfaces and days (CD-11 follow-ups)', () => {
+    const D0 = '2026-10-30T01:00:00.000Z';
+    const D_PLUS_1 = '2026-10-31T01:00:00.000Z';
+    const store = () => import('@agent/core/governance/approval-store');
+    const requests = async (surface: string) => {
+      const { listApprovalRequests } = await store();
+      return initialContext('surface_runtime', () =>
+        listApprovalRequests({ storageChannels: [surface] })
+      );
+    };
+    const request = async (surface: string, id: unknown) =>
+      (await requests(surface)).find((item) => item.id === id);
+    const decide = async (surface: string, id: unknown) => {
+      const { decideApprovalRequest } = await store();
+      const current = (await request(surface, id))!;
+      return decideApprovalRequest('mission_controller', {
+        channel: surface,
+        requestId: current.id,
+        decision: 'approved',
+        decidedBy: 'user:boss',
+        decidedByType: 'human',
+        authenticated: true,
+        authMethod: 'surface_session',
+        payloadHash: current.accountability?.payloadHash,
+        effectBinding: current.accountability?.effectBinding,
+      });
+    };
+    const messagesOf = async (surface: 'slack' | 'telegram', tenant: string) => {
+      const { listSurfaceOutboxMessages } =
+        await import('@agent/core/surface/surface-coordination-store');
+      return initialContext('surface_runtime', () =>
+        listSurfaceOutboxMessages(surface, { includeTenantNamespaces: true })
+      ).filter((message) => String(message.correlation_id).includes(`:${tenant}:`));
+    };
+    const reminderOf = (out: Out, actor: string, kind: string) =>
+      (out.reminders as Out[]).find((item) => item.actor_id === actor && item.kind === kind) as Out;
+    const recordOf = (tenant: string, agendaId: string, reminderId: unknown) =>
+      (JSON.parse(readAgendaFile(tenant, agendaId)) as { reminders: Out[] }).reminders.find(
+        (item) => item.reminder_id === reminderId
+      ) as Out;
+    const moveChannel = (tenant: string, channel: string) =>
+      run([
+        'actor-add',
+        ...base(tenant),
+        '--customer',
+        'acme',
+        '--actor',
+        ACTOR,
+        '--name',
+        'CTO',
+        '--channel',
+        channel,
+      ]);
+
+    it('a decider moved to another surface: the old pending request is cancelled (recorded why) and approving it sends nothing', async () => {
+      const { agendaId } = await sendAgenda(MOVE);
+      const first = await run(['remind', '--tenant', MOVE, '--now', D_MINUS_1]);
+      const onSlack = reminderOf(first, ACTOR, 'before_due');
+      expect(onSlack.outcome).toBe('approval_pending');
+      expect((await request('slack', onSlack.approval_request_id))?.status).toBe('pending');
+
+      await moveChannel(MOVE, 'telegram:T-ACME');
+      const moved = await run(['remind', '--tenant', MOVE, '--now', D_MINUS_1]);
+      const onTelegram = reminderOf(moved, ACTOR, 'before_due');
+      expect(onTelegram).toMatchObject({
+        outcome: 'approval_pending',
+        superseded_request_ids: [onSlack.approval_request_id],
+      });
+      expect(onTelegram.approval_request_id).not.toBe(onSlack.approval_request_id);
+      expect((await request('telegram', onTelegram.approval_request_id))?.status).toBe('pending');
+      // Withdrawn through the approval store, not left open with a warning.
+      const old = await request('slack', onSlack.approval_request_id);
+      expect(old?.status).toBe('cancelled');
+      // Why, on the reminder record (ids only).
+      expect(recordOf(MOVE, agendaId, onSlack.reminder_id)).toMatchObject({
+        status: 'approval_pending',
+        approval_request_id: onTelegram.approval_request_id,
+        superseded_requests: [
+          {
+            request_id: onSlack.approval_request_id,
+            surface: 'slack',
+            reason: 'surface_changed',
+            at: D_MINUS_1,
+          },
+        ],
+      });
+      // The approval store's own event log names the reason, never the message.
+      const { approvalEventLogicalPath } = await store();
+      const { pathResolver } = await import('@agent/core/path-resolver');
+      const events = initialContext('ecosystem_architect', () =>
+        String(
+          io.safeReadFile(pathResolver.resolve(approvalEventLogicalPath('slack')), {
+            encoding: 'utf8',
+          })
+        )
+      )
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Out)
+        .filter((event) => event.request_id === onSlack.approval_request_id);
+      expect(events.at(-1)).toMatchObject({
+        event: 'cancelled',
+        cancelled_by: 'customer-decision',
+        reason: expect.stringContaining('surface_changed'),
+      });
+      expect(JSON.stringify(events)).not.toContain(TITLE);
+
+      // Approving the stale request afterwards is refused, and no sweep sends on Slack.
+      await expect(decide('slack', onSlack.approval_request_id)).rejects.toThrow(/cancelled/u);
+      await run(['remind', '--tenant', MOVE, '--now', D_MINUS_1]);
+      expect(await messagesOf('slack', MOVE)).toHaveLength(0);
+      expect(await messagesOf('telegram', MOVE)).toHaveLength(0);
+    }, 120_000);
+
+    it("approved after the day's sweep: the next sweep sends it under its original key, and the same decider's due is not sent too", async () => {
+      // Continues MOVE: the before_due is held on Telegram; a human approves it late on D-1.
+      const held = (await requests('telegram')).filter(
+        (item) => String(item.correlationId).includes(`:${MOVE}:`) && item.status === 'pending'
+      );
+      expect(held).toHaveLength(1);
+      await decide('telegram', held[0].id);
+
+      const d0 = await run(['remind', '--tenant', MOVE, '--now', D0]);
+      const carried = reminderOf(d0, ACTOR, 'before_due');
+      expect(carried).toMatchObject({
+        outcome: 'sent',
+        carried_over: true,
+        target_date: '2026-10-30',
+      });
+      // One message a day: the due for the same decider is covered, not asked.
+      expect(reminderOf(d0, ACTOR, 'due')).toMatchObject({ outcome: 'covered' });
+      expect(reminderOf(d0, ACTOR, 'due')).not.toHaveProperty('approval_request_id');
+      const sent = await messagesOf('telegram', MOVE);
+      expect(sent).toHaveLength(1);
+      expect(sent[0]).toMatchObject({ channel: 'T-ACME' });
+      expect(sent[0].text).toContain(TITLE);
+      expect(sent[0].text).toContain('2026-10-30');
+      // Idempotent: the same day again sends nothing and opens no request for the due.
+      const again = await run(['remind', '--tenant', MOVE, '--now', D0]);
+      expect(reminderOf(again, ACTOR, 'due')).toBeUndefined();
+      expect(reminderOf(again, ACTOR, 'before_due')).toBeUndefined();
+      expect(await messagesOf('telegram', MOVE)).toHaveLength(1);
+      expect(
+        (await requests('telegram')).filter(
+          (item) => String(item.correlationId).includes(`:${MOVE}:`) && item.status === 'pending'
+        )
+      ).toEqual([]);
+    }, 120_000);
+
+    it('an approval for an older agenda revision never sends; a held reminder past its day lapses and its request is withdrawn', async () => {
+      const { agendaId } = await sendAgenda(LATE);
+      const first = await run(['remind', '--tenant', LATE, '--now', D_MINUS_1]);
+      const before = reminderOf(first, ACTOR, 'before_due');
+      expect(before.outcome).toBe('approval_pending');
+      // Approved late on D-1 — but the agenda changes before the next sweep.
+      await decide('slack', before.approval_request_id);
+      const edit = path.join(ROOT, 'active/shared/tmp', 'late-edit.json');
+      io.safeWriteFile(
+        edit,
+        JSON.stringify({
+          entries: [
+            {
+              entry_id: 'auth',
+              item: 'NFR',
+              key: 'auth.method',
+              kind: 'choice',
+              question: 'Which sign-in method, now?',
+              options: [
+                { value: 'password', label: 'Password' },
+                { value: 'sso', label: 'SSO' },
+              ],
+              our_decision: { value: 'sso' },
+              requires_customer: false,
+            },
+          ],
+        })
+      );
+      await run(['draft', ...base(LATE), '--agenda', agendaId, '--file', edit]);
+      await run(['submit', ...base(LATE), '--agenda', agendaId, '--by', 'user:alice']);
+
+      const d0 = await run(['remind', '--tenant', LATE, '--now', D0]);
+      // Same text, same channel, but another agenda revision: a new request, nothing sent.
+      const carried = reminderOf(d0, ACTOR, 'before_due');
+      expect(carried).toMatchObject({ outcome: 'approval_pending', carried_over: true });
+      expect(carried.approval_request_id).not.toBe(before.approval_request_id);
+      expect(reminderOf(d0, ACTOR, 'due').outcome).toBe('approval_pending');
+      expect(await messagesOf('slack', LATE)).toHaveLength(0);
+
+      // Nobody decides on D0. The next day both are dropped, not sent.
+      const late = await run(['remind', '--tenant', LATE, '--now', D_PLUS_1]);
+      const lapsedBefore = reminderOf(late, ACTOR, 'before_due');
+      const lapsedDue = reminderOf(late, ACTOR, 'due');
+      expect(lapsedBefore).toMatchObject({ outcome: 'lapsed' });
+      expect(lapsedDue).toMatchObject({ outcome: 'lapsed' });
+      for (const item of [lapsedBefore, lapsedDue]) {
+        expect(item.superseded_request_ids).toEqual([item.approval_request_id]);
+        expect((await request('slack', item.approval_request_id))?.status).toBe('cancelled');
+        expect(recordOf(LATE, agendaId, item.reminder_id)).toMatchObject({
+          status: 'lapsed',
+          superseded_requests: [
+            expect.objectContaining({ surface: 'slack', reason: 'no_longer_due' }),
+          ],
+        });
+        await expect(decide('slack', item.approval_request_id)).rejects.toThrow(/cancelled/u);
+      }
+      expect((await run(['remind', '--tenant', LATE, '--now', D_PLUS_1])).counts).toEqual({});
+      expect(await messagesOf('slack', LATE)).toHaveLength(0);
+      const status = await run(['status', ...base(LATE), '--agenda', agendaId], D_PLUS_1);
+      expect(status.reminders).toMatchObject({
+        pending_approval: [],
+        lapsed: [
+          expect.objectContaining({ actor_id: ACTOR }),
+          expect.objectContaining({ actor_id: ACTOR }),
+        ],
+      });
+    }, 120_000);
+  });
 
   it('a hold that reaches no human (charter stop, no request) becomes one manual task, not a silent retry', async () => {
     mocks.outbound = { allowed: false, status: 'pending', message: '[CHARTER_STOP] tripwire' };
