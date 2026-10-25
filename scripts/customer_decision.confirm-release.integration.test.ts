@@ -53,6 +53,8 @@ const TASK = 'release';
 const CONSUMER = `mission-${MISSION}.${TASK}`;
 /** The registered organization member (owner of TENANT, no membership in OTHER). */
 const OPERATOR = 'user:owner';
+/** Not a registered member. */
+const STRANGER = 'user:stranger';
 const keys = [
   'KYBERION_PERSONA',
   'MISSION_ROLE',
@@ -322,7 +324,7 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
       // Decided by the customer, but provisional until the operator confirms: still held.
       expect(awaiting()).toBe(true);
 
-      const confirmArgs = (tenant: string) => [
+      const confirmArgs = (tenant: string, by = OPERATOR) => [
         '--tenant',
         tenant,
         '--case',
@@ -332,7 +334,7 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
         '--entry',
         proposalId,
         '--by',
-        OPERATOR,
+        by,
       ];
       const stillHeld = async () => {
         expect(awaiting()).toBe(true);
@@ -372,13 +374,17 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
       const request = loadApprovalRequest('terminal', requestId);
       expect(request).toMatchObject({
         status: 'pending',
-        correlationId: `${agendaId}:${proposalId}:${decisionId}`,
-        scope: { tenant_slug: TENANT },
+        correlationId: `${TENANT}:${agendaId}:${proposalId}:${decisionId}`,
+        scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: TENANT },
         accountability: {
           finalDecision: 'human_only',
           effectBinding: 'customer_decision:operator_confirm',
         },
       });
+      // The shared approval store holds ids only: no question, no customer answer.
+      expect(JSON.stringify([request?.title, request?.summary, request?.details])).not.toMatch(
+        /order screen|order\.release|approved/u
+      );
       // Re-running before anyone decides asks again, releases nothing.
       const again = await confirmChild(confirmArgs(TENANT), TENANT);
       expect(again.out).toMatchObject({
@@ -405,12 +411,15 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
       expect(crossAfterApproval.stderr).toMatch(/CUSTOMER_DECISION_TENANT_MISMATCH/u);
       await stillHeld();
 
-      const confirmed = await confirmChild(confirmArgs(TENANT), TENANT);
+      // Run as a name that is no member: it is recorded as the unverified
+      // requester only; who confirmed comes from the approval decision.
+      const confirmed = await confirmChild(confirmArgs(TENANT, STRANGER), TENANT);
       expect(confirmed.status, confirmed.stderr).toBe(0);
       expect(confirmed.out).toMatchObject({
         entry_id: proposalId,
         decision_id: decisionId,
         confirmed_by: OPERATOR,
+        requested_by: STRANGER,
         approval_request_id: requestId,
         status: 'confirmed',
         already_confirmed: false,
@@ -465,7 +474,10 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
             agenda_id: agendaId,
             entry_id: proposalId,
             decision_id: decisionId,
+            // From the approval decision (the owner, as a human), not from --by.
             confirmed_by: OPERATOR,
+            confirmed_by_type: 'human',
+            requested_by: STRANGER,
             request_id: requestId,
             already_confirmed: false,
           }),

@@ -84,7 +84,18 @@
         "properties": {
           "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
           "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
-          "by": { "type": "string", "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$" },
+          "by": {
+            "description": "The decider of the approval request that authorized the confirmation (decidedBy), never the CLI's unverified --by.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "by_type": { "type": "string", "enum": ["human", "ai_agent", "service"] },
+          "requested_by": {
+            "description": "The member the confirm was run as (--by user:<member>, unverified).",
+            "type": "string",
+            "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$"
+          },
           "at": { "type": "string", "minLength": 1 },
           "request_id": {
             "description": "The approval request (operation customer_decision:operator_confirm) that authorized the confirmation.",

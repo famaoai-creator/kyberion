@@ -63,6 +63,8 @@ import {
   assertUniqueEntries,
   assertNoOpenAgendaOverlap,
   parseRespondBy,
+  tenantApprovalScope,
+  statusCommand,
 } from './common.js';
 import { findTenantCustomerChannelBinding } from '@agent/core/customer-channel-binding';
 import { reconcileCase } from './reconcile.js';
@@ -271,23 +273,6 @@ function isCustomerDecision(record: DecisionRecord | undefined): boolean {
   );
 }
 
-function approvalSummary(agenda: DecisionAgenda): string {
-  const lines = agenda.entries.map((entry) => {
-    const ours = entry.requires_customer
-      ? 'requires the customer'
-      : entry.our_decision
-        ? `ours: ${JSON.stringify(entry.our_decision.value)}`
-        : 'no decision of ours';
-    return `- ${entry.entry_id} (${entry.kind}): ${entry.question} — ${ours}`;
-  });
-  return [
-    `Agenda ${agenda.agenda_id} r${agenda.revision} for customer ${agenda.customer} (case ${agenda.case_id}): ${agenda.title}`,
-    ...lines,
-  ]
-    .join('\n')
-    .slice(0, 4000);
-}
-
 /**
  * Every entry must be answerable by the customer: an `approval` entry shows
  * the draft being approved (`our_decision.value`), a `ranking` entry ranks
@@ -354,7 +339,11 @@ function submitLocked(
   assertAnswerable(agenda);
   // Before the gate and the ledger pins: an internal link never gets approved.
   assertAgendaLinks(agenda);
-  const correlationId = `${agenda.agenda_id}:${hash}`;
+  // The shared approval store is not tenant-partitioned: ids only (the title,
+  // questions and our decisions stay in the case; see `status`), and the
+  // tenant in the correlation id and payload hash so two tenants' identical
+  // agenda ids never share an approval.
+  const correlationId = `${tenant}:${agenda.agenda_id}:${hash}`;
   const gate = enforceApprovalGate({
     requireApproval: true,
     intentId: AGENDA_APPROVE_OPERATION,
@@ -362,11 +351,15 @@ function submitLocked(
     agentId: AUDIT_AGENT,
     correlationId,
     channel: APPROVAL_CHANNEL,
-    payload: { agenda_id: agenda.agenda_id, case_id: agenda.case_id, content_hash: hash },
-    requestScope: { tenant_slug: tenant },
+    payload: { tenant, agenda_id: agenda.agenda_id, case_id: agenda.case_id, content_hash: hash },
+    requestScope: tenantApprovalScope(tenant),
     draft: {
-      title: `Approve customer decision agenda: ${agenda.title}`,
-      summary: approvalSummary(agenda),
+      title: `Approve customer decision agenda ${agenda.agenda_id} r${agenda.revision}`,
+      summary: [
+        `Tenant ${tenant}, case ${agenda.case_id}, agenda ${agenda.agenda_id} r${agenda.revision} (content ${hash.slice(0, 16)}), ${agenda.entries.length} entries`,
+        `Submitted as ${member} (unverified)`,
+        `Details: ${statusCommand(tenant, agenda.case_id, agenda.agenda_id)}`,
+      ].join('\n'),
       severity: 'medium',
     },
   });

@@ -4,6 +4,7 @@
  */
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
+import { loadApprovalRequest } from '@agent/core/governance/approval-store';
 import { readLedger } from '@agent/core/decision-ledger';
 import { sweepDecisionConsumers } from '@agent/core/mission/mission-decision-lock';
 import {
@@ -24,11 +25,14 @@ import {
   type DecisionAgenda,
   type DecisionSwitch,
   type EffectiveDecision,
+  type OperatorConfirmation,
 } from '@agent/core/customer-decision';
 import { ScriptExitError } from '../lib/harness.js';
 import {
   OPERATOR_CONFIRM_OPERATION,
   APPROVAL_CHANNEL,
+  tenantApprovalScope,
+  statusCommand,
   AUDIT_AGENT,
   requireOpt,
   tenantOf,
@@ -225,35 +229,37 @@ function confirmDecision(opts: Record<string, string>, now: string): unknown {
           `entry ${entryId} has no customer decision to confirm (effective: ${current.layer} / ${current.status})`
         );
       }
-      return { agenda, entry, ledger, before, current, decisionId: current.decision_id };
+      return { agenda, ledger, before, current, decisionId: current.decision_id };
     });
-    const { agenda, entry, decisionId } = target;
+    const { agenda, decisionId } = target;
     let requestId: string | undefined;
+    /** Who confirmed: the approval's decider (never the unverified `--by`). */
+    let confirmer: { by: string; type?: OperatorConfirmation['by_type'] } | undefined;
     if (target.current.awaiting_operator_confirmation) {
+      // The shared approval store is not tenant-partitioned: ids only, the
+      // question and the customer's answer stay in the case (see `status`).
       const gate = enforceApprovalGate({
         requireApproval: true,
         intentId: OPERATOR_CONFIRM_OPERATION,
         operationId: OPERATOR_CONFIRM_OPERATION,
         agentId: AUDIT_AGENT,
-        correlationId: `${agenda.agenda_id}:${entryId}:${decisionId}`,
+        correlationId: `${tenant}:${agenda.agenda_id}:${entryId}:${decisionId}`,
         channel: APPROVAL_CHANNEL,
         payload: {
+          tenant,
           agenda_id: agenda.agenda_id,
           case_id: agenda.case_id,
           entry_id: entryId,
           decision_id: decisionId,
         },
-        requestScope: { tenant_slug: tenant },
+        requestScope: tenantApprovalScope(tenant),
         draft: {
-          title: `Confirm the customer's decision: ${entry.question}`.slice(0, 300),
+          title: `Confirm customer decision ${decisionId} (${agenda.agenda_id} / ${entryId})`,
           summary: [
-            `Agenda ${agenda.agenda_id} r${agenda.revision} for customer ${agenda.customer} (case ${agenda.case_id})`,
-            `- ${entryId} (${entry.kind}): ${entry.question}`,
-            `- customer decision ${decisionId} by ${target.current.decided_by ?? 'unknown'}: ${JSON.stringify(target.current.value)}`,
-            `- requested by ${member}`,
-          ]
-            .join('\n')
-            .slice(0, 4000),
+            `Tenant ${tenant}, case ${agenda.case_id}, agenda ${agenda.agenda_id} r${agenda.revision}, entry ${entryId}, customer decision ${decisionId}`,
+            `Requested as ${member} (unverified)`,
+            `Details: ${statusCommand(tenant, agenda.case_id, agenda.agenda_id)}`,
+          ].join('\n'),
           severity: 'high',
         },
       });
@@ -284,6 +290,17 @@ function confirmDecision(opts: Record<string, string>, now: string): unknown {
         return result;
       }
       requestId = gate.requestId;
+      const decided = requestId ? loadApprovalRequest(APPROVAL_CHANNEL, requestId) : null;
+      if (!decided?.decidedBy) {
+        throw new ScriptExitError(
+          1,
+          `approval ${requestId ?? '(none)'} for ${entryId} names no decider; the confirmation is not recorded`
+        );
+      }
+      confirmer = {
+        by: decided.decidedBy,
+        ...(decided.decidedByType ? { type: decided.decidedByType } : {}),
+      };
     }
     return asLedgerWriter(tenant, () => {
       const { ledger, before, current } = target;
@@ -295,10 +312,16 @@ function confirmDecision(opts: Record<string, string>, now: string): unknown {
         newId: newSwitchId,
       };
       const alreadyConfirmed = !current.awaiting_operator_confirmation;
+      // Already confirmed: the original confirmer stays; this run adds no identity.
+      const original = (agenda.operator_confirmations ?? []).find(
+        (item) => item.entry_id === entryId && item.decision_id === decisionId
+      );
+      const confirmedBy = confirmer?.by ?? original?.by;
       let written = agenda;
       let after = before;
       let switches: DecisionSwitch[] = [];
       if (!alreadyConfirmed) {
+        if (!confirmer) throw new Error('[CUSTOMER_DECISION_CONFIRM_UNGATED] no approval decider');
         written = writeAgenda(location, {
           ...agenda,
           operator_confirmations: [
@@ -306,7 +329,9 @@ function confirmDecision(opts: Record<string, string>, now: string): unknown {
             {
               entry_id: entryId,
               decision_id: decisionId,
-              by: member,
+              by: confirmer.by,
+              ...(confirmer.type ? { by_type: confirmer.type } : {}),
+              requested_by: member,
               at: now,
               ...(requestId ? { request_id: requestId } : {}),
             },
@@ -351,7 +376,9 @@ function confirmDecision(opts: Record<string, string>, now: string): unknown {
           case_id: agenda.case_id,
           entry_id: entryId,
           decision_id: decisionId,
-          confirmed_by: member,
+          ...(confirmedBy ? { confirmed_by: confirmedBy } : {}),
+          ...(confirmer?.type ? { confirmed_by_type: confirmer.type } : {}),
+          requested_by: member,
           ...(requestId ? { request_id: requestId } : {}),
           already_confirmed: alreadyConfirmed,
           switch_ids: switches.map((item) => item.switch_id),
@@ -362,7 +389,8 @@ function confirmDecision(opts: Record<string, string>, now: string): unknown {
         agenda_id: agenda.agenda_id,
         entry_id: entryId,
         decision_id: decisionId,
-        confirmed_by: member,
+        ...(confirmedBy ? { confirmed_by: confirmedBy } : {}),
+        requested_by: member,
         ...(requestId ? { approval_request_id: requestId } : {}),
         status: after.find((decision) => decision.entry_id === entryId)?.status,
         already_confirmed: alreadyConfirmed,
