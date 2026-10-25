@@ -210,4 +210,26 @@ describe('customer-decisions overview route (CD-12)', () => {
     expect(response.status).toBe(401);
     expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
+
+  it('marks every answer no-store: data, refusals, the viewer-scope 400 and errors', async () => {
+    const statuses: number[] = [];
+    const check = async (query: string) => {
+      const response = await GET(new NextRequest(`${URL_BASE}${query}`));
+      statuses.push(response.status);
+      expect(response.headers.get('Cache-Control'), query).toBe('no-store');
+    };
+    await check('?tenant=acme');
+    mocks.readCustomerDecisionFacade.mockResolvedValue({ ok: false, status: 504, error: 'x' });
+    await check('?tenant=acme');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['acme', 'globex']);
+    await check('?');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue('all');
+    mocks.strictViewerTier.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer tier scope denied');
+    });
+    await check('?tenant=acme');
+    mocks.requireChronosAccess.mockReturnValue(new Response('forbidden', { status: 403 }));
+    await check('?tenant=acme');
+    expect(statuses).toEqual([200, 504, 400, 403, 403]);
+  });
 });

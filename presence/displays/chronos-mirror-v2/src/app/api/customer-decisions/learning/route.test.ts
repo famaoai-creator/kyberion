@@ -150,6 +150,8 @@ describe('customer-decisions learning route (CD-12 drill-down)', () => {
     '?tenant=acme&date=latest',
     '?tenant=acme&date=../2026-10-19',
     '?tenant=acme&date=2026-10-19T00:00',
+    '?tenant=acme&date=2026-02-30',
+    '?tenant=acme&date=2026-13-01',
   ])('rejects an invalid date %s with 400 and spawns nothing', async (query) => {
     const response = await get(query);
     expect(response.status).toBe(400);
@@ -180,5 +182,27 @@ describe('customer-decisions learning route (CD-12 drill-down)', () => {
     const response = await get('?tenant=acme');
     expect(response.status).toBe(403);
     expect(mocks.resolveViewerContextForRequest).not.toHaveBeenCalled();
+  });
+
+  it('marks every answer no-store: data, refusals, the viewer-scope 400 and errors', async () => {
+    const statuses: number[] = [];
+    const check = async (query: string) => {
+      const response = await GET(new NextRequest(`${URL_BASE}${query}`));
+      statuses.push(response.status);
+      expect(response.headers.get('Cache-Control'), query).toBe('no-store');
+    };
+    await check('?tenant=acme');
+    mocks.readCustomerDecisionFacade.mockResolvedValue({ ok: false, status: 504, error: 'x' });
+    await check('?tenant=acme');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['acme', 'globex']);
+    await check('?');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue('all');
+    mocks.strictViewerTier.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer tier scope denied');
+    });
+    await check('?tenant=acme');
+    mocks.requireChronosAccess.mockReturnValue(new Response('forbidden', { status: 403 }));
+    await check('?tenant=acme');
+    expect(statuses).toEqual([200, 504, 400, 403, 403]);
   });
 });

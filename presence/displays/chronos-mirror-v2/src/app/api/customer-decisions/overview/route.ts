@@ -5,7 +5,10 @@ import {
   viewerErrorResponse,
   ViewerContextError,
 } from '../../../../lib/viewer-context';
-import { resolveCustomerDecisionTenant } from '../../../../lib/customer-decision-viewer-scope';
+import {
+  customerDecisionNoStore,
+  resolveCustomerDecisionTenant,
+} from '../../../../lib/customer-decision-viewer-scope';
 import { readCustomerDecisionFacade } from '../../../../lib/customer-decision-overview-facade';
 
 /**
@@ -16,7 +19,7 @@ import { readCustomerDecisionFacade } from '../../../../lib/customer-decision-ov
  * run as a child bound to that tenant — Chronos itself never reads the
  * tenant's decision stores (see lib/customer-decision-overview-facade.ts).
  */
-export async function GET(req: NextRequest) {
+async function read(req: NextRequest): Promise<Response> {
   const denied = guardRequest(req);
   if (denied) return denied;
   const accessDenied = requireChronosAccess(req, 'readonly');
@@ -31,7 +34,10 @@ export async function GET(req: NextRequest) {
     const result = await readCustomerDecisionFacade('overview', scope.tenant);
     // `in` narrows the result under this app's non-strict tsconfig as well.
     if ('error' in result)
-      return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json(
+        { error: result.error, ...(result.reason ? { reason: result.reason } : {}) },
+        { status: result.status }
+      );
     return NextResponse.json(
       { overview: result.value },
       { headers: { 'Cache-Control': 'no-store' } }
@@ -40,4 +46,9 @@ export async function GET(req: NextRequest) {
     if (error instanceof ViewerContextError) return viewerErrorResponse(error);
     return viewerErrorResponse(error, 500);
   }
+}
+
+/** Every answer — data, refusals and errors alike — is `Cache-Control: no-store`. */
+export async function GET(req: NextRequest) {
+  return customerDecisionNoStore(await read(req));
 }

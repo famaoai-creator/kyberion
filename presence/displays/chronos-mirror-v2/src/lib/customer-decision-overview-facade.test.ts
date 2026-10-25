@@ -247,7 +247,12 @@ describe('customer-decision facade child (CD-12)', () => {
     ],
   ] as const)('maps %s to a fixed error', async (_label, exists, run, status, error) => {
     const result = await readFacadeView('overview', 'acme', undefined, run, exists);
-    expect(result).toEqual({ ok: false, status, error });
+    expect(result).toEqual({
+      ok: false,
+      status,
+      error,
+      ...(status === 503 ? { reason: 'not_built' } : {}),
+    });
     expect(JSON.stringify(result)).not.toMatch(/secret|ENOENT|confidential/u);
   });
 
@@ -297,16 +302,88 @@ describe('customer-decision facade child (CD-12)', () => {
     expect(run).toHaveBeenCalledTimes(5);
   });
 
-  it('does not cache a failure (a not-found included)', async () => {
+  it('does not cache a failure', async () => {
+    const run = vi
+      .fn<(tenant: string, args: string[]) => Promise<OverviewChildOutcome>>()
+      .mockResolvedValueOnce(failed('[CUSTOMER_DECISION_X] x'))
+      .mockResolvedValueOnce(ok(minimalCase('acme')));
+    const read = createFacadeReader({ run, scriptExists: () => true, now: () => 0 });
+    expect(await read('case', 'acme', 'case-a')).toMatchObject({ ok: false, status: 502 });
+    await Promise.resolve();
+    expect((await read('case', 'acme', 'case-a')).ok).toBe(true);
+    expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a not-found briefly (shorter than a success)', async () => {
+    let clock = 0;
     const run = vi
       .fn<(tenant: string, args: string[]) => Promise<OverviewChildOutcome>>()
       .mockResolvedValueOnce(failed('[CUSTOMER_DECISION_CASE_NOT_FOUND] x'))
       .mockResolvedValueOnce(ok(minimalCase('acme')));
-    const read = createFacadeReader({ run, scriptExists: () => true, now: () => 0 });
+    const read = createFacadeReader({
+      run,
+      scriptExists: () => true,
+      ttlMs: 1000,
+      notFoundTtlMs: 100,
+      now: () => clock,
+    });
     expect(await read('case', 'acme', 'case-a')).toMatchObject({ ok: false, status: 404 });
     await Promise.resolve();
+    clock = 99;
+    expect(await read('case', 'acme', 'case-a')).toMatchObject({ ok: false, status: 404 });
+    expect(run).toHaveBeenCalledTimes(1);
+    clock = 100;
     expect((await read('case', 'acme', 'case-a')).ok).toBe(true);
     expect(run).toHaveBeenCalledTimes(2);
+  });
+
+  it('evicts the oldest settled entry first when the cache is full', async () => {
+    let release: (() => void) | undefined;
+    const run = vi.fn(async (tenant: string) => {
+      if (tenant === 'pending') await new Promise<void>((resolve) => (release = resolve));
+      return ok(minimalOverview(tenant));
+    });
+    const read = createFacadeReader({ run, scriptExists: () => true, cacheLimit: 2, now: () => 0 });
+    const pending = read('overview', 'pending');
+    await read('overview', 'settled');
+    await Promise.resolve();
+    // Full: 'pending' (oldest, still running) stays shared; 'settled' goes.
+    await read('overview', 'third');
+    await Promise.resolve();
+    void read('overview', 'pending');
+    expect(run.mock.calls.filter(([tenant]) => tenant === 'pending')).toHaveLength(1);
+    await read('overview', 'settled');
+    expect(run.mock.calls.filter(([tenant]) => tenant === 'settled')).toHaveLength(2);
+    release?.();
+    expect((await pending).ok).toBe(true);
+  });
+
+  it('answers a fixed 503 (busy) when the child queue is full', async () => {
+    const releases: Array<() => void> = [];
+    const run = vi.fn(async (tenant: string) => {
+      await new Promise<void>((resolve) => releases.push(resolve));
+      return ok(minimalOverview(tenant));
+    });
+    const read = createFacadeReader({
+      run,
+      scriptExists: () => true,
+      concurrency: 1,
+      maxWaiting: 1,
+    });
+    const first = read('overview', 't1');
+    const second = read('overview', 't2');
+    const third = await read('overview', 't3');
+    expect(third).toEqual({ ok: false, status: 503, error: OVERVIEW_ERRORS.busy, reason: 'busy' });
+    // A busy answer is not cached: the next request queues again.
+    while (releases.length > 0 || run.mock.calls.length < 2) {
+      releases.shift()?.();
+      for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    }
+    expect((await first).ok && (await second).ok).toBe(true);
+    const retry = read('overview', 't3');
+    for (let i = 0; i < 10; i += 1) await Promise.resolve();
+    releases.shift()?.();
+    expect((await retry).ok).toBe(true);
   });
 
   it(`runs at most ${FACADE_CHILD_CONCURRENCY} children at once`, async () => {

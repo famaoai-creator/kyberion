@@ -33,7 +33,7 @@ export type CustomerDecisionViewState<T> =
   | { kind: 'forbidden'; message: string }
   /** 404: the case (or the report of that date) does not exist. */
   | { kind: 'not_found'; message: string }
-  /** 503: the server's governed facade is not built. */
+  /** 503 with `reason: 'not_built'`: the server's governed facade is not built. */
   | { kind: 'not_built'; message: string };
 
 /**
@@ -105,7 +105,15 @@ export async function fetchCustomerDecisionView<K extends CustomerDecisionViewKi
     const message = errorMessage(raw, response.status);
     if (response.status === 401 || response.status === 403) return { kind: 'forbidden', message };
     if (response.status === 404) return { kind: 'not_found', message };
-    if (response.status === 503) return { kind: 'not_built', message };
+    // A 503 is "not built" only when the route says so; a busy server is retryable.
+    if (
+      response.status === 503 &&
+      raw &&
+      typeof raw === 'object' &&
+      'reason' in raw &&
+      raw.reason === 'not_built'
+    )
+      return { kind: 'not_built', message };
     return { kind: 'error', message };
   } catch (error) {
     if (options.signal?.aborted) return null;
