@@ -21,7 +21,11 @@ import {
   listWorkItems,
   setWorkCoordinationNamespace,
 } from '../workforce/work-coordination.js';
+import { inspect } from 'node:util';
+import { withExecutionContext } from '../authority.js';
+import { auditChain } from '../governance/audit-chain.js';
 import {
+  auditTaskDecisionDelivery,
   pinTaskDecisions,
   reconcileTaskDecisions,
   isTaskAwaitingCustomerDecision,
@@ -198,7 +202,13 @@ describe('mission decision lock (CD-09)', () => {
           throw new Error('[DEAL_SCOPE] unreadable');
         },
       };
-      expect(pinTaskDecisions(task, broken)).toBeNull();
+      // A failed lookup is not "no case": the worker decides whether to block.
+      expect(pinTaskDecisions(task, broken)).toEqual({
+        consumer: 'mission-MSN-CD09-LOCK.impl',
+        pinned_count: 0,
+        pinned: false,
+        failed: { case_found: false },
+      });
       expect(reconcileTaskDecisions(task, broken)).toMatchObject({ checked: 0, stale_count: 0 });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('DEAL_SCOPE'));
       expect(reworkItems()).toEqual([]);
@@ -408,6 +418,13 @@ describe('mission decision lock (CD-09)', () => {
         consumer: 'mission-MSN-CD09-LOCK.impl',
         pinned_count: 1,
         pinned: true,
+        // The open question holds the task: the worker does not dispatch it.
+        held: {
+          case_id: 'case-a',
+          tenant_slug: TENANT,
+          proposal_ids: result.hold_proposal_ids,
+          reason: 'awaiting_customer_decision',
+        },
       });
       // The open requires_customer question keeps the re-pinned task held.
       expect(readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')?.hold).toEqual({
@@ -544,7 +561,7 @@ describe('mission decision lock (CD-09)', () => {
       key: 'release.go',
       requires_customer: true,
     };
-    const decide = (item: string, key: string, value: unknown, at = LATER) =>
+    const decide = (item: string, key: string, value: unknown, at = LATER, supersedes?: string) =>
       appendDecisions(
         { dir },
         [
@@ -562,6 +579,7 @@ describe('mission decision lock (CD-09)', () => {
               on_behalf_of: { actor_id: 'customer:acme-cto', evidence: 'rcp-0001' },
             },
             decided_at: at,
+            ...(supersedes ? { supersedes } : {}),
           },
         ],
         { caseId: 'case-a' }
@@ -822,6 +840,201 @@ describe('mission decision lock (CD-09)', () => {
         expect(isTaskAwaitingCustomerDecision({ ...task, taskId: 'other' }, { decisionCase })).toBe(
           false
         );
+      });
+
+      describe('values for the resumed task (CD-09 2026-10-25)', () => {
+        const SENTINEL = 'ship-on-nov-first-SENTINEL';
+        const confirmRelease = () => {
+          writeAgenda({ dir }, releaseAgenda(false));
+          holdOn();
+          decide('RELEASE', 'release.go', { approved: true, note: SENTINEL });
+          // The customer also decided an entry the task never asked about.
+          decide('NFR', 'auth.method', 'other-case-value-SENTINEL');
+          writeAgenda({ dir }, releaseAgenda(true));
+        };
+
+        it('a held task gets nothing; after confirm the resumed pin holds its own value, ids only when shown', () => {
+          writeAgenda({ dir }, releaseAgenda(false));
+          holdOn();
+          decide('RELEASE', 'release.go', { approved: true, note: SENTINEL });
+          // Decided, not confirmed: still held, nothing delivered.
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })).not.toHaveProperty(
+            'decision_values'
+          );
+          decide('NFR', 'auth.method', 'other-case-value-SENTINEL');
+          writeAgenda({ dir }, releaseAgenda(true));
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          const values = resumed?.decision_values;
+          expect(values?.count).toBe(1);
+          expect(values?.decisionIds).toEqual(['D-0001']);
+          const text = values!.promptLines().join('\n');
+          expect(text).toContain(SENTINEL);
+          expect(text).not.toContain('other-case-value-SENTINEL');
+          // Serialized (event payloads, logs), the pin result shows ids only.
+          for (const shown of [JSON.stringify(resumed), inspect(resumed, { depth: 10 })]) {
+            expect(shown).not.toMatch(/SENTINEL|release\.go|RELEASE/u);
+            expect(shown).toContain('D-0001');
+          }
+          // Nothing new is written to the lock (it pins the case as before).
+          expect(Object.keys(lockNow()).sort()).not.toContain('decision_values');
+          // A task that never held gets nothing.
+          expect(
+            pinTaskDecisions({ ...task, taskId: 'other' }, { decisionCase, now: LATER })
+          ).not.toHaveProperty('decision_values');
+        });
+
+        it('a customer who changes the answer after the release re-opens the hold: no values, ids only', () => {
+          confirmRelease();
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.decision_values?.count).toBe(
+            1
+          );
+          expect(lockNow().hold?.resolved_at).toBe(LATER);
+          // A new answer (D-0003), not confirmed yet.
+          decide(
+            'RELEASE',
+            'release.go',
+            { approved: false, note: `changed ${SENTINEL}` },
+            LATER,
+            'D-0001'
+          );
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(resumed).not.toHaveProperty('decision_values');
+          expect(resumed?.held).toEqual({
+            case_id: 'case-a',
+            tenant_slug: TENANT,
+            proposal_ids: [expect.stringMatching(/^tp-[a-f0-9]{16}$/u)],
+            reason: 'decision_not_in_force',
+          });
+          expect(JSON.stringify(resumed)).not.toMatch(/SENTINEL|release\.go|RELEASE/u);
+          // The lock holds again, and every other boundary agrees.
+          expect(lockNow().hold).toEqual({ work_item_id: 'WI-TASK', at: NOW });
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+          expect(
+            recordTaskDecisionProposals({ ...task, requests: [] }, { decisionCase, now: LATER })
+              .hold_proposal_ids
+          ).toHaveLength(1);
+        });
+
+        const sweepNow = () =>
+          sweepDecisionConsumers(
+            { tenantSlug: TENANT, caseId: 'case-a', location: { dir } },
+            { now: LATER }
+          );
+        const closeAgenda = (status: 'closed' | 'withdrawn' = 'closed') =>
+          writeAgenda({ dir }, { ...readAgenda({ dir }, 'agd-test0001')!, status });
+
+        it('confirmed A, the customer answers B, the agenda closes unconfirmed: A is never delivered (unresolvable)', () => {
+          confirmRelease();
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.decision_values?.count).toBe(
+            1
+          );
+          // The customer changes the answer (D-0003 supersedes D-0001, provisional);
+          // the operator closes the agenda without confirming it.
+          decide('RELEASE', 'release.go', { approved: false }, LATER, 'D-0001');
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.held?.reason).toBe(
+            'decision_not_in_force'
+          );
+          closeAgenda();
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(resumed).not.toHaveProperty('decision_values');
+          expect(resumed?.held?.reason).toBe('customer_decision_unresolvable');
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+        });
+
+        it('closed with no confirmed answer: held as unresolvable at every boundary, never released', () => {
+          writeAgenda({ dir }, releaseAgenda(false));
+          holdOn();
+          decide('RELEASE', 'release.go', { approved: true, note: SENTINEL });
+          closeAgenda('withdrawn');
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(resumed?.held).toMatchObject({ reason: 'customer_decision_unresolvable' });
+          expect(resumed).not.toHaveProperty('decision_values');
+          // The sweep never releases it (no hold / release loop), record-evidence keeps it held.
+          expect(sweepNow()).not.toHaveProperty('released_holds');
+          expect(lockNow().hold?.resolved_at).toBeUndefined();
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.held?.reason).toBe(
+            'customer_decision_unresolvable'
+          );
+        });
+
+        it('a completed task is not re-held when the customer changes the answer later', () => {
+          confirmRelease();
+          pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(reconcileTaskDecisions(task, { decisionCase, now: LATER })).not.toHaveProperty(
+            'held_proposal_ids'
+          );
+          expect(lockNow().status).toBe('completed');
+          decide('RELEASE', 'release.go', { approved: false }, LATER, 'D-0001');
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(false);
+          const rerun = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(rerun).not.toHaveProperty('held');
+          // The superseded value is not delivered; the task is told so, ids only.
+          const values = rerun?.decision_values;
+          expect(values?.count).toBe(0);
+          expect(values?.unconfirmedProposalIds).toHaveLength(1);
+          expect(values?.unconfirmedReasons).toEqual(['changed_after_completion']);
+          const text = values!.promptLines().join('\n');
+          expect(text).toContain('changed after this task completed and is not confirmed');
+          expect(text).not.toContain(SENTINEL);
+          expect(JSON.parse(JSON.stringify(rerun))).toMatchObject({
+            decision_values: {
+              count: 0,
+              decision_ids: [],
+              unconfirmed_proposal_ids: values!.unconfirmedProposalIds,
+            },
+          });
+          // The re-pin keeps the completion, so the next boundaries agree.
+          expect(lockNow()).toMatchObject({ status: 'in_progress', completed_at: LATER });
+          expect(
+            recordTaskDecisionProposals({ ...task, requests: [] }, { decisionCase, now: LATER })
+              .hold_proposal_ids
+          ).toEqual([]);
+        });
+
+        it('a process bound to another tenant gets nothing', () => {
+          confirmRelease();
+          vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+          const other = withExecutionContext(
+            'mission_controller',
+            () => pinTaskDecisions(task, { decisionCase, now: LATER }),
+            undefined,
+            'other-corp'
+          );
+          expect(other).not.toHaveProperty('decision_values');
+          expect(other?.failed).toEqual({ case_found: true, case_id: 'case-a' });
+        });
+
+        it('audits delivery with ids only', () => {
+          confirmRelease();
+          const values = pinTaskDecisions(task, { decisionCase, now: LATER })!.decision_values!;
+          const record = vi
+            .spyOn(auditChain, 'record')
+            .mockImplementation((entry) => entry as ReturnType<typeof auditChain.record>);
+          auditTaskDecisionDelivery({
+            values,
+            missionId: MISSION,
+            taskId: 'impl',
+            operation: 'task_decisions_withheld',
+            reason: 'mission_tier_public',
+          });
+          expect(record).toHaveBeenCalledWith(
+            expect.objectContaining({
+              action: 'customer_decision',
+              operation: 'task_decisions_withheld',
+              tenantSlug: TENANT,
+              metadata: {
+                case_id: 'case-a',
+                consumer: 'mission-MSN-CD09-LOCK.impl',
+                mission_id: MISSION,
+                task_id: 'impl',
+                decision_ids: ['D-0001'],
+                reason: 'mission_tier_public',
+              },
+            })
+          );
+          expect(JSON.stringify(record.mock.calls)).not.toMatch(/SENTINEL|release\.go|RELEASE/u);
+        });
       });
 
       it('after the operator confirms, the rerun completes', () => {

@@ -1,0 +1,30 @@
+{
+  "record_id": "mem-MSN-CUSTOMER-DECISION-CD09-INVITE-20261025-2026_10_25",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Handing confidential values to a worker prompt: gate on the mission scope, scrub stored copies, decide on what was seen, one hold rule",
+  "summary": "When a resumed task needs confidential customer answers, deliver them only in the in-memory prompt of a mission whose context-pack scope may carry that tenant's confidential data; keep every persisted form ids-only; run acceptance logic on the raw result but scrub every stored/sent copy; and drive every hold boundary from one shared state function.",
+  "candidate_id": "mem-MSN-CUSTOMER-DECISION-CD09-INVITE-20261025-2026_10_25",
+  "evidence_refs": [
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/implementation-report.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/retrospective.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/design-spec.json",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/test-report.md"
+  ],
+  "created_at": "2026-10-25T17:01:41.356Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "## Context\nCD-09 delivered confirmed customer decisions to tasks resumed after a customer hold; CD-10 required an active registry tenant for invite storage.\n\n## Lessons\n1. Gate confidential prompt content on the mission's own context-pack security scope (same tenant, write_tier confidential, egress deny, pack not degraded) and block the task otherwise — reference-only delivery makes the worker guess.\n2. Hold values in a holder whose toJSON / inspect / toString expose ids only, so accidental serialization into events, logs or WorkItems is harmless.\n3. Separate 'decide on what was seen' from 'store what is safe': scrubbing the in-memory result broke the acceptance gate (artifact paths, criteria matching, enum fields). Gate and reviewer on the raw result; scrub every stored, sent and notified copy, including reviewer gaps, gate reasons and best-of-N losers. Scrub must be idempotent (keep existing markers) and whole-word for short values, Unicode-aware.\n4. When a hold depends on several stores (consumer-lock stamp, agenda state, ledger), one shared state function must drive every boundary (pin, sweep, record-evidence, reconcile, overview). Divergent rules produced a never-releasable hold, a release/hold loop and silently dropped answers.\n5. A ledger fallback must check the record still stands (active and not named in a later supersedes); otherwise a superseded value is delivered as confirmed.\n6. Distinguish 'no case' from 'read failed'; block only tasks known to carry decisions, retry once otherwise.\n7. Content not gated by tier (ids-only notes) must not carry short hashes of tenant names into lower-tier missions — use counts there.\n8. Canonical-JSON comparisons used by write guards must be prototype-safe (Object.create(null) + defineProperty); a __proto__ key otherwise vanishes from the comparison.\n9. For public-facing surfaces, check input format before tenant state so error kinds never reveal registration state.\n\n## How to apply\nBefore adding confidential data to any worker prompt, list every place the prompt or result is persisted or excerpted (bridge excerpts, observability, WorkItems, events, NEXT_TASKS, prompt-visibility, compaction, best-of-N) and add a sentinel leak-sweep test over active/shared/** and the public mission directory."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/implementation-report.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/retrospective.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/design-spec.json",
+    "active/missions/public/MSN-CUSTOMER-DECISION-CD09-INVITE-20261025/evidence/test-report.md"
+  ],
+  "source_branch": "feat/customer-decision-cd09-invite-20261025",
+  "source_commit": "4315253c665d44c5ab08a9bad968b8191bcda3b3"
+}

@@ -1,5 +1,6 @@
 import * as pptxUtils from '@agent/core/pptx-utils';
 import { runGovernedCommand } from '@agent/core/command-runner';
+import { parseOoxmlCorePropertiesXml } from '@agent/core/media/ooxml-core-props';
 import type { ExtractionMode, ExtractionOptions, ExtractionResult } from './extraction-engine.js';
 import { collectXmlCaptures } from './xml-utils.js';
 
@@ -50,8 +51,14 @@ function extractMetadata(filePath: string) {
   }
 
   const slideCount = (presXml.match(/<p:sldId /g) ?? []).length;
+  const coreXml = readZipEntryText(filePath, 'docProps/core.xml') || '';
+  const title = parseOoxmlCorePropertiesXml(coreXml).title;
 
-  return { type: 'PowerPoint', slides: slideCount };
+  return {
+    type: 'PowerPoint',
+    slides: slideCount,
+    ...(title ? { title } : {}),
+  };
 }
 
 function extractAesthetic(filePath: string) {

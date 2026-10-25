@@ -348,28 +348,36 @@ describe('buildCaseOverview (CD-12)', () => {
       held: 1,
       ready_to_resume: 0,
     });
+    // Collected onto the price entry; the customer's answer (D-0002) is in force once confirmed.
+    const resolvedLock = lock({
+      hold: { at: CREATED },
+      decisions: [
+        {
+          ...proposal('cccc', true),
+          item: 'DEAL',
+          key: 'price.plan',
+          agenda_id: AGENDA,
+          entry_id: 'price',
+          proposal: {
+            ...proposal('cccc', true).proposal,
+            collected_at: CREATED,
+            resolved: { decision_id: 'D-0002', at: CREATED },
+          },
+        },
+      ],
+    });
+    const confirmed = agenda({
+      operator_confirmations: [
+        { entry_id: 'price', decision_id: 'D-0002', by: 'user:boss', at: CREATED },
+      ],
+    });
     const resolved = buildCaseOverview(
-      caseInput({
-        consumers: [
-          lock({
-            hold: { at: CREATED },
-            decisions: [
-              {
-                ...proposal('cccc', true),
-                agenda_id: AGENDA,
-                entry_id: 'tp-cccc000000000000',
-                proposal: {
-                  ...proposal('cccc', true).proposal,
-                  collected_at: CREATED,
-                  resolved: { decision_id: 'D-0009', at: CREATED },
-                },
-              },
-            ],
-          }),
-        ],
-      })
+      caseInput({ agendas: [confirmed], consumers: [resolvedLock] })
     );
     expect(resolved.tasks).toEqual({ pending_proposals: 0, held: 0, ready_to_resume: 1 });
+    // Released before, but the decision is no longer confirmed: held again.
+    const unconfirmed = buildCaseOverview(caseInput({ consumers: [resolvedLock] }));
+    expect(unconfirmed.tasks).toEqual({ pending_proposals: 0, held: 1, ready_to_resume: 0 });
   });
 
   it('includes draft-only cases and shows no decision values or customer free text', () => {

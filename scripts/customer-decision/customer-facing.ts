@@ -15,6 +15,7 @@ import {
   agendaAnswerState,
   buildResponseReceipt,
   findDuplicateReceipt,
+  inviteIdOfToken,
   listReceipts,
   newReceiptId,
   planCustomerResponse,
@@ -26,6 +27,7 @@ import {
   type CustomerDecisionInvite,
   type DecisionAgenda,
 } from '@agent/core/customer-decision';
+import { isActiveCustomerTenant } from '@agent/core/customer-channel-binding';
 import { sweepDecisionConsumers } from '@agent/core/mission/mission-decision-lock';
 import { ScriptExitError } from '../lib/harness.js';
 import {
@@ -113,6 +115,19 @@ function openInvite(
   if (!opts.tenant || typeof token !== 'string') throw new CustomerFacingError('invalid_link');
   // The bound-tenant check before the token is verified (and recorded).
   const tenant = tenantOf(opts);
+  // A malformed token is `invalid_link` whatever the tenant's state, so the
+  // answer to a malformed token never reveals the registration state.
+  const inviteId = inviteIdOfToken(token);
+  if (!inviteId) throw new CustomerFacingError('invalid_link');
+  // CD-10: invites of a tenant that is not registered and active stop working.
+  // The customer sees the same `unavailable` as a store failure (never the
+  // registration state); the audit trace carries the well-formed token's id only.
+  if (!isActiveCustomerTenant(tenant)) {
+    auditFailure(tenant, `invite_${action}`, 'CD_INVITE_TENANT_NOT_REGISTERED', {
+      invite_id: inviteId,
+    });
+    throw new CustomerFacingError('unavailable');
+  }
   const verified = verifyInviteToken(tenant, token, { now, action, record });
   if (verified.ok === false) {
     throw new CustomerFacingError(

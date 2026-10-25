@@ -8,18 +8,12 @@
  * reached the file.
  */
 
+import { sanitizeXmlText } from '../../text-escaping.js';
+
 const NS =
   'xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
 
 const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
-
-function escapeXml(value: string): string {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 const GROUP_PROPS =
   '<p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>';
@@ -50,7 +44,7 @@ export function generateNotesSlideXml(text: string): string {
     .split(/\r?\n/)
     .map((line) =>
       line.trim()
-        ? `<a:p><a:r><a:rPr lang="ja-JP" dirty="0"/><a:t>${escapeXml(line)}</a:t></a:r></a:p>`
+        ? `<a:p><a:r><a:rPr lang="ja-JP" dirty="0"/><a:t>${sanitizeXmlText(line)}</a:t></a:r></a:p>`
         : '<a:p><a:endParaRPr lang="ja-JP"/></a:p>'
     )
     .join('');

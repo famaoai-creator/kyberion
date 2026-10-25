@@ -14,6 +14,8 @@ import {
   openAgendas,
   pendingTaskProposals,
   reconcileConsumedDecisionLock,
+  resolvedTaskProposalDecisions,
+  unconfirmedTaskProposals,
   taskProposalAgendaEntry,
   taskProposalHolds,
   taskProposalId,
@@ -607,5 +609,258 @@ describe('CD-09 review fixes', () => {
     });
     expect(taskProposalsOf(later)[0].proposal.requires_customer).toBe(true);
     expect(taskProposalsOf(later)[0]).not.toHaveProperty('value');
+  });
+});
+
+describe('resolvedTaskProposalDecisions (CD-09 values for resumed tasks)', () => {
+  const consumer = 'mission-MSN-CD09.impl';
+  const empty = { consumer, decisions: [] };
+  const choiceEntry = {
+    entry_id: 'release',
+    item: 'RELEASE',
+    key: 'release.date',
+    kind: 'choice' as const,
+    question: 'Which release date?',
+    options: [
+      { value: 'date-alpha-sentinel', label: 'Alpha date' },
+      { value: 'date-beta-sentinel', label: 'Beta date' },
+    ],
+    requires_customer: true,
+  };
+  const askRelease = {
+    question: 'Which release date?',
+    item: 'RELEASE',
+    key: 'release.date',
+    requires_customer: true,
+  };
+  // An agent proposal on an entry of the same agenda (not requires_customer).
+  const proposeAuth = {
+    question: 'Which sign-in method?',
+    item: 'NFR',
+    key: 'auth.method',
+    proposed_value: 'sso',
+    requires_customer: false,
+  };
+  const confirmations = (...ids: string[]) =>
+    ids.map((id) => ({ entry_id: 'release', decision_id: id, by: 'user:boss', at: NOW }));
+  const withRelease = (confirmed: string[]) =>
+    agenda({
+      entries: [...agenda().entries, choiceEntry],
+      ...(confirmed.length ? { operator_confirmations: confirmations(...confirmed) } : {}),
+    });
+  const lockFor = (agendas: DecisionAgenda[]) => ({
+    decisions: mergeTaskProposals({
+      lock: empty,
+      requests: [askRelease, proposeAuth],
+      agendas,
+      now: NOW,
+    }).decisions,
+  });
+
+  it("returns only the task's own resolved requires_customer proposals", () => {
+    const agendas = [withRelease(['D-0001'])];
+    const ledger = [
+      customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel'),
+      // The customer also decided the agent-proposed entry: never delivered.
+      customerDecision('D-0002', 'auth.method', 'NFR', 'password'),
+    ];
+    const resolved = resolvedTaskProposalDecisions(lockFor(agendas), agendas, ledger, NOW);
+    expect(resolved).toEqual([
+      {
+        proposal_id: taskProposalId(consumer, 'RELEASE', 'release.date'),
+        agenda_id: 'agd-test0001',
+        entry_id: 'release',
+        item: 'RELEASE',
+        key: 'release.date',
+        question: 'Which release date?',
+        decision_id: 'D-0001',
+        value: 'date-alpha-sentinel',
+        option_label: 'Alpha date',
+      },
+    ]);
+    // Another task's lock (a different consumer, no proposals of its own) gets nothing.
+    expect(resolvedTaskProposalDecisions({ decisions: [] }, agendas, ledger, NOW)).toEqual([]);
+    // An uncollected proposal (no agenda entry yet) gets nothing.
+    const uncollected = {
+      decisions: mergeTaskProposals({ lock: empty, requests: [askRelease], agendas: [], now: NOW })
+        .decisions,
+    };
+    expect(resolvedTaskProposalDecisions(uncollected, agendas, ledger, NOW)).toEqual([]);
+  });
+
+  it('a superseded decision yields the one in force; one awaiting confirmation is excluded', () => {
+    const first = customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel');
+    const second = customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel');
+    const superseded = [{ ...first, status: 'superseded' as const }, second];
+    const confirmedBoth = [withRelease(['D-0001', 'D-0002'])];
+    expect(
+      resolvedTaskProposalDecisions(lockFor(confirmedBoth), confirmedBoth, superseded, NOW)
+    ).toEqual([
+      expect.objectContaining({
+        decision_id: 'D-0002',
+        value: 'date-beta-sentinel',
+        option_label: 'Beta date',
+      }),
+    ]);
+    // The newer customer decision is not confirmed yet: nothing, not the old value.
+    const confirmedFirst = [withRelease(['D-0001'])];
+    expect(
+      resolvedTaskProposalDecisions(lockFor(confirmedFirst), confirmedFirst, superseded, NOW)
+    ).toEqual([]);
+    // Decided but never confirmed: nothing.
+    const unconfirmed = [withRelease([])];
+    expect(resolvedTaskProposalDecisions(lockFor(unconfirmed), unconfirmed, [first], NOW)).toEqual(
+      []
+    );
+  });
+
+  it('a released hold re-opens once the decision in force is no longer confirmed', () => {
+    const agendas = [withRelease(['D-0001'])];
+    const first = customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel');
+    const id = taskProposalId(consumer, 'RELEASE', 'release.date');
+    // Released on D-0001: the proposal carries the stamp.
+    const stamped = {
+      decisions: lockFor(agendas).decisions.map((entry) =>
+        entry.proposal?.proposal_id === id
+          ? {
+              ...entry,
+              proposal: { ...entry.proposal, resolved: { decision_id: 'D-0001', at: NOW } },
+            }
+          : entry
+      ),
+    };
+    expect(taskProposalHolds(stamped, agendas, [first], NOW)).toEqual([
+      { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+    ]);
+    // The customer changed the answer: D-0002 awaits the operator's confirmation.
+    const changed = [
+      { ...first, status: 'superseded' as const },
+      customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel'),
+    ];
+    expect(taskProposalHolds(stamped, agendas, changed, NOW)).toEqual([
+      { proposal_id: id, collected: true },
+    ]);
+    expect(resolvedTaskProposalDecisions(stamped, agendas, changed, NOW)).toEqual([]);
+    // The agenda is closed (or withdrawn, or gone) before the operator
+    // confirmed D-0002: D-0001 was superseded, so it is never delivered as
+    // confirmed — unresolvable.
+    for (const agendasNow of [
+      [{ ...agendas[0], status: 'closed' as const }],
+      [{ ...agendas[0], status: 'withdrawn' as const }],
+      [],
+    ]) {
+      expect(taskProposalHolds(stamped, agendasNow, changed, NOW)).toEqual([
+        { proposal_id: id, collected: true, unresolvable: true },
+      ]);
+      expect(resolvedTaskProposalDecisions(stamped, agendasNow, changed, NOW)).toEqual([]);
+    }
+    // Superseded by a later record but still marked active (a ledger written
+    // before the mark): the supersedes link alone is enough.
+    const linked = [
+      first,
+      {
+        ...customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel'),
+        supersedes: 'D-0001',
+      },
+    ];
+    expect(taskProposalHolds(stamped, [], linked, NOW)).toEqual([
+      { proposal_id: id, collected: true, unresolvable: true },
+    ]);
+    // The agenda is gone and the released decision still stands: delivered.
+    expect(taskProposalHolds(stamped, [], [first], NOW)).toEqual([
+      { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+    ]);
+    expect(resolvedTaskProposalDecisions(stamped, [], [first], NOW)).toMatchObject([
+      { decision_id: 'D-0001', value: 'date-alpha-sentinel' },
+    ]);
+    // No confirmed decision is left (never released, or the ledger lost it):
+    // unresolvable — held for good, never released.
+    const closed = [{ ...agendas[0], status: 'closed' as const }];
+    const unstamped = lockFor(agendas);
+    expect(taskProposalHolds(unstamped, closed, changed, NOW)).toEqual([
+      { proposal_id: id, collected: true, unresolvable: true },
+    ]);
+    expect(taskProposalHolds(stamped, [], [], NOW)).toEqual([
+      { proposal_id: id, collected: true, unresolvable: true },
+    ]);
+    expect(resolvedTaskProposalDecisions(stamped, [], [], NOW)).toEqual([]);
+  });
+
+  it('a lock that completed once trusts its release: a later change is not a new hold', () => {
+    const agendas = [withRelease(['D-0001'])];
+    const id = taskProposalId(consumer, 'RELEASE', 'release.date');
+    const first = customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel');
+    const stamped = lockFor(agendas).decisions.map((entry) =>
+      entry.proposal?.proposal_id === id
+        ? {
+            ...entry,
+            proposal: { ...entry.proposal, resolved: { decision_id: 'D-0001', at: NOW } },
+          }
+        : entry
+    );
+    const changed = [
+      { ...first, status: 'superseded' as const },
+      customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel'),
+    ];
+    for (const lock of [
+      { decisions: stamped, status: 'completed' as const, completed_at: NOW },
+      // Re-pinned for a new run after completion: still completed once.
+      { decisions: stamped, status: 'in_progress' as const, completed_at: NOW },
+    ]) {
+      expect(taskProposalHolds(lock, agendas, changed, NOW)).toEqual([
+        { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+      ]);
+      // Not re-held, but the superseded value is never delivered: the task is told.
+      expect(resolvedTaskProposalDecisions(lock, agendas, changed, NOW)).toEqual([]);
+      expect(unconfirmedTaskProposals(lock, agendas, changed, NOW)).toEqual([
+        { proposal_id: id, reason: 'changed_after_completion' },
+      ]);
+      // The ledger lost the released decision: the same, with its own reason.
+      expect(unconfirmedTaskProposals(lock, agendas, [], NOW)).toEqual([
+        { proposal_id: id, reason: 'decision_not_recorded' },
+      ]);
+      // Still standing: delivered, nothing to say.
+      expect(resolvedTaskProposalDecisions(lock, agendas, [first], NOW)).toMatchObject([
+        { decision_id: 'D-0001', value: 'date-alpha-sentinel' },
+      ]);
+      expect(unconfirmedTaskProposals(lock, agendas, [first], NOW)).toEqual([]);
+    }
+    // Never completed: the change re-opens the hold.
+    expect(
+      taskProposalHolds({ decisions: stamped, status: 'in_progress' }, agendas, changed, NOW)
+    ).toEqual([{ proposal_id: id, collected: true }]);
+  });
+
+  it('holds and the resolver read the same entry when the lock has no entry id', () => {
+    const agendas = [withRelease(['D-0001'])].map((item) => ({
+      ...item,
+      entries: item.entries.map((entry) =>
+        entry.entry_id === 'release'
+          ? { ...entry, entry_id: taskProposalId(consumer, 'RELEASE', 'release.date') }
+          : entry
+      ),
+      operator_confirmations: [
+        {
+          entry_id: taskProposalId(consumer, 'RELEASE', 'release.date'),
+          decision_id: 'D-0001',
+          by: 'user:boss',
+          at: NOW,
+        },
+      ],
+    }));
+    const lock = {
+      decisions: lockFor(agendas).decisions.map((entry) => {
+        if (entry.layer !== 'task_proposal' || !entry.proposal?.requires_customer) return entry;
+        const { entry_id: _dropped, ...rest } = entry;
+        return rest;
+      }),
+    };
+    const ledger = [customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel')];
+    expect(taskProposalHolds(lock, agendas, ledger, NOW)[0]).toMatchObject({
+      resolved_decision_id: 'D-0001',
+    });
+    expect(resolvedTaskProposalDecisions(lock, agendas, ledger, NOW)).toMatchObject([
+      { decision_id: 'D-0001' },
+    ]);
   });
 });

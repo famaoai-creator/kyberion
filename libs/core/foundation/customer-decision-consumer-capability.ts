@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import * as path from 'node:path';
+import { caseRecordCanonicalJson } from './customer-decision-milestone-capability.js';
 import type { ResourceAccessScope } from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
@@ -196,20 +197,7 @@ function asRecord(value: unknown): JsonRecord | undefined {
     : undefined;
 }
 
-function sortKeys(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortKeys);
-  if (value && typeof value === 'object') {
-    return Object.keys(value as JsonRecord)
-      .sort()
-      .reduce<JsonRecord>((acc, key) => {
-        acc[key] = sortKeys((value as JsonRecord)[key]);
-        return acc;
-      }, {});
-  }
-  return value;
-}
-
-const canonical = (value: unknown) => JSON.stringify(sortKeys(value));
+const canonical = caseRecordCanonicalJson;
 
 function parseJson(text: string | undefined): unknown {
   if (text === undefined) return undefined;

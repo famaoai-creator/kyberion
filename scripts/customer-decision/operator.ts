@@ -66,7 +66,10 @@ import {
   tenantApprovalScope,
   statusCommand,
 } from './common.js';
-import { findTenantCustomerChannelBinding } from '@agent/core/customer-channel-binding';
+import {
+  findTenantCustomerChannelBinding,
+  isActiveCustomerTenant,
+} from '@agent/core/customer-channel-binding';
 import { reconcileCase } from './reconcile.js';
 
 // ---------------------------------------------------------------------------
@@ -649,6 +652,15 @@ export function runSend(opts: Record<string, string>, now: string): unknown {
   const caseId = requireOpt(opts, 'case');
   const location = locationOf(opts, caseId);
   const agendaId = requireOpt(opts, 'agenda');
+  // CD-10: invites exist only for a registered active tenant (the guard enforces
+  // the same rule on the store); refuse before anything is issued or written.
+  if (!isActiveCustomerTenant(tenant)) {
+    throw new ScriptExitError(
+      2,
+      `[CD_INVITE_TENANT_NOT_REGISTERED] tenant ${tenant} is not a registered active tenant, so no invite can be sent | ` +
+        `register or reactivate it (knowledge/personal/tenants/${tenant}.json, status active — pnpm onboarding) and send again`
+    );
+  }
   return withCaseLock(location, () => sendLocked(opts, now, tenant, location, agendaId));
 }
 
