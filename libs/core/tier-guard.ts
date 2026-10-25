@@ -1234,6 +1234,7 @@ export function validateWritePermission(
 
   // Dedicated-store tenant partitions skip runtime defaults (tier-guard-tenant-store-partitions.ts).
   const storeDecision = tenantStorePartitionWriteDecision(policy, relativePath, identity, {
+    operation,
     sudoAllows: (scope) => hasScopedSudoAccess(relativePath, scope),
     matches: (p) => policyPathMatches(relativePath, p, currentMission, tenantSlug),
   });

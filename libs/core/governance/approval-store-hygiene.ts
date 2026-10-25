@@ -9,7 +9,7 @@ import {
   resolveGovernedArtifactPath,
   type GovernedArtifactRole,
 } from '../workforce/artifact-store.js';
-import { withExecutionContext } from '../authority.js';
+import { resolveIdentityContext, withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeUnlinkSync } from '../secure-io.js';
 import { approvalRequestLogicalPath, approvalStoreRoots } from './approval-store-paths.js';
@@ -28,11 +28,13 @@ import {
   TENANT_ACTIVATION_REQUEST_KIND,
   TENANT_ACTIVATION_STORAGE_CHANNEL,
   tenantApprovalPartitionLogicalRoot,
+  writeApprovalJsonAt,
   writeLocatedApprovalRequest,
   type ApprovalPartition,
   type ApprovalTenantPartition,
 } from './approval-store-location.js';
 import { withApprovalRecordLock } from './approval-apply-claim.js';
+import { withApprovalPasskeyChallengeLock } from './approval-passkey-challenge.js';
 import { auditChain } from './audit-chain.js';
 import { isTenantActivationActive } from '../organization/tenant-activation.js';
 import { appendRetentionAudit, softDeleteToTrash, TRASH_REPO_SUBPATH } from '../storage-janitor.js';
@@ -327,9 +329,9 @@ export function purgeFixtureApprovals(options: {
   for (const candidate of candidates) {
     try {
       const absolute = pathResolver.resolve(candidate.logicalPath);
-      // A tenant partition file is probed as that tenant's store role, after
-      // the caller's own per-channel read grant (approval-store-location.ts;
-      // an unbound caller may bind any tenant; a bound one only its own). The
+      // A tenant partition file is probed as that tenant's store role
+      // (approval-store-location.ts; an unbound caller may bind any tenant, a
+      // bound one only its own; reads are not role-confined). The
       // trash move itself runs as the sovereign caller, as offboarding does.
       if (
         candidate.partition.kind === 'tenant' &&
@@ -640,6 +642,9 @@ export function migrateLegacyTenantApproval(
         );
       }
     }
+    // The request's passkey challenges live beside it: move them in the same
+    // locked step, before the system copy of the request goes away.
+    const challenges = migrateLegacyPasskeyChallenges(role, partition, storageChannel, requestId);
     withExecutionContext(role, () => {
       const absolute = resolveGovernedArtifactPath(from);
       if (safeExistsSync(absolute)) safeUnlinkSync(absolute);
@@ -655,10 +660,70 @@ export function migrateLegacyTenantApproval(
         storage_channel: storageChannel,
         partition_tier: partition.tier,
         outcome,
+        passkey_challenges_moved: challenges,
       },
     });
     return outcome;
   });
+}
+
+/**
+ * Move the system-tree passkey challenges bound to `requestId` into the
+ * partition (caller holds the record lock; each challenge also under its own
+ * lock). Idempotent: an identical partition copy only has the system copy
+ * removed; a different one refuses `[APPROVAL_MIGRATION_CONFLICT]` before the
+ * request's system copy is removed. Each copy is read back before the system
+ * copy is deleted. Returns how many were moved or de-duplicated.
+ */
+function migrateLegacyPasskeyChallenges(
+  role: GovernedArtifactRole,
+  partition: ApprovalTenantPartition,
+  storageChannel: string,
+  requestId: string
+): number {
+  const fromDir = approvalPasskeyChallengesLogicalDirAt(SYSTEM_APPROVAL_PARTITION, storageChannel);
+  const toDir = approvalPasskeyChallengesLogicalDirAt(partition, storageChannel);
+  let moved = 0;
+  for (const entry of listApprovalDirAt(SYSTEM_APPROVAL_PARTITION, fromDir)) {
+    if (!entry.endsWith('.json')) continue;
+    const challengeId = entry.slice(0, -'.json'.length);
+    const from = `${fromDir}/${entry}`;
+    const to = `${toDir}/${entry}`;
+    let bound: boolean;
+    try {
+      const probe = readApprovalJsonAt<{ request_id?: unknown }>(SYSTEM_APPROVAL_PARTITION, from);
+      bound = probe?.request_id === requestId;
+    } catch {
+      continue; // an unreadable challenge is not this request's to move
+    }
+    if (!bound) continue;
+    withApprovalPasskeyChallengeLock(storageChannel, challengeId, () => {
+      const system = readApprovalJsonAt<Record<string, unknown>>(SYSTEM_APPROVAL_PARTITION, from);
+      if (!system) return;
+      const existing = readApprovalJsonAt<Record<string, unknown>>(partition, to);
+      if (existing && canonicalJson(existing) !== canonicalJson(system)) {
+        throw new Error(
+          `[APPROVAL_MIGRATION_CONFLICT] the ${partition.tier} tenant partition already holds passkey challenge ${storageChannel}/${challengeId} with different content | ` +
+            'next: compare both copies, keep one and remove the other; the request was not moved out of the system tree | ' +
+            `evidence: ${from}`
+        );
+      }
+      if (!existing) {
+        writeApprovalJsonAt(role, partition, to, system, { fsync: true });
+        const readBack = readApprovalJsonAt<Record<string, unknown>>(partition, to);
+        if (!readBack || canonicalJson(readBack) !== canonicalJson(system)) {
+          throw new Error(
+            `[APPROVAL_MIGRATION_READBACK_FAILED] the partition copy of passkey challenge ${storageChannel}/${challengeId} does not read back as written | ` +
+              'next: inspect the partition copy; the system copies were kept | ' +
+              `evidence: ${to}`
+          );
+        }
+      }
+      removeApprovalFileAt(role, SYSTEM_APPROVAL_PARTITION, from);
+      moved += 1;
+    });
+  }
+  return moved;
 }
 
 export interface TenantPartitionMigrationResult extends ApprovalSweepResult<LegacyTenantApprovalRecord> {
@@ -676,7 +741,13 @@ export function migrateTenantApprovalPartitions(options: {
   isTenantActive?: (record: ApprovalRequestRecord) => boolean;
 }): TenantPartitionMigrationResult {
   const role = options.role ?? 'infrastructure_sentinel';
-  const records = options.records ?? withExecutionContext(role, listSystemTreeApprovalRequests);
+  // Keep the caller's tenant binding inside the assumed role (as
+  // withApprovalRecordLock does): a binding that comes only from the execution
+  // scope must still hide other tenants' legacy records.
+  const callerTenant = resolveIdentityContext().tenantSlug || undefined;
+  const records =
+    options.records ??
+    withExecutionContext(role, listSystemTreeApprovalRequests, undefined, callerTenant);
   const candidates = findLegacyTenantApprovals(records, {
     ...(options.isTenantActive ? { isTenantActive: options.isTenantActive } : {}),
   });

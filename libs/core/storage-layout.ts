@@ -225,7 +225,8 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
 
 /**
  * Partitioned ledger roots whose tenant partitions belong to one dedicated,
- * tenant-bound store role (`<root>/<personal|confidential>/<tenant>/…`). These
+ * tenant-bound store role (`<root>/<tier>/<tenant>/…`, every tier including
+ * `public`, which the stores never use but must not leave open). These
  * partitions are authority evidence (hash-chained audit entries, approval
  * decisions), so tier-guard does not let broad runtime defaults or other roles'
  * grants write them: only SUDO, a persona grant, or the store role's own grant
@@ -245,14 +246,16 @@ export const TENANT_STORE_LEDGER_ROOTS = {
 export interface TenantStoreLedgerPartition {
   root: string;
   storeRole: string;
-  tier: 'personal' | 'confidential';
+  tier: StorageDataTier;
+  /** Empty for the bare tier directory itself (`<root>/<tier>`). */
   tenant: string;
 }
 
 /**
  * The tenant partition of a dedicated-store ledger root a repo-relative (or
  * absolute, under this root) path lies in — the tenant directory itself or
- * anything below it — or undefined.
+ * anything below it, in any storage tier — or undefined. The bare tier
+ * directory (`<root>/<tier>`) is reported with an empty `tenant`.
  */
 export function tenantStoreLedgerPartitionOf(
   filePath: string
@@ -260,9 +263,9 @@ export function tenantStoreLedgerPartitionOf(
   const relative = toPosixRelative(filePath);
   for (const { root, storeRole } of Object.values(TENANT_STORE_LEDGER_ROOTS)) {
     if (!relative.startsWith(root + '/')) continue;
-    const [tier, tenant] = relative.slice(root.length + 1).split('/');
-    if ((tier === 'personal' || tier === 'confidential') && tenant) {
-      return { root, storeRole, tier, tenant };
+    const [tier, tenant = ''] = relative.slice(root.length + 1).split('/');
+    if (STORAGE_DATA_TIERS.includes(tier as StorageDataTier)) {
+      return { root, storeRole, tier: tier as StorageDataTier, tenant };
     }
   }
   return undefined;

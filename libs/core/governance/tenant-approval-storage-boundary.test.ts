@@ -159,6 +159,17 @@ describe('tenant approval partitions use real secure-io tier and tenant boundari
         /tenant store partition/
       );
     });
+    // The rule covers every tier (public too, though the store never uses it)
+    // and files at the bare tier directory; creating that directory stays open.
+    asCaller('slack_bridge', () => {
+      expect(guard.validateWritePermission(recordFile(TENANT, 'public')).allowed).toBe(false);
+      expect(guard.validateWritePermission(path.join(ROOT, STORE, 'confidential')).allowed).toBe(
+        false
+      );
+      expect(
+        guard.validateWritePermission(path.join(ROOT, STORE, 'confidential'), 'mkdir').allowed
+      ).toBe(true);
+    });
     // A broad role grant (mission_controller: active/shared/) does not either.
     asCaller('mission_controller', () =>
       expect(() => safeWriteFile(recordFile(TENANT), 'forged')).toThrow(/tenant store partition/)

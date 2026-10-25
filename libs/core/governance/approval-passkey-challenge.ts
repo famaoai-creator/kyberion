@@ -139,6 +139,18 @@ function writeChallenge(
   );
 }
 
+/**
+ * The per-challenge lock every challenge transition takes; exported for the
+ * approval store hygiene migration, which moves a challenge between locations.
+ */
+export function withApprovalPasskeyChallengeLock<T>(
+  storageChannel: string,
+  challengeId: string,
+  fn: () => T
+): T {
+  return withChallengeLock(storageChannel, challengeId, fn);
+}
+
 function withChallengeLock<T>(storageChannel: string, challengeId: string, fn: () => T): T {
   return withLockSync(
     `approval-passkey-challenge-${channelSegment(storageChannel)}-${challengeId.toLowerCase()}`,
