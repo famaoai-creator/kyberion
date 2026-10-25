@@ -23,6 +23,7 @@ import {
   safeLstat,
   safeMkdir,
   safeRmSync,
+  safeWriteFile,
 } from '../secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';
@@ -356,15 +357,63 @@ function boundItemAttempts(item: WorkItem): WorkItem {
   return { ...item, attempts: attempts.slice(-MAX_RETAINED_ITEM_ATTEMPTS) };
 }
 
+/**
+ * Store growth guard: the append-only stores are also the read path, and
+ * `readJsonLines` enforces the secure 100 MB read cap — a store that grows past
+ * it self-DoSes every reader, including the janitor that exists to compact it
+ * (observed: one crash-looping item inflated items.jsonl to 100 MB and halted
+ * all `pnpm work` commands). Appends run inside the coordination mutation
+ * fence, so once a store crosses the threshold we fold it in place: latest
+ * record per key, keyless rows verbatim, original archived under
+ * `active/archive/jsonl-compaction/` matching the janitor's layout.
+ */
+const APPEND_ONLY_COMPACT_AT_BYTES = 64 * 1024 * 1024;
+const COMPACTION_ARCHIVE_REPO_SUBPATH = 'active/archive/jsonl-compaction';
+
+function maybeCompactAppendOnlyStore(filePath: string, keyField: string): void {
+  const stat = safeLstat(filePath);
+  if (!stat.isFile() || stat.size < APPEND_ONLY_COMPACT_AT_BYTES) return;
+  const records = readJsonLines<Record<string, unknown>>(filePath);
+  const lastIndex = new Map<string, number>();
+  records.forEach((record, index) => {
+    const key = record[keyField];
+    if (typeof key === 'string' && key) lastIndex.set(key, index);
+  });
+  const kept = records.filter((record, index) => {
+    const key = record[keyField];
+    return typeof key !== 'string' || !key || lastIndex.get(key) === index;
+  });
+  const stamp = nowIso().replace(/[-:]/g, '').replace(/\..*$/, '');
+  const repoRel = path
+    .relative(pathResolver.rootDir(), filePath)
+    .split(path.sep)
+    .join('/');
+  const archivePath = assertSafeRepositoryPath(
+    path.resolve(
+      pathResolver.rootDir(),
+      COMPACTION_ARCHIVE_REPO_SUBPATH,
+      `${repoRel.replace(/\.jsonl$/, '')}.${stamp}Z-${process.pid}.jsonl`
+    ),
+    { allowMissingLeaf: true }
+  );
+  safeMkdir(path.dirname(archivePath), { recursive: true });
+  safeWriteFile(archivePath, records.map((r) => JSON.stringify(r)).join('\n') + '\n');
+  safeWriteFile(filePath, kept.map((r) => JSON.stringify(r)).join('\n') + '\n');
+}
+
 function appendItemSnapshot(item: WorkItem): WorkItem {
   const bounded = boundItemAttempts(item);
   validateWorkItem(bounded);
-  appendJsonl(itemsPath(), bounded);
+  const file = itemsPath();
+  appendJsonl(file, bounded);
+  maybeCompactAppendOnlyStore(file, 'item_id');
   return bounded;
 }
 
 function appendLeaseSnapshot(lease: WorkLease): WorkLease {
-  appendJsonl(leasesPath(), lease);
+  const file = leasesPath();
+  appendJsonl(file, lease);
+  maybeCompactAppendOnlyStore(file, 'lease_id');
   return lease;
 }
 
@@ -1086,6 +1135,19 @@ export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; 
   return withCoordinationMutation(() => releaseWorkItemInternal(input));
 }
 
+/** Trailing run of attempts that ended 'released' carrying a failed execution status. */
+function countTrailingFailedReleases(attempts: readonly WorkItemAttempt[]): number {
+  let count = 0;
+  for (let i = attempts.length - 1; i >= 0; i--) {
+    const attempt = attempts[i];
+    const executionStatus = (attempt.metadata as Record<string, unknown> | undefined)
+      ?.execution_status;
+    if (attempt.status === 'released' && executionStatus === 'failed') count++;
+    else break;
+  }
+  return count;
+}
+
 function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
   item: WorkItem;
   lease: WorkLease;
@@ -1137,9 +1199,21 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
     metadata: input.metadata,
   });
 
+  // Poison-pill guard on the normal release path (mirrors the reaper's lease
+  // budget): a worker that claims, fails its delegation and releases back to
+  // ready is instantly re-claimable, and was observed churning one item every
+  // ~30 s indefinitely — thousands of snapshots that pushed the append-only
+  // store past its read cap. Count trailing consecutive attempts released
+  // with a failed execution status; past the error budget the item parks as
+  // blocked instead of returning to ready.
+  const trailingFailures = countTrailingFailedReleases(finalAttempt.attempts);
+  const requestedStatus = input.nextStatus || 'ready';
+  const shouldPark =
+    requestedStatus === 'ready' && trailingFailures >= DEFAULT_MAX_ERROR_ATTEMPTS;
+
   const next: WorkItem = appendItemSnapshot({
     ...current,
-    status: input.nextStatus || 'ready',
+    status: shouldPark ? 'blocked' : requestedStatus,
     effect_ownership: effectOwnership,
     version: current.version + 1,
     updated_at: now,
@@ -1151,7 +1225,27 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
     claimed_by_user_id: undefined,
     current_attempt_id: finalAttempt.currentAttemptId,
     attempts: finalAttempt.attempts,
+    ...(shouldPark
+      ? {
+          metadata: {
+            ...(current.metadata || {}),
+            ...(input.metadata || {}),
+            parked: true,
+            parked_at: now,
+            parked_reason: `release-path attempt budget exhausted (consecutive failures=${trailingFailures}/${DEFAULT_MAX_ERROR_ATTEMPTS})`,
+          },
+        }
+      : {}),
   });
+
+  if (shouldPark) {
+    appendEvent({
+      eventType: 'item_blocked',
+      itemId: next.item_id,
+      status: 'blocked',
+      note: `parked on release: ${trailingFailures} consecutive failed attempts`,
+    });
+  }
 
   appendLeaseEvent(
     'item_released',
@@ -1292,6 +1386,7 @@ export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): Reap
 
 function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWorkLeasesResult {
   const now = options.now ?? nowIso();
+  const nowMs = new Date(now).getTime();
   const maxClaims = options.maxClaimAttempts ?? DEFAULT_MAX_CLAIM_ATTEMPTS;
   const maxErrors = options.maxErrorAttempts ?? DEFAULT_MAX_ERROR_ATTEMPTS;
   const expired = expireWorkItemLeasesInternal(now);
@@ -1403,6 +1498,62 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
       });
       recovered.push(next);
     }
+  }
+
+  // Orphaned-attempt reconcile: an item already back at a non-running status
+  // (e.g. reset to ready/blocked by an operator while its lease was gone) can
+  // still carry a `running` attempt whose lease no longer exists. Left alone it
+  // poisons the record forever — claim-side only checks leases, so the item is
+  // claimable while its own history claims an executor is still mid-flight.
+  // Finalize the stale attempt so every attempt reaches a coherent terminal
+  // state or a provably live lease.
+  for (const item of currentWorkItems()) {
+    if (item.status === 'in_progress') continue;
+    if (options.itemFilter && !options.itemFilter(item)) continue;
+    const runningAttempt = (item.attempts || []).find(
+      (attempt) => attempt.status === 'running' && !attempt.ended_at
+    );
+    if (!runningAttempt) continue;
+    if (activeLeaseForItem(item.item_id)) continue;
+    const lease = currentLeaseById(runningAttempt.lease_id);
+    if (lease?.status === 'active' && new Date(lease.expires_at).getTime() > nowMs) continue;
+
+    const index = (item.attempts || []).findIndex(
+      (attempt) => attempt.run_id === runningAttempt.run_id
+    );
+    const attempts = [...(item.attempts || [])];
+    attempts[index] = {
+      ...runningAttempt,
+      status: 'released',
+      ended_at: now,
+      failure_reason: 'lease_lost',
+      summary: 'running attempt orphaned without a live lease; reconciled by reaper',
+    };
+    const next = appendItemSnapshot({
+      ...item,
+      version: item.version + 1,
+      updated_at: now,
+      current_attempt_id:
+        item.current_attempt_id === runningAttempt.run_id ? undefined : item.current_attempt_id,
+      attempts,
+    });
+    appendWorkItemAttemptEvent(
+      'item_attempt_released',
+      item.item_id,
+      attempts[index],
+      'orphaned running attempt reconciled (lease lost)',
+      undefined,
+      undefined,
+      item.version
+    );
+    appendEvent({
+      eventType: 'item_updated',
+      itemId: item.item_id,
+      status: item.status,
+      note: `stale running attempt ${runningAttempt.run_id} reconciled (lease lost)`,
+      expectedVersion: item.version,
+    });
+    recovered.push(next);
   }
 
   return { expired, recovered, parked, replayed };

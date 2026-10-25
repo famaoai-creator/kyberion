@@ -8,6 +8,7 @@ import { pathResolver, findMissionPath } from '@agent/core/path-resolver';
 import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission/mission-next-task-reader';
 import { loadState } from '@agent/core/mission/mission-state';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
+import { listWorkItems, updateWorkItem } from '@agent/core/workforce/work-coordination';
 import {
   runContinuousWorkOwner,
   type ContinuousWorkOwnerPorts,
@@ -399,10 +400,31 @@ export function createContinuousOwnerPorts(
           '--dispatch-statuses',
           'ready',
           '--dispatch-final-status',
-          'review',
+          'done',
         ],
         input
       );
+      // Rework loop-back: with final-status 'done', an item can only land in
+      // 'review' when the independent review did not approve (or repair needs
+      // eyes). Return those items to 'ready' with the verdict noted so the
+      // next sweep re-dispatches them; bounded by rework_count so an
+      // unapprovable item still parks for the operator.
+      for (const item of listWorkItems()) {
+        if (item.status !== 'review') continue;
+        if (!(item.labels || []).includes(`mission:${input.mission_id}`)) continue;
+        const reworks = Number(item.metadata?.rework_count ?? 0);
+        if (reworks >= 2) continue;
+        updateWorkItem({
+          itemId: item.item_id,
+          status: 'ready',
+          metadata: {
+            ...(item.metadata || {}),
+            rework_count: reworks + 1,
+            rework_reason: 'landed at review — independent review not approved; requeued for rework',
+            rework_actor: 'continuous-work-owner',
+          },
+        });
+      }
       state = assertMissionScope(input);
       if (complete()) {
         await command(

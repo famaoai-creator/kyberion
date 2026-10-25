@@ -105,7 +105,12 @@ describe('continuous operations policy', () => {
       now
     )[0].proposal;
     expect(proposal).toMatchObject({ requested_decision: 'approve', continuous_work: work_plan });
-    expect(proposal.objective).toContain(JSON.stringify(work_plan));
+    // The card carries a compact mission index, not the serialized plan — the
+    // plan stays bound through proposal.continuous_work and the admission
+    // semantic hash, and the objective must fit the 1000-char card limit.
+    expect(proposal.objective).toContain('Managed work plan (mission, 1 mission(s))');
+    expect(proposal.objective).toContain('fix: Fix errors');
+    expect(proposal.objective.length).toBeLessThanOrEqual(950);
     expect(() =>
       parseContinuousOperationsConfig({
         ...scopedInput,
