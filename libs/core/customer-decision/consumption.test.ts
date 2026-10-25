@@ -15,6 +15,7 @@ import {
   pendingTaskProposals,
   reconcileConsumedDecisionLock,
   resolvedTaskProposalDecisions,
+  unconfirmedTaskProposals,
   taskProposalAgendaEntry,
   taskProposalHolds,
   taskProposalId,
@@ -741,19 +742,37 @@ describe('resolvedTaskProposalDecisions (CD-09 values for resumed tasks)', () =>
     ]);
     expect(resolvedTaskProposalDecisions(stamped, agendas, changed, NOW)).toEqual([]);
     // The agenda is closed (or withdrawn, or gone) before the operator
-    // confirmed D-0002: the last confirmed decision (the release's) stands.
+    // confirmed D-0002: D-0001 was superseded, so it is never delivered as
+    // confirmed — unresolvable.
     for (const agendasNow of [
       [{ ...agendas[0], status: 'closed' as const }],
       [{ ...agendas[0], status: 'withdrawn' as const }],
       [],
     ]) {
       expect(taskProposalHolds(stamped, agendasNow, changed, NOW)).toEqual([
-        { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+        { proposal_id: id, collected: true, unresolvable: true },
       ]);
-      expect(resolvedTaskProposalDecisions(stamped, agendasNow, changed, NOW)).toMatchObject([
-        { decision_id: 'D-0001', value: 'date-alpha-sentinel' },
-      ]);
+      expect(resolvedTaskProposalDecisions(stamped, agendasNow, changed, NOW)).toEqual([]);
     }
+    // Superseded by a later record but still marked active (a ledger written
+    // before the mark): the supersedes link alone is enough.
+    const linked = [
+      first,
+      {
+        ...customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel'),
+        supersedes: 'D-0001',
+      },
+    ];
+    expect(taskProposalHolds(stamped, [], linked, NOW)).toEqual([
+      { proposal_id: id, collected: true, unresolvable: true },
+    ]);
+    // The agenda is gone and the released decision still stands: delivered.
+    expect(taskProposalHolds(stamped, [], [first], NOW)).toEqual([
+      { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+    ]);
+    expect(resolvedTaskProposalDecisions(stamped, [], [first], NOW)).toMatchObject([
+      { decision_id: 'D-0001', value: 'date-alpha-sentinel' },
+    ]);
     // No confirmed decision is left (never released, or the ledger lost it):
     // unresolvable — held for good, never released.
     const closed = [{ ...agendas[0], status: 'closed' as const }];
@@ -791,6 +810,20 @@ describe('resolvedTaskProposalDecisions (CD-09 values for resumed tasks)', () =>
       expect(taskProposalHolds(lock, agendas, changed, NOW)).toEqual([
         { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
       ]);
+      // Not re-held, but the superseded value is never delivered: the task is told.
+      expect(resolvedTaskProposalDecisions(lock, agendas, changed, NOW)).toEqual([]);
+      expect(unconfirmedTaskProposals(lock, agendas, changed, NOW)).toEqual([
+        { proposal_id: id, reason: 'changed_after_completion' },
+      ]);
+      // The ledger lost the released decision: the same, with its own reason.
+      expect(unconfirmedTaskProposals(lock, agendas, [], NOW)).toEqual([
+        { proposal_id: id, reason: 'decision_not_recorded' },
+      ]);
+      // Still standing: delivered, nothing to say.
+      expect(resolvedTaskProposalDecisions(lock, agendas, [first], NOW)).toMatchObject([
+        { decision_id: 'D-0001', value: 'date-alpha-sentinel' },
+      ]);
+      expect(unconfirmedTaskProposals(lock, agendas, [first], NOW)).toEqual([]);
     }
     // Never completed: the change re-opens the hold.
     expect(

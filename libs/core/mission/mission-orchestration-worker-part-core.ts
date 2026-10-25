@@ -115,12 +115,28 @@ export async function dispatchPlannedMissionTaskCore(
       mission_id: input.missionId,
     },
   });
-  // CD-09: pin the customer decisions this task starts on (no-op without a decision case).
-  const decisionPin = pinTaskDecisions({
-    missionId: input.missionId,
-    taskId: input.task.task_id,
-    mode: 'start',
-  });
+  // CD-09: pin the customer decisions this task starts on (no-op without a
+  // decision case). A failed pin is retried once.
+  const pinOnce = () =>
+    pinTaskDecisions({ missionId: input.missionId, taskId: input.task.task_id, mode: 'start' });
+  let decisionPin = pinOnce();
+  if (decisionPin?.failed) decisionPin = pinOnce();
+  const previousBlockedReason = previousWorkItem?.metadata?.blocked_reason;
+  // Is this task known to carry customer-decision proposals or holds? Only
+  // its WorkItem can say so when the case cannot be read.
+  const knownDecisionTask =
+    Boolean(previousWorkItem?.metadata?.customer_decision_hold) ||
+    (typeof previousBlockedReason === 'string' &&
+      CUSTOMER_DECISION_BLOCKED_REASONS.includes(previousBlockedReason));
+  if (decisionPin?.failed && !knownDecisionTask) {
+    // Not known to wait for anything: not blocked, not run on a guess either —
+    // left planned for the next dispatch round.
+    logger.warn(
+      `task ${input.task.task_id} not dispatched — its customer decision pin failed twice${decisionPin.failed.case_found ? ' on a known case' : ''} | it stays planned and is retried on the next dispatch; check that the decision case is readable | mission=${input.missionId} consumer=${decisionPin.consumer}${decisionPin.failed.case_id ? ` case=${decisionPin.failed.case_id}` : ''}`
+    );
+    input.task.status = 'planned';
+    return null;
+  }
   const claimed = claimWorkItem({
     itemId: workItem.item_id,
     actorPeerId: 'mission-orchestration-worker',
@@ -140,17 +156,11 @@ export async function dispatchPlannedMissionTaskCore(
   });
   // CD-09: a task whose own requires_customer question has no confirmed
   // decision waits, undispatched (the hold re-opens if the customer changed
-  // an answer after the release); so does one whose pin could not be made
-  // when its case is known or it was already held — never run on a guess.
-  const previousBlockedReason = previousWorkItem?.metadata?.blocked_reason;
+  // an answer after the release); so does a task known to carry proposals or
+  // holds whose pin could not be made — never run on a guess.
   const pinnedHold = decisionPin?.held;
-  const pinFailed =
-    decisionPin?.failed &&
-    (decisionPin.failed.case_found ||
-      (typeof previousBlockedReason === 'string' &&
-        CUSTOMER_DECISION_BLOCKED_REASONS.includes(previousBlockedReason)))
-      ? decisionPin.failed
-      : undefined;
+  // Still failing, and the task is known to carry proposals or holds.
+  const pinFailed = decisionPin?.failed;
   if (decisionPin && (pinnedHold || pinFailed)) {
     const unresolvable = pinnedHold?.reason === 'customer_decision_unresolvable';
     const blockedReason = pinFailed
@@ -162,8 +172,9 @@ export async function dispatchPlannedMissionTaskCore(
       ? `resume the mission once the decision case is readable: pnpm mission resume ${input.missionId}`
       : unresolvable
         ? // No customer-decision verb asks a collected question again or lets the
-          // operator decide a requires_customer entry: the task itself must change.
-          `the question's agenda was closed or withdrawn with no confirmed answer and cannot be asked again: adjust or replace the task in NEXT_TASKS, then pnpm mission resume ${input.missionId}`
+          // operator decide a requires_customer entry, and the lock (keyed by
+          // mission and task id) never drops a proposal: only a new task id helps.
+          `the question's agenda was closed or withdrawn with no confirmed answer and cannot be asked again: replace it with a task under a new task id in NEXT_TASKS, then pnpm mission resume ${input.missionId}`
         : `collect and send the question if it is not on an agenda yet (customer-decision draft --from-tasks), confirm the customer's answer (customer-decision confirm), then pnpm mission resume ${input.missionId}`;
     if (pinFailed) {
       logger.warn(
@@ -348,8 +359,20 @@ export async function dispatchPlannedMissionTaskCore(
       missionId: input.missionId,
       taskId: input.task.task_id,
       operation: 'task_decisions_delivered',
-      // The route failed after the prompt went out: the agent may have seen it.
-      ...(attempted ? { reason: 'attempted' } : {}),
+      // `attempted`: the route failed after the prompt went out (the agent may
+      // have seen it); `changed_after_completion` / `decision_not_recorded`:
+      // the prompt told a completed task it has no confirmed value for these.
+      ...(attempted || decisionValues.unconfirmedReasons.length > 0
+        ? {
+            reason: [
+              ...(attempted ? ['attempted'] : []),
+              ...decisionValues.unconfirmedReasons,
+            ].join(','),
+          }
+        : {}),
+      ...(decisionValues.unconfirmedProposalIds.length > 0
+        ? { proposalIds: decisionValues.unconfirmedProposalIds }
+        : {}),
     });
     if (attempted) return;
     try {

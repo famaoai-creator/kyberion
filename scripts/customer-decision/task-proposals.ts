@@ -315,7 +315,7 @@ export function taskProposalStatus(
       ...(resolved ? { next: `pnpm mission resume ${lock.mission_id}` } : {}),
       ...(unresolvable
         ? {
-            next: `the question cannot be asked again: adjust or replace task ${lock.task_id} in NEXT_TASKS, then pnpm mission resume ${lock.mission_id}`,
+            next: `the question cannot be asked again: replace task ${lock.task_id} with a task under a new task id in NEXT_TASKS, then pnpm mission resume ${lock.mission_id}`,
           }
         : {}),
     };
