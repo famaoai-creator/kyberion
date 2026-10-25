@@ -509,7 +509,9 @@ function removeWorkspaceFromDisk(record: WorkspaceRecord, resolved: string): boo
     }
     const result = safeExecResult('git', ['worktree', 'remove', '--force', resolved], {
       cwd: record.repoRoot ?? rootDir(),
-      timeoutMs: 60_000,
+      // Agent worktrees carry node_modules + dist: recursive deletion takes
+      // minutes, so 60s always ended in ETIMEDOUT before the tree was gone.
+      timeoutMs: 600_000,
     });
     if (result.status !== 0) {
       throw new Error(
@@ -561,7 +563,13 @@ export function deleteRegisteredWorkspace(
   guard: DeleteWorkspaceGuard = {}
 ): DeleteWorkspaceResult {
   const probed = probeWorktreeBeforeLock(id, options, guard);
-  return mutateLedger(options, (records) => {
+  // The disk delete runs OUTSIDE the ledger lock: `git worktree remove` on a
+  // node_modules-bearing agent worktree takes minutes, and holding the 5s-
+  // acquisition ledger lock across it would LOCK_TIMEOUT every concurrent
+  // writer. Phase 1 only validates; the record stays so a failed delete is
+  // retryable. Phase 2 drops the record, keyed on id+path so a record
+  // re-registered at a different path in between is left alone.
+  const staged = mutateLedger(options, (records) => {
     const record = records.find((candidate) => candidate.id === id);
     if (!record) throw new Error(`[WORKSPACE_NOT_REGISTERED] no workspace with id ${id}`);
     if (guard.expect) assertSnapshotMatches(record, guard.expect);
@@ -577,12 +585,15 @@ export function deleteRegisteredWorkspace(
     if (resolved !== record.path) {
       throw new Error(`[WORKSPACE_PATH] ledger path is not canonical: ${record.path}`);
     }
-    const removedFromDisk = removeWorkspaceFromDisk(record, resolved);
-    return {
-      records: records.filter((candidate) => candidate.id !== id),
-      result: { record, removedFromDisk, deletedAt: nowIsoOf(options) },
-    };
+    return { records: null, result: { record, resolved } };
   });
+  const removedFromDisk = removeWorkspaceFromDisk(staged.record, staged.resolved);
+  return mutateLedger(options, (records) => ({
+    records: records.filter(
+      (candidate) => !(candidate.id === id && candidate.path === staged.record.path)
+    ),
+    result: { record: staged.record, removedFromDisk, deletedAt: nowIsoOf(options) },
+  }));
 }
 
 /**
