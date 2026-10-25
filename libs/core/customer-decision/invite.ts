@@ -200,34 +200,49 @@ function writeInvite(invite: CustomerDecisionInvite, expectedGeneration: string 
         );
       }
       try {
-        safeMkdir(path.dirname(filePath), { recursive: true });
+        // A new record may need its partition; an update writes beside an
+        // existing record (the guard refuses every mkdir of an inactive tenant).
+        if (expectedGeneration === null) safeMkdir(path.dirname(filePath), { recursive: true });
+        writeJson(filePath, validated);
       } catch (error) {
         throw tierPartitionError(invite.tenant_slug, error);
       }
-      writeJson(filePath, validated);
     })
   );
 }
 
+const TENANT_NOT_REGISTERED = '[CD_INVITE_TENANT_NOT_REGISTERED]';
+
+function isTenantNotRegistered(error: unknown): boolean {
+  return errorText(error).includes(TENANT_NOT_REGISTERED);
+}
+
 /**
- * The tier directory of the invite store (`…/confidential/`) is a protected
- * partition: the guard lets the invite store create it only for a tenant that
- * is registered and active (tier-guard `isScopedStructuralMkdir`). Name that
- * cause instead of the raw policy refusal; any other error passes through.
+ * The invite store writes only for a registered active tenant: the guard
+ * refuses the tier directory (`…/confidential/`, tier-guard
+ * `isScopedStructuralMkdir`) and every write / mkdir of the store role for an
+ * inactive tenant except a revoke (foundation/customer-decision-invite-write-content.ts).
+ * Name that cause instead of the raw policy refusal; any other error passes through.
  */
 function tierPartitionError(tenantSlug: string, error: unknown): unknown {
-  if (!errorText(error).includes('tenant.scope_invalid_prefix')) return error;
+  const text = errorText(error);
+  if (!text.includes('tenant.scope_invalid_prefix') && !text.includes(TENANT_NOT_REGISTERED))
+    return error;
   return new Error(
-    `[CD_INVITE_TENANT_NOT_REGISTERED] tenant '${tenantSlug}' is not a registered active tenant, so its customer decision invite partition cannot be created | ` +
+    `${TENANT_NOT_REGISTERED} tenant '${tenantSlug}' is not a registered active tenant, so its customer decision invites cannot be issued or used (only revoked) | ` +
       `register the tenant (knowledge/personal/tenants/${tenantSlug}.json, status active — pnpm onboarding) and send again | tenant=${tenantSlug}`
   );
 }
 
-/** Optimistic read-modify-write; retried because use logging races with revoke. */
+/**
+ * Optimistic read-modify-write; retried because use logging races with revoke.
+ * `mutate` returns null when the record needs no change (nothing is written).
+ * A refusal for an inactive tenant is final, never retried.
+ */
 function updateInvite(
   tenantSlug: string,
   inviteId: string,
-  mutate: (invite: CustomerDecisionInvite) => CustomerDecisionInvite
+  mutate: (invite: CustomerDecisionInvite) => CustomerDecisionInvite | null
 ): CustomerDecisionInvite {
   let lastError: unknown;
   for (let attempt = 0; attempt < 5; attempt++) {
@@ -236,10 +251,12 @@ function updateInvite(
       throw new Error('[CD_INVITE_UNAVAILABLE] invite store unavailable');
     if (current.kind !== 'found') throw new Error('[CD_INVITE_UNKNOWN] invite not found');
     const next = mutate(structuredClone(current.invite));
+    if (next === null) return current.invite;
     try {
       writeInvite(next, current.generation);
       return next;
     } catch (error) {
+      if (isTenantNotRegistered(error)) throw error;
       lastError = error;
     }
   }
@@ -334,14 +351,24 @@ export function verifyInviteToken(
   if (nowMs >= Date.parse(invite.expires_at)) return { ok: false, reason: 'expired' };
 
   if (opts.record === false) return { ok: true, invite };
-  const updated = updateInvite(tenantSlug, inviteId, (current) => {
-    current.uses = [
-      ...current.uses,
-      { at: new Date(nowMs).toISOString(), action: opts.action },
-    ].slice(-MAX_INVITE_USES);
-    return current;
-  });
-  return { ok: true, invite: updated };
+  try {
+    const updated = updateInvite(tenantSlug, inviteId, (current) => {
+      current.uses = [
+        ...current.uses,
+        { at: new Date(nowMs).toISOString(), action: opts.action },
+      ].slice(-MAX_INVITE_USES);
+      return current;
+    });
+    return { ok: true, invite: updated };
+  } catch (error) {
+    // The guard refuses the use record of an inactive tenant: the invite stops working.
+    if (!isTenantNotRegistered(error)) throw error;
+    logger.warn(
+      `customer decision invite use refused — the tenant is not a registered active tenant | ` +
+        `register or reactivate the tenant, or revoke the invite | tenant=${tenantSlug} invite=${inviteId}`
+    );
+    return { ok: false, reason: 'unavailable' };
+  }
 }
 
 export function revokeInvite(
@@ -352,10 +379,10 @@ export function revokeInvite(
   if (!opts.reason?.trim()) throw new Error('[CD_INVITE_INVALID] revoke reason is required');
   const nowIso = new Date(assertIso(opts.now, 'now')).toISOString();
   return updateInvite(tenantSlug, inviteId, (current) => {
-    if (!current.revoked_at) {
-      current.revoked_at = nowIso;
-      current.revoked_reason = opts.reason.trim();
-    }
+    // Already revoked: nothing to write (the first revoke stands).
+    if (current.revoked_at) return null;
+    current.revoked_at = nowIso;
+    current.revoked_reason = opts.reason.trim();
     return current;
   });
 }

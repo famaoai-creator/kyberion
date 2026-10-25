@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
@@ -185,8 +185,35 @@ function inviteDir(): string {
   );
 }
 
+/**
+ * CD-10: invites exist only for a registered active tenant. The registry
+ * profile lives in the checkout (`knowledge/personal/tenants/<t>.json`, read
+ * raw by the guard and by `isActiveCustomerTenant`); `null` removes it.
+ */
+function setTenantProfile(status: string | null): void {
+  const file = pathResolver.rootResolve(`knowledge/personal/tenants/${TENANT}.json`);
+  withExecutionContext(
+    'ecosystem_architect',
+    () =>
+      status === null
+        ? safeRmSync(file, { force: true })
+        : safeWriteFile(
+            file,
+            JSON.stringify({
+              tenant_slug: TENANT,
+              display_name: 'CD facade test',
+              status,
+              assigned_role: 'owner',
+            })
+          ),
+    'ecosystem_architect'
+  );
+}
+
 describe('customer-decision facade', () => {
   let dir: string;
+  beforeAll(() => setTenantProfile('active'));
+  afterAll(() => setTenantProfile(null));
   const run = (argv: string[], stdin?: string, now = NOW) =>
     runCustomerDecision(argv, { now: () => now, ...(stdin !== undefined ? { stdin } : {}) });
   const base = () => ['--tenant', TENANT, '--case', CASE, '--dir', dir];
@@ -976,6 +1003,76 @@ describe('customer-decision facade', () => {
         metadata: expect.objectContaining({ invite_id: inviteId }),
       })
     );
+  });
+
+  describe('a tenant that is not registered and active (CD-10)', () => {
+    afterEach(() => setTenantProfile('active'));
+
+    it('send refuses it before anything is issued', async () => {
+      const agendaId = await draftAgenda();
+      approveNext();
+      await run(['submit', ...base(), '--agenda', agendaId, '--by', 'user:alice']);
+      await run(['actor-add', ...base(), '--customer', 'acme', '--actor', ACTOR, '--name', 'CTO']);
+      for (const status of ['suspended', null]) {
+        setTenantProfile(status);
+        const refused = await run([
+          'send',
+          ...base(),
+          '--agenda',
+          agendaId,
+          '--name',
+          'Hanako',
+          '--role',
+          'decider',
+          '--actor',
+          ACTOR,
+        ]).catch((error: unknown) => error);
+        expect(refused).toBeInstanceOf(ScriptExitError);
+        expect((refused as ScriptExitError).code).toBe(2);
+        expect((refused as ScriptExitError).message).toContain('[CD_INVITE_TENANT_NOT_REGISTERED]');
+      }
+      expect(safeExistsSync(inviteDir())).toBe(false);
+      expect(agendaOf(agendaId).status).not.toBe('sent');
+      expect(mocks.audit).not.toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'invite_issue' })
+      );
+    });
+
+    it('the customer room answers unavailable; the operator can still revoke', async () => {
+      const { token, inviteId } = await approvedAndSent();
+      setTenantProfile('suspended');
+      mocks.audit.mockClear();
+      for (const verb of ['view', 'respond'] as const)
+        expect(await customerRun(verb, { token })).toEqual({
+          code: 1,
+          out: { ok: false, reason: 'unavailable' },
+        });
+      // The audit trace carries ids only: never the token or its secret.
+      expect(mocks.audit).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'invite_view',
+          result: 'failed',
+          reason: 'CD_INVITE_TENANT_NOT_REGISTERED',
+          metadata: { invite_id: inviteId, diagnostic_code: 'CD_INVITE_TENANT_NOT_REGISTERED' },
+        })
+      );
+      expect(JSON.stringify(mocks.audit.mock.calls)).not.toContain(token);
+      const revoked = (await run([
+        'revoke',
+        ...base(),
+        '--invite',
+        inviteId,
+        '--reason',
+        'tenant suspended',
+      ])) as Record<string, unknown>;
+      expect(revoked).toMatchObject({ invite_id: inviteId });
+      // Reactivated: the revoke stands.
+      setTenantProfile('active');
+      expect((await customerRun('view', { token })).out).toEqual({
+        ok: false,
+        reason: 'revoked',
+      });
+    });
   });
 
   it('shows updating after an edit and never lets ours supersede a customer decision', async () => {
@@ -2259,10 +2356,11 @@ describe('customer-decision facade', () => {
           attachment_id: attachments[0].id,
         })
       ).toEqual(unknown);
-      // Another tenant's room never opens this tenant's invite.
+      // Another tenant's room never opens this tenant's invite (that tenant is
+      // not registered, so its room answers unavailable before any lookup — CD-10).
       expect(
         await attachmentRun({ token, attachment_id: attachments[0].id }, 'other-tenant')
-      ).toEqual(unknown);
+      ).toEqual({ ok: false, reason: 'unavailable' });
       // Fetching images does not count as a use of the invite.
       const status = (await run(['status', ...base(), '--agenda', drafted.agenda_id])) as {
         invites: Array<{ uses: number }>;

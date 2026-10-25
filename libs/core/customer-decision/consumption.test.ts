@@ -14,6 +14,7 @@ import {
   openAgendas,
   pendingTaskProposals,
   reconcileConsumedDecisionLock,
+  resolvedTaskProposalDecisions,
   taskProposalAgendaEntry,
   taskProposalHolds,
   taskProposalId,
@@ -607,5 +608,108 @@ describe('CD-09 review fixes', () => {
     });
     expect(taskProposalsOf(later)[0].proposal.requires_customer).toBe(true);
     expect(taskProposalsOf(later)[0]).not.toHaveProperty('value');
+  });
+});
+
+describe('resolvedTaskProposalDecisions (CD-09 values for resumed tasks)', () => {
+  const consumer = 'mission-MSN-CD09.impl';
+  const empty = { consumer, decisions: [] };
+  const choiceEntry = {
+    entry_id: 'release',
+    item: 'RELEASE',
+    key: 'release.date',
+    kind: 'choice' as const,
+    question: 'Which release date?',
+    options: [
+      { value: 'date-alpha-sentinel', label: 'Alpha date' },
+      { value: 'date-beta-sentinel', label: 'Beta date' },
+    ],
+    requires_customer: true,
+  };
+  const askRelease = {
+    question: 'Which release date?',
+    item: 'RELEASE',
+    key: 'release.date',
+    requires_customer: true,
+  };
+  // An agent proposal on an entry of the same agenda (not requires_customer).
+  const proposeAuth = {
+    question: 'Which sign-in method?',
+    item: 'NFR',
+    key: 'auth.method',
+    proposed_value: 'sso',
+    requires_customer: false,
+  };
+  const confirmations = (...ids: string[]) =>
+    ids.map((id) => ({ entry_id: 'release', decision_id: id, by: 'user:boss', at: NOW }));
+  const withRelease = (confirmed: string[]) =>
+    agenda({
+      entries: [...agenda().entries, choiceEntry],
+      ...(confirmed.length ? { operator_confirmations: confirmations(...confirmed) } : {}),
+    });
+  const lockFor = (agendas: DecisionAgenda[]) => ({
+    decisions: mergeTaskProposals({
+      lock: empty,
+      requests: [askRelease, proposeAuth],
+      agendas,
+      now: NOW,
+    }).decisions,
+  });
+
+  it("returns only the task's own resolved requires_customer proposals", () => {
+    const agendas = [withRelease(['D-0001'])];
+    const ledger = [
+      customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel'),
+      // The customer also decided the agent-proposed entry: never delivered.
+      customerDecision('D-0002', 'auth.method', 'NFR', 'password'),
+    ];
+    const resolved = resolvedTaskProposalDecisions(lockFor(agendas), agendas, ledger, NOW);
+    expect(resolved).toEqual([
+      {
+        proposal_id: taskProposalId(consumer, 'RELEASE', 'release.date'),
+        agenda_id: 'agd-test0001',
+        entry_id: 'release',
+        item: 'RELEASE',
+        key: 'release.date',
+        question: 'Which release date?',
+        decision_id: 'D-0001',
+        value: 'date-alpha-sentinel',
+        option_label: 'Alpha date',
+      },
+    ]);
+    // Another task's lock (a different consumer, no proposals of its own) gets nothing.
+    expect(resolvedTaskProposalDecisions({ decisions: [] }, agendas, ledger, NOW)).toEqual([]);
+    // An uncollected proposal (no agenda entry yet) gets nothing.
+    const uncollected = {
+      decisions: mergeTaskProposals({ lock: empty, requests: [askRelease], agendas: [], now: NOW })
+        .decisions,
+    };
+    expect(resolvedTaskProposalDecisions(uncollected, agendas, ledger, NOW)).toEqual([]);
+  });
+
+  it('a superseded decision yields the one in force; one awaiting confirmation is excluded', () => {
+    const first = customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel');
+    const second = customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel');
+    const superseded = [{ ...first, status: 'superseded' as const }, second];
+    const confirmedBoth = [withRelease(['D-0001', 'D-0002'])];
+    expect(
+      resolvedTaskProposalDecisions(lockFor(confirmedBoth), confirmedBoth, superseded, NOW)
+    ).toEqual([
+      expect.objectContaining({
+        decision_id: 'D-0002',
+        value: 'date-beta-sentinel',
+        option_label: 'Beta date',
+      }),
+    ]);
+    // The newer customer decision is not confirmed yet: nothing, not the old value.
+    const confirmedFirst = [withRelease(['D-0001'])];
+    expect(
+      resolvedTaskProposalDecisions(lockFor(confirmedFirst), confirmedFirst, superseded, NOW)
+    ).toEqual([]);
+    // Decided but never confirmed: nothing.
+    const unconfirmed = [withRelease([])];
+    expect(resolvedTaskProposalDecisions(lockFor(unconfirmed), unconfirmed, [first], NOW)).toEqual(
+      []
+    );
   });
 });

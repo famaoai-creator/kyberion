@@ -1,7 +1,14 @@
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeReadFile, safeReaddir, safeRmSync, safeExistsSync } from '../secure-io.js';
+import {
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeExistsSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '../storage-layout.js';
 import {
   DEFAULT_INVITE_TTL_MS,
@@ -35,10 +42,30 @@ function tenantDir(tenant: string): string {
   );
 }
 
+/**
+ * The invite store writes only for a registered active tenant; the guard reads
+ * the registry profile raw from the checkout (`null` removes it).
+ */
+function setProfile(tenant: string, status: string | null): void {
+  const file = pathResolver.rootResolve(`knowledge/personal/tenants/${tenant}.json`);
+  withExecutionContext(
+    'ecosystem_architect',
+    () =>
+      status === null
+        ? safeRmSync(file, { force: true })
+        : safeWriteFile(file, JSON.stringify({ tenant_slug: tenant, status })),
+    'ecosystem_architect'
+  );
+}
+
+beforeEach(() => setProfile(TENANT, 'active'));
+
 afterEach(() => {
   for (const tenant of [TENANT, OTHER])
     safeRmSync(tenantDir(tenant), { recursive: true, force: true });
 });
+
+afterAll(() => setProfile(TENANT, null));
 
 describe('customer decision invites', () => {
   it('issues and verifies, recording a use', () => {
@@ -94,6 +121,27 @@ describe('customer decision invites', () => {
       ok: false,
       reason: 'revoked',
     });
+  });
+
+  it('an inactive tenant: no new invite, uses stop, revoke still works', () => {
+    expect(() => issueInvite({ ...base, tenantSlug: OTHER })).toThrow(
+      /\[CD_INVITE_TENANT_NOT_REGISTERED\]/u
+    );
+    expect(safeExistsSync(tenantDir(OTHER))).toBe(false);
+    const { invite, token } = issueInvite(base);
+    setProfile(TENANT, 'suspended');
+    expect(() => issueInvite(base)).toThrow(/\[CD_INVITE_TENANT_NOT_REGISTERED\]/u);
+    expect(verifyInviteToken(TENANT, token, { now: NOW, action: 'view' })).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+    const revoked = revokeInvite(TENANT, invite.invite_id, { now: NOW, reason: 'offboard' });
+    expect(revoked.revoked_reason).toBe('offboard');
+    // A repeated revoke writes nothing and keeps the first reason.
+    expect(revokeInvite(TENANT, invite.invite_id, { now: NOW, reason: 'x' }).revoked_reason).toBe(
+      'offboard'
+    );
+    expect(listInvites(TENANT).map((item) => item.uses.length)).toEqual([0]);
   });
 
   it('treats malformed input as malformed without file access', () => {
