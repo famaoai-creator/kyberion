@@ -712,4 +712,71 @@ describe('resolvedTaskProposalDecisions (CD-09 values for resumed tasks)', () =>
       []
     );
   });
+
+  it('a released hold re-opens once the decision in force is no longer confirmed', () => {
+    const agendas = [withRelease(['D-0001'])];
+    const first = customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel');
+    const id = taskProposalId(consumer, 'RELEASE', 'release.date');
+    // Released on D-0001: the proposal carries the stamp.
+    const stamped = {
+      decisions: lockFor(agendas).decisions.map((entry) =>
+        entry.proposal?.proposal_id === id
+          ? {
+              ...entry,
+              proposal: { ...entry.proposal, resolved: { decision_id: 'D-0001', at: NOW } },
+            }
+          : entry
+      ),
+    };
+    expect(taskProposalHolds(stamped, agendas, [first], NOW)).toEqual([
+      { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+    ]);
+    // The customer changed the answer: D-0002 awaits the operator's confirmation.
+    const changed = [
+      { ...first, status: 'superseded' as const },
+      customerDecision('D-0002', 'release.date', 'RELEASE', 'date-beta-sentinel'),
+    ];
+    expect(taskProposalHolds(stamped, agendas, changed, NOW)).toEqual([
+      { proposal_id: id, collected: true },
+    ]);
+    expect(resolvedTaskProposalDecisions(stamped, agendas, changed, NOW)).toEqual([]);
+    // An agenda that is gone keeps the release it recorded (nothing to deliver).
+    expect(taskProposalHolds(stamped, [], changed, NOW)[0]).toMatchObject({
+      resolved_decision_id: 'D-0001',
+    });
+    expect(resolvedTaskProposalDecisions(stamped, [], changed, NOW)).toEqual([]);
+  });
+
+  it('holds and the resolver read the same entry when the lock has no entry id', () => {
+    const agendas = [withRelease(['D-0001'])].map((item) => ({
+      ...item,
+      entries: item.entries.map((entry) =>
+        entry.entry_id === 'release'
+          ? { ...entry, entry_id: taskProposalId(consumer, 'RELEASE', 'release.date') }
+          : entry
+      ),
+      operator_confirmations: [
+        {
+          entry_id: taskProposalId(consumer, 'RELEASE', 'release.date'),
+          decision_id: 'D-0001',
+          by: 'user:boss',
+          at: NOW,
+        },
+      ],
+    }));
+    const lock = {
+      decisions: lockFor(agendas).decisions.map((entry) => {
+        if (entry.layer !== 'task_proposal' || !entry.proposal?.requires_customer) return entry;
+        const { entry_id: _dropped, ...rest } = entry;
+        return rest;
+      }),
+    };
+    const ledger = [customerDecision('D-0001', 'release.date', 'RELEASE', 'date-alpha-sentinel')];
+    expect(taskProposalHolds(lock, agendas, ledger, NOW)[0]).toMatchObject({
+      resolved_decision_id: 'D-0001',
+    });
+    expect(resolvedTaskProposalDecisions(lock, agendas, ledger, NOW)).toMatchObject([
+      { decision_id: 'D-0001' },
+    ]);
+  });
 });

@@ -1,4 +1,8 @@
 import { a2aBridge } from '../mesh/a2a-bridge.js';
+import {
+  scrubTaskResponseValues,
+  type ConfidentialTaskDecisionValues,
+} from '../customer-decision/task-decision-values.js';
 import { type DelegationChain } from './delegation-chain.js';
 import { type PlanningPacket } from '../surface/channel-surface.js';
 import { draftRefine } from '../draft-refine.js';
@@ -378,16 +382,25 @@ export async function obtainBestOfTaskResultResponse(input: {
   deliveredKnowledgeRefs?: DeliveredKnowledgeRef[];
   /** NI-03: forwarded verbatim to each candidate's obtainTaskResultResponse. */
   delegationChain?: DelegationChain;
+  /**
+   * CD-09: a resumed task's confirmed customer decisions. Each candidate is
+   * scrubbed before anything of it is stored (the losing candidate's
+   * evidence, the judge's rationale and merge hints).
+   */
+  customerDecisionValues?: ConfidentialTaskDecisionValues;
 }): Promise<Awaited<ReturnType<typeof obtainTaskResultResponse>>> {
+  const { customerDecisionValues: decisionValues, ...candidateInput } = input;
+  const scrubText = (text: string) => (decisionValues ? decisionValues.scrub(text) : text);
   const attempts: Array<{
     key: string;
     response: Awaited<ReturnType<typeof obtainTaskResultResponse>>;
   }> = [];
   for (const approach of BEST_OF_APPROACHES) {
     const response = await obtainTaskResultResponse({
-      ...input,
+      ...candidateInput,
       prompt: `## Approach directive (best-of-N candidate ${approach.key})\n${approach.directive}\n\n${input.prompt}`,
     });
+    if (decisionValues) scrubTaskResponseValues(decisionValues, response);
     attempts.push({ key: approach.key, response });
   }
   const [first, second] = attempts;
@@ -475,6 +488,13 @@ export async function obtainBestOfTaskResultResponse(input: {
     }
   }
 
+  if (verdict && decisionValues) {
+    verdict = {
+      ...verdict,
+      ...(verdict.rationale ? { rationale: scrubText(verdict.rationale) } : {}),
+      ...(verdict.merge_hints ? { merge_hints: verdict.merge_hints.map(scrubText) } : {}),
+    };
+  }
   const winnerKey = verdict?.winner || 'A';
   const winner = winnerKey === 'B' ? second : first;
   const loser = winnerKey === 'B' ? first : second;

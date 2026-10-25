@@ -412,6 +412,13 @@ describe('mission decision lock (CD-09)', () => {
         consumer: 'mission-MSN-CD09-LOCK.impl',
         pinned_count: 1,
         pinned: true,
+        // The open question holds the task: the worker does not dispatch it.
+        held: {
+          case_id: 'case-a',
+          tenant_slug: TENANT,
+          proposal_ids: result.hold_proposal_ids,
+          reason: 'awaiting_customer_decision',
+        },
       });
       // The open requires_customer question keeps the re-pinned task held.
       expect(readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-LOCK.impl')?.hold).toEqual({
@@ -548,7 +555,7 @@ describe('mission decision lock (CD-09)', () => {
       key: 'release.go',
       requires_customer: true,
     };
-    const decide = (item: string, key: string, value: unknown, at = LATER) =>
+    const decide = (item: string, key: string, value: unknown, at = LATER, supersedes?: string) =>
       appendDecisions(
         { dir },
         [
@@ -566,6 +573,7 @@ describe('mission decision lock (CD-09)', () => {
               on_behalf_of: { actor_id: 'customer:acme-cto', evidence: 'rcp-0001' },
             },
             decided_at: at,
+            ...(supersedes ? { supersedes } : {}),
           },
         ],
         { caseId: 'case-a' }
@@ -867,6 +875,38 @@ describe('mission decision lock (CD-09)', () => {
           expect(
             pinTaskDecisions({ ...task, taskId: 'other' }, { decisionCase, now: LATER })
           ).not.toHaveProperty('decision_values');
+        });
+
+        it('a customer who changes the answer after the release re-opens the hold: no values, ids only', () => {
+          confirmRelease();
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.decision_values?.count).toBe(
+            1
+          );
+          expect(lockNow().hold?.resolved_at).toBe(LATER);
+          // A new answer (D-0003), not confirmed yet.
+          decide(
+            'RELEASE',
+            'release.go',
+            { approved: false, note: `changed ${SENTINEL}` },
+            LATER,
+            'D-0001'
+          );
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(resumed).not.toHaveProperty('decision_values');
+          expect(resumed?.held).toEqual({
+            case_id: 'case-a',
+            tenant_slug: TENANT,
+            proposal_ids: [expect.stringMatching(/^tp-[a-f0-9]{16}$/u)],
+            reason: 'decision_not_in_force',
+          });
+          expect(JSON.stringify(resumed)).not.toMatch(/SENTINEL|release\.go|RELEASE/u);
+          // The lock holds again, and every other boundary agrees.
+          expect(lockNow().hold).toEqual({ work_item_id: 'WI-TASK', at: NOW });
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+          expect(
+            recordTaskDecisionProposals({ ...task, requests: [] }, { decisionCase, now: LATER })
+              .hold_proposal_ids
+          ).toHaveLength(1);
         });
 
         it('a process bound to another tenant gets nothing', () => {
