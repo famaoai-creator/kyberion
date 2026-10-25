@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "mlx_audio",
+      "toolsets": ["tts", "stt"],
       "display_name": "mlx-audio TTS Runtime",
       "ecosystem": "python",
       "status": "active",

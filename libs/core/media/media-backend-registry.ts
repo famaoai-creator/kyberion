@@ -2,7 +2,7 @@ import os from 'node:os';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { clamp } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync } from '../secure-io.js';
+import { safeExistsSync, safeExecResult } from '../secure-io.js';
 import {
   loadRegistryDirectory,
   resolveRegistryDirectory,
@@ -363,12 +363,29 @@ async function probeMediaBackendAvailabilityUncached(
   }
   if (probeKind === 'tool_runtime') {
     const resolution = probeToolRuntime(backend.probe?.ref || backend.provider, 'trial', platform);
+    const command = resolution.selected_backend?.command;
+    const launchable =
+      resolution.tool.tool_id === (backend.probe?.ref || backend.provider) &&
+      resolution.tool.status !== 'disabled' &&
+      resolution.selected_action !== 'install' &&
+      Boolean(command && resolution.available_commands.includes(command));
+    const healthcheck = resolution.tool.healthcheck_backend;
+    const available =
+      launchable &&
+      (!healthcheck ||
+        safeExecResult(healthcheck.command, healthcheck.args, {
+          cwd: pathResolver.rootDir(),
+          timeoutMs: 15_000,
+          maxOutputMB: 1,
+        }).status === 0);
     return {
       backend_id: backend.backend_id,
       modality: backend.modality,
-      available: resolution.selected_action !== 'install',
+      available,
       probe_kind: 'tool_runtime',
-      reason: resolution.reason,
+      reason: available
+        ? resolution.reason
+        : `Tool runtime ${resolution.tool.tool_id} launcher or healthcheck is unavailable.`,
     };
   }
   if (probeKind === 'native_bridge') {

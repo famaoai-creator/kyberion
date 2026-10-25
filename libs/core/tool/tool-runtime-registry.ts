@@ -46,6 +46,10 @@ export interface ToolRuntimeRecord {
   status: ToolRuntimeStatus;
   platforms: ToolRuntimePlatform[];
   supported_modes: ToolRuntimeMode[];
+  /** Operator-selectable dependency groups; membership grants no execution authority. */
+  toolsets?: string[];
+  /** Read-only readiness command, distinct from a potentially effectful trial. */
+  healthcheck_backend?: ToolRuntimeBackendCommand;
   trial_backend: ToolRuntimeBackendCommand;
   install_backend?: ToolRuntimeBackendCommand;
   install_backend_platform_overrides?: Partial<
@@ -484,8 +488,51 @@ export function probeToolRuntime(
     selectedBackend = record.installed_backend || record.trial_backend;
   if (selectedAction === 'run_trial') selectedBackend = record.trial_backend;
   if (selectedAction === 'install') selectedBackend = installBackend;
+  if (selectedAction !== 'install' && record.ecosystem === 'python' && selectedBackend) {
+    const python = resolveManagedPythonCandidates(resolveManagedEnvPath(record)).find((candidate) =>
+      safeExistsSync(candidate)
+    );
+    if (python && ['python', 'python3'].includes(selectedBackend.command)) {
+      selectedBackend = { ...selectedBackend, kind: 'system', command: python };
+    } else if (
+      python &&
+      selectedBackend.command === 'uv' &&
+      selectedBackend.args[0] === 'run' &&
+      ['python', 'python3'].includes(selectedBackend.args[1] || '')
+    ) {
+      selectedBackend = { kind: 'system', command: python, args: selectedBackend.args.slice(2) };
+    }
+  }
+  // uv tool installs are scoped by the installer; reuse their exposed binary
+  // instead of resolving a similarly named tool from the host-wide uv store.
+  if (
+    selectedAction === 'run_installed' &&
+    selectedBackend?.command === 'uv' &&
+    selectedBackend.args[0] === 'tool' &&
+    selectedBackend.args[1] === 'run'
+  ) {
+    const entry = selectedBackend.args[2];
+    if (entry && !entry.includes('/') && !entry.includes('\\')) {
+      const binary = path.join(
+        resolveManagedEnvPath(record),
+        'bin',
+        platform === 'win32' ? `${entry}.exe` : entry
+      );
+      if (safeExistsSync(binary))
+        selectedBackend = {
+          kind: 'system',
+          command: binary,
+          args: selectedBackend.args.slice(3),
+        };
+    }
+  }
 
-  const availableCommands = [record.trial_backend, installBackend, record.installed_backend]
+  const availableCommands = [
+    record.trial_backend,
+    installBackend,
+    record.installed_backend,
+    selectedBackend,
+  ]
     .filter((backend): backend is ToolRuntimeBackendCommand => Boolean(backend))
     .filter((backend) => backendIsAvailable(backend, platform))
     .map((backend) => backend.command);

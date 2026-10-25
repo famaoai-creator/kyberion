@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "kokoro_tts",
+      "toolsets": ["tts"],
       "display_name": "Kokoro TTS Runtime",
       "ecosystem": "python",
       "status": "active",

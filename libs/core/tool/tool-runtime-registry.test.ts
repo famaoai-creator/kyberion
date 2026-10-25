@@ -64,13 +64,14 @@ vi.mock('../secure-io.js', async () => {
 });
 
 describe('tool runtime registry', () => {
-  const tmpRoot = pathResolver.sharedTmp('tool-runtime-tests');
+  const tmpRoot = pathResolver.sharedTmp(`tool-runtime-tests-${process.pid}`);
   const policyPath = path.join(tmpRoot, 'tool-runtime-policy.json');
   const registryPath = path.join(tmpRoot, 'tool-runtime-registry.json');
   const managedRoot = path.join(tmpRoot, 'managed');
   const cacheRoot = path.join(tmpRoot, 'cache');
 
   beforeEach(() => {
+    safeRmSync(tmpRoot, { recursive: true, force: true });
     safeMkdir(tmpRoot, { recursive: true });
     safeMkdir(managedRoot, { recursive: true });
     safeMkdir(cacheRoot, { recursive: true });
@@ -337,6 +338,7 @@ describe('tool runtime registry', () => {
     vi.unstubAllEnvs();
     _resetToolRuntimePolicyCacheForTests();
     _resetToolRuntimeRegistryCacheForTests();
+    safeRmSync(tmpRoot, { recursive: true, force: true });
   });
 
   it('loads the governed registry and defaults to mflux', () => {
@@ -485,6 +487,19 @@ describe('tool runtime registry', () => {
     expect(resolution.state?.status).toBe('installed');
   });
 
+  it('reuses a managed uv-tool entrypoint rather than the host uv store', () => {
+    const binary = path.join(managedRoot, 'tool-runtimes', 'mflux', 'bin', 'mflux-generate');
+    safeWriteFile(binary, '', { mkdir: true, encoding: 'utf8' });
+    try {
+      markToolRuntimeInstalled('mflux');
+      const resolution = probeToolRuntime('mflux', 'installed', 'darwin');
+      expect(resolution.selected_backend?.command).toBe(binary);
+      expect(resolution.selected_backend?.args).toEqual([]);
+    } finally {
+      safeRmSync(binary, { force: true });
+    }
+  });
+
   it('exposes an install plan when explicitly requested', () => {
     const resolution = probeToolRuntime('mflux', 'approved_install', 'darwin');
     expect(resolution.selected_action).toBe('install');
@@ -523,6 +538,10 @@ describe('tool runtime registry', () => {
     safeWriteFile(path.join(runtimeRoot, pythonName), '', { encoding: 'utf8' });
 
     expect(resolveManagedToolPythonBin('mlx_audio')).toBe(path.join(runtimeRoot, pythonName));
+    markToolRuntimeInstalled('mlx_audio');
+    expect(probeToolRuntime('mlx_audio', 'installed', 'darwin').selected_backend?.command).toBe(
+      path.join(runtimeRoot, pythonName)
+    );
   });
 
   function addManagedBinaryTool(relativePath = 'bin/panda'): void {
