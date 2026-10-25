@@ -21,7 +21,11 @@ import {
   listWorkItems,
   setWorkCoordinationNamespace,
 } from '../workforce/work-coordination.js';
+import { inspect } from 'node:util';
+import { withExecutionContext } from '../authority.js';
+import { auditChain } from '../governance/audit-chain.js';
 import {
+  auditTaskDecisionDelivery,
   pinTaskDecisions,
   reconcileTaskDecisions,
   isTaskAwaitingCustomerDecision,
@@ -822,6 +826,91 @@ describe('mission decision lock (CD-09)', () => {
         expect(isTaskAwaitingCustomerDecision({ ...task, taskId: 'other' }, { decisionCase })).toBe(
           false
         );
+      });
+
+      describe('values for the resumed task (CD-09 2026-10-25)', () => {
+        const SENTINEL = 'ship-on-nov-first-SENTINEL';
+        const confirmRelease = () => {
+          writeAgenda({ dir }, releaseAgenda(false));
+          holdOn();
+          decide('RELEASE', 'release.go', { approved: true, note: SENTINEL });
+          // The customer also decided an entry the task never asked about.
+          decide('NFR', 'auth.method', 'other-case-value-SENTINEL');
+          writeAgenda({ dir }, releaseAgenda(true));
+        };
+
+        it('a held task gets nothing; after confirm the resumed pin holds its own value, ids only when shown', () => {
+          writeAgenda({ dir }, releaseAgenda(false));
+          holdOn();
+          decide('RELEASE', 'release.go', { approved: true, note: SENTINEL });
+          // Decided, not confirmed: still held, nothing delivered.
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })).not.toHaveProperty(
+            'decision_values'
+          );
+          decide('NFR', 'auth.method', 'other-case-value-SENTINEL');
+          writeAgenda({ dir }, releaseAgenda(true));
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          const values = resumed?.decision_values;
+          expect(values?.count).toBe(1);
+          expect(values?.decisionIds).toEqual(['D-0001']);
+          const text = values!.promptLines().join('\n');
+          expect(text).toContain(SENTINEL);
+          expect(text).not.toContain('other-case-value-SENTINEL');
+          // Serialized (event payloads, logs), the pin result shows ids only.
+          for (const shown of [JSON.stringify(resumed), inspect(resumed, { depth: 10 })]) {
+            expect(shown).not.toMatch(/SENTINEL|release\.go|RELEASE/u);
+            expect(shown).toContain('D-0001');
+          }
+          // Nothing new is written to the lock (it pins the case as before).
+          expect(Object.keys(lockNow()).sort()).not.toContain('decision_values');
+          // A task that never held gets nothing.
+          expect(
+            pinTaskDecisions({ ...task, taskId: 'other' }, { decisionCase, now: LATER })
+          ).not.toHaveProperty('decision_values');
+        });
+
+        it('a process bound to another tenant gets nothing', () => {
+          confirmRelease();
+          vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+          const other = withExecutionContext(
+            'mission_controller',
+            () => pinTaskDecisions(task, { decisionCase, now: LATER }),
+            undefined,
+            'other-corp'
+          );
+          expect(other).toBeNull();
+        });
+
+        it('audits delivery with ids only', () => {
+          confirmRelease();
+          const values = pinTaskDecisions(task, { decisionCase, now: LATER })!.decision_values!;
+          const record = vi
+            .spyOn(auditChain, 'record')
+            .mockImplementation((entry) => entry as ReturnType<typeof auditChain.record>);
+          auditTaskDecisionDelivery({
+            values,
+            missionId: MISSION,
+            taskId: 'impl',
+            operation: 'task_decisions_withheld',
+            reason: 'mission_tier_public',
+          });
+          expect(record).toHaveBeenCalledWith(
+            expect.objectContaining({
+              action: 'customer_decision',
+              operation: 'task_decisions_withheld',
+              tenantSlug: TENANT,
+              metadata: {
+                case_id: 'case-a',
+                consumer: 'mission-MSN-CD09-LOCK.impl',
+                mission_id: MISSION,
+                task_id: 'impl',
+                decision_ids: ['D-0001'],
+                reason: 'mission_tier_public',
+              },
+            })
+          );
+          expect(JSON.stringify(record.mock.calls)).not.toMatch(/SENTINEL|release\.go|RELEASE/u);
+        });
       });
 
       it('after the operator confirms, the rerun completes', () => {

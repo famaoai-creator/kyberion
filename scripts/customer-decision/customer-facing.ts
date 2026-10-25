@@ -26,6 +26,7 @@ import {
   type CustomerDecisionInvite,
   type DecisionAgenda,
 } from '@agent/core/customer-decision';
+import { isActiveCustomerTenant } from '@agent/core/customer-channel-binding';
 import { sweepDecisionConsumers } from '@agent/core/mission/mission-decision-lock';
 import { ScriptExitError } from '../lib/harness.js';
 import {
@@ -113,6 +114,19 @@ function openInvite(
   if (!opts.tenant || typeof token !== 'string') throw new CustomerFacingError('invalid_link');
   // The bound-tenant check before the token is verified (and recorded).
   const tenant = tenantOf(opts);
+  // CD-10: invites of a tenant that is not registered and active stop working.
+  // The customer sees the same `unavailable` as a store failure (never the
+  // registration state); the audit trace carries ids only.
+  if (!isActiveCustomerTenant(tenant)) {
+    const inviteId = token.match(/^inv-[a-f0-9]{16}(?=\.)/u)?.[0];
+    auditFailure(
+      tenant,
+      `invite_${action}`,
+      'CD_INVITE_TENANT_NOT_REGISTERED',
+      inviteId ? { invite_id: inviteId } : {}
+    );
+    throw new CustomerFacingError('unavailable');
+  }
   const verified = verifyInviteToken(tenant, token, { now, action, record });
   if (verified.ok === false) {
     throw new CustomerFacingError(

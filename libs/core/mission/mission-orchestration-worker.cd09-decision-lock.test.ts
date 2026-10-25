@@ -19,6 +19,11 @@ const mocks = vi.hoisted(() => ({
   reconcileTaskDecisions: vi.fn(),
   importExternalWorkItem: vi.fn(),
   updateWorkItem: vi.fn(),
+  auditTaskDecisionDelivery: vi.fn(),
+  provisionTaskKnowledge: vi.fn(),
+  recordMissionVisiblePrompt: vi.fn(),
+  /** Set per test: the security scope the (real) context pack is given. */
+  packScope: { value: undefined as Record<string, unknown> | undefined },
 }));
 
 function makeTaskResultText(input: { summary: string; needs?: string[]; gaps?: string[] }): string {
@@ -77,12 +82,51 @@ vi.mock('../knowledge/distill-knowledge-injector.js', async (importOriginal) => 
   };
 });
 
+// The passthrough implementations are set in beforeEach (a factory runs on the
+// first import, which may come after a test set its own implementation).
+vi.mock('../task/task-knowledge-provisioning.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../task/task-knowledge-provisioning.js')>();
+  return {
+    ...actual,
+    provisionTaskKnowledge: async (...args: Parameters<typeof actual.provisionTaskKnowledge>) => {
+      const provisioned = await mocks.provisionTaskKnowledge(...args);
+      return mocks.packScope.value && provisioned.pack
+        ? {
+            ...provisioned,
+            pack: { ...provisioned.pack, security_scope: mocks.packScope.value },
+          }
+        : provisioned;
+    },
+  };
+});
+
+vi.mock('./mission-orchestration-worker-part-context.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./mission-orchestration-worker-part-context.js')>();
+  return {
+    ...actual,
+    recordMissionVisiblePrompt: (...args: Parameters<typeof actual.recordMissionVisiblePrompt>) =>
+      mocks.recordMissionVisiblePrompt(...args),
+    // The fixture scope (confidential, tenant-bound) does not match the public
+    // fixture mission's directory; the compactor (cached per mission) places
+    // its own records by that scope, so it keeps the mission's real one.
+    maybeCompactDispatchSections: (
+      input: Parameters<typeof actual.maybeCompactDispatchSections>[0]
+    ) =>
+      actual.maybeCompactDispatchSections(
+        mocks.packScope.value ? { ...input, securityScope: undefined } : input
+      ),
+  };
+});
+
 vi.mock('./mission-decision-lock.js', () => ({
+  auditTaskDecisionDelivery: mocks.auditTaskDecisionDelivery,
   pinTaskDecisions: mocks.pinTaskDecisions,
   reconcileTaskDecisions: mocks.reconcileTaskDecisions,
   CUSTOMER_DECISION_BLOCKED_REASONS: [
     'awaiting_customer_decision',
     'customer_decision_check_failed',
+    'customer_decision_tier_mismatch',
   ],
   // Every structured result re-checks the task's holds; none here.
   recordTaskDecisionProposals: () => ({
@@ -119,6 +163,17 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
     // repeated its module initialisation every test (operations-hygiene-runbook §5).
     // Per-test state is reset through the work-coordination namespace/store and the mocks.
     vi.resetAllMocks();
+    mocks.packScope.value = undefined;
+    {
+      const provisioning = await vi.importActual<
+        typeof import('../task/task-knowledge-provisioning.js')
+      >('../task/task-knowledge-provisioning.js');
+      mocks.provisionTaskKnowledge.mockImplementation(provisioning.provisionTaskKnowledge);
+      const context = await vi.importActual<
+        typeof import('./mission-orchestration-worker-part-context.js')
+      >('./mission-orchestration-worker-part-context.js');
+      mocks.recordMissionVisiblePrompt.mockImplementation(context.recordMissionVisiblePrompt);
+    }
     process.env.MISSION_ROLE = 'mission_controller';
     const { missionDir, pathResolver } = await import('../path-resolver.js');
     process.env.KYBERION_TEST_OBSERVABILITY_DIR = pathResolver.shared(
@@ -309,6 +364,197 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       checked: 3,
       stale_count: 1,
       rework_work_item_ids: ['WI-CDR-0123456789ABCDEF'],
+    });
+  });
+
+  describe('confirmed customer decisions of a resumed task (CD-09 2026-10-25)', () => {
+    const SENTINEL = 'ship-on-nov-first-SENTINEL';
+    const CONSUMER = 'mission-MSN-CD09-WORKER.task-1';
+    async function decisionValues() {
+      const { ConfidentialTaskDecisionValues } =
+        await import('../customer-decision/task-decision-values.js');
+      return new ConfidentialTaskDecisionValues(
+        { tenantSlug: 'acme-corp', caseId: 'case-a', consumer: CONSUMER },
+        [
+          {
+            proposal_id: 'tp-0123456789abcdef',
+            agenda_id: 'agd-test0001',
+            entry_id: 'release',
+            item: 'RELEASE',
+            key: 'release.go',
+            question: 'May we release?',
+            decision_id: 'D-0001',
+            value: { approved: true, note: SENTINEL },
+          },
+        ]
+      );
+    }
+    async function useRealStores() {
+      const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
+        '../workforce/work-coordination.js'
+      );
+      mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
+      mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
+      mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    }
+    /** Every file under the shared runtime and the public mission directory that holds `needle`. */
+    async function filesContaining(needle: string): Promise<string[]> {
+      const { missionDir, pathResolver } = await import('../path-resolver.js');
+      const { safeExistsSync, safeLstat, safeReadFile, safeReaddir } =
+        await import('../secure-io.js');
+      const nodePath = await import('node:path');
+      const roots = [
+        pathResolver.shared(''),
+        nodePath.join(pathResolver.rootDir(), 'active', 'shared'),
+        missionDir(MISSION_ID, 'public'),
+      ];
+      const hits: string[] = [];
+      const walk = (dir: string) => {
+        if (!safeExistsSync(dir)) return;
+        for (const name of safeReaddir(dir)) {
+          const file = nodePath.join(dir, name);
+          // Other suites of the run create and remove files concurrently.
+          let stat: ReturnType<typeof safeLstat>;
+          try {
+            stat = safeLstat(file);
+          } catch {
+            continue;
+          }
+          if (stat.isDirectory()) walk(file);
+          else if (stat.isFile() && stat.size < 8 * 1024 * 1024) {
+            let text = '';
+            try {
+              text = String(safeReadFile(file, { encoding: 'utf8' }));
+            } catch {
+              continue;
+            }
+            if (text.includes(needle)) hits.push(file);
+          }
+        }
+      };
+      for (const root of new Set(roots)) walk(root);
+      return hits;
+    }
+
+    it('a public mission: the WorkItem is blocked as a tier mismatch and nothing is sent', async () => {
+      await useRealStores();
+      const values = await decisionValues();
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 1,
+        pinned: true,
+        decision_values: values,
+      });
+      const warn = vi
+        .spyOn((await import('../core.js')).logger, 'warn')
+        .mockImplementation(() => undefined);
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION_ID);
+
+      expect(mocks.route).not.toHaveBeenCalled();
+      expect(mocks.reconcileTaskDecisions).not.toHaveBeenCalled();
+      const blocked = mocks.updateWorkItem.mock.calls
+        .map((call) => call[0] as { status?: string; metadata?: Record<string, unknown> })
+        .find((update) => update.status === 'blocked');
+      expect(blocked?.metadata).toMatchObject({
+        blocked_reason: 'customer_decision_tier_mismatch',
+        customer_decision_hold: {
+          status: 'tier_mismatch',
+          consumer: CONSUMER,
+          case_id: 'case-a',
+          decision_ids: ['D-0001'],
+          reason: 'mission_tier_public',
+        },
+      });
+      expect(mocks.auditTaskDecisionDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'task_decisions_withheld',
+          reason: 'mission_tier_public',
+          missionId: MISSION_ID,
+          taskId: 'task-1',
+        })
+      );
+      expect(
+        JSON.stringify([
+          mocks.updateWorkItem.mock.calls,
+          mocks.emitMissionTaskEvent.mock.calls,
+          mocks.recordMissionVisiblePrompt.mock.calls,
+          warn.mock.calls,
+        ])
+      ).not.toMatch(/SENTINEL|release\.go|May we release/u);
+      expect(await filesContaining(SENTINEL)).toEqual([]);
+      warn.mockRestore();
+    });
+
+    it('a confidential same-tenant scope: the prompt carries the value, the WorkItem summary does not', async () => {
+      await useRealStores();
+      const values = await decisionValues();
+      mocks.packScope.value = {
+        tenant_slug: 'acme-corp',
+        tenant_id: 'acme-corp',
+        mission_id: MISSION_ID,
+        read_tiers: ['public', 'confidential'],
+        write_tier: 'confidential',
+        purpose: 'implementer',
+        external_egress: 'deny',
+      };
+      // The visibility ledger would place the record by the (fixture) scope's tier.
+      mocks.recordMissionVisiblePrompt.mockImplementation(() => undefined);
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 1,
+        pinned: true,
+        decision_values: values,
+      });
+      mocks.reconcileTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        checked: 1,
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      mocks.route.mockResolvedValueOnce({
+        payload: {
+          text: makeTaskResultText({
+            summary: `Released as decided (${SENTINEL}) per D-0001.`,
+          }),
+        },
+      });
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION_ID);
+
+      expect(mocks.route).toHaveBeenCalledTimes(1);
+      const prompt = String(
+        (mocks.route.mock.calls[0][0] as { payload: { text: string } }).payload.text
+      );
+      expect(prompt).toContain(SENTINEL);
+      expect(prompt.slice(0, 240)).not.toContain(SENTINEL);
+      expect(prompt.indexOf('## Confirmed customer decisions (confidential')).toBeGreaterThan(
+        prompt.indexOf('Mission context pack') >= 0 ? prompt.indexOf('Mission context pack') : 0
+      );
+      // Nothing in the envelope besides the prompt text carries it.
+      const envelope = mocks.route.mock.calls[0][0] as { payload: Record<string, unknown> };
+      expect(JSON.stringify({ ...envelope.payload, text: undefined })).not.toContain(SENTINEL);
+      const done = mocks.updateWorkItem.mock.calls
+        .map((call) => call[0] as { status?: string; metadata?: Record<string, unknown> })
+        .find((update) => update.status === 'done');
+      expect(done?.metadata?.summary).toBe(
+        'Released as decided ([customer decision D-0001]) per D-0001.'
+      );
+      expect(mocks.auditTaskDecisionDelivery).toHaveBeenCalledTimes(1);
+      expect(mocks.auditTaskDecisionDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({ operation: 'task_decisions_delivered', taskId: 'task-1' })
+      );
+      // The prompt-visibility record names the decisions by id (metadata only).
+      expect(mocks.recordMissionVisiblePrompt).toHaveBeenCalledWith(
+        expect.objectContaining({
+          form: 'customer_decision_values',
+          knowledgeRefs: [{ path: 'customer-decision:case-a#D-0001' }],
+        })
+      );
+      expect(
+        JSON.stringify([mocks.updateWorkItem.mock.calls, mocks.emitMissionTaskEvent.mock.calls])
+      ).not.toContain(SENTINEL);
+      expect(await filesContaining(SENTINEL)).toEqual([]);
     });
   });
 
