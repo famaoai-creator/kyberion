@@ -22,6 +22,12 @@ import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
 import {
+  evaluateContextFragment,
+  resolveTenantAlias,
+  type ContextSecurityScope,
+} from '../context-security-scope.js';
+import type { ConfidentialTaskDecisionValues } from '../customer-decision/task-decision-values.js';
+import {
   buildArtifactReviewLines,
   prepareArtifactReviewTask,
 } from './mission-orchestration-artifact-review.js';
@@ -84,6 +90,51 @@ export interface DispatchPlannedMissionTaskInput {
   };
 }
 
+/** Blocked reason of a task whose confirmed customer decisions may not reach its prompt. */
+export const CUSTOMER_DECISION_TIER_MISMATCH = 'customer_decision_tier_mismatch';
+
+/**
+ * CD-09 tier gate (human decision 2026-10-25): a resumed task's confirmed
+ * customer decisions are confidential data of the case's tenant. They reach
+ * the prompt only when the mission's context pack may carry that tenant's
+ * confidential data: a pack is present (not the degraded fallback), it
+ * writes the confidential tier, denies external egress, is scoped to the
+ * case's tenant, and admits a confidential fragment of that tenant / mission
+ * / project (`evaluateContextFragment`). Otherwise the values are withheld
+ * and the caller blocks the task. Returns the withhold reason (ids-safe), or
+ * null when the values may be delivered.
+ */
+export function customerDecisionTierGate(input: {
+  securityScope: ContextSecurityScope | undefined;
+  missionId: string;
+  tenantSlug: string;
+  caseId: string;
+  projectId?: string;
+}): string | null {
+  const scope = input.securityScope;
+  if (!scope) return 'context_pack_unavailable';
+  if (scope.write_tier !== 'confidential') return `mission_tier_${scope.write_tier}`;
+  if (scope.external_egress !== 'deny') return 'external_egress_not_denied';
+  if (resolveTenantAlias(scope) !== input.tenantSlug) return 'tenant_scope_mismatch';
+  const rejection = evaluateContextFragment(scope, {
+    fragment_id: `customer-decision:${input.caseId}`,
+    source_ref: `customer-decision:${input.caseId}`,
+    source_tier: 'confidential',
+    tenant_slug: input.tenantSlug,
+    mission_id: input.missionId,
+    ...(input.projectId ? { project_id: input.projectId } : {}),
+    content: null,
+  });
+  return rejection ? rejection.code.toLowerCase() : null;
+}
+
+/** What became of a resumed task's confirmed customer decisions in this dispatch (ids only). */
+export interface CustomerDecisionDelivery {
+  status: 'delivered' | 'withheld';
+  reason?: string;
+  decision_ids: string[];
+}
+
 export async function buildTaskDispatchContext(input: {
   missionId: string;
   task: PlannedNextTask;
@@ -95,6 +146,8 @@ export async function buildTaskDispatchContext(input: {
   upstreamHandoffs?: Array<MissionGraphHandoff<DispatchMissionTaskOutcome, TaskResultBlock>>;
   /** OH-01 reactive path: force compaction after a prompt-too-long dispatch failure. */
   forceContextCompaction?: boolean;
+  /** CD-09: a resumed task's confirmed customer decisions (from the decision pin). */
+  customerDecisionValues?: ConfidentialTaskDecisionValues;
 }): Promise<{
   prompt: string;
   missionContextPackId?: string;
@@ -104,6 +157,8 @@ export async function buildTaskDispatchContext(input: {
   securityScope?: import('../context-security-scope.js').ContextSecurityScope;
   /** KP-05: knowledge actually delivered as part of this dispatch's context pack. */
   deliveredKnowledgeRefs: DeliveredKnowledgeRef[];
+  /** CD-09: present when the task had confirmed customer decisions to receive. */
+  customerDecisionDelivery?: CustomerDecisionDelivery;
 }> {
   const missionStateRaw = loadMissionStateSnapshot(input.missionId);
   const missionState =
@@ -260,6 +315,38 @@ export async function buildTaskDispatchContext(input: {
     delegationNotificationLines.join('\n').length +
     dynamicInjectionLines.join('\n').length +
     256;
+  // CD-09: the values go into the prompt only past the tier gate; they are
+  // never passed to the compaction step or into any other section.
+  const decisionValues =
+    input.customerDecisionValues && !input.customerDecisionValues.isEmpty
+      ? input.customerDecisionValues
+      : undefined;
+  // The gate decides whether this mission may carry the case tenant's data.
+  // Values it would not carry block the task; a section of unconfirmed
+  // proposals only (no values) still goes, but by count when the gate would
+  // refuse (a proposal id lets a reader confirm a guessed item × key).
+  const gateVerdict = decisionValues
+    ? customerDecisionTierGate({
+        securityScope: missionContextPack ? missionContextPack.security_scope : undefined,
+        missionId: String(missionState.mission_id || input.missionId),
+        tenantSlug: decisionValues.tenantSlug,
+        caseId: decisionValues.caseId,
+        ...(decisionValues.projectId ? { projectId: decisionValues.projectId } : {}),
+      })
+    : null;
+  const decisionWithheld = decisionValues && decisionValues.count > 0 ? gateVerdict : null;
+  const customerDecisionDelivery: CustomerDecisionDelivery | undefined = decisionValues
+    ? {
+        status: decisionWithheld ? 'withheld' : 'delivered',
+        ...(decisionWithheld ? { reason: decisionWithheld } : {}),
+        decision_ids: decisionValues.decisionIds,
+      }
+    : undefined;
+  if (decisionValues && decisionWithheld) {
+    logger.warn(
+      `customer decisions withheld from task ${input.task.task_id} — the mission context may not carry tenant ${decisionValues.tenantSlug}'s confidential data (${decisionWithheld}) | the task is blocked (${CUSTOMER_DECISION_TIER_MISMATCH}); run it in a confidential mission of that tenant | mission=${input.missionId} consumer=${decisionValues.consumer} decisions=${decisionValues.decisionIds.join(',')}`
+    );
+  }
   const prompt = buildTaskExecutionPrompt({
     missionId: input.missionId,
     tenantSlug: missionTenantSlug,
@@ -277,6 +364,9 @@ export async function buildTaskDispatchContext(input: {
     reviewFindingsLines,
     artifactReviewLines,
     targetPath: input.task.target_path || input.task.deliverable,
+    ...(decisionValues && !decisionWithheld
+      ? { customerDecisionLines: decisionValues.promptLines({ proposalIds: gateVerdict === null }) }
+      : {}),
   });
   const missionContextPackPruningSummary = missionContextPack?.pruning
     ? {
@@ -294,6 +384,7 @@ export async function buildTaskDispatchContext(input: {
     missionContextPackPruningSummary,
     securityScope: missionContextPack?.security_scope,
     deliveredKnowledgeRefs: provisionedContext.deliveredKnowledgeRefs,
+    ...(customerDecisionDelivery ? { customerDecisionDelivery } : {}),
   };
 }
 

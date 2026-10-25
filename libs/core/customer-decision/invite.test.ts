@@ -1,11 +1,19 @@
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeReadFile, safeReaddir, safeRmSync, safeExistsSync } from '../secure-io.js';
+import {
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+  safeExistsSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '../storage-layout.js';
 import {
   DEFAULT_INVITE_TTL_MS,
   MAX_INVITE_TTL_MS,
+  inviteIdOfToken,
   issueInvite,
   listInvites,
   revokeInvite,
@@ -35,9 +43,41 @@ function tenantDir(tenant: string): string {
   );
 }
 
+/**
+ * The invite store writes only for a registered active tenant; the guard reads
+ * the registry profile raw from the checkout (`null` removes it).
+ */
+function setProfile(tenant: string, status: string | null): void {
+  const file = pathResolver.rootResolve(`knowledge/personal/tenants/${tenant}.json`);
+  withExecutionContext(
+    'ecosystem_architect',
+    () =>
+      status === null
+        ? safeRmSync(file, { force: true })
+        : safeWriteFile(
+            file,
+            JSON.stringify({
+              tenant_slug: tenant,
+              display_name: tenant,
+              status,
+              assigned_role: 'owner',
+            })
+          ),
+    'ecosystem_architect'
+  );
+}
+
+beforeEach(() => {
+  for (const tenant of [TENANT, OTHER]) setProfile(tenant, 'active');
+});
+
 afterEach(() => {
   for (const tenant of [TENANT, OTHER])
     safeRmSync(tenantDir(tenant), { recursive: true, force: true });
+});
+
+afterAll(() => {
+  for (const tenant of [TENANT, OTHER]) setProfile(tenant, null);
 });
 
 describe('customer decision invites', () => {
@@ -94,6 +134,51 @@ describe('customer decision invites', () => {
       ok: false,
       reason: 'revoked',
     });
+  });
+
+  it('an inactive tenant: no new invite, uses stop, revoke still works', () => {
+    setProfile(OTHER, null);
+    expect(() => issueInvite({ ...base, tenantSlug: OTHER })).toThrow(
+      /\[CD_INVITE_TENANT_NOT_REGISTERED\]/u
+    );
+    expect(safeExistsSync(tenantDir(OTHER))).toBe(false);
+    const { invite, token } = issueInvite(base);
+    setProfile(TENANT, 'suspended');
+    expect(() => issueInvite(base)).toThrow(/\[CD_INVITE_TENANT_NOT_REGISTERED\]/u);
+    expect(verifyInviteToken(TENANT, token, { now: NOW, action: 'view' })).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+    // Fails closed without a use record too (the attachment path).
+    expect(verifyInviteToken(TENANT, token, { now: NOW, action: 'view', record: false })).toEqual({
+      ok: false,
+      reason: 'unavailable',
+    });
+    // A malformed token is still malformed: the answer does not reveal the state.
+    expect(verifyInviteToken(TENANT, 'nope', { now: NOW, action: 'view' })).toEqual({
+      ok: false,
+      reason: 'malformed',
+    });
+    const revoked = revokeInvite(TENANT, invite.invite_id, { now: NOW, reason: 'offboard' });
+    expect(revoked.revoked_reason).toBe('offboard');
+    // A repeated revoke writes nothing and keeps the first reason.
+    expect(revokeInvite(TENANT, invite.invite_id, { now: NOW, reason: 'x' }).revoked_reason).toBe(
+      'offboard'
+    );
+    expect(listInvites(TENANT).map((item) => item.uses.length)).toEqual([0]);
+    // Reactivated: the revoke stands.
+    setProfile(TENANT, 'active');
+    expect(verifyInviteToken(TENANT, token, { now: NOW, action: 'view', record: false })).toEqual({
+      ok: false,
+      reason: 'revoked',
+    });
+  });
+
+  it('extracts the id of a well-formed token only', () => {
+    const { invite, token } = issueInvite(base);
+    expect(inviteIdOfToken(token)).toBe(invite.invite_id);
+    for (const bad of ['', 'nope', `${invite.invite_id}`, `${invite.invite_id}.short`, 42])
+      expect(inviteIdOfToken(bad)).toBeUndefined();
   });
 
   it('treats malformed input as malformed without file access', () => {
