@@ -45,6 +45,7 @@ import {
   relinkTaskProposal,
   taskProposalAgendaEntry,
   taskProposalHolds,
+  taskProposalRelinkProblem,
   taskProposalsOf,
   unresolvableTaskProposals,
   writeAgenda,
@@ -55,6 +56,7 @@ import {
   type TaskProposalLockEntry,
 } from '@agent/core/customer-decision';
 import { ScriptExitError } from '../lib/harness.js';
+import { isApprovedSupersededConsumerLock } from './superseded-locks.js';
 import {
   agendaSummary,
   asLedgerWriter,
@@ -81,9 +83,15 @@ function readLocks(location: DecisionLedgerLocation): ConsumedDecisionLockRecord
   );
 }
 
-/** Locks a boundary still acts on: a superseded task's lock is frozen. */
-function activeLocks(location: DecisionLedgerLocation): ConsumedDecisionLockRecord[] {
-  return readLocks(location).filter((lock) => !lock.superseded);
+/**
+ * Locks a boundary still acts on: all but those superseded by an approval
+ * the mission side verified (an unverified mark is ignored, see superseded-locks.ts).
+ */
+function activeLocks(
+  tenant: string,
+  location: DecisionLedgerLocation
+): ConsumedDecisionLockRecord[] {
+  return readLocks(location).filter((lock) => !isApprovedSupersededConsumerLock(tenant, lock));
 }
 
 /**
@@ -152,6 +160,7 @@ function reaskRequest(opts: Record<string, string>): ReaskRequest {
  * re-run); anything else is refused (exit 2) before anything is written.
  */
 function reaskCandidates(
+  tenant: string,
   location: DecisionLedgerLocation,
   request: ReaskRequest,
   now: string
@@ -168,9 +177,13 @@ function reaskCandidates(
     );
     if (!lock) throw new ScriptExitError(2, `task proposal ${id} not found in this case`);
     if (lock.superseded) {
+      // Verified: the task was replaced. Unverified: the guard keeps a marked
+      // lock frozen, so nothing could be written to it either way.
       throw new ScriptExitError(
         2,
-        `task proposal ${id} belongs to task ${lock.task_id}, which was superseded by ${lock.superseded.by_task_id}; nothing to re-ask`
+        isApprovedSupersededConsumerLock(tenant, lock)
+          ? `task proposal ${id} belongs to task ${lock.task_id}, which was superseded by ${lock.superseded.by_task_id}; nothing to re-ask`
+          : `task proposal ${id} belongs to task ${lock.task_id}, whose lock carries a superseded mark no verified approval backs; it is frozen — check the mission's supersede-task approval`
       );
     }
     const entry = unresolvableTaskProposals(lock, agendas, ledger, now).find(
@@ -214,10 +227,10 @@ function collectLocked(
       `agenda ${target.agenda_id} is ${target.status}; --from-tasks adds to a draft agenda only (omit --agenda to start a new one)`
     );
   }
-  const candidates = reask ? reaskCandidates(location, reask, now) : undefined;
+  const candidates = reask ? reaskCandidates(tenant, location, reask, now) : undefined;
   const pending: PendingProposal[] = (
     candidates?.pending ??
-    activeLocks(location).flatMap((lock) =>
+    activeLocks(tenant, location).flatMap((lock) =>
       pendingTaskProposals(lock).map((entry) => ({ lock, entry }))
     )
   ).sort(
@@ -302,16 +315,13 @@ function collectLocked(
     });
   }
 
-  for (const id of promotedAgendas) {
-    const agenda = others.get(id)!;
-    assertUniqueEntries(agenda.entries);
-    writeAgenda(location, { ...agenda, updated_at: now });
-  }
-  let written: DecisionAgenda | undefined = target;
+  // Plan every agenda write first: a re-ask is checked against the planned
+  // state before anything is written, so a refusal leaves no orphan entry.
+  const writes = new Map<string, DecisionAgenda>();
+  for (const id of promotedAgendas) writes.set(id, { ...others.get(id)!, updated_at: now });
   if (added > 0 || targetChanged) {
-    assertUniqueEntries(entries);
     if (target) {
-      written = writeAgenda(location, { ...target, entries, updated_at: now });
+      writes.set(agendaId, { ...target, entries, updated_at: now });
     } else {
       const customer = opts.customer?.trim();
       if (!customer || !CUSTOMER_SLUG_PATTERN.test(customer)) {
@@ -319,7 +329,7 @@ function collectLocked(
       }
       // i18n-exempt: validates the --locale flag against the agenda schema's ja|en enum, not a UI branch
       const locale = opts.locale === 'en' ? 'en' : 'ja';
-      written = writeAgenda(location, {
+      writes.set(agendaId, {
         version: '1.0.0',
         agenda_id: agendaId,
         tenant_slug: tenant,
@@ -340,6 +350,39 @@ function collectLocked(
         updated_at: now,
       });
     }
+  }
+  if (reask) {
+    // The facade's marker on each target agenda: the only thing that lets the
+    // consumer store guard accept the relink (a worker cannot write agendas).
+    for (const { lock, entry } of pending) {
+      const link = links.get(entry.proposal.proposal_id);
+      if (!link) continue;
+      const base =
+        writes.get(link.agenda_id) ??
+        others.get(link.agenda_id) ??
+        (link.agenda_id === target?.agenda_id ? target : undefined);
+      if (!base) throw new Error(`[CUSTOMER_DECISION_REASK_TARGET_MISSING] ${link.agenda_id}`);
+      writes.set(link.agenda_id, {
+        ...base,
+        reasked_proposals: [
+          ...(base.reasked_proposals ?? []),
+          {
+            proposal_id: entry.proposal.proposal_id,
+            consumer: lock.consumer,
+            by: reask.by,
+            at: now,
+          },
+        ],
+        updated_at: now,
+      });
+    }
+    assertRelinksAllowed(location, pending, links, writes, now, reask.by);
+  }
+  let written: DecisionAgenda | undefined = target;
+  for (const agenda of writes.values()) {
+    assertUniqueEntries(agenda.entries);
+    const stored = writeAgenda(location, agenda);
+    if (stored.agenda_id === agendaId) written = stored;
   }
 
   // Link each proposal back on its lock: it is collected once.
@@ -399,6 +442,64 @@ function collectLocked(
   };
 }
 
+/** The lock entries a re-ask writes: each linked proposal relinked, the rest as is. */
+function relinkedDecisions(
+  lock: Pick<ConsumedDecisionLockRecord, 'decisions'>,
+  links: ReadonlyMap<string, { agenda_id: string; entry_id: string }>,
+  now: string,
+  by: string
+): ConsumedDecisionLockRecord['decisions'] {
+  return lock.decisions.map((decision) => {
+    const link =
+      decision.layer === 'task_proposal' && decision.proposal
+        ? links.get(decision.proposal.proposal_id)
+        : undefined;
+    return link && decision.proposal
+      ? relinkTaskProposal({ ...decision, proposal: decision.proposal }, link, now, by)
+      : decision;
+  });
+}
+
+const AGENDA_FILE = /^agendas\/(.+)\.json$/u;
+
+/**
+ * The guard's own relink rule (`taskProposalRelinkProblem`), run before any
+ * agenda is written against the planned agendas and the ledger, so the
+ * facade and the guard decide alike and a refusal (exit 2) leaves nothing
+ * behind.
+ */
+function assertRelinksAllowed(
+  location: DecisionLedgerLocation,
+  pending: readonly PendingProposal[],
+  links: ReadonlyMap<string, { agenda_id: string; entry_id: string }>,
+  writes: ReadonlyMap<string, DecisionAgenda>,
+  now: string,
+  by: string
+): void {
+  const agendas = new Map(listAgendas(location).map((agenda) => [agenda.agenda_id, agenda]));
+  for (const [id, agenda] of writes) agendas.set(id, agenda);
+  const ledgerText = readLedger(location)
+    .map((record) => JSON.stringify(record))
+    .join('\n');
+  const read = (relative: string): string | undefined => {
+    if (relative === 'decisions.jsonl') return ledgerText;
+    const id = relative.match(AGENDA_FILE)?.[1];
+    const agenda = id ? agendas.get(id) : undefined;
+    return agenda ? JSON.stringify(agenda) : undefined;
+  };
+  for (const { lock, entry } of pending) {
+    if (!links.has(entry.proposal.proposal_id)) continue;
+    const [relinked] = relinkedDecisions({ decisions: [entry] }, links, now, by);
+    const problem = taskProposalRelinkProblem(entry, relinked, read, lock);
+    if (problem) {
+      throw new ScriptExitError(
+        2,
+        `task proposal ${entry.proposal.proposal_id} cannot be re-asked: ${problem}; nothing was written`
+      );
+    }
+  }
+}
+
 /**
  * Write a re-asked lock as the content-checked consumer store role, owner
  * bound to the lock's consumer: the lock is read again under that capability
@@ -435,15 +536,7 @@ function relinkOnLock(
       }
       writeConsumedDecisionLock(location, {
         ...current,
-        decisions: current.decisions.map((decision) => {
-          const link =
-            decision.layer === 'task_proposal' && decision.proposal
-              ? links.get(decision.proposal.proposal_id)
-              : undefined;
-          return link && decision.proposal
-            ? relinkTaskProposal({ ...decision, proposal: decision.proposal }, link, now, by)
-            : decision;
-        }),
+        decisions: relinkedDecisions(current, links, now, by),
       });
     }
   );
@@ -464,8 +557,11 @@ export function taskProposalStatus(
   now: string
 ): Record<string, unknown> {
   const all = readLocks(location);
-  const superseded = all.filter((lock) => lock.superseded);
-  const locks = all.filter((lock) => !lock.superseded);
+  // A superseded mark counts only when the mission side verified its approval.
+  const isSuperseded = (lock: ConsumedDecisionLockRecord) =>
+    isApprovedSupersededConsumerLock(tenant, lock);
+  const superseded = all.filter(isSuperseded);
+  const locks = all.filter((lock) => !isSuperseded(lock));
   const pending = locks.flatMap((lock) =>
     pendingTaskProposals(lock).map((entry) => entry.proposal.proposal_id)
   );

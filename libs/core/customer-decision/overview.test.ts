@@ -399,16 +399,26 @@ describe('buildCaseOverview (CD-12)', () => {
     );
     expect(gone.tasks).toMatchObject({ held: 1, unresolvable: 1 });
     expect(gone.tasks.unresolvable_next).toMatch(/--from-tasks --reask .*mission supersede-task/u);
-    // A superseded task is skipped entirely (no hold, no pending proposal).
+    // A task superseded by a verified approval is skipped entirely; a mark
+    // alone (no verifier, or one that refuses it) is a live task.
+    const marked = caseInput().consumers.map((item) => ({
+      ...item,
+      superseded: {
+        by_consumer: `${item.consumer}-v2`,
+        by_task_id: 'v2',
+        at: CREATED,
+        approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+      },
+    }));
+    expect(buildCaseOverview(caseInput({ consumers: marked })).tasks).toMatchObject({
+      pending_proposals: 2,
+      held: 1,
+    });
+    expect(
+      buildCaseOverview(caseInput({ consumers: marked, isSuperseded: () => false })).tasks
+    ).toMatchObject({ pending_proposals: 2, held: 1 });
     const superseded = buildCaseOverview(
-      caseInput({
-        consumers: [
-          ...caseInput().consumers.map((item) => ({
-            ...item,
-            superseded: { by_consumer: `${item.consumer}-v2`, by_task_id: 'v2', at: CREATED },
-          })),
-        ],
-      })
+      caseInput({ consumers: marked, isSuperseded: (lock) => lock.superseded !== undefined })
     );
     expect(superseded.tasks).toEqual({
       pending_proposals: 0,

@@ -123,6 +123,12 @@ export async function dispatchPlannedMissionTaskCore(
       ? nextCustomerDecisionPinFailures(previousPinFailures, decisionPin.failed, nowIso())
       : undefined;
   const pinEscalated = isCustomerDecisionPinEscalated(pinFailures);
+  const previousRewrites = previousWorkItem?.metadata?.dependencies_rewritten_from;
+  const rewrittenFrom = input.task.dependencies_rewritten_from?.length
+    ? input.task.dependencies_rewritten_from
+    : Array.isArray(previousRewrites) && previousRewrites.length > 0
+      ? previousRewrites
+      : undefined;
   const workItem = importExternalWorkItem({
     source: 'local',
     sourceRef: workItemSourceRef,
@@ -152,6 +158,8 @@ export async function dispatchPlannedMissionTaskCore(
       task_id: input.task.task_id,
       mission_id: input.missionId,
       ...(pinFailures ? { customer_decision_pin_failures: pinFailures } : {}),
+      // m6: the supersede-task rewrite note survives the wholesale re-import.
+      ...(rewrittenFrom ? { dependencies_rewritten_from: rewrittenFrom } : {}),
     },
   });
   if (decisionPin?.failed && !knownDecisionTask && !pinEscalated) {

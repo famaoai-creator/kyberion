@@ -1358,6 +1358,57 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
     );
   });
 
+  it('a new planner packet never re-plans a superseded task or un-archives its WorkItem', async () => {
+    const { missionDir } = await import('../path-resolver.js');
+    const { safeReadFile, safeWriteFile } = await import('../secure-io.js');
+    const { persistPlanningPacket } = await import('./mission-orchestration-worker.js');
+    const { createWorkItem, getWorkItem } = await import('../workforce/work-coordination.js');
+    const missionPath = missionDir('MSN-FOLLOWUP', 'public');
+    const superseded = {
+      task_id: 'task-1',
+      status: 'superseded',
+      description: 'Replaced task',
+      deliverable: 'artifacts/current-missions.md',
+      dependencies: [],
+      superseded: {
+        by_task_id: 'task-2',
+        at: '2026-10-26T00:00:00.000Z',
+        actor_id: 'operator',
+        reason_sha256: 'a'.repeat(64),
+        approval_request_id: 'approval-1',
+      },
+    };
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify([superseded], null, 2));
+    createWorkItem({
+      itemId: 'witem-followup-superseded',
+      title: 'Replaced task',
+      description: 'Replaced task',
+      status: 'archived',
+      projectId: 'MSN-FOLLOWUP',
+      source: 'local',
+      sourceRef: 'mission:MSN-FOLLOWUP:task-1',
+      context: { mission_id: 'MSN-FOLLOWUP', project_id: 'MSN-FOLLOWUP', task_id: 'task-1' },
+      metadata: { task_id: 'task-1', superseded_by: 'task-2' },
+    });
+
+    persistPlanningPacket('MSN-FOLLOWUP', {
+      mission_id: 'MSN-FOLLOWUP',
+      summary: 'Re-plan',
+      plan_markdown: '# PLAN\n\n## Objective\nRe-plan\n',
+      next_tasks: [
+        { task_id: 'task-1', team_role: 'operator', description: 'Planner re-plans it' },
+        { task_id: 'task-2', team_role: 'operator', description: 'The replacement' },
+      ],
+    });
+
+    const nextTasks = JSON.parse(
+      safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }) as string
+    ) as Array<Record<string, unknown>>;
+    expect(nextTasks.find((task) => task.task_id === 'task-1')).toEqual(superseded);
+    expect(nextTasks.find((task) => task.task_id === 'task-2')?.status).toBe('planned');
+    expect(getWorkItem('witem-followup-superseded')?.status).toBe('archived');
+  });
+
   it('re-prompts the planner once when the initial planning packet fails validation', async () => {
     const { resolveMissionPlanningPacket } = await import('./mission-orchestration-worker.js');
     const { safeExistsSync, safeReaddir, safeReadFile } = await import('../secure-io.js');

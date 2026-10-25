@@ -57,6 +57,9 @@ import {
   type CustomerDecisionConsumerSuperseded,
 } from '../foundation/customer-decision-consumer-capability.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+
+/** The guard's relink rule, for the facade to check a re-ask before it writes anything. */
+export { taskProposalRelinkProblem } from '../foundation/customer-decision-consumer-capability.js';
 import {
   CASE_ID_PATTERN,
   CUSTOMER_SLUG_PATTERN,
@@ -643,7 +646,12 @@ export interface ConsumedDecisionLockRecord extends ConsumedDecisionLock {
   superseded?: CustomerDecisionConsumerSuperseded;
 }
 
-/** A superseded lock is frozen: no hold, release, rework or re-ask applies to it. */
+/**
+ * The lock carries a `superseded` mark. The mark alone is NOT trusted (a
+ * worker holding its own lock capability can write one; the guard checks
+ * only its shape): readers honour it only through the mission-side
+ * verification of its `approval_request_id`.
+ */
 export function isConsumedDecisionLockSuperseded(
   lock: Pick<ConsumedDecisionLockRecord, 'superseded'>
 ): boolean {
@@ -654,7 +662,7 @@ export function isConsumedDecisionLockSuperseded(
  * The lock as `mission_controller supersede-task` writes it: the same record
  * plus `superseded` and nothing else (the only shape the guard accepts). A
  * lock already superseded by the same task is returned unchanged (an
- * idempotent re-run); by another task it is refused.
+ * idempotent re-run with the same approval); otherwise it is refused.
  */
 export function supersededConsumedDecisionLock(
   lock: ConsumedDecisionLockRecord,
@@ -663,7 +671,8 @@ export function supersededConsumedDecisionLock(
   if (lock.superseded) {
     if (
       lock.superseded.by_consumer === superseded.by_consumer &&
-      lock.superseded.by_task_id === superseded.by_task_id
+      lock.superseded.by_task_id === superseded.by_task_id &&
+      lock.superseded.approval_request_id === superseded.approval_request_id
     )
       return lock;
     throw new Error(
@@ -676,6 +685,7 @@ export function supersededConsumedDecisionLock(
       by_consumer: superseded.by_consumer,
       by_task_id: superseded.by_task_id,
       at: superseded.at,
+      approval_request_id: superseded.approval_request_id,
     },
   };
 }

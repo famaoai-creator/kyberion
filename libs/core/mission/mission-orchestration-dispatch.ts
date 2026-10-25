@@ -577,15 +577,14 @@ export async function dispatchMissionNextTasksCore(
       edges: derivedFrontier.graph.edges,
     };
     const terminalSuccessIds = allTasks
-      // A superseded task (supersede-task) is closed and never dispatched; its
-      // dependents were rewritten onto the replacement.
-      .filter((task) =>
-        ['completed', 'accepted', 'reviewed', 'superseded'].includes(String(task.status || ''))
-      )
+      .filter((task) => ['completed', 'accepted', 'reviewed'].includes(String(task.status || '')))
       .map((task) => task.task_id)
       .concat([...dispatchedTaskIds]);
     const terminalBlockedIds = allTasks
-      .filter((task) => ['blocked', 'requested'].includes(String(task.status || '')))
+      // A superseded task (supersede-task) never ran to success: it is never
+      // dispatched and never satisfies a dependency (its dependents were
+      // rewritten onto the replacement, so they wait on that instead).
+      .filter((task) => ['blocked', 'requested', 'superseded'].includes(String(task.status || '')))
       .map((task) => task.task_id);
     const frontierResult = await executeGraph<PlannedNextTask, Record<string, unknown>>(
       frontierGraph,

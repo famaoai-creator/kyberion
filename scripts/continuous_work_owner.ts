@@ -6,6 +6,7 @@ import { safeExistsSync, safeReadFileSnapshot, safeWriteFile } from '@agent/core
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { pathResolver, findMissionPath } from '@agent/core/path-resolver';
 import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission/mission-next-task-reader';
+import { isSupersedeProvenForGate } from '@agent/core/mission/mission-task-supersede-proof';
 import { loadState } from '@agent/core/mission/mission-state';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
 import { listWorkItems, updateWorkItem } from '@agent/core/workforce/work-coordination';
@@ -45,6 +46,8 @@ export interface ContinuousOwnerAdapterDeps {
   assessApproval?: typeof assessAlignmentDecision;
   brief?: typeof loadMissionBriefAtPath;
   tasks?: typeof loadMissionNextTaskObjectsAtPath;
+  /** The mission-side supersede proof (tests); defaults to isSupersedeProvenForGate. */
+  supersedeProven?: (missionId: string, taskId: string) => boolean;
 }
 const fingerprint = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -315,11 +318,21 @@ export function createContinuousOwnerPorts(
           path.join(dir, 'NEXT_TASKS.json'),
           input.mission_id
         ) ?? [];
-      // A superseded row (supersede-task, human-approved) is closed: its
+      // A superseded row is closed only with the mission-side proof (an
+      // approved, human supersede-task); an unproven one is pending. Its
       // replacement carries the work, and at least one row must be completed.
-      const closedRows = (rows: ReadonlyArray<{ status?: unknown }>) =>
+      const supersedeProven =
+        deps.supersedeProven ??
+        ((missionId: string, taskId: string) =>
+          isSupersedeProvenForGate(missionId, taskId, 'the continuous owner'));
+      const closedRows = (rows: ReadonlyArray<{ status?: unknown; task_id?: unknown }>) =>
         rows.length > 0 &&
-        rows.every((row) => row.status === 'completed' || row.status === 'superseded') &&
+        rows.every(
+          (row) =>
+            row.status === 'completed' ||
+            (row.status === 'superseded' &&
+              supersedeProven(input.mission_id, String(row.task_id ?? '')))
+        ) &&
         rows.some((row) => row.status === 'completed');
       const complete = () => closedRows(tasks());
       if (['completed', 'archived'].includes(state.status))

@@ -86,11 +86,26 @@ describe('mission orchestration progress path boundaries', () => {
         path.join(missionPath, 'mission-state.json'),
         JSON.stringify({ mission_id: missionId, tier: 'public' })
       );
+      const record = {
+        by_task_id: 'new',
+        at: '2026-10-26T00:00:00.000Z',
+        actor_id: 'operator',
+        reason_sha256: 'a'.repeat(64),
+        approval_request_id: 'approval-1',
+      };
+      const rewrite = { from: 'old', to: 'new', at: '2026-10-26T00:00:00.000Z' };
       fs.writeFileSync(
         path.join(missionPath, 'NEXT_TASKS.json'),
         JSON.stringify([
-          { task_id: 'old', status: 'superseded' },
+          { task_id: 'old', status: 'superseded', superseded: record },
           { task_id: 'new', status: 'planned' },
+          {
+            task_id: 'after',
+            status: 'planned',
+            dependencies: ['new'],
+            dependencies_rewritten_from: [rewrite],
+          },
+          { task_id: 'other', status: 'planned' },
         ])
       );
       fs.writeFileSync(
@@ -102,10 +117,27 @@ describe('mission orchestration progress path boundaries', () => {
       progress.writeNextTasks(missionId, [
         { task_id: 'old', status: 'blocked' },
         { task_id: 'new', status: 'completed' },
+        { task_id: 'after', status: 'planned', dependencies: ['old'] },
+        // A worker write never introduces a supersede.
+        { task_id: 'other', status: 'superseded', superseded: record },
       ]);
-      expect(progress.loadAllNextTasks(missionId).map((task) => task.status)).toEqual([
+      const written = progress.loadAllNextTasks(missionId);
+      expect(written.map((task) => task.status)).toEqual([
         'superseded',
         'completed',
+        'planned',
+        'planned',
+      ]);
+      expect(written[0].superseded).toEqual(record);
+      expect(written[2]).toMatchObject({
+        dependencies: ['new'],
+        dependencies_rewritten_from: [rewrite],
+      });
+      expect(written[3]).not.toHaveProperty('superseded');
+      // Restore the board for the outcome summary below.
+      progress.writeNextTasks(missionId, [
+        { task_id: 'old', status: 'superseded' },
+        { task_id: 'new', status: 'completed' },
       ]);
       expect(progress.summarizeMissionTaskOutcomes(missionId)).toMatchObject({
         completedCount: 1,

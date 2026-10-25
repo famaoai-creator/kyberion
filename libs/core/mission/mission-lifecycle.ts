@@ -59,7 +59,9 @@ import {
   buildMissionCompletionReconciliationInput,
   collectMissionEvidence,
   extractPromotableMissionMemory,
+  isTaskClosedForGate,
   isTaskDeliverableSatisfied,
+  isTaskProvenSuperseded,
   isTaskSuperseded,
   MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
@@ -77,6 +79,7 @@ export {
   collectMissionEvidence,
   readMissionNextTasks,
   writeMissionNextTasks,
+  isTaskProvenSuperseded,
   isTaskSuperseded,
   MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
@@ -186,7 +189,8 @@ export function evaluateMissionFinishExitGate(
   for (const task of nextTasks) {
     const taskId = String(task.task_id || '');
     if (!taskId.startsWith('repair-') && !taskId.startsWith('goal-gap-')) continue;
-    if (isTaskSuperseded(task)) continue;
+    // A proven supersede closes a repair task; an unproven one is evaluated as pending.
+    if (isTaskProvenSuperseded(missionDir, task, 'the finish gate')) continue;
     const staleCircularGoalRepair =
       taskId === 'repair-goal-satisfaction' &&
       Boolean(state) &&
@@ -204,7 +208,9 @@ export function evaluateMissionFinishExitGate(
   const pendingTasks = nextTasks
     .filter((task) => {
       const status = String(task.status || 'planned').toLowerCase();
-      return !closedStatuses.has(status);
+      return (
+        !closedStatuses.has(status) || !isTaskClosedForGate(missionDir, task, 'the finish gate')
+      );
     })
     .map((task) => String(task.task_id || task.description || 'unknown-task'));
 

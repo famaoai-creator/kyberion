@@ -170,6 +170,14 @@ export interface DecisionAgenda {
    */
   operator_confirmations?: OperatorConfirmation[];
   /**
+   * CD-09 re-ask: the task proposals the operator facade re-asked onto this
+   * agenda (`customer-decision draft --from-tasks --reask`). Only the facade
+   * (`decision_ledger`) writes agendas, so the consumer store guard accepts a
+   * relink only onto an agenda naming that proposal, consumer and member here
+   * (`taskProposalRelinkProblem`). Ids only, outside the content hash, append-only.
+   */
+  reasked_proposals?: ReaskedProposalMarker[];
+  /**
    * CD-11: customer reminders sent or held for approval (one record per
    * agenda × actor × kind × target date). Ids, dates and statuses only,
    * outside the content hash (like `bolt_routing`); written by the facade's
@@ -417,6 +425,16 @@ export interface TaskProposalPreviousLink {
   relinked_at: string;
   /** The member who re-asked it (`user:<member>`). */
   relinked_by: string;
+}
+
+/** One re-ask the facade recorded on its target agenda ({@link DecisionAgenda.reasked_proposals}). */
+export interface ReaskedProposalMarker {
+  proposal_id: string;
+  consumer: string;
+  /** The member who re-asked it (`user:<member>`), equal to the lock link's `relinked_by`. */
+  by: string;
+  /** Equal to the lock link's `relinked_at`. */
+  at: string;
 }
 
 /** How many times one task proposal may be re-asked. */

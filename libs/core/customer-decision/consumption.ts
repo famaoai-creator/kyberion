@@ -30,6 +30,10 @@ import {
   TASK_PROPOSAL_MAX_PREVIOUS_LINKS,
 } from './model.js';
 import type { ConsumedDecisionLockRecord } from './store.js';
+import {
+  isStandingCustomerDecisionRecord,
+  supersededDecisionIds,
+} from '../foundation/customer-decision-standing.js';
 import { canonicalJson, type DecisionRecord } from '../decision-ledger/model.js';
 import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 
@@ -231,13 +235,20 @@ export function findStaleConsumersForSwitches(input: {
   agendas: readonly DecisionAgenda[];
   ledger: readonly DecisionRecord[];
   now: string;
+  /**
+   * Is this lock superseded by a verified approval (mission side)? A
+   * `superseded` mark alone is never trusted; without a verifier no lock is
+   * skipped as superseded.
+   */
+  isSuperseded?: (lock: ConsumedDecisionLockRecord) => boolean;
 }): ConsumerSweepFinding[] {
+  const superseded = input.isSuperseded ?? (() => false);
   const switched = new Set(input.switches.map((item) => `${item.agenda_id}\u0000${item.entry_id}`));
   const switchedKeys = new Set(input.switches.map((item) => `${item.item}\u0000${item.key}`));
   const findings: ConsumerSweepFinding[] = [];
   for (const lock of input.locks) {
     // A superseded task's result is replaced by its successor's: no rework.
-    if (lock.status !== 'completed' || lock.superseded) continue;
+    if (lock.status !== 'completed' || superseded(lock)) continue;
     const touches = lock.decisions.some((decision) =>
       decision.agenda_id !== undefined && decision.entry_id !== undefined
         ? switched.has(`${decision.agenda_id}\u0000${decision.entry_id}`)
@@ -467,25 +478,16 @@ export type TaskProposalDecisionState =
 
 /**
  * The ledger records `record` as the customer's decided value of the entry's
- * item × key, and it is still the one that stands: active, and no later
- * record supersedes it (a superseded answer is never delivered as confirmed).
+ * item × key, and it is still the one that stands — the shared predicate
+ * (`isStandingCustomerDecisionRecord`) the relink guard uses too, so the
+ * facade and the guard agree on when a released proposal is re-askable.
  */
 function isStandingCustomerRecord(
   record: DecisionRecord | undefined,
   entry: TaskProposalLockEntry,
   supersededIds: ReadonlySet<string>
 ): record is DecisionRecord {
-  return Boolean(
-    record &&
-    record.item === entry.item &&
-    record.key === entry.key &&
-    record.level === 'customer-value' &&
-    record.state === 'decided' &&
-    record.status === 'active' &&
-    !supersededIds.has(record.id) &&
-    record.decided_by?.on_behalf_of?.actor_id &&
-    record.value !== undefined
-  );
+  return isStandingCustomerDecisionRecord(record, entry.item, entry.key, supersededIds);
 }
 
 /**
@@ -515,9 +517,7 @@ export function taskProposalStates(
 ): Array<{ entry: TaskProposalLockEntry; state: TaskProposalDecisionState }> {
   const byId = new Map(agendas.map((agenda) => [agenda.agenda_id, agenda]));
   const byRecord = new Map(ledger.map((record) => [record.id, record]));
-  const supersededIds = new Set(
-    ledger.flatMap((record) => (record.supersedes ? [record.supersedes] : []))
-  );
+  const supersededIds = supersededDecisionIds(ledger);
   const resolved = new Map<string, EffectiveDecision[]>();
   const everCompleted = lock.status === 'completed' || lock.completed_at !== undefined;
   const effectiveOf = (agenda: DecisionAgenda): EffectiveDecision[] => {
@@ -590,16 +590,15 @@ export function taskProposalStates(
  * more ({@link taskProposalStates} `unresolvable`: their agenda is closed,
  * withdrawn or gone with no standing confirmed answer). The operator re-asks
  * them (`customer-decision draft --from-tasks --reask`, {@link relinkTaskProposal})
- * or replaces the task (`mission_controller supersede-task`). A superseded
- * lock has none.
+ * or replaces the task (`mission_controller supersede-task`). Callers skip a
+ * lock whose supersede they verified.
  */
 export function unresolvableTaskProposals(
-  lock: TaskProposalLock & { superseded?: unknown },
+  lock: TaskProposalLock,
   agendas: readonly DecisionAgenda[],
   ledger: readonly DecisionRecord[],
   now: string
 ): TaskProposalLockEntry[] {
-  if (lock.superseded !== undefined) return [];
   return taskProposalStates(lock, agendas, ledger, now).flatMap(({ entry, state }) =>
     state.status === 'unresolvable' ? [entry] : []
   );

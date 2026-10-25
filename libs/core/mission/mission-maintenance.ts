@@ -61,7 +61,7 @@ import {
   emitMissionLifecycleIntentSnapshot,
 } from './mission-intent-delta.js';
 import {
-  isTaskSuperseded,
+  isTaskProvenSuperseded,
   MISSION_TASK_CLOSED_STATUSES,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
@@ -920,7 +920,7 @@ export async function recordEvidence(args: {
       return undefined;
     }
   })();
-  if (isTaskSuperseded(recordedTask)) {
+  if (isTaskProvenSuperseded(missionPath, recordedTask, 'record-evidence')) {
     throw new Error(
       `Task ${args.taskId} of ${upperId} is superseded${
         recordedTask?.superseded &&
@@ -955,6 +955,15 @@ export async function recordEvidence(args: {
   const decisionCheck = reconcileTaskDecisions({ missionId: upperId, taskId: args.taskId });
 
   await withLock(`mission-${upperId}`, async () => {
+    // m4: re-checked under the mission lock (a supersede may have landed since).
+    const lockedTask = readMissionNextTasks(missionPath).find(
+      (entry) => String(entry.task_id || '') === args.taskId
+    );
+    if (isTaskProvenSuperseded(missionPath, lockedTask, 'record-evidence')) {
+      throw new Error(
+        `Task ${args.taskId} of ${upperId} is superseded; record the evidence on the replacement task.`
+      );
+    }
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,
       mission_path_hint: missionPath,
@@ -1053,6 +1062,24 @@ function findLedgerActorIdsForTask(missionPath: string, taskId: string): string[
   return Array.from(actorIds);
 }
 
+/** Refuse a review whose task or target supersede-task closed (ids only). */
+function assertReviewNotSuperseded(
+  missionPath: string,
+  tasks: Array<Record<string, unknown>>,
+  reviewTaskId: string,
+  reviewTargetId: string,
+  missionId: string
+): void {
+  for (const taskId of [reviewTaskId, reviewTargetId]) {
+    const task = tasks.find((entry) => String(entry.task_id || '') === taskId);
+    if (isTaskProvenSuperseded(missionPath, task, 'review-task')) {
+      throw new Error(
+        `Task ${taskId} of ${missionId} is superseded; a review of it is recorded on the replacement.`
+      );
+    }
+  }
+}
+
 export interface RecordArtifactReviewResult {
   /** Whether the receipt (as recorded) satisfies independence + no-blocking-findings. */
   status: 'recorded' | 'blocked';
@@ -1108,6 +1135,8 @@ export async function recordArtifactReview(args: {
     );
   }
   const targetTask = nextTasks.find((entry) => String(entry.task_id || '') === reviewTargetId);
+  // m4: a superseded review task, or a review of a superseded task, records nothing.
+  assertReviewNotSuperseded(missionPath, nextTasks, args.reviewTaskId, reviewTargetId, upperId);
   const deliverable = String(targetTask?.deliverable || targetTask?.target_path || '');
   if (!deliverable) {
     throw new Error(`Review target "${reviewTargetId}" has no deliverable to review.`);
@@ -1175,10 +1204,18 @@ export async function recordArtifactReview(args: {
       missionPath,
     });
 
+    // Re-read the board under the mission lock: writing back the copy read
+    // before it would undo a supersede-task (or any other write) made since.
+    const lockedTasks = readMissionNextTasks(missionPath);
+    assertReviewNotSuperseded(missionPath, lockedTasks, args.reviewTaskId, reviewTargetId, upperId);
+    const lockedTask = lockedTasks.find(
+      (entry) => String(entry.task_id || '') === args.reviewTaskId
+    );
+    if (!lockedTask) throw new Error(`Task "${args.reviewTaskId}" not found in NEXT_TASKS.json.`);
     // Stamp the task so both isReviewTaskSatisfied (record-evidence-time) and
     // validateMissionArtifactReviewGate (finish-time) see the same receipt.
-    task.artifact_review_receipt = receiptRelPath;
-    task.artifact_review_profile = {
+    lockedTask.artifact_review_receipt = receiptRelPath;
+    lockedTask.artifact_review_profile = {
       artifact_kind: kind,
       artifact_path: artifactReference,
       artifact_sha256: sha256Value,
@@ -1186,7 +1223,7 @@ export async function recordArtifactReview(args: {
       independence_required: true,
       implementer_agent_ids: implementerAgentIds,
     };
-    writeMissionNextTasks(missionPath, nextTasks);
+    writeMissionNextTasks(missionPath, lockedTasks);
 
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,

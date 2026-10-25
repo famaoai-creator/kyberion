@@ -917,10 +917,6 @@ describe('re-asking an unresolvable task proposal (CD-09 lifecycle)', () => {
     expect(
       unresolvableTaskProposals(first, [closedFirst], [], NOW).map((e) => e.proposal.proposal_id)
     ).toEqual([id]);
-    // A superseded lock has nothing to re-ask.
-    expect(unresolvableTaskProposals({ ...first, superseded: {} }, [closedFirst], [], NOW)).toEqual(
-      []
-    );
 
     const relinked = relinkTaskProposal(
       proposal(first),
@@ -1038,6 +1034,7 @@ describe('re-asking an unresolvable task proposal (CD-09 lifecycle)', () => {
             by_consumer: 'mission-MSN-CD09.impl-v2',
             by_task_id: 'impl-v2',
             at: LATER,
+            approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
           },
         }
       );
@@ -1051,6 +1048,12 @@ describe('re-asking an unresolvable task proposal (CD-09 lifecycle)', () => {
             superseded: { ...lock.superseded!, extra: 1 } as never,
           }
         )
+      ).toThrow();
+      // The mark names the approval that authorized it: never without one.
+      const { approval_request_id: _approval, ...unapproved } = lock.superseded!;
+      void _approval;
+      expect(() =>
+        writeConsumedDecisionLock({ dir }, { ...lock, superseded: unapproved as never })
       ).toThrow();
       expect(() =>
         writeConsumedDecisionLock(
@@ -1074,7 +1077,7 @@ describe('re-asking an unresolvable task proposal (CD-09 lifecycle)', () => {
     });
   });
 
-  it('the response sweep skips a superseded lock', () => {
+  it('the response sweep skips a lock only when its supersede is verified', () => {
     const lock = record(
       buildConsumedDecisionLock({
         caseId: 'case-a',
@@ -1092,13 +1095,22 @@ describe('re-asking an unresolvable task proposal (CD-09 lifecycle)', () => {
       now: LATER,
     };
     expect(findStaleConsumersForSwitches({ ...input, locks: [lock] })).toHaveLength(1);
+    const marked = {
+      ...lock,
+      superseded: {
+        by_consumer: `${consumer}2`,
+        by_task_id: 'impl2',
+        at: LATER,
+        approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+      },
+    };
+    // A mark alone is never trusted: without a verifier the lock is swept as usual.
+    expect(findStaleConsumersForSwitches({ ...input, locks: [marked] })).toHaveLength(1);
     expect(
-      findStaleConsumersForSwitches({
-        ...input,
-        locks: [
-          { ...lock, superseded: { by_consumer: `${consumer}2`, by_task_id: 'impl2', at: LATER } },
-        ],
-      })
+      findStaleConsumersForSwitches({ ...input, locks: [marked], isSuperseded: () => false })
+    ).toHaveLength(1);
+    expect(
+      findStaleConsumersForSwitches({ ...input, locks: [marked], isSuperseded: () => true })
     ).toEqual([]);
   });
 });

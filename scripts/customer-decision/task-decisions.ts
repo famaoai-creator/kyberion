@@ -27,6 +27,7 @@ import {
 } from '@agent/core/customer-decision';
 import { resolveMissionDecisionCase } from '@agent/core/mission/mission-decision-lock';
 import { ScriptExitError } from '../lib/harness.js';
+import { isApprovedSupersededConsumerLock } from './superseded-locks.js';
 import {
   type CustomerDecisionIo,
   asLedgerWriter,
@@ -113,10 +114,13 @@ export function runTaskDecisions(
         ...(lock.completed_at ? { completed_at: lock.completed_at } : {}),
       }
     : { decisions: [] };
+  // A superseded mark counts only when the mission side verified its approval.
+  const superseded =
+    lock && isApprovedSupersededConsumerLock(tenant, lock) ? lock.superseded : undefined;
   const decisions =
-    lock && !lock.superseded ? resolvedTaskProposalDecisions(judged, agendas, ledger, now) : [];
+    lock && !superseded ? resolvedTaskProposalDecisions(judged, agendas, ledger, now) : [];
   const unconfirmed =
-    lock && !lock.superseded ? unconfirmedTaskProposals(judged, agendas, ledger, now) : [];
+    lock && !superseded ? unconfirmedTaskProposals(judged, agendas, ledger, now) : [];
   audit(tenant, 'task_decisions_read', {
     mission_id: missionId,
     task_id: taskId,
@@ -127,14 +131,14 @@ export function runTaskDecisions(
     count: decisions.length,
     decision_ids: decisions.map((decision) => decision.decision_id),
     unconfirmed_proposal_ids: unconfirmed.map((item) => item.proposal_id),
-    ...(lock?.superseded ? { superseded: true } : {}),
+    ...(superseded ? { superseded: true } : {}),
   });
   return {
     ...nothing,
     case_found: true,
     case_id: resolved.caseId,
     lock_found: Boolean(lock),
-    ...(lock?.superseded ? { superseded: { by_task_id: lock.superseded.by_task_id } } : {}),
+    ...(superseded ? { superseded: { by_task_id: superseded.by_task_id } } : {}),
     decisions,
     unconfirmed,
   };

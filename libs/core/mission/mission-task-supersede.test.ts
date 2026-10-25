@@ -6,6 +6,38 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
     await import('../governance/__tests__/sod-overlay-state.js');
   return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
 });
+// M1: fail the ledger append once to leave a supersede part-way applied.
+const ledgerFault = vi.hoisted(() => ({ failNext: false, failAuditStamp: false }));
+// Fail the receipt's audit stamp once (a crash between the audit and the stamp).
+vi.mock('./mission-dispatch-lifecycle.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-dispatch-lifecycle.js')>();
+  return {
+    ...actual,
+    writeDispatchArtifact: (...args: Parameters<typeof actual.writeDispatchArtifact>) => {
+      const payload = args[1] as Record<string, unknown> | undefined;
+      if (ledgerFault.failAuditStamp && payload && 'audit_recorded_at' in payload) {
+        ledgerFault.failAuditStamp = false;
+        throw new Error('[TEST_FAULT] audit stamp failed');
+      }
+      return actual.writeDispatchArtifact(...args);
+    },
+  };
+});
+vi.mock('./mission-team-binding.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-team-binding.js')>();
+  return {
+    ...actual,
+    appendMissionExecutionLedgerEntry: (
+      ...args: Parameters<typeof actual.appendMissionExecutionLedgerEntry>
+    ) => {
+      if (ledgerFault.failNext) {
+        ledgerFault.failNext = false;
+        throw new Error('[TEST_FAULT] ledger append failed');
+      }
+      return actual.appendMissionExecutionLedgerEntry(...args);
+    },
+  };
+});
 import { useSeparationOfDutiesOverlay } from '../governance/__tests__/sod-overlay.js';
 import {
   approvalEventLogicalPath,
@@ -34,7 +66,9 @@ import { evaluateMissionFinishExitGate, readMissionNextTasks } from './mission-l
 import { loadState } from './mission-state.js';
 import {
   createMissionTaskSupersedeApprovalRequest,
+  isTaskVerifiablySuperseded,
   MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
+  missionTaskSupersedeProof,
   supersedeMissionTask,
 } from './mission-task-supersede.js';
 
@@ -450,6 +484,217 @@ describe('mission_controller supersede-task', () => {
     expect(listActiveWorkLeases().some((lease) => lease.item_id === itemId('task-held'))).toBe(
       false
     );
+  });
+
+  it('a run that stops part-way is finished by re-running it with the same approval', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    ledgerFault.failNext = true;
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
+    // Part-way: the WorkItem is archived, NEXT_TASKS (written last) is not yet
+    // superseded, so the mission does not prove the supersede.
+    expect(getWorkItem(itemId('task-held'))?.status).toBe('archived');
+    expect(boardTask('task-held')?.status).toBe('blocked');
+    expect(isTaskVerifiablySuperseded(missionId, 'task-held')).toBe(false);
+
+    const finished = await supersedeMissionTask(input);
+    expect(finished.status).toBe('applied');
+    expect(boardTask('task-held')?.status).toBe('superseded');
+    expect(boardTask('task-after')?.dependencies).toEqual(['task-replacement']);
+    expect(getWorkItem(itemId('task-after'))?.dependencies).toEqual(['task-replacement']);
+    const ledger = String(
+      safeReadFile(nodePath.join(missionPath, 'execution-ledger.jsonl'), { encoding: 'utf8' })
+    );
+    expect(ledger.match(/"event_type":"task_superseded"/gu)).toHaveLength(1);
+    const receipt = JSON.parse(
+      String(
+        safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    expect(typeof receipt.audit_recorded_at).toBe('string');
+    expect(
+      loadState(missionId)?.history.filter((entry) => entry.event === 'TASK_SUPERSEDED')
+    ).toHaveLength(1);
+    expect(isTaskVerifiablySuperseded(missionId, 'task-held', { approvalRequestId })).toBe(true);
+
+    expect((await supersedeMissionTask(input)).status).toBe('already_superseded');
+    expect(
+      loadState(missionId)?.history.filter((entry) => entry.event === 'TASK_SUPERSEDED')
+    ).toHaveLength(1);
+  });
+
+  it('a crash between the audit entry and its receipt stamp never audits twice', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    ledgerFault.failAuditStamp = true;
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
+    expect((await supersedeMissionTask(input)).status).toBe('applied');
+    const { auditChain } = await import('../governance/audit-chain.js');
+    expect(
+      auditChain
+        .loadAll()
+        .filter(
+          (entry) =>
+            entry.action === 'mission.task_superseded' &&
+            entry.metadata?.approval_request_id === approvalRequestId
+        )
+    ).toHaveLength(1);
+    expect(isTaskVerifiablySuperseded(missionId, 'task-held', { approvalRequestId })).toBe(true);
+  });
+
+  it('proves a supersede only with the approved human request it records', async () => {
+    prepareMission();
+    // A board edited by hand (or a worker) without an approval proves nothing.
+    const forged = defaultTasks().map((task) =>
+      task.task_id === 'task-held'
+        ? {
+            ...task,
+            status: 'superseded',
+            superseded: {
+              by_task_id: 'task-replacement',
+              at: '2026-10-26T00:00:00.000Z',
+              actor_id: 'worker',
+              reason_sha256: 'a'.repeat(64),
+              approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+            },
+          }
+        : task
+    );
+    safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), JSON.stringify(forged));
+    expect(missionTaskSupersedeProof(missionId, 'task-held')).toEqual({
+      verified: false,
+      reason: 'approval_not_approved',
+    });
+    // The finish gate counts the unproven supersede as pending.
+    expect(evaluateMissionFinishExitGate(missionPath).pendingTasks).toContain('task-held');
+    // An approved request for another reason does not prove this record.
+    safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), JSON.stringify(defaultTasks()));
+    const approvalRequestId = approve();
+    safeWriteFile(
+      nodePath.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify(
+        forged.map((task) =>
+          task.task_id === 'task-held'
+            ? {
+                ...task,
+                superseded: {
+                  ...(task.superseded as Record<string, unknown>),
+                  approval_request_id: approvalRequestId,
+                },
+              }
+            : task
+        )
+      )
+    );
+    expect(missionTaskSupersedeProof(missionId, 'task-held')).toEqual({
+      verified: false,
+      reason: 'approval_other_payload',
+    });
+    expect(missionTaskSupersedeProof(missionId, 'task-after').verified).toBe(false);
+  });
+
+  it('a dry run never writes, even for a task already superseded under the approval', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    const before = String(
+      safeReadFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), { encoding: 'utf8' })
+    );
+    await expect(
+      supersedeMissionTask({
+        missionId,
+        taskId: 'task-held',
+        byTaskId: 'task-replacement',
+        reason,
+        approvalRequestId,
+        dryRun: true,
+      })
+    ).rejects.toThrow(/already superseded/u);
+    expect(
+      String(safeReadFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), { encoding: 'utf8' }))
+    ).toBe(before);
+  });
+
+  it('never rewrites or refuses on a closed dependent', async () => {
+    prepareMission([
+      ...defaultTasks(),
+      {
+        task_id: 'review-held-done',
+        status: 'completed',
+        description: 'A finished review of the held task',
+        assigned_to: { role: 'reviewer' },
+        review_target: 'task-held',
+        deliverable: 'evidence/REVIEW-task-held.md',
+        dependencies: ['task-held'],
+      },
+    ]);
+    const dry = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      dryRun: true,
+    });
+    expect(dry.rewritten_dependent_task_ids).toEqual(['task-after']);
+  });
+
+  it('review-task refuses a review of a task the mission proves superseded', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    // A review of the replaced task is added afterwards.
+    safeWriteFile(
+      nodePath.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify([
+        ...readMissionNextTasks(missionPath),
+        {
+          task_id: 'review-held',
+          status: 'planned',
+          description: 'Review the held task',
+          assigned_to: { role: 'reviewer' },
+          review_target: 'task-held',
+          deliverable: 'evidence/REVIEW-task-held.md',
+          dependencies: ['task-held'],
+        },
+      ])
+    );
+    const { recordArtifactReview } = await import('./mission-maintenance.js');
+    await expect(
+      recordArtifactReview({
+        missionId,
+        reviewTaskId: 'review-held',
+        reviewerAgentId: 'reviewer-agent',
+        getGitHash: () => 'hash',
+      })
+    ).rejects.toThrow(/task-held of MSN-TASK-SUPERSEDE-TEST is superseded/u);
   });
 
   it('refuses record-evidence on a superseded task', async () => {

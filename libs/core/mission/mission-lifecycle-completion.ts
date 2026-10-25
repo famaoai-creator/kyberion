@@ -34,6 +34,7 @@ import {
   receiptToArtifactReviewDecision,
 } from '../workforce/artifact-review.js';
 import { loadState } from './mission-state.js';
+import { isSupersedeProvenForGate } from './mission-task-supersede-proof.js';
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
 import type { IntentReconciliationInput } from '../intent/intent-reconciliation.js';
@@ -439,6 +440,32 @@ export const MISSION_TASK_CLOSED_STATUSES: ReadonlySet<string> = new Set([
   MISSION_TASK_SUPERSEDED_STATUS,
 ]);
 
+/**
+ * Is the task closed for a reader that grants authority on it (finish gate,
+ * record-evidence auto-complete)? Completed, or superseded with the
+ * mission-side proof ({@link isSupersedeProvenForGate}); an unproven
+ * `superseded` status counts as pending.
+ */
+export function isTaskClosedForGate(
+  missionDir: string,
+  task: Record<string, unknown>,
+  reader: string
+): boolean {
+  const status = String(task.status || 'planned').toLowerCase();
+  if (MISSION_TASK_COMPLETED_STATUSES.has(status)) return true;
+  if (status !== MISSION_TASK_SUPERSEDED_STATUS) return false;
+  return isSupersedeProvenForGate(path.basename(missionDir), String(task.task_id || ''), reader);
+}
+
+/** Is the task superseded with the mission-side proof (not just its status)? */
+export function isTaskProvenSuperseded(
+  missionDir: string,
+  task: Record<string, unknown> | null | undefined,
+  reader: string
+): boolean {
+  return Boolean(task) && isTaskSuperseded(task) && isTaskClosedForGate(missionDir, task!, reader);
+}
+
 /** Was the task replaced by `supersede-task` (status, case-insensitive)? */
 export function isTaskSuperseded(task: { status?: unknown } | null | undefined): boolean {
   return String(task?.status || '').toLowerCase() === MISSION_TASK_SUPERSEDED_STATUS;
@@ -627,7 +654,8 @@ export function tryAutoCompleteTaskFromEvidence(
   if (MISSION_TASK_COMPLETED_STATUSES.has(currentStatus)) {
     return { completed: false, reason: 'already completed', cascaded: [] };
   }
-  if (currentStatus === MISSION_TASK_SUPERSEDED_STATUS) {
+  // Only a proven supersede closes it; an unproven `superseded` status is pending.
+  if (isTaskProvenSuperseded(missionDir, task, 'record-evidence')) {
     return { completed: false, reason: 'superseded by another task', cascaded: [] };
   }
   if (!isTaskDeliverableSatisfied(missionDir, task, statusByTaskId)) {
@@ -659,8 +687,9 @@ export function tryAutoCompleteTaskFromEvidence(
       if (
         !candidateId ||
         candidateId === taskId ||
-        // A superseded task is closed, never completed by a cascade.
-        MISSION_TASK_CLOSED_STATUSES.has(candidateStatus)
+        // A completed or proven-superseded task is closed, never completed by a cascade.
+        MISSION_TASK_COMPLETED_STATUSES.has(candidateStatus) ||
+        isTaskProvenSuperseded(missionDir, candidate, 'record-evidence')
       )
         continue;
       const refreshedStatuses = new Map(
@@ -740,10 +769,20 @@ export function upsertGoalGapTasks(input: {
     });
     created.push(taskId, reviewTaskId);
   });
-  const createdIds = new Set(created);
+  // m3: a goal-gap task superseded by supersede-task is never reset to planned.
+  const supersededIds = new Set(
+    tasks.filter((task) => isTaskSuperseded(task)).map((task) => String(task.task_id || ''))
+  );
+  // Nor is a review of a superseded gap task filed.
+  const kept = upserted.filter(
+    (task) =>
+      !supersededIds.has(String(task.task_id || '')) &&
+      !supersededIds.has(String(task.review_target || ''))
+  );
+  const createdIds = new Set(kept.map((task) => String(task.task_id || '')));
   const filtered = tasks.filter((task) => !createdIds.has(String(task.task_id || '')));
-  writeMissionNextTasks(input.missionDir, [...filtered, ...upserted]);
-  return created;
+  writeMissionNextTasks(input.missionDir, [...filtered, ...kept]);
+  return created.filter((taskId) => createdIds.has(taskId));
 }
 
 export function upsertMissionGateRepairTask(input: {
@@ -754,6 +793,11 @@ export function upsertMissionGateRepairTask(input: {
 }): string[] {
   const tasks = readMissionNextTasks(input.missionDir);
   const repairTaskId = `repair-${input.gateId}`;
+  // m3: a repair task superseded by supersede-task (human-approved) stays so;
+  // its replacement carries the repair.
+  if (tasks.some((task) => String(task.task_id || '') === repairTaskId && isTaskSuperseded(task))) {
+    return [];
+  }
   const repairTask = {
     task_id: repairTaskId,
     status: 'planned',
