@@ -85,6 +85,10 @@ import { parseMcpTextPayload, parseSafeJsonObject } from './mcp-json.js';
 import { registerKyberionServiceCaptureTool } from './mcp-service-capture-tool.js';
 import { registerMcpFacadeDiscoverTools } from './mcp-facade-discover.js';
 import { registerMcpFacadeActTools } from './mcp-facade-act.js';
+import {
+  registerMcpMissionLifecycleTools,
+  MCP_MISSION_LIFECYCLE_OPERATIONS,
+} from './mcp-mission-lifecycle.js';
 import type { ActuatorInvokeAllowlistEntry } from './mcp-actuator-invoke.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -156,7 +160,11 @@ const APPROVAL_SCOPE_KEYS = [
 ] as const;
 
 /** Tools whose handler must call ensureMcpApproval before producing an effect. */
-const APPROVAL_GATED_MCP_TOOLS = new Set(['kyberion.mission.create', 'kyberion.service.actuate']);
+const APPROVAL_GATED_MCP_TOOLS = new Set([
+  'kyberion.mission.create',
+  'kyberion.service.actuate',
+  ...MCP_MISSION_LIFECYCLE_OPERATIONS.map((operation) => `kyberion.mission.${operation}`),
+]);
 
 function exactMcpApprovalScopeMatches(
   actual: EventScope | undefined,
@@ -702,6 +710,12 @@ export function createKyberionMcpServer(): McpServer {
 
   // ── discover-band facade tools (scope.current, skill.list/.get, resource) ──
   registerMcpFacadeDiscoverTools({ server, catalog, registerGovernedTool });
+  registerMcpMissionLifecycleTools({
+    server,
+    catalog,
+    registerGovernedTool,
+    approve: ensureMcpApproval,
+  });
 
   // ── kyberion.knowledge.feedback ──────────────────────────────────────────
   registerGovernedTool(

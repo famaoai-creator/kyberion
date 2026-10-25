@@ -28,6 +28,18 @@ const mockRequest = () => {
   return request;
 };
 describe('member API transport', () => {
+  it('carries member authentication to only the exact governance overview endpoint', async () => {
+    const request = mockRequest();
+    storeFrontDeskToken('synthetic-owner');
+    await frontDeskFetch('/api/governance-overview');
+    expect(new Headers(request.mock.calls[0]![1]?.headers).get('authorization')).toBe(
+      'Bearer synthetic-owner'
+    );
+    for (const path of ['/api/governance-overview/nested', '/api/governance-overview-other']) {
+      await expect(frontDeskFetch(path)).rejects.toThrow('Unsupported member API path');
+    }
+    expect(request).toHaveBeenCalledTimes(1);
+  });
   it('never dispatches anonymously when storage is blocked or a token save fails', async () => {
     const request = mockRequest();
     vi.stubGlobal('window', {

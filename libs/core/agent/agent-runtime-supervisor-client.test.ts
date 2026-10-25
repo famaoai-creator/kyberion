@@ -4,9 +4,33 @@ import {
   normalizeSupervisorResponse,
   normalizeSupervisorResult,
   resolveAskTransportTimeout,
+  restoreSupervisorError,
 } from './agent-runtime-supervisor-client.js';
+import { isAgentRuntimeApprovalPendingError } from './agent-prompt-approval-port.js';
 
 describe('normalizeSupervisorResponse', () => {
+  it('restores an approval suspension across the daemon transport', () => {
+    const error = restoreSupervisorError('pending', {
+      code: 'AGENT_APPROVAL_PENDING',
+      approval_request_id: 'approval-1',
+      approval_storage_channel: 'pipeline-approvals',
+      approval_kind: 'pipeline',
+      scope: { tier: 'public', mission_id: 'MSN-A' },
+    });
+    expect(isAgentRuntimeApprovalPendingError(error)).toBe(true);
+    expect(error).toMatchObject({
+      code: 'AGENT_APPROVAL_PENDING',
+      approvalRequestId: 'approval-1',
+      approvalStorageChannel: 'pipeline-approvals',
+      approvalKind: 'pipeline',
+      scope: { mission_id: 'MSN-A' },
+    });
+    expect(
+      isAgentRuntimeApprovalPendingError(
+        restoreSupervisorError('bad', { code: 'AGENT_APPROVAL_PENDING' })
+      )
+    ).toBe(false);
+  });
   it('accepts a valid response envelope and preserves the result', () => {
     expect(
       normalizeSupervisorResponse<{ text: string }>({

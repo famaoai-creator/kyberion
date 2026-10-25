@@ -5,7 +5,12 @@
 
 import * as path from 'node:path';
 import { z } from 'zod';
-import { enqueueMemoryPromotionCandidate } from '../knowledge/memory-promotion-queue.js';
+import {
+  enqueueMemoryPromotionCandidate,
+  loadMemoryPromotionCandidate,
+  validateMemoryPromotionCandidate,
+  type MemoryCandidate,
+} from '../knowledge/memory-promotion-queue.js';
 import { ledger } from '../ledger.js';
 import { logger } from '../core.js';
 import * as pathResolver from '../path-resolver.js';
@@ -22,12 +27,66 @@ import {
 import { transitionStatus } from './mission-status.js';
 import { type MissionState } from './mission-types.js';
 import { findMissionPath } from '../path-resolver.js';
-import { loadState, saveState } from './mission-state.js';
+import { loadMissionStateIncludingArchive, loadState, saveState } from './mission-state.js';
 import { syncProjectLedgerIfLinked } from './mission-project-ledger.js';
 import { runAdaptiveStructuredLlmProfile, type LlmPolicyConfig } from './mission-llm.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
+import { readJsonIfPresent, writeJson } from '../foundation/json.js';
+
+export const DISTILL_MEMORY_OUTBOX_FILE = 'memory-promotion-outbox.json';
+
+interface DistillMemoryOutbox {
+  version: 1;
+  mission_id: string;
+  status: 'pending' | 'delivered';
+  candidate: MemoryCandidate;
+}
+
+/** Replay only the persisted candidate: retrying must not regenerate or approve knowledge. */
+function deliverDistillMemoryOutbox(filePath: string, state: MissionState): void {
+  const outbox = readJsonIfPresent<DistillMemoryOutbox>(filePath);
+  if (!outbox) return; // Completed missions predating the outbox have nothing to replay.
+  const candidate = outbox.candidate;
+  const tier = state.tier || 'confidential';
+  if (
+    outbox.version !== 1 ||
+    outbox.mission_id !== state.mission_id ||
+    !['pending', 'delivered'].includes(outbox.status) ||
+    !candidate ||
+    !validateMemoryPromotionCandidate(candidate).valid ||
+    candidate.source_type !== 'mission' ||
+    candidate.source_ref !== `mission:${state.mission_id}` ||
+    candidate.status !== 'queued' ||
+    candidate.sensitivity_tier !== tier ||
+    candidate.ratification_required !== (tier !== 'public') ||
+    (candidate.scope && candidate.scope.tier !== tier) ||
+    (candidate.scope?.tenant_slug ?? '') !== (state.tenant_slug ?? '') ||
+    (candidate.scope && candidate.scope.mission_id !== state.mission_id) ||
+    (candidate.scope?.organization_id ?? '') !==
+      (state.tenant_slug ? (state.organization_id ?? '') : '')
+  )
+    throw new Error('[MISSION_DISTILL_OUTBOX] Candidate does not match mission identity or scope');
+  if (outbox.status === 'delivered') return;
+  const existing = loadMemoryPromotionCandidate(candidate.candidate_id, candidate.scope);
+  if (existing) {
+    if (
+      existing.source_type !== candidate.source_type ||
+      existing.source_ref !== candidate.source_ref ||
+      existing.sensitivity_tier !== candidate.sensitivity_tier ||
+      (existing.scope?.tenant_slug ?? '') !== (candidate.scope?.tenant_slug ?? '') ||
+      (existing.scope?.organization_id ?? '') !== (candidate.scope?.organization_id ?? '') ||
+      (existing.scope?.mission_id ?? '') !== (candidate.scope?.mission_id ?? '')
+    )
+      throw new Error('[MISSION_DISTILL_OUTBOX] Existing candidate identity mismatch');
+    // An acknowledgement may be lost after enqueue. Preserve curation, approval,
+    // rejection and promotion exactly as stored rather than re-enqueueing them.
+  } else {
+    enqueueMemoryPromotionCandidate(candidate);
+  }
+  writeJson(filePath, { ...outbox, status: 'delivered' });
+}
 
 const WISDOM_POLICY_PATH = pathResolver.knowledge('product/governance/wisdom-policy.json');
 const WISDOM_POLICY_SCHEMA_PATH = pathResolver.knowledge(
@@ -149,8 +208,10 @@ export const WISDOM_SCHEMA = z.object({
     failures_and_recoveries: z.array(z.string()),
     reusable_artifacts: z.array(z.string()),
   }),
-  experience: DISTILL_EXPERIENCE_SCHEMA.optional(),
-  edit_rows: z.array(DISTILL_EDIT_ROW_SCHEMA).optional(),
+  // Structured-output providers represent an absent optional field as null.
+  // Absence is not a malformed lesson: present objects still require evidence.
+  experience: DISTILL_EXPERIENCE_SCHEMA.nullish(),
+  edit_rows: z.array(DISTILL_EDIT_ROW_SCHEMA).nullish(),
 });
 
 export function gatherDistillContext(
@@ -320,20 +381,34 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     return;
   }
   const upperId = id.toUpperCase();
-  const missionPathCandidate = findMissionPath(upperId);
-  if (!missionPathCandidate) throw new Error(`Mission directory for ${upperId} not found.`);
-  const missionPath = assertSafeRepositoryPath(missionPathCandidate, { allowMissingLeaf: true });
-  const state = loadState(upperId);
+  const activeMissionPath = findMissionPath(upperId);
+  // The archive state loader applies tenant visibility before any archive
+  // evidence is inspected. A directory lookup alone is not authorization.
+  const state = activeMissionPath ? loadState(upperId) : loadMissionStateIncludingArchive(upperId);
   if (!state)
     throw new Error(`Mission ${upperId} not found. Run "list" to see available missions.`);
+  if (state.mission_id !== upperId)
+    throw new Error('[MISSION_DISTILL_OUTBOX] Resolved mission identity mismatch');
+  const missionPathCandidate =
+    activeMissionPath ||
+    (state.status === 'archived' ? pathResolver.findArchivedMissionDir(upperId) : undefined);
+  if (!missionPathCandidate) throw new Error(`Mission directory for ${upperId} not found.`);
+  const missionPath = assertSafeRepositoryPath(missionPathCandidate, { allowMissingLeaf: true });
+
+  const outboxPath = assertSafeRepositoryPath(
+    path.join(missionPath, 'evidence', DISTILL_MEMORY_OUTBOX_FILE),
+    { allowMissingLeaf: true }
+  );
+  if (state.status === 'completed' || state.status === 'archived') {
+    deliverDistillMemoryOutbox(outboxPath, state);
+    return;
+  }
 
   if (state.status !== 'distilling' && state.status !== 'validating') {
     const hint =
       state.status === 'active'
         ? 'Run "verify" first to move the mission to distilling status.'
-        : state.status === 'completed'
-          ? 'This mission is already completed.'
-          : `Current status "${state.status}" cannot transition to distillation.`;
+        : `Current status "${state.status}" cannot transition to distillation.`;
     logger.error(`❌ Cannot distill mission ${upperId} (status: ${state.status}). ${hint}`);
     return;
   }
@@ -422,58 +497,62 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     note: `Knowledge distillation completed. Output: ${wisdomFileName}`,
   });
 
-  await saveState(upperId, state);
-  await syncProjectLedgerIfLinked(upperId, rootDir);
-
   // Auto-enqueue the distilled wisdom into the memory-promotion queue so the
   // mission-closure path of the corporate-memory loop (execute → distill →
   // promote) advances without manual operator glue. Higher tiers require human
   // ratification before promotion.
+  const tier: 'public' | 'confidential' | 'personal' =
+    state.tier === 'public' ? 'public' : state.tier === 'personal' ? 'personal' : 'confidential';
+  const candidate: MemoryCandidate = {
+    candidate_id: `mem-${upperId}-${dateSlug}`,
+    source_type: 'mission',
+    source_ref: `mission:${upperId}`,
+    proposed_memory_kind:
+      wisdom.category === 'Incident'
+        ? 'risk_rule'
+        : wisdom.category === 'Operations'
+          ? 'sop'
+          : 'heuristic',
+    summary: wisdom.sections.summary || `Distilled wisdom from mission ${upperId}`,
+    knowledge_domain: 'unclassified',
+    // Harness2 experience contract: a distillation that produced no
+    // cue/lesson/evidence record is marked declined so the review surface can
+    // flag it — the edit rows are still kept on the mission's distillation.
+    // Only an actual LLM run can "decline": a structural fallback means the
+    // record was never inspected, which is unknown, not declined.
+    ...(wisdom.experience ? { distill_experience: wisdom.experience } : {}),
+    ...(llmUsed ? { distill_experience_declined: !wisdom.experience } : {}),
+    evidence_refs: listMissionEvidenceRefs(wisdomDirPath, rootDir),
+    ...(state.tenant_slug
+      ? {
+          scope: {
+            tier,
+            tenant_slug: state.tenant_slug,
+            mission_id: upperId,
+            ...(state.organization_id ? { organization_id: state.organization_id } : {}),
+          },
+        }
+      : {}),
+    sensitivity_tier: tier,
+    ratification_required: tier !== 'public',
+    status: 'queued',
+    queued_at: nowIso(),
+  };
+  // The candidate is durable before completion can make future owners skip this
+  // mission. A queue failure or lost acknowledgement leaves a replayable intent.
+  writeJson(outboxPath, {
+    version: 1,
+    mission_id: upperId,
+    status: 'pending',
+    candidate,
+  } satisfies DistillMemoryOutbox);
+  await saveState(upperId, state);
+  await syncProjectLedgerIfLinked(upperId, rootDir);
   try {
-    const tier: 'public' | 'confidential' | 'personal' =
-      state.tier === 'confidential'
-        ? 'confidential'
-        : state.tier === 'personal'
-          ? 'personal'
-          : 'public';
-    enqueueMemoryPromotionCandidate({
-      candidate_id: `mem-${upperId}-${dateSlug}`,
-      source_type: 'mission',
-      source_ref: `mission:${upperId}`,
-      proposed_memory_kind:
-        wisdom.category === 'Incident'
-          ? 'risk_rule'
-          : wisdom.category === 'Operations'
-            ? 'sop'
-            : 'heuristic',
-      summary: wisdom.sections.summary || `Distilled wisdom from mission ${upperId}`,
-      knowledge_domain: 'unclassified',
-      // Harness2 experience contract: a distillation that produced no
-      // cue/lesson/evidence record is marked declined so the review surface can
-      // flag it — the edit rows are still kept on the mission's distillation.
-      // Only an actual LLM run can "decline": a structural fallback means the
-      // record was never inspected, which is unknown, not declined.
-      ...(wisdom.experience ? { distill_experience: wisdom.experience } : {}),
-      ...(llmUsed ? { distill_experience_declined: !wisdom.experience } : {}),
-      evidence_refs: listMissionEvidenceRefs(wisdomDirPath, rootDir),
-      ...(state.tenant_slug
-        ? {
-            scope: {
-              tier,
-              tenant_slug: state.tenant_slug,
-              mission_id: upperId,
-              ...(state.organization_id ? { organization_id: state.organization_id } : {}),
-            },
-          }
-        : {}),
-      sensitivity_tier: tier,
-      ratification_required: tier !== 'public',
-      status: 'queued',
-      queued_at: nowIso(),
-    });
+    deliverDistillMemoryOutbox(outboxPath, state);
   } catch (err) {
     logger.warn(
-      `⚠️ Failed to enqueue memory promotion candidate for ${upperId}: ${err instanceof Error ? err.message : String(err)}`
+      `memory candidate delivery pending — ${err instanceof Error ? err.message : String(err)} | next: rerun mission distill ${upperId} to replay the saved candidate | evidence: ${outboxPath}`
     );
   }
 

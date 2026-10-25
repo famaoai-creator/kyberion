@@ -28,6 +28,23 @@ import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy
 const POLICY_DIR = pathResolver.sharedTmp('reasoning-egress-tests');
 const POLICY_PATH = path.join(POLICY_DIR, 'egress-policy.json');
 
+it('enforces the claimed backend allowlist even for local failover', () => {
+  withReasoningPayloadScope({ tier: 'public', allowed_reasoning_backends: ['stub'] }, () => {
+    expect(() => assertReasoningEgressAllowed('ollama')).toThrow(/task allowlist/);
+  });
+});
+
+it('honors explicit task external denial even for public training eligible content', () => {
+  withReasoningPayloadScope(
+    { tier: 'public', training_use: 'training_eligible', external_egress: 'deny' },
+    () => {
+      expect(() =>
+        assertReasoningEgressAllowedAtEndpoint('anthropic', 'https://api.anthropic.com')
+      ).toThrow(/Task forbids/);
+    }
+  );
+});
+
 beforeEach(() => {
   safeMkdir(POLICY_DIR, { recursive: true });
   safeWriteFile(

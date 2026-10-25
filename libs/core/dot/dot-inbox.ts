@@ -1,10 +1,13 @@
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
+import { type EventScopeInput } from '../event-scope.js';
+import { assertScopeContext } from '../scope-context-validation.js';
+import { dotStatePath } from './dot-state-paths.js';
 /**
  * dot-inbox producer — the write side of the durable wake lane.
  *
- * `evaluateDotTriggersDue` reads `active/shared/runtime/dot-inbox.jsonl` for
- * `wake` charter triggers: a row addressed to `dot_id` wakes that one dot, a
- * row without `dot_id` wakes every charter declaring the row's `channel`.
+ * `evaluateDotTriggersDue` reads the charter's exact tier/tenant/owner lane.
+ * A row addressed to `dot_id` wakes that dot only inside its matching scope;
+ * an explicit public row may notify matching public-channel subscribers.
  * Before this module existed, only tests wrote the lane — any producer that
  * wants to wake a resident dot appends through here.
  *
@@ -35,6 +38,21 @@ import { isFrontDeskDiagnosticDot, listDotCharters } from './dot-charter.js';
 const logger = createLogger('dot-inbox');
 
 export const DOT_INBOX_PATH = 'active/shared/runtime/dot-inbox.jsonl';
+
+/** Public notifications retain the legacy lane; private content never enters it. */
+export type DotInboxScope = EventScopeInput & { owner_nhi?: string };
+function inboxScope(scope: DotInboxScope): DotCharter['scope'] {
+  const canonical = assertScopeContext(scope, { allowShared: true });
+  if (canonical.tier === 'personal' && !scope.owner_nhi?.trim())
+    throw new Error('[DOT_PERSONAL_OWNER] private inbox requires owner_nhi');
+  return { ...canonical, ...(scope.owner_nhi ? { owner_nhi: scope.owner_nhi } : {}) };
+}
+export function dotInboxPath(scope: DotInboxScope = { tier: 'public' }): string {
+  const canonical = inboxScope(scope);
+  if (canonical.tier === 'public' && !canonical.tenant_slug && !canonical.organization_id)
+    return DOT_INBOX_PATH;
+  return dotStatePath({ scope: canonical }, 'inbox.jsonl');
+}
 
 /**
  * Channels a charter `wake` trigger may declare — kept in sync with the
@@ -107,6 +125,8 @@ function findDotInboxReceipt(
 }
 
 export interface DotInboxEntryInput {
+  /** Trusted producer scope, never inferred from an untrusted message payload. */
+  scope?: DotInboxScope;
   /** Omit for broadcast: every charter declaring `channel` wakes. */
   dot_id?: string;
   channel: string;
@@ -120,6 +140,7 @@ export interface DotInboxEntryInput {
 }
 
 export interface DotInboxAppendDeps {
+  scope?: DotInboxScope;
   rootDir?: string;
   now?: () => Date;
   /** Test seam: override the byte threshold that gates tombstone compaction. */
@@ -162,7 +183,13 @@ export function appendDotInboxEntry(
     throw new Error('[DOT_INBOX] payload exceeds 4KB — pass a reference, not the content');
   }
   const text = input.text?.slice(0, MAX_INBOX_TEXT_CHARS);
+  if (!input.scope)
+    throw new Error(
+      '[DOT_INBOX_SCOPE_REQUIRED] declare trusted scope or an explicit public notification'
+    );
+  const scope = inboxScope(input.scope);
   const entry: AppendedDotInboxEntry = {
+    scope,
     channel,
     ...(dotId ? { dot_id: dotId } : {}),
     ...(text?.trim() ? { text } : {}),
@@ -172,7 +199,7 @@ export function appendDotInboxEntry(
     enqueued_at: (deps.now?.() ?? new Date()).toISOString(),
   };
   const filePath = assertSafeRepositoryPath(
-    path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_INBOX_PATH),
+    path.join(deps.rootDir ?? pathResolver.rootDir(), dotInboxPath(scope)),
     { allowMissingLeaf: true }
   );
   safeMkdir(path.dirname(filePath), { recursive: true });
@@ -213,11 +240,11 @@ export function appendDotInboxEntry(
       return entry;
     });
     const appended = result === entry;
-    if (appended) maybeCompactDotInbox(filePath, deps);
+    if (appended) maybeCompactDotInbox(filePath, { ...deps, scope });
     return result;
   }
   appendJsonLine(filePath, entry);
-  maybeCompactDotInbox(filePath, deps);
+  maybeCompactDotInbox(filePath, { ...deps, scope });
   return entry;
 }
 
@@ -265,9 +292,31 @@ export function dotInboxWakeKey(lineIndex: number, rawLine: string): string {
  * row needs its channel declared.
  */
 export function dotInboxRowWakesCharter(
-  row: { dot_id?: string; channel?: string; payload?: Record<string, unknown> },
+  row: {
+    dot_id?: string;
+    channel?: string;
+    payload?: Record<string, unknown>;
+    scope?: DotInboxScope;
+  },
   charter: DotCharter
 ): boolean {
+  // Legacy global rows have no trustworthy origin. Do not reinterpret private
+  // historical content as public merely because its producer omitted scope.
+  if (!row.scope) return false;
+  let scope: DotCharter['scope'];
+  try {
+    scope = inboxScope(row.scope ?? { tier: 'public' });
+  } catch {
+    return false;
+  }
+  if (
+    scope.tier !== charter.scope.tier ||
+    (scope.tenant_slug ?? '') !== (charter.scope.tenant_slug ?? '') ||
+    (scope.organization_id ?? '') !== (charter.scope.organization_id ?? '') ||
+    (scope.project_id ?? '') !== (charter.scope.project_id ?? '')
+  )
+    return false;
+  if (scope.tier === 'personal' && scope.owner_nhi !== charter.scope.owner_nhi) return false;
   const declaredChannels = charter.attention.triggers
     .filter((t): t is Extract<DotTrigger, { kind: 'wake' }> => t.kind === 'wake')
     .flatMap((t) => t.channels);
@@ -317,7 +366,7 @@ export interface DotInboxCompactResult {
 export function compactDotInbox(deps: DotInboxAppendDeps = {}): DotInboxCompactResult {
   const empty = { tombstoned: 0, scanned: 0, bytes_before: 0, bytes_after: 0 };
   const filePath = assertSafeRepositoryPath(
-    path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_INBOX_PATH),
+    path.join(deps.rootDir ?? pathResolver.rootDir(), dotInboxPath(deps.scope)),
     { allowMissingLeaf: true }
   );
   const compactMinBytes = deps.compactMinBytes ?? DOT_INBOX_COMPACT_MIN_BYTES;

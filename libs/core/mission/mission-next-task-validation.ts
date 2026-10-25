@@ -1,6 +1,10 @@
 import * as nodePath from 'node:path';
 import type { PlannedNextTask } from './mission-orchestration-worker-contracts.js';
 import { missionClassOf } from './mission-gate-record-reader.js';
+import {
+  validateTaskPipelineRefs,
+  validateTaskSourcePaths,
+} from '../foundation/task-tool-grant-validation.js';
 
 export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): PlannedNextTask[] {
   if (!Array.isArray(rawTasks)) {
@@ -25,6 +29,21 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
       throw new Error(`Invalid NEXT_TASKS.json for ${missionId}: duplicate task_id ${taskId}`);
     }
     taskIds.add(taskId);
+    if (
+      task.source_edit_requires_approval !== undefined &&
+      typeof task.source_edit_requires_approval !== 'boolean'
+    )
+      throw new Error(
+        `Invalid NEXT_TASKS.json for ${missionId}: task ${taskId} source_edit_requires_approval must be boolean`
+      );
+    const sourceEditPaths =
+      task.source_edit_paths === undefined
+        ? undefined
+        : validateTaskSourcePaths(task.source_edit_paths);
+    const allowedPipelines =
+      task.allowed_pipelines === undefined
+        ? undefined
+        : validateTaskPipelineRefs(task.allowed_pipelines);
 
     const drive = (() => {
       if (task.drive === undefined) return undefined;
@@ -103,6 +122,11 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
 
     return {
       task_id: taskId,
+      ...(sourceEditPaths !== undefined ? { source_edit_paths: sourceEditPaths } : {}),
+      ...(typeof task.source_edit_requires_approval === 'boolean'
+        ? { source_edit_requires_approval: task.source_edit_requires_approval }
+        : {}),
+      ...(allowedPipelines !== undefined ? { allowed_pipelines: allowedPipelines } : {}),
       ...(typeof task.status === 'string' && task.status.trim()
         ? { status: task.status.trim() }
         : {}),

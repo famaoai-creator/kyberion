@@ -488,6 +488,24 @@ describe('mission selection preview and atomic save', () => {
     state.runtime = undefined;
     expect(() => save(previewMissionTeamSelection('MSN-FIXTURE').revision)).toThrow('reservation');
   });
+  it('reserves a runtime-only role only through the explicit runtime launch route', () => {
+    state.plan.selection_settings = {
+      implementer: {
+        mode: 'fixed',
+        agent_id: 'a',
+        execution_route: 'agent_runtime',
+      },
+    };
+    const input = { missionId: 'MSN-FIXTURE', teamRole: 'implementer', agentId: 'a' };
+    expect(() => reserveMissionTeamSelectionDispatch(input)).toThrow(
+      'agent_runtime launch reservation'
+    );
+    expect(state.ledger).toHaveLength(0);
+    expect(
+      reserveMissionTeamSelectionDispatch({ ...input, executionRoute: 'agent_runtime' })
+    ).toMatchObject({ agent_id: 'a' });
+    expect(state.ledger).toHaveLength(1);
+  });
   it('does not treat a same-timestamp stop as proof that a reserved launch ended', () => {
     state.plan.selection_settings = { implementer: { mode: 'fixed', agent_id: 'a' } };
     reserveMissionTeamSelectionDispatch({

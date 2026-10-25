@@ -592,6 +592,8 @@ export function tryAutoCompleteTaskFromEvidence(
      * requires_customer hold) is never auto-completed, nor cascaded.
      */
     isHeld?: (taskId: string) => boolean;
+    /** Only supplied after the canonical claim fence hashes this exact source target. Never cascaded. */
+    verifiedSourceTarget?: string;
   } = {}
 ): { completed: boolean; reason: string; cascaded: string[] } {
   const nextTasks = readMissionNextTasks(missionDir);
@@ -608,7 +610,18 @@ export function tryAutoCompleteTaskFromEvidence(
   if (MISSION_TASK_COMPLETED_STATUSES.has(currentStatus)) {
     return { completed: false, reason: 'already completed', cascaded: [] };
   }
-  if (!isTaskDeliverableSatisfied(missionDir, task, statusByTaskId)) {
+  const verifiedSourceSatisfied = Boolean(
+    options.verifiedSourceTarget &&
+    !task.deliverable &&
+    task.target_path === options.verifiedSourceTarget &&
+    !isReviewKindTask(task) &&
+    (Array.isArray(task.dependencies) ? task.dependencies : []).every(
+      (dependency) =>
+        dependency === taskId ||
+        MISSION_TASK_COMPLETED_STATUSES.has(statusByTaskId.get(String(dependency)) || 'planned')
+    )
+  );
+  if (!verifiedSourceSatisfied && !isTaskDeliverableSatisfied(missionDir, task, statusByTaskId)) {
     return {
       completed: false,
       reason: 'deliverable file missing or a dependency is not yet completed',

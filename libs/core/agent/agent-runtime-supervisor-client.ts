@@ -23,6 +23,7 @@ import {
 } from '../event-scope.js';
 import { createLogger } from '../logger.js';
 import { resolveLocalIpcAddress } from '../local-ipc.js';
+import { AgentRuntimeApprovalPendingError } from './agent-prompt-approval-port.js';
 const logger = createLogger('agent-runtime-supervisor-client');
 
 function errorMessage(error: unknown): string {
@@ -37,6 +38,20 @@ class SupervisorRemoteError extends Error {
     super(message);
     this.name = 'SupervisorRemoteError';
   }
+}
+
+/** Preserve suspension across JSON-RPC instead of collapsing it to a failure. */
+export function restoreSupervisorError(message: string, detail?: Record<string, unknown>): Error {
+  if (detail?.code === 'AGENT_APPROVAL_PENDING' && typeof detail.approval_request_id === 'string')
+    return new AgentRuntimeApprovalPendingError(
+      detail.approval_request_id,
+      isRecord(detail.scope) ? (detail.scope as EventScopeInput) : undefined,
+      typeof detail.approval_storage_channel === 'string'
+        ? detail.approval_storage_channel
+        : undefined,
+      detail.approval_kind === 'pipeline' ? 'pipeline' : 'runtime'
+    );
+  return new SupervisorRemoteError(message, detail);
 }
 
 type SupervisorMethod =
@@ -456,7 +471,7 @@ async function sendSupervisorRequest<TPayload, TResult>(
         const parsed: unknown = parseSafeJsonInput(line, 'supervisor response');
         const response = normalizeSupervisorResponse<TResult>(parsed);
         if (!response.ok) {
-          const err = new SupervisorRemoteError(
+          const err = restoreSupervisorError(
             response.error || 'supervisor_request_failed',
             response.errorDetail
           );

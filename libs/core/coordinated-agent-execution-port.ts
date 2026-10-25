@@ -15,6 +15,7 @@ import type { ContextSecurityScope } from './context-security-scope.js';
 import { resolveTenantAlias } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
+import { isAgentRuntimeApprovalPendingError } from './agent/agent-prompt-approval-port.js';
 import { stripCustomerDecisionsFromReply } from './task/task-result-contract.js';
 import { parseActorRef } from './actor.js';
 import { withActorContext } from './actor-context.js';
@@ -172,7 +173,8 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
         : await delegate();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(
+      const pendingApproval = isAgentRuntimeApprovalPendingError(error);
+      (pendingApproval ? logger.info : logger.error)(
         `[coordinated-agent-execution-port] delegation threw for work_item_id=${request.work_item_id} task_id=${request.task_id}: ${message}`
       );
       closeWorkItem(
@@ -185,7 +187,7 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
           execution_kind: 'agent_delegation',
           task_id: request.task_id,
           agent_id: request.agent_id || 'unknown',
-          status: 'failed',
+          status: pendingApproval ? 'submitted' : 'failed',
           error: message,
         },
         request.security_scope

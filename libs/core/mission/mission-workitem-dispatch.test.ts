@@ -40,6 +40,11 @@ import { writeMissionStateAtPath } from './mission-state-reader.js';
 import { dispatchMissionTickets } from './mission-ticket-dispatch.js';
 import { dispatchMissionWorkItems } from './mission-workitem-dispatch.js';
 import {
+  AgentRuntimeApprovalPendingError,
+  registerAgentPromptApprovalPort,
+  registerPipelineApprovalStatus,
+} from '../agent/agent-prompt-approval-port.js';
+import {
   getMissionLabel,
   getTeamRole,
   parseIndependentReviewerVerdict,
@@ -765,6 +770,176 @@ describe('mission work item dispatch', () => {
     expect(delegateTask).toHaveBeenCalledTimes(1);
     expect(manifest.records[0]?.title).toContain('Archived dependency consumer');
   });
+
+  it.each(['runtime', 'pipeline'] as const)(
+    'parks %s approval without model escalation and resumes only after a human decision',
+    async (kind) => {
+      let decision: 'pending' | 'approved' = 'pending';
+      const port = {
+        open: () => ({ id: 'approval-runtime', created: false }),
+        status: () => decision,
+        consume: vi.fn(),
+      };
+      const unregister = registerAgentPromptApprovalPort(() => port);
+      const canonical = vi.fn(() => decision);
+      const unregisterCanonical =
+        kind === 'pipeline' ? registerPipelineApprovalStatus(canonical) : undefined;
+      try {
+        const item = createWorkItem({
+          title: `${missionId}: Approval-bound work`,
+          description:
+            'Produce the bounded mission evidence artifact after the human approves the required runtime tool request.',
+          status: 'ready',
+          projectId: missionId,
+          assigneePeerId: 'approval-agent',
+          labels: [`mission:${missionId}`, 'team_role:implementer', 'ticket:workitem'],
+          context: { mission_id: missionId, task_id: 'approval-task' },
+          metadata: {
+            mission_id: missionId,
+            task_id: 'approval-task',
+            team_role: 'implementer',
+            risk: 'low',
+            execution_surface: 'agent_runtime',
+            deliverable: 'evidence/approval-task.md',
+            acceptance_criteria: ['Artifact is produced after the exact request is approved'],
+          },
+        });
+        const routeA2A = vi.fn(async () => {
+          throw new AgentRuntimeApprovalPendingError(
+            'approval-runtime',
+            undefined,
+            kind === 'pipeline' ? 'pipeline-channel' : undefined,
+            kind
+          );
+        });
+        const first = await dispatchMissionWorkItems(
+          makeMissionState(),
+          { mode: 'agent', statuses: ['ready'] },
+          { routeA2A }
+        );
+        expect(first.records[0], JSON.stringify(first.records)).toMatchObject({
+          status: 'deferred',
+          work_item_status_after: 'blocked',
+        });
+        expect(getWorkItem(item.item_id)?.metadata).toMatchObject({
+          awaiting_approval: true,
+          approval_request_id: 'approval-runtime',
+        });
+        expect(getWorkItem(item.item_id)?.metadata?.routing_minimum_tier).toBeUndefined();
+        expect(routeA2A).toHaveBeenCalledTimes(1);
+        await dispatchMissionWorkItems(
+          makeMissionState(),
+          { mode: 'agent', statuses: ['ready'] },
+          { routeA2A }
+        );
+        expect(routeA2A).toHaveBeenCalledTimes(1);
+        decision = 'approved';
+        await dispatchMissionWorkItems(
+          makeMissionState(),
+          { mode: 'agent', statuses: ['ready'] },
+          { routeA2A }
+        );
+        expect(routeA2A).toHaveBeenCalledTimes(2);
+        expect(port.consume).not.toHaveBeenCalled();
+        if (kind === 'pipeline')
+          expect(canonical).toHaveBeenCalledWith('pipeline-channel', 'approval-runtime');
+        const context = (
+          routeA2A.mock.calls[0] as unknown as [{ payload: { context: Record<string, unknown> } }]
+        )[0].payload.context;
+        expect(context).toMatchObject({ task_id: 'approval-task', lease_id: expect.any(String) });
+      } finally {
+        unregister();
+        unregisterCanonical?.();
+      }
+    }
+  );
+
+  it.each(['agent_runtime', 'cli_subagent'] as const)(
+    'routes a governed Codex planner only through its declared runtime route (%s)',
+    async (surface) => {
+      createWorkItem({
+        title: `${missionId}: Plan governed work`,
+        description:
+          'Produce the bounded mission planning report at the declared deliverable path using governed runtime task tools.',
+        status: 'ready',
+        projectId: missionId,
+        assigneePeerId: 'planning-agent',
+        labels: [`mission:${missionId}`, 'team_role:planner', 'ticket:workitem'],
+        context: { mission_id: missionId, task_id: 'planner-task' },
+        metadata: {
+          mission_id: missionId,
+          task_id: 'planner-task',
+          team_role: 'planner',
+          risk: 'low',
+          execution_surface: surface,
+          deliverable: 'evidence/plan.md',
+          acceptance_criteria: ['Planning report exists'],
+        },
+      });
+      safeWriteFile(
+        nodePath.join(missionPath, 'team-composition.json'),
+        JSON.stringify({
+          mission_id: missionId,
+          mission_type: 'development',
+          tier: 'public',
+          template: 'test',
+          generated_at: new Date().toISOString(),
+          selection_settings: {
+            planner: {
+              mode: 'fixed',
+              agent_id: 'planning-agent',
+              provider: 'codex',
+              model_id: 'codex',
+              execution_route: 'agent_runtime',
+            },
+          },
+          assignments: [
+            {
+              team_role: 'planner',
+              required: true,
+              status: 'assigned',
+              agent_id: 'planning-agent',
+              authority_role: 'software_developer',
+              provider: 'codex',
+              modelId: 'codex',
+              requested_selection: {
+                mode: 'fixed',
+                agent_id: 'planning-agent',
+                provider: 'codex',
+                model_id: 'codex',
+                execution_route: 'agent_runtime',
+              },
+            },
+          ],
+        })
+      );
+      const routeA2A = vi.fn(async () => {
+        throw new AgentRuntimeApprovalPendingError('planner-approval');
+      });
+      const delegateTask = vi.fn();
+      const result = await dispatchMissionWorkItems(
+        makeMissionState(),
+        { mode: 'agent', statuses: ['ready'] },
+        { routeA2A, delegateTask }
+      );
+      if (surface === 'cli_subagent') {
+        expect(routeA2A).not.toHaveBeenCalled();
+        expect(delegateTask).not.toHaveBeenCalled();
+        expect(JSON.stringify(result.records)).toContain('requires agent_runtime');
+        return;
+      }
+      expect(routeA2A, JSON.stringify(result.records)).toHaveBeenCalledTimes(1);
+      expect(
+        (
+          routeA2A.mock.calls[0] as unknown as [{ payload: { context: Record<string, unknown> } }]
+        )[0].payload.context
+      ).toMatchObject({
+        capability_profile: 'planner',
+        task_id: 'planner-task',
+        lease_id: expect.any(String),
+      });
+    }
+  );
 
   it('routes a work item to the assigned agent and records the response', async () => {
     createWorkItem({
