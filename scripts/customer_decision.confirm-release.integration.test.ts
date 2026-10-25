@@ -81,6 +81,7 @@ const SOURCE_DIRS = ['scripts/customer-decision', 'libs/core/customer-decision']
 const SOURCE_FILES = [
   'scripts/customer_decision.ts',
   'libs/core/mission/mission-decision-lock.ts',
+  'libs/core/mission/mission-orchestration-worker-part-dispatch-context.ts',
   'libs/core/governance/approval-gate.ts',
   'libs/core/governance/approval-store.ts',
 ];
@@ -502,6 +503,84 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
           decision_ids: [decisionId],
         }),
       ]);
+
+      // Resume (CD-09 2026-10-25): the task's next dispatch re-pins and its
+      // prompt — built for the tenant's confidential mission of the case's
+      // project — carries the confirmed value; serialized, the pin shows ids.
+      const { missionDir } = await import('@agent/core/path-resolver');
+      const missionPath = missionDir(MISSION, 'confidential', TENANT);
+      const { withExecutionContext: missionContext } = await import('@agent/core/authority');
+      missionContext(
+        'mission_controller',
+        () => {
+          io.safeMkdir(missionPath, { recursive: true });
+          io.safeWriteFile(
+            path.join(missionPath, 'mission-state.json'),
+            `${JSON.stringify(
+              {
+                mission_id: MISSION,
+                mission_type: 'development',
+                tier: 'confidential',
+                tenant_slug: TENANT,
+                status: 'active',
+                execution_mode: 'local',
+                priority: 3,
+                assigned_persona: 'worker',
+                confidence_score: 1,
+                git: { branch: 'main', start_commit: '', latest_commit: '', checkpoints: [] },
+                history: [],
+                relationships: { project: { project_id: CASE, relationship_type: 'belongs_to' } },
+              },
+              null,
+              2
+            )}\n`
+          );
+        },
+        undefined,
+        TENANT
+      );
+      const resumed = lockApi.pinTaskDecisions(
+        { missionId: MISSION, taskId: TASK, mode: 'start' },
+        { decisionCase: { ...decisionCase(), projectId: CASE }, now: NOW }
+      );
+      expect(JSON.parse(JSON.stringify(resumed))).toMatchObject({
+        consumer: CONSUMER,
+        decision_values: { count: 1, decision_ids: [decisionId] },
+      });
+      const { buildTaskDispatchContext } =
+        await import('@agent/core/mission/mission-orchestration-worker-part-dispatch-context');
+      const { withExecutionContextAsync } = await import('@agent/core/authority');
+      const dispatchContext = await withExecutionContextAsync(
+        'mission_controller',
+        () =>
+          buildTaskDispatchContext({
+            missionId: MISSION,
+            task: {
+              task_id: TASK,
+              status: 'planned',
+              assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+              description: 'Release the order screen',
+              deliverable: 'deliverables/release.md',
+            },
+            teamRole: 'implementer',
+            agentId: 'implementation-architect',
+            allTasks: [],
+            customerDecisionValues: resumed!.decision_values!,
+          }),
+        undefined,
+        TENANT
+      );
+      expect(dispatchContext.customerDecisionDelivery).toEqual({
+        status: 'delivered',
+        decision_ids: [decisionId],
+      });
+      const prompt = dispatchContext.prompt;
+      const section = prompt.indexOf('## Confirmed customer decisions (confidential');
+      expect(section).toBeGreaterThan(240);
+      expect(prompt.slice(section)).toContain(
+        `[${decisionId}] May we release the order screen on 11/1?`
+      );
+      expect(prompt.slice(section)).toContain('{"approved":true}');
     },
     240_000
   );
