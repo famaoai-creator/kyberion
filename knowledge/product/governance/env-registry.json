@@ -1222,6 +1222,16 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES",
+      "category": "runtime",
+      "type": "string",
+      "required": false,
+      "default": "",
+      "subsystem": "customer-room",
+      "description": "Comma-separated IPs / CIDRs of the reverse proxy in front of the customer room (e.g. 127.0.0.1,::1 for Tailscale Funnel). Only when the direct peer is listed are per-client rate limits keyed on the rightmost X-Forwarded-For / Forwarded hop that is not itself listed; empty trusts nobody. An invalid entry stops the room from starting.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_DELEGATED_ROLE",
       "category": "runtime",
       "type": "string",

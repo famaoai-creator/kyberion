@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
-import { resolveCompany } from '@agent/core/company';
 import { guardRequest, requireChronosAccess } from '../../../../lib/api-guard';
 import {
   resolveViewerContextForRequest,
@@ -14,6 +13,7 @@ import {
 } from '../../../../lib/viewer-context';
 import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 import { readCustomerDecisionOverview } from '../../../../lib/customer-decision-overview-facade';
+import { companyIdMemo } from './company-memo';
 
 /**
  * CD-12: the read-only customer-decision overview of exactly one tenant for
@@ -65,10 +65,10 @@ export async function GET(req: NextRequest) {
     // The child reads the confidential decision stores under its own
     // tenant-bound roles, so the viewer's own reach is checked here: the
     // confidential tier, and the tenant's organization (as the organization
-    // model route resolves it). All of this runs before the cached read.
+    // model route resolves it). All of this runs before the cached read, on
+    // every request; only the tenant -> company id lookup is memoized.
     strictViewerTier(viewer, 'confidential');
-    const company = resolveCompany(tenant);
-    strictViewerScopeOrganizationIds(viewer, company.company_id);
+    strictViewerScopeOrganizationIds(viewer, companyIdMemo.companyIdOf(tenant));
     const result = await readCustomerDecisionOverview(tenant);
     // `in` narrows the result under this app's non-strict tsconfig as well.
     if ('error' in result)

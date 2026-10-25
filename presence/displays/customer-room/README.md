@@ -21,10 +21,34 @@ pnpm run build:repo          # emits dist/presence/displays/customer-room/** and
 KYBERION_CUSTOMER_ROOM_TENANT=<tenant-slug> node dist/presence/displays/customer-room/server.js
 ```
 
-| Variable                        | Default | Meaning                                                                             |
-| ------------------------------- | ------- | ----------------------------------------------------------------------------------- |
-| `KYBERION_CUSTOMER_ROOM_TENANT` | —       | **Required.** Tenant slug served. The process refuses to start without a valid one. |
-| `KYBERION_CUSTOMER_ROOM_PORT`   | `3046`  | Loopback port (the process binds `127.0.0.1` only).                                 |
+| Variable                                 | Default | Meaning                                                                                                                       |
+| ---------------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `KYBERION_CUSTOMER_ROOM_TENANT`          | —       | **Required.** Tenant slug served. The process refuses to start without a valid one.                                           |
+| `KYBERION_CUSTOMER_ROOM_PORT`            | `3046`  | Loopback port (the process binds `127.0.0.1` only).                                                                           |
+| `KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES` | empty   | IPs / CIDRs of the reverse proxy in front (see [Behind the public ingress](#behind-the-public-ingress)). Empty trusts nobody. |
+
+### Behind the public ingress
+
+Behind Tailscale Funnel or another reverse proxy every request reaches the room
+from the proxy's address, so the per-client rate limits would put every
+customer in one bucket. List the proxy's addresses so the room reads the client
+address from the forwarded headers — for a proxy on the same host (Tailscale
+Funnel forwards from loopback):
+
+```bash
+KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES=127.0.0.1,::1
+```
+
+- The headers are read **only** when the direct peer is listed; from any other
+  peer they are ignored, so a customer cannot pick their own bucket.
+- `X-Forwarded-For` is walked from the right and the first hop that is not
+  itself a listed proxy is the client (the leftmost value is whatever the
+  client sent). Without `X-Forwarded-For`, RFC 7239 `Forwarded: for=` is used.
+  List every proxy in a multi-proxy chain.
+- A malformed, obfuscated (`unknown`, `_hidden`) or overlong chain keys on the
+  nearest listed proxy (one shared bucket), never on a value it names.
+- An entry that is not an IP or CIDR stops the room from starting. Express
+  `trust proxy` stays off; the setting affects only the rate-limit keys.
 
 Invite links are produced by `pnpm kyberion customer-decision send` as
 `<KYBERION_CUSTOMER_ROOM_PUBLIC_URL>/r#t=<token>`.
@@ -69,7 +93,8 @@ Routes — everything else is a plain 404:
   each image with the token header and shows it from a `blob:` URL (the CSP allows
   `blob:` for `img-src` only); external links open with `rel="noopener noreferrer"`.
 - No operator `ViewerContext`, no other Kyberion API, no proxying. 64 KB body limit,
-  per-IP rate limit (images have their own per-IP budget, 120/min, and at most 4
+  per-client rate limit (the socket address, or the forwarded client address from a
+  listed proxy; images have their own per-client budget, 120/min, and at most 4
   facade runs in flight, so an agenda with many images does not use up the
   view/respond budget; a full address table refuses new addresses rather than
   evicting a limited one), strict CSP (no inline script), `Referrer-Policy: no-referrer`,
