@@ -7,7 +7,7 @@ import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { nowIso } from '../../foundation/time.js';
 import { safeExistsSync, safeReadFile } from '../../secure-io.js';
-import { escapeXml as sharedEscapeXml } from '../../text-escaping.js';
+import { escapeXml as sharedEscapeXml, sanitizeXmlText } from '../../text-escaping.js';
 import {
   KYBERION_BRAND_FONT_STACK,
   resolveEastAsianFontFamily,
@@ -704,14 +704,15 @@ export async function generateNativeDocx(
   zip.addFile('[Content_Types].xml', Buffer.from(contentTypes, 'utf8'));
   zip.addFile('_rels/.rels', Buffer.from(generateGlobalRels(), 'utf8'));
 
-  // Doc props
+  // Doc props — write the protocol title when present (never a fake placeholder).
+  const docTitle = String(protocol.source?.title ?? '').trim();
+  const titleXml = docTitle ? `  <dc:title>${sanitizeXmlText(docTitle)}</dc:title>\n` : '';
   zip.addFile(
     'docProps/core.xml',
     Buffer.from(
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>Kyberion Native Document</dc:title>
-<dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || nowIso()}</dcterms:created>
+${titleXml}<dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || nowIso()}</dcterms:created>
 </cp:coreProperties>`,
       'utf8'
     )
