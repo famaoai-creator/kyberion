@@ -219,6 +219,128 @@ describe('Native PDF 2.0 Engine - Binary Generation', () => {
     expect(design.metadata?.author).toBe('監査部');
   });
 
+  it('reads title from a FlateDecode XMP metadata stream', async () => {
+    ensureDir(OUT);
+    const out = pathResolver.sharedTmp('tests/native-pdf/flate-xmp-title.pdf');
+    const xmp = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">Flate XMP Title</rdf:li></rdf:Alt></dc:title>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+    const compressed = zlib.deflateSync(Buffer.from(xmp, 'utf8'));
+    const head = `%PDF-1.7
+1 0 obj<< /Type /Catalog /Pages 2 0 R /Metadata 7 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 44 >>stream
+BT /F1 12 Tf 100 700 Td (Hello) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+6 0 obj<< /Producer (Test) >>endobj
+7 0 obj<< /Type /Metadata /Subtype /XML /Filter /FlateDecode /Length ${compressed.length} >>stream
+`;
+    const tail = `
+endstream
+endobj
+trailer<< /Size 8 /Root 1 0 R /Info 6 0 R >>
+%%EOF
+`;
+    fs.writeFileSync(
+      out,
+      Buffer.concat([Buffer.from(head, 'binary'), compressed, Buffer.from(tail, 'binary')])
+    );
+    const design = await distillPdfDesign(out);
+    expect(design.metadata?.title).toBe('Flate XMP Title');
+  });
+
+  it('prefers Info /Title when XMP only carries a placeholder', async () => {
+    ensureDir(OUT);
+    const out = pathResolver.sharedTmp('tests/native-pdf/xmp-placeholder-vs-info.pdf');
+    const xmp = `<?xpacket begin="" id="W5M0MpCehiHzreSzNTczkc9d"?>
+<x:xmpmeta xmlns:x="adobe:ns:meta/">
+ <rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+  <rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">
+   <dc:title><rdf:Alt><rdf:li xml:lang="x-default">PDF Specification</rdf:li></rdf:Alt></dc:title>
+  </rdf:Description>
+ </rdf:RDF>
+</x:xmpmeta>
+<?xpacket end="w"?>`;
+    fs.writeFileSync(
+      out,
+      `%PDF-1.7
+1 0 obj<< /Type /Catalog /Pages 2 0 R /Metadata 7 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 44 >>stream
+BT /F1 12 Tf 100 700 Td (Hello) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+6 0 obj<< /Title (Real Document Title) /Author (A) >>endobj
+7 0 obj<< /Type /Metadata /Subtype /XML /Length ${xmp.length} >>stream
+${xmp}
+endstream
+endobj
+trailer<< /Size 8 /Root 1 0 R /Info 6 0 R >>
+%%EOF
+`
+    );
+    const design = await distillPdfDesign(out);
+    expect(design.metadata?.title).toBe('Real Document Title');
+  });
+
+  it('decodes Info titles with escaped parentheses and UTF-16BE literals', async () => {
+    ensureDir(OUT);
+    const escapedOut = pathResolver.sharedTmp('tests/native-pdf/escaped-parens-title.pdf');
+    fs.writeFileSync(
+      escapedOut,
+      `%PDF-1.7
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 44 >>stream
+BT /F1 12 Tf 100 700 Td (Hello) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+6 0 obj<< /Title (Report \\(Draft\\)) /Author (Craft) >>endobj
+trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+%%EOF
+`
+    );
+    expect((await distillPdfDesign(escapedOut)).metadata?.title).toBe('Report (Draft)');
+
+    const utf16Out = pathResolver.sharedTmp('tests/native-pdf/utf16-literal-title.pdf');
+    const title = '報告書タイトル';
+    let octal = '\\376\\377';
+    for (const ch of title) {
+      const cp = ch.charCodeAt(0);
+      octal += `\\${((cp >> 8) & 0xff).toString(8).padStart(3, '0')}\\${(cp & 0xff).toString(8).padStart(3, '0')}`;
+    }
+    fs.writeFileSync(
+      utf16Out,
+      `%PDF-1.7
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 44 >>stream
+BT /F1 12 Tf 100 700 Td (Hello) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+6 0 obj<< /Title (${octal}) /Author (Word) >>endobj
+trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+%%EOF
+`
+    );
+    expect((await distillPdfDesign(utf16Out)).metadata?.title).toBe(title);
+  });
+
   it('should not emit XMP metadata when xmpMetadata is false', async () => {
     ensureDir(OUT);
     await generateNativePdf(

@@ -417,7 +417,7 @@ describe('continuous work production owner ports', () => {
         '--dispatch-statuses',
         'ready',
         '--dispatch-final-status',
-        'review',
+        'done',
       ]);
     }
   );

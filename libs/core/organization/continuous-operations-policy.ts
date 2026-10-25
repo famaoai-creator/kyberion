@@ -238,8 +238,11 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
         fail('managed mission work requires project scope');
       if (pipeline !== CONTINUOUS_MANAGED_WORK_PIPELINE)
         fail('managed work requires its governed pipeline');
-      if (managedObjective(result.objective, result.work_plan).length > 4000)
-        fail('managed work approval summary exceeds 4000 characters');
+      // The rendered card text is capped inside managedObjective, so the size
+      // gate applies to the operator-written objective itself: a huge objective
+      // would be silently truncated on the card otherwise.
+      if (result.objective.length > 2000)
+        fail('managed work approval summary exceeds 2000 characters');
     } else if (pipeline === CONTINUOUS_MANAGED_WORK_PIPELINE)
       fail('managed work pipeline requires a work plan');
     if (rule.expected_effect !== undefined) {
@@ -292,8 +295,21 @@ export function parseContinuousObservations(value: unknown): ContinuousObservati
   unique(result.map((row) => row.metric));
   return result;
 }
+/**
+ * Decision-card text for a managed plan. The full plan JSON used to be inlined
+ * here, which blew past the 1000-character approval-card limit for any
+ * non-trivial plan while config validation allowed 4000 — the card, not the
+ * plan, is what the human reads; the plan itself stays bound by the admission
+ * semantic hash. Emit a compact mission index instead and hard-cap the result
+ * so a card can always be rendered.
+ */
 function managedObjective(objective: string, plan: ContinuousWorkPlan): string {
-  return `${objective}\nManaged work plan: ${JSON.stringify(plan)}`;
+  const index = plan.missions
+    .map((m) => `${m.key}: ${m.title}`)
+    .join('; ')
+    .slice(0, 600);
+  const text = `${objective}\nManaged work plan (${plan.kind}, ${plan.missions.length} mission(s)): ${index}${plan.missions.map((m) => `${m.key}: ${m.title}`).join('; ').length > 600 ? '…' : ''}`;
+  return text.length > 950 ? `${text.slice(0, 947)}…` : text;
 }
 
 export function evaluateContinuousOperations(
