@@ -946,22 +946,31 @@ describe('CodexAppServerAdapter', () => {
     'projects subagent turns and resolves native default model alias %s',
     async (model) => {
       const adapter = new CodexAppServerAdapter({ timeoutMs: 1000, model });
-      const requests: any[] = [];
-      const fakeChild: any = {
+      const internals = adapter as unknown as {
+        child: unknown;
+        threadId: string | null;
+        handleMessage(message: Record<string, unknown>): void;
+      };
+      const requests: Array<{
+        id: number | string;
+        method: string;
+        params: Record<string, unknown>;
+      }> = [];
+      const fakeChild = {
         stdin: {
           writable: true,
           write(payload: string) {
-            const request = JSON.parse(payload);
+            const request = JSON.parse(payload) as (typeof requests)[number];
             requests.push(request);
             if (request.method !== 'turn/start') return true;
             setTimeout(() => {
-              (adapter as any).handleMessage({
+              internals.handleMessage({
                 id: request.id,
                 result: { turn: { id: 'turn-native-1' } },
               });
             }, 0);
             setTimeout(() => {
-              (adapter as any).handleMessage({
+              internals.handleMessage({
                 method: 'item/agentMessage/delta',
                 params: {
                   threadId: 'thread-root',
@@ -969,7 +978,7 @@ describe('CodexAppServerAdapter', () => {
                   delta: 'native result',
                 },
               });
-              (adapter as any).handleMessage({
+              internals.handleMessage({
                 method: 'turn/completed',
                 params: { turn: { id: 'turn-native-1', status: 'completed' } },
               });
@@ -978,32 +987,41 @@ describe('CodexAppServerAdapter', () => {
           },
         },
       };
-      (adapter as any).child = fakeChild;
-      (adapter as any).threadId = 'thread-root';
+      internals.child = fakeChild;
+      internals.threadId = 'thread-root';
 
       const response = await adapter.ask('delegate this', { subagent: true });
 
       expect(response.text).toBe('native result');
       const turnStart = requests.find((request) => request.method === 'turn/start');
-      expect(turnStart.params.threadId).toBe('thread-root');
-      expect(turnStart.params.model).toBe(model === 'exact-account-model' ? model : undefined);
-      expect(turnStart.params.effort).toBe('medium');
+      expect(turnStart?.params.threadId).toBe('thread-root');
+      expect(turnStart?.params.model).toBe(model === 'exact-account-model' ? model : undefined);
+      expect(turnStart?.params.effort).toBe('medium');
       expect(requests.filter((request) => request.method === 'turn/start')).toHaveLength(1);
     }
   );
 
   it('retains a native failed-turn provider cause instead of an opaque empty result', async () => {
     const adapter = new CodexAppServerAdapter({ timeoutMs: 1000, model: 'auto' });
-    const requests: any[] = [];
-    (adapter as any).child = {
+    const internals = adapter as unknown as {
+      child: unknown;
+      threadId: string | null;
+      handleMessage(message: Record<string, unknown>): void;
+    };
+    const requests: Array<{
+      id: number | string;
+      method: string;
+      params: Record<string, unknown>;
+    }> = [];
+    internals.child = {
       stdin: {
         writable: true,
         write(payload: string) {
-          const request = JSON.parse(payload);
+          const request = JSON.parse(payload) as (typeof requests)[number];
           requests.push(request);
           if (request.method === 'turn/start') {
             queueMicrotask(() => {
-              (adapter as any).handleMessage({
+              internals.handleMessage({
                 method: 'turn/completed',
                 params: {
                   turn: {
@@ -1013,7 +1031,7 @@ describe('CodexAppServerAdapter', () => {
                   },
                 },
               });
-              (adapter as any).handleMessage({
+              internals.handleMessage({
                 id: request.id,
                 result: { turn: { id: 'failed-provider-turn' } },
               });
@@ -1023,7 +1041,7 @@ describe('CodexAppServerAdapter', () => {
         },
       },
     };
-    (adapter as any).threadId = 'thread-root';
+    internals.threadId = 'thread-root';
     const result = await adapter.ask('run once');
     expect(result).toMatchObject({
       stopReason: 'error',
@@ -1034,31 +1052,40 @@ describe('CodexAppServerAdapter', () => {
 
   it('interrupts the active native turn on cancellation without restarting the app-server', async () => {
     const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
-    const requests: any[] = [];
-    const fakeChild: any = {
+    const internals = adapter as unknown as {
+      child: unknown;
+      threadId: string | null;
+      handleMessage(message: Record<string, unknown>): void;
+    };
+    const requests: Array<{
+      id: number | string;
+      method: string;
+      params: Record<string, unknown>;
+    }> = [];
+    const fakeChild = {
       stdin: {
         writable: true,
         write(payload: string) {
-          const request = JSON.parse(payload);
+          const request = JSON.parse(payload) as (typeof requests)[number];
           requests.push(request);
           if (request.method === 'turn/start') {
             setTimeout(() => {
-              (adapter as any).handleMessage({
+              internals.handleMessage({
                 id: request.id,
                 result: { turn: { id: 'turn-cancel-1' } },
               });
             }, 0);
           } else if (request.method === 'turn/interrupt') {
             setTimeout(() => {
-              (adapter as any).handleMessage({ id: request.id, result: {} });
+              internals.handleMessage({ id: request.id, result: {} });
             }, 0);
           }
           return true;
         },
       },
     };
-    (adapter as any).child = fakeChild;
-    (adapter as any).threadId = 'thread-root';
+    internals.child = fakeChild;
+    internals.threadId = 'thread-root';
     const controller = new AbortController();
     const pending = adapter.ask('cancel this', { subagent: true, signal: controller.signal });
 
