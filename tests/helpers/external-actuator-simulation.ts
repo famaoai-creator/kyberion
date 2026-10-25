@@ -7,6 +7,10 @@ import {
   computeApprovalPresentedDigest,
   type ApprovalRequestRecord,
   approvalStoreRoots,
+  asTenantApprovalStore,
+  listApprovalPartitions,
+  normalizeApprovalChannel,
+  tenantApprovalPartitionLogicalRoot,
   VITEST_APPROVAL_STORE_ROOT,
 } from '@agent/core/governance/approval-store';
 import { isVitestProcess, getRegisteredEnvText } from '@agent/core/foundation/env';
@@ -68,8 +72,15 @@ export function approveSimulationRequest(
   });
 }
 
-/** Clear only this Vitest run/pool's external-operation approval channel. */
-export function cleanupSimulationApprovals(): void {
+/**
+ * Clear only this Vitest run/pool's approval channels (default
+ * `external-operation`): the system tree as mission_controller, and every
+ * tenant partition's channel directory as that tenant's approval store role
+ * (tenant-scoped requests never land in the system tree).
+ */
+export function cleanupSimulationApprovals({
+  channels = ['external-operation'],
+}: { channels?: readonly string[] } = {}): void {
   const roots = approvalStoreRoots();
   if (
     !isVitestProcess() ||
@@ -79,8 +90,18 @@ export function cleanupSimulationApprovals(): void {
   ) {
     throw new Error('Simulation cleanup refuses a non-isolated approval store');
   }
+  const normalized = channels.map((channel) => normalizeApprovalChannel(channel));
   withExecutionContext('mission_controller', () => {
-    for (const root of Object.values(roots))
-      safeRmSync(rootResolve(`${root}/external-operation`), { recursive: true, force: true });
+    for (const channel of normalized)
+      for (const root of [roots.coordination, roots.observability])
+        safeRmSync(rootResolve(`${root}/${channel}`), { recursive: true, force: true });
   });
+  for (const partition of listApprovalPartitions())
+    asTenantApprovalStore(partition.tenant_slug, () => {
+      for (const channel of normalized)
+        safeRmSync(rootResolve(`${tenantApprovalPartitionLogicalRoot(partition)}/${channel}`), {
+          recursive: true,
+          force: true,
+        });
+    });
 }

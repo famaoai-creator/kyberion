@@ -204,8 +204,10 @@ import {
   INGEST_DEDUP_REGISTRY_REPO_PATH,
   offboardScope,
   OFFBOARDING_EXPORT_SUBDIR,
+  TENANT_RUNTIME_PARTITION_TARGET_KINDS,
   verifyScopeOffboarded,
 } from './scope-offboarding.js';
+import { TENANT_RUNTIME_PARTITION_ROOTS } from './storage-layout.js';
 import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
 import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
 
@@ -1013,6 +1015,12 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
         abs(`${result.export_path}/${partition('confidential', TENANT)}/terminal/approvals.jsonl`)
       )
     ).toBe(true);
+  });
+
+  it('decides an offboarding disposition for every registered tenant runtime partition root', () => {
+    expect(Object.keys(TENANT_RUNTIME_PARTITION_TARGET_KINDS).sort()).toEqual(
+      TENANT_RUNTIME_PARTITION_ROOTS.map((entry) => entry.key).sort()
+    );
   });
 
   it("exports and removes the tenant's customer decision invites, never another tenant's", () => {
