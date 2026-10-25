@@ -53,7 +53,7 @@ process は registry/schema、Dot は typed extension registration、モデル�
 手順と回帰条件は [scoped-runtime-task-tools](../../../knowledge/product/orchestration/scoped-runtime-task-tools.md) と
 [operations-hygiene-runbook](../../../knowledge/product/governance/operations-hygiene-runbook.md) に記録する。
 
-## 最終検証
+## 初期改修時の検証
 
 - package / repository の build と typecheck が成功。
 - 変更対象48ファイル・870テストが `KYBERION_TEST_LEAK_STRICT=1` で成功。ライブ状態への書込みなし。
@@ -90,3 +90,15 @@ OS登録はまだ適用していない。適用前のジョブ分担と移行手
 検出した固定store初回作成、mock export不足、新しいscope契約に未対応のfixtureを修正した。
 加えてorigin/main由来のAsk入力消失を2行の修正で直し、意図されたhearing直送は維持した（250テスト成功）。
 既存の認証済みgovernance-overview endpointの完全一致許可と取得失敗表示も修正した（27テスト成功）。
+
+### 実モデルによるdispatch完了の確認
+
+認証済みCodex CLIを実際に起動し、公開の検証専用missionを既定のdispatchからagent_runtime supervisorへ渡した。
+plannerの任意ファイル読取権限は広げず、宣言済み成果物の作成、固定成果物だけの読み戻し、ハッシュ照合、controllerへの証跡登録を実行した。
+WorkItemはdone、canonical taskはcompletedとなり、実行ledgerの証跡と成果物の検証markerが一致した。
+task・lease・planner profileのbindingも確認し、検証runtimeは停止した。外部通知は0件。
+
+実行中に判明したIPC応答の型不一致と終了待ち、応答受領後の誤ったlocal fallback、native model aliasとtool namespaceを修正した。
+通信断で実行有無が不明な場合はclaimを保持して隔離し、人間による承認付き復旧まで再実行しない。
+native code hostはI/Oを持たないVMに限定し、実バイナリでファイル・process・networkの直接利用不可と、登録したKyberion toolだけへの到達を確認した。
+外部API providerへの課金を伴う実呼出しは行っていない。API側は既定execution portから実task runtimeまでを結合テストし、provider I/Oだけを代替した。
