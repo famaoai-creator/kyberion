@@ -6,14 +6,18 @@ import {
   safeExecResult,
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
   safeRmSync,
+  safeSymlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
 import {
   agentWorktreeLaunchHint,
   createAgentWorktree,
+  DIST_BUILD_STAMP,
   listAgentWorktrees,
   removeAgentWorktree,
+  stampAgentWorktreeDistHead,
   type AgentWorktreeOptions,
 } from './agent-worktree.js';
 import { listWorkspaces } from './workspace-ledger.js';
@@ -164,6 +168,42 @@ describe('listAgentWorktrees', () => {
       dist: 'stale',
       dist_built_from: 'deadbeef',
     });
+  });
+});
+
+describe('stampAgentWorktreeDistHead', () => {
+  it('writes the worktree HEAD through the owner exec channel so list reports fresh', () => {
+    const record = createAgentWorktree({ name: 's', base: 'main' }, options);
+    const head = git(record.path, ['rev-parse', 'HEAD']);
+    expect(stampAgentWorktreeDistHead(record.path)).toEqual({ ok: true });
+    const stampPath = path.join(record.path, DIST_BUILD_STAMP);
+    expect(safeReadFile(stampPath, { encoding: 'utf8' })).toBe(`${head}\n`);
+    expect(listAgentWorktrees(options)[0]).toMatchObject({
+      dist: 'fresh',
+      dist_built_from: head,
+    });
+  });
+
+  it('fails closed on a path that is not a git worktree', () => {
+    const outside = path.join(base, 'not-a-repo');
+    safeMkdir(outside, { recursive: true });
+    expect(stampAgentWorktreeDistHead(outside)).toMatchObject({ ok: false });
+    expect(safeExistsSync(path.join(outside, DIST_BUILD_STAMP))).toBe(false);
+  });
+
+  it('refuses to stamp through a symlinked dist directory', () => {
+    const record = createAgentWorktree({ name: 'l', base: 'main' }, options);
+    const redirect = path.join(base, 'redirected');
+    safeMkdir(redirect, { recursive: true });
+    safeSymlinkSync(redirect, path.join(record.path, 'dist'), 'dir');
+    expect(stampAgentWorktreeDistHead(record.path)).toMatchObject({ ok: false });
+    expect(safeExistsSync(path.join(redirect, '.session-build-head'))).toBe(false);
+  });
+
+  it('refuses a delegated worker', () => {
+    const record = createAgentWorktree({ name: 'w', base: 'main' }, options);
+    vi.stubEnv('KYBERION_DELEGATION_DEPTH', '1');
+    expect(() => stampAgentWorktreeDistHead(record.path)).toThrow(/SESSION_INDEX_OWNER_ONLY/);
   });
 });
 
