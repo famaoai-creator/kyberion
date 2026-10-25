@@ -140,8 +140,10 @@ export function customerDecisionLearningCommands(
 ): string[] {
   const scope = `--organization-id ${organizationId} --tier confidential --tenant-slug ${tenant}`;
   const first = learning.suggestions[0]?.learning_id ?? '<learning_id>';
+  // One line per status, so each pastes as is.
   return [
-    `pnpm organization learning transition ${scope} --learning-id ${first} --record-status approved|rejected --dry-run`,
+    `pnpm organization learning transition ${scope} --learning-id ${first} --record-status approved --dry-run`,
+    `pnpm organization learning transition ${scope} --learning-id ${first} --record-status rejected --dry-run`,
     `pnpm kyberion customer-decision learning --tenant ${tenant} --dry-run`,
   ];
 }
@@ -216,15 +218,19 @@ export function CustomerDecisionLearningView({
               <ChronosInline>
                 <Badge label={`${uxText('chronos_tenant', locale)}: ${learning.tenant_slug}`} />
                 <ChronosMeta>
-                  {uxMessage(
-                    'chronos_cd_learning_report',
-                    {
-                      date: learning.report_date,
-                      since: learning.since?.slice(0, 10) ?? uxText('chronos_cd_none', locale),
-                    },
-                    learning.report_date,
-                    locale
-                  )}
+                  {learning.since
+                    ? uxMessage(
+                        'chronos_cd_learning_report',
+                        { date: learning.report_date, since: learning.since.slice(0, 10) },
+                        learning.report_date,
+                        locale
+                      )
+                    : uxMessage(
+                        'chronos_cd_learning_report_date',
+                        { date: learning.report_date },
+                        learning.report_date,
+                        locale
+                      )}
                 </ChronosMeta>
               </ChronosInline>
               {learning.available_dates.length > 1 ? (

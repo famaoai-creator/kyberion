@@ -170,4 +170,26 @@ describe('customer-decisions case route (CD-12 drill-down)', () => {
     expect(response.status).toBe(403);
     expect(mocks.resolveViewerContextForRequest).not.toHaveBeenCalled();
   });
+
+  it('marks every answer no-store: data, refusals, the viewer-scope 400 and errors', async () => {
+    const statuses: number[] = [];
+    const check = async (query: string) => {
+      const response = await GET(new NextRequest(`${URL_BASE}${query}`));
+      statuses.push(response.status);
+      expect(response.headers.get('Cache-Control'), query).toBe('no-store');
+    };
+    await check('?tenant=acme&case=case-a');
+    mocks.readCustomerDecisionFacade.mockResolvedValue({ ok: false, status: 504, error: 'x' });
+    await check('?tenant=acme&case=case-a');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['acme', 'globex']);
+    await check('?case=case-a');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue('all');
+    mocks.strictViewerTier.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer tier scope denied');
+    });
+    await check('?tenant=acme&case=case-a');
+    mocks.requireChronosAccess.mockReturnValue(new Response('forbidden', { status: 403 }));
+    await check('?tenant=acme&case=case-a');
+    expect(statuses).toEqual([200, 504, 400, 403, 403]);
+  });
 });

@@ -49,6 +49,18 @@ export function clearCustomerDecisionSelection(params: URLSearchParams): URLSear
   return next;
 }
 
+/**
+ * `next` with its `cd_*` parameters only while it stays on the tenant and
+ * organization of `previous`; any change of either clears them.
+ */
+export function keepCustomerDecisionSelectionFor(
+  previous: URLSearchParams,
+  next: URLSearchParams
+): URLSearchParams {
+  const same = (name: string) => (previous.get(name) || '') === (next.get(name) || '');
+  return same('tenant') && same('organization_id') ? next : clearCustomerDecisionSelection(next);
+}
+
 export function withCustomerDecisionSelection(
   params: URLSearchParams,
   selection: CustomerDecisionSelection
