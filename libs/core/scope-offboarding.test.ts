@@ -1023,6 +1023,49 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     );
   });
 
+  it("exports and removes the tenant's other runtime state partitions, never another tenant's", () => {
+    const roots = [
+      'active/shared/runtime/pipeline-library-runs',
+      'active/shared/runtime/autonomy-learning',
+      'active/shared/runtime/external-operations',
+      'active/shared/runtime/hearing',
+      'active/shared/runtime/discussion-create-requests',
+      'active/shared/runtime/grants',
+    ];
+    const record = (root: string, tenant: string) => `${root}/confidential/${tenant}/state.json`;
+    for (const root of roots)
+      for (const tenant of [TENANT, 'tenant-beta']) {
+        fs.mkdirSync(path.dirname(abs(record(root, tenant))), { recursive: true });
+        fs.writeFileSync(abs(record(root, tenant)), JSON.stringify({ tenant }));
+      }
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining(
+        roots.map((root) => ({
+          path: `${root}/confidential/${TENANT}`,
+          kind: 'tenant_runtime_state',
+        }))
+      )
+    );
+    expect(dryRun.targets.map((t) => t.path).filter((p) => p.includes('tenant-beta'))).toEqual([]);
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    for (const root of roots) {
+      expect(fs.existsSync(abs(`${root}/confidential/${TENANT}`))).toBe(false);
+      expect(fs.existsSync(abs(record(root, 'tenant-beta')))).toBe(true);
+      expect(fs.existsSync(abs(`${result.export_path}/${record(root, TENANT)}`))).toBe(true);
+    }
+    expect(result.verification?.clean).toBe(true);
+  });
+
   it("exports and removes the tenant's customer decision invites, never another tenant's", () => {
     const partition = (tenant: string) =>
       `active/shared/runtime/customer-decision-invites/confidential/${tenant}`;

@@ -304,7 +304,13 @@ export type OffboardTargetKind =
   /** The tenant's approval store partition (requests, passkey challenges, event logs; one per tier). */
   | 'tenant_approvals'
   /** The tenant's customer decision invite records (CD-06; one partition per tier). */
-  | 'customer_decision_invites';
+  | 'customer_decision_invites'
+  /**
+   * The tenant's partition of another registered runtime state root (pipeline
+   * library runs, autonomy learning, external operations, hearing, discussion
+   * create requests, standing grants; one partition per root and tier).
+   */
+  | 'tenant_runtime_state';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -439,12 +445,12 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   tenant_ledger: 'tenant_ledger',
   tenant_approvals: 'tenant_approvals',
   customer_decision_invites: 'customer_decision_invites',
-  pipeline_library_runs: null,
-  autonomy_learning: null,
-  external_operations: null,
-  hearing: null,
-  discussion_create_requests: null,
-  grants: null,
+  pipeline_library_runs: 'tenant_runtime_state',
+  autonomy_learning: 'tenant_runtime_state',
+  external_operations: 'tenant_runtime_state',
+  hearing: 'tenant_runtime_state',
+  discussion_create_requests: 'tenant_runtime_state',
+  grants: 'tenant_runtime_state',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | null>;
 
 /**
