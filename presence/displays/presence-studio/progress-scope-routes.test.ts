@@ -75,14 +75,17 @@ function call(
   tenant = 'alpha-team',
   selection: Record<string, string> = {},
   detail = false,
-  detailId = 'artifact-1'
+  detailId = 'artifact-1',
+  remoteToken?: string
 ) {
   const req = {
     body,
     query: { tenant, ...selection },
     params: { id: detail ? detailId : 'entry-1' },
-    headers: { host: '127.0.0.1:3031' },
-    socket: { remoteAddress: '127.0.0.1' },
+    headers: remoteToken
+      ? { host: '127.0.0.1:3031', authorization: `Bearer ${remoteToken}` }
+      : { host: '127.0.0.1:3031' },
+    socket: { remoteAddress: remoteToken ? '198.51.100.24' : '127.0.0.1' },
     path: method === 'GET' ? '/api/progress' : '/api/outcomes/entry-1/verdict',
     method,
   } as unknown as express.Request;
@@ -148,9 +151,16 @@ describe('progress viewer scope HTTP integration', () => {
     expect(call('POST', { status: 'accepted' }).statusCode).toBe(403);
     expect(f.accept).not.toHaveBeenCalled();
   });
-  it('changes the marker when selected tenant changes and never widens a server-bound viewer', () => {
-    expect(call('GET', {}, 'beta-team').statusCode).toBe(403);
-    vi.stubEnv('KYBERION_TENANT', '');
+  it('never widens a token viewer bound to the server tenant', () => {
+    vi.stubEnv('PRESENCE_STUDIO_TOKEN', 'studio-token');
+    expect(call('GET', {}, 'alpha-team', {}, false, 'artifact-1', 'studio-token').statusCode).toBe(
+      200
+    );
+    expect(call('GET', {}, 'beta-team', {}, false, 'artifact-1', 'studio-token').statusCode).toBe(
+      403
+    );
+  });
+  it('changes the marker when the loopback owner switches tenant (FD-01)', () => {
     const alpha = call().body.viewer_scope_id;
     const beta = call('GET', {}, 'beta-team').body.viewer_scope_id;
     expect(alpha).not.toBe(beta);

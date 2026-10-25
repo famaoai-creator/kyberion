@@ -13,8 +13,8 @@ import { resolveChronosWorkspace } from '../../../../lib/workspace-scope';
 export async function POST(req: NextRequest) {
   const denied = guardRequest(req) ?? requireChronosAccess(req, 'localadmin');
   if (denied) return denied;
-  const resolved = resolveViewerContextForRequest(req);
-  if (resolved.response) return resolved.response;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
   try {
     const body: unknown = await req.json();
     if (!body || typeof body !== 'object' || Array.isArray(body))
@@ -45,10 +45,10 @@ export async function POST(req: NextRequest) {
     ] as const) {
       if (input[key] !== undefined) Object.assign(requested, { [key]: input[key] });
     }
-    const scope = resolveChronosWorkspace(resolved.context, requested);
+    const scope = resolveChronosWorkspace(resolvedViewer.context, requested);
     const selection = scope.selection;
     const decision = authorizeSurfaceContextOperation({
-      context: toSurfaceAuthorizationContext(resolved.context),
+      context: toSurfaceAuthorizationContext(resolvedViewer.context),
       operation: {
         operationId: 'chronos.workspace.autonomy.control',
         effect: 'write',
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     });
     if (!decision.allowed) throw new Error(decision.reason);
     const viewer = {
-      ...resolved.context,
+      ...resolvedViewer.context,
       tenantSlugs: scope.tenantSlugs,
       organizationIds: scope.organizationIds,
       projectIds: scope.projectIds,
