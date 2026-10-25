@@ -27,9 +27,9 @@ import {
   assertNoAppendOnlyConflict,
   assertTenantLedgerPartitionsIntact,
   currentAuditChainKeyId,
-  quarantineRestoredRevocableState,
-  trimRestoredLedgerTails,
-  verifyRestoredTenantLedgers,
+  archiveMembers,
+  extractWithStagedPartitions,
+  normalizeArchiveMember,
   type RestoredLedgerVerification,
 } from './lib/backup-tenant-partitions.js';
 import {
@@ -427,7 +427,22 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
     }
     // Every tenant-partitioned runtime root (ledgers, approvals, metrics and
     // the registered state roots), `<root>/<tier>/<tenant>` per tier.
-    for (const partition of tenantRuntimePartitionPaths(tenant, pathExists)) {
+    // A symlinked partition directory is never archived (it could name
+    // another tenant's data or leave the repository on restore).
+    const isLinked = (repoPath: string): boolean => {
+      try {
+        return safeLstat(path.join(rootDir, repoPath)).isSymbolicLink();
+      } catch {
+        return false;
+      }
+    };
+    const plainPartition = (repoPath: string): boolean => {
+      if (!pathExists(repoPath)) return false;
+      if (!isLinked(repoPath)) return true;
+      warnings.push(`Skipped symlinked tenant runtime partition: ${repoPath}`);
+      return false;
+    };
+    for (const partition of tenantRuntimePartitionPaths(tenant, plainPartition)) {
       tenantRuntimePartitions.push(partition);
       entries.add(partition.path);
     }
@@ -930,31 +945,6 @@ const TENANT_PHYSICAL_BACKUP_ROOTS = [
   'active/shared/coordination/tenants',
 ] as const;
 
-function normalizeArchiveMember(member: string): string {
-  const normalized = member.replace(/^\.\//, '').replace(/\/+$/, '');
-  if (!normalized || normalized.startsWith('/') || normalized.split('/').includes('..')) {
-    throw new Error(`Backup archive contains an unsafe member path: ${member}`);
-  }
-  return normalized;
-}
-
-function archiveMembers(plainArchive: string): string[] {
-  const result = safeExecResult('tar', ['-tzf', plainArchive], {
-    timeoutMs: 120000,
-    maxOutputMB: 50,
-  });
-  if (result.status !== 0) {
-    throw new Error(
-      `backup archive listing failed: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
-    );
-  }
-  return result.stdout
-    .split('\n')
-    .map((member) => member.trim())
-    .filter(Boolean)
-    .map(normalizeArchiveMember);
-}
-
 function readArchiveManifest(
   plainArchive: string,
   members: string[]
@@ -1256,6 +1246,12 @@ export function restoreBackup(options: BackupCliOptions): {
   if (!safeExistsSync(archive)) throw new Error(`Archive not found: ${archive}`);
   if (!options.target) throw new Error('restore requires --target <clean-root>');
   const target = path.resolve(options.target);
+  const targetRel = path.relative(pathResolver.rootDir(), target);
+  if (targetRel.startsWith('..') || path.isAbsolute(targetRel)) {
+    throw new Error(
+      `[BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY] restore target is outside this checkout — governed I/O cannot write or verify it | next: run pnpm backup restore from the clean checkout itself (--target .), or restore under this checkout (e.g. active/shared/tmp/<restore>) | evidence: ${target}`
+    );
+  }
   if (safeExistsSync(target) && safeReaddir(target).length > 0 && !options.force) {
     throw new Error(`Restore target is not empty; pass --force to restore into ${target}`);
   }
@@ -1286,18 +1282,24 @@ export function restoreBackup(options: BackupCliOptions): {
 
   const { manifest, members } = validateBackupArchive(plainArchive, options);
   assertNoAppendOnlyConflict(target, members);
-  safeMkdir(target);
-  runRequired('tar', ['-xzf', plainArchive, '-C', target], 'backup restore extraction failed');
+  const tenantRestore = options.scope === 'tenant' && options.tenant ? options.tenant : undefined;
+  const extracted = extractWithStagedPartitions({
+    plainArchive,
+    target,
+    staging: path.join(tempDir, 'staged-partitions'),
+    members,
+    archiveChainKeyId: manifest.chain_key_id,
+    tenant: tenantRestore,
+    stampId: stamp(),
+  });
+  const trimmedTails = extracted.trimmedTails;
+  const ledgerVerification = extracted.ledgerVerification;
   const quarantinePaths: string[] = [];
-  if (options.scope === 'tenant' && options.tenant) {
-    const quarantine = quarantineRestoredPeerRuntime(target, options.tenant);
+  if (tenantRestore) {
+    const quarantine = quarantineRestoredPeerRuntime(target, tenantRestore);
     if (quarantine.moved.length > 0) quarantinePaths.push(quarantine.quarantinePath);
-    quarantinePaths.push(
-      ...quarantineRestoredRevocableState(target, options.tenant, stamp()).quarantinePaths
-    );
   }
-  const trimmedTails = trimRestoredLedgerTails(target, members);
-  const ledgerVerification = verifyRestoredTenantLedgers(target, members, manifest.chain_key_id);
+  quarantinePaths.push(...extracted.quarantinePaths);
   restoreMissionGitBundles(target);
 
   if (options.verifyBaseline) {

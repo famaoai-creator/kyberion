@@ -434,6 +434,7 @@ describe('mission ledger scope (D9)', () => {
     });
     expect(orphanEntry?.payload).toBeUndefined();
     expect(String(orphanEntry?.payload_digest)).toMatch(/^[0-9a-f]{64}$/u);
+    expect(orphanEntry?.payload_digest_alg).toBe('hmac-sha256');
     expect(fs.readFileSync(ledger.GLOBAL_LEDGER_PATH, 'utf8')).not.toContain(marker);
     expect(ledger.verifyAllLedgerIntegrity().ok).toBe(true);
 

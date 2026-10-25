@@ -56,6 +56,7 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   metricsLedgerLockId,
   metricsRowTenant,
+  tenantRuntimePartitionOf,
   tenantRuntimePartitionPaths,
   type TenantRuntimePartitionKey,
 } from './storage-layout.js';
@@ -884,9 +885,16 @@ export function collectScopeTargets(
     // - Metrics ledgers: pre-partition rows of the system file are pruned below
     //   (METRICS_LEDGERS).
     if (isValidTenantSlug(id)) {
+      // A partition this process cannot even probe is listed (fail loud: its
+      // removal then fails visibly) rather than silently skipped.
       const present = (subtree: string): boolean => {
         const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-        return Boolean(subtreePath && safeExistsSync(subtreePath));
+        if (!subtreePath) return false;
+        try {
+          return safeExistsSync(subtreePath);
+        } catch {
+          return true;
+        }
       };
       for (const partition of tenantRuntimePartitionPaths(id, present)) {
         const kind = TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key];
@@ -1448,6 +1456,18 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
           `[scope-offboarding] post-offboard verification for ${scopeType} '${scopeId}' found ` +
             `leftovers: ${result.verification.leftovers.join(', ')}`
         );
+      }
+      // A tenant runtime partition that survived is a failed offboarding, not
+      // a warning: its records (ledgers, grants, approvals) outlive the tenant.
+      const partitionLeftovers =
+        scopeType === 'tenant'
+          ? result.verification.leftovers.filter(
+              (leftover) => tenantRuntimePartitionOf(leftover)?.tenant === scopeId
+            )
+          : [];
+      if (partitionLeftovers.length > 0) {
+        result.status = 'error';
+        result.reason = `[OFFBOARD_PARTITION_LEFTOVER] tenant runtime partition(s) were not removed — the tenant's records outlive it | next: check this process's write grant on the partitions (tenant ledger and approval partitions need the sovereign persona), then rerun the offboarding | evidence: ${partitionLeftovers.join(', ')}`;
       }
     } catch (err) {
       logger.warn(
