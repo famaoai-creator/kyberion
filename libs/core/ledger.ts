@@ -11,7 +11,7 @@ import { validateReadPermission } from './tier-guard.js';
 import { resolveIdentityContext, withExecutionContext } from './authority.js';
 import * as pathResolver from './path-resolver.js';
 import * as path from 'node:path';
-import { createHash } from 'node:crypto';
+import { createHash, createHmac } from 'node:crypto';
 import {
   computeLedgerEntryHash,
   GENESIS_HASH,
@@ -233,9 +233,9 @@ export const record = (type: string, data: any) => {
         type,
         scope: unplaceableMissionScope(scope.tier, String(missionId)),
         role: data.role || 'Unknown',
-        mission_id: missionId,
+        mission_id: String(missionId),
         payload_withheld: 'mission_unplaceable',
-        payload_digest: createHash('sha256').update(sortedKeyJson(data), 'utf8').digest('hex'),
+        ...withheldPayloadDigest(data),
         note: 'Metadata only. The mission id is not placeable; its payload was withheld.',
       });
     }
@@ -282,6 +282,35 @@ function unplaceableMissionScope(tier: EventScope['tier'], missionId: string): E
   } catch {
     return normalizeEventScope({ tier, scope_kind: 'system' });
   }
+}
+
+/**
+ * Digest of a withheld payload: an HMAC under the audit chain key when one is
+ * available (a low-entropy payload cannot be confirmed by guessing), else
+ * sha256. `payload_digest_alg` says which.
+ */
+function withheldPayloadDigest(data: unknown): {
+  payload_digest: string;
+  payload_digest_alg: 'hmac-sha256' | 'sha256';
+} {
+  const input = sortedKeyJson(data);
+  let key: string | null = null;
+  try {
+    key = resolveAuditChainKey({ createIfMissing: true });
+  } catch (err) {
+    logger.debug(
+      `withheld payload digest unkeyed — audit chain key unavailable | next: none | evidence: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  return key
+    ? {
+        payload_digest: createHmac('sha256', key).update(input, 'utf8').digest('hex'),
+        payload_digest_alg: 'hmac-sha256',
+      }
+    : {
+        payload_digest: createHash('sha256').update(input, 'utf8').digest('hex'),
+        payload_digest_alg: 'sha256',
+      };
 }
 
 /** JSON with object keys sorted at every depth (a stable digest input). */

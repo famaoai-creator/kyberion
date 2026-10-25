@@ -426,13 +426,17 @@ the record is stored follows its scope
   maps each key to a target kind in a `satisfies Record<…>` table (the six
   other state roots export + soft-delete as `tenant_runtime_state`), so a new
   root fails to compile until its disposition is decided.
-- A tenant restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
-  append-only partition over a target that already holds one, trims a torn
-  last `.jsonl` line of the restored copy, verifies restored tenant-ledger
-  chains only when the target's audit chain key id equals the archive's
-  `chain_key_id` (else `deferred_key_mismatch`; the key never rides in a tenant
-  archive), and moves restored customer decision invites and standing grants
-  into `<partition>/.restore-quarantine/<restore-id>/`.
+- A restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
+  append-only partition over a target that already holds one (the only
+  rollback guard: a chain has no head anchor). Append-only partitions and, on
+  a tenant restore, invites and grants are extracted into staging, never in
+  place: a torn (unparseable) last `.jsonl` line is trimmed there, restored
+  tenant-ledger chains are verified there when the target's audit chain key id
+  equals the archive's `chain_key_id` (every entry HMAC-chained under that id;
+  else `deferred_key_mismatch`; the key never rides in a tenant archive), and
+  the archive's invites and grants move straight into
+  `<partition>/.restore-quarantine/<restore-id>/`, leaving live records as
+  they are.
 
 ## 3. Surface visibility
 
