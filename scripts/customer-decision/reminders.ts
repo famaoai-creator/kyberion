@@ -15,6 +15,16 @@
  *      that channel; no usable channel → an operator inbox task (ids only);
  *   3. record under the case lock (short wait): the outcome on the agenda's
  *      `reminders`, merged by reminder id, then an audit entry (ids only).
+ * Held requests: a reminder's correlation id binds the surface, channel,
+ * message and agenda content hash, so an approval covers exactly what is
+ * sent. When a reminder gets an outcome, every other pending request of the
+ * same reminder — on any outbox surface (the decider's channel moved), or for
+ * an earlier text / agenda revision — is cancelled through the approval store
+ * (a cancelled request cannot be decided, so approving it later sends
+ * nothing) and listed on the record's `superseded_requests` with why. A held
+ * reminder approved after its day's sweep goes out on the next sweep under
+ * its original key (`REMINDER_CARRY_OVER_DAYS`, never after the date it is
+ * about); one no longer due is recorded `lapsed`, its request withdrawn.
  * A `delivery_failed` attempt or a failed inbox write records nothing, so
  * the next sweep retries. Every agenda runs in its own try/catch: one
  * broken agenda never stops the others, and the sweep never throws for an
@@ -31,25 +41,34 @@ import { createHash } from 'node:crypto';
 import { logger } from '@agent/core/core';
 import { t } from '@agent/core/t';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { cancelApprovalRequest } from '@agent/core/governance/approval-store';
+import {
+  cancelApprovalRequest,
+  listApprovalRequests,
+  type ApprovalRequestRecord,
+} from '@agent/core/governance/approval-store';
 import {
   readLedger,
   readCustomerActors,
   type DecisionLedgerLocation,
 } from '@agent/core/decision-ledger';
 import {
+  agendaContentHash,
   dueAgendaReminders,
   handoffTargets,
   isHandoffDone,
+  lapsedAgendaReminders,
   listInvites,
   listReceipts,
   readAgenda,
   resolveAgendaEffective,
   upcomingAgendaReminders,
+  utcDate,
   withCustomerDecisionCaseLock,
   writeAgenda,
   type AgendaHandoffRecord,
   type AgendaReminderRecord,
+  type AgendaReminderSupersededRequest,
+  type AgendaReminderSupersedeReason,
   type CustomerDecisionInvite,
   type DecisionAgenda,
   type PlannedReminder,
@@ -90,6 +109,9 @@ export type ReminderOutcome =
   | AgendaReminderRecord['status']
   | 'would_send'
   | 'would_remind_manually'
+  | 'would_lapse'
+  /** A `due` not sent: the decider got the carried-over `before_due` this run. */
+  | 'covered'
   | 'delivery_failed'
   | 'unreachable'
   | 'failed';
@@ -109,8 +131,12 @@ export interface ReminderSweepResult {
     actor_id: string;
     target_date: string;
     outcome: ReminderOutcome;
+    /** A held reminder sent (or asked again) after its send day. */
+    carried_over?: true;
     approval_request_id?: string;
     inbox_entry_id?: string;
+    /** Earlier pending requests of this reminder cancelled this run (ids only). */
+    superseded_request_ids?: string[];
   }>;
   counts: Partial<Record<ReminderOutcome, number>>;
 }
@@ -161,8 +187,16 @@ async function deliverReminder(
   const body = renderCustomerRoutineTemplate(reminder.template);
   if (!binding || body === null) return { outcome: 'failed' };
   // Bound to the content: an approval (or a charter consumption) covers this
-  // exact text to this exact channel, never an edited text or another channel.
-  const correlationId = reminderCorrelationId(tenant, reminder, channel, body);
+  // exact text to this exact channel for this agenda revision, never an
+  // edited text, another channel or a changed agenda — also when the
+  // approval comes after the day's sweep and the reminder is carried over.
+  const correlationId = reminderCorrelationId(
+    tenant,
+    reminder,
+    channel,
+    body,
+    agendaContentHash(agenda)
+  );
   // Bound to the tenant (the facade's tenant-bound role), so the gate reads
   // the tenant's charter through its exact charter scope — the same binding
   // a chronos tenant run has from its environment.
@@ -225,10 +259,14 @@ async function deliverReminder(
       : result.status === 'denied' || finalRefusal
         ? 'denied'
         : result.status === 'approval_pending'
-          ? result.approvalRequestId && result.approvalRequestStatus !== 'human_required'
+          ? result.approvalRequestId &&
+            (result.approvalRequestStatus === 'created' ||
+              result.approvalRequestStatus === 'pending')
             ? 'approval_pending'
             : // Held with no request a human can decide (a charter stop, no
-              // request opened): never retried silently — a manual task.
+              // request opened, or the correlation id names a request this
+              // sweep withdrew earlier — the channel moved back): never
+              // retried silently — a manual task.
               'unreachable'
           : 'delivery_failed';
   return {
@@ -237,49 +275,123 @@ async function deliverReminder(
   };
 }
 
-/** `customer-decision-reminder:<tenant>:<reminder>:<hash of channel + body>`. */
+/** The correlation id prefix every request of one reminder shares, whatever its channel or text. */
+export function reminderCorrelationPrefix(
+  tenant: string,
+  reminder: Pick<PlannedReminder, 'reminder_id'>
+): string {
+  return `customer-decision-reminder:${tenant}:${reminder.reminder_id}:`;
+}
+
+/** `customer-decision-reminder:<tenant>:<reminder>:<hash of channel + body + agenda content hash>`. */
 export function reminderCorrelationId(
   tenant: string,
   reminder: Pick<PlannedReminder, 'reminder_id'>,
   channel: { surface: string; channelId: string },
-  body: string
+  body: string,
+  agendaHash: string
 ): string {
   const digest = createHash('sha256')
-    .update([channel.surface, channel.channelId, body].join('\u0000'))
+    .update([channel.surface, channel.channelId, body, agendaHash].join('\u0000'))
     .digest('hex')
     .slice(0, 16);
-  return `customer-decision-reminder:${tenant}:${reminder.reminder_id}:${digest}`;
+  return `${reminderCorrelationPrefix(tenant, reminder)}${digest}`;
 }
 
 /**
- * A reminder whose text changed (an edited title) gets a new correlation id
- * and so a new request: cancel the request the earlier attempt left pending,
- * so stale requests do not pile up. Best-effort.
+ * The pending reminder requests of one tenant sweep, listed once (lazily)
+ * from the outbox surfaces' approval channels, tenant-scoped; `cancelled`
+ * keeps one request from being withdrawn (or listed) twice.
  */
-function supersedeHeldRequest(
-  agenda: DecisionAgenda,
+interface HeldRequestIndex {
+  pending?: ApprovalRequestRecord[];
+  cancelled: Set<string>;
+}
+
+function pendingReminderRequests(tenant: string, index: HeldRequestIndex): ApprovalRequestRecord[] {
+  index.pending ??= withExecutionContext(APPROVAL_STORE_ROLE, () =>
+    listApprovalRequests({
+      storageChannels: [...OUTBOX_SURFACES],
+      status: 'pending',
+      scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: tenant },
+    })
+  ).filter((record) =>
+    String(record.correlationId ?? '').startsWith(`customer-decision-reminder:${tenant}:`)
+  );
+  return index.pending;
+}
+
+/**
+ * Withdraw every other pending request of a reminder: on another surface
+ * (the decider's channel moved), or for another channel id / text / agenda
+ * revision on the same surface — or all of them when the reminder got no
+ * request of its own (a manual task, lapsed). Cancelled through the approval
+ * store, so the request cannot be approved afterwards and nothing is sent for
+ * it. Best-effort: a request that cannot be cancelled is left (warned), never
+ * fails the sweep.
+ */
+function withdrawHeldRequests(
+  tenant: string,
+  index: HeldRequestIndex,
   reminder: Pick<PlannedReminder, 'reminder_id'>,
-  currentRequestId: string | undefined,
-  surface: string
-): void {
-  const previous = (agenda.reminders ?? []).find(
-    (record) => record.reminder_id === reminder.reminder_id && record.status === 'approval_pending'
-  )?.approval_request_id;
-  if (!previous || previous === currentRequestId) return;
+  keep: { requestId?: string; surface?: string },
+  otherReason: AgendaReminderSupersedeReason,
+  now: string
+): AgendaReminderSupersededRequest[] {
+  const prefix = reminderCorrelationPrefix(tenant, reminder);
+  let candidates: ApprovalRequestRecord[];
   try {
-    withExecutionContext(APPROVAL_STORE_ROLE, () =>
-      cancelApprovalRequest(APPROVAL_STORE_ROLE, {
-        channel: surface,
-        requestId: previous,
-        cancelledBy: 'customer-decision',
-        reason: 'superseded: the reminder text changed',
-      })
+    candidates = pendingReminderRequests(tenant, index).filter(
+      (record) =>
+        String(record.correlationId).startsWith(prefix) &&
+        record.id !== keep.requestId &&
+        !index.cancelled.has(record.id)
     );
   } catch (error) {
     logger.warn(
-      `customer decision reminder: earlier approval request not cancelled — ${diagnosticCode(error)} | cancel it by hand | request=${previous} reminder=${reminder.reminder_id}`
+      `customer decision reminder: earlier approval requests not checked — ${diagnosticCode(error)} | the next sweep checks again | reminder=${reminder.reminder_id}`
     );
+    return [];
   }
+  const withdrawn: AgendaReminderSupersededRequest[] = [];
+  for (const record of candidates) {
+    const surface = String(record.storageChannel || record.channel).toLowerCase();
+    const reason: AgendaReminderSupersedeReason = keep.surface
+      ? surface === keep.surface
+        ? 'content_changed'
+        : 'surface_changed'
+      : otherReason;
+    try {
+      const updated = withExecutionContext(APPROVAL_STORE_ROLE, () =>
+        cancelApprovalRequest(APPROVAL_STORE_ROLE, {
+          channel: record.channel,
+          storageChannel: surface,
+          requestId: record.id,
+          cancelledBy: 'customer-decision',
+          // Ids only: the approval store is shared.
+          reason: `superseded: ${reason} (customer decision reminder ${reminder.reminder_id})`,
+        })
+      );
+      index.cancelled.add(record.id);
+      // Decided in the meantime: an approval of the old channel / text is
+      // never presented again (the correlation id differs), so nothing sends.
+      if (updated.status !== 'cancelled') continue;
+      withdrawn.push({ request_id: record.id, surface, reason, at: now });
+    } catch (error) {
+      logger.warn(
+        `customer decision reminder: earlier approval request not cancelled — ${diagnosticCode(error)} | cancel it by hand | request=${record.id} surface=${surface} reminder=${reminder.reminder_id}`
+      );
+    }
+  }
+  return withdrawn;
+}
+
+function mergeSuperseded(
+  ...lists: Array<readonly AgendaReminderSupersededRequest[] | undefined>
+): AgendaReminderSupersededRequest[] {
+  const merged = new Map<string, AgendaReminderSupersededRequest>();
+  for (const list of lists) for (const item of list ?? []) merged.set(item.request_id, item);
+  return [...merged.values()];
 }
 
 function mergeReminders(
@@ -291,7 +403,16 @@ function mergeReminders(
     const index = merged.findIndex((item) => item.reminder_id === record.reminder_id);
     if (index >= 0) {
       // A final status is never overwritten by a later attempt.
-      if (merged[index].status === 'approval_pending') merged[index] = record;
+      const previous = merged[index];
+      if (previous.status === 'approval_pending' || previous.status === 'lapsed') {
+        const superseded = mergeSuperseded(
+          previous.superseded_requests,
+          record.superseded_requests
+        );
+        const { superseded_requests: _drop, ...rest } = record;
+        void _drop;
+        merged[index] = superseded.length > 0 ? { ...rest, superseded_requests: superseded } : rest;
+      }
     } else merged.push(record);
   }
   return merged;
@@ -311,7 +432,8 @@ async function sweepAgenda(
   invites: readonly CustomerDecisionInvite[],
   dryRun: boolean,
   now: string,
-  result: ReminderSweepResult
+  result: ReminderSweepResult,
+  held: HeldRequestIndex
 ): Promise<void> {
   const state = asLedgerWriter(tenant, () => {
     const agenda = readAgenda(location, agendaId);
@@ -325,15 +447,84 @@ async function sweepAgenda(
   });
   if (!state) return;
   result.agendas += 1;
-  const due = dueAgendaReminders({
+  const planInput = {
     agenda: state.agenda,
     invites: invites.filter((invite) => invite.agenda_id === agendaId),
     receipts: state.receipts,
     effective: state.effective,
     now,
-  });
-  if (due.length === 0) return;
+  };
+  // Carried-over reminders first, so a `before_due` sent today covers the
+  // same decider's `due` in this run (stable: reminder id order otherwise).
+  const due = [...dueAgendaReminders(planInput)].sort(
+    (a, b) => Number(Boolean(b.carried_over)) - Number(Boolean(a.carried_over))
+  );
+  const lapsed = lapsedAgendaReminders(planInput);
+  if (due.length === 0 && lapsed.length === 0) return;
+  const heldRecords = new Map(
+    (state.agenda.reminders ?? [])
+      .filter((record) => record.status === 'approval_pending')
+      .map((record) => [record.reminder_id, record])
+  );
   const records: AgendaReminderRecord[] = [];
+  const superseded = new Map<string, string[]>();
+  /** Lapse a held record: withdraw its requests, record it `lapsed` (nothing sent). */
+  const lapse = (
+    record: AgendaReminderRecord,
+    reason: AgendaReminderSupersedeReason
+  ): ReminderOutcome => {
+    if (dryRun) return 'would_lapse';
+    const withdrawn = withdrawHeldRequests(tenant, held, record, {}, reason, now);
+    if (withdrawn.length > 0)
+      superseded.set(
+        record.reminder_id,
+        withdrawn.map((item) => item.request_id)
+      );
+    records.push({
+      ...record,
+      status: 'lapsed',
+      at: now,
+      ...(withdrawn.length > 0 ? { superseded_requests: withdrawn } : {}),
+    });
+    return 'lapsed';
+  };
+  const sentBeforeDueOnTheDay = (record: AgendaReminderRecord): boolean =>
+    record.kind === 'due' &&
+    (state.agenda.reminders ?? []).some(
+      (item) =>
+        item.kind === 'before_due' &&
+        item.status === 'sent' &&
+        item.actor_id === record.actor_id &&
+        item.target_date === record.target_date &&
+        (utcDate(item.at) ?? '') >= record.target_date
+    );
+  for (const record of lapsed) {
+    let outcome: ReminderOutcome = 'failed';
+    try {
+      outcome = lapse(
+        record,
+        sentBeforeDueOnTheDay(record) ? 'covered_by_earlier_reminder' : 'no_longer_due'
+      );
+    } catch (error) {
+      logger.warn(
+        `customer decision reminder not lapsed — ${diagnosticCode(error)} | the next sweep retries it | reminder=${record.reminder_id} agenda=${agendaId}`
+      );
+    }
+    const ids = superseded.get(record.reminder_id);
+    result.reminders.push({
+      case_id: caseId,
+      agenda_id: agendaId,
+      reminder_id: record.reminder_id,
+      kind: record.kind,
+      actor_id: record.actor_id,
+      target_date: record.target_date,
+      outcome,
+      ...(record.approval_request_id ? { approval_request_id: record.approval_request_id } : {}),
+      ...(ids ? { superseded_request_ids: ids } : {}),
+    });
+  }
+  /** actor × target date whose carried-over `before_due` went out this run. */
+  const covered = new Set<string>();
   for (const reminder of due) {
     const base = {
       case_id: caseId,
@@ -342,10 +533,27 @@ async function sweepAgenda(
       kind: reminder.kind,
       actor_id: reminder.actor_id,
       target_date: reminder.target_date,
+      ...(reminder.carried_over ? { carried_over: true as const } : {}),
     };
+    const coverKey = `${reminder.actor_id}\u0000${reminder.target_date}`;
     let outcome: ReminderOutcome = 'failed';
     let record: AgendaReminderRecord | undefined;
     try {
+      if (reminder.kind === 'due' && covered.has(coverKey)) {
+        // One message a day: the carried-over `before_due` already went out.
+        const earlier = heldRecords.get(reminder.reminder_id);
+        outcome = earlier ? lapse(earlier, 'covered_by_earlier_reminder') : 'covered';
+        const ids = superseded.get(reminder.reminder_id);
+        result.reminders.push({
+          ...base,
+          outcome,
+          ...(earlier?.approval_request_id
+            ? { approval_request_id: earlier.approval_request_id }
+            : {}),
+          ...(ids ? { superseded_request_ids: ids } : {}),
+        });
+        continue;
+      }
       const actor = state.actors.find((item) => item.id === reminder.actor_id);
       // A title the fixed template refuses (too long, a link, a mention, …)
       // cannot go out unattended: the operator reminds by hand.
@@ -394,12 +602,6 @@ async function sweepAgenda(
               ? { approval_request_id: delivered.approval_request_id }
               : {}),
           };
-          supersedeHeldRequest(
-            state.agenda,
-            reminder,
-            delivered.approval_request_id,
-            channel.surface
-          );
         } else if (outcome === 'unreachable') {
           const notice = notifyManualReminder({
             tenantSlug: tenant,
@@ -416,6 +618,29 @@ async function sweepAgenda(
             inbox_entry_id: notice.inbox_entry_id,
           };
         }
+        if (outcome === 'sent' && reminder.kind === 'before_due' && reminder.carried_over)
+          covered.add(coverKey);
+      }
+      if (record) {
+        // The reminder has its outcome now: withdraw its other pending
+        // requests (another surface, an older channel / text / revision).
+        const withdrawn = withdrawHeldRequests(
+          tenant,
+          held,
+          reminder,
+          channel.manualReason
+            ? {}
+            : { requestId: record.approval_request_id, surface: channel.surface },
+          channel.manualReason === 'template_refused' ? 'content_changed' : 'channel_unusable',
+          now
+        );
+        if (withdrawn.length > 0) {
+          record = { ...record, superseded_requests: withdrawn };
+          superseded.set(
+            reminder.reminder_id,
+            withdrawn.map((item) => item.request_id)
+          );
+        }
       }
     } catch (error) {
       outcome = 'failed';
@@ -424,11 +649,13 @@ async function sweepAgenda(
       );
     }
     if (record) records.push(record);
+    const ids = superseded.get(reminder.reminder_id);
     result.reminders.push({
       ...base,
       outcome,
       ...(record?.approval_request_id ? { approval_request_id: record.approval_request_id } : {}),
       ...(record?.inbox_entry_id ? { inbox_entry_id: record.inbox_entry_id } : {}),
+      ...(ids ? { superseded_request_ids: ids } : {}),
     });
   }
   if (records.length === 0) return;
@@ -458,6 +685,15 @@ async function sweepAgenda(
       status: record.status,
       ...(record.approval_request_id ? { approval_request_id: record.approval_request_id } : {}),
       ...(record.inbox_entry_id ? { inbox_entry_id: record.inbox_entry_id } : {}),
+      ...(record.superseded_requests
+        ? {
+            superseded_requests: record.superseded_requests.map((item) => ({
+              request_id: item.request_id,
+              surface: item.surface,
+              reason: item.reason,
+            })),
+          }
+        : {}),
     })),
   });
 }
@@ -487,6 +723,7 @@ export async function sweepTenantReminders(input: {
   };
   // Invite I/O runs inside invite.ts as the tenant-bound invite store role.
   const invites = listInvites(tenant, input.caseId ? { caseId: input.caseId } : {});
+  const held: HeldRequestIndex = { cancelled: new Set() };
   for (const pair of sentAgendaPairs(invites, input.caseId)) {
     const location = input.locationFor
       ? input.locationFor(pair.caseId)
@@ -500,7 +737,8 @@ export async function sweepTenantReminders(input: {
         invites,
         dryRun,
         input.now,
-        result
+        result,
+        held
       );
     } catch (error) {
       const code = diagnosticCode(error);
@@ -705,5 +943,6 @@ export function reminderStatus(
     pending_approval: records.filter((record) => record.status === 'approval_pending'),
     manual: records.filter((record) => record.status === 'manual'),
     denied: records.filter((record) => record.status === 'denied'),
+    lapsed: records.filter((record) => record.status === 'lapsed'),
   };
 }
