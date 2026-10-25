@@ -27,6 +27,8 @@ KYBERION_CUSTOMER_ROOM_TENANT=<tenant-slug> node dist/presence/displays/customer
 | `KYBERION_CUSTOMER_ROOM_PORT`            | `3046`  | Loopback port (the process binds `127.0.0.1` only).                                                                           |
 | `KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES` | empty   | IPs / CIDRs of the reverse proxy in front (see [Behind the public ingress](#behind-the-public-ingress)). Empty trusts nobody. |
 
+The tenant must be active in the tenant registry (`knowledge/personal/tenants/<tenant>.json`, `status: active`). For any other tenant, every link answers `unavailable`, and `customer-decision send` refuses with `[CD_INVITE_TENANT_NOT_REGISTERED]`. Only revoking is still possible. `knowledge/personal/` is gitignored, so a git worktree has no registry profiles: run the room and `customer-decision` from the checkout that holds the registry, or register the tenant in the worktree first.
+
 ### Behind the public ingress
 
 Behind Tailscale Funnel or another reverse proxy every request reaches the room

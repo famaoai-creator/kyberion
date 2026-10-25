@@ -299,18 +299,25 @@ export function taskProposalStatus(
   const holds = held.map((lock) => {
     const proposals = taskProposalHolds(lock, agendas, ledger, now);
     const resolved = proposals.length > 0 && proposals.every((hold) => hold.resolved_decision_id);
+    // Its agenda is closed or withdrawn with no confirmed answer: nothing here releases it.
+    const unresolvable = !resolved && proposals.some((hold) => hold.unresolvable);
     return {
       consumer: lock.consumer,
       mission_id: lock.mission_id,
       task_id: lock.task_id,
       ...(lock.hold?.work_item_id ? { work_item_id: lock.hold.work_item_id } : {}),
-      status: resolved ? 'resolved' : 'awaiting',
+      status: resolved ? 'resolved' : unresolvable ? 'unresolvable' : 'awaiting',
       proposal_ids: proposals.map((hold) => hold.proposal_id),
       uncollected: proposals.filter((hold) => !hold.collected).length,
       decision_ids: proposals.flatMap((hold) =>
         hold.resolved_decision_id ? [hold.resolved_decision_id] : []
       ),
       ...(resolved ? { next: `pnpm mission resume ${lock.mission_id}` } : {}),
+      ...(unresolvable
+        ? {
+            next: `the question cannot be asked again: replace task ${lock.task_id} with a task under a new task id in NEXT_TASKS, then pnpm mission resume ${lock.mission_id}`,
+          }
+        : {}),
     };
   });
   return {

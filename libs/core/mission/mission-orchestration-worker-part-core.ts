@@ -35,6 +35,7 @@ import { isPromptTooLongError } from '../workforce/worker-context-compaction.js'
 
 import {
   recordMissionContextTask,
+  recordMissionVisiblePrompt,
   taskClarificationFilePath,
   summarizeTaskResultObservability,
   buildTaskClarificationPacket,
@@ -49,7 +50,9 @@ import type {
 import {
   buildTaskDispatchContext,
   attachDeliveredKnowledgeRefs,
+  CUSTOMER_DECISION_TIER_MISMATCH,
 } from './mission-orchestration-worker-part-dispatch-context.js';
+import { scrubTaskResponseValues } from '../customer-decision/task-decision-values.js';
 import type { DispatchPlannedMissionTaskInput } from './mission-orchestration-worker-part-dispatch-context.js';
 import {
   obtainTaskResultResponse,
@@ -62,6 +65,7 @@ import {
 } from './mission-orchestration-worker-part-results.js';
 import { registerMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
 import {
+  auditTaskDecisionDelivery,
   pinTaskDecisions,
   reconcileTaskDecisions,
   recordTaskDecisionProposals,
@@ -111,12 +115,28 @@ export async function dispatchPlannedMissionTaskCore(
       mission_id: input.missionId,
     },
   });
-  // CD-09: pin the customer decisions this task starts on (no-op without a decision case).
-  const decisionPin = pinTaskDecisions({
-    missionId: input.missionId,
-    taskId: input.task.task_id,
-    mode: 'start',
-  });
+  // CD-09: pin the customer decisions this task starts on (no-op without a
+  // decision case). A failed pin is retried once.
+  const pinOnce = () =>
+    pinTaskDecisions({ missionId: input.missionId, taskId: input.task.task_id, mode: 'start' });
+  let decisionPin = pinOnce();
+  if (decisionPin?.failed) decisionPin = pinOnce();
+  const previousBlockedReason = previousWorkItem?.metadata?.blocked_reason;
+  // Is this task known to carry customer-decision proposals or holds? Only
+  // its WorkItem can say so when the case cannot be read.
+  const knownDecisionTask =
+    Boolean(previousWorkItem?.metadata?.customer_decision_hold) ||
+    (typeof previousBlockedReason === 'string' &&
+      CUSTOMER_DECISION_BLOCKED_REASONS.includes(previousBlockedReason));
+  if (decisionPin?.failed && !knownDecisionTask) {
+    // Not known to wait for anything: not blocked, not run on a guess either —
+    // left planned for the next dispatch round.
+    logger.warn(
+      `task ${input.task.task_id} not dispatched — its customer decision pin failed twice${decisionPin.failed.case_found ? ' on a known case' : ''} | it stays planned and is retried on the next dispatch; check that the decision case is readable | mission=${input.missionId} consumer=${decisionPin.consumer}${decisionPin.failed.case_id ? ` case=${decisionPin.failed.case_id}` : ''}`
+    );
+    input.task.status = 'planned';
+    return null;
+  }
   const claimed = claimWorkItem({
     itemId: workItem.item_id,
     actorPeerId: 'mission-orchestration-worker',
@@ -134,6 +154,112 @@ export async function dispatchPlannedMissionTaskCore(
       estimated_scope: input.task.estimated_scope,
     },
   });
+  // CD-09: a task whose own requires_customer question has no confirmed
+  // decision waits, undispatched (the hold re-opens if the customer changed
+  // an answer after the release); so does a task known to carry proposals or
+  // holds whose pin could not be made — never run on a guess.
+  const pinnedHold = decisionPin?.held;
+  // Still failing, and the task is known to carry proposals or holds.
+  const pinFailed = decisionPin?.failed;
+  if (decisionPin && (pinnedHold || pinFailed)) {
+    const unresolvable = pinnedHold?.reason === 'customer_decision_unresolvable';
+    const blockedReason = pinFailed
+      ? 'customer_decision_check_failed'
+      : unresolvable
+        ? 'customer_decision_unresolvable'
+        : 'awaiting_customer_decision';
+    const nextStep = pinFailed
+      ? `resume the mission once the decision case is readable: pnpm mission resume ${input.missionId}`
+      : unresolvable
+        ? // No customer-decision verb asks a collected question again or lets the
+          // operator decide a requires_customer entry, and the lock (keyed by
+          // mission and task id) never drops a proposal: only a new task id helps.
+          `the question's agenda was closed or withdrawn with no confirmed answer and cannot be asked again: replace it with a task under a new task id in NEXT_TASKS, then pnpm mission resume ${input.missionId}`
+        : `collect and send the question if it is not on an agenda yet (customer-decision draft --from-tasks), confirm the customer's answer (customer-decision confirm), then pnpm mission resume ${input.missionId}`;
+    if (pinFailed) {
+      logger.warn(
+        `task ${input.task.task_id} blocked — its customer decision pin could not be made (customer_decision_check_failed) | ${nextStep} | mission=${input.missionId} consumer=${decisionPin.consumer}${pinFailed.case_id ? ` case=${pinFailed.case_id}` : ''}`
+      );
+    }
+    if (pinnedHold) {
+      auditTaskDecisionDelivery({
+        values: {
+          tenantSlug: pinnedHold.tenant_slug,
+          caseId: pinnedHold.case_id,
+          consumer: decisionPin.consumer,
+          decisionIds: [],
+        },
+        missionId: input.missionId,
+        taskId: input.task.task_id,
+        operation: 'task_decisions_withheld',
+        reason: pinnedHold.reason,
+        proposalIds: pinnedHold.proposal_ids,
+      });
+    }
+    const caseId = pinnedHold?.case_id ?? pinFailed?.case_id;
+    const hold = {
+      status: pinFailed ? 'check_failed' : unresolvable ? 'unresolvable' : 'awaiting',
+      consumer: decisionPin.consumer,
+      ...(caseId ? { case_id: caseId } : {}),
+      ...(pinnedHold
+        ? {
+            hold_count: pinnedHold.proposal_ids.length,
+            hold_proposal_ids: pinnedHold.proposal_ids,
+            reason: pinnedHold.reason,
+          }
+        : { reason: 'pin_failed' }),
+      next: nextStep,
+    };
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary: pinFailed
+          ? 'Task blocked: its customer decision holds could not be checked'
+          : unresolvable
+            ? 'Task blocked: its customer decision can no longer be made'
+            : 'Task waits for a customer decision',
+        blocked_reason: blockedReason,
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        customer_decision_hold: hold,
+      },
+    });
+    input.task.status = 'blocked';
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: pinFailed
+        ? 'The task customer decision holds could not be checked; it is not run on a guess.'
+        : 'Task waits for a confirmed customer decision (requires_customer) before it can run.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: [],
+      payload: { customer_decision_hold: hold },
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step: nextStep,
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...summarizeTaskResultObservability({ parseErrors: [] }),
+    };
+  }
+  // CD-09: a resumed task's confirmed customer decisions (held in memory only).
+  const decisionValues = decisionPin?.decision_values;
+  /** CD-09: replace echoed values in any text bound for a shared store. */
+  const scrubText = (text: string) => (decisionValues ? decisionValues.scrub(text) : text);
   let dispatchContext;
   let response;
   const buildContext = (forceContextCompaction?: boolean) =>
@@ -147,8 +273,127 @@ export async function dispatchPlannedMissionTaskCore(
       allTasks: input.allTasks,
       ...(input.upstreamHandoffs ? { upstreamHandoffs: input.upstreamHandoffs } : {}),
       ...(forceContextCompaction ? { forceContextCompaction: true } : {}),
+      ...(decisionValues ? { customerDecisionValues: decisionValues } : {}),
     });
-  const dispatchOnce = (context: Awaited<ReturnType<typeof buildTaskDispatchContext>>) => {
+  type BuiltDispatchContext = Awaited<ReturnType<typeof buildTaskDispatchContext>>;
+  /**
+   * CD-09: the tier gate withheld the values: the task is not dispatched (the
+   * values are never sent) and its WorkItem is blocked, ids only.
+   */
+  const blockOnDecisionTier = (context: BuiltDispatchContext): DispatchMissionTaskOutcome => {
+    const delivery = context.customerDecisionDelivery;
+    const decisionIds = delivery?.decision_ids ?? [];
+    const reason = delivery?.reason ?? 'tier_gate';
+    if (decisionValues) {
+      auditTaskDecisionDelivery({
+        values: decisionValues,
+        missionId: input.missionId,
+        taskId: input.task.task_id,
+        operation: 'task_decisions_withheld',
+        reason,
+      });
+    }
+    const hold = {
+      status: 'tier_mismatch',
+      ...(decisionValues
+        ? { consumer: decisionValues.consumer, case_id: decisionValues.caseId }
+        : {}),
+      decision_ids: decisionIds,
+      reason,
+      next: `run the task in a confidential mission of the decision case's tenant, then pnpm mission resume ${input.missionId}`,
+    };
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary:
+          'Task blocked: its confirmed customer decisions may not be sent in this mission’s context',
+        blocked_reason: CUSTOMER_DECISION_TIER_MISMATCH,
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        customer_decision_hold: hold,
+      },
+    });
+    input.task.status = 'blocked';
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'The mission context may not carry the confidential customer decisions this task needs.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: [],
+      payload: { customer_decision_hold: hold },
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step: hold.next,
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+      context_pack_id: context.missionContextPackId,
+      context_pack_path: context.missionContextPackPath,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...summarizeTaskResultObservability({
+        pruning: context.missionContextPackPruningSummary,
+        parseErrors: [],
+      }),
+    };
+  };
+  /**
+   * CD-09: audit and record, ids only, that the values went into the prompt
+   * of a dispatch that reached the agent (called after a successful route).
+   */
+  const noteDecisionsDelivered = (context: BuiltDispatchContext | undefined, attempted = false) => {
+    if (!decisionValues || context?.customerDecisionDelivery?.status !== 'delivered') return;
+    auditTaskDecisionDelivery({
+      values: decisionValues,
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      operation: 'task_decisions_delivered',
+      // `attempted`: the route failed after the prompt went out (the agent may
+      // have seen it); `changed_after_completion` / `decision_not_recorded`:
+      // the prompt told a completed task it has no confirmed value for these.
+      ...(attempted || decisionValues.unconfirmedReasons.length > 0
+        ? {
+            reason: [
+              ...(attempted ? ['attempted'] : []),
+              ...decisionValues.unconfirmedReasons,
+            ].join(','),
+          }
+        : {}),
+      ...(decisionValues.unconfirmedProposalIds.length > 0
+        ? { proposalIds: decisionValues.unconfirmedProposalIds }
+        : {}),
+    });
+    if (attempted) return;
+    try {
+      recordMissionVisiblePrompt({
+        missionId: input.missionId,
+        taskId: input.task.task_id,
+        // Ids only: a plain hash of the section would let its few likely
+        // values be guessed back, so the record describes the decisions.
+        content: decisionValues.knowledgeRefs().join('\n'),
+        form: 'customer_decision_values',
+        ...(context.missionContextPackId ? { contextPackId: context.missionContextPackId } : {}),
+        knowledgeRefs: decisionValues.knowledgeRefs().map((ref) => ({ path: ref })),
+        securityScope: context.securityScope,
+      });
+    } catch (error) {
+      logger.warn(
+        `customer decision prompt visibility not recorded — ${error instanceof Error ? error.name : 'error'} | the task goes on | mission=${input.missionId} consumer=${decisionValues.consumer}`
+      );
+    }
+  };
+  const dispatchOnce = (context: BuiltDispatchContext) => {
     const dispatchArgs = {
       missionId: input.missionId,
       task: input.task,
@@ -171,13 +416,20 @@ export async function dispatchPlannedMissionTaskCore(
       delegationChain,
     };
     return isBestOfNCandidate({ teamRole: input.teamRole, task: input.task })
-      ? obtainBestOfTaskResultResponse(dispatchArgs)
+      ? obtainBestOfTaskResultResponse({
+          ...dispatchArgs,
+          // CD-09: best-of-N scrubs each candidate before it stores the loser.
+          ...(decisionValues ? { customerDecisionValues: decisionValues } : {}),
+        })
       : obtainTaskResultResponse(dispatchArgs);
   };
   try {
     dispatchContext = await (gapRecorder
       ? gapRecorder.measure('context_pack', () => buildContext())
       : buildContext());
+    if (dispatchContext.customerDecisionDelivery?.status === 'withheld') {
+      return blockOnDecisionTier(dispatchContext);
+    }
     try {
       response = await (gapRecorder
         ? gapRecorder.measure('backend_dispatch', () => dispatchOnce(dispatchContext))
@@ -192,6 +444,9 @@ export async function dispatchPlannedMissionTaskCore(
       dispatchContext = await (gapRecorder
         ? gapRecorder.measure('context_pack', () => buildContext(true))
         : buildContext(true));
+      if (dispatchContext.customerDecisionDelivery?.status === 'withheld') {
+        return blockOnDecisionTier(dispatchContext);
+      }
       response = await (gapRecorder
         ? gapRecorder.measure('backend_dispatch', () => dispatchOnce(dispatchContext))
         : dispatchOnce(dispatchContext));
@@ -214,7 +469,17 @@ export async function dispatchPlannedMissionTaskCore(
       }
       return null;
     }
+    noteDecisionsDelivered(dispatchContext, true);
     throw err;
+  }
+  // CD-09: the route returned, so the values reached the agent. In-memory
+  // logic (the acceptance gate, the independent reviewer — the same
+  // confidential context) works on the result as the worker wrote it; every
+  // copy that is stored, sent elsewhere or notified is the scrubbed one.
+  const rawTaskResult = response.taskResult;
+  if (decisionValues) {
+    noteDecisionsDelivered(dispatchContext);
+    scrubTaskResponseValues(decisionValues, response);
   }
   // KP-05: report what buildTaskDispatchContext's context pack actually
   // delivered onto this dispatch's trace span.
@@ -441,7 +706,6 @@ export async function dispatchPlannedMissionTaskCore(
   // Fail closed, but say so: a check that failed on a known case, or a case
   // lookup that failed for a task already held, blocks with a reason of its
   // own (customer_decision_check_failed) so it is told apart from a real wait.
-  const previousBlockedReason = previousWorkItem?.metadata?.blocked_reason;
   const decisionCheckFailed = Boolean(
     decisionProposals &&
     ((decisionProposals.case_found && decisionProposals.failed) ||
@@ -794,7 +1058,8 @@ export async function dispatchPlannedMissionTaskCore(
   const acceptance = await evaluateTaskAcceptanceGate({
     missionId: input.missionId,
     task: input.task,
-    taskResult: response.taskResult,
+    // CD-09: artifact paths, criteria and enum fields as written (unscrubbed).
+    taskResult: rawTaskResult,
   });
 
   // Separation of duties: the deterministic gate only checks structure and
@@ -812,11 +1077,21 @@ export async function dispatchPlannedMissionTaskCore(
     independentReview = await requestIndependentAcceptanceReview({
       missionId: input.missionId,
       task: input.task,
-      taskResult: response.taskResult,
+      taskResult: rawTaskResult,
       workerAgentId: input.assignment.agent_id,
       workerTeamRole: input.teamRole,
       securityScope: dispatchContext.securityScope,
     });
+    if (independentReview && decisionValues) {
+      // The reviewer saw the result as written: its words are scrubbed before storage.
+      independentReview = {
+        ...independentReview,
+        gaps: independentReview.gaps.map(scrubText),
+        ...(independentReview.rationale
+          ? { rationale: scrubText(independentReview.rationale) }
+          : {}),
+      };
+    }
     if (independentReview && !independentReview.approve) {
       acceptance.passed = false;
       acceptance.reasons = [
@@ -828,6 +1103,8 @@ export async function dispatchPlannedMissionTaskCore(
     }
   }
 
+  // CD-09: gate reasons go into WorkItems, events and the operator notification.
+  if (decisionValues) acceptance.reasons = acceptance.reasons.map(scrubText);
   if (!acceptance.passed) {
     const currentReworkCount = Number(input.task.rework_count || 0);
     const nextReworkCount = currentReworkCount + 1;
