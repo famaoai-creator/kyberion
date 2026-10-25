@@ -6,21 +6,49 @@
     {
       "id": "implementer-execution",
       "description": "Implementers doing execution-phase work always get the working philosophy up front, and never see unreviewed auto-distilled placeholders that would crowd the budget with low-signal text.",
-      "match": { "team_role": "implementer", "phase": "*" },
-      "pinned": ["knowledge/product/governance/working-philosophy.md"],
-      "exclude": ["knowledge/product/evolution/distill_*.md"]
+      "match": {
+        "team_role": "implementer",
+        "phase": "*"
+      },
+      "pinned": [
+        "knowledge/product/governance/working-philosophy.md"
+      ],
+      "exclude": [
+        "knowledge/product/evolution/distill_*.md"
+      ]
     },
     {
       "id": "tenant-wide-default",
       "description": "DA-07: demonstrates the tenant match dimension. '*' matches any concrete tenant (and tenantless requests, whose tenant normalizes to '*'); replace with a concrete slug (e.g. {\"tenant\": \"tenant-masked-a\"}) to declare per-tenant pinned/search_roots/exclude. The exclude below repeats the corpus-wide distill_ glob (excludes are unioned), so this slice adds no behavioral delta until a concrete tenant slice is declared.",
-      "match": { "tenant": "*" },
-      "exclude": ["knowledge/product/evolution/distill_*.md"]
+      "match": {
+        "tenant": "*"
+      },
+      "exclude": [
+        "knowledge/product/evolution/distill_*.md"
+      ]
     },
     {
       "id": "default-exclude-unreviewed-distills",
       "description": "Wildcard default applied to every task: auto-distilled evolution notes are placeholder-prone (many still contain 'None extracted automatically (policy fallback)') and pollute retrieval ranking, so they are excluded corpus-wide. Curated evolution docs (biometric_privacy.md, reconstruction-learnings-*, wisdom_*) are NOT matched by the distill_ glob and remain searchable.",
-      "match": { "team_role": "*", "phase": "*", "mission_type": "*" },
-      "exclude": ["knowledge/product/evolution/distill_*.md"]
+      "match": {
+        "team_role": "*",
+        "phase": "*",
+        "mission_type": "*"
+      },
+      "exclude": [
+        "knowledge/product/evolution/distill_*.md"
+      ]
+    },
+    {
+      "id": "productization-governed-evidence-tools",
+      "description": "Pinned: delegated workers on PRJ-KYBERION-PRODUCTIZATION must write requirements/design evidence through the governed CLI tools (scripts/requirements_draft.ts, scripts/design_spec.ts), never directly.",
+      "match": {
+        "team_role": "implementer",
+        "project": "PRJ-KYBERION-PRODUCTIZATION"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/governed-evidence-tools.md"
+      ]
     }
   ]
 }
