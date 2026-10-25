@@ -347,6 +347,7 @@ describe('buildCaseOverview (CD-12)', () => {
       pending_proposals: 2,
       held: 1,
       ready_to_resume: 0,
+      unresolvable: 0,
     });
     // Collected onto the price entry; the customer's answer (D-0002) is in force once confirmed.
     const resolvedLock = lock({
@@ -374,10 +375,47 @@ describe('buildCaseOverview (CD-12)', () => {
     const resolved = buildCaseOverview(
       caseInput({ agendas: [confirmed], consumers: [resolvedLock] })
     );
-    expect(resolved.tasks).toEqual({ pending_proposals: 0, held: 0, ready_to_resume: 1 });
+    expect(resolved.tasks).toEqual({
+      pending_proposals: 0,
+      held: 0,
+      ready_to_resume: 1,
+      unresolvable: 0,
+    });
     // Released before, but the decision is no longer confirmed: held again.
     const unconfirmed = buildCaseOverview(caseInput({ consumers: [resolvedLock] }));
-    expect(unconfirmed.tasks).toEqual({ pending_proposals: 0, held: 1, ready_to_resume: 0 });
+    expect(unconfirmed.tasks).toEqual({
+      pending_proposals: 0,
+      held: 1,
+      ready_to_resume: 0,
+      unresolvable: 0,
+    });
+    // Its agenda withdrawn with no standing confirmed answer: unresolvable, with how to clear it.
+    const gone = buildCaseOverview(
+      caseInput({
+        agendas: [agenda({ status: 'withdrawn' })],
+        ledger: [],
+        consumers: [resolvedLock],
+      })
+    );
+    expect(gone.tasks).toMatchObject({ held: 1, unresolvable: 1 });
+    expect(gone.tasks.unresolvable_next).toMatch(/--from-tasks --reask .*mission supersede-task/u);
+    // A superseded task is skipped entirely (no hold, no pending proposal).
+    const superseded = buildCaseOverview(
+      caseInput({
+        consumers: [
+          ...caseInput().consumers.map((item) => ({
+            ...item,
+            superseded: { by_consumer: `${item.consumer}-v2`, by_task_id: 'v2', at: CREATED },
+          })),
+        ],
+      })
+    );
+    expect(superseded.tasks).toEqual({
+      pending_proposals: 0,
+      held: 0,
+      ready_to_resume: 0,
+      unresolvable: 0,
+    });
   });
 
   it('includes draft-only cases and shows no decision values or customer free text', () => {

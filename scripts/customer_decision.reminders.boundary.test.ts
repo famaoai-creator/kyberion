@@ -51,6 +51,8 @@ const MOVE = 'cd-remind-move';
 const LATE = 'cd-remind-late';
 /** No charter; the due is approved before the carried-over before_due. */
 const REVERSE = 'cd-remind-reverse';
+/** No charter; the hourly sweeps of one day (09:30–18:30 Asia/Tokyo). */
+const HOURLY = 'cd-remind-hourly';
 const CASE = 'case-cd';
 const NOW = '2026-10-24T00:00:00.000Z';
 const D_MINUS_1 = '2026-10-29T01:00:00.000Z';
@@ -148,7 +150,7 @@ beforeAll(async () => {
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
   process.env.KYBERION_PERSONA = 'sovereign';
-  for (const tenant of [TENANT, CHARTERED, MOVE, LATE, REVERSE]) {
+  for (const tenant of [TENANT, CHARTERED, MOVE, LATE, REVERSE, HOURLY]) {
     writeFixtureJson(`knowledge/personal/tenants/${tenant}.json`, {
       tenant_slug: tenant,
       display_name: tenant,
@@ -985,6 +987,84 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
       expect(messages).toHaveLength(1);
       expect(messages[0].text).toContain('Today (2026-10-30)');
     }, 120_000);
+
+    it('the template sweeps hourly from 09:30 to 18:30 Asia/Tokyo', () => {
+      const template = JSON.parse(
+        String(
+          initialIO.safeReadFile(
+            path.join(
+              SOURCE_ROOT,
+              'knowledge/product/pipeline-templates/customer-decision-reminders.json'
+            ),
+            { encoding: 'utf8' }
+          )
+        )
+      ) as { schedule: { cron: string; timezone: string; enabled: boolean } };
+      expect(template.schedule).toMatchObject({
+        cron: '30 9-18 * * *',
+        timezone: 'Asia/Tokyo',
+        enabled: true,
+      });
+    });
+
+    it('hourly sweeps of one day: a due approved after the first sweep goes out at the next one, once', async () => {
+      const { agendaId } = await sendAgenda(HOURLY);
+      /** 2026-10-30 at hh:30 Asia/Tokyo (every sweep falls on the UTC date 2026-10-30). */
+      const sweep = (hour: number) =>
+        run([
+          'remind',
+          '--tenant',
+          HOURLY,
+          '--now',
+          new Date(
+            Date.parse(`2026-10-30T${String(hour).padStart(2, '0')}:30:00.000+09:00`)
+          ).toISOString(),
+        ]);
+      const ofTenant = async () =>
+        (await requests('slack')).filter((item) =>
+          String(item.correlationId).includes(`:${HOURLY}:`)
+        );
+      const first = await sweep(9);
+      const held = reminderOf(first, ACTOR, 'due');
+      expect(held.outcome).toBe('approval_pending');
+      // The request tells the approver how the approved reminder goes out.
+      const opened = await request('slack', held.approval_request_id);
+      expect(opened?.summary).toContain(
+        `pnpm kyberion customer-decision remind --tenant ${HOURLY} --case ${CASE}`
+      );
+      expect(opened?.summary).not.toContain(TITLE);
+      const status = await run(['status', ...base(HOURLY), '--agenda', agendaId], D0);
+      expect((status.reminders as Out).pending_approval).toEqual([
+        expect.objectContaining({
+          reminder_id: held.reminder_id,
+          next: `pnpm kyberion customer-decision remind --tenant ${HOURLY} --case ${CASE}`,
+        }),
+      ]);
+      // 10:30, still undecided: asked again on the same request, nothing sent.
+      const second = await sweep(10);
+      expect(reminderOf(second, ACTOR, 'due')).toMatchObject({
+        outcome: 'approval_pending',
+        approval_request_id: held.approval_request_id,
+      });
+      expect(await messagesOf('slack', HOURLY)).toHaveLength(0);
+      // Approved before 11:30: that sweep sends it the same day (a due is never carried over).
+      await decide('slack', held.approval_request_id);
+      const third = await sweep(11);
+      expect(reminderOf(third, ACTOR, 'due')).toMatchObject({
+        outcome: 'sent',
+        approval_request_id: held.approval_request_id,
+      });
+      for (const hour of [12, 13, 14, 15, 16, 17, 18]) {
+        const later = await sweep(hour);
+        expect(reminderOf(later, ACTOR, 'due')).toBeUndefined();
+      }
+      // Exactly one request and one message for the day.
+      expect(await ofTenant()).toHaveLength(1);
+      const messages = await messagesOf('slack', HOURLY);
+      expect(messages).toHaveLength(1);
+      expect(messages[0].text).toContain('Today (2026-10-30)');
+      expect(recordOf(HOURLY, agendaId, held.reminder_id)).toMatchObject({ status: 'sent' });
+    }, 180_000);
 
     it('an approval for an older agenda revision never sends; a held reminder past its day lapses and its request is withdrawn', async () => {
       const { agendaId } = await sendAgenda(LATE);

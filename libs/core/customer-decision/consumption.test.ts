@@ -13,6 +13,7 @@ import {
   mergeTaskProposals,
   openAgendas,
   pendingTaskProposals,
+  relinkTaskProposal,
   reconcileConsumedDecisionLock,
   resolvedTaskProposalDecisions,
   unconfirmedTaskProposals,
@@ -21,6 +22,7 @@ import {
   taskProposalId,
   taskProposalsOf,
   unreworkedStale,
+  unresolvableTaskProposals,
 } from './consumption.js';
 import { CONSUMER_ID_PATTERN, type DecisionAgenda, type DecisionSwitch } from './model.js';
 import {
@@ -862,5 +864,241 @@ describe('resolvedTaskProposalDecisions (CD-09 values for resumed tasks)', () =>
     expect(resolvedTaskProposalDecisions(lock, agendas, ledger, NOW)).toMatchObject([
       { decision_id: 'D-0001' },
     ]);
+  });
+});
+
+describe('re-asking an unresolvable task proposal (CD-09 lifecycle)', () => {
+  const consumer = 'mission-MSN-CD09.impl';
+  const id = taskProposalId(consumer, 'RELEASE', 'release.date');
+  const askRelease = {
+    question: 'Which release date?',
+    item: 'RELEASE',
+    key: 'release.date',
+    requires_customer: true,
+  };
+  const askedOn = (agendaId: string, status: DecisionAgenda['status'], confirmed?: string) =>
+    agenda({
+      agenda_id: agendaId,
+      status,
+      entries: [
+        {
+          entry_id: id,
+          item: 'RELEASE',
+          key: 'release.date',
+          kind: 'approval',
+          question: 'Which release date?',
+          requires_customer: true,
+        },
+      ],
+      ...(confirmed
+        ? {
+            operator_confirmations: [
+              { entry_id: id, decision_id: confirmed, by: 'user:boss', at: NOW },
+            ],
+          }
+        : {}),
+    });
+  const collectedOn = (agendaId: string) => ({
+    consumer,
+    status: 'in_progress' as const,
+    decisions: mergeTaskProposals({
+      lock: { consumer, decisions: [] },
+      requests: [askRelease],
+      agendas: [askedOn(agendaId, 'sent')],
+      now: NOW,
+    }).decisions,
+  });
+  const proposal = (lock: { decisions: ConsumedDecisionLockRecord['decisions'] }) =>
+    taskProposalsOf(lock)[0];
+
+  it('unresolvable → re-asked (awaiting) → resolved, keeping the history; a second re-ask appends', () => {
+    const first = collectedOn('agd-first001');
+    const closedFirst = askedOn('agd-first001', 'closed');
+    expect(
+      unresolvableTaskProposals(first, [closedFirst], [], NOW).map((e) => e.proposal.proposal_id)
+    ).toEqual([id]);
+    // A superseded lock has nothing to re-ask.
+    expect(unresolvableTaskProposals({ ...first, superseded: {} }, [closedFirst], [], NOW)).toEqual(
+      []
+    );
+
+    const relinked = relinkTaskProposal(
+      proposal(first),
+      { agenda_id: 'agd-second01', entry_id: id },
+      LATER,
+      'user:alice'
+    );
+    expect(relinked).toMatchObject({
+      agenda_id: 'agd-second01',
+      entry_id: id,
+      item: 'RELEASE',
+      key: 'release.date',
+      layer: 'task_proposal',
+      proposal: {
+        proposal_id: id,
+        requires_customer: true,
+        collected_at: LATER,
+        previous_links: [
+          {
+            agenda_id: 'agd-first001',
+            entry_id: id,
+            collected_at: NOW,
+            relinked_at: LATER,
+            relinked_by: 'user:alice',
+          },
+        ],
+      },
+    });
+    expect(relinked.proposal).not.toHaveProperty('resolved');
+    const second = { ...first, decisions: [relinked] };
+    const sent = askedOn('agd-second01', 'sent');
+    expect(unresolvableTaskProposals(second, [closedFirst, sent], [], LATER)).toEqual([]);
+    expect(taskProposalHolds(second, [closedFirst, sent], [], LATER)).toEqual([
+      { proposal_id: id, collected: true },
+    ]);
+    // The customer answers there and the operator confirms: resolved on the new link.
+    const decided = [customerDecision('D-0001', 'release.date', 'RELEASE', true)];
+    const confirmed = askedOn('agd-second01', 'sent', 'D-0001');
+    expect(taskProposalHolds(second, [closedFirst, confirmed], decided, LATER)).toEqual([
+      { proposal_id: id, collected: true, resolved_decision_id: 'D-0001' },
+    ]);
+    expect(
+      resolvedTaskProposalDecisions(second, [closedFirst, confirmed], decided, LATER)
+    ).toMatchObject([{ agenda_id: 'agd-second01', decision_id: 'D-0001', value: true }]);
+
+    // Withdrawn again with a stale release stamp: re-asked a second time, history appended.
+    const stamped = {
+      ...relinked,
+      proposal: { ...relinked.proposal, resolved: { decision_id: 'D-0001', at: LATER } },
+    };
+    const third = relinkTaskProposal(
+      stamped,
+      { agenda_id: 'agd-third001', entry_id: id },
+      '2026-10-26T00:00:00.000Z',
+      'user:bob'
+    );
+    expect(third.proposal.previous_links).toEqual([
+      relinked.proposal.previous_links![0],
+      {
+        agenda_id: 'agd-second01',
+        entry_id: id,
+        collected_at: LATER,
+        resolved: { decision_id: 'D-0001', at: LATER },
+        relinked_at: '2026-10-26T00:00:00.000Z',
+        relinked_by: 'user:bob',
+      },
+    ]);
+    expect(third.proposal).not.toHaveProperty('resolved');
+  });
+
+  it('refuses an uncollected proposal and a proposal re-asked too often', () => {
+    const uncollected = mergeTaskProposals({
+      lock: { consumer, decisions: [] },
+      requests: [askRelease],
+      agendas: [],
+      now: NOW,
+    }).decisions[0] as Parameters<typeof relinkTaskProposal>[0];
+    expect(() =>
+      relinkTaskProposal(uncollected, { agenda_id: 'agd-second01', entry_id: id }, LATER, 'user:a')
+    ).toThrow(/REASK_NOT_COLLECTED/u);
+    let entry = proposal(collectedOn('agd-first001'));
+    for (let round = 0; round < 10; round += 1)
+      entry = relinkTaskProposal(
+        entry,
+        { agenda_id: `agd-round-${round}`, entry_id: id },
+        LATER,
+        'user:a'
+      );
+    expect(entry.proposal.previous_links).toHaveLength(10);
+    expect(() =>
+      relinkTaskProposal(entry, { agenda_id: 'agd-onemore', entry_id: id }, LATER, 'user:a')
+    ).toThrow(/REASK_LIMIT/u);
+  });
+
+  describe('through the lock schema', () => {
+    let dir: string;
+    beforeEach(() => {
+      dir = pathResolver.sharedTmp(`customer-decision-reask-${randomUUID()}`);
+      safeMkdir(dir, { recursive: true });
+    });
+    afterEach(() => safeRmSync(dir, { recursive: true, force: true }));
+
+    it('stores previous_links and superseded', () => {
+      const base = collectedOn('agd-first001');
+      const relinked = relinkTaskProposal(
+        proposal(base),
+        { agenda_id: 'agd-second01', entry_id: id },
+        LATER,
+        'user:alice'
+      );
+      const lock = record(
+        { case_id: 'case-a', consumer, locked_at: NOW, decisions: [relinked] },
+        {
+          superseded: {
+            by_consumer: 'mission-MSN-CD09.impl-v2',
+            by_task_id: 'impl-v2',
+            at: LATER,
+          },
+        }
+      );
+      writeConsumedDecisionLock({ dir }, lock);
+      expect(readConsumedDecisionLock({ dir }, consumer)).toEqual(lock);
+      expect(() =>
+        writeConsumedDecisionLock(
+          { dir },
+          {
+            ...lock,
+            superseded: { ...lock.superseded!, extra: 1 } as never,
+          }
+        )
+      ).toThrow();
+      expect(() =>
+        writeConsumedDecisionLock(
+          { dir },
+          {
+            ...lock,
+            decisions: [
+              {
+                ...relinked,
+                proposal: {
+                  ...relinked.proposal,
+                  previous_links: [
+                    { ...relinked.proposal.previous_links![0], relinked_by: 'agent' },
+                  ],
+                },
+              },
+            ],
+          }
+        )
+      ).toThrow();
+    });
+  });
+
+  it('the response sweep skips a superseded lock', () => {
+    const lock = record(
+      buildConsumedDecisionLock({
+        caseId: 'case-a',
+        consumer,
+        agendas: [agenda()],
+        ledger: [],
+        now: NOW,
+      }),
+      { status: 'completed', completed_at: NOW }
+    );
+    const input = {
+      switches: [switchOf('nfr.auth', 'NFR', 'auth.method')],
+      agendas: [agenda()],
+      ledger: [customerDecision('D-0001', 'auth.method', 'NFR', 'sso')],
+      now: LATER,
+    };
+    expect(findStaleConsumersForSwitches({ ...input, locks: [lock] })).toHaveLength(1);
+    expect(
+      findStaleConsumersForSwitches({
+        ...input,
+        locks: [
+          { ...lock, superseded: { by_consumer: `${consumer}2`, by_task_id: 'impl2', at: LATER } },
+        ],
+      })
+    ).toEqual([]);
   });
 });

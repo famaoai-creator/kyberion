@@ -186,7 +186,7 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
   - 承認ゲートと store: `approval_gate`、`approval_gate_session_cache`、`apply_claim`
   - DOT: `dot_release`、`dot_dispatch`、`dot_autonomy_promotion`（拒否時は昇格待ちを監査付きで取り消す）、
     `front_desk_execution`
-  - mission と discussion: `mission_scope_approve`、`mission_reconcile_work`、`discussion_mission`
+  - mission と discussion: `mission_scope_approve`、`mission_reconcile_work`、`mission_task_supersede`、`discussion_mission`
   - plugin と MCP: `plugin_view_action`、`plugin_activation`（plugin の有効化判定。監査なしで判定し、
     使えない承認は `pending_approval` にする）、`mcp_governed_tool`
   - pipeline: `pipeline_await_decision`、`pipeline_bound_approval`

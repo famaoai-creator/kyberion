@@ -58,7 +58,8 @@ import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js'
 import { readCanonicalWorkGraphTasks } from '../workforce/work-graph-projection.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
-const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
+// `superseded` (supersede-task) is terminal: a replaced task is never adoptable.
+const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed', 'superseded']);
 const ADOPTABLE_TASK_STATUSES = new Set([
   'planned',
   'backlog',
@@ -769,7 +770,12 @@ function assertDependenciesResolved(
       throw new Error(`Task ${plannedTask.task_id} has unknown dependency ${dependency}`);
     }
     const dependencyStatus = String(dependencyTask.status || 'planned').toLowerCase();
-    if (!TERMINAL_TASK_STATUSES.has(dependencyStatus) && !adoptedTaskIds.has(dependency)) {
+    // A superseded dependency never ran to success: it does not resolve one
+    // (supersede-task rewrites dependents onto the replacement).
+    if (
+      (!TERMINAL_TASK_STATUSES.has(dependencyStatus) || dependencyStatus === 'superseded') &&
+      !adoptedTaskIds.has(dependency)
+    ) {
       throw new Error(`Task ${plannedTask.task_id} has unresolved dependency ${dependency}`);
     }
   }

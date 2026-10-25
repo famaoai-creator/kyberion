@@ -109,6 +109,16 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
       ...(typeof task.rework_count === 'number' && Number.isFinite(task.rework_count)
         ? { rework_count: task.rework_count }
         : {}),
+      // supersede-task records survive every worker rewrite of the board.
+      ...(task.superseded && typeof task.superseded === 'object'
+        ? { superseded: task.superseded as PlannedNextTask['superseded'] }
+        : {}),
+      ...(Array.isArray(task.dependencies_rewritten_from)
+        ? {
+            dependencies_rewritten_from:
+              task.dependencies_rewritten_from as PlannedNextTask['dependencies_rewritten_from'],
+          }
+        : {}),
       ...(task.assigned_to && typeof task.assigned_to === 'object'
         ? {
             assigned_to: {

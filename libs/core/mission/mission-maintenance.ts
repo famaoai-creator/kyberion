@@ -61,7 +61,8 @@ import {
   emitMissionLifecycleIntentSnapshot,
 } from './mission-intent-delta.js';
 import {
-  MISSION_TASK_COMPLETED_STATUSES,
+  isTaskSuperseded,
+  MISSION_TASK_CLOSED_STATUSES,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
   writeMissionNextTasks,
@@ -532,7 +533,7 @@ export async function approveScopeChange(args: {
     const driftRepair = tasks.find(
       (task) =>
         String(task.task_id || '') === driftRepairTaskId &&
-        !MISSION_TASK_COMPLETED_STATUSES.has(String(task.status || 'planned').toLowerCase())
+        !MISSION_TASK_CLOSED_STATUSES.has(String(task.status || 'planned').toLowerCase())
     );
     if (driftRepair) {
       const reportPath = safeMissionArtifactPath(
@@ -908,14 +909,35 @@ export async function recordEvidence(args: {
 
   logger.info(`🧾 Evidence for ${upperId}: ${args.taskId}...`);
 
+  // A task replaced by supersede-task is closed: evidence for it would
+  // re-open nothing and only confuse the ledger (record it on the replacement).
+  const recordedTask = (() => {
+    try {
+      return readMissionNextTasks(missionPath).find(
+        (entry) => String(entry.task_id || '') === args.taskId
+      );
+    } catch {
+      return undefined;
+    }
+  })();
+  if (isTaskSuperseded(recordedTask)) {
+    throw new Error(
+      `Task ${args.taskId} of ${upperId} is superseded${
+        recordedTask?.superseded &&
+        typeof recordedTask.superseded === 'object' &&
+        typeof (recordedTask.superseded as Record<string, unknown>).by_task_id === 'string'
+          ? ` by ${(recordedTask.superseded as Record<string, unknown>).by_task_id}`
+          : ''
+      }; record the evidence on the replacement task.`
+    );
+  }
+
   // Stamp the deliverable's file mtime so the retrospective can tell
   // record-as-you-go apart from evidence reconstructed at mission close —
   // deliverables written long after the work look identical without it.
   const deliverableRelPath = (() => {
     try {
-      const task = readMissionNextTasks(missionPath).find(
-        (entry) => String(entry.task_id || '') === args.taskId
-      );
+      const task = recordedTask;
       const rel = String(task?.deliverable || '');
       if (!rel) return null;
       const candidate = path.resolve(missionPath, rel);

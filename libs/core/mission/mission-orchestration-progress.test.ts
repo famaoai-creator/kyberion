@@ -77,6 +77,53 @@ describe('mission orchestration progress path boundaries', () => {
     expect(tasks).toEqual([{ task_id: 'confidential-task', status: 'planned' }]);
   });
 
+  it('never lets a worker write revert a superseded task, and counts it on the task board', () => {
+    const previousRole = process.env.MISSION_ROLE;
+    process.env.MISSION_ROLE = 'mission_controller';
+    try {
+      fs.mkdirSync(missionPath, { recursive: true });
+      fs.writeFileSync(
+        path.join(missionPath, 'mission-state.json'),
+        JSON.stringify({ mission_id: missionId, tier: 'public' })
+      );
+      fs.writeFileSync(
+        path.join(missionPath, 'NEXT_TASKS.json'),
+        JSON.stringify([
+          { task_id: 'old', status: 'superseded' },
+          { task_id: 'new', status: 'planned' },
+        ])
+      );
+      fs.writeFileSync(
+        path.join(missionPath, 'TASK_BOARD.md'),
+        '# TASK_BOARD\n\n## Status: Execution Ready\n'
+      );
+      const progress = controller((raw) => raw as PlannedNextTask[]);
+      // A stale in-memory board (loaded before the supersede) is written back.
+      progress.writeNextTasks(missionId, [
+        { task_id: 'old', status: 'blocked' },
+        { task_id: 'new', status: 'completed' },
+      ]);
+      expect(progress.loadAllNextTasks(missionId).map((task) => task.status)).toEqual([
+        'superseded',
+        'completed',
+      ]);
+      expect(progress.summarizeMissionTaskOutcomes(missionId)).toMatchObject({
+        completedCount: 1,
+        supersededCount: 1,
+      });
+      progress.reconcileMissionProgress(missionId);
+      const board = fs.readFileSync(path.join(missionPath, 'TASK_BOARD.md'), 'utf8');
+      expect(board).toMatch(/^Superseded tasks: 1$/mu);
+      progress.reconcileMissionProgress(missionId);
+      expect(
+        fs.readFileSync(path.join(missionPath, 'TASK_BOARD.md'), 'utf8').match(/Superseded tasks/gu)
+      ).toHaveLength(1);
+    } finally {
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+    }
+  });
+
   it('rejects a symlinked mission directory before loading NEXT_TASKS', () => {
     const externalMissionPath = pathResolver.sharedTmp('mission-progress-external');
     fs.mkdirSync(externalMissionPath, { recursive: true });

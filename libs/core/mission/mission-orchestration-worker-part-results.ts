@@ -705,6 +705,9 @@ export function restoreMissionGraphRunTaskSnapshots(
     const snapshot = node.task_snapshot;
     const task = snapshot ? taskById.get(node.task_id) : undefined;
     if (!task || !snapshot) continue;
+    // A task superseded after the snapshot (supersede-task, human-approved)
+    // stays superseded: a resumed graph run never restores its old state.
+    if (String(task.status || '').toLowerCase() === 'superseded') continue;
     for (const field of executionFields) {
       if (Object.prototype.hasOwnProperty.call(snapshot, field)) {
         (task as unknown as Record<string, unknown>)[field] = snapshot[field];

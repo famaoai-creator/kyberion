@@ -153,6 +153,14 @@ export interface CaseOverview {
     held: number;
     /** Held tasks whose every question has a confirmed customer decision (resume the mission). */
     ready_to_resume: number;
+    /**
+     * Held tasks (counted in `held`) that nothing can release: a question's
+     * agenda was closed, withdrawn or lost with no confirmed answer. Re-ask it
+     * or replace the task; superseded tasks are never counted anywhere here.
+     */
+    unresolvable: number;
+    /** Present when `unresolvable` > 0: how to clear them (no ids, no values). */
+    unresolvable_next?: string;
   };
 }
 
@@ -353,18 +361,34 @@ export function buildCaseOverview(input: CaseOverviewInput): CaseOverview {
   let pendingProposals = 0;
   let held = 0;
   let ready = 0;
+  let unresolvable = 0;
   for (const lock of input.consumers) {
+    // A superseded task was replaced: its lock is frozen and asks nothing.
+    if (lock.superseded) continue;
     pendingProposals += pendingTaskProposals(lock).length;
     if (!lock.hold || lock.status !== 'in_progress') continue;
     const holds = taskProposalHolds(lock, input.agendas, input.ledger, input.now);
     if (holds.length > 0 && holds.every((hold) => hold.resolved_decision_id)) ready += 1;
-    else held += 1;
+    else {
+      held += 1;
+      if (holds.some((hold) => hold.unresolvable)) unresolvable += 1;
+    }
   }
   return {
     case_id: input.case_id,
     agendas,
     draft_only: input.invites.length === 0,
-    tasks: { pending_proposals: pendingProposals, held, ready_to_resume: ready },
+    tasks: {
+      pending_proposals: pendingProposals,
+      held,
+      ready_to_resume: ready,
+      unresolvable,
+      ...(unresolvable > 0
+        ? {
+            unresolvable_next: `pnpm kyberion customer-decision status --case ${input.case_id} names them: ask again with draft --from-tasks --reask <tp-id,...> --by user:<member>, or replace the task with pnpm mission supersede-task`,
+          }
+        : {}),
+    },
   };
 }
 

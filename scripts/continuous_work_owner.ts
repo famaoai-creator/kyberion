@@ -315,10 +315,13 @@ export function createContinuousOwnerPorts(
           path.join(dir, 'NEXT_TASKS.json'),
           input.mission_id
         ) ?? [];
-      const complete = () => {
-        const rows = tasks();
-        return rows.length > 0 && rows.every((row) => row.status === 'completed');
-      };
+      // A superseded row (supersede-task, human-approved) is closed: its
+      // replacement carries the work, and at least one row must be completed.
+      const closedRows = (rows: ReadonlyArray<{ status?: unknown }>) =>
+        rows.length > 0 &&
+        rows.every((row) => row.status === 'completed' || row.status === 'superseded') &&
+        rows.some((row) => row.status === 'completed');
+      const complete = () => closedRows(tasks());
       if (['completed', 'archived'].includes(state.status))
         return complete() && state.verification?.status === 'verified'
           ? { status: 'completed', evidence_refs: refs }
@@ -373,13 +376,7 @@ export function createContinuousOwnerPorts(
       );
       const rowsBefore = tasks();
       for (const phase of state.process_template?.phase_specs ?? []) {
-        if (
-          phase.exit_gate &&
-          rowsBefore.some((row) => row.phase === phase.id) &&
-          rowsBefore
-            .filter((row) => row.phase === phase.id)
-            .every((row) => row.status === 'completed')
-        ) {
+        if (phase.exit_gate && closedRows(rowsBefore.filter((row) => row.phase === phase.id))) {
           await command(
             'mission_controller.bundle.js',
             ['gate-pass', input.mission_id, phase.exit_gate.id, '--machine-only'],
@@ -420,7 +417,8 @@ export function createContinuousOwnerPorts(
           metadata: {
             ...(item.metadata || {}),
             rework_count: reworks + 1,
-            rework_reason: 'landed at review — independent review not approved; requeued for rework',
+            rework_reason:
+              'landed at review — independent review not approved; requeued for rework',
             rework_actor: 'continuous-work-owner',
           },
         });

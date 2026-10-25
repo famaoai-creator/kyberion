@@ -33055,6 +33055,16 @@
         "en": "## ⚠️ Usage not recorded\n{count} task(s) were completed but no token or resource usage entry exists for this mission. The zero token/cost figures above mean the usage was never recorded — not that the work was free.",
         "ja": "## ⚠️ 使用量が未記録\n{count} 件のタスクが完了していますが、このミッションのトークン／リソース使用量エントリが 1 件もありません。上記のトークン・コストの 0 は「無料」ではなく「未記録」を意味します。",
         "qps-ploc": "⟦## ⚠️ Ůşȧɠė ñőŧ řėƈőřḓėḓ\n{count} ŧȧşķ(ş) ẇėřė ƈőɱṗŀėŧėḓ ƀůŧ ñő ŧőķėñ őř řėşőůřƈė ůşȧɠė ėñŧřẏ ėẋïşŧş ƒőř ŧħïş ɱïşşïőñ. Ŧħė ẑėřő ŧőķėñ/ƈőşŧ ƒïɠůřėş ȧƀőṽė ɱėȧñ ŧħė ůşȧɠė ẇȧş ñėṽėř řėƈőřḓėḓ — ñőŧ ŧħȧŧ ŧħė ẇőřķ ẇȧş ƒřėė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "customer_decision_pin_failed_title": {
+        "en": "Task {taskId} of {missionId} cannot check its customer decisions",
+        "ja": "{missionId} のタスク {taskId} が顧客の決定を確認できません",
+        "qps-ploc": "⟦Ŧȧşķ {taskId} őƒ {missionId} ƈȧññőŧ ƈħėƈķ ïŧş ƈůşŧőɱėř ḓėƈïşïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "customer_decision_pin_failed_body": {
+        "en": "The customer decision pin of task {taskId} failed in {count} dispatch rounds in a row (first at {firstFailedAt}, decision case {caseId}). The task is blocked (customer_decision_check_failed) and is not run on a guess. Make the decision case readable, then run: pnpm mission resume {missionId}",
+        "ja": "タスク {taskId} の顧客の決定の固定が {count} 回の配信ラウンドで連続して失敗しました（初回 {firstFailedAt}、決定案件 {caseId}）。タスクは推測で実行されず、停止中です（customer_decision_check_failed）。決定案件を読める状態にしてから実行してください: pnpm mission resume {missionId}",
+        "qps-ploc": "⟦Ŧħė ƈůşŧőɱėř ḓėƈïşïőñ ṗïñ őƒ ŧȧşķ {taskId} ƒȧïŀėḓ ïñ {count} ḓïşṗȧŧƈħ řőůñḓş ïñ ȧ řőẇ (ƒïřşŧ ȧŧ {firstFailedAt}, ḓėƈïşïőñ ƈȧşė {caseId}). Ŧħė ŧȧşķ ïş ƀŀőƈķėḓ (ƈůşŧőɱėř_ḓėƈïşïőñ_ƈħėƈķ_ƒȧïŀėḓ) ȧñḓ ïş ñőŧ řůñ őñ ȧ ɠůėşş. Ɱȧķė ŧħė ḓėƈïşïőñ ƈȧşė řėȧḓȧƀŀė, ŧħėñ řůñ: ṗñṗɱ ɱïşşïőñ řėşůɱė {missionId} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀ⟧"
       }
     },
     "dot_confirmation": {
@@ -33971,9 +33981,9 @@
         "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñ řėɱïñḓėř {reminderId} ƒőř ȧɠėñḓȧ {agendaId} ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
       },
       "reminder_outbound_summary": {
-        "en": "Reminder {reminderId} ({kind}, {date}) of agenda {agendaId} in decision case {caseId}, fixed template {templateId}. The message is not copied here; read it with: {command}",
-        "ja": "決定案件 {caseId} の調整セット {agendaId} のリマインド {reminderId}（{kind}、{date}）、定型文 {templateId}。文面はここには写しません。次のコマンドで確認してください: {command}",
-        "qps-ploc": "⟦Řėɱïñḓėř {reminderId} ({kind}, {date}) őƒ ȧɠėñḓȧ {agendaId} ïñ ḓėƈïşïőñ ƈȧşė {caseId}, ƒïẋėḓ ŧėɱṗŀȧŧė {templateId}. Ŧħė ɱėşşȧɠė ïş ñőŧ ƈőṗïėḓ ħėřė; řėȧḓ ïŧ ẇïŧħ: {command} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
+        "en": "Reminder {reminderId} ({kind}, {date}) of agenda {agendaId} in decision case {caseId}, fixed template {templateId}. The message is not copied here; read it with: {command}. Once approved it goes out on the next hourly sweep (09:30-18:30 Asia/Tokyo), or send it now with: {next}",
+        "ja": "決定案件 {caseId} の調整セット {agendaId} のリマインド {reminderId}（{kind}、{date}）、定型文 {templateId}。文面はここには写しません。次のコマンドで確認してください: {command}。承認後は次の毎時の送信（日本時間 9:30〜18:30）で送られます。すぐ送るには: {next}",
+        "qps-ploc": "⟦Řėɱïñḓėř {reminderId} ({kind}, {date}) őƒ ȧɠėñḓȧ {agendaId} ïñ ḓėƈïşïőñ ƈȧşė {caseId}, ƒïẋėḓ ŧėɱṗŀȧŧė {templateId}. Ŧħė ɱėşşȧɠė ïş ñőŧ ƈőṗïėḓ ħėřė; řėȧḓ ïŧ ẇïŧħ: {command}. Őñƈė ȧṗṗřőṽėḓ ïŧ ɠőėş őůŧ őñ ŧħė ñėẋŧ ħőůřŀẏ şẇėėṗ (09:30-18:30 Ȧşïȧ/Ŧőķẏő), őř şėñḓ ïŧ ñőẇ ẇïŧħ: {next} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈ⟧"
       },
       "reminder_manual_title": {
         "en": "Remind the customer yourself: agenda {agendaId}",

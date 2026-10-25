@@ -1,5 +1,5 @@
 /**
- * CD-11: the daily tenant pipeline op `core:customer_decision_reminders`.
+ * CD-11: the tenant pipeline op `core:customer_decision_reminders` (hourly, 09:30–18:30 Asia/Tokyo).
  *
  * The op never runs the sweep in the pipeline process. It runs the built
  * governed facade (`dist/scripts/customer_decision.js remind`) as a child
