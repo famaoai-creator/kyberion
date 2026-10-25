@@ -32,6 +32,13 @@ export const TENANT_LEDGER_ROOT_PATH = 'active/shared/runtime/tenant-ledger';
  */
 export const RUNTIME_LOCK_ROOT_PATH = 'active/shared/runtime/locks';
 
+/**
+ * Root of the work-coordination append-only ledgers (items/leases JSONL,
+ * boards state, observability events) owned by
+ * workforce/work-coordination-ledger.ts.
+ */
+export const WORK_COORDINATION_ROOT_PATH = 'active/shared/runtime/work-coordination';
+
 /** Logical names preserve existing layouts; registration never grants access. */
 export const RUNTIME_STATE_PATHS = {
   'dot.wakeLedger': 'active/shared/runtime/dot-wake-ledger.jsonl',
