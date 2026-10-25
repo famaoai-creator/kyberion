@@ -22,6 +22,8 @@ import {
 import { safeReadFileSnapshot, safeExistsSync } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { findMissionPath } from '@agent/core/path-resolver';
+import { missionPathOrNull } from '@agent/core/mission-lookup';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ExtractedDesignSpec = Parameters<typeof saveDesignSpec>[0]['extracted'];
 
@@ -45,68 +47,63 @@ function parseArgs(argv: string[]): Args {
   return args;
 }
 
-function usage(): never {
-  console.error(
-    'usage: design_spec.ts save --mission <id> --project-name <name> --file <payload.json> --by <work-item-id> | show|gate --mission <id>'
-  );
-  process.exit(1);
-}
+const USAGE =
+  'usage: design_spec.ts save --mission <id> --project-name <name> --file <payload.json> --by <work-item-id> | show|gate --mission <id>';
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args.mission || !args.command) usage();
+export const runDesignSpec = defineScript({
+  name: 'design-spec',
+  run(context) {
+    const args = parseArgs(context.argv);
+    if (!args.mission || !args.command) throw new Error(USAGE);
 
-  if (args.command === 'show' || args.command === 'gate') {
-    const spec = readDesignSpec(args.mission);
-    if (!spec) {
-      console.log(JSON.stringify({ ok: false, reason: 'no design-spec.json yet' }));
-      return;
-    }
-    const gate = evaluateArchitectureReadyGate(args.mission);
-    console.log(
-      JSON.stringify({
+    if (args.command === 'show' || args.command === 'gate') {
+      const spec = readDesignSpec(args.mission);
+      if (!spec) {
+        context.print({ ok: false, reason: 'no design-spec.json yet' });
+        return;
+      }
+      const gate = evaluateArchitectureReadyGate(args.mission);
+      context.print({
         ok: true,
         version: spec.version,
         components: spec.components.length,
         architecture_ready: { passed: gate.passed, reasons: gate.reasons },
-      })
-    );
-    return;
-  }
+      });
+      return;
+    }
 
-  if (args.command !== 'save' || !args.file || !args.projectName || !args.by) usage();
-  if (!safeExistsSync(args.file)) {
-    console.error(JSON.stringify({ ok: false, error: `payload file not found: ${args.file}` }));
-    process.exit(1);
-  }
-  const extracted = parseSafeJsonInput(
-    safeReadFileSnapshot(args.file, 10 * 1024 * 1024).toString('utf8'),
-    args.file
-  ) as ExtractedDesignSpec;
+    if (args.command !== 'save' || !args.file || !args.projectName || !args.by) {
+      throw new Error(USAGE);
+    }
+    if (!safeExistsSync(args.file)) {
+      throw new Error(`payload file not found: ${args.file}`);
+    }
+    const extracted = parseSafeJsonInput(
+      safeReadFileSnapshot(args.file, 10 * 1024 * 1024).toString('utf8'),
+      args.file
+    ) as ExtractedDesignSpec;
 
-  const spec = saveDesignSpec({
-    missionId: args.mission,
-    projectName: args.projectName,
-    extracted,
-    generatedBy: args.by,
-  });
-  const gate = evaluateArchitectureReadyGate(args.mission);
-  const missionDir = findMissionPath(args.mission);
-  console.log(
-    JSON.stringify({
+    const spec = saveDesignSpec({
+      missionId: args.mission,
+      projectName: args.projectName,
+      extracted,
+      generatedBy: args.by,
+    });
+    const gate = evaluateArchitectureReadyGate(args.mission);
+    const missionDir = missionPathOrNull(findMissionPath, args.mission);
+    context.print({
       ok: true,
       saved: true,
       path: missionDir ? path.join(missionDir, 'evidence', 'design-spec.json') : null,
       version: spec.version,
       components: spec.components.length,
       architecture_ready: { passed: gate.passed, reasons: gate.reasons },
-    })
-  );
-}
-
-main().catch((error) => {
-  console.error(
-    JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) })
-  );
-  process.exit(1);
+    });
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'design_spec.ts') ||
+  isDirectScript(import.meta.url, 'design_spec.js')
+)
+  void runDesignSpec();

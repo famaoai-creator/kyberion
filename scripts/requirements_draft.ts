@@ -23,6 +23,8 @@ import {
 import { safeReadFileSnapshot, safeExistsSync } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { findMissionPath } from '@agent/core/path-resolver';
+import { missionPathOrNull } from '@agent/core/mission-lookup';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 type ExtractedRequirements = Parameters<typeof saveRequirementsDraft>[0]['extracted'];
 
@@ -46,71 +48,65 @@ function parseArgs(argv: string[]): Args {
   return args;
 }
 
-function usage(): never {
-  console.error(
-    'usage: requirements_draft.ts save --mission <id> --project-name <name> --file <payload.json> --by <actor> | show --mission <id>'
-  );
-  process.exit(1);
-}
+const USAGE =
+  'usage: requirements_draft.ts save --mission <id> --project-name <name> --file <payload.json> --by <actor> | show --mission <id>';
 
-async function main(): Promise<void> {
-  const args = parseArgs(process.argv.slice(2));
-  if (!args.mission) usage();
+export const runRequirementsDraft = defineScript({
+  name: 'requirements-draft',
+  run(context) {
+    const args = parseArgs(context.argv);
+    if (!args.mission) throw new Error(USAGE);
 
-  if (args.command === 'show') {
-    const draft = readRequirementsDraft(args.mission);
-    if (!draft) {
-      console.log(JSON.stringify({ ok: false, reason: 'no requirements-draft.json yet' }));
-      return;
-    }
-    const gate = evaluateRequirementsCompletenessGate(args.mission);
-    console.log(
-      JSON.stringify({
+    if (args.command === 'show') {
+      const draft = readRequirementsDraft(args.mission);
+      if (!draft) {
+        context.print({ ok: false, reason: 'no requirements-draft.json yet' });
+        return;
+      }
+      const gate = evaluateRequirementsCompletenessGate(args.mission);
+      context.print({
         ok: true,
         version: draft.version,
         functional_count: draft.functional_requirements.length,
         open_questions: (draft.open_questions || []).length,
         requirements_complete: { passed: gate.passed, reasons: gate.reasons },
-      })
-    );
-    return;
-  }
+      });
+      return;
+    }
 
-  if (args.command !== 'save' || !args.file || !args.projectName || !args.by) usage();
+    if (args.command !== 'save' || !args.file || !args.projectName || !args.by) {
+      throw new Error(USAGE);
+    }
+    if (!safeExistsSync(args.file)) {
+      throw new Error(`payload file not found: ${args.file}`);
+    }
+    const extracted = parseSafeJsonInput(
+      safeReadFileSnapshot(args.file, 10 * 1024 * 1024).toString('utf8'),
+      args.file
+    ) as ExtractedRequirements;
 
-  if (!safeExistsSync(args.file)) {
-    console.error(JSON.stringify({ ok: false, error: `payload file not found: ${args.file}` }));
-    process.exit(1);
-  }
-  const extracted = parseSafeJsonInput(
-    safeReadFileSnapshot(args.file, 10 * 1024 * 1024).toString('utf8'),
-    args.file
-  ) as ExtractedRequirements;
+    const draft = saveRequirementsDraft({
+      missionId: args.mission,
+      projectName: args.projectName,
+      extracted,
+      generatedBy: args.by,
+    });
 
-  const draft = saveRequirementsDraft({
-    missionId: args.mission,
-    projectName: args.projectName,
-    extracted,
-    generatedBy: args.by,
-  });
-
-  const gate = evaluateRequirementsCompletenessGate(args.mission);
-  const missionDir = findMissionPath(args.mission);
-  console.log(
-    JSON.stringify({
+    const gate = evaluateRequirementsCompletenessGate(args.mission);
+    const missionDir = missionPathOrNull(findMissionPath, args.mission);
+    context.print({
       ok: true,
       saved: true,
       path: missionDir ? path.join(missionDir, 'evidence', 'requirements-draft.json') : null,
       version: draft.version,
       functional_count: draft.functional_requirements.length,
       requirements_complete: { passed: gate.passed, reasons: gate.reasons },
-    })
-  );
-}
-
-main().catch((error) => {
-  console.error(
-    JSON.stringify({ ok: false, error: error instanceof Error ? error.message : String(error) })
-  );
-  process.exit(1);
+    });
+  },
 });
+
+if (
+  isDirectScript(import.meta.url, 'requirements_draft.ts') ||
+  isDirectScript(import.meta.url, 'requirements_draft.js')
+)
+  void runRequirementsDraft();
