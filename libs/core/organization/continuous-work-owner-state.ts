@@ -20,6 +20,7 @@ import { assertScopedCadenceExecution } from './organization-cadence.js';
 import { parseContinuousWorkPlan, type ContinuousWorkPlan } from './continuous-work-plan.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFileSnapshot } from '../secure-io.js';
+import { writeJson } from '../foundation/json.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import * as path from 'node:path';
 import { assertSafeRepositoryPath } from '../secure-io.js';
@@ -272,6 +273,68 @@ export function validateState(
     throw new Error('Invalid completed owner checkpoint');
   return state;
 }
+/**
+ * Governed reconcile for an owner checkpoint that stopped mid-effect.
+ *
+ * `state.intent`/`state.error` mean "an effect may have partially applied;
+ * verify before resuming" — previously there was no path to clear it, so one
+ * interrupted step (observed: the 100 MB items.jsonl read cap during
+ * `advance-mission`) parked the managed work item forever. The verifier runs
+ * the caller-supplied effect check (mission exists, marker/brief pins match),
+ * records the human's verification on the checkpoint, and only then clears
+ * the uncertain markers so the next owner sweep can resume.
+ */
+export function resolveUncertainContinuousOwnerState(
+  charter: DotCharter,
+  item: WorkItem,
+  input: {
+    verifiedBy: string;
+    note: string;
+    approvalRequestId?: string;
+  },
+  options: { rootDir?: string } = {},
+  deps: Pick<ContinuousWorkOwnerDeps, 'authorize' | 'authorizeItem' | 'write'> & {
+    verifyEffects?: (state: OwnerState) => void;
+    now?: () => string;
+  } = {}
+): { resolved: boolean; state_path: string; reason?: string } {
+  (deps.authorize ?? authorize)(charter);
+  const rootDir = options.rootDir ?? pathResolver.rootDir();
+  (deps.authorizeItem ?? ((c, i, r) => authorizeItem(c, i, r, false)))(charter, item, rootDir);
+  const plan = parseContinuousWorkPlan(item.metadata?.continuous_work);
+  const actionRef = item.metadata?.action_ref;
+  if (typeof actionRef !== 'string' || !actionRef)
+    throw new Error('Managed reconcile requires admitted action identity');
+  const { ids, identity, statePath } = continuousWorkCheckpoint(charter, actionRef, plan, rootDir);
+  const stored = safeExistsSync(statePath)
+    ? parseSafeJsonInput(
+        safeReadFileSnapshot(statePath, 4 * 1024 * 1024).toString('utf8'),
+        'continuous work owner checkpoint'
+      )
+    : undefined;
+  if (stored === undefined)
+    return { resolved: false, state_path: statePath, reason: 'no checkpoint' };
+  const state = validateState(stored, identity, ids);
+  if (!state.intent && !state.error)
+    return { resolved: false, state_path: statePath, reason: 'checkpoint is not uncertain' };
+  (deps.verifyEffects ?? (() => {}))(state);
+  const cleared = { ...state };
+  delete cleared.intent;
+  delete cleared.error;
+  (deps.write ?? ((file: string, value: unknown) => writeJson(file, value)))(statePath, {
+    ...cleared,
+    reconciled: {
+      at: (deps.now ?? (() => new Date().toISOString()))(),
+      verified_by: input.verifiedBy,
+      note: input.note,
+      ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
+      cleared_intent: state.intent,
+      cleared_error: state.error,
+    },
+  });
+  return { resolved: true, state_path: statePath };
+}
+
 /** Read retained progress without claiming work or interpreting an expired approval as execution authority. */
 export function readContinuousWorkOwnerProgress(
   charter: DotCharter,
