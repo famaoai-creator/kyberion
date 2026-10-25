@@ -210,7 +210,10 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     // member decides only through the membership role they hold on the
     // approval's tenant — owner or approver, positively allowed. An
     // unresolved principal keeps the legacy chronos identity.
-    const decisionMember = withExecutionContext('chronos_gateway', () =>
+    // Member profiles live under knowledge/personal/members/ (personal
+    // tier). chronos_gateway has no personal tier_access, so resolve with
+    // nhi_accountability_reader — the read-only member-lookup role.
+    const decisionMember = withExecutionContext('nhi_accountability_reader', () =>
       resolveMemberByPrincipal({
         principalId: resolvedViewer.context.principalId,
         source: resolvedViewer.context.source,
@@ -224,7 +227,7 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
     // sovereign identity (F1).
     const bindingDenied =
       !decisionMember &&
-      withExecutionContext('chronos_gateway', () =>
+      withExecutionContext('nhi_accountability_reader', () =>
         memberBindingDenied({
           principalId: resolvedViewer.context.principalId,
           source: resolvedViewer.context.source,
@@ -271,7 +274,10 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
             : 'approver';
       }
     }
-    const updated = decideApprovalRequest('chronos_gateway', {
+    // chronos_localadmin may write active/shared/coordination/channels/
+    // (including terminal approvals). chronos_gateway cannot — using it
+    // here surfaces as a wire "internal" error on approval_decision.
+    const updated = decideApprovalRequest('chronos_localadmin', {
       channel,
       storageChannel,
       requestId,

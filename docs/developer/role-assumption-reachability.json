@@ -1880,17 +1880,17 @@
     },
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>",
-      "roles": ["chronos_gateway"],
+      "roles": ["nhi_accountability_reader"],
       "unresolved": []
     },
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
-      "roles": ["chronos_gateway"],
+      "roles": ["chronos_localadmin"],
       "unresolved": []
     },
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["chronos_gateway"],
+      "roles": ["chronos_gateway", "chronos_localadmin"],
       "unresolved": []
     },
     {
@@ -3981,7 +3981,7 @@
         },
         "chronos_localadmin": {
           "example_path": [
-            "presence/displays/chronos-mirror-v2/src/lib/distill-candidate-scope.ts#listDistillCandidatesForViewer"
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module>"
           ]
         },
         "chronos_operator": {

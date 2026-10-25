@@ -91,7 +91,7 @@ describe('scoped learning shared decision boundary', () => {
   it('records an authorized exact request without publishing private summary into shared notifications', async () => {
     expect((await run()).status).toBe(200);
     expect(mocks.decide).toHaveBeenCalledWith(
-      'chronos_gateway',
+      'chronos_localadmin',
       expect.objectContaining({
         requestId: 'review',
         storageChannel: 'terminal',

@@ -111,12 +111,16 @@ export function verifyDecisionApprovalRef(
   const bindings =
     status === 'rejected' ? [effect, decisionEffect(decision.decision_id, 'approved')] : [effect];
   const payloadHash = approval?.accountability?.payloadHash;
+  const strongAuth = ['surface_session', 'totp', 'passkey'] as const;
+  const authOk = strongAuth.includes(
+    (approval?.decidedAuthMethod || '') as (typeof strongAuth)[number]
+  );
   if (
     !approval ||
     approval.status !== status ||
     approval.decidedByType !== 'human' ||
     approval.authenticated !== true ||
-    !['surface_session', 'totp', 'passkey'].includes(approval.decidedAuthMethod || '') ||
+    !authOk ||
     approval.accountability?.finalDecision !== 'human_only' ||
     !bindings.includes(approval.accountability.effectBinding || '') ||
     approval.scope?.organization_id !== decision.organization_id ||
@@ -124,8 +128,16 @@ export function verifyDecisionApprovalRef(
     approval.scope?.tenant_slug !== decision.tenant_slug ||
     !approval.justification?.requestedEffects?.includes(effect)
   ) {
+    const authHint =
+      approval &&
+      approval.status === status &&
+      approval.decidedByType === 'human' &&
+      approval.authenticated === true &&
+      !authOk
+        ? ` This approval used auth method '${approval.decidedAuthMethod || '(none)'}' (e.g. CLI --approve → terminal_attested). Organization decisions require Chronos/concierge with a signed-in member session (surface_session), or totp/passkey. Re-request with decision transition --request-approval, approve in the browser, then retry with the new --approval-ref.`
+        : ' Approve the request on Chronos or concierge while signed in as an owner/approver member, then pass that channel:id as --approval-ref.';
     throw new Error(
-      'Approval reference does not contain an authenticated human decision bound to this organization decision.'
+      `Approval reference does not contain an authenticated human decision bound to this organization decision.${authHint}`
     );
   }
   if (status === 'approved') {

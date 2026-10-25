@@ -96,7 +96,27 @@ describe('organization decision approval binding', () => {
       scope: { organization_id: 'ORG-1', tier: 'confidential', tenant_slug: 'acme' },
       justification: { requestedEffects: ['organization:decision:DEC-1:approved'] },
     });
-    expect(() => verifyDecisionApprovalRef('local:APP-1', decision, 'approved')).toThrow(/bound/);
+    expect(() => verifyDecisionApprovalRef('local:APP-1', decision, 'approved')).toThrow(
+      /auth method 'local_token'/
+    );
+  });
+
+  it('names terminal_attested when CLI approve is not strong enough for org decisions', () => {
+    load.mockReturnValue({
+      status: 'approved',
+      decidedByType: 'human',
+      authenticated: true,
+      decidedAuthMethod: 'terminal_attested',
+      accountability: {
+        finalDecision: 'human_only',
+        effectBinding: 'organization:decision:DEC-1:approved',
+      },
+      scope: { organization_id: 'ORG-1', tier: 'confidential', tenant_slug: 'acme' },
+      justification: { requestedEffects: ['organization:decision:DEC-1:approved'] },
+    });
+    expect(() => verifyDecisionApprovalRef('terminal:APP-1', decision, 'approved')).toThrow(
+      /terminal_attested.*surface_session/s
+    );
   });
 
   it('opens a human-only request scoped to the decision and its proposed option', () => {

@@ -856,7 +856,9 @@
         "knowledge/confidential/${KYBERION_TENANT}/",
         "knowledge/confidential/shared/",
         "active/shared/runtime/",
-        "active/shared/observability/"
+        "active/shared/observability/",
+        "active/shared/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/traces/"
       ],
       "allow_write": [
         "active/organizations/confidential/${KYBERION_TENANT}/",
@@ -864,7 +866,9 @@
         "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/",
         "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
         "active/shared/runtime/",
-        "active/shared/observability/"
+        "active/shared/observability/",
+        "active/shared/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/traces/"
       ]
     },
     "decision_ledger": {
