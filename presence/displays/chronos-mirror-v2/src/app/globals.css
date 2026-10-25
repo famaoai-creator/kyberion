@@ -2101,6 +2101,66 @@ body {
   }
 }
 
+/* CD-12 drill-down (case / agenda set / learning): breadcrumb, a focusable
+   heading, and the report-date links. Tokens only, so light and dark follow
+   the theme. */
+.chronos-cd-detail .kb-section > * + * {
+  margin-top: var(--kb-ui-space-3);
+}
+
+.chronos-cd-breadcrumb ol,
+.chronos-cd-dates ul {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--kb-ui-space-1) var(--kb-ui-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--kb-ui-font-size-sm);
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-cd-breadcrumb li + li::before {
+  content: '/';
+  margin-inline-end: var(--kb-ui-space-2);
+  color: var(--kb-ui-text-subtle);
+}
+
+.chronos-cd-breadcrumb a,
+.chronos-cd-dates a {
+  color: var(--kb-ui-accent-text);
+  overflow-wrap: anywhere;
+}
+
+.chronos-cd-breadcrumb [aria-current='page'],
+.chronos-cd-dates [aria-current='page'] {
+  color: var(--kb-ui-text);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.chronos-cd-detail__title {
+  margin: 0;
+  font-size: var(--kb-ui-font-size-lg);
+  color: var(--kb-ui-text);
+  overflow-wrap: anywhere;
+}
+
+.chronos-cd-detail__title:focus-visible {
+  outline: 2px solid var(--kb-ui-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--kb-ui-radius-sm);
+}
+
+.chronos-cd-detail__title:focus:not(:focus-visible) {
+  outline: none;
+}
+
+.chronos-cd-detail .kb-disclosure + .kb-disclosure {
+  margin-top: var(--kb-ui-space-2);
+}
+
 /* Collaboration tree rows: indent by depth, stage as a quiet prefix. */
 .chronos-tree-node {
   display: inline-flex;
