@@ -29,6 +29,7 @@ import {
   currentAuditChainKeyId,
   archiveMembers,
   extractWithStagedPartitions,
+  withPlaintextTempDir,
   normalizeArchiveMember,
   type RestoredLedgerVerification,
 } from './lib/backup-tenant-partitions.js';
@@ -717,98 +718,99 @@ export function createBackup(options: BackupCliOptions): {
   }
 
   safeMkdir(path.dirname(outPath));
-  const tempDir = pathResolver.sharedTmp(`backup-${stamp()}`);
-  safeMkdir(tempDir);
-  const manifestPath = path.join(tempDir, 'manifest.json');
-  const includeListPath = path.join(tempDir, 'include.txt');
-  const plainArchivePath = options.encrypt ? path.join(tempDir, 'payload.tar.gz') : outPath;
-  const archivePath = options.encrypt && !outPath.endsWith('.enc') ? `${outPath}.enc` : outPath;
-  const missionGitBundles = createMissionGitBundles(tempDir, plan.missionGitRepos);
-  if (plan.scope === 'tenant' && options.tenant) {
-    assertTenantLedgerPartitionsIntact(options.tenant, plan.tenantRuntimePartitions);
-  }
-  // D2: the chain key itself never rides in a tenant archive; its id lets the
-  // restore verify the chains only on a host holding the same key.
-  const chainKeyId = currentAuditChainKeyId();
+  // The temp dir holds plaintext (payload, mission bundles): removed on every path.
+  return withPlaintextTempDir(`backup-${stamp()}`, (tempDir) => {
+    const manifestPath = path.join(tempDir, 'manifest.json');
+    const includeListPath = path.join(tempDir, 'include.txt');
+    const plainArchivePath = options.encrypt ? path.join(tempDir, 'payload.tar.gz') : outPath;
+    const archivePath = options.encrypt && !outPath.endsWith('.enc') ? `${outPath}.enc` : outPath;
+    const missionGitBundles = createMissionGitBundles(tempDir, plan.missionGitRepos);
+    if (plan.scope === 'tenant' && options.tenant) {
+      assertTenantLedgerPartitionsIntact(options.tenant, plan.tenantRuntimePartitions);
+    }
+    // D2: the chain key itself never rides in a tenant archive; its id lets the
+    // restore verify the chains only on a host holding the same key.
+    const chainKeyId = currentAuditChainKeyId();
 
-  const manifest = {
-    format: 'kyberion-backup-v1',
-    created_at: nowIso(),
-    scope: plan.scope,
-    mission: options.mission || null,
-    tenant: options.tenant || null,
-    encrypted: Boolean(options.encrypt),
-    includes_sensitive: plan.includesSensitive,
-    entries: plan.entries,
-    mission_git_repos: plan.missionGitRepos.map((repo, index) => ({
-      repo_relative_path: repo.repoRelativePath,
-      bundle_path: missionGitBundles[index] || null,
-    })),
-    ...(plan.scope === 'tenant'
-      ? {
-          tenant_runtime_partitions: plan.tenantRuntimePartitions.map((partition) => ({
-            key: partition.key,
-            path: partition.path,
-            append_only: partition.appendOnly,
-            hash_chained: partition.hashChained,
-          })),
-        }
-      : {}),
-    ...(chainKeyId ? { chain_key_id: chainKeyId } : {}),
-    warnings,
-  };
-  const manifestRepoPath = normalizeRepoRelative(pathResolver.rootDir(), manifestPath);
-  safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
-  safeWriteFile(
-    includeListPath,
-    [...plan.entries, ...missionGitBundles, manifestRepoPath].join('\n') + '\n'
-  );
-
-  runRequired(
-    'tar',
-    [
-      ...tarExcludesFor(archivePath, plainArchivePath),
-      ...missionGitExcludes(plan.missionGitRepos),
-      '-czf',
-      plainArchivePath,
-      '-C',
-      pathResolver.rootDir(),
-      '-T',
+    const manifest = {
+      format: 'kyberion-backup-v1',
+      created_at: nowIso(),
+      scope: plan.scope,
+      mission: options.mission || null,
+      tenant: options.tenant || null,
+      encrypted: Boolean(options.encrypt),
+      includes_sensitive: plan.includesSensitive,
+      entries: plan.entries,
+      mission_git_repos: plan.missionGitRepos.map((repo, index) => ({
+        repo_relative_path: repo.repoRelativePath,
+        bundle_path: missionGitBundles[index] || null,
+      })),
+      ...(plan.scope === 'tenant'
+        ? {
+            tenant_runtime_partitions: plan.tenantRuntimePartitions.map((partition) => ({
+              key: partition.key,
+              path: partition.path,
+              append_only: partition.appendOnly,
+              hash_chained: partition.hashChained,
+            })),
+          }
+        : {}),
+      ...(chainKeyId ? { chain_key_id: chainKeyId } : {}),
+      warnings,
+    };
+    const manifestRepoPath = normalizeRepoRelative(pathResolver.rootDir(), manifestPath);
+    safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+    safeWriteFile(
       includeListPath,
-    ],
-    'backup archive creation failed'
-  );
-
-  if (options.encrypt) {
-    const passphrase = requirePassphrase(options.passphraseEnv);
-    runRequired(
-      'openssl',
-      [
-        'enc',
-        '-aes-256-cbc',
-        '-pbkdf2',
-        '-salt',
-        '-in',
-        plainArchivePath,
-        '-out',
-        archivePath,
-        '-pass',
-        `env:${options.passphraseEnv}`,
-      ],
-      'backup encryption failed',
-      { [options.passphraseEnv]: passphrase }
+      [...plan.entries, ...missionGitBundles, manifestRepoPath].join('\n') + '\n'
     );
-    safeRmSync(plainArchivePath, { force: true });
-  }
 
-  if (options.prune || options.out === undefined) {
-    pruneBackups(path.dirname(archivePath), {
-      retainDaily: options.retainDaily,
-      retainWeekly: options.retainWeekly,
-    });
-  }
+    runRequired(
+      'tar',
+      [
+        ...tarExcludesFor(archivePath, plainArchivePath),
+        ...missionGitExcludes(plan.missionGitRepos),
+        '-czf',
+        plainArchivePath,
+        '-C',
+        pathResolver.rootDir(),
+        '-T',
+        includeListPath,
+      ],
+      'backup archive creation failed'
+    );
 
-  return { archive: archivePath, plan, warnings };
+    if (options.encrypt) {
+      const passphrase = requirePassphrase(options.passphraseEnv);
+      runRequired(
+        'openssl',
+        [
+          'enc',
+          '-aes-256-cbc',
+          '-pbkdf2',
+          '-salt',
+          '-in',
+          plainArchivePath,
+          '-out',
+          archivePath,
+          '-pass',
+          `env:${options.passphraseEnv}`,
+        ],
+        'backup encryption failed',
+        { [options.passphraseEnv]: passphrase }
+      );
+      safeRmSync(plainArchivePath, { force: true });
+    }
+
+    if (options.prune || options.out === undefined) {
+      pruneBackups(path.dirname(archivePath), {
+        retainDaily: options.retainDaily,
+        retainWeekly: options.retainWeekly,
+      });
+    }
+
+    return { archive: archivePath, plan, warnings };
+  });
 }
 
 interface RestoredBackupManifest {
@@ -1256,70 +1258,71 @@ export function restoreBackup(options: BackupCliOptions): {
     throw new Error(`Restore target is not empty; pass --force to restore into ${target}`);
   }
 
-  const tempDir = pathResolver.sharedTmp(`restore-${stamp()}`);
-  safeMkdir(tempDir);
-  const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
-  if (archive.endsWith('.enc')) {
-    const passphrase = requirePassphrase(options.passphraseEnv);
-    runRequired(
-      'openssl',
-      [
-        'enc',
-        '-d',
-        '-aes-256-cbc',
-        '-pbkdf2',
-        '-in',
-        archive,
-        '-out',
-        plainArchive,
-        '-pass',
-        `env:${options.passphraseEnv}`,
-      ],
-      'backup decryption failed',
-      { [options.passphraseEnv]: passphrase }
-    );
-  }
-
-  const { manifest, members } = validateBackupArchive(plainArchive, options);
-  assertNoAppendOnlyConflict(target, members);
-  const tenantRestore = options.scope === 'tenant' && options.tenant ? options.tenant : undefined;
-  const extracted = extractWithStagedPartitions({
-    plainArchive,
-    target,
-    staging: path.join(tempDir, 'staged-partitions'),
-    members,
-    archiveChainKeyId: manifest.chain_key_id,
-    tenant: tenantRestore,
-    stampId: stamp(),
-  });
-  const trimmedTails = extracted.trimmedTails;
-  const ledgerVerification = extracted.ledgerVerification;
-  const quarantinePaths: string[] = [];
-  if (tenantRestore) {
-    const quarantine = quarantineRestoredPeerRuntime(target, tenantRestore);
-    if (quarantine.moved.length > 0) quarantinePaths.push(quarantine.quarantinePath);
-  }
-  quarantinePaths.push(...extracted.quarantinePaths);
-  restoreMissionGitBundles(target);
-
-  if (options.verifyBaseline) {
-    const result = safeExecResult(
-      'pnpm',
-      ['pipeline', '--input', 'pipelines/baseline-check.json'],
-      { cwd: target, timeoutMs: 120000, maxOutputMB: 20 }
-    );
-    if (result.status !== 0) {
-      throw new Error(`baseline-check failed after restore: ${result.stderr || result.stdout}`);
+  // Decrypted payload and staged partitions are plaintext: removed on every path.
+  return withPlaintextTempDir(`restore-${stamp()}`, (tempDir) => {
+    const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
+    if (archive.endsWith('.enc')) {
+      const passphrase = requirePassphrase(options.passphraseEnv);
+      runRequired(
+        'openssl',
+        [
+          'enc',
+          '-d',
+          '-aes-256-cbc',
+          '-pbkdf2',
+          '-in',
+          archive,
+          '-out',
+          plainArchive,
+          '-pass',
+          `env:${options.passphraseEnv}`,
+        ],
+        'backup decryption failed',
+        { [options.passphraseEnv]: passphrase }
+      );
     }
-  }
 
-  return {
-    target,
-    archive,
-    quarantinePaths,
-    ledger_verification: ledgerVerification,
-    trimmed_tails: trimmedTails,
-  };
+    const { manifest, members } = validateBackupArchive(plainArchive, options);
+    assertNoAppendOnlyConflict(target, members);
+    const tenantRestore = options.scope === 'tenant' && options.tenant ? options.tenant : undefined;
+    const extracted = extractWithStagedPartitions({
+      plainArchive,
+      target,
+      staging: path.join(tempDir, 'staged-partitions'),
+      members,
+      archiveChainKeyId: manifest.chain_key_id,
+      tenant: tenantRestore,
+      stampId: stamp(),
+    });
+    const trimmedTails = extracted.trimmedTails;
+    const ledgerVerification = extracted.ledgerVerification;
+    const quarantinePaths: string[] = [];
+    if (tenantRestore) {
+      const quarantine = quarantineRestoredPeerRuntime(target, tenantRestore);
+      if (quarantine.moved.length > 0) quarantinePaths.push(quarantine.quarantinePath);
+    }
+    quarantinePaths.push(...extracted.quarantinePaths);
+    restoreMissionGitBundles(target);
+
+    if (options.verifyBaseline) {
+      const result = safeExecResult(
+        'pnpm',
+        ['pipeline', '--input', 'pipelines/baseline-check.json'],
+        { cwd: target, timeoutMs: 120000, maxOutputMB: 20 }
+      );
+      if (result.status !== 0) {
+        throw new Error(`baseline-check failed after restore: ${result.stderr || result.stdout}`);
+      }
+    }
+
+    return {
+      target,
+      archive,
+      quarantinePaths,
+      ledger_verification: ledgerVerification,
+      trimmed_tails: trimmedTails,
+    };
+  });
 }
 
 export function runRestoreDrill(options: BackupCliOptions): {

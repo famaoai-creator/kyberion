@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { getAuditChainKeyId } from '@agent/core/chain-integrity';
 import { logger } from '@agent/core/core';
+import { pathResolver } from '@agent/core/path-resolver';
 import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { writeJson } from '@agent/core/foundation/json';
 import {
@@ -66,13 +67,36 @@ export function archiveMembers(plainArchive: string): string[] {
   }
   verbose.forEach((line, index) => {
     const type = line.trimStart().charAt(0);
-    if (type !== '-' && type !== 'd') {
+    // bsdtar and GNU tar mark hard links `h` and append ` link to <name>`;
+    // both are refused (fails closed for a file name containing that text).
+    if ((type !== '-' && type !== 'd') || line.includes(' link to ')) {
       throw new Error(
         `[BACKUP_ARCHIVE_MEMBER_TYPE] backup archive member is not a regular file or directory (type '${type}') | next: recreate the backup without links | evidence: ${names[index].trim()}`
       );
     }
   });
   return names.map((member) => member.trim()).map(normalizeArchiveMember);
+}
+
+/**
+ * Run `fn` with a fresh `active/shared/tmp/<name>` directory that is removed
+ * on every path, success or failure: backup and restore temp dirs hold
+ * plaintext tenant data (decrypted payloads, staged partitions, bundles).
+ */
+export function withPlaintextTempDir<T>(name: string, fn: (tempDir: string) => T): T {
+  const tempDir = pathResolver.sharedTmp(name);
+  safeMkdir(tempDir, { recursive: true });
+  try {
+    return fn(tempDir);
+  } finally {
+    try {
+      safeRmSync(tempDir, { recursive: true, force: true });
+    } catch (error) {
+      logger.warn(
+        `[backup] temp dir not removed — it may hold plaintext tenant data | next: delete it by hand | evidence: ${tempDir}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
 }
 
 /** Key id of this host's audit chain key, or undefined when there is none (never the key). */
@@ -359,8 +383,12 @@ export function quarantineStagedRevocableState(
     if (!safeExistsSync(source)) continue;
     const children = safeReaddir(source).filter((child) => child !== RESTORE_QUARANTINE_DIR);
     if (children.length === 0) continue;
-    const quarantineDir = path.join(target, partition, RESTORE_QUARANTINE_DIR, stampId);
+    const partitionDir = path.join(target, partition);
+    const quarantineRoot = path.join(partitionDir, RESTORE_QUARANTINE_DIR);
+    const quarantineDir = path.join(quarantineRoot, stampId);
+    assertNotSymlinked(partitionDir, quarantineRoot, quarantineDir);
     safeMkdir(quarantineDir, { recursive: true });
+    assertNotSymlinked(partitionDir, quarantineRoot, quarantineDir);
     for (const child of children)
       placeStagedTree(path.join(source, child), path.join(quarantineDir, child));
     writeJson(path.join(quarantineDir, 'quarantine-manifest.json'), {
@@ -375,6 +403,78 @@ export function quarantineStagedRevocableState(
     moved.push(...children.map((child) => `${partition}/${child}`));
   }
   return { quarantinePaths, moved };
+}
+
+/** Every regular file under the given partitions of `root` (repo paths → bytes). */
+function snapshotPartitions(root: string, partitions: string[]): Map<string, Buffer> {
+  const files = new Map<string, Buffer>();
+  const walk = (dir: string, depth: number): void => {
+    if (depth > 12 || !safeExistsSync(dir)) return;
+    const stat = safeLstat(dir);
+    if (stat.isDirectory()) {
+      for (const child of safeReaddir(dir)) walk(path.join(dir, child), depth + 1);
+    } else {
+      files.set(
+        dir,
+        asPartitionStore(dir, () => safeReadFile(dir, { encoding: null }) as Buffer)
+      );
+    }
+  };
+  for (const partition of partitions) walk(path.join(root, partition), 0);
+  return files;
+}
+
+/**
+ * `--exclude` is fail-open, so prove it held: an append-only partition the
+ * conflict check found empty must still hold no file, and a revocable
+ * partition must be byte-identical to its pre-extraction state. On a breach
+ * the partitions are put back (extracted files removed, originals rewritten)
+ * and the restore fails.
+ */
+function assertExclusionsHeld(
+  target: string,
+  staged: StagedRestorePartitions,
+  revocableBefore: Map<string, Buffer>
+): void {
+  const breached: string[] = [];
+  for (const partition of staged.appendOnly) {
+    for (const file of snapshotPartitions(target, [partition]).keys()) {
+      asPartitionStore(file, () => safeRmSync(file, { force: true }));
+      breached.push(file);
+    }
+  }
+  const revocableAfter = snapshotPartitions(target, staged.revocable);
+  for (const [file, content] of revocableAfter) {
+    const before = revocableBefore.get(file);
+    if (before && before.equals(content)) continue;
+    if (before) safeWriteFile(file, before);
+    else safeRmSync(file, { force: true });
+    breached.push(file);
+  }
+  for (const [file, content] of revocableBefore) {
+    if (revocableAfter.has(file)) continue;
+    safeWriteFile(file, content);
+    breached.push(file);
+  }
+  if (breached.length > 0) {
+    throw new Error(
+      `[BACKUP_RESTORE_EXCLUDE_FAILED] the main extraction wrote into staged partitions — they were put back; other archive members are already in the target | next: roll the target back, then restore with a tar that honours --exclude | evidence: ${breached
+        .slice(0, 5)
+        .map((file) => path.relative(target, file))
+        .join(', ')}`
+    );
+  }
+}
+
+/** Refuse to place records through a symlinked partition or quarantine directory. */
+function assertNotSymlinked(...paths: string[]): void {
+  for (const candidate of paths) {
+    if (safeExistsSync(candidate) && safeLstat(candidate).isSymbolicLink()) {
+      throw new Error(
+        `[BACKUP_RESTORE_SYMLINKED_PARTITION] restore will not write through a symlinked directory | next: replace the link with a real directory after review | evidence: ${candidate}`
+      );
+    }
+  }
 }
 
 function runTar(args: string[], errorPrefix: string): void {
@@ -422,6 +522,7 @@ export function extractWithStagedPartitions(input: {
     ledgerVerification = verifyRestoredTenantLedgers(staging, members, input.archiveChainKeyId);
   }
   safeMkdir(target, { recursive: true });
+  const revocableBefore = snapshotPartitions(target, staged.revocable);
   runTar(
     [
       ...stagedPaths.flatMap((partition) => ['--exclude', partition]),
@@ -432,6 +533,7 @@ export function extractWithStagedPartitions(input: {
     ],
     'backup restore extraction failed'
   );
+  assertExclusionsHeld(target, staged, revocableBefore);
   placeStagedAppendOnlyPartitions(staging, target, staged.appendOnly);
   const quarantinePaths = input.tenant
     ? quarantineStagedRevocableState(staging, target, staged.revocable, input.tenant, input.stampId)

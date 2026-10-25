@@ -334,6 +334,8 @@ export interface OffboardVerification {
   clean: boolean;
   /** Repo-relative paths (or annotated registry refs) still carrying scope traces. */
   leftovers: string[];
+  /** Set when the leftover scan itself failed: the scope is not proven clean. */
+  error?: string;
 }
 
 export interface OffboardScopeResult {
@@ -1046,10 +1048,8 @@ export function verifyScopeOffboarded(
   try {
     leftovers = collectScopeTargets(scopeType, id, filter).map((target) => target.path);
   } catch (error) {
-    return {
-      clean: false,
-      leftovers: [error instanceof Error ? error.message : String(error)],
-    };
+    const message = error instanceof Error ? error.message : String(error);
+    return { clean: false, leftovers: [message], error: message };
   }
 
   if (scopeType === 'tenant' && id) {
@@ -1465,15 +1465,20 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
               (leftover) => tenantRuntimePartitionOf(leftover)?.tenant === scopeId
             )
           : [];
-      if (partitionLeftovers.length > 0) {
+      if (result.verification.error) {
+        result.status = 'error';
+        result.reason = `[OFFBOARD_VERIFICATION_FAILED] post-offboard verification could not run — the scope may still hold data | next: fix the cause and rerun the offboarding (idempotent) | evidence: ${result.verification.error}`;
+      } else if (partitionLeftovers.length > 0) {
         result.status = 'error';
         result.reason = `[OFFBOARD_PARTITION_LEFTOVER] tenant runtime partition(s) were not removed — the tenant's records outlive it | next: check this process's write grant on the partitions (tenant ledger and approval partitions need the sovereign persona), then rerun the offboarding | evidence: ${partitionLeftovers.join(', ')}`;
       }
     } catch (err) {
+      // An offboarding that cannot prove itself clean is not reported as done.
+      const message = err instanceof Error ? err.message : String(err);
+      result.status = 'error';
+      result.reason = `[OFFBOARD_VERIFICATION_FAILED] post-offboard verification could not run — the scope may still hold data | next: fix the cause and rerun the offboarding (idempotent) | evidence: ${message}`;
       logger.warn(
-        `[scope-offboarding] post-offboard verification failed for ${scopeType} '${scopeId}': ${
-          err instanceof Error ? err.message : String(err)
-        }`
+        `[scope-offboarding] post-offboard verification failed for ${scopeType} '${scopeId}': ${message}`
       );
     }
 
