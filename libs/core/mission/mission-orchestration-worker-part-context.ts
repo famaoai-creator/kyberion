@@ -846,6 +846,12 @@ export function buildTaskExecutionPrompt(input: {
   delegationNotificationLines?: string[];
   dynamicInjectionLines?: string[];
   targetPath?: string;
+  /**
+   * CD-09: the confirmed customer decisions of a resumed task (confidential).
+   * Placed after the mission context pack, far from the prompt head that
+   * logs and observations excerpt; only past the dispatch tier gate.
+   */
+  customerDecisionLines?: string[];
 }): string {
   const lines = [
     `Execute task ${input.task.task_id} for mission ${input.missionId}.`,
@@ -892,6 +898,7 @@ export function buildTaskExecutionPrompt(input: {
       : []),
     input.missionContextPack,
     '',
+    ...(input.customerDecisionLines ?? []),
     'Return exactly one ```task_result``` block and nothing else structured.',
     `Schema: ${renderStructuredOutputSchemaPrompt('task_result')}`,
     resolveReviewTargetForTask(input.task)

@@ -1015,6 +1015,34 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     ).toBe(true);
   });
 
+  it("exports and removes the tenant's customer decision invites, never another tenant's", () => {
+    const partition = (tenant: string) =>
+      `active/shared/runtime/customer-decision-invites/confidential/${tenant}`;
+    const record = (tenant: string) => `${partition(tenant)}/inv-00000000000000aa.json`;
+    for (const tenant of [TENANT, 'tenant-beta']) {
+      fs.mkdirSync(abs(partition(tenant)), { recursive: true });
+      fs.writeFileSync(abs(record(tenant)), JSON.stringify({ invite_id: 'inv-00000000000000aa' }));
+    }
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([{ path: partition(TENANT), kind: 'customer_decision_invites' }])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(partition('tenant-beta'));
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(fs.existsSync(abs(partition(TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(record('tenant-beta')))).toBe(true);
+    expect(fs.existsSync(abs(`${result.export_path}/${record(TENANT)}`))).toBe(true);
+  });
+
   it("purges the tenant's execution-metrics partitions and legacy rows through the same ceremony", () => {
     const partition = (tier: string, tenant: string) =>
       `active/shared/runtime/execution-metrics/${tier}/${tenant}`;
