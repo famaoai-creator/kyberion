@@ -1819,22 +1819,27 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/work-coordination.ts#appendJsonl",
+      "site": "libs/core/workforce/work-coordination-ledger.ts#appendJsonl",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/workforce/work-coordination-ledger.ts#rewriteJsonl",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/workforce/work-coordination-ledger.ts#withCoordinationMutation",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/workforce/work-coordination-ledger.ts#writeCoordinationState",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
       "site": "libs/core/workforce/work-coordination.ts#ensureDefaultWorkCoordinationCatalog",
-      "roles": ["infrastructure_sentinel"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/workforce/work-coordination.ts#withCoordinationMutation",
-      "roles": ["infrastructure_sentinel"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/workforce/work-coordination.ts#writeCoordinationState",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -6172,8 +6177,8 @@
             "libs/core/dot/dot-runtime.ts#<module>",
             "libs/core/dot/dot-dispatch.ts#<module>",
             "libs/core/workforce/work-coordination.ts#<module>",
-            "libs/core/workforce/work-coordination.ts#appendLeaseSnapshot",
-            "libs/core/workforce/work-coordination.ts#appendJsonl"
+            "libs/core/workforce/work-coordination-ledger.ts#appendLeaseSnapshot",
+            "libs/core/workforce/work-coordination-ledger.ts#appendJsonl"
           ]
         },
         "tenant_ledger_store": {

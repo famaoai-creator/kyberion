@@ -11,6 +11,7 @@ import { latestById } from './work-coordination-inventory.js';
 import { validateWorkItem } from './work-coordination-identity.js';
 import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { WORK_COORDINATION_ROOT_PATH } from '../foundation/runtime-state-roots.js';
 import type {
   AppendCoordinationEventInput,
   CoordinationEvent,
@@ -20,7 +21,7 @@ import type {
   WorkLease,
 } from './work-coordination-types.js';
 
-const STORE_ROOT = 'active/shared/runtime/work-coordination';
+const STORE_ROOT = WORK_COORDINATION_ROOT_PATH;
 const OBS_ROOT = 'active/shared/observability/work-coordination';
 
 let coordinationNamespaceOverride: string | null = null;
