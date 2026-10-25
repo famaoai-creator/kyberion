@@ -291,6 +291,9 @@ function buildSelectionView(
                 agent_id: selected.agent_id,
                 provider: selected.provider,
                 model_id: selected.modelId,
+                ...(configured.execution_route
+                  ? { execution_route: configured.execution_route }
+                  : {}),
               },
               snapshot.providers
             )
@@ -333,6 +336,9 @@ function buildSelectionView(
                 agent_id: agentId,
                 ...(configured.provider ? { provider: configured.provider } : {}),
                 ...(configured.model_id ? { model_id: configured.model_id } : {}),
+                ...(configured.execution_route
+                  ? { execution_route: configured.execution_route }
+                  : {}),
               },
               snapshot.providers
             );

@@ -1,5 +1,6 @@
 import { logger } from '../core.js';
 import { isAgentRuntimeApprovalPendingError } from '../agent/agent-prompt-approval-port.js';
+import { isUncertainSupervisorTransportFailure } from '../agent/supervisor-transport-uncertainty.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { agentRegistry, AgentProvider } from '../agent/agent-registry.js';
@@ -55,6 +56,7 @@ import {
 } from '../agent/agent-runtime-supervisor.js';
 import {
   askAgentRuntimeViaDaemon,
+  isSupervisorRemoteError,
   createSupervisorBackedAgentHandle,
   ensureAgentRuntimeViaDaemon,
   refreshAgentRuntimeViaDaemon,
@@ -563,6 +565,14 @@ class A2ABridgeImpl {
       // Approval is a durable suspension, never daemon unavailability. Running
       // the same task in-process would create a second effect attempt.
       if (isAgentRuntimeApprovalPendingError(daemonErr)) throw daemonErr;
+      if (isSupervisorRemoteError(daemonErr)) throw daemonErr;
+      if (isUncertainSupervisorTransportFailure(errorMessage(daemonErr))) throw daemonErr;
+      const daemonFailure = errorMessage(daemonErr);
+      if (
+        !daemonFailure.includes('[SUPERVISOR_PREASK_FAILED]') ||
+        daemonFailure.includes('invalid_supervisor_response')
+      )
+        throw daemonErr;
 
       // Fallback in-process route with Semaphore limits
       const agentSem = getAgentSemaphore(agentId);

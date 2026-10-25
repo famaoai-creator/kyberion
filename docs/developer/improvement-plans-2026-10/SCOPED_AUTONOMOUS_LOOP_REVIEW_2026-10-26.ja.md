@@ -82,3 +82,11 @@ OS登録はまだ適用していない。適用前のジョブ分担と移行手
 - Codex app-server の stdout callback は起動時の非同期 context を保持するため、ask 開始時の context を保存して native tool 実行時に復元する。完了検証も同じ task context 内で行う。boot と ask の scope が異なる AsyncResource 回帰を含む5ファイル99テストが成功。
 - standalone worktree の本人設定確認は、同じ Git common directory にある正本の固定3ファイルの存在だけを照会する。内容のコピーや worker の読取権限追加は行わない。13テストと、worktreeでの実際の公開mission kickoffが成功。
 - 独立した2つの実 Chronos processで公開ダミーjobを実行し、一方を停止した後も他方が翌周期に成功した。receipt数は停止側1件・継続側2件で、停止側のlastRunは変化しなかった。OS service登録や外部通知は行っていない。
+- prewarm成功後に結果schemaが選択情報を拒否し、親が結果を待ち続ける不具合を修正した。選択schemaを共通化し、子の起動・検証失敗も終端結果として保存する。関連52テストと共有writerの20テストが成功。
+- A2Aのstrict型にlease・tool profile・選択情報を追加し、実際のdispatch payloadを正規validatorで検証する。public shared taskへ架空のdefault tenantを付与せず、tenantなしはpublicだけに限定する。関連77テストと実payloadの2ケースが成功。
+- facadeと設計文書で許可された親組織なしのpublic projectを、authoritative scopeと委譲先にも保持する。別projectへの置換を拒否し、private/tenant-boundの親要件は維持する。関連63テストと実payload/lineageの2ケースが成功。
+
+全suiteの初回実行では、変更途中のbuildと実daemonが並行したため、その結果を最終成功とは扱わない。
+検出した固定store初回作成、mock export不足、新しいscope契約に未対応のfixtureを修正した。
+加えてorigin/main由来のAsk入力消失を2行の修正で直し、意図されたhearing直送は維持した（250テスト成功）。
+既存の認証済みgovernance-overview endpointの完全一致許可と取得失敗表示も修正した（27テスト成功）。

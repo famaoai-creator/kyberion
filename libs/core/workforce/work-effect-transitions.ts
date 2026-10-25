@@ -102,17 +102,29 @@ export function prepareHumanEffectRelease(
     updated_at: verifiedAt,
     metadata: {
       ...item.metadata,
-      dot_executor: {
-        ...previousExecutor,
-        operator_verified_at: verifiedAt,
-        operator_verified_by: approval.decidedBy,
-        operator_verified_reason: String(approval.justification?.reason ?? '')
-          .replace(/\s+/g, ' ')
-          .trim()
-          .slice(0, 300),
-        operator_verified_approval_id: approval.id,
-        released_from: item.status,
-      },
+      ...(hold.actor_id.startsWith('dot:')
+        ? {
+            dot_executor: {
+              ...previousExecutor,
+              operator_verified_at: verifiedAt,
+              operator_verified_by: approval.decidedBy,
+              operator_verified_reason: String(approval.justification?.reason ?? '')
+                .replace(/\s+/g, ' ')
+                .trim()
+                .slice(0, 300),
+              operator_verified_approval_id: approval.id,
+              released_from: item.status,
+            },
+          }
+        : {
+            execution_recovery: {
+              verified_at: verifiedAt,
+              verified_by: approval.decidedBy,
+              approval_request_id: input.approvalRequestId,
+            },
+            execution_outcome: 'reconciled',
+            recovery_required: false,
+          }),
     },
     effect_ownership: {
       ...hold,

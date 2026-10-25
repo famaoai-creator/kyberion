@@ -408,6 +408,12 @@ describe('CodexAppServerAdapter', () => {
       });
     const args = resolveCodexTaskIsolationArgs('codex', { CODEX_HOME: '/isolated/home' }, '/task');
     expect(args).toContain('mcp_servers.hostile_inherited.enabled=false');
+    expect(args).toContain('features.code_mode.enabled=false');
+    expect(args).toContain('code_mode_host');
+    expect(CODEX_GOVERNED_DISABLED_FEATURES).not.toContain('code_mode_host');
+    expect(args).toContain('code_mode_only_strict_3p_tools');
+    expect(args).toContain('features.code_mode.direct_only_tool_namespaces=[]');
+    expect(args).toContain('features.code_mode.excluded_tool_namespaces=["functions"]');
     expect(codexMocks.safeExecResult.mock.calls.at(-1)![2]).toMatchObject({
       env: { CODEX_HOME: '/isolated/home' },
       cwd: '/task',
@@ -427,9 +433,15 @@ describe('CodexAppServerAdapter', () => {
     vi.clearAllMocks();
   });
   it('checks effective MCP and native settings instead of trusting launch arguments', () => {
-    const features = Object.fromEntries(
-      CODEX_GOVERNED_DISABLED_FEATURES.map((name) => [name, false])
-    );
+    const features = {
+      ...Object.fromEntries(CODEX_GOVERNED_DISABLED_FEATURES.map((name) => [name, false])),
+      code_mode_host: true,
+      code_mode: {
+        enabled: false,
+        direct_only_tool_namespaces: [],
+        excluded_tool_namespaces: ['functions'],
+      },
+    };
     expect(() =>
       assertCodexTaskIsolationConfig({
         config: {
@@ -449,6 +461,36 @@ describe('CodexAppServerAdapter', () => {
         config: { web_search: 'disabled', features: { ...features, shell_tool: true } },
       })
     ).toThrow('not governed-tool-only');
+    expect(() =>
+      assertCodexTaskIsolationConfig({
+        config: {
+          web_search: 'disabled',
+          features: { ...features, code_mode_only_strict_3p_tools: true },
+        },
+      })
+    ).toThrow('not governed-tool-only');
+    expect(() =>
+      assertCodexTaskIsolationConfig({
+        config: {
+          web_search: 'disabled',
+          features: { ...features, code_mode_host: false },
+        },
+      })
+    ).toThrow('not governed-tool-only');
+    for (const code_mode of [
+      { enabled: true, direct_only_tool_namespaces: ['kyberion'], excluded_tool_namespaces: [] },
+      {
+        enabled: false,
+        direct_only_tool_namespaces: ['kyberion'],
+        excluded_tool_namespaces: ['functions'],
+      },
+    ]) {
+      expect(() =>
+        assertCodexTaskIsolationConfig({
+          config: { web_search: 'disabled', features: { ...features, code_mode } },
+        })
+      ).toThrow('not governed-tool-only');
+    }
   });
   it('does not let legacy exec configuration drop a claimed task tool binding', async () => {
     vi.stubEnv('KYBERION_CODEX_MODE', 'exec');
@@ -490,9 +532,17 @@ describe('CodexAppServerAdapter', () => {
                       ? {
                           config: {
                             web_search: 'disabled',
-                            features: Object.fromEntries(
-                              CODEX_GOVERNED_DISABLED_FEATURES.map((name) => [name, false])
-                            ),
+                            features: {
+                              ...Object.fromEntries(
+                                CODEX_GOVERNED_DISABLED_FEATURES.map((name) => [name, false])
+                              ),
+                              code_mode_host: true,
+                              code_mode: {
+                                enabled: false,
+                                direct_only_tool_namespaces: [],
+                                excluded_tool_namespaces: ['functions'],
+                              },
+                            },
                             mcp_servers: { inherited: { enabled: false } },
                           },
                         }
@@ -530,12 +580,17 @@ describe('CodexAppServerAdapter', () => {
     codexMocks.spawnManagedProcess.mockReturnValue({ child });
     const adapter = new CodexAppServerAdapter({
       cwd: 'fixture/project',
+      model: 'codex',
       timeoutMs: 1000,
       taskToolRuntime: runtime,
       sandboxMode: 'read-only',
       networkAccess: false,
     });
     await adapter.boot();
+    expect(adapter.getRuntimeInfo()).toMatchObject({
+      governedTaskToolCount: 1,
+      governedTaskToolNamespace: 'kyberion',
+    });
     const argv = codexMocks.spawnManagedProcess.mock.calls.at(-1)![0].args;
     expect(argv).toEqual(
       expect.arrayContaining([
@@ -553,15 +608,24 @@ describe('CodexAppServerAdapter', () => {
     ).toBe(true);
     expect(requests.find((request) => request.method === 'thread/start')?.params).toMatchObject({
       sandbox: 'read-only',
-      dynamicTools: [{ name: 'kyberion_task_read_file', type: 'function' }],
+      dynamicTools: [
+        {
+          name: 'kyberion',
+          type: 'namespace',
+          tools: [{ name: '_task_read_file', type: 'function' }],
+        },
+      ],
     });
+    expect(
+      requests.find((request) => request.method === 'thread/start')?.params.model
+    ).toBeUndefined();
     await adapter.shutdown();
     vi.clearAllMocks();
   });
   it('executes only tools bound to the claimed task and refuses native grants even in relaxed mode', async () => {
     const runtime = {
       definitions: [
-        { name: 'kyberion.task.read_file', description: 'read', inputSchema: { type: 'object' } },
+        { name: 'kyberion_task_read_file', description: 'read', inputSchema: { type: 'object' } },
       ],
       assertCurrent: vi.fn(),
       execute: vi.fn(async () => ({ text: 'safe result' })),
@@ -587,10 +651,14 @@ describe('CodexAppServerAdapter', () => {
     await harness.handleServerRequest({
       id: 1,
       method: 'item/tool/call',
-      params: { tool: 'kyberion.task.read_file', arguments: { path: 'libs/a.ts' } },
+      params: {
+        namespace: 'kyberion',
+        tool: '_task_read_file',
+        arguments: { path: 'libs/a.ts' },
+      },
     });
     expect(runtime.execute).toHaveBeenCalledWith({
-      name: 'kyberion.task.read_file',
+      name: 'kyberion_task_read_file',
       arguments: { path: 'libs/a.ts' },
     });
     expect(responses[0].result).toMatchObject({ success: true });
@@ -598,9 +666,42 @@ describe('CodexAppServerAdapter', () => {
       harness.handleServerRequest({
         id: 2,
         method: 'item/tool/call',
-        params: { tool: 'unregistered', arguments: {} },
+        params: { namespace: 'kyberion', tool: 'unregistered', arguments: {} },
       })
-    ).rejects.toThrow('not installed');
+    ).rejects.toThrow('not installed uniquely');
+    for (const namespace of [undefined, 'functions', 'foreign']) {
+      await expect(
+        harness.handleServerRequest({
+          id: 21,
+          method: 'item/tool/call',
+          params: { namespace, tool: '_task_read_file', arguments: {} },
+        })
+      ).rejects.toThrow('does not belong');
+    }
+    expect(runtime.execute).toHaveBeenCalledTimes(1);
+    for (const tool of ['kyberion_task_read_file', 'task_read_file']) {
+      await expect(
+        harness.handleServerRequest({
+          id: 22,
+          method: 'item/tool/call',
+          params: { namespace: 'kyberion', tool, arguments: {} },
+        })
+      ).rejects.toThrow('not installed uniquely');
+    }
+    runtime.definitions.push({
+      name: '_task_read_file',
+      description: 'collision',
+      inputSchema: { type: 'object' },
+    });
+    await expect(
+      harness.handleServerRequest({
+        id: 23,
+        method: 'item/tool/call',
+        params: { namespace: 'kyberion', tool: '_task_read_file', arguments: {} },
+      })
+    ).rejects.toThrow('not installed uniquely');
+    runtime.definitions.pop();
+    expect(runtime.execute).toHaveBeenCalledTimes(1);
     await harness.handleServerRequest({
       id: 3,
       method: 'item/commandExecution/requestApproval',
@@ -644,7 +745,7 @@ describe('CodexAppServerAdapter', () => {
       ).handleServerRequest({
         id: 1,
         method: 'item/tool/call',
-        params: { tool: 'bound', arguments: {} },
+        params: { namespace: 'kyberion', tool: 'bound', arguments: {} },
       })
     ).rejects.toThrow('lease expired');
     expect(runtime.execute).not.toHaveBeenCalled();
@@ -690,6 +791,7 @@ describe('CodexAppServerAdapter', () => {
                 params: {
                   threadId: 'thread-b',
                   turnId: 'turn-b',
+                  namespace: 'kyberion',
                   tool: 'bound',
                   arguments: {},
                 },
@@ -725,7 +827,11 @@ describe('CodexAppServerAdapter', () => {
       },
     ]);
     expect(harness.activeTurnContext).toBeNull();
-    emit({ id: 92, method: 'item/tool/call', params: { tool: 'bound', arguments: {} } });
+    emit({
+      id: 92,
+      method: 'item/tool/call',
+      params: { namespace: 'kyberion', tool: 'bound', arguments: {} },
+    });
     await new Promise((resolve) => setImmediate(resolve));
     expect(runtime.execute).toHaveBeenCalledTimes(1);
     boot.emitDestroy();
@@ -836,45 +942,93 @@ describe('CodexAppServerAdapter', () => {
     stderrWrite.mockRestore();
   });
 
-  it('projects subagent turns onto configurable medium effort without spawning another process', async () => {
-    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
+  it.each(['codex', 'codex-cli', 'default', 'auto', ' CoDeX ', ' AUTO ', 'exact-account-model'])(
+    'projects subagent turns and resolves native default model alias %s',
+    async (model) => {
+      const adapter = new CodexAppServerAdapter({ timeoutMs: 1000, model });
+      const requests: any[] = [];
+      const fakeChild: any = {
+        stdin: {
+          writable: true,
+          write(payload: string) {
+            const request = JSON.parse(payload);
+            requests.push(request);
+            if (request.method !== 'turn/start') return true;
+            setTimeout(() => {
+              (adapter as any).handleMessage({
+                id: request.id,
+                result: { turn: { id: 'turn-native-1' } },
+              });
+            }, 0);
+            setTimeout(() => {
+              (adapter as any).handleMessage({
+                method: 'item/agentMessage/delta',
+                params: {
+                  threadId: 'thread-root',
+                  turnId: 'turn-native-1',
+                  delta: 'native result',
+                },
+              });
+              (adapter as any).handleMessage({
+                method: 'turn/completed',
+                params: { turn: { id: 'turn-native-1', status: 'completed' } },
+              });
+            }, 1);
+            return true;
+          },
+        },
+      };
+      (adapter as any).child = fakeChild;
+      (adapter as any).threadId = 'thread-root';
+
+      const response = await adapter.ask('delegate this', { subagent: true });
+
+      expect(response.text).toBe('native result');
+      const turnStart = requests.find((request) => request.method === 'turn/start');
+      expect(turnStart.params.threadId).toBe('thread-root');
+      expect(turnStart.params.model).toBe(model === 'exact-account-model' ? model : undefined);
+      expect(turnStart.params.effort).toBe('medium');
+      expect(requests.filter((request) => request.method === 'turn/start')).toHaveLength(1);
+    }
+  );
+
+  it('retains a native failed-turn provider cause instead of an opaque empty result', async () => {
+    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000, model: 'auto' });
     const requests: any[] = [];
-    const fakeChild: any = {
+    (adapter as any).child = {
       stdin: {
         writable: true,
         write(payload: string) {
           const request = JSON.parse(payload);
           requests.push(request);
-          if (request.method !== 'turn/start') return true;
-          setTimeout(() => {
-            (adapter as any).handleMessage({
-              id: request.id,
-              result: { turn: { id: 'turn-native-1' } },
+          if (request.method === 'turn/start') {
+            queueMicrotask(() => {
+              (adapter as any).handleMessage({
+                method: 'turn/completed',
+                params: {
+                  turn: {
+                    id: 'failed-provider-turn',
+                    status: 'failed',
+                    error: { message: 'model_not_found: selected account model unavailable' },
+                  },
+                },
+              });
+              (adapter as any).handleMessage({
+                id: request.id,
+                result: { turn: { id: 'failed-provider-turn' } },
+              });
             });
-          }, 0);
-          setTimeout(() => {
-            (adapter as any).handleMessage({
-              method: 'item/agentMessage/delta',
-              params: { threadId: 'thread-root', turnId: 'turn-native-1', delta: 'native result' },
-            });
-            (adapter as any).handleMessage({
-              method: 'turn/completed',
-              params: { turn: { id: 'turn-native-1', status: 'completed' } },
-            });
-          }, 1);
+          }
           return true;
         },
       },
     };
-    (adapter as any).child = fakeChild;
     (adapter as any).threadId = 'thread-root';
-
-    const response = await adapter.ask('delegate this', { subagent: true });
-
-    expect(response.text).toBe('native result');
-    const turnStart = requests.find((request) => request.method === 'turn/start');
-    expect(turnStart.params.threadId).toBe('thread-root');
-    expect(turnStart.params.effort).toBe('medium');
+    const result = await adapter.ask('run once');
+    expect(result).toMatchObject({
+      stopReason: 'error',
+      text: 'model_not_found: selected account model unavailable',
+    });
     expect(requests.filter((request) => request.method === 'turn/start')).toHaveLength(1);
   });
 

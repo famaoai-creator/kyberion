@@ -10,6 +10,7 @@ import { registerOrganizationWorkJudgment } from '../organization/organization-o
 import {
   exportRoutingCorpus,
   classifyDispatchFailure,
+  classifyDispatchAttemptOutcome,
   exportRoutingCorpusAcrossMissions,
   nextTaskModelTier,
   routeTaskWithJudgment,
@@ -35,11 +36,38 @@ describe('dispatch infrastructure failures', () => {
     '[ADVISORY_BACKEND_DENIED] unknown adapter',
     '[TASK_TOOL_LEASE_LOST] expired task lease',
     '[AGENT_APPROVAL_PENDING] approval request requires human decision',
+    'A2A task contract validation failed: /context Unrecognized key lease_id',
+    '[SCOPE_ENVELOPE_INVALID] project_id requires an organization_id',
+    '[EVENT_SCOPE_LINEAGE_CONFLICT] project differs from authoritative scope',
+    'invalid_supervisor_response: supervisor refresh result.refreshed must be boolean',
+    'supervisor_response_closed',
   ])('does not grade or escalate model capability for %s', (reason) => {
     expect(classifyDispatchFailure([reason])).toBeDefined();
   });
   it('retains ordinary task failures as model-attempt outcomes', () => {
     expect(classifyDispatchFailure(['Acceptance criteria not satisfied'])).toBeUndefined();
+  });
+  it('distinguishes lost in-flight replies from proven pre-ask refresh or contract failures', () => {
+    expect(
+      classifyDispatchAttemptOutcome([
+        '[SUPERVISOR_PREASK_FAILED] method=refresh supervisor_response_closed',
+      ])
+    ).toBe('not_attempted');
+    expect(classifyDispatchAttemptOutcome(['method=ask supervisor_response_closed'])).toBe(
+      'unknown'
+    );
+    for (const reason of [
+      'supervisor_request_timeout',
+      'supervisor_response_closed',
+      'invalid_supervisor_response: malformed ask result',
+    ])
+      expect(classifyDispatchAttemptOutcome([reason])).toBe('unknown');
+    for (const reason of [
+      'invalid_supervisor_response: supervisor refresh result.refreshed must be boolean',
+      '[AGENT_RUNTIME_PREWARM_FAILED] invalid assignment',
+      'A2A task contract validation failed: missing lease',
+    ])
+      expect(classifyDispatchAttemptOutcome([reason])).toBe('not_attempted');
   });
 });
 
@@ -197,6 +225,27 @@ describe('retry escalation', () => {
 });
 
 describe('exportRoutingCorpus', () => {
+  it('never uses unknown transport outcomes as model labels', () => {
+    const mission = pathResolver.sharedTmp(`routing-corpus-unknown-${process.pid}`);
+    try {
+      safeMkdir(`${mission}/evidence`, { recursive: true });
+      const unknown: RoutingOutcome = {
+        task_excerpt: 'lost provider reply',
+        baseline_tier: 'small',
+        chosen_tier: 'small',
+        chosen_by: 'baseline',
+        succeeded: false,
+        escalated_to: 'large',
+        outcome: 'unknown',
+        unknown_reason: 'SUPERVISOR_TRANSPORT_UNAVAILABLE',
+        recorded_at: '2026-10-26T00:00:00Z',
+      };
+      safeWriteFile(`${mission}/evidence/routing-outcomes.jsonl`, JSON.stringify(unknown) + '\n');
+      expect(exportRoutingCorpusAcrossMissions([mission])).toEqual([]);
+    } finally {
+      safeRmSync(mission, { recursive: true, force: true });
+    }
+  });
   /** `recordRoutingOutcome` is a no-op under vitest, so build the shape here. */
   const ledger: RoutingOutcome[] = [
     {

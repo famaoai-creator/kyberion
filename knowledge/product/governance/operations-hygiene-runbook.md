@@ -2206,3 +2206,43 @@ exact-path alert-store facade, while custom destinations retain caller rights.
 Regressions: operational-store-policy, operational-learning, ops-alert and
 authority-assumption tests. Do not grant a runner broad personal access to
 silence an operational permission error.
+
+Validate the real dispatch payload through every wire contract, including the
+strict A2A context and prewarm result. A successful boot with an invalid result
+must persist a terminal failure; the parent must not poll for a missing success
+file. Parse IPC responses before marking the request settled, and reject a
+closed socket without a complete response. Keep daemon results consistent with
+the public client contract. Gates: canonical A2A validation parity, prewarm
+failure propagation and real headless Node IPC process tests.
+
+Public shared tasks must not acquire a fabricated tenant. Preserve the canonical
+standalone public project in authority projections even without an organization;
+private and tenant-bound parent requirements remain enforced. Contract, scope
+and transport failures before a model ask are repairable boundary failures, not
+evidence that the model needs a larger tier. Verify an actual supervised model
+turn through deliverable readback and canonical evidence before claiming the
+runtime flow works.
+
+When a supervisor reply is lost after task submission, retain blocked work,
+the exact lease and effect ownership; neither lease expiry nor a status reset
+proves the work did not run. Stop and inspect the exact runtime before recovery.
+For a stopped active lease, release the scheduling lease with status `blocked`;
+the effect hold remains. Request the standard human-only approval using
+`pnpm work release-effect --item-id <ID> --expected-version <VERSION> --request-approval`.
+The command returns the approval and apply commands. Apply the same reviewed
+version with `--approval-request-id <ID>`. An expired scheduling lease is cleared
+only after exact human approval. Held lineage cannot be rewritten to change the
+scope of the approval. Gates: work-effect ownership, release approval and
+coordinated execution uncertainty regressions.
+
+Codex provider-default aliases are not native model names; omit the model field
+instead of sending `codex` to inference. Expose governed dynamic tools in a
+dedicated namespace and validate their effective direct-call configuration.
+Model-specific third-party tool deferral must not silently require a disabled
+code host. Keep native I/O and inherited integrations closed. A code host may
+orchestrate the bounded tools only when its isolated VM has no ambient OS,
+environment or network access and rejects imports; verify this with the actual
+installed host and a fixed synthetic callback before enabling it. Prove the
+chosen model can call the governed tools in a real turn. References:
+[App Server dynamic tools](https://learn.chatgpt.com/docs/app-server#dynamic-tool-calls-experimental)
+and [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
