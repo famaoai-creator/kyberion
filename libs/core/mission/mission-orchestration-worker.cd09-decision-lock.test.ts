@@ -1301,6 +1301,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
         missionId: MISSION_ID,
         taskId: 'task-1',
         byTaskId: 'task-1-v2',
+        approvalRequestId: request.id,
       });
 
       const { evaluateMissionFinishExitGate } = await import('./mission-lifecycle.js');
@@ -1337,6 +1338,84 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
         force: true,
       });
     }
+  });
+
+  it('never starts a dependent of a superseded task (the dependency is not satisfied)', async () => {
+    const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
+      '../workforce/work-coordination.js'
+    );
+    mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
+    mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
+    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.pinTaskDecisions.mockReturnValue(null);
+    const { missionDir } = await import('../path-resolver.js');
+    const { safeWriteFile } = await import('../secure-io.js');
+    safeWriteFile(
+      `${missionDir(MISSION_ID, 'public')}/NEXT_TASKS.json`,
+      JSON.stringify([
+        {
+          task_id: 'task-old',
+          status: 'superseded',
+          assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+          description: 'Replaced task',
+          deliverable: 'deliverables/widget.md',
+          dependencies: [],
+        },
+        {
+          task_id: 'task-1',
+          status: 'planned',
+          assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+          description: 'A dependent that was not rewritten',
+          deliverable: 'deliverables/widget.md',
+          dependencies: ['task-old'],
+        },
+      ])
+    );
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    await dispatchMissionNextTasks(MISSION_ID);
+    expect(mocks.route).not.toHaveBeenCalled();
+  });
+
+  it("carries a dependent's supersede rewrite note onto its re-imported WorkItem", async () => {
+    const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
+      '../workforce/work-coordination.js'
+    );
+    mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
+    mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
+    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    mocks.pinTaskDecisions.mockReturnValue({
+      consumer: 'mission-MSN-CD09-WORKER.task-1',
+      pinned_count: 1,
+      pinned: false,
+      failed: { case_found: true, case_id: 'case-a' },
+    });
+    const rewrite = { from: 'task-old', to: 'task-new', at: '2026-10-26T00:00:00.000Z' };
+    const { missionDir } = await import('../path-resolver.js');
+    const { safeWriteFile } = await import('../secure-io.js');
+    safeWriteFile(
+      `${missionDir(MISSION_ID, 'public')}/NEXT_TASKS.json`,
+      JSON.stringify([
+        {
+          task_id: 'task-1',
+          status: 'planned',
+          assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+          description: 'Implement the widget procedure',
+          deliverable: 'deliverables/widget.md',
+          dependencies: [],
+          dependencies_rewritten_from: [rewrite],
+        },
+      ])
+    );
+    const warn = vi
+      .spyOn((await import('../core.js')).logger, 'warn')
+      .mockImplementation(() => undefined);
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    await dispatchMissionNextTasks(MISSION_ID);
+    const imported = mocks.importExternalWorkItem.mock.calls[0][0] as {
+      metadata?: Record<string, unknown>;
+    };
+    expect(imported.metadata?.dependencies_rewritten_from).toEqual([rewrite]);
+    warn.mockRestore();
   });
 
   it('adds nothing to the task event for a mission without a decision case', async () => {

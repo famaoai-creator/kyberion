@@ -87,14 +87,19 @@
       "description": "The task was replaced by another task of the same mission (mission_controller supersede-task, a human-approved mission_gate decision). Set once by the owner-bound consumer store, in a write that adds only this field; the lock is frozen afterwards. Every boundary skips a superseded lock (no hold, no release, no rework, no re-ask).",
       "type": "object",
       "additionalProperties": false,
-      "required": ["by_consumer", "by_task_id", "at"],
+      "required": ["by_consumer", "by_task_id", "at", "approval_request_id"],
       "properties": {
         "by_consumer": {
           "type": "string",
           "pattern": "^mission-[A-Za-z0-9][A-Za-z0-9_-]{0,100}\\.[A-Za-z0-9][A-Za-z0-9._-]{0,120}$"
         },
         "by_task_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-        "at": { "type": "string", "minLength": 1 }
+        "at": { "type": "string", "minLength": 1 },
+        "approval_request_id": {
+          "description": "The authenticated human mission_gate approval (channel mission-task-supersede) that authorized the supersede. A mark is honoured only after the mission side verifies this approval; the guard requires it to be present.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
       }
     },
     "rework": {

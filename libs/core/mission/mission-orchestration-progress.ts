@@ -7,6 +7,7 @@ import {
   type MissionTaskEventIdentity,
 } from './mission-task-events.js';
 import { ledger } from '../ledger.js';
+import { logger } from '../core.js';
 import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { readJsonLines } from '../foundation/json.js';
 import { readTextFile } from '../foundation/text.js';
@@ -19,7 +20,7 @@ import {
 import { validatePlanningPacket } from '../planning-packet-contract.js';
 import { readProcessTemplateSeededTasks } from './mission-planning-packet.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
-import { importExternalWorkItem } from '../workforce/work-coordination.js';
+import { importExternalWorkItem, listWorkItems } from '../workforce/work-coordination.js';
 import type { PlannedNextTask } from './mission-orchestration-worker-contracts.js';
 
 type GateSummary = { lines: string[]; reworkCount: number };
@@ -132,6 +133,16 @@ export function createMissionProgressController(
     const existingById = new Map(existingTasks.map((task) => [task.task_id, task]));
     const mergedTasks = tasks.map((task) => {
       const existing = existingById.get(task.task_id);
+      // supersede-task owns `superseded` (human-approved): a worker write never
+      // introduces it — without a matching on-disk record it is dropped (M2).
+      if (task.status === 'superseded' && existing?.status !== 'superseded') {
+        logger.warn(
+          `task ${task.task_id} not written as superseded — a worker write cannot supersede a task | the status on disk is kept; supersede it with pnpm mission supersede-task ${missionId} ${task.task_id} --by <new_task_id> --reason <text> --request-approval | mission=${missionId}`
+        );
+        const rest: PlannedNextTask = { ...task, status: existing?.status ?? 'planned' };
+        delete rest.superseded;
+        return rest;
+      }
       if (!existing) return task;
       const existingPriority =
         PLANNED_NEXT_TASK_STATUS_PRIORITY[String(existing.status || 'planned')] ?? 0;
@@ -142,10 +153,23 @@ export function createMissionProgressController(
         Number(existing.rework_count || 0),
         Number(task.rework_count || 0)
       );
+      // A stale in-memory board never undoes a supersede: the on-disk record
+      // and the dependency rewrite it made win over the incoming task (M2).
+      const supersedeOwned =
+        existing.status === 'superseded' || Boolean(existing.dependencies_rewritten_from?.length);
       return {
         ...task,
         ...(status ? { status } : {}),
         ...(rework_count > 0 ? { rework_count } : {}),
+        ...(supersedeOwned
+          ? {
+              dependencies: existing.dependencies,
+              ...(existing.superseded ? { superseded: existing.superseded } : {}),
+              ...(existing.dependencies_rewritten_from
+                ? { dependencies_rewritten_from: existing.dependencies_rewritten_from }
+                : {}),
+            }
+          : {}),
       };
     });
     writeProvisionedJson({
@@ -311,9 +335,20 @@ export function createMissionProgressController(
     const nextTasks = validation.value.next_tasks.map((_, index) => ({ ...derivedTasks[index] }));
 
     function registerCanonicalWorkItems(tasks: Array<Record<string, unknown>>): void {
+      const supersededItemTaskIds = new Set(
+        listWorkItems({ source: 'local' })
+          .filter(
+            (item) =>
+              item.source_ref.startsWith(`mission:${missionId}:`) &&
+              typeof item.metadata?.superseded_by === 'string'
+          )
+          .map((item) => item.source_ref.slice(`mission:${missionId}:`.length))
+      );
       for (const task of tasks) {
         const taskId = String(task.task_id || '').trim();
         if (!taskId) continue;
+        // m3: a superseded task's WorkItem stays archived (never re-planned).
+        if (supersededOnDisk.has(taskId) || supersededItemTaskIds.has(taskId)) continue;
         const description = String(task.description || taskId).trim();
         const assignment =
           task.assigned_to && typeof task.assigned_to === 'object'
@@ -356,6 +391,23 @@ export function createMissionProgressController(
     // MO-01: process-template-seeded tasks are the mission's fixed skeleton —
     // the planner may add tasks around them but never drop or restructure them.
     const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
+    // m3: a task superseded on disk (supersede-task, human-approved) keeps its
+    // entry; a new plan never resets it to planned.
+    const supersededOnDisk = new Map(
+      (safeExistsSync(nextTasksPath)
+        ? loadMissionNextTaskObjectsAtPath(
+            nextTasksPath,
+            path.basename(path.dirname(nextTasksPath))
+          ) || []
+        : []
+      )
+        .filter((task) => String(task.status || '') === 'superseded')
+        .map((task) => [String(task.task_id || ''), task as Record<string, unknown>])
+    );
+    const keepSuperseded = <T extends { task_id?: unknown }>(tasks: T[]): T[] =>
+      tasks.map(
+        (task) => (supersededOnDisk.get(String(task.task_id || '')) as T | undefined) ?? task
+      );
     const seededTasks = readProcessTemplateSeededTasks(nextTasksPath);
     if (seededTasks.length > 0) {
       const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
@@ -365,7 +417,7 @@ export function createMissionProgressController(
         missionId,
         filePath: nextTasksPath,
         targetPath: 'NEXT_TASKS.json',
-        provisioned: provisionMissionEntry([...seededTasks, ...additions]),
+        provisioned: provisionMissionEntry(keepSuperseded([...seededTasks, ...additions])),
       });
       ledger.record('MISSION_PLAN_MERGED_WITH_PROCESS_TEMPLATE', {
         mission_id: missionId,
@@ -380,7 +432,7 @@ export function createMissionProgressController(
       missionId,
       filePath: nextTasksPath,
       targetPath: 'NEXT_TASKS.json',
-      provisioned: provisionMissionEntry(nextTasks),
+      provisioned: provisionMissionEntry(keepSuperseded(nextTasks)),
     });
   }
 

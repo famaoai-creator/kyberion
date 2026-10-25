@@ -2090,6 +2090,15 @@ describe('customer-decision facade', () => {
       expect(agendaOf(reasked.agenda_id).entries).toEqual([
         expect.objectContaining({ entry_id: proposalId, requires_customer: true }),
       ]);
+      // The facade's marker on the target agenda: what the guard binds the relink to.
+      expect(agendaOf(reasked.agenda_id).reasked_proposals).toEqual([
+        {
+          proposal_id: proposalId,
+          consumer: 'mission-MSN-CD09-REASK.release',
+          by: 'user:alice',
+          at: NOW,
+        },
+      ]);
       const lock = readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-REASK.release');
       const entry = lock?.decisions.find((item) => item.proposal?.proposal_id === proposalId);
       expect(entry).toMatchObject({
