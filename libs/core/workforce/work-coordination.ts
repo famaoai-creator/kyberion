@@ -2,28 +2,16 @@ import {
   continueSuspendedPipelineWorkItem,
   type ResumeSuspendedPipelineWorkItemInput,
 } from './work-coordination-pipeline-continuation.js';
-import { latestById, readWorkItemInventoryAtPath } from './work-coordination-inventory.js';
+import { readWorkItemInventoryAtPath } from './work-coordination-inventory.js';
 import { finalizeWorkItemAttempt } from './work-item-attempt.js';
-import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
 import * as crypto from 'node:crypto';
-import * as path from 'node:path';
-import { withLockSync } from '../foundation/lock-utils.js';
 import { slugify } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { withExecutionContext } from '../authority.js';
-import {
-  selectCurrentWorkItems,
-  withImmutableWorkItemInventorySnapshot,
-} from './work-coordination-snapshot.js';
+import { withImmutableWorkItemInventorySnapshot } from './work-coordination-snapshot.js';
 import { enforceNhiActorPolicy } from '../nhi-actor-verification.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeRmSync,
-} from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeRmSync } from '../secure-io.js';
 import { buildWorkItemHandoffPacket, type HandoffPacket } from '../mesh/handoff-packet.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
@@ -47,7 +35,6 @@ import {
   canReplayWorkItemClaim,
   isTerminalStatus,
   normalizeWorkItemContext,
-  validateWorkItem,
 } from './work-coordination-identity.js';
 import {
   hasUndispatchedWorkItemEvidenceScope,
@@ -118,284 +105,36 @@ export type {
 const WORK_BOARD_CATALOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/work-board-catalog.schema.json'
 );
-const STORE_ROOT = 'active/shared/runtime/work-coordination';
-const OBS_ROOT = 'active/shared/observability/work-coordination';
-
-let coordinationNamespaceOverride: string | null = null;
-let coordinationRootOverride: string | null = null;
-
-export function setWorkCoordinationNamespace(namespace: string | null | undefined): void {
-  coordinationNamespaceOverride = namespace ? normalizeCoordinationNamespace(namespace) : null;
-}
-
-export function clearWorkCoordinationNamespace(): void {
-  coordinationNamespaceOverride = null;
-}
-
-function withCoordinationRoot<T>(rootDir: string | undefined, fn: () => T): T {
-  const previousRoot = coordinationRootOverride;
-  coordinationRootOverride = rootDir ? path.resolve(rootDir) : null;
-  try {
-    return fn();
-  } finally {
-    coordinationRootOverride = previousRoot;
-  }
-}
-
-function randomId(prefix: string): string {
-  return `${prefix}-${crypto.randomUUID().slice(0, 8)}`;
-}
-
-function coordinationNamespace(): string {
-  const configured =
-    coordinationNamespaceOverride ||
-    String(getRegisteredEnvText('KYBERION_WORK_COORDINATION_NAMESPACE') || '').trim();
-  return configured ? normalizeCoordinationNamespace(configured) : '';
-}
-
-function normalizeCoordinationNamespace(value: string): string {
-  const normalized = String(value || '').trim();
-  if (!normalized || normalized === '.' || normalized === '..' || /[\\/\0]/u.test(normalized)) {
-    throw new Error(`[RESOURCE_PATH_SCOPE] invalid work coordination namespace: ${value}`);
-  }
-  return normalized;
-}
-
-function coordinationBase(): string {
-  const base = path.resolve(coordinationRootOverride || pathResolver.rootDir());
-  assertSafeRepositoryPath(path.join(base, '.work-coordination-root'), {
-    allowMissingLeaf: true,
-  });
-  return base;
-}
-
-function runtimeRoot(): string {
-  const namespace = coordinationNamespace();
-  const base = coordinationBase();
-  return assertSafeRepositoryPath(
-    pathResolver.vitestLivePath(
-      path.resolve(base, namespace ? `${STORE_ROOT}/${namespace}` : STORE_ROOT)
-    ),
-    { allowMissingLeaf: true }
-  );
-}
-
-const heldCoordinationMutations = new Set<string>();
-/** All item/lease/event transitions share one synchronous reentrant inter-process fence. */
-function withCoordinationMutation<T>(fn: () => T): T {
-  const key = crypto.createHash('sha256').update(runtimeRoot()).digest('hex');
-  if (heldCoordinationMutations.has(key)) return fn();
-  return withExecutionContext('infrastructure_sentinel', () =>
-    withLockSync(`work-coordination:${key}`, () => {
-      heldCoordinationMutations.add(key);
-      try {
-        return fn();
-      } finally {
-        heldCoordinationMutations.delete(key);
-      }
-    })
-  );
-}
-
-function observabilityRoot(): string {
-  const namespace = coordinationNamespace();
-  const base = coordinationBase();
-  return assertSafeRepositoryPath(
-    pathResolver.vitestLivePath(
-      path.resolve(base, namespace ? `${OBS_ROOT}/${namespace}` : OBS_ROOT)
-    ),
-    { allowMissingLeaf: true }
-  );
-}
-
-function itemsPath(): string {
-  return `${runtimeRoot()}/items.jsonl`;
-}
-
-function leasesPath(): string {
-  return `${runtimeRoot()}/leases.jsonl`;
-}
-
-function boardsPath(): string {
-  return `${runtimeRoot()}/boards.json`;
-}
-
-function eventsPath(): string {
-  return `${observabilityRoot()}/events.jsonl`;
-}
-
-function ensureStore(): void {
-  safeMkdir(runtimeRoot(), { recursive: true });
-  safeMkdir(observabilityRoot(), { recursive: true });
-}
-
-function readJsonl<T>(logicalPath: string): T[] {
-  return readJsonLines<T>(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }));
-}
-
-function appendJsonl(logicalPath: string, record: unknown): void {
-  withExecutionContext('infrastructure_sentinel', () => {
-    ensureStore();
-    appendJsonLine(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }), record);
-  });
-}
-
-/** State publication keeps its governed writer role; serialization is shared. */
-function writeCoordinationState(logicalPath: string, value: unknown): void {
-  withExecutionContext('infrastructure_sentinel', () => {
-    ensureStore();
-    writeJson(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }), value);
-  });
-}
-
-function currentWorkItems(): WorkItem[] {
-  return selectCurrentWorkItems(readJsonl<WorkItem>(itemsPath()));
-}
-
-function currentWorkItem(itemId: string): WorkItem | null {
-  const normalized = String(itemId || '').trim();
-  if (!normalized) return null;
-  const items = currentWorkItems();
-  return items.find((item) => item.item_id === normalized) || null;
-}
-
-function currentLeaseRecords(): WorkLease[] {
-  const records = readJsonl<WorkLease>(leasesPath());
-  return latestById(records, 'lease_id').map((lease) => ({ ...lease }));
-}
-
-function currentLeaseForItem(itemId: string): WorkLease | null {
-  const now = Date.now();
-  const leases = currentLeaseRecords()
-    .filter((lease) => lease.item_id === itemId)
-    .filter((lease) => lease.status === 'active')
-    .filter((lease) => new Date(lease.expires_at).getTime() > now)
-    .sort((a, b) => a.renewed_at.localeCompare(b.renewed_at));
-  return leases.length > 0 ? leases[leases.length - 1] : null;
-}
-
-function currentLeaseById(leaseId: string): WorkLease | null {
-  const normalized = String(leaseId || '').trim();
-  if (!normalized) return null;
-  const leases = currentLeaseRecords();
-  return leases.find((lease) => lease.lease_id === normalized) || null;
-}
-
-function createWorkItemAttempt(input: {
-  actorPeerId: string;
-  actorUserId?: string;
-  leaseId: string;
-  traceId?: string;
-  metadata?: Record<string, unknown>;
-}): WorkItemAttempt {
-  const now = nowIso();
-  return {
-    attempt_id: randomId('wattempt'),
-    run_id: randomId('wrun'),
-    status: 'running',
-    started_at: now,
-    actor_peer_id: input.actorPeerId,
-    ...(input.actorUserId ? { actor_user_id: input.actorUserId } : {}),
-    lease_id: input.leaseId,
-    ...(input.traceId ? { trace_id: input.traceId } : {}),
-    ...(input.metadata ? { metadata: input.metadata } : {}),
-  };
-}
-
-function appendWorkItemAttemptEvent(
-  eventType: WorkCoordinationEventType,
-  itemId: string,
-  attempt: WorkItemAttempt | null,
-  note: string,
-  actorPeerId?: string,
-  actorUserId?: string,
-  expectedVersion?: number
-): void {
-  appendEvent({
-    eventType,
-    itemId,
-    actorPeerId,
-    actorUserId,
-    expectedVersion,
-    status: attempt?.status,
-    note,
-    payload: attempt
-      ? {
-          attempt_id: attempt.attempt_id,
-          run_id: attempt.run_id,
-          status: attempt.status,
-          started_at: attempt.started_at,
-          ended_at: attempt.ended_at,
-          actor_peer_id: attempt.actor_peer_id,
-          actor_user_id: attempt.actor_user_id,
-          lease_id: attempt.lease_id,
-          summary: attempt.summary,
-          blocked_reason: attempt.blocked_reason,
-          failure_reason: attempt.failure_reason,
-          trace_id: attempt.trace_id,
-          metadata: attempt.metadata,
-        }
-      : undefined,
-  });
-}
-
-/**
- * MSN-LOG-STORE-HARDENING-20261016: cap the per-item attempts array carried
- * by every versioned snapshot. Each item version embedded its FULL attempt
- * history (observed: 16 attempts ≈ 239KB in one record), so every status
- * change re-wrote all prior attempts — the store grew quadratically and the
- * largest line reached ~240KB. Only the tail is retained; the complete
- * attempt history stays in `observability/work-coordination/events.jsonl`
- * via appendWorkItemAttemptEvent.
- */
-export const MAX_RETAINED_ITEM_ATTEMPTS = 10;
-
-function boundItemAttempts(item: WorkItem): WorkItem {
-  const attempts = item.attempts;
-  if (!attempts || attempts.length <= MAX_RETAINED_ITEM_ATTEMPTS) return item;
-  return { ...item, attempts: attempts.slice(-MAX_RETAINED_ITEM_ATTEMPTS) };
-}
-
-function appendItemSnapshot(item: WorkItem): WorkItem {
-  const bounded = boundItemAttempts(item);
-  validateWorkItem(bounded);
-  appendJsonl(itemsPath(), bounded);
-  return bounded;
-}
-
-function appendLeaseSnapshot(lease: WorkLease): WorkLease {
-  appendJsonl(leasesPath(), lease);
-  return lease;
-}
-
-function createEvent(payload: AppendCoordinationEventInput): CoordinationEvent {
-  return {
-    event_id: randomId('wce'),
-    ts: nowIso(),
-    event_type: payload.eventType,
-    ...(payload.itemId ? { item_id: payload.itemId } : {}),
-    ...(payload.boardId ? { board_id: payload.boardId } : {}),
-    ...(payload.leaseId ? { lease_id: payload.leaseId } : {}),
-    ...(payload.actorPeerId ? { actor_peer_id: payload.actorPeerId } : {}),
-    ...(payload.actorUserId ? { actor_user_id: payload.actorUserId } : {}),
-    ...(payload.commandId ? { command_id: payload.commandId } : {}),
-    ...(payload.idempotencyKey ? { idempotency_key: payload.idempotencyKey } : {}),
-    ...(typeof payload.expectedVersion === 'number'
-      ? { expected_version: payload.expectedVersion }
-      : {}),
-    ...(payload.status ? { status: payload.status } : {}),
-    ...(payload.note ? { note: payload.note } : {}),
-    ...(payload.payload ? { payload: payload.payload } : {}),
-  };
-}
-
-function appendEvent(payload: AppendCoordinationEventInput): CoordinationEvent {
-  return withCoordinationMutation(() => {
-    const event = createEvent(payload);
-    appendJsonl(eventsPath(), event);
-    return event;
-  });
-}
+import {
+  appendEvent,
+  appendItemSnapshot,
+  appendLeaseSnapshot,
+  appendWorkItemAttemptEvent,
+  boardsPath,
+  coordinationRootOverride,
+  createWorkItemAttempt,
+  currentLeaseById,
+  currentLeaseForItem,
+  currentLeaseRecords,
+  currentWorkItem,
+  currentWorkItems,
+  ensureStore,
+  eventsPath,
+  itemsPath,
+  leasesPath,
+  observabilityRoot,
+  randomId,
+  readJsonl,
+  runtimeRoot,
+  withCoordinationMutation,
+  withCoordinationRoot,
+  writeCoordinationState,
+} from './work-coordination-ledger.js';
+export {
+  setWorkCoordinationNamespace,
+  clearWorkCoordinationNamespace,
+  MAX_RETAINED_ITEM_ATTEMPTS,
+} from './work-coordination-ledger.js';
 
 /** Record a mission-level handoff on every canonical WorkItem for the mission. */
 export function recordMissionHandoff(input: RecordMissionHandoffInput): WorkItem[] {
@@ -1086,6 +825,19 @@ export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; 
   return withCoordinationMutation(() => releaseWorkItemInternal(input));
 }
 
+/** Trailing run of attempts that ended 'released' carrying a failed execution status. */
+function countTrailingFailedReleases(attempts: readonly WorkItemAttempt[]): number {
+  let count = 0;
+  for (let i = attempts.length - 1; i >= 0; i--) {
+    const attempt = attempts[i];
+    const executionStatus = (attempt.metadata as Record<string, unknown> | undefined)
+      ?.execution_status;
+    if (attempt.status === 'released' && executionStatus === 'failed') count++;
+    else break;
+  }
+  return count;
+}
+
 function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
   item: WorkItem;
   lease: WorkLease;
@@ -1137,9 +889,20 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
     metadata: input.metadata,
   });
 
+  // Poison-pill guard on the normal release path (mirrors the reaper's lease
+  // budget): a worker that claims, fails its delegation and releases back to
+  // ready is instantly re-claimable, and was observed churning one item every
+  // ~30 s indefinitely — thousands of snapshots that pushed the append-only
+  // store past its read cap. Count trailing consecutive attempts released
+  // with a failed execution status; past the error budget the item parks as
+  // blocked instead of returning to ready.
+  const trailingFailures = countTrailingFailedReleases(finalAttempt.attempts);
+  const requestedStatus = input.nextStatus || 'ready';
+  const shouldPark = requestedStatus === 'ready' && trailingFailures >= DEFAULT_MAX_ERROR_ATTEMPTS;
+
   const next: WorkItem = appendItemSnapshot({
     ...current,
-    status: input.nextStatus || 'ready',
+    status: shouldPark ? 'blocked' : requestedStatus,
     effect_ownership: effectOwnership,
     version: current.version + 1,
     updated_at: now,
@@ -1151,7 +914,27 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
     claimed_by_user_id: undefined,
     current_attempt_id: finalAttempt.currentAttemptId,
     attempts: finalAttempt.attempts,
+    ...(shouldPark
+      ? {
+          metadata: {
+            ...(current.metadata || {}),
+            ...(input.metadata || {}),
+            parked: true,
+            parked_at: now,
+            parked_reason: `release-path attempt budget exhausted (consecutive failures=${trailingFailures}/${DEFAULT_MAX_ERROR_ATTEMPTS})`,
+          },
+        }
+      : {}),
   });
+
+  if (shouldPark) {
+    appendEvent({
+      eventType: 'item_blocked',
+      itemId: next.item_id,
+      status: 'blocked',
+      note: `parked on release: ${trailingFailures} consecutive failed attempts`,
+    });
+  }
 
   appendLeaseEvent(
     'item_released',
@@ -1292,6 +1075,7 @@ export function reapExpiredWorkLeases(options: ReapWorkLeasesOptions = {}): Reap
 
 function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWorkLeasesResult {
   const now = options.now ?? nowIso();
+  const nowMs = new Date(now).getTime();
   const maxClaims = options.maxClaimAttempts ?? DEFAULT_MAX_CLAIM_ATTEMPTS;
   const maxErrors = options.maxErrorAttempts ?? DEFAULT_MAX_ERROR_ATTEMPTS;
   const expired = expireWorkItemLeasesInternal(now);
@@ -1403,6 +1187,62 @@ function reapExpiredWorkLeasesInternal(options: ReapWorkLeasesOptions): ReapWork
       });
       recovered.push(next);
     }
+  }
+
+  // Orphaned-attempt reconcile: an item already back at a non-running status
+  // (e.g. reset to ready/blocked by an operator while its lease was gone) can
+  // still carry a `running` attempt whose lease no longer exists. Left alone it
+  // poisons the record forever — claim-side only checks leases, so the item is
+  // claimable while its own history claims an executor is still mid-flight.
+  // Finalize the stale attempt so every attempt reaches a coherent terminal
+  // state or a provably live lease.
+  for (const item of currentWorkItems()) {
+    if (item.status === 'in_progress') continue;
+    if (options.itemFilter && !options.itemFilter(item)) continue;
+    const runningAttempt = (item.attempts || []).find(
+      (attempt) => attempt.status === 'running' && !attempt.ended_at
+    );
+    if (!runningAttempt) continue;
+    if (activeLeaseForItem(item.item_id)) continue;
+    const lease = currentLeaseById(runningAttempt.lease_id);
+    if (lease?.status === 'active' && new Date(lease.expires_at).getTime() > nowMs) continue;
+
+    const index = (item.attempts || []).findIndex(
+      (attempt) => attempt.run_id === runningAttempt.run_id
+    );
+    const attempts = [...(item.attempts || [])];
+    attempts[index] = {
+      ...runningAttempt,
+      status: 'released',
+      ended_at: now,
+      failure_reason: 'lease_lost',
+      summary: 'running attempt orphaned without a live lease; reconciled by reaper',
+    };
+    const next = appendItemSnapshot({
+      ...item,
+      version: item.version + 1,
+      updated_at: now,
+      current_attempt_id:
+        item.current_attempt_id === runningAttempt.run_id ? undefined : item.current_attempt_id,
+      attempts,
+    });
+    appendWorkItemAttemptEvent(
+      'item_attempt_released',
+      item.item_id,
+      attempts[index],
+      'orphaned running attempt reconciled (lease lost)',
+      undefined,
+      undefined,
+      item.version
+    );
+    appendEvent({
+      eventType: 'item_updated',
+      itemId: item.item_id,
+      status: item.status,
+      note: `stale running attempt ${runningAttempt.run_id} reconciled (lease lost)`,
+      expectedVersion: item.version,
+    });
+    recovered.push(next);
   }
 
   return { expired, recovered, parked, replayed };
