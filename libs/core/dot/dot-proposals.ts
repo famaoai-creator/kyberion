@@ -12,6 +12,7 @@
  *   ```dot-proposals``` JSON array.
  */
 
+import { createHash } from 'node:crypto';
 import type { FrontDeskExecutionBinding } from '../surface/front-desk-execution-contract.js';
 import type { ContinuousWorkPlan } from '../organization/continuous-work-plan.js';
 import { loadDotExecutionPolicy } from './dot-execution-policy.js';
@@ -338,8 +339,21 @@ export function dotProposalInstructions(mode: 'tool' | 'fence'): string {
  * deliberately excluded.
  */
 export function proposalActionIdentity(
-  proposal: Pick<DotProposal, 'action_id' | 'target' | 'pipeline_ref'>
+  proposal: Pick<DotProposal, 'action_id' | 'target' | 'pipeline_ref' | 'continuous_work'>
 ): string {
   const discriminator = proposal.target ?? proposal.pipeline_ref ?? '';
-  return discriminator ? `${proposal.action_id}#${discriminator}` : proposal.action_id;
+  // Managed-work proposals share action_id and pipeline_ref, so without a plan
+  // discriminator every continuous-operations proposal superseded the previous
+  // pending one — observed: eight distinct P0 missions collapsed to the last
+  // card. Two proposals are only "the same ask re-stated" when their plans
+  // match too; the short digest keeps identity stable across re-observations.
+  const planDigest = proposal.continuous_work
+    ? `#plan:${createHash('sha256')
+        .update(JSON.stringify(proposal.continuous_work))
+        .digest('hex')
+        .slice(0, 12)}`
+    : '';
+  return discriminator
+    ? `${proposal.action_id}#${discriminator}${planDigest}`
+    : `${proposal.action_id}${planDigest}`;
 }
