@@ -693,11 +693,35 @@ describe('mission-context-pack', () => {
     });
 
     expect(pack.skill_resources).toHaveLength(1);
+    expect(pack.security_scope.tenant_slug).toBeUndefined();
+    expect(pack.security_scope.tenant_id).toBeUndefined();
     expect(pack.skill_resources?.[0]?.frontmatter.allowed_tools).toEqual(['Read']);
     const rendered = renderMissionContextPack(pack);
     expect(rendered).toContain('<skill name="demo-context-skill"');
     expect(rendered).not.toContain('Secret skill body');
   });
+
+  it.each(['confidential', 'personal'] as const)(
+    'refuses a %s context pack without a real tenant',
+    (tier) => {
+      expect(() =>
+        buildMissionContextPack({
+          missionPath,
+          missionState: {
+            mission_id: `${missionId}-PRIVATE-NO-TENANT`,
+            tier,
+            status: 'active',
+            assigned_persona: 'worker',
+            execution_mode: 'local',
+            priority: 3,
+            confidence_score: 1,
+            git: { branch: 'main', start_commit: 'a', latest_commit: 'a', checkpoints: [] },
+            history: [],
+          },
+        })
+      ).toThrow('tenant_slug (or legacy tenant_id) is required');
+    }
+  );
 
   it('propagates the pre-trust boundary to project-local skill paths', () => {
     expect(() =>
