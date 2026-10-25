@@ -11,9 +11,13 @@ import {
   locateApprovalRequest,
   readApprovalJsonAt,
   SYSTEM_APPROVAL_PARTITION,
+  systemRecordVisibleToThisProcess,
   type ApprovalPartition,
 } from './approval-store-location.js';
 import { normalizeApprovalChannel } from './approval-store-paths.js';
+import { createLogger } from '../logger.js';
+
+const logger = createLogger('approval-store-reader');
 
 export {
   normalizeApprovalChannel,
@@ -83,11 +87,27 @@ export function listApprovalRequests(params?: {
       for (const entry of listApprovalDirAt(partition, requestsDir).filter((item) =>
         item.endsWith('.json')
       )) {
-        const record = readApprovalJsonAt<ApprovalRequestRecord>(
+        const logicalPath = approvalRequestLogicalPathAt(
           partition,
-          approvalRequestLogicalPathAt(partition, storageChannel, entry.replace(/\.json$/, ''))
+          storageChannel,
+          entry.replace(/\.json$/, '')
         );
+        let record: ApprovalRequestRecord | null;
+        if (partition.kind === 'system') {
+          record = readApprovalJsonAt<ApprovalRequestRecord>(partition, logicalPath);
+        } else {
+          // One unreadable tenant record must not blind every listing.
+          try {
+            record = readApprovalJsonAt<ApprovalRequestRecord>(partition, logicalPath);
+          } catch (err) {
+            logger.warn(
+              `approval request skipped in listing — a tenant partition record is unreadable | next: inspect or repair the record (approval store hygiene) | evidence: ${logicalPath}: ${err instanceof Error ? err.message : String(err)}`
+            );
+            continue;
+          }
+        }
         if (!record) continue;
+        if (partition.kind === 'system' && !systemRecordVisibleToThisProcess(record)) continue;
         if (statuses && !statuses.has(record.status)) continue;
         if (kinds && !kinds.has(record.kind)) continue;
         if (scopeFilter) {

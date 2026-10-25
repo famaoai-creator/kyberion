@@ -223,6 +223,51 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
   tenant_approvals: TENANT_APPROVAL_ROOT_PATH,
 } as const;
 
+/**
+ * Partitioned ledger roots whose tenant partitions belong to one dedicated,
+ * tenant-bound store role (`<root>/<personal|confidential>/<tenant>/…`). These
+ * partitions are authority evidence (hash-chained audit entries, approval
+ * decisions), so tier-guard does not let broad runtime defaults or other roles'
+ * grants write them: only SUDO, a persona grant, or the store role's own grant
+ * (bound to that tenant) may. The metrics ledgers are deliberately absent.
+ */
+export const TENANT_STORE_LEDGER_ROOTS = {
+  tenant_ledger: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger,
+    storeRole: 'tenant_ledger_store',
+  },
+  tenant_approvals: {
+    root: PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals,
+    storeRole: 'tenant_approval_store',
+  },
+} as const;
+
+export interface TenantStoreLedgerPartition {
+  root: string;
+  storeRole: string;
+  tier: 'personal' | 'confidential';
+  tenant: string;
+}
+
+/**
+ * The tenant partition of a dedicated-store ledger root a repo-relative (or
+ * absolute, under this root) path lies in — the tenant directory itself or
+ * anything below it — or undefined.
+ */
+export function tenantStoreLedgerPartitionOf(
+  filePath: string
+): TenantStoreLedgerPartition | undefined {
+  const relative = toPosixRelative(filePath);
+  for (const { root, storeRole } of Object.values(TENANT_STORE_LEDGER_ROOTS)) {
+    if (!relative.startsWith(root + '/')) continue;
+    const [tier, tenant] = relative.slice(root.length + 1).split('/');
+    if ((tier === 'personal' || tier === 'confidential') && tenant) {
+      return { root, storeRole, tier, tenant };
+    }
+  }
+  return undefined;
+}
+
 /** Knowledge permission path corresponding to a registered runtime state path. */
 export function partitionedRuntimeStateKnowledgePath(filePath: string): string | undefined {
   const relative = toPosixRelative(filePath);

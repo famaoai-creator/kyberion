@@ -25,7 +25,7 @@
  */
 import * as path from 'node:path';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
-import { appendJsonLine } from '../foundation/json.js';
+import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -34,9 +34,11 @@ import {
   safeFsyncFile,
   safeMkdir,
   safeReaddir,
+  safeUnlinkSync,
   safeWriteFile,
 } from '../secure-io.js';
 import { storagePartitionSegments } from '../storage-layout.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
 import type { EventScope, EventScopeInput } from '../event-scope.js';
 import {
   ensureRegularGovernedArtifactFile,
@@ -68,6 +70,8 @@ export const TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE = 'tenant_approval_part
  * (organization/tenant-activation-approval.ts TENANT_ACTIVATION_APPROVAL_CHANNEL).
  */
 export const TENANT_ACTIVATION_STORAGE_CHANNEL = 'tenant-activation';
+/** Kind of a tenant-activation request (the only kind the activation exception applies to). */
+export const TENANT_ACTIVATION_REQUEST_KIND = 'mission_gate';
 
 export type ApprovalPartitionTier = 'personal' | 'confidential';
 
@@ -102,20 +106,27 @@ function normalizedTenant(value: string | undefined): string | undefined {
 
 /**
  * Where a record with this scope is stored (decision 2 of the partition
- * design): a valid `tenant_slug` → that tenant's partition, except a
- * tenant-activation request (`storageChannel` `tenant-activation`) unless the
- * caller states the tenant is already active (`tenantActive: true`). Anything
- * else — no scope, no tenant, an invalid tenant — is the system tree.
+ * design): a valid `tenant_slug` → that tenant's partition, except a genuine
+ * tenant-activation request — the `tenant-activation` storage channel AND kind
+ * `mission_gate`, as organization/tenant-activation-approval.ts creates it —
+ * for a tenant that is not yet active, which stays in the system tree.
+ * Activeness is the creator's verdict (`tenantActive`, computed there with
+ * isTenantActivationActive; the store cannot import the organization layer
+ * without a cycle); anything short of `tenantActive: true` keeps the request
+ * in the system tree, which is still hidden from processes bound to another
+ * tenant (systemRecordVisibleToThisProcess). Anything else — no scope, no
+ * tenant, an invalid tenant — is the system tree.
  */
 export function approvalPartitionForScope(
   scope: EventScope | EventScopeInput | undefined,
-  options: { storageChannel?: string; tenantActive?: boolean } = {}
+  options: { storageChannel?: string; kind?: string; tenantActive?: boolean } = {}
 ): ApprovalPartition {
   const tenant = normalizedTenant(scope?.tenant_slug);
   if (!tenant) return SYSTEM_APPROVAL_PARTITION;
   if (
     options.storageChannel !== undefined &&
     normalizeApprovalChannel(options.storageChannel) === TENANT_ACTIVATION_STORAGE_CHANNEL &&
+    options.kind === TENANT_ACTIVATION_REQUEST_KIND &&
     options.tenantActive !== true
   ) {
     return SYSTEM_APPROVAL_PARTITION;
@@ -252,14 +263,89 @@ export function asTenantApprovalStore<T>(tenantSlug: string, fn: () => T): T {
 // writers (the role assumed around a regular-file write under a governed path).
 // ---------------------------------------------------------------------------
 
-/** Run `fn` as the identity that may write `partition`, refusing an unbindable tenant first. */
+/** Live (never Vitest-remapped) system-tree roots a tenant partition path is confined like. */
+const LIVE_SYSTEM_COORDINATION_ROOT = 'active/shared/coordination/channels';
+const LIVE_SYSTEM_OBSERVABILITY_ROOT = 'active/shared/observability/channels';
+
+/**
+ * The live system-tree path a tenant partition path stands in for:
+ * `<ch>/requests/…` → `coordination/channels/<ch>/approvals/requests/…`,
+ * `<ch>/passkey-challenges/…` → `…/<ch>/approvals/passkey-challenges/…`,
+ * `<ch>/approvals.jsonl` → `observability/channels/<ch>/approvals.jsonl`,
+ * `<ch>` → `coordination/channels/<ch>`, the partition root → `coordination/channels`.
+ * Absolute (under the project root), so tier-guard judges the real grant even
+ * under Vitest, where the store itself lives in the isolated root.
+ */
+function liveSystemPathFor(partition: ApprovalTenantPartition, logicalPath: string): string {
+  const root = tenantApprovalPartitionLogicalRoot(partition);
+  if (logicalPath !== root && !logicalPath.startsWith(root + '/')) {
+    throw new Error(
+      `[APPROVAL_LOCATION_MISMATCH] '${logicalPath}' is not inside the approval partition it is written as`
+    );
+  }
+  const [channel, area, ...rest] = logicalPath
+    .slice(root.length)
+    .split('/')
+    .filter((segment) => segment.length > 0);
+  let live: string;
+  if (!channel) live = LIVE_SYSTEM_COORDINATION_ROOT;
+  else if (area === 'approvals.jsonl' && rest.length === 0)
+    live = `${LIVE_SYSTEM_OBSERVABILITY_ROOT}/${channel}/approvals.jsonl`;
+  else
+    live = [
+      LIVE_SYSTEM_COORDINATION_ROOT,
+      channel,
+      ...(area ? ['approvals', area] : []),
+      ...rest,
+    ].join('/');
+  return path.join(pathResolver.rootDir(), live);
+}
+
+/**
+ * Per-channel role confinement for tenant records: before the store role
+ * touches a tenant partition, the caller (its `role` for writes, its ambient
+ * identity for reads) must hold the grant the same operation needs on the
+ * live system-tree path of that channel — so `slack_bridge` decides a tenant
+ * record on the slack channel exactly as it would a system one, and no other.
+ */
+function assertCallerChannelAccess(
+  access: 'read' | 'write' | 'mkdir',
+  partition: ApprovalTenantPartition,
+  logicalPath: string,
+  role?: GovernedArtifactRole
+): void {
+  const live = liveSystemPathFor(partition, logicalPath);
+  const decision =
+    access === 'read'
+      ? role
+        ? withExecutionContext(role, () => validateReadPermission(live))
+        : validateReadPermission(live)
+      : role
+        ? withExecutionContext(role, () => validateWritePermission(live, access))
+        : validateWritePermission(live, access);
+  if (!decision.allowed) {
+    throw new Error(
+      `[POLICY_VIOLATION] approval ${access} refused — the caller may not ${access === 'read' ? 'read' : 'write'} this channel's approvals | ` +
+        `next: use the role that owns the channel | evidence: ${decision.reason ?? 'denied'}`
+    );
+  }
+}
+
+/**
+ * Run `fn` as the identity that may write `partition`: the caller's `role` in
+ * the system tree; in a tenant partition, after the binding and channel checks,
+ * the tenant-bound store role.
+ */
 function asPartitionWriter<T>(
   role: GovernedArtifactRole,
   partition: ApprovalPartition,
+  logicalPath: string,
+  access: 'write' | 'mkdir',
   fn: () => T
 ): T {
   if (partition.kind === 'system') return withExecutionContext(role, fn);
   assertMayBindApprovalTenant(partition.tenant_slug);
+  assertCallerChannelAccess(access, partition, logicalPath, role);
   return asTenantApprovalStore(partition.tenant_slug, fn);
 }
 
@@ -276,6 +362,7 @@ function prepareGovernedFile(logicalPath: string): string {
 export function readApprovalJsonAt<T>(partition: ApprovalPartition, logicalPath: string): T | null {
   if (partition.kind === 'system') return readGovernedArtifactJson<T>(logicalPath);
   if (!mayBindApprovalTenant(partition.tenant_slug)) return null;
+  assertCallerChannelAccess('read', partition, logicalPath);
   return asTenantApprovalStore(partition.tenant_slug, () =>
     readGovernedArtifactJson<T>(logicalPath)
   );
@@ -289,6 +376,7 @@ export function listApprovalDirAt(partition: ApprovalPartition, logicalDir: stri
   };
   if (partition.kind === 'system') return list();
   if (!mayBindApprovalTenant(partition.tenant_slug)) return [];
+  assertCallerChannelAccess('read', partition, logicalDir);
   return asTenantApprovalStore(partition.tenant_slug, list);
 }
 
@@ -298,7 +386,7 @@ export function ensureApprovalDirAt(
   partition: ApprovalPartition,
   logicalDir: string
 ): string {
-  return asPartitionWriter(role, partition, () => {
+  return asPartitionWriter(role, partition, logicalDir, 'mkdir', () => {
     const resolved = resolveGovernedArtifactPath(logicalDir);
     if (!safeExistsSync(resolved)) safeMkdir(resolved, { recursive: true });
     return resolved;
@@ -313,7 +401,7 @@ export function writeApprovalJsonAt(
   value: unknown,
   options: { fsync?: boolean } = {}
 ): string {
-  return asPartitionWriter(role, partition, () => {
+  return asPartitionWriter(role, partition, logicalPath, 'write', () => {
     const resolved = prepareGovernedFile(logicalPath);
     safeWriteFile(logicalPath, JSON.stringify(value, null, 2));
     if (options.fsync) safeFsyncFile(resolved);
@@ -328,11 +416,71 @@ export function appendApprovalJsonlAt(
   logicalPath: string,
   value: unknown
 ): string {
-  return asPartitionWriter(role, partition, () => {
+  return asPartitionWriter(role, partition, logicalPath, 'write', () => {
     const resolved = prepareGovernedFile(logicalPath);
     appendJsonLine(logicalPath, value);
     return resolved;
   });
+}
+
+/**
+ * Whether a file exists in a location. A tenant partition is probed as its
+ * store role after the binding and per-channel read checks (`role` = the
+ * caller's role; omitted = the ambient identity); a tenant this process may
+ * not bind reports false.
+ */
+export function approvalFileExistsAt(
+  role: GovernedArtifactRole | undefined,
+  partition: ApprovalPartition,
+  logicalPath: string
+): boolean {
+  const exists = (): boolean => safeExistsSync(resolveGovernedArtifactPath(logicalPath));
+  if (partition.kind === 'system') return role ? withExecutionContext(role, exists) : exists();
+  if (!mayBindApprovalTenant(partition.tenant_slug)) return false;
+  assertCallerChannelAccess('read', partition, logicalPath, role);
+  return asTenantApprovalStore(partition.tenant_slug, exists);
+}
+
+/**
+ * Remove one file (a request record or a passkey challenge) in a location,
+ * confined like a write: the caller's `role` in the system tree; in a tenant
+ * partition, after the binding and per-channel write checks, the store role.
+ * Absent files are a no-op; returns whether a file was removed.
+ */
+export function removeApprovalFileAt(
+  role: GovernedArtifactRole,
+  partition: ApprovalPartition,
+  logicalPath: string
+): boolean {
+  return asPartitionWriter(role, partition, logicalPath, 'write', () => {
+    const resolved = resolveGovernedArtifactPath(logicalPath);
+    if (!safeExistsSync(resolved)) return false;
+    ensureRegularGovernedArtifactFile(resolved);
+    safeUnlinkSync(resolved);
+    return true;
+  });
+}
+
+/**
+ * Read an append-only JSONL log (a channel's `approvals.jsonl`) in a location;
+ * malformed lines are skipped, an absent log is empty. Confined like
+ * {@link approvalFileExistsAt}.
+ */
+export function readApprovalJsonlAt<T = Record<string, unknown>>(
+  role: GovernedArtifactRole | undefined,
+  partition: ApprovalPartition,
+  logicalPath: string
+): T[] {
+  const read = (): T[] => {
+    const resolved = resolveGovernedArtifactPath(logicalPath);
+    if (!safeExistsSync(resolved)) return [];
+    ensureRegularGovernedArtifactFile(resolved);
+    return readJsonLines<T>(resolved, { onMalformed: 'skip' });
+  };
+  if (partition.kind === 'system') return role ? withExecutionContext(role, read) : read();
+  if (!mayBindApprovalTenant(partition.tenant_slug)) return [];
+  assertCallerChannelAccess('read', partition, logicalPath, role);
+  return asTenantApprovalStore(partition.tenant_slug, read);
 }
 
 // ---------------------------------------------------------------------------
@@ -351,8 +499,8 @@ function listTierTenants(tier: ApprovalPartitionTier): string[] {
       'worker'
     ).filter((name) => normalizedTenant(name) === name);
   } catch (err) {
-    logger.debug(
-      `tenant approval partition listing skipped — unreadable tier directory | next: check the tenant approval root | evidence: ${tier}: ${err instanceof Error ? err.message : String(err)}`
+    logger.warn(
+      `tenant approval partitions not listed — the ${tier} tier directory is unreadable, so its tenants' approvals are invisible to this process | next: check the tenant approval root and the ${TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE} grant | evidence: ${dir}: ${err instanceof Error ? err.message : String(err)}`
     );
     return [];
   }
@@ -412,6 +560,19 @@ function approvalDirExistsAt(partition: ApprovalPartition, logicalDir: string): 
   return asTenantApprovalStore(partition.tenant_slug, exists);
 }
 
+/**
+ * A legacy tenant record left in the system tree is visible only to a process
+ * that may bind its tenant — the same rule as its tenant partition — so a
+ * process bound to tenant A never reads, lists or decides tenant B's record
+ * wherever it is stored. Untenanted records are visible to everyone.
+ */
+export function systemRecordVisibleToThisProcess(
+  record: Pick<ApprovalRequestRecord, 'scope'>
+): boolean {
+  const tenant = normalizedTenant(record.scope?.tenant_slug);
+  return !tenant || mayBindApprovalTenant(tenant);
+}
+
 function describePartition(partition: ApprovalPartition): string {
   return partition.kind === 'system' ? 'system' : `${partition.tier} tenant partition`;
 }
@@ -436,7 +597,7 @@ export function locateApprovalRequest(
     SYSTEM_APPROVAL_PARTITION,
     approvalRequestLogicalPath(channel, requestId)
   );
-  if (system)
+  if (system && systemRecordVisibleToThisProcess(system))
     found.push({ record: system, partition: SYSTEM_APPROVAL_PARTITION, storageChannel: channel });
   const hinted = normalizedTenant(options.scope?.tenant_slug);
   const partitions = hinted ? approvalPartitionsForTenant(hinted) : listApprovalPartitions();

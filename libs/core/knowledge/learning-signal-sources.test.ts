@@ -51,6 +51,13 @@ vi.mock('../task/task-session.js', () => ({ listTaskSessions: mocks.sessions }))
 
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { approvalStoreRoots } from '../governance/approval-store-paths.js';
+import {
+  asTenantApprovalStore,
+  tenantApprovalEventLogicalPath,
+  tenantApprovalRequestsLogicalDir,
+} from '../governance/approval-store-location.js';
+import { withExecutionContext } from '../authority.js';
 import {
   adfRepairSource,
   approvalRejectionSource,
@@ -184,6 +191,51 @@ describe('built-in learning-signal sources (LS-02)', () => {
       expect.objectContaining({ key: 'send_mail:quality', ref: 'approval:terminal/r4' }),
     ]);
     expect(rows[1].tenantSlug).toBeUndefined();
+  });
+
+  it('reads rejections from tenant approval partitions with the record loaded by its tenant', () => {
+    const tenant = `lss-${process.pid}`;
+    const partition = {
+      kind: 'tenant' as const,
+      tier: 'confidential' as const,
+      tenant_slug: tenant,
+    };
+    const channel = 'terminal';
+    asTenantApprovalStore(tenant, () => {
+      safeMkdir(pathResolver.rootResolve(tenantApprovalRequestsLogicalDir(partition, channel)), {
+        recursive: true,
+      });
+      safeWriteFile(
+        pathResolver.rootResolve(tenantApprovalEventLogicalPath(partition, channel)),
+        [
+          { ts: IN, event: 'rejected', request_id: 't1', reason_category: 'scope' },
+          { ts: IN, event: 'approved', request_id: 't2' },
+        ]
+          .map((row) => JSON.stringify(row))
+          .join('\n') + '\n'
+      );
+    });
+    try {
+      mocks.approval.mockImplementation(() => ({ kind: 'deploy' }));
+      const rows = approvalRejectionSource.read(WINDOW);
+      expect(rows).toEqual([
+        expect.objectContaining({
+          key: 'deploy:scope',
+          ref: 'approval:terminal/t1',
+          tenantSlug: tenant,
+        }),
+      ]);
+      expect(mocks.approval).toHaveBeenCalledWith(channel, 't1', {
+        scope: { tenant_slug: tenant },
+      });
+    } finally {
+      withExecutionContext('mission_controller', () => {
+        const dir = pathResolver.rootResolve(
+          `${approvalStoreRoots().tenantApprovals}/confidential/${tenant}`
+        );
+        if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+      });
+    }
   });
 
   it('reads failed spans of runs outside missions only', () => {

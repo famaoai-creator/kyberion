@@ -28,7 +28,24 @@
       "unresolved": []
     },
     {
+      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/actuators/approval-actuator/src/approval-ops.ts#requestReviewOp (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/actuators/approval-actuator/src/approval-ops.ts#requestReviewOp (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -55,6 +72,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/actuators/system-actuator/src/system-action-helpers.ts#handleComputerInteraction (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/accepted-pipeline-bindings.ts#acceptPromotedPipelineBinding",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -70,7 +92,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/accepted-pipeline-bindings.ts#acceptPromotedPipelineBinding (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/accepted-pipeline-bindings.ts#requestPipelineBindingApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/accepted-pipeline-bindings.ts#requestPipelineBindingApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -91,6 +123,11 @@
     },
     {
       "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -145,6 +182,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane.decideHeldAction (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -155,12 +197,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
       "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -200,6 +252,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/discussion/discussion-request-storage-scope.ts#withDiscussionRequestReceiptAccess",
       "roles": ["discussion_request_store"],
       "unresolved": []
@@ -218,6 +275,18 @@
     },
     {
       "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -275,6 +344,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposalsUnlocked (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposalsUnlocked (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -297,6 +378,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
       "roles": ["infrastructure_sentinel"],
       "unresolved": [
@@ -314,12 +400,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-executor-release.ts#requestDotWorkItemRelease",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
       "site": "libs/core/dot/dot-executor-release.ts#requestDotWorkItemRelease (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-executor-release.ts#requestDotWorkItemRelease (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -419,6 +515,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -427,6 +528,85 @@
       "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#migrateTenantApprovalPartitions",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#migrateTenantApprovalPartitions (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#migrateTenantApprovalPartitions (via libs/core/governance/approval-store-hygiene.ts#migrateLegacyTenantApproval)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#migrateTenantApprovalPartitions (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#migrateTenantApprovalPartitions (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+      "roles": [],
+      "unresolved": [
+        "role argument `undefined` could not be resolved at libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals"
+      ]
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [],
+      "unresolved": [
+        "role argument `undefined` could not be resolved at libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals"
+      ]
     },
     {
       "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
@@ -439,8 +619,44 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpiredPasskeyChallenges",
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpiredPasskeyChallenges",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpiredPasskeyChallenges (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpiredPasskeyChallenges (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
       "unresolved": []
     },
     {
@@ -459,7 +675,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
@@ -484,7 +710,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/grant-store.ts#grantStanding (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/grant-store.ts#requestGrantApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/grant-store.ts#requestGrantApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -499,7 +735,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -510,6 +756,11 @@
     },
     {
       "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -529,6 +780,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/integrations/slack-approval-ui.ts#createSlackApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["slack_bridge"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/integrations/slack-approval-ui.ts#emitSlackApprovalEvent (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["slack_bridge"],
       "unresolved": []
@@ -542,6 +798,20 @@
       "site": "libs/core/integrations/slack-onboarding.ts#writeJsonAs (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["slack_bridge"],
       "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [],
+      "unresolved": [
+        "role argument `undefined` could not be resolved at libs/core/knowledge/learning-signal-sources.ts#<module>"
+      ]
+    },
+    {
+      "site": "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#readApprovalJsonlAt)",
+      "roles": [],
+      "unresolved": [
+        "role argument `undefined` could not be resolved at libs/core/knowledge/learning-signal-sources.ts#<module>"
+      ]
     },
     {
       "site": "libs/core/knowledge/memory-provenance.ts#load",
@@ -579,12 +849,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#recordScopedLearningPublicationConsumption (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApprovalLocked",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
       "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApprovalLocked (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApprovalLocked (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -912,6 +1192,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mesh/peer-runtime-recovery.ts#createPeerRuntimeRecoveryApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mesh/peer-runtime-recovery.ts#resumePeerRuntimeFromQuarantine (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -1049,6 +1341,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-orchestration-dispatch.ts#dispatchMissionNextTasksCore [delegated child role]",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1099,6 +1396,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-scope-approval.ts#createMissionScopeApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-task-recovery.ts#recoverMissionRequestedTasks",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1110,6 +1412,11 @@
     },
     {
       "site": "libs/core/mission/mission-work-reconciliation.ts#createMissionWorkReconciliationApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission/mission-work-reconciliation.ts#createMissionWorkReconciliationApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1206,7 +1513,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/nhi-session-admission.ts#applyNhiSessionAdmission (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/nhi-session-admission.ts#requestNhiSessionAdmission (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/nhi-session-admission.ts#requestNhiSessionAdmission (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1231,7 +1548,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/onboarding-authority.ts#requestOnboardingAuthority (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/onboarding-authority.ts#requestOnboardingAuthority (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1285,7 +1612,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/publication-role-migration.ts#applyPublicationRoleMigration (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/publication-role-migration.ts#requestPublicationRoleMigrationApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/publication-role-migration.ts#requestPublicationRoleMigrationApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -1300,7 +1637,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/tenant-activation-approval.ts#applyApprovedTenantActivation (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/tenant-activation-approval.ts#requestTenantActivationApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/tenant-activation-approval.ts#requestTenantActivationApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1320,7 +1667,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/organization/tenant-governance.ts#requestTenantProviderAttestationApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/organization/tenant-governance.ts#requestTenantProviderAttestationApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1345,6 +1702,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/plugin/plugin-managed-install.ts#openPluginApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/plugin/plugin-managed-install.ts#refreshManagedPluginActivation",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1356,6 +1718,11 @@
     },
     {
       "site": "libs/core/plugin/plugin-view-actions.ts#dispatchPluginViewAction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/plugin/plugin-view-actions.ts#dispatchPluginViewAction (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1375,12 +1742,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/plugin/plugin-view-actions.ts#prunePluginViewActionRequests",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
       "site": "libs/core/project/project-trust.ts#createProjectTrustApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/project/project-trust.ts#createProjectTrustApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1420,12 +1797,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
       "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1440,7 +1827,17 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/service/service-recording-review-approval.ts#requestServiceRecordingReview (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/service/service-recording-review-approval.ts#requestServiceRecordingReview (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1486,6 +1883,11 @@
     },
     {
       "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -1572,12 +1974,32 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalRejectionReason (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalRejectionReason (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalRejectionReason (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-approval-ui.ts#createSurfaceApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/surface-approval-ui.ts#createSurfaceApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1592,12 +2014,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
     {
       "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1773,6 +2205,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/surface/surface-mission-steering.ts#buildSteeringApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/surface/surface-mission-steering.ts#executeApprovedMissionSteeringApproval",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1863,6 +2307,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/workforce/work-coordination.ts#appendJsonl",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -1903,6 +2352,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/shared-network/src/mcp-server-engine.ts#ensureMcpApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/agent/route.ts#clearChronosMissionProposalState (via presence/displays/chronos-mirror-v2/src/app/api/agent/agent-route-helpers.ts#withMissionRole)",
       "roles": ["chronos_gateway"],
       "unresolved": []
@@ -1934,6 +2388,11 @@
     },
     {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["chronos_localadmin"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["chronos_localadmin"],
       "unresolved": []
     },
@@ -2037,12 +2496,22 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
       "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2198,6 +2667,11 @@
     },
     {
       "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2462,6 +2936,11 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/presence-studio/avatar-routes.ts#readPersonal",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -2599,6 +3078,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/agent_worktree.ts#asOwner",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2624,6 +3108,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/approval_inbox.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/approval_inbox.ts#collectDecisionDigest",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -2635,6 +3124,11 @@
     },
     {
       "site": "scripts/audit_mirror_reconcile.ts#openAuditMirrorApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/audit_mirror_reconcile.ts#openAuditMirrorApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2655,6 +3149,11 @@
     },
     {
       "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2834,7 +3333,17 @@
       "unresolved": []
     },
     {
+      "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/config_mission.ts#cmdRequestApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/config_mission.ts#cmdRequestApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2897,17 +3406,22 @@
     },
     {
       "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests",
-      "roles": ["surface_runtime"],
+      "roles": ["slack_bridge", "surface_runtime"],
       "unresolved": []
     },
     {
       "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
-      "roles": ["surface_runtime"],
+      "roles": ["slack_bridge", "surface_runtime"],
       "unresolved": []
     },
     {
       "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
-      "roles": ["surface_runtime"],
+      "roles": ["slack_bridge", "surface_runtime"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["slack_bridge", "surface_runtime"],
       "unresolved": []
     },
     {
@@ -2922,6 +3436,11 @@
     },
     {
       "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -2968,6 +3487,11 @@
     },
     {
       "site": "scripts/entity_governance_cleanup.ts#openCleanupApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/entity_governance_cleanup.ts#openCleanupApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3052,6 +3576,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -3062,7 +3591,17 @@
       "unresolved": []
     },
     {
+      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/lib/video-production-evidence.ts#requestVideoProductionApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/lib/video-production-evidence.ts#requestVideoProductionApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3112,6 +3651,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/mission-alignment-gate/alignment-approval.ts#openAlignmentApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel", "surface_runtime"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/mission_admission_confirmation.ts#applyApprovedMissionAdmissionConfirmation",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -3127,12 +3671,22 @@
       "unresolved": []
     },
     {
+      "site": "scripts/mission_admission_confirmation.ts#applyApprovedMissionAdmissionConfirmation (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/mission_admission_confirmation.ts#openConfirmationUnlocked",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
       "site": "scripts/mission_admission_confirmation.ts#openConfirmationUnlocked (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#openConfirmationUnlocked (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -3148,6 +3702,11 @@
     },
     {
       "site": "scripts/mission_admission_confirmation.ts#recordConfirmationFailure (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_confirmation.ts#recordConfirmationFailure (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -3168,6 +3727,11 @@
     },
     {
       "site": "scripts/mission_admission_continuation.ts#continueHumanMissionAdmission (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/mission_admission_continuation.ts#continueHumanMissionAdmission (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -3327,7 +3891,17 @@
       "unresolved": []
     },
     {
+      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/organization_decision_approval.ts#requestDecisionApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/organization_decision_approval.ts#requestDecisionApproval (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3378,6 +3952,11 @@
     },
     {
       "site": "scripts/personal-workbench/actions.ts#proposeCalendarEvent (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/personal-workbench/actions.ts#proposeCalendarEvent (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3474,6 +4053,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/security-ledger.ts#main (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/service_recording.ts#candidate",
       "roles": ["surface_runtime"],
       "unresolved": []
@@ -3565,8 +4149,20 @@
     "libs/core/environment-capability.ts#runProbe": [
       "dynamic import with a computed specifier at libs/core/environment-capability.ts#runProbe"
     ],
+    "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)": [
+      "role argument `undefined` could not be resolved at libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals"
+    ],
+    "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)": [
+      "role argument `undefined` could not be resolved at libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals"
+    ],
     "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)": [
+      "role argument `undefined` could not be resolved at libs/core/knowledge/learning-signal-sources.ts#<module>"
+    ],
+    "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#readApprovalJsonlAt)": [
+      "role argument `undefined` could not be resolved at libs/core/knowledge/learning-signal-sources.ts#<module>"
     ],
     "libs/core/media/native-speech-listen-bridge.ts#listenNativeSpeech": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
@@ -4351,6 +4947,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -4975,7 +5573,11 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#readApprovalJsonlAt)",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend.embedBatch",
@@ -5674,6 +6276,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -6281,6 +6885,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -7208,6 +7814,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -7741,6 +8349,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -8468,7 +9078,11 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#readApprovalJsonlAt)",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend.embedBatch",
@@ -9263,6 +9877,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -9890,7 +10506,11 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#readApprovalJsonlAt)",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
         "libs/core/mlx-embedding-backend.ts#MlxEmbeddingBackend.embedBatch",
@@ -10344,7 +10964,11 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
+        "libs/core/knowledge/learning-signal-sources.ts#<module> (via libs/core/governance/approval-store-location.ts#readApprovalJsonlAt)",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mic-capture.ts#probeMicCapture",
         "libs/core/mic-capture.ts#startMicCapture",
@@ -10879,6 +11503,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -11410,6 +12036,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -11916,6 +12544,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -12457,6 +13087,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/mesh/acp-mediator.ts#<module>",
         "libs/core/mission/mission-gate-engine.ts#evaluateGateCheck",
@@ -12961,6 +13593,8 @@
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
         "libs/core/environment-capability.ts#runCommandProbe",
         "libs/core/environment-capability.ts#runProbe",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#approvalFileExistsAt)",
+        "libs/core/governance/approval-store-hygiene.ts#purgeFixtureApprovals (via libs/core/governance/approval-store-location.ts#assertCallerChannelAccess)",
         "libs/core/governance/audit-forwarder.ts#ShellAuditForwarder.publish",
         "libs/core/media/native-speech-listen-bridge.ts#listenNativeSpeech",
         "libs/core/mesh/acp-mediator.ts#<module>",

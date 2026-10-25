@@ -173,9 +173,10 @@ export function tenantOf(opts: Record<string, string>): string {
 }
 
 /**
- * The scope of an approval request the facade opens. The approval store is
- * shared (not tenant-partitioned), so requests carry ids only and name the
- * tenant's confidential scope explicitly.
+ * The scope of an approval request the facade opens: the tenant's
+ * confidential scope, so the request is stored in that tenant's approval
+ * partition (approval-store-location.ts). Titles and summaries still carry ids
+ * only, since worker events, notifications and the audit chain stay shared.
  */
 export function tenantApprovalScope(tenant: string): {
   scope_kind: 'tenant';
