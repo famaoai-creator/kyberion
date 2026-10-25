@@ -147,9 +147,51 @@ describe('ConfidentialTaskDecisionValues (CD-09)', () => {
       parseErrors: [`bad ${SENTINEL}`],
       surfaceParseErrors: [],
     };
+    const original = response.taskResult;
     scrubTaskResponseValues(values, response);
-    const { customer_decisions, ...rest } = response.taskResult;
+    // The caller keeps the original for its in-memory checks.
+    expect(original.summary).toBe(`done ${SENTINEL}`);
+    const scrubbed = response.taskResult;
+    const { customer_decisions, artifacts, knowledge_feedback, ...rest } = scrubbed;
     expect(JSON.stringify([rest, response.notes, response.parseErrors])).not.toContain(SENTINEL);
+    expect(knowledge_feedback.missing_topics).toEqual(['[customer decision D-0002]']);
+    // Not free text: proposals, artifact paths, reported knowledge paths, enum fields.
     expect(customer_decisions[0].proposed_value).toBe(SENTINEL);
+    expect(artifacts[0].path).toBe(`out/${SENTINEL}.md`);
+    expect(knowledge_feedback.used).toEqual([SENTINEL]);
+    expect(scrubbed.review_findings[0].severity).toBe('nit');
+    expect(scrubbed.acceptance_evidence[0].status).toBe('passed');
+  });
+
+  it('is idempotent: markers are kept, even when a value matches inside one', () => {
+    // "decision" and "D-0001" both occur inside the marker the first pass writes.
+    const values = shortValues('decision', 'D-0001', 'ok');
+    const once = values.scrub('the decision was ok, see D-0001');
+    expect(once).toBe(
+      'the [customer decision D-0001] was [customer decision D-0003], see [customer decision D-0002]'
+    );
+    expect(values.scrub(once)).toBe(once);
+    // Best-of-N style double pass over a whole result changes nothing either.
+    const result = { summary: once, gaps: [once] };
+    expect(values.scrubValue(values.scrubValue(result))).toEqual(values.scrubValue(result));
+  });
+
+  it('never touches other characters (private-use included), however many matches', () => {
+    const values = shortValues('yes');
+    const privateUse = '\uE000\uE100\uE001 \uF8FF';
+    expect(values.scrub(`${privateUse} yes ${privateUse}`)).toBe(
+      `${privateUse} [customer decision D-0001] ${privateUse}`
+    );
+    const many = Array.from({ length: 7000 }, () => 'yes').join(' ');
+    const scrubbed = values.scrub(many);
+    expect(scrubbed.split('[customer decision D-0001]')).toHaveLength(7001);
+    expect(scrubbed).not.toMatch(/\byes\b/u);
+  });
+
+  it('matches short Latin forms case-insensitively, still as whole words', () => {
+    const values = shortValues('yes', 'ok');
+    expect(values.scrub('YES, Ok — yesterday, okay')).toBe(
+      '[customer decision D-0001], [customer decision D-0002] — yesterday, okay'
+    );
   });
 });

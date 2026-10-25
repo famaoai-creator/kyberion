@@ -202,7 +202,13 @@ describe('mission decision lock (CD-09)', () => {
           throw new Error('[DEAL_SCOPE] unreadable');
         },
       };
-      expect(pinTaskDecisions(task, broken)).toBeNull();
+      // A failed lookup is not "no case": the worker decides whether to block.
+      expect(pinTaskDecisions(task, broken)).toEqual({
+        consumer: 'mission-MSN-CD09-LOCK.impl',
+        pinned_count: 0,
+        pinned: false,
+        failed: { case_found: false },
+      });
       expect(reconcileTaskDecisions(task, broken)).toMatchObject({ checked: 0, stale_count: 0 });
       expect(warn).toHaveBeenCalledWith(expect.stringContaining('DEAL_SCOPE'));
       expect(reworkItems()).toEqual([]);
@@ -909,6 +915,69 @@ describe('mission decision lock (CD-09)', () => {
           ).toHaveLength(1);
         });
 
+        const sweepNow = () =>
+          sweepDecisionConsumers(
+            { tenantSlug: TENANT, caseId: 'case-a', location: { dir } },
+            { now: LATER }
+          );
+        const closeAgenda = (status: 'closed' | 'withdrawn' = 'closed') =>
+          writeAgenda({ dir }, { ...readAgenda({ dir }, 'agd-test0001')!, status });
+
+        it('released, then changed by the customer, then closed unconfirmed: the last confirmed answer is delivered', () => {
+          confirmRelease();
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.decision_values?.count).toBe(
+            1
+          );
+          // The customer changes the answer (D-0003, provisional); the operator
+          // closes the agenda without confirming it.
+          decide('RELEASE', 'release.go', { approved: false }, LATER, 'D-0001');
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.held?.reason).toBe(
+            'decision_not_in_force'
+          );
+          closeAgenda();
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(resumed).not.toHaveProperty('held');
+          expect(resumed?.decision_values?.decisionIds).toEqual(['D-0001']);
+          expect(resumed!.decision_values!.promptLines().join('\n')).toContain(SENTINEL);
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(false);
+        });
+
+        it('closed with no confirmed answer: held as unresolvable at every boundary, never released', () => {
+          writeAgenda({ dir }, releaseAgenda(false));
+          holdOn();
+          decide('RELEASE', 'release.go', { approved: true, note: SENTINEL });
+          closeAgenda('withdrawn');
+          const resumed = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(resumed?.held).toMatchObject({ reason: 'customer_decision_unresolvable' });
+          expect(resumed).not.toHaveProperty('decision_values');
+          // The sweep never releases it (no hold / release loop), record-evidence keeps it held.
+          expect(sweepNow()).not.toHaveProperty('released_holds');
+          expect(lockNow().hold?.resolved_at).toBeUndefined();
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+          expect(pinTaskDecisions(task, { decisionCase, now: LATER })?.held?.reason).toBe(
+            'customer_decision_unresolvable'
+          );
+        });
+
+        it('a completed task is not re-held when the customer changes the answer later', () => {
+          confirmRelease();
+          pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(reconcileTaskDecisions(task, { decisionCase, now: LATER })).not.toHaveProperty(
+            'held_proposal_ids'
+          );
+          expect(lockNow().status).toBe('completed');
+          decide('RELEASE', 'release.go', { approved: false }, LATER, 'D-0001');
+          expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(false);
+          const rerun = pinTaskDecisions(task, { decisionCase, now: LATER });
+          expect(rerun).not.toHaveProperty('held');
+          // The re-pin keeps the completion, so the next boundaries agree.
+          expect(lockNow()).toMatchObject({ status: 'in_progress', completed_at: LATER });
+          expect(
+            recordTaskDecisionProposals({ ...task, requests: [] }, { decisionCase, now: LATER })
+              .hold_proposal_ids
+          ).toEqual([]);
+        });
+
         it('a process bound to another tenant gets nothing', () => {
           confirmRelease();
           vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
@@ -918,7 +987,8 @@ describe('mission decision lock (CD-09)', () => {
             undefined,
             'other-corp'
           );
-          expect(other).toBeNull();
+          expect(other).not.toHaveProperty('decision_values');
+          expect(other?.failed).toEqual({ case_found: true, case_id: 'case-a' });
         });
 
         it('audits delivery with ids only', () => {
