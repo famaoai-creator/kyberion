@@ -252,6 +252,10 @@ describe('Mission team composition contract', () => {
       loadJson('knowledge/product/schemas/security-scope.schema.json'),
       'security-scope.schema.json'
     );
+    ajv.addSchema(
+      loadJson('knowledge/product/schemas/mission-team-role-selection.schema.json'),
+      'mission-team-role-selection.schema.json'
+    );
     const validate = ajv.compile(
       loadJson('knowledge/product/schemas/mission-team-plan.schema.json')
     );
