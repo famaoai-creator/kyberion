@@ -45,6 +45,31 @@ const TENANT = 'cd-room-it';
 const NOW = '2026-10-24T00:00:00.000Z';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 5, 4, 3, 2, 1]);
 
+/**
+ * CD-10: invites exist only for a registered active tenant. The facade child
+ * reads the profile from the checkout (`knowledge/personal/tenants/<t>.json`);
+ * `null` removes it.
+ */
+function setTenantProfile(tenant: string, status: string | null): void {
+  const file = pathResolver.rootResolve(`knowledge/personal/tenants/${tenant}.json`);
+  withExecutionContext(
+    'ecosystem_architect',
+    () =>
+      status === null
+        ? safeRmSync(file, { force: true })
+        : safeWriteFile(
+            file,
+            JSON.stringify({
+              tenant_slug: tenant,
+              display_name: tenant,
+              status,
+              assigned_role: 'owner',
+            })
+          ),
+    'ecosystem_architect'
+  );
+}
+
 describe.skipIf(!BUILT)('customer-room against the built facade', () => {
   let dir: string;
   let server: Server;
@@ -61,6 +86,7 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
     });
 
   beforeAll(async () => {
+    setTenantProfile(TENANT, 'active');
     dir = pathResolver.sharedTmp(`customer-room-it-${randomUUID()}`);
     safeMkdir(dir, { recursive: true });
     const agenda: DecisionAgenda = {
@@ -178,6 +204,7 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
       ),
       { recursive: true, force: true }
     );
+    setTenantProfile(TENANT, null);
   });
 
   it('shows the agenda behind a valid link without internal ids or hashes of the invite', async () => {
@@ -283,6 +310,24 @@ describe.skipIf(!BUILT)('customer-room against the built facade', () => {
     expect(wrongType.status).toBe(422);
   }, 30_000);
 
+  it('answers unavailable while the tenant is not registered and active, and works again after', async () => {
+    setTenantProfile(TENANT, 'suspended');
+    try {
+      for (const route of ['/api/view', '/api/respond']) {
+        const response = await post(route, {
+          content_hash: hash,
+          answers: [{ entry_id: 'auth.method', choice: 'keep' }],
+        });
+        expect(response.status).toBe(503);
+        // Same body as any store failure: nothing about the registration state.
+        expect(await response.json()).toEqual({ ok: false, reason: 'unavailable' });
+      }
+    } finally {
+      setTenantProfile(TENANT, 'active');
+    }
+    expect((await post('/api/view', {})).status).toBe(200);
+  }, 30_000);
+
   it('answers a stale page with stale_version and a wrong link with invalid_link', async () => {
     const stale = await post('/api/respond', {
       content_hash: 'sha256:old',
@@ -317,6 +362,7 @@ describe.skipIf(!BUILT)('customer-room attachments against the built facade', ()
     });
 
   beforeAll(async () => {
+    setTenantProfile(ATENANT, 'active');
     dir = pathResolver.sharedTmp(`customer-room-att-${randomUUID()}`);
     safeMkdir(dir, { recursive: true });
     const asWriter = <T>(fn: () => T): T =>
@@ -418,6 +464,7 @@ describe.skipIf(!BUILT)('customer-room attachments against the built facade', ()
       ),
       { recursive: true, force: true }
     );
+    setTenantProfile(ATENANT, null);
   });
 
   it('lists the image and link on the item and serves exactly the stored bytes', async () => {
@@ -561,6 +608,7 @@ describe.skipIf(!BUILT)(
     });
 
     beforeAll(() => {
+      setTenantProfile(CTENANT, 'active');
       dir = pathResolver.sharedTmp(`customer-room-race-${randomUUID()}`);
       safeMkdir(dir, { recursive: true });
       const agenda: DecisionAgenda = {
@@ -617,6 +665,7 @@ describe.skipIf(!BUILT)(
         ),
         { recursive: true, force: true }
       );
+      setTenantProfile(CTENANT, null);
     });
 
     const ledgerLines = () =>

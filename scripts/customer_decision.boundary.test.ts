@@ -80,7 +80,13 @@ beforeAll(async () => {
   for (const tenant of [TENANT, OTHER])
     io.safeWriteFile(
       path.join(ROOT, 'knowledge/personal/tenants', `${tenant}.json`),
-      JSON.stringify({ tenant_slug: tenant, status: 'active' })
+      // Schema-valid: `send` checks the registry through the tenant registry reader (CD-10).
+      JSON.stringify({
+        tenant_slug: tenant,
+        display_name: tenant,
+        status: 'active',
+        assigned_role: 'owner',
+      })
     );
   io.safeMkdir(dir, { recursive: true });
   for (const key of keys) delete process.env[key];
