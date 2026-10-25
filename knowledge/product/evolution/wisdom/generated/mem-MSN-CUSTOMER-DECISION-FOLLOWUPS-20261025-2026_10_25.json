@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025-2026_10_25",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Tenant-bound facades: enforce the binding in the shared option parser and take identities from the authenticating record",
+  "summary": "Lessons from the customer decision follow-ups: an end-to-end test with a real bound identity found that every facade verb accepted another tenant via --tenant; recorded approvers must come from the approval decision; approval requests in a shared store carry ids only and tenant-prefixed correlation ids; forwarded-address keying trusts one header from declared proxies only.",
+  "candidate_id": "mem-MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025-2026_10_25",
+  "evidence_refs": [
+    "active/missions/public/MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025/evidence/retrospective.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025/evidence/implementation-report.md"
+  ],
+  "created_at": "2026-10-25T04:59:07.293Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "Applies to governed CLI facades and surfaces that act for a tenant.\n\n1. When a facade assumes its own ledger roles for the tenant named by an option, check that option against the bound tenant in the one shared parser every verb uses (and fail closed on a set-but-invalid binding) - per-verb checks drift and miss verbs.\n2. Prove isolation with a test that spawns the built CLI with a real bound identity and a human approval; facade-function unit tests cannot see the binding.\n3. Record who confirmed or approved from the authenticating record (the approval decision decidedBy/decidedByType); keep a caller-supplied --by only as requested_by, and refuse when the approval names no decider.\n4. Approval requests in a shared store carry ids only, a tenant scope, and the tenant in the correlation id and payload hash, so identical ids in two tenants never match.\n5. Behind a proxy, key limits on X-Forwarded-For walked from the right, only when the direct peer is a declared trusted proxy; read one header only, never both XFF and Forwarded.\n6. Superseded approval requests (surface or content changed) are cancelled through the approval API with a recorded reason; a once-per-day message rule must hold in both approval orders."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025/evidence/retrospective.md",
+    "active/missions/public/MSN-CUSTOMER-DECISION-FOLLOWUPS-20261025/evidence/implementation-report.md"
+  ],
+  "source_branch": "fix/customer-decision-followups-20261025",
+  "source_commit": "c29f3ff8be7ac6f2e6ccba7a9723ae3cb2babc9e"
+}
