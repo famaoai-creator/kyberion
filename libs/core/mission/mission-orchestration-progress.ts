@@ -42,6 +42,7 @@ export interface MissionProgressController {
     reviewedCount: number;
     completedCount: number;
     requestedCount: number;
+    supersededCount: number;
   };
 }
 
@@ -53,6 +54,8 @@ const PLANNED_NEXT_TASK_STATUS_PRIORITY: Record<string, number> = {
   reviewed: 4,
   accepted: 5,
   completed: 6,
+  // supersede-task (human-approved) is final: no worker write reverts it.
+  superseded: 7,
 };
 
 const TASK_EVENT_STATUS_MAP: Partial<
@@ -442,6 +445,7 @@ export function createMissionProgressController(
     const reviewedCount = tasks.filter((task) => task.status === 'reviewed').length;
     const completedCount = tasks.filter((task) => task.status === 'completed').length;
     const requestedCount = tasks.filter((task) => task.status === 'requested').length;
+    const supersededCount = tasks.filter((task) => task.status === 'superseded').length;
 
     reconcileTaskOutcomeEvents(missionId);
 
@@ -476,6 +480,15 @@ export function createMissionProgressController(
         .replace('- [ ] Step 2: Implementation', '- [~] Step 2: Implementation');
     }
 
+    // Superseded tasks are closed without running: say how many, apart from
+    // the completed ones (one line, replaced in place).
+    const supersededLine = `Superseded tasks: ${supersededCount}`;
+    if (/^Superseded tasks: \d+$/mu.test(updatedTaskBoard)) {
+      updatedTaskBoard = updatedTaskBoard.replace(/^Superseded tasks: \d+$/mu, supersededLine);
+    } else if (supersededCount > 0) {
+      updatedTaskBoard = updatedTaskBoard.replace(/(## Status: .+)/u, `$1\n${supersededLine}`);
+    }
+
     if (gateSection) {
       if (/### Gate Status[\s\S]*$/u.test(updatedTaskBoard)) {
         updatedTaskBoard = updatedTaskBoard.replace(/(?:\n### Gate Status[\s\S]*)$/u, gateSection);
@@ -500,6 +513,7 @@ export function createMissionProgressController(
         reviewed_count: reviewedCount,
         completed_count: completedCount,
         requested_count: requestedCount,
+        ...(supersededCount > 0 ? { superseded_count: supersededCount } : {}),
       });
     }
   }
@@ -528,6 +542,7 @@ export function createMissionProgressController(
       reviewedCount: tasks.filter((task) => task.status === 'reviewed').length,
       completedCount: tasks.filter((task) => task.status === 'completed').length,
       requestedCount: tasks.filter((task) => task.status === 'requested').length,
+      supersededCount: tasks.filter((task) => task.status === 'superseded').length,
     };
   }
 

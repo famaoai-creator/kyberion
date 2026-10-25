@@ -26,6 +26,8 @@ export interface MissionProgressSnapshot {
   nextTasksTotal: number;
   nextTasksPending: number;
   nextTasksCompleted: number;
+  /** Tasks replaced by `supersede-task`: closed, neither pending nor completed. */
+  nextTasksSuperseded?: number;
   dependencies: string[];
   generatedAssets: MissionAssetSummary[];
 }
@@ -34,7 +36,7 @@ export function parseTaskBoard(
   taskBoard: string
 ): Omit<
   MissionProgressSnapshot,
-  'missionId' | 'nextTasksTotal' | 'nextTasksPending' | 'nextTasksCompleted'
+  'missionId' | 'nextTasksTotal' | 'nextTasksPending' | 'nextTasksCompleted' | 'nextTasksSuperseded'
 > {
   const statusMatch = taskBoard.match(/^## Status:\s+(.+)$/m);
   const stepLines = taskBoard.match(/^- \[(?: |x|~)\] Step .+$/gm) || [];
@@ -65,14 +67,21 @@ export function parseTaskBoard(
 
 export function summarizeNextTasks(
   tasks: NextTaskRecord[]
-): Pick<MissionProgressSnapshot, 'nextTasksTotal' | 'nextTasksPending' | 'nextTasksCompleted'> {
+): Pick<
+  MissionProgressSnapshot,
+  'nextTasksTotal' | 'nextTasksPending' | 'nextTasksCompleted' | 'nextTasksSuperseded'
+> {
   let nextTasksPending = 0;
   let nextTasksCompleted = 0;
+  let nextTasksSuperseded = 0;
 
   for (const task of tasks) {
     const status = task.status || 'planned';
     if (status === 'completed' || status === 'done' || status === 'accepted') {
       nextTasksCompleted += 1;
+    } else if (status === 'superseded') {
+      // Closed by supersede-task: not waiting for anything.
+      nextTasksSuperseded += 1;
     } else {
       nextTasksPending += 1;
     }
@@ -82,6 +91,7 @@ export function summarizeNextTasks(
     nextTasksTotal: tasks.length,
     nextTasksPending,
     nextTasksCompleted,
+    nextTasksSuperseded,
   };
 }
 

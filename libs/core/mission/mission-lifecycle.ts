@@ -60,6 +60,8 @@ import {
   collectMissionEvidence,
   extractPromotableMissionMemory,
   isTaskDeliverableSatisfied,
+  isTaskSuperseded,
+  MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
   publishMeetingDeliverablesIfNeeded,
   readMissionNextTasks,
@@ -75,6 +77,8 @@ export {
   collectMissionEvidence,
   readMissionNextTasks,
   writeMissionNextTasks,
+  isTaskSuperseded,
+  MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
   tryAutoCompleteTaskFromEvidence,
 };
@@ -169,7 +173,9 @@ export function evaluateMissionFinishExitGate(
   pendingTasks: string[];
 } {
   const nextTasks = readMissionNextTasks(missionDir);
-  const completedStatuses = MISSION_TASK_COMPLETED_STATUSES;
+  // A superseded task (supersede-task, human-approved) is closed; its
+  // replacement still has to complete.
+  const closedStatuses = MISSION_TASK_CLOSED_STATUSES;
   const statusByTaskId = new Map(
     nextTasks.map((task) => [
       String(task.task_id || ''),
@@ -180,6 +186,7 @@ export function evaluateMissionFinishExitGate(
   for (const task of nextTasks) {
     const taskId = String(task.task_id || '');
     if (!taskId.startsWith('repair-') && !taskId.startsWith('goal-gap-')) continue;
+    if (isTaskSuperseded(task)) continue;
     const staleCircularGoalRepair =
       taskId === 'repair-goal-satisfaction' &&
       Boolean(state) &&
@@ -197,7 +204,7 @@ export function evaluateMissionFinishExitGate(
   const pendingTasks = nextTasks
     .filter((task) => {
       const status = String(task.status || 'planned').toLowerCase();
-      return !completedStatuses.has(status);
+      return !closedStatuses.has(status);
     })
     .map((task) => String(task.task_id || task.description || 'unknown-task'));
 

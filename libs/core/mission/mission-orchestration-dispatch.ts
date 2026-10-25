@@ -577,7 +577,11 @@ export async function dispatchMissionNextTasksCore(
       edges: derivedFrontier.graph.edges,
     };
     const terminalSuccessIds = allTasks
-      .filter((task) => ['completed', 'accepted', 'reviewed'].includes(String(task.status || '')))
+      // A superseded task (supersede-task) is closed and never dispatched; its
+      // dependents were rewritten onto the replacement.
+      .filter((task) =>
+        ['completed', 'accepted', 'reviewed', 'superseded'].includes(String(task.status || ''))
+      )
       .map((task) => task.task_id)
       .concat([...dispatchedTaskIds]);
     const terminalBlockedIds = allTasks

@@ -396,7 +396,31 @@ export interface TaskDecisionProposal {
   collected_at?: string;
   /** `requires_customer`: the confirmed customer decision that released the hold. */
   resolved?: { decision_id: string; at: string };
+  /**
+   * Earlier agenda links of a re-asked proposal (`customer-decision draft
+   * --from-tasks --reask`), oldest first, append-only, at most
+   * {@link TASK_PROPOSAL_MAX_PREVIOUS_LINKS}: the link it had when its agenda
+   * was closed, withdrawn or gone with no confirmed answer, and who re-asked
+   * it when. The proposal's current link is the lock entry's own
+   * `agenda_id` / `entry_id`.
+   */
+  previous_links?: TaskProposalPreviousLink[];
 }
+
+/** One earlier agenda link of a re-asked task proposal (see {@link TaskDecisionProposal.previous_links}). */
+export interface TaskProposalPreviousLink {
+  agenda_id: string;
+  entry_id: string;
+  collected_at: string;
+  /** The release stamp the old link carried (its decision is superseded or gone). */
+  resolved?: { decision_id: string; at: string };
+  relinked_at: string;
+  /** The member who re-asked it (`user:<member>`). */
+  relinked_by: string;
+}
+
+/** How many times one task proposal may be re-asked. */
+export const TASK_PROPOSAL_MAX_PREVIOUS_LINKS = 10;
 
 /** What a task consumed at its start (same shape idea as the SSOD `DecisionLock`). */
 export interface ConsumedDecisionLock {

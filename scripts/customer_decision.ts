@@ -12,6 +12,9 @@
  *   draft    --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>]
  *   draft    --agenda <id> --file <agenda.json>        replace title/from/entries (an approved/sent agenda becomes a new revision)
  *   draft    --from-tasks [--agenda <draft id>] [--customer <slug>]   collect mission tasks' customer-judgment proposals (CD-09) into a draft agenda
+ *   draft    --from-tasks --reask <tp-id,...> --by user:<member> [--agenda <draft id>] [--customer <slug>]
+ *            ask again a requires_customer question whose agenda was closed / withdrawn / lost with no
+ *            confirmed answer (unresolvable); the lock keeps the old link in previous_links
  *   generate --agenda <id> --intent-file <path> [--grounding-file <path>]
  *   submit   --agenda <id> --by user:<member> [--role owner|approver]
  *   actor-add --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>] [--channel <surface>:<channel_id>]
@@ -27,8 +30,12 @@
  *   remind   [--case <id>] [--dry-run] [--now <iso>]   send the reminders due today (CD-11): respond-by D-1 / D0,
  *            override-closing D-2; through the decider's bound channel (sendToCustomer, fixed template),
  *            else an operator inbox task; --dry-run writes nothing
- *   reminders --install --by user:<member> [--force]    install the daily tenant reminder pipeline (pipeline:promote);
- *            --by is the asset ledger's ingested_by (no identity env needed)
+ *   reminders --install --by user:<member> [--force]    install the tenant reminder pipeline (pipeline:promote;
+ *            hourly 09:30–18:30 Asia/Tokyo, each reminder sent once per day; an installed tenant re-installs
+ *            with --force); --by is the asset ledger's ingested_by (no identity env needed)
+ *   task-decisions --mission <MSN> --task <id>   (no --case; read-only) the confirmed customer decisions of a task's own
+ *            requires_customer questions, for direct CLI work on that task; stdout only, audited ids only;
+ *            refused unless bound to the tenant (KYBERION_TENANT) and the tenant is registered and active
  *   overview [--case <id>] [--now <iso>] [--summary]   read-only tenant overview (CD-12; JSON contract
  *            `CustomerDecisionOverview`, libs/core/customer-decision/overview.ts): status counts,
  *            deadlines, change requests, hand-offs, reminders and held tasks per agenda; never
@@ -61,7 +68,8 @@
  * audit, agenda helpers), `operator.ts` (draft … send), `operator-lifecycle.ts`
  * (status, confirm, close / withdraw, revoke), `reconcile.ts` (respond
  * completion and recovery), `customer-facing.ts` (view / respond / attachment),
- * `task-proposals.ts` (draft --from-tasks, the task part of status),
+ * `task-proposals.ts` (draft --from-tasks [--reask], the task part of status),
+ * `task-decisions.ts` (task-decisions),
  * `bolt-review.ts` (CD-10 bolt-review draft and answer routing), `reminders.ts`
  * (CD-11), `overview.ts` / `learning.ts` (CD-12 overview and learning). This file
  * is the entry point; the room spawns `dist/scripts/customer_decision.js`.
@@ -104,6 +112,7 @@ import {
 } from './customer-decision/operator-lifecycle.js';
 import { runCustomerFacing } from './customer-decision/customer-facing.js';
 import { runCollectTaskProposals } from './customer-decision/task-proposals.js';
+import { runTaskDecisions } from './customer-decision/task-decisions.js';
 import { runBoltReview } from './customer-decision/bolt-review.js';
 import { runRemind, runRemindersInstall } from './customer-decision/reminders.js';
 import { runOverview } from './customer-decision/overview.js';
@@ -151,6 +160,8 @@ export async function runCustomerDecision(
       return runOverview(opts, flags, now);
     case 'learning':
       return flags.has('install') ? runLearningInstall(opts, flags) : runLearning(opts, flags, now);
+    case 'task-decisions':
+      return runTaskDecisions(opts, io, now);
     case 'confirm':
       return runConfirm(opts, now);
     case 'close':

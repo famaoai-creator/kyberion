@@ -426,6 +426,25 @@ export const MISSION_TASK_COMPLETED_STATUSES = new Set([
 ]);
 
 /**
+ * A task `mission_controller supersede-task` replaced with another task
+ * (human-approved). It never ran to success, so it never satisfies a
+ * dependency (its dependents were rewritten to the replacement) — but it no
+ * longer keeps the mission open either.
+ */
+export const MISSION_TASK_SUPERSEDED_STATUS = 'superseded';
+
+/** Statuses that close a task for the finish gate: completed ∪ superseded. */
+export const MISSION_TASK_CLOSED_STATUSES: ReadonlySet<string> = new Set([
+  ...MISSION_TASK_COMPLETED_STATUSES,
+  MISSION_TASK_SUPERSEDED_STATUS,
+]);
+
+/** Was the task replaced by `supersede-task` (status, case-insensitive)? */
+export function isTaskSuperseded(task: { status?: unknown } | null | undefined): boolean {
+  return String(task?.status || '').toLowerCase() === MISSION_TASK_SUPERSEDED_STATUS;
+}
+
+/**
  * A review-kind task — identified the same way `mission-process-task-expansion.ts`
  * and `mission-governance.ts`'s artifact-review gate independently do, ORed
  * together since neither alone is authoritative across every task origin
@@ -608,6 +627,9 @@ export function tryAutoCompleteTaskFromEvidence(
   if (MISSION_TASK_COMPLETED_STATUSES.has(currentStatus)) {
     return { completed: false, reason: 'already completed', cascaded: [] };
   }
+  if (currentStatus === MISSION_TASK_SUPERSEDED_STATUS) {
+    return { completed: false, reason: 'superseded by another task', cascaded: [] };
+  }
   if (!isTaskDeliverableSatisfied(missionDir, task, statusByTaskId)) {
     return {
       completed: false,
@@ -637,7 +659,8 @@ export function tryAutoCompleteTaskFromEvidence(
       if (
         !candidateId ||
         candidateId === taskId ||
-        MISSION_TASK_COMPLETED_STATUSES.has(candidateStatus)
+        // A superseded task is closed, never completed by a cascade.
+        MISSION_TASK_CLOSED_STATUSES.has(candidateStatus)
       )
         continue;
       const refreshedStatuses = new Map(

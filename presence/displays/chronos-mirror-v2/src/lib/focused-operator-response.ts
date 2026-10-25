@@ -98,6 +98,7 @@ function parseMissionProgress(value: unknown): Payload['missionProgress'][number
     !nonNegativeInteger(value.nextTasksTotal) ||
     !nonNegativeInteger(value.nextTasksPending) ||
     !nonNegativeInteger(value.nextTasksCompleted) ||
+    (value.nextTasksSuperseded !== undefined && !nonNegativeInteger(value.nextTasksSuperseded)) ||
     !stringArray(value.dependencies) ||
     !Array.isArray(value.generatedAssets)
   ) {
@@ -117,6 +118,9 @@ function parseMissionProgress(value: unknown): Payload['missionProgress'][number
     nextTasksTotal: value.nextTasksTotal,
     nextTasksPending: value.nextTasksPending,
     nextTasksCompleted: value.nextTasksCompleted,
+    ...(typeof value.nextTasksSuperseded === 'number'
+      ? { nextTasksSuperseded: value.nextTasksSuperseded }
+      : {}),
     dependencies: value.dependencies,
     generatedAssets,
   };

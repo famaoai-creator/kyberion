@@ -1676,9 +1676,68 @@ describe('mission controller router — archive verb (AL-03)', () => {
       archiveMissions: vi.fn(async () => undefined),
       reconcileExistingWork: vi.fn(async () => undefined),
       requestMissionWorkReconciliationApproval: vi.fn(async () => undefined),
+      requestMissionTaskSupersedeApproval: vi.fn(async () => undefined),
+      supersedeMissionTask: vi.fn(async () => undefined),
       showHelp: vi.fn(),
     } as any;
   }
+
+  it('routes supersede-task approval requests, dry runs and applies; flag values stay out of positionals', async () => {
+    const base = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'supersede-task',
+      'MSN-SUPERSEDE',
+      'task-held',
+      '--by',
+      'task-new',
+      '--reason',
+      'agenda withdrawn',
+    ];
+    const positional = extractMissionControllerPositionalArgs([
+      ...base,
+      '--approval-request-id',
+      'approval-9',
+      '--request-approval',
+    ]);
+    expect(positional).toEqual(['supersede-task', 'MSN-SUPERSEDE', 'task-held']);
+
+    const request = makeRoutingContext(
+      [...base, '--request-approval', '--requested-by', 'operator'],
+      'supersede-task'
+    );
+    request.arg2 = 'task-held';
+    await missionControllerRouter.runMissionControllerAction(request);
+    expect(request.requestMissionTaskSupersedeApproval).toHaveBeenCalledWith({
+      missionId: 'MSN-SUPERSEDE',
+      taskId: 'task-held',
+      byTaskId: 'task-new',
+      reason: 'agenda withdrawn',
+      requestedBy: 'operator',
+    });
+    expect(request.supersedeMissionTask).not.toHaveBeenCalled();
+
+    const apply = makeRoutingContext(
+      [...base, '--approval-request-id', 'approval-9'],
+      'supersede-task'
+    );
+    apply.arg2 = 'task-held';
+    await missionControllerRouter.runMissionControllerAction(apply);
+    expect(apply.supersedeMissionTask).toHaveBeenCalledWith({
+      missionId: 'MSN-SUPERSEDE',
+      taskId: 'task-held',
+      byTaskId: 'task-new',
+      reason: 'agenda withdrawn',
+      dryRun: false,
+      approvalRequestId: 'approval-9',
+    });
+
+    const missing = makeRoutingContext(base.slice(0, 5), 'supersede-task');
+    missing.arg2 = 'task-held';
+    await expect(missionControllerRouter.runMissionControllerAction(missing)).rejects.toThrow(
+      /--by <new_task_id> --reason <text>/u
+    );
+  });
 
   it("routes 'archive' to archiveMissions, passing --mission and --execute through", async () => {
     const targeted = makeRoutingContext(
