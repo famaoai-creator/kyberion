@@ -271,6 +271,132 @@ export function tenantStoreLedgerPartitionOf(
   return undefined;
 }
 
+/** Registry key of a tenant-partitioned runtime root (ledger or state registry). */
+export type TenantRuntimePartitionKey =
+  keyof typeof PARTITIONED_RUNTIME_LEDGER_ROOTS | keyof typeof PARTITIONED_RUNTIME_STATE_ROOTS;
+
+export interface TenantRuntimePartitionRoot {
+  key: TenantRuntimePartitionKey;
+  /** Repo-relative root; tenant partitions live at `<root>/<tier>/<tenant>/`. */
+  root: string;
+  family: 'ledger' | 'state';
+  /** Append-only files: an older copy over a longer live file is a silent rollback. */
+  appendOnly: boolean;
+  /** Hash-chained (verifiable with the audit chain key). */
+  hashChained: boolean;
+  /** Dedicated tenant-bound store role that alone may write the partition. */
+  storeRole?: string;
+}
+
+function storeRoleOfRoot(root: string): string | undefined {
+  return Object.values(TENANT_STORE_LEDGER_ROOTS).find((entry) => entry.root === root)?.storeRole;
+}
+
+/**
+ * Every tenant-partitioned runtime root, derived from the two registries —
+ * the ONE enumeration backup, restore and tenant offboarding walk, so a root
+ * registered later is covered by all three without another hand loop.
+ */
+export const TENANT_RUNTIME_PARTITION_ROOTS: readonly TenantRuntimePartitionRoot[] = [
+  ...(
+    Object.entries(PARTITIONED_RUNTIME_LEDGER_ROOTS) as [
+      keyof typeof PARTITIONED_RUNTIME_LEDGER_ROOTS,
+      string,
+    ][]
+  ).map(([key, root]) => ({
+    key,
+    root,
+    family: 'ledger' as const,
+    appendOnly: true,
+    hashChained: key === 'tenant_ledger',
+    ...(storeRoleOfRoot(root) ? { storeRole: storeRoleOfRoot(root) } : {}),
+  })),
+  ...(
+    Object.entries(PARTITIONED_RUNTIME_STATE_ROOTS) as [
+      keyof typeof PARTITIONED_RUNTIME_STATE_ROOTS,
+      string,
+    ][]
+  ).map(([key, root]) => ({
+    key,
+    root,
+    family: 'state' as const,
+    appendOnly: false,
+    hashChained: false,
+    ...(storeRoleOfRoot(root) ? { storeRole: storeRoleOfRoot(root) } : {}),
+  })),
+];
+
+export interface TenantRuntimePartitionPath extends TenantRuntimePartitionRoot {
+  tier: StorageDataTier;
+  tenant: string;
+  /** Repo-relative `<root>/<tier>/<tenant>`. */
+  path: string;
+}
+
+function assertPartitionTenant(tenant: string): string {
+  const slug = tenant.trim().toLowerCase();
+  if (
+    slug !== tenant ||
+    !isValidTenantSlug(slug) ||
+    isReservedScopeName(slug) ||
+    slug === SYSTEM_PARTITION_SEGMENT
+  ) {
+    throw new Error(`[STORAGE_LAYOUT_TENANT_INVALID] '${tenant}'`);
+  }
+  return slug;
+}
+
+/**
+ * The tenant's partitions of every registered runtime root
+ * (`<root>/<tier>/<tenant>` for each storage tier). `exists` (repo-relative
+ * path → boolean) filters to partitions present on disk; this module does no
+ * I/O itself. Throws `[STORAGE_LAYOUT_TENANT_INVALID]` for a non-slug or a
+ * reserved name (`shared`, `system`, tier names are never tenants).
+ */
+export function tenantRuntimePartitionPaths(
+  tenant: string,
+  exists: (repoRelativePath: string) => boolean = () => true
+): TenantRuntimePartitionPath[] {
+  const slug = assertPartitionTenant(tenant);
+  return TENANT_RUNTIME_PARTITION_ROOTS.flatMap((entry) =>
+    STORAGE_DATA_TIERS.map((tier) => ({
+      ...entry,
+      tier,
+      tenant: slug,
+      path: `${entry.root}/${tier}/${slug}`,
+    }))
+  ).filter((partition) => exists(partition.path));
+}
+
+/**
+ * The tenant runtime partition a repo-relative (or absolute, under this root)
+ * path lies in — the `<root>/<tier>/<tenant>` directory itself or anything
+ * below it — or undefined. `system/`, `<tier>/shared` and other reserved or
+ * non-slug segments are never reported as a tenant.
+ */
+export function tenantRuntimePartitionOf(
+  filePath: string
+):
+  | { key: TenantRuntimePartitionKey; root: string; tier: StorageDataTier; tenant: string }
+  | undefined {
+  const relative = toPosixRelative(filePath);
+  for (const { key, root } of TENANT_RUNTIME_PARTITION_ROOTS) {
+    if (!relative.startsWith(root + '/')) continue;
+    const [tier, tenant = ''] = relative.slice(root.length + 1).split('/');
+    if (!STORAGE_DATA_TIERS.includes(tier as StorageDataTier)) return undefined;
+    if (
+      !tenant ||
+      !isValidTenantSlug(tenant) ||
+      isReservedScopeName(tenant) ||
+      tenant === SYSTEM_PARTITION_SEGMENT
+    ) {
+      return undefined;
+    }
+    return { key, root, tier: tier as StorageDataTier, tenant };
+  }
+  return undefined;
+}
+
 /** Knowledge permission path corresponding to a registered runtime state path. */
 export function partitionedRuntimeStateKnowledgePath(filePath: string): string | undefined {
   const relative = toPosixRelative(filePath);

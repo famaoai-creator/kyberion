@@ -20,6 +20,7 @@ export {
   loadApprovalRequest,
   listApprovalRequests,
   isApprovalRequestExpired,
+  normalizeApprovalChannel,
 } from './approval-store-reader.js';
 import { withExecutionContext } from '../authority.js';
 import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';

@@ -19,6 +19,12 @@ import {
   restoreBackup,
   summarizeBackupStatus,
 } from './backup.js';
+import {
+  computeLedgerEntryHash,
+  GENESIS_HASH,
+  getAuditChainKeyId,
+} from '@agent/core/chain-integrity';
+import { TENANT_RUNTIME_PARTITION_ROOTS } from '@agent/core/storage-layout';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('backup-test');
 
@@ -460,6 +466,211 @@ describe('backup cli', () => {
       status: 'fresh',
     });
     expect(status.latestSizeBytes).toBe(6);
+  });
+});
+
+describe('tenant runtime partitions in backup and restore', () => {
+  const TEST_CHAIN_KEY = 'backup-test-chain-key';
+  const LEDGER = 'active/shared/runtime/tenant-ledger/confidential/acme/ledger.jsonl';
+  const restoreOptions = (archive: string, target: string, force = false) => ({
+    command: 'restore' as const,
+    scope: 'tenant' as const,
+    tenant: 'acme',
+    archive,
+    target,
+    force,
+    passphraseEnv: 'KYBERION_BACKUP_PASSPHRASE',
+    retainDaily: 7,
+    retainWeekly: 4,
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
+  });
+
+  /** A tenant archive of `files` (repo-relative → content) with a manifest naming `entries`. */
+  function tenantArchive(
+    name: string,
+    entries: string[],
+    files: Record<string, string>,
+    extra: Record<string, unknown> = {}
+  ): string {
+    const source = `${FIXTURE_DIR}/${name}-source`;
+    const manifestMember = `active/shared/tmp/backup-${name}/manifest.json`;
+    safeWriteFile(
+      `${source}/${manifestMember}`,
+      JSON.stringify({
+        format: 'kyberion-backup-v1',
+        scope: 'tenant',
+        tenant: 'acme',
+        entries,
+        mission_git_repos: [],
+        ...extra,
+      })
+    );
+    for (const [file, content] of Object.entries(files))
+      safeWriteFile(`${source}/${file}`, content);
+    const archive = `${FIXTURE_DIR}/${name}.tar.gz`;
+    const result = safeExecResult(
+      'tar',
+      ['-czf', archive, '-C', source, manifestMember, ...entries],
+      { timeoutMs: 120000 }
+    );
+    expect(result.status).toBe(0);
+    return archive;
+  }
+
+  /** Hash-chained entries in the hybrid ledger's on-disk format (ledger.ts _writeToLedger). */
+  function chainedLedger(key: string, count: number): string {
+    let parent = GENESIS_HASH;
+    const lines: string[] = [];
+    for (let i = 0; i < count; i += 1) {
+      const entry: Record<string, unknown> = {
+        timestamp: `2026-10-26T00:00:0${i}.000Z`,
+        type: `TEST_EVENT_${i}`,
+        scope: { tier: 'confidential', tenant_slug: 'acme' },
+        role: 'Unknown',
+        mission_id: 'None',
+        payload: { i },
+        parent_hash: parent,
+        chain_alg: 'hmac-sha256',
+        chain_key_id: getAuditChainKeyId(key),
+      };
+      entry.hash = computeLedgerEntryHash(entry, { alg: 'hmac-sha256', key });
+      parent = String(entry.hash);
+      lines.push(JSON.stringify(entry));
+    }
+    return lines.join('\n') + '\n';
+  }
+
+  it('plans every registered partition root for the tenant, never another tenant or system', () => {
+    const existing = new Set<string>();
+    for (const { root } of TENANT_RUNTIME_PARTITION_ROOTS) {
+      for (const partition of [
+        'personal/acme',
+        'confidential/acme',
+        'confidential/other',
+        'system',
+      ])
+        existing.add(`${root}/${partition}`);
+    }
+    const plan = resolveBackupPlan({
+      scope: 'tenant',
+      tenant: 'acme',
+      rootDir: '/repo',
+      pathExists: (repoPath) => existing.has(repoPath),
+      tenantResolver: () => undefined,
+    });
+    for (const { root } of TENANT_RUNTIME_PARTITION_ROOTS) {
+      expect(plan.entries).toContain(`${root}/personal/acme`);
+      expect(plan.entries).toContain(`${root}/confidential/acme`);
+    }
+    expect(plan.entries.filter((entry) => /\/(other|system)(\/|$)/u.test(entry))).toEqual([]);
+    expect(plan.tenantRuntimePartitions).toHaveLength(TENANT_RUNTIME_PARTITION_ROOTS.length * 2);
+  });
+
+  it("accepts the tenant's own partitions and rejects another tenant's in a tenant archive", () => {
+    const own = tenantArchive('own', ['active/shared/runtime/usage-ledger/confidential/acme'], {
+      'active/shared/runtime/usage-ledger/confidential/acme/resource-usage.jsonl': '{"a":1}\n',
+    });
+    const restored = restoreBackup(restoreOptions(own, `${FIXTURE_DIR}/own-target`));
+    expect(restored.ledger_verification).toBe('not_applicable');
+    expect(
+      safeExistsSync(
+        `${FIXTURE_DIR}/own-target/active/shared/runtime/usage-ledger/confidential/acme/resource-usage.jsonl`
+      )
+    ).toBe(true);
+
+    const other = tenantArchive(
+      'other',
+      ['active/shared/runtime/usage-ledger/confidential/other'],
+      {
+        'active/shared/runtime/usage-ledger/confidential/other/resource-usage.jsonl': '{"b":1}\n',
+      }
+    );
+    expect(() => restoreBackup(restoreOptions(other, `${FIXTURE_DIR}/other-target`))).toThrow(
+      'tenant export allowlist'
+    );
+    expect(safeExistsSync(`${FIXTURE_DIR}/other-target`)).toBe(false);
+  });
+
+  it('refuses --force over an existing tenant-ledger file and leaves it byte-identical', () => {
+    const archive = tenantArchive(
+      'conflict',
+      ['active/shared/runtime/tenant-ledger/confidential/acme'],
+      { [LEDGER]: '{"old":true}\n' }
+    );
+    const target = `${FIXTURE_DIR}/conflict-target`;
+    const live = '{"live":1}\n{"live":2}\n';
+    safeWriteFile(`${target}/${LEDGER}`, live);
+    expect(() => restoreBackup(restoreOptions(archive, target, true))).toThrow(
+      'BACKUP_RESTORE_APPEND_ONLY_CONFLICT'
+    );
+    expect(safeReadFile(`${target}/${LEDGER}`, { encoding: 'utf8' })).toBe(live);
+  });
+
+  it('trims a torn last ledger line and verifies the restored chain with the same key', () => {
+    vi.stubEnv('KYBERION_AUDIT_CHAIN_KEY', TEST_CHAIN_KEY);
+    const archive = tenantArchive(
+      'torn',
+      ['active/shared/runtime/tenant-ledger/confidential/acme'],
+      { [LEDGER]: chainedLedger(TEST_CHAIN_KEY, 3) + '{"timestamp":"2026-10-26T00:00:09' },
+      { chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY) }
+    );
+    const target = `${FIXTURE_DIR}/torn-target`;
+    const result = restoreBackup(restoreOptions(archive, target));
+    expect(result.trimmed_tails).toEqual([LEDGER]);
+    expect(result.ledger_verification).toBe('verified');
+    expect(safeReadFile(`${target}/${LEDGER}`, { encoding: 'utf8' })).toBe(
+      chainedLedger(TEST_CHAIN_KEY, 3)
+    );
+  });
+
+  it('defers ledger verification when the archive was chained with another key', () => {
+    vi.stubEnv('KYBERION_AUDIT_CHAIN_KEY', 'some-other-host-key');
+    const archive = tenantArchive(
+      'deferred',
+      ['active/shared/runtime/tenant-ledger/confidential/acme'],
+      { [LEDGER]: chainedLedger(TEST_CHAIN_KEY, 2) },
+      { chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY) }
+    );
+    const result = restoreBackup(restoreOptions(archive, `${FIXTURE_DIR}/deferred-target`));
+    expect(result.ledger_verification).toBe('deferred_key_mismatch');
+  });
+
+  it('fails a restore whose chain is corrupt under the matching key', () => {
+    vi.stubEnv('KYBERION_AUDIT_CHAIN_KEY', TEST_CHAIN_KEY);
+    const tampered = chainedLedger(TEST_CHAIN_KEY, 2).replace('TEST_EVENT_0', 'TEST_EVENT_X');
+    const archive = tenantArchive(
+      'corrupt',
+      ['active/shared/runtime/tenant-ledger/confidential/acme'],
+      { [LEDGER]: tampered },
+      { chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY) }
+    );
+    expect(() => restoreBackup(restoreOptions(archive, `${FIXTURE_DIR}/corrupt-target`))).toThrow(
+      'BACKUP_RESTORE_LEDGER_CORRUPT'
+    );
+  });
+
+  it('quarantines restored customer decision invites and standing grants (D1)', () => {
+    const invites = 'active/shared/runtime/customer-decision-invites/confidential/acme';
+    const grants = 'active/shared/runtime/grants/confidential/acme';
+    const archive = tenantArchive('revocable', [invites, grants], {
+      [`${invites}/inv-00000000000000aa.json`]: '{"invite_id":"inv-00000000000000aa"}\n',
+      [`${grants}/grant-a.json`]: '{"grant_id":"grant-a"}\n',
+    });
+    const target = `${FIXTURE_DIR}/revocable-target`;
+    const result = restoreBackup(restoreOptions(archive, target));
+    expect(safeExistsSync(`${target}/${invites}/inv-00000000000000aa.json`)).toBe(false);
+    expect(safeExistsSync(`${target}/${grants}/grant-a.json`)).toBe(false);
+    const quarantined = result.quarantinePaths.filter((p) => p.includes('/.restore-quarantine/'));
+    expect(quarantined).toHaveLength(2);
+    for (const quarantinePath of quarantined)
+      expect(safeExistsSync(`${target}/${quarantinePath}/quarantine-manifest.json`)).toBe(true);
+    expect(
+      quarantined.some((p) => safeExistsSync(`${target}/${p}/inv-00000000000000aa.json`))
+    ).toBe(true);
   });
 });
 

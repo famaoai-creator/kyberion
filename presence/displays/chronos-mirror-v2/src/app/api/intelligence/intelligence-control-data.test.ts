@@ -1,5 +1,56 @@
-import { describe, expect, it } from 'vitest';
-import { parseControlEventLine, parseControlEventRecord } from './intelligence-control-data';
+import { describe, expect, it, vi } from 'vitest';
+
+const remediation = vi.hoisted(() => ({ record: vi.fn(), emit: vi.fn() }));
+vi.mock('../../../lib/intelligence-primitives', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../lib/intelligence-primitives')>()),
+  ledger: { record: remediation.record },
+  emitChannelSurfaceEvent: remediation.emit,
+}));
+vi.mock('./intelligence-observation-data', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./intelligence-observation-data')>()),
+  missionTenantSlug: (missionId: string) => (missionId === 'MSN-TENANT' ? 'acme' : undefined),
+}));
+
+import {
+  parseControlEventLine,
+  parseControlEventRecord,
+  recordRuntimeRemediationArtifacts,
+} from './intelligence-control-data';
+
+describe('runtime remediation ledger record', () => {
+  it("names the mission's tenant and records only allow-listed lease metadata", () => {
+    const lease = {
+      agent_id: 'agent-1',
+      owner_id: 'MSN-TENANT',
+      owner_type: 'mission',
+      metadata: { execution_mode: 'conversation', channel: 'slack', secret_blob: { x: 1 } },
+    };
+    recordRuntimeRemediationArtifacts({
+      action: 'cleanup_runtime_lease',
+      agentId: 'agent-1',
+      lease,
+    });
+    expect(remediation.record).toHaveBeenCalledWith('MISSION_RUNTIME_REMEDIATION', {
+      mission_id: 'MSN-TENANT',
+      tenant_slug: 'acme',
+      role: 'chronos_localadmin',
+      agent_id: 'agent-1',
+      remediation_action: 'cleanup_runtime_lease',
+      owner_type: 'mission',
+      metadata: { execution_mode: 'conversation', channel: 'slack' },
+    });
+
+    remediation.record.mockClear();
+    recordRuntimeRemediationArtifacts({
+      action: 'restart_runtime_lease',
+      agentId: 'agent-2',
+      lease: { ...lease, owner_id: 'MSN-NOWHERE', metadata: undefined },
+    });
+    const [, data] = remediation.record.mock.calls[0];
+    expect(data).not.toHaveProperty('tenant_slug');
+    expect(data.metadata).toEqual({});
+  });
+});
 
 describe('intelligence control event parser', () => {
   it('keeps typed control event fields and payload values', () => {

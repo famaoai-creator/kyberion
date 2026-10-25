@@ -221,6 +221,24 @@ export const record = (type: string, data: any) => {
       );
       return '';
     }
+    if (mission.kind === 'unknown' && !tenantSlug) {
+      // D4: an id no process can place may belong to a tenant this process
+      // cannot see; its payload never reaches the system ledger. The raw id
+      // and a digest of the payload stay for correlation.
+      logger.warn(
+        `ledger payload withheld — mission id is not placeable by this process | next: record it with an explicit tenant_slug, or from a process that can resolve the mission | evidence: ${type} mission ${String(missionId)}`
+      );
+      return writeScoped({
+        timestamp,
+        type,
+        scope: unplaceableMissionScope(scope.tier, String(missionId)),
+        role: data.role || 'Unknown',
+        mission_id: missionId,
+        payload_withheld: 'mission_unplaceable',
+        payload_digest: createHash('sha256').update(sortedKeyJson(data), 'utf8').digest('hex'),
+        note: 'Metadata only. The mission id is not placeable; its payload was withheld.',
+      });
+    }
     return writeScoped(detail);
   }
 
@@ -256,6 +274,28 @@ export const record = (type: string, data: any) => {
   }
   return detailHash;
 };
+
+/** Mission-kind scope of an unplaceable id; system scope when the id is not scope-shaped. */
+function unplaceableMissionScope(tier: EventScope['tier'], missionId: string): EventScope {
+  try {
+    return normalizeEventScope({ tier, scope_kind: 'mission', mission_id: missionId });
+  } catch {
+    return normalizeEventScope({ tier, scope_kind: 'system' });
+  }
+}
+
+/** JSON with object keys sorted at every depth (a stable digest input). */
+function sortedKeyJson(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) =>
+    isRecord(item) && !Array.isArray(item)
+      ? Object.fromEntries(
+          Object.keys(item)
+            .sort()
+            .map((key) => [key, item[key]])
+        )
+      : item
+  );
+}
 
 type MissionResolution =
   | { kind: 'none' }

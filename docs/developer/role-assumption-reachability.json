@@ -3587,6 +3587,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/lib/backup-tenant-partitions.ts#asPartitionStore",
+      "roles": ["tenant_approval_store", "tenant_ledger_store"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/lib/video-production-evidence.ts#requestVideoProductionApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []

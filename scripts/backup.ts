@@ -19,6 +19,20 @@ import {
 } from '@agent/core/secure-io';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
 import {
+  tenantRuntimePartitionOf,
+  tenantRuntimePartitionPaths,
+  type TenantRuntimePartitionPath,
+} from '@agent/core/storage-layout';
+import {
+  assertNoAppendOnlyConflict,
+  assertTenantLedgerPartitionsIntact,
+  currentAuditChainKeyId,
+  quarantineRestoredRevocableState,
+  trimRestoredLedgerTails,
+  verifyRestoredTenantLedgers,
+  type RestoredLedgerVerification,
+} from './lib/backup-tenant-partitions.js';
+import {
   portableProtocolServicePathRef,
   recordProtocolServiceLifecycleBestEffort,
 } from '@agent/core/protocol-service-lifecycle';
@@ -64,6 +78,8 @@ export interface BackupPlan {
   includesSensitive: boolean;
   entries: string[];
   missionGitRepos: MissionGitRepo[];
+  /** Tenant scope: the tenant's partitions of every registered runtime root that exist. */
+  tenantRuntimePartitions: TenantRuntimePartitionPath[];
   warnings: string[];
 }
 
@@ -365,6 +381,7 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
     ((repoRelativePath: string) => safeExistsSync(path.join(rootDir, repoRelativePath)));
   const entries = new Set<string>();
   const warnings: string[] = [];
+  const tenantRuntimePartitions: TenantRuntimePartitionPath[] = [];
 
   if (options.scope === 'all') {
     for (const repoPath of ['active', 'vault', 'knowledge/personal', 'knowledge/confidential']) {
@@ -408,6 +425,12 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
     for (const physicalRoot of TENANT_PHYSICAL_BACKUP_ROOTS) {
       addPhysicalTenantNamespaceMatches(entries, rootDir, tenant, physicalRoot, pathExists);
     }
+    // Every tenant-partitioned runtime root (ledgers, approvals, metrics and
+    // the registered state roots), `<root>/<tier>/<tenant>` per tier.
+    for (const partition of tenantRuntimePartitionPaths(tenant, pathExists)) {
+      tenantRuntimePartitions.push(partition);
+      entries.add(partition.path);
+    }
   }
 
   if (entries.size === 0) {
@@ -432,6 +455,7 @@ export function resolveBackupPlan(options: PlanOptions): BackupPlan {
     includesSensitive,
     entries: sortedEntries,
     missionGitRepos: resolveMissionGitRepos(rootDir, sortedEntries, pathExists),
+    tenantRuntimePartitions,
     warnings,
   };
 }
@@ -685,6 +709,12 @@ export function createBackup(options: BackupCliOptions): {
   const plainArchivePath = options.encrypt ? path.join(tempDir, 'payload.tar.gz') : outPath;
   const archivePath = options.encrypt && !outPath.endsWith('.enc') ? `${outPath}.enc` : outPath;
   const missionGitBundles = createMissionGitBundles(tempDir, plan.missionGitRepos);
+  if (plan.scope === 'tenant' && options.tenant) {
+    assertTenantLedgerPartitionsIntact(options.tenant, plan.tenantRuntimePartitions);
+  }
+  // D2: the chain key itself never rides in a tenant archive; its id lets the
+  // restore verify the chains only on a host holding the same key.
+  const chainKeyId = currentAuditChainKeyId();
 
   const manifest = {
     format: 'kyberion-backup-v1',
@@ -699,6 +729,17 @@ export function createBackup(options: BackupCliOptions): {
       repo_relative_path: repo.repoRelativePath,
       bundle_path: missionGitBundles[index] || null,
     })),
+    ...(plan.scope === 'tenant'
+      ? {
+          tenant_runtime_partitions: plan.tenantRuntimePartitions.map((partition) => ({
+            key: partition.key,
+            path: partition.path,
+            append_only: partition.appendOnly,
+            hash_chained: partition.hashChained,
+          })),
+        }
+      : {}),
+    ...(chainKeyId ? { chain_key_id: chainKeyId } : {}),
     warnings,
   };
   const manifestRepoPath = normalizeRepoRelative(pathResolver.rootDir(), manifestPath);
@@ -764,6 +805,39 @@ interface RestoredBackupManifest {
     repo_relative_path?: string;
     bundle_path?: string | null;
   }>;
+  tenant_runtime_partitions?: Array<{
+    key: string;
+    path: string;
+    append_only: boolean;
+    hash_chained: boolean;
+  }>;
+  chain_key_id?: string;
+}
+
+const CHAIN_KEY_ID_PATTERN = /^[0-9a-f]{16}$/u;
+
+function parseTenantRuntimePartitions(
+  value: unknown
+): RestoredBackupManifest['tenant_runtime_partitions'] {
+  if (!Array.isArray(value))
+    throw new Error('Backup manifest tenant runtime partitions are invalid.');
+  return value.map((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.key !== 'string' ||
+      typeof entry.path !== 'string' ||
+      typeof entry.append_only !== 'boolean' ||
+      typeof entry.hash_chained !== 'boolean'
+    ) {
+      throw new Error('Backup manifest tenant runtime partition is invalid.');
+    }
+    return {
+      key: entry.key,
+      path: normalizeArchiveMember(entry.path),
+      append_only: entry.append_only,
+      hash_chained: entry.hash_chained,
+    };
+  });
 }
 
 export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest {
@@ -787,6 +861,16 @@ export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest
   }
   if (parsed.tenant !== undefined && parsed.tenant !== null && typeof parsed.tenant !== 'string') {
     throw new Error('Backup manifest tenant is invalid.');
+  }
+  let chainKeyId: string | undefined;
+  if (parsed.chain_key_id !== undefined) {
+    if (
+      typeof parsed.chain_key_id !== 'string' ||
+      !CHAIN_KEY_ID_PATTERN.test(parsed.chain_key_id)
+    ) {
+      throw new Error('Backup manifest chain key id is invalid.');
+    }
+    chainKeyId = parsed.chain_key_id;
   }
   let missionGitRepos: RestoredBackupManifest['mission_git_repos'];
   if (parsed.mission_git_repos !== undefined) {
@@ -819,6 +903,12 @@ export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest
     ...(parsed.tenant !== undefined ? { tenant: parsed.tenant as string | null } : {}),
     entries: parsed.entries,
     ...(missionGitRepos ? { mission_git_repos: missionGitRepos } : {}),
+    ...(parsed.tenant_runtime_partitions !== undefined
+      ? {
+          tenant_runtime_partitions: parseTenantRuntimePartitions(parsed.tenant_runtime_partitions),
+        }
+      : {}),
+    ...(chainKeyId !== undefined ? { chain_key_id: chainKeyId } : {}),
   };
 }
 
@@ -912,6 +1002,7 @@ function isTenantBackupEntry(entry: string, tenant: string): boolean {
     `${GENERATION_QUOTA_COUNTER_REPO_SUBPATH}/${tenant}`,
   ];
   if (exactRoots.some((root) => isArchiveEntryWithinRoot(entry, root))) return true;
+  if (tenantRuntimePartitionOf(entry)?.tenant === tenant) return true;
   if (/^active\/(projects|missions)\/[^/]+\//.test(entry)) {
     const parts = entry.split('/');
     return parts[3] === tenant;
@@ -992,6 +1083,13 @@ function validateArchiveManifestScope(
         'Tenant backup manifest contains an entry outside the tenant export allowlist.'
       );
     }
+    for (const partition of manifest.tenant_runtime_partitions || []) {
+      if (tenantRuntimePartitionOf(partition.path)?.tenant !== manifest.tenant) {
+        throw new Error(
+          'Tenant backup manifest names a runtime partition outside the tenant scope.'
+        );
+      }
+    }
   } else if (options.scope !== 'all' && options.scope !== scope) {
     throw new Error(`Backup restore scope mismatch: archive=${scope}, requested=${options.scope}`);
   }
@@ -1003,10 +1101,14 @@ function validateArchiveManifestScope(
   }
 }
 
-function validateBackupArchive(plainArchive: string, options: BackupCliOptions): void {
+function validateBackupArchive(
+  plainArchive: string,
+  options: BackupCliOptions
+): { manifest: RestoredBackupManifest; members: string[] } {
   const members = archiveMembers(plainArchive);
   const { manifest, member } = readArchiveManifest(plainArchive, members);
   validateArchiveManifestScope(manifest, member, members, options);
+  return { manifest, members };
 }
 
 function findRestoredManifests(target: string): string[] {
@@ -1146,6 +1248,8 @@ export function restoreBackup(options: BackupCliOptions): {
   target: string;
   archive: string;
   quarantinePaths: string[];
+  ledger_verification: RestoredLedgerVerification;
+  trimmed_tails: string[];
 } {
   if (!options.archive) throw new Error('restore requires an archive path');
   const archive = path.resolve(options.archive);
@@ -1180,14 +1284,20 @@ export function restoreBackup(options: BackupCliOptions): {
     );
   }
 
-  validateBackupArchive(plainArchive, options);
+  const { manifest, members } = validateBackupArchive(plainArchive, options);
+  assertNoAppendOnlyConflict(target, members);
   safeMkdir(target);
   runRequired('tar', ['-xzf', plainArchive, '-C', target], 'backup restore extraction failed');
   const quarantinePaths: string[] = [];
   if (options.scope === 'tenant' && options.tenant) {
     const quarantine = quarantineRestoredPeerRuntime(target, options.tenant);
     if (quarantine.moved.length > 0) quarantinePaths.push(quarantine.quarantinePath);
+    quarantinePaths.push(
+      ...quarantineRestoredRevocableState(target, options.tenant, stamp()).quarantinePaths
+    );
   }
+  const trimmedTails = trimRestoredLedgerTails(target, members);
+  const ledgerVerification = verifyRestoredTenantLedgers(target, members, manifest.chain_key_id);
   restoreMissionGitBundles(target);
 
   if (options.verifyBaseline) {
@@ -1201,7 +1311,13 @@ export function restoreBackup(options: BackupCliOptions): {
     }
   }
 
-  return { target, archive, quarantinePaths };
+  return {
+    target,
+    archive,
+    quarantinePaths,
+    ledger_verification: ledgerVerification,
+    trimmed_tails: trimmedTails,
+  };
 }
 
 export function runRestoreDrill(options: BackupCliOptions): {
@@ -1321,6 +1437,8 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
       metadata: {
         archive: portableProtocolServicePathRef(result.archive),
         target: portableProtocolServicePathRef(result.target),
+        ledger_verification: result.ledger_verification,
+        trimmed_tail_count: result.trimmed_tails.length,
       },
     });
     if (!lifecycleReceipt) logger.warn('[backup] restore lifecycle receipt unavailable');
@@ -1342,6 +1460,8 @@ export function main(argv: string[], print: (value: unknown) => void = () => und
       archive: result.archive,
       target: result.target,
       quarantine_paths: result.quarantinePaths,
+      ledger_verification: result.ledger_verification,
+      trimmed_tails: result.trimmed_tails,
     });
     return;
   }

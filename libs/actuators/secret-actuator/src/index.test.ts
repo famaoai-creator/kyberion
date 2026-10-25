@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn(),
   retry: vi.fn(async (fn: () => Promise<any>) => fn()),
   ledgerRecord: vi.fn(),
-  logger: { debug: vi.fn(), info: vi.fn(), error: vi.fn(), success: vi.fn() },
+  logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   fetchSecret: vi.fn(),
   storeSecret: vi.fn(),
   removeSecret: vi.fn(),
@@ -119,6 +119,28 @@ describe('secret-actuator: governed mutation', () => {
         service_id: 'slack',
         action: 'set',
       })
+    );
+  });
+
+  it("records mission_id 'None' when the ephemeral mission could not be created", async () => {
+    delete process.env.MISSION_ID;
+    mocks.safeExec.mockImplementation((_bin: string, args: string[]) => {
+      if (args.includes('create')) throw new Error('mission controller unavailable');
+      return '';
+    });
+    mocks.storeSecret.mockResolvedValue(undefined);
+
+    const { handleAction } = await import('./index.js');
+    const result = await handleAction({
+      action: 'set' as const,
+      params: { account: 'test_user', service: 'slack', value: 'secret123' },
+    });
+
+    expect(result.status).toBe('success');
+    expect(result.mission_id).toBeUndefined();
+    expect(mocks.ledgerRecord).toHaveBeenCalledWith(
+      'CONFIG_CHANGE',
+      expect.objectContaining({ mission_id: 'None', service_id: 'slack', action: 'set' })
     );
   });
 
