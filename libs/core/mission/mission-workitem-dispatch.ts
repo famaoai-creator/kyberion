@@ -70,6 +70,7 @@ import {
 } from './mission-workitem-dispatch-internals.js';
 import {
   classifyDispatchFailure,
+  classifyDispatchAttemptOutcome,
   nextTaskModelTier,
   recordRoutingOutcome,
   routingOutcomeLedgerPath,
@@ -265,7 +266,7 @@ async function dispatchMissionWorkItemsRound(
      * ones. Recorded whether or not a judgment narrowed the tier, because a
      * baseline run that succeeded is evidence about that tier too.
      */
-    const recordRouting = (input: { attempted: boolean; succeeded: boolean }): void => {
+    const recordRouting = (input: { attempted: boolean | 'unknown'; succeeded: boolean }): void => {
       // A refusal before the model runs is not the model failing.
       const blockedBy = classifyDispatchFailure(record.notes || []);
       recordRoutingOutcome(
@@ -276,7 +277,15 @@ async function dispatchMissionWorkItemsRound(
           chosen_tier: taskModelHint.tier,
           chosen_by: routing.downgraded ? 'judgment' : 'baseline',
           succeeded: input.succeeded,
-          outcome: input.attempted ? 'attempted' : 'not_attempted',
+          outcome:
+            input.attempted === 'unknown'
+              ? 'unknown'
+              : input.attempted
+                ? 'attempted'
+                : 'not_attempted',
+          ...(input.attempted === 'unknown'
+            ? { unknown_reason: blockedBy || 'transport_outcome_unknown' }
+            : {}),
           ...(!input.attempted ? { not_attempted_reason: blockedBy || 'dispatch_preflight' } : {}),
         },
         { ledgerPath: routingOutcomeLedgerPath(missionPath) }
@@ -489,8 +498,10 @@ async function dispatchMissionWorkItemsRound(
           unknown
         >),
       };
-      delete catchMetadata.routing_minimum_tier;
-      if (escalatedTo) catchMetadata.routing_minimum_tier = escalatedTo;
+      if (!blockedBy) {
+        delete catchMetadata.routing_minimum_tier;
+        if (escalatedTo) catchMetadata.routing_minimum_tier = escalatedTo;
+      }
       updateWorkItem({
         itemId: item.item_id,
         status: 'blocked',
@@ -519,7 +530,8 @@ async function dispatchMissionWorkItemsRound(
         next_action: 'inspect provider/session and re-dispatch after recovery',
       });
       recordRouting({
-        attempted: !blockedBy,
+        attempted:
+          classifyDispatchAttemptOutcome(record.notes) === 'unknown' ? 'unknown' : !blockedBy,
         succeeded: false,
       });
       records.push(record);

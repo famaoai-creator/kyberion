@@ -397,6 +397,34 @@ export function createRuntimeForTask(
     },
     {
       definition: {
+        name: 'kyberion_task_read_deliverable',
+        description:
+          'Read back exactly the declared task deliverable written and verified by this current lease. No path argument is accepted.',
+        inputSchema: { type: 'object', properties: {}, additionalProperties: false },
+      },
+      op: 'task:emit_result',
+      execute(input) {
+        if (
+          !input ||
+          typeof input !== 'object' ||
+          Array.isArray(input) ||
+          Object.keys(input).length
+        )
+          throw new Error('[TASK_TOOL_INPUT] Deliverable read-back accepts no arguments');
+        if (!deliverablePath)
+          throw new Error(
+            '[TASK_TOOL_CAPABILITY_UNAVAILABLE] Task contract has no file deliverable'
+          );
+        const content = inspectOutput(deliverablePath);
+        if (!outputDigest || content === undefined || digest(content) !== outputDigest)
+          throw new Error(
+            '[TASK_TOOL_OUTPUT_UNVERIFIED] No current-lease verified declared output to read back'
+          );
+        return { deliverable: deliverablePath, content, sha256: outputDigest };
+      },
+    },
+    {
+      definition: {
         name: 'kyberion_task_write_deliverable',
         description:
           'Write exactly this task NEXT_TASKS declared evidence/artifact deliverable; path is fixed by the server contract.',

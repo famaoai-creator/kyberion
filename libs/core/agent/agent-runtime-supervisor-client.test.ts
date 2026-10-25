@@ -5,10 +5,18 @@ import {
   normalizeSupervisorResult,
   resolveAskTransportTimeout,
   restoreSupervisorError,
+  isSupervisorRemoteError,
 } from './agent-runtime-supervisor-client.js';
 import { isAgentRuntimeApprovalPendingError } from './agent-prompt-approval-port.js';
 
 describe('normalizeSupervisorResponse', () => {
+  it('distinguishes acknowledged server failures from local transport unavailability', () => {
+    const remote = restoreSupervisorError('[TASK_TOOL_OUTPUT_UNVERIFIED] Original server cause');
+    expect(isSupervisorRemoteError(remote)).toBe(true);
+    expect(
+      isSupervisorRemoteError(new Error('[SUPERVISOR_PREASK_FAILED] method=health ECONNREFUSED'))
+    ).toBe(false);
+  });
   it('restores an approval suspension across the daemon transport', () => {
     const error = restoreSupervisorError('pending', {
       code: 'AGENT_APPROVAL_PENDING',

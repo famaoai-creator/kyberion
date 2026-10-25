@@ -1,0 +1,10 @@
+/** Transport loss cannot prove whether the remote model or its effects ran. */
+export function isUncertainSupervisorTransportFailure(message: string): boolean {
+  if (message.includes('[SUPERVISOR_PREASK_FAILED]')) return false;
+  // Refresh is a pre-ask operation with no model turn; its typed parser error
+  // is evidence of a contract failure rather than unknown task execution.
+  if (/invalid_supervisor_response:.*supervisor refresh result/iu.test(message)) return false;
+  return /invalid_supervisor_response|supervisor_response_closed|supervisor_request_timeout|agent_runtime_supervisor_not_available|\bECONNRESET\b|\bEPIPE\b/iu.test(
+    message
+  );
+}

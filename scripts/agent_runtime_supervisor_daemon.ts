@@ -1105,7 +1105,7 @@ async function handleRequest(
         return {
           id: request.id,
           ok: true,
-          result,
+          result: { refreshed: true, reason: result.mode },
         };
       }
       case 'restart': {

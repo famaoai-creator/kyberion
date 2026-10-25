@@ -1796,6 +1796,10 @@
       "types": "./dist/governance/approval-store-paths.d.ts",
       "default": "./dist/governance/approval-store-paths.js"
     },
+    "./governance/work-effect-release-request": {
+      "types": "./dist/governance/work-effect-release-request.d.ts",
+      "default": "./dist/governance/work-effect-release-request.js"
+    },
     "./governance/approval-veto-window": {
       "types": "./dist/governance/approval-veto-window.d.ts",
       "default": "./dist/governance/approval-veto-window.js"
