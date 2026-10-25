@@ -3,6 +3,8 @@ import { pathResolver } from '@agent/core/path-resolver';
 import {
   safeExistsSync,
   safeExecResult,
+  safeLinkExclusiveSync,
+  safeReaddir,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -671,6 +673,54 @@ describe('tenant runtime partitions in backup and restore', () => {
       'BACKUP_RESTORE_LEDGER_DOWNGRADED'
     );
     expect(safeExistsSync(`${target}/${LEDGER}`)).toBe(false);
+  });
+
+  it('removes the restore temp dir (decrypted payload, staging) when a restore is refused', () => {
+    vi.stubEnv('KYBERION_AUDIT_CHAIN_KEY', TEST_CHAIN_KEY);
+    const archive = tenantArchive(
+      'temp-cleanup',
+      ['active/shared/runtime/tenant-ledger/confidential/acme'],
+      { [LEDGER]: chainedLedger(TEST_CHAIN_KEY, 2, 'sha256') },
+      { chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY) }
+    );
+    const restoreDirs = () =>
+      safeReaddir(pathResolver.sharedTmp('')).filter((name) => name.startsWith('restore-'));
+    const before = new Set(restoreDirs());
+    expect(() => restoreBackup(restoreOptions(archive, `${FIXTURE_DIR}/temp-target`))).toThrow(
+      'BACKUP_RESTORE_LEDGER_DOWNGRADED'
+    );
+    expect(restoreDirs().filter((name) => !before.has(name))).toEqual([]);
+  });
+
+  it('rejects an archive carrying a hard-link member before extraction', () => {
+    const source = `${FIXTURE_DIR}/hardlink-source`;
+    const manifestMember = 'active/shared/tmp/backup-hardlink/manifest.json';
+    const partition = 'active/shared/runtime/usage-ledger/confidential/acme';
+    safeWriteFile(
+      `${source}/${manifestMember}`,
+      JSON.stringify({
+        format: 'kyberion-backup-v1',
+        scope: 'tenant',
+        tenant: 'acme',
+        entries: [partition],
+        mission_git_repos: [],
+      })
+    );
+    safeWriteFile(`${source}/${partition}/real.jsonl`, '{}\n');
+    safeLinkExclusiveSync(`${source}/${partition}/real.jsonl`, `${source}/${partition}/hard.jsonl`);
+    const archive = `${FIXTURE_DIR}/hardlink.tar.gz`;
+    expect(
+      safeExecResult('tar', ['-czf', archive, '-C', source, manifestMember, partition], {
+        timeoutMs: 120000,
+      }).status
+    ).toBe(0);
+    const listing = safeExecResult('tar', ['-tvzf', archive], { timeoutMs: 120000 }).stdout;
+    expect(listing).toMatch(/ link to /u);
+    const target = `${FIXTURE_DIR}/hardlink-target`;
+    expect(() => restoreBackup(restoreOptions(archive, target))).toThrow(
+      'BACKUP_ARCHIVE_MEMBER_TYPE'
+    );
+    expect(safeExistsSync(target)).toBe(false);
   });
 
   it('keeps a complete final ledger record that only lacks its trailing newline', () => {

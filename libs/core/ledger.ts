@@ -293,7 +293,8 @@ function withheldPayloadDigest(data: unknown): {
   payload_digest: string;
   payload_digest_alg: 'hmac-sha256' | 'sha256';
 } {
-  const input = sortedKeyJson(data);
+  // Domain-separated from every other use of the chain key.
+  const input = `withheld-payload:${sortedKeyJson(data)}`;
   let key: string | null = null;
   try {
     key = resolveAuditChainKey({ createIfMissing: true });
