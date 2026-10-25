@@ -70,6 +70,23 @@ describe('parseTrustedProxies', () => {
     expect(proxies.has('not-an-ip')).toBe(false);
   });
 
+  it('translates an IPv4-mapped CIDR prefix to its IPv4 prefix', () => {
+    const proxies = trusted('::ffff:10.0.0.0/104, ::ffff:c0a8:100/120, ::ffff:203.0.113.9/128');
+    expect(proxies.size).toBe(3);
+    expect(proxies.has('10.200.1.1')).toBe(true);
+    expect(proxies.has('::ffff:10.200.1.1')).toBe(true);
+    expect(proxies.has('11.0.0.1')).toBe(false);
+    expect(proxies.has('192.168.1.77')).toBe(true);
+    expect(proxies.has('192.168.2.1')).toBe(false);
+    expect(proxies.has('203.0.113.9')).toBe(true);
+    expect(proxies.has('203.0.113.8')).toBe(false);
+    const { invalid } = parseTrustedProxies('::ffff:10.0.0.0/95,::ffff:10.0.0.0/129');
+    expect(invalid).toEqual([
+      '::ffff:10.0.0.0/95 (an IPv4-mapped network needs a prefix of /96 or longer)',
+      '::ffff:10.0.0.0/129',
+    ]);
+  });
+
   it('reports invalid entries instead of trusting them', () => {
     const { proxies, invalid } = parseTrustedProxies(
       '127.0.0.1,localhost,10.0.0.0/33,::/129,1.2.3.4/x,*'
