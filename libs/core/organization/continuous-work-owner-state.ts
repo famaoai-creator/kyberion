@@ -19,7 +19,8 @@ import type { WorkItem } from '../workforce/work-coordination-types.js';
 import { assertScopedCadenceExecution } from './organization-cadence.js';
 import { parseContinuousWorkPlan, type ContinuousWorkPlan } from './continuous-work-plan.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeReadFileSnapshot, safeWriteFile } from '../secure-io.js';
+import { safeExistsSync, safeReadFileSnapshot } from '../secure-io.js';
+import { writeJson } from '../foundation/json.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import * as path from 'node:path';
 import { assertSafeRepositoryPath } from '../secure-io.js';
@@ -311,7 +312,8 @@ export function resolveUncertainContinuousOwnerState(
         'continuous work owner checkpoint'
       )
     : undefined;
-  if (stored === undefined) return { resolved: false, state_path: statePath, reason: 'no checkpoint' };
+  if (stored === undefined)
+    return { resolved: false, state_path: statePath, reason: 'no checkpoint' };
   const state = validateState(stored, identity, ids);
   if (!state.intent && !state.error)
     return { resolved: false, state_path: statePath, reason: 'checkpoint is not uncertain' };
@@ -319,9 +321,7 @@ export function resolveUncertainContinuousOwnerState(
   const cleared = { ...state };
   delete cleared.intent;
   delete cleared.error;
-  (deps.write ??
-    ((file: string, value: unknown) =>
-      safeWriteFile(file, `${JSON.stringify(value, null, 2)}\n`)))(statePath, {
+  (deps.write ?? ((file: string, value: unknown) => writeJson(file, value)))(statePath, {
     ...cleared,
     reconciled: {
       at: (deps.now ?? (() => new Date().toISOString()))(),
