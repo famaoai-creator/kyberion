@@ -522,7 +522,11 @@ describe('tenant runtime partitions in backup and restore', () => {
   }
 
   /** Hash-chained entries in the hybrid ledger's on-disk format (ledger.ts _writeToLedger). */
-  function chainedLedger(key: string, count: number): string {
+  function chainedLedger(
+    key: string,
+    count: number,
+    alg: 'hmac-sha256' | 'sha256' = 'hmac-sha256'
+  ): string {
     let parent = GENESIS_HASH;
     const lines: string[] = [];
     for (let i = 0; i < count; i += 1) {
@@ -534,10 +538,10 @@ describe('tenant runtime partitions in backup and restore', () => {
         mission_id: 'None',
         payload: { i },
         parent_hash: parent,
-        chain_alg: 'hmac-sha256',
-        chain_key_id: getAuditChainKeyId(key),
+        chain_alg: alg,
+        ...(alg === 'hmac-sha256' ? { chain_key_id: getAuditChainKeyId(key) } : {}),
       };
-      entry.hash = computeLedgerEntryHash(entry, { alg: 'hmac-sha256', key });
+      entry.hash = computeLedgerEntryHash(entry, alg === 'hmac-sha256' ? { alg, key } : { alg });
       parent = String(entry.hash);
       lines.push(JSON.stringify(entry));
     }
@@ -649,8 +653,137 @@ describe('tenant runtime partitions in backup and restore', () => {
       { chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY) }
     );
     expect(() => restoreBackup(restoreOptions(archive, `${FIXTURE_DIR}/corrupt-target`))).toThrow(
-      'BACKUP_RESTORE_LEDGER_CORRUPT'
+      'nothing was restored'
     );
+    expect(safeExistsSync(`${FIXTURE_DIR}/corrupt-target/${LEDGER}`)).toBe(false);
+  });
+
+  it('never reports a keyless (sha256) chain as verified, even with matching key ids', () => {
+    vi.stubEnv('KYBERION_AUDIT_CHAIN_KEY', TEST_CHAIN_KEY);
+    const archive = tenantArchive(
+      'keyless',
+      ['active/shared/runtime/tenant-ledger/confidential/acme'],
+      { [LEDGER]: chainedLedger(TEST_CHAIN_KEY, 2, 'sha256') },
+      { chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY) }
+    );
+    const target = `${FIXTURE_DIR}/keyless-target`;
+    expect(() => restoreBackup(restoreOptions(archive, target))).toThrow(
+      'BACKUP_RESTORE_LEDGER_DOWNGRADED'
+    );
+    expect(safeExistsSync(`${target}/${LEDGER}`)).toBe(false);
+  });
+
+  it('keeps a complete final ledger record that only lacks its trailing newline', () => {
+    vi.stubEnv('KYBERION_AUDIT_CHAIN_KEY', TEST_CHAIN_KEY);
+    const full = chainedLedger(TEST_CHAIN_KEY, 2);
+    const archive = tenantArchive(
+      'no-newline',
+      ['active/shared/runtime/tenant-ledger/confidential/acme'],
+      { [LEDGER]: full.slice(0, -1) },
+      { chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY) }
+    );
+    const target = `${FIXTURE_DIR}/no-newline-target`;
+    const result = restoreBackup(restoreOptions(archive, target));
+    expect(result.trimmed_tails).toEqual([]);
+    expect(result.ledger_verification).toBe('verified');
+    expect(safeReadFile(`${target}/${LEDGER}`, { encoding: 'utf8' })).toBe(full);
+  });
+
+  it('rejects an archive carrying a symlink member before extraction', () => {
+    const source = `${FIXTURE_DIR}/link-source`;
+    const manifestMember = 'active/shared/tmp/backup-link/manifest.json';
+    const partition = 'active/shared/runtime/usage-ledger/confidential/acme';
+    safeWriteFile(
+      `${source}/${manifestMember}`,
+      JSON.stringify({
+        format: 'kyberion-backup-v1',
+        scope: 'tenant',
+        tenant: 'acme',
+        entries: [partition],
+        mission_git_repos: [],
+      })
+    );
+    safeWriteFile(`${source}/${partition}/real.jsonl`, '{}\n');
+    safeSymlinkSync(
+      `${source}/${partition}/real.jsonl`,
+      `${source}/${partition}/link.jsonl`,
+      'file'
+    );
+    const archive = `${FIXTURE_DIR}/link.tar.gz`;
+    expect(
+      safeExecResult('tar', ['-czf', archive, '-C', source, manifestMember, partition], {
+        timeoutMs: 120000,
+      }).status
+    ).toBe(0);
+    const target = `${FIXTURE_DIR}/link-target`;
+    expect(() => restoreBackup(restoreOptions(archive, target))).toThrow(
+      'BACKUP_ARCHIVE_MEMBER_TYPE'
+    );
+    expect(safeExistsSync(target)).toBe(false);
+  });
+
+  it('refuses a restore target outside this checkout before extraction', () => {
+    const archive = tenantArchive(
+      'outside',
+      ['active/shared/runtime/usage-ledger/confidential/acme'],
+      {
+        'active/shared/runtime/usage-ledger/confidential/acme/resource-usage.jsonl': '{"a":1}\n',
+      }
+    );
+    expect(() => restoreBackup(restoreOptions(archive, '/nonexistent-kyberion-restore'))).toThrow(
+      'BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY'
+    );
+  });
+
+  it('skips a symlinked tenant partition directory when planning a backup', () => {
+    const real = `${FIXTURE_DIR}/elsewhere`;
+    safeMkdir(real);
+    safeMkdir(`${FIXTURE_DIR}/active/shared/runtime/grants/confidential`);
+    safeMkdir(`${FIXTURE_DIR}/active/shared/runtime/hearing/confidential/acme`);
+    safeSymlinkSync(real, `${FIXTURE_DIR}/active/shared/runtime/grants/confidential/acme`, 'dir');
+    const plan = resolveBackupPlan({
+      scope: 'tenant',
+      tenant: 'acme',
+      rootDir: FIXTURE_DIR,
+      pathExists: (repoPath) => safeExistsSync(`${FIXTURE_DIR}/${repoPath}`),
+      tenantResolver: () => undefined,
+    });
+    expect(plan.entries).toContain('active/shared/runtime/hearing/confidential/acme');
+    expect(plan.entries).not.toContain('active/shared/runtime/grants/confidential/acme');
+    expect(plan.warnings.join('\n')).toContain('symlinked tenant runtime partition');
+  });
+
+  it('a --force restore over live state never revives a revoked grant or touches a newer one', () => {
+    const grants = 'active/shared/runtime/grants/confidential/acme';
+    const invites = 'active/shared/runtime/customer-decision-invites/confidential/acme';
+    const archive = tenantArchive('live-revocable', [grants, invites], {
+      [`${grants}/grant-a.json`]: '{"grant_id":"grant-a","status":"active"}\n',
+      [`${invites}/inv-00000000000000aa.json`]:
+        '{"invite_id":"inv-00000000000000aa","status":"open"}\n',
+    });
+    const target = `${FIXTURE_DIR}/live-revocable-target`;
+    const revoked = '{"grant_id":"grant-a","status":"revoked"}\n';
+    const newer = '{"grant_id":"grant-b","status":"active"}\n';
+    const revokedInvite = '{"invite_id":"inv-00000000000000aa","status":"revoked"}\n';
+    safeWriteFile(`${target}/${grants}/grant-a.json`, revoked);
+    safeWriteFile(`${target}/${grants}/grant-b.json`, newer);
+    safeWriteFile(`${target}/${invites}/inv-00000000000000aa.json`, revokedInvite);
+
+    const result = restoreBackup(restoreOptions(archive, target, true));
+
+    expect(safeReadFile(`${target}/${grants}/grant-a.json`, { encoding: 'utf8' })).toBe(revoked);
+    expect(safeReadFile(`${target}/${grants}/grant-b.json`, { encoding: 'utf8' })).toBe(newer);
+    expect(
+      safeReadFile(`${target}/${invites}/inv-00000000000000aa.json`, { encoding: 'utf8' })
+    ).toBe(revokedInvite);
+    const grantQuarantine = result.quarantinePaths.find((p) =>
+      p.startsWith(`${grants}/.restore-quarantine/`)
+    );
+    expect(grantQuarantine).toBeDefined();
+    expect(
+      safeReadFile(`${target}/${grantQuarantine}/grant-a.json`, { encoding: 'utf8' })
+    ).toContain('"active"');
+    expect(safeExistsSync(`${target}/${grantQuarantine}/grant-b.json`)).toBe(false);
   });
 
   it('quarantines restored customer decision invites and standing grants (D1)', () => {

@@ -1066,6 +1066,28 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     expect(result.verification?.clean).toBe(true);
   });
 
+  it('reports a tenant runtime partition it could not remove as a failed offboarding', () => {
+    const parent = 'active/shared/runtime/hearing/confidential';
+    fs.mkdirSync(abs(`${parent}/${TENANT}`), { recursive: true });
+    fs.writeFileSync(abs(`${parent}/${TENANT}/session.json`), '{}');
+    fs.chmodSync(abs(parent), 0o555);
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        nowIso: '2026-10-08T01:02:03.000Z',
+      });
+      expect(fs.existsSync(abs(`${parent}/${TENANT}`))).toBe(true);
+      expect(result.status).toBe('error');
+      expect(result.reason).toContain('OFFBOARD_PARTITION_LEFTOVER');
+      expect(result.reason).toContain(`${parent}/${TENANT}`);
+    } finally {
+      fs.chmodSync(abs(parent), 0o755);
+    }
+  });
+
   it("exports and removes the tenant's customer decision invites, never another tenant's", () => {
     const partition = (tenant: string) =>
       `active/shared/runtime/customer-decision-invites/confidential/${tenant}`;

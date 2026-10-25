@@ -8,30 +8,72 @@ import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { getAuditChainKeyId } from '@agent/core/chain-integrity';
 import { logger } from '@agent/core/core';
-import { nowIso, readTextFile } from '@agent/core/foundation';
+import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { writeJson } from '@agent/core/foundation/json';
 import {
   TENANT_LEDGER_FILE,
-  tenantLedgerPath,
   verifyLedgerIntegrityDetailed,
   verifyTenantLedgerIntegrity,
 } from '@agent/core/ledger';
 import {
+  safeExecResult,
   safeExistsSync,
+  safeRmSync,
   safeLstat,
   safeMkdir,
-  safeMoveSync,
+  safeReadFile,
   safeReaddir,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
   TENANT_RUNTIME_PARTITION_ROOTS,
   tenantRuntimePartitionOf,
-  tenantRuntimePartitionPaths,
   tenantStoreLedgerPartitionOf,
-  type StorageDataTier,
   type TenantRuntimePartitionPath,
 } from '@agent/core/storage-layout';
+
+export function normalizeArchiveMember(member: string): string {
+  const normalized = member.replace(/^\.\//, '').replace(/\/+$/, '');
+  if (!normalized || normalized.startsWith('/') || normalized.split('/').includes('..')) {
+    throw new Error(`Backup archive contains an unsafe member path: ${member}`);
+  }
+  return normalized;
+}
+
+function listArchive(plainArchive: string, flags: string): string[] {
+  const result = safeExecResult('tar', [flags, plainArchive], {
+    timeoutMs: 120000,
+    maxOutputMB: 50,
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `backup archive listing failed: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
+    );
+  }
+  return result.stdout.split('\n').filter((line) => line.trim());
+}
+
+/**
+ * Archive member names, failing closed on anything but regular files and
+ * directories: a symlink or hard link could point extraction outside its
+ * partition. The verbose listing (same order) carries the type character.
+ */
+export function archiveMembers(plainArchive: string): string[] {
+  const names = listArchive(plainArchive, '-tzf');
+  const verbose = listArchive(plainArchive, '-tvzf');
+  if (names.length !== verbose.length) {
+    throw new Error('Backup archive listing is inconsistent; refusing to restore it.');
+  }
+  verbose.forEach((line, index) => {
+    const type = line.trimStart().charAt(0);
+    if (type !== '-' && type !== 'd') {
+      throw new Error(
+        `[BACKUP_ARCHIVE_MEMBER_TYPE] backup archive member is not a regular file or directory (type '${type}') | next: recreate the backup without links | evidence: ${names[index].trim()}`
+      );
+    }
+  });
+  return names.map((member) => member.trim()).map(normalizeArchiveMember);
+}
 
 /** Key id of this host's audit chain key, or undefined when there is none (never the key). */
 export function currentAuditChainKeyId(): string | undefined {
@@ -127,23 +169,66 @@ export function assertNoAppendOnlyConflict(target: string, members: string[]): v
 }
 
 /**
- * Trim each restored append-only `.jsonl` back to its last newline when its
- * final line is torn (restored copy only); returns the trimmed members.
+ * Tenant runtime partitions a restore never extracts in place: every
+ * append-only partition (trimmed and verified in staging first), and on a
+ * tenant restore the revocable state (D1). Repo-relative `<root>/<tier>/<tenant>`.
  */
-export function trimRestoredLedgerTails(target: string, members: string[]): string[] {
+export interface StagedRestorePartitions {
+  appendOnly: string[];
+  revocable: string[];
+}
+
+const REVOCABLE_RESTORE_KEYS: ReadonlySet<string> = new Set([
+  'customer_decision_invites',
+  'grants',
+]);
+export const RESTORE_QUARANTINE_DIR = '.restore-quarantine';
+
+export function stagedRestorePartitions(
+  members: string[],
+  tenantRestore: boolean
+): StagedRestorePartitions {
+  const revocable = new Set<string>();
+  for (const member of members) {
+    const partition = tenantRuntimePartitionOf(member);
+    if (tenantRestore && partition && REVOCABLE_RESTORE_KEYS.has(partition.key)) {
+      revocable.add(`${partition.root}/${partition.tier}/${partition.tenant}`);
+    }
+  }
+  return {
+    appendOnly: appendOnlyPartitionsIn(members),
+    revocable: [...revocable].sort((a, b) => a.localeCompare(b)),
+  };
+}
+
+/**
+ * Trim each staged append-only `.jsonl` whose final line is torn (does not
+ * parse as JSON) back to its last newline; a complete final record without a
+ * trailing newline is kept and only gets its newline. Returns trimmed members.
+ */
+export function trimRestoredLedgerTails(staging: string, members: string[]): string[] {
   const trimmed: string[] = [];
   for (const member of members) {
     if (!member.endsWith('.jsonl')) continue;
     const partition = tenantRuntimePartitionOf(member);
     if (!partition || !APPEND_ONLY_PARTITION_KEYS.has(partition.key)) continue;
-    const restoredPath = path.join(target, member);
-    asPartitionStore(restoredPath, () => {
-      if (!safeExistsSync(restoredPath) || !safeLstat(restoredPath).isFile()) return;
-      const content = readTextFile(restoredPath);
-      if (!content || content.endsWith('\n')) return;
-      safeWriteFile(restoredPath, content.slice(0, content.lastIndexOf('\n') + 1));
-      trimmed.push(member);
-    });
+    const stagedPath = path.join(staging, member);
+    if (!safeExistsSync(stagedPath) || !safeLstat(stagedPath).isFile()) continue;
+    const content = readTextFile(stagedPath);
+    if (!content || content.endsWith('\n')) continue;
+    const cut = content.lastIndexOf('\n') + 1;
+    let complete = true;
+    try {
+      parseSafeJsonInput(content.slice(cut), 'restored ledger tail');
+    } catch {
+      complete = false;
+    }
+    if (complete) {
+      safeWriteFile(stagedPath, `${content}\n`);
+      continue;
+    }
+    safeWriteFile(stagedPath, content.slice(0, cut));
+    trimmed.push(member);
   }
   return trimmed;
 }
@@ -151,11 +236,41 @@ export function trimRestoredLedgerTails(target: string, members: string[]): stri
 export type RestoredLedgerVerification = 'not_applicable' | 'verified' | 'deferred_key_mismatch';
 
 /**
- * D2: verify the restored tenant-ledger chains when this host's audit chain
- * key is the archive's (fail on corruption); otherwise defer and say how.
+ * Entries of a staged ledger that are not keyed under the archive's chain key
+ * (`chain_alg` other than `hmac-sha256`, or another `chain_key_id`): a keyless
+ * sha256 chain verifies without the key, so it proves nothing.
+ */
+function unkeyedEntries(stagedPath: string, archiveChainKeyId: string): string[] {
+  const findings: string[] = [];
+  readTextFile(stagedPath)
+    .split('\n')
+    .forEach((line, index) => {
+      if (!line.trim()) return;
+      let entry: unknown;
+      try {
+        entry = parseSafeJsonInput(line, 'restored ledger entry');
+      } catch {
+        findings.push(`line:${index + 1}:parse_error`);
+        return;
+      }
+      const record = isRecord(entry) ? entry : {};
+      if (record.chain_alg !== 'hmac-sha256') findings.push(`line:${index + 1}:chain_alg`);
+      else if (record.chain_key_id !== archiveChainKeyId)
+        findings.push(`line:${index + 1}:chain_key_id`);
+    });
+  return findings;
+}
+
+/**
+ * D2: verify the staged tenant-ledger chains BEFORE anything reaches the
+ * target, when this host's audit chain key is the archive's: every entry
+ * must be HMAC-chained under the archive's key id and the chain must verify
+ * (else the restore fails). Otherwise defer and say how. Truncation of a
+ * chain's tail is not detectable here (no head anchor); the pre-extraction
+ * conflict check is the rollback guard.
  */
 export function verifyRestoredTenantLedgers(
-  target: string,
+  staging: string,
   members: string[],
   archiveChainKeyId: string | undefined
 ): RestoredLedgerVerification {
@@ -175,65 +290,153 @@ export function verifyRestoredTenantLedgers(
     return 'deferred_key_mismatch';
   }
   for (const member of ledgers) {
-    const partition = tenantRuntimePartitionOf(member);
-    const restoredPath = path.join(target, member);
-    const live =
-      partition !== undefined &&
-      path.resolve(restoredPath) ===
-        path.resolve(tenantLedgerPath(partition.tier as StorageDataTier, partition.tenant));
-    const report =
-      live && partition
-        ? verifyTenantLedgerIntegrity(partition.tier, partition.tenant)
-        : verifyLedgerIntegrityDetailed(restoredPath);
+    const stagedPath = path.join(staging, member);
+    const unkeyed = unkeyedEntries(stagedPath, archiveChainKeyId);
+    if (unkeyed.length > 0) {
+      throw new Error(
+        `[BACKUP_RESTORE_LEDGER_DOWNGRADED] restored tenant ledger has entries not HMAC-chained under the archive's key — nothing was restored to the target | next: do not use this archive; restore an earlier backup | evidence: ${member} (${unkeyed.slice(0, 5).join(', ')}${unkeyed.length > 5 ? ', …' : ''})`
+      );
+    }
+    const report = verifyLedgerIntegrityDetailed(stagedPath);
     if (!report.ok) {
       throw new Error(
-        `[BACKUP_RESTORE_LEDGER_CORRUPT] restored tenant ledger fails hash-chain verification | next: do not use this restore; inspect the archive and restore an earlier backup | evidence: ${member} (${report.corrupted.length} corrupted of ${report.total})`
+        `[BACKUP_RESTORE_LEDGER_CORRUPT] restored tenant ledger fails hash-chain verification — nothing was restored to the target | next: do not use this archive; inspect it and restore an earlier backup | evidence: ${member} (${report.corrupted.length} corrupted of ${report.total})`
       );
     }
   }
   return 'verified';
 }
 
+/** Move a staged tree file by file into `dest` (written as the partition's store role when live). */
+function placeStagedTree(source: string, dest: string, depth = 0): string[] {
+  if (depth > 12) throw new Error(`[BACKUP_RESTORE_TREE_TOO_DEEP] ${source}`);
+  const stat = safeLstat(source);
+  if (stat.isDirectory()) {
+    asPartitionStore(dest, () => {
+      if (!safeExistsSync(dest)) safeMkdir(dest, { recursive: true });
+    });
+    return safeReaddir(source).flatMap((child) =>
+      placeStagedTree(path.join(source, child), path.join(dest, child), depth + 1)
+    );
+  }
+  if (!stat.isFile()) throw new Error(`[BACKUP_RESTORE_MEMBER_TYPE] ${source}`);
+  const content = safeReadFile(source, { encoding: null }) as Buffer;
+  asPartitionStore(dest, () => safeWriteFile(dest, content));
+  return [dest];
+}
+
+/** Place the verified append-only partitions from staging into the target. */
+export function placeStagedAppendOnlyPartitions(
+  staging: string,
+  target: string,
+  partitions: string[]
+): void {
+  for (const partition of partitions) {
+    const source = path.join(staging, partition);
+    if (safeExistsSync(source)) placeStagedTree(source, path.join(target, partition));
+  }
+}
+
 /**
  * D1: a tenant restore must not bring back customer decision invites or
- * standing grants revoked after the backup was taken. Move the restored
- * records into a stamped `.restore-quarantine/` inside the same tenant
- * partition (same tier and tenant boundary, ignored by both stores, which
- * read only top-level `*.json`), with a manifest; re-issue what is still due.
+ * standing grants revoked after the backup, and must not touch records issued
+ * since. The archive's own records never reach the live partition: they go
+ * from staging straight into `<partition>/.restore-quarantine/<stamp>/` (same
+ * tier and tenant boundary; both stores read only top-level `*.json`), with a
+ * manifest; live records are left as they are. Re-issue what is still due.
  */
-const REVOCABLE_RESTORE_KEYS = ['customer_decision_invites', 'grants'] as const;
-export const RESTORE_QUARANTINE_DIR = '.restore-quarantine';
-
-export function quarantineRestoredRevocableState(
+export function quarantineStagedRevocableState(
+  staging: string,
   target: string,
+  partitions: string[],
   tenant: string,
   stampId: string
 ): { quarantinePaths: string[]; moved: string[] } {
   const quarantinePaths: string[] = [];
   const moved: string[] = [];
-  const exists = (repoPath: string) => safeExistsSync(path.join(target, repoPath));
-  for (const partition of tenantRuntimePartitionPaths(tenant, exists)) {
-    if (!(REVOCABLE_RESTORE_KEYS as readonly string[]).includes(partition.key)) continue;
-    const partitionDir = path.join(target, partition.path);
-    const children = safeReaddir(partitionDir).filter((child) => child !== RESTORE_QUARANTINE_DIR);
+  for (const partition of partitions) {
+    const source = path.join(staging, partition);
+    if (!safeExistsSync(source)) continue;
+    const children = safeReaddir(source).filter((child) => child !== RESTORE_QUARANTINE_DIR);
     if (children.length === 0) continue;
-    const quarantineDir = path.join(partitionDir, RESTORE_QUARANTINE_DIR, stampId);
+    const quarantineDir = path.join(target, partition, RESTORE_QUARANTINE_DIR, stampId);
     safeMkdir(quarantineDir, { recursive: true });
-    const partitionMoved: string[] = [];
-    for (const child of children) {
-      safeMoveSync(path.join(partitionDir, child), path.join(quarantineDir, child));
-      partitionMoved.push(child);
-    }
+    for (const child of children)
+      placeStagedTree(path.join(source, child), path.join(quarantineDir, child));
     writeJson(path.join(quarantineDir, 'quarantine-manifest.json'), {
       format: 'kyberion-restore-revocable-quarantine-v1',
       tenant,
-      key: partition.key,
+      key: tenantRuntimePartitionOf(partition)?.key,
       created_at: nowIso(),
       reason: 'tenant_restore_must_not_revive_state_revoked_after_backup',
-      moved: partitionMoved,
+      moved: children,
     });
     quarantinePaths.push(path.relative(target, quarantineDir).split(path.sep).join('/'));
-    moved.push(...partitionMoved.map((child) => `${partition.path}/${child}`));
+    moved.push(...children.map((child) => `${partition}/${child}`));
   }
   return { quarantinePaths, moved };
+}
+
+function runTar(args: string[], errorPrefix: string): void {
+  const result = safeExecResult('tar', args, { timeoutMs: 120000, maxOutputMB: 50 });
+  if (result.status !== 0) {
+    throw new Error(
+      `${errorPrefix}: ${result.stderr || result.stdout || result.error?.message || 'command failed'}`
+    );
+  }
+}
+
+/**
+ * Extract an archive into `target` without ever extracting an append-only
+ * partition or (tenant restore) revocable state in place: those land in
+ * `staging` first, the ledgers are trimmed and verified there (a failure
+ * leaves the target untouched), then the main extraction excludes them, the
+ * ledgers move into their partitions and the revocable records into
+ * quarantine.
+ */
+export function extractWithStagedPartitions(input: {
+  plainArchive: string;
+  target: string;
+  staging: string;
+  members: string[];
+  archiveChainKeyId: string | undefined;
+  tenant: string | undefined;
+  stampId: string;
+}): {
+  trimmedTails: string[];
+  ledgerVerification: RestoredLedgerVerification;
+  quarantinePaths: string[];
+} {
+  const { plainArchive, target, staging, members } = input;
+  const staged = stagedRestorePartitions(members, Boolean(input.tenant));
+  const stagedPaths = [...staged.appendOnly, ...staged.revocable];
+  let trimmedTails: string[] = [];
+  let ledgerVerification: RestoredLedgerVerification = 'not_applicable';
+  if (stagedPaths.length > 0) {
+    safeMkdir(staging, { recursive: true });
+    runTar(
+      ['-xzf', plainArchive, '-C', staging, '--', ...stagedPaths],
+      'backup restore staging failed'
+    );
+    trimmedTails = trimRestoredLedgerTails(staging, members);
+    ledgerVerification = verifyRestoredTenantLedgers(staging, members, input.archiveChainKeyId);
+  }
+  safeMkdir(target, { recursive: true });
+  runTar(
+    [
+      ...stagedPaths.flatMap((partition) => ['--exclude', partition]),
+      '-xzf',
+      plainArchive,
+      '-C',
+      target,
+    ],
+    'backup restore extraction failed'
+  );
+  placeStagedAppendOnlyPartitions(staging, target, staged.appendOnly);
+  const quarantinePaths = input.tenant
+    ? quarantineStagedRevocableState(staging, target, staged.revocable, input.tenant, input.stampId)
+        .quarantinePaths
+    : [];
+  if (stagedPaths.length > 0) safeRmSync(staging, { recursive: true, force: true });
+  return { trimmedTails, ledgerVerification, quarantinePaths };
 }
