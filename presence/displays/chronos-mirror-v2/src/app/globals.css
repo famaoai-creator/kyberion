@@ -2028,6 +2028,79 @@ body {
   gap: var(--kb-ui-space-2);
 }
 
+/* CD-12 customer decisions card: a table while the card is wide, stacked
+   label/value cards when it is narrow (container query on the card, so a
+   squeezed column never wraps one character per line). */
+.chronos-cd {
+  container-type: inline-size;
+}
+
+.chronos-cd-rows__stacked {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  gap: var(--kb-ui-space-2);
+}
+
+.chronos-cd-card {
+  padding: var(--kb-ui-space-3);
+  border: 1px solid var(--kb-ui-border);
+  border-radius: var(--kb-ui-radius-md);
+  background: var(--kb-ui-surface);
+}
+
+.chronos-cd-card__head {
+  margin-bottom: var(--kb-ui-space-2);
+}
+
+.chronos-cd-card__title {
+  display: flex;
+  flex-direction: column;
+  gap: var(--kb-ui-space-1);
+  color: var(--kb-ui-text);
+}
+
+.chronos-cd-card__id {
+  font-family: var(--kb-ui-font-mono);
+  font-size: var(--kb-ui-font-size-xs);
+  color: var(--kb-ui-text-muted);
+  overflow-wrap: anywhere;
+}
+
+.chronos-cd-card__fields {
+  display: grid;
+  gap: var(--kb-ui-space-1);
+  margin: 0;
+}
+
+.chronos-cd-card__field {
+  display: grid;
+  grid-template-columns: minmax(6.5rem, 38%) minmax(0, 1fr);
+  gap: var(--kb-ui-space-2);
+  font-size: var(--kb-ui-font-size-sm);
+}
+
+.chronos-cd-card__field dt {
+  color: var(--kb-ui-text-muted);
+}
+
+.chronos-cd-card__field dd {
+  margin: 0;
+  color: var(--kb-ui-text);
+  overflow-wrap: anywhere;
+}
+
+@container (max-width: 720px) {
+  .chronos-cd-rows__wide {
+    display: none;
+  }
+
+  .chronos-cd-rows__stacked {
+    display: grid;
+  }
+}
+
 /* Collaboration tree rows: indent by depth, stage as a quiet prefix. */
 .chronos-tree-node {
   display: inline-flex;

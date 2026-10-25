@@ -310,6 +310,7 @@
         "capture_avatar_photo",
         "continuous_operations",
         "continuous_operations_report",
+        "customer_decision_learning",
         "customer_decision_reminders",
         "generate_avatar",
         "grant_voice_consent",

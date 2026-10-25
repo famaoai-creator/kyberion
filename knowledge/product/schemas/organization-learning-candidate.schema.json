@@ -35,7 +35,8 @@
         "routine_exception",
         "project_closure",
         "governance_decision",
-        "runtime_signal"
+        "runtime_signal",
+        "customer_decision"
       ]
     },
     "source_ref": { "type": "string", "minLength": 1 },

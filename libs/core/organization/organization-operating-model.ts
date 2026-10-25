@@ -369,14 +369,17 @@ export interface OrganizationDecisionRecord {
 /**
  * `runtime_signal` is a recurring failure the learning-signal adapter clustered
  * from a runtime log (conversation, approvals, audit, traces, ...); the
- * originating log is named in `metadata.signal_source`.
+ * originating log is named in `metadata.signal_source`. `customer_decision`
+ * is a CD-12 suggestion from a tenant's customer decisions (`customer-decision
+ * learning`): `metadata` names the template, entry and suggested change.
  */
 export type OrganizationLearningSourceType =
   | 'incident_review'
   | 'routine_exception'
   | 'project_closure'
   | 'governance_decision'
-  | 'runtime_signal';
+  | 'runtime_signal'
+  | 'customer_decision';
 
 export interface OrganizationLearningCandidate {
   version: string;

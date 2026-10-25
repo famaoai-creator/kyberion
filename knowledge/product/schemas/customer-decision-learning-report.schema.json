@@ -1,0 +1,206 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "customer-decision-learning-report.schema.json",
+  "title": "Customer Decision Learning Report",
+  "description": "CD-12 tenant learning report (knowledge/confidential/<tenant>/decisions/_reports/learning-<YYYY-MM-DD>.json, written by `customer-decision learning`): how often our decisions and organization defaults were overturned, recurring questions and change requests per entry, and the improvement suggestions queued as organization learning candidates. Counts, ids and offered option values only; never the customer's free text.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "tenant_slug",
+    "report_date",
+    "generated_at",
+    "since",
+    "thresholds",
+    "metrics",
+    "suggestions"
+  ],
+  "definitions": {
+    "subject": {
+      "type": "object",
+      "required": ["item", "key", "template_id", "entry_id"],
+      "properties": {
+        "item": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "key": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "template_id": { "type": ["string", "null"], "pattern": "^[a-z][a-z0-9-]{0,80}$" },
+        "entry_id": { "type": ["string", "null"], "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" }
+      }
+    },
+    "count": { "type": "integer", "minimum": 0 },
+    "rate": { "type": "number", "minimum": 0, "maximum": 1 },
+    "values": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["value", "count"],
+        "properties": {
+          "value": {},
+          "count": { "$ref": "#/definitions/count" }
+        }
+      }
+    },
+    "overturn": {
+      "type": "object",
+      "allOf": [{ "$ref": "#/definitions/subject" }],
+      "required": [
+        "from_layer",
+        "decided",
+        "overturned",
+        "kept",
+        "overturn_rate",
+        "proposed_values",
+        "customer_values",
+        "other_values"
+      ],
+      "properties": {
+        "from_layer": { "type": "string", "enum": ["ours", "org_default"] },
+        "decided": { "$ref": "#/definitions/count" },
+        "overturned": { "$ref": "#/definitions/count" },
+        "kept": { "$ref": "#/definitions/count" },
+        "overturn_rate": { "$ref": "#/definitions/rate" },
+        "proposed_values": { "$ref": "#/definitions/values" },
+        "customer_values": { "$ref": "#/definitions/values" },
+        "other_values": { "$ref": "#/definitions/count" },
+        "current_org_default": {}
+      }
+    }
+  },
+  "properties": {
+    "version": { "type": "string", "enum": ["1.0.0"] },
+    "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" },
+    "report_date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "since": { "type": ["string", "null"] },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_samples",
+        "min_overturn_rate",
+        "min_value_count",
+        "min_change_requests",
+        "min_change_request_rate",
+        "min_questions"
+      ],
+      "properties": {
+        "min_samples": { "$ref": "#/definitions/count" },
+        "min_overturn_rate": { "$ref": "#/definitions/rate" },
+        "min_value_count": { "$ref": "#/definitions/count" },
+        "min_change_requests": { "$ref": "#/definitions/count" },
+        "min_change_request_rate": { "$ref": "#/definitions/rate" },
+        "min_questions": { "$ref": "#/definitions/count" }
+      }
+    },
+    "metrics": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "cases",
+        "agendas",
+        "receipts",
+        "switches",
+        "overturn_by_item_key",
+        "overturn_by_template_entry",
+        "questions_by_entry",
+        "questions_by_agenda",
+        "change_requests_by_entry"
+      ],
+      "properties": {
+        "cases": { "$ref": "#/definitions/count" },
+        "agendas": { "$ref": "#/definitions/count" },
+        "receipts": { "$ref": "#/definitions/count" },
+        "switches": { "$ref": "#/definitions/count" },
+        "overturn_by_item_key": { "type": "array", "items": { "$ref": "#/definitions/overturn" } },
+        "overturn_by_template_entry": {
+          "type": "array",
+          "items": { "$ref": "#/definitions/overturn" }
+        },
+        "questions_by_entry": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "allOf": [{ "$ref": "#/definitions/subject" }],
+            "required": ["agendas", "off_option", "comments"],
+            "properties": {
+              "agendas": { "$ref": "#/definitions/count" },
+              "off_option": { "$ref": "#/definitions/count" },
+              "comments": { "$ref": "#/definitions/count" }
+            }
+          }
+        },
+        "questions_by_agenda": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["case_id", "agenda_id", "receipts", "general_questions"],
+            "properties": {
+              "case_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,80}$" },
+              "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+              "receipts": { "$ref": "#/definitions/count" },
+              "general_questions": { "$ref": "#/definitions/count" }
+            }
+          }
+        },
+        "change_requests_by_entry": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "allOf": [{ "$ref": "#/definitions/subject" }],
+            "required": [
+              "kind",
+              "answers",
+              "change_requests",
+              "request_changes",
+              "reject",
+              "rate",
+              "requested_values"
+            ],
+            "properties": {
+              "kind": { "type": "string", "enum": ["choice", "approval", "ranking", "hearing"] },
+              "answers": { "$ref": "#/definitions/count" },
+              "change_requests": { "$ref": "#/definitions/count" },
+              "request_changes": { "$ref": "#/definitions/count" },
+              "reject": { "$ref": "#/definitions/count" },
+              "rate": { "$ref": "#/definitions/rate" },
+              "requested_values": { "$ref": "#/definitions/values" }
+            }
+          }
+        }
+      }
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "allOf": [{ "$ref": "#/definitions/subject" }],
+        "required": ["suggestion_key", "kind", "evidence", "learning_id"],
+        "properties": {
+          "suggestion_key": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "kind": {
+            "type": "string",
+            "enum": ["change_org_default", "revise_options", "clarify_entry"]
+          },
+          "current_org_default": {},
+          "suggested_org_default": {},
+          "evidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["samples", "count"],
+            "properties": {
+              "samples": { "$ref": "#/definitions/count" },
+              "count": { "$ref": "#/definitions/count" },
+              "rate": { "$ref": "#/definitions/rate" }
+            }
+          },
+          "learning_id": { "type": "string", "pattern": "^cdl-[a-f0-9]{16}$" },
+          "candidate": {
+            "type": "string",
+            "enum": ["created", "existing", "refused", "failed"]
+          }
+        }
+      }
+    }
+  }
+}
