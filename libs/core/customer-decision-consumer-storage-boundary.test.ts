@@ -98,7 +98,12 @@ function seedCase(tenant: string): void {
   );
 }
 
-function customerDecides(tenant: string): void {
+function customerDecides(
+  tenant: string,
+  item = 'NFR',
+  key = 'auth.method',
+  value: unknown = 'sso'
+): void {
   authority.withExecutionContext(
     'decision_ledger',
     () =>
@@ -106,11 +111,11 @@ function customerDecides(tenant: string): void {
         { tenantSlug: tenant, caseId: CASE },
         [
           {
-            item: 'NFR',
-            key: 'auth.method',
+            item,
+            key,
             level: 'customer-value',
             state: 'decided',
-            value: 'sso',
+            value,
             basis: [{ ref: 'agenda:agd-boundary01', version: 'h' }],
             origin: 'facade',
             decided_by: {
@@ -608,18 +613,29 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
       const putAgenda = (
         agendaId: string,
         status: 'draft' | 'withdrawn' | 'closed',
-        entry: Record<string, unknown>
+        entry: Record<string, unknown>,
+        extra: Record<string, unknown> = {}
       ) =>
         authority.withExecutionContext(
           'decision_ledger',
           () =>
             store.writeAgenda(
               { tenantSlug: TENANT, caseId: CASE },
-              { ...agenda(TENANT), agenda_id: agendaId, status, entries: [entry as never] }
+              {
+                ...agenda(TENANT),
+                agenda_id: agendaId,
+                status,
+                entries: [entry as never],
+                ...extra,
+              }
             ),
           'sovereign',
           TENANT
         );
+      /** The facade's re-ask marker (only decision_ledger writes agendas). */
+      const marker = (proposalId: string, by = 'user:alice') => ({
+        reasked_proposals: [{ proposal_id: proposalId, consumer, by, at: LATER }],
+      });
       /** A held task whose question the operator collected onto agd-old00001. */
       function collected(): { lock: LockJson; proposalId: string } {
         seedCase(TENANT);
@@ -698,7 +714,8 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
 
       it('allows the exact relink only once the old agenda is closed and onto a requires_customer entry', () => {
         const { lock, proposalId } = collected();
-        putAgenda('agd-new00001', 'draft', { ...ENTRY, entry_id: proposalId });
+        putAgenda('agd-new00001', 'draft', { ...ENTRY, entry_id: proposalId }, marker(proposalId));
+        putAgenda('agd-unmarked1', 'draft', { ...ENTRY, entry_id: proposalId });
         putAgenda('agd-plain0001', 'draft', {
           ...ENTRY,
           entry_id: proposalId,
@@ -724,6 +741,21 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
         // A forged relink onto an agenda that does not exist.
         expect(() => writeLock(relinkTo(lock, proposalId, 'agd-missing01'))).toThrow(
           /re-asked on an agenda that is open/u
+        );
+        // A worker relink onto an open requires_customer entry the facade never marked.
+        expect(() => writeLock(relinkTo(lock, proposalId, 'agd-unmarked1'))).toThrow(
+          /only onto an agenda the operator facade marked for it/u
+        );
+        // The marker names another member than the link's relinked_by.
+        const byBob = (p: Record<string, unknown>) => ({
+          ...p,
+          previous_links: (p.previous_links as Array<Record<string, unknown>>).map((link) => ({
+            ...link,
+            relinked_by: 'user:bob',
+          })),
+        });
+        expect(() => writeLock(relinkTo(lock, proposalId, 'agd-new00001', byBob))).toThrow(
+          /only onto an agenda the operator facade marked for it/u
         );
         expect(() =>
           writeLock(
@@ -814,7 +846,21 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
 
       it('superseded is added once, alone, by another task of the mission; the lock is frozen', () => {
         const { lock } = collected();
-        const by = { by_consumer: `${consumer}-v2`, by_task_id: 'build-v2', at: LATER };
+        const by = {
+          by_consumer: `${consumer}-v2`,
+          by_task_id: 'build-v2',
+          at: LATER,
+          approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+        };
+        // B1: a mark that names no approval (or not a request id) is refused.
+        const { approval_request_id: _approval, ...unapproved } = by;
+        void _approval;
+        expect(() => writeLock({ ...lock, superseded: unapproved })).toThrow(
+          /only with the approval request that authorized it/u
+        );
+        expect(() =>
+          writeLock({ ...lock, superseded: { ...by, approval_request_id: 'apr-forged' } })
+        ).toThrow(/only with the approval request that authorized it/u);
         expect(() =>
           writeLock({ ...lock, superseded: { ...by, by_consumer: 'mission-MSN-OTHER.build-v2' } })
         ).toThrow(/superseded only by another task of the same mission/u);
@@ -847,6 +893,79 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
         expect(() =>
           store.supersededConsumedDecisionLock(superseded, { ...by, by_task_id: 'build-v3' })
         ).toThrow(/already superseded by another task/u);
+        expect(() =>
+          store.supersededConsumedDecisionLock(superseded, {
+            ...by,
+            approval_request_id: '1f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+          })
+        ).toThrow(/already superseded/u);
+      });
+
+      it('re-asks a released proposal only when nothing can release it (the consumption rule)', () => {
+        const { lock, proposalId } = collected();
+        customerDecides(TENANT, 'RELEASE', 'release.go', { approved: true });
+        // Stamp the release on the old link as the facade's store could (decision_ledger).
+        const stamp = (status?: 'completed') =>
+          authority.withExecutionContext(
+            'decision_ledger',
+            () => {
+              const location = { tenantSlug: TENANT, caseId: CASE };
+              const current = store.readConsumedDecisionLock(location, consumer)!;
+              store.writeConsumedDecisionLock(location, {
+                ...current,
+                ...(status ? { status, completed_at: LATER } : {}),
+                decisions: current.decisions.map((entry) =>
+                  entry.proposal?.proposal_id === proposalId
+                    ? {
+                        ...entry,
+                        proposal: {
+                          ...entry.proposal,
+                          resolved: { decision_id: 'D-0001', at: LATER },
+                        },
+                      }
+                    : entry
+                ),
+              });
+            },
+            'sovereign',
+            TENANT
+          );
+        const relinkStamped = (current: LockJson) =>
+          relinkTo(current, proposalId, 'agd-new00001', ({ resolved: _stale, ...p }) => ({
+            ...p,
+            previous_links: (p.previous_links as Array<Record<string, unknown>>).map((link) => ({
+              ...link,
+              resolved: { decision_id: 'D-0001', at: LATER },
+            })),
+          }));
+        putAgenda('agd-old00001', 'withdrawn', { ...ENTRY, entry_id: proposalId });
+        putAgenda('agd-new00001', 'draft', { ...ENTRY, entry_id: proposalId }, marker(proposalId));
+        // The old agenda confirmed a decision that still stands: it delivers, no re-ask.
+        putAgenda(
+          'agd-old00001',
+          'withdrawn',
+          { ...ENTRY, entry_id: proposalId },
+          {
+            operator_confirmations: [
+              { entry_id: proposalId, decision_id: 'D-0001', by: 'user:boss', at: LATER },
+            ],
+          }
+        );
+        expect(() => writeLock(relinkTo(lock, proposalId, 'agd-new00001'))).toThrow(
+          /confirmed a standing customer decision is not re-asked/u
+        );
+        putAgenda('agd-old00001', 'withdrawn', { ...ENTRY, entry_id: proposalId });
+        // Released on a decision that still stands (the shared standing predicate).
+        stamp();
+        expect(() => writeLock(relinkStamped(readLock()))).toThrow(
+          /re-asked only when its decision no longer stands/u
+        );
+        // A task that completed with its release trusts it.
+        stamp('completed');
+        expect(() => writeLock(relinkStamped(readLock()))).toThrow(
+          /of a task that completed is not re-asked/u
+        );
+        expect(lock.hold).toBeDefined();
       });
 
       it('a new lock is never superseded and never carries earlier links', () => {

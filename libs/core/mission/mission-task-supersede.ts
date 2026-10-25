@@ -79,11 +79,22 @@ import type {
   MissionTaskSupersededRecord,
 } from './mission-orchestration-worker-contracts.js';
 import { loadState, saveState } from './mission-state.js';
+import {
+  MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
+  missionTaskSupersedeEffectBinding,
+  missionTaskSupersedePayloadFromHash,
+} from './mission-task-supersede-proof.js';
+import { readJson, readJsonLines } from '../foundation/json.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import { getMissionLabel } from './mission-workitem-dispatch-review.js';
 import type { MissionState } from './mission-types.js';
 
-export const MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL = 'mission-task-supersede';
+export {
+  MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
+  missionTaskSupersedeEffectBinding,
+  isTaskVerifiablySuperseded,
+  missionTaskSupersedeProof,
+} from './mission-task-supersede-proof.js';
 /** A human approval older than this no longer authorizes the supersede (PI-05 precedent). */
 const APPROVAL_TTL_MS = 72 * 60 * 60 * 1000;
 
@@ -144,21 +155,16 @@ function normalizeInput(input: MissionTaskSupersedeInput): MissionTaskSupersedeI
   return { missionId, taskId, byTaskId, reason };
 }
 
-export function missionTaskSupersedeEffectBinding(missionId: string, taskId: string): string {
-  return `mission-task-supersede:${missionId.toUpperCase()}:${taskId}`;
-}
-
 export function missionTaskSupersedeApprovalPayload(
   input: MissionTaskSupersedeInput
 ): Record<string, string> {
   const normalized = normalizeInput(input);
-  return {
-    mission_id: normalized.missionId,
-    task_id: normalized.taskId,
-    by_task_id: normalized.byTaskId,
-    reason_sha256: sha256Text(normalized.reason),
-    effect: missionTaskSupersedeEffectBinding(normalized.missionId, normalized.taskId),
-  };
+  return missionTaskSupersedePayloadFromHash({
+    missionId: normalized.missionId,
+    taskId: normalized.taskId,
+    byTaskId: normalized.byTaskId,
+    reasonSha256: sha256Text(normalized.reason),
+  });
 }
 
 /** The executing actor (persona, else the OS user), as reconcile-work records it. */
@@ -226,6 +232,26 @@ interface SupersedePlan {
   views: Map<string, TaskView>;
   items: Map<string, WorkItem>;
   dependents: string[];
+  /** A partly applied supersede under this approval: its record, to finish it (M1). */
+  resumed?: MissionTaskSupersededRecord;
+}
+
+function supersededRecordOf(value: unknown): MissionTaskSupersededRecord | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as Record<string, unknown>;
+  return typeof record.by_task_id === 'string' &&
+    typeof record.approval_request_id === 'string' &&
+    typeof record.reason_sha256 === 'string' &&
+    typeof record.at === 'string' &&
+    typeof record.actor_id === 'string'
+    ? (record as unknown as MissionTaskSupersededRecord)
+    : undefined;
+}
+
+/** A completed or superseded task: never rewritten, never a reason to refuse. */
+function isClosedTask(view: TaskView): boolean {
+  const status = String(view.status || 'planned').toLowerCase();
+  return MISSION_TASK_COMPLETED_STATUSES.has(status) || status === MISSION_TASK_SUPERSEDED_STATUS;
 }
 
 function taskDependencies(task: Record<string, unknown> | undefined): string[] {
@@ -239,7 +265,10 @@ function taskDependencies(task: Record<string, unknown> | undefined): string[] {
  * dependencies winning, as readPlannedTasks does) and check every
  * precondition. Throws with the first refusal.
  */
-function planSupersede(input: MissionTaskSupersedeInput): SupersedePlan {
+function planSupersede(
+  input: MissionTaskSupersedeInput,
+  resume?: { approvalRequestId: string; reasonSha256: string }
+): SupersedePlan {
   const { missionId, taskId, byTaskId } = input;
   const missionPath = findMissionPath(missionId);
   if (!missionPath) throw new Error(`Mission ${missionId} not found`);
@@ -257,10 +286,12 @@ function planSupersede(input: MissionTaskSupersedeInput): SupersedePlan {
   for (const [id, item] of items) {
     const current = views.get(id) ?? { task_id: id };
     const canonicalDependencies = (item.dependencies || []).map(String).filter(Boolean);
+    const itemRecord = supersededRecordOf(item.metadata?.superseded);
     views.set(id, {
       ...current,
       status: itemTaskStatus(item),
       ...(canonicalDependencies.length > 0 ? { dependencies: canonicalDependencies } : {}),
+      ...(!current.superseded && itemRecord ? { superseded: itemRecord } : {}),
     });
   }
 
@@ -274,16 +305,35 @@ function planSupersede(input: MissionTaskSupersedeInput): SupersedePlan {
     );
   }
   const oldStatus = String(old.status || 'planned').toLowerCase();
-  if (MISSION_TASK_COMPLETED_STATUSES.has(oldStatus)) {
-    throw new Error(`Task ${taskId} is already ${oldStatus}; a completed task is not superseded`);
+  // M1: a supersede under this very approval that stopped part-way is finished,
+  // never refused (every effect below is idempotent).
+  const priorRecord =
+    supersededRecordOf(old.superseded) ??
+    supersededRecordOf(items.get(taskId)?.metadata?.superseded);
+  const resumed =
+    resume &&
+    priorRecord &&
+    priorRecord.approval_request_id === resume.approvalRequestId &&
+    priorRecord.by_task_id === byTaskId &&
+    priorRecord.reason_sha256 === resume.reasonSha256 &&
+    (oldStatus === MISSION_TASK_SUPERSEDED_STATUS ||
+      items.get(taskId)?.metadata?.superseded_by === byTaskId)
+      ? priorRecord
+      : undefined;
+  // The old task's own preconditions held when a resumed run started; only
+  // the dependents are recomputed for it.
+  if (!resumed) {
+    if (MISSION_TASK_COMPLETED_STATUSES.has(oldStatus)) {
+      throw new Error(`Task ${taskId} is already ${oldStatus}; a completed task is not superseded`);
+    }
+    if (oldStatus === MISSION_TASK_SUPERSEDED_STATUS) {
+      throw new Error(`Task ${taskId} is already superseded`);
+    }
+    if (oldStatus === 'in_progress') {
+      throw new Error(`Task ${taskId} is in progress; wait until its attempt ends`);
+    }
   }
-  if (oldStatus === MISSION_TASK_SUPERSEDED_STATUS) {
-    throw new Error(`Task ${taskId} is already superseded`);
-  }
-  if (oldStatus === 'in_progress') {
-    throw new Error(`Task ${taskId} is in progress; wait until its attempt ends`);
-  }
-  const oldItem = items.get(taskId);
+  const oldItem = resumed ? undefined : items.get(taskId);
   if (oldItem) {
     // A blocked item's attempt has ended (a held task never ran) even while
     // its scheduling lease has not expired yet; any other leased item is live.
@@ -327,7 +377,9 @@ function planSupersede(input: MissionTaskSupersedeInput): SupersedePlan {
   const rawById = new Map(nextTasks.map((task) => [String(task.task_id || '').trim(), task]));
   const dependents: string[] = [];
   for (const view of views.values()) {
-    if (view.task_id === taskId || isTaskSuperseded(view)) continue;
+    // A closed task (completed or superseded) keeps its history: neither
+    // rewritten nor a reason to refuse (m2).
+    if (view.task_id === taskId || isClosedTask(view)) continue;
     // Canonical (WorkItem) or board (NEXT_TASKS) dependency: both are rewritten.
     if (
       !taskDependencies(view).includes(taskId) &&
@@ -352,6 +404,7 @@ function planSupersede(input: MissionTaskSupersedeInput): SupersedePlan {
     views,
     items,
     dependents: dependents.sort(),
+    ...(resumed ? { resumed } : {}),
   };
 }
 
@@ -512,12 +565,34 @@ function withRewrite(
     : [...previous, rewrite];
 }
 
+/** Has the execution ledger recorded this supersede already (same approval)? */
+function ledgerHasSupersede(missionPath: string, taskId: string, approvalId: string): boolean {
+  const ledgerPath = nodePath.join(missionPath, 'execution-ledger.jsonl');
+  if (!safeExistsSync(ledgerPath)) return false;
+  return readJsonLines<Record<string, unknown> | null>(ledgerPath, {
+    onMalformed: 'skip',
+    map: (value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null,
+  }).some(
+    (entry) =>
+      entry?.event_type === 'task_superseded' &&
+      entry.task_id === taskId &&
+      (entry.payload as Record<string, unknown> | undefined)?.approval_request_id === approvalId
+  );
+}
+
 /**
  * Supersede a mission task (see the module header). `dryRun` checks every
- * precondition and reports the dependents it would move; the apply run needs
- * an approved, hash-bound, authenticated human `mission_gate` request.
- * Re-running an applied supersede with the same approval only retries the
- * consumer lock mark (`already_superseded`).
+ * precondition, reports the dependents it would move and never writes; the
+ * apply run needs an approved, hash-bound, authenticated human `mission_gate`
+ * request.
+ *
+ * Every effect is idempotent and NEXT_TASKS (what the finish gate and the
+ * supersede proof read) is written last: a run that stops part-way is
+ * finished by re-running it with the same approval, and a complete one
+ * re-run reports `already_superseded` (it only retries the lock mark).
  */
 export async function supersedeMissionTask(
   rawInput: MissionTaskSupersedeInput & { dryRun?: boolean; approvalRequestId?: string }
@@ -532,75 +607,190 @@ export async function supersedeMissionTask(
     reason_sha256: reasonSha256,
   };
   const approvalRequestId = rawInput.approvalRequestId?.trim();
-  if (!rawInput.dryRun) {
-    if (!approvalRequestId) {
-      throw new Error(
-        '[POLICY_VIOLATION] supersede-task apply requires --approval-request-id for an authenticated human approval (open one with --request-approval)'
-      );
-    }
-    assertSupersedeApproval(approvalRequestId, input);
+  if (rawInput.dryRun) {
+    // m1: a dry run reads only.
+    const plan = planSupersede(input);
+    return {
+      status: 'dry_run_ready',
+      ...base,
+      rewritten_dependent_task_ids: plan.dependents,
+      work_item_ids_updated: [],
+      ...(approvalRequestId ? { approval_request_id: approvalRequestId } : {}),
+    };
   }
-
-  const missionPathForRerun = findMissionPath(input.missionId);
-  if (approvalRequestId && missionPathForRerun) {
-    // An applied supersede re-run with the same approval: retry the lock mark only.
-    const prior = readMissionNextTasks(missionPathForRerun).find(
-      (task) => String(task.task_id || '') === input.taskId
+  if (!approvalRequestId) {
+    throw new Error(
+      '[POLICY_VIOLATION] supersede-task apply requires --approval-request-id for an authenticated human approval (open one with --request-approval)'
     );
-    const priorMark = prior?.superseded as MissionTaskSupersededRecord | undefined;
-    if (
-      isTaskSuperseded(prior) &&
-      priorMark?.by_task_id === input.byTaskId &&
-      priorMark.approval_request_id === approvalRequestId &&
-      priorMark.reason_sha256 === reasonSha256
-    ) {
-      return {
-        status: 'already_superseded',
-        ...base,
-        rewritten_dependent_task_ids: [],
-        work_item_ids_updated: [],
-        approval_request_id: approvalRequestId,
-        receipt_path: pathResolver.toRepoRelative(
-          nodePath.join(missionPathForRerun, 'evidence', 'task-supersede', `${input.taskId}.json`)
-        ),
-        customer_decision_lock: markTaskDecisionLockSuperseded({
-          missionId: input.missionId,
-          taskId: input.taskId,
-          byTaskId: input.byTaskId,
-        }),
-      };
-    }
   }
+  assertSupersedeApproval(approvalRequestId, input);
+  const approvalId = approvalRequestId;
 
   const applied = await withLock(`mission-${input.missionId}`, async () => {
-    const plan = planSupersede(input);
-    if (rawInput.dryRun) {
-      return {
-        status: 'dry_run_ready' as const,
-        ...base,
-        rewritten_dependent_task_ids: plan.dependents,
-        work_item_ids_updated: [],
-        ...(approvalRequestId ? { approval_request_id: approvalRequestId } : {}),
-      };
-    }
-    const approvalId = approvalRequestId!;
-    const at = nowIso();
+    const plan = planSupersede(input, { approvalRequestId: approvalId, reasonSha256 });
     const executor = actorId();
-    const record: MissionTaskSupersededRecord = {
+    const record: MissionTaskSupersededRecord = plan.resumed ?? {
       by_task_id: input.byTaskId,
-      at,
+      at: nowIso(),
       actor_id: executor,
       reason_sha256: reasonSha256,
       approval_request_id: approvalId,
     };
+    const at = record.at;
     const rewrite: MissionTaskDependencyRewrite = { from: input.taskId, to: input.byTaskId, at };
     const dependents = new Set(plan.dependents);
+    let changed = false;
 
-    // 1. NEXT_TASKS (what the finish gate reads).
+    // 1. Canonical WorkItems: the old one archived with superseded_by, the
+    //    dependents' dependencies moved (each skipped once done).
+    const workItemIdsUpdated: string[] = [];
+    const oldItem = plan.items.get(input.taskId);
+    if (oldItem) {
+      const current = getWorkItem(oldItem.item_id) ?? oldItem;
+      if (current.status !== 'archived' || current.metadata?.superseded_by !== input.byTaskId) {
+        updateWorkItem({
+          itemId: current.item_id,
+          expectedVersion: current.version,
+          status: 'archived',
+          metadata: {
+            ...(current.metadata || {}),
+            superseded_by: input.byTaskId,
+            superseded: record,
+            summary: `Superseded by ${input.byTaskId}`,
+          },
+        });
+        workItemIdsUpdated.push(current.item_id);
+      }
+    }
+    for (const dependentId of plan.dependents) {
+      const item = plan.items.get(dependentId);
+      if (!item) continue;
+      const current = getWorkItem(item.item_id) ?? item;
+      const metadata = current.metadata || {};
+      const canonical = rewriteDependencies(
+        (current.dependencies || []).map(String),
+        input.taskId,
+        input.byTaskId
+      );
+      const metadataDependencies = Array.isArray(metadata.dependencies)
+        ? rewriteDependencies(
+            (metadata.dependencies as unknown[]).map(String),
+            input.taskId,
+            input.byTaskId
+          )
+        : null;
+      if (!canonical.changed && !metadataDependencies?.changed) continue;
+      updateWorkItem({
+        itemId: current.item_id,
+        expectedVersion: current.version,
+        ...(canonical.changed ? { dependencies: canonical.dependencies } : {}),
+        metadata: {
+          ...metadata,
+          ...(metadataDependencies?.changed
+            ? { dependencies: metadataDependencies.dependencies }
+            : {}),
+          dependencies_rewritten_from: withRewrite(metadata.dependencies_rewritten_from, rewrite),
+        },
+      });
+      workItemIdsUpdated.push(current.item_id);
+    }
+    if (workItemIdsUpdated.length > 0) changed = true;
+
+    // 2. Receipt (the only place the reason text is kept), then the audit
+    //    entry it records as written (so a re-run never audits twice).
+    const receiptPath = nodePath.join(
+      plan.missionPath,
+      'evidence',
+      'task-supersede',
+      `${input.taskId.replace(/[^a-zA-Z0-9._-]/gu, '-')}.json`
+    );
+    const receiptRelative = pathResolver.toRepoRelative(receiptPath);
+    const receiptBody = (auditRecordedAt?: string) => ({
+      kind: 'mission-task-supersede-receipt',
+      version: '1.0.0',
+      ...base,
+      reason: input.reason,
+      superseded: record,
+      rewritten_dependent_task_ids: plan.dependents,
+      ...(auditRecordedAt ? { audit_recorded_at: auditRecordedAt } : {}),
+    });
+    const existingReceipt = safeExistsSync(receiptPath)
+      ? readJson<Record<string, unknown>>(receiptPath)
+      : undefined;
+    const writeReceipt = (auditRecordedAt?: string) =>
+      writeDispatchArtifact(receiptPath, receiptBody(auditRecordedAt), {
+        missionId: input.missionId,
+        missionPath: plan.missionPath,
+      });
+    if (!existingReceipt) {
+      writeReceipt();
+      changed = true;
+    }
+    // A receipt left unstamped by an earlier run may sit after a recorded
+    // audit (a crash between the two): look for that run's entry, keyed by
+    // the approval, before recording. A fresh receipt cannot have one (the
+    // audit always follows the receipt), so the chain is scanned only then.
+    const auditedBefore =
+      existingReceipt !== undefined &&
+      typeof existingReceipt.audit_recorded_at !== 'string' &&
+      auditChain
+        .loadAll()
+        .some(
+          (entry) =>
+            entry.action === 'mission.task_superseded' &&
+            entry.metadata?.approval_request_id === approvalId &&
+            entry.metadata?.task_id === input.taskId
+        );
+    if (auditedBefore) {
+      writeReceipt(nowIso());
+      changed = true;
+    } else if (typeof existingReceipt?.audit_recorded_at !== 'string') {
+      auditChain.record({
+        agentId: executor,
+        action: 'mission.task_superseded',
+        operation: `supersede-task:${input.missionId}`,
+        result: 'completed',
+        metadata: {
+          mission_id: input.missionId,
+          task_id: input.taskId,
+          by_task_id: input.byTaskId,
+          reason_sha256: reasonSha256,
+          approval_request_id: approvalId,
+          rewritten_dependent_task_ids: plan.dependents,
+          receipt_path: receiptRelative,
+        },
+      });
+      writeReceipt(nowIso());
+      changed = true;
+    }
+
+    // 3. Execution ledger (once per approval).
+    if (!ledgerHasSupersede(plan.missionPath, input.taskId, approvalId)) {
+      appendMissionExecutionLedgerEntry({
+        mission_id: input.missionId,
+        mission_path_hint: plan.missionPath,
+        event_type: 'task_superseded',
+        task_id: input.taskId,
+        actor_id: executor,
+        actor_type: 'human',
+        decision: `superseded by ${input.byTaskId}`,
+        evidence: [receiptRelative],
+        payload: {
+          by_task_id: input.byTaskId,
+          reason_sha256: reasonSha256,
+          approval_request_id: approvalId,
+          rewritten_dependent_task_ids: plan.dependents,
+        },
+      });
+      changed = true;
+    }
+
+    // 4. NEXT_TASKS last: the finish gate and the supersede proof read it.
     let nextTasksChanged = false;
     const nextTasks = plan.nextTasks.map((task) => {
       const id = String(task.task_id || '').trim();
       if (id === input.taskId) {
+        if (isTaskSuperseded(task) && supersededRecordOf(task.superseded)) return task;
         nextTasksChanged = true;
         return { ...task, status: MISSION_TASK_SUPERSEDED_STATUS, superseded: record };
       }
@@ -614,150 +804,50 @@ export async function supersedeMissionTask(
         dependencies_rewritten_from: withRewrite(task.dependencies_rewritten_from, rewrite),
       };
     });
-    if (nextTasksChanged) writeMissionNextTasks(plan.missionPath, nextTasks);
-
-    // 2. Canonical WorkItems: they win over NEXT_TASKS in every projection.
-    const workItemIdsUpdated: string[] = [];
-    const oldItem = plan.items.get(input.taskId);
-    if (oldItem) {
-      const current = getWorkItem(oldItem.item_id) ?? oldItem;
-      updateWorkItem({
-        itemId: current.item_id,
-        expectedVersion: current.version,
-        status: 'archived',
-        metadata: {
-          ...(current.metadata || {}),
-          superseded_by: input.byTaskId,
-          superseded: record,
-          summary: `Superseded by ${input.byTaskId}`,
-        },
-      });
-      workItemIdsUpdated.push(current.item_id);
-    }
-    for (const dependentId of plan.dependents) {
-      const item = plan.items.get(dependentId);
-      if (!item) continue;
-      const current = getWorkItem(item.item_id) ?? item;
-      const canonical = rewriteDependencies(
-        (current.dependencies || []).map(String),
-        input.taskId,
-        input.byTaskId
-      );
-      const metadataDependencies = Array.isArray(current.metadata?.dependencies)
-        ? rewriteDependencies(
-            (current.metadata.dependencies as unknown[]).map(String),
-            input.taskId,
-            input.byTaskId
-          )
-        : null;
-      if (!canonical.changed && !metadataDependencies?.changed) continue;
-      updateWorkItem({
-        itemId: current.item_id,
-        expectedVersion: current.version,
-        ...(canonical.changed ? { dependencies: canonical.dependencies } : {}),
-        metadata: {
-          ...(current.metadata || {}),
-          ...(metadataDependencies?.changed
-            ? { dependencies: metadataDependencies.dependencies }
-            : {}),
-          dependencies_rewritten_from: withRewrite(
-            current.metadata?.dependencies_rewritten_from,
-            rewrite
-          ),
-        },
-      });
-      workItemIdsUpdated.push(current.item_id);
+    if (nextTasksChanged) {
+      writeMissionNextTasks(plan.missionPath, nextTasks);
+      changed = true;
     }
 
-    // 3. Receipt (the only place the reason text is kept), ledger, history, audit.
-    const receiptPath = nodePath.join(
-      plan.missionPath,
-      'evidence',
-      'task-supersede',
-      `${input.taskId.replace(/[^a-zA-Z0-9._-]/gu, '-')}.json`
-    );
-    const receiptRelative = pathResolver.toRepoRelative(receiptPath);
-    writeDispatchArtifact(
-      receiptPath,
-      {
-        kind: 'mission-task-supersede-receipt',
-        version: '1.0.0',
-        ...base,
-        reason: input.reason,
-        superseded: record,
-        rewritten_dependent_task_ids: plan.dependents,
-        work_item_ids_updated: workItemIdsUpdated,
-      },
-      { missionId: input.missionId, missionPath: plan.missionPath }
-    );
-    appendMissionExecutionLedgerEntry({
-      mission_id: input.missionId,
-      mission_path_hint: plan.missionPath,
-      event_type: 'task_superseded',
-      task_id: input.taskId,
-      actor_id: executor,
-      actor_type: 'human',
-      decision: `superseded by ${input.byTaskId}`,
-      evidence: [receiptRelative],
-      payload: {
-        by_task_id: input.byTaskId,
-        reason_sha256: reasonSha256,
-        approval_request_id: approvalId,
-        rewritten_dependent_task_ids: plan.dependents,
-      },
-    });
-
-    // Commit like record-evidence, but only in the mission's own repository
-    // (never the enclosing checkout).
-    const missionRepo = safeExistsSync(nodePath.join(plan.missionPath, '.git'));
-    if (missionRepo) {
-      try {
-        safeExec('git', ['add', '.'], { cwd: plan.missionPath });
-        safeExec(
-          'git',
-          ['commit', '-m', `supersede(${input.missionId}): ${input.taskId} -> ${input.byTaskId}`],
-          { cwd: plan.missionPath }
-        );
-      } catch (_) {
-        logger.info('No new changes in mission repo after supersede-task.');
-      }
-    }
+    // 5. History (once per approval) and the commit, like record-evidence but
+    //    only in the mission's own repository (never the enclosing checkout).
     const currentState = loadState(input.missionId);
     if (!currentState) throw new Error(`Mission ${input.missionId} state disappeared`);
-    if (missionRepo) {
-      try {
-        const head = safeExec('git', ['rev-parse', 'HEAD'], { cwd: plan.missionPath }).trim();
-        if (head) currentState.git.latest_commit = head;
-      } catch (error) {
-        logger.warn(
-          `mission HEAD not refreshed after supersede-task — ${error instanceof Error ? error.message : String(error)} | the supersede is recorded; the next checkpoint refreshes it | mission=${input.missionId}`
-        );
+    const historyNote = `${input.taskId} superseded by ${input.byTaskId} (approval ${approvalId})`;
+    const hasHistory = currentState.history.some(
+      (entry) => entry.event === 'TASK_SUPERSEDED' && entry.note === historyNote
+    );
+    if (changed || !hasHistory) {
+      const missionRepo = safeExistsSync(nodePath.join(plan.missionPath, '.git'));
+      if (missionRepo) {
+        try {
+          safeExec('git', ['add', '.'], { cwd: plan.missionPath });
+          safeExec(
+            'git',
+            ['commit', '-m', `supersede(${input.missionId}): ${input.taskId} -> ${input.byTaskId}`],
+            { cwd: plan.missionPath }
+          );
+        } catch (_) {
+          logger.info('No new changes in mission repo after supersede-task.');
+        }
+        try {
+          const head = safeExec('git', ['rev-parse', 'HEAD'], { cwd: plan.missionPath }).trim();
+          if (head) currentState.git.latest_commit = head;
+        } catch (error) {
+          logger.warn(
+            `mission HEAD not refreshed after supersede-task — ${error instanceof Error ? error.message : String(error)} | the supersede is recorded; the next checkpoint refreshes it | mission=${input.missionId}`
+          );
+        }
       }
+      if (!hasHistory) {
+        currentState.history.push({ ts: at, event: 'TASK_SUPERSEDED', note: historyNote });
+        changed = true;
+      }
+      await saveState(input.missionId, currentState, { alreadyLocked: true });
     }
-    currentState.history.push({
-      ts: at,
-      event: 'TASK_SUPERSEDED',
-      note: `${input.taskId} superseded by ${input.byTaskId} (approval ${approvalId})`,
-    });
-    await saveState(input.missionId, currentState, { alreadyLocked: true });
 
-    auditChain.record({
-      agentId: executor,
-      action: 'mission.task_superseded',
-      operation: `supersede-task:${input.missionId}`,
-      result: 'completed',
-      metadata: {
-        mission_id: input.missionId,
-        task_id: input.taskId,
-        by_task_id: input.byTaskId,
-        reason_sha256: reasonSha256,
-        approval_request_id: approvalId,
-        rewritten_dependent_task_ids: plan.dependents,
-        receipt_path: receiptRelative,
-      },
-    });
     return {
-      status: 'applied' as const,
+      status: changed ? ('applied' as const) : ('already_superseded' as const),
       ...base,
       rewritten_dependent_task_ids: plan.dependents,
       work_item_ids_updated: workItemIdsUpdated,
@@ -765,15 +855,17 @@ export async function supersedeMissionTask(
       receipt_path: receiptRelative,
     };
   });
-  if (applied.status !== 'applied') return applied;
 
-  // 4. The task's customer-decision lock (best-effort; the case lock is taken
-  //    outside the mission lock, like every other task boundary).
+  // 6. The task's customer-decision lock, once the mission proves the
+  //    supersede (best-effort; the case lock is taken outside the mission lock).
   const lockMark = markTaskDecisionLockSuperseded({
     missionId: input.missionId,
     taskId: input.taskId,
     byTaskId: input.byTaskId,
+    approvalRequestId: approvalId,
   });
-  logger.success(`Superseded ${input.taskId} by ${input.byTaskId} in ${input.missionId}.`);
+  if (applied.status === 'applied') {
+    logger.success(`Superseded ${input.taskId} by ${input.byTaskId} in ${input.missionId}.`);
+  }
   return { ...applied, customer_decision_lock: lockMark };
 }

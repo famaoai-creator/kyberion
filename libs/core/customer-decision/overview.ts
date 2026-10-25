@@ -210,6 +210,12 @@ export interface CaseOverviewInput {
   invites: readonly CustomerDecisionInvite[];
   consumers: readonly ConsumedDecisionLockRecord[];
   now: string;
+  /**
+   * Is this lock superseded by a verified approval (the facade passes the
+   * mission-side verification)? A `superseded` mark alone is never trusted:
+   * without a verifier every lock counts as a live task.
+   */
+  isSuperseded?: (lock: ConsumedDecisionLockRecord) => boolean;
 }
 
 export function emptyStatusCounts(): OverviewStatusCounts {
@@ -363,8 +369,8 @@ export function buildCaseOverview(input: CaseOverviewInput): CaseOverview {
   let ready = 0;
   let unresolvable = 0;
   for (const lock of input.consumers) {
-    // A superseded task was replaced: its lock is frozen and asks nothing.
-    if (lock.superseded) continue;
+    // A task superseded by a verified approval was replaced: it asks nothing.
+    if (input.isSuperseded?.(lock)) continue;
     pendingProposals += pendingTaskProposals(lock).length;
     if (!lock.hold || lock.status !== 'in_progress') continue;
     const holds = taskProposalHolds(lock, input.agendas, input.ledger, input.now);

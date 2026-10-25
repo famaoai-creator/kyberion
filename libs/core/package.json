@@ -3768,6 +3768,10 @@
       "types": "./dist/mission/mission-task-recovery.d.ts",
       "default": "./dist/mission/mission-task-recovery.js"
     },
+    "./mission/mission-task-supersede-proof": {
+      "types": "./dist/mission/mission-task-supersede-proof.d.ts",
+      "default": "./dist/mission/mission-task-supersede-proof.js"
+    },
     "./mission/mission-task-supersede": {
       "types": "./dist/mission/mission-task-supersede.d.ts",
       "default": "./dist/mission/mission-task-supersede.js"

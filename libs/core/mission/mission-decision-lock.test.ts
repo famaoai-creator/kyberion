@@ -37,11 +37,13 @@ import {
   type MissionDecisionCase,
 } from './mission-decision-lock.js';
 import type { MissionState } from './mission-types.js';
+import { tryAutoCompleteTaskFromEvidence } from './mission-lifecycle-completion.js';
 
 const TENANT = 'acme-corp';
 const MISSION = 'MSN-CD09-LOCK';
 const NOW = '2026-10-24T00:00:00.000Z';
 const LATER = '2026-10-25T00:00:00.000Z';
+const APPROVAL_ID = '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6';
 
 function agenda(): DecisionAgenda {
   return {
@@ -1065,45 +1067,118 @@ describe('mission decision lock (CD-09)', () => {
         writeAgenda({ dir }, releaseAgenda(false));
         holdOn();
         expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+        const proven = { verifySuperseded: () => true };
         const marked = markTaskDecisionLockSuperseded(
-          { ...task, byTaskId: 'impl-v2' },
-          { decisionCase, now: LATER }
+          { ...task, byTaskId: 'impl-v2', approvalRequestId: APPROVAL_ID },
+          { decisionCase, now: LATER, ...proven }
         );
         expect(marked).toMatchObject({ case_found: true, marked: true, case_id: 'case-a' });
         expect(lockNow().superseded).toEqual({
           by_consumer: 'mission-MSN-CD09-LOCK.impl-v2',
           by_task_id: 'impl-v2',
           at: LATER,
+          approval_request_id: APPROVAL_ID,
         });
-        expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(false);
+        // The mission proves the supersede (approved, human): nothing to wait for.
+        expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER, ...proven })).toBe(
+          false
+        );
         // The customer's answer is confirmed later: the frozen lock is not released.
         decide('RELEASE', 'release.go', { approved: true });
         writeAgenda({ dir }, releaseAgenda(true));
         const swept = sweepDecisionConsumers(
           { tenantSlug: TENANT, caseId: 'case-a', location: { dir } },
-          { now: LATER }
+          { now: LATER, ...proven }
         );
         expect(swept.released_holds).toBeUndefined();
         expect(lockNow().hold).toEqual({ work_item_id: 'WI-TASK', at: NOW });
         // A re-run is idempotent; no lock means nothing to mark.
         expect(
           markTaskDecisionLockSuperseded(
-            { ...task, byTaskId: 'impl-v2' },
-            { decisionCase, now: LATER }
+            { ...task, byTaskId: 'impl-v2', approvalRequestId: APPROVAL_ID },
+            { decisionCase, now: LATER, ...proven }
           )
         ).toMatchObject({ marked: true, already_marked: true });
         expect(
           markTaskDecisionLockSuperseded(
-            { missionId: MISSION, taskId: 'never-pinned', byTaskId: 'impl-v2' },
-            { decisionCase, now: LATER }
+            {
+              missionId: MISSION,
+              taskId: 'never-pinned',
+              byTaskId: 'impl-v2',
+              approvalRequestId: APPROVAL_ID,
+            },
+            { decisionCase, now: LATER, ...proven }
           )
         ).toMatchObject({ case_found: true, marked: false });
         expect(
           markTaskDecisionLockSuperseded(
-            { ...task, byTaskId: 'impl-v2' },
+            { ...task, byTaskId: 'impl-v2', approvalRequestId: APPROVAL_ID },
             { decisionCase: null, now: LATER }
           )
         ).toMatchObject({ case_found: false, marked: false });
+        // Without the mission-side proof the lock is never marked.
+        expect(
+          markTaskDecisionLockSuperseded(
+            {
+              missionId: MISSION,
+              taskId: 'other',
+              byTaskId: 'impl-v2',
+              approvalRequestId: APPROVAL_ID,
+            },
+            { decisionCase, now: LATER }
+          )
+        ).toMatchObject({ marked: false, failed: true });
+      });
+
+      it('a worker that marks its own held lock superseded without an approved supersede stays held', () => {
+        const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+        writeAgenda({ dir }, releaseAgenda(false));
+        holdOn();
+        // The lock's owner writes the mark itself, skipping the mission check
+        // (the guard accepts the shape: it cannot see the mission side).
+        expect(
+          markTaskDecisionLockSuperseded(
+            { ...task, byTaskId: 'impl-v2', approvalRequestId: APPROVAL_ID },
+            { decisionCase, now: LATER, verifySuperseded: () => true }
+          )
+        ).toMatchObject({ marked: true });
+        expect(lockNow().superseded).toBeDefined();
+        // No NEXT_TASKS supersede backed by a human approval: the mark is ignored.
+        expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+        expect(warn).toHaveBeenCalledWith(
+          expect.stringMatching(/superseded mark ignored — SUPERSEDE_UNPROVEN \|/u)
+        );
+        // record-evidence: the held task is not auto-completed.
+        const missionDir = pathResolver.sharedTmp(`mission-decision-lock-forged-${randomUUID()}`);
+        try {
+          safeMkdir(`${missionDir}/evidence`, { recursive: true });
+          safeWriteFile(`${missionDir}/evidence/impl.md`, '# impl');
+          safeWriteFile(
+            `${missionDir}/NEXT_TASKS.json`,
+            JSON.stringify([
+              { task_id: 'impl', status: 'blocked', deliverable: 'evidence/impl.md' },
+            ])
+          );
+          const completion = tryAutoCompleteTaskFromEvidence(missionDir, 'impl', {
+            isHeld: (taskId) =>
+              isTaskAwaitingCustomerDecision(
+                { missionId: MISSION, taskId },
+                { decisionCase, now: LATER }
+              ),
+          });
+          expect(completion).toMatchObject({
+            completed: false,
+            reason: 'awaiting a customer decision',
+          });
+        } finally {
+          safeRmSync(missionDir, { recursive: true, force: true });
+        }
+        // Nor does the sweep treat it as superseded: the hold is checked as usual.
+        decide('RELEASE', 'release.go', { approved: true });
+        expect(
+          reconcileTaskDecisions(task, { decisionCase, now: LATER }).rework_work_item_ids
+        ).toEqual([]);
+        expect(lockNow().status).not.toBe('completed');
       });
     });
   });
