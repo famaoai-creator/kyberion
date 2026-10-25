@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "poppler",
+      "display_name": "Poppler PDF Rasterizer",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["any"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "toolsets": ["document_review"],
+      "trial_backend": { "kind": "system", "command": "pdftoppm", "args": ["-v"] },
+      "install_backend_platform_overrides": {
+        "darwin": { "kind": "brew", "command": "brew", "args": ["install", "poppler"] }
+      },
+      "installed_backend": { "kind": "system", "command": "pdftoppm", "args": ["-v"] },
+      "managed_env_subpath": "tool-runtimes/poppler",
+      "notes": "Optional document visual review dependency. Linux: operator installs poppler-utils; no automatic sudo."
+    }
+  ]
+}

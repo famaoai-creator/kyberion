@@ -1,4 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { safeExecResult } from '../secure-io.js';
+
+vi.mock('../secure-io.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../secure-io.js')>()),
+  safeExecResult: vi.fn(),
+}));
 import {
   getMediaBackendRecord,
   getMediaBackendRegistry,
@@ -16,6 +22,12 @@ import {
 
 describe('media backend registry', () => {
   beforeEach(() => {
+    vi.mocked(safeExecResult).mockReturnValue({
+      status: 0,
+      stdout: '/mock/bin',
+      stderr: '',
+      error: null,
+    });
     _resetMediaBackendAvailabilityCacheForTests();
     delete process.env.KYBERION_RUNWAY_API_KEY;
     delete process.env.RUNWAYML_API_SECRET;
@@ -49,6 +61,28 @@ describe('media backend registry', () => {
     resetMediaBackendAvailabilityCache();
     resetMediaBackendRegistryCache();
     expect(getMediaBackendRegistry().default_backend_ids.image).toBe('media-generation.local_flux');
+  });
+
+  it('does not advertise a registered runtime when its launcher or healthcheck fails', async () => {
+    vi.mocked(safeExecResult).mockReturnValue({
+      status: 1,
+      stdout: '',
+      stderr: 'missing',
+      error: null,
+    });
+    const missing = await probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux');
+    expect(missing.available).toBe(false);
+    expect(missing.probe_kind).toBe('tool_runtime');
+    vi.mocked(safeExecResult).mockImplementation((command) => ({
+      status: command === 'pnpm' ? 1 : 0,
+      stdout: '/mock/pnpm',
+      stderr: '',
+      error: null,
+    }));
+    const broken = await probeMediaBackendAvailability('video.hyperframes_cli', 'video', 'linux', {
+      force: true,
+    });
+    expect(broken.available).toBe(false);
   });
 
   it('force bypasses the availability probe cache', async () => {
@@ -243,7 +277,7 @@ describe('media backend registry', () => {
     );
     expect(resolution.backend.modality).toBe('video');
     expect(resolution.backend.backend_id).toBe('video.hyperframes_cli');
-    expect(resolution.availability.probe_kind).toBe('registry');
+    expect(resolution.availability.probe_kind).toBe('tool_runtime');
     expect(resolution.fallback_used).toBe(false);
   });
 
