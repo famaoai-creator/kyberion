@@ -46,6 +46,7 @@ import {
   safeReaddir,
 } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
+import { discoveryOpsByActuator, loadMcpActuatorOpDiscovery } from './mcp-actuator-discovery.js';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
 import { assertMcpCallerRole, resolveMcpRequestContext } from '@agent/core/mcp-request-context';
 import { assertProtocolServiceRegistered } from '@agent/core/protocol-service-registry';
@@ -567,11 +568,24 @@ async function searchKnowledge(
   }));
 }
 
+/**
+ * actuator-op-discovery.json carries the fine-grained single-op surface that
+ * pipeline-style actuators do not declare in manifest.json — the same merge
+ * the playground applies, so MCP clients see the ops they can actually name.
+ * The catalog is generated state: when it is missing or unreadable the list
+ * degrades to manifest-only rather than failing the tool.
+ */
+function loadDiscoveryOpsByActuator(): Map<string, string[]> {
+  const catalog = loadMcpActuatorOpDiscovery();
+  return catalog ? discoveryOpsByActuator(catalog) : new Map();
+}
+
 function listCapabilities(): { actuator: string; ops: string[] }[] {
   const actuatorsDir = nodePath.join(REPO_ROOT, 'libs/actuators');
   if (!safeExistsSync(actuatorsDir)) return [];
 
   const results: { actuator: string; ops: string[] }[] = [];
+  const discoveryOps = loadDiscoveryOpsByActuator();
 
   let dirs: string[];
   try {
@@ -596,12 +610,14 @@ function listCapabilities(): { actuator: string; ops: string[] }[] {
               isRecord(capability) && typeof capability.op === 'string'
           )
         : [];
-      results.push({
-        actuator: typeof manifest.actuator_id === 'string' ? manifest.actuator_id : dir,
-        ops: capabilities.map((capability) => capability.op as string),
-      });
+      const actuatorId = typeof manifest.actuator_id === 'string' ? manifest.actuator_id : dir;
+      const ops = capabilities.map((capability) => capability.op as string);
+      for (const op of discoveryOps.get(actuatorId) ?? discoveryOps.get(dir) ?? []) {
+        if (!ops.includes(op)) ops.push(op);
+      }
+      results.push({ actuator: actuatorId, ops });
     } catch {
-      results.push({ actuator: dir, ops: [] });
+      results.push({ actuator: dir, ops: discoveryOps.get(dir) ?? [] });
     }
   }
 

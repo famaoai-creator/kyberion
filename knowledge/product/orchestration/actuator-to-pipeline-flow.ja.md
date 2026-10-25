@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-03
+last_updated: 2026-10-26
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -78,6 +78,19 @@ accept の断絶（仕様）:
 で scratch）。再利用見込みが出たら昇格します
 （`pipeline-crystallization-memo.md`、`architecture/loop-closure-machinery.md`）。
 
+繰り返し検知は機械的です: `pipelines/` 外の ADF 実行が成功するたび
+`active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json` に集計され
+（`libs/core/promotion-candidates.ts`）、同一 ADF が3回成功すると昇格候補として
+実行出力と operator status packet に提示されます。パイプライン化されなかった
+不確定な依頼は unhandled-intent registry に溜まり
+（`pipelines/reconcile-unhandled-intents.json` が提案 stub を生成。スケジュールは
+既定で無効・opt-in）。昇格後の最終段は accepted binding
+（`libs/core/accepted-pipeline-bindings.ts`）: 昇格済み pipeline + 成功 run journal
+
+- 人間承認で `intent_id → pipelines/<slug>.json` を束ね、`run_intent` がその
+  発話クラスの LLM compile をバイパスします（shape=pipeline・risk=low・confidence
+  ≥0.9 が条件）。
+
 昇格は2系統で入力が違います。
 
 | 入力                                                         | コマンド                                                                                                   | 出力                                                               |
@@ -114,3 +127,10 @@ Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗しま�
   scope を明記。
 - accept 後の停滞 — accept 時に `next_steps` を表示し、cowork レビューの
   完了ログにも次行動を記載。
+- MCP 面（`kyberion.capability.*`、`actuator.invoke`）が manifest のみ参照で
+  pipeline 駆動 actuator の細粒度 op が届かなかった — 2026-10-26 に
+  discovery マージ + one-step pipeline envelope 包みで解消。
+- エージェントが actuator へ到達する経路の整理は
+  [actuator-agent-usage.md](./actuator-agent-usage.md) の
+  「Where agents reach actuators」表を参照。既知ギャップ一覧（`actuator_action`
+  未配線、mandatory trigger の signal 未到達など）は英語正本 §5 Known gaps。

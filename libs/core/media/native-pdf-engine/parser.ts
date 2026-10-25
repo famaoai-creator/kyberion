@@ -4,6 +4,7 @@ import { createHash } from 'node:crypto';
 import { nowIso } from '../../foundation/time.js';
 import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
+import { decodeEntities } from '../../text-escaping.js';
 import type {
   PdfDesignProtocol,
   PdfLayoutElement,
@@ -261,7 +262,14 @@ export class NativePdfParser {
       'Kyberion';
 
     const result: Record<string, string> = { title, author };
-    for (const key of ['creationDate', 'modDate', 'producer'] as const) {
+    for (const key of [
+      'subject',
+      'creator',
+      'keywords',
+      'creationDate',
+      'modDate',
+      'producer',
+    ] as const) {
       const value = this.pickRealMetaValue(xmpMeta[key]) ?? this.pickRealMetaValue(infoMeta[key]);
       if (value) result[key] = value;
     }
@@ -287,12 +295,17 @@ export class NativePdfParser {
     // still prefer hex/literal decoding over the old non-greedy regex.
     const source = infoObj || this.str;
 
-    const title = this.readPdfInfoString(source, 'Title');
-    if (title) result.title = title;
-    const author = this.readPdfInfoString(source, 'Author');
-    if (author) result.author = author;
-    const producer = this.readPdfInfoString(source, 'Producer');
-    if (producer) result.producer = producer;
+    for (const [key, pdfName] of [
+      ['title', 'Title'],
+      ['author', 'Author'],
+      ['subject', 'Subject'],
+      ['creator', 'Creator'],
+      ['keywords', 'Keywords'],
+      ['producer', 'Producer'],
+    ] as const) {
+      const value = this.readPdfInfoString(source, pdfName);
+      if (value) result[key] = value;
+    }
     return result;
   }
 
@@ -442,10 +455,16 @@ export class NativePdfParser {
     );
     const titleAny = xmpBlock.match(/<dc:title>[\s\S]*?<rdf:li[^>]*>([\s\S]*?)<\/rdf:li>/i);
     const title = (titleDefault || titleAny)?.[1]?.trim();
-    if (title) result.title = this.unescapeXmlText(title);
+    if (title) result.title = decodeEntities(title);
 
     const creatorMatch = xmpBlock.match(/<dc:creator>[\s\S]*?<rdf:li[^>]*>([\s\S]*?)<\/rdf:li>/i);
-    if (creatorMatch) result.author = this.unescapeXmlText(creatorMatch[1].trim());
+    if (creatorMatch) result.author = decodeEntities(creatorMatch[1].trim());
+
+    // Dublin Core description maps to PDF Info /Subject.
+    const descriptionMatch = xmpBlock.match(
+      /<dc:description>[\s\S]*?<rdf:li[^>]*>([\s\S]*?)<\/rdf:li>/i
+    );
+    if (descriptionMatch) result.subject = decodeEntities(descriptionMatch[1].trim());
 
     const dateMatch = xmpBlock.match(/<xmp:CreateDate>([\s\S]*?)<\/xmp:CreateDate>/i);
     if (dateMatch) result.creationDate = dateMatch[1].trim();
@@ -454,18 +473,13 @@ export class NativePdfParser {
     if (modMatch) result.modDate = modMatch[1].trim();
 
     const prodMatch = xmpBlock.match(/<pdf:Producer>([\s\S]*?)<\/pdf:Producer>/i);
-    if (prodMatch) result.producer = this.unescapeXmlText(prodMatch[1].trim());
+    if (prodMatch) result.producer = decodeEntities(prodMatch[1].trim());
+
+    // xmp:CreatorTool is the creating application (/Creator), distinct from dc:creator (author).
+    const toolMatch = xmpBlock.match(/<xmp:CreatorTool>([\s\S]*?)<\/xmp:CreatorTool>/i);
+    if (toolMatch) result.creator = decodeEntities(toolMatch[1].trim());
 
     return result;
-  }
-
-  private unescapeXmlText(value: string): string {
-    return value
-      .replace(/&lt;/g, '<')
-      .replace(/&gt;/g, '>')
-      .replace(/&quot;/g, '"')
-      .replace(/&apos;/g, "'")
-      .replace(/&amp;/g, '&');
   }
 
   // ── Page Extraction ───────────────────────────────────────
