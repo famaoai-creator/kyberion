@@ -49,7 +49,10 @@ import type { TaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import type { TaskModelPhaseKind, TaskModelTier } from '../reasoning/reasoning-level-policy.js';
 import type { TierLevel } from '../types.js';
 import * as nodePath from 'node:path';
-import { isUncertainSupervisorTransportFailure } from '../agent/supervisor-transport-uncertainty.js';
+import {
+  isSupervisorRefreshContractFailure,
+  isUncertainSupervisorTransportFailure,
+} from '../agent/supervisor-transport-uncertainty.js';
 
 const logger = createLogger('task-routing-judgment');
 
@@ -211,8 +214,7 @@ export function classifyDispatchFailure(notes: readonly string[]): string | unde
       if (note.includes(`[${code}]`)) return code;
     }
     if (/A2A task contract validation failed:/iu.test(note)) return 'A2A_TASK_CONTRACT_INVALID';
-    if (/invalid_supervisor_response:.*supervisor refresh result/iu.test(note))
-      return 'SUPERVISOR_REFRESH_CONTRACT_INVALID';
+    if (isSupervisorRefreshContractFailure(note)) return 'SUPERVISOR_REFRESH_CONTRACT_INVALID';
     if (isUncertainSupervisorTransportFailure(note)) return 'SUPERVISOR_TRANSPORT_UNAVAILABLE';
     // These provider diagnostics mean no model could attempt the task.
     // Raising the model tier cannot repair login or workspace trust.

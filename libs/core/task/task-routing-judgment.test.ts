@@ -1,3 +1,7 @@
+import {
+  isSupervisorRefreshContractFailure,
+  isUncertainSupervisorTransportFailure,
+} from '../agent/supervisor-transport-uncertainty.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -29,6 +33,26 @@ const BASELINE: TaskModelHint = {
 };
 
 describe('dispatch infrastructure failures', () => {
+  it('classifies repeated diagnostic prefixes without changing refresh or transport semantics', () => {
+    const repeated = 'invalid_supervisor_response:'.repeat(20_000);
+    expect(isSupervisorRefreshContractFailure(repeated)).toBe(false);
+    expect(isUncertainSupervisorTransportFailure(repeated)).toBe(true);
+    expect(classifyDispatchAttemptOutcome([repeated])).toBe('unknown');
+    const refresh = `${repeated}SUPERVISOR REFRESH RESULT.refreshed must be boolean`;
+    expect(isSupervisorRefreshContractFailure(refresh)).toBe(true);
+    expect(isUncertainSupervisorTransportFailure(refresh)).toBe(false);
+    expect(classifyDispatchFailure([refresh])).toBe('SUPERVISOR_REFRESH_CONTRACT_INVALID');
+    expect(classifyDispatchAttemptOutcome([refresh])).toBe('not_attempted');
+    for (const separator of ['\n', '\r', '\u2028', '\u2029']) {
+      expect(
+        isSupervisorRefreshContractFailure(`${repeated}${separator}supervisor refresh result`)
+      ).toBe(false);
+    }
+    expect(
+      isSupervisorRefreshContractFailure('supervisor refresh result invalid_supervisor_response:')
+    ).toBe(false);
+  });
+
   it.each([
     '[auth] Not signed in. To authenticate run the provider login command',
     'Ignoring permissions: this workspace has not been trusted',
