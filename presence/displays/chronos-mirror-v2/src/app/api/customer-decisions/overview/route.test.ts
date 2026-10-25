@@ -1,6 +1,15 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
+const ref = (exists: boolean) => ({ path: 'x', exists, data: null });
+const company = (tenant: string, recorded = true) => ({
+  company_id: `org-${tenant}`,
+  tenant_slug: tenant,
+  customer_ref: ref(recorded),
+  identity_ref: ref(false),
+  organization_profile_ref: ref(false),
+});
+
 const mocks = vi.hoisted(() => ({
   readCustomerDecisionOverview: vi.fn(),
   listTenantProfileSlugs: vi.fn(() => ['acme', 'globex']),
@@ -48,6 +57,8 @@ vi.mock('../../../../lib/viewer-context', () => ({
 }));
 
 import { GET } from './route.js';
+import { companyIdMemo, createCompanyIdMemo } from './company-memo';
+import type { CompanyAggregate } from '@agent/core/company';
 import { ViewerContextError } from '../../../../lib/viewer-context';
 
 const URL_BASE = 'http://localhost/api/customer-decisions/overview';
@@ -72,10 +83,8 @@ describe('customer-decisions overview route (CD-12)', () => {
     mocks.readCustomerDecisionOverview.mockResolvedValue({ ok: true, overview: OVERVIEW });
     mocks.strictViewerTier.mockReturnValue('confidential');
     mocks.strictViewerScopeOrganizationIds.mockReturnValue('all');
-    mocks.resolveCompany.mockImplementation((tenant: string) => ({
-      company_id: `org-${tenant}`,
-      tenant_slug: tenant,
-    }));
+    mocks.resolveCompany.mockImplementation((tenant: string) => company(tenant));
+    companyIdMemo.clear();
   });
 
   it('checks the confidential tier and the tenant organization before reading', async () => {
@@ -179,6 +188,49 @@ describe('customer-decisions overview route (CD-12)', () => {
     expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
   });
 
+  it('memoizes only the company lookup; every authorization check still runs per request', async () => {
+    for (let i = 0; i < 3; i += 1) {
+      expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(200);
+    }
+    expect(mocks.resolveCompany).toHaveBeenCalledTimes(1);
+    expect(mocks.strictViewerScopeTenantSlugs).toHaveBeenCalledTimes(3);
+    expect(mocks.listTenantProfileSlugs).toHaveBeenCalledTimes(3);
+    expect(mocks.strictViewerTier).toHaveBeenCalledTimes(3);
+    expect(mocks.strictViewerScopeOrganizationIds).toHaveBeenCalledTimes(3);
+    expect(mocks.strictViewerScopeOrganizationIds).toHaveBeenLastCalledWith(ALL_VIEWER, 'org-acme');
+    // A memoized company does not let another viewer past its organization scope …
+    mocks.strictViewerScopeOrganizationIds.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer organization scope denied');
+    });
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(403);
+    // … nor past the tier, nor a tenant that left the registry.
+    mocks.strictViewerScopeOrganizationIds.mockReturnValue('all');
+    mocks.strictViewerTier.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer tier scope denied');
+    });
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(403);
+    mocks.strictViewerTier.mockReturnValue('confidential');
+    mocks.listTenantProfileSlugs.mockReturnValue(['globex']);
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(403);
+    expect(mocks.resolveCompany).toHaveBeenCalledTimes(1);
+    expect(mocks.readCustomerDecisionOverview).toHaveBeenCalledTimes(3);
+  });
+
+  it('resolves a company without its own records, or a failed lookup, again on the next request', async () => {
+    mocks.resolveCompany.mockImplementation((tenant: string) => company(tenant, false));
+    await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
+    await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
+    expect(mocks.resolveCompany).toHaveBeenCalledTimes(2);
+    mocks.resolveCompany.mockImplementationOnce(() => {
+      throw new Error('[COMPANY_TENANT_SCOPE] invalid tenant slug');
+    });
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(500);
+    mocks.resolveCompany.mockImplementation((tenant: string) => company(tenant));
+    expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(200);
+    expect(mocks.resolveCompany).toHaveBeenCalledTimes(4);
+    expect(companyIdMemo.size).toBe(1);
+  });
+
   it('returns the viewer resolution response as is', async () => {
     mocks.resolveViewerContextForRequest.mockReturnValue({
       response: new Response('unknown token', { status: 401 }),
@@ -186,5 +238,37 @@ describe('customer-decisions overview route (CD-12)', () => {
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
     expect(response.status).toBe(401);
     expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+  });
+});
+
+describe('company id memo', () => {
+  const aggregate = (tenant: string, recorded = true) =>
+    company(tenant, recorded) as unknown as CompanyAggregate;
+
+  it('expires an entry after its TTL', () => {
+    let clock = 0;
+    const resolve = vi.fn((tenant: string) => aggregate(tenant));
+    const memo = createCompanyIdMemo({ resolve, ttlMs: 1000, now: () => clock });
+    expect(memo.companyIdOf('acme')).toBe('org-acme');
+    clock = 999;
+    expect(memo.companyIdOf('acme')).toBe('org-acme');
+    expect(resolve).toHaveBeenCalledTimes(1);
+    clock = 1000;
+    expect(memo.companyIdOf('acme')).toBe('org-acme');
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps at most its limit, dropping the oldest entry first', () => {
+    const resolve = vi.fn((tenant: string) => aggregate(tenant));
+    const memo = createCompanyIdMemo({ resolve, limit: 2, now: () => 0 });
+    memo.companyIdOf('a');
+    memo.companyIdOf('b');
+    memo.companyIdOf('c');
+    expect(memo.size).toBe(2);
+    memo.companyIdOf('b');
+    memo.companyIdOf('c');
+    expect(resolve).toHaveBeenCalledTimes(3);
+    memo.companyIdOf('a');
+    expect(resolve).toHaveBeenCalledTimes(4);
   });
 });
