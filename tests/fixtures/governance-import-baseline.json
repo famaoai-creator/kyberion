@@ -124,6 +124,7 @@
     "libs/core/voice/voice-profile-registry.test.ts",
     "libs/core/voice/voice-sample-collection.test.ts",
     "libs/core/voice/voice-sample-ingestion-policy.test.ts",
+    "libs/core/workforce/agent-worktree.ts",
     "libs/core/workforce/artifact-bundle.test.ts",
     "libs/core/workforce/artifact-review.test.ts",
     "libs/core/workforce/artifact-store.test.ts",

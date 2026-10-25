@@ -1,7 +1,7 @@
 ---
 title: Agent-facing actuator discovery and usage
 tags: [actuator, agent, browser-use, computer-use, discovery, cli]
-last_updated: 2026-10-18
+last_updated: 2026-10-26
 role_affinity: [implementer, operator, worker]
 phase_affinity: [alignment, execution]
 ---
@@ -12,6 +12,32 @@ Choose an executor by target, discover its contract, then observe → act → ve
 Use the existing pipeline for repeatable work. During exploration, describe one
 operation instead of loading the entire catalog into the model context.
 `pnpm playground -- --help` prints the full flag summary.
+
+## Where agents reach actuators
+
+An agent never calls an actuator handler directly — every route goes through a
+governed boundary. Pick the route by the shape of the request:
+
+| Situation                                                   | Route                                                                                 |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Settled / repeatable work (an existing pipeline or new ADF) | Pipeline step — `pnpm pipeline --input <adf>.json`; ops dispatch per `domain:op`      |
+| Exploring an unknown target or contract (discovery work)    | `pnpm playground --actuator <id> --op <op>` (`--check` → `--dry-run` → live)          |
+| One-shot governed call from the CLI                         | `pnpm kyberion run` (shares the playground's wrap/validate machinery)                 |
+| Cowork / external MCP client                                | `kyberion.capability.list` / `.search` → `kyberion.actuator.invoke` (allowlist-gated) |
+| Reading files / images / audio / video, speaking, drawing   | Sense verbs — `pnpm kyberion read                                                     | see | listen | watch | speak | draw`, not the playground |
+
+Selection rule: repeatable work belongs in a pipeline step; interactive
+discovery belongs in the playground (or `kyberion run`); MCP clients see the
+same manifest + `actuator-op-discovery.json` surface merged since
+MSN-ACTUATOR-FLOW-20261026, with execution still bounded by
+`actuator_invoke_allowlist`. Perception and speech/drawing go through the
+sense verbs — they are the production path, not the playground.
+
+The `actuator_action` execution shape exists in the intent-layer enums but is
+declarative only today: no route handler dispatches a single actuator op for a
+user utterance, and the shape projects to `task_session`. Single ops reach the
+runtime through the routes above, all of which wrap a discovery-only op into
+the same one-step pipeline envelope production executes.
 
 ## Discover without execution
 
