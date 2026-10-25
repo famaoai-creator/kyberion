@@ -453,8 +453,30 @@ KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
     --scope tenant --tenant acme --target /path/to/clean/kyberion
 ```
 
-Tenant restores quarantine peer messaging, conversation, and Mesh Hub runtime
-state. Run the following from the restored checkout only after re-enrolling the
+A tenant archive carries the tenant's partition of every registered runtime
+root (`active/shared/runtime/<root>/<tier>/<tenant>/`: the hybrid-ledger
+partition, approval store, usage and execution-metrics ledgers, and the
+partitioned state roots). The manifest lists them under
+`tenant_runtime_partitions` and records the audit chain key id
+(`chain_key_id`), never the key itself. On restore:
+
+- The restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`, before
+  extraction) when the target already holds files in an append-only partition
+  the archive carries: an older snapshot over a longer live chain would be an
+  undetectable rollback. Restore into an empty target and reconcile there.
+- A torn last line of a restored `.jsonl` ledger is trimmed back to its last
+  newline (the restored copy only); the output lists `trimmed_tails`.
+- Restored tenant-ledger chains are verified when the target host holds the
+  same audit chain key (`ledger_verification: verified`; a broken chain fails
+  the restore). Otherwise the output reports `deferred_key_mismatch`: set
+  `KYBERION_AUDIT_CHAIN_KEY` to the source host's key (its id is in the
+  manifest) and run `pnpm audit:verify` in the restored checkout.
+- Restored customer decision invites and standing grants are moved into
+  `<partition>/.restore-quarantine/<restore-id>/` so state revoked after the
+  backup cannot come back; re-issue what is still due.
+
+Tenant restores also quarantine peer messaging, conversation, and Mesh Hub
+runtime state. Run the following from the restored checkout only after re-enrolling the
 peer and confirming a fresh healthy heartbeat. The request creates a human
 approval record; it does not resume runtime by itself:
 

@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-25
+last_updated: 2026-10-26
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -350,8 +350,14 @@ never recorded as `public` or untenanted.
 - **Residual case**: a `mission_id` that no process can place — no active or
   archived mission dir anywhere this process can see (a purged mission, or a
   Chronos `MISSION_RUNTIME_REMEDIATION` lease for an id that never was a
-  mission) and no `tenant_slug` in the record — stays a system record,
-  payload included.
+  mission) and no `tenant_slug` in the record — stays a system record, but
+  metadata only (D4): the entry keeps the raw `mission_id`, `type`, `role` and
+  a mission-kind scope, carries `payload_withheld: 'mission_unplaceable'` and
+  a `payload_digest` (sha256 of the sorted-key payload JSON), and never the
+  payload itself; `record` warns naming only the type and id. A record that
+  names its `tenant_slug` explicitly still routes to that tenant's partition
+  with full detail. The system ledger is append-only: rows written before D4
+  keep their payloads (not rewritten).
 - Each file is its own hash chain. `verifyAllLedgerIntegrity()` (used by
   `pnpm audit:verify` / `system:audit_verify` and `system:pulse_status`)
   verifies the system ledger plus every tenant partition the process may
@@ -405,6 +411,28 @@ the record is stored follows its scope
   learning-signal rejection reader cover the partitions too. Retention is
   `review_required`; tenant offboarding exports and soft-deletes the tenant's
   partitions (target kind `tenant_approvals`).
+
+### Tenant runtime partitions (backup, restore, offboarding)
+
+- `TENANT_RUNTIME_PARTITION_ROOTS` (`storage-layout.ts`) derives one list
+  from `PARTITIONED_RUNTIME_LEDGER_ROOTS` and `PARTITIONED_RUNTIME_STATE_ROOTS`
+  (`family`, `appendOnly` for every ledger root, `hashChained` for the tenant
+  ledger, `storeRole` for the dedicated-store roots).
+  `tenantRuntimePartitionPaths(tenant, exists)` lists `<root>/<tier>/<tenant>`
+  per tier and `tenantRuntimePartitionOf(path)` maps a path back; `system/`,
+  `<tier>/shared` and reserved names are never a tenant.
+- Tenant backup, the tenant restore allowlist and tenant offboarding all walk
+  this list, so a newly registered root is covered by all three. Offboarding
+  maps each key to a target kind in a `satisfies Record<…>` table (the six
+  other state roots export + soft-delete as `tenant_runtime_state`), so a new
+  root fails to compile until its disposition is decided.
+- A tenant restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
+  append-only partition over a target that already holds one, trims a torn
+  last `.jsonl` line of the restored copy, verifies restored tenant-ledger
+  chains only when the target's audit chain key id equals the archive's
+  `chain_key_id` (else `deferred_key_mismatch`; the key never rides in a tenant
+  archive), and moves restored customer decision invites and standing grants
+  into `<partition>/.restore-quarantine/<restore-id>/`.
 
 ## 3. Surface visibility
 

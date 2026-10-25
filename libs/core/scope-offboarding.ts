@@ -56,7 +56,10 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   metricsLedgerLockId,
   metricsRowTenant,
+  tenantRuntimePartitionPaths,
+  type TenantRuntimePartitionKey,
 } from './storage-layout.js';
+import { isValidTenantSlug } from './foundation/scope.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
@@ -424,6 +427,25 @@ const METRICS_LEDGERS: readonly MetricsLedgerOffboarding[] = [
 ];
 
 const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
+
+/**
+ * Offboarding disposition of every tenant-partitioned runtime root. `null`
+ * leaves the partition in place. The `satisfies` clause makes a newly
+ * registered root fail to compile until its disposition is decided here.
+ */
+export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
+  resource_usage: 'tenant_usage_ledger',
+  execution_metrics: 'tenant_execution_metrics',
+  tenant_ledger: 'tenant_ledger',
+  tenant_approvals: 'tenant_approvals',
+  customer_decision_invites: 'customer_decision_invites',
+  pipeline_library_runs: null,
+  autonomy_learning: null,
+  external_operations: null,
+  hearing: null,
+  discussion_create_requests: null,
+  grants: null,
+} as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | null>;
 
 /**
  * Repo-relative knowledge root for a tenant slug. Deliberately the
@@ -843,45 +865,26 @@ export function collectScopeTargets(
         targets.push({ path: subtree, kind: 'ingest_cursors_tree' });
       }
     }
-    // The tenant's metrics-ledger partitions must not outlive the tenant.
-    for (const ledger of METRICS_LEDGERS) {
-      for (const tier of SCOPE_TIERS) {
-        const subtree = `${ledger.partition_root}/${tier}/${id}`;
+    // Every tenant-partitioned runtime root (storage-layout registry): the
+    // tenant's `<root>/<tier>/<tenant>` partitions must not outlive the tenant;
+    // other tenants' partitions stay. Notes per root:
+    // - D9 hybrid ledger: rows written before D9 still hold tenant mission ids
+    //   in the hash-chained system ledger; that file is append-only, so
+    //   offboarding leaves those rows (not pruned).
+    // - Approval store: tenant records written before the partition existed may
+    //   still sit in the system approval tree until the hygiene migration moves
+    //   them (approval_store_hygiene --migrate-tenant-partitions); their
+    //   append-only event-log lines stay.
+    // - Metrics ledgers: pre-partition rows of the system file are pruned below
+    //   (METRICS_LEDGERS).
+    if (isValidTenantSlug(id)) {
+      const present = (subtree: string): boolean => {
         const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-        if (subtreePath && safeExistsSync(subtreePath)) {
-          targets.push({ path: subtree, kind: ledger.target_kind });
-        }
-      }
-    }
-    // D9: the tenant's hybrid-ledger partitions (tenant mission events). New
-    // records never reach the system ledger, but rows written before D9 still
-    // hold tenant mission ids (and some tenant slugs) there; that hash-chained
-    // file is append-only, so offboarding leaves those rows (not pruned).
-    for (const tier of SCOPE_TIERS) {
-      const subtree = `${TENANT_LEDGER_REPO_SUBPATH}/${tier}/${id}`;
-      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-      if (subtreePath && safeExistsSync(subtreePath)) {
-        targets.push({ path: subtree, kind: 'tenant_ledger' });
-      }
-    }
-    // The tenant's approval store partitions. Tenant records written before
-    // the partition existed may still sit in the system approval tree until
-    // the hygiene migration moves them (approval_store_hygiene
-    // --migrate-tenant-partitions); their append-only event-log lines stay.
-    for (const tier of SCOPE_TIERS) {
-      const subtree = `${TENANT_APPROVALS_REPO_SUBPATH}/${tier}/${id}`;
-      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-      if (subtreePath && safeExistsSync(subtreePath)) {
-        targets.push({ path: subtree, kind: 'tenant_approvals' });
-      }
-    }
-    // CD-10: the tenant's customer decision invites (hashed secrets, participant
-    // names) must not outlive the tenant; other tenants' partitions stay.
-    for (const tier of SCOPE_TIERS) {
-      const subtree = `${CUSTOMER_DECISION_INVITES_REPO_SUBPATH}/${tier}/${id}`;
-      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-      if (subtreePath && safeExistsSync(subtreePath)) {
-        targets.push({ path: subtree, kind: 'customer_decision_invites' });
+        return Boolean(subtreePath && safeExistsSync(subtreePath));
+      };
+      for (const partition of tenantRuntimePartitionPaths(id, present)) {
+        const kind = TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key];
+        if (kind) targets.push({ path: partition.path, kind });
       }
     }
   }
