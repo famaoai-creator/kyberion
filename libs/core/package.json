@@ -2936,6 +2936,10 @@
       "types": "./dist/media/native-xlsx-engine/worksheet.d.ts",
       "default": "./dist/media/native-xlsx-engine/worksheet.js"
     },
+    "./media/ooxml-core-props": {
+      "types": "./dist/media/ooxml-core-props.d.ts",
+      "default": "./dist/media/ooxml-core-props.js"
+    },
     "./media/pdf-utils": {
       "types": "./dist/media/pdf-utils.d.ts",
       "default": "./dist/media/pdf-utils.js"
