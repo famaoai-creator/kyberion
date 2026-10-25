@@ -38,6 +38,7 @@ describe('approval-store test isolation', () => {
     expect(approvalStoreRoots({})).toEqual({
       coordination: 'active/shared/coordination/channels',
       observability: 'active/shared/observability/channels',
+      tenantApprovals: 'active/shared/runtime/tenant-approvals',
     });
   });
 
@@ -53,6 +54,11 @@ describe('approval-store test isolation', () => {
       approvalStoreRoots({ VITEST: 'true', VITEST_POOL_ID: '3', KYBERION_VITEST_RUN_ID: 'r/../9' })
         .coordination
     ).toBe(`${VITEST_APPROVAL_STORE_ROOT}/run-r9/pool-3/coordination/channels`);
+    // In the code checkout the tenant partitions are isolated per run and pool too.
+    expect(
+      approvalStoreRoots({ VITEST: 'true', VITEST_POOL_ID: '3', KYBERION_VITEST_RUN_ID: 'r9' })
+        .tenantApprovals
+    ).toBe(`${VITEST_APPROVAL_STORE_ROOT}/run-r9/pool-3/tenant-approvals`);
     const roots = approvalStoreRoots();
     expect(roots.coordination.startsWith(`${VITEST_APPROVAL_STORE_ROOT}/`)).toBe(true);
     expect(approvalRequestLogicalPath('terminal', id)).toBe(

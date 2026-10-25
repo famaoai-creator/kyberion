@@ -199,6 +199,8 @@ afterEach(() => {
   });
   for (const root of [roots.coordination, roots.observability])
     safeRmSync(pathResolver.resolve(root + '/autonomy'), { recursive: true, force: true });
+  // Tenant-scoped requests live in the tenant approval partitions.
+  safeRmSync(pathResolver.resolve(roots.tenantApprovals), { recursive: true, force: true });
   safeRmSync(h.dir, { recursive: true, force: true });
   vi.restoreAllMocks();
 });

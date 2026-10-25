@@ -873,13 +873,17 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
         ],
       });
       // The approval store's own event log names the reason, never the message.
-      const { approvalEventLogicalPath } = await store();
+      // A tenant-scoped request logs in its tenant's approval partition.
+      const { approvalEventLogicalPathAt, locateApprovalRequest } = await store();
       const { pathResolver } = await import('@agent/core/path-resolver');
+      const located = locateApprovalRequest('slack', String(onSlack.approval_request_id));
+      if (!located) throw new Error('the cancelled slack request is not stored');
       const events = initialContext('ecosystem_architect', () =>
         String(
-          io.safeReadFile(pathResolver.resolve(approvalEventLogicalPath('slack')), {
-            encoding: 'utf8',
-          })
+          io.safeReadFile(
+            pathResolver.resolve(approvalEventLogicalPathAt(located.partition, 'slack')),
+            { encoding: 'utf8' }
+          )
         )
       )
         .trim()

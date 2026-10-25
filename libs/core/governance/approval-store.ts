@@ -1,11 +1,16 @@
 import { withApprovalRecordLock } from './approval-apply-claim.js';
 import {
   normalizeApprovalChannel,
-  approvalRequestLogicalPath,
-  loadApprovalRequest,
   listApprovalRequests,
   isApprovalRequestExpired,
 } from './approval-store-reader.js';
+import {
+  appendLocatedApprovalEvent,
+  locateApprovalRequest,
+  SYSTEM_APPROVAL_PARTITION,
+  writeLocatedApprovalRequest,
+  type LocatedApprovalRequest,
+} from './approval-store-location.js';
 export {
   approvalRequestLogicalPath,
   loadApprovalRequest,
@@ -38,11 +43,7 @@ import type * as assurance from './approval-assurance.js';
 export * from './approval-assurance.js';
 import { computeApprovalPayloadHash } from './approval-presentation.js';
 export * from './approval-presentation.js';
-import {
-  appendGovernedArtifactJsonl,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { nowIso } from '../foundation/time.js';
 import type { RejectionReasonCategory } from '../rejection-reason.js';
 import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
@@ -408,7 +409,21 @@ export function recordSessionCacheAutoApproval(
     correlationId: string;
   }
 ): void {
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.entry.storageChannel), {
+  // The event goes to the log of the location the seed request lives in.
+  let seedLocation: Pick<LocatedApprovalRequest, 'partition' | 'storageChannel'> = {
+    partition: SYSTEM_APPROVAL_PARTITION,
+    storageChannel: normalizeApprovalChannel(params.entry.storageChannel),
+  };
+  try {
+    const seed = locateApprovalRequest(
+      params.entry.storageChannel,
+      params.entry.grantedByRequestId
+    );
+    if (seed) seedLocation = seed;
+  } catch {
+    /* an unreadable or ambiguous seed keeps the system log */
+  }
+  appendLocatedApprovalEvent(role, seedLocation, {
     ts: nowIso(),
     event: 'auto_approved_via_session_cache',
     request_id: params.entry.grantedByRequestId,
@@ -459,7 +474,7 @@ function enforceSeparationOfDutiesOnDecision(
   role: GovernedArtifactRole,
   params: {
     record: ApprovalRequestRecord;
-    storageChannel: string;
+    located: LocatedApprovalRequest;
     decidedBy: unknown;
     identitySource?: ApprovalDeciderIdentitySource;
   }
@@ -475,7 +490,7 @@ function enforceSeparationOfDutiesOnDecision(
   const decidedBy = typeof params.decidedBy === 'string' ? params.decidedBy : '';
   const reason = `Separation of duties: approval refused because ${SEPARATION_OF_DUTIES_MESSAGES[violation]}`;
   auditSeparationOfDutiesRefusal({ record, violation, decidedBy, stage: 'decide', reason });
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(params.storageChannel), {
+  appendLocatedApprovalEvent(role, params.located, {
     ts: nowIso(),
     event: 'separation_of_duties_refused',
     request_id: record.id,
@@ -493,9 +508,43 @@ function enforceSeparationOfDutiesOnDecision(
 }
 
 export { approvalStoreRoots, VITEST_APPROVAL_STORE_ROOT } from './approval-store-paths.js';
+export {
+  TENANT_APPROVAL_STORE_ROLE,
+  TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE,
+  TENANT_ACTIVATION_STORAGE_CHANNEL,
+  SYSTEM_APPROVAL_PARTITION,
+  approvalPartitionForScope,
+  approvalPartitionsForTenant,
+  locateApprovalRequest,
+  listApprovalPartitions,
+  listApprovalChannelsAt,
+  mayBindApprovalTenant,
+  tenantApprovalPartitionTier,
+  tenantApprovalPartitionLogicalRoot,
+  tenantApprovalRequestsLogicalDir,
+  tenantApprovalRequestLogicalPath,
+  tenantApprovalEventLogicalPath,
+  tenantApprovalPasskeyChallengesLogicalDir,
+  approvalRequestsLogicalDirAt,
+  approvalRequestLogicalPathAt,
+  approvalEventLogicalPathAt,
+  approvalPasskeyChallengesLogicalDirAt,
+  asTenantApprovalStore,
+  readApprovalJsonAt,
+  listApprovalDirAt,
+  ensureApprovalDirAt,
+  writeApprovalJsonAt,
+  appendApprovalJsonlAt,
+  assertApprovalLocationAgrees,
+  writeLocatedApprovalRequest,
+  appendLocatedApprovalEvent,
+  type ApprovalPartition,
+  type ApprovalPartitionTier,
+  type ApprovalTenantPartition,
+  type LocatedApprovalRequest,
+} from './approval-store-location.js';
 
 import {
-  approvalEventLogicalPath,
   projectApprovalWorkerEvent,
   approvalWorkerEventSource,
 } from './approval-request-create.js';
@@ -526,13 +575,15 @@ function expireApprovalRequestUnlocked(
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  const record = loadApprovalRequest(storageChannel, params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   if (record.status !== 'pending') return record;
 
   const updated: ApprovalRequestRecord = { ...record, status: 'expired' };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: 'expired',
     request_id: updated.id,
@@ -575,13 +626,15 @@ function cancelApprovalRequestUnlocked(
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  const record = loadApprovalRequest(storageChannel, params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   if (record.status !== 'pending') return record;
 
   const updated: ApprovalRequestRecord = { ...record, status: 'cancelled' };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: 'cancelled',
     request_id: updated.id,
@@ -675,8 +728,10 @@ export function annotateApprovalRejectionReason(
   }
 ): ApprovalRequestRecord {
   const storageChannel = params.storageChannel || params.channel;
-  const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   const workflow = record.workflow
     ? {
         ...record.workflow,
@@ -692,8 +747,8 @@ export function annotateApprovalRejectionReason(
       }
     : undefined;
   const updated: ApprovalRequestRecord = { ...record, workflow };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: 'rejection_reason_captured',
     request_id: updated.id,
@@ -770,8 +825,10 @@ function decideApprovalRequestUnlocked(
     }
   }
   const storageChannel = params.storageChannel || params.channel;
-  const record = loadApprovalRequest(normalizeApprovalChannel(storageChannel), params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
 
   if (
     params.expectedRecordHash !== undefined &&
@@ -838,7 +895,7 @@ function decideApprovalRequestUnlocked(
   if (params.decision === 'approved') {
     enforceSeparationOfDutiesOnDecision(role, {
       record,
-      storageChannel,
+      located,
       decidedBy: params.decidedBy,
       identitySource: params.deciderIdentitySource,
     });
@@ -943,8 +1000,8 @@ function decideApprovalRequestUnlocked(
     workflow,
   };
 
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: params.decision,
     request_id: updated.id,
@@ -1003,7 +1060,7 @@ function decideApprovalRequestUnlocked(
       ...(updated.source ? { source: updated.source } : {}),
     };
     sessionApprovalCache.set(key, entry);
-    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    appendLocatedApprovalEvent(role, located, {
       ts: nowIso(),
       event: 'session_cache_written',
       request_id: updated.id,
@@ -1246,8 +1303,10 @@ function recordApprovalApplyResultUnlocked(
   }
 ): ApprovalRequestRecord {
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  const record = loadApprovalRequest(storageChannel, params.requestId);
-  if (!record) throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
+  const located = locateApprovalRequest(storageChannel, params.requestId);
+  const record = located?.record;
+  if (!located || !record)
+    throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
   if (record.applyClaim && params.claimId !== record.applyClaim.claimId) {
     throw new Error('[POLICY_VIOLATION] Approval apply claim does not match');
   }
@@ -1273,8 +1332,8 @@ function recordApprovalApplyResultUnlocked(
     status: nextStatus,
     applyResult: params.applyResult,
   };
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, updated.id), updated);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, updated);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: params.applyResult.result === 'success' ? 'applied' : 'apply_failed',
     request_id: updated.id,

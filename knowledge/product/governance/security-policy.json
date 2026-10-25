@@ -66,6 +66,8 @@
       "active/shared/runtime/execution-metrics/confidential/",
       "active/shared/runtime/tenant-ledger/personal/",
       "active/shared/runtime/tenant-ledger/confidential/",
+      "active/shared/runtime/tenant-approvals/personal/",
+      "active/shared/runtime/tenant-approvals/confidential/",
       "active/shared/runtime/hearing/personal/",
       "active/shared/runtime/hearing/confidential/",
       "active/shared/runtime/discussion-create-requests/personal/",
@@ -650,6 +652,27 @@
         "active/shared/runtime/tenant-ledger/personal/${KYBERION_TENANT}/",
         "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
       ]
+    },
+    "tenant_approval_store": {
+      "allow_read": [
+        "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/"
+      ]
+    },
+    "tenant_approval_partition_index_reader": {
+      "allow_read": [
+        "active/shared/runtime/tenant-approvals/personal/",
+        "active/shared/runtime/tenant-approvals/confidential/"
+      ],
+      "deny_read_descendants": [
+        "active/shared/runtime/tenant-approvals/personal/",
+        "active/shared/runtime/tenant-approvals/confidential/"
+      ],
+      "allow_write": []
     },
     "generation_scheduler": {
       "allow_read": ["knowledge/personal/tenants/"],

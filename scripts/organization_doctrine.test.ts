@@ -49,6 +49,11 @@ afterEach(() => {
     });
     for (const root of Object.values(approvals.approvalStoreRoots()))
       safeRmSync(pathResolver.rootResolve(root + '/terminal'), { recursive: true, force: true });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(pathResolver.rootResolve(approvals.approvalStoreRoots().tenantApprovals), {
+      recursive: true,
+      force: true,
+    });
   });
   vi.unstubAllEnvs();
 });

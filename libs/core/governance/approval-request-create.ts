@@ -1,17 +1,14 @@
 /** Request creation only: cannot resolve decisions or dispatch mission steering. */
 import { randomUUID } from 'node:crypto';
+import { normalizeApprovalChannel } from './approval-store-paths.js';
 import {
-  normalizeApprovalChannel,
-  approvalRequestsLogicalDir,
-  approvalRequestLogicalPath,
-} from './approval-store-reader.js';
-import { approvalStoreRoots } from './approval-store-paths.js';
-import {
-  appendGovernedArtifactJsonl,
-  ensureGovernedArtifactDir,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
+  appendLocatedApprovalEvent,
+  approvalPartitionForScope,
+  approvalRequestsLogicalDirAt,
+  ensureApprovalDirAt,
+  writeLocatedApprovalRequest,
+} from './approval-store-location.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { nowIso } from '../foundation/time.js';
 import { validateDecisionCard, type DecisionCard } from './decision-card.js';
 import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
@@ -39,9 +36,8 @@ import type {
   ApprovalSteeringAction,
 } from './approval-store.js';
 
-export function approvalEventLogicalPath(storageChannel: string): string {
-  return `${approvalStoreRoots().observability}/${normalizeApprovalChannel(storageChannel)}/approvals.jsonl`;
-}
+/** System-tree event log of a channel (tenant partitions: approval-store-location.ts). */
+export { approvalEventLogicalPath } from './approval-store-paths.js';
 
 export function createApprovalRequest(
   role: GovernedArtifactRole,
@@ -71,6 +67,14 @@ export function createApprovalRequest(
     scope?: EventScopeInput;
     decisionCard?: DecisionCard;
     veto?: ApprovalVetoWindow;
+    /**
+     * Only for the `tenant-activation` channel: the scope's tenant is already
+     * active (organization/tenant-activation.ts isTenantActivationActive). An
+     * activation request for a tenant that is not yet active stays in the
+     * system tree; every other tenant-scoped request goes to the tenant's
+     * partition (approval-store-location.ts).
+     */
+    tenantActive?: boolean;
   }
 ): ApprovalRequestRecord {
   if (params.decisionCard) validateDecisionCard(params.decisionCard);
@@ -80,7 +84,20 @@ export function createApprovalRequest(
     );
   }
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
-  ensureGovernedArtifactDir(role, approvalRequestsLogicalDir(storageChannel));
+  const scope = params.scope ? normalizeEventScope(params.scope) : undefined;
+  const located = {
+    partition: approvalPartitionForScope(scope, {
+      storageChannel,
+      tenantActive: params.tenantActive,
+    }),
+    storageChannel,
+  };
+  // Refuses a tenant this process may not bind before anything is written.
+  ensureApprovalDirAt(
+    role,
+    located.partition,
+    approvalRequestsLogicalDirAt(located.partition, storageChannel)
+  );
 
   const record: ApprovalRequestRecord = {
     id: randomUUID(),
@@ -119,13 +136,13 @@ export function createApprovalRequest(
       }),
     accountability: withDefaultMinAssurance(params.accountability),
     steering: params.steering,
-    ...(params.scope ? { scope: normalizeEventScope(params.scope) } : {}),
+    ...(scope ? { scope } : {}),
     ...(params.decisionCard ? { decisionCard: params.decisionCard } : {}),
     ...(params.veto ? { veto: params.veto } : {}),
   };
 
-  writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), record);
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+  writeLocatedApprovalRequest(role, located, record);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event: 'approval_requested',
     request_id: record.id,

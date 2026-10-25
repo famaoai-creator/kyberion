@@ -1,0 +1,12 @@
+{
+  "role": "tenant_approval_store",
+  "description": "Tenant-bound store role of the per-tenant approval store partitions (libs/core/governance/approval-store-location.ts). The approval store assumes it (withExecutionContext) for every tenant partition read and write, always bound to the record's tenant, so the grants resolve through ${KYBERION_TENANT} to that one tenant's active/shared/runtime/tenant-approvals/<personal|confidential>/<tenant>/ partition (public tenant records are stored in the confidential partition): it reads, writes and lists request records, reads and writes passkey challenges and appends the channel's approval event log. Tenant-bound (TENANT_BOUND_READER_ROLES): a caller with another active tenant cannot bind it, so a process bound to one tenant never finds another tenant's approvals. No knowledge, mission, system approval tree or customer/ grant.",
+  "default_persona": "worker",
+  "write_scopes": [
+    "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",
+    "active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/"
+  ],
+  "scope_classes": ["audit"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential", "personal"]
+}

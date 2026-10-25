@@ -32,6 +32,12 @@ let execution: typeof import('@agent/core/surface/front-desk-execution');
 let executor: typeof import('./dot_executor_step.js');
 let approval: typeof import('@agent/core/surface/first-job-approval');
 let approvalStore: typeof import('@agent/core/governance/approval-store');
+/** Where a stored autonomy request lives (system tree or its tenant approval partition). */
+function storedRecordPath(id: string): string {
+  const located = approvalStore.locateApprovalRequest('autonomy', id);
+  if (!located) throw new Error(`fixture request ${id} not found`);
+  return approvalStore.approvalRequestLogicalPathAt(located.partition, 'autonomy', id);
+}
 let browser: typeof import('@agent/core/authn-providers');
 let authority: typeof import('@agent/core/authority');
 let foundation: typeof import('@agent/core/foundation');
@@ -450,7 +456,7 @@ describe('request-bound first-job status with real governed stores', { timeout: 
   it('does not mistake an unsigned approved status for a current verified human decision', async () => {
     const fixture = await pending();
     const record = approvalStore.loadApprovalRequest('autonomy', fixture.card.approval_request_id)!;
-    put(approvalStore.approvalRequestLogicalPath('autonomy', record.id), {
+    put(storedRecordPath(record.id), {
       ...record,
       status: 'approved',
     });
@@ -460,7 +466,7 @@ describe('request-bound first-job status with real governed stores', { timeout: 
     const fixture = await pending();
     decide(fixture);
     const record = approvalStore.loadApprovalRequest('autonomy', fixture.card.approval_request_id)!;
-    const file = approvalStore.approvalRequestLogicalPath('autonomy', record.id);
+    const file = storedRecordPath(record.id);
     for (const patch of [
       { diagnosticDecision: { ...record.diagnosticDecision, signature: '0'.repeat(64) } },
       { scope: { ...record.scope, tenant_slug: 'other-tenant' } },

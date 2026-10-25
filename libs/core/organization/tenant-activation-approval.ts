@@ -43,6 +43,7 @@ import {
 } from './organization-operating-model-persistence.js';
 import {
   applyTenantActivation,
+  isTenantActivationActive,
   loadTenantActivation,
   resolveTenantActivation,
   tenantActivationProbeEvidenceDir,
@@ -415,6 +416,9 @@ export async function requestTenantActivationApproval(
       tier: command.tier,
     },
     sourceText: JSON.stringify(payload),
+    // A request for a tenant that is not yet active stays in the system
+    // approval tree; an already-active tenant's lands in its partition.
+    tenantActive: isTenantActivationActive(command, rootDir),
     expiresAt: new Date(expiry).toISOString(),
     draft: {
       title: 'Activate ' + command.customerSlug,
