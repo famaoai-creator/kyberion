@@ -7,7 +7,9 @@ import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { nowIso } from '../../foundation/time.js';
 import { safeExistsSync, safeMkdir, safeReadFile } from '../../secure-io.js';
+import { sanitizeXmlText } from '../../text-escaping.js';
 import type { XlsxDesignProtocol } from '../../contracts/xlsx-protocol.js';
+import { parseOoxmlCorePropertiesXml } from '../ooxml-core-props.js';
 import { generateContentTypes } from './content-types.js';
 import { generateGlobalRels, generateWorkbookRels, generateSheetRels } from './rels.js';
 import { generateStyles } from './styles.js';
@@ -62,13 +64,24 @@ export async function generateNativeXlsx(
     Buffer.from(generateContentTypes(sheetCount, totalDrawings, totalTables), 'utf8')
   );
   zip.addFile('_rels/.rels', Buffer.from(generateGlobalRels(), 'utf8'));
+  // Preserve a title from raw core.xml when present; otherwise omit dc:title
+  // (do not invent "Kyberion Native Spreadsheet" — the reader treats that as empty).
+  const packageTitle = (() => {
+    const raw = protocol.rawParts?.['docProps/core.xml'];
+    if (!raw) return undefined;
+    try {
+      return parseOoxmlCorePropertiesXml(Buffer.from(raw, 'base64').toString('utf8')).title;
+    } catch {
+      return undefined;
+    }
+  })();
+  const titleXml = packageTitle ? `  <dc:title>${sanitizeXmlText(packageTitle)}</dc:title>\n` : '';
   zip.addFile(
     'docProps/core.xml',
     Buffer.from(
       `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
-  <dc:title>Kyberion Native Spreadsheet</dc:title>
-<dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || nowIso()}</dcterms:created>
+${titleXml}<dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || nowIso()}</dcterms:created>
 </cp:coreProperties>`,
       'utf8'
     )
