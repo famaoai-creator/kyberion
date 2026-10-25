@@ -42,6 +42,7 @@ import {
   archivedMissionStateCapability,
 } from '../foundation/archived-mission-state-capability.js';
 import { pathResolver } from '../path-resolver.js';
+import { auditChain } from '../governance/audit-chain.js';
 import { isValidCaseId, ledgerDir, readLedger } from '../decision-ledger/ledger.js';
 import {
   buildConsumedDecisionLock,
@@ -52,11 +53,13 @@ import {
   taskProposalsOf,
   missionTaskConsumerId,
   reconcileConsumedDecisionLock,
+  resolvedTaskProposalDecisions,
   taskProposalHolds,
   taskProposalId,
   unreworkedStale,
   type StaleConsumedDecision,
 } from '../customer-decision/consumption.js';
+import { ConfidentialTaskDecisionValues } from '../customer-decision/task-decision-values.js';
 import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 import type { DecisionAgenda, DecisionSwitch } from '../customer-decision/model.js';
 import {
@@ -124,6 +127,13 @@ export interface PinTaskDecisionsResult {
   pinned_count: number;
   /** false when an existing lock was kept (a re-recorded start). */
   pinned: boolean;
+  /**
+   * A resumed task whose hold is resolved: the confirmed customer decisions on
+   * its own `requires_customer` questions. Present only when there are any;
+   * serialized it shows ids only. The prompt receives the values only past
+   * the tier gate of `buildTaskDispatchContext`.
+   */
+  decision_values?: ConfidentialTaskDecisionValues;
 }
 
 export interface TaskDecisionReconciliation {
@@ -469,6 +479,12 @@ export function pinTaskDecisions(
       // re-pin (a resume before the operator confirmed the customer's decision).
       const stillHeld = holds.some((hold) => !hold.resolved_decision_id);
       const hold = nextHold(existing?.hold, stillHeld, now);
+      // The values a resumed task receives: only once the hold it had is resolved,
+      // from the snapshot just read (nothing new is written to the lock).
+      const resolvedValues =
+        existing?.hold && !stillHeld
+          ? resolvedTaskProposalDecisions(existing, agendas, ledger, now)
+          : [];
       writeLock(decisionCase, {
         version: '1.0.0',
         ...lock,
@@ -481,11 +497,69 @@ export function pinTaskDecisions(
         ...(existing?.rework?.length ? { rework: existing.rework } : {}),
         ...(hold ? { hold } : {}),
       });
-      return { consumer, pinned_count: lock.decisions.length, pinned: true };
+      return {
+        consumer,
+        pinned_count: lock.decisions.length,
+        pinned: true,
+        ...(resolvedValues.length > 0
+          ? {
+              decision_values: new ConfidentialTaskDecisionValues(
+                {
+                  tenantSlug: decisionCase.tenantSlug,
+                  caseId: decisionCase.caseId,
+                  consumer,
+                  ...(decisionCase.projectId ? { projectId: decisionCase.projectId } : {}),
+                },
+                resolvedValues
+              ),
+            }
+          : {}),
+      };
     });
   } catch (error) {
     warnOnce(input.missionId, 'customer decision pin skipped', error, consumer);
     return null;
+  }
+}
+
+export type TaskDecisionDeliveryOperation = 'task_decisions_delivered' | 'task_decisions_withheld';
+
+/**
+ * Audit that a resumed task's confirmed customer decisions were put into its
+ * prompt, or withheld by the tier gate. Ids only (case, consumer, mission,
+ * task, decision ids, the withhold reason), in the case's tenant (mirrored
+ * to its audit partition), under the dispatching worker's own identity. A
+ * process bound to another tenant is refused by the chain. Best-effort: a
+ * failure logs a diagnostic warning.
+ */
+export function auditTaskDecisionDelivery(input: {
+  values: ConfidentialTaskDecisionValues;
+  missionId: string;
+  taskId: string;
+  operation: TaskDecisionDeliveryOperation;
+  reason?: string;
+}): void {
+  const tenantSlug = input.values.tenantSlug;
+  try {
+    auditChain.record({
+      agentId: 'customer-decision',
+      action: 'customer_decision',
+      operation: input.operation,
+      result: 'completed',
+      tenantSlug,
+      metadata: {
+        case_id: input.values.caseId,
+        consumer: input.values.consumer,
+        mission_id: input.missionId.toUpperCase(),
+        task_id: input.taskId,
+        decision_ids: input.values.decisionIds,
+        ...(input.reason ? { reason: input.reason } : {}),
+      },
+    });
+  } catch (error) {
+    logger.warn(
+      `customer decision delivery not audited — ${diagnosticCode(error)} | the task goes on; check the audit chain for tenant ${tenantSlug} | ${input.values.consumer} operation=${input.operation}`
+    );
   }
 }
 
@@ -918,6 +992,7 @@ function settleLock(
 export const CUSTOMER_DECISION_BLOCKED_REASONS: readonly string[] = [
   'awaiting_customer_decision',
   'customer_decision_check_failed',
+  'customer_decision_tier_mismatch',
 ];
 
 /**

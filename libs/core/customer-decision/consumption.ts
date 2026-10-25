@@ -442,3 +442,74 @@ export function taskProposalHolds(
         : hold;
     });
 }
+
+/** A confirmed customer decision on one of the task's own `requires_customer` proposals. */
+export interface ResolvedTaskProposalDecision {
+  proposal_id: string;
+  agenda_id: string;
+  entry_id: string;
+  item: string;
+  key: string;
+  question: string;
+  decision_id: string;
+  value: unknown;
+  /** The agenda option the value picked, when the entry offers options. */
+  option_label?: string;
+}
+
+/**
+ * The decisions a resumed task may receive (CD-09 human decision 2026-10-25):
+ * for each of the lock's own `requires_customer` proposals, the decision
+ * currently in force on its agenda entry — layer customer with a ledger id,
+ * confirmed by the operator (same rule as {@link taskProposalHolds}). A
+ * superseded decision yields the one in force now, never the one the hold was
+ * released on; an entry whose newest customer decision still awaits the
+ * operator's confirmation yields nothing. Proposals the agent made (not
+ * `requires_customer`) and every other decision of the case are never here.
+ */
+export function resolvedTaskProposalDecisions(
+  lock: Pick<ConsumedDecisionLock, 'decisions'>,
+  agendas: readonly DecisionAgenda[],
+  ledger: readonly DecisionRecord[],
+  now: string
+): ResolvedTaskProposalDecision[] {
+  const byId = new Map(agendas.map((agenda) => [agenda.agenda_id, agenda]));
+  const resolved = new Map<string, EffectiveDecision[]>();
+  const out: ResolvedTaskProposalDecision[] = [];
+  for (const entry of taskProposalsOf(lock)) {
+    if (!entry.proposal.requires_customer || !entry.agenda_id) continue;
+    const agenda = byId.get(entry.agenda_id);
+    if (!agenda) continue;
+    const entryId = entry.entry_id ?? entry.proposal.proposal_id;
+    let effective = resolved.get(agenda.agenda_id);
+    if (!effective) {
+      effective = resolveAgendaEffective(agenda, ledger, { now });
+      resolved.set(agenda.agenda_id, effective);
+    }
+    const current = effective.find((decision) => decision.entry_id === entryId);
+    if (
+      current?.layer !== 'customer' ||
+      !current.decision_id ||
+      current.awaiting_operator_confirmation ||
+      current.value === undefined
+    ) {
+      continue;
+    }
+    const agendaEntry = agenda.entries.find((candidate) => candidate.entry_id === entryId);
+    const picked = agendaEntry?.options?.find(
+      (option) => canonicalJson(option.value) === canonicalJson(current.value)
+    );
+    out.push({
+      proposal_id: entry.proposal.proposal_id,
+      agenda_id: agenda.agenda_id,
+      entry_id: entryId,
+      item: entry.item,
+      key: entry.key,
+      question: entry.proposal.question,
+      decision_id: current.decision_id,
+      value: current.value,
+      ...(picked?.label ? { option_label: picked.label } : {}),
+    });
+  }
+  return out;
+}

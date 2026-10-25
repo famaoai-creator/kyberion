@@ -53,6 +53,7 @@ import {
 import { RETENTION_CATALOG_REPO_PATH } from './storage-retention-catalog.js';
 import {
   PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  PARTITIONED_RUNTIME_STATE_ROOTS,
   metricsLedgerLockId,
   metricsRowTenant,
 } from './storage-layout.js';
@@ -298,7 +299,9 @@ export type OffboardTargetKind =
   /** The tenant's partition of the hybrid (audit) ledger (one per tier, D9). */
   | 'tenant_ledger'
   /** The tenant's approval store partition (requests, passkey challenges, event logs; one per tier). */
-  | 'tenant_approvals';
+  | 'tenant_approvals'
+  /** The tenant's customer decision invite records (CD-06; one partition per tier). */
+  | 'customer_decision_invites';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -377,6 +380,9 @@ export const EXECUTION_METRICS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.e
 export const TENANT_LEDGER_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger;
 /** approval-store-location.ts tenant partitions (`<root>/<tier>/<tenant>/<channel>/…`). */
 export const TENANT_APPROVALS_REPO_SUBPATH = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals;
+/** customer-decision/invite.ts invite records (`<root>/<tier>/<tenant>/inv-<id>.json`). */
+export const CUSTOMER_DECISION_INVITES_REPO_SUBPATH =
+  PARTITIONED_RUNTIME_STATE_ROOTS.customer_decision_invites;
 /** The repo-wide (system) execution-metrics ledger; pre-partition rows are pruned like usage rows. */
 export const EXECUTION_METRICS_LEGACY_REPO_PATH = 'work/metrics/execution-metrics.jsonl';
 
@@ -867,6 +873,15 @@ export function collectScopeTargets(
       const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
       if (subtreePath && safeExistsSync(subtreePath)) {
         targets.push({ path: subtree, kind: 'tenant_approvals' });
+      }
+    }
+    // CD-10: the tenant's customer decision invites (hashed secrets, participant
+    // names) must not outlive the tenant; other tenants' partitions stay.
+    for (const tier of SCOPE_TIERS) {
+      const subtree = `${CUSTOMER_DECISION_INVITES_REPO_SUBPATH}/${tier}/${id}`;
+      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
+      if (subtreePath && safeExistsSync(subtreePath)) {
+        targets.push({ path: subtree, kind: 'customer_decision_invites' });
       }
     }
   }

@@ -35,6 +35,7 @@ import { isPromptTooLongError } from '../workforce/worker-context-compaction.js'
 
 import {
   recordMissionContextTask,
+  recordMissionVisiblePrompt,
   taskClarificationFilePath,
   summarizeTaskResultObservability,
   buildTaskClarificationPacket,
@@ -49,7 +50,10 @@ import type {
 import {
   buildTaskDispatchContext,
   attachDeliveredKnowledgeRefs,
+  CUSTOMER_DECISION_TIER_MISMATCH,
 } from './mission-orchestration-worker-part-dispatch-context.js';
+import type { ConfidentialTaskDecisionValues } from '../customer-decision/task-decision-values.js';
+import type { TaskResultBlock } from './mission-orchestration-worker-contracts.js';
 import type { DispatchPlannedMissionTaskInput } from './mission-orchestration-worker-part-dispatch-context.js';
 import {
   obtainTaskResultResponse,
@@ -62,11 +66,38 @@ import {
 } from './mission-orchestration-worker-part-results.js';
 import { registerMissionWorkerCoreDispatcher } from './mission-orchestration-worker-dispatch-port.js';
 import {
+  auditTaskDecisionDelivery,
   pinTaskDecisions,
   reconcileTaskDecisions,
   recordTaskDecisionProposals,
   CUSTOMER_DECISION_BLOCKED_REASONS,
 } from './mission-decision-lock.js';
+
+/**
+ * CD-09: replace echoed customer decision values in the worker's own words
+ * (summary, needs, gaps, verification, review instructions, notes) before
+ * any copy of them reaches a store that is not tenant-partitioned.
+ */
+function scrubTaskResultValues(
+  values: ConfidentialTaskDecisionValues,
+  taskResult: TaskResultBlock | undefined,
+  notes: string[] | undefined
+): void {
+  if (notes) notes.splice(0, notes.length, ...notes.map((note) => values.scrub(note)));
+  if (!taskResult) return;
+  const scrubList = (list: string[] | undefined) =>
+    Array.isArray(list) ? list.map((entry) => values.scrub(String(entry))) : list;
+  taskResult.summary = values.scrub(String(taskResult.summary || ''));
+  taskResult.needs = scrubList(taskResult.needs) ?? [];
+  taskResult.gaps = scrubList(taskResult.gaps) ?? [];
+  taskResult.verification_done = scrubList(taskResult.verification_done) ?? [];
+  if (Array.isArray(taskResult.review_findings)) {
+    taskResult.review_findings = taskResult.review_findings.map((finding) => ({
+      ...finding,
+      instruction: values.scrub(String(finding.instruction || '')),
+    }));
+  }
+}
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -134,6 +165,9 @@ export async function dispatchPlannedMissionTaskCore(
       estimated_scope: input.task.estimated_scope,
     },
   });
+  // CD-09: a resumed task's confirmed customer decisions (held in memory only).
+  const decisionValues = decisionPin?.decision_values;
+  let decisionsAudited = false;
   let dispatchContext;
   let response;
   const buildContext = (forceContextCompaction?: boolean) =>
@@ -147,8 +181,110 @@ export async function dispatchPlannedMissionTaskCore(
       allTasks: input.allTasks,
       ...(input.upstreamHandoffs ? { upstreamHandoffs: input.upstreamHandoffs } : {}),
       ...(forceContextCompaction ? { forceContextCompaction: true } : {}),
+      ...(decisionValues ? { customerDecisionValues: decisionValues } : {}),
     });
-  const dispatchOnce = (context: Awaited<ReturnType<typeof buildTaskDispatchContext>>) => {
+  type BuiltDispatchContext = Awaited<ReturnType<typeof buildTaskDispatchContext>>;
+  /**
+   * CD-09: the tier gate withheld the values: the task is not dispatched (the
+   * values are never sent) and its WorkItem is blocked, ids only.
+   */
+  const blockOnDecisionTier = (context: BuiltDispatchContext): DispatchMissionTaskOutcome => {
+    const delivery = context.customerDecisionDelivery;
+    const decisionIds = delivery?.decision_ids ?? [];
+    const reason = delivery?.reason ?? 'tier_gate';
+    if (decisionValues) {
+      auditTaskDecisionDelivery({
+        values: decisionValues,
+        missionId: input.missionId,
+        taskId: input.task.task_id,
+        operation: 'task_decisions_withheld',
+        reason,
+      });
+    }
+    const hold = {
+      status: 'tier_mismatch',
+      ...(decisionValues
+        ? { consumer: decisionValues.consumer, case_id: decisionValues.caseId }
+        : {}),
+      decision_ids: decisionIds,
+      reason,
+      next: `run the task in a confidential mission of the decision case's tenant, then pnpm mission resume ${input.missionId}`,
+    };
+    updateWorkItem({
+      itemId: claimed.item.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+      metadata: {
+        summary:
+          'Task blocked: its confirmed customer decisions may not be sent in this mission’s context',
+        blocked_reason: CUSTOMER_DECISION_TIER_MISMATCH,
+        mission_id: input.missionId,
+        task_id: input.task.task_id,
+        team_role: input.teamRole,
+        customer_decision_hold: hold,
+      },
+    });
+    input.task.status = 'blocked';
+    emitMissionTaskEvent({
+      event_type: 'task_reviewed',
+      mission_id: input.missionId,
+      task_id: input.task.task_id,
+      agent_id: input.assignment.agent_id,
+      team_role: input.teamRole,
+      decision: 'task_reviewed',
+      why: 'The mission context may not carry the confidential customer decisions this task needs.',
+      policy_used: 'mission_orchestration_control_plane_v1',
+      evidence: [],
+      payload: { customer_decision_hold: hold },
+    });
+    recordMissionContextTask(input.missionId, `Blocked work item ${input.task.task_id}`, {
+      next_step: hold.next,
+      work_item_id: input.task.task_id,
+      team_role: input.teamRole,
+      assignee_peer_id: input.assignment.agent_id,
+      context_pack_id: context.missionContextPackId,
+      context_pack_path: context.missionContextPackPath,
+    });
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      ...summarizeTaskResultObservability({
+        pruning: context.missionContextPackPruningSummary,
+        parseErrors: [],
+      }),
+    };
+  };
+  /** CD-09: audit (once) and record, ids only, that the values went into the prompt. */
+  const noteDecisionsDelivered = (context: BuiltDispatchContext) => {
+    if (!decisionValues || context.customerDecisionDelivery?.status !== 'delivered') return;
+    if (decisionsAudited) return;
+    decisionsAudited = true;
+    auditTaskDecisionDelivery({
+      values: decisionValues,
+      missionId: input.missionId,
+      taskId: input.task.task_id,
+      operation: 'task_decisions_delivered',
+    });
+    try {
+      recordMissionVisiblePrompt({
+        missionId: input.missionId,
+        taskId: input.task.task_id,
+        content: decisionValues.promptLines().join('\n'),
+        form: 'customer_decision_values',
+        ...(context.missionContextPackId ? { contextPackId: context.missionContextPackId } : {}),
+        knowledgeRefs: decisionValues.knowledgeRefs().map((ref) => ({ path: ref })),
+        securityScope: context.securityScope,
+      });
+    } catch (error) {
+      logger.warn(
+        `customer decision prompt visibility not recorded — ${error instanceof Error ? error.name : 'error'} | the task goes on | mission=${input.missionId} consumer=${decisionValues.consumer}`
+      );
+    }
+  };
+  const dispatchOnce = (context: BuiltDispatchContext) => {
+    noteDecisionsDelivered(context);
     const dispatchArgs = {
       missionId: input.missionId,
       task: input.task,
@@ -178,6 +314,9 @@ export async function dispatchPlannedMissionTaskCore(
     dispatchContext = await (gapRecorder
       ? gapRecorder.measure('context_pack', () => buildContext())
       : buildContext());
+    if (dispatchContext.customerDecisionDelivery?.status === 'withheld') {
+      return blockOnDecisionTier(dispatchContext);
+    }
     try {
       response = await (gapRecorder
         ? gapRecorder.measure('backend_dispatch', () => dispatchOnce(dispatchContext))
@@ -192,6 +331,9 @@ export async function dispatchPlannedMissionTaskCore(
       dispatchContext = await (gapRecorder
         ? gapRecorder.measure('context_pack', () => buildContext(true))
         : buildContext(true));
+      if (dispatchContext.customerDecisionDelivery?.status === 'withheld') {
+        return blockOnDecisionTier(dispatchContext);
+      }
       response = await (gapRecorder
         ? gapRecorder.measure('backend_dispatch', () => dispatchOnce(dispatchContext))
         : dispatchOnce(dispatchContext));
@@ -216,6 +358,8 @@ export async function dispatchPlannedMissionTaskCore(
     }
     throw err;
   }
+  // CD-09: echoed customer decision values never leave in the worker's words.
+  if (decisionValues) scrubTaskResultValues(decisionValues, response.taskResult, response.notes);
   // KP-05: report what buildTaskDispatchContext's context pack actually
   // delivered onto this dispatch's trace span.
   attachDeliveredKnowledgeRefs(traceCtx, dispatchContext.deliveredKnowledgeRefs);
