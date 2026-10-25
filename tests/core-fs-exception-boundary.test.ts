@@ -170,6 +170,11 @@ const allowedCoreFsImports = [
   'libs/core/promotion-candidates.test.ts',
   'libs/core/provider/provider-discovery.test.ts',
   'libs/core/provider/provider-egress-gate.test.ts',
+  // Not an in-process fs import: `dist/.session-build-head` lands under
+  // `.worktrees/`, which no persona allow_write pattern covers, so the
+  // mission-owner-gated bootstrap emits it through a spawned node -e script —
+  // the same exec channel the `git worktree` mutations use.
+  'libs/core/workforce/agent-worktree.ts',
 ].sort((a, b) => a.localeCompare(b));
 
 function normalize(relPath: string): string {
