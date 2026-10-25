@@ -28,8 +28,13 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  * `--migrate-tenant-partitions` instead moves tenant-scoped records written to
  * the system tree before the per-tenant partitions existed into their
  * tenant's partition (dry run by default; `--apply` moves them, under the
- * record lock, with an audit line). It needs no sovereign persona and runs
- * no other sweep. Every other run reports how many such records remain.
+ * record lock, with an audit line; the record's passkey challenges move with
+ * it). It needs no sovereign persona and runs no other sweep. Every other run
+ * reports how many such records remain. Between writing the partition copy and
+ * removing the system copy, a reader that does not take the record lock may
+ * briefly see `[APPROVAL_LOCATION_AMBIGUOUS]`; if the process crashes in that
+ * gap, re-running `--apply` resolves it (an identical partition copy only has
+ * the system copy removed).
  *
  *   node dist/scripts/approval_store_hygiene.js [--stale-days N] [--json]
  *   KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply

@@ -393,10 +393,13 @@ the record is stored follows its scope
   partitions existed stay readable and writable in place.
   `node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions`
   lists them (dry run); add `--apply` to move each one under its record lock
-  (write + fsync + read-back, remove the system copy, audit-chain entry
-  `migrate_tenant_partition`). The run is idempotent and refuses
-  (`[APPROVAL_MIGRATION_CONFLICT]`) when the partition already holds the id
-  with different content. Old `approvals.jsonl` lines stay in the system log
+  (write + fsync + read-back, move the request's passkey challenges the same
+  way, remove the system copy, audit-chain entry `migrate_tenant_partition`).
+  The run is idempotent and refuses (`[APPROVAL_MIGRATION_CONFLICT]`) when the
+  partition already holds the id with different content. A reader that does
+  not take the record lock may briefly see `[APPROVAL_LOCATION_AMBIGUOUS]`
+  while a record is between its two copies; if the process crashes in that
+  gap, re-running `--apply` resolves it. Old `approvals.jsonl` lines stay in the system log
   as history. The regular hygiene report counts the records still to move.
 - The hygiene sweeps (expired passkey challenges, fixture purge) and the
   learning-signal rejection reader cover the partitions too. Retention is

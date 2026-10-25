@@ -33,12 +33,16 @@ export function tenantStorePartitionWriteDecision(
   relativePath: string,
   identity: PartitionWriteIdentity,
   deps: {
+    operation: 'write' | 'mkdir';
     sudoAllows: (sudoScope: string[] | undefined) => boolean;
     matches: (pattern: string) => boolean;
   }
 ): { allowed: boolean; reason?: string } | null {
   const partition = tenantStoreLedgerPartitionOf(relativePath);
   if (!partition) return null;
+  // Creating the bare tier directory (the parent of every tenant partition)
+  // follows the ordinary rules; any file at or under it does not.
+  if (!partition.tenant && deps.operation === 'mkdir') return null;
   const { persona, role, authorities, sudoScope } = identity;
   if (authorities.includes('SUDO') && deps.sudoAllows(sudoScope)) return { allowed: true };
   const grants = [

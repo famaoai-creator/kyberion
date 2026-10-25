@@ -51,7 +51,10 @@ import {
 } from './approval-store-location.js';
 import { auditChain } from './audit-chain.js';
 import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
-import { issueApprovalPasskeyChallenge } from './approval-passkey-challenge.js';
+import {
+  claimApprovalPasskeyChallenge,
+  issueApprovalPasskeyChallenge,
+} from './approval-passkey-challenge.js';
 import { computeApprovalPresentedDigest } from './approval-presentation.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
@@ -439,6 +442,49 @@ describe('approval store hygiene over tenant partitions', () => {
     const again = migrateTenantApprovalPartitions({ dryRun: false });
     expect(again.candidates.filter((c) => c.storageChannel === channel)).toEqual([]);
     expect(again.errors).toEqual([]);
+  });
+
+  it("moves a legacy record's passkey challenges into the partition in the same step", () => {
+    const legacy = writeLegacy();
+    const challenge = issueApprovalPasskeyChallenge('mission_controller', {
+      record: legacy,
+      presentedDigest: computeApprovalPresentedDigest(legacy),
+      storageChannel: channel,
+      decision: 'approved',
+      memberId: 'owner',
+    });
+    const systemPath = `${approvalStoreRoots().coordination}/${channel}/approvals/passkey-challenges/${challenge.challenge_id}.json`;
+    const partitionPath = `${tenantApprovalPasskeyChallengesLogicalDir(TENANT_PARTITION, channel)}/${challenge.challenge_id}.json`;
+    expect(existsAt(systemPath)).toBe(true);
+    const applied = migrateTenantApprovalPartitions({ dryRun: false });
+    expect(applied.errors).toEqual([]);
+    expect(applied.outcomes[legacy.id]).toBe('moved');
+    expect(existsAt(systemPath)).toBe(false);
+    expect(existsAt(partitionPath)).toBe(true);
+    // The moved challenge still settles against its (now partitioned) request.
+    expect(
+      claimApprovalPasskeyChallenge('mission_controller', {
+        storageChannel: channel,
+        challengeId: challenge.challenge_id,
+        requestId: legacy.id,
+        memberId: 'owner',
+        decision: 'approved',
+      }).claimed_at
+    ).toBeTruthy();
+  });
+
+  it('keeps a tenant binding from the execution scope when listing migration candidates', () => {
+    const legacy = writeLegacy();
+    const bound = withExecutionContext(
+      'mission_controller',
+      () => migrateTenantApprovalPartitions({ dryRun: true, role: 'mission_controller' }),
+      undefined,
+      `hyg-other-${process.pid}`
+    );
+    expect(bound.candidates.map((c) => c.requestId)).not.toContain(legacy.id);
+    expect(
+      migrateTenantApprovalPartitions({ dryRun: true }).candidates.map((c) => c.requestId)
+    ).toContain(legacy.id);
   });
 
   it('removes an identical system copy and refuses a partition copy with different content', () => {
