@@ -13,6 +13,7 @@ import {
   handoffInboxEntryId,
   handoffTargets,
   isCalendarDate,
+  isCoveredByEarlierReminder,
   isHandoffDone,
   lapsedAgendaReminders,
   REMINDER_CARRY_OVER_DAYS,
@@ -589,6 +590,18 @@ describe('held reminders after their day (CD-11 follow-up: approval after the sw
     // A before_due sent on its own day does not cover the due.
     const onTime = agenda({ reminders: [held('before_due', 'sent', D_MINUS_1)] });
     expect(kinds(dueAgendaReminders(input(onTime, D0)))).toEqual(['due']);
+  });
+
+  it('a due sent first covers the carried-over before_due (either approval order)', () => {
+    const dueSent = agenda({
+      reminders: [held('before_due'), held('due', 'sent', D0)],
+    });
+    expect(dueAgendaReminders(input(dueSent, D0))).toEqual([]);
+    expect(lapsedAgendaReminders(input(dueSent, D0)).map((item) => item.kind)).toEqual([
+      'before_due',
+    ]);
+    expect(isCoveredByEarlierReminder(held('before_due'), [held('due', 'sent', D0)])).toBe(true);
+    expect(isCoveredByEarlierReminder(held('before_due'), [held('due')])).toBe(false);
   });
 
   it('a held reminder no longer due (the decider answered, the agenda closed) lapses', () => {

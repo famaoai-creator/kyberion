@@ -324,23 +324,24 @@ function isCarriedOver(
 }
 
 /**
- * A `due` reminder whose decider already got the same respond-by date's
- * `before_due` on (or after) that date — a carried-over one: one message a day.
+ * One message a day per decider and respond-by date: a `due` whose decider
+ * already got that date's `before_due` on (or after) the date — a carried-over
+ * one — and a `before_due` (only ever carried over, on the date) whose
+ * decider already got that date's `due`, whichever approval came first.
  */
-function isCoveredByEarlierReminder(
-  reminder: PlannedReminder,
+export function isCoveredByEarlierReminder(
+  reminder: Pick<PlannedReminder, 'kind' | 'actor_id' | 'target_date'>,
   records: readonly AgendaReminderRecord[]
 ): boolean {
-  return (
-    reminder.kind === 'due' &&
-    records.some(
-      (record) =>
-        record.kind === 'before_due' &&
-        record.status === 'sent' &&
-        record.actor_id === reminder.actor_id &&
-        record.target_date === reminder.target_date &&
-        (utcDate(record.at) ?? '') >= reminder.target_date
-    )
+  if (reminder.kind === 'override_closing') return false;
+  const other = reminder.kind === 'due' ? 'before_due' : 'due';
+  return records.some(
+    (record) =>
+      record.kind === other &&
+      record.status === 'sent' &&
+      record.actor_id === reminder.actor_id &&
+      record.target_date === reminder.target_date &&
+      (utcDate(record.at) ?? '') >= reminder.target_date
   );
 }
 

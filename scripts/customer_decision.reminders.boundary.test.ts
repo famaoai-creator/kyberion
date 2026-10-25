@@ -49,6 +49,8 @@ const CHARTERED = 'cd-remind-charter';
 const MOVE = 'cd-remind-move';
 /** No charter; approvals that come too late or for an older agenda revision. */
 const LATE = 'cd-remind-late';
+/** No charter; the due is approved before the carried-over before_due. */
+const REVERSE = 'cd-remind-reverse';
 const CASE = 'case-cd';
 const NOW = '2026-10-24T00:00:00.000Z';
 const D_MINUS_1 = '2026-10-29T01:00:00.000Z';
@@ -146,7 +148,7 @@ beforeAll(async () => {
   facade = await import('./customer_decision.js');
   expect((await import('@agent/core/path-resolver')).rootDir()).toBe(ROOT);
   process.env.KYBERION_PERSONA = 'sovereign';
-  for (const tenant of [TENANT, CHARTERED, MOVE, LATE]) {
+  for (const tenant of [TENANT, CHARTERED, MOVE, LATE, REVERSE]) {
     writeFixtureJson(`knowledge/personal/tenants/${tenant}.json`, {
       tenant_slug: tenant,
       display_name: tenant,
@@ -912,6 +914,8 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
         outcome: 'sent',
         carried_over: true,
         target_date: '2026-10-30',
+        // The record names the approval that authorized the send.
+        approval_request_id: held[0].id,
       });
       // One message a day: the due for the same decider is covered, not asked.
       expect(reminderOf(d0, ACTOR, 'due')).toMatchObject({ outcome: 'covered' });
@@ -931,6 +935,51 @@ describe('customer-decision reminders and hand-offs (CD-11, real paths)', () => 
           (item) => String(item.correlationId).includes(`:${MOVE}:`) && item.status === 'pending'
         )
       ).toEqual([]);
+    }, 120_000);
+
+    it('the due approved first: once it is sent, the carried-over before_due is withdrawn and approving it sends nothing', async () => {
+      const { agendaId } = await sendAgenda(REVERSE);
+      const first = await run(['remind', '--tenant', REVERSE, '--now', D_MINUS_1]);
+      expect(reminderOf(first, ACTOR, 'before_due').outcome).toBe('approval_pending');
+      // Nobody decides on D-1; on D0 both are held.
+      const d0 = await run(['remind', '--tenant', REVERSE, '--now', D0]);
+      const before = reminderOf(d0, ACTOR, 'before_due');
+      const due = reminderOf(d0, ACTOR, 'due');
+      expect(before).toMatchObject({ outcome: 'approval_pending', carried_over: true });
+      expect(due.outcome).toBe('approval_pending');
+      // The approver decides the due first; the next sweep the same day sends it.
+      await decide('slack', due.approval_request_id);
+      const sent = await run(['remind', '--tenant', REVERSE, '--now', D0]);
+      expect(reminderOf(sent, ACTOR, 'due')).toMatchObject({
+        outcome: 'sent',
+        approval_request_id: due.approval_request_id,
+      });
+      expect(reminderOf(sent, ACTOR, 'before_due')).toMatchObject({
+        outcome: 'lapsed',
+        superseded_request_ids: [before.approval_request_id],
+      });
+      expect((await request('slack', before.approval_request_id))?.status).toBe('cancelled');
+      expect(recordOf(REVERSE, agendaId, before.reminder_id)).toMatchObject({
+        status: 'lapsed',
+        superseded_requests: [
+          expect.objectContaining({
+            request_id: before.approval_request_id,
+            reason: 'covered_by_earlier_reminder',
+          }),
+        ],
+      });
+      expect(recordOf(REVERSE, agendaId, due.reminder_id)).toMatchObject({
+        status: 'sent',
+        approval_request_id: due.approval_request_id,
+      });
+      // Approving the before_due afterwards is refused; later sweeps send nothing more.
+      await expect(decide('slack', before.approval_request_id)).rejects.toThrow(/cancelled/u);
+      const again = await run(['remind', '--tenant', REVERSE, '--now', D0]);
+      expect(reminderOf(again, ACTOR, 'before_due')).toBeUndefined();
+      expect(reminderOf(again, ACTOR, 'due')).toBeUndefined();
+      const messages = await messagesOf('slack', REVERSE);
+      expect(messages).toHaveLength(1);
+      expect(messages[0].text).toContain('Today (2026-10-30)');
     }, 120_000);
 
     it('an approval for an older agenda revision never sends; a held reminder past its day lapses and its request is withdrawn', async () => {

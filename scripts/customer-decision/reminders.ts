@@ -55,6 +55,7 @@ import {
   agendaContentHash,
   dueAgendaReminders,
   handoffTargets,
+  isCoveredByEarlierReminder,
   isHandoffDone,
   lapsedAgendaReminders,
   listInvites,
@@ -62,7 +63,6 @@ import {
   readAgenda,
   resolveAgendaEffective,
   upcomingAgendaReminders,
-  utcDate,
   withCustomerDecisionCaseLock,
   writeAgenda,
   type AgendaHandoffRecord,
@@ -356,6 +356,13 @@ function withdrawHeldRequests(
   const withdrawn: AgendaReminderSupersededRequest[] = [];
   for (const record of candidates) {
     const surface = String(record.storageChannel || record.channel).toLowerCase();
+    // Never cancel another tenant's request, whatever the listing returned.
+    if (record.scope?.tenant_slug !== tenant) {
+      logger.warn(
+        `customer decision reminder: approval request outside the tenant skipped — scope_mismatch | nothing cancelled | request=${record.id} surface=${surface} reminder=${reminder.reminder_id}`
+      );
+      continue;
+    }
     const reason: AgendaReminderSupersedeReason = keep.surface
       ? surface === keep.surface
         ? 'content_changed'
@@ -488,22 +495,14 @@ async function sweepAgenda(
     });
     return 'lapsed';
   };
-  const sentBeforeDueOnTheDay = (record: AgendaReminderRecord): boolean =>
-    record.kind === 'due' &&
-    (state.agenda.reminders ?? []).some(
-      (item) =>
-        item.kind === 'before_due' &&
-        item.status === 'sent' &&
-        item.actor_id === record.actor_id &&
-        item.target_date === record.target_date &&
-        (utcDate(item.at) ?? '') >= record.target_date
-    );
   for (const record of lapsed) {
     let outcome: ReminderOutcome = 'failed';
     try {
       outcome = lapse(
         record,
-        sentBeforeDueOnTheDay(record) ? 'covered_by_earlier_reminder' : 'no_longer_due'
+        isCoveredByEarlierReminder(record, state.agenda.reminders ?? [])
+          ? 'covered_by_earlier_reminder'
+          : 'no_longer_due'
       );
     } catch (error) {
       logger.warn(
@@ -523,8 +522,10 @@ async function sweepAgenda(
       ...(ids ? { superseded_request_ids: ids } : {}),
     });
   }
-  /** actor × target date whose carried-over `before_due` went out this run. */
+  /** actor × target date whose `before_due` (carried over) or `due` went out this run. */
   const covered = new Set<string>();
+  /** Carried-over `before_due` records left held this run, by actor × target date. */
+  const heldCarried = new Map<string, AgendaReminderRecord>();
   for (const reminder of due) {
     const base = {
       case_id: caseId,
@@ -539,8 +540,8 @@ async function sweepAgenda(
     let outcome: ReminderOutcome = 'failed';
     let record: AgendaReminderRecord | undefined;
     try {
-      if (reminder.kind === 'due' && covered.has(coverKey)) {
-        // One message a day: the carried-over `before_due` already went out.
+      if (reminder.kind !== 'override_closing' && covered.has(coverKey)) {
+        // One message a day: that date's other reminder already went out.
         const earlier = heldRecords.get(reminder.reminder_id);
         outcome = earlier ? lapse(earlier, 'covered_by_earlier_reminder') : 'covered';
         const ids = superseded.get(reminder.reminder_id);
@@ -618,7 +619,10 @@ async function sweepAgenda(
             inbox_entry_id: notice.inbox_entry_id,
           };
         }
-        if (outcome === 'sent' && reminder.kind === 'before_due' && reminder.carried_over)
+        if (
+          outcome === 'sent' &&
+          (reminder.kind === 'due' || (reminder.kind === 'before_due' && reminder.carried_over))
+        )
           covered.add(coverKey);
       }
       if (record) {
@@ -649,6 +653,8 @@ async function sweepAgenda(
       );
     }
     if (record) records.push(record);
+    if (record?.status === 'approval_pending' && reminder.carried_over)
+      heldCarried.set(coverKey, record);
     const ids = superseded.get(reminder.reminder_id);
     result.reminders.push({
       ...base,
@@ -657,6 +663,35 @@ async function sweepAgenda(
       ...(record?.inbox_entry_id ? { inbox_entry_id: record.inbox_entry_id } : {}),
       ...(ids ? { superseded_request_ids: ids } : {}),
     });
+  }
+  // A carried-over `before_due` still held when the same decider's `due` went
+  // out later in this run: covered — withdraw its request too, so approving
+  // it afterwards sends nothing.
+  for (const [key, record] of heldCarried) {
+    if (!covered.has(key)) continue;
+    const index = records.indexOf(record);
+    const withdrawn = withdrawHeldRequests(
+      tenant,
+      held,
+      record,
+      {},
+      'covered_by_earlier_reminder',
+      now
+    );
+    const superseded_requests = mergeSuperseded(record.superseded_requests, withdrawn);
+    records[index] = {
+      ...record,
+      status: 'lapsed',
+      ...(superseded_requests.length > 0 ? { superseded_requests } : {}),
+    };
+    const item = result.reminders.find(
+      (entry) => entry.agenda_id === agendaId && entry.reminder_id === record.reminder_id
+    );
+    if (item) {
+      item.outcome = 'lapsed';
+      if (superseded_requests.length > 0)
+        item.superseded_request_ids = superseded_requests.map((entry) => entry.request_id);
+    }
   }
   if (records.length === 0) return;
   withCustomerDecisionCaseLock(
