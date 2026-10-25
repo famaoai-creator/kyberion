@@ -102,3 +102,11 @@ task・lease・planner profileのbindingも確認し、検証runtimeは停止し
 通信断で実行有無が不明な場合はclaimを保持して隔離し、人間による承認付き復旧まで再実行しない。
 native code hostはI/Oを持たないVMに限定し、実バイナリでファイル・process・networkの直接利用不可と、登録したKyberion toolだけへの到達を確認した。
 外部API providerへの課金を伴う実呼出しは行っていない。API側は既定execution portから実task runtimeまでを結合テストし、provider I/Oだけを代替した。
+
+### PR公開前の統合検証
+
+正式な全build（package・repository・両UI）とrepository/bootstrapの型検査が成功した。
+固定ソースの全strict suiteは29,105件成功・23件skip・契約チェック4件失敗で、strict leak違反と未処理例外は0件だった。
+4件はschema参照登録、明示的なruntime routeの期待値、条件式で選ぶ承認consumerの静的検査に対応し、対象4ファイル64件をstrict条件でまとめて再実行して全件成功した。
+全suite後の変更はテストと文書だけで、本番コードは変えていない。修正後の全suite再実行は行っていない。
+承認の検査ではdotと一般WorkItemの両consumerを列挙し、動的なconsumerや単なる文字列記載を許可しない回帰も追加した。
