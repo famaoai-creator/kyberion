@@ -321,18 +321,20 @@ export async function buildTaskDispatchContext(input: {
     input.customerDecisionValues && !input.customerDecisionValues.isEmpty
       ? input.customerDecisionValues
       : undefined;
-  // Only confidential values pass the gate; a section that carries just the
-  // ids of unconfirmed proposals is no tenant data and goes to any mission.
-  const decisionWithheld =
-    decisionValues && decisionValues.count > 0
-      ? customerDecisionTierGate({
-          securityScope: missionContextPack ? missionContextPack.security_scope : undefined,
-          missionId: String(missionState.mission_id || input.missionId),
-          tenantSlug: decisionValues.tenantSlug,
-          caseId: decisionValues.caseId,
-          ...(decisionValues.projectId ? { projectId: decisionValues.projectId } : {}),
-        })
-      : null;
+  // The gate decides whether this mission may carry the case tenant's data.
+  // Values it would not carry block the task; a section of unconfirmed
+  // proposals only (no values) still goes, but by count when the gate would
+  // refuse (a proposal id lets a reader confirm a guessed item × key).
+  const gateVerdict = decisionValues
+    ? customerDecisionTierGate({
+        securityScope: missionContextPack ? missionContextPack.security_scope : undefined,
+        missionId: String(missionState.mission_id || input.missionId),
+        tenantSlug: decisionValues.tenantSlug,
+        caseId: decisionValues.caseId,
+        ...(decisionValues.projectId ? { projectId: decisionValues.projectId } : {}),
+      })
+    : null;
+  const decisionWithheld = decisionValues && decisionValues.count > 0 ? gateVerdict : null;
   const customerDecisionDelivery: CustomerDecisionDelivery | undefined = decisionValues
     ? {
         status: decisionWithheld ? 'withheld' : 'delivered',
@@ -363,7 +365,7 @@ export async function buildTaskDispatchContext(input: {
     artifactReviewLines,
     targetPath: input.task.target_path || input.task.deliverable,
     ...(decisionValues && !decisionWithheld
-      ? { customerDecisionLines: decisionValues.promptLines() }
+      ? { customerDecisionLines: decisionValues.promptLines({ proposalIds: gateVerdict === null }) }
       : {}),
   });
   const missionContextPackPruningSummary = missionContextPack?.pruning

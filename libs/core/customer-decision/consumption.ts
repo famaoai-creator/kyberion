@@ -597,17 +597,6 @@ export interface ResolvedTaskProposalDecision {
 }
 
 /**
- * The decisions a resumed task may receive (CD-09 human decision 2026-10-25):
- * for each of the lock's own `requires_customer` proposals that
- * {@link taskProposalStates} resolves, the decision and its value: the one in
- * force on its agenda entry (a superseded decision yields the one in force
- * now), or — once the agenda is closed, withdrawn or gone — the last one the
- * operator confirmed. An entry whose newest customer decision still awaits
- * the operator's confirmation on an open agenda yields nothing. Proposals the
- * agent made (not `requires_customer`) and every other decision of the case
- * are never here.
- */
-/**
  * Proposals of a completed-once lock whose release no longer has a value to
  * deliver (ids and why only): the resumed task is told not to assume one.
  */
@@ -624,6 +613,17 @@ export function unconfirmedTaskProposals(
   );
 }
 
+/**
+ * The decisions a resumed task may receive (CD-09 human decision 2026-10-25):
+ * for each of the lock's own `requires_customer` proposals that
+ * {@link taskProposalStates} resolves, the decision and its value: the one in
+ * force on its agenda entry (a superseded decision yields the one in force
+ * now), or — once the agenda is closed, withdrawn or gone — the last one the
+ * operator confirmed. An entry whose newest customer decision still awaits
+ * the operator's confirmation on an open agenda yields nothing. Proposals the
+ * agent made (not `requires_customer`) and every other decision of the case
+ * are never here.
+ */
 export function resolvedTaskProposalDecisions(
   lock: TaskProposalLock,
   agendas: readonly DecisionAgenda[],
