@@ -7,12 +7,13 @@
 import * as nodePath from 'node:path';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { rootDir } from '../path-resolver.js';
+import { findArchivedMissionDir, rootDir } from '../path-resolver.js';
+import { safeExistsSync } from '../secure-io.js';
 import {
   retryPendingSharedIndexReconcile,
   type RunReconcileOptions,
 } from '../session-git-index.js';
-import { tryResolveOwnerScope } from '../owner-scope.js';
+import { OwnerScopeError, resolveOwnerScope, tryResolveOwnerScope } from '../owner-scope.js';
 import { loadWorkspaceBudgetPolicy, measureWorkspaceBytes } from './workspace-budget.js';
 import {
   annotateWorkspace,
@@ -87,18 +88,32 @@ function repoRelativePosix(absolutePath: string): string {
 
 const TERMINAL_MISSION_STATUSES = new Set(['completed', 'failed', 'archived']);
 
+/**
+ * The active scope resolver never looks under the mission archive, so an
+ * archived mission reads as "unresolvable". A mission that landed in the
+ * archive is terminal by definition — check the flat layout and the
+ * partitioned `<root>/<tier>/<tenant|shared>/<ID>` layout.
+ */
+export function archivedMissionExists(missionId: string, archiveRoot?: string): boolean {
+  const dir = findArchivedMissionDir(missionId, archiveRoot ? { archiveRoot } : {});
+  return dir !== undefined && safeExistsSync(nodePath.join(dir, 'mission-state.json'));
+}
+
 /** Whether the owning mission resolves to a terminal status (unresolvable = not terminal). */
 export function missionOwnerTerminal(owner: WorkspaceOwner): boolean {
   if (!owner.mission_id) return false;
   try {
     // SC-07: owner resolution goes through the shared owner-scope resolver;
-    // a sweep must not abort on one ambiguous or hidden mission — unresolvable
-    // means not terminal, not swept.
-    const scope = tryResolveOwnerScope({ kind: 'mission', id: owner.mission_id });
-    if (!scope) return false;
+    // a sweep must not abort on one ambiguous or hidden mission. The archive
+    // fallback applies only to OWNER_NOT_FOUND — an ambiguous mission (e.g. a
+    // live twin next to an archived copy) stays non-terminal.
+    const scope = resolveOwnerScope({ kind: 'mission', id: owner.mission_id });
     const state = loadMissionStateAtPath(nodePath.join(scope.dir, 'mission-state.json'));
     return state ? TERMINAL_MISSION_STATUSES.has(state.status) : false;
-  } catch {
+  } catch (err) {
+    if (err instanceof OwnerScopeError && err.code === 'OWNER_NOT_FOUND') {
+      return archivedMissionExists(owner.mission_id);
+    }
     return false;
   }
 }
