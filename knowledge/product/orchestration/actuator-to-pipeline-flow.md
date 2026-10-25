@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-18
+last_updated: 2026-10-26
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -31,6 +31,13 @@ Commands:
 pnpm capabilities            # manifest scan, build-free; shows +N step ops hint
 pnpm generate:op-registry    # regenerate discovery + registry after op changes
 ```
+
+Every agent-facing surface merges both layers, so a step op that resolves in
+the playground resolves everywhere: playground, `kyberion run`, and the MCP
+`kyberion.capability.list` / `.search` tools (execution still bounded by
+`actuator_invoke_allowlist`). `CAPABILITIES_GUIDE.md` is a generated render —
+treat names in it as hints and confirm against `--describe` when an op does
+not resolve.
 
 ## 2. Try (playground)
 
@@ -82,6 +89,16 @@ Doctrine: get to SUCCESS first (scratch under `active/shared/tmp/<job>/` or
 mission evidence), promote only on reuse
 (`pipeline-crystallization-memo.md`, `architecture/loop-closure-machinery.md`).
 
+The repetition detector is mechanical: every successful ad-hoc ADF run (input
+outside `pipelines/`) is tallied in
+`active/shared/runtime/feedback-loop/adhoc-pipeline-runs.json`
+(`libs/core/promotion-candidates.ts`); at ≥3 runs the same ADF surfaces as a
+promotion candidate in the run output and in the operator status packet.
+Uncertain requests that never became a pipeline accumulate in the
+unhandled-intent registry instead (`libs/core/unhandled-intent-registry.ts`;
+`pipelines/reconcile-unhandled-intents.json` turns them into catalog/routing
+proposal stubs — the schedule ships disabled, opt-in).
+
 Two promotions, different inputs:
 
 | Input                                                       | Command                                                                                                    | Output                                                                |
@@ -106,7 +123,36 @@ unless approved (`pnpm kyberion project-trust request <path>` → human
 Schedules additionally need a `schedule{id,cron,timezone,enabled}` block and
 `pnpm kyberion schedule register`.
 
-## 5. Failure map (where this flow used to stall)
+The last crystallization rung is the accepted binding
+(`libs/core/accepted-pipeline-bindings.ts`): a promoted pipeline + a
+successful run journal + authenticated human approval binds an `intent_id` to
+`pipelines/<slug>.json`, and `run_intent` then bypasses LLM compile for that
+utterance class. The bar is deliberately high — `shape: pipeline`,
+`risk_profile: low`, confidence ≥0.9 with ≥0.1 margin, promoted provenance,
+and a hash-matched successful run — so most actuator work still routes
+through the normal compile path.
+
+## 5. Known gaps (verified 2026-10-26)
+
+- `actuator_action` in the execution-shape enum is declarative only — it
+  projects to `task_session` and no route handler dispatches a bare actuator
+  op for an utterance. Single ops go through the routes in §1–2.
+- `resolveWorkScopeSignalOptions` reads only five runtime signals, so just
+  two of the seven `work-scope-policy.json` mandatory triggers
+  (`external_regulatory_evidence`, `high_stakes_action`) are reachable from
+  context; the rest need a caller to pass them programmatically.
+- `front-desk-execution` calls `resolveWorkScopeDecision` with no input
+  signals, so the scope gate never promotes or restricts there.
+- `reconcile-unhandled-intents` ships `enabled: false`; the trace→procedure
+  analyzer was retired, leaving the browser-extension recording compiler as
+  the only active recording→procedure path.
+- `pipeline:promote`'s LLM advice (`{{placeholder}}`, `_semantic` flags) is
+  advisory — nothing downstream enforces it, and a stub backend promotes
+  verbatim.
+- super-nerve `system:shell` execs `zsh -lc` directly, bypassing the
+  typed-op/approval machinery it otherwise enforces.
+
+## 6. Failure map (where this flow used to stall)
 
 - Playground rejected valid step ops (`Machine mode requires --op`) — fixed by
   merging discovery ops; discovery-only ops on pipeline-accepting actuators
@@ -133,3 +179,8 @@ Schedules additionally need a `schedule{id,cron,timezone,enabled}` block and
   (`adb_health_check`, `list_calendars`, `knowledge_search`, …) — fixed by
   resolving the op kind from the discovery registry.
 - Machine mode required `--params` even for zero-argument ops — now optional.
+- The MCP surface (`kyberion.capability.*`, `actuator.invoke`) saw manifest
+  ops only, so pipeline-driven actuators advertised just `pipeline` and
+  allowlisted step ops died on `[MCP_ACTUATOR_OP_UNKNOWN]` — fixed 2026-10-26
+  by merging `actuator-op-discovery.json` into list/search/declaration and
+  wrapping discovery-only ops into the one-step pipeline envelope.

@@ -43,6 +43,22 @@ function commitPptxZip(zip: AdmZip, outputPath: string, options?: PptxWriteOptio
   safeWriteFile(outputPath, buffer);
 }
 
+/** First-line title for `docProps/core.xml` — title/ctrTitle placeholder, else first text. */
+function resolvePptxPackageTitle(protocol: PptxDesignProtocol): string | undefined {
+  const slide = protocol.slides[0];
+  if (!slide?.elements?.length) return undefined;
+  const titled = slide.elements.find(
+    (el) =>
+      (el.placeholderType === 'title' || el.placeholderType === 'ctrTitle') &&
+      String(el.text ?? '').trim()
+  );
+  const source = titled ?? slide.elements.find((el) => String(el.text ?? '').trim());
+  const line = String(source?.text ?? '')
+    .split('\n')[0]
+    ?.trim();
+  return line || undefined;
+}
+
 export async function generateNativePptx(
   protocol: PptxDesignProtocol,
   outputPath: string,
@@ -182,10 +198,13 @@ export async function generateNativePptx(
     )
   );
   zip.addFile('_rels/.rels', Buffer.from(generateGlobalRels(), 'utf8'));
+  // Package title from the first title placeholder (or first text), never a fake placeholder.
+  const packageTitle = resolvePptxPackageTitle(protocol);
+  const titleXml = packageTitle ? `<dc:title>${sanitizeXmlText(packageTitle)}</dc:title>` : '';
   zip.addFile(
     'docProps/core.xml',
     Buffer.from(
-      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>Kyberion Native Presentation</dc:title></cp:coreProperties>`,
+      `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:dcmitype="http://purl.org/dc/dcmitype/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">${titleXml}</cp:coreProperties>`,
       'utf8'
     )
   );

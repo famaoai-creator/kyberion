@@ -23,6 +23,7 @@ import {
   safeLstat,
   safeMkdir,
   safeReadFile,
+  safeRealpath,
   safeWriteFile,
 } from '../secure-io.js';
 import { assertMissionOwnerPath } from '../mission/mission-git.js';
@@ -438,9 +439,72 @@ export function bootstrapAgentWorktree(record: Pick<AgentWorktreeRecord, 'path'>
     }
     steps.push(step);
   }
-  const head = gitText(record.path, ['rev-parse', 'HEAD']);
-  if (head) {
-    safeWriteFile(path.join(record.path, DIST_BUILD_STAMP), `${head}\n`, { encoding: 'utf8' });
-  }
+  const stampResult = stampAgentWorktreeDistHead(record.path);
+  steps.push({
+    command: `stamp ${DIST_BUILD_STAMP}`,
+    status: stampResult.ok ? 0 : 1,
+    ...(stampResult.ok ? {} : { detail: stampResult.detail }),
+  });
   return steps;
+}
+
+/**
+ * Stamp `dist/.session-build-head` inside a worktree with the HEAD dist was
+ * built from, so `list` can report freshness. The file lands under
+ * `.worktrees/`, which no persona tier-guard allow_write pattern covers — the
+ * mission-owner git guard is the authorization boundary, so the file goes
+ * through the same exec channel the `git worktree` mutations use instead of
+ * a policy-gated write. Self-guards like every other mutation verb here.
+ */
+export function stampAgentWorktreeDistHead(worktreePath: string): {
+  ok: boolean;
+  detail?: string;
+} {
+  assertMissionOwnerPath('stamp an agent worktree dist head');
+  // A nested path still resolves `rev-parse` against a parent checkout; only
+  // stamp when the worktree is its own git toplevel, so the file never
+  // records a foreign HEAD as the dist provenance.
+  const toplevel = gitText(worktreePath, ['rev-parse', '--show-toplevel']);
+  let realWorktreePath: string;
+  try {
+    realWorktreePath = safeRealpath(worktreePath);
+  } catch {
+    return { ok: false, detail: 'worktree path does not resolve inside the repository' };
+  }
+  if (!toplevel || path.normalize(toplevel) !== path.normalize(realWorktreePath)) {
+    return { ok: false, detail: 'path is not its own git worktree toplevel' };
+  }
+  const head = gitText(worktreePath, ['rev-parse', 'HEAD']);
+  if (!head) return { ok: false, detail: 'no HEAD rev-parse in worktree' };
+  // The exec write follows symlinks; a planted `dist/` link would redirect
+  // the mission-owner write outside the worktree, so refuse anything that
+  // is not a real directory before touching it.
+  const distDir = path.join(realWorktreePath, 'dist');
+  if (safeExistsSync(distDir)) {
+    const distStat = safeLstat(distDir);
+    if (distStat.isSymbolicLink() || !distStat.isDirectory()) {
+      return { ok: false, detail: 'worktree dist/ is not a real directory' };
+    }
+  }
+  const stampPath = path.join(realWorktreePath, DIST_BUILD_STAMP);
+  const stamp = safeExecResult(
+    process.execPath,
+    [
+      '-e',
+      'require("node:fs").mkdirSync(require("node:path").dirname(process.argv[1]),{recursive:true});require("node:fs").writeFileSync(process.argv[1],process.argv[2])',
+      stampPath,
+      `${head}\n`,
+    ],
+    { cwd: realWorktreePath, timeoutMs: 15_000 }
+  );
+  if (stamp.status !== 0) {
+    return {
+      ok: false,
+      detail: (stamp.stderr.trim() || stamp.stdout.trim() || 'stamp write failed')
+        .split('\n')
+        .slice(-20)
+        .join('\n'),
+    };
+  }
+  return { ok: true };
 }
