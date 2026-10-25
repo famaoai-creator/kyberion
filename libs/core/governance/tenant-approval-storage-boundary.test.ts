@@ -15,6 +15,7 @@ const ROOT = path.join(SOURCE_ROOT, 'active/shared/tmp/tenant-approval-boundary-
 let withExecutionContext = initialContext;
 let { safeExistsSync, safeReadFile, safeReaddir, safeRmSync, safeWriteFile } = initialIO;
 let retention: typeof import('../storage-retention-catalog.js');
+let guard: typeof import('../tier-guard.js');
 let store: typeof import('./approval-store.js');
 const savedRoot = process.env.KYBERION_ROOT;
 
@@ -83,15 +84,19 @@ beforeAll(async () => {
     await import('../secure-io.js'));
   ({ withExecutionContext } = await import('../authority.js'));
   retention = await import('../storage-retention-catalog.js');
+  guard = await import('../tier-guard.js');
   store = await import('./approval-store.js');
   expect((await import('../path-resolver.js')).rootDir()).toBe(ROOT);
 }, 120_000);
 
 function cleanup(): void {
-  privileged(() => {
-    for (const tier of ['personal', 'confidential'])
-      for (const tenant of [TENANT, OTHER])
+  // Only the store role bound to a tenant (or SUDO) may write its partition.
+  for (const tenant of [TENANT, OTHER])
+    asStore(() => {
+      for (const tier of ['personal', 'confidential'])
         safeRmSync(path.join(ROOT, STORE, tier, tenant), { recursive: true, force: true });
+    }, tenant);
+  privileged(() => {
     // System-tree records of a fixture root keep the per-run Vitest store root.
     safeRmSync(path.join(ROOT, 'active/shared/runtime/vitest-approvals'), {
       recursive: true,
@@ -103,10 +108,8 @@ function cleanup(): void {
 beforeEach(() => {
   for (const key of keys) delete process.env[key];
   cleanup();
-  privileged(() => {
-    safeWriteFile(recordFile(TENANT), 'own tenant approval');
-    safeWriteFile(recordFile(OTHER), 'other tenant approval');
-  });
+  asStore(() => safeWriteFile(recordFile(TENANT), 'own tenant approval'), TENANT);
+  asStore(() => safeWriteFile(recordFile(OTHER), 'other tenant approval'), OTHER);
 });
 
 afterAll(() => {
@@ -142,12 +145,24 @@ describe('tenant approval partitions use real secure-io tier and tenant boundari
     );
   });
 
-  it('denies a caller without the store role reads of a tenant record, and a foreign-bound caller writes', () => {
+  it('denies a caller without the store role reads and writes of a tenant record, bound or not', () => {
     asCaller('slack_bridge', () => {
       expect(() => safeReadFile(recordFile(TENANT), { encoding: 'utf8' })).toThrow(
         /SECURITY|POLICY|tenant\.|Higher tier required/
       );
+      // Unbound: the runtime default grant does not reach a tenant store partition.
+      expect(guard.validateWritePermission(recordFile(TENANT)).allowed).toBe(false);
+      expect(() => safeWriteFile(recordFile(TENANT), 'forged approved record')).toThrow(
+        /tenant store partition/
+      );
+      expect(() => safeWriteFile(recordFile(TENANT, 'personal'), 'forged')).toThrow(
+        /tenant store partition/
+      );
     });
+    // A broad role grant (mission_controller: active/shared/) does not either.
+    asCaller('mission_controller', () =>
+      expect(() => safeWriteFile(recordFile(TENANT), 'forged')).toThrow(/tenant store partition/)
+    );
     asCaller(
       'slack_bridge',
       () => {
@@ -180,10 +195,8 @@ describe('tenant approval partitions use real secure-io tier and tenant boundari
     ));
 
   it('places a tenant-scoped approval in the protected partition and hides it from another tenant', () => {
-    privileged(() => {
-      safeRmSync(recordFile(TENANT), { force: true });
-      safeRmSync(recordFile(OTHER), { force: true });
-    });
+    asStore(() => safeRmSync(recordFile(TENANT), { force: true }), TENANT);
+    asStore(() => safeRmSync(recordFile(OTHER), { force: true }), OTHER);
     const record = store.createApprovalRequest('mission_controller', {
       channel: CHANNEL,
       threadTs: '1',

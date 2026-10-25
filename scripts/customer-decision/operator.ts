@@ -339,10 +339,11 @@ function submitLocked(
   assertAnswerable(agenda);
   // Before the gate and the ledger pins: an internal link never gets approved.
   assertAgendaLinks(agenda);
-  // The shared approval store is not tenant-partitioned: ids only (the title,
-  // questions and our decisions stay in the case; see `status`), and the
-  // tenant in the correlation id and payload hash so two tenants' identical
-  // agenda ids never share an approval.
+  // The request lives in the tenant's approval partition, but its title and
+  // summary reach shared worker events and notifications: ids only (the
+  // title, questions and our decisions stay in the case; see `status`), and
+  // the tenant in the correlation id and payload hash so two tenants'
+  // identical agenda ids never share an approval.
   const correlationId = `${tenant}:${agenda.agenda_id}:${hash}`;
   const gate = enforceApprovalGate({
     requireApproval: true,

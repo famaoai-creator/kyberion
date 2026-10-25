@@ -22,9 +22,9 @@ import {
   isApprovalRequestExpired,
   isSeparationOfDutiesEnabled,
   listApprovalRequests,
-  loadApprovalRequest,
   lookupSessionApprovalCache,
   recordSessionCacheAutoApproval,
+  resolveSessionCacheSeed,
   type ApprovalActionDescriptor,
   type ApprovalRequestRecord,
   type ApprovalRequestSource,
@@ -643,9 +643,12 @@ export function enforceApprovalGate(
   const cachedUsable =
     cached !== null &&
     (() => {
-      const seed = loadApprovalRequest(cached.storageChannel, cached.grantedByRequestId);
-      if (!seed) return !isSeparationOfDutiesEnabled();
-      return !approvalUsabilityRefusal(seed, 'approval_gate_session_cache');
+      // A tenant seed that cannot be found or read where it was stored is
+      // unusable; only a vanished system-tree seed keeps the legacy rule.
+      const seed = resolveSessionCacheSeed(cached);
+      if (seed.status === 'unusable') return false;
+      if (seed.status === 'missing') return !isSeparationOfDutiesEnabled();
+      return !approvalUsabilityRefusal(seed.record, 'approval_gate_session_cache');
     })();
   if (cached && cachedUsable) {
     auditChain.record({

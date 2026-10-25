@@ -59,6 +59,16 @@ describe('approval-store test isolation', () => {
       approvalStoreRoots({ VITEST: 'true', VITEST_POOL_ID: '3', KYBERION_VITEST_RUN_ID: 'r9' })
         .tenantApprovals
     ).toBe(`${VITEST_APPROVAL_STORE_ROOT}/run-r9/pool-3/tenant-approvals`);
+    expect(
+      approvalStoreRoots(
+        { VITEST: 'true', VITEST_POOL_ID: '3', KYBERION_VITEST_RUN_ID: 'r9' },
+        { fixtureRoot: false }
+      ).tenantApprovals
+    ).toBe(`${VITEST_APPROVAL_STORE_ROOT}/run-r9/pool-3/tenant-approvals`);
+    // A fixture root (temp KYBERION_ROOT) keeps the live layout and its real grants.
+    expect(approvalStoreRoots({ VITEST: 'true' }, { fixtureRoot: true }).tenantApprovals).toBe(
+      'active/shared/runtime/tenant-approvals'
+    );
     const roots = approvalStoreRoots();
     expect(roots.coordination.startsWith(`${VITEST_APPROVAL_STORE_ROOT}/`)).toBe(true);
     expect(approvalRequestLogicalPath('terminal', id)).toBe(

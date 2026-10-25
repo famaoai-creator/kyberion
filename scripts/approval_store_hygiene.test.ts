@@ -1,8 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   formatApprovalStoreHygieneReport,
+  formatTenantPartitionMigrationReport,
   runApprovalStoreHygiene,
   type ApprovalStoreHygieneReport,
+  type TenantPartitionMigrationReport,
 } from './approval_store_hygiene.js';
 
 function report(dryRun: boolean): ApprovalStoreHygieneReport {
@@ -28,6 +30,7 @@ function report(dryRun: boolean): ApprovalStoreHygieneReport {
         {
           storageChannel: 'plugin-install',
           requestId: 'b',
+          partition: { kind: 'system' },
           logicalPath: 'x',
           title: 'probe-12345',
           requestedBy: 'plugin-installer',
@@ -37,6 +40,7 @@ function report(dryRun: boolean): ApprovalStoreHygieneReport {
         {
           storageChannel: 'plugin-install',
           requestId: 'c',
+          partition: { kind: 'system' },
           logicalPath: 'y',
           title: 'fixture-plugin',
           requestedBy: 'plugin-installer',
@@ -47,6 +51,36 @@ function report(dryRun: boolean): ApprovalStoreHygieneReport {
       applied: [],
       errors: dryRun ? [] : ['plugin-install/b: denied'],
       dryRun,
+    },
+    tenantPartitionMigration: {
+      candidates: [legacyCandidate],
+      applied: [],
+      errors: [],
+      dryRun: true,
+      outcomes: {},
+    },
+  };
+}
+
+const legacyCandidate = {
+  storageChannel: 'terminal',
+  requestId: 'd',
+  status: 'pending' as const,
+  from: 'active/shared/coordination/channels/terminal/approvals/requests/d.json',
+  to: 'active/shared/runtime/tenant-approvals/confidential/acme/terminal/requests/d.json',
+  partition: { kind: 'tenant' as const, tier: 'confidential' as const, tenant_slug: 'acme' },
+};
+
+function migrationReport(dryRun: boolean): TenantPartitionMigrationReport {
+  return {
+    mode: 'migrate-tenant-partitions',
+    dryRun,
+    migration: {
+      candidates: [legacyCandidate, { ...legacyCandidate, requestId: 'e' }],
+      applied: dryRun ? [] : ['d'],
+      errors: dryRun ? [] : ['terminal/e: [APPROVAL_MIGRATION_CONFLICT] differs'],
+      dryRun,
+      outcomes: dryRun ? {} : { d: 'moved' },
     },
   };
 }
@@ -61,6 +95,37 @@ describe('approval_store_hygiene', () => {
     expect(text).toContain('by channel: plugin-install=2');
     expect(text).toContain('by rule: plugin_title=2');
     expect(text).not.toContain('expired:');
+  });
+
+  it('flags tenant-scoped records left in the system tree and names the migration command', () => {
+    const text = formatApprovalStoreHygieneReport(report(true));
+    expect(text).toContain('Tenant-scoped records still in the system tree: 1');
+    expect(text).toContain('--migrate-tenant-partitions (dry run), then add --apply');
+  });
+
+  it('summarizes the tenant-partition migration as a dry run and after --apply', () => {
+    const dry = formatTenantPartitionMigrationReport(migrationReport(true));
+    expect(dry).toContain('dry-run (pass --apply to move)');
+    expect(dry).toContain('Tenant-scoped records in the system tree: 2');
+    expect(dry).not.toContain('moved:');
+    const applied = formatTenantPartitionMigrationReport(migrationReport(false));
+    expect(applied).toContain('moved: 1');
+    expect(applied).toContain('[APPROVAL_MIGRATION_CONFLICT]');
+  });
+
+  it('runs --migrate-tenant-partitions as a dry run without the sovereign persona', async () => {
+    vi.stubEnv('KYBERION_PERSONA', 'analyst');
+    try {
+      const result = (await runApprovalStoreHygiene([
+        '--migrate-tenant-partitions',
+        '--json',
+      ])) as TenantPartitionMigrationReport;
+      expect(result.mode).toBe('migrate-tenant-partitions');
+      expect(result.dryRun).toBe(true);
+      expect(result.migration.applied).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('reports applied counts and errors after --apply', () => {

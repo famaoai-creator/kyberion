@@ -107,10 +107,17 @@ interface ChallengeLocation {
   storageChannel: string;
 }
 
-function challengeLocation(storageChannel: string, requestId: string): ChallengeLocation {
+function challengeLocation(
+  storageChannel: string,
+  requestId: string,
+  options: { requireRequest?: boolean } = {}
+): ChallengeLocation {
   const channel = channelSegment(storageChannel);
   // A malformed request id cannot name a stored request; the expectation check refuses it.
   const located = UUID_PATTERN.test(requestId) ? locateApprovalRequest(channel, requestId) : null;
+  // A challenge is only ever issued beside a request this process can find:
+  // never into the system tree for a tenant request it cannot see.
+  if (!located && options.requireRequest) refuse('request not found', `${channel}/${requestId}`);
   return { partition: located?.partition ?? SYSTEM_APPROVAL_PARTITION, storageChannel: channel };
 }
 
@@ -253,7 +260,11 @@ export function issueApprovalPasskeyChallenge(
     issued_at: now.toISOString(),
     ...binding,
   };
-  writeChallenge(role, challengeLocation(params.storageChannel, record.id), challenge);
+  writeChallenge(
+    role,
+    challengeLocation(params.storageChannel, record.id, { requireRequest: true }),
+    challenge
+  );
   return challenge;
 }
 
