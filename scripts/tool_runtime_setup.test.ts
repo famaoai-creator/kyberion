@@ -7,6 +7,9 @@ const mocks = vi.hoisted(() => ({
   getToolRuntimeRecord: vi.fn(),
   findInstalledManagedBinary: vi.fn(),
   safeExecResult: vi.fn(),
+  probeToolRuntime: vi.fn(),
+  resolveManagedToolPythonBin: vi.fn(),
+  markToolRuntimeInstalled: vi.fn(),
 }));
 
 vi.mock('@agent/core/network', () => ({ secureFetch: mocks.secureFetch }));
@@ -17,6 +20,9 @@ vi.mock('@agent/core/tool/tool-runtime-registry', async (importOriginal) => ({
   resolveManagedBinaryPath: mocks.resolveManagedBinaryPath,
   getToolRuntimeRecord: mocks.getToolRuntimeRecord,
   findInstalledManagedBinary: mocks.findInstalledManagedBinary,
+  probeToolRuntime: mocks.probeToolRuntime,
+  resolveManagedToolPythonBin: mocks.resolveManagedToolPythonBin,
+  markToolRuntimeInstalled: mocks.markToolRuntimeInstalled,
 }));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
@@ -24,7 +30,8 @@ vi.mock('@agent/core/secure-io', async (importOriginal) => ({
   safeExecResult: mocks.safeExecResult,
 }));
 
-const { assertPinnedSha256, installManagedBinary } = await import('./tool_runtime_setup.js');
+const { assertPinnedSha256, installManagedBinary, installTool, inspectTool, resolveToolSelection } =
+  await import('./tool_runtime_setup.js');
 
 const REAL = '99e67739ed8cf5b985af7cbfa7c76b2bab257b171b2dad21109bd74b4f3bb510';
 
@@ -39,6 +46,10 @@ describe('tool_runtime_setup managed_binary pin', () => {
     });
     mocks.findInstalledManagedBinary.mockReturnValue(null);
     mocks.safeExecResult.mockReturnValue({ status: 1, stdout: '', stderr: '' });
+    mocks.probeToolRuntime.mockReturnValue({
+      tool: { ecosystem: 'system' },
+      trial_backend: { command: 'tool', args: ['--version'] },
+    });
   });
 
   it('accepts a real digest and normalizes case', () => {
@@ -59,5 +70,99 @@ describe('tool_runtime_setup managed_binary pin', () => {
     });
     await expect(installManagedBinary('yt_dlp')).resolves.toBeNull();
     expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+});
+
+describe('tool runtime setup isolation', () => {
+  const managedPath = '/managed/python-runtime';
+  const backend = { command: 'uv', args: ['pip', 'install', 'example-package'] };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    const tool = {
+      display_name: 'Example',
+      ecosystem: 'python',
+      status: 'active',
+      platforms: ['any'],
+    };
+    mocks.getToolRuntimeRecord.mockReturnValue(tool);
+    mocks.probeToolRuntime.mockReturnValue({
+      tool,
+      managed_env_path: managedPath,
+      install_backend: backend,
+      trial_backend: { command: 'python3', args: ['-c', 'import example_package'] },
+    });
+    mocks.resolveManagedToolPythonBin.mockReturnValue(null);
+    mocks.findInstalledManagedBinary.mockReturnValue(null);
+    mocks.safeExecResult.mockReturnValue({ status: 0, stdout: 'ok', stderr: '' });
+  });
+
+  it('targets uv pip installs at the tool environment even when system Python is healthy', () => {
+    installTool('example');
+    expect(mocks.safeExecResult).toHaveBeenCalledWith(
+      'uv',
+      expect.arrayContaining([
+        'pip',
+        'install',
+        '--python',
+        expect.stringContaining(managedPath),
+        'example-package',
+      ]),
+      expect.any(Object)
+    );
+    expect(mocks.safeExecResult).not.toHaveBeenCalledWith(
+      'python3',
+      expect.anything(),
+      expect.anything()
+    );
+  });
+
+  it('does not run unsupported platform commands or mark them installed', () => {
+    mocks.getToolRuntimeRecord.mockReturnValue({
+      platforms: [],
+      display_name: 'Example',
+      status: 'active',
+    });
+    expect(installTool('example').status).toBe('unsupported');
+    expect(inspectTool('example').status).toBe('unsupported');
+    expect(mocks.safeExecResult).not.toHaveBeenCalled();
+    expect(mocks.markToolRuntimeInstalled).not.toHaveBeenCalled();
+  });
+
+  it('does not record failed installs', () => {
+    mocks.safeExecResult.mockImplementation((command, args) => ({
+      status: command === 'uv' && args[0] === 'pip' ? 1 : 0,
+      stdout: '',
+      stderr: 'failed',
+    }));
+    expect(() => installTool('example')).toThrow('failed');
+    expect(mocks.markToolRuntimeInstalled).not.toHaveBeenCalled();
+  });
+
+  it('adopts a healthy host tool without requiring an installer', () => {
+    mocks.probeToolRuntime.mockReturnValue({
+      tool: { display_name: 'Poppler', ecosystem: 'system' },
+      trial_backend: { command: 'pdftoppm', args: ['-v'] },
+      install_backend: null,
+    });
+    expect(installTool('poppler').status).toBe('ready');
+    expect(mocks.markToolRuntimeInstalled).toHaveBeenCalledWith('poppler', expect.any(Object));
+  });
+});
+
+describe('toolset registration', () => {
+  it('selects only declared dependencies and deduplicates explicit tool ids', () => {
+    expect(resolveToolSelection(undefined, undefined, 'document_review')).toEqual([
+      'poppler',
+      'libreoffice',
+    ]);
+    expect(resolveToolSelection(undefined, undefined, 'render')).toEqual(['hyperframes', 'ffmpeg']);
+    expect(resolveToolSelection(undefined, 'ffmpeg,ffmpeg')).toEqual(['ffmpeg']);
+  });
+  it('rejects unknown groups, unknown tools and conflicting selectors before execution', () => {
+    expect(() => resolveToolSelection(undefined, undefined, 'missing')).toThrow(
+      'Unknown or empty toolset'
+    );
+    expect(() => resolveToolSelection('missing')).toThrow('Unknown tool_id');
+    expect(() => resolveToolSelection('ffmpeg', undefined, 'render')).toThrow('not both');
   });
 });

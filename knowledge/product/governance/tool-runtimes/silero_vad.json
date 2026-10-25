@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "silero_vad",
+      "toolsets": ["vad"],
       "display_name": "Silero VAD Runtime",
       "ecosystem": "python",
       "status": "active",
