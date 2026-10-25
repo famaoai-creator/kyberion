@@ -241,71 +241,231 @@ export class NativePdfParser {
 
   // ── Metadata Extraction ───────────────────────────────────
 
+  /** Writer/parser placeholders — never treat these as a real document title. */
+  private static readonly PLACEHOLDER_TITLES = new Set(['', 'PDF Specification', 'Kyberion PDF']);
+
   extractMetadata(): Record<string, string> {
-    // Try XMP metadata first (PDF 2.0 preferred)
+    // PDF 2.0 prefers XMP; Info is the fallback when the packet omits a field
+    // or only carries a placeholder. Never let a placeholder XMP title blank a
+    // real Info /Title (and never spread XMP after Info — that used to).
     const xmpMeta = this.extractXmpMetadata();
-    if (xmpMeta.title && xmpMeta.title !== 'PDF Specification') {
-      return xmpMeta;
+    const infoMeta = this.extractInfoDictionaryMetadata();
+
+    const title =
+      this.pickRealMetaValue(xmpMeta.title) ??
+      this.pickRealMetaValue(infoMeta.title) ??
+      'PDF Specification';
+    const author =
+      this.pickRealMetaValue(xmpMeta.author) ??
+      this.pickRealMetaValue(infoMeta.author) ??
+      'Kyberion';
+
+    const result: Record<string, string> = { title, author };
+    for (const key of ['creationDate', 'modDate', 'producer'] as const) {
+      const value = this.pickRealMetaValue(xmpMeta[key]) ?? this.pickRealMetaValue(infoMeta[key]);
+      if (value) result[key] = value;
     }
+    return result;
+  }
 
-    // Fallback to Info dictionary
-    const titleMatch = this.str.match(/\/Title\s*\((.*?)\)/);
-    const authorMatch = this.str.match(/\/Author\s*\((.*?)\)/);
-
-    // Also try hex string title
-    let title = titleMatch ? titleMatch[1] : '';
-    if (!title) {
-      const hexTitleMatch = this.str.match(/\/Title\s*<([0-9A-Fa-f]+)>/);
-      if (hexTitleMatch) {
-        title = this.decodeHexString(hexTitleMatch[1]);
-      }
-    }
-
-    return {
-      title: title || xmpMeta.title || 'PDF Specification',
-      author: authorMatch ? authorMatch[1] : xmpMeta.author || 'Kyberion',
-      ...xmpMeta,
-    };
+  private pickRealMetaValue(value: string | undefined): string | undefined {
+    const trimmed = String(value ?? '').trim();
+    if (!trimmed) return undefined;
+    if (NativePdfParser.PLACEHOLDER_TITLES.has(trimmed)) return undefined;
+    return trimmed;
   }
 
   /**
-   * Extract XMP metadata from <x:xmpmeta> blocks (ISO 32000-2 §14.3.2)
+   * Read /Title /Author (and friends) from the trailer Info dictionary —
+   * not from outline `/Title` entries scattered through the file.
+   */
+  private extractInfoDictionaryMetadata(): Record<string, string> {
+    const result: Record<string, string> = {};
+    const infoRef = this.str.match(/\/Info\s+(\d+)\s+0\s+R/);
+    const infoObj = infoRef ? this.getFullObject(parseInt(infoRef[1], 10)) : null;
+    // Fall back to a whole-file scan only when the trailer has no /Info —
+    // still prefer hex/literal decoding over the old non-greedy regex.
+    const source = infoObj || this.str;
+
+    const title = this.readPdfInfoString(source, 'Title');
+    if (title) result.title = title;
+    const author = this.readPdfInfoString(source, 'Author');
+    if (author) result.author = author;
+    const producer = this.readPdfInfoString(source, 'Producer');
+    if (producer) result.producer = producer;
+    return result;
+  }
+
+  /**
+   * Read a PDF string value (`(literal)` or `<hex>`) that follows `/Name`.
+   * Literal strings honour escapes and nested parentheses; UTF-16BE BOM
+   * literals (Word / Acrobat) decode to Unicode.
+   */
+  private readPdfInfoString(source: string, name: string): string | undefined {
+    const marker = new RegExp(`/${name}(?![A-Za-z])\\s*`);
+    const match = marker.exec(source);
+    if (!match || match.index === undefined) return undefined;
+    let i = match.index + match[0].length;
+    while (i < source.length && /\s/.test(source[i])) i++;
+
+    if (source[i] === '<') {
+      const end = source.indexOf('>', i + 1);
+      if (end === -1) return undefined;
+      return this.decodeHexString(source.slice(i + 1, end));
+    }
+
+    if (source[i] === '(') {
+      let depth = 0;
+      for (let j = i; j < source.length; j++) {
+        const ch = source[j];
+        if (ch === '\\') {
+          j += 1;
+          continue;
+        }
+        if (ch === '(') depth += 1;
+        else if (ch === ')') {
+          depth -= 1;
+          if (depth === 0) {
+            return this.decodeInfoLiteralString(source.slice(i + 1, j));
+          }
+        }
+      }
+    }
+
+    return undefined;
+  }
+
+  /** Decode an Info-dict literal, including UTF-16BE/LE BOM forms. */
+  private decodeInfoLiteralString(input: string): string {
+    const normalized = this.decodeLiteralString(input);
+    if (normalized.length >= 2) {
+      const b0 = normalized.charCodeAt(0);
+      const b1 = normalized.charCodeAt(1);
+      if (b0 === 0xfe && b1 === 0xff) {
+        let result = '';
+        for (let i = 2; i + 1 < normalized.length; i += 2) {
+          result += String.fromCharCode(
+            (normalized.charCodeAt(i) << 8) | normalized.charCodeAt(i + 1)
+          );
+        }
+        return result;
+      }
+      if (b0 === 0xff && b1 === 0xfe) {
+        let result = '';
+        for (let i = 2; i + 1 < normalized.length; i += 2) {
+          result += String.fromCharCode(
+            normalized.charCodeAt(i) | (normalized.charCodeAt(i + 1) << 8)
+          );
+        }
+        return result;
+      }
+    }
+    return normalized;
+  }
+
+  /**
+   * Extract XMP metadata from <x:xmpmeta> blocks (ISO 32000-2 §14.3.2).
+   * Plain packets in the file body come first; FlateDecode /Metadata streams
+   * (common from Acrobat / PDF/A writers) are inflated and scanned next.
    */
   private extractXmpMetadata(): Record<string, string> {
-    const result: Record<string, string> = {};
+    const plain = this.parseXmpPacketText(this.findPlainXmpBlock());
+    if (this.pickRealMetaValue(plain.title)) return plain;
 
+    for (const objectId of this.xref.keys()) {
+      const fullObject = this.getFullObject(objectId) || '';
+      if (!/\/Type\s*\/Metadata\b/.test(fullObject) && !/\/Subtype\s*\/XML\b/.test(fullObject)) {
+        continue;
+      }
+      const decoded = this.decodeMetadataStream(objectId);
+      if (!decoded) continue;
+      const parsed = this.parseXmpPacketText(decoded);
+      if (parsed.title || parsed.author || parsed.producer) {
+        return { ...plain, ...parsed };
+      }
+    }
+    return plain;
+  }
+
+  private findPlainXmpBlock(): string | null {
     const xmpStart = this.str.indexOf('<x:xmpmeta');
     const xmpEnd = this.str.indexOf('</x:xmpmeta>');
-    if (xmpStart === -1 || xmpEnd === -1) return result;
-
+    if (xmpStart === -1 || xmpEnd === -1 || xmpEnd < xmpStart) return null;
     // XMP packets are UTF-8 (ISO 16684-1), but this.str is a byte-per-char
     // ('binary') view of the file — re-decode so non-ASCII titles and author
     // names do not come out as mojibake.
-    const xmpBlock = Buffer.from(this.str.substring(xmpStart, xmpEnd + 13), 'binary').toString(
-      'utf8'
+    return Buffer.from(this.str.substring(xmpStart, xmpEnd + 13), 'binary').toString('utf8');
+  }
+
+  private decodeMetadataStream(objectId: number): string | null {
+    const raw = this.readRawStream(objectId);
+    if (!raw) return null;
+    let data = raw.data;
+    const lengthMatch = raw.header.match(/\/Length\s+(\d+)\b/);
+    if (lengthMatch) {
+      const length = parseInt(lengthMatch[1], 10);
+      if (Number.isFinite(length) && length >= 0 && length <= data.length) {
+        data = data.subarray(0, length);
+      }
+    } else {
+      // endstream search may include the EOL before the keyword.
+      while (
+        data.length > 0 &&
+        (data[data.length - 1] === 0x0a || data[data.length - 1] === 0x0d)
+      ) {
+        data = data.subarray(0, data.length - 1);
+      }
+    }
+
+    let decoded = data;
+    if (/\/FlateDecode\b/.test(raw.header)) {
+      try {
+        decoded = zlib.inflateSync(data);
+      } catch {
+        try {
+          decoded = zlib.unzipSync(data);
+        } catch {
+          return null;
+        }
+      }
+    }
+    return decoded.toString('utf8');
+  }
+
+  private parseXmpPacketText(xmpBlock: string | null): Record<string, string> {
+    const result: Record<string, string> = {};
+    if (!xmpBlock) return result;
+
+    // Prefer x-default language alternative; else first rdf:li.
+    const titleDefault = xmpBlock.match(
+      /<dc:title>[\s\S]*?<rdf:li[^>]*xml:lang=["']x-default["'][^>]*>([\s\S]*?)<\/rdf:li>/i
     );
+    const titleAny = xmpBlock.match(/<dc:title>[\s\S]*?<rdf:li[^>]*>([\s\S]*?)<\/rdf:li>/i);
+    const title = (titleDefault || titleAny)?.[1]?.trim();
+    if (title) result.title = this.unescapeXmlText(title);
 
-    // dc:title
-    const titleMatch = xmpBlock.match(/<dc:title>.*?<rdf:Alt>.*?<rdf:li[^>]*>(.*?)<\/rdf:li>/s);
-    if (titleMatch) result.title = titleMatch[1];
+    const creatorMatch = xmpBlock.match(/<dc:creator>[\s\S]*?<rdf:li[^>]*>([\s\S]*?)<\/rdf:li>/i);
+    if (creatorMatch) result.author = this.unescapeXmlText(creatorMatch[1].trim());
 
-    // dc:creator
-    const creatorMatch = xmpBlock.match(/<dc:creator>.*?<rdf:Seq>.*?<rdf:li[^>]*>(.*?)<\/rdf:li>/s);
-    if (creatorMatch) result.author = creatorMatch[1];
+    const dateMatch = xmpBlock.match(/<xmp:CreateDate>([\s\S]*?)<\/xmp:CreateDate>/i);
+    if (dateMatch) result.creationDate = dateMatch[1].trim();
 
-    // xmp:CreateDate
-    const dateMatch = xmpBlock.match(/<xmp:CreateDate>(.*?)<\/xmp:CreateDate>/);
-    if (dateMatch) result.creationDate = dateMatch[1];
+    const modMatch = xmpBlock.match(/<xmp:ModifyDate>([\s\S]*?)<\/xmp:ModifyDate>/i);
+    if (modMatch) result.modDate = modMatch[1].trim();
 
-    // xmp:ModifyDate
-    const modMatch = xmpBlock.match(/<xmp:ModifyDate>(.*?)<\/xmp:ModifyDate>/);
-    if (modMatch) result.modDate = modMatch[1];
-
-    // pdf:Producer
-    const prodMatch = xmpBlock.match(/<pdf:Producer>(.*?)<\/pdf:Producer>/);
-    if (prodMatch) result.producer = prodMatch[1];
+    const prodMatch = xmpBlock.match(/<pdf:Producer>([\s\S]*?)<\/pdf:Producer>/i);
+    if (prodMatch) result.producer = this.unescapeXmlText(prodMatch[1].trim());
 
     return result;
+  }
+
+  private unescapeXmlText(value: string): string {
+    return value
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&apos;/g, "'")
+      .replace(/&amp;/g, '&');
   }
 
   // ── Page Extraction ───────────────────────────────────────

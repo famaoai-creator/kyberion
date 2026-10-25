@@ -393,8 +393,8 @@ async function readPptx(
 
 // ─── PDF ───────────────────────────────────────────────────
 
-/** Placeholder metadata the native parser fills in when a PDF has none. */
-const PDF_PLACEHOLDER_TITLES = new Set(['PDF Specification', '']);
+/** Placeholder metadata the native parser/writer fills in when a PDF has none. */
+const PDF_PLACEHOLDER_TITLES = new Set(['PDF Specification', 'Kyberion PDF', '']);
 
 async function pdfParsePageTexts(raw: Buffer): Promise<string[] | null> {
   try {
