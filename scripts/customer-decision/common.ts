@@ -3,7 +3,7 @@
  * Part of scripts/customer_decision.ts (the entry point); see its header.
  */
 import { humanActor } from '@agent/core/actor';
-import { withExecutionContext } from '@agent/core/authority';
+import { resolveIdentityContext, withExecutionContext } from '@agent/core/authority';
 import { getRegisteredEnvText, isVitestProcess } from '@agent/core/foundation';
 import { logger } from '@agent/core/core';
 import { auditChain } from '@agent/core/governance/audit-chain';
@@ -140,8 +140,23 @@ export function requireOpt(opts: Record<string, string>, name: string): string {
   return value.trim();
 }
 
+/**
+ * `--tenant`, refused when this process is bound to another tenant
+ * (`KYBERION_TENANT`): the facade assumes its ledger roles for the named
+ * tenant itself, so without this check a process bound to one tenant could
+ * read and write another tenant's case (e.g. `confirm` releasing its held
+ * tasks). An unbound operator CLI names the tenant with `--tenant`.
+ */
 export function tenantOf(opts: Record<string, string>): string {
-  return requireOpt(opts, 'tenant');
+  const tenant = requireOpt(opts, 'tenant');
+  const bound = resolveIdentityContext().tenantSlug?.trim();
+  if (bound && bound !== tenant) {
+    throw new ScriptExitError(
+      2,
+      `[CUSTOMER_DECISION_TENANT_MISMATCH] --tenant ${tenant} differs from the tenant this process is bound to (KYBERION_TENANT); run it for the bound tenant`
+    );
+  }
+  return tenant;
 }
 
 /** `--dir` (a scratch case directory) exists for hermetic tests only. */
