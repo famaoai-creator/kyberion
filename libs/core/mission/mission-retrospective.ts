@@ -114,6 +114,11 @@ export interface MissionExecutionStats {
   };
   /** Tasks marked completed in NEXT_TASKS.json. */
   tasks_completed: number;
+  /**
+   * Tasks replaced by `supersede-task` (closed without running to success).
+   * Counted apart from tasks_completed: they are neither done nor pending.
+   */
+  tasks_superseded: number;
   /** True when tasks were completed but no usage entry of any kind exists —
    *  the zeros above mean "not recorded", never "free". */
   usage_unrecorded: boolean;
@@ -137,6 +142,8 @@ export const RETROSPECTIVE_STATS_REPORT = 'evidence/retrospective-stats.md';
 /** Mirrors MISSION_TASK_COMPLETED_STATUSES (mission-lifecycle-completion.ts),
  *  kept local so the retrospective does not pull in the lifecycle module graph. */
 const COMPLETED_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed']);
+/** Mirrors MISSION_TASK_SUPERSEDED_STATUS (same reason as above). */
+const SUPERSEDED_TASK_STATUS = 'superseded';
 
 /**
  * The mission's own tier/tenant, from its state record: the resource-usage
@@ -455,6 +462,7 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
     },
     resource_usage: { entries: 0, cost_usd: 0 },
     tasks_completed: 0,
+    tasks_superseded: 0,
     usage_unrecorded: false,
     item_outcomes: [],
   };
@@ -476,6 +484,9 @@ export function collectMissionExecutionStats(missionId: string): MissionExecutio
   stats.task_total = nextTasks.length;
   stats.tasks_completed = nextTasks.filter((task) =>
     COMPLETED_TASK_STATUSES.has(String(task.status || '').toLowerCase())
+  ).length;
+  stats.tasks_superseded = nextTasks.filter(
+    (task) => String(task.status || '').toLowerCase() === SUPERSEDED_TASK_STATUS
   ).length;
   stats.usage_unrecorded =
     stats.tasks_completed > 0 && stats.token_usage.entries + stats.resource_usage.entries === 0;

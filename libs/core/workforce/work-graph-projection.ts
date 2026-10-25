@@ -48,6 +48,11 @@ export interface CanonicalWorkGraphRead {
 
 type NextTask = Record<string, unknown> & { task_id: string };
 
+/** The mission task id a WorkItem carries (typed context, then metadata, then source_ref). */
+export function workItemTaskId(item: WorkItem): string {
+  return taskIdForItem(item);
+}
+
 function taskIdForItem(item: WorkItem): string {
   const contextTaskId = item.context?.task_id;
   if (contextTaskId?.trim()) return contextTaskId.trim();
@@ -111,12 +116,24 @@ function roleForItem(item: WorkItem): string | undefined {
   return item.labels.find((label) => label.startsWith('team_role:'))?.slice('team_role:'.length);
 }
 
+/**
+ * The task status of a WorkItem. An item `supersede-task` archived with
+ * `metadata.superseded_by` projects to `superseded` (closed, not completed).
+ */
+function taskStatusForItem(item: WorkItem): string {
+  const supersededBy = item.metadata?.superseded_by;
+  if (item.status === 'archived' && typeof supersededBy === 'string' && supersededBy.trim()) {
+    return 'superseded';
+  }
+  return plannedStatus(item.status);
+}
+
 function toProjectedTask(item: WorkItem): NextTask {
   const metadata = item.metadata || {};
   const role = roleForItem(item);
   const task: NextTask = {
     task_id: taskIdForItem(item),
-    status: plannedStatus(item.status),
+    status: taskStatusForItem(item),
     assigned_to: {
       ...(role ? { role } : {}),
       ...(item.assignee_peer_id ? { agent_id: item.assignee_peer_id } : {}),
@@ -144,8 +161,16 @@ function toProjectedTask(item: WorkItem): NextTask {
     'artifact_review_receipt',
     'ticket_dispatch',
     'reconciliation',
+    'superseded',
+    'dependencies_rewritten_from',
   ]) {
-    const value = ['artifact_review_profile', 'ticket_dispatch', 'reconciliation'].includes(key)
+    const value = [
+      'artifact_review_profile',
+      'ticket_dispatch',
+      'reconciliation',
+      'superseded',
+      'dependencies_rewritten_from',
+    ].includes(key)
       ? metadata[key]
       : stringMetadata(item, key);
     if (value !== undefined && value !== null) task[key] = value;

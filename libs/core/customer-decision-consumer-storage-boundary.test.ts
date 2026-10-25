@@ -38,6 +38,7 @@ let io: typeof import('./secure-io.js');
 let authority: typeof import('./authority.js');
 let core: typeof import('./core.js');
 let store: typeof import('./customer-decision/store.js');
+let consumption: typeof import('./customer-decision/consumption.js');
 let ledger: typeof import('./decision-ledger/ledger.js');
 let lockModule: typeof import('./mission/mission-decision-lock.js');
 let capability: typeof import('./foundation/customer-decision-consumer-capability.js');
@@ -168,6 +169,7 @@ beforeAll(async () => {
   authority = await import('./authority.js');
   core = await import('./core.js');
   store = await import('./customer-decision/store.js');
+  consumption = await import('./customer-decision/consumption.js');
   ledger = await import('./decision-ledger/ledger.js');
   lockModule = await import('./mission/mission-decision-lock.js');
   capability = await import('./foundation/customer-decision-consumer-capability.js');
@@ -592,6 +594,312 @@ describe('customer decision consumer locks on the real tier/tenant guard', () =>
           now: LATER,
         })
       ).toBe(true);
+    });
+
+    describe('re-ask relink and supersede (CD-09 lifecycle)', () => {
+      const ENTRY = {
+        item: 'RELEASE',
+        key: 'release.go',
+        kind: 'approval' as const,
+        question: 'May we release?',
+        requires_customer: true,
+      };
+      /** Write an agenda as the operator facade does (decision_ledger). */
+      const putAgenda = (
+        agendaId: string,
+        status: 'draft' | 'withdrawn' | 'closed',
+        entry: Record<string, unknown>
+      ) =>
+        authority.withExecutionContext(
+          'decision_ledger',
+          () =>
+            store.writeAgenda(
+              { tenantSlug: TENANT, caseId: CASE },
+              { ...agenda(TENANT), agenda_id: agendaId, status, entries: [entry as never] }
+            ),
+          'sovereign',
+          TENANT
+        );
+      /** A held task whose question the operator collected onto agd-old00001. */
+      function collected(): { lock: LockJson; proposalId: string } {
+        seedCase(TENANT);
+        lockModule.pinTaskDecisions(task, { decisionCase: decisionCase(), now: NOW });
+        const held = lockModule.recordTaskDecisionProposals(
+          {
+            ...task,
+            requests: [
+              {
+                question: ENTRY.question,
+                item: ENTRY.item,
+                key: ENTRY.key,
+                requires_customer: true,
+              },
+            ],
+            workItemId: 'WI-TASK',
+          },
+          { decisionCase: decisionCase(), now: NOW }
+        );
+        const [proposalId] = held.hold_proposal_ids;
+        putAgenda('agd-old00001', 'draft', { ...ENTRY, entry_id: proposalId });
+        authority.withExecutionContext(
+          'decision_ledger',
+          () => {
+            const location = { tenantSlug: TENANT, caseId: CASE };
+            const current = store.readConsumedDecisionLock(location, consumer)!;
+            store.writeConsumedDecisionLock(location, {
+              ...current,
+              decisions: current.decisions.map((entry) =>
+                entry.proposal?.proposal_id === proposalId
+                  ? {
+                      ...entry,
+                      agenda_id: 'agd-old00001',
+                      entry_id: proposalId,
+                      proposal: { ...entry.proposal, collected_at: NOW },
+                    }
+                  : entry
+              ),
+            });
+          },
+          'sovereign',
+          TENANT
+        );
+        return { lock: readLock(), proposalId };
+      }
+      const relinkTo = (
+        lock: LockJson,
+        proposalId: string,
+        agendaId: string,
+        edit: (proposal: Record<string, unknown>) => Record<string, unknown> = (p) => p
+      ): LockJson => ({
+        ...lock,
+        decisions: lock.decisions.map((entry) => {
+          if (entry.proposal?.proposal_id !== proposalId) return entry;
+          const { collected_at: collectedAt, ...rest } = entry.proposal;
+          return {
+            ...entry,
+            agenda_id: agendaId,
+            entry_id: proposalId,
+            proposal: edit({
+              ...rest,
+              collected_at: LATER,
+              previous_links: [
+                {
+                  agenda_id: entry.agenda_id,
+                  entry_id: entry.entry_id,
+                  collected_at: collectedAt,
+                  relinked_at: LATER,
+                  relinked_by: 'user:alice',
+                },
+              ],
+            }),
+          };
+        }),
+      });
+
+      it('allows the exact relink only once the old agenda is closed and onto a requires_customer entry', () => {
+        const { lock, proposalId } = collected();
+        putAgenda('agd-new00001', 'draft', { ...ENTRY, entry_id: proposalId });
+        putAgenda('agd-plain0001', 'draft', {
+          ...ENTRY,
+          entry_id: proposalId,
+          requires_customer: false,
+          org_default: { value: { approved: true }, source: 'hearing:aidlc_inception' },
+        });
+        putAgenda('agd-other0001', 'draft', {
+          ...ENTRY,
+          entry_id: proposalId,
+          key: 'release.other',
+        });
+        // The old agenda is still open: nothing to re-ask.
+        expect(() => writeLock(relinkTo(lock, proposalId, 'agd-new00001'))).toThrow(
+          /re-asked only when its agenda is closed, withdrawn or gone/u
+        );
+        putAgenda('agd-old00001', 'withdrawn', { ...ENTRY, entry_id: proposalId });
+        expect(() => writeLock(relinkTo(lock, proposalId, 'agd-plain0001'))).toThrow(
+          /only on a requires_customer agenda entry/u
+        );
+        expect(() => writeLock(relinkTo(lock, proposalId, 'agd-other0001'))).toThrow(
+          /an agenda entry with its item and key/u
+        );
+        // A forged relink onto an agenda that does not exist.
+        expect(() => writeLock(relinkTo(lock, proposalId, 'agd-missing01'))).toThrow(
+          /re-asked on an agenda that is open/u
+        );
+        expect(() =>
+          writeLock(
+            relinkTo(lock, proposalId, 'agd-new00001', (p) => ({ ...p, question: 'Edited?' }))
+          )
+        ).toThrow(/keeps its question, item, key and value/u);
+        expect(() =>
+          writeLock(
+            relinkTo(lock, proposalId, 'agd-new00001', (p) => ({
+              ...p,
+              resolved: { decision_id: 'D-0001', at: LATER },
+            }))
+          )
+        ).toThrow(/re-asked task proposal is not resolved/u);
+        expect(() =>
+          writeLock({
+            ...relinkTo(lock, proposalId, 'agd-new00001'),
+            hold: { ...lock.hold, at: LATER },
+          })
+        ).toThrow(/a hold keeps its start|re-ask leaves the hold/u);
+
+        // The legitimate path: the store helper + relinkTaskProposal on the real guard.
+        const location = { tenantSlug: TENANT, caseId: CASE };
+        const own = `consumers/${consumer}.json`;
+        store.asCustomerDecisionConsumerOwner(
+          TENANT,
+          location,
+          {
+            owner: consumer,
+            read: [
+              'decisions.jsonl',
+              'agendas/agd-old00001.json',
+              'agendas/agd-new00001.json',
+              own,
+            ],
+            write: own,
+          },
+          () => {
+            const current = store.readConsumedDecisionLock(location, consumer)!;
+            store.writeConsumedDecisionLock(location, {
+              ...current,
+              decisions: current.decisions.map((entry) =>
+                entry.proposal?.proposal_id === proposalId
+                  ? consumption.relinkTaskProposal(
+                      { ...entry, proposal: entry.proposal },
+                      { agenda_id: 'agd-new00001', entry_id: proposalId },
+                      LATER,
+                      'user:alice'
+                    )
+                  : entry
+              ),
+            });
+          }
+        );
+        const relinked = readLock();
+        const proposal = relinked.decisions.find(
+          (entry) => entry.proposal?.proposal_id === proposalId
+        )!.proposal!;
+        expect(proposal.previous_links).toEqual([
+          {
+            agenda_id: 'agd-old00001',
+            entry_id: proposalId,
+            collected_at: NOW,
+            relinked_at: LATER,
+            relinked_by: 'user:alice',
+          },
+        ]);
+        // History is immutable: dropped or edited links are refused.
+        const withLinks = (links: unknown[]) => ({
+          ...relinked,
+          decisions: relinked.decisions.map((entry) =>
+            entry.proposal?.proposal_id === proposalId
+              ? { ...entry, proposal: { ...entry.proposal, previous_links: links } }
+              : entry
+          ),
+        });
+        expect(() => writeLock(withLinks([]))).toThrow(/appends exactly one earlier link/u);
+        expect(() =>
+          writeLock(
+            withLinks([
+              { ...(proposal.previous_links as object[])[0], relinked_by: 'user:mallory' },
+            ])
+          )
+        ).toThrow(/appends exactly one earlier link/u);
+        // Still held: the re-ask leaves the hold as it is.
+        expect(relinked.hold).toEqual(lock.hold);
+      });
+
+      it('superseded is added once, alone, by another task of the mission; the lock is frozen', () => {
+        const { lock } = collected();
+        const by = { by_consumer: `${consumer}-v2`, by_task_id: 'build-v2', at: LATER };
+        expect(() =>
+          writeLock({ ...lock, superseded: { ...by, by_consumer: 'mission-MSN-OTHER.build-v2' } })
+        ).toThrow(/superseded only by another task of the same mission/u);
+        expect(() =>
+          writeLock({ ...lock, superseded: { ...by, by_task_id: task.taskId } })
+        ).toThrow(/superseded only by another task of the same mission/u);
+        expect(() =>
+          writeLock({ ...lock, status: 'completed', completed_at: LATER, superseded: by })
+        ).toThrow(/adds only superseded/u);
+        const superseded = authority.withExecutionContext(
+          'decision_ledger',
+          () =>
+            store.supersededConsumedDecisionLock(
+              store.readConsumedDecisionLock({ tenantSlug: TENANT, caseId: CASE }, consumer)!,
+              by
+            ),
+          'sovereign',
+          TENANT
+        );
+        writeLock(superseded);
+        expect(readLock().superseded).toEqual(by);
+        // Frozen: an identical re-write passes, anything else is refused.
+        writeLock(superseded);
+        expect(() =>
+          writeLock({ ...superseded, last_check: { at: LATER, checked: 0, stale_count: 0 } })
+        ).toThrow(/a superseded consumer lock is frozen/u);
+        const { superseded: _dropped, ...unsuperseded } = superseded;
+        void _dropped;
+        expect(() => writeLock(unsuperseded)).toThrow(/a superseded consumer lock is frozen/u);
+        expect(() =>
+          store.supersededConsumedDecisionLock(superseded, { ...by, by_task_id: 'build-v3' })
+        ).toThrow(/already superseded by another task/u);
+      });
+
+      it('a new lock is never superseded and never carries earlier links', () => {
+        seedCase(TENANT);
+        const fresh = {
+          version: '1.0.0',
+          case_id: CASE,
+          consumer,
+          mission_id: task.missionId,
+          task_id: task.taskId,
+          status: 'in_progress',
+          locked_at: NOW,
+          decisions: [],
+        };
+        const writeFresh = (lock: unknown) =>
+          asConsumer({ read: [], write: lockFile }, () => {
+            io.safeMkdir(inCase('consumers'), { recursive: true });
+            io.safeWriteFile(inCase(lockFile), JSON.stringify(lock));
+          });
+        expect(() =>
+          writeFresh({
+            ...fresh,
+            superseded: { by_consumer: `${consumer}-v2`, by_task_id: 'build-v2', at: NOW },
+          })
+        ).toThrow(/a new consumer lock is never superseded/u);
+        expect(() =>
+          writeFresh({
+            ...fresh,
+            decisions: [
+              {
+                item: 'RELEASE',
+                key: 'release.go',
+                layer: 'task_proposal',
+                proposal: {
+                  proposal_id: 'tp-0123456789abcdef',
+                  question: 'May we release?',
+                  requires_customer: true,
+                  proposed_at: NOW,
+                  previous_links: [
+                    {
+                      agenda_id: 'agd-old00001',
+                      entry_id: 'x',
+                      collected_at: NOW,
+                      relinked_at: NOW,
+                      relinked_by: 'user:alice',
+                    },
+                  ],
+                },
+              },
+            ],
+          })
+        ).toThrow(/a new task proposal has no earlier links/u);
+      });
     });
 
     it('a new lock starts in progress without rework', () => {

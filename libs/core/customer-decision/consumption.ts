@@ -26,6 +26,8 @@ import {
   type DecisionSwitch,
   type EffectiveDecision,
   type TaskDecisionProposal,
+  type TaskProposalPreviousLink,
+  TASK_PROPOSAL_MAX_PREVIOUS_LINKS,
 } from './model.js';
 import type { ConsumedDecisionLockRecord } from './store.js';
 import { canonicalJson, type DecisionRecord } from '../decision-ledger/model.js';
@@ -234,7 +236,8 @@ export function findStaleConsumersForSwitches(input: {
   const switchedKeys = new Set(input.switches.map((item) => `${item.item}\u0000${item.key}`));
   const findings: ConsumerSweepFinding[] = [];
   for (const lock of input.locks) {
-    if (lock.status !== 'completed') continue;
+    // A superseded task's result is replaced by its successor's: no rework.
+    if (lock.status !== 'completed' || lock.superseded) continue;
     const touches = lock.decisions.some((decision) =>
       decision.agenda_id !== undefined && decision.entry_id !== undefined
         ? switched.has(`${decision.agenda_id}\u0000${decision.entry_id}`)
@@ -580,6 +583,79 @@ export function taskProposalStates(
   return taskProposalsOf(lock)
     .filter((entry) => entry.proposal.requires_customer)
     .map((entry) => ({ entry, state: stateOf(entry) }));
+}
+
+/**
+ * The `requires_customer` proposals of a lock that nothing can release any
+ * more ({@link taskProposalStates} `unresolvable`: their agenda is closed,
+ * withdrawn or gone with no standing confirmed answer). The operator re-asks
+ * them (`customer-decision draft --from-tasks --reask`, {@link relinkTaskProposal})
+ * or replaces the task (`mission_controller supersede-task`). A superseded
+ * lock has none.
+ */
+export function unresolvableTaskProposals(
+  lock: TaskProposalLock & { superseded?: unknown },
+  agendas: readonly DecisionAgenda[],
+  ledger: readonly DecisionRecord[],
+  now: string
+): TaskProposalLockEntry[] {
+  if (lock.superseded !== undefined) return [];
+  return taskProposalStates(lock, agendas, ledger, now).flatMap(({ entry, state }) =>
+    state.status === 'unresolvable' ? [entry] : []
+  );
+}
+
+/**
+ * Re-ask a task proposal (CD-09): its current link moves to the end of
+ * `previous_links` (with its `collected_at`, any `resolved` stamp, when and by
+ * whom it was re-asked), it links to the new agenda entry, `collected_at` is
+ * `now` and the stale `resolved` stamp is dropped. Item, key, value and the
+ * question stay; the guard (`taskProposalRelinkProblem`) accepts exactly this.
+ */
+export function relinkTaskProposal(
+  entry: TaskProposalLockEntry,
+  link: { agenda_id: string; entry_id: string },
+  now: string,
+  by: string
+): TaskProposalLockEntry {
+  const collectedAt = entry.proposal.collected_at;
+  if (!entry.agenda_id || !entry.entry_id || !collectedAt) {
+    throw new Error(
+      '[CUSTOMER_DECISION_REASK_NOT_COLLECTED] only a collected proposal is re-asked'
+    );
+  }
+  const previous = entry.proposal.previous_links ?? [];
+  if (previous.length >= TASK_PROPOSAL_MAX_PREVIOUS_LINKS) {
+    throw new Error(
+      `[CUSTOMER_DECISION_REASK_LIMIT] a task proposal is re-asked at most ${TASK_PROPOSAL_MAX_PREVIOUS_LINKS} times`
+    );
+  }
+  const {
+    resolved,
+    collected_at: _collected,
+    previous_links: _links,
+    ...proposal
+  } = entry.proposal;
+  void _collected;
+  void _links;
+  const earlier: TaskProposalPreviousLink = {
+    agenda_id: entry.agenda_id,
+    entry_id: entry.entry_id,
+    collected_at: collectedAt,
+    ...(resolved ? { resolved: { ...resolved } } : {}),
+    relinked_at: now,
+    relinked_by: by,
+  };
+  return {
+    ...entry,
+    agenda_id: link.agenda_id,
+    entry_id: link.entry_id,
+    proposal: {
+      ...proposal,
+      collected_at: now,
+      previous_links: [...previous, earlier],
+    },
+  };
 }
 
 /** A confirmed customer decision on one of the task's own `requires_customer` proposals. */

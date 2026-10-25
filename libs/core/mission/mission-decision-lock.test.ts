@@ -29,6 +29,7 @@ import {
   pinTaskDecisions,
   reconcileTaskDecisions,
   isTaskAwaitingCustomerDecision,
+  markTaskDecisionLockSuperseded,
   recordTaskDecisionProposals,
   resolveMissionDecisionCase,
   sweepDecisionConsumers,
@@ -1058,6 +1059,51 @@ describe('mission decision lock (CD-09)', () => {
           stale_count: 0,
         });
         expect(lockNow().status).toBe('completed');
+      });
+
+      it('a superseded task (supersede-task) waits for nothing and is never released', () => {
+        writeAgenda({ dir }, releaseAgenda(false));
+        holdOn();
+        expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(true);
+        const marked = markTaskDecisionLockSuperseded(
+          { ...task, byTaskId: 'impl-v2' },
+          { decisionCase, now: LATER }
+        );
+        expect(marked).toMatchObject({ case_found: true, marked: true, case_id: 'case-a' });
+        expect(lockNow().superseded).toEqual({
+          by_consumer: 'mission-MSN-CD09-LOCK.impl-v2',
+          by_task_id: 'impl-v2',
+          at: LATER,
+        });
+        expect(isTaskAwaitingCustomerDecision(task, { decisionCase, now: LATER })).toBe(false);
+        // The customer's answer is confirmed later: the frozen lock is not released.
+        decide('RELEASE', 'release.go', { approved: true });
+        writeAgenda({ dir }, releaseAgenda(true));
+        const swept = sweepDecisionConsumers(
+          { tenantSlug: TENANT, caseId: 'case-a', location: { dir } },
+          { now: LATER }
+        );
+        expect(swept.released_holds).toBeUndefined();
+        expect(lockNow().hold).toEqual({ work_item_id: 'WI-TASK', at: NOW });
+        // A re-run is idempotent; no lock means nothing to mark.
+        expect(
+          markTaskDecisionLockSuperseded(
+            { ...task, byTaskId: 'impl-v2' },
+            { decisionCase, now: LATER }
+          )
+        ).toMatchObject({ marked: true, already_marked: true });
+        expect(
+          markTaskDecisionLockSuperseded(
+            { missionId: MISSION, taskId: 'never-pinned', byTaskId: 'impl-v2' },
+            { decisionCase, now: LATER }
+          )
+        ).toMatchObject({ case_found: true, marked: false });
+        expect(
+          markTaskDecisionLockSuperseded(
+            { ...task, byTaskId: 'impl-v2' },
+            { decisionCase: null, now: LATER }
+          )
+        ).toMatchObject({ case_found: false, marked: false });
       });
     });
   });

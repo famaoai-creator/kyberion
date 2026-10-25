@@ -49,8 +49,14 @@ import {
   safeReaddir,
   safeRmSync,
 } from '../secure-io.js';
-import { resolveRole } from '../authority.js';
+import { resolveRole, withExecutionContext } from '../authority.js';
 import { CUSTOMER_DECISION_MILESTONE_STORE_ROLE } from '../foundation/customer-decision-milestone-capability.js';
+import {
+  CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
+  customerDecisionConsumerCapability,
+  type CustomerDecisionConsumerSuperseded,
+} from '../foundation/customer-decision-consumer-capability.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import {
   CASE_ID_PATTERN,
   CUSTOMER_SLUG_PATTERN,
@@ -628,6 +634,71 @@ export interface ConsumedDecisionLockRecord extends ConsumedDecisionLock {
    * `resolved_at` once every held proposal has a confirmed customer decision.
    */
   hold?: { work_item_id?: string; at: string; resolved_at?: string };
+  /**
+   * The task was replaced by another task of the same mission
+   * (`mission_controller supersede-task`): set once, alone, on an existing
+   * lock; the lock is frozen afterwards and every boundary skips it (guard:
+   * `consumerLockSupersedeProblem`).
+   */
+  superseded?: CustomerDecisionConsumerSuperseded;
+}
+
+/** A superseded lock is frozen: no hold, release, rework or re-ask applies to it. */
+export function isConsumedDecisionLockSuperseded(
+  lock: Pick<ConsumedDecisionLockRecord, 'superseded'>
+): boolean {
+  return lock.superseded !== undefined;
+}
+
+/**
+ * The lock as `mission_controller supersede-task` writes it: the same record
+ * plus `superseded` and nothing else (the only shape the guard accepts). A
+ * lock already superseded by the same task is returned unchanged (an
+ * idempotent re-run); by another task it is refused.
+ */
+export function supersededConsumedDecisionLock(
+  lock: ConsumedDecisionLockRecord,
+  superseded: CustomerDecisionConsumerSuperseded
+): ConsumedDecisionLockRecord {
+  if (lock.superseded) {
+    if (
+      lock.superseded.by_consumer === superseded.by_consumer &&
+      lock.superseded.by_task_id === superseded.by_task_id
+    )
+      return lock;
+    throw new Error(
+      '[CUSTOMER_DECISION_CONSUMER_SUPERSEDED] the consumer lock is already superseded by another task'
+    );
+  }
+  return {
+    ...lock,
+    superseded: {
+      by_consumer: superseded.by_consumer,
+      by_task_id: superseded.by_task_id,
+      at: superseded.at,
+    },
+  };
+}
+
+/**
+ * Run `fn` as the narrow, content-checked consumer store role bound to the
+ * case's tenant, inside the exact owner-bound capability for one consumer
+ * lock (`access`: case-relative reads, the one lock written). The operator
+ * facade writes a re-asked lock this way so the tier guard holds the write
+ * to the relink rule (CD-09 human decision 2026-10-26); the mission side
+ * uses the same capability shape (mission-decision-lock.ts).
+ */
+export function asCustomerDecisionConsumerOwner<T>(
+  tenantSlug: string,
+  location: CustomerDecisionLocation,
+  access: { owner: string; read: readonly string[]; write?: string },
+  fn: () => T
+): T {
+  const caseDir = pathResolver.toRepoRelative(ledgerDir(location));
+  return runInResourceAccessScope(
+    customerDecisionConsumerCapability(tenantSlug, caseDir, access),
+    () => withExecutionContext(CUSTOMER_DECISION_CONSUMER_STORE_ROLE, fn, undefined, tenantSlug)
+  );
 }
 
 function consumerPath(location: CustomerDecisionLocation, consumer: string): string {

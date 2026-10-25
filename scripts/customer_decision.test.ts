@@ -2024,6 +2024,121 @@ describe('customer-decision facade', () => {
       });
     });
 
+    it('re-asks an unresolvable question (--reask): refusals, ids-only audit, idempotent', async () => {
+      const { recordTaskDecisionProposals } =
+        await import('@agent/core/mission/mission-decision-lock');
+      const { readConsumedDecisionLock } = await import('@agent/core/customer-decision');
+      const ask = (taskId: string, item: string, key: string) =>
+        recordTaskDecisionProposals(
+          {
+            missionId: 'MSN-CD09-REASK',
+            taskId,
+            requests: [{ question: 'May we release on 11/1?', item, key, requires_customer: true }],
+          },
+          { decisionCase: decisionCase(), now: NOW }
+        );
+      const held = ask('release', 'RELEASE', 'order.release');
+      const [proposalId] = held.hold_proposal_ids;
+      const first = (await run(['draft', ...base(), '--from-tasks', '--customer', 'acme'])) as {
+        agenda_id: string;
+      };
+      // Another task's question stays pending: not unresolvable.
+      const other = ask('docs', 'DOCS', 'docs.tone');
+      const [pendingId] = other.proposal_ids;
+      const reask = (ids: string, ...extra: string[]) =>
+        run(['draft', ...base(), '--from-tasks', '--reask', ids, ...extra]);
+      // Awaiting on an open agenda: nothing to re-ask yet.
+      await expect(reask(proposalId, '--by', 'user:alice')).rejects.toMatchObject({
+        code: 2,
+        message: expect.stringMatching(/is not unresolvable/u),
+      });
+      await run(['withdraw', ...base(), '--agenda', first.agenda_id, '--by', 'user:alice']);
+      const status = await taskStatus();
+      const hold = status.awaiting_customer.find(
+        (item) => item.consumer === 'mission-MSN-CD09-REASK.release'
+      );
+      expect(hold).toMatchObject({
+        status: 'unresolvable',
+        unresolvable_proposal_ids: [proposalId],
+      });
+      expect(String(hold?.next)).toContain(`--from-tasks --reask ${proposalId}`);
+      expect(String(hold?.next)).toContain(
+        'pnpm mission supersede-task MSN-CD09-REASK release --by <new_task_id>'
+      );
+
+      // Refusals: no --by, a bad id, an id that is not unresolvable, an unknown id.
+      await expect(reask(proposalId)).rejects.toThrow(/--by user:<member> is required/u);
+      await expect(reask('not-an-id', '--by', 'user:alice')).rejects.toThrow(
+        /--reask takes task proposal ids/u
+      );
+      await expect(reask(`${proposalId},${pendingId}`, '--by', 'user:alice')).rejects.toMatchObject(
+        { code: 2, message: expect.stringMatching(new RegExp(`${pendingId} is not unresolvable`)) }
+      );
+      await expect(reask('tp-0000000000000000', '--by', 'user:alice')).rejects.toThrow(
+        /not found in this case/u
+      );
+      // Nothing was written by the refused runs.
+      expect(listAgendas({ dir }).map((agenda) => agenda.agenda_id)).toEqual([first.agenda_id]);
+
+      mocks.audit.mockClear();
+      const reasked = (await reask(proposalId, '--by', 'user:alice', '--customer', 'acme')) as {
+        agenda_id: string;
+        reasked: number;
+      };
+      expect(reasked).toMatchObject({ status: 'draft', reasked: 1, added: 1, collected: 1 });
+      expect(reasked.agenda_id).not.toBe(first.agenda_id);
+      expect(agendaOf(reasked.agenda_id).entries).toEqual([
+        expect.objectContaining({ entry_id: proposalId, requires_customer: true }),
+      ]);
+      const lock = readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-REASK.release');
+      const entry = lock?.decisions.find((item) => item.proposal?.proposal_id === proposalId);
+      expect(entry).toMatchObject({
+        agenda_id: reasked.agenda_id,
+        entry_id: proposalId,
+        proposal: {
+          collected_at: NOW,
+          previous_links: [
+            {
+              agenda_id: first.agenda_id,
+              entry_id: proposalId,
+              collected_at: NOW,
+              relinked_at: NOW,
+              relinked_by: 'user:alice',
+            },
+          ],
+        },
+      });
+      // The hold stays as it is: the task still waits for the customer.
+      expect(lock?.hold).toEqual({ at: NOW });
+      const audited = mocks.audit.mock.calls
+        .map(([entry]) => entry as { operation: string; metadata: Record<string, unknown> })
+        .filter((entry) => entry.operation === 'task_proposals_reask');
+      expect(audited).toHaveLength(1);
+      expect(audited[0].metadata).toMatchObject({
+        agenda_id: reasked.agenda_id,
+        proposal_ids: [proposalId],
+        consumers: ['mission-MSN-CD09-REASK.release'],
+        reasked_by: 'user:alice',
+      });
+      expect(JSON.stringify(audited[0])).not.toMatch(/release on 11\/1|order\.release|RELEASE/u);
+      expect((await taskStatus()).awaiting_customer).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            consumer: 'mission-MSN-CD09-REASK.release',
+            status: 'awaiting',
+          }),
+        ])
+      );
+
+      // Idempotent: a second run reports it and writes nothing.
+      expect(await reask(proposalId, '--by', 'user:alice', '--customer', 'acme')).toMatchObject({
+        collected: 0,
+        reasked: 0,
+        already_reasked: [proposalId],
+      });
+      expect(listAgendas({ dir })).toHaveLength(2);
+    });
+
     it('refuses to add task proposals to an agenda that is not a draft', async () => {
       const { agendaId } = await approvedAndSent();
       await expect(run(['draft', ...base(), '--from-tasks', '--agenda', agendaId])).rejects.toThrow(

@@ -45,6 +45,7 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/mission/mission-runtime.ts': 'lifecycle',
   'libs/core/mission/mission-scope-approval.ts': 'lifecycle',
   'libs/core/mission/mission-seal.ts': 'lifecycle',
+  'libs/core/mission/mission-task-supersede.ts': 'lifecycle',
   'libs/core/mission/mission-triage.ts': 'lifecycle',
   'libs/core/mission/mission-work-reconciliation.ts': 'lifecycle',
   'libs/core/workforce/work-inventory-promotion.ts': 'lifecycle',

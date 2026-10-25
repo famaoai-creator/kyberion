@@ -100,6 +100,20 @@ template task is recorded while the work happens**. Verified end to end on 2026-
    dropped) when the provider is not the `--actor-id` prefix, so the retrospective can tell unrecorded usage
    (`usage_unrecorded`) from free work.
 
+   A task that waited on a customer's decision (CD-09 `requires_customer` question)
+   gets the confirmed values in its dispatch prompt. Done directly there is no prompt:
+   read them with
+   `KYBERION_TENANT=<tenant> pnpm kyberion customer-decision task-decisions --tenant <tenant> --mission <MISSION_ID> --task <TASK_ID> --json`
+   (read-only; values on stdout only, the audit records ids; refused unless bound to a
+   registered, active tenant). Never copy the values into public evidence or notes.
+
+   A task that can never complete (e.g. its customer decision is unresolvable) is not
+   edited in NEXT_TASKS: re-ask the question (`pnpm kyberion customer-decision draft --tenant <t> --case <c> --from-tasks --reask <tp-id> --by user:<member>`)
+   or replace it with another task of the mission through
+   `pnpm mission supersede-task <MISSION_ID> <TASK_ID> --by <NEW_TASK_ID> --reason <text> --request-approval`
+   — a human approves with `pnpm kyberion approvals --approve <id>` — then rerun with
+   `--approval-request-id <id>`.
+
 4. **Review with a different agent.** After an independent reviewer (a distinct subagent,
    or the agent reviewing the PR) has reviewed, record its verdict, then close the review
    task with its own deliverable:

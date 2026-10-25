@@ -528,6 +528,67 @@ describe('mission lifecycle finish gate', () => {
     expect(tasks.find((task) => task.task_id === 'goal-gap-r1-1-review')?.status).toBe('completed');
   });
 
+  it('closes the finish gate over a superseded task once its replacement completed, never before', () => {
+    const board = (replacementStatus: string) =>
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-held',
+            status: 'superseded',
+            superseded: {
+              by_task_id: 'task-replacement',
+              at: '2026-10-26T00:00:00.000Z',
+              actor_id: 'operator',
+              reason_sha256: 'a'.repeat(64),
+              approval_request_id: 'approval-1',
+            },
+          },
+          { task_id: 'task-replacement', status: replacementStatus },
+        ],
+        null,
+        2
+      );
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, board('planned'));
+    expect(evaluateMissionFinishExitGate(missionPath)).toMatchObject({
+      ok: false,
+      pendingTasks: ['task-replacement'],
+    });
+
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, board('completed'));
+    expect(evaluateMissionFinishExitGate(missionPath)).toEqual({ ok: true, pendingTasks: [] });
+  });
+
+  it('never auto-completes or cascades a superseded task from record-evidence', () => {
+    seedMissionEvidence('held.md', '# Held deliverable');
+    seedMissionEvidence('next.md', '# Next deliverable');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          { task_id: 'task-held', status: 'superseded', deliverable: 'evidence/held.md' },
+          {
+            task_id: 'task-next',
+            status: 'planned',
+            deliverable: 'evidence/next.md',
+            dependencies: [],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    expect(tryAutoCompleteTaskFromEvidence(missionPath, 'task-held')).toEqual({
+      completed: false,
+      reason: 'superseded by another task',
+      cascaded: [],
+    });
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'task-next');
+    expect(result.completed).toBe(true);
+    expect(result.cascaded).toEqual([]);
+    const tasks = readMissionNextTasks(missionPath);
+    expect(tasks.find((task) => task.task_id === 'task-held')?.status).toBe('superseded');
+  });
+
   it('retires stale circular goal repairs for in-flight missions after the lifecycle evidence exists', () => {
     safeWriteFile(
       `${missionPath}/NEXT_TASKS.json`,

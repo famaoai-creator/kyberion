@@ -211,6 +211,8 @@ export const TASK_STATUS_RANK: Record<string, number> = {
   done: 4,
   completed: 4,
   accepted: 5,
+  // supersede-task (human-approved) is final: no ticket outcome reverts it.
+  superseded: 6,
 };
 
 export function updateNextTasksReflection(

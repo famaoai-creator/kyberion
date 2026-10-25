@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// CD-09: the worker pins the case's customer decisions right after the task's
+// CD-09: the worker pins the case's customer decisions right before the task's
 // WorkItem import and reconciles them just before the WorkItem goes `done`.
 // A stale result still completes the task, and only counts, the consumer id
 // and WorkItem ids reach the (public) task event.
@@ -24,6 +24,9 @@ const mocks = vi.hoisted(() => ({
   recordMissionVisiblePrompt: vi.fn(),
   requestIndependentAcceptanceReview: vi.fn(),
   notifyOperator: vi.fn(),
+  addInboxEntry: vi.fn(),
+  emitMissionOrchestrationObservation: vi.fn(),
+  markTaskDecisionLockSuperseded: vi.fn(),
   /** Set per test: the security scope the (real) context pack is given. */
   packScope: { value: undefined as Record<string, unknown> | undefined },
 }));
@@ -129,10 +132,29 @@ vi.mock('../surface/operator-notifications.js', async (importOriginal) => ({
   notifyOperator: (...args: unknown[]) => mocks.notifyOperator(...args),
 }));
 
+// The escalation's inbox entry and owner notification are observed, never
+// written to the shared runtime stores.
+vi.mock('../deliverable-inbox.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../deliverable-inbox.js')>()),
+  addInboxEntry: (...args: unknown[]) => mocks.addInboxEntry(...args),
+}));
+
+vi.mock('./mission-orchestration-events.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-orchestration-events.js')>();
+  return {
+    ...actual,
+    emitMissionOrchestrationObservation: (event: Record<string, unknown>) => {
+      mocks.emitMissionOrchestrationObservation(event);
+      actual.emitMissionOrchestrationObservation(event);
+    },
+  };
+});
+
 vi.mock('./mission-decision-lock.js', () => ({
   auditTaskDecisionDelivery: mocks.auditTaskDecisionDelivery,
   pinTaskDecisions: mocks.pinTaskDecisions,
   reconcileTaskDecisions: mocks.reconcileTaskDecisions,
+  markTaskDecisionLockSuperseded: mocks.markTaskDecisionLockSuperseded,
   CUSTOMER_DECISION_BLOCKED_REASONS: [
     'awaiting_customer_decision',
     'customer_decision_check_failed',
@@ -325,7 +347,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       .find((event) => event.event_type === 'task_completed');
   }
 
-  it('pins after the WorkItem import and reconciles before done; stale still completes', async () => {
+  it('pins before the WorkItem import and reconciles before done; stale still completes', async () => {
     const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
       '../workforce/work-coordination.js'
     );
@@ -364,7 +386,8 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       (call) => (call[0] as { status?: string }).status === 'done'
     );
     expect(doneCall).toBeGreaterThanOrEqual(0);
-    expect(order(mocks.importExternalWorkItem)).toBeLessThan(order(mocks.pinTaskDecisions));
+    // The pin comes first so the import carries this round's pin-failure count.
+    expect(order(mocks.pinTaskDecisions)).toBeLessThan(order(mocks.importExternalWorkItem));
     expect(order(mocks.pinTaskDecisions)).toBeLessThan(order(mocks.route));
     expect(order(mocks.reconcileTaskDecisions)).toBeLessThan(
       mocks.updateWorkItem.mock.invocationCallOrder[doneCall]
@@ -695,6 +718,136 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       warn.mockRestore();
     });
 
+    describe('a pin that never succeeds is escalated (N = 3 rounds)', () => {
+      const failing = () =>
+        mocks.pinTaskDecisions.mockReturnValue({
+          consumer: CONSUMER,
+          pinned_count: 0,
+          pinned: false,
+          failed: { case_found: true, case_id: 'case-a' },
+        });
+      async function taskWorkItem() {
+        const { listWorkItems } = await vi.importActual<
+          typeof import('../workforce/work-coordination.js')
+        >('../workforce/work-coordination.js');
+        return listWorkItems({ source: 'local' }).find(
+          (item) => item.source_ref === `mission:${MISSION_ID}:task-1`
+        );
+      }
+      async function setTaskStatus(status: string) {
+        const { missionDir } = await import('../path-resolver.js');
+        const { safeReadFile, safeWriteFile } = await import('../secure-io.js');
+        const file = `${missionDir(MISSION_ID, 'public')}/NEXT_TASKS.json`;
+        const tasks = JSON.parse(String(safeReadFile(file, { encoding: 'utf8' }))) as Array<
+          Record<string, unknown>
+        >;
+        safeWriteFile(file, JSON.stringify(tasks.map((task) => ({ ...task, status }))));
+      }
+      const pinFailures = async () =>
+        (await taskWorkItem())?.metadata?.customer_decision_pin_failures as
+          { count: number; first_failed_at: string; case_id?: string } | undefined;
+      const ownerNotified = () =>
+        mocks.emitMissionOrchestrationObservation.mock.calls.filter(
+          (call) =>
+            (call[0] as Record<string, unknown>).reason ===
+            'customer_decision_pin_failed_repeatedly'
+        );
+
+      it('counts consecutive rounds on the WorkItem, blocks at the third and notifies once', async () => {
+        await useRealStores();
+        failing();
+        const warn = vi
+          .spyOn((await import('../core.js')).logger, 'warn')
+          .mockImplementation(() => undefined);
+        const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+        await dispatchMissionNextTasks(MISSION_ID);
+        expect(await pinFailures()).toMatchObject({ count: 1, case_id: 'case-a' });
+        const firstFailedAt = (await pinFailures())!.first_failed_at;
+        await dispatchMissionNextTasks(MISSION_ID);
+        expect(await pinFailures()).toMatchObject({ count: 2, first_failed_at: firstFailedAt });
+        expect(blockedUpdate()).toBeUndefined();
+        expect(mocks.addInboxEntry).not.toHaveBeenCalled();
+
+        await dispatchMissionNextTasks(MISSION_ID);
+        expect(mocks.route).not.toHaveBeenCalled();
+        expect(blockedUpdate()?.metadata).toMatchObject({
+          blocked_reason: 'customer_decision_check_failed',
+          customer_decision_hold: { status: 'check_failed', reason: 'pin_failed_repeatedly' },
+          customer_decision_pin_failures: { count: 3, first_failed_at: firstFailedAt },
+        });
+        expect(mocks.addInboxEntry).toHaveBeenCalledTimes(1);
+        const entry = mocks.addInboxEntry.mock.calls[0][0] as Record<string, unknown>;
+        expect(entry).toMatchObject({
+          ifAbsent: true,
+          missionId: MISSION_ID,
+          kind: 'customer_decision_pin_failed',
+        });
+        expect(String(entry.entryId)).toMatch(/^INBOX-CDP-[0-9A-F]{16}$/u);
+        expect(ownerNotified()).toHaveLength(1);
+        expect(ownerNotified()[0][0]).toMatchObject({
+          event_type: 'mission_owner_notified',
+          task_id: 'task-1',
+          pin_failure_count: 3,
+          inbox_entry_id: entry.entryId,
+        });
+
+        // mission resume (after the held attempt's lease ended): the task runs
+        // again, still failing — blocked, never re-notified.
+        {
+          const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
+            '../workforce/work-coordination.js'
+          );
+          const held = (await taskWorkItem())!;
+          if (held.lease_id) {
+            actual.releaseWorkItem({
+              itemId: held.item_id,
+              leaseId: held.lease_id,
+              actorPeerId: 'mission-orchestration-worker',
+              nextStatus: 'blocked',
+            });
+          }
+        }
+        await setTaskStatus('planned');
+        mocks.updateWorkItem.mockClear();
+        await dispatchMissionNextTasks(MISSION_ID);
+        expect(blockedUpdate()?.metadata).toMatchObject({
+          customer_decision_hold: { reason: 'pin_failed_repeatedly' },
+          customer_decision_pin_failures: { count: 4, first_failed_at: firstFailedAt },
+        });
+        expect(mocks.addInboxEntry).toHaveBeenCalledTimes(1);
+        expect(ownerNotified()).toHaveLength(1);
+        expect(mocks.route).not.toHaveBeenCalled();
+        warn.mockRestore();
+      });
+
+      it('a successful pin or a mission without a case resets the count', async () => {
+        await useRealStores();
+        failing();
+        const warn = vi
+          .spyOn((await import('../core.js')).logger, 'warn')
+          .mockImplementation(() => undefined);
+        const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+        await dispatchMissionNextTasks(MISSION_ID);
+        await dispatchMissionNextTasks(MISSION_ID);
+        expect(await pinFailures()).toMatchObject({ count: 2 });
+        // No decision case any more (null pin): the record is dropped, the task runs.
+        mocks.pinTaskDecisions.mockReturnValue(null);
+        mocks.route.mockResolvedValueOnce({
+          payload: { text: makeTaskResultText({ summary: 'Completed the widget.' }) },
+        });
+        await dispatchMissionNextTasks(MISSION_ID);
+        expect(mocks.route).toHaveBeenCalledTimes(1);
+        expect(await pinFailures()).toBeUndefined();
+        expect(mocks.addInboxEntry).not.toHaveBeenCalled();
+        // Failing again starts a new streak.
+        await setTaskStatus('planned');
+        failing();
+        await dispatchMissionNextTasks(MISSION_ID);
+        expect(await pinFailures()).toMatchObject({ count: 1 });
+        warn.mockRestore();
+      });
+    });
+
     it('a pin that recovers on the retry dispatches normally', async () => {
       await useRealStores();
       mocks.pinTaskDecisions
@@ -813,9 +966,14 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
           reason: 'customer_decision_unresolvable',
         },
       });
-      expect(
-        String((metadata?.customer_decision_hold as { next?: string } | undefined)?.next)
-      ).toMatch(/new task id in NEXT_TASKS/u);
+      const next = String(
+        (metadata?.customer_decision_hold as { next?: string } | undefined)?.next
+      );
+      // The two ways out: ask the question again, or replace the task (human-approved).
+      expect(next).toMatch(/customer-decision draft --from-tasks --reask/u);
+      expect(next).toMatch(
+        new RegExp(`pnpm mission supersede-task ${MISSION_ID} task-1 --by <new_task_id>`, 'u')
+      );
       expect(String((metadata?.customer_decision_hold as { next?: string }).next)).not.toMatch(
         /customer-decision confirm/u
       );
@@ -1042,6 +1200,143 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       ).not.toContain(SENTINEL);
       expect(await filesContaining(SENTINEL)).toEqual([]);
     });
+  });
+
+  it('an unresolvable task is superseded (human-approved) and the mission finishes on its replacement', async () => {
+    const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
+      '../workforce/work-coordination.js'
+    );
+    mocks.importExternalWorkItem.mockImplementation(actual.importExternalWorkItem);
+    mocks.updateWorkItem.mockImplementation(actual.updateWorkItem);
+    mocks.findRelevantDistilledKnowledge.mockResolvedValue([]);
+    const consumer = 'mission-MSN-CD09-WORKER.task-1';
+    mocks.pinTaskDecisions.mockImplementation((input: { taskId: string }) =>
+      input.taskId === 'task-1'
+        ? {
+            consumer,
+            pinned_count: 1,
+            pinned: true,
+            held: {
+              case_id: 'case-a',
+              tenant_slug: 'acme-corp',
+              proposal_ids: ['tp-0123456789abcdef'],
+              reason: 'customer_decision_unresolvable',
+            },
+          }
+        : null
+    );
+    mocks.markTaskDecisionLockSuperseded.mockReturnValue({
+      case_found: true,
+      consumer,
+      case_id: 'case-a',
+      marked: true,
+    });
+    const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+    await dispatchMissionNextTasks(MISSION_ID);
+    expect(mocks.route).not.toHaveBeenCalled();
+
+    const { missionDir } = await import('../path-resolver.js');
+    const { safeReadFile, safeWriteFile, safeRmSync } = await import('../secure-io.js');
+    const missionPath = missionDir(MISSION_ID, 'public');
+    const tasks = JSON.parse(
+      String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+    ) as Array<Record<string, unknown>>;
+    expect(tasks.find((task) => task.task_id === 'task-1')?.status).toBe('blocked');
+    // The operator adds the replacement task, then supersedes the held one.
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          ...tasks,
+          {
+            task_id: 'task-1-v2',
+            status: 'planned',
+            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
+            description: 'Implement the widget without the withdrawn decision',
+            deliverable: 'deliverables/widget.md',
+            dependencies: [],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    const { approvalEventLogicalPath, approvalRequestLogicalPath, decideApprovalRequest } =
+      await import('../governance/approval-store.js');
+    const {
+      createMissionTaskSupersedeApprovalRequest,
+      MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
+      supersedeMissionTask,
+    } = await import('./mission-task-supersede.js');
+    const supersede = {
+      missionId: MISSION_ID,
+      taskId: 'task-1',
+      byTaskId: 'task-1-v2',
+      reason: 'The agenda was withdrawn; the widget ships without that decision.',
+    };
+    const request = createMissionTaskSupersedeApprovalRequest({
+      ...supersede,
+      requestedBy: 'cd09-worker-operator',
+    });
+    try {
+      decideApprovalRequest('mission_controller', {
+        channel: request.channel,
+        storageChannel: request.storageChannel,
+        requestId: request.id,
+        decision: 'approved',
+        decidedBy: 'human-supersede-approver',
+        decidedByRole: 'sovereign',
+        authMethod: 'manual',
+        decidedByType: 'human',
+        authenticated: true,
+        payloadHash: request.accountability?.payloadHash,
+        effectBinding: request.accountability?.effectBinding,
+      });
+      const applied = await supersedeMissionTask({ ...supersede, approvalRequestId: request.id });
+      expect(applied).toMatchObject({
+        status: 'applied',
+        customer_decision_lock: { marked: true },
+      });
+      expect(mocks.markTaskDecisionLockSuperseded).toHaveBeenCalledWith({
+        missionId: MISSION_ID,
+        taskId: 'task-1',
+        byTaskId: 'task-1-v2',
+      });
+
+      const { evaluateMissionFinishExitGate } = await import('./mission-lifecycle.js');
+      expect(evaluateMissionFinishExitGate(missionPath)).toMatchObject({
+        ok: false,
+        pendingTasks: ['task-1-v2'],
+      });
+      mocks.reconcileTaskDecisions.mockReturnValue({
+        checked: 0,
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      mocks.route.mockResolvedValueOnce({
+        payload: { text: makeTaskResultText({ summary: 'Completed the widget.' }) },
+      });
+      await dispatchMissionNextTasks(MISSION_ID);
+      // Only the replacement ran; the superseded task was never dispatched again.
+      expect(mocks.route).toHaveBeenCalledTimes(1);
+      expect(
+        mocks.pinTaskDecisions.mock.calls.filter(
+          (call) => (call[0] as { taskId: string }).taskId === 'task-1'
+        ).length
+      ).toBe(1);
+      const after = JSON.parse(
+        String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+      ) as Array<Record<string, unknown>>;
+      expect(after.find((task) => task.task_id === 'task-1')?.status).toBe('superseded');
+      expect(evaluateMissionFinishExitGate(missionPath)).toEqual({ ok: true, pendingTasks: [] });
+    } finally {
+      safeRmSync(approvalRequestLogicalPath(MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL, request.id), {
+        force: true,
+      });
+      safeRmSync(approvalEventLogicalPath(MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL), {
+        force: true,
+      });
+    }
   });
 
   it('adds nothing to the task event for a mission without a decision case', async () => {

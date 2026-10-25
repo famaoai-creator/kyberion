@@ -64,11 +64,13 @@ import { ConfidentialTaskDecisionValues } from '../customer-decision/task-decisi
 import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 import type { DecisionAgenda, DecisionSwitch } from '../customer-decision/model.js';
 import {
+  isConsumedDecisionLockSuperseded,
   listAgendaIds,
   listConsumedDecisionLockIds,
   readAgenda,
   readConsumedDecisionLock,
   readSwitches,
+  supersededConsumedDecisionLock,
   withCustomerDecisionCaseLock,
   writeConsumedDecisionLock,
   type ConsumedDecisionLockRecord,
@@ -899,6 +901,8 @@ function releaseResolvedHolds(
   const released: string[] = [];
   for (const lock of snapshot.locks) {
     if (!lock.hold || lock.hold.resolved_at) continue;
+    // A superseded task never resumes: its lock is frozen, nothing to release.
+    if (isConsumedDecisionLockSuperseded(lock)) continue;
     try {
       const holds = taskProposalHolds(lock, snapshot.agendas, snapshot.ledger, now);
       const resolved = new Map(
@@ -1141,6 +1145,8 @@ export function isTaskAwaitingCustomerDecision(
   try {
     const now = options.now ?? nowIso();
     const { agendas, ledger, locks } = readCase(decisionCase, { owner: consumer });
+    // A superseded task waits for nothing (its replacement carries the work).
+    if (locks[0] && isConsumedDecisionLockSuperseded(locks[0])) return false;
     return Boolean(locks[0] && unresolvedHoldIds(locks[0], agendas, ledger, now).length > 0);
   } catch (error) {
     // The case exists but the lock cannot be read: never close on a guess.
@@ -1248,7 +1254,8 @@ export function sweepDecisionConsumers(
             switches.length === 0
               ? []
               : findStaleConsumersForSwitches({
-                  locks: snapshot.locks,
+                  // A superseded task's lock is frozen: no rework is filed for it.
+                  locks: snapshot.locks.filter((lock) => !isConsumedDecisionLockSuperseded(lock)),
                   switches,
                   agendas: snapshot.agendas,
                   ledger: snapshot.ledger,
@@ -1282,4 +1289,81 @@ export function sweepDecisionConsumers(
   }
   result.rework_work_item_ids = [...new Set(result.rework_work_item_ids)].sort();
   return result;
+}
+
+export interface TaskDecisionLockSupersedeResult {
+  /** false: the mission has no decision case; nothing was marked. */
+  case_found: boolean;
+  consumer: string;
+  case_id?: string;
+  /** The lock now carries the supersede mark (false: no lock, or the write failed). */
+  marked: boolean;
+  /** The mark was already on the lock (an idempotent re-run). */
+  already_marked?: boolean;
+  /** Finding the case or writing the lock failed (logged); the supersede goes on. */
+  failed?: boolean;
+}
+
+/**
+ * `mission_controller supersede-task`: mark the replaced task's consumer lock
+ * superseded (`superseded: {by_consumer, by_task_id, at}`, top level). The lock
+ * is written by its own owner under the narrow consumer store role; the guard
+ * accepts the mark only on an existing lock, alone in that write, naming
+ * another task of the same mission, and freezes the lock afterwards. A
+ * superseded lock is never released, re-held or reworked. No case or no lock:
+ * nothing to mark. Never throws (a failure is logged; ids only).
+ */
+export function markTaskDecisionLockSuperseded(
+  input: { missionId: string; taskId: string; byTaskId: string },
+  options: MissionDecisionLockOptions = {}
+): TaskDecisionLockSupersedeResult {
+  const consumer = missionTaskConsumerId(input.missionId, input.taskId);
+  const byConsumer = missionTaskConsumerId(input.missionId, input.byTaskId);
+  let caseId: string | undefined;
+  try {
+    const decisionCase = resolveMissionDecisionCase(input.missionId, options);
+    if (!decisionCase) return { case_found: false, consumer, marked: false };
+    caseId = decisionCase.caseId;
+    const now = options.now ?? nowIso();
+    return withCustomerDecisionCaseLock(
+      decisionCase.location,
+      () => {
+        const { locks } = readCase(decisionCase, { owner: consumer });
+        const lock = locks[0];
+        if (!lock) {
+          return { case_found: true, consumer, case_id: decisionCase.caseId, marked: false };
+        }
+        if (lock.superseded) {
+          return {
+            case_found: true,
+            consumer,
+            case_id: decisionCase.caseId,
+            marked: lock.superseded.by_consumer === byConsumer,
+            already_marked: true,
+          };
+        }
+        writeLock(
+          decisionCase,
+          supersededConsumedDecisionLock(lock, {
+            by_consumer: byConsumer,
+            by_task_id: input.byTaskId,
+            at: now,
+          })
+        );
+        return { case_found: true, consumer, case_id: decisionCase.caseId, marked: true };
+      },
+      ...(options.lockTimeoutMs !== undefined ? [options.lockTimeoutMs] : [])
+    );
+  } catch (error) {
+    logger.warn(
+      `customer decision lock not marked superseded — ${diagnosticCode(error)} | the task is superseded on the mission; the lock keeps its hold until marked — re-run supersede-task with the same approval to retry | ${consumer}${caseId ? ` case=${caseId}` : ''} by=${byConsumer}`
+    );
+    return {
+      case_found: caseId !== undefined,
+      consumer,
+      ...(caseId ? { case_id: caseId } : {}),
+      marked: false,
+      failed: true,
+    };
+  }
 }
