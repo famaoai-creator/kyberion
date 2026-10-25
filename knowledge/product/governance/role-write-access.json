@@ -194,7 +194,9 @@
         "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/",
         "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
         "active/shared/runtime/",
-        "active/shared/observability/"
+        "active/shared/observability/",
+        "active/shared/logs/traces/",
+        "customer/${KYBERION_CUSTOMER}/logs/traces/"
       ]
     },
     "deliverable_inbox_writer": {
