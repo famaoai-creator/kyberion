@@ -529,7 +529,12 @@ describe('customer-decision facade', () => {
       '--by',
       'user:alice',
     ])) as Record<string, unknown>;
-    expect(approved).toMatchObject({ status: 'approved', approved_by: 'user:boss' });
+    // approved_by is the approval's decider; --by is only the unverified submitter.
+    expect(approved).toMatchObject({
+      status: 'approved',
+      approved_by: 'user:boss',
+      submitted_by: 'user:alice',
+    });
     const ledger = readLedger({ dir });
     expect(ledger.map((record) => [record.key, record.state, record.value])).toEqual([
       ['auth.method', 'proposed', 'sso'],
@@ -542,7 +547,12 @@ describe('customer-decision facade', () => {
       basis: [{ ref: `agenda:${agendaId}`, version: hash }],
     });
     const agenda = agendaOf(agendaId);
-    expect(agenda.approval).toMatchObject({ content_hash: hash, request_id: 'apr-7' });
+    expect(agenda.approval).toMatchObject({
+      content_hash: hash,
+      request_id: 'apr-7',
+      approved_by: 'user:boss',
+      submitted_by: 'user:alice',
+    });
     expect(agendaContentHash(agenda)).toBe(hash);
     expect(agenda.entries[0].our_decision?.decision_id).toBe('D-0001');
 
@@ -557,6 +567,29 @@ describe('customer-decision facade', () => {
     ])) as Record<string, unknown>;
     expect(again.already_approved).toBe(true);
     expect(readLedger({ dir })).toHaveLength(2);
+  });
+
+  it('pins nothing when the allowed approval names no decider (never falls back to --by)', async () => {
+    const agendaId = await draftAgenda();
+    approveNext('apr-nodecider');
+    mocks.load.mockReturnValueOnce({ decidedAt: NOW });
+    const failure = await run([
+      'submit',
+      ...base(),
+      '--agenda',
+      agendaId,
+      '--by',
+      'user:alice',
+    ]).catch((error: unknown) => error);
+    expect(failure).toBeInstanceOf(ScriptExitError);
+    expect((failure as ScriptExitError).code).toBe(1);
+    expect(String((failure as Error).message)).toMatch(/names no decider/u);
+    expect(agendaOf(agendaId).approval).toBeUndefined();
+    expect(agendaOf(agendaId).status).not.toBe('approved');
+    expect(readLedger({ dir })).toEqual([]);
+    expect(mocks.audit).not.toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'agenda_approve' })
+    );
   });
 
   it('refuses to send an unapproved agenda or to an unregistered actor', async () => {

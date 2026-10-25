@@ -56,7 +56,17 @@
         "content_hash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "request_id": { "type": "string", "minLength": 1 },
         "approved_at": { "type": "string", "minLength": 1 },
-        "approved_by": { "type": "string", "minLength": 1 }
+        "approved_by": {
+          "description": "The decider of the approval request (decidedBy), never the CLI's unverified --by.",
+          "type": "string",
+          "minLength": 1
+        },
+        "approved_by_type": { "type": "string", "enum": ["human", "ai_agent", "service"] },
+        "submitted_by": {
+          "description": "The member submit was run as (--by user:<member>, unverified).",
+          "type": "string",
+          "pattern": "^user:[A-Za-z0-9][A-Za-z0-9._-]*$"
+        }
       }
     },
     "in_force": {

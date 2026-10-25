@@ -127,7 +127,12 @@ export interface DecisionAgenda {
     content_hash: string;
     request_id?: string;
     approved_at: string;
+    /** The decider of the approval request (`decidedBy`), never the CLI's unverified `--by`. */
     approved_by: string;
+    /** The approval decider's type (`decidedByType`), when the approval records it. */
+    approved_by_type?: 'human' | 'ai_agent' | 'service';
+    /** The member `submit` was run as (`--by user:<member>`, unverified). */
+    submitted_by?: string;
   };
   /**
    * Our decisions in force: the pins of the last approval. Editing the agenda

@@ -392,9 +392,18 @@ function submitLocked(
     return result;
   }
 
+  // Who approved is the approval's decider, never the unverified `--by`
+  // (recorded as `submitted_by`). No decider: nothing is pinned.
   const decision = gate.requestId ? loadApprovalRequest(APPROVAL_CHANNEL, gate.requestId) : null;
-  const approvedBy = decision?.decidedBy || member;
-  const approvedAt = decision?.decidedAt || now;
+  if (!decision?.decidedBy) {
+    throw new ScriptExitError(
+      1,
+      `approval ${gate.requestId ?? '(none)'} for agenda ${agenda.agenda_id} names no decider; nothing is pinned`
+    );
+  }
+  const approvedBy = decision.decidedBy;
+  const approvedByType = decision.decidedByType;
+  const approvedAt = decision.decidedAt || now;
   const proposer = humanActor(member.replace(/^user:/u, ''));
 
   return asLedgerWriter(tenant, () => {
@@ -451,6 +460,8 @@ function submitLocked(
         ...(gate.requestId ? { request_id: gate.requestId } : {}),
         approved_at: approvedAt,
         approved_by: approvedBy,
+        ...(approvedByType ? { approved_by_type: approvedByType } : {}),
+        submitted_by: member,
       },
       updated_at: now,
     };
@@ -477,6 +488,7 @@ function submitLocked(
         content_hash: hash,
         request_id: gate.requestId,
         approved_by: approvedBy,
+        ...(approvedByType ? { approved_by_type: approvedByType } : {}),
         submitted_by: member,
         role,
         decision_ids: [...pinned.values()],
@@ -487,6 +499,7 @@ function submitLocked(
       ...agendaSummary(written),
       approval_request_id: gate.requestId,
       approved_by: approvedBy,
+      submitted_by: member,
       our_decisions: Object.fromEntries(pinned),
       skipped,
     };
