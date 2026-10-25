@@ -652,7 +652,28 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
         .map((call) => call[0] as { status?: string; metadata?: Record<string, unknown> })
         .find((update) => update.status === 'blocked');
 
-    it('a pin that failed on a known case blocks the task as a failed check, undispatched', async () => {
+    async function markHeldBefore(blockedReason: string): Promise<void> {
+      const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
+        '../workforce/work-coordination.js'
+      );
+      const created = actual.importExternalWorkItem({
+        source: 'local',
+        sourceRef: `mission:${MISSION_ID}:task-1`,
+        title: 'task-1',
+        description: 'task-1',
+        status: 'ready',
+        priority: 'normal',
+        projectId: MISSION_ID,
+      });
+      actual.updateWorkItem({
+        itemId: created.item_id,
+        expectedVersion: created.version,
+        status: 'blocked',
+        metadata: { blocked_reason: blockedReason },
+      });
+    }
+
+    it('a pin that keeps failing for a task not known to wait is left planned: retried once, not blocked, not run', async () => {
       await useRealStores();
       mocks.pinTaskDecisions.mockReturnValue({
         consumer: CONSUMER,
@@ -665,30 +686,28 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
         .mockImplementation(() => undefined);
       const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
       await dispatchMissionNextTasks(MISSION_ID);
+      expect(mocks.pinTaskDecisions).toHaveBeenCalledTimes(2);
       expect(mocks.route).not.toHaveBeenCalled();
-      expect(blockedUpdate()?.metadata).toMatchObject({
-        blocked_reason: 'customer_decision_check_failed',
-        customer_decision_hold: { status: 'check_failed', consumer: CONSUMER, case_id: 'case-a' },
-      });
+      expect(blockedUpdate()).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
-        expect.stringMatching(/blocked — .*customer_decision_check_failed.* \| .* \| mission=/u)
+        expect.stringMatching(/not dispatched — .*pin failed twice.* \| .*retried.* \| mission=/u)
       );
       warn.mockRestore();
     });
 
-    it('a failed case lookup blocks only a task that was already held', async () => {
+    it('a pin that recovers on the retry dispatches normally', async () => {
       await useRealStores();
-      const failed = {
-        consumer: CONSUMER,
-        pinned_count: 0,
-        pinned: false,
-        failed: { case_found: false },
-      };
-      vi.spyOn((await import('../core.js')).logger, 'warn').mockImplementation(() => undefined);
-      // Not held before: runs as a mission without a case.
-      mocks.pinTaskDecisions.mockReturnValue(failed);
+      mocks.pinTaskDecisions
+        .mockReturnValueOnce({
+          consumer: CONSUMER,
+          pinned_count: 0,
+          pinned: false,
+          failed: { case_found: true, case_id: 'case-a' },
+        })
+        .mockReturnValueOnce({ consumer: CONSUMER, pinned_count: 1, pinned: true });
       mocks.reconcileTaskDecisions.mockReturnValue({
-        checked: 0,
+        consumer: CONSUMER,
+        checked: 1,
         stale_count: 0,
         rework_work_item_ids: [],
       });
@@ -698,43 +717,74 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
       await dispatchMissionNextTasks(MISSION_ID);
       expect(mocks.route).toHaveBeenCalledTimes(1);
-      // Held before (its WorkItem says so): blocked, undispatched.
-      const { listWorkItems } = await vi.importActual<
-        typeof import('../workforce/work-coordination.js')
-      >('../workforce/work-coordination.js');
-      const item = listWorkItems({ source: 'local' }).find(
-        (entry) => entry.source_ref === `mission:${MISSION_ID}:task-1`
-      )!;
-      const actual = await vi.importActual<typeof import('../workforce/work-coordination.js')>(
-        '../workforce/work-coordination.js'
-      );
-      actual.updateWorkItem({
-        itemId: item.item_id,
-        expectedVersion: item.version,
-        status: 'blocked',
-        metadata: { blocked_reason: 'awaiting_customer_decision' },
+    });
+
+    it('a pin that keeps failing for a task blocked on a customer decision before blocks as a failed check', async () => {
+      await useRealStores();
+      await markHeldBefore('awaiting_customer_decision');
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 0,
+        pinned: false,
+        failed: { case_found: false },
       });
-      const { missionDir } = await import('../path-resolver.js');
-      const { safeWriteFile } = await import('../secure-io.js');
-      safeWriteFile(
-        `${missionDir(MISSION_ID, 'public')}/NEXT_TASKS.json`,
-        JSON.stringify([
-          {
-            task_id: 'task-1',
-            status: 'planned',
-            assigned_to: { role: 'implementer', agent_id: 'implementation-architect' },
-            description: 'Implement the widget procedure',
-            deliverable: 'deliverables/widget.md',
-          },
-        ])
-      );
-      mocks.route.mockClear();
-      mocks.updateWorkItem.mockClear();
+      const warn = vi
+        .spyOn((await import('../core.js')).logger, 'warn')
+        .mockImplementation(() => undefined);
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
       await dispatchMissionNextTasks(MISSION_ID);
       expect(mocks.route).not.toHaveBeenCalled();
       expect(blockedUpdate()?.metadata).toMatchObject({
         blocked_reason: 'customer_decision_check_failed',
+        customer_decision_hold: { status: 'check_failed', consumer: CONSUMER },
       });
+      expect(warn).toHaveBeenCalledWith(
+        expect.stringMatching(/blocked — .*customer_decision_check_failed.* \| .* \| mission=/u)
+      );
+      warn.mockRestore();
+    });
+
+    it('a completed task whose decision changed is told, never silent: ids-only note, any mission, audited', async () => {
+      await useRealStores();
+      const { ConfidentialTaskDecisionValues } =
+        await import('../customer-decision/task-decision-values.js');
+      mocks.pinTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        pinned_count: 1,
+        pinned: true,
+        decision_values: new ConfidentialTaskDecisionValues(
+          { tenantSlug: 'acme-corp', caseId: 'case-a', consumer: CONSUMER },
+          [],
+          [{ proposal_id: 'tp-0123456789abcdef', reason: 'changed_after_completion' }]
+        ),
+      });
+      mocks.reconcileTaskDecisions.mockReturnValue({
+        consumer: CONSUMER,
+        checked: 1,
+        stale_count: 0,
+        rework_work_item_ids: [],
+      });
+      mocks.route.mockResolvedValueOnce({
+        payload: { text: makeTaskResultText({ summary: 'Completed the widget.' }) },
+      });
+      // A public fixture mission: no confidential value, so no tier gate.
+      const { dispatchMissionNextTasks } = await import('./mission-orchestration-worker.js');
+      await dispatchMissionNextTasks(MISSION_ID);
+      expect(mocks.route).toHaveBeenCalledTimes(1);
+      const prompt = String(
+        (mocks.route.mock.calls[0][0] as { payload: { text: string } }).payload.text
+      );
+      expect(prompt).toContain(
+        'The decision for tp-0123456789abcdef changed after this task completed and is not confirmed; do not assume a value'
+      );
+      expect(blockedUpdate()).toBeUndefined();
+      expect(mocks.auditTaskDecisionDelivery).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'task_decisions_delivered',
+          reason: 'changed_after_completion',
+          proposalIds: ['tp-0123456789abcdef'],
+        })
+      );
     });
 
     it('an unresolvable hold blocks with its own reason and a next step that can be done', async () => {
@@ -763,7 +813,7 @@ describe('mission-orchestration-worker CD-09 customer decision lock', { timeout:
       });
       expect(
         String((metadata?.customer_decision_hold as { next?: string } | undefined)?.next)
-      ).toMatch(/NEXT_TASKS/u);
+      ).toMatch(/new task id in NEXT_TASKS/u);
       expect(String((metadata?.customer_decision_hold as { next?: string }).next)).not.toMatch(
         /customer-decision confirm/u
       );

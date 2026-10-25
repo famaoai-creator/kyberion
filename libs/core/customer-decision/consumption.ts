@@ -449,6 +449,12 @@ export type TaskProposalDecisionState =
       decision_id: string;
       /** Absent only when a completed lock's release names a decision the ledger lost. */
       value?: unknown;
+      /**
+       * Why a resolved proposal of a completed lock has no value to deliver:
+       * the released decision was superseded since (the customer changed the
+       * answer, not confirmed) or the ledger no longer records it.
+       */
+      unconfirmed?: 'changed_after_completion' | 'decision_not_recorded';
       agenda?: DecisionAgenda;
       /** in_force: on the entry now; last_confirmed: the release's decision. */
       source: 'in_force' | 'last_confirmed';
@@ -456,10 +462,15 @@ export type TaskProposalDecisionState =
   | { status: 'awaiting' }
   | { status: 'unresolvable' };
 
-/** The ledger still records `record` as the customer's decided value of the entry's item × key. */
-function isCustomerDecidedRecord(
+/**
+ * The ledger records `record` as the customer's decided value of the entry's
+ * item × key, and it is still the one that stands: active, and no later
+ * record supersedes it (a superseded answer is never delivered as confirmed).
+ */
+function isStandingCustomerRecord(
   record: DecisionRecord | undefined,
-  entry: TaskProposalLockEntry
+  entry: TaskProposalLockEntry,
+  supersededIds: ReadonlySet<string>
 ): record is DecisionRecord {
   return Boolean(
     record &&
@@ -467,6 +478,8 @@ function isCustomerDecidedRecord(
     record.key === entry.key &&
     record.level === 'customer-value' &&
     record.state === 'decided' &&
+    record.status === 'active' &&
+    !supersededIds.has(record.id) &&
     record.decided_by?.on_behalf_of?.actor_id &&
     record.value !== undefined
   );
@@ -479,14 +492,16 @@ function isCustomerDecidedRecord(
  *     → resolved (a superseded decision yields the one in force now);
  *   - a lock that completed once trusts its release (`resolved` stamp): a
  *     decision changed after completion is the rework path's to handle
- *     (`reconcileConsumedDecisionLock`), never a new hold;
+ *     (`reconcileConsumedDecisionLock`), never a new hold. Its value is the
+ *     released decision only while that still stands; otherwise it is
+ *     resolved with no value and `unconfirmed` says why (the prompt says so);
  *   - its agenda still open (the customer may answer, the operator may
  *     confirm) → awaiting;
  *   - its agenda closed, withdrawn or gone: the release's decision (the
  *     last one the operator confirmed — the stamp is guard-checked against
- *     the agenda's confirmations) when the ledger still records it as the
- *     customer's decided value → resolved; otherwise → unresolvable, which no
- *     boundary ever releases (no hold / release loop).
+ *     the agenda's confirmations) while it still stands (active, not
+ *     superseded) → resolved; otherwise → unresolvable, which no boundary
+ *     ever releases (no hold / release loop).
  * An uncollected proposal is awaiting.
  */
 export function taskProposalStates(
@@ -497,6 +512,9 @@ export function taskProposalStates(
 ): Array<{ entry: TaskProposalLockEntry; state: TaskProposalDecisionState }> {
   const byId = new Map(agendas.map((agenda) => [agenda.agenda_id, agenda]));
   const byRecord = new Map(ledger.map((record) => [record.id, record]));
+  const supersededIds = new Set(
+    ledger.flatMap((record) => (record.supersedes ? [record.supersedes] : []))
+  );
   const resolved = new Map<string, EffectiveDecision[]>();
   const everCompleted = lock.status === 'completed' || lock.completed_at !== undefined;
   const effectiveOf = (agenda: DecisionAgenda): EffectiveDecision[] => {
@@ -531,12 +549,16 @@ export function taskProposalStates(
     }
     const stampedId = entry.proposal.resolved?.decision_id;
     const stamped = stampedId ? byRecord.get(stampedId) : undefined;
-    const lastConfirmed = isCustomerDecidedRecord(stamped, entry) ? stamped : undefined;
+    const lastConfirmed = isStandingCustomerRecord(stamped, entry, supersededIds)
+      ? stamped
+      : undefined;
     if (stampedId && everCompleted) {
       return {
         status: 'resolved',
         decision_id: stampedId,
-        ...(lastConfirmed ? { value: lastConfirmed.value } : {}),
+        ...(lastConfirmed
+          ? { value: lastConfirmed.value }
+          : { unconfirmed: stamped ? 'changed_after_completion' : 'decision_not_recorded' }),
         ...(agenda ? { agenda } : {}),
         source: 'last_confirmed',
       };
@@ -585,6 +607,23 @@ export interface ResolvedTaskProposalDecision {
  * agent made (not `requires_customer`) and every other decision of the case
  * are never here.
  */
+/**
+ * Proposals of a completed-once lock whose release no longer has a value to
+ * deliver (ids and why only): the resumed task is told not to assume one.
+ */
+export function unconfirmedTaskProposals(
+  lock: TaskProposalLock,
+  agendas: readonly DecisionAgenda[],
+  ledger: readonly DecisionRecord[],
+  now: string
+): Array<{ proposal_id: string; reason: 'changed_after_completion' | 'decision_not_recorded' }> {
+  return taskProposalStates(lock, agendas, ledger, now).flatMap(({ entry, state }) =>
+    state.status === 'resolved' && state.unconfirmed
+      ? [{ proposal_id: entry.proposal.proposal_id, reason: state.unconfirmed }]
+      : []
+  );
+}
+
 export function resolvedTaskProposalDecisions(
   lock: TaskProposalLock,
   agendas: readonly DecisionAgenda[],

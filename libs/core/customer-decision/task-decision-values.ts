@@ -33,6 +33,13 @@ export interface TaskDecisionValuesCase {
 export interface TaskDecisionValuesSummary {
   count: number;
   decision_ids: string[];
+  unconfirmed_proposal_ids?: string[];
+}
+
+/** A completed-lock proposal whose release has no value to deliver any more. */
+export interface UnconfirmedTaskProposal {
+  proposal_id: string;
+  reason: 'changed_after_completion' | 'decision_not_recorded';
 }
 
 function escapeRegExp(text: string): string {
@@ -117,17 +124,37 @@ function scalarLeaves(value: unknown, out: string[], depth = 0): void {
 export class ConfidentialTaskDecisionValues {
   readonly #case: TaskDecisionValuesCase;
   readonly #items: readonly ResolvedTaskProposalDecision[];
+  readonly #unconfirmed: readonly UnconfirmedTaskProposal[];
 
   constructor(
     decisionCase: TaskDecisionValuesCase,
-    items: readonly ResolvedTaskProposalDecision[]
+    items: readonly ResolvedTaskProposalDecision[],
+    /** Completed-lock proposals with no value to deliver (ids and why only). */
+    unconfirmed: readonly UnconfirmedTaskProposal[] = []
   ) {
     this.#case = { ...decisionCase };
     this.#items = items.map((item) => ({ ...item }));
+    this.#unconfirmed = unconfirmed.map((item) => ({ ...item }));
   }
 
+  /** Decisions whose values are held (confidential). */
   get count(): number {
     return this.#items.length;
+  }
+
+  /** Nothing to put in the prompt: no value and no unconfirmed proposal. */
+  get isEmpty(): boolean {
+    return this.#items.length === 0 && this.#unconfirmed.length === 0;
+  }
+
+  /** Proposals the task is told it has no confirmed value for (ids only), sorted. */
+  get unconfirmedProposalIds(): string[] {
+    return [...new Set(this.#unconfirmed.map((item) => item.proposal_id))].sort();
+  }
+
+  /** Why those proposals have no value (`changed_after_completion`, …), sorted and unique. */
+  get unconfirmedReasons(): string[] {
+    return [...new Set(this.#unconfirmed.map((item) => item.reason))].sort();
   }
 
   get tenantSlug(): string {
@@ -151,13 +178,24 @@ export class ConfidentialTaskDecisionValues {
     return [...new Set(this.#items.map((item) => item.decision_id))].sort();
   }
 
-  /** `customer-decision:<case>#<decision_id>` refs for metadata-only records. */
+  /**
+   * `customer-decision:<case>#<decision_id>` refs (and `#<proposal_id>` for
+   * an unconfirmed proposal) for metadata-only records.
+   */
   knowledgeRefs(): string[] {
-    return this.decisionIds.map((id) => `customer-decision:${this.#case.caseId}#${id}`);
+    return [...this.decisionIds, ...this.unconfirmedProposalIds].map(
+      (id) => `customer-decision:${this.#case.caseId}#${id}`
+    );
   }
 
   toJSON(): TaskDecisionValuesSummary {
-    return { count: this.count, decision_ids: this.decisionIds };
+    return {
+      count: this.count,
+      decision_ids: this.decisionIds,
+      ...(this.#unconfirmed.length > 0
+        ? { unconfirmed_proposal_ids: this.unconfirmedProposalIds }
+        : {}),
+    };
   }
 
   [INSPECT_CUSTOM](): TaskDecisionValuesSummary {
@@ -168,16 +206,25 @@ export class ConfidentialTaskDecisionValues {
     return `[customer decisions ${this.decisionIds.join(', ')}]`;
   }
 
-  /** The prompt section carrying the values (empty when there are none). */
+  /** The prompt section carrying the values (empty when there is nothing to say). */
   promptLines(): string[] {
-    if (this.#items.length === 0) return [];
+    if (this.isEmpty) return [];
     return [
       CONFIRMED_CUSTOMER_DECISIONS_HEADING,
       ...this.#items.map((item) => {
         const label = item.option_label ? ` (option: ${item.option_label})` : '';
         return `- [${item.decision_id}] ${item.question} (${item.item} / ${item.key}) → ${JSON.stringify(item.value)}${label}`;
       }),
-      'These are the customer’s confirmed answers to the questions this task asked; build on them. Refer to a decision only by its id in summary, needs and gaps.',
+      ...this.#unconfirmed.map((item) =>
+        item.reason === 'changed_after_completion'
+          ? `- The decision for ${item.proposal_id} changed after this task completed and is not confirmed; do not assume a value (put it in needs if the work depends on it).`
+          : `- The decision for ${item.proposal_id} is no longer recorded; do not assume a value (put it in needs if the work depends on it).`
+      ),
+      ...(this.#items.length > 0
+        ? [
+            'These are the customer’s confirmed answers to the questions this task asked; build on them. Refer to a decision only by its id in summary, needs and gaps.',
+          ]
+        : []),
       '',
     ];
   }
