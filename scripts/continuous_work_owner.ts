@@ -7,6 +7,7 @@ import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { pathResolver, findMissionPath } from '@agent/core/path-resolver';
 import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission/mission-next-task-reader';
 import { loadState } from '@agent/core/mission/mission-state';
+import { DISTILL_MEMORY_OUTBOX_FILE } from '@agent/core/mission/mission-distill';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
 import { listWorkItems, updateWorkItem } from '@agent/core/workforce/work-coordination';
 import {
@@ -45,6 +46,8 @@ export interface ContinuousOwnerAdapterDeps {
   assessApproval?: typeof assessAlignmentDecision;
   brief?: typeof loadMissionBriefAtPath;
   tasks?: typeof loadMissionNextTaskObjectsAtPath;
+  workItems?: typeof listWorkItems;
+  updateItem?: typeof updateWorkItem;
 }
 const fingerprint = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -319,14 +322,42 @@ export function createContinuousOwnerPorts(
         const rows = tasks();
         return rows.length > 0 && rows.every((row) => row.status === 'completed');
       };
-      if (['completed', 'archived'].includes(state.status))
-        return complete() && state.verification?.status === 'verified'
-          ? { status: 'completed', evidence_refs: refs }
-          : {
-              status: 'blocked',
-              evidence_refs: refs,
-              reason: 'Mission has unfinished contracts or lacks verified outcome evidence',
-            };
+      const reconcileLearning = async () => {
+        const outboxPath = path.join(dir, 'evidence', DISTILL_MEMORY_OUTBOX_FILE);
+        if (!exists(outboxPath)) return;
+        const pending = () => {
+          const outbox = read(outboxPath) as {
+            version?: number;
+            mission_id?: string;
+            status?: string;
+          };
+          if (
+            !outbox ||
+            outbox.version !== 1 ||
+            outbox.mission_id !== input.mission_id ||
+            !['pending', 'delivered'].includes(outbox.status ?? '')
+          )
+            throw new Error('Invalid mission learning delivery evidence');
+          return outbox.status === 'pending';
+        };
+        if (pending()) {
+          await command('mission_controller.bundle.js', ['distill', input.mission_id], input);
+          if (pending())
+            throw new Error(
+              'Mission learning registration remains pending; retry governed distillation recovery'
+            );
+        }
+      };
+      if (['completed', 'archived'].includes(state.status)) {
+        if (!complete() || state.verification?.status !== 'verified')
+          return {
+            status: 'blocked',
+            evidence_refs: refs,
+            reason: 'Mission has unfinished contracts or lacks verified outcome evidence',
+          };
+        await reconcileLearning();
+        return { status: 'completed', evidence_refs: refs };
+      }
 
       if (state.status === 'failed')
         return { status: 'failed', evidence_refs: refs, reason: 'Mission failed' };
@@ -366,11 +397,14 @@ export function createContinuousOwnerPorts(
         state = assertMissionScope(input);
         if (state.status === 'planned') throw new Error('Approved mission did not activate');
       }
-      await command(
-        'mission_controller.bundle.js',
-        ['dispatch-tickets', input.mission_id, '--ticket-targets', 'workitem'],
-        input
-      );
+      // Native ticket creation rejects missions with no planned tasks. Existing
+      // reviewed/ready WorkItems still need a dispatch/rework sweep in that case.
+      if (tasks().some((row) => (row.status || 'planned') === 'planned'))
+        await command(
+          'mission_controller.bundle.js',
+          ['dispatch-tickets', input.mission_id, '--ticket-targets', 'workitem'],
+          input
+        );
       const rowsBefore = tasks();
       for (const phase of state.process_template?.phase_specs ?? []) {
         if (
@@ -409,22 +443,69 @@ export function createContinuousOwnerPorts(
       // eyes). Return those items to 'ready' with the verdict noted so the
       // next sweep re-dispatches them; bounded by rework_count so an
       // unapprovable item still parks for the operator.
-      for (const item of listWorkItems()) {
+      const interventions: string[] = [];
+      const pendingApprovals: string[] = [];
+      for (const item of (deps.workItems ?? listWorkItems)({}, { rootDir: root })) {
+        if (
+          item.context?.mission_id !== input.mission_id ||
+          item.context.organization_id !== input.scope.organization_id ||
+          (item.context.tenant_slug ?? '') !== (input.scope.tenant_slug ?? '') ||
+          item.context.project_id !== input.project_id
+        )
+          continue;
+        if (item.status === 'blocked') {
+          if (
+            item.metadata?.awaiting_approval === true &&
+            typeof item.metadata.approval_request_id === 'string'
+          ) {
+            pendingApprovals.push(item.metadata.approval_request_id);
+            continue;
+          }
+          interventions.push(item.item_id);
+          continue;
+        }
         if (item.status !== 'review') continue;
-        if (!(item.labels || []).includes(`mission:${input.mission_id}`)) continue;
         const reworks = Number(item.metadata?.rework_count ?? 0);
-        if (reworks >= 2) continue;
-        updateWorkItem({
+        const exhausted = !Number.isSafeInteger(reworks) || reworks < 0 || reworks >= 2;
+        input.assertCurrent();
+        (deps.updateItem ?? updateWorkItem)({
           itemId: item.item_id,
-          status: 'ready',
+          expectedVersion: item.version,
+          rootDir: root,
+          status: exhausted ? 'blocked' : 'ready',
           metadata: {
             ...(item.metadata || {}),
-            rework_count: reworks + 1,
-            rework_reason: 'landed at review — independent review not approved; requeued for rework',
+            ...(exhausted
+              ? {
+                  blocked_reason:
+                    'Independent review rework limit reached or invalid counter; operator intervention required',
+                  next_action:
+                    'Inspect review evidence, repair the task or revise its approved contract, then explicitly return the child WorkItem and its blocked continuous-owner WorkItem to ready',
+                }
+              : { rework_count: reworks + 1 }),
+            rework_reason: exhausted
+              ? 'Independent review cannot advance automatically; held for operator review'
+              : 'landed at review — independent review not approved; requeued for rework',
             rework_actor: 'continuous-work-owner',
           },
         });
+        if (exhausted) interventions.push(item.item_id);
       }
+      if (pendingApprovals.length && !interventions.length)
+        return {
+          status: 'pending_approval',
+          evidence_refs: refs,
+          approval_request_id: pendingApprovals[0],
+          reason:
+            'Runtime tool approval pending; the continuous owner resumes after the human decision',
+        };
+      if (interventions.length)
+        return {
+          status: 'blocked',
+          evidence_refs: [...refs, ...interventions.map((id) => `workitem:${id}`)],
+          reason: `WorkItems require operator intervention: ${interventions.join(', ')}. Inspect review evidence, repair the task or revise its approved contract, then explicitly return the child WorkItem and its blocked continuous-owner WorkItem to ready.`,
+          approval_request_id: approval.requestId,
+        };
       state = assertMissionScope(input);
       if (complete()) {
         await command(
@@ -439,6 +520,7 @@ export function createContinuousOwnerPorts(
         );
         await command('mission_controller.bundle.js', ['distill', input.mission_id], input);
         state = assertMissionScope(input);
+        await reconcileLearning();
       }
       const remaining = tasks();
       const blocked = remaining.some((row) => row.status === 'blocked');

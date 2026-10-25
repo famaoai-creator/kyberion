@@ -16,6 +16,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import { resolveActiveProviderPermissionArgs } from '../provider/provider-permission-profiles.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
+import { buildKyberionMcpServerConfig } from '../provider/claude-mcp-server-config.js';
 import {
   CodexAppServerAdapter,
   CodexExecutionEnhancer,
@@ -187,12 +188,6 @@ export interface AgentAdapter {
 function registerEnhancer(enhancers: AgentEnhancer[], enhancer: AgentEnhancer): void {
   enhancers.push(enhancer);
   logger.info(`[UAA] Enhancer added: ${enhancer.name}`);
-}
-
-function summarizePromptForLog(prompt: string, maxChars = 200): string {
-  const oneLine = prompt.replace(/\s+/g, ' ').trim();
-  if (oneLine.length <= maxChars) return oneLine;
-  return `${oneLine.slice(0, maxChars)}...`;
 }
 
 async function waitForBootSignal(
@@ -977,7 +972,7 @@ export class CodexAdapter implements AgentAdapter {
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
-    logger.info(`[UAA] Codex Executing prompt: "${summarizePromptForLog(enhanced.prompt)}"`);
+    logger.debug(`[UAA] Codex executing prompt (${enhanced.prompt.length} chars)`);
     assertReasoningEgressAllowed('codex-cli');
 
     try {
@@ -1065,7 +1060,7 @@ export class AgyAdapter implements AgentAdapter {
   public async ask(text: string, options?: AgentAskOptions): Promise<AgentResponse> {
     const isInteractive = options?.interactive === true;
     logger.info(
-      `[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}): "${text.slice(0, 80)}..."`
+      `[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}, ${text.length} chars)`
     );
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
     assertReasoningEgressAllowed('agy-cli');
@@ -1217,6 +1212,8 @@ export interface ClaudeAdapterOptions {
    * model can only answer from the prompt it is given.
    */
   toolsDisabled?: boolean;
+  /** Explicit Kyberion MCP composition; ignore ambient user/project servers. */
+  governedMcp?: boolean;
 }
 
 // Map Kyberion actuator names to Claude Code tool names
@@ -1248,7 +1245,7 @@ export class ClaudeAdapter implements AgentAdapter {
   }
 
   public async ask(text: string): Promise<AgentResponse> {
-    logger.info(`[UAA] Claude asking: "${text.slice(0, 80)}..."`);
+    logger.debug(`[UAA] Claude asking (${text.length} chars)`);
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
     assertReasoningEgressAllowed('claude-cli');
     try {
@@ -1274,6 +1271,15 @@ export class ClaudeAdapter implements AgentAdapter {
         args.push(...activePermissionArgs);
       } else if (this.options.permissionMode) {
         args.push('--permission-mode', this.options.permissionMode);
+      }
+      if (!this.options.toolsDisabled && this.options.governedMcp) {
+        args.push(
+          '--strict-mcp-config',
+          '--mcp-config',
+          JSON.stringify({
+            mcpServers: buildKyberionMcpServerConfig(PROJECT_ROOT),
+          })
+        );
       }
 
       // Tool restrictions from manifest

@@ -432,7 +432,7 @@ export function runContinuousOperations(
         const record =
           result.records[0] ??
           (!deps.dispatch && result.duplicates[0]
-            ? readDotActionLedgerStrict({ rootDir: root })
+            ? readDotActionLedgerStrict({ rootDir: root, dotId: charter.dot_id })
                 .filter((row) => row.action_ref === result.duplicates[0])
                 .at(-1)
             : undefined);

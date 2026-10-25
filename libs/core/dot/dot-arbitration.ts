@@ -128,7 +128,12 @@ function dotPriority(charter: DotCharter): number {
 
 /** Same tenant scope: both untenanted, or the same tenant slug. */
 function sameTenantScope(a: DotCharter, b: DotCharter): boolean {
-  return (a.scope.tenant_slug ?? '') === (b.scope.tenant_slug ?? '');
+  return (
+    a.scope.tier === b.scope.tier &&
+    (a.scope.owner_nhi ?? '') === (b.scope.owner_nhi ?? '') &&
+    (a.scope.tenant_slug ?? '') === (b.scope.tenant_slug ?? '') &&
+    (a.scope.organization_id ?? '') === (b.scope.organization_id ?? '')
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -398,7 +403,8 @@ function noteClaimedWorkItem(
   older: DotActionRecord,
   supersededBy: { dot_id: string; action_ref: string },
   deps: DotArbitrationDeps,
-  now: Date
+  now: Date,
+  scope: DotCharter['scope']
 ): void {
   const append =
     deps.appendInbox ??
@@ -413,6 +419,7 @@ function noteClaimedWorkItem(
     try {
       append({
         dot_id: dotId,
+        scope,
         channel: 'inbox',
         source: DOT_ARBITRATION_INBOX_SOURCE,
         text: `WorkItem ${older.work_item_id} (${older.action_ref}) was already in progress when ${supersededBy.action_ref} was approved to supersede it — not interrupted; reconcile once it finishes`,
@@ -494,7 +501,7 @@ export function settleDotArbitration(
           if (blocked === 'blocked') effect = 'blocked_work_item';
           else if (blocked === 'claimed') {
             effect = 'flagged_claimed';
-            noteClaimedWorkItem(older, supersededBy, deps, now);
+            noteClaimedWorkItem(older, supersededBy, deps, now, charter.scope);
           }
         } catch (error) {
           logger.warn(

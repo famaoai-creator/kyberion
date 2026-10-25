@@ -11,6 +11,63 @@
  * that lock.
  */
 import type { DaemonServiceSpec } from './service-manager.js';
+import { createHash } from 'node:crypto';
+import * as path from 'node:path';
+import { safeRealpath } from '../secure-io.js';
+
+export interface DaemonInstance {
+  id: string;
+  /** Physical checkout root; path aliases must resolve to the same instance. */
+  repoRoot: string;
+}
+
+/** Pure identity derivation after the caller has resolved filesystem aliases. */
+export function daemonInstanceFromCanonicalRoot(
+  canonicalRoot: string,
+  platform: NodeJS.Platform = process.platform
+): DaemonInstance {
+  const paths = platform === 'win32' ? path.win32 : path.posix;
+  if (!paths.isAbsolute(canonicalRoot) || /[\u0000-\u001f\u007f]/.test(canonicalRoot))
+    throw new Error(
+      '[DAEMON_INSTANCE_ROOT_INVALID] An absolute canonical checkout root is required'
+    );
+  const normalized = paths.normalize(canonicalRoot);
+  const root =
+    normalized === paths.parse(normalized).root ? normalized : normalized.replace(/[\\/]+$/, '');
+  // Native realpath handles case-insensitive aliases. Directory spelling may
+  // still distinguish case-sensitive Windows/WSL trees; only drive letters fold.
+  const identityRoot =
+    platform === 'win32' ? root.replace(/^[A-Z]:/, (drive) => drive.toLowerCase()) : root;
+  return {
+    id: `ws-${createHash('sha256').update(identityRoot).digest('hex').slice(0, 16)}`,
+    repoRoot: root,
+  };
+}
+
+export function resolveDaemonInstance(
+  repoRoot: string,
+  canonicalize: (root: string) => string = safeRealpath,
+  platform: NodeJS.Platform = process.platform
+): DaemonInstance {
+  return daemonInstanceFromCanonicalRoot(canonicalize(repoRoot), platform);
+}
+
+/** All OS management verbs use this same identity, never a global fallback. */
+export function scopeDaemonServiceSpec(
+  base: DaemonServiceSpec,
+  instance: DaemonInstance
+): DaemonServiceSpec {
+  if (!/^ws-[a-f0-9]{16}$/.test(instance.id))
+    throw new Error('[DAEMON_INSTANCE_INVALID] Invalid checkout instance id');
+  if (!/^[a-z][a-z0-9.-]*$/i.test(base.label))
+    throw new Error('[DAEMON_SERVICE_LABEL_INVALID] Scoped services need a portable base label');
+  return {
+    ...base,
+    instanceId: instance.id,
+    label: `${base.label}.${instance.id}`,
+    logBaseName: `${base.logBaseName}-${instance.id}`,
+  };
+}
 
 export const CHRONOS_DAEMON_LABEL = 'com.kyberion.chronos';
 

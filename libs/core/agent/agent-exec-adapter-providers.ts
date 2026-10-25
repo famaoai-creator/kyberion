@@ -12,6 +12,8 @@ import {
 } from './agent-adapter.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { pathResolver } from '../path-resolver.js';
+import { createTaskBackedAgentAdapter } from '../workforce/task-api-adapter.js';
+import { createScopedRuntimeApprovalHandler } from './agent-task-approval.js';
 import {
   registerAgentExecAdapterBridge,
   type AgentExecAdapterRequest,
@@ -23,13 +25,29 @@ let registered = false;
 
 function createCodexAdapter(request: AgentExecAdapterRequest): AgentAdapter {
   const mode = (getRegisteredEnvText('KYBERION_CODEX_MODE') || 'app-server').toLowerCase();
-  if (mode === 'exec' || mode === 'legacy') return new CodexAdapter({ model: request.modelId });
+  // Legacy exec has no host tool executor: it must never swallow a claimed
+  // task binding and fall back to unrestricted provider-native tools.
+  if (!request.taskToolRuntime && (mode === 'exec' || mode === 'legacy'))
+    return new CodexAdapter({ model: request.modelId });
   return new CodexAppServerAdapter({
     model: request.modelId,
     modelProvider: getRegisteredEnvText('KYBERION_CODEX_MODEL_PROVIDER'),
     codexProfile: getRegisteredEnvText('KYBERION_CODEX_PROFILE'),
     cwd: request.cwd || PROJECT_ROOT,
     systemPrompt: request.systemPrompt,
+    taskToolRuntime: request.taskToolRuntime,
+    sandboxMode: request.taskToolRuntime ? 'read-only' : undefined,
+    networkAccess: request.taskToolRuntime ? false : undefined,
+    requestApproval:
+      request.scope && request.agentId
+        ? createScopedRuntimeApprovalHandler({
+            agentId: request.agentId,
+            provider: 'codex',
+            cwd: request.cwd || PROJECT_ROOT,
+            scope: request.scope,
+            missionId: request.missionId,
+          })
+        : undefined,
     approvalMode:
       (getRegisteredEnvText('KYBERION_CODEX_APPROVAL') || 'strict').toLowerCase() === 'relaxed'
         ? 'relaxed'
@@ -43,7 +61,9 @@ export function registerBuiltinAgentExecAdapters(): void {
   registerAgentExecAdapterBridge(
     {
       bridge_id: 'claude',
+      governedTaskTools: true,
       createAdapter(request) {
+        if (request.taskToolRuntime) return createTaskBackedAgentAdapter(request);
         const fromManifest =
           request.allowedActuators || request.deniedActuators
             ? ClaudeAdapter.resolveToolRestrictions(
@@ -71,6 +91,7 @@ export function registerBuiltinAgentExecAdapters(): void {
           allowedTools,
           disallowedTools,
           permissionMode: 'auto',
+          governedMcp: true,
           ...(request.toolsDisabled ? { toolsDisabled: true } : {}),
         });
       },
@@ -80,6 +101,7 @@ export function registerBuiltinAgentExecAdapters(): void {
   registerAgentExecAdapterBridge(
     {
       bridge_id: 'codex',
+      governedTaskTools: true,
       createAdapter: createCodexAdapter,
     },
     { provenance: 'builtin', source: 'agent-exec-adapter-providers' }
@@ -88,6 +110,7 @@ export function registerBuiltinAgentExecAdapters(): void {
     {
       bridge_id: 'agy',
       createAdapter(request) {
+        if (request.taskToolRuntime) return createTaskBackedAgentAdapter(request);
         return new AgyAdapter({
           bin: 'agy',
           cwd: request.cwd || PROJECT_ROOT,

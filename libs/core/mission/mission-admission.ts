@@ -252,7 +252,7 @@ function verifiedDotMissionAdmission(item: WorkItem, deps: Deps) {
   )
     throw new Error('current Dot admission authority missing');
   assertDotAccountabilityCharter(dot, deps);
-  const record = readDotActionLedgerStrict(deps)
+  const record = readDotActionLedgerStrict({ ...deps, dotId: dot.dot_id })
     .filter((row) => row.action_ref === actionRef)
     .pop();
   if (

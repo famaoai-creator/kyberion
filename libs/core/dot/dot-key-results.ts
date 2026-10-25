@@ -14,7 +14,7 @@ import { withExecutionContextAsync } from '../authority.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
-import { isTenantPhysicalNamespacePath, physicalScopedPath } from '../physical-namespace.js';
+import { isTenantPhysicalNamespacePath } from '../physical-namespace.js';
 import { assertSafeRepositoryPath, safeMkdir, safeReadFile } from '../secure-io.js';
 import { evaluateStateProbe, type StateProbeDeps, type StateProbeResult } from '../state-probe.js';
 import {
@@ -43,8 +43,8 @@ import type { DotDigestSection, DotPromptSection, DotStatusSection } from './dot
 import { readDotSignals, type DotSignalEntry } from './dot-feedback.js';
 import {
   DOT_KR_LEDGER_FILE,
-  DOT_ORG_KR_LEDGER_FILE,
   DOT_STATE_ROOT,
+  DOT_ORG_KR_LEDGER_FILE,
   dotStatePath,
   orgKrLedgerPath,
   type KrMeasurementRow,
@@ -58,6 +58,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const DEFAULT_SIGNAL_WINDOW_HOURS = 24;
 
 export interface OrgMetricScope {
+  ownerNhi?: string;
   organizationId?: string;
   tenantSlug?: string;
   tier: OrganizationTier;
@@ -94,8 +95,9 @@ export function runAsDotCharter<T>(c: DotCharter, fn: () => Promise<T>): Promise
     c.authority.authority_role,
     fn,
     undefined,
-    c.scope.tenant_slug,
-    c.scope.organization_id
+    c.scope.tenant_slug ?? '',
+    c.scope.organization_id,
+    { missionId: null, taskId: null, projectId: c.scope.project_id ?? null }
   );
 }
 
@@ -224,6 +226,11 @@ export function assertDotKrFilePathAllowed(
   }
   const under = (prefix: string) =>
     normalized === prefix.replace(/\/$/, '') || normalized.startsWith(prefix);
+  if (
+    under(DOT_STATE_ROOT + '/') &&
+    !(scope.stateRoot && under(`${scope.stateRoot.replace(/\/$/, '')}/`))
+  )
+    throw new Error(`file metric may read only its own dot state subtree: ${normalized}`);
   if (under('knowledge/personal/')) {
     throw new Error(`file metric may not read personal knowledge: ${normalized}`);
   }
@@ -348,11 +355,12 @@ export async function measureDotKeyResults(
   const rows: KrMeasurementRow[] = [];
   const target: MeasureTarget = {
     dotId: c.dot_id,
-    ...(c.scope.tenant_slug ? { stateRoot: dotStatePath(c) } : {}),
+    stateRoot: dotStatePath(c),
     orgScope: {
       organizationId: c.scope.organization_id,
       tenantSlug: c.scope.tenant_slug,
       tier: c.scope.tier,
+      ownerNhi: c.scope.owner_nhi,
     },
   };
   for (const spec of specs) {
@@ -421,6 +429,8 @@ export function readOrganizationKrMeasurements(
   deps: Pick<DotKeyResultDeps, 'rootDir'> = {}
 ): OrgKrMeasurementRow[] {
   const ledger = orgKrLedgerPath({
+    ownerNhi: scope.ownerNhi,
+    tier: scope.tier,
     tenantSlug: scope.tenantSlug,
     organizationId: scope.organizationId,
   });
@@ -450,6 +460,8 @@ export async function measureOrganizationKeyResults(
 ): Promise<KrMeasurementRow[]> {
   const now = deps.now?.() ?? new Date();
   const ledger = orgKrLedgerPath({
+    ownerNhi: scope.ownerNhi,
+    tier: scope.tier,
     tenantSlug: scope.tenantSlug,
     organizationId: scope.organizationId,
   });
@@ -480,18 +492,23 @@ export async function measureOrganizationKeyResults(
     (row) => `${row.objective_id}\u0000${row.kr_id}`
   );
   const target: MeasureTarget = {
-    ...(scope.tenantSlug
+    ...(scope.tenantSlug || scope.tier === 'personal'
       ? {
-          stateRoot: physicalScopedPath(DOT_STATE_ROOT, {
-            tenant_slug: scope.tenantSlug,
-            organization_id: scope.organizationId,
-          }),
+          stateRoot: dotStatePath({
+            scope: {
+              tier: scope.tier,
+              owner_nhi: scope.ownerNhi,
+              tenant_slug: scope.tenantSlug,
+              organization_id: scope.organizationId,
+            },
+          } as DotCharter),
         }
       : {}),
     orgScope: {
       organizationId: scope.organizationId,
       tenantSlug: scope.tenantSlug,
       tier: scope.tier,
+      ownerNhi: scope.ownerNhi,
     },
   };
   const rows: KrMeasurementRow[] = [];
@@ -586,7 +603,12 @@ export function recordOrganizationKeyResult(
     measured_at: new Date(measuredAt).toISOString(),
   };
   appendLedger(
-    orgKrLedgerPath({ tenantSlug: scope.tenantSlug, organizationId: scope.organizationId }),
+    orgKrLedgerPath({
+      ownerNhi: scope.ownerNhi,
+      tier: scope.tier,
+      tenantSlug: scope.tenantSlug,
+      organizationId: scope.organizationId,
+    }),
     [row],
     deps.rootDir
   );
@@ -781,10 +803,20 @@ export async function measureActiveDotKeyResults(
     if (!isObjectiveRef(ref)) continue;
     const organizationId = ref.organization_id ?? c.scope.organization_id;
     if (!organizationId) continue;
-    const key = [c.scope.tier, c.scope.tenant_slug ?? '', organizationId].join('\u0000');
+    const key = [
+      c.scope.tier,
+      c.scope.tenant_slug ?? '',
+      c.scope.owner_nhi ?? '',
+      organizationId,
+    ].join('\u0000');
     if (!orgs.has(key)) {
       orgs.set(key, {
-        scope: { organizationId, tenantSlug: c.scope.tenant_slug, tier: c.scope.tier },
+        scope: {
+          organizationId,
+          tenantSlug: c.scope.tenant_slug,
+          tier: c.scope.tier,
+          ownerNhi: c.scope.owner_nhi,
+        },
         as: c,
       });
     }

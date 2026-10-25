@@ -16,6 +16,9 @@ import { createHash } from 'node:crypto';
 import type { FrontDeskExecutionBinding } from '../surface/front-desk-execution-contract.js';
 import type { ContinuousWorkPlan } from '../organization/continuous-work-plan.js';
 import { loadDotExecutionPolicy } from './dot-execution-policy.js';
+import { DOT_PROPOSE_TOOL_NAME, DOT_PROPOSALS_FENCE } from './dot-extensions.js';
+
+export { DOT_PROPOSE_TOOL_NAME, DOT_PROPOSALS_FENCE } from './dot-extensions.js';
 
 import type { ToolDefinition } from '../reasoning/reasoning-backend-contracts.js';
 
@@ -82,8 +85,6 @@ const EFFECT_DIRECTIONS = ['increase', 'decrease', 'maintain'] as const;
 const TARGET_PATTERN =
   /^(path:\S.*|service:[A-Za-z0-9][A-Za-z0-9._-]*|pr:[\w.-]+\/[\w.-]+#\d+|work_item:\S+|org_operation:\S+)$/;
 
-export const DOT_PROPOSE_TOOL_NAME = 'dot_propose_action';
-export const DOT_PROPOSALS_FENCE = 'dot-proposals';
 export const DEFAULT_DOT_ACTION_ID = 'dot_delegate_work';
 export const DOT_HANDOFF_ACTION_ID = 'dot_handoff';
 /** The only policy actions a dot proposal can resolve to. */

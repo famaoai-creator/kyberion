@@ -66,7 +66,7 @@ import { estimateTokens } from '../workforce/worker-context-compaction.js';
 import {
   dotGoalRefLabel,
   listDotCharters,
-  loadDotCharterSource,
+  rereadOwnDotCharter,
   type DotCharter,
   type DotCharterLoadError,
   type DotTrigger,
@@ -75,6 +75,7 @@ import {
 import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../state-probe.js';
 import { createLogger } from '../logger.js';
 import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
+import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import {
   buildDotProposeToolDefinition,
   collectDotProposals,
@@ -95,6 +96,7 @@ import { DOT_PROMPT_SECTIONS, DOT_WAKE_TOOLS } from './dot-extension-registry.js
 import { dotExtCtx, type DotExtCtx } from './dot-extensions.js';
 import { DOT_FOLLOWUP_TOOL_NAME } from './dot-followups.js';
 import { dotOutcomeContinuation } from './dot-progress.js';
+import { assertDotStateLayoutReady } from './dot-state-paths.js';
 import {
   runDelegatedWake,
   dotBackendIsUnconfiguredStub,
@@ -110,7 +112,7 @@ export const DOT_WATCH_STATE_PATH = 'active/shared/runtime/dot-watch-state.json'
 export const DOT_PROBE_STATE_PATH = 'active/shared/runtime/dot-probe-state.json';
 export { DOT_INBOX_PATH } from './dot-inbox.js';
 import {
-  DOT_INBOX_PATH,
+  dotInboxPath,
   dotInboxRowWakesCharter,
   dotInboxWakeKey,
   DOT_EXECUTOR_REPORT_SOURCE_VALUE,
@@ -202,6 +204,7 @@ export type DotWakeOutcome = 'delivered' | 'skipped' | 'failed' | 'rejected';
 export type DotWakeTrigger = DotTrigger | { kind: 'followup' } | { kind: 'outcome' };
 
 export interface DotWakeLedgerEntry {
+  scope?: DotCharter['scope'];
   /** Durable event attempt correlation; absence never proves a dispatch did not occur. */
   event_attempt_id?: string;
   dot_id: string;
@@ -315,9 +318,48 @@ function runtimePath(rootDir: string | undefined, rel: string): string {
  * replay that parses only the rows appended since the previous call (G01).
  */
 export function readDotWakeLedger(deps: DotRuntimeDeps = {}): DotWakeLedgerEntry[] {
-  return readJsonLinesCached<DotWakeLedgerEntry>(
-    runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH)
-  ).filter((row) => typeof row?.dot_id === 'string' && typeof row?.trigger_key === 'string');
+  return readJsonLinesCached<DotWakeLedgerEntry>(runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH))
+    .filter((row) => typeof row?.dot_id === 'string' && typeof row?.trigger_key === 'string')
+    .map((row) => {
+      if (row.scope?.tier === 'public' && !row.scope.tenant_slug) return row;
+      // Old unscoped rows never become public just because their producer omitted tier.
+      return {
+        ...row,
+        summary: undefined,
+        ...(row.reason
+          ? {
+              reason: isDotWakeProcessFailure(row.reason)
+                ? DOT_WAKE_FAILURE_CATEGORY.backend
+                : row.reason_code === 'charter' || row.reason === DOT_WAKE_FAILURE_CATEGORY.charter
+                  ? DOT_WAKE_FAILURE_CATEGORY.charter
+                  : row.outcome === 'failed'
+                    ? DOT_WAKE_FAILURE_CATEGORY.wake
+                    : `scoped wake ${row.outcome}`,
+            }
+          : {}),
+      };
+    });
+}
+
+/** Owner-scoped diagnostics; the global ledger remains a content-free control index. */
+export function readScopedDotWakeLedger(
+  charter: DotCharter,
+  deps: DotRuntimeDeps = {}
+): DotWakeLedgerEntry[] {
+  if (charter.scope.tier === 'public' && !charter.scope.tenant_slug)
+    return readDotWakeLedger(deps).filter((row) => row.dot_id === charter.dot_id);
+  const key = (row: DotWakeLedgerEntry) =>
+    JSON.stringify([row.trigger_key, row.fired_at, row.outcome]);
+  const rows = new Map(
+    readDotWakeLedger(deps)
+      .filter((row) => row.dot_id === charter.dot_id)
+      .map((row) => [key(row), row])
+  );
+  for (const row of readJsonLinesCached<DotWakeLedgerEntry>(
+    runtimePath(deps.rootDir, dotStatePath(charter, 'wake-ledger.jsonl'))
+  ))
+    if (row.dot_id === charter.dot_id) rows.set(key(row), row);
+  return [...rows.values()];
 }
 
 /** Compact only when the ledger is large — hot sweeps stat once and skip. */
@@ -515,24 +557,45 @@ export function recordDotWakeOutcome(
       `[DOT] wake-ledger compaction failed — ledger stays append-only | next: inspect the archive/staging siblings | evidence: ${error instanceof Error ? error.message : String(error)}`
     );
   }
+  const row: DotWakeLedgerEntry = {
+    scope: charter.scope,
+    dot_id: charter.dot_id,
+    ...(deps.eventAttemptId ? { event_attempt_id: deps.eventAttemptId } : {}),
+    trigger_key: key,
+    kind: trigger?.trigger.kind ?? 'manual',
+    fired_at: now.toISOString(),
+    outcome,
+    ...(deps.reason ? { reason: deps.reason } : {}),
+    ...(outcome === 'failed'
+      ? { reason_code: deps.reason_code ?? classifyDotWakeReason(deps.reason) }
+      : {}),
+    ...(deps.turns_run !== undefined ? { turns_run: deps.turns_run } : {}),
+    ...(deps.tokens_used !== undefined ? { tokens_used: deps.tokens_used } : {}),
+    ...(deps.summary ? { summary: deps.summary } : {}),
+    ...(deps.trigger_retained && outcome === 'delivered' ? { trigger_retained: true } : {}),
+  };
+  const scoped = charter.scope.tier !== 'public' || Boolean(charter.scope.tenant_slug);
+  if (scoped) appendJsonlEnsured(dotStatePath(charter, 'wake-ledger.jsonl'), row, deps);
   appendJsonlEnsured(
     DOT_WAKE_LEDGER_PATH,
-    {
-      dot_id: charter.dot_id,
-      ...(deps.eventAttemptId ? { event_attempt_id: deps.eventAttemptId } : {}),
-      trigger_key: key,
-      kind: trigger?.trigger.kind ?? 'manual',
-      fired_at: now.toISOString(),
-      outcome,
-      ...(deps.reason ? { reason: deps.reason } : {}),
-      ...(outcome === 'failed'
-        ? { reason_code: deps.reason_code ?? classifyDotWakeReason(deps.reason) }
-        : {}),
-      ...(deps.turns_run !== undefined ? { turns_run: deps.turns_run } : {}),
-      ...(deps.tokens_used !== undefined ? { tokens_used: deps.tokens_used } : {}),
-      ...(deps.summary ? { summary: deps.summary } : {}),
-      ...(deps.trigger_retained && outcome === 'delivered' ? { trigger_retained: true } : {}),
-    } satisfies DotWakeLedgerEntry,
+    scoped
+      ? {
+          ...row,
+          summary: undefined,
+          ...(row.reason
+            ? {
+                reason: isDotWakeProcessFailure(row.reason)
+                  ? DOT_WAKE_FAILURE_CATEGORY.backend
+                  : row.reason_code === 'charter' ||
+                      row.reason === DOT_WAKE_FAILURE_CATEGORY.charter
+                    ? DOT_WAKE_FAILURE_CATEGORY.charter
+                    : row.outcome === 'failed'
+                      ? DOT_WAKE_FAILURE_CATEGORY.wake
+                      : `scoped wake ${row.outcome}`,
+              }
+            : {}),
+        }
+      : row,
     deps
   );
 }
@@ -684,7 +747,7 @@ function wakeTriggerKeys(
   // Match + key derivation live in dot-inbox.ts so this consumer and the
   // tombstone compactor can never drift apart.
   const rows = readJsonLines<DotInboxEntry & { __line?: string; __index?: number }>(
-    runtimePath(deps.rootDir, DOT_INBOX_PATH),
+    runtimePath(deps.rootDir, dotInboxPath(charter.scope)),
     {
       onMalformed: 'skip',
       map: (value, lineNumber, rawLine) => ({
@@ -808,7 +871,7 @@ function recordDotWakeFailure(
   reason: string,
   deps: DotRuntimeDeps & { turns_run?: number; tokens_used?: number }
 ): string {
-  if (!charter.scope.tenant_slug) {
+  if (charter.scope.tier === 'public' && !charter.scope.tenant_slug) {
     recordDotWakeOutcome(charter, trigger, 'failed', { ...deps, reason });
     return reason;
   }
@@ -1004,6 +1067,7 @@ export function evaluateDotTriggersDue(
   charter: DotCharter,
   deps: DotRuntimeDeps = {}
 ): DueDotTrigger[] {
+  assertDotStateLayoutReady(charter, deps.rootDir);
   if (isFrontDeskDiagnosticDot(charter)) return [];
   const now = deps.now?.() ?? new Date();
   const isDue = buildDotDueChecker(charter, now, deps);
@@ -1471,7 +1535,7 @@ async function runFencedWake(
     tokens_used: tokens,
     trigger_retained: followupSuccessorLost(deps.trigger, failedTools),
     // The wake ledger is a shared system-floor file: tenant prose stays out.
-    ...(current.scope.tenant_slug ? {} : { summary: dotWakeSummary(text) }),
+    summary: dotWakeSummary(text),
   });
   return {
     dot_id: current.dot_id,
@@ -1488,16 +1552,6 @@ async function runFencedWake(
  * tenant-bound runner context the loader scanned it with (dot-charter.ts); a
  * charter role need not read its own tenant's `knowledge/confidential/<slug>/dots/`.
  */
-function rereadOwnCharter(loaded: LoadedDotCharter): DotCharter {
-  const normalized = loaded.path.split(path.sep).join('/');
-  // The directory binds a tenant charter (loadDotCharterSource reads it in
-  // that tenant's context and rejects a scope that names another tenant).
-  const dirTenant = normalized.match(/(?:^|\/)knowledge\/confidential\/([^/]+)\/dots\/[^/]+$/)?.[1];
-  return loadDotCharterSource({
-    path: loaded.path,
-    ...(dirTenant ? { tenant_slug: dirTenant } : {}),
-  });
-}
 
 /**
  * Bounded wake: own-file reload and status/mode/role gates precede provider resolution.
@@ -1509,6 +1563,7 @@ export async function runDotWake(
   deps: DotRuntimeDeps & { trigger?: DueDotTrigger } = {}
 ): Promise<DotWakeReceipt> {
   const { charter } = loaded;
+  assertDotStateLayoutReady(charter, deps.rootDir);
   if (wakingDots.has(charter.dot_id)) {
     return { dot_id: charter.dot_id, outcome: 'skipped', reason: 'wake already in progress' };
   }
@@ -1516,7 +1571,7 @@ export async function runDotWake(
   try {
     let current: DotCharter;
     try {
-      current = rereadOwnCharter(loaded);
+      current = rereadOwnDotCharter(loaded);
       isFrontDeskDiagnosticDot(charter);
       if (
         current.dot_id !== charter.dot_id ||
@@ -1599,7 +1654,18 @@ export async function runDotWake(
       const withWakeUsage = <T>(fn: () => T): T =>
         withUsageAttribution(
           { actor_id: `dot:${current.dot_id}`, accounting_id, scope: current.scope },
-          () => (deps.eventAttemptId ? withoutAutomaticReasoningRedispatch(fn) : fn())
+          () =>
+            withReasoningPayloadScope(
+              {
+                tier: current.scope.tier,
+                tenant_slug: current.scope.tenant_slug,
+                purpose: 'dot-wake',
+                training_use:
+                  current.runtime.reasoning_training_use ??
+                  (current.scope.tier === 'public' ? 'training_eligible' : 'local_only'),
+              },
+              () => (deps.eventAttemptId ? withoutAutomaticReasoningRedispatch(fn) : fn())
+            )
         );
       // Only a caller-injected backend may be the stub (tests, explicit
       // `KYBERION_REASONING_BACKEND=stub`); the process-default stub would

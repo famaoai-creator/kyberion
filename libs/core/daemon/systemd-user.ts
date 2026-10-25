@@ -11,6 +11,7 @@
  * commands through the governed exec seam.
  */
 import * as path from 'node:path';
+import { daemonBoundEnvironment } from './render-context.js';
 import type { DaemonManager, DaemonRenderContext, DaemonServiceSpec } from './service-manager.js';
 
 /** systemd unit-safe name: com.kyberion.chronos -> kyberion-chronos. */
@@ -23,11 +24,40 @@ function logDir(ctx: DaemonRenderContext): string {
   return path.posix.join(ctx.homeDir, '.local', 'state', 'kyberion');
 }
 
+function printable(value: string): void {
+  if (/[\u0000-\u001f\u007f]/.test(value))
+    throw new Error(
+      '[DAEMON_UNIT_VALUE_UNSUPPORTED] Control characters are not supported in systemd values'
+    );
+}
+
+/** Paths are single directive values; escape specifiers and reject ambiguous syntax. */
+function unitPath(value: string): string {
+  printable(value);
+  if (value.trim() !== value || /[\\"']/.test(value))
+    throw new Error('[DAEMON_UNIT_VALUE_UNSUPPORTED] Unsupported systemd path spelling');
+  return value.replaceAll('%', '%%');
+}
+
+/** systemd.syntax quoting, with Exec* dollar substitution escaped separately. */
+function unitWord(value: string, executableArgument = false): string {
+  printable(value);
+  let escaped = value.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%');
+  if (executableArgument) escaped = escaped.replaceAll('$', () => '$$');
+  return /^[A-Za-z0-9_./:@=,+-]+$/.test(escaped) ? escaped : `"${escaped}"`;
+}
+
+function environmentLine(name: string, value: string): string {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name))
+    throw new Error('[DAEMON_UNIT_VALUE_UNSUPPORTED] Invalid environment variable name');
+  return `Environment=${unitWord(`${name}=${value}`)}`;
+}
+
 /** Pure unit-file render — string in, string out, no I/O. */
 export function buildSystemdServiceUnit(spec: DaemonServiceSpec, ctx: DaemonRenderContext): string {
   const daemonScript = path.posix.join(ctx.repoRoot, spec.daemonScript);
-  const envLines = Object.entries(ctx.env ?? {})
-    .map(([name, value]) => `Environment=${name}=${value}`)
+  const envLines = Object.entries(daemonBoundEnvironment(ctx))
+    .map(([name, value]) => environmentLine(name, value))
     .join('\n');
   const restart = spec.startIntervalSec
     ? ''
@@ -37,12 +67,12 @@ Description=Kyberion daemon: ${spec.id}
 
 [Service]
 Type=${spec.startIntervalSec ? 'oneshot' : 'simple'}
-WorkingDirectory=${ctx.repoRoot}
-Environment=PATH=${[...new Set([path.posix.dirname(ctx.nodePath), ...(ctx.userPath ?? []), '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'])].join(':')}
-${envLines ? `${envLines}\n` : ''}ExecStartPre=/bin/mkdir -p ${logDir(ctx)}
-ExecStart=${ctx.nodePath} ${daemonScript}${(spec.daemonArgs ?? []).map((arg) => ` ${arg}`).join('')}
-${restart}StandardOutput=append:${path.posix.join(logDir(ctx), `${spec.logBaseName}.log`)}
-StandardError=append:${path.posix.join(logDir(ctx), `${spec.logBaseName}.err.log`)}
+WorkingDirectory=${unitPath(ctx.repoRoot)}
+${environmentLine('PATH', [...new Set([path.posix.dirname(ctx.nodePath), ...(ctx.userPath ?? []), '/usr/local/bin', '/usr/bin', '/bin', '/usr/sbin', '/sbin'])].join(':'))}
+${envLines ? `${envLines}\n` : ''}ExecStartPre=/bin/mkdir -p ${unitWord(logDir(ctx), true)}
+ExecStart=${[ctx.nodePath, daemonScript, ...(spec.daemonArgs ?? [])].map((arg) => unitWord(arg, true)).join(' ')}
+${restart}StandardOutput=append:${unitPath(path.posix.join(logDir(ctx), `${spec.logBaseName}.log`))}
+StandardError=append:${unitPath(path.posix.join(logDir(ctx), `${spec.logBaseName}.err.log`))}
 
 [Install]
 WantedBy=default.target

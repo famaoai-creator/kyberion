@@ -28,6 +28,7 @@ import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
 import { logger } from '../core.js';
 import { metrics, resolveCostRates } from '../metrics.js';
 import { parseEventScopeInput, type EventScope, type EventScopeInput } from '../event-scope.js';
+import { isAgentRuntimeApprovalPendingError } from './agent-prompt-approval-port.js';
 import {
   assertRuntimeNhiScope,
   assertRuntimeScopeCompatible,
@@ -59,6 +60,13 @@ export interface AgentRuntimeEnsureResult {
   runtime_plan: MissionTeamRuntimePlan;
 }
 
+interface AgentRuntimeEnsureFailure extends AgentRuntimeEnsureRequest {
+  completed_at: string;
+  status: 'failed';
+  error: string;
+}
+type AgentRuntimeEnsureOutcome = AgentRuntimeEnsureResult | AgentRuntimeEnsureFailure;
+
 interface EnsureMissionTeamRuntimeViaSupervisorOptions extends EnsureMissionTeamRuntimeOptions {
   requestedBy: string;
   scope?: EventScopeInput;
@@ -76,7 +84,7 @@ const AGENT_RUNTIME_ENSURE_REQUEST_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/agent-runtime-ensure-request.schema.json'
 );
 
-const agentRuntimeEnsureResultCatalog = defineCatalog<AgentRuntimeEnsureResult>({
+const agentRuntimeEnsureResultCatalog = defineCatalog<AgentRuntimeEnsureOutcome>({
   id: 'agent-runtime-ensure-result',
   path: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
   schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
@@ -91,7 +99,7 @@ function agentRuntimeEnsureRequestCatalogAtPath(filePath: string) {
 }
 
 function agentRuntimeEnsureResultCatalogAtPath(filePath: string) {
-  return defineCatalog<AgentRuntimeEnsureResult>({
+  return defineCatalog<AgentRuntimeEnsureOutcome>({
     id: 'agent-runtime-ensure-result',
     path: filePath,
     schema: AGENT_RUNTIME_ENSURE_RESULT_SCHEMA_PATH,
@@ -229,6 +237,15 @@ export function getAgentRuntimeEnsureResultPath(requestId: string): string {
   return safeQueuePath(path.join(RESULTS_DIR, `${requestId}.json`), RESULTS_DIR);
 }
 
+function persistAgentRuntimeEnsureOutcome(
+  outcome: AgentRuntimeEnsureOutcome
+): AgentRuntimeEnsureOutcome {
+  const resultPath = getAgentRuntimeEnsureResultPath(outcome.request_id);
+  const validated = agentRuntimeEnsureResultCatalog.validate(outcome, resultPath);
+  safeWriteFile(resultPath, JSON.stringify(validated, null, 2));
+  return validated;
+}
+
 export function enqueueMissionTeamPrewarmRequest(input: {
   missionId: string;
   teamRoles?: string[];
@@ -284,45 +301,53 @@ export async function processMissionTeamPrewarmRequest(
   requestPath: string
 ): Promise<AgentRuntimeEnsureResult> {
   const request = loadMissionTeamPrewarmRequest(requestPath);
-  appendSupervisorEvent({
-    decision: 'agent_runtime_prewarm_started',
-    request_id: request.request_id,
-    mission_id: request.mission_id,
-    scope: request.scope,
-    requested_by: request.requested_by,
-  });
+  try {
+    appendSupervisorEvent({
+      decision: 'agent_runtime_prewarm_started',
+      request_id: request.request_id,
+      mission_id: request.mission_id,
+      scope: request.scope,
+      requested_by: request.requested_by,
+    });
 
-  const runtime_plan = await ensureMissionTeamRuntime({
-    missionId: request.mission_id,
-    teamRoles: request.team_roles,
-    scope: request.scope,
-    runtimeOwnerId: `agent-runtime-supervisor:${request.request_id}`,
-    runtimeOwnerType: 'agent-runtime-supervisor',
-  });
+    const runtime_plan = await ensureMissionTeamRuntime({
+      missionId: request.mission_id,
+      teamRoles: request.team_roles,
+      scope: request.scope,
+      runtimeOwnerId: `agent-runtime-supervisor:${request.request_id}`,
+      runtimeOwnerType: 'agent-runtime-supervisor',
+    });
 
-  const result: AgentRuntimeEnsureResult = {
-    ...request,
-    completed_at: nowIso(),
-    organization_profile: runtime_plan.organization_profile,
-    runtime_plan,
-  };
-  const validatedResult = agentRuntimeEnsureResultCatalog.validate(
-    result,
-    getAgentRuntimeEnsureResultPath(request.request_id)
-  );
-  safeWriteFile(
-    getAgentRuntimeEnsureResultPath(request.request_id),
-    JSON.stringify(validatedResult, null, 2)
-  );
-  appendSupervisorEvent({
-    decision: 'agent_runtime_prewarm_completed',
-    request_id: request.request_id,
-    mission_id: request.mission_id,
-    scope: request.scope,
-    requested_by: request.requested_by,
-    assignment_count: runtime_plan.assignments.length,
-  });
-  return validatedResult;
+    const result: AgentRuntimeEnsureResult = {
+      ...request,
+      completed_at: nowIso(),
+      organization_profile: runtime_plan.organization_profile,
+      runtime_plan,
+    };
+    const validatedResult = persistAgentRuntimeEnsureOutcome(result);
+    appendSupervisorEvent({
+      decision: 'agent_runtime_prewarm_completed',
+      request_id: request.request_id,
+      mission_id: request.mission_id,
+      scope: request.scope,
+      requested_by: request.requested_by,
+      assignment_count: runtime_plan.assignments.length,
+    });
+    return validatedResult as AgentRuntimeEnsureResult;
+  } catch (error) {
+    // A failed child must publish a terminal outcome, otherwise its caller
+    // keeps polling for ten minutes after a known validation/boot failure.
+    const failure: AgentRuntimeEnsureFailure = {
+      ...request,
+      completed_at: nowIso(),
+      status: 'failed',
+      error:
+        (error instanceof Error ? error.message : String(error)).slice(0, 4000) ||
+        'Runtime prewarm failed',
+    };
+    persistAgentRuntimeEnsureOutcome(failure);
+    throw error;
+  }
 }
 
 /**
@@ -414,6 +439,7 @@ export function loadMissionTeamPrewarmResultAtPath(
       `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] result belongs to ${result.request_id}, expected ${expectedRequestId}`
     );
   }
+  if ('status' in result) throw new Error(`[AGENT_RUNTIME_PREWARM_FAILED] ${result.error}`);
   if (result.runtime_plan.mission_id.toUpperCase() !== result.mission_id.toUpperCase()) {
     throw new Error(
       `[AGENT_RUNTIME_RESULT_SCOPE_MISMATCH] runtime plan belongs to ${result.runtime_plan.mission_id}, expected ${result.mission_id}`
@@ -468,6 +494,7 @@ export async function ensureAgentRuntime(options: EnsureAgentRuntimeOptions): Pr
     task_model_hint: taskModelHint,
   });
   const handle = await agentLifecycle.spawn({ ...options, scope: runtimeScope });
+  assertRuntimeScopeCompatible(handle.getRecord()?.scope, runtimeScope);
   const runtimeRecord = runtimeSupervisor.get(options.agentId || handle.agentId);
   const resolvedAgentId = options.agentId || handle.agentId;
   const snapshot = getAgentRuntimeSnapshot(resolvedAgentId, 20);
@@ -619,6 +646,17 @@ export async function askAgentRuntime(
     scope: options.scope || record?.scope,
   });
   assertRuntimeNhiScope(runtimeScope);
+  if (handle) {
+    if (!record?.scope && runtimeScope.scope_kind !== 'system')
+      throw new Error('[RUNTIME_SCOPE_MISMATCH] Unscoped runtime cannot serve a scoped prompt');
+    assertRuntimeScopeCompatible(record?.scope, runtimeScope);
+    if (record?.scope) {
+      assertRuntimeScopeCompatible(runtimeScope, record.scope);
+      for (const key of ['nhi_id', 'viewer_principal'] as const)
+        if (record.scope[key] !== runtimeScope[key])
+          throw new Error(`[RUNTIME_SCOPE_MISMATCH] Runtime ${key} differs from prompt scope`);
+    }
+  }
   appendSupervisorEvent({
     decision: 'agent_runtime_ask_requested',
     agent_id: agentId,
@@ -734,6 +772,18 @@ export async function askAgentRuntime(
     }
     return response;
   } catch (error) {
+    if (isAgentRuntimeApprovalPendingError(error)) {
+      appendSupervisorEvent({
+        decision: 'agent_runtime_awaiting_human',
+        agent_id: agentId,
+        mission_id: options.missionId || record?.missionId,
+        scope: runtimeScope,
+        requested_by: requestedBy,
+        correlation_id: options.correlationId,
+        approval_request_id: error.approvalRequestId,
+      });
+      throw error;
+    }
     appendSupervisorEvent({
       decision: 'agent_runtime_ask_failed',
       agent_id: agentId,

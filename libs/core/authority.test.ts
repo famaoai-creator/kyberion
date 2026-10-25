@@ -1,4 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resolveProjectScope } from './foundation/project-scope-env.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
 import {
@@ -76,6 +77,67 @@ describe('resolveIdentityContext', () => {
     expect(env.MISSION_ROLE).toBe('sovereign_concierge');
     expect(env.KYBERION_PERSONA).toBe('sovereign');
     expect(inferPersonaFromRole('ruthless_auditor')).toBe('analyst');
+  });
+
+  it('isolates explicit mission/project/task boundaries across concurrent role scopes', async () => {
+    vi.stubEnv('MISSION_ID', 'MSN-PARENT');
+    vi.stubEnv('KYBERION_PROJECT_ID', 'PRJ-PARENT');
+    vi.stubEnv('KYBERION_TASK_ID', 'task-parent');
+    try {
+      const [dot, child] = await Promise.all([
+        withExecutionContextAsync(
+          'mission_controller',
+          async () => {
+            await Promise.resolve();
+            return withExecutionContextAsync('mission_controller', () => ({
+              mission: resolveIdentityContext().missionId,
+              scope: resolveProjectScope(),
+              env: buildExecutionEnv(process.env, 'mission_controller'),
+            }));
+          },
+          undefined,
+          undefined,
+          undefined,
+          { missionId: null, projectId: 'PRJ-DOT', taskId: null }
+        ),
+        withExecutionContextAsync(
+          'mission_controller',
+          async () => {
+            await Promise.resolve();
+            return { mission: resolveIdentityContext().missionId, scope: resolveProjectScope() };
+          },
+          undefined,
+          undefined,
+          undefined,
+          { missionId: 'MSN-CHILD', projectId: null, taskId: 'task-child' }
+        ),
+      ]);
+      expect(dot.mission).toBeUndefined();
+      expect(dot.scope).toMatchObject({ projectId: 'PRJ-DOT' });
+      expect(dot.scope.missionId).toBeUndefined();
+      expect(dot.scope.taskId).toBeUndefined();
+      expect(dot.env).toMatchObject({
+        MISSION_ID: '',
+        KYBERION_PROJECT_ID: 'PRJ-DOT',
+        KYBERION_TASK_ID: '',
+        TASK_ID: '',
+      });
+      expect(child.mission).toBe('MSN-CHILD');
+      expect(child.scope).toMatchObject({ missionId: 'MSN-CHILD', taskId: 'task-child' });
+      expect(child.scope.projectId).toBeUndefined();
+      expect(process.env.MISSION_ID).toBe('MSN-PARENT');
+      expect(process.env.KYBERION_PROJECT_ID).toBe('PRJ-PARENT');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it('rejects invalid explicit identity before entering the role scope', () => {
+    expect(() =>
+      withExecutionContext('mission_controller', () => true, undefined, undefined, undefined, {
+        missionId: '../other',
+      })
+    ).toThrow('invalid execution identity');
   });
 
   it('does not grant SUDO intrinsically to ecosystem_architect', () => {

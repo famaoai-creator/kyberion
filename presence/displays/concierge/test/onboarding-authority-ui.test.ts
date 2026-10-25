@@ -44,6 +44,7 @@ const receipt = (pending_requests: unknown[] = []) => ({
   scope: { kind: 'person' },
   accountable: { id: 'human:fixture', display_name: 'Fixture owner' },
   charter: null,
+  delegable_decisions: [],
   pending_requests,
   runtime: { ready: true, agent_id: 'kyberion://agent/fixture/installed' },
   renewal_required: false,
@@ -143,7 +144,13 @@ describe('onboarding authority review and resumption', () => {
           agent_id: 'kyberion://agent/fixture/provisioned',
           reason: 'activation_requires_approval',
         },
-        charter: { id: 'granted', stopped: false, expires_at: '2099-01-01T00:00:00Z', grants: [] },
+        charter: {
+          id: 'granted',
+          stopped: false,
+          expires_at: '2099-01-01T00:00:00Z',
+          grants: [],
+          delegated_decisions: {},
+        },
       })
     );
     expect(m.container.textContent).toContain('Agent execution is not ready');
@@ -192,6 +199,7 @@ describe('onboarding authority review and resumption', () => {
       ...receipt(),
       charter: {
         id: 'existing',
+        delegated_decisions: {},
         expires_at: '2099-10-21T12:00:00.000Z',
         stopped: false,
         grants: [

@@ -9,6 +9,7 @@ import {
 import { registerOrganizationWorkJudgment } from '../organization/organization-operating-model-persistence.js';
 import {
   exportRoutingCorpus,
+  classifyDispatchFailure,
   exportRoutingCorpusAcrossMissions,
   nextTaskModelTier,
   routeTaskWithJudgment,
@@ -25,6 +26,22 @@ const BASELINE: TaskModelHint = {
   model_id: 'big-model',
   route_reason: 'phase_kind=implement',
 };
+
+describe('dispatch infrastructure failures', () => {
+  it.each([
+    '[auth] Not signed in. To authenticate run the provider login command',
+    'Ignoring permissions: this workspace has not been trusted',
+    '[PROVIDER_PROFILE_REFUSED] cannot project planner',
+    '[ADVISORY_BACKEND_DENIED] unknown adapter',
+    '[TASK_TOOL_LEASE_LOST] expired task lease',
+    '[AGENT_APPROVAL_PENDING] approval request requires human decision',
+  ])('does not grade or escalate model capability for %s', (reason) => {
+    expect(classifyDispatchFailure([reason])).toBeDefined();
+  });
+  it('retains ordinary task failures as model-attempt outcomes', () => {
+    expect(classifyDispatchFailure(['Acceptance criteria not satisfied'])).toBeUndefined();
+  });
+});
 
 function provider(value: string, confidence = 0.95): JudgmentBackend {
   return {

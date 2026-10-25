@@ -3740,6 +3740,10 @@
       "types": "./dist/mission/mission-seed-registry.d.ts",
       "default": "./dist/mission/mission-seed-registry.js"
     },
+    "./mission/mission-prerequisite-identity": {
+      "types": "./dist/mission/mission-prerequisite-identity.d.ts",
+      "default": "./dist/mission/mission-prerequisite-identity.js"
+    },
     "./mission/mission-state": {
       "types": "./dist/mission/mission-state.d.ts",
       "default": "./dist/mission/mission-state.js"
@@ -3752,6 +3756,10 @@
       "types": "./dist/mission/mission-state-reader.d.ts",
       "default": "./dist/mission/mission-state-reader.js"
     },
+    "./mission/mission-mutation-snapshot": {
+      "types": "./dist/mission/mission-mutation-snapshot.d.ts",
+      "default": "./dist/mission/mission-mutation-snapshot.js"
+    },
     "./mission/mission-status": {
       "types": "./dist/mission/mission-status.d.ts",
       "default": "./dist/mission/mission-status.js"
@@ -3763,6 +3771,10 @@
     "./mission/mission-task-events": {
       "types": "./dist/mission/mission-task-events.d.ts",
       "default": "./dist/mission/mission-task-events.js"
+    },
+    "./mission/mission-task-evidence-binding": {
+      "types": "./dist/mission/mission-task-evidence-binding.d.ts",
+      "default": "./dist/mission/mission-task-evidence-binding.js"
     },
     "./mission/mission-task-recovery": {
       "types": "./dist/mission/mission-task-recovery.d.ts",
@@ -7711,6 +7723,22 @@
     "./workforce/background-review-runner": {
       "types": "./dist/workforce/background-review-runner.d.ts",
       "default": "./dist/workforce/background-review-runner.js"
+    },
+    "./workforce/task-api-adapter": {
+      "types": "./dist/workforce/task-api-adapter.d.ts",
+      "default": "./dist/workforce/task-api-adapter.js"
+    },
+    "./workforce/task-pipeline-tool": {
+      "types": "./dist/workforce/task-pipeline-tool.d.ts",
+      "default": "./dist/workforce/task-pipeline-tool.js"
+    },
+    "./workforce/task-source-edit": {
+      "types": "./dist/workforce/task-source-edit.d.ts",
+      "default": "./dist/workforce/task-source-edit.js"
+    },
+    "./workforce/task-tool-runtime": {
+      "types": "./dist/workforce/task-tool-runtime.d.ts",
+      "default": "./dist/workforce/task-tool-runtime.js"
     },
     "./workforce/work-coordination": {
       "types": "./dist/workforce/work-coordination.d.ts",
