@@ -39,6 +39,8 @@ import * as pathResolver from './path-resolver.js';
 import { missionPathOrNull } from './mission-lookup.js';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import { resolveProjectScope } from './foundation/project-scope-env.js';
+/** A set-but-invalid bound tenant (see foundation/project-scope-env): callers fail closed on it. */
+export { isBoundTenantInvalid } from './foundation/project-scope-env.js';
 import { isScopeEnvOnly } from './foundation/scope-resolution-mode.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { Persona, Authority, ExecutionMode, IdentityContext } from './types.js';

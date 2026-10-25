@@ -10,7 +10,6 @@
  * those, so it is never called from here. The JSON contract is
  * `CustomerDecisionOverview` (`libs/core/customer-decision/overview.ts`).
  */
-import { resolveIdentityContext } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
 import { isValidCaseId, readLedger } from '@agent/core/decision-ledger';
 import {
@@ -30,20 +29,11 @@ import { ScriptExitError } from '../lib/harness.js';
 import { asLedgerWriter, diagnosticCode, tenantOf, usageError } from './common.js';
 
 /**
- * `--tenant`, refused when this process is bound to another tenant (its
- * identity's tenant: `KYBERION_TENANT`, the binding a Chronos tenant child
- * runs with): a tenant-scoped caller never reads another tenant through this
- * facade. An unbound operator CLI names the tenant with `--tenant`.
+ * `--tenant` (bound-tenant check in `tenantOf`); tenant-wide verbs take no
+ * `--dir`.
  */
 export function boundTenantOf(opts: Record<string, string>): string {
   const tenant = tenantOf(opts);
-  const bound = resolveIdentityContext().tenantSlug?.trim();
-  if (bound && bound !== tenant) {
-    throw new ScriptExitError(
-      2,
-      `[CUSTOMER_DECISION_TENANT_MISMATCH] --tenant ${tenant} differs from the tenant this process is bound to (KYBERION_TENANT); run it for the bound tenant`
-    );
-  }
   if (opts.dir !== undefined) throw usageError('--dir is not accepted by tenant-wide verbs');
   return tenant;
 }

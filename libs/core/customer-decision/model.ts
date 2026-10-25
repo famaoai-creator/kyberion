@@ -265,8 +265,12 @@ export interface OperatorConfirmation {
   entry_id: string;
   /** The customer decision (ledger id) the operator confirmed. */
   decision_id: string;
-  /** `user:<member>` */
+  /** Who confirmed: the decider of the approval request (`decidedBy`), never the CLI's unverified `--by`. */
   by: string;
+  /** The approval decider's type (`decidedByType`), when the approval records it. */
+  by_type?: 'human' | 'ai_agent' | 'service';
+  /** The member the confirm was run as (`--by user:<member>`, unverified). */
+  requested_by?: string;
   at: string;
   /** The approval request (`customer_decision:operator_confirm`) that authorized it. */
   request_id?: string;

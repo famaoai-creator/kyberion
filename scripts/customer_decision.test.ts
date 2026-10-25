@@ -101,6 +101,8 @@ vi.mock('@agent/core/deal-store', async (importOriginal) => ({
 }));
 
 import { parseCustomerDecisionArgs, runCustomerDecision } from './customer_decision.js';
+import { tenantOf } from './customer-decision/common.js';
+import { withExecutionContext } from '@agent/core/authority';
 
 const TENANT = 'cd-facade-test';
 const CASE = 'case-cd';
@@ -504,11 +506,17 @@ describe('customer-decision facade', () => {
       expect.objectContaining({
         requireApproval: true,
         operationId: 'customer_decision:agenda_approve',
-        correlationId: `${agendaId}:${hash}`,
-        requestScope: { tenant_slug: TENANT },
-        draft: expect.objectContaining({ summary: expect.stringContaining('ours: "sso"') }),
+        correlationId: `${TENANT}:${agendaId}:${hash}`,
+        payload: expect.objectContaining({ tenant: TENANT, agenda_id: agendaId }),
+        requestScope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: TENANT },
+        draft: expect.objectContaining({
+          summary: expect.stringContaining('customer-decision status --tenant'),
+        }),
       })
     );
+    // The shared approval store gets ids only: no title, question or decision of ours.
+    const submitDraft = JSON.stringify(mocks.gate.mock.calls.at(-1)?.[0]?.draft);
+    expect(submitDraft).not.toMatch(/Inception|sign-in|"sso"|sso|Release to production/u);
     expect(agendaOf(agendaId).status).toBe('pending_approval');
     expect(readLedger({ dir })).toEqual([]);
 
@@ -778,10 +786,15 @@ describe('customer-decision facade', () => {
       expect.objectContaining({
         requireApproval: true,
         operationId: 'customer_decision:operator_confirm',
-        correlationId: `${agendaId}:release:${decisionId}`,
-        requestScope: { tenant_slug: TENANT },
+        correlationId: `${TENANT}:${agendaId}:release:${decisionId}`,
+        payload: expect.objectContaining({ tenant: TENANT, decision_id: decisionId }),
+        requestScope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: TENANT },
       })
     );
+    // Ids only in the shared approval store; --by is shown as unverified.
+    const confirmDraft = JSON.stringify(mocks.gate.mock.calls.at(-1)?.[0]?.draft);
+    expect(confirmDraft).not.toMatch(/Release to production|approved/u);
+    expect(confirmDraft).toContain('Requested as user:alice (unverified)');
     expect(agendaOf(agendaId).operator_confirmations ?? []).toEqual([]);
     mocks.gate.mockReturnValueOnce({
       allowed: false,
@@ -801,7 +814,9 @@ describe('customer-decision facade', () => {
     expect(confirmed).toMatchObject({
       entry_id: 'release',
       decision_id: decisionId,
-      confirmed_by: 'user:alice',
+      // Who confirmed is the approval's decider, not the unverified --by.
+      confirmed_by: 'user:boss',
+      requested_by: 'user:alice',
       approval_request_id: 'apr-c2',
       status: 'confirmed',
       already_confirmed: false,
@@ -812,7 +827,8 @@ describe('customer-decision facade', () => {
       {
         entry_id: 'release',
         decision_id: decisionId,
-        by: 'user:alice',
+        by: 'user:boss',
+        requested_by: 'user:alice',
         at: NOW,
         request_id: 'apr-c2',
       },
@@ -840,12 +856,23 @@ describe('customer-decision facade', () => {
     expect(mocks.audit).toHaveBeenCalledWith(
       expect.objectContaining({
         operation: 'operator_confirm',
-        metadata: expect.objectContaining({ decision_id: decisionId, confirmed_by: 'user:alice' }),
+        metadata: expect.objectContaining({
+          decision_id: decisionId,
+          confirmed_by: 'user:boss',
+          requested_by: 'user:alice',
+        }),
       })
     );
     const gateCalls = mocks.gate.mock.calls.length;
-    const again = (await run([...confirmArgs, '--by', 'user:alice'])) as Record<string, unknown>;
-    expect(again).toMatchObject({ already_confirmed: true, switches: 0 });
+    // Re-run as someone else: the original confirmer stays, no new identity is recorded.
+    const again = (await run([...confirmArgs, '--by', 'user:mallory'])) as Record<string, unknown>;
+    expect(again).toMatchObject({
+      already_confirmed: true,
+      switches: 0,
+      confirmed_by: 'user:boss',
+      requested_by: 'user:mallory',
+    });
+    expect(agendaOf(agendaId).operator_confirmations?.[0]).toMatchObject({ by: 'user:boss' });
     // Re-confirming the same decision writes nothing new and asks no approval.
     expect(mocks.gate.mock.calls.length).toBe(gateCalls);
     expect(agendaOf(agendaId).operator_confirmations).toHaveLength(1);
@@ -2324,5 +2351,49 @@ describe('customer-decision facade', () => {
         expect(ledger.at(-1)?.value).toMatchObject({ approved: false, rejected: true });
       });
     });
+  });
+});
+
+describe('tenantOf (the bound-tenant check every verb runs)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  const mismatch = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch (error) {
+      expect(error).toBeInstanceOf(ScriptExitError);
+      expect((error as ScriptExitError).code).toBe(2);
+      expect(String((error as Error).message)).toMatch(/CUSTOMER_DECISION_TENANT_MISMATCH/u);
+      return;
+    }
+    throw new Error('tenantOf accepted the tenant');
+  };
+
+  it('takes --tenant when the process is unbound', () => {
+    vi.stubEnv('KYBERION_TENANT', '');
+    expect(tenantOf({ tenant: TENANT })).toBe(TENANT);
+  });
+
+  it('takes the bound tenant and refuses another one', () => {
+    vi.stubEnv('KYBERION_TENANT', TENANT);
+    expect(tenantOf({ tenant: TENANT })).toBe(TENANT);
+    mismatch(() => tenantOf({ tenant: 'cd-other-tenant' }));
+  });
+
+  it('fails closed on a bound tenant that is not a valid slug', () => {
+    vi.stubEnv('KYBERION_TENANT', 'ACME');
+    mismatch(() => tenantOf({ tenant: TENANT }));
+    mismatch(() => tenantOf({ tenant: 'acme' }));
+  });
+
+  it('refuses another tenant inside a tenant-bound execution scope', () => {
+    vi.stubEnv('KYBERION_TENANT', '');
+    withExecutionContext(
+      'decision_ledger',
+      () => mismatch(() => tenantOf({ tenant: 'cd-other-tenant' })),
+      undefined,
+      TENANT
+    );
   });
 });

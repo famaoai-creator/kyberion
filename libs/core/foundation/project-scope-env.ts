@@ -21,6 +21,26 @@ export interface ProjectScopeBinding {
  * resolveScopeResolution's persisted < environment < explicit input order.
  */
 export function resolveProjectScope(): ProjectScopeBinding {
+  const { projectId, tenantSlug, missionId, taskId } = readRawProjectScope();
+  return {
+    ...(projectId && SAFE_PROJECT_ID.test(projectId) ? { projectId } : {}),
+    ...(tenantSlug && isValidTenantSlug(tenantSlug) ? { tenantSlug } : {}),
+    ...(missionId && SAFE_PROJECT_ID.test(missionId) ? { missionId } : {}),
+    ...(taskId && SAFE_PROJECT_ID.test(taskId) ? { taskId } : {}),
+  };
+}
+
+/**
+ * The bound tenant is set (`KYBERION_TENANT`, else the persisted scope) but is
+ * not a valid tenant slug. `resolveProjectScope` drops such a value, which
+ * would look unbound; callers that refuse cross-tenant work fail closed on it.
+ */
+export function isBoundTenantInvalid(): boolean {
+  const tenantSlug = readRawProjectScope().tenantSlug;
+  return Boolean(tenantSlug) && !isValidTenantSlug(String(tenantSlug));
+}
+
+function readRawProjectScope(): ProjectScopeBinding {
   let persisted: Record<string, string> = {};
   try {
     const configuredPath = getRegisteredEnvText('KYBERION_SCOPE_ENV_PATH')?.trim();
@@ -55,10 +75,10 @@ export function resolveProjectScope(): ProjectScopeBinding {
   const missionId = environmentMissionId || persisted.MISSION_ID;
   const taskId = environmentTaskId || persisted.KYBERION_TASK_ID;
   return {
-    ...(projectId && SAFE_PROJECT_ID.test(projectId) ? { projectId } : {}),
-    ...(tenantSlug && isValidTenantSlug(tenantSlug) ? { tenantSlug } : {}),
-    ...(missionId && SAFE_PROJECT_ID.test(missionId) ? { missionId } : {}),
-    ...(taskId && SAFE_PROJECT_ID.test(taskId) ? { taskId } : {}),
+    ...(projectId ? { projectId } : {}),
+    ...(tenantSlug ? { tenantSlug } : {}),
+    ...(missionId ? { missionId } : {}),
+    ...(taskId ? { taskId } : {}),
   };
 }
 
