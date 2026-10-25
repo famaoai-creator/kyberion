@@ -13,7 +13,6 @@ import {
 } from '../../../../lib/viewer-context';
 import { readChronosOptionalStringParam } from '../../../../lib/request-input';
 import { readCustomerDecisionOverview } from '../../../../lib/customer-decision-overview-facade';
-import { companyIdMemo } from './company-memo';
 
 /**
  * CD-12: the read-only customer-decision overview of exactly one tenant for
@@ -65,10 +64,12 @@ export async function GET(req: NextRequest) {
     // The child reads the confidential decision stores under its own
     // tenant-bound roles, so the viewer's own reach is checked here: the
     // confidential tier, and the tenant's organization (as the organization
-    // model route resolves it). All of this runs before the cached read, on
-    // every request; only the tenant -> company id lookup is memoized.
+    // model route resolves it). All of this runs before the cached read.
     strictViewerTier(viewer, 'confidential');
-    strictViewerScopeOrganizationIds(viewer, companyIdMemo.companyIdOf(tenant));
+    // A tenant's organization id is its slug: `resolveCompany` sets
+    // `company_id` to the tenant slug (libs/core/company.ts), so the whole
+    // company aggregate is not loaded just to read it back.
+    strictViewerScopeOrganizationIds(viewer, tenant);
     const result = await readCustomerDecisionOverview(tenant);
     // `in` narrows the result under this app's non-strict tsconfig as well.
     if ('error' in result)

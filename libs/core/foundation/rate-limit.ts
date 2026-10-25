@@ -99,10 +99,13 @@ export function fixedWindowLimiter(options: FixedWindowOptions) {
 /**
  * Trusted-proxy client keying for per-address limits. An HTTP surface behind a
  * reverse proxy (public ingress) sees every request from the proxy's address;
- * keying limits on it would put every caller in one bucket. The forwarded
- * headers name the real caller, but any client can send them, so they are only
- * read when the direct peer is an operator-declared proxy, and only the hops
- * those proxies appended (walking from the right) are believed.
+ * keying limits on it would put every caller in one bucket. `X-Forwarded-For`
+ * names the real caller, but any client can send it, so it is only read when
+ * the direct peer is an operator-declared proxy, and only the hops those
+ * proxies appended (walking from the right) are believed. RFC 7239 `Forwarded`
+ * is deliberately never read: a proxy writes one of the two and passes the
+ * other through from the client, so reading both would let the client choose.
+ * The declared proxy must append to (or overwrite) `X-Forwarded-For`.
  */
 export interface TrustedProxies {
   /** Whether `address` (an IP literal) belongs to a declared proxy. */
@@ -115,7 +118,42 @@ export interface TrustedProxies {
 export const MAX_FORWARDED_HOPS = 32;
 
 const IPV4_WITH_PORT = /^\d{1,3}(?:\.\d{1,3}){3}:\d{1,5}$/u;
-const IPV4_MAPPED = /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/iu;
+
+/** The eight 16-bit groups of a valid IPv6 literal (an embedded IPv4 tail allowed). */
+function ipv6Groups(value: string): number[] {
+  const lastColon = value.lastIndexOf(':');
+  const last = value.slice(lastColon + 1);
+  let text = value;
+  let tail: number[] = [];
+  if (isIP(last) === 4) {
+    const [a = 0, b = 0, c = 0, d = 0] = last.split('.').map(Number);
+    tail = [(a << 8) | b, (c << 8) | d];
+    // Replace the dotted tail with two placeholder groups.
+    text = `${value.slice(0, lastColon + 1)}0:0`;
+  }
+  const parse = (part: string | undefined): number[] =>
+    part ? part.split(':').map((group) => Number.parseInt(group, 16)) : [];
+  const [head, rest] = text.split('::');
+  const left = parse(head);
+  const right = parse(rest);
+  const groups =
+    rest === undefined
+      ? left
+      : [...left, ...new Array<number>(8 - left.length - right.length).fill(0), ...right];
+  if (tail.length === 2) groups.splice(6, 2, ...tail);
+  return groups;
+}
+
+/** The IPv4 address an IPv4-mapped IPv6 literal (`::ffff:0:0/96`, any notation) carries. */
+function unwrapIpv4Mapped(value: string): string | null {
+  const groups = ipv6Groups(value);
+  if (groups.length !== 8 || groups.slice(0, 5).some((g) => g !== 0) || groups[5] !== 0xffff) {
+    return null;
+  }
+  const hi = groups[6] ?? 0;
+  const lo = groups[7] ?? 0;
+  return [hi >> 8, hi & 0xff, lo >> 8, lo & 0xff].join('.');
+}
 
 /**
  * An IP literal, or null. Accepts the forms proxies write (`[v6]`, `[v6]:port`,
@@ -139,9 +177,7 @@ export function normalizeIpAddress(raw: string | undefined | null): string | nul
   const family = isIP(value);
   if (family === 4) return value;
   if (family !== 6) return null;
-  const mapped = IPV4_MAPPED.exec(value);
-  if (mapped?.[1] && isIP(mapped[1]) === 4) return mapped[1];
-  return value.toLowerCase();
+  return unwrapIpv4Mapped(value) ?? value.toLowerCase();
 }
 
 /**
@@ -192,62 +228,29 @@ export function parseTrustedProxies(raw: string | undefined | null): {
 
 type HeaderValue = string | string[] | undefined | null;
 
-function joinHeader(value: HeaderValue): string {
-  return Array.isArray(value) ? value.join(',') : (value ?? '');
-}
-
-/** Split on commas outside double quotes (RFC 7239 values may be quoted). */
-function splitList(value: string): string[] {
-  const parts: string[] = [];
-  let current = '';
-  let quoted = false;
-  for (const char of value) {
-    if (char === '"') quoted = !quoted;
-    if (char === ',' && !quoted) {
-      parts.push(current);
-      current = '';
-    } else {
-      current += char;
-    }
-  }
-  parts.push(current);
-  return parts.map((part) => part.trim()).filter(Boolean);
-}
-
-/** The `for=` node of one RFC 7239 element, unquoted; '' when it has none. */
-function forwardedForNode(element: string): string {
-  for (const pair of element.split(';')) {
-    const eq = pair.indexOf('=');
-    if (eq < 0 || pair.slice(0, eq).trim().toLowerCase() !== 'for') continue;
-    const value = pair.slice(eq + 1).trim();
-    return value.length >= 2 && value.startsWith('"') && value.endsWith('"')
-      ? value.slice(1, -1)
-      : value;
-  }
-  return '';
-}
-
 /**
  * The address to key per-client limits on. Unless the direct peer is a
- * declared proxy, the peer is the answer and forwarded headers are ignored.
+ * declared proxy, the peer is the answer and `X-Forwarded-For` is ignored.
  * Behind a declared proxy the chain is walked from the right: the first hop
- * that is not itself a declared proxy is the client. `X-Forwarded-For` wins
- * over `Forwarded` when both are present. A malformed, obfuscated (`unknown`,
- * `_hidden`) or overlong chain stops the walk at the nearest trusted address,
- * so a bad chain shares its proxy's bucket instead of naming an arbitrary key.
+ * that is not itself a declared proxy is the client (repeated headers are
+ * joined in order). A malformed, obfuscated (`unknown`, `_hidden`) or
+ * overlong chain stops the walk at the nearest trusted address, so a bad
+ * chain shares its proxy's bucket instead of naming an arbitrary key.
  */
 export function resolveClientAddress(input: {
   peer: string | undefined | null;
   forwardedFor?: HeaderValue;
-  forwarded?: HeaderValue;
   trustedProxies: TrustedProxies;
 }): string {
   const peer = normalizeIpAddress(input.peer) ?? (input.peer?.trim() || 'unknown');
   if (input.trustedProxies.size === 0 || !input.trustedProxies.has(peer)) return peer;
-  const xff = joinHeader(input.forwardedFor);
-  const hops = xff.trim()
-    ? splitList(xff)
-    : splitList(joinHeader(input.forwarded)).map(forwardedForNode);
+  const header = Array.isArray(input.forwardedFor)
+    ? input.forwardedFor.join(',')
+    : (input.forwardedFor ?? '');
+  const hops = header
+    .split(',')
+    .map((hop) => hop.trim())
+    .filter(Boolean);
   let client = peer;
   for (let index = hops.length - 1; index >= 0; index -= 1) {
     if (hops.length - index > MAX_FORWARDED_HOPS) return client;

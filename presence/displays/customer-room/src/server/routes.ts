@@ -223,18 +223,21 @@ function outcomeDiagnostic(outcome: { status: number | null; aborted: boolean } 
 }
 
 /**
- * The address every per-client limit keys on: the socket address, or — only
- * when that peer is a declared proxy — the rightmost hop of the forwarded
- * chain that is not itself a declared proxy. Express `trust proxy` stays off.
+ * The key every per-client limit uses: the socket address, or — only when
+ * that peer is a declared proxy — the rightmost `X-Forwarded-For` hop that is
+ * not itself a declared proxy (`Forwarded` is never read). IPv6 callers share
+ * their /56 (`ipKeyGenerator`), so one cannot rotate through its own range.
+ * Express `trust proxy` stays off.
  */
 function clientAddressOf(trustedProxies: TrustedProxies) {
   return (req: express.Request): string =>
-    resolveClientAddress({
-      peer: req.socket.remoteAddress,
-      forwardedFor: req.headers['x-forwarded-for'],
-      forwarded: req.headers.forwarded,
-      trustedProxies,
-    });
+    ipKeyGenerator(
+      resolveClientAddress({
+        peer: req.socket.remoteAddress,
+        forwardedFor: req.headers['x-forwarded-for'],
+        trustedProxies,
+      })
+    );
 }
 
 function limiter(limit: number, clientAddress: (req: express.Request) => string) {
@@ -243,8 +246,7 @@ function limiter(limit: number, clientAddress: (req: express.Request) => string)
     limit,
     standardHeaders: 'draft-8',
     legacyHeaders: false,
-    // IPv6 callers share their /56, as with the library's default key.
-    keyGenerator: (req) => ipKeyGenerator(clientAddress(req)),
+    keyGenerator: (req) => clientAddress(req),
     // Forwarded headers are read by clientAddress alone, never by Express.
     validate: { xForwardedForHeader: false, trustProxy: false },
     handler: (_req, res) => {

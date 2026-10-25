@@ -330,13 +330,32 @@ describe('customer-room routes', () => {
     expect(await as('6.6.6.3, 203.0.113.7')).toBe(429);
     // Another customer behind the same proxy has its own budget.
     expect(await as('203.0.113.8')).toBe(200);
-    expect(
-      (await post('/api/view', { headers: { Forwarded: 'for="[2001:db8::9]:443"' } })).status
-    ).toBe(200);
+    expect(await as('[2001:db8::9]:443')).toBe(200);
     // A chain that names no client shares the proxy's bucket.
     expect([await as('garbage'), await as('unknown'), await as('garbage')]).toEqual([
       200, 200, 429,
     ]);
+  });
+
+  it('behind a declared proxy, never reads a client-supplied Forwarded header', async () => {
+    await start({ api: 2, trustedProxies: '127.0.0.1,::1' });
+    const statuses: number[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const headers = { Forwarded: `for=198.51.100.${i}` };
+      statuses.push((await post('/api/view', { headers })).status);
+    }
+    // Every request keys on the proxy itself: one shared bucket.
+    expect(statuses).toEqual([200, 200, 429, 429]);
+  });
+
+  it('groups an IPv6 client by its /56, so rotating addresses does not mint buckets', async () => {
+    await start({ api: 2, trustedProxies: '127.0.0.1' });
+    const statuses: number[] = [];
+    for (const suffix of ['1', '2', 'ff:3', 'aa:bb:4']) {
+      const headers = { 'X-Forwarded-For': `2001:db8:0:1::${suffix}` };
+      statuses.push((await post('/api/view', { headers })).status);
+    }
+    expect(statuses).toEqual([200, 200, 429, 429]);
   });
 
   it('never logs or echoes the token', async () => {
@@ -544,7 +563,10 @@ describe('customer-room attachment route', () => {
       (await fetchAs('6.6.6.6, 198.51.100.1')).status,
       (await fetchAs('7.7.7.7, 198.51.100.1')).status,
       (await fetchAs('198.51.100.2')).status,
-    ]).toEqual([200, 429, 200]);
+      // IPv6 callers share their /56 in the image window too.
+      (await fetchAs('2001:db8:0:1::1')).status,
+      (await fetchAs('2001:db8:0:1:aa::2')).status,
+    ]).toEqual([200, 429, 200, 200, 429]);
   });
 
   it('has its own per-address budget, separate from the view/respond budget', async () => {

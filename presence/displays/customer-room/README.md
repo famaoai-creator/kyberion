@@ -32,19 +32,25 @@ KYBERION_CUSTOMER_ROOM_TENANT=<tenant-slug> node dist/presence/displays/customer
 Behind Tailscale Funnel or another reverse proxy every request reaches the room
 from the proxy's address, so the per-client rate limits would put every
 customer in one bucket. List the proxy's addresses so the room reads the client
-address from the forwarded headers — for a proxy on the same host (Tailscale
+address from `X-Forwarded-For` — for a proxy on the same host (Tailscale
 Funnel forwards from loopback):
 
 ```bash
 KYBERION_CUSTOMER_ROOM_TRUSTED_PROXIES=127.0.0.1,::1
 ```
 
-- The headers are read **only** when the direct peer is listed; from any other
-  peer they are ignored, so a customer cannot pick their own bucket.
+- The proxy **must append the peer it saw to `X-Forwarded-For`** (or overwrite
+  the header). Tailscale Funnel and the common reverse proxies do. A proxy
+  that writes only RFC 7239 `Forwarded` is not supported: `Forwarded` is never
+  read, because such a proxy passes the client's own `X-Forwarded-For` through
+  untouched and the client would then pick its bucket.
+- The header is read **only** when the direct peer is listed; from any other
+  peer it is ignored, so a customer cannot pick their own bucket.
 - `X-Forwarded-For` is walked from the right and the first hop that is not
   itself a listed proxy is the client (the leftmost value is whatever the
-  client sent). Without `X-Forwarded-For`, RFC 7239 `Forwarded: for=` is used.
-  List every proxy in a multi-proxy chain.
+  client sent). List every proxy in a multi-proxy chain. IPv4-mapped IPv6
+  hops count as their IPv4 address, and IPv6 clients are grouped by their /56
+  for every limit, including the image budget.
 - A malformed, obfuscated (`unknown`, `_hidden`) or overlong chain keys on the
   nearest listed proxy (one shared bucket), never on a value it names.
 - An entry that is not an IP or CIDR stops the room from starting. Express
