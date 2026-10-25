@@ -226,6 +226,46 @@ describe('document-reader', () => {
     expect(result.markdown).not.toContain('Jane Example');
   });
 
+  it('does not surface the writer placeholder as a PDF title', async () => {
+    const pdfPath = path.join(workDir, 'untitled.pdf');
+    await generateNativePdf(
+      {
+        version: '1.0.0',
+        generatedAt: '2026-01-01T00:00:00.000Z',
+        source: { format: 'markdown', body: 'no title body' },
+      } as unknown as Parameters<typeof generateNativePdf>[0],
+      pdfPath,
+      { compress: false, xmpMetadata: false }
+    );
+    const result = await readDocument(pdfPath, 'pdf');
+    expect(result.title).toBeUndefined();
+    expect(result.markdown.startsWith('# ')).toBe(false);
+    expect(result.markdown).toContain('no title body');
+  });
+
+  it('reads Info titles with escaped parentheses through kyberion read', async () => {
+    const pdfPath = path.join(workDir, 'parens.pdf');
+    safeWriteFile(
+      pdfPath,
+      `%PDF-1.7
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 44 >>stream
+BT /F1 12 Tf 100 700 Td (Hello) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+6 0 obj<< /Title (Report \\(Draft\\)) >>endobj
+trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+%%EOF
+`
+    );
+    const result = await readDocument(pdfPath, 'pdf');
+    expect(result.title).toBe('Report (Draft)');
+    expect(result.markdown.startsWith('# Report (Draft)')).toBe(true);
+  });
+
   it('rejects password-protected Office bytes and paths outside the repository', async () => {
     const encrypted = Buffer.concat([
       Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
