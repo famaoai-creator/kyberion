@@ -21,12 +21,64 @@ export interface OoxmlCoreProperties {
   subject?: string;
 }
 
+/** Strip XML/HTML tags with a linear scan (no regex — avoids ReDoS / incomplete sanitizers). */
+function stripXmlTags(value: string): string {
+  let out = '';
+  let inTag = false;
+  for (let i = 0; i < value.length; i += 1) {
+    const ch = value[i];
+    if (ch === '<') {
+      inTag = true;
+      continue;
+    }
+    if (ch === '>') {
+      inTag = false;
+      continue;
+    }
+    if (!inTag) out += ch;
+  }
+  return out;
+}
+
+/**
+ * Find `<dc:name>…</dc:name>` (optional prefix) via index scans.
+ * OOXML core props are small; avoid nested/backtracking regexes on zip input.
+ */
 function readDcElement(coreXml: string, localName: string): string | undefined {
-  const match = coreXml.match(
-    new RegExp(`<(?:\\w+:)?${localName}\\b[^>]*>([\\s\\S]*?)</(?:\\w+:)?${localName}>`, 'i')
-  );
-  if (!match) return undefined;
-  const text = decodeEntities(match[1].replace(/<[^>]+>/g, '')).trim();
+  const lower = coreXml.toLowerCase();
+  const bare = localName.toLowerCase();
+  // Prefer namespaced Dublin Core; fall back to unprefixed.
+  const openCandidates = [`<dc:${bare}`, `<${bare}`];
+  let openAt = -1;
+  let openToken = '';
+  for (const token of openCandidates) {
+    let from = 0;
+    while (from < lower.length) {
+      const idx = lower.indexOf(token, from);
+      if (idx === -1) break;
+      const after = lower[idx + token.length];
+      // Require tag boundary: end of name, then space/>/attributes — not `titleFoo`.
+      if (after === undefined || after === '>' || after === '/' || /\s/.test(after)) {
+        openAt = idx;
+        openToken = token;
+        break;
+      }
+      from = idx + token.length;
+    }
+    if (openAt !== -1) break;
+  }
+  if (openAt === -1) return undefined;
+
+  const openEnd = coreXml.indexOf('>', openAt);
+  if (openEnd === -1) return undefined;
+  // Self-closing / empty element.
+  if (coreXml[openEnd - 1] === '/') return undefined;
+
+  const closeToken = openToken.startsWith('<dc:') ? `</dc:${bare}>` : `</${bare}>`;
+  const closeAt = lower.indexOf(closeToken, openEnd + 1);
+  if (closeAt === -1) return undefined;
+
+  const text = decodeEntities(stripXmlTags(coreXml.slice(openEnd + 1, closeAt))).trim();
   return text || undefined;
 }
 
