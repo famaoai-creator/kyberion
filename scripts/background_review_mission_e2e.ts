@@ -21,8 +21,10 @@ import {
 import { resolveSurfaceApprovalReply } from '@agent/core/surface/surface-approval-ui';
 import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import {
-  approvalRequestLogicalPath,
+  approvalRequestLogicalPathAt,
+  asTenantApprovalStore,
   listApprovalRequests,
+  locateApprovalRequest,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import {
@@ -257,14 +259,21 @@ async function main(argv: string[]): Promise<void> {
       }
     });
     if (approvalId) {
-      withExecutionContext('mission_controller', () =>
-        safeRmSync(
-          pathResolver.rootResolve(approvalRequestLogicalPath('background-review', approvalId!)),
-          {
-            force: true,
-          }
-        )
-      );
+      // A tenant-scoped request lives in its tenant's approval partition.
+      const id = approvalId;
+      withExecutionContext('mission_controller', () => {
+        const located = locateApprovalRequest('background-review', id);
+        if (!located) return;
+        const remove = () =>
+          safeRmSync(
+            pathResolver.rootResolve(
+              approvalRequestLogicalPathAt(located.partition, located.storageChannel, id)
+            ),
+            { force: true }
+          );
+        if (located.partition.kind === 'system') remove();
+        else asTenantApprovalStore(located.partition.tenant_slug, remove);
+      });
     }
     if (notificationId) {
       if (surface === 'presence') {

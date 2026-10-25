@@ -1250,6 +1250,8 @@ export function runInlineApprovalStoreHygiene(
       expired: report.pendingExpiry.applied.length,
       expirable: report.pendingExpiry.candidates.length,
       fixtures_trashed: report.fixturePurge.applied.length,
+      // Moved only by `approval_store_hygiene.js --migrate-tenant-partitions --apply`.
+      tenant_records_in_system_tree: report.tenantPartitionMigration?.candidates.length ?? 0,
       errors: [...report.pendingExpiry.errors, ...report.fixturePurge.errors],
     },
     ctx

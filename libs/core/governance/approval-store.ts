@@ -6,9 +6,13 @@ import {
 } from './approval-store-reader.js';
 import {
   appendLocatedApprovalEvent,
+  approvalRequestLogicalPathAt,
   locateApprovalRequest,
+  mayBindApprovalTenant,
+  readApprovalJsonAt,
   SYSTEM_APPROVAL_PARTITION,
   writeLocatedApprovalRequest,
+  type ApprovalPartition,
   type LocatedApprovalRequest,
 } from './approval-store-location.js';
 export {
@@ -327,6 +331,13 @@ export interface SessionApprovalCacheEntry {
   effectBinding: string;
   /** Optional mission/task scope; when present it must match on lookup. */
   source?: ApprovalRequestSource;
+  /**
+   * Where the seed request was stored when it was decided (system tree or its
+   * tenant partition, approval-store-location.ts); the seed is re-read there.
+   */
+  seedPartition?: ApprovalPartition;
+  /** The seed's tenant: the grant is usable only by a process that may bind it. */
+  tenantSlug?: string;
 }
 
 export interface SessionApprovalCacheLookupContext {
@@ -374,6 +385,8 @@ export function lookupSessionApprovalCache(
   ) {
     return null;
   }
+  // A tenant's grant never serves a process bound to another tenant.
+  if (entry.tenantSlug && !mayBindApprovalTenant(entry.tenantSlug)) return null;
   // A scoped request must never consume an unscoped cache entry, and a
   // scoped seed must only be reused by the same source scope.
   if (Boolean(entry.source) !== Boolean(context.source)) return null;
@@ -386,6 +399,55 @@ export function lookupSessionApprovalCache(
     return null;
   }
   return entry;
+}
+
+export type SessionCacheSeedResolution =
+  | { status: 'found'; record: ApprovalRequestRecord }
+  /** A system-tree seed that no longer exists (legacy grants keep their SoD-off behaviour). */
+  | { status: 'missing' }
+  /** The seed cannot be trusted: a tenant seed that is missing or unreadable, or an ambiguous id. */
+  | { status: 'unusable'; reason: string };
+
+/**
+ * Re-read the request that seeded a session-cache grant where it was stored.
+ * A tenant seed that cannot be found or read makes the grant unusable (it
+ * may have been revoked in its partition); only a system-tree seed may be
+ * reported missing.
+ */
+export function resolveSessionCacheSeed(
+  entry: SessionApprovalCacheEntry
+): SessionCacheSeedResolution {
+  if (entry.tenantSlug && !mayBindApprovalTenant(entry.tenantSlug)) {
+    return { status: 'unusable', reason: 'the seed belongs to a tenant this process may not bind' };
+  }
+  try {
+    if (entry.seedPartition?.kind === 'tenant') {
+      const record = readApprovalJsonAt<ApprovalRequestRecord>(
+        entry.seedPartition,
+        approvalRequestLogicalPathAt(
+          entry.seedPartition,
+          entry.storageChannel,
+          entry.grantedByRequestId
+        )
+      );
+      return record
+        ? { status: 'found', record }
+        : {
+            status: 'unusable',
+            reason: 'the tenant seed request is not readable in its partition',
+          };
+    }
+    const located = locateApprovalRequest(entry.storageChannel, entry.grantedByRequestId);
+    if (!located) return { status: 'missing' };
+    if (located.partition.kind === 'tenant' || located.record.scope?.tenant_slug) {
+      // Stored as untenanted but now found tenant-scoped: never trust it silently.
+      if (!entry.tenantSlug)
+        return { status: 'unusable', reason: 'the seed moved to a tenant partition' };
+    }
+    return { status: 'found', record: located.record };
+  } catch (err) {
+    return { status: 'unusable', reason: err instanceof Error ? err.message : String(err) };
+  }
 }
 
 export function clearSessionApprovalCache(): void {
@@ -409,20 +471,13 @@ export function recordSessionCacheAutoApproval(
     correlationId: string;
   }
 ): void {
-  // The event goes to the log of the location the seed request lives in.
-  let seedLocation: Pick<LocatedApprovalRequest, 'partition' | 'storageChannel'> = {
-    partition: SYSTEM_APPROVAL_PARTITION,
+  // The event goes to the log of the location the seed request was stored in
+  // when it was decided; a tenant seed's event never reaches the system log
+  // (a write the caller may not make there throws instead).
+  const seedLocation: Pick<LocatedApprovalRequest, 'partition' | 'storageChannel'> = {
+    partition: params.entry.seedPartition ?? SYSTEM_APPROVAL_PARTITION,
     storageChannel: normalizeApprovalChannel(params.entry.storageChannel),
   };
-  try {
-    const seed = locateApprovalRequest(
-      params.entry.storageChannel,
-      params.entry.grantedByRequestId
-    );
-    if (seed) seedLocation = seed;
-  } catch {
-    /* an unreadable or ambiguous seed keeps the system log */
-  }
   appendLocatedApprovalEvent(role, seedLocation, {
     ts: nowIso(),
     event: 'auto_approved_via_session_cache',
@@ -512,6 +567,7 @@ export {
   TENANT_APPROVAL_STORE_ROLE,
   TENANT_APPROVAL_PARTITION_INDEX_READER_ROLE,
   TENANT_ACTIVATION_STORAGE_CHANNEL,
+  TENANT_ACTIVATION_REQUEST_KIND,
   SYSTEM_APPROVAL_PARTITION,
   approvalPartitionForScope,
   approvalPartitionsForTenant,
@@ -519,6 +575,7 @@ export {
   listApprovalPartitions,
   listApprovalChannelsAt,
   mayBindApprovalTenant,
+  systemRecordVisibleToThisProcess,
   tenantApprovalPartitionTier,
   tenantApprovalPartitionLogicalRoot,
   tenantApprovalRequestsLogicalDir,
@@ -535,6 +592,9 @@ export {
   ensureApprovalDirAt,
   writeApprovalJsonAt,
   appendApprovalJsonlAt,
+  approvalFileExistsAt,
+  removeApprovalFileAt,
+  readApprovalJsonlAt,
   assertApprovalLocationAgrees,
   writeLocatedApprovalRequest,
   appendLocatedApprovalEvent,
@@ -717,6 +777,15 @@ export function cancelApprovalRequestsBySource(
  * learning/re-execution loops see the reason in the event stream.
  */
 export function annotateApprovalRejectionReason(
+  role: GovernedArtifactRole,
+  params: Parameters<typeof annotateApprovalRejectionReasonUnlocked>[1]
+): ApprovalRequestRecord {
+  // Under the record lock, on a fresh read: a concurrent transition is never overwritten.
+  return withApprovalRecordLock(role, params, () =>
+    annotateApprovalRejectionReasonUnlocked(role, params)
+  );
+}
+function annotateApprovalRejectionReasonUnlocked(
   role: GovernedArtifactRole,
   params: {
     channel: string;
@@ -1058,6 +1127,12 @@ function decideApprovalRequestUnlocked(
       payloadHash: updated.accountability!.payloadHash!,
       effectBinding: updated.accountability!.effectBinding!,
       ...(updated.source ? { source: updated.source } : {}),
+      seedPartition: located.partition,
+      ...(located.partition.kind === 'tenant'
+        ? { tenantSlug: located.partition.tenant_slug }
+        : updated.scope?.tenant_slug
+          ? { tenantSlug: updated.scope.tenant_slug }
+          : {}),
     };
     sessionApprovalCache.set(key, entry);
     appendLocatedApprovalEvent(role, located, {

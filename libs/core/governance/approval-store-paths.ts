@@ -32,8 +32,19 @@ function fixtureRoot(): boolean {
  * `coordination`, the append-only event log under `observability`, and the
  * per-tenant partitions (records, challenges and event log of tenant-scoped
  * approvals, `approval-store-location.ts`) under `tenantApprovals`.
+ *
+ * `options.fixtureRoot` decides whether the tenant partitions keep the live
+ * layout under Vitest. It defaults to whether this process's project root is
+ * a fixture root rather than the code checkout. That is not derived from
+ * `env`: path-resolver binds the root once at import (KYBERION_ROOT or cwd),
+ * and every store path is relative to that bound root, so the decision must
+ * follow the bound root even when `env` is a test's synthetic map. Pass it to
+ * get a pure result.
  */
-export function approvalStoreRoots(env: Record<string, string | undefined> = process.env): {
+export function approvalStoreRoots(
+  env: Record<string, string | undefined> = process.env,
+  options: { fixtureRoot?: boolean } = {}
+): {
   coordination: string;
   observability: string;
   tenantApprovals: string;
@@ -49,9 +60,10 @@ export function approvalStoreRoots(env: Record<string, string | undefined> = pro
     return {
       coordination: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/coordination/channels`,
       observability: `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/observability/channels`,
-      tenantApprovals: fixtureRoot()
-        ? TENANT_APPROVAL_ROOT_PATH
-        : `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/tenant-approvals`,
+      tenantApprovals:
+        (options.fixtureRoot ?? fixtureRoot())
+          ? TENANT_APPROVAL_ROOT_PATH
+          : `${VITEST_APPROVAL_STORE_ROOT}${run}${pool}/tenant-approvals`,
     };
   }
   return {

@@ -890,6 +890,9 @@ async function scenario(
   });
 
   await step('governed-stores', () => {
+    // Both requests are created without a tenant scope (plugin-managed-install,
+    // plugin-view-actions), so they stay in the system approval tree, never a
+    // tenant partition.
     const install = readJson<Record<string, unknown>>(
       path.join(root, approvalRequestLogicalPath('plugin-install', installApprovalId))
     );

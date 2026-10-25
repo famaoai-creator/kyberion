@@ -68,11 +68,12 @@ export function createApprovalRequest(
     decisionCard?: DecisionCard;
     veto?: ApprovalVetoWindow;
     /**
-     * Only for the `tenant-activation` channel: the scope's tenant is already
+     * Only for a genuine tenant-activation request (`tenant-activation`
+     * storage channel and kind `mission_gate`): the scope's tenant is already
      * active (organization/tenant-activation.ts isTenantActivationActive). An
      * activation request for a tenant that is not yet active stays in the
      * system tree; every other tenant-scoped request goes to the tenant's
-     * partition (approval-store-location.ts).
+     * partition (approval-store-location.ts approvalPartitionForScope).
      */
     tenantActive?: boolean;
   }
@@ -88,6 +89,7 @@ export function createApprovalRequest(
   const located = {
     partition: approvalPartitionForScope(scope, {
       storageChannel,
+      kind: params.kind || 'channel-approval',
       tenantActive: params.tenantActive,
     }),
     storageChannel,

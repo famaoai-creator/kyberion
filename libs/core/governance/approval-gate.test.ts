@@ -29,6 +29,7 @@ vi.mock('./approval-store.js', async (importOriginal) => ({
   evaluateApprovalUsability: vi.fn(() => null),
   isSeparationOfDutiesEnabled: vi.fn(() => false),
   loadApprovalRequest: vi.fn(),
+  resolveSessionCacheSeed: vi.fn(() => ({ status: 'missing' })),
   computeApprovalPayloadHash: (payload: Record<string, unknown> | undefined) =>
     JSON.stringify(payload || {}),
 }));

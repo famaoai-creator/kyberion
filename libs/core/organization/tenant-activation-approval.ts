@@ -401,6 +401,9 @@ export async function requestTenantActivationApproval(
   };
   assertPrincipal(auth, principal, command.organizationId, command.tier);
   await verifySurfaceManagementAuthorization(auth);
+  // The approval's scope (auth tenant) and the activated tenant (command) must be one tenant.
+  if (command.tenantSlug !== auth.tenantSlug)
+    refuse('The activation command names another tenant than the verified owner.');
   const expiry = Number(payload.snapshot.probeCreatedAt) + TENANT_ACTIVATION_EVIDENCE_MAX_AGE_MS;
   if (expiry <= Date.now()) refuse('Probe evidence expired while preparing approval.');
   const approval = createApprovalRequest('mission_controller', {
