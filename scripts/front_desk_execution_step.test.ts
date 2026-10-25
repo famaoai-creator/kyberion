@@ -39,7 +39,14 @@ let runFrontDeskExecutionIntake: typeof import('@agent/core/surface/front-desk-e
 let prepareFrontDeskExecution: typeof import('@agent/core/surface/front-desk-execution').prepareFrontDeskExecution;
 let currentDotActions: typeof import('@agent/core/dot/dot-dispatch').currentDotActions;
 let settleDotParkedActions: typeof import('@agent/core/dot/dot-dispatch').settleDotParkedActions;
-let approvalRequestLogicalPath: typeof import('@agent/core/governance/approval-store').approvalRequestLogicalPath;
+let approvalRequestLogicalPathAt: typeof import('@agent/core/governance/approval-store').approvalRequestLogicalPathAt;
+let locateApprovalRequest: typeof import('@agent/core/governance/approval-store').locateApprovalRequest;
+/** Where a stored request lives (system tree or its tenant approval partition). */
+function storedRecordPath(channel: string, id: string): string {
+  const located = locateApprovalRequest(channel, id);
+  if (!located) throw new Error(`fixture request ${id} not found`);
+  return approvalRequestLogicalPathAt(located.partition, channel, id);
+}
 let loadApprovalRequest: typeof import('@agent/core/governance/approval-store').loadApprovalRequest;
 let AUTONOMY_APPROVAL_CHANNEL: typeof import('@agent/core/governance/approval-decision-card').AUTONOMY_APPROVAL_CHANNEL;
 let getWorkItem: typeof import('@agent/core/workforce/work-coordination').getWorkItem;
@@ -132,7 +139,7 @@ beforeAll(async () => {
   ({ runFrontDeskExecutionIntake, prepareFrontDeskExecution } =
     await import('@agent/core/surface/front-desk-execution'));
   ({ currentDotActions, settleDotParkedActions } = await import('@agent/core/dot/dot-dispatch'));
-  ({ approvalRequestLogicalPath, loadApprovalRequest } =
+  ({ approvalRequestLogicalPathAt, locateApprovalRequest, loadApprovalRequest } =
     await import('@agent/core/governance/approval-store'));
   ({ AUTONOMY_APPROVAL_CHANNEL } = await import('@agent/core/governance/approval-decision-card'));
   ({
@@ -385,7 +392,7 @@ describe('durable diagnostic intake vertical slice', () => {
     const action = currentDotActions(charter.dot_id, deps()).at(-1)!;
     expect(action.status, action.reason).toBe('parked');
     const approval = loadApprovalRequest(AUTONOMY_APPROVAL_CHANNEL, action.request_id!)!;
-    const recordPath = approvalRequestLogicalPath(AUTONOMY_APPROVAL_CHANNEL, approval.id);
+    const recordPath = storedRecordPath(AUTONOMY_APPROVAL_CHANNEL, approval.id);
     put(recordPath, {
       ...approval,
       status: 'approved',
@@ -395,11 +402,14 @@ describe('durable diagnostic intake vertical slice', () => {
       decidedAuthMethod: 'manual',
     });
     const ledgerPath = path.join(root, 'active/shared/runtime/dot-action-ledger.jsonl');
-    const beforeApproval = safeReadFile(path.join(root, recordPath));
+    // The record may sit in a protected tenant approval partition.
+    const readRecord = () =>
+      withExecutionContext('ecosystem_architect', () => safeReadFile(path.join(root, recordPath)));
+    const beforeApproval = readRecord();
     const beforeLedger = safeReadFile(ledgerPath);
     expect(bound(() => settleDotParkedActions(charter, deps()))).toEqual([]);
     expect(listWorkItems()).toEqual([]);
-    expect(safeReadFile(path.join(root, recordPath))).toBe(beforeApproval);
+    expect(readRecord()).toBe(beforeApproval);
     expect(safeReadFile(ledgerPath)).toBe(beforeLedger);
     expect(executePipeline).not.toHaveBeenCalled();
   });
@@ -410,7 +420,7 @@ describe('durable diagnostic intake vertical slice', () => {
       String(item.metadata?.approval_request_id)
     )!;
     const { diagnosticDecision: _proof, ...unsigned } = approval;
-    put(approvalRequestLogicalPath(AUTONOMY_APPROVAL_CHANNEL, approval.id), unsigned);
+    put(storedRecordPath(AUTONOMY_APPROVAL_CHANNEL, approval.id), unsigned);
     expect(() => prepareReceipt(charter, item, deps())).toThrow(
       'verified first-job human approval required'
     );

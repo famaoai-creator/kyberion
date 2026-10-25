@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
+  TENANT_APPROVAL_ROOT_PATH,
   TENANT_LEDGER_ROOT_PATH,
 } from './foundation/runtime-state-roots.js';
 import { createHash } from 'node:crypto';
@@ -213,6 +214,13 @@ export const PARTITIONED_RUNTIME_LEDGER_ROOTS = {
    * Tenant records and tenant mission metadata never reach the system ledger.
    */
   tenant_ledger: TENANT_LEDGER_ROOT_PATH,
+  /**
+   * Per-tenant approval store partitions (`libs/core/governance/approval-store-location.ts`):
+   * `<personal|confidential>/<tenant>/<channel>/` request records, passkey challenges and the
+   * channel's `approvals.jsonl` event log, read and written as `tenant_approval_store`.
+   * Untenanted records (and pre-activation tenant requests) stay in the system tree.
+   */
+  tenant_approvals: TENANT_APPROVAL_ROOT_PATH,
 } as const;
 
 /** Knowledge permission path corresponding to a registered runtime state path. */

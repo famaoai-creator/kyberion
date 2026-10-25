@@ -7,6 +7,7 @@ import { readTenantProfile } from '@agent/core/organization/tenant-registry';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   decideApprovalRequest,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
@@ -170,6 +171,8 @@ describe('tenant attest-provider --request-approval prints an apply command that
       });
     }
     safeRmSync(approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), { force: true });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(approvalStoreRoots().tenantApprovals, { recursive: true, force: true });
     safeRmSync(rootDir, { recursive: true, force: true });
   });
 

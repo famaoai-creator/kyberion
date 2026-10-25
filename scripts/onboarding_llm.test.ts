@@ -29,6 +29,7 @@ import { auditChain } from '@agent/core/governance/audit-chain';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   decideApprovalRequest,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
@@ -265,6 +266,8 @@ describe('pnpm onboarding llm', () => {
         });
       }
       safeRmSync(approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), { force: true });
+      // Tenant-scoped requests live in the tenant approval partitions.
+      safeRmSync(approvalStoreRoots().tenantApprovals, { recursive: true, force: true });
     });
 
     it('training_use none: request approval, a human approves, then apply — audited with the approver', () => {

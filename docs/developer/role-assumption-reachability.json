@@ -16,7 +16,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -28,7 +28,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/actuators/approval-actuator/src/approval-ops.ts#requestReviewOp (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/actuators/approval-actuator/src/approval-ops.ts#requestReviewOp (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -50,7 +50,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/actuators/system-actuator/src/system-action-helpers.ts#handleComputerInteraction (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/actuators/system-actuator/src/system-action-helpers.ts#handleComputerInteraction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -65,12 +65,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/accepted-pipeline-bindings.ts#acceptPromotedPipelineBinding (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/accepted-pipeline-bindings.ts#acceptPromotedPipelineBinding (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/accepted-pipeline-bindings.ts#requestPipelineBindingApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/accepted-pipeline-bindings.ts#requestPipelineBindingApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -90,7 +90,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/agent/agent-prompt-approval.ts#createApprovalStorePromptPort (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -140,7 +140,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane.decideHeldAction (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/cloudflare-os-control-plane.ts#CloudflareOsControlPlane.decideHeldAction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -150,7 +150,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#prepareCancellation (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -160,7 +160,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/cloudflare-os-held-lifecycle.ts#reconcileLinkedApprovals (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -195,7 +195,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -206,6 +206,18 @@
     },
     {
       "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -251,6 +263,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposalsUnlocked (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/dot/dot-dispatch.ts#dispatchDotProposalsUnlocked (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": [
         "chronos_gateway",
@@ -268,7 +292,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/dot/dot-dispatch.ts#expirePendingDecision (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -285,7 +309,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -295,7 +319,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/dot/dot-executor-release.ts#requestDotWorkItemRelease (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/dot/dot-executor-release.ts#requestDotWorkItemRelease (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -390,7 +414,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/approval-cowork-adapter.ts#decideApprovalFromCowork (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -400,7 +424,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/approval-gate.ts#enforceApprovalGate (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -410,7 +434,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/approval-store-hygiene.ts#sweepExpirablePendingApprovals (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -420,12 +444,22 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/governance/approval-store-location.ts#asTenantApprovalStore",
+      "roles": ["tenant_approval_store"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/governance/approval-store-location.ts#listTierTenants",
+      "roles": ["tenant_approval_partition_index_reader"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/governance/approval-store.ts#decideApprovalRequestUnlocked",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/approval-veto-window.ts#recordApprovalDeliveryReceipt (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
@@ -445,12 +479,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/grant-store.ts#grantStanding (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/grant-store.ts#grantStanding (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/grant-store.ts#requestGrantApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/grant-store.ts#requestGrantApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -460,12 +494,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/grant-store.ts#revokeGrant (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/held-effect-request.ts#createHeldApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -475,7 +509,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/governance/human-execution.ts#claimHumanExecutionAuthorization (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -490,7 +524,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/integrations/slack-approval-ui.ts#createSlackApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/integrations/slack-approval-ui.ts#createSlackApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["slack_bridge"],
       "unresolved": []
     },
@@ -540,7 +574,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/knowledge/scoped-learning-approval.ts#recordScopedLearningPublicationConsumption (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#recordScopedLearningPublicationConsumption (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -550,7 +584,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApprovalLocked (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/knowledge/scoped-learning-approval.ts#requestScopedLearningApprovalLocked (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -866,7 +900,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mesh/peer-runtime-recovery.ts#createPeerRuntimeRecoveryApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/mesh/peer-runtime-recovery.ts#createPeerRuntimeRecoveryApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -1010,7 +1044,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/mission/mission-maintenance.ts#approveScopeChange (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1060,7 +1094,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mission/mission-scope-approval.ts#createMissionScopeApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/mission/mission-scope-approval.ts#createMissionScopeApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1075,7 +1109,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mission/mission-work-reconciliation.ts#createMissionWorkReconciliationApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/mission/mission-work-reconciliation.ts#createMissionWorkReconciliationApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1167,12 +1201,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/nhi-session-admission.ts#applyNhiSessionAdmission (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/nhi-session-admission.ts#applyNhiSessionAdmission (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/nhi-session-admission.ts#requestNhiSessionAdmission (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/nhi-session-admission.ts#requestNhiSessionAdmission (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1192,12 +1226,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/onboarding-authority.ts#applyOnboardingAuthority (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/onboarding-authority.ts#requestOnboardingAuthority (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/onboarding-authority.ts#requestOnboardingAuthority (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1246,12 +1280,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/publication-role-migration.ts#applyPublicationRoleMigration (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/publication-role-migration.ts#applyPublicationRoleMigration (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/publication-role-migration.ts#requestPublicationRoleMigrationApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/publication-role-migration.ts#requestPublicationRoleMigrationApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -1261,12 +1295,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/tenant-activation-approval.ts#applyApprovedTenantActivation (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/tenant-activation-approval.ts#applyApprovedTenantActivation (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/tenant-activation-approval.ts#requestTenantActivationApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/tenant-activation-approval.ts#requestTenantActivationApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1281,12 +1315,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/tenant-governance.ts#attestTenantProvider (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/tenant-governance.ts#requestTenantProviderAttestationApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/organization/tenant-governance.ts#requestTenantProviderAttestationApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1306,7 +1340,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/plugin/plugin-managed-install.ts#openPluginApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/plugin/plugin-managed-install.ts#openPluginApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1321,6 +1355,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/plugin/plugin-view-actions.ts#dispatchPluginViewAction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/plugin/plugin-view-actions.ts#dispatchPluginViewAction (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1331,7 +1370,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/plugin/plugin-view-actions.ts#executeApprovedPluginViewAction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1341,7 +1380,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/project/project-trust.ts#createProjectTrustApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/project/project-trust.ts#createProjectTrustApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1376,7 +1415,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/secret/secret-introduction.ts#applySecretIntroduction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1386,7 +1425,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/secret/secret-introduction.ts#proposeSecretIntroduction (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1396,12 +1435,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/service/service-recording-review-approval.ts#consumeServiceRecordingReviewApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/service/service-recording-review-approval.ts#requestServiceRecordingReview (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/service/service-recording-review-approval.ts#requestServiceRecordingReview (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1446,7 +1485,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/first-job-approval.ts#decideFirstJobApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -1528,17 +1567,17 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalRejectionReason (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalRejectionReason (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#createSurfaceApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/surface-approval-ui.ts#createSurfaceApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1548,7 +1587,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveDecisionCardToken (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1558,7 +1597,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalRecord (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
     },
@@ -1722,7 +1761,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/surface-mission-steering.ts#buildSteeringApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/surface/surface-mission-steering.ts#buildSteeringApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": [
         "chronos_gateway",
         "infrastructure_sentinel",
@@ -1819,7 +1858,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequest (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -1859,7 +1898,7 @@
       "unresolved": []
     },
     {
-      "site": "libs/shared-network/src/mcp-server-engine.ts#ensureMcpApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "libs/shared-network/src/mcp-server-engine.ts#ensureMcpApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
@@ -1894,8 +1933,13 @@
       "unresolved": []
     },
     {
+      "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["chronos_localadmin"],
+      "unresolved": []
+    },
+    {
       "site": "presence/displays/chronos-mirror-v2/src/app/api/intelligence/actions.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": ["chronos_gateway", "chronos_localadmin"],
+      "roles": ["chronos_gateway"],
       "unresolved": []
     },
     {
@@ -1988,7 +2032,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/passkey/route.ts#POST (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -1998,7 +2042,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "presence/displays/concierge/src/app/api/approvals/[id]/route.ts#POST (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2153,7 +2197,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "presence/displays/concierge/src/app/api/plugins/[id]/route.ts#POST (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -2413,7 +2457,7 @@
       "unresolved": []
     },
     {
-      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
@@ -2550,7 +2594,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -2575,7 +2619,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/approval_inbox.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/approval_inbox.ts#<module> (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2590,7 +2634,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/audit_mirror_reconcile.ts#openAuditMirrorApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/audit_mirror_reconcile.ts#openAuditMirrorApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2606,6 +2650,11 @@
     },
     {
       "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2780,12 +2829,12 @@
       "unresolved": []
     },
     {
-      "site": "scripts/config_mission.ts#cmdApply (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "scripts/config_mission.ts#cmdRequestApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/config_mission.ts#cmdRequestApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2857,7 +2906,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/customer-decision/reminders.ts#withdrawHeldRequests (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["surface_runtime"],
       "unresolved": []
     },
@@ -2868,6 +2917,11 @@
     },
     {
       "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["infrastructure_sentinel"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/daemon_watchdog.ts#routeDaemonRecoveryDecision (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -2913,7 +2967,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/entity_governance_cleanup.ts#openCleanupApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/entity_governance_cleanup.ts#openCleanupApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -2993,7 +3047,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/lib/approval-cli-decision.ts#decideApprovalFromCli (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3003,12 +3057,12 @@
       "unresolved": []
     },
     {
-      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/lib/approval-cli-decision.ts#revokeApprovalFromCli (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "scripts/lib/video-production-evidence.ts#requestVideoProductionApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/lib/video-production-evidence.ts#requestVideoProductionApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3053,7 +3107,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/mission-alignment-gate/alignment-approval.ts#openAlignmentApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/mission-alignment-gate/alignment-approval.ts#openAlignmentApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel", "surface_runtime"],
       "unresolved": []
     },
@@ -3068,7 +3122,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/mission_admission_confirmation.ts#applyApprovedMissionAdmissionConfirmation (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/mission_admission_confirmation.ts#applyApprovedMissionAdmissionConfirmation (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -3078,7 +3132,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/mission_admission_confirmation.ts#openConfirmationUnlocked (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/mission_admission_confirmation.ts#openConfirmationUnlocked (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -3093,7 +3147,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/mission_admission_confirmation.ts#recordConfirmationFailure (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/mission_admission_confirmation.ts#recordConfirmationFailure (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -3113,7 +3167,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/mission_admission_continuation.ts#continueHumanMissionAdmission (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/mission_admission_continuation.ts#continueHumanMissionAdmission (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
     },
@@ -3268,12 +3322,12 @@
       "unresolved": []
     },
     {
-      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/organization_decision_approval.ts#consumeDecisionApprovalRef (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "scripts/organization_decision_approval.ts#requestDecisionApproval (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/organization_decision_approval.ts#requestDecisionApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3323,7 +3377,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/personal-workbench/actions.ts#proposeCalendarEvent (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/personal-workbench/actions.ts#proposeCalendarEvent (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -3415,7 +3469,7 @@
       "unresolved": []
     },
     {
-      "site": "scripts/security-ledger.ts#main (via libs/core/workforce/artifact-store.ts#withRole)",
+      "site": "scripts/security-ledger.ts#main (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -4236,6 +4290,22 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-control-data.ts#collectPendingSecretApprovals",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-control-data.ts#collectPendingSecretApprovals",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
+          ]
+        },
         "tenant_ledger_store": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/intelligence/intelligence-control-data.ts#recordRuntimeRemediationArtifacts",
@@ -4771,6 +4841,52 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -5495,6 +5611,22 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/governance-overview/route.ts#GET",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/governance-overview/route.ts#GET",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
+          ]
+        },
         "tenant_ledger_store": {
           "example_path": [
             "presence/displays/concierge/src/app/api/secrets/apply/route.ts#<module>",
@@ -5610,6 +5742,8 @@
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime",
+        "tenant_approval_partition_index_reader",
+        "tenant_approval_store",
         "tenant_ledger_store",
         "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
@@ -5671,6 +5805,8 @@
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime",
+        "tenant_approval_partition_index_reader",
+        "tenant_approval_store",
         "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
@@ -6056,6 +6192,24 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
+            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordInteraction",
+            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
+          ]
+        },
         "tenant_ledger_store": {
           "example_path": [
             "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
@@ -6228,6 +6382,8 @@
         "scope_locale_reader",
         "slack_bridge",
         "surface_runtime",
+        "tenant_approval_partition_index_reader",
+        "tenant_approval_store",
         "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
@@ -6400,6 +6556,46 @@
             "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
             "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
             "libs/core/surface/operator-notifications.ts#deliver"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/governance/human-execution.ts#currentHumanExecutionAuthorization",
+            "libs/core/governance/human-execution.ts#verify",
+            "libs/core/governance/approval-store-reader.ts#loadApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#locateApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
+            "scripts/run_generation_schedule_daemon.ts#runTick",
+            "scripts/run_generation_schedule.ts#runGenerationScheduleAction [child process]",
+            "libs/core/generation-scheduler.ts#runGenerationScheduleAction",
+            "libs/core/generation-scheduler.ts#tickGenerationSchedule",
+            "libs/core/generation-scheduler.ts#resolveHandleAction",
+            "libs/core/generation-scheduler.ts#loadMediaGenerationActuator",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#handleAction",
+            "libs/actuators/media-generation-actuator/src/media-generation-action-helpers.ts#executeSingleAction",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/governance/human-execution.ts#currentHumanExecutionAuthorization",
+            "libs/core/governance/human-execution.ts#verify",
+            "libs/core/governance/approval-store-reader.ts#loadApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#locateApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#readApprovalJsonAt",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -6893,6 +7089,46 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -7415,6 +7651,31 @@
             "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
             "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
             "libs/core/cowork-surface.ts#deliverToCowork"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -8095,6 +8356,47 @@
             "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction"
           ]
         },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/approval-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/approval-actuator/src/approval-actuator-helpers.ts#handleApprovalAction",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "scripts/run_baseline_check.ts#maybeSubmitJanitorMaintenanceJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
+          ]
+        },
         "tenant_ledger_store": {
           "example_path": [
             "presence/bridge/nexus-daemon.ts#<module>",
@@ -8368,6 +8670,36 @@
             "libs/core/surface/operator-notifications.ts#notifyOperatorSync",
             "libs/core/surface/operator-notifications.ts#notifyOperatorWithReceiptSync",
             "libs/core/surface/operator-notifications.ts#deliver"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/governance/human-execution.ts#currentHumanExecutionAuthorization",
+            "libs/core/governance/human-execution.ts#verify",
+            "libs/core/governance/approval-store-reader.ts#loadApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#locateApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "scripts/oauth_callback_surface.ts#<module>",
+            "libs/core/oauth-broker.ts#completeOAuthCallback",
+            "libs/core/oauth-broker.ts#exchangeServiceOAuthCode",
+            "libs/core/oauth-broker.ts#exchangeOAuthCodeWithState",
+            "libs/core/service/service-engine.ts#executeServicePreset",
+            "libs/core/governance/human-execution.ts#currentHumanExecutionAuthorization",
+            "libs/core/governance/human-execution.ts#verify",
+            "libs/core/governance/approval-store-reader.ts#loadApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#locateApprovalRequest",
+            "libs/core/governance/approval-store-location.ts#readApprovalJsonAt",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -8836,6 +9168,36 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -9396,6 +9758,52 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
+          ]
+        },
         "tenant_ledger_store": {
           "example_path": [
             "scripts/mission_controller.ts#handoffMission [child process]",
@@ -9866,6 +10274,27 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/approval-inbox-routes.ts#registerApprovalInboxRoutes",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
+            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
+            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -10358,6 +10787,24 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#resolveSlackApprovalText",
+            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#resolveSlackApprovalText",
+            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
+          ]
+        },
         "tenant_ledger_store": {
           "example_path": [
             "satellites/slack-bridge/src/index.ts#<module>",
@@ -10527,6 +10974,8 @@
         "pr_publication_store",
         "slack_bridge",
         "sovereign_concierge",
+        "tenant_approval_partition_index_reader",
+        "tenant_approval_store",
         "tool_runtime_policy_reader",
         "workspace_tenant_registry_index_reader",
         "workspace_tenant_registry_reader"
@@ -10890,6 +11339,23 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -11359,6 +11825,24 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramCallbackQuery",
+            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramCallbackQuery",
+            "libs/core/surface/surface-approval-ui.ts#resolveSurfaceApprovalReply",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {
@@ -11886,6 +12370,34 @@
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
           ]
         },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#listAgentRuntimesViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#listAgentRuntimesViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
+          ]
+        },
         "tenant_ledger_store": {
           "example_path": [
             "presence/displays/terminal-hud/src/index.ts#<module>",
@@ -12361,6 +12873,36 @@
             "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
             "scripts/dot_supervisor_extensions.ts#<module>",
             "libs/core/dot/dot-autonomy.ts#runDotAutonomyStep"
+          ]
+        },
+        "tenant_approval_partition_index_reader": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#listTierTenants"
+          ]
+        },
+        "tenant_approval_store": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#runDotSweepOnce [child process]",
+            "libs/core/governance/approval-veto-window.ts#tickVetoWindows",
+            "libs/core/governance/approval-store-reader.ts#listApprovalRequests",
+            "libs/core/governance/approval-store-location.ts#listApprovalPartitions",
+            "libs/core/governance/approval-store-location.ts#asTenantApprovalStore"
           ]
         },
         "tenant_ledger_store": {

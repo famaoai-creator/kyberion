@@ -11,11 +11,7 @@
  */
 import { nowIso } from '../foundation/time.js';
 import { resolveMemberByPrincipal } from '../organization/member-registry.js';
-import {
-  appendGovernedArtifactJsonl,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import { auditChain } from './audit-chain.js';
 import {
   APPROVAL_PLACEHOLDER_DECIDERS,
@@ -24,15 +20,17 @@ import {
   normalizeApprovalPrincipalId,
 } from './approval-separation-of-duties.js';
 import {
-  approvalEventLogicalPath,
-  approvalRequestLogicalPath,
   approvalWorkerEventSource,
   forgetSessionApprovalCacheFor,
-  loadApprovalRequest,
   projectApprovalWorkerEvent,
   withApprovalRecordLock,
   type ApprovalRequestRecord,
 } from './approval-store.js';
+import {
+  appendLocatedApprovalEvent,
+  locateApprovalRequest,
+  writeLocatedApprovalRequest,
+} from './approval-store-location.js';
 
 export interface ApprovalRevocation {
   revokedBy: string;
@@ -116,8 +114,9 @@ function revoke(
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => {
     const storageChannel = params.storageChannel || params.channel;
-    const record = loadApprovalRequest(storageChannel, params.requestId);
-    if (!record)
+    const located = locateApprovalRequest(storageChannel, params.requestId);
+    const record = located?.record;
+    if (!located || !record)
       throw new Error(`Approval request not found: ${params.channel}/${params.requestId}`);
     const refuse = (why: string): never => {
       throw new Error(`[POLICY_VIOLATION] Approval ${record.id} cannot be revoked: ${why}`);
@@ -164,8 +163,8 @@ function revoke(
       ...(params.reason?.trim() ? { reason: params.reason.trim() } : {}),
     };
     const updated: ApprovalRequestRecord = { ...record, revocation };
-    writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), updated);
-    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    writeLocatedApprovalRequest(role, located, updated);
+    appendLocatedApprovalEvent(role, located, {
       ts: revocation.revokedAt,
       event: 'revoked',
       request_id: record.id,
@@ -264,8 +263,9 @@ export function markApprovalConsumed(
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => {
     const storageChannel = params.storageChannel || params.channel;
-    const record = loadApprovalRequest(storageChannel, params.requestId);
-    if (!record || record.status !== 'approved') {
+    const located = locateApprovalRequest(storageChannel, params.requestId);
+    const record = located?.record;
+    if (!located || !record || record.status !== 'approved') {
       throw new Error(
         `[POLICY_VIOLATION] Approval ${params.requestId} is ${record?.status ?? 'missing'}, not approved`
       );
@@ -283,8 +283,8 @@ export function markApprovalConsumed(
       ...(params.effectRef ? { effectRef: params.effectRef } : {}),
     };
     const updated: ApprovalRequestRecord = { ...record, consumption };
-    writeGovernedArtifactJson(role, approvalRequestLogicalPath(storageChannel, record.id), updated);
-    appendGovernedArtifactJsonl(role, approvalEventLogicalPath(storageChannel), {
+    writeLocatedApprovalRequest(role, located, updated);
+    appendLocatedApprovalEvent(role, located, {
       ts: consumption.consumedAt,
       event: 'consumed',
       request_id: record.id,
