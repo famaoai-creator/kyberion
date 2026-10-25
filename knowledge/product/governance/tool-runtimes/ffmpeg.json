@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "ffmpeg",
+      "toolsets": ["render", "media"],
       "display_name": "FFmpeg Media Toolkit",
       "ecosystem": "system",
       "status": "active",

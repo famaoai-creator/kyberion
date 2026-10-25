@@ -15,6 +15,8 @@
  */
 
 import { createHash } from 'node:crypto';
+import * as path from 'node:path';
+import { getRegisteredEnvText } from '@agent/core/foundation';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { secureFetch } from '@agent/core/network';
@@ -26,9 +28,16 @@ import {
   probeToolRuntime,
   resolveManagedBinaryArtifact,
   resolveManagedBinaryPath,
+  resolveManagedToolPythonBin,
 } from '@agent/core/tool/tool-runtime-registry';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeChmodSync, safeExecResult, safeMoveSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeChmodSync,
+  safeExecResult,
+  safeExistsSync,
+  safeMoveSync,
+  safeWriteFile,
+} from '@agent/core/secure-io';
 import { resetLocalSttDiscoveryCache } from '@agent/core/local-stt-discovery';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
@@ -58,11 +67,69 @@ function parseToolIds(raw: unknown, toolsCsv: unknown): string[] {
   return [...DEFAULT_TOOLS];
 }
 
+export function resolveToolSelection(tool?: string, tools?: string, toolset?: string): string[] {
+  if (toolset && (tool || tools)) {
+    throw new ScriptExitError(1, 'Use --toolset or --tool/--tools, not both.');
+  }
+  const ids = toolset
+    ? listToolRuntimes()
+        .filter((record) => record.toolsets?.includes(toolset))
+        .map((record) => record.tool_id)
+    : parseToolIds(tool, tools);
+  if (ids.length === 0)
+    throw new ScriptExitError(1, `Unknown or empty toolset '${toolset}'. Use --list.`);
+  const known = new Set(listToolRuntimes().map((record) => record.tool_id));
+  for (const id of ids) {
+    if (!known.has(id))
+      throw new ScriptExitError(1, `Unknown tool_id '${id}'. Use --list to see registry entries.`);
+  }
+  return [...new Set(ids)];
+}
+
 function isBinaryHealthy(toolId: string): boolean {
   const trial = probeToolRuntime(toolId, 'trial');
-  const backend = trial.trial_backend;
+  if (trial.install_backend?.command === 'uv' && trial.install_backend.args[0] === 'tool') {
+    const entry = trial.tool.installed_backend?.args.at(-1);
+    if (!entry || entry.includes('/') || entry.includes('\\')) return false;
+    const binary = path.join(
+      trial.managed_env_path,
+      'bin',
+      process.platform === 'win32' ? `${entry}.exe` : entry
+    );
+    return (
+      safeExistsSync(binary) &&
+      safeExecResult(binary, ['--help'], {
+        cwd: pathResolver.rootDir(),
+        timeoutMs: 15_000,
+        maxOutputMB: 1,
+      }).status === 0
+    );
+  }
+  const backend = trial.tool.healthcheck_backend || trial.trial_backend;
   if (!backend) return false;
-  const command = findInstalledManagedBinary(toolId) ?? backend.command;
+  // Trial launchers may download packages or start generation. Inspection must
+  // never run those recipes; only explicitly probe-shaped commands are safe.
+  if (
+    !trial.tool.healthcheck_backend &&
+    (['uvx', 'npx'].includes(backend.command) ||
+      !backend.args.some((arg) =>
+        ['--version', '-version', '-v', 'version', '-h', '--help', '-c', 'list'].includes(arg)
+      ))
+  )
+    return false;
+  const managedPython =
+    trial.tool.ecosystem === 'python' && backend.command === 'python3'
+      ? resolveManagedToolPythonBin(toolId)
+      : null;
+  if (
+    trial.tool.ecosystem === 'python' &&
+    backend.command === 'python3' &&
+    trial.install_backend?.command === 'uv' &&
+    trial.install_backend.args[0] === 'pip' &&
+    !managedPython
+  )
+    return false;
+  const command = findInstalledManagedBinary(toolId) ?? managedPython ?? backend.command;
   const result = safeExecResult(command, backend.args || [], {
     cwd: pathResolver.rootDir(),
     timeoutMs: 15_000,
@@ -82,8 +149,9 @@ function isCommandAvailable(command: string): boolean {
   );
 }
 
-function inspectTool(toolId: string): SetupRow {
+export function inspectTool(toolId: string): SetupRow {
   const resolution = probeToolRuntime(toolId, 'installed');
+  if (!supportsHost(toolId)) return unsupportedHost(toolId);
   const healthy = isBinaryHealthy(toolId);
   if (healthy) {
     return {
@@ -185,13 +253,14 @@ export async function installManagedBinary(toolId: string): Promise<SetupRow | n
   safeChmodSync(staging, 0o755);
   safeMoveSync(staging, target);
 
-  markToolRuntimeInstalled(toolId, {
-    action: 'tool_runtime_setup',
-    command: target,
-    args: [],
-    notes: `managed_binary ${version} sha256:${digest} from ${artifact.url}`,
-  });
   const healthy = isBinaryHealthy(toolId);
+  if (healthy)
+    markToolRuntimeInstalled(toolId, {
+      action: 'tool_runtime_setup',
+      command: target,
+      args: [],
+      notes: `managed_binary ${version} sha256:${digest} from ${artifact.url}`,
+    });
   return {
     tool_id: toolId,
     display_name: record.display_name,
@@ -206,9 +275,45 @@ export async function installManagedBinary(toolId: string): Promise<SetupRow | n
   };
 }
 
-function installTool(toolId: string): SetupRow {
+function supportsHost(toolId: string): boolean {
+  const { platforms, status } = getToolRuntimeRecord(toolId);
+  return (
+    status !== 'disabled' &&
+    platforms.some((platform) => platform === 'any' || platform === process.platform)
+  );
+}
+
+function unsupportedHost(toolId: string): SetupRow {
+  return {
+    tool_id: toolId,
+    display_name: getToolRuntimeRecord(toolId).display_name,
+    status: 'unsupported',
+    selected_action: 'install',
+    installed: false,
+    requires_install: true,
+    detail: `${toolId} is disabled or unsupported on ${process.platform}.`,
+  };
+}
+
+export function installTool(toolId: string): SetupRow {
+  if (!supportsHost(toolId)) return unsupportedHost(toolId);
   const resolution = probeToolRuntime(toolId, 'approved_install');
   const backend = resolution.install_backend;
+  if (isBinaryHealthy(toolId)) {
+    markToolRuntimeInstalled(toolId, {
+      action: 'tool_runtime_setup',
+      notes: 'Existing runtime passed healthcheck.',
+    });
+    return {
+      tool_id: toolId,
+      display_name: resolution.tool.display_name,
+      status: 'ready',
+      selected_action: 'run_installed',
+      installed: true,
+      requires_install: false,
+      detail: `${resolution.tool.display_name} is already available.`,
+    };
+  }
   if (!backend) {
     return {
       tool_id: toolId,
@@ -234,27 +339,47 @@ function installTool(toolId: string): SetupRow {
     };
   }
 
-  if (isBinaryHealthy(toolId)) {
-    markToolRuntimeInstalled(toolId, {
-      action: 'tool_runtime_setup',
-      command: backend.command,
-      args: backend.args,
-      notes: 'Already present on PATH; marked installed.',
-    });
-    return {
-      tool_id: toolId,
-      display_name: resolution.tool.display_name,
-      status: 'ready',
-      selected_action: 'run_installed',
-      installed: true,
-      requires_install: false,
-      command: backend.command,
-      detail: `${resolution.tool.display_name} was already available; marked installed.`,
-    };
+  let installArgs = backend.args;
+  if (
+    resolution.tool.ecosystem === 'python' &&
+    backend.command === 'uv' &&
+    backend.args[0] === 'pip' &&
+    backend.args[1] === 'install'
+  ) {
+    const pythonBin = path.join(
+      resolution.managed_env_path,
+      process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'
+    );
+    const created = resolveManagedToolPythonBin(toolId)
+      ? null
+      : safeExecResult(
+          'uv',
+          [
+            'venv',
+            '--python',
+            getRegisteredEnvText('KYBERION_MANAGED_PYTHON_VERSION')?.trim() || '3.11',
+            resolution.managed_env_path,
+          ],
+          {
+            cwd: pathResolver.rootDir(),
+            timeoutMs: 120_000,
+            maxOutputMB: 8,
+          }
+        );
+    if (created && created.status !== 0)
+      throw new Error(`Managed Python creation failed for ${toolId}: ${created.stderr}`);
+    installArgs = ['pip', 'install', '--python', pythonBin, ...backend.args.slice(2)];
   }
-
-  const result = safeExecResult(backend.command, backend.args || [], {
+  const toolEnv =
+    backend.command === 'uv' && backend.args[0] === 'tool'
+      ? {
+          UV_TOOL_DIR: path.join(resolution.managed_env_path, 'tools'),
+          UV_TOOL_BIN_DIR: path.join(resolution.managed_env_path, 'bin'),
+        }
+      : undefined;
+  const result = safeExecResult(backend.command, installArgs, {
     cwd: pathResolver.rootDir(),
+    ...(toolEnv ? { env: toolEnv } : {}),
     timeoutMs: 600_000,
     maxOutputMB: 32,
   });
@@ -266,14 +391,15 @@ function installTool(toolId: string): SetupRow {
     );
   }
 
-  markToolRuntimeInstalled(toolId, {
-    action: 'tool_runtime_setup',
-    command: backend.command,
-    args: backend.args,
-    notes: backend.description,
-  });
-
   const healthy = isBinaryHealthy(toolId);
+  if (healthy)
+    markToolRuntimeInstalled(toolId, {
+      action: 'tool_runtime_setup',
+      command: backend.command,
+      args: installArgs,
+      notes: backend.description,
+    });
+
   return {
     tool_id: toolId,
     display_name: resolution.tool.display_name,
@@ -318,6 +444,10 @@ export const runToolRuntimeSetup = defineScript({
         default: false,
         describe: 'Run the install backend (otherwise inspect only)',
       })
+      .option('toolset', {
+        type: 'string',
+        describe: 'Select a registered runtime dependency group (see --list)',
+      })
       .option('list', {
         type: 'boolean',
         default: false,
@@ -332,21 +462,13 @@ export const runToolRuntimeSetup = defineScript({
         ecosystem: tool.ecosystem,
         status: tool.status,
         platforms: tool.platforms,
+        toolsets: tool.toolsets || [],
       }));
       context.print(JSON.stringify({ tools }, null, 2));
       return;
     }
 
-    const toolIds = parseToolIds(argv.tool, argv.tools);
-    const known = new Set(listToolRuntimes().map((tool) => tool.tool_id));
-    for (const toolId of toolIds) {
-      if (!known.has(toolId)) {
-        throw new ScriptExitError(
-          1,
-          `Unknown tool_id '${toolId}'. Use --list to see registry entries.`
-        );
-      }
-    }
+    const toolIds = resolveToolSelection(argv.tool, argv.tools, argv.toolset);
 
     const rows: SetupRow[] = [];
     for (const toolId of toolIds) {
@@ -355,6 +477,10 @@ export const runToolRuntimeSetup = defineScript({
         continue;
       }
       try {
+        if (!supportsHost(toolId)) {
+          rows.push(unsupportedHost(toolId));
+          continue;
+        }
         rows.push((await installManagedBinary(toolId)) ?? installTool(toolId));
       } finally {
         // A just-installed runtime may be a local STT backend: drop the cached probe.

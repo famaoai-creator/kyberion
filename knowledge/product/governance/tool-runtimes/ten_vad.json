@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "ten_vad",
+      "toolsets": ["vad"],
       "display_name": "TEN VAD Runtime",
       "ecosystem": "python",
       "status": "active",

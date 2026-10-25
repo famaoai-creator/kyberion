@@ -16,6 +16,11 @@
         "properties": {
           "tool_id": { "type": "string", "minLength": 1 },
           "display_name": { "type": "string", "minLength": 1 },
+          "toolsets": {
+            "type": "array",
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z][a-z0-9_-]*$" }
+          },
           "ecosystem": { "type": "string", "enum": ["python", "node", "system"] },
           "status": { "type": "string", "enum": ["active", "shadow", "disabled"] },
           "platforms": {
@@ -93,6 +98,7 @@
             "required": ["kind", "command", "args"]
           },
           "fallback_tool_id": { "type": "string", "minLength": 1 },
+          "healthcheck_backend": { "$ref": "#/$defs/backend" },
           "managed_env_subpath": { "type": "string", "minLength": 1 },
           "managed_binary": { "$ref": "#/$defs/managed_binary" },
           "notes": { "type": "string" }

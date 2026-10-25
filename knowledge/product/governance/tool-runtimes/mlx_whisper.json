@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "mlx_whisper",
+      "toolsets": ["stt"],
       "display_name": "mlx-whisper STT Runtime",
       "ecosystem": "python",
       "status": "active",

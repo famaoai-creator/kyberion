@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "faster_whisper",
+      "toolsets": ["stt"],
       "display_name": "faster-whisper STT Runtime",
       "ecosystem": "python",
       "status": "active",

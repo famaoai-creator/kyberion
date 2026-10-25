@@ -4,6 +4,7 @@
   "tools": [
     {
       "tool_id": "pocket_tts",
+      "toolsets": ["tts"],
       "display_name": "Kyutai Pocket TTS Runtime",
       "ecosystem": "python",
       "status": "active",

@@ -7,6 +7,24 @@ last_updated: 2026-10-25
 
 # Operations Hygiene Runbook
 
+## Managed tool registration and readiness
+
+Keep tool identities, dependency-group membership and safe healthchecks in the
+schema-backed `tool-runtimes/` catalog. Do not execute a trial recipe to inspect
+a tool when that recipe can fetch packages or produce artifacts. Python package
+installation must target a tool-specific venv or uv-tool directory; a healthy
+system Python does not prove that managed environment exists. Refuse disabled
+and unsupported tools before invoking either probes or installers. Media
+availability must check the launcher and any declared healthcheck, rather than
+equating a registered launch plan with readiness.
+
+Procedure: follow [tool runtime registration](./tool-runtimes/README.md), then
+run `scripts/tool_runtime_setup.test.ts`,
+`libs/core/tool/tool-runtime-registry.test.ts` and
+`libs/core/media/media-backend-registry.test.ts`. These gates cover scoped Python
+installation, platform refusal, failed-install evidence and unavailable media
+launchers/healthchecks.
+
 **Purpose.** Each section below covers one class of operational defect that was fixed at least once
 and then came back. For each class it gives the rule, the procedure to follow when you touch that
 area, and the automated check that enforces the rule. A defect class that recurs means its procedure
