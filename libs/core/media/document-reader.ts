@@ -47,6 +47,7 @@ import {
 } from './protocol-to-markdown.js';
 import type { PdfDesignProtocol } from '../contracts/pdf-protocol.js';
 import { extractHtmlTitle, htmlToMarkdown } from '../html-to-markdown.js';
+import { extractOoxmlCoreTitle, OOXML_PLACEHOLDER_TITLES } from './ooxml-core-props.js';
 
 export type OfficeDocumentFormat = 'pdf' | 'pptx' | 'docx' | 'xlsx';
 export type TextDocumentFormat = 'html' | 'markdown' | 'text' | 'csv' | 'tsv' | 'json' | 'yaml';
@@ -127,6 +128,41 @@ export interface ReadDocumentResult {
 }
 
 const OCR_NOTE = 'OCR — unverified, check figures against the source';
+
+/**
+ * Placeholder titles writers / parsers invent when a package has none.
+ * Never surface these as a document title in `kyberion read`.
+ */
+const DOCUMENT_PLACEHOLDER_TITLES = new Set([
+  ...OOXML_PLACEHOLDER_TITLES,
+  'PDF Specification',
+  'Kyberion PDF',
+]);
+
+/** First non-empty, non-placeholder candidate wins. */
+function pickDocumentTitle(...candidates: Array<string | undefined | null>): string | undefined {
+  for (const candidate of candidates) {
+    const title = String(candidate ?? '').trim();
+    if (title && !DOCUMENT_PLACEHOLDER_TITLES.has(title)) return title;
+  }
+  return undefined;
+}
+
+/**
+ * Ensure Markdown leads with `# title` when we have a package/document title
+ * that is not already visible as the first H1 or `## Slide N: …` heading.
+ */
+function withLeadingTitle(
+  markdown: string,
+  title: string | undefined
+): { markdown: string; title?: string } {
+  if (!title) return { markdown };
+  const h1 = /^#\s+(.+)$/m.exec(markdown)?.[1]?.trim();
+  if (h1 === title) return { markdown, title };
+  const slideHeading = /^##\s+Slide\s+\d+:\s+(.+)$/m.exec(markdown)?.[1]?.trim();
+  if (slideHeading === title) return { markdown, title };
+  return { markdown: `# ${title}\n\n${markdown}`.trim(), title };
+}
 
 /** OLE compound-file magic: what Office writes for password-protected files. */
 const CFB_MAGIC = Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
@@ -381,20 +417,21 @@ async function readPptx(
   if (!options.ocr && slides.some((slide) => slide.image_parts.length > 0)) {
     warnings.push('slide images were not OCR’d — pass ocr to read text inside them');
   }
-  const title = slides[0]?.shapes_text[0]?.split('\n')[0]?.trim() || undefined;
+  const contentTitle = slides[0]?.shapes_text[0]?.split('\n')[0]?.trim() || undefined;
+  // File → Properties title wins over the first shape (same as PDF Info / XMP).
+  const title = pickDocumentTitle(extractOoxmlCoreTitle(raw), contentTitle);
+  const body = chunks.join('\n\n');
+  const headed = withLeadingTitle(body, title);
   return {
     format: 'pptx',
-    markdown: chunks.join('\n\n'),
+    markdown: headed.markdown,
     tables,
     warnings,
-    ...(title ? { title } : {}),
+    ...(headed.title ? { title: headed.title } : {}),
   };
 }
 
 // ─── PDF ───────────────────────────────────────────────────
-
-/** Placeholder metadata the native parser/writer fills in when a PDF has none. */
-const PDF_PLACEHOLDER_TITLES = new Set(['PDF Specification', 'Kyberion PDF', '']);
 
 async function pdfParsePageTexts(raw: Buffer): Promise<string[] | null> {
   try {
@@ -493,11 +530,11 @@ async function readPdf(
           }
         }
       }
-      const rawTitle = String(design.metadata?.title ?? '').trim();
-      const title = PDF_PLACEHOLDER_TITLES.has(rawTitle) ? undefined : rawTitle;
       // Author / creator are personal names more often than not — the reader
-      // does not surface them.
+      // does not surface them. Subject stays in distill metadata only.
+      const title = pickDocumentTitle(design.metadata?.title);
       const body = pdfToMarkdown({ ...design, metadata: undefined } as PdfDesignProtocol);
+      const headed = withLeadingTitle(body, title);
       const warnings: string[] = [];
       const skipped = pages.reduce((sum, page) => sum + (page.imageOcrSkipped?.length ?? 0), 0);
       if (skipped) warnings.push(`${skipped} page image(s) could not be OCR’d`);
@@ -506,10 +543,10 @@ async function readPdf(
       }
       return {
         format: 'pdf' as const,
-        markdown: title ? `# ${title}\n\n${body}` : body,
+        markdown: headed.markdown,
         tables: [],
         warnings,
-        ...(title ? { title } : {}),
+        ...(headed.title ? { title: headed.title } : {}),
       };
     } finally {
       for (const dir of imageDirs) safeRmSync(dir, { recursive: true, force: true });
@@ -579,8 +616,17 @@ async function readDocx(
   } else if (images.size > 0) {
     warnings.push(`${images.size} picture(s) not OCR’d — pass ocr to read text inside them`);
   }
-  const title = /^#\s+(.+)$/m.exec(markdown)?.[1]?.trim();
-  return { format: 'docx', markdown, tables: [], warnings, ...(title ? { title } : {}) };
+  const headingTitle = /^#\s+(.+)$/m.exec(markdown)?.[1]?.trim();
+  // File → Properties title wins over the first Heading 1.
+  const title = pickDocumentTitle(extractOoxmlCoreTitle(raw), headingTitle);
+  const headed = withLeadingTitle(markdown, title);
+  return {
+    format: 'docx',
+    markdown: headed.markdown,
+    tables: [],
+    warnings,
+    ...(headed.title ? { title: headed.title } : {}),
+  };
 }
 
 // ─── XLSX ──────────────────────────────────────────────────
@@ -605,7 +651,15 @@ async function readXlsx(raw: Buffer): Promise<Omit<ReadDocumentResult, 'images'>
     chunks.push(`_Hidden sheets not read: ${hidden.join(', ')}_`);
     warnings.push(`hidden sheets not read: ${hidden.join(', ')}`);
   }
-  return { format: 'xlsx', markdown: chunks.join('\n\n'), tables, warnings };
+  const title = pickDocumentTitle(extractOoxmlCoreTitle(raw));
+  const headed = withLeadingTitle(chunks.join('\n\n'), title);
+  return {
+    format: 'xlsx',
+    markdown: headed.markdown,
+    tables,
+    warnings,
+    ...(headed.title ? { title: headed.title } : {}),
+  };
 }
 
 // ─── HTML / Markdown / text / csv / tsv / json / yaml ───────
