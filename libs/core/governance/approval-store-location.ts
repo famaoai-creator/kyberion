@@ -25,7 +25,7 @@
  */
 import * as path from 'node:path';
 import { resolveIdentityContext, withExecutionContext } from '../authority.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -35,7 +35,6 @@ import {
   safeMkdir,
   safeReaddir,
   safeUnlinkSync,
-  safeWriteFile,
 } from '../secure-io.js';
 import { storagePartitionSegments } from '../storage-layout.js';
 import { validateWritePermission } from '../tier-guard.js';
@@ -399,7 +398,7 @@ export function writeApprovalJsonAt(
 ): string {
   return asPartitionWriter(role, partition, logicalPath, 'write', () => {
     const resolved = prepareGovernedFile(logicalPath);
-    safeWriteFile(logicalPath, JSON.stringify(value, null, 2));
+    writeJson(resolved, value);
     if (options.fsync) safeFsyncFile(resolved);
     return resolved;
   });

@@ -14,6 +14,7 @@ import {
 } from '@agent/core/governance/approval-store-hygiene';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { withExecutionContext } from '@agent/core/authority';
+import { cliOptionValue, hasCliFlag } from './lib/cli-guard.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -81,9 +82,8 @@ const MIGRATE_COMMAND = 'node dist/scripts/approval_store_hygiene.js --migrate-t
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function readStaleDays(argv: string[]): number {
-  const index = argv.indexOf('--stale-days');
-  if (index < 0) return DEFAULT_STALE_PENDING_APPROVAL_MS / DAY_MS;
-  const raw = argv[index + 1];
+  if (!hasCliFlag(argv, '--stale-days')) return DEFAULT_STALE_PENDING_APPROVAL_MS / DAY_MS;
+  const raw = cliOptionValue(argv, '--stale-days');
   const days = Number(raw);
   if (!raw || !Number.isInteger(days) || days < 1) {
     throw new ScriptExitError(2, `--stale-days requires a positive integer, got: ${raw ?? ''}`);
@@ -209,8 +209,8 @@ export const runApprovalStoreHygiene = defineScript({
   name: 'approval-store-hygiene',
   flags: ['json'],
   run(context) {
-    const dryRun = !context.argv.includes('--apply');
-    if (context.argv.includes('--migrate-tenant-partitions')) {
+    const dryRun = !hasCliFlag(context.argv, '--apply');
+    if (hasCliFlag(context.argv, '--migrate-tenant-partitions')) {
       const report: TenantPartitionMigrationReport = {
         mode: 'migrate-tenant-partitions',
         dryRun,
