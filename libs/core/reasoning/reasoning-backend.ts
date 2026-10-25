@@ -49,6 +49,7 @@ import {
 } from './reasoning-egress-scope.js';
 import { classifyReasoningFailure, reasoningFailureMessage } from './reasoning-failure-taxonomy.js';
 import { appendReasoningFailoverEvent, markReasoningFailover } from './reasoning-failover.js';
+import { resolveReasoningProviderDescriptor } from './reasoning-provider-registry.js';
 // Existing reasoning/delegation cycle is tracked by check:module-boundaries baseline.
 // eslint-disable-next-line import/no-cycle -- baseline until the delegation seam is split
 import { createDelegationHandle, type DelegationHandle } from '../delegated-task-observability.js';
@@ -135,14 +136,43 @@ function candidateLabel(candidate: ReasoningBackendCandidate): string {
   return candidate.label || candidate.backend.name || candidate.provider || 'unknown';
 }
 
-/** Exact model ids belong to the provider that resolved the primary route. */
+/**
+ * Exact model ids belong to the provider that resolved the primary route.
+ *
+ * Registry-shaped ids (`vendor:model`, e.g. `opencode:big-pickle`) carry their
+ * vendor in the id itself — that binding wins over candidate order. A
+ * `vendor:` id is only ever passed to a candidate that serves that vendor
+ * (descriptor `model_vendor`, else the provider id); other candidates receive
+ * provider-neutral options so their own configured default model applies
+ * instead of an unrecognised foreign id. Observed failure: a task-model hint
+ * of `opencode:big-pickle` was passed verbatim to `claude-cli`, which answered
+ * with a model 404 on every retry — the claim→release loop that then parked
+ * the work item and inflated the coordination store.
+ */
 function optionsForCandidate(
   candidates: readonly ReasoningBackendCandidate[],
   candidate: ReasoningBackendCandidate,
   options?: ReasoningCallOptions
 ): ReasoningCallOptions | undefined {
   assertAdvisoryBackendPermission(candidate.backend.name, options);
-  if (!options?.model || candidate === candidates[0]) return options;
+  if (!options?.model) return options;
+  const model = options.model;
+  const separator = model.indexOf(':');
+  if (separator > 0) {
+    const modelVendor = normalizeProviderName(model.slice(0, separator));
+    const candidateVendor = candidateModelVendor(candidate);
+    const { model: _model, ...providerNeutralOptions } = options;
+    if (!modelVendor || !candidateVendor || modelVendor !== candidateVendor) {
+      return providerNeutralOptions;
+    }
+    return {
+      ...providerNeutralOptions,
+      model: nativeModelIdForVendor(model, modelVendor),
+    };
+  }
+  // Provider-native id without a `vendor:` prefix: exact ids still belong to
+  // the primary route only — later candidates get provider-neutral options.
+  if (candidate === candidates[0]) return options;
   const primaryProvider = normalizeProviderName(candidates[0]?.provider);
   const candidateProvider = normalizeProviderName(candidate.provider);
   if (primaryProvider && candidateProvider && primaryProvider === candidateProvider) {
@@ -150,6 +180,24 @@ function optionsForCandidate(
   }
   const { model: _model, ...providerNeutralOptions } = options;
   return providerNeutralOptions;
+}
+
+/** The model vendor a failover candidate serves, when the registry declares one. */
+function candidateModelVendor(candidate: ReasoningBackendCandidate): string | null {
+  const descriptor = resolveReasoningProviderDescriptor(candidate.provider ?? candidate.label);
+  return (
+    normalizeProviderName(descriptor?.model_vendor) ?? normalizeProviderName(candidate.provider)
+  );
+}
+
+/**
+ * `vendor:model` -> the provider-native model name. OpenCode names its models
+ * `provider/model` (provider-config `opencode-default` uses the slash form);
+ * every other vendor's CLI takes the bare model name.
+ */
+function nativeModelIdForVendor(model: string, vendor: string): string {
+  const name = model.slice(model.indexOf(':') + 1);
+  return vendor === 'opencode' ? `opencode/${name}` : name;
 }
 
 function recordReasoningPromptVisibility(
