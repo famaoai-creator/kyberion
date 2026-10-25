@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as nodePath from 'node:path';
 import { readJsonLines } from '../foundation/json.js';
 import { validateA2ATaskContract } from '../mesh/a2a-task-contract.js';
+import { resolveRuntimeScope } from '../tool/runtime-scope.js';
 import * as dispatchLifecycle from './mission-dispatch-lifecycle.js';
 
 import {
@@ -919,14 +920,34 @@ describe('mission work item dispatch', () => {
         expect(validation.valid, JSON.stringify(validation.errors)).toBe(true);
         expect(validation.value?.context.security_scope?.tenant_slug).toBeUndefined();
         expect(validation.value?.context.security_scope?.tenant_id).toBeUndefined();
+        expect(validation.value?.context.security_scope?.project_id).toBe(missionId);
+        expect(
+          resolveRuntimeScope({
+            missionId,
+            scope: {
+              scope_kind: 'mission',
+              tier: 'public',
+              mission_id: missionId,
+              project_id: String(validation.value?.context.security_scope?.project_id),
+            },
+          })
+        ).toMatchObject({ project_id: missionId });
         throw new AgentRuntimeApprovalPendingError('planner-approval');
       });
       const delegateTask = vi.fn();
-      const result = await dispatchMissionWorkItems(
-        makeMissionState(),
-        { mode: 'agent', statuses: ['ready'] },
-        { routeA2A, delegateTask }
-      );
+      const previousMissionId = process.env.MISSION_ID;
+      process.env.MISSION_ID = missionId;
+      let result: Awaited<ReturnType<typeof dispatchMissionWorkItems>>;
+      try {
+        result = await dispatchMissionWorkItems(
+          makeMissionState(),
+          { mode: 'agent', statuses: ['ready'] },
+          { routeA2A, delegateTask }
+        );
+      } finally {
+        if (previousMissionId === undefined) delete process.env.MISSION_ID;
+        else process.env.MISSION_ID = previousMissionId;
+      }
       if (surface === 'cli_subagent') {
         expect(routeA2A).not.toHaveBeenCalled();
         expect(delegateTask).not.toHaveBeenCalled();

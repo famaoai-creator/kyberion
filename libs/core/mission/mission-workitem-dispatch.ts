@@ -201,7 +201,9 @@ async function dispatchMissionWorkItemsRound(
         mission_id: missionId,
         ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
         ...(state.organization_id ? { organization_id: state.organization_id } : {}),
-        ...(state.organization_id && state.relationships?.project?.project_id
+        ...((state.organization_id ||
+          (state.tier === 'public' && !state.tenant_slug && !state.tenant_id)) &&
+        state.relationships?.project?.project_id
           ? { project_id: state.relationships.project.project_id }
           : {}),
       },
