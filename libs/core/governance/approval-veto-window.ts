@@ -1,15 +1,14 @@
 import { isOperationsHalted } from './operations-halt.js';
+import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
 import {
-  appendGovernedArtifactJsonl,
-  writeGovernedArtifactJson,
-  type GovernedArtifactRole,
-} from '../workforce/artifact-store.js';
+  appendLocatedApprovalEvent,
+  locateApprovalRequest,
+  writeLocatedApprovalRequest,
+} from './approval-store-location.js';
 import {
-  approvalEventLogicalPath,
-  approvalRequestLogicalPath,
-  decideApprovalRequest,
+  withApprovalRecordLock,
+  decideApprovalRequestUnderLock,
   listApprovalRequests,
-  loadApprovalRequest,
   type ApprovalRequestRecord,
 } from './approval-store.js';
 import type { AutonomousOpsPolicy } from './autonomous-ops-gate.js';
@@ -149,21 +148,38 @@ export function evaluateVetoWindow(veto: ApprovalVetoWindow, now = Date.now()): 
   return veto.shadow ? 'elapsed_shadow' : 'elapsed';
 }
 
-function writeRecord(role: GovernedArtifactRole, record: ApprovalRequestRecord): void {
-  writeGovernedArtifactJson(
+type LocatedRequest = NonNullable<ReturnType<typeof locateApprovalRequest>>;
+
+/**
+ * Run a veto transition under the record lock on a FRESH read of the record
+ * (never a caller's possibly stale copy, which could flip a decided request
+ * back to pending), writing it back where it is stored (system tree or its
+ * tenant partition, approval-store-location.ts). Null when the record is gone.
+ */
+function withLockedVetoRecord<T>(
+  role: GovernedArtifactRole,
+  ref: { storageChannel: string; requestId: string },
+  fn: (located: LocatedRequest) => T
+): T | null {
+  return withApprovalRecordLock(
     role,
-    approvalRequestLogicalPath(record.storageChannel, record.id),
-    record
+    { channel: ref.storageChannel, storageChannel: ref.storageChannel, requestId: ref.requestId },
+    () => {
+      const located = locateApprovalRequest(ref.storageChannel, ref.requestId);
+      return located ? fn(located) : null;
+    }
   );
 }
 
-function appendEvent(
+function persistWithEvent(
   role: GovernedArtifactRole,
+  located: LocatedRequest,
   record: ApprovalRequestRecord,
   event: string,
   extra: Record<string, unknown> = {}
 ): void {
-  appendGovernedArtifactJsonl(role, approvalEventLogicalPath(record.storageChannel), {
+  writeLocatedApprovalRequest(role, located, record);
+  appendLocatedApprovalEvent(role, located, {
     ts: nowIso(),
     event,
     request_id: record.id,
@@ -190,46 +206,48 @@ export function markApprovalNotificationDelivered(
   role: GovernedArtifactRole,
   params: { storageChannel: string; requestId: string; deliveredAt?: string }
 ): ApprovalRequestRecord | null {
-  const record = loadApprovalRequest(params.storageChannel, params.requestId);
-  if (!record?.veto || record.status !== 'pending' || record.veto.deliveredAt) return record;
-  const deliveredMs = parseInstant(params.deliveredAt ?? nowIso());
-  if (!Number.isFinite(deliveredMs)) return record;
-  if (evaluateVetoWindow(record.veto, deliveredMs) === 'undelivered') {
-    return fallBackToDecision(role, record);
-  }
-  const proceedsAt = computeVetoDeadline(
-    deliveredMs,
-    record.veto.windowMinutes,
-    record.veto.activeHours
-  );
-  const updated: ApprovalRequestRecord = {
-    ...record,
-    veto: {
-      ...record.veto,
-      deliveredAt: new Date(deliveredMs).toISOString(),
-      ...(proceedsAt ? { proceedsAt: proceedsAt.toISOString() } : {}),
-    },
-  };
-  if (!proceedsAt) return fallBackToDecision(role, updated);
-  writeRecord(role, updated);
-  appendEvent(role, updated, 'notification_delivered', {
-    delivered_at: updated.veto?.deliveredAt,
-    proceeds_at: updated.veto?.proceedsAt,
+  return withLockedVetoRecord(role, params, (located) => {
+    const record = located.record;
+    if (!record.veto || record.status !== 'pending' || record.veto.deliveredAt) return record;
+    const deliveredMs = parseInstant(params.deliveredAt ?? nowIso());
+    if (!Number.isFinite(deliveredMs)) return record;
+    if (evaluateVetoWindow(record.veto, deliveredMs) === 'undelivered') {
+      return fallBackToDecisionUnlocked(role, located, record);
+    }
+    const proceedsAt = computeVetoDeadline(
+      deliveredMs,
+      record.veto.windowMinutes,
+      record.veto.activeHours
+    );
+    const updated: ApprovalRequestRecord = {
+      ...record,
+      veto: {
+        ...record.veto,
+        deliveredAt: new Date(deliveredMs).toISOString(),
+        ...(proceedsAt ? { proceedsAt: proceedsAt.toISOString() } : {}),
+      },
+    };
+    if (!proceedsAt) return fallBackToDecisionUnlocked(role, located, updated);
+    persistWithEvent(role, located, updated, 'notification_delivered', {
+      delivered_at: updated.veto?.deliveredAt,
+      proceeds_at: updated.veto?.proceedsAt,
+    });
+    return updated;
   });
-  return updated;
 }
 
-function fallBackToDecision(
+/** Caller holds the record lock and passes the fresh record (or a fresh-derived update). */
+function fallBackToDecisionUnlocked(
   role: GovernedArtifactRole,
+  located: LocatedRequest,
   record: ApprovalRequestRecord
 ): ApprovalRequestRecord {
-  if (!record.veto || record.veto.fallback) return record;
+  if (!record.veto || record.veto.fallback || record.status !== 'pending') return record;
   const updated: ApprovalRequestRecord = {
     ...record,
     veto: { ...record.veto, fallback: 'undelivered' },
   };
-  writeRecord(role, updated);
-  appendEvent(role, updated, 'veto_window_fallback', { reason: 'undelivered' });
+  persistWithEvent(role, located, updated, 'veto_window_fallback', { reason: 'undelivered' });
   return updated;
 }
 
@@ -288,35 +306,58 @@ export function tickVetoWindows(
   });
   for (const record of pending) {
     if (!record.veto) continue;
-    const veto = record.veto;
     try {
-      const state = evaluateVetoWindow(veto, now);
-      if (state === 'undelivered' && !veto.fallback) {
-        result.fellBack.push(fallBackToDecision(role, record));
-      } else if (state === 'elapsed_shadow' && !veto.shadowElapsedAt) {
-        const updated: ApprovalRequestRecord = {
-          ...record,
-          veto: { ...veto, shadowElapsedAt: new Date(now).toISOString() },
-        };
-        writeRecord(role, updated);
-        appendEvent(role, updated, 'veto_window_elapsed_shadow', {
-          proceeds_at: veto.proceedsAt,
-        });
-        result.shadowElapsed.push(updated);
-      } else if (state === 'elapsed') {
-        result.proceeded.push(
-          decideApprovalRequest(role, {
-            channel: record.channel,
-            storageChannel: record.storageChannel,
-            requestId: record.id,
-            decision: 'approved',
-            decidedBy: VETO_WINDOW_DECIDER,
-            decidedByType: 'service',
-            authenticated: false,
-            note: `no objection within ${veto.windowMinutes} active minutes after delivery`,
-          })
-        );
-      }
+      // The listing is only a pre-filter: the window is re-evaluated on the
+      // fresh record under its lock, and an elapsed window is decided in that
+      // same locked step — a fallback or decision recorded in between wins.
+      const listed = evaluateVetoWindow(record.veto, now);
+      if (listed !== 'undelivered' && listed !== 'elapsed_shadow' && listed !== 'elapsed') continue;
+      const ref = { storageChannel: record.storageChannel, requestId: record.id };
+      const outcome = withLockedVetoRecord(
+        role,
+        ref,
+        (
+          located
+        ): {
+          kind: keyof Omit<VetoWindowTickResult, 'errors'>;
+          record: ApprovalRequestRecord;
+        } | null => {
+          const fresh = located.record;
+          if (fresh.status !== 'pending' || !fresh.veto) return null;
+          const veto = fresh.veto;
+          const state = evaluateVetoWindow(veto, now);
+          if (state === 'undelivered' && !veto.fallback) {
+            return { kind: 'fellBack', record: fallBackToDecisionUnlocked(role, located, fresh) };
+          }
+          if (state === 'elapsed_shadow' && !veto.shadowElapsedAt) {
+            const next: ApprovalRequestRecord = {
+              ...fresh,
+              veto: { ...veto, shadowElapsedAt: new Date(now).toISOString() },
+            };
+            persistWithEvent(role, located, next, 'veto_window_elapsed_shadow', {
+              proceeds_at: veto.proceedsAt,
+            });
+            return { kind: 'shadowElapsed', record: next };
+          }
+          if (state === 'elapsed') {
+            return {
+              kind: 'proceeded',
+              record: decideApprovalRequestUnderLock(role, {
+                channel: fresh.channel,
+                storageChannel: fresh.storageChannel,
+                requestId: fresh.id,
+                decision: 'approved',
+                decidedBy: VETO_WINDOW_DECIDER,
+                decidedByType: 'service',
+                authenticated: false,
+                note: `no objection within ${veto.windowMinutes} active minutes after delivery`,
+              }),
+            };
+          }
+          return null;
+        }
+      );
+      if (outcome) result[outcome.kind].push(outcome.record);
     } catch (error) {
       result.errors.push({
         requestId: record.id,

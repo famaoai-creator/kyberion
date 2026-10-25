@@ -151,6 +151,8 @@ describe('existing main service proof satisfies shared external admission exactl
     for (const channel of [...channels, 'external-operation'])
       for (const base of Object.values(roots))
         safeRmSync(rootResolve(`${base}/${channel}`), { recursive: true, force: true });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(rootResolve(roots.tenantApprovals), { recursive: true, force: true });
     safeRmSync(root, { recursive: true, force: true });
     vi.unstubAllEnvs();
   });

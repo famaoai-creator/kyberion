@@ -760,6 +760,13 @@
       "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions."
     },
     {
+      "path": "active/shared/runtime/tenant-approvals",
+      "artifact_class": "state",
+      "action": "review_required",
+      "note": "Per-tenant approval store partitions (libs/core/governance/approval-store-location.ts, TENANT_APPROVAL_ROOT_PATH): <personal|confidential>/<tenant>/<channel>/requests/<id>.json, passkey-challenges/<id>.json and the channel's append-only approvals.jsonl event log, for every approval whose scope names a tenant (except tenant-activation requests for a tenant that is not yet active, which stay in active/shared/coordination/channels/). Decision records and their event history are audit evidence, so no TTL deletion; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_approval_store role; tenant offboarding exports and soft-deletes a tenant's partitions.",
+      "audit": true
+    },
+    {
       "path": "active/shared/runtime/discussions",
       "artifact_class": "log",
       "action": "review_required",

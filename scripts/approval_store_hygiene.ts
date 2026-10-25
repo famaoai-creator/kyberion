@@ -2,6 +2,7 @@ import {
   APPROVAL_TRASH_PERSONA_ENV,
   checkApprovalTrashWritable,
   DEFAULT_STALE_PENDING_APPROVAL_MS,
+  migrateTenantApprovalPartitions,
   purgeFixtureApprovals,
   sweepExpirablePendingApprovals,
   sweepExpiredPasskeyChallenges,
@@ -9,9 +10,11 @@ import {
   type ExpiredPasskeyChallenge,
   type ExpirablePendingApproval,
   type FixtureApprovalRecord,
+  type TenantPartitionMigrationResult,
 } from '@agent/core/governance/approval-store-hygiene';
 import { listApprovalRequests } from '@agent/core/governance/approval-store';
 import { withExecutionContext } from '@agent/core/authority';
+import { cliOptionValue, hasCliFlag } from './lib/cli-guard.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 /**
@@ -23,8 +26,20 @@ import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js'
  * `active/archive/.trash/` (30-day restore window), which only the sovereign
  * persona may write, so `--apply` needs `KYBERION_PERSONA=sovereign`.
  *
+ * `--migrate-tenant-partitions` instead moves tenant-scoped records written to
+ * the system tree before the per-tenant partitions existed into their
+ * tenant's partition (dry run by default; `--apply` moves them, under the
+ * record lock, with an audit line; the record's passkey challenges move with
+ * it). It needs no sovereign persona and runs no other sweep. Every other run
+ * reports how many such records remain. Between writing the partition copy and
+ * removing the system copy, a reader that does not take the record lock may
+ * briefly see `[APPROVAL_LOCATION_AMBIGUOUS]`; if the process crashes in that
+ * gap, re-running `--apply` resolves it (an identical partition copy only has
+ * the system copy removed).
+ *
  *   node dist/scripts/approval_store_hygiene.js [--stale-days N] [--json]
  *   KYBERION_PERSONA=sovereign node dist/scripts/approval_store_hygiene.js --apply
+ *   node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions [--apply] [--json]
  */
 
 const APPROVAL_CHANNELS_LOGICAL_DIR = 'active/shared/coordination/channels';
@@ -49,14 +64,26 @@ export interface ApprovalStoreHygieneReport {
   fixturePurge: ApprovalSweepResult<FixtureApprovalRecord>;
   /** Expired passkey challenge files (HA-07). */
   passkeyChallenges?: ApprovalSweepResult<ExpiredPasskeyChallenge>;
+  /**
+   * Tenant-scoped records still in the system tree (always a dry run here;
+   * `--migrate-tenant-partitions --apply` moves them).
+   */
+  tenantPartitionMigration?: TenantPartitionMigrationResult;
 }
+
+export interface TenantPartitionMigrationReport {
+  mode: 'migrate-tenant-partitions';
+  dryRun: boolean;
+  migration: TenantPartitionMigrationResult;
+}
+
+const MIGRATE_COMMAND = 'node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function readStaleDays(argv: string[]): number {
-  const index = argv.indexOf('--stale-days');
-  if (index < 0) return DEFAULT_STALE_PENDING_APPROVAL_MS / DAY_MS;
-  const raw = argv[index + 1];
+  if (!hasCliFlag(argv, '--stale-days')) return DEFAULT_STALE_PENDING_APPROVAL_MS / DAY_MS;
+  const raw = cliOptionValue(argv, '--stale-days');
   const days = Number(raw);
   if (!raw || !Number.isInteger(days) || days < 1) {
     throw new ScriptExitError(2, `--stale-days requires a positive integer, got: ${raw ?? ''}`);
@@ -98,7 +125,19 @@ export function formatApprovalStoreHygieneReport(report: ApprovalStoreHygieneRep
     lines.push('', `Expired passkey challenges to remove: ${challenges.candidates.length}`);
     if (!report.dryRun) lines.push(`  removed: ${challenges.applied.length}`);
   }
-  const errors = [...pendingExpiry.errors, ...fixturePurge.errors, ...(challenges?.errors ?? [])];
+  const legacy = report.tenantPartitionMigration;
+  if (legacy) {
+    lines.push('', `Tenant-scoped records still in the system tree: ${legacy.candidates.length}`);
+    if (legacy.candidates.length > 0) {
+      lines.push(`  move them: ${MIGRATE_COMMAND} (dry run), then add --apply`);
+    }
+  }
+  const errors = [
+    ...pendingExpiry.errors,
+    ...fixturePurge.errors,
+    ...(challenges?.errors ?? []),
+    ...(legacy?.errors ?? []),
+  ];
   if (errors.length > 0) {
     lines.push('', `Errors (${errors.length}):`, ...errors.slice(0, 20).map((e) => `  - ${e}`));
   }
@@ -123,20 +162,69 @@ export function runApprovalStoreHygieneSweeps(options: {
     records: records.filter((record) => record.status === 'pending' && !trashed.has(record.id)),
   });
   const passkeyChallenges = sweepExpiredPasskeyChallenges({ dryRun: options.dryRun });
+  const tenantPartitionMigration = migrateTenantApprovalPartitions({ dryRun: true });
   return {
     dryRun: options.dryRun,
     staleAfterDays: options.staleAfterDays,
     pendingExpiry,
     fixturePurge,
     passkeyChallenges,
+    tenantPartitionMigration,
   };
+}
+
+export function formatTenantPartitionMigrationReport(
+  report: TenantPartitionMigrationReport
+): string {
+  const { migration } = report;
+  const mode = report.dryRun ? 'dry-run (pass --apply to move)' : 'applied';
+  const lines = [
+    `Approval tenant-partition migration — ${mode}`,
+    '',
+    `Tenant-scoped records in the system tree: ${migration.candidates.length}`,
+  ];
+  if (migration.candidates.length > 0) {
+    lines.push(`  by channel: ${countBy(migration.candidates, (c) => c.storageChannel)}`);
+    lines.push(`  by status: ${countBy(migration.candidates, (c) => c.status)}`);
+    lines.push('  (--json lists every record with its source and target path)');
+  }
+  if (!report.dryRun) {
+    const outcomes = Object.values(migration.outcomes);
+    lines.push(`  moved: ${outcomes.filter((o) => o === 'moved').length}`);
+    lines.push(
+      `  identical partition copy, system copy removed: ${outcomes.filter((o) => o === 'removed_duplicate').length}`
+    );
+  }
+  if (migration.errors.length > 0) {
+    lines.push(
+      '',
+      `Errors (${migration.errors.length}):`,
+      ...migration.errors.slice(0, 20).map((e) => `  - ${e}`)
+    );
+  }
+  return lines.join('\n');
 }
 
 export const runApprovalStoreHygiene = defineScript({
   name: 'approval-store-hygiene',
   flags: ['json'],
   run(context) {
-    const dryRun = !context.argv.includes('--apply');
+    const dryRun = !hasCliFlag(context.argv, '--apply');
+    if (hasCliFlag(context.argv, '--migrate-tenant-partitions')) {
+      const report: TenantPartitionMigrationReport = {
+        mode: 'migrate-tenant-partitions',
+        dryRun,
+        migration: migrateTenantApprovalPartitions({ dryRun }),
+      };
+      context.print(
+        context.json
+          ? JSON.stringify(report, null, 2)
+          : formatTenantPartitionMigrationReport(report)
+      );
+      // Printed above; a refused record still fails the run.
+      if (report.migration.errors.length > 0) throw new ScriptExitError(1, '', true, report);
+      return report;
+    }
     const staleAfterDays = readStaleDays(context.argv);
     if (!dryRun) assertApplyAllowed();
     const report = runApprovalStoreHygieneSweeps({ dryRun, staleAfterDays });

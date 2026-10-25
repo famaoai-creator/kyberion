@@ -973,6 +973,48 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
     ).toBe(true);
   });
 
+  it("exports and removes the tenant's approval store partitions, never another tenant's", () => {
+    const partition = (tier: string, tenant: string) =>
+      `active/shared/runtime/tenant-approvals/${tier}/${tenant}`;
+    writeJsonl(`${partition('confidential', TENANT)}/terminal/approvals.jsonl`, [
+      { event: 'approval_requested', request_id: 'req-a' },
+    ]);
+    writeJsonl(`${partition('personal', TENANT)}/terminal/approvals.jsonl`, [
+      { event: 'approval_requested', request_id: 'req-a2' },
+    ]);
+    writeJsonl(`${partition('confidential', 'tenant-beta')}/terminal/approvals.jsonl`, [
+      { event: 'approval_requested', request_id: 'req-b' },
+    ]);
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining([
+        { path: partition('confidential', TENANT), kind: 'tenant_approvals' },
+        { path: partition('personal', TENANT), kind: 'tenant_approvals' },
+      ])
+    );
+    expect(dryRun.targets.map((t) => t.path)).not.toContain(
+      partition('confidential', 'tenant-beta')
+    );
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    expect(fs.existsSync(abs(partition('confidential', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('personal', TENANT)))).toBe(false);
+    expect(fs.existsSync(abs(partition('confidential', 'tenant-beta')))).toBe(true);
+    expect(
+      fs.existsSync(
+        abs(`${result.export_path}/${partition('confidential', TENANT)}/terminal/approvals.jsonl`)
+      )
+    ).toBe(true);
+  });
+
   it("purges the tenant's execution-metrics partitions and legacy rows through the same ceremony", () => {
     const partition = (tier: string, tenant: string) =>
       `active/shared/runtime/execution-metrics/${tier}/${tenant}`;

@@ -132,6 +132,12 @@
         "active/shared/runtime/tenant-ledger/confidential/${KYBERION_TENANT}/"
       ]
     },
+    "tenant_approval_store": {
+      "allow": [
+        "active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/",
+        "active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/"
+      ]
+    },
     "surface_runtime": {
       "allow": [
         "active/shared/inbox/",

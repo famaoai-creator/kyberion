@@ -73,6 +73,7 @@ import { withExecutionContext } from '@agent/core/authority';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
+  approvalStoreRoots,
   loadApprovalRequest,
 } from '@agent/core/governance/approval-store';
 import {
@@ -197,6 +198,8 @@ describe('terminal approvals record one stable operator principal', () => {
       });
     }
     safeRmSync(approvalEventLogicalPath(PROVIDER_ATTESTATION_APPROVAL_CHANNEL), { force: true });
+    // Tenant-scoped requests live in the tenant approval partitions.
+    safeRmSync(approvalStoreRoots().tenantApprovals, { recursive: true, force: true });
     safeRmSync(rootDir, { recursive: true, force: true });
   });
 

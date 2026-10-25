@@ -9,6 +9,7 @@ import {
 } from './foundation/autonomy-learning-capability.js';
 import {
   SYSTEM_PARTITION,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
   PARTITIONED_RUNTIME_STATE_ROOTS,
   partitionedRuntimeStateKnowledgePath,
   partitionedRuntimeStateTierInPath,
@@ -297,5 +298,52 @@ describe('durable partitioned runtime state', () => {
     expect(isAutonomyLearningCapability(capability)).toBe(true);
     expect(isAutonomyLearningCapability({ ...capability, writeExact: [tenantRoot] })).toBe(false);
     expect(isAutonomyLearningCapability({ ...capability, tenantSlug: 'tenant-b' })).toBe(false);
+  });
+});
+
+describe('tenant approval partitions', () => {
+  it('registers the root as a partitioned ledger root (not state) with only its two store roles', () => {
+    expect(PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals).toBe(
+      'active/shared/runtime/tenant-approvals'
+    );
+    expect(Object.values(PARTITIONED_RUNTIME_STATE_ROOTS)).not.toContain(
+      'active/shared/runtime/tenant-approvals'
+    );
+    const policy = JSON.parse(
+      safeReadFile(path.join(rootDir(), 'knowledge/product/governance/security-policy.json'), {
+        encoding: 'utf8',
+      }) as string
+    );
+    for (const tier of ['personal', 'confidential'])
+      expect(policy.tenant_scope.protected_prefixes).toContain(
+        `active/shared/runtime/tenant-approvals/${tier}/`
+      );
+    expect(
+      policy.tenant_scope.shared_prefixes.some((prefix: string) =>
+        prefix.includes('/tenant-approvals/')
+      )
+    ).toBe(false);
+    for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
+      expect(JSON.stringify(policy[field])).not.toContain('runtime/tenant-approvals');
+    const own = [
+      'active/shared/runtime/tenant-approvals/personal/${KYBERION_TENANT}/',
+      'active/shared/runtime/tenant-approvals/confidential/${KYBERION_TENANT}/',
+    ];
+    expect(policy.authority_role_permissions.tenant_approval_store).toEqual({
+      allow_read: own,
+      allow_write: own,
+    });
+    const tiers = [
+      'active/shared/runtime/tenant-approvals/personal/',
+      'active/shared/runtime/tenant-approvals/confidential/',
+    ];
+    expect(policy.authority_role_permissions.tenant_approval_partition_index_reader).toEqual({
+      allow_read: tiers,
+      deny_read_descendants: tiers,
+      allow_write: [],
+    });
+    for (const [role, grant] of Object.entries(policy.authority_role_permissions))
+      if (role !== 'tenant_approval_store' && role !== 'tenant_approval_partition_index_reader')
+        expect(JSON.stringify(grant)).not.toContain('runtime/tenant-approvals');
   });
 });
