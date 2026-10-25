@@ -595,6 +595,7 @@ export function readMissionTeamSelectionDispatch(input: {
  * Call immediately before entering a runtime/claim boundary, after pure preflight.
  */
 export function reserveMissionTeamSelectionDispatch(input: {
+  executionRoute?: 'agent_runtime';
   missionId: string;
   teamRole: string;
   agentId: string;
@@ -646,6 +647,8 @@ export function reserveMissionTeamSelectionDispatch(input: {
       return selectionError('STALE', 'Role policy changed before launch; repeat preflight.');
     }
     if (!requested) return null;
+    if (requested.execution_route === 'agent_runtime' && input.executionRoute !== 'agent_runtime')
+      return selectionError('INVALID', 'This role requires an agent_runtime launch reservation.');
     const assignment = snapshot.plan.assignments.find(
       (entry) => entry.team_role === input.teamRole
     );

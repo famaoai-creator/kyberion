@@ -140,6 +140,13 @@ export function resumePipelineRunAfterApproval(
   }
   const mismatch = approvalBindsToSuspendedRun(record, runId, missionId, state);
   if (mismatch) return { status: 'not_applicable', reason: mismatch };
+  if (state.started?.library_execution?.resume_owner === 'task') {
+    return {
+      status: 'already_running',
+      reason: 'task dispatch owns the lease-fenced continuation',
+      runId,
+    };
+  }
   const originalAuthority = state.started?.execution_authority;
   if (
     !originalAuthority?.scope ||

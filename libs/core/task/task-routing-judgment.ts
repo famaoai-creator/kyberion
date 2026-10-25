@@ -180,6 +180,13 @@ const NOT_ATTEMPTED_CODES = [
   'PROVIDER_EGRESS_DENIED',
   'EXECUTION_SURFACE_UNAVAILABLE',
   'AGENT_RUNTIME_AWAITING_HUMAN',
+  'AGENT_APPROVAL_PENDING',
+  'PROVIDER_PROFILE_REFUSED',
+  'ADVISORY_BACKEND_DENIED',
+  'TASK_TOOL_BINDING',
+  'TASK_TOOL_SCOPE_DENIED',
+  'TASK_TOOL_LEASE_LOST',
+  'TASK_TOOL_UNAVAILABLE',
   // A person declined a prompt the agent stopped on. Mid-turn the model has
   // run, but what ended the turn was a person's decision, not its capability.
   'AGENT_RUNTIME_PROMPT_DECLINED',
@@ -193,6 +200,14 @@ export function classifyDispatchFailure(notes: readonly string[]): string | unde
     for (const code of NOT_ATTEMPTED_CODES) {
       if (note.includes(`[${code}]`)) return code;
     }
+    // These provider diagnostics mean no model could attempt the task.
+    // Raising the model tier cannot repair login or workspace trust.
+    if (
+      /\[auth\]|not signed in|not logged in|workspace has not been trusted|hasTrustDialogAccepted/iu.test(
+        note
+      )
+    )
+      return 'PROVIDER_AUTH_REQUIRED';
   }
   return undefined;
 }

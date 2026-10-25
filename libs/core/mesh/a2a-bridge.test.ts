@@ -227,6 +227,33 @@ describe('a2a-bridge', () => {
       ).toBeUndefined();
     });
 
+    it('preserves claimed task tool identity through supervisor spawn and separates fresh leases', async () => {
+      const { a2aBridge } = await import('./a2a-bridge.js');
+      const context = {
+        work_item_id: 'work-a',
+        task_id: 'task-a',
+        mission_id: 'MSN-A',
+        capability_profile: 'explorer',
+        lease_id: 'lease-a',
+        execution_mode: 'workitem',
+      };
+      const request = payload({ mode: 'fixed', provider: 'codex' }, context);
+      await a2aBridge.ensureAgent('planner-agent', undefined, request);
+      expect(mocks.ensureAgentRuntime).toHaveBeenCalledWith(
+        expect.objectContaining({
+          runtimeMetadata: expect.objectContaining(context),
+        })
+      );
+      const harness = a2aBridge as unknown as {
+        getRuntimeContextKey(input: typeof request): string;
+      };
+      const first = harness.getRuntimeContextKey(request);
+      const next = harness.getRuntimeContextKey(
+        payload({ mode: 'fixed', provider: 'codex' }, { ...context, lease_id: 'lease-b' })
+      );
+      expect(first).not.toBe(next);
+    });
+
     it('does not turn a provider-only fixed constraint into a fixed model or agent identity', async () => {
       const { a2aBridge } = await import('./a2a-bridge.js');
       await a2aBridge.ensureAgent(

@@ -99,6 +99,56 @@
       "band": "discover"
     },
     {
+      "name": "kyberion.mission.record_evidence",
+      "description": "Record task evidence through the mission controller as the authenticated mission owner.",
+      "category": "mission",
+      "risk_class": "medium",
+      "requires_approval": true,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent"],
+      "band": "govern"
+    },
+    {
+      "name": "kyberion.mission.review_task",
+      "description": "Record an independently authored task review through the mission controller.",
+      "category": "mission",
+      "risk_class": "high",
+      "requires_approval": true,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent"],
+      "band": "govern"
+    },
+    {
+      "name": "kyberion.mission.verify",
+      "description": "Verify or reject mission outcome through native controller gates.",
+      "category": "mission",
+      "risk_class": "high",
+      "requires_approval": true,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent"],
+      "band": "govern"
+    },
+    {
+      "name": "kyberion.mission.distill",
+      "description": "Distill mission learning or replay its pending learning delivery.",
+      "category": "mission",
+      "risk_class": "medium",
+      "requires_approval": true,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent"],
+      "band": "govern"
+    },
+    {
+      "name": "kyberion.mission.finish",
+      "description": "Finish a mission through the native completion and approval gates.",
+      "category": "mission",
+      "risk_class": "high",
+      "requires_approval": true,
+      "allowed_tiers": ["public", "confidential", "personal"],
+      "allowed_caller_roles": ["operator", "agent"],
+      "band": "govern"
+    },
+    {
       "name": "kyberion.capability.list",
       "description": "List available Kyberion actuator capabilities.",
       "category": "capability",

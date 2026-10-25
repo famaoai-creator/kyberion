@@ -162,7 +162,7 @@ export function authorizeItem(
   currentApproval = true
 ): void {
   assertDotAccountabilityCharter(charter, { rootDir });
-  const record = readDotActionLedgerStrict({ rootDir })
+  const record = readDotActionLedgerStrict({ rootDir, dotId: charter.dot_id })
     .filter((row) => row.action_ref === item.metadata?.action_ref)
     .at(-1);
   if (

@@ -9,6 +9,11 @@ import { ensureMissionTeamRuntimeViaSupervisor } from '../agent/agent-runtime-su
 import * as pathResolver from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
+import {
+  getAgentPromptApprovalPort,
+  getPipelineApprovalStatus,
+  isAgentRuntimeApprovalPendingError,
+} from '../agent/agent-prompt-approval-port.js';
 import { loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import {
   getWorkItem,
@@ -137,6 +142,34 @@ async function dispatchMissionWorkItemsRound(
     throw new Error(`Mission path not found for ${missionId}`);
   }
 
+  // A human decision resumes only the matching blocked task. The runtime
+  // consumes the approval when the exact tool request is actually relayed.
+  const approvalPort = getAgentPromptApprovalPort();
+  {
+    for (const waiting of selectWorkItems(state, { ...options, statuses: ['blocked'] })) {
+      if (
+        waiting.metadata?.awaiting_approval !== true ||
+        typeof waiting.metadata.approval_request_id !== 'string'
+      )
+        continue;
+      const channel = waiting.metadata.approval_storage_channel;
+      const pipelineApproval =
+        waiting.metadata.approval_kind === 'pipeline' && typeof channel === 'string'
+          ? getPipelineApprovalStatus(channel, waiting.metadata.approval_request_id)
+          : undefined;
+      const decision =
+        waiting.metadata.approval_kind === 'pipeline'
+          ? (pipelineApproval ?? 'closed')
+          : (approvalPort?.status(waiting.metadata.approval_request_id) ?? 'closed');
+      if (decision === 'pending') continue;
+      updateWorkItem({
+        itemId: waiting.item_id,
+        expectedVersion: waiting.version,
+        status: decision === 'approved' ? 'ready' : 'blocked',
+        metadata: { ...waiting.metadata, awaiting_approval: false, approval_decision: decision },
+      });
+    }
+  }
   const workItems = selectWorkItems(state, options);
   const existingManifest = readManifest(missionPath);
   const records: MissionWorkItemDispatchRecord[] = [];
@@ -407,6 +440,32 @@ async function dispatchMissionWorkItemsRound(
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
+      if (isAgentRuntimeApprovalPendingError(error)) {
+        record.status = 'deferred';
+        record.work_item_status_after = 'blocked';
+        record.notes.push(
+          reason,
+          `next action: decide approval ${error.approvalRequestId}; dispatch resumes the task after approval`
+        );
+        const current = getWorkItem(item.item_id);
+        updateWorkItem({
+          itemId: item.item_id,
+          ...(current ? { expectedVersion: current.version } : {}),
+          status: 'blocked',
+          metadata: {
+            ...(current?.metadata || item.metadata || {}),
+            awaiting_approval: true,
+            approval_request_id: error.approvalRequestId,
+            approval_storage_channel: error.approvalStorageChannel,
+            approval_kind: error.approvalKind,
+            response_wait_status: 'awaiting_approval',
+            response_wait_next_action: `decide approval ${error.approvalRequestId}; dispatch resumes after approval`,
+          },
+        });
+        recordRouting({ attempted: false, succeeded: false });
+        records.push(record);
+        continue;
+      }
       record.status = 'failed';
       record.work_item_status_after = 'blocked';
       record.notes.push(`response wait failed: ${reason}`);

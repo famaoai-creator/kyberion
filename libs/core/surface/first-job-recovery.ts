@@ -79,7 +79,7 @@ function inspected(viewer: SurfaceViewerScope, auth: Auth, requestId: string) {
   const effect = firstJobApprovalEffect(charter, binding);
   if (effect.ownerMemberId !== auth.principal.memberId) reject();
   if (request.status === 'pending' && !inspectFrontDeskExecution(binding, charter).ok) reject();
-  const rows = readDotActionLedgerStrict();
+  const rows = readDotActionLedgerStrict({ dotId: charter.dot_id });
   const linked = rows.filter(
     (row) =>
       row.front_desk_execution?.request_id === requestId ||

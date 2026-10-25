@@ -81,7 +81,9 @@
       "active/shared/runtime/pipeline-library-runs/personal/",
       "active/shared/runtime/pipeline-library-runs/confidential/",
       "active/shared/runtime/external-operations/personal/",
-      "active/shared/runtime/external-operations/confidential/"
+      "active/shared/runtime/external-operations/confidential/",
+      "active/shared/runtime/dot/personal/",
+      "active/shared/runtime/dot/confidential/"
     ],
     "shared_prefixes": [
       "knowledge/confidential/tenant-groups/",
@@ -304,6 +306,22 @@
     },
     "ops_alerts": {
       "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
+    },
+    "ops_alert_store": {
+      "allow_read": [
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/ops-alerts.dedupe.json",
+        "active/shared/runtime/state/scheduler-ops-alert-days.json"
+      ],
+      "allow_write": [
+        "active/shared/observability/ops-alerts.jsonl",
+        "active/shared/observability/ops-alerts.dedupe.json",
+        "active/shared/runtime/state/scheduler-ops-alert-days.json"
+      ]
+    },
+    "task_runtime_worker": {
+      "allow_read": [],
+      "allow_write": []
     },
     "operational_learning_writer": {
       "allow_write": [
@@ -923,6 +941,7 @@
     "dot_lifecycle_writer": {
       "allow_read": [
         "dots/",
+        "knowledge/personal/dots/",
         "knowledge/personal/tenants/${KYBERION_TENANT}.json",
         "active/organizations/confidential/${KYBERION_TENANT}/${KYBERION_ORGANIZATION_ID}/",
         "active/organizations/public/shared/${KYBERION_ORGANIZATION_ID}/",
@@ -932,6 +951,7 @@
       ],
       "allow_write": [
         "dots/",
+        "knowledge/personal/dots/",
         "knowledge/confidential/${KYBERION_TENANT}/dots/",
         "active/shared/runtime/",
         "active/shared/tmp/"

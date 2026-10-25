@@ -16,6 +16,7 @@ import { resolveWorkforceLoad, type WorkforceLoadIndex } from '../workforce/work
 import { workerLoadPenalty } from '../workforce/worker-assignment-policy.js';
 import { providerCanProjectProfile } from '../provider/provider-permission-profiles.js';
 import { resolveCapabilityProfileForTeamRole } from '../subagent-capability-profiles.js';
+import { canProvideGovernedTaskTools } from '../agent/agent-exec-adapter-bridge.js';
 
 export interface AuthorityRoleRecord {
   description: string;
@@ -85,6 +86,8 @@ export interface MissionTeamRoleSelection {
   agent_id?: string;
   provider?: string;
   model_id?: string;
+  /** Runtime-only eligibility; dispatch still validates the live task lease and tool binding. */
+  execution_route?: 'agent_runtime';
 }
 
 export interface MissionTeamSelectionResolution {
@@ -101,11 +104,16 @@ export function normalizeMissionTeamRoleSelection(
     );
   }
   for (const key of Object.keys(value)) {
-    if (!['mode', 'agent_id', 'provider', 'model_id'].includes(key)) {
+    if (!['mode', 'agent_id', 'provider', 'model_id', 'execution_route'].includes(key)) {
       throw new Error('[MISSION_TEAM_SELECTION_INVALID] Unsupported selection field: ' + key);
     }
   }
   const normalized: MissionTeamRoleSelection = { mode: value.mode };
+  if (value.execution_route !== undefined) {
+    if (value.execution_route !== 'agent_runtime')
+      throw new Error('[MISSION_TEAM_SELECTION_INVALID] Unsupported execution route.');
+    normalized.execution_route = value.execution_route;
+  }
   for (const key of ['agent_id', 'provider', 'model_id'] as const) {
     if (value[key] === undefined) continue;
     if (typeof value[key] !== 'string' || !value[key]!.trim()) {
@@ -380,6 +388,10 @@ export function selectAgentForTeamRole(input: SelectAgentForTeamRoleInput): Miss
       // fixed/requested provider that cannot project is never substituted.
       if (
         resolvedTarget.provider &&
+        !(
+          requestedSelection?.execution_route === 'agent_runtime' &&
+          canProvideGovernedTaskTools(resolvedTarget.provider)
+        ) &&
         !providerCanProjectProfile(resolvedTarget.provider, requiredTier)
       ) {
         const failedProvider = resolvedTarget.provider;
