@@ -34,18 +34,65 @@ import {
 import {
   DEFAULT_STALE_PENDING_APPROVAL_MS,
   findExpirablePendingApprovals,
+  findLegacyTenantApprovals,
   isFixtureApproval,
+  migrateTenantApprovalPartitions,
   purgeFixtureApprovals,
   sweepExpirablePendingApprovals,
   sweepExpiredPasskeyChallenges,
 } from './approval-store-hygiene.js';
-import { issueApprovalPasskeyChallenge } from './approval-passkey-challenge.js';
+import { approvalRequestLogicalPath } from './approval-store-paths.js';
+import {
+  locateApprovalRequest,
+  tenantApprovalPasskeyChallengesLogicalDir,
+  tenantApprovalRequestLogicalPath,
+  writeApprovalJsonAt,
+  type ApprovalTenantPartition,
+} from './approval-store-location.js';
+import { auditChain } from './audit-chain.js';
+import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
+import {
+  claimApprovalPasskeyChallenge,
+  issueApprovalPasskeyChallenge,
+} from './approval-passkey-challenge.js';
 import { computeApprovalPresentedDigest } from './approval-presentation.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';
 
 const NOW = Date.parse('2026-09-27T12:00:00Z');
+const TENANT = `hyg-${process.pid}`;
+const TENANT_PARTITION: ApprovalTenantPartition = {
+  kind: 'tenant',
+  tier: 'confidential',
+  tenant_slug: TENANT,
+};
+const TENANT_SCOPE = {
+  scope_kind: 'tenant' as const,
+  tier: 'confidential' as const,
+  tenant_slug: TENANT,
+};
+
+/** Remove a channel from the system tree and the test tenant's partitions. */
+function removeChannel(channel: string): void {
+  withExecutionContext('mission_controller', () => {
+    const roots = approvalStoreRoots();
+    for (const root of [roots.coordination, roots.observability]) {
+      const dir = pathResolver.rootResolve(`${root}/${channel}`);
+      if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+    }
+    for (const tier of ['personal', 'confidential']) {
+      const dir = pathResolver.rootResolve(`${roots.tenantApprovals}/${tier}/${TENANT}`);
+      if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
+    }
+  });
+}
+
+function existsAt(logicalPath: string): boolean {
+  return withExecutionContext('mission_controller', () =>
+    safeExistsSync(pathResolver.rootResolve(logicalPath))
+  );
+}
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 function record(overrides: Partial<ApprovalRequestRecord>): ApprovalRequestRecord {
@@ -273,5 +320,218 @@ describe('sweepExpiredPasskeyChallenges', () => {
     expect(applied.applied).toContain(path(stale.challenge_id));
     expect(safeExistsSync(pathResolver.rootResolve(path(stale.challenge_id)))).toBe(false);
     expect(safeExistsSync(pathResolver.rootResolve(path(live.challenge_id)))).toBe(true);
+  });
+});
+
+describe('approval store hygiene over tenant partitions', () => {
+  const channel = `hygiene-tenant-${process.pid}`;
+  const fixtureChannel = `qm98-tenant-fixture-${process.pid}`;
+
+  afterEach(() => {
+    removeChannel(channel);
+    removeChannel(fixtureChannel);
+    janitor.softDeleteToTrash.mockClear();
+    vi.restoreAllMocks();
+  });
+
+  function createTenant(storageChannel = channel): ApprovalRequestRecord {
+    return createApprovalRequest('mission_controller', {
+      channel: storageChannel,
+      threadTs: '1',
+      correlationId: 'tenant-hygiene',
+      requestedBy: 'operator',
+      draft: { title: 'tenant hygiene', summary: 'approval-store-hygiene tenant partition' },
+      scope: TENANT_SCOPE,
+      accountability: { finalDecision: 'human_only', min_assurance: 'A3' },
+    });
+  }
+
+  /** A tenant record written to the system tree before the partitions existed. */
+  function writeLegacy(storageChannel = channel): ApprovalRequestRecord {
+    const base = createApprovalRequest('mission_controller', {
+      channel: storageChannel,
+      threadTs: '1',
+      correlationId: 'tenant-hygiene-legacy',
+      requestedBy: 'operator',
+      draft: { title: 'legacy tenant record', summary: 'pre-partition' },
+    });
+    const legacy: ApprovalRequestRecord = { ...base, scope: TENANT_SCOPE };
+    writeGovernedArtifactJson(
+      'mission_controller',
+      approvalRequestLogicalPath(storageChannel, legacy.id),
+      legacy
+    );
+    return legacy;
+  }
+
+  it('sweeps expired passkey challenges inside a tenant partition', () => {
+    const created = createTenant();
+    const issue = (now: Date) =>
+      issueApprovalPasskeyChallenge('mission_controller', {
+        record: created,
+        presentedDigest: computeApprovalPresentedDigest(created),
+        storageChannel: channel,
+        decision: 'approved',
+        memberId: 'owner',
+        now,
+      });
+    const stale = issue(new Date(Date.now() - 3 * 60 * 60 * 1000));
+    const live = issue(new Date());
+    const path = (id: string) =>
+      `${tenantApprovalPasskeyChallengesLogicalDir(TENANT_PARTITION, channel)}/${id}.json`;
+    expect(existsAt(path(stale.challenge_id))).toBe(true);
+
+    const dry = sweepExpiredPasskeyChallenges({ dryRun: true });
+    const mine = dry.candidates.filter((c) => c.storageChannel === channel);
+    expect(mine.map((c) => [c.logicalPath, c.partition])).toEqual([
+      [path(stale.challenge_id), TENANT_PARTITION],
+    ]);
+
+    const applied = sweepExpiredPasskeyChallenges({ dryRun: false });
+    expect(applied.errors).toEqual([]);
+    expect(applied.applied).toContain(path(stale.challenge_id));
+    expect(existsAt(path(stale.challenge_id))).toBe(false);
+    expect(existsAt(path(live.challenge_id))).toBe(true);
+  });
+
+  it('trashes a fixture record from the tenant partition it lives in', () => {
+    const created = createTenant(fixtureChannel);
+    const partitionPath = tenantApprovalRequestLogicalPath(
+      TENANT_PARTITION,
+      fixtureChannel,
+      created.id
+    );
+    const result = purgeFixtureApprovals({ dryRun: false, records: [created] });
+    expect(result.errors).toEqual([]);
+    expect(result.candidates.map((c) => [c.logicalPath, c.partition])).toEqual([
+      [partitionPath, TENANT_PARTITION],
+    ]);
+    expect(janitor.softDeleteToTrash).toHaveBeenCalledWith(pathResolver.resolve(partitionPath));
+  });
+
+  it('reports a legacy tenant record and moves it into its partition on apply, idempotently', () => {
+    const legacy = writeLegacy();
+    const audit = vi.spyOn(auditChain, 'record');
+    const from = approvalRequestLogicalPath(channel, legacy.id);
+    const to = tenantApprovalRequestLogicalPath(TENANT_PARTITION, channel, legacy.id);
+
+    const dry = migrateTenantApprovalPartitions({ dryRun: true });
+    const mine = dry.candidates.filter((c) => c.storageChannel === channel);
+    expect(mine).toEqual([
+      expect.objectContaining({ requestId: legacy.id, from, to, partition: TENANT_PARTITION }),
+    ]);
+    expect(existsAt(from)).toBe(true);
+    expect(existsAt(to)).toBe(false);
+
+    const applied = migrateTenantApprovalPartitions({ dryRun: false });
+    expect(applied.errors).toEqual([]);
+    expect(applied.outcomes[legacy.id]).toBe('moved');
+    expect(existsAt(from)).toBe(false);
+    expect(existsAt(to)).toBe(true);
+    const located = locateApprovalRequest(channel, legacy.id);
+    expect(located?.partition).toEqual(TENANT_PARTITION);
+    expect(located?.record).toEqual(legacy);
+    expect(audit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operation: 'migrate_tenant_partition',
+        result: 'completed',
+        metadata: expect.objectContaining({ request_id: legacy.id, outcome: 'moved' }),
+      })
+    );
+
+    const again = migrateTenantApprovalPartitions({ dryRun: false });
+    expect(again.candidates.filter((c) => c.storageChannel === channel)).toEqual([]);
+    expect(again.errors).toEqual([]);
+  });
+
+  it("moves a legacy record's passkey challenges into the partition in the same step", () => {
+    const legacy = writeLegacy();
+    const challenge = issueApprovalPasskeyChallenge('mission_controller', {
+      record: legacy,
+      presentedDigest: computeApprovalPresentedDigest(legacy),
+      storageChannel: channel,
+      decision: 'approved',
+      memberId: 'owner',
+    });
+    const systemPath = `${approvalStoreRoots().coordination}/${channel}/approvals/passkey-challenges/${challenge.challenge_id}.json`;
+    const partitionPath = `${tenantApprovalPasskeyChallengesLogicalDir(TENANT_PARTITION, channel)}/${challenge.challenge_id}.json`;
+    expect(existsAt(systemPath)).toBe(true);
+    const applied = migrateTenantApprovalPartitions({ dryRun: false });
+    expect(applied.errors).toEqual([]);
+    expect(applied.outcomes[legacy.id]).toBe('moved');
+    expect(existsAt(systemPath)).toBe(false);
+    expect(existsAt(partitionPath)).toBe(true);
+    // The moved challenge still settles against its (now partitioned) request.
+    expect(
+      claimApprovalPasskeyChallenge('mission_controller', {
+        storageChannel: channel,
+        challengeId: challenge.challenge_id,
+        requestId: legacy.id,
+        memberId: 'owner',
+        decision: 'approved',
+      }).claimed_at
+    ).toBeTruthy();
+  });
+
+  it('keeps a tenant binding from the execution scope when listing migration candidates', () => {
+    const legacy = writeLegacy();
+    const bound = withExecutionContext(
+      'mission_controller',
+      () => migrateTenantApprovalPartitions({ dryRun: true, role: 'mission_controller' }),
+      undefined,
+      `hyg-other-${process.pid}`
+    );
+    expect(bound.candidates.map((c) => c.requestId)).not.toContain(legacy.id);
+    expect(
+      migrateTenantApprovalPartitions({ dryRun: true }).candidates.map((c) => c.requestId)
+    ).toContain(legacy.id);
+  });
+
+  it('removes an identical system copy and refuses a partition copy with different content', () => {
+    const same = writeLegacy();
+    writeApprovalJsonAt(
+      'mission_controller',
+      TENANT_PARTITION,
+      tenantApprovalRequestLogicalPath(TENANT_PARTITION, channel, same.id),
+      same
+    );
+    const differs = writeLegacy();
+    writeApprovalJsonAt(
+      'mission_controller',
+      TENANT_PARTITION,
+      tenantApprovalRequestLogicalPath(TENANT_PARTITION, channel, differs.id),
+      { ...differs, status: 'approved' }
+    );
+
+    const result = migrateTenantApprovalPartitions({
+      dryRun: false,
+      records: [same, differs],
+    });
+    expect(result.outcomes[same.id]).toBe('removed_duplicate');
+    expect(existsAt(approvalRequestLogicalPath(channel, same.id))).toBe(false);
+    expect(result.errors).toHaveLength(1);
+    expect(result.errors[0]).toContain('[APPROVAL_MIGRATION_CONFLICT]');
+    expect(existsAt(approvalRequestLogicalPath(channel, differs.id))).toBe(true);
+  });
+
+  it('leaves a tenant-activation request in the system tree until its tenant is active', () => {
+    const activation = record({
+      id: '44444444-4444-4444-8444-444444444444',
+      kind: 'mission_gate',
+      storageChannel: 'tenant-activation',
+      channel: 'tenant-activation',
+      scope: TENANT_SCOPE,
+    });
+    const untenanted = record({ id: '55555555-5555-4555-8555-555555555555' });
+    expect(
+      findLegacyTenantApprovals([activation, untenanted], { isTenantActive: () => false })
+    ).toEqual([]);
+    expect(
+      findLegacyTenantApprovals([activation, untenanted], { isTenantActive: () => true }).map(
+        (c) => c.requestId
+      )
+    ).toEqual([activation.id]);
+    // Without a readable activation command the default rule counts it as not active.
+    expect(findLegacyTenantApprovals([activation])).toEqual([]);
   });
 });

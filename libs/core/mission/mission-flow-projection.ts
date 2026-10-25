@@ -8,6 +8,10 @@ import {
   isApprovalRequestExpired,
   approvalRequestLogicalPath,
 } from '../governance/approval-store-reader.js';
+import {
+  approvalRequestLogicalPathAt,
+  locateApprovalRequest,
+} from '../governance/approval-store-location.js';
 import { reconcileCompletionStructurally } from '../intent/intent-reconciliation.js';
 import { evaluateMissionPrerequisites } from './mission-state.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
@@ -79,6 +83,29 @@ function reference(file: string): string {
   return pathResolver.toRepoRelative(file).split(path.sep).join('/');
 }
 
+/**
+ * Where a listed record lives: a tenant-scoped record is looked up in its
+ * tenant's partition (it may also still be a legacy system-tree record);
+ * anything else is the system tree.
+ */
+function approvalRecordEvidenceRef(
+  record: ReturnType<typeof listApprovalRequests>[number]
+): string {
+  if (record.scope?.tenant_slug) {
+    try {
+      const located = locateApprovalRequest(record.storageChannel, record.id, {
+        scope: record.scope,
+      });
+      if (located) {
+        return approvalRequestLogicalPathAt(located.partition, located.storageChannel, record.id);
+      }
+    } catch {
+      // Ambiguous or unreadable: fall back to the system path below.
+    }
+  }
+  return approvalRequestLogicalPath(record.storageChannel, record.id);
+}
+
 /** Exact-bound observations only; matching a mission name alone is not a scope boundary. */
 export function projectMissionApprovalBlockers(
   state: MissionState,
@@ -107,7 +134,7 @@ export function projectMissionApprovalBlockers(
           reason: expired
             ? `Approval ${record.id} is expired; obtain a current decision through the governed approval flow.`
             : `Approval ${record.id} is pending a human decision.`,
-          evidence_refs: [approvalRequestLogicalPath(record.storageChannel, record.id)],
+          evidence_refs: [approvalRecordEvidenceRef(record)],
         },
       ];
     });

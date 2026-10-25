@@ -9599,9 +9599,9 @@
         "qps-ploc": "⟦Şůɱɱȧřïẑė ṗėñḓïñɠ ḓėƈïşïőñş ȧñḓ ȧůŧőñőɱőůş ȧƈŧïőñş ȧş ȧ ḓïɠėşŧ (őṗŧïőñȧŀŀẏ şėñḓ ïŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
       },
       "cli_cmd_script_approvals_hygiene": {
-        "en": "Expire stale pending approvals and move test-fixture records out of the store (dry-run by default).",
-        "ja": "放置された承認依頼を期限切れにし、テスト用レコードを退避する(既定はドライラン)。",
-        "qps-ploc": "⟦Ėẋṗïřė şŧȧŀė ṗėñḓïñɠ ȧṗṗřőṽȧŀş ȧñḓ ɱőṽė ŧėşŧ-ƒïẋŧůřė řėƈőřḓş őůŧ őƒ ŧħė şŧőřė (ḓřẏ-řůñ ƀẏ ḓėƒȧůŀŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+        "en": "Expire stale approvals, trash test fixtures, or move legacy tenant records into partitions (dry-run by default).",
+        "ja": "放置された承認依頼を期限切れにし、テスト用レコードを退避する。--migrate-tenant-partitions で古いテナントの依頼をテナントの置き場に移す(既定はドライラン)。",
+        "qps-ploc": "⟦Ėẋṗïřė şŧȧŀė ȧṗṗřőṽȧŀş, ŧřȧşħ ŧėşŧ ƒïẋŧůřėş, őř ɱőṽė ŀėɠȧƈẏ ŧėñȧñŧ řėƈőřḓş ïñŧő ṗȧřŧïŧïőñş (ḓřẏ-řůñ ƀẏ ḓėƒȧůŀŧ). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
       },
       "cli_cmd_script_halt_status": {
         "en": "Show whether autonomous operations are halted, since when and by whom.",

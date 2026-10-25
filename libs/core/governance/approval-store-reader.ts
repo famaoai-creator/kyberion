@@ -1,48 +1,43 @@
-import { pathResolver } from '../path-resolver.js';
 import { eventScopeMatches, normalizeEventScope, type EventScopeInput } from '../event-scope.js';
-import { safeExistsSync, safeReaddir } from '../secure-io.js';
 /** Read-only approval addressing shared by the store and fenced recovery. */
 import type { ApprovalRequestRecord } from './approval-store.js';
-import { readGovernedArtifactJson } from '../workforce/artifact-store-reader.js';
-import { approvalStoreRoots } from './approval-store-paths.js';
+import {
+  approvalPartitionsForTenant,
+  approvalRequestLogicalPathAt,
+  approvalRequestsLogicalDirAt,
+  listApprovalChannelsAt,
+  listApprovalDirAt,
+  listApprovalPartitions,
+  locateApprovalRequest,
+  readApprovalJsonAt,
+  SYSTEM_APPROVAL_PARTITION,
+  systemRecordVisibleToThisProcess,
+  type ApprovalPartition,
+} from './approval-store-location.js';
+import { normalizeApprovalChannel } from './approval-store-paths.js';
+import { createLogger } from '../logger.js';
 
-const APPROVAL_CHANNEL_PATTERN = /^[a-z][a-z0-9-]{0,63}$/;
-const APPROVAL_REQUEST_ID_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const logger = createLogger('approval-store-reader');
 
-export function normalizeApprovalChannel(channel: string, label = 'channel'): string {
-  const normalized = String(channel || '')
-    .trim()
-    .toLowerCase();
-  if (!normalized || !APPROVAL_CHANNEL_PATTERN.test(normalized)) {
-    throw new Error(`[POLICY_VIOLATION] Invalid approval ${label}: ${channel}`);
-  }
-  return normalized;
-}
+export {
+  normalizeApprovalChannel,
+  normalizeApprovalRequestId,
+  approvalRequestsLogicalDir,
+  approvalRequestLogicalPath,
+} from './approval-store-paths.js';
 
-export function normalizeApprovalRequestId(id: string): string {
-  const normalized = String(id || '').trim();
-  if (!normalized || !APPROVAL_REQUEST_ID_PATTERN.test(normalized)) {
-    throw new Error(`[POLICY_VIOLATION] Invalid approval request id: ${id}`);
-  }
-  return normalized.toLowerCase();
-}
-
-export function approvalRequestsLogicalDir(storageChannel: string): string {
-  return `${approvalStoreRoots().coordination}/${normalizeApprovalChannel(storageChannel)}/approvals/requests`;
-}
-
-export function approvalRequestLogicalPath(storageChannel: string, id: string): string {
-  return `${approvalRequestsLogicalDir(storageChannel)}/${normalizeApprovalRequestId(id)}.json`;
-}
-
+/**
+ * Load a request by `(storageChannel, id)` from wherever it lives — the
+ * system tree or a tenant partition this process may bind
+ * (approval-store-location.ts). A `scope` naming a tenant narrows the
+ * partition probe to that tenant.
+ */
 export function loadApprovalRequest(
   storageChannel: string,
-  id: string
+  id: string,
+  options: { scope?: EventScopeInput } = {}
 ): ApprovalRequestRecord | null {
-  return readGovernedArtifactJson<ApprovalRequestRecord>(
-    approvalRequestLogicalPath(storageChannel, id)
-  );
+  return locateApprovalRequest(storageChannel, id, options)?.record ?? null;
 }
 
 /** Treat a malformed expiry as expired so approval cannot fail open. */
@@ -55,15 +50,17 @@ export function isApprovalRequestExpired(
   return !Number.isFinite(expiresAt) || expiresAt <= now;
 }
 
+/**
+ * List requests across the system tree and every tenant partition this
+ * process may bind. A `scope` filter naming a tenant probes only that
+ * tenant's partitions (plus the system tree, for legacy records).
+ */
 export function listApprovalRequests(params?: {
   storageChannels?: string[];
   status?: ApprovalRequestRecord['status'] | ApprovalRequestRecord['status'][];
   kind?: ApprovalRequestRecord['kind'] | ApprovalRequestRecord['kind'][];
   scope?: EventScopeInput;
 }): ApprovalRequestRecord[] {
-  const channelsRoot = pathResolver.resolve(approvalStoreRoots().coordination);
-  if (!safeExistsSync(channelsRoot)) return [];
-
   const statuses = params?.status
     ? new Set(Array.isArray(params.status) ? params.status : [params.status])
     : null;
@@ -72,40 +69,63 @@ export function listApprovalRequests(params?: {
     : null;
   const requestedScopeKind = params?.scope?.scope_kind;
   const scopeFilter = params?.scope ? normalizeEventScope(params.scope) : undefined;
-  const storageChannels = params?.storageChannels?.length
+  const requestedChannels = params?.storageChannels?.length
     ? params.storageChannels.map((channel) => normalizeApprovalChannel(channel, 'storage channel'))
-    : safeReaddir(channelsRoot).filter((entry) =>
-        safeExistsSync(
-          pathResolver.resolve(
-            approvalRequestsLogicalDir(normalizeApprovalChannel(entry, 'storage channel'))
-          )
-        )
-      );
+    : undefined;
+  const partitions: ApprovalPartition[] = [
+    SYSTEM_APPROVAL_PARTITION,
+    ...(scopeFilter?.tenant_slug
+      ? approvalPartitionsForTenant(scopeFilter.tenant_slug)
+      : listApprovalPartitions()),
+  ];
 
   const records: ApprovalRequestRecord[] = [];
-  for (const storageChannel of storageChannels) {
-    const requestsDir = pathResolver.resolve(approvalRequestsLogicalDir(storageChannel));
-    if (!safeExistsSync(requestsDir)) continue;
-    for (const entry of safeReaddir(requestsDir).filter((item) => item.endsWith('.json'))) {
-      const record = loadApprovalRequest(storageChannel, entry.replace(/\.json$/, ''));
-      if (!record) continue;
-      if (statuses && !statuses.has(record.status)) continue;
-      if (kinds && !kinds.has(record.kind)) continue;
-      if (scopeFilter) {
-        if (record.scope?.tier !== scopeFilter.tier) continue;
-        if (
-          !eventScopeMatches(record.scope, {
-            ...(requestedScopeKind ? { scope_kind: requestedScopeKind } : {}),
-            tenant_slug: scopeFilter.tenant_slug,
-            organization_id: scopeFilter.organization_id,
-            project_id: scopeFilter.project_id,
-            mission_id: scopeFilter.mission_id,
-            task_id: scopeFilter.task_id,
-          })
-        )
-          continue;
+  for (const partition of partitions) {
+    const storageChannels = requestedChannels ?? listApprovalChannelsAt(partition);
+    for (const storageChannel of storageChannels) {
+      const requestsDir = approvalRequestsLogicalDirAt(partition, storageChannel);
+      for (const entry of listApprovalDirAt(partition, requestsDir).filter((item) =>
+        item.endsWith('.json')
+      )) {
+        const logicalPath = approvalRequestLogicalPathAt(
+          partition,
+          storageChannel,
+          entry.replace(/\.json$/, '')
+        );
+        let record: ApprovalRequestRecord | null;
+        if (partition.kind === 'system') {
+          record = readApprovalJsonAt<ApprovalRequestRecord>(partition, logicalPath);
+        } else {
+          // One unreadable tenant record must not blind every listing.
+          try {
+            record = readApprovalJsonAt<ApprovalRequestRecord>(partition, logicalPath);
+          } catch (err) {
+            logger.warn(
+              `approval request skipped in listing — a tenant partition record is unreadable | next: inspect or repair the record (approval store hygiene) | evidence: ${logicalPath}: ${err instanceof Error ? err.message : String(err)}`
+            );
+            continue;
+          }
+        }
+        if (!record) continue;
+        if (partition.kind === 'system' && !systemRecordVisibleToThisProcess(record)) continue;
+        if (statuses && !statuses.has(record.status)) continue;
+        if (kinds && !kinds.has(record.kind)) continue;
+        if (scopeFilter) {
+          if (record.scope?.tier !== scopeFilter.tier) continue;
+          if (
+            !eventScopeMatches(record.scope, {
+              ...(requestedScopeKind ? { scope_kind: requestedScopeKind } : {}),
+              tenant_slug: scopeFilter.tenant_slug,
+              organization_id: scopeFilter.organization_id,
+              project_id: scopeFilter.project_id,
+              mission_id: scopeFilter.mission_id,
+              task_id: scopeFilter.task_id,
+            })
+          )
+            continue;
+        }
+        records.push(record);
       }
-      records.push(record);
     }
   }
 

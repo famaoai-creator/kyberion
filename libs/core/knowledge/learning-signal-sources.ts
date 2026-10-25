@@ -3,6 +3,13 @@ import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
 import { listConversationSignals } from '../intent/conversation-signals.js';
 import { loadApprovalRequest } from '../governance/approval-store.js';
+import {
+  readApprovalJsonlAt,
+  listApprovalChannelsAt,
+  listApprovalPartitions,
+  tenantApprovalEventLogicalPath,
+  type ApprovalTenantPartition,
+} from '../governance/approval-store-location.js';
 import { readWorkerEventStreamJsonl } from '../workforce/worker-event-stream.js';
 import { reasoningFailoverEventsPath } from '../reasoning/reasoning-failover.js';
 import { metrics, type ResourceUsageRecord } from '../metrics.js';
@@ -120,37 +127,82 @@ export const approvalRejectionSource: LearningSignalSource = {
     const observations: LearningObservation[] = [];
     for (const channel of listSubdirs(root)) {
       const events = readJsonlRecords(path.join(root, channel, 'approvals.jsonl'));
-      for (const event of events) {
-        if (event.event !== 'rejected') continue;
-        const ts = stringField(event, 'ts');
-        if (!inWindow(ts, window)) continue;
-        const requestId = stringField(event, 'request_id');
-        let record = null;
+      observations.push(...approvalRejectionObservations(events, channel, window));
+    }
+    // Tenant-scoped approvals keep their event log in the tenant's partition
+    // (approval-store-location.ts), read as that tenant's store role.
+    for (const partition of listApprovalPartitions()) {
+      for (const channel of safeApprovalChannels(partition)) {
+        // Read as the tenant-bound store role (approval-store-location.ts); a
+        // tenant this process may not bind yields nothing.
+        let events: Row[];
         try {
-          record = requestId ? loadApprovalRequest(channel, requestId) : null;
+          events = readApprovalJsonlAt<Row>(
+            undefined,
+            partition,
+            tenantApprovalEventLogicalPath(partition, channel)
+          );
         } catch {
-          record = null;
+          continue; // an unreadable log contributes nothing
         }
-        const annotated = record?.workflow?.approvals.find(
-          (approval) => approval.status === 'rejected' && approval.reasonCategory
-        )?.reasonCategory;
-        const reason = closedToken(
-          stringField(event, 'reason_category') || annotated || 'uncategorized'
-        );
-        const kind = closedToken(String(record?.kind || 'unknown'));
-        const tenantSlug = record?.scope?.tenant_slug?.trim() || undefined;
-        observations.push({
-          key: `${kind}:${reason}`,
-          title: `${kind} approval rejected (${reason})`,
-          ref: `approval:${channel}/${requestId}`,
-          ts,
-          ...(tenantSlug ? { tenantSlug } : {}),
-        });
+        observations.push(...approvalRejectionObservations(events, channel, window, partition));
       }
     }
     return observations;
   },
 };
+
+function safeApprovalChannels(partition: ApprovalTenantPartition): string[] {
+  try {
+    return listApprovalChannelsAt(partition);
+  } catch {
+    return [];
+  }
+}
+
+/** Rejection observations of one channel's event log (system tree or a tenant partition). */
+function approvalRejectionObservations(
+  events: Row[],
+  channel: string,
+  window: LearningSignalWindow,
+  partition?: ApprovalTenantPartition
+): LearningObservation[] {
+  const observations: LearningObservation[] = [];
+  for (const event of events) {
+    if (event.event !== 'rejected') continue;
+    const ts = stringField(event, 'ts');
+    if (!inWindow(ts, window)) continue;
+    const requestId = stringField(event, 'request_id');
+    let record = null;
+    try {
+      record = requestId
+        ? loadApprovalRequest(
+            channel,
+            requestId,
+            partition ? { scope: { tenant_slug: partition.tenant_slug } } : {}
+          )
+        : null;
+    } catch {
+      record = null;
+    }
+    const annotated = record?.workflow?.approvals.find(
+      (approval) => approval.status === 'rejected' && approval.reasonCategory
+    )?.reasonCategory;
+    const reason = closedToken(
+      stringField(event, 'reason_category') || annotated || 'uncategorized'
+    );
+    const kind = closedToken(String(record?.kind || 'unknown'));
+    const tenantSlug = record?.scope?.tenant_slug?.trim() || partition?.tenant_slug || undefined;
+    observations.push({
+      key: `${kind}:${reason}`,
+      title: `${kind} approval rejected (${reason})`,
+      ref: `approval:${channel}/${requestId}`,
+      ts,
+      ...(tenantSlug ? { tenantSlug } : {}),
+    });
+  }
+  return observations;
+}
 
 // 3. Non-mission runs: failed trace spans and failed task sessions -----------
 
