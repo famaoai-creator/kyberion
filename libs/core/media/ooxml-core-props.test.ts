@@ -36,4 +36,12 @@ describe('ooxml-core-props', () => {
     ).toBeUndefined();
     expect(extractOoxmlCoreProperties(Buffer.from('not-a-zip')).title).toBeUndefined();
   });
+
+  it('strips nested markup inside dc:title without regex tag sanitizers', () => {
+    expect(
+      parseOoxmlCorePropertiesXml(
+        '<cp:coreProperties xmlns:dc="http://purl.org/dc/elements/1.1/"><dc:title>Safe <em>Title</em></dc:title></cp:coreProperties>'
+      ).title
+    ).toBe('Safe Title');
+  });
 });
