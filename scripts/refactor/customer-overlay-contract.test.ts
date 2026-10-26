@@ -15,14 +15,17 @@ describe('mission refactor customer overlay contract', () => {
     // SO-01: these implementations moved to libs/core/ (scripts/refactor/
     // now holds thin re-export shims with no logic to grep).
     const state = read('libs/core/mission/mission-state.ts');
+    const identity = read('libs/core/mission/mission-prerequisite-identity.ts');
     const creation = read('libs/core/mission/mission-creation.ts');
     const llm = read('libs/core/mission/mission-llm.ts');
 
     // mission-state.ts uses resolveActiveProfileRoot() (refactored from customerResolver.customerRoot)
     expect(state).toContain('resolveActiveProfileRoot');
-    expect(state).toContain('my-identity.json');
-    expect(state).toContain('my-vision.md');
-    expect(state).toContain('agent-identity.json');
+    expect(state).toContain('MISSION_IDENTITY_FILES.map');
+    expect(state).toContain('probeMissionPrerequisiteIdentity');
+    expect(identity).toContain('my-identity.json');
+    expect(identity).toContain('my-vision.md');
+    expect(identity).toContain('agent-identity.json');
     expect(state).toContain('Sovereign profile incomplete');
     expect(state).toContain('complete customer onboarding');
     expect(creation).toContain('resolveCompany');

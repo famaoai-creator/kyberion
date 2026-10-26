@@ -272,7 +272,7 @@
             }
           },
           "requested_selection": {
-            "$ref": "#/definitions/mission_team_role_selection"
+            "$ref": "mission-team-role-selection.schema.json"
           },
           "selection_resolution": {
             "type": "object",
@@ -292,7 +292,7 @@
     "selection_settings": {
       "type": "object",
       "additionalProperties": {
-        "$ref": "#/definitions/mission_team_role_selection"
+        "$ref": "mission-team-role-selection.schema.json"
       }
     }
   },
@@ -406,65 +406,7 @@
       "additionalProperties": false
     },
     "mission_team_role_selection": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["mode"],
-      "properties": {
-        "mode": {
-          "enum": ["auto", "preferred", "fixed"]
-        },
-        "agent_id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "provider": {
-          "type": "string",
-          "minLength": 1
-        },
-        "model_id": {
-          "type": "string",
-          "minLength": 1
-        }
-      },
-      "allOf": [
-        {
-          "if": {
-            "properties": {
-              "mode": {
-                "const": "auto"
-              }
-            }
-          },
-          "then": {
-            "not": {
-              "anyOf": [
-                {
-                  "required": ["agent_id"]
-                },
-                {
-                  "required": ["provider"]
-                },
-                {
-                  "required": ["model_id"]
-                }
-              ]
-            }
-          },
-          "else": {
-            "anyOf": [
-              {
-                "required": ["agent_id"]
-              },
-              {
-                "required": ["provider"]
-              },
-              {
-                "required": ["model_id"]
-              }
-            ]
-          }
-        }
-      ]
+      "$ref": "mission-team-role-selection.schema.json"
     }
   }
 }

@@ -1,7 +1,6 @@
-import * as nodePath from 'node:path';
-import type { CanUseTool, McpServerConfig, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
+import type { CanUseTool, PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { pathResolver } from '../path-resolver.js';
+export { buildKyberionMcpServerConfig } from './claude-mcp-server-config.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { evaluatePreToolUse } from './claude-code-hook.js';
 import {
@@ -181,21 +180,6 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
     return deny(
       `Kyberion governance: tool "${toolName}" is not in the governed sub-agent allowlist.`
     );
-  };
-}
-
-/** Wire Kyberion's own MCP server (the kyberion.* surface) into the sub-agent. */
-export function buildKyberionMcpServerConfig(
-  repoRoot: string = pathResolver.rootDir()
-): Record<string, McpServerConfig> {
-  return {
-    kyberion: {
-      type: 'stdio',
-      command: 'node',
-      args: [nodePath.join(repoRoot, 'dist/scripts/mcp_server.js')],
-      cwd: repoRoot,
-      env: { KYBERION_PERSONA: getRegisteredEnvText('KYBERION_PERSONA') ?? 'sovereign_concierge' },
-    } as McpServerConfig,
   };
 }
 

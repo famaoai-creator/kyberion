@@ -23,6 +23,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'libs/core/project/project-trust.ts', consumer: 'project_trust' },
   { file: 'libs/core/dot/dot-executor-release.ts', consumer: 'dot_release' },
   { file: 'libs/core/governance/work-effect-release.ts', consumer: 'dot_release' },
+  { file: 'libs/core/governance/work-effect-release.ts', consumer: 'work_effect_release' },
   { file: 'libs/core/dot/dot-dispatch.ts', consumer: 'dot_dispatch' },
   { file: 'libs/core/dot/dot-autonomy.ts', consumer: 'dot_autonomy_promotion' },
   { file: 'libs/core/surface/front-desk-execution.ts', consumer: 'front_desk_execution' },
@@ -216,6 +217,35 @@ function callShapeFor(consumer: string): RegExp {
   );
 }
 
+/** Recognize explicit consumer branches passed directly to the refusal check. */
+function hasExplicitConsumerCheck(source: string, consumer: string): boolean {
+  if (callShapeFor(consumer).test(source)) return true;
+  const file = ts.createSourceFile('consumer.ts', source, ts.ScriptTarget.Latest, true);
+  const literalBranches = (node: ts.Expression): string[] | undefined => {
+    if (ts.isStringLiteral(node)) return [node.text];
+    if (ts.isConditionalExpression(node)) {
+      const yes = literalBranches(node.whenTrue);
+      const no = literalBranches(node.whenFalse);
+      return yes && no ? [...yes, ...no] : undefined;
+    }
+    return undefined;
+  };
+  let found = false;
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'approvalUsabilityRefusal' &&
+      node.arguments.length === 2 &&
+      literalBranches(node.arguments[1])?.includes(consumer)
+    )
+      found = true;
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}
+
 describe('separation-of-duties consumer registry', () => {
   const doc = read('knowledge/product/governance/approval-gate-design.md');
 
@@ -231,8 +261,24 @@ describe('separation-of-duties consumer registry', () => {
     ).not.toMatch(shape);
   });
 
+  it('recognizes both explicit conditional consumers without accepting unrelated mentions or dynamic ids', () => {
+    const source = "approvalUsabilityRefusal(record, dot ? 'dot_release' : 'work_effect_release');";
+    expect(hasExplicitConsumerCheck(source, 'dot_release')).toBe(true);
+    expect(hasExplicitConsumerCheck(source, 'work_effect_release')).toBe(true);
+    expect(hasExplicitConsumerCheck(source, 'unrelated')).toBe(false);
+    expect(
+      hasExplicitConsumerCheck(
+        "approvalUsabilityRefusal(record, dot ? 'dot_release' : dynamic);",
+        'dot_release'
+      )
+    ).toBe(false);
+    expect(
+      hasExplicitConsumerCheck("log(dot ? 'dot_release' : 'work_effect_release');", 'dot_release')
+    ).toBe(false);
+  });
+
   it.each(SOD_CONSUMERS)('$file checks approvals as `$consumer`', ({ file, consumer }) => {
-    expect(read(file)).toMatch(callShapeFor(consumer));
+    expect(hasExplicitConsumerCheck(read(file), consumer)).toBe(true);
     expect(doc).toContain(`\`${consumer}\``);
   });
 
