@@ -258,6 +258,44 @@ describe('reasoning-backend', () => {
     expect(fallbackOptions).toEqual({ model_tier: 'fast', effort: 'low' });
   });
 
+  it('projects a registry-qualified model only to its own vendor during task fallback', async () => {
+    const seen: unknown[] = [];
+    const backend = buildFailoverReasoningBackend([
+      {
+        provider: 'claude',
+        label: 'claude-cli',
+        backend: {
+          ...stubReasoningBackend,
+          delegateTask: async (_task, _context, options) => {
+            seen.push(options);
+            throw new Error('provider unavailable');
+          },
+        },
+      },
+      {
+        provider: 'opencode-cli',
+        label: 'opencode-cli',
+        backend: {
+          ...stubReasoningBackend,
+          delegateTask: async (_task, _context, options) => {
+            seen.push(options);
+            return 'served';
+          },
+        },
+      },
+    ]);
+    await expect(
+      backend.delegateTask('synthetic task', undefined, {
+        model: 'opencode:big-pickle',
+        effort: 'medium',
+      })
+    ).resolves.toBe('served');
+    expect(seen).toEqual([
+      { effort: 'medium' },
+      { model: 'opencode/big-pickle', effort: 'medium' },
+    ]);
+  });
+
   it('retries transient failures in place before demoting the provider', async () => {
     process.env.KYBERION_REASONING_RETRY_BASE_MS = '0';
     clearProviderHealth();

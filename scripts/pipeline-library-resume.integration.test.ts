@@ -143,6 +143,7 @@ describe('protected library execution approval continuation', () => {
           );
           const pending = await withScopeEnvelope(sourceEnvelope, () =>
             executePipelineFile(file, {
+              resumeOwner: 'task',
               delegatedExecution: 'require',
               delegatedWorkItem: owner,
               payloadScope: {
@@ -216,11 +217,38 @@ describe('protected library execution approval continuation', () => {
               effectBinding: approval.accountability!.effectBinding,
             });
           vi.stubEnv('KYBERION_TASK_ID', 'ambient-unrelated-task');
-          const completed = await resumeLibraryPipelineRun(pending.runId, {
-            tier: 'confidential',
-            tenantSlug: tenant,
+          await expect(
+            resumeLibraryPipelineRun(pending.runId, {
+              tier: 'confidential',
+              tenantSlug: tenant,
+            })
+          ).rejects.toThrow('live task tool binding');
+          const sourceGuard = vi.fn(() => {
+            throw new Error('pinned-source-mismatch');
           });
+          await expect(
+            resumeLibraryPipelineRun(
+              pending.runId,
+              {
+                tier: 'confidential',
+                tenantSlug: tenant,
+              },
+              () => undefined,
+              sourceGuard
+            )
+          ).rejects.toThrow('pinned-source-mismatch');
+          expect(sourceGuard).toHaveBeenCalledTimes(1);
+          const completed = await resumeLibraryPipelineRun(
+            pending.runId,
+            {
+              tier: 'confidential',
+              tenantSlug: tenant,
+            },
+            () => undefined,
+            (source) => expect(source).toContain('Exact library continuation')
+          );
           expect(completed.status).toBe(decision === 'approved' ? 'succeeded' : 'aborted');
+          if (decision === 'approved') expect(completed.runId).toBe(pending.runId);
           expect(completed.context.answer).toBe(decision === 'approved' ? 42 : undefined);
           if (decision === 'approved')
             expect(observedPolicies).toEqual([

@@ -1,3 +1,7 @@
+import { registerTaskGoalLoop } from './task-execution-port.js';
+
+registerTaskGoalLoop(runGoalDrivenLoop);
+
 /**
  * Worker Goal autonomous driver (KD-01).
  *
@@ -57,6 +61,7 @@
  */
 
 import { logger } from '../core.js';
+import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import {
   ManualDriveActionController,
   registerAgentRuntimeManualDriver,
@@ -771,6 +776,12 @@ export async function runGoalDrivenLoop(
         options.systemPrompt ?? '',
         renderInjectionsAsSystemReminders(injections),
         toolSearchAnnouncement,
+        rewindContext.getMessages().length
+          ? frameUntrustedInput({
+              source: 'bounded worker tool history',
+              data: JSON.stringify(rewindContext.getMessages().slice(-16)),
+            })
+          : '',
         ...preStepMessages,
         options.turnPrompt ?? '',
         queuedTurnPrompt ?? '',
@@ -978,6 +989,20 @@ export async function runGoalDrivenLoop(
               break;
             }
             const toolExecution = exec as GoalToolExecution;
+            const pairId = `${goal.goalId}:${turnNumber}:${toolIndex}`;
+            rewindContext.append({
+              role: 'tool_use',
+              pairId,
+              content: JSON.stringify({ name: call.name, input: call.input }).slice(0, 16_000),
+            });
+            rewindContext.append({
+              role: 'tool_result',
+              pairId,
+              content:
+                toolExecution.resultText.length > 16_000
+                  ? `${toolExecution.resultText.slice(0, 16_000)}\n[tool result truncated at 16000 characters]`
+                  : toolExecution.resultText,
+            });
             if (toolExecution.externalEffect) {
               rewindContext.recordExternalEffect(toolExecution.effectDescription);
             }

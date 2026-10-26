@@ -6,6 +6,7 @@ import type { OrganizationPurposeRecord } from './organization-operating-model.j
 export type { KrMeasurementRow } from '../dot/dot-state-paths.js';
 
 export interface ObjectiveProgressScope {
+  ownerNhi?: string;
   organizationId: string;
   tenantSlug?: string;
   tier: OrganizationTier;

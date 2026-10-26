@@ -1224,9 +1224,12 @@ function verifiedTerminalRecovery(request: FrontDeskExecutionRequest, rootDir?: 
   const receipt = request.recoveryReceipt;
   if (request.status !== 'terminated_unstarted' || !receipt) return false;
   try {
-    const allRows = readDotActionLedgerStrict({ rootDir });
+    const mapping = getFrontDeskExecutionMapping(request.binding);
+    const charter = mapping ? findRepoDotCharter(mapping.dotId, rootDir)?.charter : undefined;
+    if (!mapping || !charter) return false;
+    const indexRows = readDotActionLedgerStrict({ rootDir, indexOnly: true });
     if (
-      allRows.some(
+      indexRows.some(
         (row) =>
           row.action_ref !== receipt.action_ref &&
           (row.front_desk_execution?.request_id === request.binding.request_id ||
@@ -1236,7 +1239,9 @@ function verifiedTerminalRecovery(request: FrontDeskExecutionRequest, rootDir?: 
       )
     )
       return false;
-    const rows = allRows.filter((row) => row.action_ref === receipt.action_ref);
+    const rows = readDotActionLedgerStrict({ rootDir, dotId: charter.dot_id }).filter(
+      (row) => row.action_ref === receipt.action_ref
+    );
     const latest = rows.at(-1);
     const original = rows.find(
       (row) => row.status === 'parked' && dotActionRecordHash(row) === receipt.action_hash
@@ -1262,8 +1267,6 @@ function verifiedTerminalRecovery(request: FrontDeskExecutionRequest, rootDir?: 
     const approval = loadApprovalRequest('autonomy', receipt.approval_request_id);
     if (!approval || computeApprovalPayloadHash({ value: approval }) !== receipt.approval_hash)
       return false;
-    const mapping = getFrontDeskExecutionMapping(request.binding);
-    const charter = mapping ? findRepoDotCharter(mapping.dotId, rootDir)?.charter : undefined;
     if (!mapping || !charter || charter.dot_id !== latest.dot_id) return false;
     const effect = firstJobApprovalEffect(charter, request.binding);
     const expected = frontDeskExecutionProposal(request.binding);

@@ -28,6 +28,10 @@
           ]
         },
         "path": { "type": "string", "minLength": 1 },
+        "schema": {
+          "type": "string",
+          "pattern": "^knowledge/product/schemas/(?:[A-Za-z0-9_-]+/)*[A-Za-z0-9_.-]+\\.schema\\.json$"
+        },
         "execution_role": {
           "enum": ["runtime", "validation", "knowledge", "protocol"]
         },
@@ -44,7 +48,17 @@
           "type": "array",
           "items": { "type": "string", "minLength": 1 }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "kind": { "enum": ["mission_workflow_catalog", "scenario_pack"] } },
+            "required": ["kind"]
+          },
+          "then": { "required": ["schema"] },
+          "else": { "not": { "required": ["schema"] } }
+        }
+      ]
     }
   }
 }

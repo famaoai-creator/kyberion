@@ -77,20 +77,30 @@
     },
     "security_scope": {
       "type": "object",
-      "required": ["tenant_id", "mission_id", "read_tiers", "write_tier", "purpose"],
+      "required": ["mission_id", "read_tiers", "write_tier", "purpose"],
+      "anyOf": [
+        { "required": ["tenant_slug"] },
+        { "required": ["tenant_id"] },
+        {
+          "properties": {
+            "write_tier": { "const": "public" },
+            "read_tiers": { "type": "array", "items": { "const": "public" } }
+          }
+        }
+      ],
       "properties": {
         "tenant_slug": {
           "type": "string",
           "minLength": 1,
           "not": {
-            "enum": ["public", "confidential", "personal", "shared"]
+            "enum": ["public", "confidential", "personal", "shared", "system"]
           }
         },
         "tenant_id": {
           "type": "string",
           "minLength": 1,
           "not": {
-            "enum": ["public", "confidential", "personal", "shared"]
+            "enum": ["public", "confidential", "personal", "shared", "system"]
           }
         },
         "organization_id": {

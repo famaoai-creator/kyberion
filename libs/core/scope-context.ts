@@ -131,12 +131,14 @@ function readMissionScope(missionId: string): ScopeContextInput {
     // make every subsequent `currentScope()` throw, which is how a stale
     // mission blocked unrelated CLI verbs (reasoning-backend selection
     // resolves the process scope during bootstrap). Each level is contributed
-    // only when its parent is present.
+    // only when its parent is present, except documented public shared
+    // projects, whose organization is optional.
     return {
       tier: state.tier,
       tenant_slug: tenantSlug,
       ...(tenantSlug ? { organization_id: organizationId } : {}),
-      ...(tenantSlug && organizationId
+      ...((tenantSlug && organizationId) ||
+      (state.tier === 'public' && !tenantSlug && !organizationId)
         ? { project_id: state.relationships?.project?.project_id }
         : {}),
     };

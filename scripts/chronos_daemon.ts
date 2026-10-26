@@ -506,12 +506,12 @@ export function readScheduledPipelineAdf(fullPath: string): {
   };
 }
 
-/** Make a restrictive KYBERION_CHRONOS_SCHEDULES visible instead of silently idling jobs. */
+/** Make this instance's explicit schedule ownership visible. */
 function warnOperatorExcludedSchedules(): void {
   const excluded = listOperatorExcludedSchedules(listScheduledPipelines());
   if (excluded.length === 0) return;
-  logger.warn(
-    `[CHRONOS] ${excluded.length} enabled schedule(s) will never run on this host — KYBERION_CHRONOS_SCHEDULES lists plain ids, which restricts the host to those ids | next: prefix opt-in ids with + (e.g. +organization-daily-digest) to keep every enabled schedule running | evidence: ${excluded.slice(0, 10).join(', ')}${excluded.length > 10 ? ', …' : ''}`
+  logger.info(
+    `[CHRONOS] this instance excludes ${excluded.length} enabled schedule(s) by its explicit allowlist — plain KYBERION_CHRONOS_SCHEDULES ids partition job ownership | next: confirm these jobs belong to another instance; use +ID only when additive execution is intended | evidence: ${excluded.slice(0, 10).join(', ')}${excluded.length > 10 ? ', …' : ''}`
   );
 }
 

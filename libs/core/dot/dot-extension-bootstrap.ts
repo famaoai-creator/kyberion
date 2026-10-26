@@ -1,7 +1,8 @@
 /**
  * Dot extension bootstrap — registers every dot capability into the leaf
- * arrays of `dot-extension-registry.ts`. A capability registers by appending
- * ONE line here; order is significant (cores iterate in array order).
+ * arrays of `dot-extension-registry.ts` through its typed registration API.
+ * New capabilities register their own bundle at a composition boundary;
+ * order is explicit and duplicate hook identities are rejected atomically.
  *
  * Kept out of the registry so the cores never import the extensions
  * (extensions import the cores — the other direction would be a runtime
@@ -11,16 +12,7 @@
  * explicit idempotent form for callers and tests.
  */
 
-import {
-  DOT_DECISION_RELAXERS,
-  DOT_DIGEST_SECTIONS,
-  DOT_DISPOSITION_OVERRIDES,
-  DOT_FLOOR_CONTRIBUTORS,
-  DOT_PRE_GATE_CHECKS,
-  DOT_PROMPT_SECTIONS,
-  DOT_STATUS_SECTIONS,
-  DOT_WAKE_TOOLS,
-} from './dot-extension-registry.js';
+import { registerDotExtension } from './dot-extension-registry.js';
 import {
   DOT_GOAL_GAP_PROMPT_SECTION,
   DOT_KEY_RESULTS_DIGEST_SECTION,
@@ -55,43 +47,43 @@ let registered = false;
 /** Populate the dot extension registry once (idempotent). */
 export function ensureDotExtensionsRegistered(): void {
   if (registered) return;
+  registerDotExtension({
+    id: 'dot-builtin-capabilities',
+    order: 0,
+    metadata: { provenance: 'builtin', source: 'libs/core/dot/dot-extension-bootstrap.ts' },
+    hooks: {
+      promptSections: [
+        DOT_GOAL_GAP_PROMPT_SECTION,
+        dotMemoryPromptSection,
+        dotFollowupsPromptSection,
+        dotWorkResultsPromptSection(),
+        dotOutcomesPromptSection(),
+        dotProgressPromptSection(),
+      ],
+      wakeTools: [dotUpdateMemoryTool, dotScheduleFollowupTool],
+      floorContributors: [DOT_BUDGET_FLOOR_CONTRIBUTOR, dotAutonomyFloorContributor()],
+      preGateChecks: [dotArbitrationPreGateCheck()],
+      decisionRelaxers: [dotAutonomyDecisionRelaxer()],
+      dispositionOverrides: [dotAutonomyDispositionOverride()],
+      statusSections: [
+        DOT_KEY_RESULTS_STATUS_SECTION,
+        DOT_BUDGET_STATUS_SECTION,
+        dotOutcomesStatusSection(),
+        dotProgressStatusSection(),
+        dotAutonomyStatusSection(),
+        dotExecutorStatusSection(),
+        dotEventIntakeStatusSection(),
+      ],
+      digestSections: [
+        DOT_KEY_RESULTS_DIGEST_SECTION,
+        DOT_BUDGET_DIGEST_SECTION,
+        dotOutcomesDigestSection(),
+        dotAutonomyDigestSection(),
+      ],
+    },
+  });
+  // A construction or registration failure leaves initialization retryable.
   registered = true;
-
-  // DL-03 key results
-  DOT_PROMPT_SECTIONS.push(DOT_GOAL_GAP_PROMPT_SECTION);
-  DOT_STATUS_SECTIONS.push(DOT_KEY_RESULTS_STATUS_SECTION);
-  DOT_DIGEST_SECTIONS.push(DOT_KEY_RESULTS_DIGEST_SECTION);
-
-  // DL-05 memory + DL-09 follow-ups
-  DOT_WAKE_TOOLS.push(dotUpdateMemoryTool, dotScheduleFollowupTool);
-  DOT_PROMPT_SECTIONS.push(dotMemoryPromptSection, dotFollowupsPromptSection);
-
-  // DL-01 executor results + DL-07 budget wiring
-  DOT_PROMPT_SECTIONS.push(dotWorkResultsPromptSection());
-  DOT_FLOOR_CONTRIBUTORS.push(DOT_BUDGET_FLOOR_CONTRIBUTOR);
-  DOT_STATUS_SECTIONS.push(DOT_BUDGET_STATUS_SECTION);
-  DOT_DIGEST_SECTIONS.push(DOT_BUDGET_DIGEST_SECTION);
-
-  // DL-04 outcome evaluation
-  DOT_PROMPT_SECTIONS.push(dotOutcomesPromptSection());
-  DOT_STATUS_SECTIONS.push(dotOutcomesStatusSection());
-  DOT_DIGEST_SECTIONS.push(dotOutcomesDigestSection());
-  DOT_PROMPT_SECTIONS.push(dotProgressPromptSection());
-  DOT_STATUS_SECTIONS.push(dotProgressStatusSection());
-
-  // DL-11 cross-dot arbitration
-  DOT_PRE_GATE_CHECKS.push(dotArbitrationPreGateCheck());
-
-  // DL-10 graduated autonomy
-  DOT_FLOOR_CONTRIBUTORS.push(dotAutonomyFloorContributor());
-  DOT_DECISION_RELAXERS.push(dotAutonomyDecisionRelaxer());
-  DOT_DISPOSITION_OVERRIDES.push(dotAutonomyDispositionOverride());
-  DOT_STATUS_SECTIONS.push(dotAutonomyStatusSection());
-  DOT_DIGEST_SECTIONS.push(dotAutonomyDigestSection());
-
-  // DL-01 executor status (results + escalations)
-  DOT_STATUS_SECTIONS.push(dotExecutorStatusSection());
-  DOT_STATUS_SECTIONS.push(dotEventIntakeStatusSection());
 }
 
 ensureDotExtensionsRegistered();

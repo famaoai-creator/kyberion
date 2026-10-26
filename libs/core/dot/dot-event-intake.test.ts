@@ -336,7 +336,7 @@ describe('processInboundEventRequest + ingest', () => {
       policy: POLICY,
       rootDir: TEST_ROOT,
     });
-    expect(result.ledger).toBe('active/shared/runtime/dot/tenants/acme/events.jsonl');
+    expect(result.ledger).toBe('active/shared/runtime/dot/confidential/acme/events.jsonl');
     expect(result.event.tenant_slug).toBe('acme');
     const raw = String(safeReadFile(`${TEST_ROOT}/${result.ledger}`, { encoding: 'utf8' }));
     expect(raw).toContain(result.event.event_id);

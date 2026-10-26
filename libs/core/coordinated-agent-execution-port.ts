@@ -1,5 +1,6 @@
 import {
   claimWorkItem,
+  quarantineWorkItemExecution,
   getWorkItem,
   releaseWorkItem,
   updateWorkItem,
@@ -15,6 +16,8 @@ import type { ContextSecurityScope } from './context-security-scope.js';
 import { resolveTenantAlias } from './context-security-scope.js';
 import { getAgentExecutionPort } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
+import { isAgentRuntimeApprovalPendingError } from './agent/agent-prompt-approval-port.js';
+import { isUncertainSupervisorTransportFailure } from './agent/supervisor-transport-uncertainty.js';
 import { stripCustomerDecisionsFromReply } from './task/task-result-contract.js';
 import { parseActorRef } from './actor.js';
 import { withActorContext } from './actor-context.js';
@@ -172,7 +175,20 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
         : await delegate();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      logger.error(
+      const pendingApproval = isAgentRuntimeApprovalPendingError(error);
+      if (isUncertainSupervisorTransportFailure(message)) {
+        quarantineWorkItemExecution({
+          itemId: claimed.item.item_id,
+          leaseId: claimed.lease.lease_id,
+          actorPeerId: this.actorPeerId,
+          reason: message,
+        });
+        logger.error(
+          `[coordinated-agent-execution-port] transport outcome unknown — effects may still be running | stop and reconcile the exact runtime before governed recovery | work_item_id=${request.work_item_id}`
+        );
+        throw error;
+      }
+      (pendingApproval ? logger.info : logger.error)(
         `[coordinated-agent-execution-port] delegation threw for work_item_id=${request.work_item_id} task_id=${request.task_id}: ${message}`
       );
       closeWorkItem(
@@ -185,7 +201,7 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
           execution_kind: 'agent_delegation',
           task_id: request.task_id,
           agent_id: request.agent_id || 'unknown',
-          status: 'failed',
+          status: pendingApproval ? 'submitted' : 'failed',
           error: message,
         },
         request.security_scope
@@ -215,15 +231,26 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
 
     const terminalStatus =
       receipt.status === 'succeeded' ? request.success_status || 'done' : 'blocked';
-    closeWorkItem(
-      claimed.item,
-      this.actorPeerId,
-      terminalStatus,
-      stored.error || stored.output || `agent execution ${stored.status}`,
-      attemptId,
-      stored,
-      request.security_scope
-    );
+    if (
+      receipt.status !== 'succeeded' &&
+      isUncertainSupervisorTransportFailure(stored.error || stored.output || '')
+    ) {
+      quarantineWorkItemExecution({
+        itemId: claimed.item.item_id,
+        leaseId: claimed.lease.lease_id,
+        actorPeerId: this.actorPeerId,
+        reason: stored.error || stored.output || 'transport outcome unknown',
+      });
+    } else
+      closeWorkItem(
+        claimed.item,
+        this.actorPeerId,
+        terminalStatus,
+        stored.error || stored.output || `agent execution ${stored.status}`,
+        attemptId,
+        stored,
+        request.security_scope
+      );
     return {
       ...receipt,
       work_item_id: item.item_id,
@@ -233,10 +260,18 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
 }
 
 export function getCoordinatedAgentExecutionPort(
-  delegatePort: AgentExecutionPort = getAgentExecutionPort(),
-  actorPeerId = 'coordinated-agent-execution-port'
+  delegatePort?: AgentExecutionPort,
+  actorPeerId?: string
 ): AgentExecutionPort {
-  return new CoordinatedAgentExecutionPort(delegatePort, actorPeerId);
+  if (!delegatePort && !actorPeerId)
+    return {
+      delegate: (request) =>
+        new CoordinatedAgentExecutionPort(
+          getAgentExecutionPort(),
+          request.agent_id || `task-agent-${request.task_id}`
+        ).delegate(request as CoordinatedAgentTaskEnvelope),
+    };
+  return new CoordinatedAgentExecutionPort(delegatePort ?? getAgentExecutionPort(), actorPeerId);
 }
 
 export async function delegateCoordinatedAgentTask(

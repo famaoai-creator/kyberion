@@ -1,3 +1,7 @@
+import { registerTaskBackendFactory } from '../workforce/task-execution-port.js';
+
+registerTaskBackendFactory((mode) => buildReasoningBackendForMode(mode)?.backend);
+
 /**
  * Reasoning Bootstrap — installs a real reasoning / intent-extraction /
  * voice backend at startup based on the configured mode.

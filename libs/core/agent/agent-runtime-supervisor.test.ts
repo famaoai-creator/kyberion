@@ -165,6 +165,14 @@ describe('agent-runtime-supervisor', () => {
           required_capabilities: [],
           notes: '',
           runtime_status: 'spawned',
+          requested_selection: {
+            mode: 'fixed',
+            agent_id: 'nerve-agent',
+            provider: 'codex',
+            model_id: 'codex',
+            execution_route: 'agent_runtime',
+          },
+          selection_resolution: { source: 'requested', reason: 'Explicit governed runtime route' },
         },
       ],
     });
@@ -200,7 +208,51 @@ describe('agent-runtime-supervisor', () => {
     expect(safeExistsSync(resultPath)).toBe(true);
     const stored = JSON.parse(safeReadFile(resultPath, { encoding: 'utf8' }) as string);
     expect(stored.request_id).toBe(request.request_id);
+    expect(stored.runtime_plan.assignments[0].requested_selection.execution_route).toBe(
+      'agent_runtime'
+    );
   });
+
+  it.each(['provider boot failed', 'invalid runtime assignment'])(
+    'publishes terminal prewarm failure without waiting for the polling deadline: %s',
+    async (reason) => {
+      const { safeReadFile } = await import('../secure-io.js');
+      const api = await import('./agent-runtime-supervisor.js');
+      const request = api.enqueueMissionTeamPrewarmRequest({
+        missionId: 'MSN-PREWARM',
+        requestedBy: 'test',
+        scope: { scope_kind: 'mission', tier: 'public', mission_id: 'MSN-PREWARM' },
+      });
+      if (reason === 'provider boot failed')
+        mocks.ensureMissionTeamRuntime.mockRejectedValueOnce(new Error(reason));
+      else
+        mocks.ensureMissionTeamRuntime.mockResolvedValueOnce({
+          mission_id: 'MSN-PREWARM',
+          assignments: [{ unexpected: true }],
+        });
+      await expect(
+        api.processMissionTeamPrewarmRequest(
+          api.getAgentRuntimeEnsureRequestPath(request.request_id)
+        )
+      ).rejects.toThrow();
+      const artifact = JSON.parse(
+        String(
+          safeReadFile(api.getAgentRuntimeEnsureResultPath(request.request_id), {
+            encoding: 'utf8',
+          })
+        )
+      );
+      expect(artifact).toMatchObject({
+        request_id: request.request_id,
+        status: 'failed',
+        error: expect.any(String),
+      });
+      expect(artifact.runtime_plan).toBeUndefined();
+      await expect(
+        api.waitForMissionTeamPrewarmResult(request.request_id, 60_000, 30_000)
+      ).rejects.toThrow('AGENT_RUNTIME_PREWARM_FAILED');
+    }
+  );
 
   it('rejects result artifacts with unknown fields', async () => {
     const { getAgentRuntimeEnsureResultPath, loadMissionTeamPrewarmResultAtPath } =
@@ -304,6 +356,87 @@ describe('agent-runtime-supervisor', () => {
         ],
       })
     );
+  });
+
+  it.each([{ tier: 'confidential' as const, tenant_slug: 'tenant-b' }, { task_id: 'task-b' }])(
+    'refuses a prompt whose scope differs from the held runtime: %j',
+    async (override) => {
+      const { askAgentRuntime } = await import('./agent-runtime-supervisor.js');
+      const { agentLifecycle } = await import('./agent-lifecycle.js');
+      const scope = {
+        scope_kind: 'task' as const,
+        tier: 'public' as const,
+        mission_id: 'MSN-ASK-BINDING',
+        task_id: 'task-a',
+      };
+      const record: import('./agent-registry.js').AgentRecord = {
+        agentId: 'ask-binding-fixture',
+        provider: 'stub',
+        modelId: 'fixture',
+        status: 'ready',
+        capabilities: [],
+        trustScore: 1,
+        sessionId: null,
+        threadId: 'fixture',
+        spawnedAt: 1,
+        lastActivity: 1,
+        missionId: scope.mission_id,
+        scope,
+      };
+      const ask = vi.fn(async () => 'must not run');
+      const getHandle = vi.spyOn(agentLifecycle, 'getHandle').mockReturnValue({
+        agentId: record.agentId,
+        ask,
+        shutdown: vi.fn(),
+        getRecord: () => record,
+      });
+      try {
+        await expect(
+          askAgentRuntime(record.agentId, 'Other task prompt', 'fixture', {
+            missionId: scope.mission_id,
+            scope: { ...scope, ...override },
+          })
+        ).rejects.toThrow('RUNTIME_SCOPE_MISMATCH');
+        expect(ask).not.toHaveBeenCalled();
+      } finally {
+        getHandle.mockRestore();
+      }
+    }
+  );
+
+  it('does not treat an unbound public runtime as authority for a scoped prompt', async () => {
+    const { askAgentRuntime } = await import('./agent-runtime-supervisor.js');
+    const { agentLifecycle } = await import('./agent-lifecycle.js');
+    const record: import('./agent-registry.js').AgentRecord = {
+      agentId: 'unbound-ask-fixture',
+      provider: 'stub',
+      modelId: 'fixture',
+      status: 'ready',
+      capabilities: [],
+      trustScore: 1,
+      sessionId: null,
+      threadId: 'fixture',
+      spawnedAt: 1,
+      lastActivity: 1,
+      scope: { scope_kind: 'system', tier: 'public' },
+    };
+    const ask = vi.fn(async () => 'must not run');
+    const getHandle = vi.spyOn(agentLifecycle, 'getHandle').mockReturnValue({
+      agentId: record.agentId,
+      ask,
+      shutdown: vi.fn(),
+      getRecord: () => record,
+    });
+    try {
+      await expect(
+        askAgentRuntime(record.agentId, 'Scoped prompt', 'fixture', {
+          scope: { tier: 'public', mission_id: 'MSN-UNBOUND-ASK', task_id: 'task-b' },
+        })
+      ).rejects.toThrow('RUNTIME_SCOPE_MISMATCH');
+      expect(ask).not.toHaveBeenCalled();
+    } finally {
+      getHandle.mockRestore();
+    }
   });
 
   it('retains the stopped runtime generation and mission after shutdown removes the record', async () => {

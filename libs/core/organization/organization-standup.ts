@@ -13,7 +13,7 @@ import { calendarDateInZone } from '../business-calendar.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { createLogger } from '../logger.js';
 import { listDotCharters, type DotCharter, type LoadedDotCharter } from '../dot/dot-charter.js';
-import { readDotActionLedger, type DotActionRecord } from '../dot/dot-dispatch.js';
+import { currentDotActions, type DotActionRecord } from '../dot/dot-dispatch.js';
 import { readDotWorkResults } from '../dot/dot-executor.js';
 import { readOrganizationKrMeasurements } from '../dot/dot-key-results.js';
 import type { DotWorkResultRow, KrMeasurementRow } from '../dot/dot-state-paths.js';
@@ -119,7 +119,8 @@ export function organizationActions(
 ): DotActionRecord[] {
   const latest = new Map<string, DotActionRecord>();
   for (const row of (
-    deps.readActionLedger ?? (() => readDotActionLedger({ rootDir: deps.rootDir }))
+    deps.readActionLedger ??
+    (() => [...dotIds].flatMap((dotId) => currentDotActions(dotId, { rootDir: deps.rootDir })))
   )()) {
     if (dotIds.has(row.dot_id)) latest.set(row.action_ref, row);
   }

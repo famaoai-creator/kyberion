@@ -13,6 +13,7 @@ import {
   readJsonObjectRequest,
   readJsonLines,
   writeJson,
+  writeJsonLines,
 } from './json.js';
 import { safeReadFile, safeRmSync } from '../secure-io.js';
 
@@ -29,6 +30,19 @@ describe('foundation exclusive JSON writer', () => {
     expect(safeReadFile(file, { encoding: 'utf8' }).toString()).toBe(original);
     writeJson(file, { digest: 'ordinary-update' });
     expect(safeReadFile(file, { encoding: 'utf8' }).toString()).toContain('ordinary-update');
+  });
+
+  it('replaces JSONL with one record per line and clears an empty ledger', () => {
+    const file = `${directory}/records.jsonl`;
+    const records = [
+      { id: 'one', text: 'embedded\nnewline' },
+      { id: 'two', text: 'second' },
+    ];
+    writeJsonLines(file, records);
+    expect(readJsonLines(file)).toEqual(records);
+    expect(safeReadFile(file, { encoding: 'utf8' }).toString().split('\n')).toHaveLength(3);
+    writeJsonLines(file, []);
+    expect(safeReadFile(file, { encoding: 'utf8' }).toString()).toBe('');
   });
 
   it('fails closed without an exclusive bridge instead of falling back to overwrite', () => {

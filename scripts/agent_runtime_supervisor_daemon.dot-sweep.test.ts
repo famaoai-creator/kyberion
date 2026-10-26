@@ -4,12 +4,18 @@ import type { DueDotTrigger } from '@agent/core/dot/dot-runtime';
 
 const mocks = vi.hoisted(() => ({
   codeStamp: { value: 1000 },
+  compilerBusy: false,
   due: new Map<string, DueDotTrigger[]>(),
   runnerSources: [] as string[],
   reselect: vi.fn(),
   recordDotWakeOutcome: vi.fn(),
   recordDaemonHeartbeat: vi.fn(),
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock('@agent/core/build-coordination', () => ({
+  tryInspectCompilerOutputs: async (inspect: () => Promise<unknown>) =>
+    mocks.compilerBusy ? { deferred: true } : { deferred: false, value: await inspect() },
 }));
 
 vi.mock('@agent/core/process-guards', () => ({ installProcessGuards: vi.fn() }));
@@ -108,6 +114,7 @@ beforeEach(() => {
   // import; they would write dot state into the live active/ tree.
   DOT_SUPERVISOR_STEPS.length = 0;
   resetDotSweepStateForTests();
+  mocks.compilerBusy = false;
   mocks.due.clear();
   mocks.runnerSources.length = 0;
   mocks.codeStamp.value = 1000;
@@ -119,6 +126,16 @@ afterEach(() => {
 });
 
 describe('runDotSweepOnce', () => {
+  it('defers work while a compiler owns outputs without consuming triggers', async () => {
+    mocks.compilerBusy = true;
+    const listCharters = vi.fn(() => [A]);
+    const wake = vi.fn();
+    expect(await runDotSweepOnce(NOW, { listCharters, wake })).toBe(0);
+    expect(listCharters).not.toHaveBeenCalled();
+    expect(wake).not.toHaveBeenCalled();
+    expect(mocks.recordDotWakeOutcome).not.toHaveBeenCalled();
+  });
+
   it('surfaces malformed charters in the heartbeat and still wakes the good ones', async () => {
     mocks.due.set('a', [{ trigger: { kind: 'cron', cron: '* * * * *' }, key: 'cron:a' }]);
     const woken: string[] = [];

@@ -21,6 +21,15 @@ import {
 } from './mission-maintenance.js';
 import { removeMissionFixture } from '../testing/mission-fixture.js';
 import { inferProviderFromActorId, recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
+import { createHash } from 'node:crypto';
+import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
+import {
+  createWorkItem,
+  claimWorkItem,
+  releaseWorkItem,
+  clearWorkCoordinationStore,
+  setWorkCoordinationNamespace,
+} from '../workforce/work-coordination.js';
 
 const mocks = vi.hoisted(() => ({ spawnManagedProcess: vi.fn() }));
 // Route the shared usage ledger to a per-test collector so record-evidence
@@ -413,6 +422,84 @@ describe('direct-CLI usage accounting', () => {
     getGitHash: () => 'hash',
     syncProjectLedgerIfLinked: async () => undefined,
   });
+
+  for (const change of ['lease', 'artifact', 'paused', 'no-output'])
+    it(`refuses a queued evidence commit after ${change} changes`, async (ctx) => {
+      const { missionId, missionPath, readTasks } = seedMission(
+        ctx,
+        [
+          {
+            task_id: 'impl',
+            status: 'planned',
+            ...(change === 'no-output' ? {} : { deliverable: 'evidence/report.md' }),
+          },
+        ],
+        change === 'no-output' ? [] : ['evidence/report.md']
+      );
+      setWorkCoordinationNamespace(`evidence-fence-${process.pid}`);
+      ctx.onTestFinished(() => {
+        clearWorkCoordinationStore();
+        setWorkCoordinationNamespace(null);
+      });
+      const actorId = 'codex-implementer';
+      const item = createWorkItem({
+        title: 'Fenced evidence task',
+        description: 'Commit only current task evidence',
+        status: 'ready',
+        projectId: missionId,
+        context: { mission_id: missionId, task_id: 'impl' },
+      });
+      const { lease } = claimWorkItem({
+        itemId: item.item_id,
+        actorPeerId: actorId,
+        purpose: 'test evidence',
+      });
+      const artifact = `${missionPath}/evidence/report.md`;
+      const taskBinding = {
+        workItemId: item.item_id,
+        leaseId: lease.lease_id,
+        actorId,
+        scope: {
+          tier: 'public' as const,
+          scope_kind: 'task' as const,
+          mission_id: missionId,
+          task_id: 'impl',
+        },
+        ...(change === 'no-output'
+          ? {}
+          : {
+              artifactPath: 'evidence/report.md',
+              artifactSha256: createHash('sha256').update(safeReadFile(artifact)).digest('hex'),
+            }),
+      };
+      expect(await acquireLock(`mission-${missionId}`)).toBe(true);
+      const pending = recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl', taskBinding });
+      if (change === 'lease')
+        releaseWorkItem({
+          itemId: item.item_id,
+          actorPeerId: actorId,
+          leaseId: lease.lease_id,
+          nextStatus: 'ready',
+        });
+      else if (change === 'paused') {
+        const statePath = `${missionPath}/mission-state.json`;
+        const state = JSON.parse(String(safeReadFile(statePath)));
+        safeWriteFile(statePath, JSON.stringify({ ...state, status: 'paused' }));
+      } else if (change !== 'no-output') safeWriteFile(artifact, 'changed after runtime proof');
+      releaseLock(`mission-${missionId}`);
+      await expect(pending).rejects.toThrow(
+        change === 'no-output'
+          ? 'TASK_EVIDENCE_OUTPUT_REQUIRED'
+          : change === 'artifact'
+            ? 'TASK_EVIDENCE_OUTPUT_CHANGED'
+            : 'TASK_EVIDENCE_LEASE_LOST'
+      );
+      expect(readTasks()[0].status).toBe('planned');
+      const ledger = `${missionPath}/execution-ledger.jsonl`;
+      expect(
+        safeExistsSync(ledger) ? String(safeReadFile(ledger)).includes('evidence_recorded') : false
+      ).toBe(false);
+    });
 
   it('record-evidence appends one estimated direct_cli entry per completed task, never twice', async (ctx) => {
     const { missionId, collector } = seedMission(
