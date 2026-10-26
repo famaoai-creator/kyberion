@@ -36,6 +36,7 @@ const allowedManagedProcessConsumers = [
   // double; keep the boundary inventory aligned with that explicit mock.
   'libs/core/agent/agent-adapter.test.ts',
   'libs/core/agent/agent-runtime-supervisor-client.ts',
+  'libs/core/agent/agent-runtime-supervisor-client.process.test.ts',
   'libs/core/agent/agent-runtime-supervisor.test.ts',
   'libs/core/agent/agent-runtime-supervisor.ts',
   'libs/core/delegated-task-observability.ts',

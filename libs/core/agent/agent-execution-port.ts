@@ -13,8 +13,12 @@ import {
 import type { EventScopeInput } from '../event-scope.js';
 import { nowIso } from '../foundation/time.js';
 import { coreSeamCatalog, createSeam } from '../seam.js';
+import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
+import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
 
 export interface AgentTaskEnvelope {
+  /** Optional canonical WorkItem; lease/profile authority is always re-derived server-side. */
+  work_item_id?: string;
   task_id: string;
   mission_id?: string;
   agent_id?: string;
@@ -67,6 +71,43 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
     const startedAt = nowIso();
     const agentId = request.agent_id || `task-agent-${request.task_id}`;
     try {
+      let taskBinding: Record<string, unknown> | undefined;
+      if (request.work_item_id) {
+        const item = getWorkItem(request.work_item_id);
+        const taskId = item?.context?.task_id;
+        const lease = listActiveWorkLeases().find(
+          (candidate) =>
+            candidate.item_id === request.work_item_id && candidate.lease_id === item?.lease_id
+        );
+        if (
+          !item ||
+          item.status !== 'in_progress' ||
+          !taskId ||
+          taskId !== request.task_id ||
+          item.context?.mission_id !== request.mission_id ||
+          request.security_scope.mission_id !== request.mission_id ||
+          !lease ||
+          lease.holder_peer_id !== agentId ||
+          item.claimed_by_peer_id !== agentId
+        )
+          throw new Error(
+            '[TASK_TOOL_BINDING] Default API runtime requires the current worker-owned mission/task claim'
+          );
+        const role =
+          typeof item.metadata?.team_role === 'string' ? item.metadata.team_role : undefined;
+        taskBinding = {
+          work_item_id: item.item_id,
+          lease_id: lease.lease_id,
+          task_id: taskId,
+          capability_profile: role
+            ? resolveDelegationCapabilityProfile({
+                teamRole: role,
+                purpose: item.metadata?.purpose === 'review' ? 'review' : 'implementation',
+              })
+            : 'explorer',
+          ...(role ? { team_role: role } : {}),
+        };
+      }
       const handle = await ensureAgentRuntime({
         agentId,
         provider: request.provider || 'claude',
@@ -74,13 +115,12 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         missionId: request.mission_id,
         capabilities: request.capabilities,
         scope: {
-          scope_kind: 'task',
+          scope_kind: 'mission',
           tier: request.security_scope.write_tier,
           tenant_slug: request.security_scope.tenant_slug || request.security_scope.tenant_id,
           organization_id: request.security_scope.organization_id,
           project_id: request.security_scope.project_id,
           mission_id: request.security_scope.mission_id,
-          task_id: request.task_id,
         } satisfies EventScopeInput,
         requestedBy: 'agent_execution_port',
         runtimeMetadata: {
@@ -90,6 +130,7 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
           agent_profile_id: request.agent_profile_id,
           team_role_id: request.team_role_id,
           authority_role_id: request.authority_role_id,
+          ...taskBinding,
         },
       });
       if (request.context_mode === 'fresh') {
@@ -100,13 +141,12 @@ export class SupervisorAgentExecutionPort implements AgentExecutionPort {
         correlationId: request.idempotency_key,
         missionId: request.mission_id,
         scope: {
-          scope_kind: 'task',
+          scope_kind: 'mission',
           tier: request.security_scope.write_tier,
           tenant_slug: request.security_scope.tenant_slug || request.security_scope.tenant_id,
           organization_id: request.security_scope.organization_id,
           project_id: request.security_scope.project_id,
           mission_id: request.security_scope.mission_id,
-          task_id: request.task_id,
         },
       });
       const snapshot = getAgentRuntimeSnapshot(agentId);

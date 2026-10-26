@@ -179,6 +179,8 @@ async function recordPipelineFeedback(
 }
 
 export interface ExecutePipelineFileOptions {
+  /** Task caller retains the live claim fence across human suspension. */
+  resumeOwner?: 'task';
   /** Trusted host identity; never read from ADF/context flags. */
   delegatedWorkItem?: { id: string; tenantSlug: string; agentId: string; attemptId?: string };
   /** Internal durable continuation, loaded from the protected journal. */
@@ -262,15 +264,16 @@ async function executePipelineFileOnce(
     projectTrustApprovalId: options.projectTrustApprovalId,
     onValidatedInput: (loaded: unknown, source: string) => {
       loadedSource = source;
+      options.validateLoadedPipeline?.(loaded, source);
       if (options.executionMode) {
         assertFrontDeskReceiptPipeline(source);
         diagnosticSource = source;
-        options.validateLoadedPipeline!(loaded, source);
       }
     },
     ...(options.executionMode
       ? {
           onValidatedInput: (loaded: unknown, source: string) => {
+            loadedSource = source;
             assertFrontDeskReceiptPipeline(source);
             diagnosticSource = source;
             options.validateLoadedPipeline!(loaded, source);
@@ -481,6 +484,7 @@ async function executePipelineFileOnce(
           ...(missionId ? { mission_id: missionId } : {}),
           step_ids: steps.map((step) => step.id),
           library_execution: {
+            ...(options.resumeOwner ? { resume_owner: options.resumeOwner } : {}),
             source_sha256: sourceHash,
             initial_context: structuredClone(mergedContext),
             payload_scope: effectivePayloadScope,
@@ -573,13 +577,24 @@ async function executePipelineFileOnce(
     nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
   if (!options.executionMode)
     await recordPipelineFeedback(pipelineId, failed ? 'failed' : 'succeeded', persisted.trace);
-  return { ...result, trace, persistedPath: persisted.path };
+  return {
+    ...result,
+    trace,
+    persistedPath: persisted.path,
+    ...(libraryJournal ? { runId: libraryJournal.runId } : {}),
+  };
 }
 
 type Print = (value: unknown) => void;
 
 /** Resume the protected original library run, never a reconstructed command. */
-export async function resumeLibraryPipelineRun(runId: string, scope: PipelineJournalScope) {
+export async function resumeLibraryPipelineRun(
+  runId: string,
+  scope: PipelineJournalScope,
+  assertCallerCurrent?: () => void,
+  validateSource?: (source: string) => void
+) {
+  assertCallerCurrent?.();
   const state = loadPipelineRunJournal(runId, undefined, scope);
   const snapshot = state.started?.library_execution;
   if (
@@ -594,6 +609,14 @@ export async function resumeLibraryPipelineRun(runId: string, scope: PipelineJou
   }
   if (!snapshot.scope_identity)
     throw new Error('[PIPELINE_RESUME_DENIED] Original scope identity is missing');
+  if (snapshot.resume_owner === 'task' && (!assertCallerCurrent || !validateSource))
+    throw new Error(
+      '[PIPELINE_RESUME_DENIED] Task-owned continuation requires its live task tool binding'
+    );
+  validateSource?.(
+    String(safeReadFile(pathResolver.rootResolve(state.started!.input_path), { encoding: 'utf8' }))
+  );
+  assertCallerCurrent?.();
   const continuationPolicy = {
     read_tiers: [scope.tier],
     write_tier: scope.tier,
@@ -717,6 +740,7 @@ export async function resumeLibraryPipelineRun(runId: string, scope: PipelineJou
             })
           : undefined;
         const assertCurrent = (): void => {
+          assertCallerCurrent?.();
           validateDot();
           if (!owner || !continuation) return;
           const latest = coordination.getWorkItem(owner.id);
@@ -774,6 +798,7 @@ export async function resumeLibraryPipelineRun(runId: string, scope: PipelineJou
               delegatedWorkItem: owner,
               resumeState: state,
               assertExecutionCurrent: assertCurrent,
+              validateLoadedPipeline: (_pipeline, source) => validateSource?.(source),
               payloadScope: snapshot.payload_scope,
               trustResolved: snapshot.trust_resolved,
               projectTrustApprovalId: snapshot.project_trust_approval_id,

@@ -10,6 +10,28 @@ import {
 } from './event-scope.js';
 
 describe('event scope', () => {
+  it('retains standalone public project lineage without inventing a parent', () => {
+    const scope = normalizeEventScope({ tier: 'public', project_id: 'PRJ-shared' });
+    expect(scope).toEqual({ scope_kind: 'project', tier: 'public', project_id: 'PRJ-shared' });
+    expect(
+      resolveEventScopeAgainstAuthority(
+        { ...scope, mission_id: 'MSN-public', scope_kind: 'mission' },
+        { ...scope, mission_id: 'MSN-public', scope_kind: 'mission' }
+      )
+    ).toMatchObject({ project_id: 'PRJ-shared' });
+    expect(() =>
+      resolveEventScopeAgainstAuthority({ ...scope, project_id: 'PRJ-other' }, scope)
+    ).toThrow('EVENT_SCOPE_LINEAGE_CONFLICT');
+    for (const candidate of [
+      { tier: 'confidential' as const, tenant_slug: 'tenant-a', project_id: 'PRJ-private' },
+      { tier: 'public' as const, tenant_slug: 'tenant-a', project_id: 'PRJ-bound' },
+      { tier: 'personal' as const, project_id: 'PRJ-private' },
+    ])
+      expect(() => normalizeEventScope(candidate)).toThrow(
+        'project_id requires an organization_id'
+      );
+  });
+
   it('strictly parses untrusted scope input before normalization', () => {
     expect(
       parseEventScopeInput({ tier: 'confidential', tenant_slug: 'client-a', scope_kind: 'tenant' })

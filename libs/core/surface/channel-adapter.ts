@@ -179,12 +179,24 @@ export async function runChannelTurn(
         appendDotInboxEntry({
           channel: adapter.channel,
           source: 'channel-turn',
-          text: input.text,
-          payload: {
-            channel: input.channel,
-            thread_ts: input.threadTs,
-            actor_id: adapter.actorId,
-          },
+          scope: input.scope
+            ? {
+                ...input.scope,
+                ...(input.scope.tier === 'personal'
+                  ? { owner_nhi: input.scope.nhi_id ?? input.scope.viewer_principal }
+                  : {}),
+              }
+            : { tier: 'public' },
+          ...(input.scope
+            ? {
+                text: input.text,
+                payload: {
+                  channel: input.channel,
+                  thread_ts: input.threadTs,
+                  actor_id: adapter.actorId,
+                },
+              }
+            : {}),
         });
       } catch (error) {
         logger.warn(

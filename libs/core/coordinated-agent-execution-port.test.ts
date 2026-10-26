@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { AgentExecutionPort } from './agent/agent-execution-port.js';
+import type { AgentExecutionPort, AgentTaskEnvelope } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
 import { currentActor, type ActorContext } from './actor-context.js';
 import {
@@ -11,6 +11,7 @@ import {
   releaseWorkItem,
   setWorkCoordinationNamespace,
   updateWorkItem,
+  expireWorkItemLeases,
 } from './workforce/work-coordination.js';
 import {
   CoordinatedAgentExecutionPort,
@@ -26,6 +27,66 @@ import {
 } from './scope-envelope.js';
 
 describe('CoordinatedAgentExecutionPort', () => {
+  it.each(['throw', 'receipt'] as const)(
+    'retains uncertain transport ownership across lease expiry: %s',
+    async (mode) => {
+      const item = createWorkItem({
+        itemId: 'WI-UNCERTAIN',
+        title: 'Uncertain remote effect',
+        description: 'Do not replay a lost remote reply',
+        status: 'ready',
+        metadata: { target: 'service:synthetic-effect' },
+      });
+      const delegate = vi.fn(async (request: AgentTaskEnvelope) => {
+        if (mode === 'throw') throw new Error('supervisor_response_closed');
+        return {
+          execution_kind: 'agent_delegation' as const,
+          task_id: request.task_id,
+          agent_id: 'agent-1',
+          status: 'failed' as const,
+          error: 'supervisor_request_timeout',
+        };
+      });
+      const request = {
+        work_item_id: item.item_id,
+        task_id: 'task-uncertain',
+        mission_id: 'MSN-UNCERTAIN',
+        security_scope: {
+          mission_id: 'MSN-UNCERTAIN',
+          read_tiers: ['public' as const],
+          write_tier: 'public' as const,
+          purpose: 'transport test',
+        },
+        instruction: 'bounded effect',
+        idempotency_key: 'uncertain-1',
+      };
+      const port = new CoordinatedAgentExecutionPort({ delegate }, 'worker-1');
+      if (mode === 'throw')
+        await expect(port.delegate(request)).rejects.toThrow('supervisor_response_closed');
+      else expect((await port.delegate(request)).status).toBe('failed');
+      const held = getWorkItem(item.item_id)!;
+      expect(held).toMatchObject({
+        status: 'blocked',
+        lease_id: expect.any(String),
+        effect_ownership: {
+          state: 'held',
+          actor_id: 'worker-1',
+          attempt_id: held.current_attempt_id,
+          target: 'service:synthetic-effect',
+        },
+        metadata: { execution_outcome: 'unknown', recovery_required: true },
+      });
+      expect(held.metadata?.dot_id).toBeUndefined();
+      expect(() =>
+        updateWorkItem({ itemId: item.item_id, status: 'in_progress', metadata: {} })
+      ).toThrow('held effects cannot be resumed');
+      expireWorkItemLeases(new Date(Date.now() + 60 * 60_000).toISOString());
+      updateWorkItem({ itemId: item.item_id, status: 'ready', metadata: {} });
+      await expect(port.delegate(request)).rejects.toThrow(/ownership/);
+      expect(delegate).toHaveBeenCalledTimes(1);
+    }
+  );
+
   beforeEach(() => {
     setWorkCoordinationNamespace(`coordinated-agent-execution-port-test-${process.pid}`);
     clearWorkCoordinationStore();

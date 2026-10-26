@@ -7,6 +7,7 @@ import { isValidTenantSlug } from './scope.js';
  * are never added to metrics offboarding/compaction merely by registration.
  */
 export const PARTITIONED_RUNTIME_STATE_ROOTS = {
+  dot: 'active/shared/runtime/dot',
   pipeline_library_runs: 'active/shared/runtime/pipeline-library-runs',
   /** Evidence and per-action autonomy overrides; never shared across tenants. */
   autonomy_learning: 'active/shared/runtime/autonomy-learning',
@@ -52,6 +53,8 @@ export const WORK_COORDINATION_ROOT_PATH = 'active/shared/runtime/work-coordinat
 /** Logical names preserve existing layouts; registration never grants access. */
 export const RUNTIME_STATE_PATHS = {
   'dot.wakeLedger': 'active/shared/runtime/dot-wake-ledger.jsonl',
+  'dot.actionLedger': 'active/shared/runtime/dot-action-ledger.jsonl',
+  'task.workspacesRoot': 'active/shared/runtime/workspaces',
   'dot.lifecycleAudit': 'active/shared/runtime/dot-lifecycle-audit.jsonl',
   'memory.promotionQueue': 'active/shared/runtime/memory/promotion-queue.jsonl',
   'memory.tenantRoot': 'active/shared/runtime/tenants',

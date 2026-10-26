@@ -61,8 +61,12 @@ export function GovernanceSection({ t }: { t: SettingsTranslate }) {
   const [error, setError] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
-    const res = await fetch('/api/governance-overview', { cache: 'no-store' });
-    setData(readOverview(await res.json().catch(() => null)));
+    try {
+      const res = await fetch('/api/governance-overview', { cache: 'no-store' });
+      setData(readOverview(await res.json().catch(() => null)));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }, []);
 
   React.useEffect(() => {
@@ -82,7 +86,7 @@ export function GovernanceSection({ t }: { t: SettingsTranslate }) {
     }
   };
 
-  if (!data) return null;
+  if (!data) return error ? <p role="alert">{error}</p> : null;
 
   const ruleGroups = [
     {

@@ -854,6 +854,7 @@ function executeDotActionUnlocked(
       (deps.appendInbox ?? ((input) => void appendDotInboxEntry(input, { rootDir: deps.rootDir })))(
         {
           dot_id: record.handoff_to,
+          scope: charter.scope,
           channel: 'inbox',
           text: `Handoff from ${actor}: ${record.title}`,
           payload: {
@@ -1033,6 +1034,7 @@ function dispatchDotProposalsUnlocked(
       continue;
     }
     const base: DotActionRecord = {
+      scope: charter.scope,
       action_ref: proposal.front_desk_execution
         ? `frontdesk-${proposal.front_desk_execution.work_item_id}`
         : identity!.action_ref,

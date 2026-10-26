@@ -3,22 +3,64 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { readJsonLines } from '../foundation/json.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
-  appendDotInboxEntry,
+  appendDotInboxEntry as appendScopedDotInboxEntry,
+  type DotInboxEntryInput,
+  type DotInboxAppendDeps,
   compactDotInbox,
   dotInboxWakeKey,
   DOT_INBOX_PATH,
   DOT_INBOX_RECEIPT_SCAN_BYTES,
   DOT_WAKE_CHANNELS,
   isDotWakeChannel,
+  dotInboxPath,
+  dotInboxRowWakesCharter,
 } from './dot-inbox.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-inbox-tests';
+const appendDotInboxEntry = (input: DotInboxEntryInput, deps?: DotInboxAppendDeps) =>
+  appendScopedDotInboxEntry({ ...input, scope: input.scope ?? { tier: 'public' } }, deps);
 
 afterEach(() => {
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
 describe('appendDotInboxEntry', () => {
+  it('requires an explicit trusted scope before persisting content', () => {
+    expect(() =>
+      appendScopedDotInboxEntry(
+        { channel: 'slack', text: 'unknown-origin' },
+        { rootDir: TEST_ROOT }
+      )
+    ).toThrow('DOT_INBOX_SCOPE_REQUIRED');
+  });
+  it('keeps private channel content in its tier and tenant lane and refuses cross-scope wake', () => {
+    const scope = {
+      tier: 'confidential' as const,
+      tenant_slug: 'tenant-a',
+      organization_id: 'org-a',
+    };
+    const entry = appendDotInboxEntry(
+      { channel: 'slack', text: 'private synthetic', scope },
+      { rootDir: TEST_ROOT }
+    );
+    const charter = (other: Record<string, unknown>) =>
+      ({
+        dot_id: 'test',
+        scope: other,
+        attention: { triggers: [{ kind: 'wake', channels: ['slack'] }] },
+      }) as never;
+    expect(readJsonLines(`${TEST_ROOT}/${DOT_INBOX_PATH}`)).toEqual([]);
+    expect(readJsonLines(`${TEST_ROOT}/${dotInboxPath(scope)}`)).toEqual([entry]);
+    expect(dotInboxRowWakesCharter(entry, charter(scope))).toBe(true);
+    for (const other of [
+      { tier: 'public' },
+      { ...scope, tenant_slug: 'tenant-b' },
+      { ...scope, organization_id: 'org-b' },
+      { tier: 'personal', owner_nhi: 'owner-a' },
+    ])
+      expect(dotInboxRowWakesCharter(entry, charter(other))).toBe(false);
+    expect(dotInboxRowWakesCharter({ channel: 'slack' }, charter({ tier: 'public' }))).toBe(false);
+  });
   it('appends a validated broadcast row', () => {
     const entry = appendDotInboxEntry(
       { channel: 'slack', text: 'hello', source: 'test' },

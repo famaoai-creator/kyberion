@@ -17,7 +17,11 @@ import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
-import { settledWorkEffect, workEffectOwnership } from './work-effect-ownership.js';
+import {
+  declaredWorkTarget,
+  settledWorkEffect,
+  workEffectOwnership,
+} from './work-effect-ownership.js';
 import {
   assertEffectClaimable,
   claimedEffectOwnership,
@@ -476,6 +480,29 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
     throw new WorkCoordinationError('item_not_found', `item not found: ${input.itemId}`);
   }
   assertVersion(current, input.expectedVersion);
+  if (
+    input.status === 'in_progress' &&
+    current.status !== 'in_progress' &&
+    workEffectOwnership(current)?.state === 'held'
+  )
+    throw new WorkCoordinationError(
+      'lease_conflict',
+      'held effects cannot be resumed through a status update; governed recovery required'
+    );
+  if (input.context && (current.lease_id || workEffectOwnership(current)?.state === 'held')) {
+    const fields = [
+      'tenant_slug',
+      'organization_id',
+      'project_id',
+      'mission_id',
+      'task_id',
+    ] as const;
+    if (fields.some((field) => input.context?.[field] !== current.context?.[field]))
+      throw new WorkCoordinationError(
+        'lease_conflict',
+        'claimed or held execution scope is immutable until governed effect recovery'
+      );
+  }
 
   const nextStatus = input.status || current.status;
   const shouldClearLease = isTerminalStatus(nextStatus);
@@ -957,12 +984,104 @@ function releaseWorkItemInternal(input: ReleaseWorkItemInput): {
   return { item: next, lease: released };
 }
 
+/** Keep an uncertain remote attempt fenced; scheduling lease expiry is not proof of stopped effects. */
+export function quarantineWorkItemExecution(input: {
+  itemId: string;
+  leaseId: string;
+  actorPeerId: string;
+  reason: string;
+}): WorkItem {
+  return withCoordinationMutation(() => {
+    const current = currentWorkItem(input.itemId);
+    const lease = currentLeaseById(input.leaseId);
+    if (
+      !current ||
+      !lease ||
+      current.lease_id !== input.leaseId ||
+      lease.item_id !== current.item_id ||
+      lease.holder_peer_id !== input.actorPeerId ||
+      lease.status === 'released' ||
+      !current.current_attempt_id
+    )
+      throw new WorkCoordinationError(
+        'lease_conflict',
+        'uncertain execution quarantine requires the unchanged attempt lease and holder'
+      );
+    const now = nowIso();
+    const hold = workEffectOwnership(current);
+    if (hold?.state === 'held' && hold.attempt_id !== current.current_attempt_id)
+      throw new WorkCoordinationError(
+        'lease_conflict',
+        'another unresolved effect owner must not be replaced'
+      );
+    const next = appendItemSnapshot({
+      ...current,
+      status: 'blocked',
+      version: current.version + 1,
+      updated_at: now,
+      effect_ownership:
+        hold?.state === 'held'
+          ? hold
+          : {
+              target: declaredWorkTarget(current) ?? `work_item:${current.item_id}`,
+              attempt_id: current.current_attempt_id,
+              actor_id: input.actorPeerId,
+              ...(current.context?.tenant_slug ? { tenant_slug: current.context.tenant_slug } : {}),
+              state: 'held',
+              acquired_at: now,
+            },
+      metadata: {
+        ...current.metadata,
+        execution_outcome: 'unknown',
+        recovery_required: true,
+        last_transport_error: input.reason.slice(0, 4000),
+      },
+    });
+    appendEvent({
+      eventType: 'item_updated',
+      itemId: next.item_id,
+      status: 'blocked',
+      note: 'transport outcome unknown; retain attempt lease and effect ownership until governed recovery',
+      payload: { attempt_id: next.current_attempt_id, lease_id: next.lease_id },
+    });
+    return next;
+  });
+}
+
 /** Approval is reloaded inside the same fence as the one-snapshot ownership/status transition. */
 export function releaseWorkItemEffectOwnership(input: EffectReleaseInput): WorkItem {
   return withCoordinationMutation(() => {
-    const updated = appendItemSnapshot(
-      prepareHumanEffectRelease(currentWorkItem(input.itemId), input, nowIso())
+    const current = currentWorkItem(input.itemId);
+    const now = nowIso();
+    const expiredLease =
+      current?.lease_id && !activeLeaseForItem(input.itemId)
+        ? currentLeaseById(current.lease_id)
+        : undefined;
+    // Human proof still binds the unchanged persisted version/attempt. An
+    // expired scheduling lease may be cleared only after that proof passes;
+    // it never settles the effect hold by itself.
+    const verified = prepareHumanEffectRelease(
+      expiredLease && current ? { ...current, lease_id: undefined } : current,
+      input,
+      now
     );
+    let next = verified;
+    if (expiredLease && current) {
+      appendLeaseSnapshot({ ...expiredLease, status: 'expired', released_at: now });
+      const final = finalizeWorkItemAttempt(current, 'released', {
+        summary: 'Authenticated human reconciled the expired uncertain attempt',
+      });
+      next = {
+        ...verified,
+        claimed_at: undefined,
+        claimed_by_peer_id: undefined,
+        claimed_by_user_id: undefined,
+        released_at: now,
+        attempts: final.attempts,
+        current_attempt_id: final.currentAttemptId,
+      };
+    }
+    const updated = appendItemSnapshot(next);
     appendEvent(effectReleaseEvent(updated));
     return updated;
   });

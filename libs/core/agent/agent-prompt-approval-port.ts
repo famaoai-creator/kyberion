@@ -10,6 +10,46 @@
  * same outcome as before escalation existed, never an answer.
  */
 
+import type { EventScopeInput } from '../event-scope.js';
+
+let pipelineApprovalStatus: ((channel: string, id: string) => string | undefined) | undefined;
+export function registerPipelineApprovalStatus(
+  reader: (channel: string, id: string) => string | undefined
+): () => void {
+  const previous = pipelineApprovalStatus;
+  pipelineApprovalStatus = reader;
+  return () => {
+    pipelineApprovalStatus = previous;
+  };
+}
+export function getPipelineApprovalStatus(channel: string, id: string): string | undefined {
+  return pipelineApprovalStatus?.(channel, id);
+}
+
+export class AgentRuntimeApprovalPendingError extends Error {
+  readonly code = 'AGENT_APPROVAL_PENDING';
+  constructor(
+    readonly approvalRequestId: string,
+    readonly scope?: EventScopeInput,
+    readonly approvalStorageChannel?: string,
+    readonly approvalKind: 'runtime' | 'pipeline' = 'runtime'
+  ) {
+    super(`[AGENT_APPROVAL_PENDING] approval ${approvalRequestId} requires a human decision`);
+    this.name = 'AgentRuntimeApprovalPendingError';
+  }
+}
+
+export function isAgentRuntimeApprovalPendingError(
+  error: unknown
+): error is AgentRuntimeApprovalPendingError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    (error as { code?: unknown }).code === 'AGENT_APPROVAL_PENDING' &&
+    typeof (error as { approvalRequestId?: unknown }).approvalRequestId === 'string'
+  );
+}
+
 export type AgentPromptApprovalStatus = 'pending' | 'approved' | 'rejected' | 'closed';
 
 export interface AgentPromptApprovalRequest {
