@@ -11,7 +11,22 @@ const ledgerFault = vi.hoisted(() => ({
   failNext: false,
   failAuditStamp: false,
   failReceipt: false,
+  failArchive: false,
 }));
+// Fail the old WorkItem's archive once (a crash right after the receipt).
+vi.mock('../workforce/work-coordination.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../workforce/work-coordination.js')>();
+  return {
+    ...actual,
+    updateWorkItem: (...args: Parameters<typeof actual.updateWorkItem>) => {
+      if (ledgerFault.failArchive && args[0].status === 'archived') {
+        ledgerFault.failArchive = false;
+        throw new Error('[TEST_FAULT] archive failed');
+      }
+      return actual.updateWorkItem(...args);
+    },
+  };
+});
 // Fail the receipt's audit stamp once (a crash between the audit and the stamp).
 vi.mock('./mission-dispatch-lifecycle.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./mission-dispatch-lifecycle.js')>();
@@ -550,7 +565,8 @@ describe('mission_controller supersede-task', () => {
       reason,
       approvalRequestId,
     };
-    ledgerFault.failReceipt = true;
+    // A crash after the receipt and the WorkItem archive (the ledger append fails).
+    ledgerFault.failNext = true;
     await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
     expect(getWorkItem(itemId('task-held'))?.status).toBe('archived');
     // The approval expires before the operator re-runs.
@@ -569,6 +585,92 @@ describe('mission_controller supersede-task', () => {
     expect((await supersedeMissionTask(input)).status).toBe('applied');
     expect(boardTask('task-held')?.status).toBe('superseded');
     expect(isTaskVerifiablySuperseded(missionId, 'task-held', { approvalRequestId })).toBe(true);
+  });
+
+  it('a worker-crafted supersede record never lets an expired approval resume', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const recordPath = approvalRequestLogicalPath(
+      MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
+      approvalRequestId
+    );
+    const stored = JSON.parse(String(safeReadFile(recordPath, { encoding: 'utf8' }))) as Record<
+      string,
+      unknown
+    >;
+    safeWriteFile(
+      recordPath,
+      JSON.stringify({ ...stored, expiresAt: '2026-01-01T00:00:00.000Z' }, null, 2)
+    );
+    const { createHash } = await import('node:crypto');
+    const crafted = {
+      by_task_id: 'task-replacement',
+      at: '2026-10-26T00:00:00.000Z',
+      actor_id: 'worker',
+      reason_sha256: createHash('sha256').update(reason, 'utf8').digest('hex'),
+      approval_request_id: approvalRequestId,
+    };
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    // On the WorkItem metadata only.
+    const item = getWorkItem(itemId('task-held'))!;
+    updateWorkItem({
+      itemId: item.item_id,
+      expectedVersion: item.version,
+      metadata: {
+        ...(item.metadata || {}),
+        superseded_by: 'task-replacement',
+        superseded: crafted,
+      },
+    });
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/approval has expired/u);
+    // And on NEXT_TASKS too.
+    safeWriteFile(
+      nodePath.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify(
+        defaultTasks().map((task) =>
+          task.task_id === 'task-held'
+            ? { ...task, status: 'superseded', superseded: crafted }
+            : task
+        )
+      )
+    );
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/already superseded|expired/u);
+    expect(
+      safeExistsSync(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'))
+    ).toBe(false);
+    expect(getWorkItem(itemId('task-held'))?.status).toBe('blocked');
+  });
+
+  it('a resumed run still refuses an old task that is in progress', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    // A crash right after the receipt (the WorkItem archive never happened)...
+    ledgerFault.failArchive = true;
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
+    // ...and the task was claimed again meanwhile.
+    const item = getWorkItem(itemId('task-held'))!;
+    updateWorkItem({ itemId: item.item_id, expectedVersion: item.version, status: 'ready' });
+    const ready = getWorkItem(itemId('task-held'))!;
+    claimWorkItem({
+      itemId: ready.item_id,
+      actorPeerId: 'test-worker',
+      purpose: 'test lease',
+      expectedVersion: ready.version,
+    });
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/in progress|live WorkItem lease/u);
   });
 
   it('refuses to start a supersede with an expired approval', async () => {

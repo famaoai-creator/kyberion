@@ -81,6 +81,7 @@ import type {
 import { loadState, saveState } from './mission-state.js';
 import {
   ledgerHasTaskSupersede,
+  missionTaskSupersedeReceiptPath,
   MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
   missionTaskSupersedeEffectBinding,
   missionTaskSupersedePayloadFromHash,
@@ -306,23 +307,27 @@ function planSupersede(
     );
   }
   const oldStatus = String(old.status || 'planned').toLowerCase();
-  // M1: a supersede under this very approval that stopped part-way is finished,
-  // never refused (every effect below is idempotent).
-  const priorRecord =
-    supersededRecordOf(old.superseded) ??
-    supersededRecordOf(items.get(taskId)?.metadata?.superseded);
+  // M1: a supersede under this very approval that stopped part-way is
+  // finished (every effect below is idempotent). Resuming is derived ONLY from
+  // the receipt apply writes as its first effect, under the mission lock —
+  // never from WorkItem metadata or NEXT_TASKS, which a worker could write.
+  const receiptPath = missionTaskSupersedeReceiptPath(missionPath, taskId);
+  const receipt =
+    resume && safeExistsSync(receiptPath)
+      ? readJson<Record<string, unknown>>(receiptPath)
+      : undefined;
+  const receiptRecord = supersededRecordOf(receipt?.superseded);
   const resumed =
     resume &&
-    priorRecord &&
-    priorRecord.approval_request_id === resume.approvalRequestId &&
-    priorRecord.by_task_id === byTaskId &&
-    priorRecord.reason_sha256 === resume.reasonSha256 &&
-    (oldStatus === MISSION_TASK_SUPERSEDED_STATUS ||
-      items.get(taskId)?.metadata?.superseded_by === byTaskId)
-      ? priorRecord
+    receipt?.kind === 'mission-task-supersede-receipt' &&
+    receiptRecord &&
+    receiptRecord.approval_request_id === resume.approvalRequestId &&
+    receiptRecord.by_task_id === byTaskId &&
+    receiptRecord.reason_sha256 === resume.reasonSha256
+      ? receiptRecord
       : undefined;
-  // The old task's own preconditions held when a resumed run started; only
-  // the dependents are recomputed for it.
+  // A resumed run's old task may already show its own supersede (archived
+  // WorkItem, NEXT_TASKS); the liveness refusals below still apply.
   if (!resumed) {
     if (MISSION_TASK_COMPLETED_STATUSES.has(oldStatus)) {
       throw new Error(`Task ${taskId} is already ${oldStatus}; a completed task is not superseded`);
@@ -330,11 +335,11 @@ function planSupersede(
     if (oldStatus === MISSION_TASK_SUPERSEDED_STATUS) {
       throw new Error(`Task ${taskId} is already superseded`);
     }
-    if (oldStatus === 'in_progress') {
-      throw new Error(`Task ${taskId} is in progress; wait until its attempt ends`);
-    }
   }
-  const oldItem = resumed ? undefined : items.get(taskId);
+  if (oldStatus === 'in_progress') {
+    throw new Error(`Task ${taskId} is in progress; wait until its attempt ends`);
+  }
+  const oldItem = items.get(taskId);
   if (oldItem) {
     // A blocked item's attempt has ended (a held task never ran) even while
     // its scheduling lease has not expired yet; any other leased item is live.
@@ -632,6 +637,34 @@ export async function supersedeMissionTask(
     const dependents = new Set(plan.dependents);
     let changed = false;
 
+    // 0. The receipt first (the only place the reason text is kept): it is
+    //    the evidence a re-run resumes from, and the proof requires it.
+    const receiptPath = missionTaskSupersedeReceiptPath(plan.missionPath, input.taskId);
+    const receiptRelative = pathResolver.toRepoRelative(receiptPath);
+    const existingReceipt = safeExistsSync(receiptPath)
+      ? readJson<Record<string, unknown>>(receiptPath)
+      : undefined;
+    const receiptBody = (auditRecordedAt?: string) => ({
+      kind: 'mission-task-supersede-receipt',
+      version: '1.0.0',
+      ...base,
+      reason: input.reason,
+      superseded: record,
+      rewritten_dependent_task_ids: Array.isArray(existingReceipt?.rewritten_dependent_task_ids)
+        ? existingReceipt.rewritten_dependent_task_ids
+        : plan.dependents,
+      ...(auditRecordedAt ? { audit_recorded_at: auditRecordedAt } : {}),
+    });
+    const writeReceipt = (auditRecordedAt?: string) =>
+      writeDispatchArtifact(receiptPath, receiptBody(auditRecordedAt), {
+        missionId: input.missionId,
+        missionPath: plan.missionPath,
+      });
+    if (!existingReceipt) {
+      writeReceipt();
+      changed = true;
+    }
+
     // 1. Canonical WorkItems: the old one archived with superseded_by, the
     //    dependents' dependencies moved (each skipped once done).
     const workItemIdsUpdated: string[] = [];
@@ -687,36 +720,8 @@ export async function supersedeMissionTask(
     }
     if (workItemIdsUpdated.length > 0) changed = true;
 
-    // 2. Receipt (the only place the reason text is kept), then the audit
-    //    entry it records as written (so a re-run never audits twice).
-    const receiptPath = nodePath.join(
-      plan.missionPath,
-      'evidence',
-      'task-supersede',
-      `${input.taskId.replace(/[^a-zA-Z0-9._-]/gu, '-')}.json`
-    );
-    const receiptRelative = pathResolver.toRepoRelative(receiptPath);
-    const receiptBody = (auditRecordedAt?: string) => ({
-      kind: 'mission-task-supersede-receipt',
-      version: '1.0.0',
-      ...base,
-      reason: input.reason,
-      superseded: record,
-      rewritten_dependent_task_ids: plan.dependents,
-      ...(auditRecordedAt ? { audit_recorded_at: auditRecordedAt } : {}),
-    });
-    const existingReceipt = safeExistsSync(receiptPath)
-      ? readJson<Record<string, unknown>>(receiptPath)
-      : undefined;
-    const writeReceipt = (auditRecordedAt?: string) =>
-      writeDispatchArtifact(receiptPath, receiptBody(auditRecordedAt), {
-        missionId: input.missionId,
-        missionPath: plan.missionPath,
-      });
-    if (!existingReceipt) {
-      writeReceipt();
-      changed = true;
-    }
+    // 2. The audit entry the receipt records as written (so a re-run never
+    //    audits twice).
     // A receipt left unstamped by an earlier run may sit after a recorded
     // audit (a crash between the two): look for that run's entry, keyed by
     // the approval, before recording. A fresh receipt cannot have one (the
