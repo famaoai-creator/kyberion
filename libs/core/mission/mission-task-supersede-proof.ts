@@ -21,6 +21,8 @@ import * as nodePath from 'node:path';
 // customer-decision boundary, which must not join the approval store's cycle.
 import { computeApprovalPayloadHash } from '../governance/approval-presentation.js';
 import { loadApprovalRequest } from '../governance/approval-store-reader.js';
+import { NON_HUMAN_PROOF_AUTH_METHODS } from '../governance/approval-assurance.js';
+import { readJson, readJsonLines } from '../foundation/json.js';
 import { logger } from '../core.js';
 import { findMissionPath } from '../path-resolver.js';
 import { safeExistsSync } from '../secure-io.js';
@@ -46,6 +48,47 @@ export function missionTaskSupersedePayloadFromHash(input: {
     reason_sha256: input.reasonSha256,
     effect: missionTaskSupersedeEffectBinding(input.missionId, input.taskId),
   };
+}
+
+/** The supersede receipt or `task_superseded` ledger entry of this approval exists. */
+function applyEvidenceExists(missionPath: string, taskId: string, approvalId: string): boolean {
+  const receiptPath = nodePath.join(
+    missionPath,
+    'evidence',
+    'task-supersede',
+    `${taskId.replace(/[^a-zA-Z0-9._-]/gu, '-')}.json`
+  );
+  if (safeExistsSync(receiptPath)) {
+    const receipt = readJson<Record<string, unknown>>(receiptPath);
+    const record =
+      receipt.superseded && typeof receipt.superseded === 'object'
+        ? (receipt.superseded as Record<string, unknown>)
+        : {};
+    if (record.approval_request_id === approvalId) return true;
+  }
+  return ledgerHasTaskSupersede(missionPath, taskId, approvalId);
+}
+
+/** Has the execution ledger recorded this supersede (same task and approval)? */
+export function ledgerHasTaskSupersede(
+  missionPath: string,
+  taskId: string,
+  approvalId: string
+): boolean {
+  const ledgerPath = nodePath.join(missionPath, 'execution-ledger.jsonl');
+  if (!safeExistsSync(ledgerPath)) return false;
+  return readJsonLines<Record<string, unknown> | null>(ledgerPath, {
+    onMalformed: 'skip',
+    map: (value) =>
+      value && typeof value === 'object' && !Array.isArray(value)
+        ? (value as Record<string, unknown>)
+        : null,
+  }).some(
+    (entry) =>
+      entry?.event_type === 'task_superseded' &&
+      entry.task_id === taskId &&
+      (entry.payload as Record<string, unknown> | undefined)?.approval_request_id === approvalId
+  );
 }
 
 export type MissionTaskSupersedeProof =
@@ -110,13 +153,26 @@ export function missionTaskSupersedeProof(
     if (approval.accountability?.payloadHash !== payloadHash) {
       return { verified: false, reason: 'approval_other_payload' };
     }
+    // N4: each human decision re-checked as apply re-checks it
+    // (validateHumanFinalDecision, phase recheck): a human, authenticated
+    // decider on a human-proof surface, bound to this payload and effect.
+    if (approval.accountability?.finalDecision !== 'human_only') {
+      return { verified: false, reason: 'approval_not_human_only' };
+    }
     const human = approval.workflow?.approvals?.some(
       (decision) =>
         decision.status === 'approved' &&
         decision.decidedByType === 'human' &&
-        decision.authenticated === true
+        decision.authenticated === true &&
+        !(decision.authMethod && NON_HUMAN_PROOF_AUTH_METHODS.has(decision.authMethod)) &&
+        decision.payloadHash === approval.accountability?.payloadHash &&
+        decision.effectBinding === approval.accountability?.effectBinding
     );
     if (!human) return { verified: false, reason: 'approval_not_human' };
+    // N4: apply ran under this approval (its receipt or its ledger entry).
+    if (!applyEvidenceExists(missionPath, taskId, approvalId)) {
+      return { verified: false, reason: 'apply_evidence_missing' };
+    }
     return { verified: true, by_task_id: byTaskId, approval_request_id: approvalId };
   } catch (error) {
     const code = /\[([A-Z0-9_]+)\]/u.exec(error instanceof Error ? error.message : String(error));
