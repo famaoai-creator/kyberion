@@ -352,9 +352,9 @@ never recorded as `public` or untenanted.
   Chronos `MISSION_RUNTIME_REMEDIATION` lease for an id that never was a
   mission) and no `tenant_slug` in the record — stays a system record, but
   metadata only (D4): the entry keeps the raw `mission_id`, `type`, `role` and
-  a mission-kind scope, carries `payload_withheld: 'mission_unplaceable'` and
-  a `payload_digest` (sha256 of the sorted-key payload JSON), and never the
-  payload itself; `record` warns naming only the type and id. A record that
+  a mission-kind scope and carries `payload_withheld: 'mission_unplaceable'`,
+  never the payload itself nor any digest of it (a fast hash of a payload that
+  may carry credential-like fields would be guessable); `record` warns naming only the type and id. A record that
   names its `tenant_slug` explicitly still routes to that tenant's partition
   with full detail. The system ledger is append-only: rows written before D4
   keep their payloads (not rewritten).
@@ -423,9 +423,13 @@ the record is stored follows its scope
   `<tier>/shared` and reserved names are never a tenant.
 - Tenant backup, the tenant restore allowlist and tenant offboarding all walk
   this list, so a newly registered root is covered by all three. Offboarding
-  maps each key to a target kind in a `satisfies Record<…>` table (the six
-  other state roots export + soft-delete as `tenant_runtime_state`), so a new
-  root fails to compile until its disposition is decided.
+  maps each key to a target kind in a `satisfies Record<…>` table (the
+  pipeline-library-run, autonomy-learning, external-operation and grant roots
+  export + soft-delete as `tenant_runtime_state`; hearing and
+  discussion-create-request receipts map to `null` — review-required, never
+  auto-offboarded, though backups include them), so a new root fails to
+  compile until its disposition is decided. Null-disposition partitions are
+  never listed or counted as post-offboard leftovers.
 - A restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`) to lay an
   append-only partition over a target that already holds one (the only
   rollback guard: a chain has no head anchor). Append-only partitions and, on

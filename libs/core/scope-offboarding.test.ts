@@ -1028,12 +1028,15 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       'active/shared/runtime/pipeline-library-runs',
       'active/shared/runtime/autonomy-learning',
       'active/shared/runtime/external-operations',
-      'active/shared/runtime/hearing',
-      'active/shared/runtime/discussion-create-requests',
       'active/shared/runtime/grants',
     ];
+    // Durable receipts: review-required, never auto-offboarded.
+    const kept = [
+      'active/shared/runtime/hearing',
+      'active/shared/runtime/discussion-create-requests',
+    ];
     const record = (root: string, tenant: string) => `${root}/confidential/${tenant}/state.json`;
-    for (const root of roots)
+    for (const root of [...roots, ...kept])
       for (const tenant of [TENANT, 'tenant-beta']) {
         fs.mkdirSync(path.dirname(abs(record(root, tenant))), { recursive: true });
         fs.writeFileSync(abs(record(root, tenant)), JSON.stringify({ tenant }));
@@ -1049,6 +1052,9 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       )
     );
     expect(dryRun.targets.map((t) => t.path).filter((p) => p.includes('tenant-beta'))).toEqual([]);
+    expect(
+      dryRun.targets.map((t) => t.path).filter((p) => kept.some((root) => p.startsWith(root)))
+    ).toEqual([]);
 
     const result = offboardScope({
       scopeType: 'tenant',
@@ -1063,11 +1069,12 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
       expect(fs.existsSync(abs(record(root, 'tenant-beta')))).toBe(true);
       expect(fs.existsSync(abs(`${result.export_path}/${record(root, TENANT)}`))).toBe(true);
     }
+    for (const root of kept) expect(fs.existsSync(abs(record(root, TENANT)))).toBe(true);
     expect(result.verification?.clean).toBe(true);
   });
 
   it('reports a tenant runtime partition it could not remove as a failed offboarding', () => {
-    const parent = 'active/shared/runtime/hearing/confidential';
+    const parent = 'active/shared/runtime/external-operations/confidential';
     fs.mkdirSync(abs(`${parent}/${TENANT}`), { recursive: true });
     fs.writeFileSync(abs(`${parent}/${TENANT}/session.json`), '{}');
     fs.chmodSync(abs(parent), 0o555);

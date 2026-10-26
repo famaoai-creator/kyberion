@@ -433,8 +433,8 @@ describe('mission ledger scope (D9)', () => {
       payload_withheld: 'mission_unplaceable',
     });
     expect(orphanEntry?.payload).toBeUndefined();
-    expect(String(orphanEntry?.payload_digest)).toMatch(/^[0-9a-f]{64}$/u);
-    expect(orphanEntry?.payload_digest_alg).toBe('hmac-sha256');
+    expect(orphanEntry).not.toHaveProperty('payload_digest');
+    expect(orphanEntry).not.toHaveProperty('payload_digest_alg');
     expect(fs.readFileSync(ledger.GLOBAL_LEDGER_PATH, 'utf8')).not.toContain(marker);
     expect(ledger.verifyAllLedgerIntegrity().ok).toBe(true);
 

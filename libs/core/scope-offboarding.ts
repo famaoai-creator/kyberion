@@ -451,8 +451,10 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   pipeline_library_runs: 'tenant_runtime_state',
   autonomy_learning: 'tenant_runtime_state',
   external_operations: 'tenant_runtime_state',
-  hearing: 'tenant_runtime_state',
-  discussion_create_requests: 'tenant_runtime_state',
+  // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
+  hearing: null,
+  // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
+  discussion_create_requests: null,
   grants: 'tenant_runtime_state',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | null>;
 
@@ -889,7 +891,13 @@ export function collectScopeTargets(
     if (isValidTenantSlug(id)) {
       // A partition this process cannot even probe is listed (fail loud: its
       // removal then fails visibly) rather than silently skipped.
+      // Null-disposition roots are never probed, listed or counted as leftovers.
+      const offboarded = (subtree: string): boolean => {
+        const key = tenantRuntimePartitionOf(subtree)?.key;
+        return key !== undefined && TENANT_RUNTIME_PARTITION_TARGET_KINDS[key] !== null;
+      };
       const present = (subtree: string): boolean => {
+        if (!offboarded(subtree)) return false;
         const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
         if (!subtreePath) return false;
         try {
@@ -1461,9 +1469,13 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
       // a warning: its records (ledgers, grants, approvals) outlive the tenant.
       const partitionLeftovers =
         scopeType === 'tenant'
-          ? result.verification.leftovers.filter(
-              (leftover) => tenantRuntimePartitionOf(leftover)?.tenant === scopeId
-            )
+          ? result.verification.leftovers.filter((leftover) => {
+              const partition = tenantRuntimePartitionOf(leftover);
+              return (
+                partition?.tenant === scopeId &&
+                TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key] !== null
+              );
+            })
           : [];
       if (result.verification.error) {
         result.status = 'error';
