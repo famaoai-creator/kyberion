@@ -50,14 +50,19 @@ export function missionTaskSupersedePayloadFromHash(input: {
   };
 }
 
-/** The supersede receipt or `task_superseded` ledger entry of this approval exists. */
-function applyEvidenceExists(missionPath: string, taskId: string, approvalId: string): boolean {
-  const receiptPath = nodePath.join(
+/** Where apply writes a task's supersede receipt (its first effect). */
+export function missionTaskSupersedeReceiptPath(missionPath: string, taskId: string): string {
+  return nodePath.join(
     missionPath,
     'evidence',
     'task-supersede',
     `${taskId.replace(/[^a-zA-Z0-9._-]/gu, '-')}.json`
   );
+}
+
+/** The supersede receipt or `task_superseded` ledger entry of this approval exists. */
+function applyEvidenceExists(missionPath: string, taskId: string, approvalId: string): boolean {
+  const receiptPath = missionTaskSupersedeReceiptPath(missionPath, taskId);
   if (safeExistsSync(receiptPath)) {
     const receipt = readJson<Record<string, unknown>>(receiptPath);
     const record =
