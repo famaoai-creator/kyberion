@@ -1,14 +1,26 @@
 {
-  "version": "2.0.0",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type + export_as.",
+  "pipeline_id": "intra-login",
+  "version": "3.0.0",
+  "description": "Shared intranet/SaaS login subroutine. Secret-first: when login_user_secret and login_password_secret (secret-store key names) are supplied, credentials are filled through browser:fill_secret_ref so values never enter the ADF or the action_trail (redacted). Plaintext login_user/login_password context variables remain only as a legacy fallback. Selectors are customer inputs passed as context vars.",
+  "_migration_note": "v3: secret-store fills via fill_secret_ref + dom_path corroboration. v2: Typed Flow format. v1 used type + export_as.",
+  "context": {
+    "login_probe_selector": "input[name='_account']",
+    "login_user_selector": "input[name='_account']",
+    "login_password_selector": "input[name='_password']",
+    "login_submit_selector": "input.login-button, input[type='submit']",
+    "login_settle_ms": 3000
+  },
   "steps": [
     {
       "id": "check-login",
       "role": "source",
       "op": "browser:evaluate",
-      "produces": { "channel": "login_status", "type": "EvalResult" },
+      "produces": {
+        "channel": "login_status",
+        "type": "EvalResult"
+      },
       "params": {
-        "script": "(() => document.querySelector(\"input[name='_account']\") ? 'need_login' : 'already_logged_in')()"
+        "script": "(() => document.querySelector(\"{{login_probe_selector}}\") ? 'need_login' : 'already_logged_in')()"
       }
     },
     {
@@ -17,24 +29,90 @@
       "op": "core:if",
       "consumes": "login_status",
       "params": {
-        "condition": { "from": "login_status", "operator": "eq", "value": "need_login" },
+        "condition": {
+          "from": "login_status",
+          "operator": "eq",
+          "value": "need_login"
+        },
         "then": [
           {
-            "role": "sink",
-            "op": "browser:fill",
-            "params": { "selector": "input[name='_account']", "text": "{{login_user}}" }
+            "id": "login-secret-path",
+            "role": "gate",
+            "op": "core:if",
+            "params": {
+              "condition": {
+                "operator": "and",
+                "conditions": [
+                  {
+                    "from": "login_user_secret",
+                    "operator": "not_empty"
+                  },
+                  {
+                    "from": "login_password_secret",
+                    "operator": "not_empty"
+                  }
+                ]
+              },
+              "then": [
+                {
+                  "id": "fill-user-secret",
+                  "role": "sink",
+                  "op": "browser:fill_secret_ref",
+                  "params": {
+                    "ref": "login-user",
+                    "secret_ref": "{{login_user_secret}}",
+                    "dom_path": "{{login_user_selector}}"
+                  }
+                },
+                {
+                  "id": "fill-password-secret",
+                  "role": "sink",
+                  "op": "browser:fill_secret_ref",
+                  "params": {
+                    "ref": "login-password",
+                    "secret_ref": "{{login_password_secret}}",
+                    "dom_path": "{{login_password_selector}}"
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "id": "fill-user-legacy",
+                  "role": "sink",
+                  "op": "browser:fill",
+                  "params": {
+                    "selector": "{{login_user_selector}}",
+                    "text": "{{login_user}}"
+                  }
+                },
+                {
+                  "id": "fill-password-legacy",
+                  "role": "sink",
+                  "op": "browser:fill",
+                  "params": {
+                    "selector": "{{login_password_selector}}",
+                    "text": "{{login_password}}"
+                  }
+                }
+              ]
+            }
           },
           {
-            "role": "sink",
-            "op": "browser:fill",
-            "params": { "selector": "input[name='_password']", "text": "{{login_password}}" }
-          },
-          {
+            "id": "submit-login",
             "role": "sink",
             "op": "browser:click",
-            "params": { "selector": "input.login-button, input[type='submit']" }
+            "params": {
+              "selector": "{{login_submit_selector}}"
+            }
           },
-          { "role": "sink", "op": "browser:wait", "params": { "duration": 3000 } }
+          {
+            "id": "wait-login-settle",
+            "role": "sink",
+            "op": "browser:wait",
+            "params": {
+              "duration": "{{login_settle_ms}}"
+            }
+          }
         ]
       }
     }
