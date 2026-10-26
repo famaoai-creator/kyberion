@@ -3,6 +3,10 @@
  * State management and prerequisite validation for missions.
  */
 import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';
+import {
+  MISSION_IDENTITY_FILES,
+  probeMissionPrerequisiteIdentity,
+} from './mission-prerequisite-identity.js';
 
 import * as path from 'node:path';
 import { compileSchema } from '../foundation/ajv.js';
@@ -26,6 +30,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { withLock } from '../foundation/lock-utils.js';
+import { holdsMissionMutationLock } from './mission-mutation-snapshot.js';
 import { withFencedWriterLease, writerLeaseResourceId } from '../writer-lease.js';
 import { resolveActiveProfileRoot } from '../profile-root.js';
 import { hasAuthority } from '../authority.js';
@@ -146,14 +151,14 @@ export function checkPrerequisites(): void {
   logger.info('🛡️ Validating Sovereign Prerequisites...');
 
   const profileRoot = resolveActiveProfileRoot();
-  const requiredFiles = ['my-identity.json', 'my-vision.md', 'agent-identity.json'].map((name) =>
-    path.join(profileRoot, name)
-  );
+  const requiredFiles = MISSION_IDENTITY_FILES.map((name) => path.join(profileRoot, name));
   const missingFiles = requiredFiles.filter((filePath) => !safeExistsSync(filePath));
-  if (missingFiles.length > 0) {
+  const installationIdentity = missingFiles.length ? probeMissionPrerequisiteIdentity() : undefined;
+  if (missingFiles.length > 0 && !installationIdentity?.ready) {
     throw new Error(
-      `CRITICAL: Sovereign profile incomplete. Missing: ${missingFiles.map((filePath) => path.basename(filePath)).join(', ')}. ` +
-        'Please run "pnpm onboarding" (or complete customer onboarding) before creating missions.'
+      `CRITICAL: Sovereign profile incomplete. Missing: ${(installationIdentity?.missing_files ?? missingFiles.map((filePath) => path.basename(filePath))).join(', ')}. ` +
+        (installationIdentity?.next ??
+          'Please run "pnpm onboarding" (or complete customer onboarding) before creating missions.')
     );
   }
 
@@ -414,7 +419,7 @@ export async function saveState(
       fn: doWrite,
     });
 
-  if (alreadyLocked) {
+  if (alreadyLocked || holdsMissionMutationLock(id)) {
     await doFencedWrite();
   } else {
     await withLock(`mission-${id}`, doFencedWrite);

@@ -106,6 +106,7 @@ describe('mission-team-orchestrator', () => {
       provider: 'gemini',
       modelId: 'gemini-2.5-pro',
       expectedRequestedSelection: null,
+      executionRoute: 'agent_runtime',
     });
     expect(mocks.reserveMissionTeamSelectionDispatch.mock.invocationCallOrder[0]).toBeLessThan(
       mocks.ensureAgentRuntimeViaDaemon.mock.invocationCallOrder[0]
@@ -277,6 +278,7 @@ describe('mission-team-orchestrator', () => {
       provider: 'gemini',
       modelId: 'gemini-2.5-pro',
       expectedRequestedSelection: null,
+      executionRoute: 'agent_runtime',
     });
     // TC-02: a role-scoped ensure is a staffing demand for exactly those roles.
     expect(mocks.staffMissionTeamRoles).toHaveBeenCalledWith(

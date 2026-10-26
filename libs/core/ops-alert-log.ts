@@ -2,7 +2,24 @@ import * as path from 'node:path';
 import { appendJsonLine } from './foundation/json.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  withSafeAppendFile,
+} from './secure-io.js';
+import { withOperationalAlertStore } from './foundation/operational-store-policy.js';
+
+/** Elevation is limited to the two fixed store files; custom paths retain caller rights. */
+export function withOpsAlertFileStore<T>(filePath: string, fn: () => T): T {
+  const canonical = path.resolve(filePath);
+  const logPath = pathResolver.shared('observability/ops-alerts.jsonl');
+  return [logPath, logPath.replace(/\.jsonl$/, '.dedupe.json')].some(
+    (file) => canonical === path.resolve(file)
+  )
+    ? withOperationalAlertStore(fn)
+    : fn();
+}
 
 const OPS_ALERT_LOG_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/ops-alert-log-record.schema.json'
@@ -35,9 +52,16 @@ export function validateOpsAlertLogRecord(
 }
 
 export function appendOpsAlertLogRecord(filePath: string, value: unknown): string {
+  return withOpsAlertFileStore(filePath, () => appendScopedOpsAlertLogRecord(filePath, value));
+}
+
+function appendScopedOpsAlertLogRecord(filePath: string, value: unknown): string {
   const safeFilePath = resolveOpsAlertLogPath(filePath);
-  const parent = path.dirname(safeFilePath);
-  if (!safeExistsSync(parent)) safeMkdir(parent, { recursive: true });
+  // Authorize the exact store file; the append helper creates its parents under
+  // that checked destination without granting a writable directory prefix.
+  if (!safeExistsSync(path.dirname(safeFilePath))) {
+    withSafeAppendFile(safeFilePath, () => undefined);
+  }
   ensureRegularOpsAlertLogFile(safeFilePath);
   appendJsonLine(safeFilePath, catalog(safeFilePath).validate(value, safeFilePath));
   return safeFilePath;

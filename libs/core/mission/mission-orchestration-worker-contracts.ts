@@ -64,6 +64,12 @@ export interface PlannedNextTask {
   dependencies?: string[];
   /** Explicit shared-resource claims; agent identity is intentionally not a claim. */
   resource_claims?: string[];
+  /** Owner-authored exact source-file grant; preserved through progress rewrites. */
+  source_edit_paths?: string[];
+  /** Approval remains required unless the owner explicitly grants otherwise. */
+  source_edit_requires_approval?: boolean;
+  /** Owner-authored exact repository pipeline references. */
+  allowed_pipelines?: string[];
   acceptance_criteria?: string[];
   risk?: string;
   expected_output_format?: 'text' | 'files' | 'structured';

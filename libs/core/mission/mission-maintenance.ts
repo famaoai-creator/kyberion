@@ -25,6 +25,11 @@ import {
 import { sendOpsAlert } from '../ops-alert.js';
 import { withLock } from '../foundation/lock-utils.js';
 import {
+  withTaskEvidenceFence,
+  type TaskEvidenceBinding,
+} from './mission-task-evidence-binding.js';
+import { assertMissionSnapshotExpectation } from './mission-mutation-snapshot.js';
+import {
   appendMissionExecutionLedgerEntry,
   type MissionActorType,
 } from './mission-team-binding.js';
@@ -892,6 +897,7 @@ export async function recordEvidence(args: {
   actorId?: string;
   actorType?: MissionActorType;
   provider?: string; // estimated usage entry; inferred from actorId when omitted
+  taskBinding?: TaskEvidenceBinding;
   getGitHash: (cwd: string) => string;
   syncProjectLedgerIfLinked: (missionId: string) => Promise<void>;
 }): Promise<void> {
@@ -930,65 +936,94 @@ export async function recordEvidence(args: {
   // CD-09: reconcile the task's pinned customer decisions before the evidence
   // is recorded. A stale result does not block it; it files a rework WorkItem.
   // Only counts, the consumer id and WorkItem ids reach the (public) ledger.
-  const decisionCheck = reconcileTaskDecisions({ missionId: upperId, taskId: args.taskId });
-
   await withLock(`mission-${upperId}`, async () => {
-    appendMissionExecutionLedgerEntry({
-      mission_id: upperId,
-      mission_path_hint: missionPath,
-      event_type: 'evidence_recorded',
-      task_id: args.taskId,
-      team_role: args.teamRole,
-      actor_id: args.actorId,
-      actor_type: args.actorType || (args.actorId ? 'agent' : undefined),
-      decision: args.note,
-      evidence: args.evidence || [],
-      payload: {
-        mission_status: state.status,
-        ...(deliverableRelPath
-          ? {
-              deliverable_path: deliverableRelPath.rel,
-              deliverable_mtime: deliverableRelPath.mtime,
-              deliverable_age_seconds: Math.max(
-                0,
-                Math.round((Date.now() - Date.parse(deliverableRelPath.mtime)) / 1000)
-              ),
-            }
-          : {}),
-        ...(decisionCheck.consumer ? { customer_decision_lock: decisionCheck } : {}),
+    assertMissionSnapshotExpectation(upperId);
+    const mutationState = loadState(upperId);
+    if (!mutationState) throw new Error(`Mission ${upperId} state not found.`);
+    withTaskEvidenceFence(
+      args.taskBinding,
+      {
+        missionId: upperId,
+        taskId: args.taskId,
+        actorId: args.actorId,
+        missionPath,
+        tier: mutationState.tier,
+        tenantSlug: mutationState.tenant_slug,
+        status: mutationState.status,
       },
-    });
+      (verified) => {
+        const decisionCheck = reconcileTaskDecisions({ missionId: upperId, taskId: args.taskId });
+        appendMissionExecutionLedgerEntry({
+          mission_id: upperId,
+          mission_path_hint: missionPath,
+          event_type: 'evidence_recorded',
+          task_id: args.taskId,
+          team_role: args.teamRole,
+          actor_id: args.actorId,
+          actor_type: args.actorType || (args.actorId ? 'agent' : undefined),
+          decision: args.note,
+          evidence: args.evidence || [],
+          payload: {
+            mission_status: state.status,
+            ...(args.taskBinding
+              ? {
+                  task_binding: {
+                    work_item_id: args.taskBinding.workItemId,
+                    lease_id: args.taskBinding.leaseId,
+                    artifact_path: args.taskBinding.artifactPath,
+                    artifact_sha256: args.taskBinding.artifactSha256,
+                    verified_sources: args.taskBinding.verifiedSources ?? [],
+                  },
+                }
+              : {}),
+            ...(deliverableRelPath
+              ? {
+                  deliverable_path: deliverableRelPath.rel,
+                  deliverable_mtime: deliverableRelPath.mtime,
+                  deliverable_age_seconds: Math.max(
+                    0,
+                    Math.round((Date.now() - Date.parse(deliverableRelPath.mtime)) / 1000)
+                  ),
+                }
+              : {}),
+            ...(decisionCheck.consumer ? { customer_decision_lock: decisionCheck } : {}),
+          },
+        });
 
-    // Close the NEXT_TASKS.json task out when its deliverable now exists and
-    // its dependencies are already done — otherwise the documented
-    // checkpoint+record-evidence flow (execution.md) silently never closes a
-    // task, and `finish` fails with "Pending tasks remain" even though every
-    // deliverable is in place. Gated on this explicit, task_id-scoped call so
-    // a bare file-existence check is never trusted without an agent
-    // deliberately asserting the work for THAT task is done.
-    // CD-09: a task waiting for a customer decision keeps its evidence but is
-    // not closed (nor any cascade candidate that is itself held).
-    const heldIds = decisionCheck.held_proposal_ids ?? [];
-    if (heldIds.length > 0) {
-      logger.warn(
-        `task ${args.taskId} not completed — it waits for a customer decision (requires_customer) | the evidence is recorded; confirm the customer decision (customer-decision confirm), then resume the mission | mission=${upperId} consumer=${decisionCheck.consumer ?? ''} proposals=${heldIds.join(',')}`
-      );
-    }
-    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId, {
-      // The task's own check re-reads its lock too, so a failed reconcile never
-      // lets a held task close (the hold check fails closed).
-      isHeld: (taskId) =>
-        (taskId === args.taskId && heldIds.length > 0) ||
-        isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
-    });
-    if (autoComplete.completed) {
-      logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
-      recordDirectCliTaskUsage({ ...args, ...autoComplete, state, event: 'record_evidence' });
-      for (const cascadedId of autoComplete.cascaded) {
-        logger.info(`✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`);
+        // Close the NEXT_TASKS.json task out when its deliverable now exists and
+        // its dependencies are already done — otherwise the documented
+        // checkpoint+record-evidence flow (execution.md) silently never closes a
+        // task, and `finish` fails with "Pending tasks remain" even though every
+        // deliverable is in place. Gated on this explicit, task_id-scoped call so
+        // a bare file-existence check is never trusted without an agent
+        // deliberately asserting the work for THAT task is done.
+        // CD-09: a task waiting for a customer decision keeps its evidence but is
+        // not closed (nor any cascade candidate that is itself held).
+        const heldIds = decisionCheck.held_proposal_ids ?? [];
+        if (heldIds.length > 0) {
+          logger.warn(
+            `task ${args.taskId} not completed — it waits for a customer decision (requires_customer) | the evidence is recorded; confirm the customer decision (customer-decision confirm), then resume the mission | mission=${upperId} consumer=${decisionCheck.consumer ?? ''} proposals=${heldIds.join(',')}`
+          );
+        }
+        const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId, {
+          verifiedSourceTarget: verified.sourceTarget,
+          // The task's own check re-reads its lock too, so a failed reconcile never
+          // lets a held task close (the hold check fails closed).
+          isHeld: (taskId) =>
+            (taskId === args.taskId && heldIds.length > 0) ||
+            isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
+        });
+        if (autoComplete.completed) {
+          logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
+          recordDirectCliTaskUsage({ ...args, ...autoComplete, state, event: 'record_evidence' });
+          for (const cascadedId of autoComplete.cascaded) {
+            logger.info(
+              `✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`
+            );
+          }
+        }
       }
-    }
-
+    );
     safeExec('git', ['add', '.'], { cwd: missionPath });
     try {
       safeExec('git', ['commit', '-m', `evidence(${upperId}): ${args.taskId} - ${args.note}`], {
@@ -1146,6 +1181,7 @@ export async function recordArtifactReview(args: {
 
   let evaluation: { ready: boolean; reasons: string[] } = { ready: false, reasons: [] };
   await withLock(`mission-${upperId}`, async () => {
+    assertMissionSnapshotExpectation(upperId);
     const reviewsDir = safeMissionArtifactPath(missionPath, 'evidence/reviews');
     if (!safeExistsSync(reviewsDir)) safeMkdir(reviewsDir, { recursive: true });
     writeDispatchArtifact(receiptPath, receipt, {

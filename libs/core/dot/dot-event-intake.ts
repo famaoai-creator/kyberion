@@ -44,7 +44,6 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { createLogger } from '../logger.js';
-import { physicalScopedPath } from '../physical-namespace.js';
 import { getSecretForIdentity, getSecret as secretGuardGetSecret } from '../secret/secret-guard.js';
 import { parseEnvSecretName } from '../secret/secret-identity.js';
 import {
@@ -53,7 +52,7 @@ import {
 } from '../organization/tenant-governance-overlay.js';
 
 import { listDotCharters, type DotCharter, type DotTrigger } from './dot-charter.js';
-import { DOT_EVENTS_FILE, DOT_STATE_ROOT, type DotInboundEvent } from './dot-state-paths.js';
+import { DOT_EVENTS_FILE, dotStatePath, type DotInboundEvent } from './dot-state-paths.js';
 import {
   buildDotDueChecker,
   readDotWakeLedger,
@@ -455,9 +454,15 @@ export function normalizeInboundEvent(input: {
 // ---------------------------------------------------------------------------
 
 /** Repo-relative events ledger for a tenant (or the system floor). */
-export function dotEventsLedgerPath(tenantSlug?: string): string {
-  if (!tenantSlug) return `${DOT_STATE_ROOT}/${DOT_EVENTS_FILE}`;
-  return physicalScopedPath(DOT_STATE_ROOT, { tenant_slug: tenantSlug }, DOT_EVENTS_FILE);
+export function dotEventsLedgerPath(
+  tenantSlug?: string,
+  tier: DotCharter['scope']['tier'] = tenantSlug ? 'confidential' : 'public',
+  owner_nhi?: string
+): string {
+  return dotStatePath(
+    { scope: { tier, tenant_slug: tenantSlug, owner_nhi } } as DotCharter,
+    DOT_EVENTS_FILE
+  );
 }
 
 export interface DotEventDeps {
@@ -774,6 +779,7 @@ export function ingestAskIntake(input: {
 
 /** An organization-bound event is visible only to dots of that organization. */
 export function dotEventVisibleToCharter(event: DotInboundEvent, charter: DotCharter): boolean {
+  if (charter.scope.tier !== (event.tenant_slug ? 'confidential' : 'public')) return false;
   return !event.organization_id || event.organization_id === charter.scope.organization_id;
 }
 
@@ -826,7 +832,11 @@ export function evaluateDotEventTriggers(
   });
   if (continuation !== null) return continuation;
   const tenantSlug = charter.scope.tenant_slug || undefined;
-  const events = readDotInboundEvents(tenantSlug, deps).filter(
+  const events = (
+    charter.scope.tier === (tenantSlug ? 'confidential' : 'public')
+      ? readDotInboundEvents(tenantSlug, deps)
+      : []
+  ).filter(
     (event) =>
       (event.tenant_slug || undefined) === tenantSlug && dotEventVisibleToCharter(event, charter)
   );

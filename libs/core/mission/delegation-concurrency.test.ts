@@ -21,6 +21,7 @@ vi.mock('../governance/kill-switch.js', () => ({
 let tmpDir: string;
 
 vi.mock('../path-resolver.js', () => ({
+  rootResolve: (sub = '') => path.join('/tmp', 'kyberion-test-root', sub),
   pathResolver: {
     rootDir: () => path.join('/tmp', 'kyberion-test-root'),
     shared: (sub = '') => path.join(tmpDir, sub),

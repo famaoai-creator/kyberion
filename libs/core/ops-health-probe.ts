@@ -283,8 +283,16 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
   // consumed wake never suppresses new work.
   if (deps.fileWorkItems && workItemsExisting.length > 0) {
     try {
+      // This producer emits counts/references only. Route that public signal
+      // explicitly to the trusted charter scope instead of an unscoped lane.
+      const target = listDotCharters(deps.rootDir ?? pathResolver.rootDir(), {
+        status: 'active',
+      }).find((loaded) => loaded.charter.dot_id === OPS_WORK_ITEM_DOT_ID);
+      if (!target)
+        throw new Error('Ops dot is unavailable; repair or activate its charter before delivery');
       appendDotInboxEntry(
         {
+          scope: target.charter.scope,
           channel: 'inbox',
           dot_id: OPS_WORK_ITEM_DOT_ID,
           source: 'ops-health-probe',

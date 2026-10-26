@@ -45,7 +45,12 @@ import {
   type DaemonServiceSpec,
 } from '@agent/core/daemon/service-manager';
 import { buildLaunchdPlist, type LaunchdPlistOptions } from '@agent/core/daemon/launchd';
-import { CHRONOS_DAEMON_LABEL, DAEMON_SPECS } from '@agent/core/daemon/specs';
+import {
+  CHRONOS_DAEMON_LABEL,
+  DAEMON_SPECS,
+  resolveDaemonInstance,
+  scopeDaemonServiceSpec,
+} from '@agent/core/daemon/specs';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export const CHRONOS_LAUNCHD_LABEL = CHRONOS_DAEMON_LABEL;
@@ -109,7 +114,7 @@ export function resolveForwardedChronosEnv(
   );
 }
 
-/** Pure plist generation — string in, string out, no I/O. */
+/** Legacy-global pure wrapper. Actual CLI installations use checkout-scoped specs. */
 export function buildChronosLaunchdPlist(options: ChronosLaunchdPlistOptions): string {
   for (const name of Object.keys(options.env ?? {})) {
     if (!(CHRONOS_FORWARDABLE_ENV as readonly string[]).includes(name)) {
@@ -209,6 +214,11 @@ export async function main(
       default: false,
       describe: 'Print the service manager status for the daemon (read-only)',
     })
+    .option('legacy-global', {
+      type: 'boolean',
+      default: false,
+      describe: 'Explicitly manage the old shared global service instead of this checkout instance',
+    })
     .option('forward-env', {
       type: 'string',
       array: true,
@@ -223,8 +233,8 @@ export async function main(
     .parseSync();
 
   const daemonId = String(argv.daemon);
-  const spec = DAEMON_SPECS[daemonId];
-  if (!spec) {
+  const baseSpec = DAEMON_SPECS[daemonId];
+  if (!baseSpec) {
     throw new Error(
       `unknown daemon '${daemonId}' — known: ${Object.keys(DAEMON_SPECS).join(', ')}`
     );
@@ -238,8 +248,15 @@ export async function main(
     );
   }
 
-  const repoRoot = pathResolver.rootDir();
-  const env = resolveForwardedChronosEnv(argv['forward-env'] as string[]);
+  const instance = resolveDaemonInstance(pathResolver.rootDir());
+  const repoRoot = instance.repoRoot;
+  const spec = argv['legacy-global'] ? baseSpec : scopeDaemonServiceSpec(baseSpec, instance);
+  // WorkingDirectory alone does not override an inherited KYBERION_ROOT.
+  // This identity is derived locally, never copied from a caller-provided id/env.
+  const env = {
+    ...resolveForwardedChronosEnv(argv['forward-env'] as string[]),
+    KYBERION_ROOT: repoRoot,
+  };
   const ctx: DaemonRenderContext = {
     nodePath: resolveStableNodePath(),
     repoRoot,
@@ -254,7 +271,8 @@ export async function main(
         : undefined,
     systemRoot: process.env.SystemRoot,
   } as DaemonRenderContext;
-  const verbFlag = daemonId === 'chronos' ? '' : ` --daemon ${daemonId}`;
+  const verbFlag = `${daemonId === 'chronos' ? '' : ` --daemon ${daemonId}`}${argv['legacy-global'] ? ' --legacy-global' : ''}`;
+  const identityHint = `instance=${argv['legacy-global'] ? 'legacy-global' : instance.id} root=${repoRoot} service=${spec.label}`;
 
   if (argv.status) {
     const status = manager.statusCommand(spec, ctx);
@@ -265,9 +283,11 @@ export async function main(
     const [command, ...commandArgs] = status.run;
     const result = safeExecResult(command, commandArgs, { timeoutMs: 15_000 });
     print(
-      result.stdout.trim() ||
-        result.stderr.trim() ||
-        `${status.run.join(' ')} exited ${result.status}`
+      identityHint +
+        '\n' +
+        (result.stdout.trim() ||
+          result.stderr.trim() ||
+          `${status.run.join(' ')} exited ${result.status}`)
     );
     return;
   }
@@ -286,7 +306,11 @@ export async function main(
       ? manager.planUninstall(spec, ctx)
       : verb === 'restart'
         ? manager.planRestart(spec, ctx)
-        : manager.planInstall(spec, ctx);
+        : verb === 'start'
+          ? manager.planStart(spec, ctx)
+          : verb === 'stop'
+            ? manager.planStop(spec, ctx)
+            : manager.planInstall(spec, ctx);
   const applyCommand = `pnpm kyberion scheduler ${verb} --apply${verbFlag}`;
 
   if (!argv.apply) {
@@ -302,7 +326,7 @@ export async function main(
               : 'Install',
       plan,
       applyCommand,
-      print
+      (value) => print(`${identityHint}\n${String(value)}`)
     );
     return;
   }

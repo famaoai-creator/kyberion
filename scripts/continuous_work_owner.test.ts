@@ -12,6 +12,7 @@ import {
 } from './continuous_work_owner.js';
 import type { ContinuousOwnerProcessOptions } from './continuous_owner_process.js';
 import type { AlignmentDecisionReport } from './mission_alignment_decision.js';
+import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
 
 const managed = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock('./continuous_owner_process.js', () => ({ runContinuousOwnerProcess: managed.run }));
@@ -83,7 +84,7 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
   });
   let currentState = state();
   let tasks: Record<string, unknown>[] = [
-    { task_id: 'task-1', phase: 'execution', status: 'pending' },
+    { task_id: 'task-1', phase: 'execution', status: 'planned' },
   ];
   const exec = vi.fn(
     async (_command: string, args: string[], _options: ContinuousOwnerProcessOptions) => {
@@ -112,6 +113,8 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
     requestId: 'approval-1',
     reasons: [],
   }));
+  const workItems = vi.fn((): WorkItem[] => []);
+  const updateItem = vi.fn((input) => input as WorkItem);
   const deps: ContinuousOwnerAdapterDeps = {
     rootDir: root,
     exec,
@@ -134,6 +137,8 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
     brief: (file) =>
       files.get(file) as ReturnType<NonNullable<ContinuousOwnerAdapterDeps['brief']>>,
     tasks: () => tasks,
+    workItems,
+    updateItem,
   };
   const initialBrief = {
     missionId: missionInput.mission_id,
@@ -158,6 +163,8 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
     files,
     openApproval,
     assessApproval,
+    workItems,
+    updateItem,
     ports: createContinuousOwnerPorts(deps),
     setProjectPresent(value: boolean) {
       projectPresent = value;
@@ -436,6 +443,115 @@ describe('continuous work production owner ports', () => {
     for (const [, args] of h.exec.mock.calls.filter((call) => call[1][1] === 'gate-pass'))
       expect(args).toContain('--machine-only');
   });
+  it.each([2, 3, -1, 'invalid'])(
+    'blocks exhausted or invalid rework %s with recovery evidence',
+    async (count) => {
+      const h = harness();
+      h.workItems.mockReturnValue([
+        {
+          item_id: 'needs-review',
+          status: 'review',
+          version: 4,
+          context: {
+            ...scope,
+            mission_id: missionInput.mission_id,
+            project_id: missionInput.project_id,
+          },
+          metadata: { rework_count: count },
+        } as unknown as WorkItem,
+      ]);
+      const result = await h.ports.advanceMission(advanceInput);
+      expect(result).toMatchObject({
+        status: 'blocked',
+        evidence_refs: ['mission:' + missionInput.mission_id, 'workitem:needs-review'],
+      });
+      expect(result.reason).toContain(
+        'child WorkItem and its blocked continuous-owner WorkItem to ready'
+      );
+      expect(h.updateItem).toHaveBeenCalledWith(
+        expect.objectContaining({
+          itemId: 'needs-review',
+          status: 'blocked',
+          expectedVersion: 4,
+          rootDir: root,
+          metadata: expect.objectContaining({
+            rework_count: count,
+            blocked_reason: expect.stringContaining('operator intervention'),
+          }),
+        })
+      );
+      expect(h.exec.mock.calls.some((call) => call[1][1] === 'verify')).toBe(false);
+    }
+  );
+  it('requeues eligible work only within its exact typed scope and reports existing blockers', async () => {
+    const h = harness();
+    const context = {
+      ...scope,
+      mission_id: missionInput.mission_id,
+      project_id: missionInput.project_id,
+    };
+    const item = {
+      item_id: 'retry',
+      status: 'review',
+      version: 2,
+      context,
+      metadata: { rework_count: 1 },
+    };
+    h.workItems.mockReturnValue([
+      item,
+      { ...item, item_id: 'other-tenant', context: { ...context, tenant_slug: 'other' } },
+      {
+        ...item,
+        item_id: 'label-only',
+        context: undefined,
+        labels: [`mission:${missionInput.mission_id}`],
+      },
+    ] as unknown as WorkItem[]);
+    expect(await h.ports.advanceMission(advanceInput)).toMatchObject({ status: 'running' });
+    expect(h.updateItem).toHaveBeenCalledTimes(1);
+    expect(h.updateItem).toHaveBeenCalledWith(
+      expect.objectContaining({
+        status: 'ready',
+        metadata: expect.objectContaining({ rework_count: 2 }),
+      })
+    );
+    h.updateItem.mockClear();
+    h.workItems.mockReturnValue([{ ...item, status: 'blocked' }] as unknown as WorkItem[]);
+    expect(await h.ports.advanceMission(advanceInput)).toMatchObject({ status: 'blocked' });
+    expect(h.updateItem).not.toHaveBeenCalled();
+  });
+  it('keeps the continuous owner waiting while a child runtime approval is pending', async () => {
+    const h = harness();
+    h.workItems.mockReturnValue([
+      {
+        item_id: 'approval-child',
+        status: 'blocked',
+        version: 1,
+        context: {
+          ...scope,
+          mission_id: missionInput.mission_id,
+          project_id: missionInput.project_id,
+        },
+        metadata: { awaiting_approval: true, approval_request_id: 'approval-runtime' },
+      } as unknown as WorkItem,
+    ]);
+    expect(await h.ports.advanceMission(advanceInput)).toMatchObject({
+      status: 'pending_approval',
+      approval_request_id: 'approval-runtime',
+    });
+    expect(h.updateItem).not.toHaveBeenCalled();
+  });
+
+  it('continues existing work without calling native ticket creation when no planned tasks remain', async () => {
+    const h = harness();
+    h.setTasks([{ task_id: 'reviewed', status: 'reviewed' }]);
+    h.exec.mockImplementation(async (_command, args) => {
+      if (args[1] === 'dispatch-tickets') throw new Error('No planned tasks available');
+      return { stdout: '', stderr: '', status: 0 };
+    });
+    expect(await h.ports.advanceMission(advanceInput)).toMatchObject({ status: 'running' });
+    expect(h.exec.mock.calls.map((call) => call[1][1])).toEqual(['dispatch-workitems']);
+  });
   it('rejects any brief mutation before approval, phase transitions or task dispatch', async () => {
     const h = harness({ status: 'planned', gated: true });
     const file = path.join(directory, 'evidence/mission-brief.json');
@@ -475,6 +591,39 @@ describe('continuous work production owner ports', () => {
       h.ports.advanceMission({ ...advanceInput, creation_key: advanceInput.operation_key })
     ).rejects.toThrow('owner identity');
     expect(h.exec).not.toHaveBeenCalled();
+  });
+  it.each(['completed', 'archived'])(
+    'recovers pending learning before accepting a %s child',
+    async (status) => {
+      const h = harness({ status });
+      h.setTasks([{ status: 'completed' }]);
+      h.setState({ verification: { status: 'verified' } });
+      const outboxPath = path.join(directory, 'evidence/memory-promotion-outbox.json');
+      const outbox = { version: 1, mission_id: missionInput.mission_id, status: 'pending' };
+      h.files.set(outboxPath, outbox);
+      h.exec.mockImplementation(async (_command, args) => {
+        expect(args.slice(1)).toEqual(['distill', missionInput.mission_id]);
+        h.files.set(outboxPath, { ...outbox, status: 'delivered' });
+        return { stdout: '', stderr: '', status: 0 };
+      });
+      expect(await h.ports.advanceMission(advanceInput)).toMatchObject({ status: 'completed' });
+      expect(h.exec).toHaveBeenCalledTimes(1);
+      expect(h.assessApproval).not.toHaveBeenCalled();
+    }
+  );
+  it('does not release a completed child while learning registration is still pending', async () => {
+    const h = harness({ status: 'completed' });
+    h.setTasks([{ status: 'completed' }]);
+    h.setState({ verification: { status: 'verified' } });
+    h.files.set(path.join(directory, 'evidence/memory-promotion-outbox.json'), {
+      version: 1,
+      mission_id: missionInput.mission_id,
+      status: 'pending',
+    });
+    await expect(h.ports.advanceMission(advanceInput)).rejects.toThrow(
+      'learning registration remains pending'
+    );
+    expect(h.exec).toHaveBeenCalledTimes(1);
   });
   it('never invokes the managed child seam for a pre-aborted command and propagates the live signal', async () => {
     const h = harness({ status: 'active' });

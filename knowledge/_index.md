@@ -460,6 +460,7 @@
 - [Same-Tenant Peer Quickstart](./product/orchestration/same-tenant-peer-quickstart.ja.md) (public | Unknown)
 - [Schedule Coordination Playbook](./product/orchestration/schedule-coordination-playbook.md) (public | Unknown)
 - [Schedule Delivery Protocol](./product/orchestration/schedule-delivery-protocol.md) (public | Ecosystem Architect)
+- [Scoped runtime task tools and autonomous continuation](./product/orchestration/scoped-runtime-task-tools.md) (public | Unknown)
 - [Scratch Tool Promotion](./product/orchestration/scratch-tool-promotion-playbook.md) (public | ecosystem_architect)
 - [Scratch-to-Pipeline Video Promotion](./product/orchestration/scratch-to-pipeline-video-promotion.md) (public | ecosystem_architect)
 - [Self-Refinement Protocol: The Path to Perpetual Growth](./product/orchestration/self-refinement-protocol.md) (public | Ecosystem Architect)
@@ -503,6 +504,7 @@
 - [自律型デバッグ・ループ (Autonomous Debug Loop)](./product/orchestration/autonomous-debug-loop.md) (public | Ecosystem Architect)
 - [自律的 Git ブランチ・PR 運用基準 (Git Flow Standards)](./product/orchestration/git-flow-standards.md) (public | Ecosystem Architect)
 - [行為プレイブック（会話する / 手を動かす / 移動する — 対象ごとにどの実行器を使うか）](./product/orchestration/action-playbook.ja.md) (public | Ecosystem Architect)
+- [複数checkoutのscheduler運用](./product/orchestration/multi-instance-scheduler.md) (public | Unknown)
 - [高度な自律開発標準ワークフロー (Advanced Development Flow)](./product/orchestration/advanced-development-flow.md) (public | Ecosystem Architect)
 
 ## 📁 product/orchestration/agent-profiles
