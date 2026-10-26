@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { escapeXml } from '../text-escaping.js';
+import { daemonBoundEnvironment } from './render-context.js';
 import type { DaemonManager, DaemonRenderContext, DaemonServiceSpec } from './service-manager.js';
 
 export interface WindowsTaskContext extends DaemonRenderContext {
@@ -11,7 +12,7 @@ function taskName(spec: DaemonServiceSpec, ctx: WindowsTaskContext): string {
   if (!ctx.userId) throw new Error('Windows Task Scheduler requires the installing user name.');
   const user = createHash('sha256').update(ctx.userId.toLowerCase()).digest('hex').slice(0, 10);
   const label = spec.id.replace(/[^A-Za-z0-9_-]/g, '-');
-  return `Kyberion-${label}-${user}`;
+  return `Kyberion-${label}${spec.instanceId ? `-${spec.instanceId}` : ''}-${user}`;
 }
 function psQuote(value: string): string {
   return `'${value.replaceAll("'", "''")}'`;
@@ -27,7 +28,7 @@ function encodedPowerShell(spec: DaemonServiceSpec, ctx: WindowsTaskContext): st
   const script = [
     `$ErrorActionPreference = 'Continue'`,
     `$env:PATH = ${psQuote(`${path.win32.dirname(ctx.nodePath)};${ctx.systemRoot ?? 'C:\\Windows'}\\System32`)} + ';' + $env:PATH`,
-    ...Object.entries(ctx.env ?? {}).map(([k, v]) => `$env:${k} = ${psQuote(v)}`),
+    ...Object.entries(daemonBoundEnvironment(ctx)).map(([k, v]) => `$env:${k} = ${psQuote(v)}`),
     `$logDir = Join-Path $env:LOCALAPPDATA 'Kyberion\\Logs'`,
     `New-Item -ItemType Directory -Force -Path $logDir | Out-Null`,
     `$log = Join-Path $logDir ${psQuote(`${spec.logBaseName}.log`)}`,

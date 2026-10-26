@@ -1045,9 +1045,6 @@
     saveDraft();
     render();
 
-    var input = document.getElementById('ask-input');
-    if (input) input.value = '';
-
     // A hearing is a question → answer sequence: the answer lands on the
     // requirement the companion asked about, and the companion's next turn is
     // the next open requirement (or "everything is filled in"). The generic

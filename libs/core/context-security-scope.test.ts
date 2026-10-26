@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   compileScopedContextPack,
+  validateContextSecurityScope,
   validateReasoningEgress,
   validateContextOutputTier,
   type ContextSecurityScope,
@@ -17,6 +18,47 @@ const scope: ContextSecurityScope = {
   write_tier: 'confidential',
   purpose: 'security-review',
 };
+
+describe('public shared scope identity', () => {
+  it('accepts tenantless public-only context without fabricating tenant authority', () => {
+    const publicScope: ContextSecurityScope = {
+      mission_id: 'MSN-public',
+      purpose: 'planning',
+      read_tiers: ['public'],
+      write_tier: 'public',
+    };
+    expect(validateContextSecurityScope(publicScope)).toEqual([]);
+    expect(
+      compileScopedContextPack(publicScope, [
+        {
+          fragment_id: 'public',
+          source_ref: 'knowledge/product/example.md',
+          source_tier: 'public',
+          content: 'public',
+        },
+      ]).fragments
+    ).toHaveLength(1);
+    for (const tier of ['confidential', 'personal'] as const)
+      expect(
+        validateContextSecurityScope({
+          ...publicScope,
+          write_tier: tier,
+          read_tiers: ['public', tier],
+        })
+      ).toContain('tenant_slug (or legacy tenant_id) is required');
+    for (const tenant of ['shared', 'system', 'public', 'personal', 'confidential'])
+      expect(validateContextSecurityScope({ ...publicScope, tenant_slug: tenant })).toContain(
+        'tenant_slug is invalid'
+      );
+    expect(
+      validateContextSecurityScope({
+        ...publicScope,
+        tenant_slug: 'tenant-a',
+        tenant_id: 'tenant-b',
+      })
+    ).toContain('tenant_slug and tenant_id must match');
+  });
+});
 
 function fragment(
   overrides: Partial<GovernedContextFragment<string>> = {}

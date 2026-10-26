@@ -127,6 +127,7 @@ export async function ensureMissionTeamRuntime(
       });
     }
     reserveMissionTeamSelectionDispatch({
+      executionRoute: 'agent_runtime',
       missionId,
       teamRole: assignment.team_role,
       agentId: assignment.agent_id,

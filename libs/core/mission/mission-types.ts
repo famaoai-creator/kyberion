@@ -332,6 +332,8 @@ export const BOOLEAN_FLAGS = new Set([
   '--request-approval',
 ]);
 export const VALUE_FLAGS = new Set([
+  '--expected-snapshot',
+  '--task-binding',
   '--persona',
   '--tenant',
   '--tenant-id',

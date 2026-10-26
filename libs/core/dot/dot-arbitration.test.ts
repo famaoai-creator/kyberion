@@ -71,6 +71,7 @@ const PROPOSAL: DotProposal = {
 
 function seedOlder(overrides: Partial<DotActionRecord> = {}): DotActionRecord {
   const row: DotActionRecord = {
+    scope: { tier: 'public' },
     action_ref: 'dact-older-1',
     dot_id: 'older',
     actor_id: 'dot:older',
@@ -297,6 +298,7 @@ describe('dot arbitration — escalation and settlement', () => {
   function seedNewcomer(status: DotActionRecord['status'], reason?: string): void {
     const file = path.join(TEST_ROOT, DOT_ACTION_LEDGER_PATH);
     appendJsonLine(file, {
+      scope: { tier: 'public' },
       action_ref: 'dact-new-1',
       dot_id: 'newcomer',
       actor_id: 'dot:newcomer',
@@ -552,7 +554,18 @@ describe('dot handoff tenant isolation', () => {
   });
 
   it('allows a handoff inside the same tenant scope', () => {
-    const same = handoff(charter('sender', {}, 'acme'), accepting('receiver', 'acme', 'org-a'));
+    const sender = charter('sender', {}, 'acme');
+    sender.scope.organization_id = 'org-a';
+    const same = handoff(sender, accepting('receiver', 'acme', 'org-a'));
     expect(same.record).toMatchObject({ status: 'dispatched', handoff_to: 'receiver' });
+  });
+  it('refuses a same-tenant handoff to a lower tier or another personal owner', () => {
+    const sender = charter('sender', {}, 'acme');
+    const lower = accepting('receiver', 'acme');
+    lower.scope.tier = 'public';
+    expect(handoff(sender, lower).record.status).toBe('refused');
+    const a = { ...sender, scope: { tier: 'personal' as const, owner_nhi: 'owner-a' } };
+    const b = { ...lower, scope: { tier: 'personal' as const, owner_nhi: 'owner-b' } };
+    expect(handoff(a, b).record.status).toBe('refused');
   });
 });

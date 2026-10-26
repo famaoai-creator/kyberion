@@ -34,15 +34,30 @@ export function readJsonIfPresent<T>(filePath: string, options?: FoundationReadO
   return loadJsonIfPresent<T>(filePath, options);
 }
 
-export function writeJson<T>(filePath: string, value: T, options?: { createOnly?: boolean }): void {
+export function writeJson<T>(
+  filePath: string,
+  value: T,
+  options?: { createOnly?: boolean; format?: 'json' | 'jsonl' }
+): void {
   const io = getFoundationIo();
-  const content = `${JSON.stringify(value, null, 2)}\n`;
+  if (options?.format === 'jsonl' && !Array.isArray(value))
+    throw new Error('jsonl_records_must_be_array');
+  const content =
+    options?.format === 'jsonl'
+      ? (value as readonly unknown[]).map((record) => JSON.stringify(record)).join('\n') +
+        ((value as readonly unknown[]).length ? '\n' : '')
+      : `${JSON.stringify(value, null, 2)}\n`;
   if (options?.createOnly) {
     if (!io.createExclusiveFile) throw new Error('secure_foundation_exclusive_io_not_registered');
     io.createExclusiveFile(filePath, content);
   } else {
     io.writeFile(filePath, content);
   }
+}
+
+/** Replace an entire JSONL ledger after its caller holds the store's lock. */
+export function writeJsonLines(filePath: string, records: readonly unknown[]): void {
+  writeJson(filePath, records, { format: 'jsonl' });
 }
 
 export interface AppendJsonLineOptions {

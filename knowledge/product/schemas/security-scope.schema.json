@@ -5,21 +5,32 @@
   "type": "object",
   "additionalProperties": false,
   "required": ["mission_id", "read_tiers", "write_tier", "purpose"],
-  "anyOf": [{ "required": ["tenant_slug"] }, { "required": ["tenant_id"] }],
+  "anyOf": [
+    { "required": ["tenant_slug"] },
+    { "required": ["tenant_id"] },
+    {
+      "properties": {
+        "write_tier": { "const": "public" },
+        "read_tiers": { "type": "array", "items": { "const": "public" } }
+      }
+    }
+  ],
   "properties": {
     "tenant_slug": {
       "type": "string",
       "minLength": 1,
-      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+      "not": { "enum": ["public", "confidential", "personal", "shared", "system"] }
     },
     "tenant_id": {
       "type": "string",
       "minLength": 1,
-      "not": { "enum": ["public", "confidential", "personal", "shared"] }
+      "not": { "enum": ["public", "confidential", "personal", "shared", "system"] }
     },
     "organization_id": { "type": "string", "minLength": 1 },
     "project_id": { "type": "string", "minLength": 1 },
     "mission_id": { "type": "string", "minLength": 1 },
+    "task_id": { "type": "string", "minLength": 1 },
+    "session_id": { "type": "string", "minLength": 1 },
     "participant_id": { "type": "string", "minLength": 1 },
     "read_tiers": {
       "type": "array",

@@ -5,6 +5,10 @@ import { formatMissionTeamPlanView } from '@agent/core/mission/mission-team-view
  */
 
 import { logger } from '@agent/core/core';
+import {
+  parseTaskEvidenceBinding,
+  type TaskEvidenceBinding,
+} from '@agent/core/mission/mission-task-evidence-binding';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import type { resolveIntentTrackGate } from '@agent/core/intent/intent-track-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
@@ -296,7 +300,8 @@ export interface MissionControllerRoutingContext {
     teamRole?: string,
     actorId?: string,
     actorType?: 'agent' | 'human' | 'service',
-    provider?: string
+    provider?: string,
+    taskBinding?: TaskEvidenceBinding
   ) => Awaitable<void>;
   recordArtifactReview: (
     missionId: string,
@@ -1158,7 +1163,12 @@ export async function runMissionControllerAction(
         getValue('--team-role', context.argv),
         getValue('--actor-id', context.argv),
         parseAllowedValue(getValue('--actor-type', context.argv), '--actor-type', ACTOR_TYPES),
-        getValue('--provider', context.argv)
+        getValue('--provider', context.argv),
+        getValue('--task-binding', context.argv)
+          ? parseTaskEvidenceBinding(
+              parseSafeJsonInput(getValue('--task-binding', context.argv)!, '--task-binding')
+            )
+          : undefined
       );
       break;
     case 'review-task': {
