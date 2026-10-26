@@ -10,7 +10,6 @@ import {
   requestGrantApproval,
   GRANT_APPROVAL_CHANNEL,
 } from '@agent/core/governance/grant-store';
-import { approvalStoreRoots } from '@agent/core/governance/approval-store';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from '@agent/core/storage-layout';
 import { checkRecordingConsent } from '../libs/actuators/meeting-actuator/src/meeting-session.js';
 import {
@@ -72,7 +71,7 @@ afterAll(() => {
     )
   );
   process.stdout.write(`SIMULATION_REPORT ${report}\n`);
-  cleanupSimulationApprovals();
+  cleanupSimulationApprovals({ channels: ['external-operation', GRANT_APPROVAL_CHANNEL] });
   for (const fixturePath of fixturePaths) safeRmSync(fixturePath, { recursive: true, force: true });
   vi.unstubAllEnvs();
   resetCurrentScope();
@@ -128,8 +127,6 @@ describe('services and meeting real governance simulation', () => {
       rootResolve(`${PARTITIONED_RUNTIME_STATE_ROOTS.grants}/confidential/${tenant}`),
       rootResolve(`customer/${tenant}`)
     );
-    for (const root of Object.values(approvalStoreRoots()))
-      fixturePaths.push(rootResolve(`${root}/${GRANT_APPROVAL_CHANNEL}`));
     // The consent and grant resolver remain real: begin denied, then create
     // only this unique fixture tenant's exact-URL grant through real approval.
     expect(checkRecordingConsent({ url: meetingUrl }).allowed).toBe(false);

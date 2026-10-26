@@ -419,12 +419,39 @@ describe('mission ledger scope (D9)', () => {
     });
     expect(fs.readFileSync(ledger.GLOBAL_LEDGER_PATH, 'utf8')).not.toContain(TENANT_MISSION);
 
-    // Residual case (runtime-storage-layout.md): an id no process can place.
+    // Residual case (runtime-storage-layout.md, D4): an id no process can
+    // place keeps its raw id in the system ledger; the payload is withheld.
     const orphan = `MSN-LEDGER-NOWHERE-${suffix}`;
-    ledger.record('ORPHAN_EVENT', { mission_id: orphan });
+    const marker = `orphan-payload-marker-${suffix}`;
+    ledger.record('ORPHAN_EVENT', { mission_id: orphan, note: marker });
+    const orphanEntry = readLines(ledger.GLOBAL_LEDGER_PATH).find(
+      (line) => line.mission_id === orphan
+    );
+    expect(orphanEntry).toMatchObject({
+      type: 'ORPHAN_EVENT',
+      scope: { scope_kind: 'mission', mission_id: orphan },
+      payload_withheld: 'mission_unplaceable',
+    });
+    expect(orphanEntry?.payload).toBeUndefined();
+    expect(orphanEntry).not.toHaveProperty('payload_digest');
+    expect(orphanEntry).not.toHaveProperty('payload_digest_alg');
+    expect(fs.readFileSync(ledger.GLOBAL_LEDGER_PATH, 'utf8')).not.toContain(marker);
+    expect(ledger.verifyAllLedgerIntegrity().ok).toBe(true);
+
+    // An explicit tenant still routes an unknown id to that tenant with full detail.
+    const tenantOrphan = `MSN-LEDGER-NOWHERE-TEN-${suffix}`;
+    ledger.record('ORPHAN_TENANT_EVENT', {
+      mission_id: tenantOrphan,
+      tenant_slug: TENANT,
+      tier: 'confidential',
+      note: marker,
+    });
     expect(
-      readLines(ledger.GLOBAL_LEDGER_PATH).find((line) => line.mission_id === orphan)
-    ).toMatchObject({ type: 'ORPHAN_EVENT', scope: { scope_kind: 'mission' } });
+      readLines(ledger.tenantLedgerPath('confidential', TENANT)).find(
+        (line) => line.mission_id === tenantOrphan
+      )
+    ).toMatchObject({ type: 'ORPHAN_TENANT_EVENT', payload: { note: marker } });
+    expect(fs.readFileSync(ledger.GLOBAL_LEDGER_PATH, 'utf8')).not.toContain(tenantOrphan);
     expect(ledger.verifyAllLedgerIntegrity().ok).toBe(true);
   });
 
