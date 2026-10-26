@@ -74,9 +74,11 @@ function readMissionScope(missionId: string): EventScope | null {
   // validation. Legacy mission state predates the chain and often carries a
   // project reference with no organization — surfacing that as scope made even
   // `mission repair` unreachable, because the guard fired before the verb that
-  // exists to fix it could run. Each level is therefore gated on its parent.
+  // exists to fix it could run. Private/tenant-bound levels remain gated on
+  // their parent; public shared projects explicitly allow no organization.
   const scopedOrganizationId = tenantSlug ? resolvedOrganizationId : undefined;
-  const scopedProjectId = scopedOrganizationId ? projectId : undefined;
+  const publicStandalone = tier === 'public' && !tenantSlug && !resolvedOrganizationId;
+  const scopedProjectId = scopedOrganizationId || publicStandalone ? projectId : undefined;
 
   return normalizeEventScope({
     scope_kind: 'mission',

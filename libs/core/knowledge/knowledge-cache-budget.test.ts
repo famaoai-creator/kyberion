@@ -8,6 +8,7 @@ import * as path from 'node:path';
 // KYBERION_KI_CACHE_MAX_MB budget, using the ki-usage.json sidecar.
 
 vi.mock('../path-resolver.js', () => ({
+  rootResolve: (sub = '') => (sub ? `/tmp/test-root/${sub}` : '/tmp/test-root'),
   knowledge: (sub = '') =>
     sub.startsWith('product/schemas/')
       ? `${process.cwd()}/knowledge/${sub}`

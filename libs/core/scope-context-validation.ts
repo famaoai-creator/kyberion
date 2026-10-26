@@ -84,7 +84,8 @@ export function validateScopeContext(
   if (context.organization_id && !context.tenant_slug && !options.allowShared) {
     errors.push('organization_id requires a tenant_slug');
   }
-  if (context.project_id && !context.organization_id)
+  const publicStandaloneProject = context.tier === 'public' && !context.tenant_slug;
+  if (context.project_id && !context.organization_id && !publicStandaloneProject)
     errors.push('project_id requires an organization_id');
   if (context.task_id && !context.mission_id) errors.push('task_id requires a mission_id');
   if (context.session_id && !context.task_id && !options.allowSessionRoot)

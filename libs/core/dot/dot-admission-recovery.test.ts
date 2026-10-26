@@ -312,6 +312,7 @@ describe('durable generic dot admission', () => {
       appendActionRecord(
         {
           ...legacy,
+          scope: CHARTER.scope,
           status: 'admitted',
           admission: admissionForDotRecord(CHARTER, legacy),
           work_item_id: dotAdmissionItemId(legacy.action_ref),

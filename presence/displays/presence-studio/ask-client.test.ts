@@ -3155,8 +3155,8 @@ describe('Ask persisted navigation recovery', () => {
   });
 });
 
-describe('hearing synchronization remains separate from saved conversation', () => {
-  it('renders saved replies and preserves the next draft while an additive hearing answer stalls', async () => {
+describe('hearing answers use the direct hearing contract', () => {
+  it('preserves the next draft while a direct hearing answer stalls without conversation routing', async () => {
     const waiting = deferred<ReturnType<typeof response>>();
     const h = harness({
       query: '?mode=hearing',
@@ -3167,7 +3167,12 @@ describe('hearing synchronization remains separate from saved conversation', () 
     h.input.value = 'First requirement';
     h.form.fire('submit');
     await flush();
-    expect(h.elements.get('turns')!.innerHTML).toContain('Done');
+    expect(h.elements.get('turns')!.innerHTML).not.toContain('Done');
+    expect(
+      h.fetch.mock.calls.filter(
+        ([url, init]) => url.startsWith('/api/hearing/') && init?.method === 'POST'
+      )
+    ).toHaveLength(1);
     h.input.value = 'Keep next answer';
     h.input.fire('input');
     h.form.fire('submit');
@@ -3176,7 +3181,7 @@ describe('hearing synchronization remains separate from saved conversation', () 
       h.fetch.mock.calls.filter(
         ([url, init]) => url === '/api/conversation' && init?.method === 'POST'
       )
-    ).toHaveLength(1);
+    ).toHaveLength(0);
     expect(h.input.value).toBe('Keep next answer');
   });
 });
@@ -3201,13 +3206,11 @@ describe('hearing recovery integration', () => {
     expect(h.elements.get('hearing-sync-continue')!.attributes.href).toBe('/ask?tenant=alpha');
   });
   it.each(['web_app_build', 'work_inventory'])(
-    'gates %s finalization while conversation is sending and hearing is uncertain',
+    'gates %s finalization while the direct hearing answer is unconfirmed',
     async (scenario) => {
-      const conversation = deferred<ReturnType<typeof response>>();
       const hearing = deferred<ReturnType<typeof response>>();
       const h = harness({
         query: '?mode=hearing&scenario=' + scenario,
-        post: () => conversation.promise,
         hearing: async (url, init) =>
           init?.method === 'POST'
             ? hearing.promise
@@ -3227,14 +3230,27 @@ describe('hearing recovery integration', () => {
         h.fetch.mock.calls.filter(
           ([url, init]) => url.startsWith('/api/hearing/') && init?.method === 'POST'
         )
+      ).toHaveLength(1);
+      expect(
+        h.fetch.mock.calls.filter(
+          ([url, init]) => url === '/api/conversation' && init?.method === 'POST'
+        )
       ).toHaveLength(0);
-      conversation.resolve(response({ ok: true, reply: 'Saved', historySaved: false }));
+      expect(h.input.value).toBe('Requirement');
+      const [answerUrl, answerInit] = h.fetch.mock.calls.find(
+        ([url, init]) => url.startsWith('/api/hearing/') && init?.method === 'POST'
+      )!;
+      const requestId = JSON.parse(answerInit!.body!).request_id;
+      hearing.resolve(
+        response({
+          ok: true,
+          record: record(answerUrl.split('/')[3].split('?')[0], requestId, scenario),
+          prompt: 'Next hearing question',
+        })
+      );
       await flush();
-      expect(h.elements.get('turns')!.innerHTML).toContain('Saved');
-      expect(h.elements.get('conversation-status')!.innerHTML).toContain('history.unsaved');
-      h.elements.get('hearing-decide')!.fire('click');
-      h.elements.get('hearing-handoff')!.fire('click');
-      await flush();
+      expect(h.elements.get('turns')!.innerHTML).toContain('Next hearing question');
+      expect(h.elements.get('ask-send')!.disabled).toBe(false);
       expect(
         h.fetch.mock.calls.filter(
           ([url, init]) => url.startsWith('/api/hearing/') && init?.method === 'POST'

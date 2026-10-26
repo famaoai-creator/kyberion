@@ -1,4 +1,6 @@
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
+import { validateReadPermission } from '../tier-guard.js';
 /**
  * Dot charter lifecycle — governed status transitions.
  *
@@ -46,6 +48,7 @@ import { loadOrganizationOperation } from '../organization/organization-operatin
 import { dotAdmissionScopeHash } from './dot-admission-identity.js';
 import {
   findDotCharter,
+  personalDotCharterDir,
   assertFrontDeskDiagnosticDotCharter,
   listDotCharters,
   validateDotCharter,
@@ -181,11 +184,24 @@ export function createDraftDotCharter(
 ): DotCharter {
   const charter = validateDotCharter(input);
   assertOperationBinding(charter, deps);
-  if (charter.status !== 'draft' || charter.scope.tier === 'personal')
+  if (charter.status !== 'draft')
     throw new Error(
       '[DOT_CREATE_DRAFT] create a public or tenant-confidential draft; activation is separate'
     );
-  if (charter.scope.tier === 'confidential') {
+  if (charter.scope.tier === 'personal') {
+    if (
+      !charter.scope.owner_nhi ||
+      charter.scope.owner_nhi !== getRegisteredEnvText('KYBERION_NHI_ID')?.trim()
+    )
+      throw new Error(
+        '[DOT_PERSONAL_OWNER] authenticated owner_nhi must match the personal charter'
+      );
+    const permission = validateReadPermission(
+      personalDotCharterDir(charter.scope.owner_nhi, deps.rootDir)
+    );
+    if (!permission.allowed)
+      throw new Error(permission.reason ?? '[DOT_PERSONAL_OWNER] personal access denied');
+  } else if (charter.scope.tier === 'confidential') {
     if (!charter.scope.tenant_slug) throw new Error('[DOT_CREATE_SCOPE] tenant is required');
     const rootDir = path.resolve(deps.rootDir ?? pathResolver.rootDir());
     resolveWorkspaceScope(
@@ -229,13 +245,19 @@ export function createDraftDotCharter(
   }
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(charter.dot_id))
     throw new Error('[DOT_CREATE_ID] invalid dot id');
-  const filePath = path.join(
-    deps.rootDir ?? pathResolver.rootDir(),
-    ...(charter.scope.tier === 'confidential'
-      ? ['knowledge', 'confidential', charter.scope.tenant_slug!, 'dots']
-      : ['dots']),
-    charter.dot_id + '.json'
-  );
+  const filePath =
+    charter.scope.tier === 'personal'
+      ? path.join(
+          personalDotCharterDir(charter.scope.owner_nhi!, deps.rootDir),
+          charter.dot_id + '.json'
+        )
+      : path.join(
+          deps.rootDir ?? pathResolver.rootDir(),
+          ...(charter.scope.tier === 'confidential'
+            ? ['knowledge', 'confidential', charter.scope.tenant_slug!, 'dots']
+            : ['dots']),
+          charter.dot_id + '.json'
+        );
   if (deps.dryRun) {
     if (findDotCharter(charter.dot_id, deps.rootDir) || safeExistsSync(filePath))
       throw new Error('[DOT_CREATE_EXISTS] dot identity or destination already exists');

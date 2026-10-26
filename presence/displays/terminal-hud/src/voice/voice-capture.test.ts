@@ -30,7 +30,8 @@ describe('transcribeWavBuffer', () => {
     let receivedPath: string | undefined;
     registerSpeechToTextBridge({
       name: 'hud-test-bridge',
-      capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
+      // Canned in-process transcription never uploads captured audio.
+      capabilities: { ...NO_TIMESTAMP_STT_CAPABILITIES, local_only: true },
       priority: 100,
       async transcribe(input) {
         receivedPath = input.audioPath;

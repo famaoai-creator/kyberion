@@ -10,6 +10,7 @@ vi.mock('./memory-provenance.js', async (importOriginal) => ({
 
 // Mock dependencies
 vi.mock('../path-resolver.js', async (importOriginal) => ({
+  rootResolve: (sub = '') => (sub ? `/tmp/test-root/${sub}` : '/tmp/test-root'),
   // Structural symlink check used by the markdown scanner.
   assertSafeRepositoryPath: (await importOriginal<typeof import('../path-resolver.js')>())
     .assertSafeRepositoryPath,

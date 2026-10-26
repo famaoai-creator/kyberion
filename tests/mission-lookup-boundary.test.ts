@@ -40,6 +40,8 @@ const DIRECT_CALLERS: Record<string, LookupCategory> = {
   'libs/core/mission/mission-lifecycle-operator-actions.ts': 'lifecycle',
   'libs/core/mission/mission-lifecycle.ts': 'lifecycle',
   'libs/core/mission/mission-maintenance.ts': 'lifecycle',
+  // An approved operation must reject ambiguous/hidden mission owners before mutation.
+  'libs/core/mission/mission-mutation-snapshot.ts': 'lifecycle',
   'libs/core/mission/mission-process-planning.ts': 'lifecycle',
   'libs/core/mission/mission-retrospective.ts': 'lifecycle',
   'libs/core/mission/mission-runtime.ts': 'lifecycle',
@@ -108,7 +110,10 @@ function stripComments(source: string): string {
 
 describe('Mission lookup boundary', () => {
   it('pins the direct findMissionPath callers to a registered category', () => {
-    const callers = getAllFiles(rootDir)
+    // Inspect source trees only; walking the live mission/tenant stores emits
+    // authorization audit records and makes a read-only registration test mutate production state.
+    const callers = ['libs', 'scripts', 'presence']
+      .flatMap((directory) => getAllFiles(path.join(rootDir, directory)))
       .filter((filePath) => /\.(ts|tsx|mts|cts|js|mjs)$/.test(filePath))
       .map((filePath) => normalize(path.relative(rootDir, filePath)))
       .filter((relPath) => /^(libs|scripts|presence)\//.test(relPath))

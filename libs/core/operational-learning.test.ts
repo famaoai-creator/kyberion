@@ -29,7 +29,10 @@ describe('operational learning signals (LC-16)', () => {
         summary: 'A schedule needs review.',
         evidenceRefs: ['schedule:daily'],
       },
-      { now: new Date('2026-08-08T12:00:00.000Z') }
+      {
+        now: new Date('2026-08-08T12:00:00.000Z'),
+        rootDir: 'active/shared/tmp/ops-learning-fixture',
+      }
     );
 
     expect(learningId).toBe('ops-2026-08-08-scheduler-failed-schedules-personal-shared');
@@ -40,6 +43,7 @@ describe('operational learning signals (LC-16)', () => {
         sourceType: 'routine_exception',
         targetKind: 'sop_candidate',
         tier: 'personal',
+        rootDir: 'active/shared/tmp/ops-learning-fixture',
       })
     );
   });

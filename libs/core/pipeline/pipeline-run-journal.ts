@@ -81,6 +81,7 @@ export interface PipelineRunStartedPayload {
     unsupported_policy_env: string[];
   };
   library_execution?: {
+    resume_owner?: 'task';
     source_sha256: string;
     initial_context: Record<string, unknown>;
     payload_scope: { tier: StorageDataTier; tenant_slug?: string; purpose?: string };
@@ -295,12 +296,18 @@ const pipelineStartedSchema = z.object({
     .optional(),
   library_execution: z
     .object({
+      resume_owner: z.literal('task').optional(),
       source_sha256: z.string().regex(/^[a-f0-9]{64}$/),
       initial_context: z.record(z.string(), z.unknown()),
       payload_scope: z.object({
         tier: z.enum(['public', 'confidential', 'personal']),
         tenant_slug: z.string().optional(),
         purpose: z.string().optional(),
+        training_use: z
+          .enum(['local_only', 'training_eligible', 'no_training', 'zero_retention'])
+          .optional(),
+        external_egress: z.enum(['allow', 'deny']).optional(),
+        allowed_reasoning_backends: z.array(z.string()).optional(),
       }),
       identity: z.object({
         role: z.string().min(1),
