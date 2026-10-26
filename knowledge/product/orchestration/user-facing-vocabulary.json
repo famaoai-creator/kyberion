@@ -7273,6 +7273,11 @@
         "ja": "停止中の Dot の委任枠を確認・設定します。--inherit でインストール既定値を使います",
         "qps-ploc": "⟦Ṗřėṽïėẇ őř ƈőñƒïɠůřė ȧ ṗȧůşėḓ Ḓőŧ ḓėŀėɠȧŧïőñ ƈȧṗȧƈïŧẏ; ïñħėřïŧ ŧħė ïñşŧȧŀŀȧŧïőñ ḓėƒȧůŀŧ ẇïŧħ --ïñħėřïŧ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
       },
+      "cli_cmd_script_dot_migrate_state": {
+        "en": "Migrate reviewed legacy state for one Dot while preserving other scopes",
+        "ja": "確認済みの旧 Dot 状態を移行します。他のスコープの状態は保持します。",
+        "qps-ploc": "⟦Ɱïɠřȧŧė řėṽïėẇėḓ ŀėɠȧƈẏ şŧȧŧė ƒőř őñė Ḓőŧ ẇħïŀė ṗřėşėřṽïñɠ őŧħėř şƈőṗėş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
       "cli_cmd_script_dot_create": {
         "en": "Preview or apply a reviewed Dot draft; activate separately",
         "ja": "レビュー済みの Dot 草案をプレビューまたは作成します。有効化は別操作です。",
@@ -9074,34 +9079,34 @@
         "qps-ploc": "⟦Ïşşůė ȧñḓ ɱȧñȧɠė ñőñ-ħůɱȧñ ïḓėñŧïŧïėş (ÑĦÏ ŀėḓɠėř) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "cli_cmd_script_chronos_install": {
-        "en": "Install the Chronos launchd agent",
-        "ja": "Chronos の launchd エージェントをインストール",
-        "qps-ploc": "⟦Ïñşŧȧŀŀ ŧħė Ƈħřőñőş ŀȧůñƈħḓ ȧɠėñŧ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Install this checkout's Chronos service (legacy global mode is explicit)",
+        "ja": "このcheckoutのChronosサービスをインストール（旧グローバル設定は明示指定）",
+        "qps-ploc": "⟦Ïñşŧȧŀŀ ŧħïş ƈħėƈķőůŧ'ş Ƈħřőñőş şėřṽïƈė (ŀėɠȧƈẏ ɠŀőƀȧŀ ɱőḓė ïş ėẋṗŀïƈïŧ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
       },
       "cli_cmd_script_chronos_uninstall": {
-        "en": "Show Chronos launchd uninstall steps",
-        "ja": "Chronos の launchd アンインストール手順を表示",
-        "qps-ploc": "⟦Şħőẇ Ƈħřőñőş ŀȧůñƈħḓ ůñïñşŧȧŀŀ şŧėṗş ŀőřėɱ ïṗşůɱ ⟧"
+        "en": "Show uninstall steps for this checkout's Chronos service",
+        "ja": "このcheckoutのChronosサービスの削除手順を表示",
+        "qps-ploc": "⟦Şħőẇ ůñïñşŧȧŀŀ şŧėṗş ƒőř ŧħïş ƈħėƈķőůŧ'ş Ƈħřőñőş şėřṽïƈė ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "cli_cmd_script_chronos_start": {
-        "en": "Start the registered Chronos daemon",
-        "ja": "????? Chronos ???????",
-        "qps-ploc": "⟦Şŧȧřŧ ŧħė řėɠïşŧėřėḓ Ƈħřőñőş ḓȧėɱőñ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Start this checkout's registered Chronos service",
+        "ja": "このcheckoutの登録済みChronosサービスを起動",
+        "qps-ploc": "⟦Şŧȧřŧ ŧħïş ƈħėƈķőůŧ'ş řėɠïşŧėřėḓ Ƈħřőñőş şėřṽïƈė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
       },
       "cli_cmd_script_chronos_stop": {
-        "en": "Stop the registered Chronos daemon",
-        "ja": "????? Chronos ???????",
-        "qps-ploc": "⟦Şŧőṗ ŧħė řėɠïşŧėřėḓ Ƈħřőñőş ḓȧėɱőñ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Stop this checkout's registered Chronos service",
+        "ja": "このcheckoutの登録済みChronosサービスを停止",
+        "qps-ploc": "⟦Şŧőṗ ŧħïş ƈħėƈķőůŧ'ş řėɠïşŧėřėḓ Ƈħřőñőş şėřṽïƈė ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
       "cli_cmd_script_chronos_restart": {
-        "en": "Restart the Chronos daemon via the host service manager",
-        "ja": "ホストのサービスマネージャ経由で Chronos デーモンを再起動",
-        "qps-ploc": "⟦Řėşŧȧřŧ ŧħė Ƈħřőñőş ḓȧėɱőñ ṽïȧ ŧħė ħőşŧ şėřṽïƈė ɱȧñȧɠėř ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+        "en": "Restart this checkout's Chronos service via the host service manager",
+        "ja": "ホストのサービスマネージャ経由でこのcheckoutのChronosサービスを再起動",
+        "qps-ploc": "⟦Řėşŧȧřŧ ŧħïş ƈħėƈķőůŧ'ş Ƈħřőñőş şėřṽïƈė ṽïȧ ŧħė ħőşŧ şėřṽïƈė ɱȧñȧɠėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
       },
       "cli_cmd_script_chronos_status": {
-        "en": "Show the Chronos daemon's service-manager status",
-        "ja": "Chronos デーモンのサービスマネージャ状態を表示",
-        "qps-ploc": "⟦Şħőẇ ŧħė Ƈħřőñőş ḓȧėɱőñ'ş şėřṽïƈė-ɱȧñȧɠėř şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+        "en": "Show this checkout's Chronos service identity and status",
+        "ja": "このcheckoutのChronosサービスの識別情報と状態を表示",
+        "qps-ploc": "⟦Şħőẇ ŧħïş ƈħėƈķőůŧ'ş Ƈħřőñőş şėřṽïƈė ïḓėñŧïŧẏ ȧñḓ şŧȧŧůş ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
       },
       "cli_cmd_script_learning_harvest": {
         "en": "Propose recurring runtime failures as learning candidates",

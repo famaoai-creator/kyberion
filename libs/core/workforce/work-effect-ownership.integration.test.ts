@@ -1,4 +1,10 @@
-import { beforeEach, afterEach, describe, expect, it } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import type { ApprovalRequestRecord } from '../governance/approval-store.js';
+import { normalizeEventScope } from '../event-scope.js';
+const fixture = vi.hoisted(() => ({ approval: null as ApprovalRequestRecord | null }));
+vi.mock('../governance/approval-store-reader.js', () => ({
+  loadApprovalRequest: () => fixture.approval,
+}));
 import {
   claimWorkItem,
   createWorkItem,
@@ -8,12 +14,16 @@ import {
   clearWorkCoordinationStore,
   clearWorkCoordinationNamespace,
   setWorkCoordinationNamespace,
+  quarantineWorkItemExecution,
+  releaseWorkItemEffectOwnership,
+  expireWorkItemLeases,
 } from './work-coordination.js';
 import { workEffectOwnership } from './work-effect-ownership.js';
 import type { WorkItem } from './work-coordination-types.js';
 beforeEach(() => {
   setWorkCoordinationNamespace('effect-ownership-regression');
   clearWorkCoordinationStore();
+  fixture.approval = null;
 });
 afterEach(() => {
   clearWorkCoordinationStore();
@@ -37,6 +47,123 @@ const claim = (id: string) =>
     requireNewLease: true,
   });
 describe('durable effect ownership mutations', () => {
+  it.each(['active', 'expired'] as const)(
+    'settles a generic uncertain %s attempt only with exact authenticated human recovery proof',
+    (leaseState) => {
+      createWorkItem({
+        itemId: 'generic',
+        title: 'generic remote task',
+        description: 'No dot authority',
+        status: 'ready',
+      });
+      const owned = claimWorkItem({ itemId: 'generic', actorPeerId: 'worker-1', purpose: 'test' });
+      expect(() =>
+        updateWorkItem({
+          itemId: 'generic',
+          context: { ...owned.item.context, mission_id: 'MSN-REWRITE-DURING-ASK' },
+        })
+      ).toThrow('execution scope is immutable');
+      expect(() =>
+        quarantineWorkItemExecution({
+          itemId: 'generic',
+          leaseId: owned.lease.lease_id,
+          actorPeerId: 'other',
+          reason: 'supervisor_response_closed',
+        })
+      ).toThrow('holder');
+      const held = quarantineWorkItemExecution({
+        itemId: 'generic',
+        leaseId: owned.lease.lease_id,
+        actorPeerId: 'worker-1',
+        reason: 'supervisor_response_closed',
+      });
+      expect(() =>
+        updateWorkItem({
+          itemId: 'generic',
+          context: { ...held.context, mission_id: 'MSN-SCOPE-REWRITE' },
+        })
+      ).toThrow('execution scope is immutable');
+      expect(getWorkItem('generic')?.context).toEqual(held.context);
+      expect(() =>
+        releaseWorkItemEffectOwnership({
+          itemId: 'generic',
+          expectedVersion: held.version,
+          approvalRequestId: 'human-proof',
+        })
+      ).toThrow('unleased');
+      if (leaseState === 'expired')
+        expireWorkItemLeases(new Date(Date.now() + 60 * 60_000).toISOString());
+      const quarantined =
+        leaseState === 'expired'
+          ? getWorkItem('generic')!
+          : releaseWorkItem({
+              itemId: 'generic',
+              leaseId: owned.lease.lease_id,
+              actorPeerId: 'worker-1',
+              nextStatus: 'blocked',
+              summary: 'Operator confirmed the exact runtime stopped; effects still require review',
+            }).item;
+      expect(quarantined.effect_ownership?.state).toBe('held');
+      const input = {
+        itemId: 'generic',
+        expectedVersion: quarantined.version,
+        approvalRequestId: 'human-proof',
+      };
+      expect(() => releaseWorkItemEffectOwnership(input)).toThrow('authenticated human');
+      const approvedScope = normalizeEventScope({ ...quarantined.context, tier: 'public' });
+      fixture.approval = {
+        scope: approvedScope,
+        id: 'human-proof',
+        status: 'approved',
+        decidedBy: 'alice',
+        decidedByType: 'human',
+        authenticated: true,
+        requestedBy: 'worker-1',
+        correlationId: `work-effect-release:generic:${held.current_attempt_id}`,
+        accountability: {
+          finalDecision: 'human_only',
+          effectBinding: `work_effect_release:worker-1:generic:${held.current_attempt_id}@v${quarantined.version}`,
+        },
+      } as ApprovalRequestRecord;
+      fixture.approval.authenticated = false;
+      expect(() => releaseWorkItemEffectOwnership(input)).toThrow('authenticated human');
+      fixture.approval.authenticated = true;
+      fixture.approval.scope = { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'other' };
+      expect(() => releaseWorkItemEffectOwnership(input)).toThrow('bind');
+      fixture.approval.scope = approvedScope;
+      fixture.approval.scope = {
+        scope_kind: 'project',
+        tier: 'public',
+        project_id: 'another-project',
+      };
+      expect(() => releaseWorkItemEffectOwnership(input)).toThrow('entity scope');
+      fixture.approval.scope = approvedScope;
+      const exactBinding = fixture.approval.accountability!.effectBinding;
+      fixture.approval.accountability!.effectBinding = 'work_effect_release:wrong-attempt';
+      expect(() => releaseWorkItemEffectOwnership(input)).toThrow('bind');
+      fixture.approval.accountability!.effectBinding = exactBinding;
+      expect(() =>
+        releaseWorkItemEffectOwnership({ ...input, expectedVersion: input.expectedVersion + 1 })
+      ).toThrow();
+      const restored = releaseWorkItemEffectOwnership(input);
+      expect(restored).toMatchObject({
+        status: 'ready',
+        effect_ownership: {
+          state: 'settled',
+          settlement: 'human_verified',
+          approval_request_id: 'human-proof',
+        },
+        metadata: { execution_outcome: 'reconciled', recovery_required: false },
+      });
+      expect(restored.metadata?.dot_executor).toBeUndefined();
+      expect(restored.lease_id).toBeUndefined();
+      expect(
+        claimWorkItem({ itemId: 'generic', actorPeerId: 'worker-1', purpose: 'verified retry' })
+          .item.status
+      ).toBe('in_progress');
+    }
+  );
+
   it('ordinary archive and metadata replacement retain original target and block own reclaim', () => {
     create('a');
     create('b');

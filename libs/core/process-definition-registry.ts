@@ -11,6 +11,8 @@ export interface ProcessDefinitionSource {
   id: string;
   kind: ProcessDefinitionKind;
   path: string;
+  /** Repository-relative governed schema; required for JSON sources. */
+  schema?: string;
   execution_role: ProcessExecutionRole;
   consumer_paths: string[];
   expected_counts?: Record<string, number>;
@@ -53,18 +55,6 @@ const registryCatalog = defineCatalog<ProcessDefinitionRegistry>({
   schema: pathResolver.knowledge('product/schemas/process-definition-registry.schema.json'),
 });
 
-const JSON_SOURCE_SCHEMA_BY_ID: Record<string, string> = {
-  'mission-workflow-catalog': pathResolver.knowledge(
-    'product/schemas/mission-workflow-catalog.schema.json'
-  ),
-  'mission-orchestration-scenarios': pathResolver.knowledge(
-    'product/schemas/mission-orchestration-scenario-pack.schema.json'
-  ),
-  'mission-task-classification-scenarios': pathResolver.knowledge(
-    'product/schemas/mission-task-classification-scenarios.schema.json'
-  ),
-};
-
 export function loadProcessDefinitionRegistry(): ProcessDefinitionRegistry {
   return registryCatalog.load();
 }
@@ -87,10 +77,18 @@ function sortedEntries(path: string): string[] {
 }
 
 function loadJsonSourceAtPath(source: ProcessDefinitionSource, filePath: string) {
-  const schema = JSON_SOURCE_SCHEMA_BY_ID[source.id];
-  if (!schema) {
+  if (!source.schema) {
     throw new Error(`[PROCESS_DEFINITION] no schema registered for ${source.id}`);
   }
+  // Descriptors select schemas, never arbitrary repository or external resources.
+  if (
+    !/^knowledge\/product\/schemas\/(?:[A-Za-z0-9_-]+\/)*[A-Za-z0-9_.-]+\.schema\.json$/.test(
+      source.schema
+    )
+  ) {
+    throw new Error(`[PROCESS_DEFINITION] invalid governed schema path for ${source.id}`);
+  }
+  const schema = assertSafeRepositoryPath(source.schema);
   return defineCatalog<Record<string, unknown>>({
     id: `process-definition-source-${source.id}`,
     path: filePath,

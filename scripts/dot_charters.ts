@@ -24,6 +24,7 @@
  * role and heartbeat uniqueness before flipping status.
  */
 
+import { hasCliFlag, cliOptionValue, cliPositionals } from '@agent/core/cli-guard';
 import {
   findDotCharter,
   listDotCharters,
@@ -56,7 +57,12 @@ import {
   configureDotDelegationCapacity,
 } from '@agent/core/dot/dot-lifecycle';
 import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
-import { dotTokensUsedToday, readDotWakeLedger } from '@agent/core/dot/dot-runtime';
+import { resolveIdentityContext } from '@agent/core/authority';
+import { validateReadPermission } from '@agent/core/tier-guard';
+import { pathResolver } from '@agent/core/path-resolver';
+import { migrateLegacyDotState } from '@agent/core/dot/dot-state-paths';
+import { migrateLegacyDotActions } from '@agent/core/dot/dot-action-ledger';
+import { dotTokensUsedToday, readScopedDotWakeLedger } from '@agent/core/dot/dot-runtime';
 import { appendDotInboxEntry } from '@agent/core/dot/dot-inbox';
 import { currentDotActions, dotDelegationCapacity } from '@agent/core/dot/dot-dispatch';
 import { dotFeedbackPromptLines, latestDotSignals } from '@agent/core/dot/dot-feedback';
@@ -67,6 +73,7 @@ import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harn
 
 const STATUSES: DotCharterStatus[] = ['draft', 'active', 'paused', 'retired'];
 const SUBCOMMANDS = [
+  'migrate-state',
   'capacity',
   'create',
   'list',
@@ -89,15 +96,53 @@ const SUBCOMMANDS = [
 ] as const;
 type Subcommand = (typeof SUBCOMMANDS)[number];
 
-function loadAll() {
+function visibleCharter(charter: DotCharter, argv: string[] = []): boolean {
+  const identity = resolveIdentityContext();
+  const system = hasCliFlag(argv, '--system');
+  if (system && !['sovereign', 'ecosystem_architect'].includes(identity.persona))
+    throw new Error('[DOT_INVENTORY_SCOPE] --system requires an authorized operator');
+  const tier = argv.find((arg) => arg.startsWith('--tier='))?.slice(7);
+  const tenant = argv.find((arg) => arg.startsWith('--tenant='))?.slice(9);
+  if (tier && !['public', 'confidential', 'personal'].includes(tier))
+    throw new Error('[DOT_INVENTORY_SCOPE] invalid tier');
+  if ((tier && charter.scope.tier !== tier) || (tenant && charter.scope.tenant_slug !== tenant))
+    return false;
+  if (
+    charter.scope.tier === 'personal' &&
+    charter.scope.owner_nhi !== getRegisteredEnvText('KYBERION_NHI_ID')?.trim()
+  )
+    return false;
+  if (!system && charter.scope.tenant_slug && charter.scope.tenant_slug !== identity.tenantSlug)
+    return false;
+  const relative =
+    charter.scope.tier === 'confidential'
+      ? `knowledge/confidential/${charter.scope.tenant_slug ?? ''}`
+      : `knowledge/${charter.scope.tier}`;
+  return validateReadPermission(pathResolver.rootResolve(relative)).allowed;
+}
+
+function loadAll(argv: string[] = []) {
+  const system = hasCliFlag(argv, '--system');
+  if (system && !['sovereign', 'ecosystem_architect'].includes(resolveIdentityContext().persona))
+    throw new Error('[DOT_INVENTORY_SCOPE] --system requires an authorized operator');
   const errors: DotCharterLoadError[] = [];
   const loaded = listDotCharters(undefined, { errors });
-  return { loaded, errors };
+  return {
+    loaded: loaded.filter((entry) => visibleCharter(entry.charter, argv)),
+    errors: system
+      ? errors
+      : errors.filter(
+          (entry) =>
+            !entry.path.includes('/knowledge/confidential/') &&
+            !entry.path.includes('/knowledge/personal/')
+        ),
+  };
 }
 
 function findDot(dotId: string) {
   const found = findDotCharter(dotId);
-  if (!found) throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
+  if (!found || !visibleCharter(found.charter))
+    throw new Error(`[DOT_NOT_FOUND] no visible charter for dot_id '${dotId}'`);
   return found;
 }
 
@@ -110,12 +155,13 @@ function reportList(argv: string[]) {
   const wanted: DotCharterStatus | undefined = wantAll
     ? undefined
     : ((statusArg as DotCharterStatus | undefined) ?? 'active');
-  const { loaded, errors } = loadAll();
+  const { loaded, errors } = loadAll(argv);
   const dots = loaded
     .filter((entry) => !wanted || entry.charter.status === wanted)
     .map((entry) => ({
       dot_id: entry.charter.dot_id,
       status: entry.charter.status,
+      scope: entry.charter.scope,
       title: entry.charter.title,
       authority_role: entry.charter.authority.authority_role,
       heartbeat_id: entry.charter.runtime.heartbeat_id,
@@ -132,7 +178,7 @@ function reportList(argv: string[]) {
 
 function reportValidate(argv: string[]) {
   const dotId = argv.find((arg) => !arg.startsWith('--'));
-  const { loaded, errors } = loadAll();
+  const { loaded, errors } = loadAll(argv);
   const results = loaded
     .filter((entry) => !dotId || entry.charter.dot_id === dotId)
     .map((entry) => {
@@ -240,9 +286,12 @@ function reportInbox(argv: string[]) {
       'dot inbox append requires --channel <slack|telegram|discord|imessage|surface|inbox>'
     );
   const dotId = flag('dot-id');
-  if (dotId) findDotCharter(dotId);
+  const target = dotId ? findDot(dotId).charter : undefined;
+  if (!target && !rest.includes('--public-broadcast'))
+    throw new Error('[DOT_INBOX_SCOPE] specify --dot-id or explicit --public-broadcast');
   const entry = appendDotInboxEntry({
     channel,
+    scope: target?.scope ?? { tier: 'public' },
     ...(dotId ? { dot_id: dotId } : {}),
     ...(flag('text') ? { text: flag('text') } : {}),
     source: 'cli',
@@ -256,8 +305,9 @@ function asCharter<T>(charter: DotCharter, fn: () => T): T {
     charter.authority.authority_role,
     fn,
     undefined,
-    charter.scope.tenant_slug,
-    charter.scope.organization_id
+    charter.scope.tenant_slug ?? '',
+    charter.scope.organization_id,
+    { missionId: null, taskId: null, projectId: charter.scope.project_id ?? null }
   );
 }
 
@@ -280,12 +330,11 @@ function collectStatusSections(charter: DotCharter): Record<string, Record<strin
 
 function reportStatus(argv: string[]) {
   const dotId = argv.find((arg) => !arg.startsWith('--'));
-  const ledger = readDotWakeLedger({});
-  const { loaded } = loadAll();
+  const { loaded } = loadAll(argv);
   const dots = loaded
     .filter((entry) => !dotId || entry.charter.dot_id === dotId)
     .map((entry) => {
-      const wakes = ledger.filter((row) => row.dot_id === entry.charter.dot_id);
+      const wakes = asCharter(entry.charter, () => readScopedDotWakeLedger(entry.charter));
       const last = wakes[wakes.length - 1];
       const actions = currentDotActions(entry.charter.dot_id);
       const actionCounts: Record<string, number> = {};
@@ -295,6 +344,7 @@ function reportStatus(argv: string[]) {
       return {
         dot_id: entry.charter.dot_id,
         status: entry.charter.status,
+        scope: entry.charter.scope,
         heartbeat_id: entry.charter.runtime.heartbeat_id,
         tokens_today: dotTokensUsedToday(entry.charter.dot_id, {}),
         wake_count: wakes.length,
@@ -472,6 +522,31 @@ async function main(argv: string[]): Promise<Record<string, unknown>> {
     : 'list';
   const args = subcommand === sub ? rest : argv;
   switch (subcommand) {
+    case 'migrate-state': {
+      const dotId = cliPositionals(args, ['--legacy-tier'])[0];
+      const legacyTier = cliOptionValue(args, '--legacy-tier');
+      if (
+        !dotId ||
+        !hasCliFlag(args, '--apply') ||
+        !['public', 'confidential', 'personal'].includes(legacyTier ?? '')
+      )
+        throw new Error(
+          'usage: pnpm kyberion dot migrate-state <dot_id> --legacy-tier <tier> --apply; review the historical namespace before moving it'
+        );
+      const { charter } = findDot(dotId);
+      if (charter.scope.tier !== legacyTier)
+        throw new Error(
+          '[DOT_STATE_MIGRATION_SCOPE] historical tier differs from destination; use a reviewed brokered migration'
+        );
+      return {
+        ok: true,
+        ...migrateLegacyDotState(charter, {
+          ...charter.scope,
+          tier: legacyTier as DotCharter['scope']['tier'],
+        }),
+        actions_migrated: migrateLegacyDotActions(charter),
+      };
+    }
     case 'capacity': {
       const [dotId, ...options] = stripSharedScriptFlags(args);
       const limitIndex = options.indexOf('--limit');
@@ -582,6 +657,7 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
           ? `  wakes=${dot.wake_count} tokens_today=${dot.tokens_today}${last ? `  last=${last.at} ${last.outcome}` : ''}`
           : `  [${dot.authority_role}]  triggers=${(dot.triggers as string[]).join(',')}  heartbeat=${dot.heartbeat_id}`;
       print(`${dot.status}  ${String(dot.dot_id).padEnd(24)} ${dot.title ?? ''}${tail}`.trimEnd());
+      if (dot.scope) print('    scope: ' + JSON.stringify(dot.scope));
       if (last?.summary) print(`    last said: ${String(last.summary).slice(0, 200)}`);
       const actions = dot.actions as Record<string, number> | undefined;
       if (actions && Object.keys(actions).length > 0) {

@@ -6,10 +6,12 @@ import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE, type DotWorkShape } from './dot-
 
 /** Handoffs preserve tenant and any jointly declared organization boundary. */
 export function sameDotHandoffScope(from: DotCharter, to: DotCharter): boolean {
+  if (from.scope.tier !== to.scope.tier) return false;
+  if ((from.scope.owner_nhi ?? '') !== (to.scope.owner_nhi ?? '')) return false;
   if ((from.scope.tenant_slug ?? '') !== (to.scope.tenant_slug ?? '')) return false;
   const fromOrg = from.scope.organization_id;
   const toOrg = to.scope.organization_id;
-  return !fromOrg || !toOrg || fromOrg === toOrg;
+  return fromOrg === toOrg && from.scope.project_id === to.scope.project_id;
 }
 
 /** Prompt bounds share the same sources as dispatch enforcement. */

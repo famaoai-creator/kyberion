@@ -302,6 +302,7 @@ export function enqueueExecutorReport(
       })
     )({
       dot_id: reportTo,
+      scope: c.scope,
       channel: 'inbox',
       source: DOT_EXECUTOR_REPORT_SOURCE,
       idempotency_key: executorReportKey(row, reportTo),

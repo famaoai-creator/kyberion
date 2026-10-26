@@ -8,6 +8,7 @@
  */
 import * as path from 'node:path';
 import { escapeXml } from '../text-escaping.js';
+import { daemonBoundEnvironment } from './render-context.js';
 import type { DaemonManager, DaemonRenderContext, DaemonServiceSpec } from './service-manager.js';
 
 export interface LaunchdPlistOptions {
@@ -116,7 +117,7 @@ export function buildLaunchdPlist(
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key>
-    <string>${escapeXml(pathEnv)}</string>${Object.entries(options.env ?? {})
+    <string>${escapeXml(pathEnv)}</string>${Object.entries(daemonBoundEnvironment(options))
       .map(
         ([name, value]) => `
     <key>${escapeXml(name)}</key>

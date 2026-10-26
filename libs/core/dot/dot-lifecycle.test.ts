@@ -1,7 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
-import { loadDotCharter, FRONT_DESK_DIAGNOSTIC_PIPELINE, type DotCharter } from './dot-charter.js';
+import {
+  loadDotCharter,
+  findDotCharter,
+  FRONT_DESK_DIAGNOSTIC_PIPELINE,
+  type DotCharter,
+} from './dot-charter.js';
 import { saveOrganizationOperationalState } from '../organization/organization-operating-model-persistence.js';
 import { saveOrganizationOperation } from '../organization/organization-operating-model-operations.js';
 import { dotAdmissionScopeHash } from './dot-admission-identity.js';
@@ -72,6 +77,7 @@ function writeTenantCharter(slug: string, charter: DotCharter, name = 'dot.json'
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -284,6 +290,15 @@ describe('checkDotActivationReadiness', () => {
 });
 
 describe('create public draft charter', () => {
+  it('creates a personal draft only for its authenticated owner and discovers it', () => {
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-a');
+    const draft = { ...DRAFT, scope: { tier: 'personal' as const, owner_nhi: 'owner-a' } };
+    expect(createDraftDotCharter(draft, deps).scope).toEqual(draft.scope);
+    expect(findDotCharter(draft.dot_id, TEST_ROOT)?.charter.scope).toEqual(draft.scope);
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-b');
+    expect(findDotCharter(draft.dot_id, TEST_ROOT)).toBeUndefined();
+    expect(() => createDraftDotCharter(draft, deps)).toThrow('authenticated owner_nhi');
+  });
   it('keeps strict tenant-owned diagnostics public without admitting arbitrary public tenant drafts', () => {
     writeTenantCharter('diagnostic-tenant', { ...DRAFT, dot_id: 'seed' });
     const diagnostic = {

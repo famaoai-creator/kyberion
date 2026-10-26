@@ -1022,8 +1022,12 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(workItemId ? { work_item_id: workItemId } : {}),
   };
   const securityScope: ContextSecurityScope = {
-    tenant_slug: input.missionState.tenant_slug || input.missionState.tenant_id || 'default',
-    tenant_id: input.missionState.tenant_id || input.missionState.tenant_slug || 'default',
+    ...(input.missionState.tenant_slug || input.missionState.tenant_id
+      ? {
+          tenant_slug: input.missionState.tenant_slug || input.missionState.tenant_id,
+          tenant_id: input.missionState.tenant_id || input.missionState.tenant_slug,
+        }
+      : {}),
     ...(organizationId ? { organization_id: organizationId } : {}),
     ...(projectId ? { project_id: projectId } : {}),
     mission_id: input.missionState.mission_id,

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
+import { pathResolver } from '@agent/core/path-resolver';
+import { resolveDaemonInstance } from '@agent/core/daemon/specs';
+import * as secureIo from '@agent/core/secure-io';
 import {
   buildChronosLaunchdPlist,
   chronosLaunchAgentTargetPath,
@@ -194,7 +197,9 @@ describe('install_chronos_launchd --daemon', () => {
     expect(output).toHaveLength(1);
     expect(output[0]).toContain('com.kyberion.generation-schedule');
     expect(output[0]).toContain('dist/scripts/run_generation_schedule_daemon.js');
-    expect(output[0]).toContain('kyberion-generation-schedule.err.log');
+    expect(output[0]).toContain(
+      `kyberion-generation-schedule-${resolveDaemonInstance(pathResolver.rootDir()).id}.err.log`
+    );
     expect(output[0]).not.toContain('chronos_daemon.js');
   });
 
@@ -226,5 +231,65 @@ describe('install_chronos_launchd --daemon', () => {
     expect(launchAgentTargetPath('com.kyberion.generation-schedule', '/Users/alice')).toBe(
       '/Users/alice/Library/LaunchAgents/com.kyberion.generation-schedule.plist'
     );
+  });
+
+  it('defaults to this physical checkout and pins its runtime root without forwarding shell overrides', async () => {
+    const output: string[] = [];
+    await main([], (value) => output.push(String(value)), { platform: 'darwin' });
+    const instance = resolveDaemonInstance(pathResolver.rootDir());
+    expect(output[0]).toContain(`instance=${instance.id} root=${instance.repoRoot}`);
+    expect(output[0]).toContain(`<string>com.kyberion.chronos.${instance.id}</string>`);
+    expect(output[0]).toContain(
+      `<key>KYBERION_ROOT</key>\n    <string>${instance.repoRoot}</string>`
+    );
+    expect(output[0]).not.toContain('bootout gui/501/com.kyberion.chronos\n');
+    await expect(
+      main(['--forward-env', 'KYBERION_ROOT'], () => {}, { platform: 'darwin' })
+    ).rejects.toThrow('KYBERION_ROOT cannot be forwarded');
+  });
+
+  it('requires explicit legacy mode to target the old global service', async () => {
+    const output: string[] = [];
+    await main(['--uninstall', '--legacy-global'], (value) => output.push(String(value)), {
+      platform: 'darwin',
+    });
+    expect(output[0]).toContain('instance=legacy-global');
+    expect(output[0]).toContain('/com.kyberion.chronos.plist');
+    expect(output[0]).toContain('scheduler uninstall --apply --legacy-global');
+    expect(output[0]).not.toContain('com.kyberion.chronos.ws-');
+  });
+
+  it.each(['start', 'stop', 'restart', 'uninstall'] as const)(
+    'plans %s only for the selected instance, without staging/installing units',
+    async (verb) => {
+      const output: string[] = [];
+      await main([`--${verb}`], (value) => output.push(String(value)), { platform: 'darwin' });
+      const instance = resolveDaemonInstance(pathResolver.rootDir());
+      expect(output[0]).toContain(`com.kyberion.chronos.${instance.id}`);
+      expect(output[0]).not.toContain('--- unit file');
+      expect(output[0]).not.toContain('cp ');
+      expect(output[0]).toContain(`scheduler ${verb} --apply`);
+    }
+  );
+
+  it('queries only the current instance and reports its canonical root without global fallback', async () => {
+    const probe = vi.spyOn(secureIo, 'safeExecResult').mockReturnValue({
+      status: 0,
+      stdout: 'service-ready',
+      stderr: '',
+    });
+    const output: string[] = [];
+    try {
+      await main(['--status'], (value) => output.push(String(value)), { platform: 'darwin' });
+      const instance = resolveDaemonInstance(pathResolver.rootDir());
+      expect(probe).toHaveBeenCalledOnce();
+      expect(probe.mock.calls[0][1]).toEqual([
+        'print',
+        expect.stringContaining(`/${LAUNCHD_DAEMON_SPECS.chronos.label}.${instance.id}`),
+      ]);
+      expect(output[0]).toContain(`instance=${instance.id} root=${instance.repoRoot}`);
+    } finally {
+      probe.mockRestore();
+    }
   });
 });

@@ -169,8 +169,15 @@
         "tier": { "enum": ["public", "confidential", "personal"] },
         "tenant_slug": { "type": "string" },
         "organization_id": { "type": "string" },
-        "project_id": { "type": "string" }
-      }
+        "project_id": { "type": "string" },
+        "owner_nhi": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "tier": { "const": "personal" } } },
+          "then": { "required": ["owner_nhi"] }
+        }
+      ]
     },
     "goal": {
       "type": "object",
@@ -493,6 +500,11 @@
         "reasoning_backend": {
           "type": "string",
           "description": "Optional reasoning-backend-policy allowed_modes entry; defaults to auto-discovery."
+        },
+        "reasoning_training_use": {
+          "type": "string",
+          "enum": ["local_only", "no_training", "zero_retention"],
+          "description": "Operator-reviewed reasoning data-use ceiling. Private charters default to local_only. no_training still requires provider attestation, processor authorization and tenant egress policy; this setting grants no authority itself."
         },
         "max_idle_wake_ms": {
           "type": "integer",

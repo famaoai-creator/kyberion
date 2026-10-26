@@ -8,7 +8,7 @@ import { t } from '../t.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { auditChain } from '../governance/audit-chain.js';
-import { resolveTenant } from './tenant-registry.js';
+import { isRegisteredOperationalTenant } from '../foundation/operational-store-policy.js';
 import { getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { compileSchema } from '../foundation/ajv.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
@@ -173,7 +173,10 @@ export function assertRecordIdentity(
     record.tenant_slug &&
     (getRegisteredEnvText('KYBERION_ENTITY_GOVERNANCE') === 'enforce' || !isVitestProcess())
   ) {
-    resolveTenant(record.tenant_slug, { rootDir });
+    if (!isRegisteredOperationalTenant(record.tenant_slug, rootDir))
+      throw new Error(
+        '[TENANT_MEMBERSHIP_REQUIRED] organization record requires an active registered tenant'
+      );
   }
 }
 

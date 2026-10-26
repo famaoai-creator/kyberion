@@ -36,6 +36,7 @@ vi.mock('./path-resolver.js', () => ({
   shared: vi.fn((p: string) => `/repo/active/shared/${p}`),
   findMissionPath: mocks.findMissionPath,
   rootDir: vi.fn(() => '/repo'),
+  rootResolve: vi.fn((p: string) => `/repo/${p}`),
   pathResolver: {
     active: mocks.active,
     knowledge: mocks.knowledge,

@@ -36,7 +36,7 @@ import type { DotWakeTool } from './dot-extensions.js';
 import { DOT_WAKE_TOOLS } from './dot-extension-registry.js';
 import { recordDotWakeOutcome, runDotWake } from './dot-runtime.js';
 
-const ROOT = 'active/shared/tmp/dot-event-continuation-tests';
+const ROOT = `active/shared/tmp/dot-event-continuation-tests-${process.pid}-${randomUUID()}`;
 const NOW = new Date('2026-10-12T12:00:00Z');
 const deps = { rootDir: ROOT, now: () => NOW };
 const policy: EventIntakePolicy = {
@@ -87,7 +87,10 @@ function ingest(i: number, blob = '') {
   return result.event;
 }
 const children = new Map<ManagedProcessHandle, Promise<void>>();
-function child(code: string): Promise<{ code: number | null; output: string }> {
+function child(
+  code: string,
+  deadlineMs = 90_000
+): Promise<{ code: number | null; output: string }> {
   return new Promise((resolve, reject) => {
     const handle = spawnManagedProcess({
       resourceId: 'event-continuation-test-' + randomUUID(),
@@ -121,7 +124,7 @@ function child(code: string): Promise<{ code: number | null; output: string }> {
     const timer = setTimeout(() => {
       stopManagedProcess(handle.resourceId, p);
       reject(new Error('Continuation test child timed out: ' + output));
-    }, 90_000);
+    }, deadlineMs);
     p.stdout!.on('data', (data) => {
       output += String(data);
     });
@@ -163,7 +166,9 @@ describe('forward-only event continuation', () => {
       if (!i) first = event.event_id;
     }
     const raw = String(
-      safeReadFile(ROOT + '/active/shared/runtime/dot/events.jsonl', { encoding: 'utf8' })
+      safeReadFile(ROOT + '/active/shared/runtime/dot/public/shared/events.jsonl', {
+        encoding: 'utf8',
+      })
     );
     expect(raw.trim().split('\n')).toHaveLength(2001);
     expect(readDotInboundEvents(undefined, deps)).toHaveLength(2000);
@@ -199,7 +204,9 @@ describe('forward-only event continuation', () => {
       'let count=0;for(let sweep=0;sweep<500;sweep++){const due=evaluateDotEventTriggers(c,deps);if(!due.length)break;' +
       "for(const d of due){const id=claimEventContinuation(c,d,deps);safeAppendFileSync(root+'/effects.jsonl',JSON.stringify(d.key)+'\\n');recordDotWakeOutcome(c,d,'delivered',{...deps,eventAttemptId:id});count++;}}" +
       "console.log('resumed='+count);},'mission_owner');";
-    const resumed = await child(code);
+    // This process persists 1996 separate effects; allow the IO-heavy fixture
+    // its own bounded deadline when the full suite shares the host.
+    const resumed = await child(code, 180_000);
     expect(resumed, resumed.output).toMatchObject({ code: 0 });
     expect(resumed.output).toContain('resumed=1996');
     const effects = String(safeReadFile(ROOT + '/effects.jsonl', { encoding: 'utf8' }))
@@ -209,7 +216,7 @@ describe('forward-only event continuation', () => {
     expect(new Set(effects).size).toBe(2001);
     expect(evaluateDotEventTriggers(c, deps)).toEqual([]);
     expect(readEventContinuation(c, deps)?.pending).toEqual([]);
-  }, 180000);
+  }, 240000);
 
   it('does not replay historical rows, acknowledge offers, or age pending work out', () => {
     ingest(0);
@@ -287,7 +294,7 @@ describe('forward-only event continuation', () => {
     expect(() => evaluateDotEventTriggers(c, deps)).toThrow(/held/);
     expect(inspectDotEventIntake(c, deps)).toMatchObject({ state: 'held' });
     safeWriteFile(file, original);
-    safeWriteFile(ROOT + '/active/shared/runtime/dot/events.jsonl', '');
+    safeWriteFile(ROOT + '/active/shared/runtime/dot/public/shared/events.jsonl', '');
     expect(() => evaluateDotEventTriggers(c, deps)).toThrow(/held/);
     safeRmSync(file);
     expect(() => evaluateDotEventTriggers(c, deps)).toThrow(/missing/);
@@ -297,7 +304,7 @@ describe('forward-only event continuation', () => {
   it('diagnoses the byte window independently and never mutates state during status reads', () => {
     for (let i = 0; i < 270; i++) ingest(i, 'x'.repeat(16000));
     const c = charter();
-    const file = ROOT + '/active/shared/runtime/dot/events.jsonl';
+    const file = ROOT + '/active/shared/runtime/dot/public/shared/events.jsonl';
     const before = safeReadFile(file);
     expect(inspectDotEventIntake(c, deps)).toMatchObject({
       byte_cutoff: true,
@@ -477,7 +484,7 @@ describe('continuation dispatch and evidence boundaries', () => {
 
   it('caps scanned lines, retains trailing fragments and holds malformed complete records', () => {
     const c = initialize();
-    const file = ROOT + '/active/shared/runtime/dot/events.jsonl';
+    const file = ROOT + '/active/shared/runtime/dot/public/shared/events.jsonl';
     safeAppendFileSync(file, '\n'.repeat(2001));
     evaluateDotEventTriggers(c, deps);
     expect(readEventContinuation(c, deps)?.source.offset).toBe(2000);
@@ -615,7 +622,7 @@ describe('durable terminal-result validation', () => {
       enableDotEventContinuation(charter().dot_id, { ...deps, confirmQuiescent: true })
     ).toThrow(/draft or paused/);
     safeWriteFile(ROOT + '/dots/fixture.json', JSON.stringify(charter()));
-    safeWriteFile(ROOT + '/active/shared/runtime/dot/events.jsonl', '{"torn":');
+    safeWriteFile(ROOT + '/active/shared/runtime/dot/public/shared/events.jsonl', '{"torn":');
     expect(() =>
       enableDotEventContinuation(charter().dot_id, { ...deps, confirmQuiescent: true })
     ).toThrow(/complete line/);

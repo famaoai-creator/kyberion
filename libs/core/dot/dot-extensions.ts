@@ -14,6 +14,10 @@ import type { DotCharter } from './dot-charter.js';
 import type { DotRuntimeDeps, DueDotTrigger } from './dot-runtime.js';
 import type { DotDecisionLevel, DotProposal } from './dot-proposals.js';
 
+/** Core wake protocol identities are reserved across native tools and delegated fences. */
+export const DOT_PROPOSE_TOOL_NAME = 'dot_propose_action';
+export const DOT_PROPOSALS_FENCE = 'dot-proposals';
+
 export interface DotExtCtx {
   rootDir?: string;
   now: () => Date;

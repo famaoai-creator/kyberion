@@ -58,7 +58,23 @@ describe('Chronos route request input boundary', () => {
           { encoding: 'utf8' }
         )
       );
-      expect(source).toContain('readChronos');
+      expect(source).toMatch(/readChronos|workspaceSelectionFromSearchParams/);
+      if (source.includes('workspaceSelectionFromSearchParams')) {
+        expect(source).toContain('workspaceSelectionFromSearchParams(req.nextUrl.searchParams)');
+        const workspace = String(
+          safeReadFile(
+            pathResolver.rootResolve(
+              'presence/displays/chronos-mirror-v2/src/lib/workspace-scope.ts'
+            ),
+            { encoding: 'utf8' }
+          )
+        );
+        expect(workspace).toContain('search.getAll(field).length > 1');
+        expect(workspace).toContain('const value = search.get(field)');
+        expect(workspace).toContain(
+          'if (value !== null) Object.assign(result, { [target]: value })'
+        );
+      }
       expect(source).not.toMatch(
         /searchParams\.get\('(?:tenant|organization_id|project_id)'\) \|\|/
       );

@@ -43,7 +43,8 @@ vi.mock('@agent/core/mission/mission-state', () => ({
   loadState: vi.fn(),
   loadStateAtPath: mocks.loadStateAtPath,
 }));
-vi.mock('@agent/core/path-resolver', () => ({
+vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/path-resolver')>()),
   rootResolve: mocks.rootResolve,
   findMissionPath: vi.fn(),
 }));

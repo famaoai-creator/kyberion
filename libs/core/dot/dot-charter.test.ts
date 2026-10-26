@@ -30,6 +30,7 @@ import {
 import {
   DOT_CHARTER_LIFECYCLE_AUDIT_PATH,
   listDotCharterPaths,
+  personalDotCharterDir,
   listDotCharterSources,
   dotGoalRefLabel,
   findDotCharter,
@@ -74,6 +75,7 @@ function writeCharter(root: string, name: string, value: unknown): string {
 }
 
 afterEach(() => {
+  vi.unstubAllEnvs();
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -107,6 +109,28 @@ const tenantCharter = (slug: string, dotId: string, scope?: DotCharter['scope'])
 });
 
 describe('tenant dot charters', () => {
+  it('discovers only the authenticated personal owner directory and rejects scope spoofing', () => {
+    const write = (owner: string, declared = owner) => {
+      const dir = personalDotCharterDir(owner, TEST_ROOT);
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(
+        `${dir}/personal.json`,
+        JSON.stringify({
+          ...VALID_CHARTER,
+          dot_id: owner === 'owner-a' ? 'personal-a' : 'personal-b',
+          scope: { tier: 'personal', owner_nhi: declared },
+        })
+      );
+    };
+    write('owner-a');
+    write('owner-b');
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-a');
+    expect(listDotCharters(TEST_ROOT).map((entry) => entry.charter.dot_id)).toEqual(['personal-a']);
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-b');
+    expect(listDotCharters(TEST_ROOT).map((entry) => entry.charter.dot_id)).toEqual(['personal-b']);
+    write('owner-b', 'owner-a');
+    expect(() => listDotCharters(TEST_ROOT)).toThrow('owner directory');
+  });
   it('lists and loads a tenant charter inside its tenant context', () => {
     seedTenant('acme');
     const filePath = writeTenantCharter('acme', 'acme-dot.json', tenantCharter('acme', 'acme-dot'));

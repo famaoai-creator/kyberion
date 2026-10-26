@@ -1,5 +1,9 @@
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { agentLifecycle, resolveAgentLifecycleModelId } from './agent-lifecycle.js';
+import {
+  agentLifecycle,
+  resolveAgentLifecycleModelId,
+  type SpawnOptions,
+} from './agent-lifecycle.js';
 import { agentRegistry, resolveAgentTrustScore } from './agent-registry.js';
 import { trustEngine } from '../trust-engine.js';
 import { ACPMediator } from '../mesh/acp-mediator.js';
@@ -10,6 +14,7 @@ import { runtimeSupervisor } from '../tool/runtime-supervisor.js';
 import * as providerDiscovery from '../provider/provider-discovery.js';
 import * as providerResolution from './agent-provider-resolution.js';
 import * as execAdapterBridge from './agent-exec-adapter-bridge.js';
+import * as taskTools from '../workforce/task-tool-runtime.js';
 
 describe('agent-lifecycle model routing', () => {
   it('routes task model routing environment reads through the governed accessor', () => {
@@ -173,6 +178,234 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     if (safeExistsSync(dir)) safeRmSync(dir, { recursive: true, force: true });
   });
 
+  it.each(['task', 'tier', 'owner', 'lease', 'profile'] as const)(
+    'rejects a concurrent %s binding change while preserving same-contract boot reuse',
+    async (changed) => {
+      const agentId = `pending-binding-${changed}`;
+      let releaseBoot: () => void = () => {};
+      const bootGate = new Promise<void>((resolve) => {
+        releaseBoot = resolve;
+      });
+      const boot = vi.fn(() => bootGate);
+      const scope = {
+        tier: 'public' as const,
+        mission_id: 'MSN-PENDING-BINDING',
+        task_id: 'task-a',
+      };
+      const runtime = {
+        binding: {
+          scope,
+          missionId: scope.mission_id,
+          taskId: scope.task_id,
+          capabilityProfile: 'explorer',
+          externalEgress: 'allow',
+        },
+        assertCurrent: vi.fn(),
+        assertComplete: vi.fn(),
+      } as unknown as taskTools.TaskToolRuntime;
+      vi.spyOn(taskTools, 'createRuntimeForTask').mockReturnValue(runtime);
+      const ask = vi.fn(async () => ({ text: 'original task result', stopReason: 'completed' }));
+      const create = vi.spyOn(execAdapterBridge, 'createAgentExecAdapter').mockResolvedValue({
+        boot,
+        ask,
+        shutdown: vi.fn(async () => {}),
+      });
+      const base: SpawnOptions = {
+        agentId,
+        provider: 'codex',
+        modelId: 'fixture',
+        missionId: scope.mission_id,
+        scope,
+        runtimeOwnerId: 'owner-a',
+        runtimeOwnerType: 'workitem',
+        runtimeMetadata: {
+          skip_provider_resolution: true,
+          work_item_id: 'work-a',
+          lease_id: 'lease-a',
+          capability_profile: 'explorer',
+          team_role: 'explorer',
+        },
+      };
+      const other: SpawnOptions = { ...base, runtimeMetadata: { ...base.runtimeMetadata } };
+      if (changed === 'task') {
+        other.scope = { ...scope, task_id: 'task-b' };
+        other.runtimeMetadata!.work_item_id = 'work-b';
+      }
+      if (changed === 'tier')
+        other.scope = { ...scope, tier: 'confidential', tenant_slug: 'tenant-b' };
+      if (changed === 'owner') other.runtimeOwnerId = 'owner-b';
+      if (changed === 'lease') other.runtimeMetadata!.lease_id = 'lease-b';
+      if (changed === 'profile') other.runtimeMetadata!.capability_profile = 'implementer';
+      const first = agentLifecycle.spawn(base);
+      try {
+        await vi.waitFor(() => expect(boot).toHaveBeenCalledOnce());
+        await expect(agentLifecycle.spawn(other)).rejects.toThrow('AGENT_RUNTIME_BINDING_CONFLICT');
+        const same = agentLifecycle.spawn({ ...base, scope: { ...scope } });
+        releaseBoot();
+        const handle = await first;
+        expect(await same).toBe(handle);
+        expect(create).toHaveBeenCalledOnce();
+        expect(handle.getRecord()?.scope).toMatchObject(scope);
+        expect(await handle.ask('Only the original task')).toBe('original task result');
+        expect(runtime.assertCurrent).toHaveBeenCalled();
+        expect(ask).toHaveBeenCalledOnce();
+      } finally {
+        releaseBoot();
+        await first.catch(() => undefined);
+        await agentLifecycle.shutdown(agentId);
+      }
+    }
+  );
+
+  it('serializes a delayed task rebind shutdown without letting stale handles tear down its replacement', async () => {
+    const agentId = 'pending-rebind-shutdown';
+    let releaseStop: () => void = () => {};
+    let releaseBoot: () => void = () => {};
+    const stopGate = new Promise<void>((resolve) => {
+      releaseStop = resolve;
+    });
+    const bootGate = new Promise<void>((resolve) => {
+      releaseBoot = resolve;
+    });
+    const stopA = vi.fn(() => stopGate),
+      stopB = vi.fn(async () => {});
+    const bootB = vi.fn(() => bootGate);
+    const scope = { tier: 'public' as const, mission_id: 'MSN-REBIND-SHUTDOWN', task_id: 'task-a' };
+    const runtime = {
+      binding: {
+        scope,
+        missionId: scope.mission_id,
+        taskId: scope.task_id,
+        capabilityProfile: 'explorer',
+        externalEgress: 'allow',
+      },
+      assertCurrent: vi.fn(),
+      assertComplete: vi.fn(),
+    } as unknown as taskTools.TaskToolRuntime;
+    vi.spyOn(taskTools, 'createRuntimeForTask').mockReturnValue(runtime);
+    const create = vi
+      .spyOn(execAdapterBridge, 'createAgentExecAdapter')
+      .mockResolvedValueOnce({
+        boot: async () => {},
+        shutdown: stopA,
+        ask: async () => ({ text: 'old result', stopReason: 'completed' }),
+      })
+      .mockResolvedValueOnce({
+        boot: bootB,
+        shutdown: stopB,
+        ask: async () => ({ text: 'replacement result', stopReason: 'completed' }),
+      });
+    const base: SpawnOptions = {
+      agentId,
+      provider: 'codex',
+      modelId: 'fixture',
+      missionId: scope.mission_id,
+      scope,
+      runtimeMetadata: {
+        skip_provider_resolution: true,
+        work_item_id: 'work-a',
+        lease_id: 'lease-a',
+        capability_profile: 'explorer',
+      },
+    };
+    const replacement: SpawnOptions = {
+      ...base,
+      runtimeMetadata: { ...base.runtimeMetadata, lease_id: 'lease-b' },
+    };
+    const oldHandle = await agentLifecycle.spawn(base);
+    const rebind = agentLifecycle.spawn(replacement);
+    try {
+      await vi.waitFor(() => expect(stopA).toHaveBeenCalledOnce());
+      const repeatedStop = agentLifecycle.shutdown(agentId);
+      await expect(
+        agentLifecycle.spawn({
+          ...replacement,
+          runtimeMetadata: { ...replacement.runtimeMetadata, lease_id: 'lease-c' },
+        })
+      ).rejects.toThrow('AGENT_RUNTIME_STOPPING');
+      expect(stopA).toHaveBeenCalledOnce();
+      releaseStop();
+      await repeatedStop;
+      await vi.waitFor(() => expect(bootB).toHaveBeenCalledOnce());
+      await expect(
+        agentLifecycle.spawn({
+          ...replacement,
+          runtimeMetadata: { ...replacement.runtimeMetadata, lease_id: 'lease-c' },
+        })
+      ).rejects.toThrow('AGENT_RUNTIME_BINDING_CONFLICT');
+      const same = agentLifecycle.spawn(replacement);
+      releaseBoot();
+      const current = await rebind;
+      expect(await same).toBe(current);
+      await oldHandle.shutdown();
+      expect(agentLifecycle.getHandle(agentId)).toBe(current);
+      expect(stopB).not.toHaveBeenCalled();
+      expect(await current.ask('Current task only')).toBe('replacement result');
+      expect(create).toHaveBeenCalledTimes(2);
+    } finally {
+      releaseStop();
+      releaseBoot();
+      await rebind.catch(() => undefined);
+      await agentLifecycle.shutdown(agentId);
+    }
+  });
+
+  it('replaces prewarm and fresh task leases without retaining stale tool authority', async () => {
+    const agentId = 'task-tool-rebind-agent';
+    const boot = vi.fn(async () => {});
+    const shutdown = vi.fn(async () => {});
+    const runtime = {
+      binding: { capabilityProfile: 'explorer' },
+      assertCurrent: vi.fn(),
+    } as unknown as taskTools.TaskToolRuntime;
+    vi.spyOn(taskTools, 'createRuntimeForTask').mockImplementation((metadata) =>
+      metadata.work_item_id ? runtime : undefined
+    );
+    const create = vi.spyOn(execAdapterBridge, 'createAgentExecAdapter').mockResolvedValue({
+      boot,
+      shutdown,
+      ask: async () => ({ text: 'ok', stopReason: 'completed' }),
+    });
+    const base = {
+      agentId,
+      provider: 'codex' as const,
+      modelId: 'fixture',
+      runtimeMetadata: { skip_provider_resolution: true },
+    };
+    try {
+      await agentLifecycle.spawn(base);
+      const task = {
+        ...base,
+        runtimeMetadata: {
+          ...base.runtimeMetadata,
+          work_item_id: 'work-a',
+          lease_id: 'lease-a',
+          capability_profile: 'explorer',
+        },
+      };
+      await agentLifecycle.spawn(task);
+      expect(create).toHaveBeenCalledTimes(2);
+      expect(create.mock.calls[1][0].taskToolRuntime).toBe(runtime);
+      agentRegistry.updateStatus(agentId, 'busy');
+      await expect(
+        agentLifecycle.spawn({
+          ...task,
+          runtimeMetadata: { ...task.runtimeMetadata, lease_id: 'lease-b' },
+        })
+      ).rejects.toThrow('AGENT_TASK_RUNTIME_BUSY');
+      expect(create).toHaveBeenCalledTimes(2);
+      agentRegistry.updateStatus(agentId, 'ready');
+      await agentLifecycle.spawn({
+        ...task,
+        runtimeMetadata: { ...task.runtimeMetadata, lease_id: 'lease-b' },
+      });
+      expect(create).toHaveBeenCalledTimes(3);
+      expect(shutdown).toHaveBeenCalledTimes(2);
+    } finally {
+      await agentLifecycle.shutdown(agentId);
+    }
+  });
+
   it('spawn issues a durable identity, binds the instance, and stamps the registry; shutdown releases the instance but keeps the identity', async () => {
     const agentId = 'ni01-wired-agent';
     await agentLifecycle.spawn({
@@ -317,7 +550,9 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
       expect(shutdown).not.toHaveBeenCalled();
       expect(create).toHaveBeenCalledOnce();
       expect(await handle.ask('use the selected model')).toBe('exact response');
-      expect(ask).toHaveBeenCalledWith('use the selected model');
+      expect(ask).toHaveBeenCalledWith('use the selected model', {
+        signal: expect.any(AbortSignal),
+      });
       expect(handle.getRecord()).toMatchObject({ provider: 'codex', modelId: 'exact' });
       await agentLifecycle.restart(agentId);
       expect(create).toHaveBeenCalledTimes(2);
@@ -375,6 +610,39 @@ describe('agent-lifecycle NI-01 identity wiring', () => {
     expect(ACPMediator.prototype.boot).not.toHaveBeenCalled();
     // Refused before registration: nothing is left behind.
     expect(agentRegistry.get('lockdown-agy-agent')).toBeUndefined();
+  });
+
+  it('cancels and removes an exec runtime when its dispatch deadline expires', async () => {
+    const agentId = 'deadline-exec-agent';
+    let signal: AbortSignal | undefined;
+    const shutdown = vi.fn(async () => undefined);
+    vi.spyOn(execAdapterBridge, 'hasAgentExecAdapter').mockResolvedValue(true);
+    vi.spyOn(execAdapterBridge, 'createAgentExecAdapter').mockResolvedValue({
+      boot: vi.fn(async () => undefined),
+      ask: vi.fn(async (_prompt, options) => {
+        signal = options?.signal;
+        return new Promise(() => {});
+      }),
+      shutdown,
+    });
+    const handle = await agentLifecycle.spawn({
+      agentId,
+      provider: 'codex',
+      runtimeMetadata: { skip_provider_resolution: true },
+    });
+    vi.useFakeTimers();
+    try {
+      const assertion = expect(handle.ask('bounded task', { timeoutMs: 5 })).rejects.toThrow(
+        'AGENT_TURN_TIMEOUT'
+      );
+      await vi.advanceTimersByTimeAsync(5);
+      await assertion;
+      expect(signal?.aborted).toBe(true);
+      expect(shutdown).toHaveBeenCalledOnce();
+      expect(agentRegistry.get(agentId)).toBeUndefined();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('fails closed when a tool-less runtime is requested on the pane backend', async () => {

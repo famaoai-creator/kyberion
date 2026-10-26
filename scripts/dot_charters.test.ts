@@ -119,6 +119,19 @@ afterEach(() => {
 });
 
 describe('dot charter CLI identity resolution', () => {
+  it('keeps every authorization scope field visible in long text inventory rows', async () => {
+    const scope = {
+      tier: 'public' as const,
+      organization_id: 'org-' + 'o'.repeat(180),
+      project_id: 'project-' + 'p'.repeat(180),
+      owner_nhi: 'owner-must-remain-visible',
+    };
+    writeCharter({ ...CHARTER, scope }, 'long-scope');
+    const result = await runDotCharters(['list']);
+    expect(result).toMatchObject({ dots: [expect.objectContaining({ scope })] });
+    const lines = vi.mocked(console.log).mock.calls.map((args) => String(args[0]));
+    expect(lines).toContain('    scope: ' + JSON.stringify(scope));
+  });
   it('previews a paused dot capacity and applies or inherits only on explicit request', async () => {
     writeCharter({ ...CHARTER, status: 'paused' }, 'capacity');
     const preview = await runDotCharters([
@@ -219,16 +232,12 @@ describe('dot charter CLI identity resolution', () => {
         path: string;
         error: string;
       }>;
-      expect(errors.map((entry) => entry.path).sort()).toEqual([second, broken].sort());
-      expect(errors.find((entry) => entry.path === second)?.error).toContain(
-        "Duplicate dot_id 'collision'"
-      );
-      expect(errors.find((entry) => entry.path === second)?.error).toContain(
-        `${first} keeps the id`
-      );
+      // A caller's default inventory does not disclose another tenant's paths.
+      expect(errors.map((entry) => entry.path).sort()).toEqual([broken]);
+      expect(errors.find((entry) => entry.path === second)).toBeUndefined();
       expect(errors.find((entry) => entry.path === broken)?.error).toMatch(/JSON/);
       const listed = (report?.dots ?? report?.results) as Array<{ dot_id: string }>;
-      expect(listed.map((entry) => entry.dot_id).sort()).toEqual(['collision', 'unique']);
+      expect(listed.map((entry) => entry.dot_id).sort()).toEqual(['unique']);
     }
   );
 

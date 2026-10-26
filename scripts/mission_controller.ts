@@ -16,6 +16,8 @@
  */
 
 import * as path from 'node:path';
+import { withMissionPrerequisiteIdentityProbe } from '@agent/core/mission/mission-prerequisite-identity';
+import { inspectMissionPrerequisiteIdentity } from './lib/installed-identity.js';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
@@ -53,6 +55,7 @@ import {
 } from './refactor/mission-controller-args.js';
 import { currentProcessArgv, defineScript, isDirectScript } from './lib/harness.js';
 import { DiagnosticError } from '@agent/core/logger';
+import { withMissionMutationExpectation } from '@agent/core/mission/mission-mutation-snapshot';
 import { buildHelpText } from './refactor/mission-controller-help.js';
 export { buildHelpText } from './refactor/mission-controller-help.js';
 import {
@@ -499,7 +502,8 @@ async function recordEvidence(
   teamRole?: string,
   actorId?: string,
   actorType?: 'agent' | 'human' | 'service',
-  provider?: string
+  provider?: string,
+  taskBinding?: import('@agent/core/mission/mission-task-evidence-binding').TaskEvidenceBinding
 ) {
   const { missionSystem } = await import('./refactor/mission-system.js');
   const { TraceContext, persistTrace } = await import('@agent/core/trace');
@@ -511,7 +515,8 @@ async function recordEvidence(
     teamRole,
     actorId,
     actorType,
-    provider
+    provider,
+    taskBinding
   );
   try {
     const tc = new TraceContext('mission:evidence', { missionId: missionId.toUpperCase() });
@@ -1614,7 +1619,33 @@ export async function main(
   const previousPrint = activePrint;
   activePrint = print;
   try {
-    await mainImpl(args, print);
+    await withMissionPrerequisiteIdentityProbe(inspectMissionPrerequisiteIdentity, async () => {
+      const hash = getOptionValue('--expected-snapshot', args);
+      if (hash) {
+        const positional = extractMissionControllerPositionalArgs(args);
+        const operations: Record<string, string> = {
+          'record-evidence': 'record_evidence',
+          'review-task': 'review_task',
+          verify: 'verify',
+          distill: 'distill',
+          finish: 'finish',
+        };
+        const operation = operations[positional[0]];
+        if (!operation || !positional[1])
+          throw new Error('[MCP_MISSION_SNAPSHOT_INVALID] Unsupported snapshot operation');
+        await withMissionMutationExpectation(
+          {
+            missionId: positional[1],
+            operation,
+            taskId: ['record_evidence', 'review_task'].includes(operation)
+              ? positional[2]
+              : undefined,
+            hash,
+          },
+          () => mainImpl(args, print)
+        );
+      } else await mainImpl(args, print);
+    });
   } finally {
     activePrint = previousPrint;
   }

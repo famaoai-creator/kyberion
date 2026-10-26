@@ -145,7 +145,11 @@ export function enqueueOperationalLearningSignal(
   try {
     withExecutionContext(
       'operational_learning_writer',
-      () => enqueueOrganizationLearningCandidate(candidateInput(signal, learningId, scope)),
+      () =>
+        enqueueOrganizationLearningCandidate({
+          ...candidateInput(signal, learningId, scope),
+          ...(options.rootDir ? { rootDir: options.rootDir } : {}),
+        }),
       undefined,
       scope.tenantSlug,
       scope.organizationId

@@ -1,3 +1,7 @@
+import {
+  isSupervisorRefreshContractFailure,
+  isUncertainSupervisorTransportFailure,
+} from '../agent/supervisor-transport-uncertainty.js';
 import { afterEach, describe, expect, it } from 'vitest';
 import * as pathResolver from '../path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -9,6 +13,8 @@ import {
 import { registerOrganizationWorkJudgment } from '../organization/organization-operating-model-persistence.js';
 import {
   exportRoutingCorpus,
+  classifyDispatchFailure,
+  classifyDispatchAttemptOutcome,
   exportRoutingCorpusAcrossMissions,
   nextTaskModelTier,
   routeTaskWithJudgment,
@@ -25,6 +31,69 @@ const BASELINE: TaskModelHint = {
   model_id: 'big-model',
   route_reason: 'phase_kind=implement',
 };
+
+describe('dispatch infrastructure failures', () => {
+  it('classifies repeated diagnostic prefixes without changing refresh or transport semantics', () => {
+    const repeated = 'invalid_supervisor_response:'.repeat(20_000);
+    expect(isSupervisorRefreshContractFailure(repeated)).toBe(false);
+    expect(isUncertainSupervisorTransportFailure(repeated)).toBe(true);
+    expect(classifyDispatchAttemptOutcome([repeated])).toBe('unknown');
+    const refresh = `${repeated}SUPERVISOR REFRESH RESULT.refreshed must be boolean`;
+    expect(isSupervisorRefreshContractFailure(refresh)).toBe(true);
+    expect(isUncertainSupervisorTransportFailure(refresh)).toBe(false);
+    expect(classifyDispatchFailure([refresh])).toBe('SUPERVISOR_REFRESH_CONTRACT_INVALID');
+    expect(classifyDispatchAttemptOutcome([refresh])).toBe('not_attempted');
+    for (const separator of ['\n', '\r', '\u2028', '\u2029']) {
+      expect(
+        isSupervisorRefreshContractFailure(`${repeated}${separator}supervisor refresh result`)
+      ).toBe(false);
+    }
+    expect(
+      isSupervisorRefreshContractFailure('supervisor refresh result invalid_supervisor_response:')
+    ).toBe(false);
+  });
+
+  it.each([
+    '[auth] Not signed in. To authenticate run the provider login command',
+    'Ignoring permissions: this workspace has not been trusted',
+    '[PROVIDER_PROFILE_REFUSED] cannot project planner',
+    '[ADVISORY_BACKEND_DENIED] unknown adapter',
+    '[TASK_TOOL_LEASE_LOST] expired task lease',
+    '[AGENT_APPROVAL_PENDING] approval request requires human decision',
+    'A2A task contract validation failed: /context Unrecognized key lease_id',
+    '[SCOPE_ENVELOPE_INVALID] project_id requires an organization_id',
+    '[EVENT_SCOPE_LINEAGE_CONFLICT] project differs from authoritative scope',
+    'invalid_supervisor_response: supervisor refresh result.refreshed must be boolean',
+    'supervisor_response_closed',
+  ])('does not grade or escalate model capability for %s', (reason) => {
+    expect(classifyDispatchFailure([reason])).toBeDefined();
+  });
+  it('retains ordinary task failures as model-attempt outcomes', () => {
+    expect(classifyDispatchFailure(['Acceptance criteria not satisfied'])).toBeUndefined();
+  });
+  it('distinguishes lost in-flight replies from proven pre-ask refresh or contract failures', () => {
+    expect(
+      classifyDispatchAttemptOutcome([
+        '[SUPERVISOR_PREASK_FAILED] method=refresh supervisor_response_closed',
+      ])
+    ).toBe('not_attempted');
+    expect(classifyDispatchAttemptOutcome(['method=ask supervisor_response_closed'])).toBe(
+      'unknown'
+    );
+    for (const reason of [
+      'supervisor_request_timeout',
+      'supervisor_response_closed',
+      'invalid_supervisor_response: malformed ask result',
+    ])
+      expect(classifyDispatchAttemptOutcome([reason])).toBe('unknown');
+    for (const reason of [
+      'invalid_supervisor_response: supervisor refresh result.refreshed must be boolean',
+      '[AGENT_RUNTIME_PREWARM_FAILED] invalid assignment',
+      'A2A task contract validation failed: missing lease',
+    ])
+      expect(classifyDispatchAttemptOutcome([reason])).toBe('not_attempted');
+  });
+});
 
 function provider(value: string, confidence = 0.95): JudgmentBackend {
   return {
@@ -180,6 +249,27 @@ describe('retry escalation', () => {
 });
 
 describe('exportRoutingCorpus', () => {
+  it('never uses unknown transport outcomes as model labels', () => {
+    const mission = pathResolver.sharedTmp(`routing-corpus-unknown-${process.pid}`);
+    try {
+      safeMkdir(`${mission}/evidence`, { recursive: true });
+      const unknown: RoutingOutcome = {
+        task_excerpt: 'lost provider reply',
+        baseline_tier: 'small',
+        chosen_tier: 'small',
+        chosen_by: 'baseline',
+        succeeded: false,
+        escalated_to: 'large',
+        outcome: 'unknown',
+        unknown_reason: 'SUPERVISOR_TRANSPORT_UNAVAILABLE',
+        recorded_at: '2026-10-26T00:00:00Z',
+      };
+      safeWriteFile(`${mission}/evidence/routing-outcomes.jsonl`, JSON.stringify(unknown) + '\n');
+      expect(exportRoutingCorpusAcrossMissions([mission])).toEqual([]);
+    } finally {
+      safeRmSync(mission, { recursive: true, force: true });
+    }
+  });
   /** `recordRoutingOutcome` is a no-op under vitest, so build the shape here. */
   const ledger: RoutingOutcome[] = [
     {

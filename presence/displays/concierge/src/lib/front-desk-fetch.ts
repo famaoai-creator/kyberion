@@ -47,7 +47,10 @@ export function isFrontDeskMemberApiPath(path: string): boolean {
     pathname.startsWith('/api/invites/join/')
   )
     return false;
-  return MEMBER_PATHS.some((root) => pathname === root || pathname.startsWith(root + '/'));
+  return (
+    pathname === '/api/governance-overview' ||
+    MEMBER_PATHS.some((root) => pathname === root || pathname.startsWith(root + '/'))
+  );
 }
 /** Same-origin member transport, with no retry, credential promotion or global fetch patch. */
 export async function frontDeskFetch(path: string, init: RequestInit = {}): Promise<Response> {

@@ -294,6 +294,33 @@ trailer<< /Size 8 /Root 1 0 R /Info 6 0 R >>
     expect(design.metadata?.title).toBe('Real Document Title');
   });
 
+  it('reads Info Subject / Creator / Keywords with escaped parentheses', async () => {
+    ensureDir(OUT);
+    const out = pathResolver.sharedTmp('tests/native-pdf/info-subject-creator.pdf');
+    fs.writeFileSync(
+      out,
+      `%PDF-1.7
+1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 44 >>stream
+BT /F1 12 Tf 100 700 Td (Hello) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+6 0 obj<< /Title (Main) /Subject (Topic \\(A\\)) /Creator (Word) /Keywords (a; b) /Author (Bob) >>endobj
+trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
+%%EOF
+`
+    );
+    const design = await distillPdfDesign(out);
+    expect(design.metadata?.title).toBe('Main');
+    expect(design.metadata?.subject).toBe('Topic (A)');
+    expect(design.metadata?.creator).toBe('Word');
+    expect(design.metadata?.keywords).toBe('a; b');
+    expect(design.metadata?.author).toBe('Bob');
+  });
+
   it('decodes Info titles with escaped parentheses and UTF-16BE literals', async () => {
     ensureDir(OUT);
     const escapedOut = pathResolver.sharedTmp('tests/native-pdf/escaped-parens-title.pdf');

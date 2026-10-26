@@ -74,6 +74,33 @@ describe('runtime-scope', () => {
       '[RUNTIME_SCOPE_REQUIRED]'
     );
   });
+  it('preserves authoritative standalone public project and rejects project substitution', async () => {
+    mocks.findMissionPath.mockReturnValue('/repo/active/missions/MSN-PUBLIC');
+    mocks.safeExistsSync.mockReturnValue(true);
+    mocks.loadJson.mockReturnValue({
+      mission_id: 'MSN-PUBLIC',
+      tier: 'public',
+      relationships: { project: { project_id: 'PRJ-public' } },
+    });
+    const { resolveRuntimeScope } = await import('./runtime-scope.js');
+    expect(resolveRuntimeScope({ missionId: 'MSN-PUBLIC' })).toEqual({
+      scope_kind: 'mission',
+      tier: 'public',
+      mission_id: 'MSN-PUBLIC',
+      project_id: 'PRJ-public',
+    });
+    expect(() =>
+      resolveRuntimeScope({
+        missionId: 'MSN-PUBLIC',
+        scope: {
+          scope_kind: 'mission',
+          tier: 'public',
+          mission_id: 'MSN-PUBLIC',
+          project_id: 'PRJ-other',
+        },
+      })
+    ).toThrow('EVENT_SCOPE_LINEAGE_CONFLICT');
+  });
 
   it('resolves organization scope from the canonical project registry for a linked mission', async () => {
     mocks.findMissionPath.mockReturnValue('/repo/active/missions/MSN-REGISTRY-SCOPE');

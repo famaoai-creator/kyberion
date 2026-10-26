@@ -22,6 +22,7 @@ const state = vi.hoisted(() => ({
   bindings: vi.fn(),
   discover: vi.fn(),
   blocked: false,
+  runtimeOnly: false,
   preferredActor: 'b',
   onLock: undefined as (() => void) | undefined,
 }));
@@ -98,22 +99,25 @@ vi.mock('../organization/team-role-assignment-selection.js', () => {
         agent_id?: string;
         provider?: string;
         model_id?: string;
+        execution_route?: 'agent_runtime';
       };
       discoveredProviders: unknown[];
     }) => {
       const requested = input.requestedSelection;
+      const blocked =
+        state.blocked || (state.runtimeOnly && requested.execution_route !== 'agent_runtime');
       return {
         ...state.plan.assignments[0],
         agent_id:
-          state.blocked || !input.discoveredProviders.length
+          blocked || !input.discoveredProviders.length
             ? null
             : requested.agent_id || state.preferredActor,
         provider: requested.provider || 'p',
         modelId: requested.model_id || 'm',
-        status: state.blocked || !input.discoveredProviders.length ? 'unfilled' : 'assigned',
+        status: blocked || !input.discoveredProviders.length ? 'unfilled' : 'assigned',
         requested_selection: requested,
         selection_resolution: {
-          source: state.blocked || !input.discoveredProviders.length ? 'blocked' : 'requested',
+          source: blocked || !input.discoveredProviders.length ? 'blocked' : 'requested',
           reason: state.blocked ? 'target denied' : 'checked',
         },
       };
@@ -164,6 +168,7 @@ beforeEach(() => {
   state.runtime = undefined;
   state.order = [];
   state.blocked = false;
+  state.runtimeOnly = false;
   state.preferredActor = 'b';
   state.onLock = undefined;
   state.write.mockClear();
@@ -181,6 +186,27 @@ const save = (revision: string) =>
     }).preview_token!,
   });
 describe('mission selection preview and atomic save', () => {
+  it('keeps runtime-only route eligibility on the configured GET and explicit preview', () => {
+    state.runtimeOnly = true;
+    const selection = {
+      mode: 'fixed' as const,
+      agent_id: 'a',
+      provider: 'p',
+      model_id: 'm',
+      execution_route: 'agent_runtime' as const,
+    };
+    state.plan.selection_settings = { implementer: selection };
+    state.plan.assignments[0]!.requested_selection = selection;
+    for (const input of [{}, { team_role: 'implementer', selection }]) {
+      const view = previewMissionTeamSelection('MSN-FIXTURE', input);
+      expect(view.roles[0]?.configured).toEqual(selection);
+      expect(view.roles[0]?.eligibility.eligible).toBe(true);
+      expect(view.roles[0]?.candidates.every((candidate) => candidate.eligible)).toBe(true);
+    }
+    expect(state.write).not.toHaveBeenCalled();
+    expect(state.ledger).toHaveLength(0);
+  });
+
   it('reports persisted effective assignment on GET even when preferred scoring would choose another actor', () => {
     state.plan.selection_settings = { implementer: { mode: 'preferred', provider: 'p' } };
     const view = previewMissionTeamSelection('MSN-FIXTURE');
@@ -487,6 +513,24 @@ describe('mission selection preview and atomic save', () => {
     state.local = undefined;
     state.runtime = undefined;
     expect(() => save(previewMissionTeamSelection('MSN-FIXTURE').revision)).toThrow('reservation');
+  });
+  it('reserves a runtime-only role only through the explicit runtime launch route', () => {
+    state.plan.selection_settings = {
+      implementer: {
+        mode: 'fixed',
+        agent_id: 'a',
+        execution_route: 'agent_runtime',
+      },
+    };
+    const input = { missionId: 'MSN-FIXTURE', teamRole: 'implementer', agentId: 'a' };
+    expect(() => reserveMissionTeamSelectionDispatch(input)).toThrow(
+      'agent_runtime launch reservation'
+    );
+    expect(state.ledger).toHaveLength(0);
+    expect(
+      reserveMissionTeamSelectionDispatch({ ...input, executionRoute: 'agent_runtime' })
+    ).toMatchObject({ agent_id: 'a' });
+    expect(state.ledger).toHaveLength(1);
   });
   it('does not treat a same-timestamp stop as proof that a reserved launch ended', () => {
     state.plan.selection_settings = { implementer: { mode: 'fixed', agent_id: 'a' } };

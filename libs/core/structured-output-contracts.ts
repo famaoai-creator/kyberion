@@ -140,6 +140,23 @@ export const TaskResultSchema: z.ZodType<TaskResultBlock> = z
   })
   .strict();
 
+const MissionTeamRoleSelectionSchema = z
+  .object({
+    mode: z.enum(['auto', 'preferred', 'fixed']),
+    agent_id: z.string().trim().min(1).optional(),
+    provider: z.string().trim().min(1).optional(),
+    model_id: z.string().trim().min(1).optional(),
+    execution_route: z.literal('agent_runtime').optional(),
+  })
+  .strict()
+  .refine(
+    (selection) => {
+      const hasTarget = Boolean(selection.agent_id || selection.provider || selection.model_id);
+      return selection.mode === 'auto' ? !hasTarget : hasTarget;
+    },
+    { message: 'Auto mode forbids target dimensions; preferred/fixed modes require one' }
+  );
+
 export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
   .object({
     mission_id: z.string().min(1),
@@ -165,6 +182,17 @@ export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
     // WorkItem dispatch attribution. Optional for backward compatibility with
     // surface-originated A2A tasks that are not backed by a WorkItem.
     work_item_id: z.string().min(1).optional(),
+    lease_id: z.string().trim().min(1).optional(),
+    capability_profile: z.enum(['planner', 'explorer', 'implementer']).optional(),
+    requested_selection: MissionTeamRoleSelectionSchema.optional(),
+    selection_resolution: z
+      .object({
+        source: z.enum(['legacy', 'auto', 'requested', 'fallback', 'blocked']),
+        reason: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+    required_capabilities: z.array(z.string().trim().min(1)).optional(),
     task_id: z.string().optional(),
     dispatch_timeout_ms: z.number().int().positive().optional(),
     context_mode: z.enum(AGENT_CONTEXT_MODES).optional(),
@@ -173,7 +201,18 @@ export const A2ATaskContextSchema: z.ZodType<A2ATaskContext> = z
     // deep-validated by delegation-chain.ts where the chain is consumed.
     delegation_chain: z.array(z.record(z.string(), z.unknown())).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((context, check) => {
+    if (context.lease_id !== undefined || context.capability_profile !== undefined) {
+      for (const key of ['work_item_id', 'task_id', 'lease_id', 'capability_profile'] as const)
+        if (!context[key]?.trim())
+          check.addIssue({
+            code: 'custom',
+            path: [key],
+            message: 'Claimed task tools require a complete work-item/task/lease/profile binding',
+          });
+    }
+  });
 
 export const A2ATaskContractSchema: z.ZodType<A2ATaskContract> = z
   .object({
