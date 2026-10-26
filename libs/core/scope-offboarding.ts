@@ -452,11 +452,11 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   autonomy_learning: 'tenant_runtime_state',
   external_operations: 'tenant_runtime_state',
   // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
-  hearing: null,
+  hearing: 'not_offboarded',
   // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
-  discussion_create_requests: null,
+  discussion_create_requests: 'not_offboarded',
   grants: 'tenant_runtime_state',
-} as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | null>;
+} as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**
  * Repo-relative knowledge root for a tenant slug. Deliberately the
@@ -894,7 +894,7 @@ export function collectScopeTargets(
       // Null-disposition roots are never probed, listed or counted as leftovers.
       const offboarded = (subtree: string): boolean => {
         const key = tenantRuntimePartitionOf(subtree)?.key;
-        return key !== undefined && TENANT_RUNTIME_PARTITION_TARGET_KINDS[key] !== null;
+        return key !== undefined && TENANT_RUNTIME_PARTITION_TARGET_KINDS[key] !== 'not_offboarded';
       };
       const present = (subtree: string): boolean => {
         if (!offboarded(subtree)) return false;
@@ -908,7 +908,7 @@ export function collectScopeTargets(
       };
       for (const partition of tenantRuntimePartitionPaths(id, present)) {
         const kind = TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key];
-        if (kind) targets.push({ path: partition.path, kind });
+        if (kind !== 'not_offboarded') targets.push({ path: partition.path, kind });
       }
     }
   }
@@ -1473,7 +1473,7 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
               const partition = tenantRuntimePartitionOf(leftover);
               return (
                 partition?.tenant === scopeId &&
-                TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key] !== null
+                TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key] !== 'not_offboarded'
               );
             })
           : [];

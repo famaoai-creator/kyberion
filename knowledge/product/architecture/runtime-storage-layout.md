@@ -426,7 +426,7 @@ the record is stored follows its scope
   maps each key to a target kind in a `satisfies Record<…>` table (the
   pipeline-library-run, autonomy-learning, external-operation and grant roots
   export + soft-delete as `tenant_runtime_state`; hearing and
-  discussion-create-request receipts map to `null` — review-required, never
+  discussion-create-request receipts map to `'not_offboarded'` — review-required, never
   auto-offboarded, though backups include them), so a new root fails to
   compile until its disposition is decided. Null-disposition partitions are
   never listed or counted as post-offboard leftovers.
