@@ -1,15 +1,44 @@
 {
-  "version": "2.0.0",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
+  "pipeline_id": "ringi-approve-single",
+  "version": "3.0.0",
+  "description": "Approve the currently open ringi detail page: click approve, confirm the dialog, return to the pending list. Callers open the item first — this fragment only applies the decision. Selectors are customer inputs passed via core:include context.",
+  "_migration_note": "v3: contract narrowed to 'act on the open detail page' (item opening moved to the caller's foreach). Ops fully qualified (browser:*) so the fragment works under core:include in generic pipelines. v2: Typed Flow format.",
   "steps": [
-    { "id": "click-first-item", "role": "sink", "op": "click", "params": { "selector": "{{item_selector}}" } },
-    { "id": "wait-after-open", "role": "sink", "op": "wait", "params": { "duration": 5000 } },
-    { "id": "click-approve", "role": "sink", "op": "click", "params": { "selector": "{{approve_button_selector}}" } },
-    { "id": "wait-after-approve", "role": "sink", "op": "wait", "params": { "duration": 5000 } },
-    { "id": "click-ok", "role": "sink", "op": "click", "params": { "selector": "{{ok_button_selector}}" } },
-    { "id": "wait-after-ok", "role": "sink", "op": "wait", "params": { "duration": 5000 } },
-    { "id": "navigate-back", "role": "sink", "op": "navigate", "params": { "url": "{{list_url}}" } },
-    { "id": "wait-after-navigate", "role": "sink", "op": "wait", "params": { "duration": 5000 } },
-    { "id": "check-remaining", "role": "source", "op": "evaluate", "produces": { "channel": "remaining_items", "type": "EvalResult" }, "params": { "script": "(() => document.querySelectorAll('{{item_selector}}').length)()" } }
+    {
+      "id": "click-approve",
+      "role": "sink",
+      "op": "browser:click",
+      "params": { "selector": "{{approve_button_selector}}" }
+    },
+    {
+      "id": "wait-after-approve",
+      "role": "sink",
+      "op": "browser:wait",
+      "params": { "duration": "{{approve_settle_ms|3000}}" }
+    },
+    {
+      "id": "click-ok",
+      "role": "sink",
+      "op": "browser:click",
+      "params": { "selector": "{{ok_button_selector}}" }
+    },
+    {
+      "id": "wait-after-ok",
+      "role": "sink",
+      "op": "browser:wait",
+      "params": { "duration": "{{ok_settle_ms|3000}}" }
+    },
+    {
+      "id": "navigate-back",
+      "role": "sink",
+      "op": "browser:goto",
+      "params": { "url": "{{list_url}}" }
+    },
+    {
+      "id": "wait-after-navigate",
+      "role": "sink",
+      "op": "browser:wait",
+      "params": { "duration": "{{list_settle_ms|3000}}" }
+    }
   ]
 }
