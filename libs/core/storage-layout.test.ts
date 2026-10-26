@@ -20,6 +20,11 @@ import {
   storageFloorRelativePath,
   storageFloorTier,
   storageFloorTierInPath,
+  STORAGE_DATA_TIERS,
+  TENANT_RUNTIME_PARTITION_ROOTS,
+  TENANT_STORE_LEDGER_ROOTS,
+  tenantRuntimePartitionOf,
+  tenantRuntimePartitionPaths,
 } from './storage-layout.js';
 
 describe('storage-layout floors', () => {
@@ -347,5 +352,66 @@ describe('tenant approval partitions', () => {
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
       if (role !== 'tenant_approval_store' && role !== 'tenant_approval_partition_index_reader')
         expect(JSON.stringify(grant)).not.toContain('runtime/tenant-approvals');
+  });
+});
+
+describe('tenant runtime partitions', () => {
+  it('enumerates every key of both partition registries exactly once', () => {
+    const keys = TENANT_RUNTIME_PARTITION_ROOTS.map((entry) => entry.key).sort();
+    expect(keys).toEqual(
+      [
+        ...Object.keys(PARTITIONED_RUNTIME_LEDGER_ROOTS),
+        ...Object.keys(PARTITIONED_RUNTIME_STATE_ROOTS),
+      ].sort()
+    );
+    for (const entry of TENANT_RUNTIME_PARTITION_ROOTS) {
+      const ledger = Object.hasOwn(PARTITIONED_RUNTIME_LEDGER_ROOTS, entry.key);
+      expect(entry.family).toBe(ledger ? 'ledger' : 'state');
+      expect(entry.appendOnly).toBe(ledger);
+      expect(entry.hashChained).toBe(entry.key === 'tenant_ledger');
+      const store = Object.values(TENANT_STORE_LEDGER_ROOTS).find((s) => s.root === entry.root);
+      expect(entry.storeRole).toBe(store?.storeRole);
+    }
+  });
+
+  it('lists one partition per tier and root, filtered by the exists probe', () => {
+    const all = tenantRuntimePartitionPaths('acme');
+    expect(all).toHaveLength(TENANT_RUNTIME_PARTITION_ROOTS.length * STORAGE_DATA_TIERS.length);
+    expect(all.map((p) => p.path)).toContain(
+      'active/shared/runtime/tenant-ledger/confidential/acme'
+    );
+    const present = new Set(['active/shared/runtime/grants/personal/acme']);
+    expect(tenantRuntimePartitionPaths('acme', (p) => present.has(p))).toEqual([
+      expect.objectContaining({ key: 'grants', tier: 'personal', tenant: 'acme' }),
+    ]);
+  });
+
+  it('rejects invalid and reserved tenant slugs', () => {
+    for (const bad of ['shared', 'system', 'public', 'confidential', 'Acme', '../x', 'a', ''])
+      expect(() => tenantRuntimePartitionPaths(bad)).toThrow(/STORAGE_LAYOUT_TENANT_INVALID/);
+  });
+
+  it('never reports system/ or <tier>/shared as a tenant and round-trips real partitions', () => {
+    for (const entry of TENANT_RUNTIME_PARTITION_ROOTS) {
+      expect(tenantRuntimePartitionOf(`${entry.root}/system/x.jsonl`)).toBeUndefined();
+      expect(tenantRuntimePartitionOf(`${entry.root}/confidential/shared/x`)).toBeUndefined();
+      expect(tenantRuntimePartitionOf(`${entry.root}/confidential/system/x`)).toBeUndefined();
+      expect(tenantRuntimePartitionOf(`${entry.root}/confidential`)).toBeUndefined();
+    }
+    for (const partition of tenantRuntimePartitionPaths('acme')) {
+      const expected = {
+        key: partition.key,
+        root: partition.root,
+        tier: partition.tier,
+        tenant: 'acme',
+      };
+      expect(tenantRuntimePartitionOf(partition.path)).toEqual(expected);
+      expect(tenantRuntimePartitionOf(path.join(rootDir(), partition.path, 'f.jsonl'))).toEqual(
+        expected
+      );
+    }
+    expect(tenantRuntimePartitionOf('active/shared/runtime/unregistered/confidential/acme')).toBe(
+      undefined
+    );
   });
 });

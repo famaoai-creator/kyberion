@@ -135,6 +135,9 @@ async function withGovernedMutation(
   const existingMissionId = getRegisteredEnvText('MISSION_ID');
   const isEphemeral = !existingMissionId;
   const missionId = existingMissionId || `MSN-SEC-${Date.now().toString(36).toUpperCase()}`;
+  // An ephemeral mission that failed to start is not a mission any process can
+  // place: its id never reaches the ledger (D4).
+  let missionReady = !isEphemeral;
 
   if (isEphemeral) {
     logger.info(
@@ -162,6 +165,7 @@ async function withGovernedMutation(
         missionId,
         'personal',
       ]);
+      missionReady = true;
     } catch (err) {
       logger.warn(`Failed to create ephemeral mission: ${err}`);
     }
@@ -172,14 +176,14 @@ async function withGovernedMutation(
     result = await logic();
     if (result.status === 'success') {
       ledger.record('CONFIG_CHANGE', {
-        mission_id: missionId,
+        mission_id: missionReady ? missionId : 'None',
         role: getRegisteredEnvText('MISSION_ROLE') || 'secret_guard',
         service_id: params.service,
         config_target: 'os-keychain',
         action: actionType,
         changed_keys: [params.account],
       });
-      result.mission_id = missionId;
+      if (missionReady) result.mission_id = missionId;
     }
     return result;
   } catch (err: any) {
