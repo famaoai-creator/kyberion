@@ -1,77 +1,125 @@
 {
   "pipeline_id": "vertical-it-saas-inventory",
-  "version": "1.0.0",
-  "description": "Walk all SAAS_SERVICES, gather accounts, cross-ref with HR, flag anomalies, write report.",
+  "version": "2.0.0",
+  "description": "Walk all SAAS_SERVICES, gather accounts via service:preset, cross-reference with the HR directory via reasoning, flag anomalies, write a markdown report. Per-service listing actions differ — set ACCOUNT_LIST_ACTION per engagement (e.g. 'list_users' for the service's preset).",
+  "_migration_note": "v2: rewritten onto real ops only — file:read_json / service:preset / core:foreach / reasoning:analyze / file:json_parse / system:write_file. v1 used non-existent ops (service:directory_list, for_each, service:list_accounts, wisdom:cross_reference, wisdom:consolidate_inventory, media:render_markdown).",
   "action": "pipeline",
   "inputs": {
-    "SAAS_SERVICES": { "required": true, "type": "array" },
-    "HR_SOURCE": { "required": true, "default": "google-workspace" },
+    "SAAS_SERVICES": {
+      "required": true,
+      "type": "array",
+      "description": "service_id list matching service-presets/ (e.g. [\"github\", \"slack\", \"notion\"])"
+    },
+    "HR_SOURCE_PATH": {
+      "required": true,
+      "description": "JSON file with the active employee roster (exported from the HR system)"
+    },
+    "ACCOUNT_LIST_ACTION": {
+      "required": true,
+      "description": "Preset action name that lists accounts for each service (must exist in that service's preset)"
+    },
     "EXPIRY_HORIZON_DAYS": { "required": false, "default": 60 },
     "REPORT_OUT_PATH": { "required": true }
   },
   "steps": [
     {
       "id": "load-hr",
-      "type": "apply",
-      "op": "service:directory_list",
-      "params": {
-        "connection": "{{HR_SOURCE}}",
-        "export_as": "active_employees"
-      }
+      "role": "source",
+      "op": "file:read_json",
+      "produces": { "channel": "active_employees", "type": "EmployeeRoster" },
+      "params": { "path": "{{HR_SOURCE_PATH}}" }
     },
     {
       "id": "audit-each-service",
-      "type": "control",
-      "op": "for_each",
+      "role": "gate",
+      "op": "core:foreach",
       "params": {
         "items": "{{SAAS_SERVICES}}",
         "as": "service",
-        "steps": [
+        "do": [
           {
             "id": "list-accounts",
-            "type": "apply",
-            "op": "service:list_accounts",
+            "role": "source",
+            "op": "service:preset",
+            "produces": { "channel": "service_accounts", "type": "AccountList" },
             "params": {
-              "connection": "{{service}}",
-              "export_as": "service_accounts"
+              "service_id": "{{service}}",
+              "auth": "secret-guard",
+              "action": "{{ACCOUNT_LIST_ACTION}}",
+              "params": {}
             },
             "on_error": {
               "strategy": "skip",
-              "remediation": "Service unreachable — record as 'audit_failed' and continue."
+              "remediation": "Service unreachable or preset action missing — record as 'audit_failed' and continue."
             }
           },
           {
             "id": "cross-reference",
-            "type": "transform",
-            "op": "wisdom:cross_reference",
+            "role": "transform",
+            "op": "reasoning:analyze",
+            "produces": { "channel": "service_audit", "type": "AuditFindingJson" },
             "params": {
-              "accounts": "{{service_accounts}}",
-              "employees": "{{active_employees}}",
-              "expiry_horizon_days": "{{EXPIRY_HORIZON_DAYS}}",
-              "export_as": "{{service}}_audit"
+              "instruction": "以下の SaaS アカウント一覧と HR の在籍者名簿を突合し、JSON のみで監査結果を返してください。\n\nサービス: {{service}}\nアカウント一覧: {{service_accounts}}\n在籍者名簿: {{active_employees}}\n猶予日数: {{EXPIRY_HORIZON_DAYS}}\n\n出力(JSON のみ): {\"service\": \"{{service}}\", \"findings\": [{\"account\": \"...\", \"issue\": \"ex_employee|unknown_user|expiring_license\", \"detail\": \"...\"}], \"anomaly_count\": 0}"
+            }
+          },
+          {
+            "id": "parse-audit",
+            "role": "transform",
+            "op": "file:json_parse",
+            "consumes": "service_audit",
+            "produces": { "channel": "audit_result", "type": "AuditFinding" },
+            "params": { "from": "service_audit" },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Audit output was not parseable JSON; keep raw text and continue."
+            }
+          },
+          {
+            "id": "record-audit",
+            "role": "sink",
+            "op": "file:append",
+            "params": {
+              "path": "active/shared/tmp/saas-inventory-findings.jsonl",
+              "content": "{\"service\": \"{{service}}\", \"audit\": {{service_audit}}}\n"
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Findings append is evidence-only; continue."
             }
           }
         ]
       }
     },
     {
+      "id": "read-findings",
+      "role": "source",
+      "op": "file:read_file",
+      "produces": { "channel": "service_audits_raw", "type": "FindingsJsonl" },
+      "params": { "path": "active/shared/tmp/saas-inventory-findings.jsonl" }
+    },
+    {
       "id": "consolidate",
-      "type": "transform",
-      "op": "wisdom:consolidate_inventory",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "produces": { "channel": "consolidated", "type": "InventorySummary" },
       "params": {
-        "service_audits": "{{SAAS_SERVICES}}",
-        "export_as": "consolidated"
+        "instruction": "以下のサービス別監査結果(JSONL内容)を統合し、SaaS棚卸しレポートのMarkdownを書いてください。\n\n監査結果: {{service_audits_raw}}\n対象サービス: {{SAAS_SERVICES}}\n猶予日数: {{EXPIRY_HORIZON_DAYS}}\n\n必須セクション: # SaaS棚卸しレポート / ## サマリ / ## サービス別の所見 / ## 退職者・不明アカウント / ## 期限切れ間近のライセンス / ## 推奨アクション"
       }
     },
     {
       "id": "render-report",
-      "type": "transform",
-      "op": "media:render_markdown",
+      "role": "sink",
+      "op": "system:write_file",
       "params": {
-        "template": "knowledge/public/templates/blueprints/saas-inventory-report.md",
-        "data": "{{consolidated}}",
-        "out": "{{REPORT_OUT_PATH}}"
+        "path": "{{REPORT_OUT_PATH}}",
+        "content": "{{consolidated}}"
       }
+    },
+    {
+      "id": "log-done",
+      "role": "sink",
+      "op": "system:log",
+      "params": { "message": "SaaS inventory report written to {{REPORT_OUT_PATH}}" }
     }
   ]
 }

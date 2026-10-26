@@ -1,100 +1,380 @@
 {
   "pipeline_id": "vertical-finance-ringi-approval",
-  "version": "1.0.0",
-  "description": "Process pending ringi approvals. Customer customizes selectors & policy. See README in this directory.",
+  "version": "2.0.0",
+  "description": "Process pending ringi approvals. Opens the workflow inbox, extracts pending items, lets reasoning:analyze judge each item against the mission policy (approve/reject/hold), applies the decision in the browser, and writes decisions.jsonl + summary. Customer customizes selectors & policy — see README in this directory.",
+  "_migration_note": "v2: rewritten onto real ops only — core:include / core:foreach / browser:evaluate / reasoning:analyze / file:json_parse / core:if / file:append / system:write_file. v1 used non-existent ops (ref+vars, for_each, extract, wisdom:decide_approval, summarize_decisions).",
   "action": "pipeline",
+  "options": {
+    "headless": false
+  },
   "inputs": {
-    "WORKFLOW_BASE_URL": { "required": true },
-    "INBOX_PATH": { "required": true, "default": "/approvals/pending?assignee=me" },
-    "APPROVE_BUTTON_SELECTOR": { "required": true },
-    "REJECT_BUTTON_SELECTOR": { "required": true },
-    "POLICY_PATH": { "required": false, "default": "{{seed_dir}}/mission-seed.json" }
+    "WORKFLOW_BASE_URL": {
+      "required": true
+    },
+    "INBOX_PATH": {
+      "required": false,
+      "default": "/approvals/pending?assignee=me"
+    },
+    "LOGIN_USER_SECRET": {
+      "required": false,
+      "description": "Secret-store key for the login user name. Preferred over LOGIN_USER."
+    },
+    "LOGIN_PASSWORD_SECRET": {
+      "required": false,
+      "description": "Secret-store key for the login password. Preferred over LOGIN_PASSWORD."
+    },
+    "LOGIN_USER": {
+      "required": false,
+      "description": "Legacy plaintext fallback; do not use for real credentials."
+    },
+    "LOGIN_PASSWORD": {
+      "required": false,
+      "description": "Legacy plaintext fallback; do not use for real credentials."
+    },
+    "LOGIN_PROBE_SELECTOR": {
+      "required": false,
+      "default": "input[name='_account']"
+    },
+    "LOGIN_USER_SELECTOR": {
+      "required": false,
+      "default": "input[name='_account']"
+    },
+    "LOGIN_PASSWORD_SELECTOR": {
+      "required": false,
+      "default": "input[name='_password']"
+    },
+    "LOGIN_SUBMIT_SELECTOR": {
+      "required": false,
+      "default": "input.login-button, input[type='submit']"
+    },
+    "PENDING_ITEM_SELECTOR": {
+      "required": true,
+      "description": "CSS selector matching each pending approval row"
+    },
+    "APPROVE_BUTTON_SELECTOR": {
+      "required": true
+    },
+    "REJECT_BUTTON_SELECTOR": {
+      "required": true
+    },
+    "OK_BUTTON_SELECTOR": {
+      "required": true,
+      "description": "Confirmation dialog button after approve/reject"
+    },
+    "POLICY_AUTO_APPROVE_BELOW": {
+      "required": false,
+      "default": 1000000
+    },
+    "EVIDENCE_DIR": {
+      "required": false,
+      "default": "active/shared/tmp/ringi-approval"
+    },
+    "DECISIONS_JSONL_PATH": {
+      "required": false,
+      "default": "active/shared/tmp/ringi-decisions.jsonl"
+    },
+    "SUMMARY_OUT_PATH": {
+      "required": false,
+      "default": "active/shared/tmp/ringi-summary.md"
+    }
   },
   "steps": [
     {
-      "id": "login",
-      "type": "control",
-      "op": "ref",
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
       "params": {
-        "ref": "pipelines/fragments/intra-login.json",
-        "vars": { "BASE_URL": "{{WORKFLOW_BASE_URL}}" }
+        "fragment": "fragments/browser-runtime-preflight.json"
+      }
+    },
+    {
+      "id": "open-inbox",
+      "role": "sink",
+      "op": "browser:open_tab",
+      "params": {
+        "url": "{{WORKFLOW_BASE_URL}}{{INBOX_PATH}}",
+        "record_trace": true,
+        "keep_alive": true
+      }
+    },
+    {
+      "id": "login",
+      "role": "gate",
+      "op": "core:include",
+      "params": {
+        "fragment": "fragments/intra-login.json",
+        "context": {
+          "login_probe_selector": "{{LOGIN_PROBE_SELECTOR}}",
+          "login_user_selector": "{{LOGIN_USER_SELECTOR}}",
+          "login_password_selector": "{{LOGIN_PASSWORD_SELECTOR}}",
+          "login_submit_selector": "{{LOGIN_SUBMIT_SELECTOR}}",
+          "login_user_secret": "{{LOGIN_USER_SECRET}}",
+          "login_password_secret": "{{LOGIN_PASSWORD_SECRET}}",
+          "login_user": "{{LOGIN_USER}}",
+          "login_password": "{{LOGIN_PASSWORD}}"
+        }
       },
       "on_error": {
         "strategy": "abort",
-        "remediation": "Login fragment failed. Check secret-actuator credentials and login URL."
+        "remediation": "Login fragment failed. Check the secret-store keys (LOGIN_USER_SECRET/LOGIN_PASSWORD_SECRET) and login selectors."
       }
     },
     {
       "id": "navigate-to-inbox",
-      "type": "control",
-      "op": "goto",
+      "role": "sink",
+      "op": "browser:goto",
       "params": {
         "url": "{{WORKFLOW_BASE_URL}}{{INBOX_PATH}}"
       }
     },
     {
-      "id": "list-pending-items",
-      "type": "capture",
-      "op": "extract",
+      "id": "wait-inbox",
+      "role": "sink",
+      "op": "browser:wait",
       "params": {
-        "selector": "[data-pending-item]",
-        "fields": ["id", "amount", "title", "submitter", "submitted_at"],
-        "export_as": "pending_items"
+        "duration": 2000
+      }
+    },
+    {
+      "id": "list-pending-items",
+      "role": "source",
+      "op": "browser:evaluate",
+      "produces": {
+        "channel": "pending_items",
+        "type": "PendingItemList"
+      },
+      "params": {
+        "script": "(() => Array.from(document.querySelectorAll(\"{{PENDING_ITEM_SELECTOR}}\")).map((el, i) => ({ index: i, title: (el.textContent || '').trim().slice(0, 200) })).slice(0, 50))()"
       }
     },
     {
       "id": "decide-each",
-      "type": "control",
-      "op": "for_each",
+      "role": "gate",
+      "op": "core:foreach",
+      "consumes": "pending_items",
       "params": {
         "items": "{{pending_items}}",
         "as": "item",
-        "steps": [
+        "do": [
           {
-            "id": "decide",
-            "type": "apply",
-            "op": "wisdom:decide_approval",
+            "id": "open-item",
+            "role": "sink",
+            "op": "browser:evaluate",
             "params": {
-              "item": "{{item}}",
-              "policy_path": "{{POLICY_PATH}}",
-              "export_as": "decision"
-            }
-          },
-          {
-            "id": "act",
-            "type": "control",
-            "op": "ref",
-            "params": {
-              "ref": "pipelines/fragments/ringi-approve-single.json",
-              "vars": {
-                "DECISION": "{{decision}}",
-                "APPROVE_SELECTOR": "{{APPROVE_BUTTON_SELECTOR}}",
-                "REJECT_SELECTOR": "{{REJECT_BUTTON_SELECTOR}}"
-              }
+              "script": "(() => { const el = document.querySelectorAll(\"{{PENDING_ITEM_SELECTOR}}\")[{{item.index}}]; if (el) { el.click(); return 'opened'; } return 'missing'; })()"
             },
             "on_error": {
               "strategy": "skip",
-              "remediation": "Single-item action failed; continue with remaining items."
+              "remediation": "Item no longer present in the DOM; continue with the next item."
             }
           },
           {
-            "id": "screenshot-evidence",
-            "type": "capture",
-            "op": "screenshot",
+            "id": "wait-item",
+            "role": "sink",
+            "op": "browser:wait",
             "params": {
-              "export_as": "last_screenshot"
+              "duration": 2000
+            }
+          },
+          {
+            "id": "judge-item",
+            "role": "transform",
+            "op": "reasoning:analyze",
+            "consumes": "item",
+            "produces": {
+              "channel": "decision_raw",
+              "type": "DecisionVerdictJson"
+            },
+            "params": {
+              "instruction": "あなたは稟議承認の判定者です。以下の案件とポリシーから判定し、JSON のみを返してください。\n\n案件: {{item}}\n\nポリシー:\n- 金額が {{POLICY_AUTO_APPROVE_BELOW}} 円未満で必須項目が揃っていれば approve\n- 金額が {{POLICY_AUTO_APPROVE_BELOW}} 円以上、または情報不足なら hold\n- 再提出・差戻し対象なら reject\n\n出力(JSON のみ、前後の説明禁止): {\"item_index\": {{item.index}}, \"decision\": \"approve|reject|hold\", \"rationale\": \"<50字以内の理由>\"}"
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Decision reasoning failed; leave the item untouched and continue."
+            }
+          },
+          {
+            "id": "parse-decision",
+            "role": "transform",
+            "op": "file:json_parse",
+            "consumes": "decision_raw",
+            "produces": {
+              "channel": "decision",
+              "type": "DecisionVerdict"
+            },
+            "params": {
+              "from": "decision_raw"
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Verdict was not parseable JSON; leave the item untouched and continue."
+            }
+          },
+          {
+            "id": "evidence-screenshot",
+            "role": "source",
+            "op": "browser:screenshot",
+            "produces": {
+              "channel": "item_evidence",
+              "type": "Screenshot"
+            },
+            "params": {
+              "export_as": "item_screenshot"
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Screenshot capture is evidence-only; do not block the decision."
+            }
+          },
+          {
+            "id": "apply-decision",
+            "role": "gate",
+            "op": "core:if",
+            "consumes": "decision",
+            "params": {
+              "condition": {
+                "operator": "and",
+                "conditions": [
+                  {
+                    "from": "decision.decision",
+                    "operator": "eq",
+                    "value": "approve"
+                  },
+                  {
+                    "from": "decision.item_index",
+                    "operator": "eq",
+                    "value": "{{item.index}}"
+                  }
+                ]
+              },
+              "then": [
+                {
+                  "id": "approve-item",
+                  "role": "sink",
+                  "op": "core:include",
+                  "params": {
+                    "fragment": "fragments/ringi-approve-single.json",
+                    "context": {
+                      "approve_button_selector": "{{APPROVE_BUTTON_SELECTOR}}",
+                      "ok_button_selector": "{{OK_BUTTON_SELECTOR}}",
+                      "list_url": "{{WORKFLOW_BASE_URL}}{{INBOX_PATH}}"
+                    }
+                  }
+                }
+              ],
+              "else": [
+                {
+                  "id": "reject-or-hold",
+                  "role": "gate",
+                  "op": "core:if",
+                  "params": {
+                    "condition": {
+                      "operator": "and",
+                      "conditions": [
+                        {
+                          "from": "decision.decision",
+                          "operator": "eq",
+                          "value": "reject"
+                        },
+                        {
+                          "from": "decision.item_index",
+                          "operator": "eq",
+                          "value": "{{item.index}}"
+                        }
+                      ]
+                    },
+                    "then": [
+                      {
+                        "id": "reject-click",
+                        "role": "sink",
+                        "op": "browser:click",
+                        "params": {
+                          "selector": "{{REJECT_BUTTON_SELECTOR}}"
+                        }
+                      },
+                      {
+                        "id": "reject-wait",
+                        "role": "sink",
+                        "op": "browser:wait",
+                        "params": {
+                          "duration": 3000
+                        }
+                      },
+                      {
+                        "id": "reject-ok",
+                        "role": "sink",
+                        "op": "browser:click",
+                        "params": {
+                          "selector": "{{OK_BUTTON_SELECTOR}}"
+                        }
+                      },
+                      {
+                        "id": "reject-back",
+                        "role": "sink",
+                        "op": "browser:goto",
+                        "params": {
+                          "url": "{{WORKFLOW_BASE_URL}}{{INBOX_PATH}}"
+                        }
+                      },
+                      {
+                        "id": "reject-back-wait",
+                        "role": "sink",
+                        "op": "browser:wait",
+                        "params": {
+                          "duration": 3000
+                        }
+                      }
+                    ],
+                    "else": [
+                      {
+                        "id": "hold-log",
+                        "role": "sink",
+                        "op": "system:log",
+                        "params": {
+                          "message": "Item held for human review: {{item}} — {{decision}}"
+                        }
+                      }
+                    ]
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "id": "record-decision",
+            "role": "sink",
+            "op": "file:append",
+            "params": {
+              "path": "{{DECISIONS_JSONL_PATH}}",
+              "content": "{\"item\": {{item}}, \"verdict\": {{decision}}, \"screenshot\": \"{{item_screenshot}}\"}\n"
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Decision record append failed; the action already happened — continue."
             }
           }
         ]
       }
     },
     {
-      "id": "summarize",
-      "type": "transform",
-      "op": "summarize_decisions",
+      "id": "write-summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "produces": {
+        "channel": "summary_artifact",
+        "type": "RunSummary"
+      },
       "params": {
-        "decisions": "{{pending_items}}",
-        "out": "summary.md"
+        "path": "{{SUMMARY_OUT_PATH}}",
+        "content": "# Ringi approval run\n\n- Inbox: {{WORKFLOW_BASE_URL}}{{INBOX_PATH}}\n- Pending items seen: {{pending_items}}\n- Decisions log: {{DECISIONS_JSONL_PATH}}\n\nReview decisions.jsonl for per-item verdicts and evidence screenshots."
+      }
+    },
+    {
+      "id": "log-done",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Ringi approval sweep finished. Decisions: {{DECISIONS_JSONL_PATH}} / summary: {{SUMMARY_OUT_PATH}}"
       }
     }
   ]
