@@ -25,7 +25,6 @@ import {
 import { readJsonLines } from '../foundation/json.js';
 import {
   applyDotWakeCircuit,
-  DOT_INBOX_PATH,
   DOT_TOKEN_USAGE_PATH,
   evaluateDotProbeTriggers,
   evaluateDotTriggersDue,
@@ -37,7 +36,7 @@ import {
 } from './dot-runtime.js';
 import { runDotWakeWithGoalDriver } from './dot-wake-orchestration.js';
 import { evaluateDotCronCatchUp, evaluateDotFollowupsDue } from './dot-followups.js';
-import { appendDotInboxEntry } from './dot-inbox.js';
+import { appendDotInboxEntry, dotInboxPath } from './dot-inbox.js';
 import {
   appendWorkResult,
   readDotWorkResults,
@@ -380,6 +379,7 @@ describe('provider-free diagnostic lifecycle', () => {
     appendDotInboxEntry(
       {
         dot_id: entry.charter.dot_id,
+        scope: entry.charter.scope,
         channel: 'inbox',
         source: 'dot-executor',
         payload: { report_from: 'dot-executor' },
@@ -393,7 +393,9 @@ describe('provider-free diagnostic lifecycle', () => {
       created_at: '2026-10-04T10:00:00Z',
       due_at: '2026-10-04T11:00:00Z',
     });
-    const beforeInbox = safeReadFile(path.join(ROOT, DOT_INBOX_PATH), { encoding: 'utf8' });
+    const beforeInbox = safeReadFile(path.join(ROOT, dotInboxPath(diagnostic().scope)), {
+      encoding: 'utf8',
+    });
     const serviceCall = vi.fn();
     for (const c of [
       entry.charter,
@@ -406,7 +408,9 @@ describe('provider-free diagnostic lifecycle', () => {
       expect(applyDotWakeCircuit(c, [recoveredWake], { rootDir: ROOT, now })).toEqual([]);
     }
     expect(serviceCall).not.toHaveBeenCalled();
-    expect(safeReadFile(path.join(ROOT, DOT_INBOX_PATH), { encoding: 'utf8' })).toBe(beforeInbox);
+    expect(
+      safeReadFile(path.join(ROOT, dotInboxPath(diagnostic().scope)), { encoding: 'utf8' })
+    ).toBe(beforeInbox);
     expect(listActiveDotHeartbeatIds(ROOT)).toEqual([]);
   });
   it('fails closed when a saved diagnostic charter broadens after it was loaded', async () => {
@@ -474,7 +478,7 @@ describe('provider-free diagnostic lifecycle', () => {
     expect(readDotWorkResults(entry.charter, deps)).toEqual([
       { ...row, report_enqueued_at: now().toISOString() },
     ]);
-    expect(readJsonLines(path.join(ROOT, DOT_INBOX_PATH))).toHaveLength(1);
+    expect(readJsonLines(path.join(ROOT, dotInboxPath(diagnostic().scope)))).toHaveLength(1);
     const resultBefore = safeReadFile(
       path.join(ROOT, dotStatePath(entry.charter, DOT_WORK_RESULTS_FILE)),
       { encoding: 'utf8' }
@@ -483,7 +487,7 @@ describe('provider-free diagnostic lifecycle', () => {
       [{ ...entry, charter: validateDotCharter(structuredClone(entry.charter)) }],
       deps
     );
-    expect(readJsonLines(path.join(ROOT, DOT_INBOX_PATH))).toHaveLength(1);
+    expect(readJsonLines(path.join(ROOT, dotInboxPath(diagnostic().scope)))).toHaveLength(1);
     expect(evaluateDotTriggersDue(entry.charter, deps)).toEqual([]);
     expect(
       safeReadFile(path.join(ROOT, dotStatePath(entry.charter, DOT_WORK_RESULTS_FILE)), {
@@ -500,7 +504,12 @@ describe('provider-free diagnostic lifecycle', () => {
     c.attention.triggers = [{ kind: 'wake', channels: ['inbox'] }];
     const entry = loaded(c);
     appendDotInboxEntry(
-      { dot_id: c.dot_id, channel: 'inbox', payload: { report_from: 'dot-executor' } },
+      {
+        dot_id: c.dot_id,
+        scope: c.scope,
+        channel: 'inbox',
+        payload: { report_from: 'dot-executor' },
+      },
       { rootDir: ROOT, now }
     );
     const due = evaluateDotTriggersDue(c, { rootDir: ROOT, now });
@@ -593,7 +602,7 @@ describe('diagnostic executor boundary', () => {
       });
       expect(release).toHaveBeenCalledWith(expect.objectContaining({ nextStatus: 'archived' }));
       expect(readDotWorkResults(entry.charter, deps)).toHaveLength(1);
-      expect(readJsonLines(path.join(ROOT, DOT_INBOX_PATH))).toHaveLength(1);
+      expect(readJsonLines(path.join(ROOT, dotInboxPath(diagnostic().scope)))).toHaveLength(1);
       for (const call of [
         ports.goalMode,
         ports.runGoalTurn,

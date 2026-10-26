@@ -156,7 +156,11 @@ function requiredForKind(kind: EventScopeKind, context: ScopeContext): boolean {
   if (kind === 'tenant') return Boolean(context.tenant_slug);
   if (kind === 'organization') return Boolean(context.organization_id && context.tenant_slug);
   if (kind === 'project')
-    return Boolean(context.project_id && context.organization_id && context.tenant_slug);
+    return Boolean(
+      context.project_id &&
+      ((context.organization_id && context.tenant_slug) ||
+        (context.tier === 'public' && !context.organization_id && !context.tenant_slug))
+    );
   if (kind === 'mission') return Boolean(context.mission_id);
   if (kind === 'task') return Boolean(context.task_id && context.mission_id);
   return Boolean(context.session_id && context.task_id && context.mission_id);

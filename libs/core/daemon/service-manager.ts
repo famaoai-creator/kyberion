@@ -23,6 +23,8 @@ import { windowsTaskSchedulerManager } from './windows-task-scheduler.js';
 export interface DaemonServiceSpec {
   /** Value accepted by `--daemon` (kebab-case). */
   id: string;
+  /** Canonical checkout identity; absent only for explicitly legacy global units. */
+  instanceId?: string;
   /**
    * System identity: launchd `Label` / plist stem (com.kyberion.*) on macOS;
    * on Linux the manager derives a systemd unit name from it.

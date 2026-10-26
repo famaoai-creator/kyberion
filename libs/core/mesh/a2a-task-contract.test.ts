@@ -9,6 +9,60 @@ const AjvCtor = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
 
 describe('a2a-task-contract schema', () => {
+  it('validates real claimed-runtime dispatch fields consistently in Zod and JSON schema', () => {
+    const ajv = new AjvCtor({ allErrors: true, strict: false });
+    const validate = compileSchemaFromPath(
+      ajv,
+      path.resolve(process.cwd(), 'knowledge/product/schemas/a2a-task-contract.schema.json')
+    );
+    const context = {
+      mission_id: 'MSN-public-task',
+      team_role: 'planner',
+      task_id: 'alignment-requirements',
+      work_item_id: 'WI-public-task',
+      lease_id: 'lease-claimed',
+      capability_profile: 'planner',
+      requested_selection: {
+        mode: 'fixed',
+        agent_id: 'control-plane-agent',
+        provider: 'codex',
+        model_id: 'codex',
+        execution_route: 'agent_runtime',
+      },
+      selection_resolution: { source: 'requested', reason: 'Explicit runtime-only selection' },
+      required_capabilities: ['reasoning', 'planning'],
+      security_scope: {
+        mission_id: 'MSN-public-task',
+        read_tiers: ['public'],
+        write_tier: 'public',
+        purpose: 'planning',
+      },
+    };
+    const contract = { intent: 'workitem_execution', text: 'Execute the bounded task', context };
+    const parsed = validateA2ATaskContract(contract);
+    expect(parsed.valid, JSON.stringify(parsed.errors)).toBe(true);
+    expect(parsed.value?.context).toEqual(context);
+    expect(validate(contract), JSON.stringify(validate.errors)).toBe(true);
+    const invalid = [
+      { ...context, lease_id: '' },
+      { ...context, task_id: undefined },
+      { ...context, capability_profile: 'administrator' },
+      { ...context, requested_selection: { mode: 'fixed' } },
+      {
+        ...context,
+        requested_selection: { ...context.requested_selection, execution_route: 'shell' },
+      },
+      { ...context, selection_resolution: { source: 'invented', reason: 'bad' } },
+      { ...context, required_capabilities: [''] },
+      { ...context, unexpected_authority: true },
+    ];
+    for (const candidate of invalid) {
+      const value = JSON.parse(JSON.stringify({ ...contract, context: candidate }));
+      expect(validateA2ATaskContract(value).valid, JSON.stringify(value)).toBe(false);
+      expect(validate(value), JSON.stringify(value)).toBe(false);
+    }
+  });
+
   it('accepts a governed A2A task payload', () => {
     const root = process.cwd();
     const ajv = new AjvCtor({ allErrors: true });

@@ -1,13 +1,25 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { AgyAdapter, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
-import { normalizeCodexAppServerMessage } from './agent-codex-app-server-adapter.js';
+import {
+  normalizeCodexAppServerMessage,
+  resolveCodexTaskIsolationArgs,
+  assertCodexTaskIsolationConfig,
+  CODEX_GOVERNED_DISABLED_FEATURES,
+} from './agent-codex-app-server-adapter.js';
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { AsyncLocalStorage, AsyncResource } from 'node:async_hooks';
+import { currentExecutionScope, runInExecutionScope } from '../foundation/execution-scope.js';
+import {
+  getReasoningPayloadScope,
+  withReasoningPayloadScope,
+} from '../reasoning/reasoning-egress-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeSymlinkSync } from '../secure-io.js';
+import type { TaskToolRuntime } from '../workforce/task-tool-runtime.js';
 
 const codexMocks = vi.hoisted(() => ({
   resolveCodexBinary: vi.fn(),
@@ -384,6 +396,447 @@ describe('ClaudeAdapter tool restrictions', () => {
 });
 
 describe('CodexAppServerAdapter', () => {
+  it('explicitly disables inherited MCP servers and rejects a surviving enabled server', () => {
+    codexMocks.safeExecResult
+      .mockReturnValueOnce({
+        stdout: JSON.stringify([{ name: 'hostile_inherited', enabled: true }]),
+        status: 0,
+      })
+      .mockReturnValueOnce({
+        stdout: JSON.stringify([{ name: 'hostile_inherited', enabled: false }]),
+        status: 0,
+      });
+    const args = resolveCodexTaskIsolationArgs('codex', { CODEX_HOME: '/isolated/home' }, '/task');
+    expect(args).toContain('mcp_servers.hostile_inherited.enabled=false');
+    expect(args).toContain('features.code_mode.enabled=false');
+    expect(args).toContain('code_mode_host');
+    expect(CODEX_GOVERNED_DISABLED_FEATURES).not.toContain('code_mode_host');
+    expect(args).toContain('code_mode_only_strict_3p_tools');
+    expect(args).toContain('features.code_mode.direct_only_tool_namespaces=[]');
+    expect(args).toContain('features.code_mode.excluded_tool_namespaces=["functions"]');
+    expect(codexMocks.safeExecResult.mock.calls.at(-1)![2]).toMatchObject({
+      env: { CODEX_HOME: '/isolated/home' },
+      cwd: '/task',
+    });
+    codexMocks.safeExecResult.mockReturnValue({
+      stdout: JSON.stringify([{ name: 'hostile_inherited', enabled: true }]),
+      status: 0,
+    });
+    expect(() => resolveCodexTaskIsolationArgs('codex', {}, '/task')).toThrow('still enables');
+    codexMocks.safeExecResult.mockReturnValue({
+      stdout: 'invalid sensitive configuration',
+      status: 0,
+    });
+    expect(() => resolveCodexTaskIsolationArgs('codex', {}, '/task')).toThrow('unreadable');
+    codexMocks.safeExecResult.mockReturnValue({ stdout: '', stderr: 'private error', status: 1 });
+    expect(() => resolveCodexTaskIsolationArgs('codex', {}, '/task')).toThrow('Cannot enumerate');
+    vi.clearAllMocks();
+  });
+  it('checks effective MCP and native settings instead of trusting launch arguments', () => {
+    const features = {
+      ...Object.fromEntries(CODEX_GOVERNED_DISABLED_FEATURES.map((name) => [name, false])),
+      code_mode_host: true,
+      code_mode: {
+        enabled: false,
+        direct_only_tool_namespaces: [],
+        excluded_tool_namespaces: ['functions'],
+      },
+    };
+    expect(() =>
+      assertCodexTaskIsolationConfig({
+        config: {
+          web_search: 'disabled',
+          features,
+          mcp_servers: { inherited: { enabled: false } },
+        },
+      })
+    ).not.toThrow();
+    expect(() =>
+      assertCodexTaskIsolationConfig({
+        config: { web_search: 'disabled', features, mcp_servers: { inherited: { enabled: true } } },
+      })
+    ).toThrow('not governed-tool-only');
+    expect(() =>
+      assertCodexTaskIsolationConfig({
+        config: { web_search: 'disabled', features: { ...features, shell_tool: true } },
+      })
+    ).toThrow('not governed-tool-only');
+    expect(() =>
+      assertCodexTaskIsolationConfig({
+        config: {
+          web_search: 'disabled',
+          features: { ...features, code_mode_only_strict_3p_tools: true },
+        },
+      })
+    ).toThrow('not governed-tool-only');
+    expect(() =>
+      assertCodexTaskIsolationConfig({
+        config: {
+          web_search: 'disabled',
+          features: { ...features, code_mode_host: false },
+        },
+      })
+    ).toThrow('not governed-tool-only');
+    for (const code_mode of [
+      { enabled: true, direct_only_tool_namespaces: ['kyberion'], excluded_tool_namespaces: [] },
+      {
+        enabled: false,
+        direct_only_tool_namespaces: ['kyberion'],
+        excluded_tool_namespaces: ['functions'],
+      },
+    ]) {
+      expect(() =>
+        assertCodexTaskIsolationConfig({
+          config: { web_search: 'disabled', features: { ...features, code_mode } },
+        })
+      ).toThrow('not governed-tool-only');
+    }
+  });
+  it('does not let legacy exec configuration drop a claimed task tool binding', async () => {
+    vi.stubEnv('KYBERION_CODEX_MODE', 'exec');
+    try {
+      await import('./agent-exec-adapter-providers.js');
+      const { createAgentExecAdapter } = await import('./agent-exec-adapter-bridge.js');
+      const runtime = {
+        definitions: [],
+        assertCurrent: vi.fn(),
+        execute: vi.fn(),
+      } as unknown as TaskToolRuntime;
+      expect(
+        await createAgentExecAdapter({ provider: 'codex', taskToolRuntime: runtime })
+      ).toBeInstanceOf(CodexAppServerAdapter);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+  it('boots a verified governed-tool protocol with native features disabled and typed dynamic tools', async () => {
+    const requests: Array<{
+      method: string;
+      params: { capabilities?: { experimentalApi?: boolean } };
+    }> = [];
+    const child = Object.assign(new EventEmitter(), {
+      pid: 43,
+      stdin: {
+        writable: true,
+        write(line: string) {
+          const request = JSON.parse(line);
+          requests.push(request);
+          queueMicrotask(() =>
+            child.stdout.write(
+              JSON.stringify({
+                id: request.id,
+                result:
+                  request.method === 'initialize'
+                    ? {}
+                    : request.method === 'config/read'
+                      ? {
+                          config: {
+                            web_search: 'disabled',
+                            features: {
+                              ...Object.fromEntries(
+                                CODEX_GOVERNED_DISABLED_FEATURES.map((name) => [name, false])
+                              ),
+                              code_mode_host: true,
+                              code_mode: {
+                                enabled: false,
+                                direct_only_tool_namespaces: [],
+                                excluded_tool_namespaces: ['functions'],
+                              },
+                            },
+                            mcp_servers: { inherited: { enabled: false } },
+                          },
+                        }
+                      : { thread: { id: 'governed-task-thread' } },
+              }) + '\n'
+            )
+          );
+          return true;
+        },
+      },
+      stdout: new PassThrough(),
+      stderr: new PassThrough(),
+    });
+    const runtime = {
+      definitions: [
+        { name: 'kyberion_task_read_file', description: 'read', inputSchema: { type: 'object' } },
+      ],
+      assertCurrent: vi.fn(),
+      execute: vi.fn(),
+    } as unknown as TaskToolRuntime;
+    codexMocks.resolveCodexBinary.mockReturnValue('codex-fixture');
+    codexMocks.safeExecResult.mockImplementation((_binary, args) => ({
+      stdout:
+        args[0] === '--version'
+          ? 'codex-cli 0.164.0'
+          : JSON.stringify([
+              {
+                name: 'inherited',
+                enabled: args.includes('mcp_servers.inherited.enabled=false') ? false : true,
+              },
+            ]),
+      stderr: '',
+      status: 0,
+    }));
+    codexMocks.spawnManagedProcess.mockReturnValue({ child });
+    const adapter = new CodexAppServerAdapter({
+      cwd: 'fixture/project',
+      model: 'codex',
+      timeoutMs: 1000,
+      taskToolRuntime: runtime,
+      sandboxMode: 'read-only',
+      networkAccess: false,
+    });
+    await adapter.boot();
+    expect(adapter.getRuntimeInfo()).toMatchObject({
+      governedTaskToolCount: 1,
+      governedTaskToolNamespace: 'kyberion',
+    });
+    const argv = codexMocks.spawnManagedProcess.mock.calls.at(-1)![0].args;
+    expect(argv).toEqual(
+      expect.arrayContaining([
+        '--disable',
+        'shell_tool',
+        'unified_exec',
+        '-c',
+        'mcp_servers.inherited.enabled=false',
+      ])
+    );
+    expect(argv).not.toContain('--ignore-user-config');
+    expect(
+      requests.find((request) => request.method === 'initialize')?.params.capabilities
+        ?.experimentalApi
+    ).toBe(true);
+    expect(requests.find((request) => request.method === 'thread/start')?.params).toMatchObject({
+      sandbox: 'read-only',
+      dynamicTools: [
+        {
+          name: 'kyberion',
+          type: 'namespace',
+          tools: [{ name: '_task_read_file', type: 'function' }],
+        },
+      ],
+    });
+    expect(
+      requests.find((request) => request.method === 'thread/start')?.params.model
+    ).toBeUndefined();
+    await adapter.shutdown();
+    vi.clearAllMocks();
+  });
+  it('executes only tools bound to the claimed task and refuses native grants even in relaxed mode', async () => {
+    const runtime = {
+      definitions: [
+        { name: 'kyberion_task_read_file', description: 'read', inputSchema: { type: 'object' } },
+      ],
+      assertCurrent: vi.fn(),
+      execute: vi.fn(async () => ({ text: 'safe result' })),
+    } as unknown as TaskToolRuntime;
+    const adapter = new CodexAppServerAdapter({
+      taskToolRuntime: runtime,
+      approvalMode: 'relaxed',
+    });
+    const responses: Array<{ result: Record<string, unknown> }> = [];
+    const harness = adapter as unknown as {
+      activeTurnContext: ReturnType<typeof AsyncLocalStorage.snapshot>;
+      child: unknown;
+      handleServerRequest(request: {
+        id: number;
+        method: string;
+        params: Record<string, unknown>;
+      }): Promise<void>;
+    };
+    harness.activeTurnContext = AsyncLocalStorage.snapshot();
+    harness.child = {
+      stdin: { writable: true, write: (line: string) => responses.push(JSON.parse(line)) },
+    };
+    await harness.handleServerRequest({
+      id: 1,
+      method: 'item/tool/call',
+      params: {
+        namespace: 'kyberion',
+        tool: '_task_read_file',
+        arguments: { path: 'libs/a.ts' },
+      },
+    });
+    expect(runtime.execute).toHaveBeenCalledWith({
+      name: 'kyberion_task_read_file',
+      arguments: { path: 'libs/a.ts' },
+    });
+    expect(responses[0].result).toMatchObject({ success: true });
+    await expect(
+      harness.handleServerRequest({
+        id: 2,
+        method: 'item/tool/call',
+        params: { namespace: 'kyberion', tool: 'unregistered', arguments: {} },
+      })
+    ).rejects.toThrow('not installed uniquely');
+    for (const namespace of [undefined, 'functions', 'foreign']) {
+      await expect(
+        harness.handleServerRequest({
+          id: 21,
+          method: 'item/tool/call',
+          params: { namespace, tool: '_task_read_file', arguments: {} },
+        })
+      ).rejects.toThrow('does not belong');
+    }
+    expect(runtime.execute).toHaveBeenCalledTimes(1);
+    for (const tool of ['kyberion_task_read_file', 'task_read_file']) {
+      await expect(
+        harness.handleServerRequest({
+          id: 22,
+          method: 'item/tool/call',
+          params: { namespace: 'kyberion', tool, arguments: {} },
+        })
+      ).rejects.toThrow('not installed uniquely');
+    }
+    runtime.definitions.push({
+      name: '_task_read_file',
+      description: 'collision',
+      inputSchema: { type: 'object' },
+    });
+    await expect(
+      harness.handleServerRequest({
+        id: 23,
+        method: 'item/tool/call',
+        params: { namespace: 'kyberion', tool: '_task_read_file', arguments: {} },
+      })
+    ).rejects.toThrow('not installed uniquely');
+    runtime.definitions.pop();
+    expect(runtime.execute).toHaveBeenCalledTimes(1);
+    await harness.handleServerRequest({
+      id: 3,
+      method: 'item/commandExecution/requestApproval',
+      params: { command: 'cat knowledge/personal/private.txt' },
+    });
+    await harness.handleServerRequest({
+      id: 4,
+      method: 'item/fileChange/requestApproval',
+      params: {},
+    });
+    await harness.handleServerRequest({
+      id: 5,
+      method: 'item/permissions/requestApproval',
+      params: { permissions: { network: true } },
+    });
+    expect(responses[1].result.decision).toBe('decline');
+    expect(responses[2].result.decision).toBe('decline');
+    expect(responses[3].result.permissions).toEqual({});
+    expect(runtime.execute).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not execute a dynamic call after lease expiry', async () => {
+    const runtime = {
+      definitions: [{ name: 'bound', description: 'bound', inputSchema: { type: 'object' } }],
+      assertCurrent: () => {
+        throw new Error('lease expired');
+      },
+      execute: vi.fn(),
+    } as unknown as TaskToolRuntime;
+    const adapter = new CodexAppServerAdapter({ taskToolRuntime: runtime });
+    Object.assign(adapter, { activeTurnContext: AsyncLocalStorage.snapshot() });
+    await expect(
+      (
+        adapter as unknown as {
+          handleServerRequest(request: {
+            id: number;
+            method: string;
+            params: Record<string, unknown>;
+          }): Promise<void>;
+        }
+      ).handleServerRequest({
+        id: 1,
+        method: 'item/tool/call',
+        params: { namespace: 'kyberion', tool: 'bound', arguments: {} },
+      })
+    ).rejects.toThrow('lease expired');
+    expect(runtime.execute).not.toHaveBeenCalled();
+  });
+
+  it('replays the asking task scope for early dynamic tools emitted by the boot resource', async () => {
+    const boot = runInExecutionScope(
+      { tenantBound: true, tenantSlug: 'boot-a' },
+      () => new AsyncResource('codex-boot-stdout')
+    );
+    const observed: unknown[] = [];
+    const runtime = {
+      definitions: [{ name: 'bound', description: 'bound', inputSchema: { type: 'object' } }],
+      assertCurrent: vi.fn(),
+      execute: vi.fn(async () => {
+        observed.push({ execution: currentExecutionScope(), payload: getReasoningPayloadScope() });
+        return { ok: true };
+      }),
+    } as unknown as TaskToolRuntime;
+    const adapter = new CodexAppServerAdapter({ taskToolRuntime: runtime, timeoutMs: 1000 });
+    const stdout = new PassThrough();
+    const harness = adapter as unknown as {
+      child: unknown;
+      threadId: string;
+      activeTurnContext: unknown;
+      handleStdout(chunk: Buffer): void;
+    };
+    stdout.on('data', (chunk: Buffer) => harness.handleStdout(chunk));
+    const emit = (message: unknown) =>
+      boot.runInAsyncScope(() => stdout.write(JSON.stringify(message) + '\n'));
+    harness.threadId = 'thread-b';
+    harness.child = {
+      stdin: {
+        writable: true,
+        write(line: string) {
+          const request = JSON.parse(line);
+          if (request.method === 'turn/start') {
+            queueMicrotask(() => {
+              // The tool arrives before the turn/start response or turn/started event.
+              emit({
+                id: 91,
+                method: 'item/tool/call',
+                params: {
+                  threadId: 'thread-b',
+                  turnId: 'turn-b',
+                  namespace: 'kyberion',
+                  tool: 'bound',
+                  arguments: {},
+                },
+              });
+              emit({ id: request.id, result: { turn: { id: 'turn-b' } } });
+            });
+          } else if (request.id === 91) {
+            emit({
+              method: 'turn/completed',
+              params: {
+                turn: { id: 'turn-b', status: 'completed' },
+              },
+            });
+          }
+          return true;
+        },
+      },
+    };
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'ask-b' }, () =>
+      withReasoningPayloadScope(
+        { tier: 'personal', tenant_slug: 'ask-b', external_egress: 'deny' },
+        () => adapter.ask('use bound tool')
+      )
+    );
+    expect(observed).toEqual([
+      {
+        execution: expect.objectContaining({ tenantSlug: 'ask-b' }),
+        payload: expect.objectContaining({
+          tier: 'personal',
+          tenant_slug: 'ask-b',
+          external_egress: 'deny',
+        }),
+      },
+    ]);
+    expect(harness.activeTurnContext).toBeNull();
+    emit({
+      id: 92,
+      method: 'item/tool/call',
+      params: { namespace: 'kyberion', tool: 'bound', arguments: {} },
+    });
+    await new Promise((resolve) => setImmediate(resolve));
+    expect(runtime.execute).toHaveBeenCalledTimes(1);
+    boot.emitDestroy();
+  });
+
   it('normalizes JSON-RPC response and request envelopes', () => {
     expect(
       normalizeCodexAppServerMessage({
@@ -489,75 +942,150 @@ describe('CodexAppServerAdapter', () => {
     stderrWrite.mockRestore();
   });
 
-  it('projects subagent turns onto configurable medium effort without spawning another process', async () => {
-    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
-    const requests: any[] = [];
-    const fakeChild: any = {
+  it.each(['codex', 'codex-cli', 'default', 'auto', ' CoDeX ', ' AUTO ', 'exact-account-model'])(
+    'projects subagent turns and resolves native default model alias %s',
+    async (model) => {
+      const adapter = new CodexAppServerAdapter({ timeoutMs: 1000, model });
+      const internals = adapter as unknown as {
+        child: unknown;
+        threadId: string | null;
+        handleMessage(message: Record<string, unknown>): void;
+      };
+      const requests: Array<{
+        id: number | string;
+        method: string;
+        params: Record<string, unknown>;
+      }> = [];
+      const fakeChild = {
+        stdin: {
+          writable: true,
+          write(payload: string) {
+            const request = JSON.parse(payload) as (typeof requests)[number];
+            requests.push(request);
+            if (request.method !== 'turn/start') return true;
+            setTimeout(() => {
+              internals.handleMessage({
+                id: request.id,
+                result: { turn: { id: 'turn-native-1' } },
+              });
+            }, 0);
+            setTimeout(() => {
+              internals.handleMessage({
+                method: 'item/agentMessage/delta',
+                params: {
+                  threadId: 'thread-root',
+                  turnId: 'turn-native-1',
+                  delta: 'native result',
+                },
+              });
+              internals.handleMessage({
+                method: 'turn/completed',
+                params: { turn: { id: 'turn-native-1', status: 'completed' } },
+              });
+            }, 1);
+            return true;
+          },
+        },
+      };
+      internals.child = fakeChild;
+      internals.threadId = 'thread-root';
+
+      const response = await adapter.ask('delegate this', { subagent: true });
+
+      expect(response.text).toBe('native result');
+      const turnStart = requests.find((request) => request.method === 'turn/start');
+      expect(turnStart?.params.threadId).toBe('thread-root');
+      expect(turnStart?.params.model).toBe(model === 'exact-account-model' ? model : undefined);
+      expect(turnStart?.params.effort).toBe('medium');
+      expect(requests.filter((request) => request.method === 'turn/start')).toHaveLength(1);
+    }
+  );
+
+  it('retains a native failed-turn provider cause instead of an opaque empty result', async () => {
+    const adapter = new CodexAppServerAdapter({ timeoutMs: 1000, model: 'auto' });
+    const internals = adapter as unknown as {
+      child: unknown;
+      threadId: string | null;
+      handleMessage(message: Record<string, unknown>): void;
+    };
+    const requests: Array<{
+      id: number | string;
+      method: string;
+      params: Record<string, unknown>;
+    }> = [];
+    internals.child = {
       stdin: {
         writable: true,
         write(payload: string) {
-          const request = JSON.parse(payload);
+          const request = JSON.parse(payload) as (typeof requests)[number];
           requests.push(request);
-          if (request.method !== 'turn/start') return true;
-          setTimeout(() => {
-            (adapter as any).handleMessage({
-              id: request.id,
-              result: { turn: { id: 'turn-native-1' } },
+          if (request.method === 'turn/start') {
+            queueMicrotask(() => {
+              internals.handleMessage({
+                method: 'turn/completed',
+                params: {
+                  turn: {
+                    id: 'failed-provider-turn',
+                    status: 'failed',
+                    error: { message: 'model_not_found: selected account model unavailable' },
+                  },
+                },
+              });
+              internals.handleMessage({
+                id: request.id,
+                result: { turn: { id: 'failed-provider-turn' } },
+              });
             });
-          }, 0);
-          setTimeout(() => {
-            (adapter as any).handleMessage({
-              method: 'item/agentMessage/delta',
-              params: { threadId: 'thread-root', turnId: 'turn-native-1', delta: 'native result' },
-            });
-            (adapter as any).handleMessage({
-              method: 'turn/completed',
-              params: { turn: { id: 'turn-native-1', status: 'completed' } },
-            });
-          }, 1);
+          }
           return true;
         },
       },
     };
-    (adapter as any).child = fakeChild;
-    (adapter as any).threadId = 'thread-root';
-
-    const response = await adapter.ask('delegate this', { subagent: true });
-
-    expect(response.text).toBe('native result');
-    const turnStart = requests.find((request) => request.method === 'turn/start');
-    expect(turnStart.params.threadId).toBe('thread-root');
-    expect(turnStart.params.effort).toBe('medium');
+    internals.threadId = 'thread-root';
+    const result = await adapter.ask('run once');
+    expect(result).toMatchObject({
+      stopReason: 'error',
+      text: 'model_not_found: selected account model unavailable',
+    });
     expect(requests.filter((request) => request.method === 'turn/start')).toHaveLength(1);
   });
 
   it('interrupts the active native turn on cancellation without restarting the app-server', async () => {
     const adapter = new CodexAppServerAdapter({ timeoutMs: 1000 });
-    const requests: any[] = [];
-    const fakeChild: any = {
+    const internals = adapter as unknown as {
+      child: unknown;
+      threadId: string | null;
+      handleMessage(message: Record<string, unknown>): void;
+    };
+    const requests: Array<{
+      id: number | string;
+      method: string;
+      params: Record<string, unknown>;
+    }> = [];
+    const fakeChild = {
       stdin: {
         writable: true,
         write(payload: string) {
-          const request = JSON.parse(payload);
+          const request = JSON.parse(payload) as (typeof requests)[number];
           requests.push(request);
           if (request.method === 'turn/start') {
             setTimeout(() => {
-              (adapter as any).handleMessage({
+              internals.handleMessage({
                 id: request.id,
                 result: { turn: { id: 'turn-cancel-1' } },
               });
             }, 0);
           } else if (request.method === 'turn/interrupt') {
             setTimeout(() => {
-              (adapter as any).handleMessage({ id: request.id, result: {} });
+              internals.handleMessage({ id: request.id, result: {} });
             }, 0);
           }
           return true;
         },
       },
     };
-    (adapter as any).child = fakeChild;
-    (adapter as any).threadId = 'thread-root';
+    internals.child = fakeChild;
+    internals.threadId = 'thread-root';
     const controller = new AbortController();
     const pending = adapter.ask('cancel this', { subagent: true, signal: controller.signal });
 
