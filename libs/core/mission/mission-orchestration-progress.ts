@@ -153,25 +153,47 @@ export function createMissionProgressController(
         Number(existing.rework_count || 0),
         Number(task.rework_count || 0)
       );
-      // A stale in-memory board never undoes a supersede: the on-disk record
-      // and the dependency rewrite it made win over the incoming task (M2).
-      const supersedeOwned =
-        existing.status === 'superseded' || Boolean(existing.dependencies_rewritten_from?.length);
+      // A stale in-memory board never undoes a supersede (M2): the on-disk
+      // record wins, and each dependency rewrite it made is re-applied to the
+      // incoming dependencies (old id → replacement) — the worker's other
+      // dependency edits are kept (N6).
+      const rewrites = existing.dependencies_rewritten_from ?? [];
+      const dependenciesOut = rewrites.length
+        ? [
+            ...new Set(
+              (task.dependencies ?? existing.dependencies ?? []).map(
+                (dependency) =>
+                  rewrites.find((rewrite) => rewrite.from === dependency)?.to ?? dependency
+              )
+            ),
+          ]
+        : undefined;
       return {
         ...task,
         ...(status ? { status } : {}),
         ...(rework_count > 0 ? { rework_count } : {}),
-        ...(supersedeOwned
-          ? {
-              dependencies: existing.dependencies,
-              ...(existing.superseded ? { superseded: existing.superseded } : {}),
-              ...(existing.dependencies_rewritten_from
-                ? { dependencies_rewritten_from: existing.dependencies_rewritten_from }
-                : {}),
-            }
+        ...(existing.status === 'superseded' && existing.superseded
+          ? { superseded: existing.superseded }
+          : {}),
+        ...(dependenciesOut
+          ? { dependencies: dependenciesOut, dependencies_rewritten_from: rewrites }
           : {}),
       };
     });
+    // N6: an on-disk task the incoming list lacks is kept when supersede-task
+    // owns it — superseded, or the replacement a supersede named.
+    const incomingIds = new Set(tasks.map((task) => task.task_id));
+    const replacementIds = new Set(
+      existingTasks
+        .map((task) => (task.status === 'superseded' ? task.superseded?.by_task_id : undefined))
+        .filter((id): id is string => Boolean(id))
+    );
+    for (const existing of existingTasks) {
+      if (incomingIds.has(existing.task_id)) continue;
+      if (existing.status === 'superseded' || replacementIds.has(existing.task_id)) {
+        mergedTasks.push(existing);
+      }
+    }
     writeProvisionedJson({
       missionId,
       filePath: nextTasksPath,

@@ -7,7 +7,11 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
   return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
 });
 // M1: fail the ledger append once to leave a supersede part-way applied.
-const ledgerFault = vi.hoisted(() => ({ failNext: false, failAuditStamp: false }));
+const ledgerFault = vi.hoisted(() => ({
+  failNext: false,
+  failAuditStamp: false,
+  failReceipt: false,
+}));
 // Fail the receipt's audit stamp once (a crash between the audit and the stamp).
 vi.mock('./mission-dispatch-lifecycle.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('./mission-dispatch-lifecycle.js')>();
@@ -15,6 +19,10 @@ vi.mock('./mission-dispatch-lifecycle.js', async (importOriginal) => {
     ...actual,
     writeDispatchArtifact: (...args: Parameters<typeof actual.writeDispatchArtifact>) => {
       const payload = args[1] as Record<string, unknown> | undefined;
+      if (ledgerFault.failReceipt && payload?.kind === 'mission-task-supersede-receipt') {
+        ledgerFault.failReceipt = false;
+        throw new Error('[TEST_FAULT] receipt write failed');
+      }
       if (ledgerFault.failAuditStamp && payload && 'audit_recorded_at' in payload) {
         ledgerFault.failAuditStamp = false;
         throw new Error('[TEST_FAULT] audit stamp failed');
@@ -532,6 +540,64 @@ describe('mission_controller supersede-task', () => {
     ).toHaveLength(1);
   });
 
+  it('an approval that expires after a crash still finishes the supersede it started, never a new one', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    ledgerFault.failReceipt = true;
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
+    expect(getWorkItem(itemId('task-held'))?.status).toBe('archived');
+    // The approval expires before the operator re-runs.
+    const recordPath = approvalRequestLogicalPath(
+      MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
+      approvalRequestId
+    );
+    const stored = JSON.parse(String(safeReadFile(recordPath, { encoding: 'utf8' }))) as Record<
+      string,
+      unknown
+    >;
+    safeWriteFile(
+      recordPath,
+      JSON.stringify({ ...stored, expiresAt: '2026-01-01T00:00:00.000Z' }, null, 2)
+    );
+    expect((await supersedeMissionTask(input)).status).toBe('applied');
+    expect(boardTask('task-held')?.status).toBe('superseded');
+    expect(isTaskVerifiablySuperseded(missionId, 'task-held', { approvalRequestId })).toBe(true);
+  });
+
+  it('refuses to start a supersede with an expired approval', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const recordPath = approvalRequestLogicalPath(
+      MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
+      approvalRequestId
+    );
+    const stored = JSON.parse(String(safeReadFile(recordPath, { encoding: 'utf8' }))) as Record<
+      string,
+      unknown
+    >;
+    safeWriteFile(
+      recordPath,
+      JSON.stringify({ ...stored, expiresAt: '2026-01-01T00:00:00.000Z' }, null, 2)
+    );
+    await expect(
+      supersedeMissionTask({
+        missionId,
+        taskId: 'task-held',
+        byTaskId: 'task-replacement',
+        reason,
+        approvalRequestId,
+      })
+    ).rejects.toThrow(/approval has expired/u);
+    expect(getWorkItem(itemId('task-held'))?.status).toBe('blocked');
+  });
+
   it('a crash between the audit entry and its receipt stamp never audits twice', async () => {
     prepareMission();
     const approvalRequestId = approve();
@@ -607,6 +673,29 @@ describe('mission_controller supersede-task', () => {
       reason: 'approval_other_payload',
     });
     expect(missionTaskSupersedeProof(missionId, 'task-after').verified).toBe(false);
+    // The exact approved payload, but apply never ran (no receipt, no ledger entry).
+    const { createHash } = await import('node:crypto');
+    safeWriteFile(
+      nodePath.join(missionPath, 'NEXT_TASKS.json'),
+      JSON.stringify(
+        forged.map((task) =>
+          task.task_id === 'task-held'
+            ? {
+                ...task,
+                superseded: {
+                  ...(task.superseded as Record<string, unknown>),
+                  approval_request_id: approvalRequestId,
+                  reason_sha256: createHash('sha256').update(reason, 'utf8').digest('hex'),
+                },
+              }
+            : task
+        )
+      )
+    );
+    expect(missionTaskSupersedeProof(missionId, 'task-held')).toEqual({
+      verified: false,
+      reason: 'apply_evidence_missing',
+    });
   });
 
   it('a dry run never writes, even for a task already superseded under the approval', async () => {

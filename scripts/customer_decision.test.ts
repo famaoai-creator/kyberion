@@ -2080,6 +2080,8 @@ describe('customer-decision facade', () => {
       // Nothing was written by the refused runs.
       expect(listAgendas({ dir }).map((agenda) => agenda.agenda_id)).toEqual([first.agenda_id]);
 
+      const lockFile = `${dir}/consumers/mission-MSN-CD09-REASK.release.json`;
+      const lockBeforeReask = String(safeReadFile(lockFile, { encoding: 'utf8' }));
       mocks.audit.mockClear();
       const reasked = (await reask(proposalId, '--by', 'user:alice', '--customer', 'acme')) as {
         agenda_id: string;
@@ -2146,6 +2148,16 @@ describe('customer-decision facade', () => {
         already_reasked: [proposalId],
       });
       expect(listAgendas({ dir })).toHaveLength(2);
+
+      // N6: a run whose agenda (and marker) landed but whose lock relink did
+      // not is finished by a rerun that reuses the marker — never a second one.
+      safeWriteFile(lockFile, lockBeforeReask);
+      await reask(proposalId, '--by', 'user:alice', '--customer', 'acme');
+      expect(agendaOf(reasked.agenda_id).reasked_proposals).toHaveLength(1);
+      const relinked = readConsumedDecisionLock({ dir }, 'mission-MSN-CD09-REASK.release');
+      expect(
+        relinked?.decisions.find((item) => item.proposal?.proposal_id === proposalId)
+      ).toMatchObject({ agenda_id: reasked.agenda_id });
     });
 
     it('refuses to add task proposals to an agenda that is not a draft', async () => {

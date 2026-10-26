@@ -80,11 +80,12 @@ import type {
 } from './mission-orchestration-worker-contracts.js';
 import { loadState, saveState } from './mission-state.js';
 import {
+  ledgerHasTaskSupersede,
   MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
   missionTaskSupersedeEffectBinding,
   missionTaskSupersedePayloadFromHash,
 } from './mission-task-supersede-proof.js';
-import { readJson, readJsonLines } from '../foundation/json.js';
+import { readJson } from '../foundation/json.js';
 import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import { getMissionLabel } from './mission-workitem-dispatch-review.js';
 import type { MissionState } from './mission-types.js';
@@ -410,7 +411,8 @@ function planSupersede(
 
 function assertSupersedeApproval(
   approvalRequestId: string,
-  input: MissionTaskSupersedeInput
+  input: MissionTaskSupersedeInput,
+  options: { allowExpired?: boolean } = {}
 ): ApprovalRequestRecord {
   const approval = loadApprovalRequest(MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL, approvalRequestId);
   if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
@@ -418,7 +420,9 @@ function assertSupersedeApproval(
       `[POLICY_VIOLATION] supersede-task requires an approved mission_gate request: ${approvalRequestId}`
     );
   }
-  if (isApprovalRequestExpired(approval)) {
+  // N2: expiry gates only the START of a supersede (checked again under the
+  // mission lock once it is known whether this run starts or finishes one).
+  if (!options.allowExpired && isApprovalRequestExpired(approval)) {
     throw new Error(`[POLICY_VIOLATION] supersede-task approval has expired: ${approval.id}`);
   }
   // Separation-of-duties consumer id: approval-sod-consumers.contract.test.ts.
@@ -565,24 +569,6 @@ function withRewrite(
     : [...previous, rewrite];
 }
 
-/** Has the execution ledger recorded this supersede already (same approval)? */
-function ledgerHasSupersede(missionPath: string, taskId: string, approvalId: string): boolean {
-  const ledgerPath = nodePath.join(missionPath, 'execution-ledger.jsonl');
-  if (!safeExistsSync(ledgerPath)) return false;
-  return readJsonLines<Record<string, unknown> | null>(ledgerPath, {
-    onMalformed: 'skip',
-    map: (value) =>
-      value && typeof value === 'object' && !Array.isArray(value)
-        ? (value as Record<string, unknown>)
-        : null,
-  }).some(
-    (entry) =>
-      entry?.event_type === 'task_superseded' &&
-      entry.task_id === taskId &&
-      (entry.payload as Record<string, unknown> | undefined)?.approval_request_id === approvalId
-  );
-}
-
 /**
  * Supersede a mission task (see the module header). `dryRun` checks every
  * precondition, reports the dependents it would move and never writes; the
@@ -623,11 +609,16 @@ export async function supersedeMissionTask(
       '[POLICY_VIOLATION] supersede-task apply requires --approval-request-id for an authenticated human approval (open one with --request-approval)'
     );
   }
-  assertSupersedeApproval(approvalRequestId, input);
+  // Every check but expiry here: a run that finishes a supersede this
+  // approval already started may do so after the approval expired (N2).
+  const approval = assertSupersedeApproval(approvalRequestId, input, { allowExpired: true });
   const approvalId = approvalRequestId;
 
   const applied = await withLock(`mission-${input.missionId}`, async () => {
     const plan = planSupersede(input, { approvalRequestId: approvalId, reasonSha256 });
+    if (!plan.resumed && isApprovalRequestExpired(approval)) {
+      throw new Error(`[POLICY_VIOLATION] supersede-task approval has expired: ${approval.id}`);
+    }
     const executor = actorId();
     const record: MissionTaskSupersededRecord = plan.resumed ?? {
       by_task_id: input.byTaskId,
@@ -765,7 +756,7 @@ export async function supersedeMissionTask(
     }
 
     // 3. Execution ledger (once per approval).
-    if (!ledgerHasSupersede(plan.missionPath, input.taskId, approvalId)) {
+    if (!ledgerHasTaskSupersede(plan.missionPath, input.taskId, approvalId)) {
       appendMissionExecutionLedgerEntry({
         mission_id: input.missionId,
         mission_path_hint: plan.missionPath,

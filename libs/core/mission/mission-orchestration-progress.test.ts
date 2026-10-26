@@ -117,7 +117,8 @@ describe('mission orchestration progress path boundaries', () => {
       progress.writeNextTasks(missionId, [
         { task_id: 'old', status: 'blocked' },
         { task_id: 'new', status: 'completed' },
-        { task_id: 'after', status: 'planned', dependencies: ['old'] },
+        // The worker's own dependency edit ('other') is kept; only old → new is re-applied.
+        { task_id: 'after', status: 'planned', dependencies: ['old', 'other'] },
         // A worker write never introduces a supersede.
         { task_id: 'other', status: 'superseded', superseded: record },
       ]);
@@ -130,10 +131,18 @@ describe('mission orchestration progress path boundaries', () => {
       ]);
       expect(written[0].superseded).toEqual(record);
       expect(written[2]).toMatchObject({
-        dependencies: ['new'],
+        dependencies: ['new', 'other'],
         dependencies_rewritten_from: [rewrite],
       });
       expect(written[3]).not.toHaveProperty('superseded');
+      // A write that lacks the superseded task and its replacement keeps both.
+      progress.writeNextTasks(missionId, [{ task_id: 'other', status: 'planned' }]);
+      expect(
+        progress
+          .loadAllNextTasks(missionId)
+          .map((task) => task.task_id)
+          .sort()
+      ).toEqual(['new', 'old', 'other']);
       // Restore the board for the outcome summary below.
       progress.writeNextTasks(missionId, [
         { task_id: 'old', status: 'superseded' },
