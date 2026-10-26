@@ -61,7 +61,7 @@ import {
   emitMissionLifecycleIntentSnapshot,
 } from './mission-intent-delta.js';
 import {
-  isTaskProvenSuperseded,
+  supersededTaskRefusal,
   MISSION_TASK_CLOSED_STATUSES,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
@@ -920,17 +920,9 @@ export async function recordEvidence(args: {
       return undefined;
     }
   })();
-  if (isTaskProvenSuperseded(missionPath, recordedTask, 'record-evidence')) {
-    throw new Error(
-      `Task ${args.taskId} of ${upperId} is superseded${
-        recordedTask?.superseded &&
-        typeof recordedTask.superseded === 'object' &&
-        typeof (recordedTask.superseded as Record<string, unknown>).by_task_id === 'string'
-          ? ` by ${(recordedTask.superseded as Record<string, unknown>).by_task_id}`
-          : ''
-      }; record the evidence on the replacement task.`
-    );
-  }
+  // N1: any superseded status is refused (an unproven one is reported for repair).
+  const supersededRefusal = supersededTaskRefusal(missionPath, recordedTask, 'record-evidence');
+  if (supersededRefusal) throw new Error(supersededRefusal);
 
   // Stamp the deliverable's file mtime so the retrospective can tell
   // record-as-you-go apart from evidence reconstructed at mission close —
@@ -959,11 +951,8 @@ export async function recordEvidence(args: {
     const lockedTask = readMissionNextTasks(missionPath).find(
       (entry) => String(entry.task_id || '') === args.taskId
     );
-    if (isTaskProvenSuperseded(missionPath, lockedTask, 'record-evidence')) {
-      throw new Error(
-        `Task ${args.taskId} of ${upperId} is superseded; record the evidence on the replacement task.`
-      );
-    }
+    const lockedRefusal = supersededTaskRefusal(missionPath, lockedTask, 'record-evidence');
+    if (lockedRefusal) throw new Error(lockedRefusal);
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,
       mission_path_hint: missionPath,
@@ -1067,16 +1056,12 @@ function assertReviewNotSuperseded(
   missionPath: string,
   tasks: Array<Record<string, unknown>>,
   reviewTaskId: string,
-  reviewTargetId: string,
-  missionId: string
+  reviewTargetId: string
 ): void {
   for (const taskId of [reviewTaskId, reviewTargetId]) {
     const task = tasks.find((entry) => String(entry.task_id || '') === taskId);
-    if (isTaskProvenSuperseded(missionPath, task, 'review-task')) {
-      throw new Error(
-        `Task ${taskId} of ${missionId} is superseded; a review of it is recorded on the replacement.`
-      );
-    }
+    const refusal = supersededTaskRefusal(missionPath, task, 'review-task');
+    if (refusal) throw new Error(refusal);
   }
 }
 
@@ -1136,7 +1121,7 @@ export async function recordArtifactReview(args: {
   }
   const targetTask = nextTasks.find((entry) => String(entry.task_id || '') === reviewTargetId);
   // m4: a superseded review task, or a review of a superseded task, records nothing.
-  assertReviewNotSuperseded(missionPath, nextTasks, args.reviewTaskId, reviewTargetId, upperId);
+  assertReviewNotSuperseded(missionPath, nextTasks, args.reviewTaskId, reviewTargetId);
   const deliverable = String(targetTask?.deliverable || targetTask?.target_path || '');
   if (!deliverable) {
     throw new Error(`Review target "${reviewTargetId}" has no deliverable to review.`);
@@ -1207,7 +1192,7 @@ export async function recordArtifactReview(args: {
     // Re-read the board under the mission lock: writing back the copy read
     // before it would undo a supersede-task (or any other write) made since.
     const lockedTasks = readMissionNextTasks(missionPath);
-    assertReviewNotSuperseded(missionPath, lockedTasks, args.reviewTaskId, reviewTargetId, upperId);
+    assertReviewNotSuperseded(missionPath, lockedTasks, args.reviewTaskId, reviewTargetId);
     const lockedTask = lockedTasks.find(
       (entry) => String(entry.task_id || '') === args.reviewTaskId
     );

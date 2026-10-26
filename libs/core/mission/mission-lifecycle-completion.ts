@@ -457,6 +457,32 @@ export function isTaskClosedForGate(
   return isSupersedeProvenForGate(path.basename(missionDir), String(task.task_id || ''), reader);
 }
 
+/**
+ * Why a write must not touch this task, or null. ANY `superseded` status is
+ * refused (N1): a proven one names its replacement; an unproven one (a hand
+ * edit, or a proof that cannot be read right now) asks the operator to repair
+ * it — completing it would erase the supersede record. Gates still count an
+ * unproven supersede as pending ({@link isTaskClosedForGate}).
+ */
+export function supersededTaskRefusal(
+  missionDir: string,
+  task: Record<string, unknown> | null | undefined,
+  reader: string
+): string | null {
+  if (!task || !isTaskSuperseded(task)) return null;
+  const missionId = path.basename(missionDir).toUpperCase();
+  const taskId = String(task.task_id || '');
+  const record =
+    task.superseded && typeof task.superseded === 'object'
+      ? (task.superseded as Record<string, unknown>)
+      : {};
+  const by = typeof record.by_task_id === 'string' ? record.by_task_id : '';
+  if (isTaskProvenSuperseded(missionDir, task, reader)) {
+    return `Task ${taskId} of ${missionId} is superseded${by ? ` by ${by}` : ''}; record it on the replacement task.`;
+  }
+  return `Task ${taskId} of ${missionId} has status superseded but the supersede is not proven (no approved supersede-task record could be verified) — repair it: re-run pnpm mission supersede-task ${missionId} ${taskId} --by ${by || '<new_task_id>'} --reason <text> --approval-request-id <id> with its approval, or restore the task's status; it is not completed meanwhile.`;
+}
+
 /** Is the task superseded with the mission-side proof (not just its status)? */
 export function isTaskProvenSuperseded(
   missionDir: string,
@@ -654,9 +680,16 @@ export function tryAutoCompleteTaskFromEvidence(
   if (MISSION_TASK_COMPLETED_STATUSES.has(currentStatus)) {
     return { completed: false, reason: 'already completed', cascaded: [] };
   }
-  // Only a proven supersede closes it; an unproven `superseded` status is pending.
-  if (isTaskProvenSuperseded(missionDir, task, 'record-evidence')) {
-    return { completed: false, reason: 'superseded by another task', cascaded: [] };
+  // N1: a superseded status is never completed, proven or not (completing it
+  // would erase the supersede record); an unproven one is reported for repair.
+  if (isTaskSuperseded(task)) {
+    return {
+      completed: false,
+      reason: isTaskProvenSuperseded(missionDir, task, 'record-evidence')
+        ? 'superseded by another task'
+        : 'superseded but not proven — repair the supersede (it is not completed meanwhile)',
+      cascaded: [],
+    };
   }
   if (!isTaskDeliverableSatisfied(missionDir, task, statusByTaskId)) {
     return {
@@ -687,9 +720,9 @@ export function tryAutoCompleteTaskFromEvidence(
       if (
         !candidateId ||
         candidateId === taskId ||
-        // A completed or proven-superseded task is closed, never completed by a cascade.
+        // A completed or superseded task (proven or not) is never completed by a cascade.
         MISSION_TASK_COMPLETED_STATUSES.has(candidateStatus) ||
-        isTaskProvenSuperseded(missionDir, candidate, 'record-evidence')
+        candidateStatus === MISSION_TASK_SUPERSEDED_STATUS
       )
         continue;
       const refreshedStatuses = new Map(

@@ -351,6 +351,11 @@ function collectLocked(
       });
     }
   }
+  // The relink time per proposal: `now`, or the marker an earlier run left on
+  // the target agenda whose lock relink never landed (N6: a rerun reuses it,
+  // never appends a second marker for the same relink).
+  const reaskAt = new Map<string, string>();
+  const atFor = (proposalId: string): string => reaskAt.get(proposalId) ?? now;
   if (reask) {
     // The facade's marker on each target agenda: the only thing that lets the
     // consumer store guard accept the relink (a worker cannot write agendas).
@@ -362,6 +367,20 @@ function collectLocked(
         others.get(link.agenda_id) ??
         (link.agenda_id === target?.agenda_id ? target : undefined);
       if (!base) throw new Error(`[CUSTOMER_DECISION_REASK_TARGET_MISSING] ${link.agenda_id}`);
+      const usedAt = new Set(
+        (entry.proposal.previous_links ?? []).map((previous) => previous.relinked_at)
+      );
+      const unused = (base.reasked_proposals ?? []).find(
+        (marker) =>
+          marker.proposal_id === entry.proposal.proposal_id &&
+          marker.consumer === lock.consumer &&
+          marker.by === reask.by &&
+          !usedAt.has(marker.at)
+      );
+      if (unused) {
+        reaskAt.set(entry.proposal.proposal_id, unused.at);
+        continue;
+      }
       writes.set(link.agenda_id, {
         ...base,
         reasked_proposals: [
@@ -376,7 +395,7 @@ function collectLocked(
         updated_at: now,
       });
     }
-    assertRelinksAllowed(location, pending, links, writes, now, reask.by);
+    assertRelinksAllowed(location, pending, links, writes, atFor, reask.by);
   }
   let written: DecisionAgenda | undefined = target;
   for (const agenda of writes.values()) {
@@ -390,7 +409,7 @@ function collectLocked(
   for (const consumer of consumers) {
     const lock = pending.find((item) => item.lock.consumer === consumer)!.lock;
     if (reask) {
-      relinkOnLock(tenant, location, lock, links, now, reask.by);
+      relinkOnLock(tenant, location, lock, links, atFor, reask.by);
       continue;
     }
     writeConsumedDecisionLock(location, {
@@ -446,7 +465,7 @@ function collectLocked(
 function relinkedDecisions(
   lock: Pick<ConsumedDecisionLockRecord, 'decisions'>,
   links: ReadonlyMap<string, { agenda_id: string; entry_id: string }>,
-  now: string,
+  atFor: (proposalId: string) => string,
   by: string
 ): ConsumedDecisionLockRecord['decisions'] {
   return lock.decisions.map((decision) => {
@@ -455,7 +474,12 @@ function relinkedDecisions(
         ? links.get(decision.proposal.proposal_id)
         : undefined;
     return link && decision.proposal
-      ? relinkTaskProposal({ ...decision, proposal: decision.proposal }, link, now, by)
+      ? relinkTaskProposal(
+          { ...decision, proposal: decision.proposal },
+          link,
+          atFor(decision.proposal.proposal_id),
+          by
+        )
       : decision;
   });
 }
@@ -473,7 +497,7 @@ function assertRelinksAllowed(
   pending: readonly PendingProposal[],
   links: ReadonlyMap<string, { agenda_id: string; entry_id: string }>,
   writes: ReadonlyMap<string, DecisionAgenda>,
-  now: string,
+  atFor: (proposalId: string) => string,
   by: string
 ): void {
   const agendas = new Map(listAgendas(location).map((agenda) => [agenda.agenda_id, agenda]));
@@ -489,7 +513,7 @@ function assertRelinksAllowed(
   };
   for (const { lock, entry } of pending) {
     if (!links.has(entry.proposal.proposal_id)) continue;
-    const [relinked] = relinkedDecisions({ decisions: [entry] }, links, now, by);
+    const [relinked] = relinkedDecisions({ decisions: [entry] }, links, atFor, by);
     const problem = taskProposalRelinkProblem(entry, relinked, read, lock);
     if (problem) {
       throw new ScriptExitError(
@@ -512,7 +536,7 @@ function relinkOnLock(
   location: DecisionLedgerLocation,
   lock: ConsumedDecisionLockRecord,
   links: ReadonlyMap<string, { agenda_id: string; entry_id: string }>,
-  now: string,
+  atFor: (proposalId: string) => string,
   by: string
 ): void {
   const own = `consumers/${lock.consumer}.json`;
@@ -536,7 +560,7 @@ function relinkOnLock(
       }
       writeConsumedDecisionLock(location, {
         ...current,
-        decisions: relinkedDecisions(current, links, now, by),
+        decisions: relinkedDecisions(current, links, atFor, by),
       });
     }
   );

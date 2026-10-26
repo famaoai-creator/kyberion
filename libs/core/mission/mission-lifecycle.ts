@@ -66,6 +66,7 @@ import {
   MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
   publishMeetingDeliverablesIfNeeded,
+  supersededTaskRefusal,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
   updateMissionMemorySidecar,
@@ -83,6 +84,7 @@ export {
   isTaskSuperseded,
   MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
+  supersededTaskRefusal,
   tryAutoCompleteTaskFromEvidence,
 };
 export type { MissionCompletionReconciliationContext } from './mission-lifecycle-completion.js';
@@ -189,8 +191,9 @@ export function evaluateMissionFinishExitGate(
   for (const task of nextTasks) {
     const taskId = String(task.task_id || '');
     if (!taskId.startsWith('repair-') && !taskId.startsWith('goal-gap-')) continue;
-    // A proven supersede closes a repair task; an unproven one is evaluated as pending.
-    if (isTaskProvenSuperseded(missionDir, task, 'the finish gate')) continue;
+    // A superseded repair task is never auto-resolved (that would erase the
+    // record); an unproven one still counts as pending below.
+    if (isTaskSuperseded(task)) continue;
     const staleCircularGoalRepair =
       taskId === 'repair-goal-satisfaction' &&
       Boolean(state) &&
