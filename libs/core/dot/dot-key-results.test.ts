@@ -71,7 +71,7 @@ describe('dot key results', () => {
   it('measures, respects every_s, and ranks the goal gap', async () => {
     let errors = 8;
     const deps = {
-      rootDir: undefined,
+      rootDir: ROOT,
       readFile: () => JSON.stringify({ a: { errors } }),
       readSignals: () => [
         { dot_id: 'kr-dot', signal: 'up', healthy: true, measured_at: at(-5)().toISOString() },
@@ -98,20 +98,19 @@ describe('dot key results', () => {
     const second = await measureDotKeyResults(c, { ...deps, now: at(11) });
     expect(second.map((r) => r.kr_id)).toEqual(['errors']);
 
-    const latest = readLatestDotKeyResults(c);
+    const latest = readLatestDotKeyResults(c, { rootDir: ROOT });
     expect(latest.get('errors')?.value).toBe(4);
-    const lines = dotGoalGapLines(c, { now: at(12) });
+    const lines = dotGoalGapLines(c, { rootDir: ROOT, now: at(12) });
     // errors gap 2*(1-0.6)=0.8, health gap 0.5
     expect(lines[0]).toContain('errors');
     expect(lines[1]).toContain('health');
     expect(lines[0]).toContain('trend ↑');
-    expect(DOT_GOAL_GAP_PROMPT_SECTION.lines(c, { now: at(12) })[0]).toBe(
+    expect(DOT_GOAL_GAP_PROMPT_SECTION.lines(c, { rootDir: ROOT, now: at(12) })[0]).toBe(
       'Largest goal gap first:'
     );
-    expect(DOT_KEY_RESULTS_STATUS_SECTION.collect(c, { now: at(12) })).toHaveProperty(
-      'key_results'
-    );
-    safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
+    expect(
+      DOT_KEY_RESULTS_STATUS_SECTION.collect(c, { rootDir: ROOT, now: at(12) })
+    ).toHaveProperty('key_results');
   });
 
   it('does not throw on failures and times probes out', async () => {
@@ -142,40 +141,45 @@ describe('dot key results', () => {
     expect(dotGoalGapLines(c)[0]).toContain('not measured yet');
   });
 
-  it('measures org metrics and org objective KRs for the roll-up port', async () => {
-    const scope = { organizationId: 'org-x', tenantSlug: 'acme', tier: 'confidential' as const };
-    const purpose = {
-      objectives: [
-        {
-          objective_id: 'o1',
-          title: 'O1',
-          key_results: [
-            {
-              kr_id: 'inc',
-              title: 'Incidents',
-              metric: { source: 'org_metric', metric: 'open_incidents' },
-              target: 0,
-              direction: 'decrease',
-              baseline: 4,
-            },
-          ],
-        },
-      ],
-    } as never;
-    const rows = await measureOrganizationKeyResults(scope, {
-      now: at(0),
-      loadPurpose: () => purpose,
-      orgMetric: () => 2,
-    });
-    expect(rows[0]).toMatchObject({ scope: 'org', objective_id: 'o1', value: 2 });
-    expect(readOrganizationKrMeasurements(scope)).toHaveLength(1);
-    const rolled = rollUpObjectiveProgress(scope, {
-      readMeasurements: (s) => readOrganizationKrMeasurements(s),
-      loadPurpose: () => purpose,
-    });
-    expect(rolled.objectives[0].progress).toBeCloseTo(0.5);
-    safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
-  });
+  it.each([
+    { organizationId: 'org-x', tenantSlug: 'acme', tier: 'confidential' as const },
+    { organizationId: 'org-x', ownerNhi: 'owner-a', tier: 'personal' as const },
+  ])(
+    'measures scoped org metrics and org objective KRs for the roll-up port: $tier',
+    async (scope) => {
+      const purpose = {
+        objectives: [
+          {
+            objective_id: 'o1',
+            title: 'O1',
+            key_results: [
+              {
+                kr_id: 'inc',
+                title: 'Incidents',
+                metric: { source: 'org_metric', metric: 'open_incidents' },
+                target: 0,
+                direction: 'decrease',
+                baseline: 4,
+              },
+            ],
+          },
+        ],
+      } as never;
+      const rows = await measureOrganizationKeyResults(scope, {
+        rootDir: ROOT,
+        now: at(0),
+        loadPurpose: () => purpose,
+        orgMetric: () => 2,
+      });
+      expect(rows[0]).toMatchObject({ scope: 'org', objective_id: 'o1', value: 2 });
+      expect(readOrganizationKrMeasurements(scope, { rootDir: ROOT })).toHaveLength(1);
+      const rolled = rollUpObjectiveProgress(scope, {
+        readMeasurements: (s) => readOrganizationKrMeasurements(s, { rootDir: ROOT }),
+        loadPurpose: () => purpose,
+      });
+      expect(rolled.objectives[0].progress).toBeCloseTo(0.5);
+    }
+  );
 
   it('re-measures an org KR inside its interval only when forced', async () => {
     const scope = { organizationId: 'org-f', tenantSlug: 'acme', tier: 'confidential' as const };
@@ -197,7 +201,7 @@ describe('dot key results', () => {
         },
       ],
     } as never;
-    const deps = { loadPurpose: () => purpose, orgMetric: () => 0 };
+    const deps = { rootDir: ROOT, loadPurpose: () => purpose, orgMetric: () => 0 };
     expect(await measureOrganizationKeyResults(scope, { ...deps, now: at(0) })).toHaveLength(1);
     // An incident opens five minutes later: the default 15-minute throttle skips it…
     const later = { ...deps, orgMetric: () => 1, now: at(5) };
@@ -205,7 +209,6 @@ describe('dot key results', () => {
     // …and an on-demand sweep with force picks it up.
     const forced = await measureOrganizationKeyResults(scope, { ...later, force: true });
     expect(forced[0]).toMatchObject({ kr_id: 'inc', value: 1 });
-    safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
   });
 
   it('records a manual KR value that sweeps leave alone', async () => {
@@ -228,12 +231,16 @@ describe('dot key results', () => {
       ],
     } as never;
     expect(
-      await measureOrganizationKeyResults(scope, { now: at(0), loadPurpose: () => purpose })
+      await measureOrganizationKeyResults(scope, {
+        rootDir: ROOT,
+        now: at(0),
+        loadPurpose: () => purpose,
+      })
     ).toEqual([]);
     const row = recordOrganizationKeyResult(
       scope,
       { objectiveId: 'o1', krId: 'nps', value: 30 },
-      { now: at(5), loadPurpose: () => purpose }
+      { rootDir: ROOT, now: at(5), loadPurpose: () => purpose }
     );
     expect(row).toMatchObject({
       scope: 'org',
@@ -243,7 +250,7 @@ describe('dot key results', () => {
       value: 30,
     });
     expect(row.progress).toBeCloseTo(0.75);
-    expect(readOrganizationKrMeasurements(scope)).toEqual([row]);
+    expect(readOrganizationKrMeasurements(scope, { rootDir: ROOT })).toEqual([row]);
     expect(() =>
       recordOrganizationKeyResult(
         scope,
@@ -272,7 +279,6 @@ describe('dot key results', () => {
         { loadPurpose: () => purpose }
       )
     ).toThrow('ISO-8601');
-    safeRmSync('active/shared/runtime/dot/tenants/acme', { recursive: true, force: true });
   });
 
   it('sweep dedupes orgs referenced by several dots', async () => {

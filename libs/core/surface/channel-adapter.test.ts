@@ -299,17 +299,27 @@ describe('runChannelTurn', () => {
       actorId: 'operator-9',
       send: () => undefined,
     };
-    await runChannelTurn(adapter, { text: 'ping', channel: 'C123', threadTs: 'ts-1' }, () => ({
-      text: 'ok',
-      a2uiMessages: [],
-      a2aMessages: [],
-      delegationResults: [],
-      approvalRequests: [],
-    }));
+    await runChannelTurn(
+      adapter,
+      {
+        text: 'ping',
+        channel: 'C123',
+        threadTs: 'ts-1',
+        scope: { tier: 'confidential', tenant_slug: 'acme' },
+      },
+      () => ({
+        text: 'ok',
+        a2uiMessages: [],
+        a2aMessages: [],
+        delegationResults: [],
+        approvalRequests: [],
+      })
+    );
     expect(mocks.appendDotInboxEntry).toHaveBeenCalledWith(
       expect.objectContaining({
         channel: 'slack',
         source: 'channel-turn',
+        scope: { tier: 'confidential', tenant_slug: 'acme' },
         text: 'ping',
         payload: { channel: 'C123', thread_ts: 'ts-1', actor_id: 'operator-9' },
       })

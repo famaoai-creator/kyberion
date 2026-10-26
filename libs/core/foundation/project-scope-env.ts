@@ -3,6 +3,7 @@ import { isValidTenantSlug } from './scope.js';
 import { rawExistsSync, rawLstatSync, rawReadTextFile } from '../fs-primitives.js';
 import { assertSafeRepositoryPath, pathResolver } from '../path-resolver.js';
 import { isScopeEnvOnly } from './scope-resolution-mode.js';
+import { currentExecutionScope } from './execution-scope.js';
 
 const SAFE_PROJECT_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
@@ -21,7 +22,14 @@ export interface ProjectScopeBinding {
  * resolveScopeResolution's persisted < environment < explicit input order.
  */
 export function resolveProjectScope(): ProjectScopeBinding {
-  const { projectId, tenantSlug, missionId, taskId } = readRawProjectScope();
+  const raw = readRawProjectScope();
+  const binding = currentExecutionScope()?.executionIdentity;
+  const { projectId, tenantSlug, missionId, taskId } = {
+    ...raw,
+    ...(binding?.projectId !== undefined ? { projectId: binding.projectId ?? undefined } : {}),
+    ...(binding?.missionId !== undefined ? { missionId: binding.missionId ?? undefined } : {}),
+    ...(binding?.taskId !== undefined ? { taskId: binding.taskId ?? undefined } : {}),
+  };
   return {
     ...(projectId && SAFE_PROJECT_ID.test(projectId) ? { projectId } : {}),
     ...(tenantSlug && isValidTenantSlug(tenantSlug) ? { tenantSlug } : {}),

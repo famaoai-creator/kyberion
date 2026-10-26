@@ -331,6 +331,8 @@ export const BOOLEAN_FLAGS = new Set([
   '--selected-only',
 ]);
 export const VALUE_FLAGS = new Set([
+  '--expected-snapshot',
+  '--task-binding',
   '--persona',
   '--tenant',
   '--tenant-id',

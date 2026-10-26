@@ -9,6 +9,11 @@ import { ensureMissionTeamRuntimeViaSupervisor } from '../agent/agent-runtime-su
 import * as pathResolver from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
+import {
+  getAgentPromptApprovalPort,
+  getPipelineApprovalStatus,
+  isAgentRuntimeApprovalPendingError,
+} from '../agent/agent-prompt-approval-port.js';
 import { loadMissionTeamPlan, resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import {
   getWorkItem,
@@ -65,6 +70,7 @@ import {
 } from './mission-workitem-dispatch-internals.js';
 import {
   classifyDispatchFailure,
+  classifyDispatchAttemptOutcome,
   nextTaskModelTier,
   recordRoutingOutcome,
   routingOutcomeLedgerPath,
@@ -137,6 +143,34 @@ async function dispatchMissionWorkItemsRound(
     throw new Error(`Mission path not found for ${missionId}`);
   }
 
+  // A human decision resumes only the matching blocked task. The runtime
+  // consumes the approval when the exact tool request is actually relayed.
+  const approvalPort = getAgentPromptApprovalPort();
+  {
+    for (const waiting of selectWorkItems(state, { ...options, statuses: ['blocked'] })) {
+      if (
+        waiting.metadata?.awaiting_approval !== true ||
+        typeof waiting.metadata.approval_request_id !== 'string'
+      )
+        continue;
+      const channel = waiting.metadata.approval_storage_channel;
+      const pipelineApproval =
+        waiting.metadata.approval_kind === 'pipeline' && typeof channel === 'string'
+          ? getPipelineApprovalStatus(channel, waiting.metadata.approval_request_id)
+          : undefined;
+      const decision =
+        waiting.metadata.approval_kind === 'pipeline'
+          ? (pipelineApproval ?? 'closed')
+          : (approvalPort?.status(waiting.metadata.approval_request_id) ?? 'closed');
+      if (decision === 'pending') continue;
+      updateWorkItem({
+        itemId: waiting.item_id,
+        expectedVersion: waiting.version,
+        status: decision === 'approved' ? 'ready' : 'blocked',
+        metadata: { ...waiting.metadata, awaiting_approval: false, approval_decision: decision },
+      });
+    }
+  }
   const workItems = selectWorkItems(state, options);
   const existingManifest = readManifest(missionPath);
   const records: MissionWorkItemDispatchRecord[] = [];
@@ -168,7 +202,9 @@ async function dispatchMissionWorkItemsRound(
         mission_id: missionId,
         ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}),
         ...(state.organization_id ? { organization_id: state.organization_id } : {}),
-        ...(state.organization_id && state.relationships?.project?.project_id
+        ...((state.organization_id ||
+          (state.tier === 'public' && !state.tenant_slug && !state.tenant_id)) &&
+        state.relationships?.project?.project_id
           ? { project_id: state.relationships.project.project_id }
           : {}),
       },
@@ -230,7 +266,7 @@ async function dispatchMissionWorkItemsRound(
      * ones. Recorded whether or not a judgment narrowed the tier, because a
      * baseline run that succeeded is evidence about that tier too.
      */
-    const recordRouting = (input: { attempted: boolean; succeeded: boolean }): void => {
+    const recordRouting = (input: { attempted: boolean | 'unknown'; succeeded: boolean }): void => {
       // A refusal before the model runs is not the model failing.
       const blockedBy = classifyDispatchFailure(record.notes || []);
       recordRoutingOutcome(
@@ -241,7 +277,15 @@ async function dispatchMissionWorkItemsRound(
           chosen_tier: taskModelHint.tier,
           chosen_by: routing.downgraded ? 'judgment' : 'baseline',
           succeeded: input.succeeded,
-          outcome: input.attempted ? 'attempted' : 'not_attempted',
+          outcome:
+            input.attempted === 'unknown'
+              ? 'unknown'
+              : input.attempted
+                ? 'attempted'
+                : 'not_attempted',
+          ...(input.attempted === 'unknown'
+            ? { unknown_reason: blockedBy || 'transport_outcome_unknown' }
+            : {}),
           ...(!input.attempted ? { not_attempted_reason: blockedBy || 'dispatch_preflight' } : {}),
         },
         { ledgerPath: routingOutcomeLedgerPath(missionPath) }
@@ -375,18 +419,23 @@ async function dispatchMissionWorkItemsRound(
     const granteeNhiId = assigneePeerId
       ? deriveAgentNhiId(assigneePeerId, item.context?.organization_id)
       : null;
-    if (grantTaskId && granteeNhiId) {
+    const grantTenant = item.context?.tenant_slug || state.tenant_slug || state.tenant_id;
+    if (grantTaskId && granteeNhiId && grantTenant) {
       const taskGrant = issueTaskGrantBestEffort({
         granteeNhiId,
         audience: { missionId, taskId: grantTaskId },
         scope: {
-          ...(item.context?.tenant_slug ? { tenant_slug: item.context.tenant_slug } : {}),
+          tenant_slug: grantTenant,
         },
         issuedBy: 'workitem-dispatch',
       });
       if (taskGrant) {
         record.notes.push(`task grant issued: ${taskGrant.grant_id}`);
       }
+    } else if (grantTaskId && granteeNhiId && state.tier === 'public') {
+      logger.debug(
+        '[task-scoped-grants] Public shared task has no tenant grant; governed task lease and capability binding remain required'
+      );
     }
 
     let response: Awaited<ReturnType<typeof obtainTaskResultResponse>>;
@@ -407,6 +456,32 @@ async function dispatchMissionWorkItemsRound(
       });
     } catch (error) {
       const reason = error instanceof Error ? error.message : String(error);
+      if (isAgentRuntimeApprovalPendingError(error)) {
+        record.status = 'deferred';
+        record.work_item_status_after = 'blocked';
+        record.notes.push(
+          reason,
+          `next action: decide approval ${error.approvalRequestId}; dispatch resumes the task after approval`
+        );
+        const current = getWorkItem(item.item_id);
+        updateWorkItem({
+          itemId: item.item_id,
+          ...(current ? { expectedVersion: current.version } : {}),
+          status: 'blocked',
+          metadata: {
+            ...(current?.metadata || item.metadata || {}),
+            awaiting_approval: true,
+            approval_request_id: error.approvalRequestId,
+            approval_storage_channel: error.approvalStorageChannel,
+            approval_kind: error.approvalKind,
+            response_wait_status: 'awaiting_approval',
+            response_wait_next_action: `decide approval ${error.approvalRequestId}; dispatch resumes after approval`,
+          },
+        });
+        recordRouting({ attempted: false, succeeded: false });
+        records.push(record);
+        continue;
+      }
       record.status = 'failed';
       record.work_item_status_after = 'blocked';
       record.notes.push(`response wait failed: ${reason}`);
@@ -423,8 +498,10 @@ async function dispatchMissionWorkItemsRound(
           unknown
         >),
       };
-      delete catchMetadata.routing_minimum_tier;
-      if (escalatedTo) catchMetadata.routing_minimum_tier = escalatedTo;
+      if (!blockedBy) {
+        delete catchMetadata.routing_minimum_tier;
+        if (escalatedTo) catchMetadata.routing_minimum_tier = escalatedTo;
+      }
       updateWorkItem({
         itemId: item.item_id,
         status: 'blocked',
@@ -453,7 +530,8 @@ async function dispatchMissionWorkItemsRound(
         next_action: 'inspect provider/session and re-dispatch after recovery',
       });
       recordRouting({
-        attempted: !blockedBy,
+        attempted:
+          classifyDispatchAttemptOutcome(record.notes) === 'unknown' ? 'unknown' : !blockedBy,
         succeeded: false,
       });
       records.push(record);

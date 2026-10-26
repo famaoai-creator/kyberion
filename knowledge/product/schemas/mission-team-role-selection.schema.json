@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.local/schemas/mission-team-role-selection.schema.json",
+  "title": "Mission Team Role Selection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["mode"],
+  "properties": {
+    "mode": { "enum": ["auto", "preferred", "fixed"] },
+    "agent_id": { "type": "string", "minLength": 1 },
+    "provider": { "type": "string", "minLength": 1 },
+    "model_id": { "type": "string", "minLength": 1 },
+    "execution_route": { "const": "agent_runtime" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "mode": { "const": "auto" } } },
+      "then": {
+        "not": {
+          "anyOf": [
+            { "required": ["agent_id"] },
+            { "required": ["provider"] },
+            { "required": ["model_id"] }
+          ]
+        }
+      },
+      "else": {
+        "anyOf": [
+          { "required": ["agent_id"] },
+          { "required": ["provider"] },
+          { "required": ["model_id"] }
+        ]
+      }
+    }
+  ]
+}

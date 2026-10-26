@@ -371,6 +371,7 @@ function findDirectionExceptions(
 
 export function checkModuleBoundaries(): {
   cycles: string[][];
+  runtimeCycles: string[][];
   directionViolations: string[];
   directionExceptions: string[];
   staleDirectionExceptions: string[];
@@ -431,6 +432,7 @@ export function checkModuleBoundaries(): {
   }
   return {
     cycles,
+    runtimeCycles,
     directionViolations,
     directionExceptions: directionExceptions.active,
     staleDirectionExceptions: directionExceptions.stale,

@@ -1,8 +1,129 @@
 import { describe, expect, it } from 'vitest';
-import { selectAgentForTeamRole } from './team-role-assignment-selection.js';
+import {
+  selectAgentForTeamRole,
+  type SelectAgentForTeamRoleInput,
+} from './team-role-assignment-selection.js';
 import type { WorkforceLoadIndex } from '../workforce/workforce-load.js';
+import { readJson } from '../foundation/json.js';
+import { rootResolve } from '../path-resolver.js';
+import type { ProviderInfo } from '../provider/provider-discovery.js';
+import { resolveAgentProviderTarget } from '../agent/agent-provider-resolution.js';
+import '../agent/agent-exec-adapter-providers.js';
 
 describe('team-role assignment selection', () => {
+  it('resolves Codex planning capabilities without bypassing planner projection or actor requirements', () => {
+    const catalog = readJson<{
+      providers: Record<
+        string,
+        Pick<ProviderInfo, 'models' | 'capabilities' | 'modelCapabilities'>
+      >;
+    }>(rootResolve('knowledge/product/orchestration/provider-capabilities.json'));
+    const codex: ProviderInfo = {
+      ...catalog.providers.codex!,
+      provider: 'codex',
+      installed: true,
+      healthy: true,
+      version: 'fixture',
+      protocol: 'exec',
+    };
+    const required = ['reasoning', 'strategy', 'planning'];
+    const options: SelectAgentForTeamRoleInput = {
+      teamRole: 'planner',
+      tier: 'public',
+      teamRoleRecord: {
+        description: 'Plan tasks',
+        required_capabilities: required,
+        compatible_authority_roles: ['mission_controller'],
+        allowed_delegate_team_roles: [],
+        escalation_parent_team_role: null,
+        required_scope_classes: ['mission_state'],
+        ownership_scope: 'Plan the mission',
+        autonomy_level: 'high',
+      },
+      authorityRoles: {
+        mission_controller: {
+          description: 'controller',
+          write_scopes: [],
+          scope_classes: ['mission_state'],
+          allowed_actuators: [],
+          tier_access: ['public'],
+        },
+      },
+      agents: {
+        planner: {
+          authority_roles: ['mission_controller'],
+          team_roles: ['planner'],
+          capabilities: required,
+        },
+        implementer: {
+          authority_roles: ['mission_controller'],
+          team_roles: ['planner'],
+          capabilities: ['code'],
+        },
+      },
+      discoveredProviders: [codex],
+    };
+    const valid = selectAgentForTeamRole({
+      ...options,
+      requestedSelection: {
+        mode: 'fixed',
+        agent_id: 'planner',
+        provider: 'codex',
+        model_id: 'codex',
+      },
+    });
+    expect(
+      resolveAgentProviderTarget(
+        {
+          selectionMode: 'fixed',
+          preferredProvider: 'codex',
+          fixedProvider: 'codex',
+          fixedModelId: 'codex',
+          requiredCapabilities: required,
+        },
+        [codex]
+      )
+    ).toMatchObject({
+      provider: 'codex',
+      modelId: 'codex',
+    });
+    // Cognitive capability does not override the CLI's explicit tool-lockdown refusal.
+    expect(valid).toMatchObject({ status: 'unfilled', agent_id: null });
+    expect(valid.selection_resolution?.reason).toContain(
+      'cannot project the "planner" capability tier'
+    );
+    const governed = selectAgentForTeamRole({
+      ...options,
+      requestedSelection: {
+        mode: 'fixed',
+        agent_id: 'planner',
+        provider: 'codex',
+        model_id: 'codex',
+        execution_route: 'agent_runtime',
+      },
+    });
+    expect(governed).toMatchObject({
+      status: 'assigned',
+      agent_id: 'planner',
+      provider: 'codex',
+      modelId: 'codex',
+    });
+    const incapable = selectAgentForTeamRole({
+      ...options,
+      requestedSelection: {
+        mode: 'fixed',
+        agent_id: 'implementer',
+        provider: 'codex',
+        model_id: 'codex',
+        execution_route: 'agent_runtime',
+      },
+    });
+    expect(incapable).toMatchObject({ status: 'unfilled', agent_id: null });
+    expect(incapable.selection_resolution?.reason).toContain(
+      'Actor does not hold every required capability'
+    );
+  });
+
   it('prefers a capability-matching preferred agent', () => {
     const assignment = selectAgentForTeamRole({
       teamRole: 'owner',

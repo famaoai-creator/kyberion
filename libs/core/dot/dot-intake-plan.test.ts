@@ -5,7 +5,7 @@ import { writeJson } from '../foundation/json.js';
 import type { DotCharter } from './dot-charter.js';
 import type { EventIntakePolicy } from './dot-event-intake.js';
 import { describeDotIntakePlan } from './dot-intake-plan.js';
-import { DOT_STATE_ROOT } from './dot-state-paths.js';
+import { dotStatePath } from './dot-state-paths.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-intake-plan-tests';
 const NOW = new Date('2026-10-25T00:00:00Z');
@@ -167,8 +167,8 @@ describe('describeDotIntakePlan', () => {
       now: NOW,
     });
     const pull = plan.rows.find((row) => row.mode === 'pull');
-    const statePath = `${TEST_ROOT}/${DOT_STATE_ROOT}/feed/${pull?.feed?.spec_id}.json`;
-    safeMkdir(`${TEST_ROOT}/${DOT_STATE_ROOT}/feed`, { recursive: true });
+    const statePath = `${TEST_ROOT}/${dotStatePath(charter(), 'feed', `${pull?.feed?.spec_id}.json`)}`;
+    safeMkdir(`${TEST_ROOT}/${dotStatePath(charter(), 'feed')}`, { recursive: true });
     writeJson(statePath, {
       spec_id: pull?.feed?.spec_id,
       source: 'slack',

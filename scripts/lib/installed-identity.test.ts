@@ -4,6 +4,7 @@ const s = vi.hoisted(() => ({
   scoped: false,
   fail: false,
   local: false,
+  response: { ready: true, missing_files: [] as string[] },
   readDenied: false,
   rootLookups: 0,
   env: {} as Record<string, string>,
@@ -25,7 +26,11 @@ vi.mock('@agent/core/secure-io', () => ({
     s.calls.push(options);
     return s.fail
       ? { status: 1, stdout: '', stderr: 'denied' }
-      : { status: 0, stdout: '\nKYBERION_IDENTITY_READINESS:{"ready":true}\n', stderr: '' };
+      : {
+          status: 0,
+          stdout: '\nKYBERION_IDENTITY_READINESS:' + JSON.stringify(s.response) + '\n',
+          stderr: '',
+        };
   },
 }));
 vi.mock('@agent/core/scope-context', () => ({ resolveScopeContext: () => s.scope }));
@@ -63,17 +68,52 @@ vi.mock('@agent/core/governance/external-operation', () => ({
 vi.mock('@agent/core/organization/tenant-governance', () => ({
   shellQuoteArg: (value: string) => `'${value}'`,
 }));
-import { inspectInstalledIdentity, canonicalAuthorityCommand } from './installed-identity.js';
+import {
+  inspectInstalledIdentity,
+  inspectMissionPrerequisiteIdentity,
+  canonicalAuthorityCommand,
+} from './installed-identity.js';
 describe('installation identity metadata', () => {
   beforeEach(() => {
     s.root = '/installation';
     s.scoped = false;
     s.fail = false;
     s.local = false;
+    s.response = { ready: true, missing_files: [] };
     s.readDenied = false;
     s.rootLookups = 0;
     s.calls = [];
     s.env = {};
+  });
+  it('checks all mission identity prerequisites at the primary host without copying files', () => {
+    expect(inspectMissionPrerequisiteIdentity()).toEqual({ ready: true, missing_files: [] });
+    expect(JSON.parse(s.calls[0].input).requiredFiles).toEqual([
+      'my-identity.json',
+      'my-vision.md',
+      'agent-identity.json',
+    ]);
+    expect(JSON.parse(s.calls[0].input).scope).toEqual(s.scope);
+  });
+  it('does not accept a partial primary identity or malformed metadata', () => {
+    s.response = { ready: false, missing_files: ['my-vision.md'] };
+    expect(inspectMissionPrerequisiteIdentity()).toMatchObject({
+      ready: false,
+      missing_files: ['my-vision.md'],
+    });
+    s.response = { ready: true, missing_files: ['my-vision.md'] };
+    expect(inspectMissionPrerequisiteIdentity().ready).toBe(false);
+    s.response = { ready: false, missing_files: ['secret.json'] };
+    expect(inspectMissionPrerequisiteIdentity().ready).toBe(false);
+  });
+  it('refuses scoped mission probes and foreign installation roots', () => {
+    s.scoped = true;
+    expect(inspectMissionPrerequisiteIdentity().ready).toBe(false);
+    expect(s.rootLookups).toBe(0);
+    expect(s.calls).toEqual([]);
+    s.scoped = false;
+    s.root = 'unrelated';
+    expect(inspectMissionPrerequisiteIdentity().ready).toBe(false);
+    expect(s.calls).toEqual([]);
   });
   it('reads only metadata at the same-repository installation and preserves tenant/customer scope', () => {
     expect(inspectInstalledIdentity()).toEqual({

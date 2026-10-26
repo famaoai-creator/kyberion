@@ -159,6 +159,16 @@ describe('pipeline approval resume', () => {
     }
   });
 
+  it('leaves task-owned continuations with the dispatch claim holder', () => {
+    mocks.loadPipelineRunJournal().started.library_execution = { resume_owner: 'task' };
+    expect(resumePipelineRunAfterApproval(record)).toMatchObject({
+      status: 'already_running',
+      runId: 'run-1',
+      reason: expect.stringContaining('lease-fenced'),
+    });
+    expect(mocks.spawnManagedProcess).not.toHaveBeenCalled();
+  });
+
   it('retains manual continuation for legacy journals without authority provenance', () => {
     const state = mocks.loadPipelineRunJournal();
     delete state.started.execution_authority;

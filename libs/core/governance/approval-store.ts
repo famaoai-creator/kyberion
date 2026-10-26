@@ -1,6 +1,11 @@
 import { withApprovalRecordLock } from './approval-apply-claim.js';
+import { registerPipelineApprovalStatus } from '../agent/agent-prompt-approval-port.js';
+
+registerPipelineApprovalStatus((channel, id) => loadApprovalRequest(channel, id)?.status);
+
 import {
   normalizeApprovalChannel,
+  loadApprovalRequest,
   listApprovalRequests,
   isApprovalRequestExpired,
 } from './approval-store-reader.js';

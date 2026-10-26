@@ -17,7 +17,11 @@ import {
   type WorkspaceLedgerOptions,
   type WorkspaceRecord,
 } from './workspace-ledger.js';
-import { sweepRegisteredWorkspaces, type SweepWorkspacesOptions } from './workspace-sweep.js';
+import {
+  archivedMissionExists,
+  sweepRegisteredWorkspaces,
+  type SweepWorkspacesOptions,
+} from './workspace-sweep.js';
 
 const HOUR = 60 * 60 * 1000;
 const T0 = Date.parse('2026-09-26T00:00:00.000Z');
@@ -291,5 +295,24 @@ describe('sweepRegisteredWorkspaces', () => {
       expect(result.unresolvedOwners).toHaveLength(0);
       expect(result.deleted).toHaveLength(0);
     });
+  });
+});
+
+describe('archivedMissionExists', () => {
+  it('detects partitioned and flat archived missions; absent missions stay non-terminal', () => {
+    const archive = path.join(base, 'archive', 'missions');
+    const partitioned = path.join(archive, 'public', 'shared', 'MSN-DONE-1');
+    safeMkdir(partitioned, { recursive: true });
+    safeWriteFile(path.join(partitioned, 'mission-state.json'), '{"status":"archived"}');
+    const flat = path.join(archive, 'MSN-DONE-2');
+    safeMkdir(flat, { recursive: true });
+    safeWriteFile(path.join(flat, 'mission-state.json'), '{"status":"archived"}');
+
+    expect(archivedMissionExists('MSN-DONE-1', archive)).toBe(true);
+    expect(archivedMissionExists('msn-done-2', archive)).toBe(true);
+    expect(archivedMissionExists('MSN-ACTIVE-1', archive)).toBe(false);
+    // A bare archive dir without mission-state.json is not proof of archival.
+    safeMkdir(path.join(archive, 'public', 'shared', 'MSN-EMPTY'), { recursive: true });
+    expect(archivedMissionExists('MSN-EMPTY', archive)).toBe(false);
   });
 });

@@ -88,7 +88,9 @@ describe('event intake surface', () => {
     expect(logged).not.toContain(SECRET);
     info.mockRestore();
     const ledger = String(
-      safeReadFile(`${TEST_ROOT}/active/shared/runtime/dot/events.jsonl`, { encoding: 'utf8' })
+      safeReadFile(`${TEST_ROOT}/active/shared/runtime/dot/public/shared/events.jsonl`, {
+        encoding: 'utf8',
+      })
     );
     expect(ledger.trim().split('\n')).toHaveLength(1);
   });

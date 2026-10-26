@@ -108,7 +108,21 @@ pnpm mission:orchestrator       # in another
 
 ### 1.7 Production launchd (optional)
 
-If Kyberion should auto-start on login, install a launchd plist:
+For per-checkout services, use the canonical installer. It generates distinct service
+and log names from the physical checkout root, and pins the daemon's runtime root:
+
+```bash
+pnpm kyberion scheduler install
+pnpm kyberion scheduler install --apply
+pnpm kyberion scheduler install --daemon agent-runtime-supervisor
+pnpm kyberion scheduler status
+```
+
+See [multi-instance scheduler operations](../../knowledge/product/orchestration/multi-instance-scheduler.md)
+for schedule ownership and explicit legacy-global management. The fixed-name templates
+below are legacy single-instance deployment examples; do not copy them for coexisting checkouts.
+
+If maintaining an existing single-instance launchd deployment, its templates are:
 
 ```bash
 # Templates live at:
@@ -180,6 +194,10 @@ Linux has no built-in OS keychain equivalent to macOS Keychain. Use one of:
 For production, prefer `LoadCredential=` or a protected environment file. The opt-in file backend is intended for hosts where its local file permissions and storage protection meet the operator's policy.
 
 ### 2.4 systemd units
+
+For coexisting checkouts, prefer the same `scheduler install` ceremony above; on
+Linux it plans per-instance systemd **user** services/timers. The root-level fixed-name
+templates below are legacy single-instance examples.
 
 Templates live under `docs/operator/systemd/`:
 

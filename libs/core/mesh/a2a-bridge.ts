@@ -1,4 +1,6 @@
 import { logger } from '../core.js';
+import { isAgentRuntimeApprovalPendingError } from '../agent/agent-prompt-approval-port.js';
+import { isUncertainSupervisorTransportFailure } from '../agent/supervisor-transport-uncertainty.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { agentRegistry, AgentProvider } from '../agent/agent-registry.js';
@@ -54,6 +56,7 @@ import {
 } from '../agent/agent-runtime-supervisor.js';
 import {
   askAgentRuntimeViaDaemon,
+  isSupervisorRemoteError,
   createSupervisorBackedAgentHandle,
   ensureAgentRuntimeViaDaemon,
   refreshAgentRuntimeViaDaemon,
@@ -559,6 +562,17 @@ class A2ABridgeImpl {
       }
     } catch (daemonErr: unknown) {
       if (daemonErr instanceof AgentBusyError) throw daemonErr;
+      // Approval is a durable suspension, never daemon unavailability. Running
+      // the same task in-process would create a second effect attempt.
+      if (isAgentRuntimeApprovalPendingError(daemonErr)) throw daemonErr;
+      if (isSupervisorRemoteError(daemonErr)) throw daemonErr;
+      if (isUncertainSupervisorTransportFailure(errorMessage(daemonErr))) throw daemonErr;
+      const daemonFailure = errorMessage(daemonErr);
+      if (
+        !daemonFailure.includes('[SUPERVISOR_PREASK_FAILED]') ||
+        daemonFailure.includes('invalid_supervisor_response')
+      )
+        throw daemonErr;
 
       // Fallback in-process route with Semaphore limits
       const agentSem = getAgentSemaphore(agentId);
@@ -870,6 +884,7 @@ class A2ABridgeImpl {
     ): void => {
       if (missionId && teamRole) {
         reserveMissionTeamSelectionDispatch({
+          executionRoute: 'agent_runtime',
           missionId,
           teamRole,
           agentId,
@@ -941,7 +956,10 @@ class A2ABridgeImpl {
       this.runtimeContexts.get(agentId) !== runtimeContextKey &&
       !canAdoptPrewarmedRuntime
     ) {
-      if (requestedSelection || existingSelection) {
+      if (
+        (requestedSelection || existingSelection) &&
+        (!runtimeContextKey.startsWith('workitem:') || existingRecord?.status === 'busy')
+      ) {
         throw new Error(
           '[AGENT_SELECTION_RUNTIME_CONFLICT] A live selected runtime has a different execution context; stop it explicitly before changing context'
         );
@@ -1060,6 +1078,19 @@ class A2ABridgeImpl {
             }
           : {}),
         task_model_hint: taskModelHint,
+        // Preserve the task's permission contract across the daemon boundary.
+        // The runtime resolves this request against the live WorkItem before
+        // installing any tools; transport metadata is never itself a grant.
+        ...(typeof payloadContext?.capability_profile === 'string'
+          ? { capability_profile: payloadContext.capability_profile }
+          : {}),
+        ...(typeof payloadContext?.work_item_id === 'string'
+          ? { work_item_id: payloadContext.work_item_id }
+          : {}),
+        ...(typeof payloadContext?.task_id === 'string' ? { task_id: payloadContext.task_id } : {}),
+        ...(typeof payloadContext?.lease_id === 'string'
+          ? { lease_id: payloadContext.lease_id }
+          : {}),
         intent: typeof payloadRecord?.intent === 'string' ? payloadRecord.intent : undefined,
       },
     } as const;
@@ -1145,6 +1176,22 @@ class A2ABridgeImpl {
 
   private getRuntimeContextKey(payload: unknown): string {
     const executionMode = this.extractExecutionMode(payload);
+    if (executionMode === 'workitem' && isRecord(payload) && isRecord(payload.context)) {
+      // A reused process must not retain a previous task's tools, lease or
+      // authority. Re-dispatch of the same contract remains reusable.
+      const context = payload.context;
+      return `workitem:${crypto
+        .createHash('sha256')
+        .update(
+          JSON.stringify({
+            work_item_id: context.work_item_id,
+            capability_profile: context.capability_profile,
+            lease_id: context.lease_id,
+            security_scope: context.security_scope,
+          })
+        )
+        .digest('hex')}`;
+    }
     return executionMode === 'conversation' ? 'conversation' : 'default';
   }
 

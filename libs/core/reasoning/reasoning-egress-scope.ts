@@ -52,6 +52,8 @@ export interface ReasoningPayloadScope {
   categories?: Array<'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown'>;
   /** Maximum provider data-use posture. Defaults to local_only. */
   training_use?: ReasoningTrainingUse;
+  external_egress?: 'allow' | 'deny';
+  allowed_reasoning_backends?: readonly string[];
 }
 
 const scopeStorage = new AsyncLocalStorage<ReasoningPayloadScope>();
@@ -230,7 +232,20 @@ function assertCharterProcessorScope(
  * caller declares a payload scope, so a missing scope cannot silently turn
  * into unrestricted external egress.
  */
+function assertTaskBackendPolicy(backendName: string, local: boolean): void {
+  const scope = getReasoningPayloadScope();
+  if (scope?.allowed_reasoning_backends && !scope.allowed_reasoning_backends.includes(backendName))
+    throw new ReasoningEgressDeniedError(
+      `[REASONING_EGRESS_DENIED] Backend ${backendName} is outside the task allowlist`
+    );
+  if (scope?.external_egress === 'deny' && !local)
+    throw new ReasoningEgressDeniedError(
+      `[REASONING_EGRESS_DENIED] Task forbids external backend ${backendName}`
+    );
+}
+
 export function assertReasoningEgressAllowed(backendName: string): void {
+  assertTaskBackendPolicy(backendName, isLocalReasoningBackend(backendName));
   assertSandboxNetworkAllowed(reasoningBackendEndpoint(backendName));
   // This overload has no endpoint information. The endpoint-aware path below
   // is the enforcement point for configurable adapters; preserve the
@@ -244,6 +259,7 @@ export function assertReasoningEgressAllowedAtEndpoint(
   backendName: string,
   endpoint: string
 ): void {
+  assertTaskBackendPolicy(backendName, isLocalReasoningEndpoint(endpoint));
   assertSandboxNetworkAllowed(endpoint);
   const localEndpoint = isLocalReasoningEndpoint(endpoint);
   if (isLocalReasoningBackend(backendName) && !localEndpoint) {

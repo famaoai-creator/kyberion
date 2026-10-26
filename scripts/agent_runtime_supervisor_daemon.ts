@@ -1,6 +1,9 @@
 import * as net from 'node:net';
+import './task_pipeline_executor.js';
+import '@agent/core/workforce/worker-goal-driver';
 import { timingSafeEqual } from 'node:crypto';
 import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
+import { tryInspectCompilerOutputs } from '@agent/core/build-coordination';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {
@@ -32,7 +35,7 @@ import {
   normalizeSupervisorResult,
 } from '@agent/core/agent/agent-runtime-supervisor-client';
 import { getRegisteredEnvText, parseSafeJsonInput, setRegisteredEnv } from '@agent/core/foundation';
-import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import { withExecutionContext } from '@agent/core/authority';
 import { createTriggerRunner, resolveCurrentTriggerAuthority } from '@agent/core/trigger-runner';
 import {
   listDotCharters,
@@ -66,6 +69,7 @@ import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration
 import { runDotHousekeeping } from '@agent/core/dot/dot-dispatch';
 import '@agent/core/dot/dot-extension-bootstrap';
 import { dotBudgetThrottle, type DotBudgetThrottle } from '@agent/core/dot/dot-budget';
+import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
 import { notifyDotBudgetStopOnce } from './dot_budget_alert.js';
 import { tickVetoWindows } from '@agent/core/governance/approval-veto-window';
 import { getOperationsHaltState } from '@agent/core/governance/operations-halt';
@@ -336,6 +340,17 @@ export async function runDotSweepOnce(
   now: Date = new Date(),
   deps: DotSweepDeps = {}
 ): Promise<number> {
+  const inspection = await tryInspectCompilerOutputs(() => runDotSweepWithStableOutputs(now, deps));
+  if (!('value' in inspection)) {
+    logger.debug(
+      '[dot-sweep] compiler outputs busy — sweep deferred until build completes | next: retry next sweep | evidence: compiler-outputs'
+    );
+    return 0;
+  }
+  return inspection.value;
+}
+
+async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Promise<number> {
   // One sweep at a time: a slow wake (up to the charter's wall-clock budget)
   // must not let the next tick pile a second sweep on top.
   if (dotSweepInFlight) return 0;
@@ -374,21 +389,17 @@ export async function runDotSweepOnce(
       alertVetoWindowFailure(now, error);
     }
     for (const loaded of active) {
-      const housekeeping = await withExecutionContextAsync(
-        loaded.charter.authority.authority_role,
-        () =>
-          runDotHousekeeping(loaded.charter, {
-            now: () => now,
-            serviceCall: (input) =>
-              executeServicePreset(
-                input.service_id,
-                input.action,
-                input.params ?? {},
-                'secret-guard'
-              ),
-          }),
-        undefined,
-        loaded.charter.scope.tenant_slug
+      const housekeeping = await runAsDotCharter(loaded.charter, () =>
+        runDotHousekeeping(loaded.charter, {
+          now: () => now,
+          serviceCall: (input) =>
+            executeServicePreset(
+              input.service_id,
+              input.action,
+              input.params ?? {},
+              'secret-guard'
+            ),
+        })
       ).catch((error: unknown) => ({
         settled: [],
         signals: 0,
@@ -418,7 +429,11 @@ export async function runDotSweepOnce(
       // Budget-capped dots skip before the runner layer so a pending trigger
       // doesn't burn a warn + 'failed' receipt every tick — but they still
       // heartbeat, or the watchdog would page a dot that is healthy-but-capped.
-      if (dotDailyTokenCapReached(loaded.charter, { now: () => now })) {
+      if (
+        await runAsDotCharter(loaded.charter, async () =>
+          dotDailyTokenCapReached(loaded.charter, { now: () => now })
+        )
+      ) {
         notifyDotBudgetStopOnce(loaded.charter, 'token-cap', now);
         recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
           status: 'running',
@@ -430,10 +445,12 @@ export async function runDotSweepOnce(
       // above still ran; the executor step skips it too). Fails open.
       let budgetThrottle: DotBudgetThrottle = 'normal';
       try {
-        budgetThrottle = (
-          deps.budgetThrottle ??
-          ((charter: DotCharter) => dotBudgetThrottle(charter, { now: () => now }).throttle)
-        )(loaded.charter);
+        budgetThrottle = await runAsDotCharter(loaded.charter, async () =>
+          (
+            deps.budgetThrottle ??
+            ((charter: DotCharter) => dotBudgetThrottle(charter, { now: () => now }).throttle)
+          )(loaded.charter)
+        );
       } catch (error) {
         logger.warn(
           `[dot-sweep] budget evaluation failed for ${loaded.charter.dot_id} — ${error instanceof Error ? error.message : error} | next: wakes held; repair spend-policy.json org_budget | evidence: libs/core/governance/org-budget-governor.ts`
@@ -450,46 +467,55 @@ export async function runDotSweepOnce(
       }
       let due: DueDotTrigger[];
       try {
-        const serviceCall = (input: {
-          service_id: string;
-          action: string;
-          params?: Record<string, unknown>;
-        }) =>
-          executeServicePreset(input.service_id, input.action, input.params ?? {}, 'secret-guard');
-        // Pull feeds first: a fresh item must be able to wake the dot in the
-        // same sweep through its ordinary event trigger.
-        const feedPolls = await evaluateDotFeedTriggers(loaded.charter, {
-          now: () => now,
-          serviceCall,
-        });
-        if (feedPolls.length > 0) {
-          recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
-            status: 'running',
-            details: {
-              dot_id: loaded.charter.dot_id,
-              trigger: 'feed',
-              feeds: feedPolls.map((poll) => ({
-                source: poll.source,
-                status: poll.status,
-                ingested: poll.ingested,
-              })),
-            },
-          });
-        }
-        due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
-        due = due.concat(
-          await evaluateDotProbeTriggers(loaded.charter, {
+        due = await runAsDotCharter(loaded.charter, async () => {
+          let due: DueDotTrigger[];
+          const serviceCall = (input: {
+            service_id: string;
+            action: string;
+            params?: Record<string, unknown>;
+          }) =>
+            executeServicePreset(
+              input.service_id,
+              input.action,
+              input.params ?? {},
+              'secret-guard'
+            );
+          // Pull feeds first: a fresh item must be able to wake the dot in the
+          // same sweep through its ordinary event trigger.
+          const feedPolls = await evaluateDotFeedTriggers(loaded.charter, {
             now: () => now,
             serviceCall,
-          })
-        );
-        due = due.concat(
-          evaluateDotFollowupsDue(loaded.charter, { now: () => now }),
-          evaluateDotCronCatchUp(loaded.charter, { now: () => now })
-        );
-        due = due.concat(evaluateDotEventTriggers(loaded.charter, { now: () => now }));
-        // Re-applied over the concatenated list: one half-open probe at most.
-        due = applyDotWakeCircuit(loaded.charter, due, { now: () => now });
+          });
+          if (feedPolls.length > 0) {
+            recordDaemonHeartbeat(loaded.charter.runtime.heartbeat_id, {
+              status: 'running',
+              details: {
+                dot_id: loaded.charter.dot_id,
+                trigger: 'feed',
+                feeds: feedPolls.map((poll) => ({
+                  source: poll.source,
+                  status: poll.status,
+                  ingested: poll.ingested,
+                })),
+              },
+            });
+          }
+          due = evaluateDotTriggersDue(loaded.charter, { now: () => now });
+          due = due.concat(
+            await evaluateDotProbeTriggers(loaded.charter, {
+              now: () => now,
+              serviceCall,
+            })
+          );
+          due = due.concat(
+            evaluateDotFollowupsDue(loaded.charter, { now: () => now }),
+            evaluateDotCronCatchUp(loaded.charter, { now: () => now })
+          );
+          due = due.concat(evaluateDotEventTriggers(loaded.charter, { now: () => now }));
+          // Re-applied over the concatenated list: one half-open probe at most.
+          due = applyDotWakeCircuit(loaded.charter, due, { now: () => now });
+          return due;
+        });
       } catch (error) {
         logger.warn(
           `[dot-sweep] trigger evaluation failed for ${loaded.charter.dot_id}: ${error instanceof Error ? error.message : error}`
@@ -497,44 +523,36 @@ export async function runDotSweepOnce(
         continue;
       }
       for (const trigger of due) {
-        const role = loaded.charter.authority.authority_role;
         // runDotWake writes its own ledger row on internal failure; only a
         // failure before the deliver callback (authority/policy) needs one
         // written here.
         let deliverRan = false;
         try {
-          const receipt = await withExecutionContextAsync(
-            role,
-            async () => {
-              const authority = resolveCurrentTriggerAuthority(loaded.charter.scope.tenant_slug);
-              return await dotTriggerRunner.run(
-                {
-                  idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
-                  source: triggerRunnerSource(trigger),
-                  createdBy: authority,
-                  payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
-                },
-                async () => {
-                  deliverRan = true;
-                  const wake = await (deps.wake ?? runDotWakeWithGoalDriver)(loaded, { trigger });
-                  wakeReasons.push(
-                    wake.outcome === 'failed' ? (wake.reason ?? 'failed') : undefined
-                  );
-                  // Only a real delivery may close the runner's idempotency
-                  // key — 'delivered' is terminal there, so throwing on
-                  // skipped/failed keeps the key retryable and lets the dot
-                  // ledger's pending event survive the block (a content-
-                  // addressed wake:<hash> key can never regenerate).
-                  if (wake.outcome === 'failed' || wake.outcome === 'skipped') {
-                    throw new Error(wake.reason ?? `dot wake ${wake.outcome}`);
-                  }
-                  return `dot-wake:${wake.outcome}`;
+          const receipt = await runAsDotCharter(loaded.charter, async () => {
+            const authority = resolveCurrentTriggerAuthority(loaded.charter.scope.tenant_slug);
+            return await dotTriggerRunner.run(
+              {
+                idempotencyKey: `dot:${loaded.charter.dot_id}:${trigger.key}`,
+                source: triggerRunnerSource(trigger),
+                createdBy: authority,
+                payload: { dot_id: loaded.charter.dot_id, trigger_key: trigger.key },
+              },
+              async () => {
+                deliverRan = true;
+                const wake = await (deps.wake ?? runDotWakeWithGoalDriver)(loaded, { trigger });
+                wakeReasons.push(wake.outcome === 'failed' ? (wake.reason ?? 'failed') : undefined);
+                // Only a real delivery may close the runner's idempotency
+                // key — 'delivered' is terminal there, so throwing on
+                // skipped/failed keeps the key retryable and lets the dot
+                // ledger's pending event survive the block (a content-
+                // addressed wake:<hash> key can never regenerate).
+                if (wake.outcome === 'failed' || wake.outcome === 'skipped') {
+                  throw new Error(wake.reason ?? `dot wake ${wake.outcome}`);
                 }
-              );
-            },
-            undefined,
-            loaded.charter.scope.tenant_slug
-          );
+                return `dot-wake:${wake.outcome}`;
+              }
+            );
+          });
           reconcileDotEventRunnerDuplicate(loaded.charter, trigger.key, receipt, () =>
             dotTriggerRunner.records()
           );
@@ -1087,7 +1105,7 @@ async function handleRequest(
         return {
           id: request.id,
           ok: true,
-          result,
+          result: { refreshed: true, reason: result.mode },
         };
       }
       case 'restart': {
@@ -1148,6 +1166,17 @@ async function handleRequest(
       id: request.id,
       ok: false,
       error: error?.message || String(error),
+      ...(error?.code === 'AGENT_APPROVAL_PENDING' && typeof error.approvalRequestId === 'string'
+        ? {
+            errorDetail: {
+              code: error.code,
+              approval_request_id: error.approvalRequestId,
+              approval_storage_channel: error.approvalStorageChannel,
+              approval_kind: error.approvalKind,
+              scope: error.scope,
+            },
+          }
+        : {}),
     };
   }
 }

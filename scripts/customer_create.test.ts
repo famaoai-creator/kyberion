@@ -34,7 +34,9 @@ vi.mock('@agent/core', () => ({
   safeReaddir: mocks.safeReaddir,
 }));
 
-vi.mock('@agent/core/path-resolver', () => ({
+vi.mock('@agent/core/path-resolver', async (importOriginal) => ({
+  // Authority loads the tracked tenant schema before per-test fixture roots apply.
+  rootResolve: (await importOriginal<typeof import('@agent/core/path-resolver')>()).rootResolve,
   pathResolver: mocks.pathResolver,
 }));
 

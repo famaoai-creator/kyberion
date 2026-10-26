@@ -184,6 +184,7 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
   記録された自己承認などは、ON にした後では効果にならない。一覧は
   `libs/core/governance/approval-sod-consumers.contract.test.ts` と一致させる。
   - 承認ゲートと store: `approval_gate`、`approval_gate_session_cache`、`apply_claim`
+  - WorkItem effect ownership: `work_effect_release`（不確実な実行の保持解除。元の実行スコープに束縛した人間の承認が必須）、
   - DOT: `dot_release`、`dot_dispatch`、`dot_autonomy_promotion`（拒否時は昇格待ちを監査付きで取り消す）、
     `front_desk_execution`
   - mission と discussion: `mission_scope_approve`、`mission_reconcile_work`、`discussion_mission`

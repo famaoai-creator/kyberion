@@ -36,11 +36,19 @@ const logger = createLogger('execution-scope');
  * the only writer exported here is {@link runInExecutionScope}, owned by
  * authority.ts.
  */
+export interface ExecutionIdentityBinding {
+  /** null explicitly clears inherited environment and persisted scope. */
+  readonly missionId?: string | null;
+  readonly projectId?: string | null;
+  readonly taskId?: string | null;
+}
+
 export interface ExecutionScope {
   readonly tenantBound: boolean;
   readonly tenantSlug?: string;
   /** Organization whose governed state the current store-writer may access. */
   readonly organizationId?: string;
+  readonly executionIdentity?: ExecutionIdentityBinding;
   /** Role assumed in-process by withExecutionContext* (already normalized). */
   readonly assumedRole?: string;
   /**

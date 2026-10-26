@@ -146,8 +146,10 @@ scope を保った実行コマンドを表示する。`--file` / `--out` は元�
 同じ envelope を `request --file <reviewed-file>` に渡す。既存の reviewed file は上書きしない。
 
 mission の本人設定・ライフサイクルは引き続き owner checkout が管理する。
-新しい worktree で `Sovereign profile incomplete` が出た場合、同じ人の onboarding / charter を
-worktree ごとに作り直さない。作業 worktree にビルド済み runtime を用意したうえで、
+新しい worktree の standalone controller は、同じ Git common directory の正本 checkout にある
+本人設定3ファイルの存在だけを確認する。本人情報の内容や charter はコピーしない。
+scope 付き worker からこの参照口は使えない。`Sovereign profile incomplete` が出た場合も、同じ人の onboarding / charter を
+worktree ごとに作り直さない。既存 mission の操作は owner checkout の正本を使い、作業 worktree にビルド済み runtime を用意したうえで、
 既存の owner checkout を明示してライフサイクルを実行する:
 
 ```bash

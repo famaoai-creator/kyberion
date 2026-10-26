@@ -108,3 +108,7 @@ export * from './surface/workspace-query.js';
 export * from './surface/workspace-work.js';
 export * from './surface/workspace-autonomy.js';
 export * from './surface/scoped-workspace-ingest.js';
+export * from './workforce/task-tool-runtime.js';
+export * from './workforce/task-api-adapter.js';
+export * from './workforce/task-source-edit.js';
+export * from './workforce/task-pipeline-tool.js';

@@ -601,6 +601,10 @@ describe('shell-claude-cli-backend', () => {
 
       const [, argv] = spawnMock.mock.calls[0];
       expect(argv[argv.indexOf('--tools') + 1]).toBe('');
+      expect(argv).toContain('--strict-mcp-config');
+      expect(argv[argv.indexOf('--mcp-config') + 1]).toBe('{"mcpServers":{}}');
+      expect(argv[argv.indexOf('--setting-sources') + 1]).toBe('');
+      expect(argv[argv.indexOf('--settings') + 1]).toBe('{"disableAllHooks":true}');
       expect(argv[argv.indexOf('--permission-mode') + 1]).toBe('plan');
       expect(argv).not.toContain('--dangerously-skip-permissions');
       expect(argv).not.toContain('bypassPermissions');
