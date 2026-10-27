@@ -53,7 +53,11 @@ export type OverviewEntryStatus =
 
 export type OverviewStatusCounts = Record<OverviewEntryStatus, number>;
 
-/** Why an item is on the attention list, in urgency order (most urgent first). */
+/**
+ * Why an item is on the attention list, in urgency order (most urgent first).
+ * Reasons may be added: a reader must ship with the facade that emits them
+ * (Chronos rejects an overview with a reason it does not know).
+ */
 export type OverviewAttentionReason =
   | 'frozen_locks'
   | 'respond_by_overdue'
@@ -415,7 +419,7 @@ export function buildCaseOverview(input: CaseOverviewInput): CaseOverview {
       frozen_locks: frozen,
       ...(frozen > 0
         ? {
-            frozen_locks_next: `pnpm kyberion customer-decision status --case ${input.case_id} names them: restore each consumers/<consumer>.json from its revision before the mark, then pnpm mission resume <mission>; or supersede the task with pnpm mission supersede-task (the lock stays frozen)`,
+            frozen_locks_next: `pnpm kyberion customer-decision status --case ${input.case_id} names them with the proof's reason: confirm the mission has no approved supersede (never restore while the proof is unreadable), then restore consumers/<consumer>.json from its revision before the mark (an operator with authority over the tenant's confidential knowledge) and run pnpm mission resume <mission>; or supersede the task with pnpm mission supersede-task — the lock then stays frozen and counted here`,
           }
         : {}),
     },
