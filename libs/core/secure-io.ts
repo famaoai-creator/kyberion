@@ -23,11 +23,12 @@ import { assertSandboxNetworkAllowed } from './shell/sandbox-policy.js';
 import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
+// Instruction-effect classification is pure; secure I/O never imports its governance facade.
 import {
   describePersistentInstructionWrite,
   describeOpaqueInstructionExecution,
   isPersistentInstructionPath,
-} from './governance/persistent-instruction-effect.js';
+} from './foundation/persistent-instruction-effect.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 // The policy gate is intentionally part of secure-io bootstrap; policy-engine

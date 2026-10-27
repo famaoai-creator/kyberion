@@ -86,8 +86,12 @@
       "pattern": "libs/core/mission/orchestrator-session.ts"
     },
     {
-      "layer": "domain",
+      "layer": "orchestration",
       "pattern": "libs/core/workforce/worker-context-compaction.ts"
+    },
+    {
+      "layer": "domain",
+      "pattern": "libs/core/workforce/worker-compaction-receipt.ts"
     },
     {
       "layer": "domain",

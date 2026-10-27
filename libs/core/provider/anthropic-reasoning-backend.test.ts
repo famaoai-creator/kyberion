@@ -104,7 +104,6 @@ describe('AnthropicReasoningBackend', () => {
 
     expect(create).toHaveBeenCalledWith(expect.any(Object), {
       signal: controller.signal,
-      maxRetries: 0,
     });
   });
 

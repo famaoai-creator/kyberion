@@ -2325,6 +2325,27 @@ tenant credentials fail closed; never repair that failure by sharing an operator
 client. Gates: credential-binding, provider-auth-home and coordinated-dispatch
 regressions, including parallel scopes and same-tenant task drift.
 
+Before viewer admission, the host token registry is read through its existing
+exact-file reader role with an explicit trusted system tenant clear. Restore the
+outer tenant afterward; this does not authorize other personal connections or
+override an active tenant resource/envelope constraint. Gate:
+`chronos-token-registry-reader.test.ts`, including ambient-tenant admission and
+unrelated-connection denial. Deterministic pipeline logging/transforms must not
+bootstrap provider credentials; unknown or reasoning operations still must.
+Approval presentation uses `redactActiveSecretsForHostLog`, not the scoped
+credential-value reader: an unbound tenant can request approval without reading
+operator secrets, and known values remain masked. Gate:
+`pipeline-library-resume.integration.test.ts` checks all four decision outcomes,
+redacted request details and continued credential lookup denial.
+
+Provider request retry policy must distinguish tenant-bound clients from operator
+clients and honor the no-redispatch scope. Native review dispatch may inherit only
+the matching default route; explicit model/profile routes stay on their selected
+delegate. Gate: Anthropic credential/retry, reasoning-dispatch-scope and ADF repair
+regressions. Keep CLI usage mocks on the actual recorder interface. Recovery
+fixtures use canonical mission IDs on case-sensitive filesystems and isolate
+provider health state so previous failures cannot change later candidate sets.
+
 Preserve the old plugin code and install/approval identity until a digest-bound
 publication commits. Serialize by canonical plugin target and retain recovery
 state across interruption. Unknown bytes require explicit recovery, never a

@@ -50,12 +50,10 @@ export function createAnthropicCredentialClient(
   const client = boundKey
     ? new TenantAnthropicClient(boundKey)
     : (options.client ??
-      new Anthropic({
-        maxRetries: 0,
-        ...(options.operatorApiKey ? { apiKey: options.operatorApiKey } : {}),
-      }));
+      new Anthropic(options.operatorApiKey ? { apiKey: options.operatorApiKey } : {}));
   return {
     client,
+    tenantScoped: Boolean(owner.tenantSlug),
     assertBinding: () => {
       assertCredentialOwner(owner);
       if (owner.tenantSlug) {

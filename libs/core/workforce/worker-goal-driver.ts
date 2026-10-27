@@ -98,7 +98,7 @@ import {
   type ToolCallRepeatGovernorConfig,
   type ToolCallRepeatGovernorState,
 } from '../tool/tool-call-repeat-governor.js';
-import { estimateTokens } from './worker-context-compaction.js';
+import { estimateTokens } from '../foundation/text.js';
 import {
   accrueGoalBudgetUsage,
   applyGoalUpdate,

@@ -14,6 +14,7 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { automaticReasoningRedispatchAllowed } from '../reasoning/reasoning-dispatch-scope.js';
 import { normalizeEventScope } from '../event-scope.js';
 import { getUsageAttribution } from '../usage-accounting.js';
 import { llmSemaphore } from '../semaphore.js';
@@ -24,7 +25,7 @@ import {
   computeCompletionTokenBudget,
   estimateRequestInputTokens,
 } from '../completion-token-budget.js';
-import { resolveContextWindowProfile } from '../workforce/worker-context-compaction.js';
+import { resolveContextWindowProfile } from '../workforce/context-window-profile.js';
 import type {
   BranchForkInput,
   CritiqueInput,
@@ -388,6 +389,7 @@ function modelSupportsEffort(model: string): boolean {
 
 export class AnthropicReasoningBackend implements ReasoningBackend {
   private readonly assertCredentialBinding: () => void;
+  private readonly tenantCredentialClient: boolean;
   readonly name = 'anthropic';
   private readonly client: Anthropic;
   private readonly model: string;
@@ -402,6 +404,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     const credentials = createAnthropicCredentialClient({ client: options.client });
     this.client = credentials.client;
     this.assertCredentialBinding = credentials.assertBinding;
+    this.tenantCredentialClient = credentials.tenantScoped;
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.effort = options.effort;
@@ -514,10 +517,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       const result = await llmSemaphore.run(() => {
         this.assertCredentialBinding();
         assertReasoningEgressAllowed(this.name);
-        return this.client.messages.parse(budgeted, {
-          ...(options?.signal ? { signal: options.signal } : {}),
-          maxRetries: 0,
-        });
+        return this.client.messages.parse(budgeted, this.requestOptions(options?.signal));
       });
       this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
@@ -548,10 +548,10 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       const result = await llmSemaphore.run(() => {
         this.assertCredentialBinding();
         assertReasoningEgressAllowed(this.name);
-        return this.client.messages.create(budgeted, {
-          ...(options?.signal ? { signal: options.signal } : {}),
-          maxRetries: 0,
-        }) as Promise<Anthropic.Message>;
+        return this.client.messages.create(
+          budgeted,
+          this.requestOptions(options?.signal)
+        ) as Promise<Anthropic.Message>;
       });
       this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
@@ -559,6 +559,15 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
       this.recordSdkUsage(started, 'error', budgeted.model);
       throw err;
     }
+  }
+
+  private requestOptions(
+    signal?: AbortSignal
+  ): { signal?: AbortSignal; maxRetries?: number } | undefined {
+    const noRetries = this.tenantCredentialClient || !automaticReasoningRedispatchAllowed();
+    return signal || noRetries
+      ? { ...(signal ? { signal } : {}), ...(noRetries ? { maxRetries: 0 } : {}) }
+      : undefined;
   }
 
   private thinkingConfig() {

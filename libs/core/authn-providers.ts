@@ -280,8 +280,13 @@ const envTokenProvider: AuthnProvider = {
 function loadRegistrations(deps?: AuthnResolveDeps) {
   if (deps?.registrations !== undefined) return deps.registrations;
   // TR-01: least privilege — the reader role's only grant is chronos-access.json.
-  return withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
-    readChronosTokenRegistrations()
+  // Authentication precedes viewer tenant admission. This exact-file reader
+  // uses system scope; its role cannot read other personal connection files.
+  return withExecutionContext(
+    CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+    () => readChronosTokenRegistrations(),
+    undefined,
+    ''
   );
 }
 

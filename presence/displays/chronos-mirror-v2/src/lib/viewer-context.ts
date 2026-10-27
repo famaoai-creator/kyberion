@@ -56,8 +56,11 @@ function loadRegistry(): ChronosTokenRegistration[] | null {
     // TR-01: Chronos runs as SYSTEM_ROLE=chronos_mirror_v2, which cannot read
     // the personal tier; the registry is read under the narrow reader role
     // whose only grant is chronos-access.json.
-    return withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
-      readChronosTokenRegistrations()
+    return withExecutionContext(
+      CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+      () => readChronosTokenRegistrations(),
+      undefined,
+      ''
     );
   } catch {
     throw new ViewerContextError(401, 'Chronos viewer token registry is unavailable.');
