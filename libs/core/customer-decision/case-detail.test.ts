@@ -433,6 +433,29 @@ describe('buildCustomerDecisionCaseDetail (CD-12 drill-down)', () => {
     expect(detail.tasks_total).toBe(1);
   });
 
+  it('marks a task whose lock carries an unproven superseded mark as frozen', () => {
+    const consumers = caseInput().consumers.map((lock) =>
+      lock.mission_id === 'MSN-2'
+        ? {
+            ...lock,
+            superseded: {
+              by_consumer: `${lock.consumer}-v2`,
+              by_task_id: 'v2',
+              at: CREATED,
+              approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+            },
+          }
+        : lock
+    );
+    const detail = buildCustomerDecisionCaseDetail(caseInput({ consumers }));
+    expect(detail.tasks.map((task) => [task.mission_id, task.frozen])).toEqual([
+      ['MSN-1', undefined],
+      ['MSN-2', true],
+    ]);
+    expect(detail.task_counts.frozen_locks).toBe(1);
+    expect(detail.attention[0]).toMatchObject({ reason: 'frozen_locks', count: 1 });
+  });
+
   it('never emits a value, free text, option, rationale, name, actor id or from', () => {
     const text = JSON.stringify(buildCustomerDecisionCaseDetail(caseInput())).toLowerCase();
     expect(text).not.toContain(SECRET);

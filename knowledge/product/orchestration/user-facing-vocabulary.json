@@ -691,6 +691,11 @@
         "ja": "まだ聞いていないタスクの問い",
         "qps-ploc": "⟦Ŧȧşķ ɋůėşŧïőñş ñőŧ ȧşķėḓ ẏėŧ ŀőřėɱ ïṗş⟧"
       },
+      "chronos_cd_reason_frozen_locks": {
+        "en": "Frozen task locks",
+        "ja": "凍結されたタスクのロック",
+        "qps-ploc": "⟦Ƒřőẑėñ ŧȧşķ ŀőƈķş ŀőřėɱ⟧"
+      },
       "chronos_cd_days_today": {
         "en": "today",
         "ja": "今日",
@@ -945,6 +950,11 @@
         "en": "Completed",
         "ja": "完了",
         "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ŀőř⟧"
+      },
+      "chronos_cd_task_frozen": {
+        "en": "Frozen",
+        "ja": "凍結",
+        "qps-ploc": "⟦Ƒřőẑėñ ŀőř⟧"
       },
       "chronos_cd_task_proposals": {
         "en": "{count, plural, one {1 proposal} other {# proposals}} · {waiting} waiting for the customer",

@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Mission Execution'
 tags: [governance, lifecycle, execution]
-last_updated: 2026-10-08
+last_updated: 2026-10-28
 runtime_stages: [contract_authoring, preflight, execution]
 ---
 
@@ -130,7 +130,11 @@ template task is recorded while the work happens**. Verified end to end on 2026-
      stores (tier- and tenant-partitioned, configured roots) with its raw reader. A worker
      that marks its own lock therefore gains nothing — every reader ignores an unproven
      mark and the task stays held — but no later write to that lock (re-pin, release,
-     rework, re-ask) succeeds, and each logs the refusal. Repair: confirm the mark has no
+     rework, re-ask) succeeds, and each logs the refusal. The operator sees it:
+     `customer-decision overview` counts it (`frozen_locks`, first on the attention list
+     and on the Chronos card), the case detail marks the task `frozen`, and
+     `customer-decision status --case <c>` lists it under `frozen_locks` with the repair
+     step. Repair: confirm the mark has no
      approved supersede (the `SUPERSEDE_UNPROVEN` warning), restore
      `consumers/<consumer>.json` in the tenant's decision case from its revision before
      the mark (an operator with authority over the tenant's confidential knowledge),

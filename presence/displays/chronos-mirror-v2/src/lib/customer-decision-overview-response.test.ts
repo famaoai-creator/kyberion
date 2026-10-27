@@ -180,4 +180,25 @@ describe('customer-decision overview projection (CD-12)', () => {
     value.totals.attention_total = -1;
     expect(parseCustomerDecisionOverview(value, 'acme')).toBeUndefined();
   });
+
+  it('reads frozen lock counts, and 0 from a facade that predates them', () => {
+    const source = structuredClone(realOverview());
+    source.totals.frozen_locks = 2;
+    source.cases[0].tasks.frozen_locks = 2;
+    source.attention.unshift({ reason: 'frozen_locks', case_id: 'case-a', count: 2 });
+    const parsed = parseCustomerDecisionOverview(source, 'acme');
+    expect(parsed?.totals.frozen_locks).toBe(2);
+    expect(parsed?.cases[0].tasks.frozen_locks).toBe(2);
+    expect(parsed?.attention[0]).toEqual({ reason: 'frozen_locks', case_id: 'case-a', count: 2 });
+    const older = structuredClone(realOverview()) as unknown as {
+      totals: Record<string, unknown>;
+      cases: Array<{ tasks: Record<string, unknown> }>;
+    };
+    delete older.totals.frozen_locks;
+    delete older.cases[0].tasks.frozen_locks;
+    delete older.cases[0].tasks.unresolvable;
+    const parsedOlder = parseCustomerDecisionOverview(older, 'acme');
+    expect(parsedOlder?.totals.frozen_locks).toBe(0);
+    expect(parsedOlder?.cases[0].tasks).toMatchObject({ unresolvable: 0, frozen_locks: 0 });
+  });
 });

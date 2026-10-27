@@ -29,7 +29,7 @@ import {
   utcDate,
 } from './reminders.js';
 import { agendaAnswerState, openChangeRequests } from './respond.js';
-import type { ConsumedDecisionLockRecord } from './store.js';
+import { isConsumedDecisionLockSuperseded, type ConsumedDecisionLockRecord } from './store.js';
 import type {
   AgendaStatus,
   DecisionAgenda,
@@ -55,6 +55,7 @@ export type OverviewStatusCounts = Record<OverviewEntryStatus, number>;
 
 /** Why an item is on the attention list, in urgency order (most urgent first). */
 export type OverviewAttentionReason =
+  | 'frozen_locks'
   | 'respond_by_overdue'
   | 'awaiting_operator_confirmation'
   | 'open_change_requests'
@@ -67,6 +68,7 @@ export type OverviewAttentionReason =
   | 'pending_task_proposals';
 
 export const OVERVIEW_ATTENTION_ORDER: readonly OverviewAttentionReason[] = [
+  'frozen_locks',
   'respond_by_overdue',
   'awaiting_operator_confirmation',
   'open_change_requests',
@@ -82,7 +84,7 @@ export const OVERVIEW_ATTENTION_ORDER: readonly OverviewAttentionReason[] = [
 export interface OverviewAttentionItem {
   reason: OverviewAttentionReason;
   case_id: string;
-  /** Absent on case-level items (`held_tasks`, `pending_task_proposals`). */
+  /** Absent on case-level items (`frozen_locks`, `held_tasks`, `pending_task_proposals`). */
   agenda_id?: string;
   title?: string;
   /** How many entries / receipts / reminders / tasks. */
@@ -161,6 +163,17 @@ export interface CaseOverview {
     unresolvable: number;
     /** Present when `unresolvable` > 0: how to clear them (no ids, no values). */
     unresolvable_next?: string;
+    /**
+     * Tasks whose lock carries a `superseded` mark the mission does not
+     * prove (`isSuperseded`; without a verifier no mark is proven). The
+     * consumer store guard only checks the mark's shape, so a worker can mark
+     * its own lock: the task stays counted as live (the mark is not trusted),
+     * but the guard refuses every later write to the lock — re-pin, release,
+     * rework and re-ask all fail.
+     */
+    frozen_locks: number;
+    /** Present when `frozen_locks` > 0: how to repair them (no ids, no values). */
+    frozen_locks_next?: string;
   };
 }
 
@@ -187,6 +200,8 @@ export interface CustomerDecisionOverview {
     reminders_due: number;
     held_tasks: number;
     pending_task_proposals: number;
+    /** Tasks whose consumer lock is frozen by an unproven `superseded` mark. */
+    frozen_locks: number;
     /**
      * Summary form only (`overview --summary`): how many attention items
      * there are in full, before `attention` was capped.
@@ -368,9 +383,12 @@ export function buildCaseOverview(input: CaseOverviewInput): CaseOverview {
   let held = 0;
   let ready = 0;
   let unresolvable = 0;
+  let frozen = 0;
   for (const lock of input.consumers) {
     // A task superseded by a verified approval was replaced: it asks nothing.
     if (input.isSuperseded?.(lock)) continue;
+    // A mark left after that check is unproven: the lock is frozen.
+    if (isConsumedDecisionLockSuperseded(lock)) frozen += 1;
     pendingProposals += pendingTaskProposals(lock).length;
     if (!lock.hold || lock.status !== 'in_progress') continue;
     const holds = taskProposalHolds(lock, input.agendas, input.ledger, input.now);
@@ -392,6 +410,12 @@ export function buildCaseOverview(input: CaseOverviewInput): CaseOverview {
       ...(unresolvable > 0
         ? {
             unresolvable_next: `pnpm kyberion customer-decision status --case ${input.case_id} names them: ask again with draft --from-tasks --reask <tp-id,...> --by user:<member>, or replace the task with pnpm mission supersede-task`,
+          }
+        : {}),
+      frozen_locks: frozen,
+      ...(frozen > 0
+        ? {
+            frozen_locks_next: `pnpm kyberion customer-decision status --case ${input.case_id} names them: restore each consumers/<consumer>.json from its revision before the mark, then pnpm mission resume <mission>; or supersede the task with pnpm mission supersede-task (the lock stays frozen)`,
           }
         : {}),
     },
@@ -480,11 +504,19 @@ export function buildCustomerDecisionOverview(input: {
     reminders_due: 0,
     held_tasks: 0,
     pending_task_proposals: 0,
+    frozen_locks: 0,
   };
   const attention: OverviewAttentionItem[] = [];
   for (const item of cases) {
     totals.held_tasks += item.tasks.held;
     totals.pending_task_proposals += item.tasks.pending_proposals;
+    totals.frozen_locks += item.tasks.frozen_locks;
+    if (item.tasks.frozen_locks > 0)
+      attention.push({
+        reason: 'frozen_locks',
+        case_id: item.case_id,
+        count: item.tasks.frozen_locks,
+      });
     if (item.tasks.held > 0)
       attention.push({ reason: 'held_tasks', case_id: item.case_id, count: item.tasks.held });
     if (item.tasks.pending_proposals > 0)
