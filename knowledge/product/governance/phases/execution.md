@@ -133,13 +133,14 @@ template task is recorded while the work happens**. Verified end to end on 2026-
      rework, re-ask) succeeds, and each logs the refusal. The operator sees it:
      `customer-decision overview` counts it (`frozen_locks`, first on the attention list
      and on the Chronos card), the case detail marks the task `frozen`, and
-     `customer-decision status --case <c>` lists it under `frozen_locks` with the repair
-     step. Repair: confirm the mark has no
+     `customer-decision status --case <c>` lists it under `frozen_locks` with the proof's
+     failure reason and the repair step (an unreadable proof — `proof_unreadable:*` — is
+     no evidence either way: fix the store and rerun, never restore on it). Repair: confirm the mark has no
      approved supersede (the `SUPERSEDE_UNPROVEN` warning), restore
      `consumers/<consumer>.json` in the tenant's decision case from its revision before
      the mark (an operator with authority over the tenant's confidential knowledge),
      then `pnpm mission resume <MISSION_ID>`; or supersede the task properly and
-     accept the frozen lock.
+     accept the frozen lock (it stays counted as frozen and live on the overview).
 
 4. **Review with a different agent.** After an independent reviewer (a distinct subagent,
    or the agent reviewing the PR) has reviewed, record its verdict, then close the review

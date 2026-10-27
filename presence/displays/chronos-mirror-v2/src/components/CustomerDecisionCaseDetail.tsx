@@ -291,6 +291,13 @@ export function CustomerDecisionCasePanel({
                 label={uxText('chronos_cd_metric_pending_proposals', locale)}
                 value={tasks.pending_proposals}
               />
+              {tasks.frozen_locks > 0 ? (
+                <Metric
+                  label={uxText('chronos_cd_metric_frozen_locks', locale)}
+                  value={tasks.frozen_locks}
+                  tone="danger"
+                />
+              ) : null}
             </div>
 
             {detail.attention.length > 0 ? (

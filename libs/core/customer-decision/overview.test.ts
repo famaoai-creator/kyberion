@@ -416,8 +416,10 @@ describe('buildCaseOverview (CD-12)', () => {
     // The unproven mark still freezes the lock: counted, with the repair step.
     const unverified = buildCaseOverview(caseInput({ consumers: marked })).tasks;
     expect(unverified).toMatchObject({ pending_proposals: 2, held: 1, frozen_locks: 2 });
+    // Confirm first (an unreadable proof is no evidence), then restore as an
+    // operator with authority over the tenant's confidential knowledge.
     expect(unverified.frozen_locks_next).toMatch(
-      /customer-decision status --case .*revision before the mark.*mission resume/u
+      /customer-decision status --case .*confirm the mission has no approved supersede \(never restore while the proof is unreadable\).*revision before the mark \(an operator with authority over the tenant's confidential knowledge\).*mission resume/u
     );
     expect(
       buildCaseOverview(caseInput({ consumers: marked, isSuperseded: () => false })).tasks
