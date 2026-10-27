@@ -1,6 +1,11 @@
 import { withApprovalRecordLock } from './approval-apply-claim.js';
+import { registerPipelineApprovalStatus } from '../agent/agent-prompt-approval-port.js';
+
+registerPipelineApprovalStatus((channel, id) => loadApprovalRequest(channel, id)?.status);
+
 import {
   normalizeApprovalChannel,
+  loadApprovalRequest,
   listApprovalRequests,
   isApprovalRequestExpired,
 } from './approval-store-reader.js';
@@ -20,6 +25,7 @@ export {
   loadApprovalRequest,
   listApprovalRequests,
   isApprovalRequestExpired,
+  normalizeApprovalChannel,
 } from './approval-store-reader.js';
 import { withExecutionContext } from '../authority.js';
 import type { FirstJobDecisionProof } from '../surface/first-job-approval-proof.js';

@@ -1,4 +1,6 @@
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { requestWorkEffectReleaseApproval } from '@agent/core/governance/work-effect-release-request';
+import { shellQuoteArg } from '@agent/core/organization/tenant-governance';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import {
   appendCoordinationEvent,
@@ -13,6 +15,7 @@ import {
   listWorkItems,
   migrateLegacyWorkItemContexts,
   releaseWorkItem,
+  releaseWorkItemEffectOwnership,
   renewWorkItemLease,
   updateWorkItem,
   type WorkBoardType,
@@ -216,6 +219,11 @@ async function runMain(args: string[] = []): Promise<void> {
     .command('list-board', 'List board items or boards', () => undefined)
     .command('claim-item', 'Claim a work item lease', () => undefined)
     .command('release-item', 'Release a work item lease', () => undefined)
+    .command(
+      'release-effect',
+      'Release quarantined effects with an authenticated human approval',
+      () => undefined
+    )
     .command('handoff-item', 'Hand off a leased item to another peer', () => undefined)
     .command('renew-lease', 'Renew a work item lease', () => undefined)
     .command('update-status', 'Update work item fields', () => undefined)
@@ -290,6 +298,8 @@ async function runMain(args: string[] = []): Promise<void> {
     .option('purpose', { type: 'string', default: 'implementation' })
     .option('ttl-ms', { type: 'number' })
     .option('expected-version', { type: 'number' })
+    .option('approval-request-id', { type: 'string' })
+    .option('request-approval', { type: 'boolean', default: false })
     .option('idempotency-key', { type: 'string' })
     .option('event-type', { type: 'string' })
     .option('command-id', { type: 'string' })
@@ -420,6 +430,36 @@ async function runMain(args: string[] = []): Promise<void> {
         nextStatus: argv.status ? (String(argv.status) as WorkItemStatus) : undefined,
       });
       print(result);
+      break;
+    }
+    case 'release-effect': {
+      if (argv['request-approval']) {
+        if (argv['approval-request-id'])
+          throw new Error('Choose request-approval or approval-request-id, not both');
+        const itemId = String(argv['item-id'] || '');
+        const version = Number(argv['expected-version']);
+        const approval = requestWorkEffectReleaseApproval({
+          itemId,
+          expectedVersion: version,
+          requestedBy: String(
+            argv['actor-user-id'] || argv['actor-peer-id'] || 'work-effect-recovery'
+          ),
+        });
+        print({
+          approval_request_id: approval.id,
+          status: approval.status,
+          approve_command: `pnpm kyberion approvals --approve ${approval.id}`,
+          apply_command: `pnpm work release-effect --item-id ${shellQuoteArg(itemId)} --expected-version ${version} --approval-request-id ${approval.id}`,
+        });
+        break;
+      }
+      print(
+        releaseWorkItemEffectOwnership({
+          itemId: String(argv['item-id'] || ''),
+          expectedVersion: Number(argv['expected-version']),
+          approvalRequestId: String(argv['approval-request-id'] || ''),
+        })
+      );
       break;
     }
     case 'handoff-item': {

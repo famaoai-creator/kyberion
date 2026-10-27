@@ -6,6 +6,7 @@
       "id": "mission-workflow-catalog",
       "kind": "mission_workflow_catalog",
       "path": "knowledge/product/governance/mission-workflow-catalog.json",
+      "schema": "knowledge/product/schemas/mission-workflow-catalog.schema.json",
       "execution_role": "runtime",
       "consumer_paths": [
         "libs/core/mission/mission-workflow-catalog.ts",
@@ -22,6 +23,7 @@
       "id": "mission-orchestration-scenarios",
       "kind": "scenario_pack",
       "path": "knowledge/product/governance/mission-orchestration-scenario-pack.json",
+      "schema": "knowledge/product/schemas/mission-orchestration-scenario-pack.schema.json",
       "execution_role": "validation",
       "consumer_paths": [
         "scripts/check_contract_schemas.ts",
@@ -36,6 +38,7 @@
       "id": "mission-task-classification-scenarios",
       "kind": "scenario_pack",
       "path": "knowledge/product/governance/mission-task-classification-scenarios.json",
+      "schema": "knowledge/product/schemas/mission-task-classification-scenarios.schema.json",
       "execution_role": "validation",
       "consumer_paths": [
         "scripts/check_contract_schemas.ts",

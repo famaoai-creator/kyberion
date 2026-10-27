@@ -245,7 +245,9 @@ export async function readFirstJobStatus(
       let history: DotActionRecord[];
       let rows: DotWorkResultRow[];
       try {
-        history = retainedFile(DOT_ACTION_LEDGER_PATH) ? readDotActionLedgerStrict() : [];
+        history = retainedFile(DOT_ACTION_LEDGER_PATH)
+          ? readDotActionLedgerStrict({ dotId: charter.dot_id })
+          : [];
         rows = strictResults(charter);
       } catch (error) {
         // Permission/scope failures use the same unavailable envelope as a missing request.

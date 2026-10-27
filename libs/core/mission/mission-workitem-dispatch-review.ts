@@ -28,6 +28,9 @@ import * as pathResolver from '../path-resolver.js';
 import { getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
+import { isAgentRuntimeApprovalPendingError } from '../agent/agent-prompt-approval-port.js';
+import { canProvideGovernedTaskTools } from '../agent/agent-exec-adapter-bridge.js';
+import { registerTaskApiAdapters } from '../workforce/task-api-adapter.js';
 import {
   resolveArtifactReviewerProfile,
   type ArtifactReviewerProfile,
@@ -35,6 +38,7 @@ import {
 import { resolveMissionTeamReceiver } from './mission-team-plan-composer.js';
 import { safeExistsSync, safeStat } from '../secure-io.js';
 import {
+  getWorkItem,
   type WorkItem,
   type WorkItemSource,
   type WorkItemStatus,
@@ -1173,6 +1177,7 @@ export async function delegateSubagentTask(input: {
         output,
       };
     } catch (error) {
+      if (isAgentRuntimeApprovalPendingError(error)) throw error;
       return {
         execution_kind: 'agent_delegation',
         task_id: getWorkItemTaskId(input.item) || input.item.item_id,
@@ -1300,8 +1305,13 @@ export async function routeToAgentOrSubagent(input: {
   notes.push(`capability profile: ${capabilityProfile}`);
   // Candidacy: an explicitly selected provider that cannot structurally
   // project this tier is refused here (fail-closed), never run wider.
-  assertProviderCanProjectProfile(input.provider, capabilityProfile);
-  const runtimeSecurityScope = resolveRuntimeSecurityScope(input.securityScope, input.provider);
+  const runtimeSecurityScope = resolveRuntimeSecurityScope(
+    {
+      ...input.securityScope,
+      task_id: input.item.context?.task_id ?? input.securityScope.task_id,
+    },
+    input.provider
+  );
   const surfaceDecision = resolveWorkItemExecutionSurface(
     input.item,
     surfacePurpose,
@@ -1316,6 +1326,13 @@ export async function routeToAgentOrSubagent(input: {
   const useRuntime =
     surfaceDecision.active_surface === 'agent_runtime' ||
     (!hasSurfaceConfiguration && input.mode === 'agent');
+  if (roleAssignment?.requested_selection?.execution_route === 'agent_runtime' && !useRuntime)
+    throw new Error(
+      '[MISSION_TEAM_SELECTION_INVALID] This role requires agent_runtime; CLI execution cannot satisfy its governed task-tool contract.'
+    );
+  registerTaskApiAdapters();
+  if (!useRuntime || !canProvideGovernedTaskTools(input.provider))
+    assertProviderCanProjectProfile(input.provider, capabilityProfile);
   const defaultA2ARoute = getA2ARoute();
   // ①モデル振り分け: the per-task model hint (tier/effort from phase_kind,
   // risk, scope) rides into the backend call instead of a global env choice.
@@ -1409,6 +1426,7 @@ export async function routeToAgentOrSubagent(input: {
       delegate: async (request) => {
         const startedAt = nowIso();
         try {
+          const liveItem = getWorkItem(input.item.item_id);
           const response = await routeA2A({
             a2a_version: '1.0',
             header: {
@@ -1437,6 +1455,8 @@ export async function routeToAgentOrSubagent(input: {
               context: {
                 mission_id: input.missionId,
                 work_item_id: input.item.item_id,
+                lease_id: liveItem?.lease_id,
+                task_id: liveItem?.context?.task_id ?? request.task_id,
                 team_role: input.teamRole,
                 capability_profile: capabilityProfile,
                 ...(input.provider ? { provider: input.provider } : {}),
@@ -1472,6 +1492,7 @@ export async function routeToAgentOrSubagent(input: {
             output: String(response.payload?.text || ''),
           };
         } catch (error) {
+          if (isAgentRuntimeApprovalPendingError(error)) throw error;
           return {
             execution_kind: 'agent_delegation',
             task_id: request.task_id,
@@ -1576,6 +1597,7 @@ export async function routeToAgentOrSubagent(input: {
       notes,
     };
   } catch (error: any) {
+    if (isAgentRuntimeApprovalPendingError(error)) throw error;
     if (fixedSelection || (!hasSurfaceConfiguration && input.mode === 'agent')) {
       throw new Error(
         `[EXECUTION_SURFACE_FAILED] ${surfaceDecision.surface} dispatch failed: ${error?.message || error}`
