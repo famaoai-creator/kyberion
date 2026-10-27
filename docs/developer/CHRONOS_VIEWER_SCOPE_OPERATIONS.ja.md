@@ -1,7 +1,7 @@
 ---
 title: Chronos viewer scope 運用手順
 tags: [chronos, security, authorization, multi-tenant]
-last_updated: 2026-09-27
+last_updated: 2026-10-26
 ---
 
 # Chronos viewer scope 運用手順
@@ -23,6 +23,17 @@ last_updated: 2026-09-27
 `/api/healthz` を除くすべての Chronos API ルートは、通常の role guard 通過後に `resolveViewerContextForRequest` を実行します。これにより、登録外 token や principal のない remote request は個別ルートでも fail-closed になります。`healthz` だけが明示的な公開 probe です。
 
 ファイル・成果物・runtime の読み取りは、可能な範囲で `withViewerExecutionContext` の内側で行い、単一 tenant viewer の境界を tier guard へ伝播します。tenant を選択できる可視化ルートは、viewer の許可集合を先に解決した後で query を交差させます。回帰防止として `src/app/api/route-contract.test.ts` が route module の viewer 契約を走査します。
+
+### 顧客の決定のルート（CD-12）
+
+`GET /api/customer-decisions/overview`・`/case?tenant=&case=`・`/learning?tenant=[&date=]` は、ひとつのテナントの顧客の決定を読むだけのルートです。三つとも `src/lib/customer-decision-viewer-scope.ts` の `resolveCustomerDecisionTenant` で、次の順に確かめてから子プロセスを動かします(控えを返す前にも毎回確かめます)。
+
+1. プロジェクトに限られた閲覧者と `project_id` の指定は 403。テナント全体の画面だからです。
+2. `tenant` は閲覧者の許可集合を絞るだけです。許可集合が一つならそのテナント、複数か全テナントで `tenant` がなければ 400。
+3. テナントの登録簿にないテナントは 403。
+4. 閲覧者が confidential tier に届かなければ 403、テナントの組織(id はテナントの slug)に届かなければ 403。
+
+`case` は台帳の案件 id の形、`date` は `YYYY-MM-DD` でなければ 400 で、子プロセスは動きません。Chronos は決定の置き場を読みません。governed facade(`dist/scripts/customer_decision.js overview`)を、そのテナントに結び付けたシステム役割なしの子プロセスとして、種類ごとに決まった引数で動かします(同時に 4 つまで、種類・テナント・引数ごとに 15 秒の控え)。応答は版・テナント・案件・日付を確かめた形に組み直し、値・選択肢・理由・コメント・名前は入りません。案件やレポートがなければ 404、facade が未ビルドなら 503、時間切れは 504、ほかは 502 で、どれも決まった文面だけを返します。
 
 middleware は edge で secret-guard のファイル読み取りを行わない設計です。したがって middleware は credential/loopback の早期境界、token registry を伴う viewer 解決は route 側、という二段構成を維持します。
 

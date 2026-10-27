@@ -8,22 +8,29 @@ import {
   Code,
   Disclosure,
   EmptyState,
+  KbLink,
   Metric,
   Section,
   Skeleton,
   Table,
+  safeHref,
+  type ActionRefLike,
 } from '@agent/shared-ui';
 import { ChronosInline, ChronosMeta } from './chronos-ui';
-import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
+import type { CustomerDecisionHrefs } from '../lib/customer-decision-navigation';
+import { createLatestRequestGuard } from '../lib/customer-decision-view-client';
 import {
   parseCustomerDecisionOverviewResponse,
   type AgendaOverviewView,
   type CaseOverviewView,
   type CustomerDecisionOverviewView,
   type OverviewAgendaStatus,
+  type OverviewAttentionItemView,
   type OverviewAttentionReason,
 } from '../lib/customer-decision-overview-response';
+
+export { createLatestRequestGuard };
 
 /**
  * CD-12: the "customer decisions" card of the organization view. Counts,
@@ -100,32 +107,65 @@ export function customerDecisionHiddenAttention(overview: CustomerDecisionOvervi
   return Math.max(0, Math.max(overview.totals.attention_total, overview.attention.length) - shown);
 }
 
+/** The drill-down hrefs a row may link to (see CustomerDecisionCaseDetail). */
+type DrillDownHrefs = Pick<CustomerDecisionHrefs, 'caseOf' | 'agendaOf'>;
+
+/**
+ * Attention rows; with `hrefs` each row (and its title) opens the agenda set
+ * it is about, or its case.
+ */
+export function customerDecisionAttentionItemRows(
+  items: readonly OverviewAttentionItemView[],
+  locale: SupportedLocale,
+  hrefs?: DrillDownHrefs,
+  limit = CUSTOMER_DECISION_ATTENTION_LIMIT
+): Array<Record<string, KbTableCell>> {
+  return items.slice(0, limit).map((item) => {
+    const href = hrefs
+      ? item.agenda_id
+        ? hrefs.agendaOf(item.case_id, item.agenda_id)
+        : hrefs.caseOf(item.case_id)
+      : undefined;
+    return {
+      reason: {
+        badge: customerDecisionReasonLabel(item.reason, locale),
+        tone: REASON_TONE[item.reason],
+      },
+      item: {
+        title: item.title || item.case_id,
+        id: item.agenda_id ? `${item.case_id} / ${item.agenda_id}` : item.case_id,
+        ...(href ? { href } : {}),
+      },
+      count: item.count,
+      due: item.due ? customerDecisionDueLabel(item.due, item.days, locale) : '',
+      ...(href ? { href } : {}),
+    };
+  });
+}
+
 export function customerDecisionAttentionRows(
   overview: CustomerDecisionOverviewView,
   locale: SupportedLocale,
-  limit = CUSTOMER_DECISION_ATTENTION_LIMIT
+  limit = CUSTOMER_DECISION_ATTENTION_LIMIT,
+  hrefs?: DrillDownHrefs
 ): Array<Record<string, KbTableCell>> {
-  return overview.attention.slice(0, limit).map((item) => ({
-    reason: {
-      badge: customerDecisionReasonLabel(item.reason, locale),
-      tone: REASON_TONE[item.reason],
-    },
-    item: {
-      title: item.title || item.case_id,
-      id: item.agenda_id ? `${item.case_id} / ${item.agenda_id}` : item.case_id,
-    },
-    count: item.count,
-    due: item.due ? customerDecisionDueLabel(item.due, item.days, locale) : '',
-  }));
+  return customerDecisionAttentionItemRows(overview.attention, locale, hrefs, limit);
 }
 
+/** An agenda-set row; with `href` the row (and its title) opens the agenda set. */
 export function customerDecisionAgendaRow(
-  agenda: AgendaOverviewView,
-  locale: SupportedLocale
+  agenda: Omit<AgendaOverviewView, 'reminders'>,
+  locale: SupportedLocale,
+  href?: string
 ): Record<string, KbTableCell> {
   const counts = agenda.counts;
   return {
-    agenda: { title: agenda.title, id: `${agenda.agenda_id} · r${agenda.revision}` },
+    ...(href ? { href } : {}),
+    agenda: {
+      title: agenda.title,
+      id: `${agenda.agenda_id} · r${agenda.revision}`,
+      ...(href ? { href } : {}),
+    },
     status: {
       badge: uxText(`chronos_cd_agenda_status_${agenda.status}`, locale),
       tone: AGENDA_STATUS_TONE[agenda.status],
@@ -208,35 +248,49 @@ export function customerDecisionCaseSummary(
 function StackedCell({ cell }: { cell: KbTableCell }) {
   if (typeof cell !== 'object') return <>{String(cell)}</>;
   if ('badge' in cell) return <Badge label={cell.badge} tone={cell.tone} />;
-  if ('title' in cell)
+  if ('title' in cell) {
+    const href = safeHref(cell.href);
     return (
       <span className="chronos-cd-card__title">
-        <strong>{cell.title}</strong>
+        {href ? (
+          <KbLink href={href}>
+            <strong>{cell.title}</strong>
+          </KbLink>
+        ) : (
+          <strong>{cell.title}</strong>
+        )}
         {cell.id ? <code className="chronos-cd-card__id">{cell.id}</code> : null}
       </span>
     );
+  }
   return <>{cell.label ?? cell.status}</>;
 }
 
 /**
  * A table on a wide card; under a narrow card (CSS container query in
  * globals.css, `.chronos-cd`) the same rows as stacked cards of label: value
- * pairs, so no column is squeezed and nothing scrolls sideways.
+ * pairs, so no column is squeezed and nothing scrolls sideways. With
+ * `row_href_key` a table row opens its href (the title cell links there too,
+ * which is what the stacked cards keep).
  */
 export function CustomerDecisionRows({
   columns,
   rows,
+  caption,
+  row_href_key,
 }: {
   columns: Array<{ key: string; label: string; width?: string }>;
   rows: Array<Record<string, KbTableCell>>;
+  caption?: string;
+  row_href_key?: string;
 }) {
   const [head, ...rest] = columns;
   return (
     <div className="chronos-cd-rows">
       <div className="chronos-cd-rows__wide">
-        <Table columns={columns} rows={rows} />
+        <Table caption={caption} columns={columns} rows={rows} row_href_key={row_href_key} />
       </div>
-      <ul className="chronos-cd-rows__stacked">
+      <ul className="chronos-cd-rows__stacked" aria-label={caption}>
         {rows.map((row, index) => (
           <li key={index} className="chronos-cd-card">
             <div className="chronos-cd-card__head">
@@ -261,13 +315,40 @@ export function CustomerDecisionRows({
   );
 }
 
-function CaseRows({ item, locale }: { item: CaseOverviewView; locale: SupportedLocale }) {
+function CaseRows({
+  item,
+  locale,
+  hrefs,
+}: {
+  item: CaseOverviewView;
+  locale: SupportedLocale;
+  hrefs?: DrillDownHrefs;
+}) {
   const summary = customerDecisionCaseSummary(item, locale);
   const tasks = item.tasks;
   return (
     <Disclosure summary={summary}>
+      {hrefs ? (
+        <p className="kb-text">
+          <KbLink href={hrefs.caseOf(item.case_id)}>
+            {uxMessage(
+              'chronos_cd_open_case',
+              { case: item.case_id },
+              `Open ${item.case_id}`,
+              locale
+            )}
+          </KbLink>
+        </p>
+      ) : null}
       {item.agendas.length > 0 ? (
         <CustomerDecisionRows
+          caption={uxMessage(
+            'chronos_cd_agendas_caption',
+            { case: item.case_id },
+            `Agenda sets of ${item.case_id}`,
+            locale
+          )}
+          row_href_key={hrefs ? 'href' : undefined}
           columns={[
             { key: 'agenda', label: uxText('chronos_cd_col_agenda', locale) },
             { key: 'status', label: uxText('chronos_cd_col_status', locale), width: '8rem' },
@@ -276,7 +357,13 @@ function CaseRows({ item, locale }: { item: CaseOverviewView; locale: SupportedL
             { key: 'override', label: uxText('chronos_cd_col_override', locale) },
             { key: 'open', label: uxText('chronos_cd_col_open', locale) },
           ]}
-          rows={item.agendas.map((agenda) => customerDecisionAgendaRow(agenda, locale))}
+          rows={item.agendas.map((agenda) =>
+            customerDecisionAgendaRow(
+              agenda,
+              locale,
+              hrefs?.agendaOf(item.case_id, agenda.agenda_id)
+            )
+          )}
         />
       ) : null}
       {tasks.held + tasks.pending_proposals + tasks.ready_to_resume > 0 ? (
@@ -309,37 +396,44 @@ export function CustomerDecisionOverviewPanel({
   locale,
   busy = false,
   onRefresh,
+  hrefs,
 }: {
   state: CustomerDecisionOverviewState;
   tenant: string;
   locale: SupportedLocale;
   busy?: boolean;
   onRefresh?: () => void;
+  /** Drill-down links (case, agenda set, learning); without them the card is read-only rows. */
+  hrefs?: CustomerDecisionHrefs;
 }) {
   const overview = state.kind === 'ready' ? state.overview : null;
   const counts = overview?.totals.counts;
   const hidden = overview ? customerDecisionHiddenAttention(overview) : 0;
   const hiddenCases = overview ? Math.max(0, overview.totals.cases - overview.cases.length) : 0;
+  const actions: ActionRefLike[] = [
+    ...(hrefs
+      ? [{ label: uxText('chronos_cd_open_learning', locale), href: hrefs.learningOf() }]
+      : []),
+    ...(onRefresh
+      ? [
+          {
+            label: busy
+              ? uxText('chronos_ac_refreshing', locale)
+              : uxText('chronos_org_refresh', locale),
+            variant: 'ghost' as const,
+            disabled: busy,
+            onClick: onRefresh,
+          },
+        ]
+      : []),
+  ];
   return (
     <div className="chronos-cd">
       <Section
         headingLevel={3}
         title={uxText('chronos_cd_title', locale)}
         description={uxText('chronos_cd_description', locale)}
-        actions={
-          onRefresh
-            ? [
-                {
-                  label: busy
-                    ? uxText('chronos_ac_refreshing', locale)
-                    : uxText('chronos_org_refresh', locale),
-                  variant: 'ghost',
-                  disabled: busy,
-                  onClick: onRefresh,
-                },
-              ]
-            : undefined
-        }
+        actions={actions.length > 0 ? actions : undefined}
       >
         {state.kind === 'error' ? (
           <Callout
@@ -439,7 +533,13 @@ export function CustomerDecisionOverviewPanel({
                         },
                         { key: 'due', label: uxText('chronos_cd_col_due', locale) },
                       ]}
-                      rows={customerDecisionAttentionRows(overview, locale)}
+                      rows={customerDecisionAttentionRows(
+                        overview,
+                        locale,
+                        CUSTOMER_DECISION_ATTENTION_LIMIT,
+                        hrefs
+                      )}
+                      row_href_key={hrefs ? 'href' : undefined}
                     />
                     {hidden > 0 ? (
                       <ChronosMeta>
@@ -460,7 +560,7 @@ export function CustomerDecisionOverviewPanel({
               {overview.cases.length > 0 ? (
                 <Section headingLevel={4} title={uxText('chronos_cd_cases', locale)}>
                   {overview.cases.map((item) => (
-                    <CaseRows key={item.case_id} item={item} locale={locale} />
+                    <CaseRows key={item.case_id} item={item} locale={locale} hrefs={hrefs} />
                   ))}
                   {hiddenCases > 0 ? (
                     <ChronosMeta>
@@ -517,32 +617,16 @@ export async function fetchCustomerDecisionOverview(
   }
 }
 
-/**
- * Only the latest request may update the card: starting a request aborts the
- * previous one, and a response that lands after a newer request (or after
- * the tenant changed / the card unmounted) is dropped.
- */
-export function createLatestRequestGuard() {
-  let controller: AbortController | null = null;
-  let generation = 0;
-  return {
-    begin(): { signal: AbortSignal; isCurrent: () => boolean } {
-      controller?.abort();
-      controller = new AbortController();
-      const mine = ++generation;
-      return { signal: controller.signal, isCurrent: () => mine === generation };
-    },
-    cancel(): void {
-      controller?.abort();
-      controller = null;
-      generation += 1;
-    },
-  };
-}
-
-/** The card: fetches the viewer-scoped overview of `tenant` and refreshes it. */
-export function CustomerDecisionOverviewCard({ tenant }: { tenant: string }) {
-  const locale = useChronosLocale();
+/** The overview body: fetches the viewer-scoped overview of `tenant` and refreshes it. */
+export function CustomerDecisionOverviewBody({
+  tenant,
+  locale,
+  hrefs,
+}: {
+  tenant: string;
+  locale: SupportedLocale;
+  hrefs: CustomerDecisionHrefs;
+}) {
   const [state, setState] = React.useState<CustomerDecisionOverviewState>({ kind: 'loading' });
   const [busy, setBusy] = React.useState(false);
 
@@ -575,6 +659,7 @@ export function CustomerDecisionOverviewCard({ tenant }: { tenant: string }) {
       locale={locale}
       busy={busy}
       onRefresh={() => void refresh()}
+      hrefs={hrefs}
     />
   );
 }

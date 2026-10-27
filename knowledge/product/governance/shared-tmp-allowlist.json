@@ -409,9 +409,15 @@
     },
     {
       "file": "scripts/backup.ts",
-      "count": 3,
+      "count": 1,
       "classification": "legit-tmp",
       "note": "backup/restore staging dirs"
+    },
+    {
+      "file": "scripts/lib/backup-tenant-partitions.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "backup/restore plaintext temp dirs (decrypted payload, staged partitions, mission bundles), removed on every path by withPlaintextTempDir"
     },
     {
       "file": "scripts/browser_live_demo.ts",

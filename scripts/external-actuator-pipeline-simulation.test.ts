@@ -1,6 +1,5 @@
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The OS process launch is simulated; the actual resume validator, journal,
@@ -13,7 +12,6 @@ vi.mock('@agent/core/managed-process', async (original) => ({
 
 import { registerEmailBackend } from '@agent/core/integrations/email-bridge';
 import {
-  approvalStoreRoots,
   computeApprovalPayloadHash,
   decideApprovalRequest,
   loadApprovalRequest,
@@ -37,6 +35,7 @@ import { safeExistsSync, safeRmSync, safeWriteFile } from '@agent/core/secure-io
 import { withExecutionContext } from '@agent/core/authority';
 import { PipelineSuspendedError } from './pipeline-execution-part-bootstrap.js';
 import { runValidatedSteps } from './pipeline-execution-part-results.js';
+import { cleanupSimulationApprovals } from '../tests/helpers/external-actuator-simulation.js';
 
 let tenant: string;
 let journal: PipelineRunJournalHandle;
@@ -137,8 +136,6 @@ describe('real external actuator pipeline simulation', () => {
       pathResolver.rootResolve(`active/shared/artifacts/confidential/${tenant}`),
       pathResolver.rootResolve(`customer/${tenant}`)
     );
-    for (const root of Object.values(approvalStoreRoots()))
-      cleanups.push(pathResolver.rootResolve(path.join(root, 'external-operation')));
   });
 
   afterEach(async () => {
@@ -148,6 +145,7 @@ describe('real external actuator pipeline simulation', () => {
       for (const file of cleanups.splice(0))
         if (safeExistsSync(file)) safeRmSync(file, { recursive: true, force: true });
     });
+    cleanupSimulationApprovals();
     resetReasoningBackend();
     resetPipelineApprovalResumeState();
     vi.unstubAllEnvs();

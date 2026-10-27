@@ -204,8 +204,10 @@ import {
   INGEST_DEDUP_REGISTRY_REPO_PATH,
   offboardScope,
   OFFBOARDING_EXPORT_SUBDIR,
+  TENANT_RUNTIME_PARTITION_TARGET_KINDS,
   verifyScopeOffboarded,
 } from './scope-offboarding.js';
+import { TENANT_RUNTIME_PARTITION_ROOTS } from './storage-layout.js';
 import { restoreFromTrash, TRASH_REPO_SUBPATH } from './storage-janitor.js';
 import { STORAGE_RETENTION_AUDIT_FILENAME } from './storage-retention-catalog.js';
 
@@ -1013,6 +1015,84 @@ describe('DA-08 tenant offboarding — ledger, cursors, dedup registry, data vau
         abs(`${result.export_path}/${partition('confidential', TENANT)}/terminal/approvals.jsonl`)
       )
     ).toBe(true);
+  });
+
+  it('decides an offboarding disposition for every registered tenant runtime partition root', () => {
+    expect(Object.keys(TENANT_RUNTIME_PARTITION_TARGET_KINDS).sort()).toEqual(
+      TENANT_RUNTIME_PARTITION_ROOTS.map((entry) => entry.key).sort()
+    );
+  });
+
+  it("exports and removes the tenant's other runtime state partitions, never another tenant's", () => {
+    const roots = [
+      'active/shared/runtime/pipeline-library-runs',
+      'active/shared/runtime/autonomy-learning',
+      'active/shared/runtime/external-operations',
+      'active/shared/runtime/grants',
+    ];
+    // Durable receipts: review-required, never auto-offboarded.
+    const kept = [
+      'active/shared/runtime/hearing',
+      'active/shared/runtime/discussion-create-requests',
+    ];
+    const record = (root: string, tenant: string) => `${root}/confidential/${tenant}/state.json`;
+    for (const root of [...roots, ...kept])
+      for (const tenant of [TENANT, 'tenant-beta']) {
+        fs.mkdirSync(path.dirname(abs(record(root, tenant))), { recursive: true });
+        fs.writeFileSync(abs(record(root, tenant)), JSON.stringify({ tenant }));
+      }
+
+    const dryRun = offboardScope({ scopeType: 'tenant', scopeId: TENANT });
+    expect(dryRun.targets).toEqual(
+      expect.arrayContaining(
+        roots.map((root) => ({
+          path: `${root}/confidential/${TENANT}`,
+          kind: 'tenant_runtime_state',
+        }))
+      )
+    );
+    expect(dryRun.targets.map((t) => t.path).filter((p) => p.includes('tenant-beta'))).toEqual([]);
+    expect(
+      dryRun.targets.map((t) => t.path).filter((p) => kept.some((root) => p.startsWith(root)))
+    ).toEqual([]);
+
+    const result = offboardScope({
+      scopeType: 'tenant',
+      scopeId: TENANT,
+      mode: 'execute',
+      approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+      nowIso: '2026-10-08T01:02:03.000Z',
+    });
+    expect(result.status).toBe('offboarded');
+    for (const root of roots) {
+      expect(fs.existsSync(abs(`${root}/confidential/${TENANT}`))).toBe(false);
+      expect(fs.existsSync(abs(record(root, 'tenant-beta')))).toBe(true);
+      expect(fs.existsSync(abs(`${result.export_path}/${record(root, TENANT)}`))).toBe(true);
+    }
+    for (const root of kept) expect(fs.existsSync(abs(record(root, TENANT)))).toBe(true);
+    expect(result.verification?.clean).toBe(true);
+  });
+
+  it('reports a tenant runtime partition it could not remove as a failed offboarding', () => {
+    const parent = 'active/shared/runtime/external-operations/confidential';
+    fs.mkdirSync(abs(`${parent}/${TENANT}`), { recursive: true });
+    fs.writeFileSync(abs(`${parent}/${TENANT}/session.json`), '{}');
+    fs.chmodSync(abs(parent), 0o555);
+    try {
+      const result = offboardScope({
+        scopeType: 'tenant',
+        scopeId: TENANT,
+        mode: 'execute',
+        approval: { approved_by: 'operator@example', purpose: 'contract ended' },
+        nowIso: '2026-10-08T01:02:03.000Z',
+      });
+      expect(fs.existsSync(abs(`${parent}/${TENANT}`))).toBe(true);
+      expect(result.status).toBe('error');
+      expect(result.reason).toContain('OFFBOARD_PARTITION_LEFTOVER');
+      expect(result.reason).toContain(`${parent}/${TENANT}`);
+    } finally {
+      fs.chmodSync(abs(parent), 0o755);
+    }
   });
 
   it("exports and removes the tenant's customer decision invites, never another tenant's", () => {

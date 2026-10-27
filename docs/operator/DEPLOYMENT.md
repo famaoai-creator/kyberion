@@ -471,8 +471,55 @@ KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
     --scope tenant --tenant acme --target /path/to/clean/kyberion
 ```
 
-Tenant restores quarantine peer messaging, conversation, and Mesh Hub runtime
-state. Run the following from the restored checkout only after re-enrolling the
+A tenant archive carries the tenant's partition of every registered runtime
+root (`active/shared/runtime/<root>/<tier>/<tenant>/`: the hybrid-ledger
+partition, approval store, usage and execution-metrics ledgers, and the
+partitioned state roots). The manifest lists them under
+`tenant_runtime_partitions` and records the audit chain key id
+(`chain_key_id`), never the key itself. On restore:
+
+- The restore target must lie inside the checkout running the command
+  (`[BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY]`); to restore a clean checkout,
+  run `pnpm backup restore` from that checkout with `--target .`.
+- Archives with symlink or hard-link members are refused before extraction
+  (`[BACKUP_ARCHIVE_MEMBER_TYPE]`); a backup skips a symlinked partition
+  directory with a warning.
+- The restore refuses (`[BACKUP_RESTORE_APPEND_ONLY_CONFLICT]`, before
+  extraction) when the target already holds files in an append-only partition
+  the archive carries: an older snapshot over a longer live chain would be an
+  undetectable rollback. Restore into an empty target and reconcile there.
+  This check is the rollback guard: a hash chain has no head anchor, so a
+  chain cut short at an earlier entry still verifies.
+- A `--force` restore into a live checkout requires every Kyberion service
+  and daemon to be stopped first: the restore's checks cannot tell a live
+  writer's change from its own extraction.
+- The check covers tenant partitions only. An `all`-scope `--force` restore
+  over a live checkout can still roll back the system ledger
+  (`active/audit/system-ledger.jsonl`), the `<tier>/shared` partitions and
+  mission evidence ledgers; restore `all` scope into an empty target. An
+  `all`-scope restore does not quarantine grants or invites: re-run every
+  grant and invite revocation made after the backup was taken.
+- Append-only partitions (and, for a tenant restore, invites and grants) are
+  never extracted in place: they are extracted into a staging directory
+  first. A torn last line (one that does not parse as JSON) of a staged
+  `.jsonl` ledger is trimmed back to its last newline; a complete last record
+  without a trailing newline is kept. The output lists `trimmed_tails`.
+- Staged tenant-ledger chains are verified before anything reaches the target
+  when the target host holds the same audit chain key
+  (`ledger_verification: verified`). Every entry must be HMAC-chained
+  (`chain_alg: hmac-sha256`) under the manifest's `chain_key_id`; an
+  unkeyed or downgraded entry (`[BACKUP_RESTORE_LEDGER_DOWNGRADED]`) or a
+  broken chain (`[BACKUP_RESTORE_LEDGER_CORRUPT]`) fails the restore with the
+  target untouched. Otherwise the output reports `deferred_key_mismatch`: set
+  `KYBERION_AUDIT_CHAIN_KEY` to the source host's key (its id is in the
+  manifest) and run `pnpm audit:verify` in the restored checkout.
+- The archive's customer decision invites and standing grants go straight into
+  `<partition>/.restore-quarantine/<restore-id>/`; live records in the
+  partition are left untouched, so state revoked after the backup cannot come
+  back and records issued since are kept. Re-issue what is still due.
+
+Tenant restores also quarantine peer messaging, conversation, and Mesh Hub
+runtime state. Run the following from the restored checkout only after re-enrolling the
 peer and confirming a fresh healthy heartbeat. The request creates a human
 approval record; it does not resume runtime by itself:
 

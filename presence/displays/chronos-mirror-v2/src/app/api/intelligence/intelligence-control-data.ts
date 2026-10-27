@@ -1188,6 +1188,20 @@ export function buildRuntimeDoctor(
   return findings.slice(0, 12);
 }
 
+/** Lease metadata keys a remediation ledger record may carry (string values only). */
+const REMEDIATION_LEASE_METADATA_KEYS = ['execution_mode', 'channel'] as const;
+
+function remediationLeaseMetadata(
+  metadata: Record<string, unknown> | undefined
+): Record<string, string> {
+  const picked: Record<string, string> = {};
+  for (const key of REMEDIATION_LEASE_METADATA_KEYS) {
+    const value = metadata?.[key];
+    if (typeof value === 'string') picked[key] = value;
+  }
+  return picked;
+}
+
 export function recordRuntimeRemediationArtifacts(input: {
   action: 'cleanup_runtime_lease' | 'restart_runtime_lease';
   agentId: string;
@@ -1197,13 +1211,17 @@ export function recordRuntimeRemediationArtifacts(input: {
   if (!lease) return;
 
   if (lease.owner_type === 'mission') {
+    // Defence in depth (D4): name the mission's tenant so the record routes to
+    // its partition, and record only allow-listed lease metadata, never the blob.
+    const tenantSlug = intelligenceData.missionTenantSlug(lease.owner_id);
     ledger.record('MISSION_RUNTIME_REMEDIATION', {
       mission_id: lease.owner_id,
+      ...(tenantSlug ? { tenant_slug: tenantSlug } : {}),
       role: 'chronos_localadmin',
       agent_id: input.agentId,
       remediation_action: input.action,
       owner_type: lease.owner_type,
-      metadata: lease.metadata || {},
+      metadata: remediationLeaseMetadata(lease.metadata),
     });
   }
 
