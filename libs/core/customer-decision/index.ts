@@ -13,3 +13,5 @@ export * from './bolt-review.js';
 export * from './reminders.js';
 export * from './overview.js';
 export * from './learning.js';
+export * from './case-detail.js';
+export * from './learning-view.js';
