@@ -6,6 +6,7 @@ import { safeExistsSync, safeReadFileSnapshot, safeWriteFile } from '@agent/core
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { pathResolver, findMissionPath } from '@agent/core/path-resolver';
 import { loadMissionNextTaskObjectsAtPath } from '@agent/core/mission/mission-next-task-reader';
+import { isSupersedeProvenForGate } from '@agent/core/mission/mission-task-supersede-proof';
 import { loadState } from '@agent/core/mission/mission-state';
 import { DISTILL_MEMORY_OUTBOX_FILE } from '@agent/core/mission/mission-distill';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
@@ -46,6 +47,8 @@ export interface ContinuousOwnerAdapterDeps {
   assessApproval?: typeof assessAlignmentDecision;
   brief?: typeof loadMissionBriefAtPath;
   tasks?: typeof loadMissionNextTaskObjectsAtPath;
+  /** The mission-side supersede proof (tests); defaults to isSupersedeProvenForGate. */
+  supersedeProven?: (missionId: string, taskId: string) => boolean;
   workItems?: typeof listWorkItems;
   updateItem?: typeof updateWorkItem;
 }
@@ -318,10 +321,23 @@ export function createContinuousOwnerPorts(
           path.join(dir, 'NEXT_TASKS.json'),
           input.mission_id
         ) ?? [];
-      const complete = () => {
-        const rows = tasks();
-        return rows.length > 0 && rows.every((row) => row.status === 'completed');
-      };
+      // A superseded row is closed only with the mission-side proof (an
+      // approved, human supersede-task); an unproven one is pending. Its
+      // replacement carries the work, and at least one row must be completed.
+      const supersedeProven =
+        deps.supersedeProven ??
+        ((missionId: string, taskId: string) =>
+          isSupersedeProvenForGate(missionId, taskId, 'the continuous owner'));
+      const closedRows = (rows: ReadonlyArray<{ status?: unknown; task_id?: unknown }>) =>
+        rows.length > 0 &&
+        rows.every(
+          (row) =>
+            row.status === 'completed' ||
+            (row.status === 'superseded' &&
+              supersedeProven(input.mission_id, String(row.task_id ?? '')))
+        ) &&
+        rows.some((row) => row.status === 'completed');
+      const complete = () => closedRows(tasks());
       const reconcileLearning = async () => {
         const outboxPath = path.join(dir, 'evidence', DISTILL_MEMORY_OUTBOX_FILE);
         if (!exists(outboxPath)) return;
@@ -407,13 +423,7 @@ export function createContinuousOwnerPorts(
         );
       const rowsBefore = tasks();
       for (const phase of state.process_template?.phase_specs ?? []) {
-        if (
-          phase.exit_gate &&
-          rowsBefore.some((row) => row.phase === phase.id) &&
-          rowsBefore
-            .filter((row) => row.phase === phase.id)
-            .every((row) => row.status === 'completed')
-        ) {
+        if (phase.exit_gate && closedRows(rowsBefore.filter((row) => row.phase === phase.id))) {
           await command(
             'mission_controller.bundle.js',
             ['gate-pass', input.mission_id, phase.exit_gate.id, '--machine-only'],

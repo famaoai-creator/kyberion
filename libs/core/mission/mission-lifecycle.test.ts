@@ -14,6 +14,17 @@ vi.mock('../surface/operator-notifications.js', async () => {
   return { ...actual, notifyOperator: vi.fn().mockResolvedValue(true) };
 });
 
+// The supersede proof (approval store) is exercised in mission-task-supersede.test.ts;
+// here a task named `*-proven` stands for a superseded task the mission proves.
+vi.mock('./mission-task-supersede-proof.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-task-supersede-proof.js')>();
+  return {
+    ...actual,
+    isSupersedeProvenForGate: (missionId: string, taskId: string, reader: string) =>
+      taskId.endsWith('-proven') || actual.isSupersedeProvenForGate(missionId, taskId, reader),
+  };
+});
+
 import {
   buildArtifactReviewReceipt,
   hashArtifactForReview,
@@ -27,6 +38,7 @@ import {
 import * as customerResolver from '../customer-resolver.js';
 import { emitIntentSnapshot, listSnapshots } from '../intent/intent-snapshot-store.js';
 import * as pathResolver from '../path-resolver.js';
+import { logger } from '../core.js';
 import {
   safeExec,
   safeExistsSync,
@@ -526,6 +538,171 @@ describe('mission lifecycle finish gate', () => {
     expect(gate).toEqual({ ok: true, pendingTasks: [] });
     expect(tasks.find((task) => task.task_id === 'repair-finish-exit')?.status).toBe('completed');
     expect(tasks.find((task) => task.task_id === 'goal-gap-r1-1-review')?.status).toBe('completed');
+  });
+
+  it('closes the finish gate over a superseded task once its replacement completed, never before', () => {
+    const board = (replacementStatus: string) =>
+      JSON.stringify(
+        [
+          {
+            task_id: 'task-held-proven',
+            status: 'superseded',
+            superseded: {
+              by_task_id: 'task-replacement',
+              at: '2026-10-26T00:00:00.000Z',
+              actor_id: 'operator',
+              reason_sha256: 'a'.repeat(64),
+              approval_request_id: 'approval-1',
+            },
+          },
+          { task_id: 'task-replacement', status: replacementStatus },
+        ],
+        null,
+        2
+      );
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, board('planned'));
+    expect(evaluateMissionFinishExitGate(missionPath)).toMatchObject({
+      ok: false,
+      pendingTasks: ['task-replacement'],
+    });
+
+    safeWriteFile(`${missionPath}/NEXT_TASKS.json`, board('completed'));
+    expect(evaluateMissionFinishExitGate(missionPath)).toEqual({ ok: true, pendingTasks: [] });
+  });
+
+  it('a hand-edited superseded status without an approved supersede still blocks the finish gate', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          { task_id: 'task-forged', status: 'superseded' },
+          { task_id: 'task-done', status: 'completed' },
+        ],
+        null,
+        2
+      )
+    );
+    expect(evaluateMissionFinishExitGate(missionPath)).toMatchObject({
+      ok: false,
+      pendingTasks: ['task-forged'],
+    });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringMatching(/task-forged counted as pending — its superseded status is not proven/u)
+    );
+    warn.mockRestore();
+  });
+
+  it('never resets a superseded repair or goal-gap task when the gate re-files it', async () => {
+    const { upsertGoalGapTasks, upsertMissionGateRepairTask } =
+      await import('./mission-lifecycle-completion.js');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          { task_id: 'repair-finish-exit', status: 'superseded' },
+          { task_id: 'goal-gap-r1-1', status: 'superseded' },
+          { task_id: 'task-1', status: 'planned' },
+        ],
+        null,
+        2
+      )
+    );
+    expect(
+      upsertMissionGateRepairTask({
+        missionDir: missionPath,
+        gateId: 'finish-exit',
+        reason: 'pending',
+        pendingTasks: ['task-1'],
+      })
+    ).toEqual([]);
+    const created = upsertGoalGapTasks({
+      missionDir: missionPath,
+      round: 1,
+      gaps: ['gap'],
+      goal: { summary: 'goal', success_condition: 'done' },
+    });
+    // Neither the superseded gap task nor a review of it is filed again.
+    expect(created).toEqual([]);
+    const tasks = readMissionNextTasks(missionPath);
+    expect(tasks.find((task) => task.task_id === 'repair-finish-exit')?.status).toBe('superseded');
+    expect(tasks.find((task) => task.task_id === 'goal-gap-r1-1')?.status).toBe('superseded');
+  });
+
+  it('a superseded task whose proof fails is never completed by record-evidence or its cascade', () => {
+    const warn = vi.spyOn(logger, 'warn').mockImplementation(() => undefined);
+    seedMissionEvidence('held.md', '# Held deliverable');
+    seedMissionEvidence('next.md', '# Next deliverable');
+    const record = {
+      by_task_id: 'task-next',
+      at: '2026-10-26T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    };
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          // The proof cannot be verified (no approval record): not proven.
+          {
+            task_id: 'task-held',
+            status: 'superseded',
+            superseded: record,
+            deliverable: 'evidence/held.md',
+            dependencies: [],
+          },
+          {
+            task_id: 'task-next',
+            status: 'planned',
+            deliverable: 'evidence/next.md',
+            dependencies: [],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    expect(tryAutoCompleteTaskFromEvidence(missionPath, 'task-held')).toMatchObject({
+      completed: false,
+      reason: expect.stringMatching(/superseded but not proven/u),
+    });
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'task-next');
+    expect(result).toMatchObject({ completed: true, cascaded: [] });
+    const held = readMissionNextTasks(missionPath).find((task) => task.task_id === 'task-held');
+    expect(held).toMatchObject({ status: 'superseded', superseded: record });
+    warn.mockRestore();
+  });
+
+  it('never auto-completes or cascades a superseded task from record-evidence', () => {
+    seedMissionEvidence('held.md', '# Held deliverable');
+    seedMissionEvidence('next.md', '# Next deliverable');
+    safeWriteFile(
+      `${missionPath}/NEXT_TASKS.json`,
+      JSON.stringify(
+        [
+          { task_id: 'task-held-proven', status: 'superseded', deliverable: 'evidence/held.md' },
+          {
+            task_id: 'task-next',
+            status: 'planned',
+            deliverable: 'evidence/next.md',
+            dependencies: [],
+          },
+        ],
+        null,
+        2
+      )
+    );
+    expect(tryAutoCompleteTaskFromEvidence(missionPath, 'task-held-proven')).toEqual({
+      completed: false,
+      reason: 'superseded by another task',
+      cascaded: [],
+    });
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'task-next');
+    expect(result.completed).toBe(true);
+    expect(result.cascaded).toEqual([]);
+    const tasks = readMissionNextTasks(missionPath);
+    expect(tasks.find((task) => task.task_id === 'task-held-proven')?.status).toBe('superseded');
   });
 
   it('retires stale circular goal repairs for in-flight missions after the lifecycle evidence exists', () => {

@@ -66,7 +66,8 @@ import {
   emitMissionLifecycleIntentSnapshot,
 } from './mission-intent-delta.js';
 import {
-  MISSION_TASK_COMPLETED_STATUSES,
+  supersededTaskRefusal,
+  MISSION_TASK_CLOSED_STATUSES,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
   writeMissionNextTasks,
@@ -537,7 +538,7 @@ export async function approveScopeChange(args: {
     const driftRepair = tasks.find(
       (task) =>
         String(task.task_id || '') === driftRepairTaskId &&
-        !MISSION_TASK_COMPLETED_STATUSES.has(String(task.status || 'planned').toLowerCase())
+        !MISSION_TASK_CLOSED_STATUSES.has(String(task.status || 'planned').toLowerCase())
     );
     if (driftRepair) {
       const reportPath = safeMissionArtifactPath(
@@ -914,14 +915,27 @@ export async function recordEvidence(args: {
 
   logger.info(`🧾 Evidence for ${upperId}: ${args.taskId}...`);
 
+  // A task replaced by supersede-task is closed: evidence for it would
+  // re-open nothing and only confuse the ledger (record it on the replacement).
+  const recordedTask = (() => {
+    try {
+      return readMissionNextTasks(missionPath).find(
+        (entry) => String(entry.task_id || '') === args.taskId
+      );
+    } catch {
+      return undefined;
+    }
+  })();
+  // N1: any superseded status is refused (an unproven one is reported for repair).
+  const supersededRefusal = supersededTaskRefusal(missionPath, recordedTask, 'record-evidence');
+  if (supersededRefusal) throw new Error(supersededRefusal);
+
   // Stamp the deliverable's file mtime so the retrospective can tell
   // record-as-you-go apart from evidence reconstructed at mission close —
   // deliverables written long after the work look identical without it.
   const deliverableRelPath = (() => {
     try {
-      const task = readMissionNextTasks(missionPath).find(
-        (entry) => String(entry.task_id || '') === args.taskId
-      );
+      const task = recordedTask;
       const rel = String(task?.deliverable || '');
       if (!rel) return null;
       const candidate = path.resolve(missionPath, rel);
@@ -937,6 +951,12 @@ export async function recordEvidence(args: {
   // is recorded. A stale result does not block it; it files a rework WorkItem.
   // Only counts, the consumer id and WorkItem ids reach the (public) ledger.
   await withLock(`mission-${upperId}`, async () => {
+    // m4: re-checked under the mission lock (a supersede may have landed since).
+    const lockedTask = readMissionNextTasks(missionPath).find(
+      (entry) => String(entry.task_id || '') === args.taskId
+    );
+    const lockedRefusal = supersededTaskRefusal(missionPath, lockedTask, 'record-evidence');
+    if (lockedRefusal) throw new Error(lockedRefusal);
     assertMissionSnapshotExpectation(upperId);
     const mutationState = loadState(upperId);
     if (!mutationState) throw new Error(`Mission ${upperId} state not found.`);
@@ -1066,6 +1086,20 @@ function findLedgerActorIdsForTask(missionPath: string, taskId: string): string[
   return Array.from(actorIds);
 }
 
+/** Refuse a review whose task or target supersede-task closed (ids only). */
+function assertReviewNotSuperseded(
+  missionPath: string,
+  tasks: Array<Record<string, unknown>>,
+  reviewTaskId: string,
+  reviewTargetId: string
+): void {
+  for (const taskId of [reviewTaskId, reviewTargetId]) {
+    const task = tasks.find((entry) => String(entry.task_id || '') === taskId);
+    const refusal = supersededTaskRefusal(missionPath, task, 'review-task');
+    if (refusal) throw new Error(refusal);
+  }
+}
+
 export interface RecordArtifactReviewResult {
   /** Whether the receipt (as recorded) satisfies independence + no-blocking-findings. */
   status: 'recorded' | 'blocked';
@@ -1121,6 +1155,8 @@ export async function recordArtifactReview(args: {
     );
   }
   const targetTask = nextTasks.find((entry) => String(entry.task_id || '') === reviewTargetId);
+  // m4: a superseded review task, or a review of a superseded task, records nothing.
+  assertReviewNotSuperseded(missionPath, nextTasks, args.reviewTaskId, reviewTargetId);
   const deliverable = String(targetTask?.deliverable || targetTask?.target_path || '');
   if (!deliverable) {
     throw new Error(`Review target "${reviewTargetId}" has no deliverable to review.`);
@@ -1189,10 +1225,18 @@ export async function recordArtifactReview(args: {
       missionPath,
     });
 
+    // Re-read the board under the mission lock: writing back the copy read
+    // before it would undo a supersede-task (or any other write) made since.
+    const lockedTasks = readMissionNextTasks(missionPath);
+    assertReviewNotSuperseded(missionPath, lockedTasks, args.reviewTaskId, reviewTargetId);
+    const lockedTask = lockedTasks.find(
+      (entry) => String(entry.task_id || '') === args.reviewTaskId
+    );
+    if (!lockedTask) throw new Error(`Task "${args.reviewTaskId}" not found in NEXT_TASKS.json.`);
     // Stamp the task so both isReviewTaskSatisfied (record-evidence-time) and
     // validateMissionArtifactReviewGate (finish-time) see the same receipt.
-    task.artifact_review_receipt = receiptRelPath;
-    task.artifact_review_profile = {
+    lockedTask.artifact_review_receipt = receiptRelPath;
+    lockedTask.artifact_review_profile = {
       artifact_kind: kind,
       artifact_path: artifactReference,
       artifact_sha256: sha256Value,
@@ -1200,7 +1244,7 @@ export async function recordArtifactReview(args: {
       independence_required: true,
       implementer_agent_ids: implementerAgentIds,
     };
-    writeMissionNextTasks(missionPath, nextTasks);
+    writeMissionNextTasks(missionPath, lockedTasks);
 
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,

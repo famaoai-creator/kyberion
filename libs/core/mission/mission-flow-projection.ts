@@ -21,6 +21,7 @@ import {
 } from './mission-gate-record-reader.js';
 import {
   buildMissionCompletionReconciliationInput,
+  MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
   isReviewKindTask,
   isTaskDeliverableSatisfied,
@@ -341,8 +342,9 @@ export function collectMissionFlowProjection(input: {
         evidence_refs: [reference(gatesDir)],
       });
     }
+    // A superseded task is closed (its replacement carries the work).
     const pending = tasks?.filter(
-      (task) => !MISSION_TASK_COMPLETED_STATUSES.has(String(task.status || 'planned').toLowerCase())
+      (task) => !MISSION_TASK_CLOSED_STATUSES.has(String(task.status || 'planned').toLowerCase())
     );
     for (const task of pending || []) {
       const taskId = String(task.task_id);

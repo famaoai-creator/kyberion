@@ -425,6 +425,14 @@ describe('buildCustomerDecisionCaseDetail (CD-12 drill-down)', () => {
     });
   });
 
+  it('leaves out tasks whose lock is an approved supersede, like the overview counts', () => {
+    const detail = buildCustomerDecisionCaseDetail(
+      caseInput({ isSuperseded: (lock) => lock.mission_id === 'MSN-2' })
+    );
+    expect(detail.tasks.map((task) => task.mission_id)).toEqual(['MSN-1']);
+    expect(detail.tasks_total).toBe(1);
+  });
+
   it('never emits a value, free text, option, rationale, name, actor id or from', () => {
     const text = JSON.stringify(buildCustomerDecisionCaseDetail(caseInput())).toLowerCase();
     expect(text).not.toContain(SECRET);

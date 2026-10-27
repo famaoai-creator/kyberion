@@ -4,6 +4,10 @@ import { caseRecordCanonicalJson } from './customer-decision-milestone-capabilit
 import type { ResourceAccessScope } from './resource-access-scope.js';
 import { getProcessEnv } from './process-env.js';
 import { isValidTenantSlug } from './scope.js';
+import {
+  isStandingCustomerDecisionRecord,
+  supersededDecisionIds,
+} from './customer-decision-standing.js';
 
 /**
  * Narrow store role for CD-09 task decision locks
@@ -277,6 +281,262 @@ function resolutionProblem(entry: JsonRecord, read: CustomerDecisionCaseFileRead
 
 const IDENTITY_FIELDS = ['version', 'case_id', 'consumer', 'mission_id', 'task_id', 'tenant_slug'];
 
+/** How many times one task proposal may be re-asked (customer-decision model, schema maxItems). */
+const MAX_PREVIOUS_LINKS = 10;
+
+/** `user:<member_id>` (foundation/scope.ts member id grammar). */
+const MEMBER_ACTOR = /^user:[a-z][a-z0-9-]{1,30}$/u;
+
+const linksOf = (proposal: JsonRecord): unknown[] =>
+  Array.isArray(proposal.previous_links) ? proposal.previous_links : [];
+
+/** An entry without its link: what a re-ask keeps. */
+function withoutLink(entry: JsonRecord): JsonRecord {
+  const { agenda_id: _agenda, entry_id: _entry, proposal: _proposal, ...rest } = entry;
+  void _agenda;
+  void _entry;
+  void _proposal;
+  const {
+    collected_at: _collected,
+    resolved: _resolved,
+    previous_links: _links,
+    ...proposal
+  } = proposalOf(entry);
+  void _collected;
+  void _resolved;
+  void _links;
+  return { ...rest, proposal };
+}
+
+const isClosed = (agenda: JsonRecord | undefined): boolean =>
+  agenda?.status === 'closed' || agenda?.status === 'withdrawn';
+
+function ledgerRecords(read: CustomerDecisionCaseFileReader): JsonRecord[] {
+  return (read('decisions.jsonl') ?? '')
+    .split('\n')
+    .map((line) => asRecord(parseJson(line.trim() || undefined)))
+    .filter((record): record is JsonRecord => Boolean(record));
+}
+
+/** The lock fields a relink is judged on (who owns it and whether it completed once). */
+export interface RelinkLockContext {
+  consumer?: unknown;
+  status?: unknown;
+  completed_at?: unknown;
+}
+
+/**
+ * Is the collected proposal `was` unresolvable — nothing can release it any
+ * more — in the sense consumption uses (`taskProposalStates`)? Its agenda is
+ * closed, withdrawn or gone; that agenda confirms no standing customer
+ * decision on its entry; a release stamp it carries names a decision that no
+ * longer stands; and the task never completed with that stamp (a completed
+ * task trusts its release). Returns why not, or null when unresolvable.
+ */
+function unresolvableProblem(
+  was: JsonRecord,
+  lock: RelinkLockContext,
+  read: CustomerDecisionCaseFileReader
+): string | null {
+  const oldText = read(`agendas/${String(was.agenda_id)}.json`);
+  const oldAgenda = oldText === undefined ? undefined : asRecord(parseJson(oldText));
+  if (oldText !== undefined && !isClosed(oldAgenda))
+    return 'a task proposal is re-asked only when its agenda is closed, withdrawn or gone';
+  const records = ledgerRecords(read);
+  const superseded = supersededDecisionIds(records);
+  const byId = new Map(records.map((record) => [record.id, record]));
+  const standing = (id: unknown) =>
+    typeof id === 'string' &&
+    isStandingCustomerDecisionRecord(byId.get(id), was.item, was.key, superseded);
+  const confirmations = Array.isArray(oldAgenda?.operator_confirmations)
+    ? oldAgenda.operator_confirmations.map(asRecord)
+    : [];
+  if (confirmations.some((item) => item?.entry_id === was.entry_id && standing(item.decision_id)))
+    return 'a task proposal whose agenda confirmed a standing customer decision is not re-asked';
+  const stamped = asRecord(proposalOf(was).resolved)?.decision_id;
+  if (stamped !== undefined) {
+    if (lock.status === 'completed' || lock.completed_at !== undefined)
+      return 'a released task proposal of a task that completed is not re-asked';
+    if (standing(stamped))
+      return 'a released task proposal is re-asked only when its decision no longer stands';
+  }
+  return null;
+}
+
+/**
+ * The one change a collected task proposal may make besides gaining its
+ * resolution (CD-09 re-ask, `customer-decision draft --from-tasks --reask`):
+ * a relink from an agenda that can no longer release it to an open agenda
+ * entry that asks the customer the same question.
+ *   - `previous_links` = the old ones + exactly one entry equal to the old
+ *     link (`agenda_id`, `entry_id`, `collected_at`, its `resolved` stamp if
+ *     any) with `relinked_at` = the new `collected_at` and a `relinked_by`
+ *     member; at most {@link MAX_PREVIOUS_LINKS};
+ *   - item, key, layer, value and every other proposal field (question,
+ *     `requires_customer: true`, options, ...) stay the same; the new link
+ *     has a `collected_at` and no `resolved`;
+ *   - the proposal is unresolvable in consumption's sense: the old agenda
+ *     (read raw by the guard) is closed, withdrawn or absent and confirms no
+ *     standing customer decision on its entry; a `resolved` stamp names a
+ *     decision that no longer stands ({@link isStandingCustomerDecisionRecord})
+ *     and the task never completed with it;
+ *   - the new agenda exists, is neither closed nor withdrawn, has the new
+ *     `entry_id` on the same item × key with `requires_customer: true`, and
+ *     carries the facade's `reasked_proposals` marker for this proposal and
+ *     consumer with `by` = `relinked_by` and `at` = the new `collected_at`
+ *     (agendas are written only by the facade's decision_ledger role).
+ * The caller also keeps the lock's `hold` unchanged in that write, and
+ * `previous_links` never change otherwise. Returns the refusal reason, or
+ * null when the relink is allowed.
+ */
+export function taskProposalRelinkProblem(
+  wasEntry: unknown,
+  nowEntry: unknown,
+  read: CustomerDecisionCaseFileReader,
+  lock: RelinkLockContext
+): string | null {
+  const was = asRecord(wasEntry);
+  const now = asRecord(nowEntry);
+  if (!was || !now) return 'a re-ask compares two task proposal entries';
+  const wasProposal = proposalOf(was);
+  const nowProposal = proposalOf(now);
+  if (typeof was.agenda_id !== 'string' || typeof was.entry_id !== 'string')
+    return 'only a collected task proposal is re-asked';
+  if (wasProposal.requires_customer !== true)
+    return 'only a requires_customer task proposal is re-asked';
+  if (canonical(withoutLink(was)) !== canonical(withoutLink(now)))
+    return 'a re-asked task proposal keeps its question, item, key and value';
+  const before = linksOf(wasProposal);
+  const after = linksOf(nowProposal);
+  if (
+    after.length !== before.length + 1 ||
+    after.length > MAX_PREVIOUS_LINKS ||
+    before.some((link, index) => canonical(link) !== canonical(after[index]))
+  )
+    return 'a re-ask appends exactly one earlier link and keeps the others';
+  if (typeof now.agenda_id !== 'string' || typeof now.entry_id !== 'string')
+    return 'a re-asked task proposal names its new agenda entry';
+  if (typeof nowProposal.collected_at !== 'string' || nowProposal.collected_at.length === 0)
+    return 'a re-asked task proposal records when it was collected again';
+  if (nowProposal.resolved !== undefined) return 'a re-asked task proposal is not resolved';
+  const appended = asRecord(after[after.length - 1]);
+  const relinkedBy = appended?.relinked_by;
+  const expected = {
+    agenda_id: was.agenda_id,
+    entry_id: was.entry_id,
+    ...(wasProposal.collected_at !== undefined ? { collected_at: wasProposal.collected_at } : {}),
+    ...(wasProposal.resolved !== undefined ? { resolved: wasProposal.resolved } : {}),
+    relinked_at: nowProposal.collected_at,
+    relinked_by: relinkedBy,
+  };
+  if (
+    !appended ||
+    typeof relinkedBy !== 'string' ||
+    !MEMBER_ACTOR.test(relinkedBy) ||
+    canonical(appended) !== canonical(expected)
+  )
+    return 'the appended link is the old link, with when and by whom it was re-asked';
+  const oldFile = `agendas/${was.agenda_id}.json`;
+  const newFile = `agendas/${now.agenda_id}.json`;
+  if (!AGENDA_FILE.test(oldFile) || !AGENDA_FILE.test(newFile)) return 'a re-ask names agendas';
+  const unresolvable = unresolvableProblem(was, lock, read);
+  if (unresolvable) return unresolvable;
+  const newAgenda = asRecord(parseJson(read(newFile)));
+  if (!newAgenda || isClosed(newAgenda))
+    return 'a task proposal is re-asked on an agenda that is open';
+  const asked = Array.isArray(newAgenda.entries)
+    ? newAgenda.entries.map(asRecord).find((entry) => entry?.entry_id === now.entry_id)
+    : undefined;
+  if (!asked || asked.item !== now.item || asked.key !== now.key)
+    return 'a task proposal is re-asked on an agenda entry with its item and key';
+  if (asked.requires_customer !== true)
+    return 'a task proposal is re-asked only on a requires_customer agenda entry';
+  // Only the operator facade (decision_ledger) writes agendas: its marker on
+  // the target agenda is what a worker holding the lock capability cannot forge.
+  const marked =
+    Array.isArray(newAgenda.reasked_proposals) &&
+    newAgenda.reasked_proposals.some((item) => {
+      const marker = asRecord(item);
+      return (
+        marker?.proposal_id === nowProposal.proposal_id &&
+        marker.consumer === lock.consumer &&
+        marker.by === relinkedBy &&
+        marker.at === nowProposal.collected_at
+      );
+    });
+  if (!marked)
+    return 'a task proposal is re-asked only onto an agenda the operator facade marked for it';
+  return null;
+}
+
+/** The top-level lock field `mission_controller supersede-task` sets (once). */
+export const CONSUMER_LOCK_SUPERSEDED_FIELD = 'superseded';
+
+/** What a superseded lock records: the replacing consumer and task, when, and the approval. */
+export interface CustomerDecisionConsumerSuperseded {
+  by_consumer: string;
+  by_task_id: string;
+  at: string;
+  /**
+   * The authenticated human mission_gate approval of the supersede. The guard
+   * only requires it to be present (it cannot read the approval store);
+   * readers honour a mark only through the mission-side verification.
+   */
+  approval_request_id: string;
+}
+
+const APPROVAL_REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
+/** `mission-<mission segment>.<task segment>` (CONSUMER_ID_PATTERN, with groups). */
+const CONSUMER_SEGMENTS =
+  /^mission-([A-Za-z0-9][A-Za-z0-9_-]{0,100})\.([A-Za-z0-9][A-Za-z0-9._-]{0,120})$/u;
+
+const missionSegmentOf = (consumer: unknown): string | undefined =>
+  typeof consumer === 'string' ? CONSUMER_SEGMENTS.exec(consumer)?.[1] : undefined;
+
+/**
+ * The supersede rule of a consumer lock (`mission_controller supersede-task`,
+ * CD-09): `superseded` is only ever added to a lock already on disk, in a
+ * write that changes nothing else, naming a different task's consumer of the
+ * same mission (`mission-<M>.` prefix); afterwards the lock is frozen — every
+ * later write must be the same record, so an idempotent re-run passes and
+ * nothing else does. Returns the refusal reason, or null when allowed. Part
+ * of {@link customerDecisionConsumerWriteProblem}.
+ */
+export function consumerLockSupersedeProblem(
+  before: JsonRecord | undefined,
+  after: JsonRecord
+): string | null {
+  const field = CONSUMER_LOCK_SUPERSEDED_FIELD;
+  if (before?.[field] !== undefined)
+    return canonical(after) === canonical(before) ? null : 'a superseded consumer lock is frozen';
+  if (after[field] === undefined) return null;
+  if (!before) return 'a new consumer lock is never superseded';
+  const { [field]: added, ...rest } = after;
+  if (canonical(rest) !== canonical(before))
+    return 'the write that supersedes a consumer lock adds only superseded';
+  const superseded = asRecord(added);
+  const mission = missionSegmentOf(after.consumer);
+  if (
+    !superseded ||
+    typeof superseded.at !== 'string' ||
+    superseded.at.length === 0 ||
+    typeof superseded.by_task_id !== 'string' ||
+    superseded.by_task_id.length === 0 ||
+    mission === undefined ||
+    missionSegmentOf(superseded.by_consumer) !== mission ||
+    superseded.by_consumer === after.consumer ||
+    superseded.by_task_id === after.task_id
+  )
+    return 'a consumer lock is superseded only by another task of the same mission';
+  if (
+    typeof superseded.approval_request_id !== 'string' ||
+    !APPROVAL_REQUEST_ID.test(superseded.approval_request_id)
+  )
+    return 'a consumer lock is superseded only with the approval request that authorized it';
+  return null;
+}
+
 /**
  * The guard-side content rule of a consumer store write (CD-09), enforced by
  * the tier guard on every write the role makes through secure-io, comparing
@@ -294,7 +554,12 @@ const IDENTITY_FIELDS = ['version', 'case_id', 'consumer', 'mission_id', 'task_i
  *   - `task_proposal` entries are never removed, never lose
  *     `requires_customer`, never lose `resolved`; a collected one changes only
  *     by gaining `resolved`, and a new `resolved` must name an
- *     operator-confirmed customer decision ({@link resolutionProblem});
+ *     operator-confirmed customer decision ({@link resolutionProblem}) —
+ *     or by a re-ask relink ({@link taskProposalRelinkProblem}, which leaves
+ *     the hold as it is); `previous_links` never change otherwise and a new
+ *     proposal has none;
+ *   - `superseded` is added once, alone, to an existing lock, and the lock is
+ *     frozen afterwards ({@link consumerLockSupersedeProblem});
  *   - a `hold` is never removed, keeps its `at` and WorkItem, and gets
  *     `resolved_at` only when every requires_customer proposal is resolved
  *     (it may be re-opened);
@@ -317,6 +582,10 @@ export function customerDecisionConsumerWriteProblem(
   const before = previous === undefined ? undefined : asRecord(previous);
   if (previous !== undefined && !before)
     return refused('the consumer lock on disk is unreadable; it is not replaced');
+  const supersede = consumerLockSupersedeProblem(before, after);
+  if (supersede) return refused(supersede);
+  // Frozen and written back unchanged: nothing below can differ.
+  if (before?.[CONSUMER_LOCK_SUPERSEDED_FIELD] !== undefined) return null;
   if (!before) {
     if (after.status !== 'in_progress' || after.completed_at !== undefined)
       return refused('a new consumer lock starts in progress');
@@ -347,6 +616,7 @@ export function customerDecisionConsumerWriteProblem(
   }
   const previousProposals = before ? proposalsOf(before) : new Map<string, JsonRecord>();
   const nextProposals = proposalsOf(after);
+  let relinked = false;
   for (const [id, was] of previousProposals) {
     const now = nextProposals.get(id);
     if (!now) return refused('task proposals may not be removed');
@@ -356,6 +626,18 @@ export function customerDecisionConsumerWriteProblem(
     const nowProposal = proposalOf(now);
     if (wasProposal.requires_customer === true && nowProposal.requires_customer !== true)
       return refused('a task proposal never loses requires_customer');
+    if (canonical(linksOf(wasProposal)) !== canonical(linksOf(nowProposal))) {
+      // A re-ask: the only change of a collected proposal besides its resolution.
+      const problem = taskProposalRelinkProblem(
+        was,
+        now,
+        read,
+        before ?? { consumer: after.consumer }
+      );
+      if (problem) return refused(problem);
+      relinked = true;
+      continue;
+    }
     if (
       wasProposal.resolved !== undefined &&
       canonical(nowProposal.resolved) !== canonical(wasProposal.resolved)
@@ -367,6 +649,11 @@ export function customerDecisionConsumerWriteProblem(
     )
       return refused('a collected task proposal may only gain its resolution');
   }
+  for (const [id, now] of nextProposals)
+    if (!previousProposals.has(id) && linksOf(proposalOf(now)).length > 0)
+      return refused('a new task proposal has no earlier links');
+  if (relinked && canonical(after.hold) !== canonical(before?.hold))
+    return refused('a re-ask leaves the hold as it is');
   for (const [id, now] of nextProposals) {
     if (proposalOf(now).resolved === undefined) continue;
     if (proposalOf(previousProposals.get(id) ?? {}).resolved !== undefined) continue;

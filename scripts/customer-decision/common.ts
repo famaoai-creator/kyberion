@@ -94,6 +94,7 @@ export function usage(): string {
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --customer <slug> [--template aidlc-inception] [--title <t>] [--from <text>] [--locale ja|en] [--deal <id>] [--project <id>] [--respond-by <YYYY-MM-DD>]',
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --agenda <id> [--file <agenda.json>] [--respond-by <YYYY-MM-DD>|none]',
     'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --from-tasks [--agenda <draft id>] [--customer <slug>] [--title <t>] [--locale ja|en]',
+    'pnpm kyberion customer-decision draft     --tenant <slug> --case <id> --from-tasks --reask <tp-id,...> --by user:<member> [--agenda <draft id>] [--customer <slug>]',
     'pnpm kyberion customer-decision generate  --tenant <slug> --case <id> --agenda <id> --intent-file <path> [--grounding-file <path>]',
     'pnpm kyberion customer-decision submit    --tenant <slug> --case <id> --agenda <id> --by user:<member> [--role owner|approver]',
     'pnpm kyberion customer-decision actor-add --tenant <slug> --case <id> --customer <slug> --actor customer:<id> --name <text> [--confirm-target <text>] [--channel <surface>:<channel_id>|none]',
@@ -106,6 +107,7 @@ export function usage(): string {
     'pnpm kyberion customer-decision revoke    --tenant <slug> --case <id> --invite <id> --reason <text>',
     'pnpm kyberion customer-decision remind    --tenant <slug> [--case <id>] [--dry-run] [--now <iso>]',
     'pnpm kyberion customer-decision reminders --tenant <slug> --install --by user:<member> [--force] [--dry-run]',
+    'pnpm kyberion customer-decision task-decisions --tenant <slug> --mission <MSN> --task <id> --json   (read-only; bound tenant only)',
     'pnpm kyberion customer-decision overview  --tenant <slug> [--case <id>] [--now <iso>] [--summary] --json   (read-only)',
     'pnpm kyberion customer-decision overview  --tenant <slug> --case <id> --detail [--now <iso>] --json   (read-only)',
     'pnpm kyberion customer-decision overview  --tenant <slug> --learning [--date <YYYY-MM-DD>] --json   (read-only)',
@@ -116,7 +118,7 @@ export function usage(): string {
     'pnpm kyberion customer-decision attachment --tenant <slug> [--case <id>] --json  (stdin: {"token","attachment_id"})',
     '',
     'send prints the invite link once; forward it to the customer yourself.',
-    "Reminders (remind / the daily tenant pipeline) go through the decider's bound channel via sendToCustomer.",
+    "Reminders (remind / the hourly tenant pipeline, 09:30-18:30 Asia/Tokyo, each reminder once per day) go through the decider's bound channel via sendToCustomer.",
     'learning queues suggestions as organization learning candidates; accept one with pnpm organization learning transition.',
   ].join('\n');
 }

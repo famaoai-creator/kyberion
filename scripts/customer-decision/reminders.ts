@@ -1,8 +1,14 @@
 /**
  * CD-11: customer reminders and operator hand-offs — `remind`, `reminders
  * --install`, the reminder / hand-off part of `status`, the hand-off
- * routing after `respond`, and the sweep the daily tenant pipeline op
- * (`core:customer_decision_reminders`) runs.
+ * routing after `respond`, and the sweep the tenant pipeline op
+ * (`core:customer_decision_reminders`) runs — hourly from 09:30 to 18:30
+ * Asia/Tokyo (`30 9-18 * * *`, every run on the same UTC date), so a held
+ * reminder approved after one sweep goes out on the next one the same day.
+ * Records keep each reminder to one send per day whatever the number of
+ * sweeps. A tenant installed with the earlier daily schedule re-installs:
+ * `reminders --install --force`, then a human re-approves the Chronos
+ * project trust of the changed pipeline.
  * Part of scripts/customer_decision.ts (the entry point); see its header.
  *
  * Sweep (one tenant, every agenda it has sent invites for, or one case):
@@ -34,7 +40,7 @@
  * the tenant-bound `decision_ledger` role, invites through the invite store
  * role, the inbox as its shared core writer. It runs only in the facade
  * process: the operator's `customer-decision remind`, or the facade child the
- * daily op starts (`reminder-op.ts`, no SYSTEM_ROLE, bound to the run's
+ * scheduled op starts (`reminder-op.ts`, no SYSTEM_ROLE, bound to the run's
  * tenant — the customer room's rule). No role is widened.
  */
 import { createHash } from 'node:crypto';
@@ -112,6 +118,11 @@ type OutboxSurface = 'slack' | 'telegram' | 'imessage' | 'discord';
 export const REMINDER_PIPELINE_TEMPLATE =
   'knowledge/product/pipeline-templates/customer-decision-reminders.json';
 export const REMINDER_PIPELINE_NAME = 'customer-decision-reminders';
+
+/** The manual sweep of one case: sends a held reminder as soon as it is approved. */
+function remindCommand(tenant: string, caseId: string): string {
+  return `pnpm kyberion customer-decision remind --tenant ${tenant} --case ${caseId}`;
+}
 
 export type ReminderOutcome =
   | AgendaReminderRecord['status']
@@ -229,6 +240,7 @@ async function deliverReminder(
           agendaId: agenda.agenda_id,
           caseId: agenda.case_id,
           command: `pnpm kyberion customer-decision status --tenant ${tenant} --case ${agenda.case_id} --agenda ${agenda.agenda_id}`,
+          next: remindCommand(tenant, agenda.case_id),
         }),
         template: reminder.template,
         correlationId,
@@ -824,7 +836,7 @@ export async function runRemind(
 }
 
 /**
- * `reminders --install --tenant <t> --by user:<member> [--force]`: promote the daily reminder
+ * `reminders --install --tenant <t> --by user:<member> [--force]`: promote the hourly reminder
  * pipeline template into the tenant's pipeline catalog through
  * `pipeline:promote` (the governed tenant catalog write: `asset_promoter`
  * bound to the tenant, the tenant asset ledger, the catalog row). Chronos
@@ -986,7 +998,10 @@ export function reminderStatus(
       send_on: item.send_on,
     })),
     sent: records.filter((record) => record.status === 'sent'),
-    pending_approval: records.filter((record) => record.status === 'approval_pending'),
+    // A held reminder goes out on the next hourly sweep once approved, or now by hand.
+    pending_approval: records
+      .filter((record) => record.status === 'approval_pending')
+      .map((record) => ({ ...record, next: remindCommand(agenda.tenant_slug, agenda.case_id) })),
     manual: records.filter((record) => record.status === 'manual'),
     denied: records.filter((record) => record.status === 'denied'),
     lapsed: records.filter((record) => record.status === 'lapsed'),
