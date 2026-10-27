@@ -52,6 +52,7 @@ vi.mock('./approval-store.js', async (original) => ({
 }));
 import {
   withExternalOperationAuthority,
+  withExplicitExternalApprovalRequest,
   admitExternalOperation,
   runExternalOperation,
   assertExternalOperationBatchResumable,
@@ -243,6 +244,35 @@ describe('trusted external authority at production pipeline dispatch', () => {
       expect.objectContaining({
         payload: expect.objectContaining({
           artifact_refs: authority?.review?.artifactRefs,
+        }),
+      })
+    );
+  });
+
+  it('defers review artifact writes to an explicit approval request host', () => {
+    const resolver = createRuntimeExternalOperationAuthority({
+      runId: 'review-run',
+      stepId: 'send',
+      hasHuman: true,
+    });
+    withExplicitExternalApprovalRequest(
+      {
+        operationId: facts.operationId,
+        reviewArtifacts: () => [
+          'active/shared/artifacts/confidential/runtime-tenant/host-review.json',
+        ],
+      },
+      () => {
+        const authority = resolver({ ...facts });
+        expect(writeScopedArtifact).not.toHaveBeenCalled();
+        expect(authority?.review?.artifactRefs).toEqual([]);
+        admitExternalOperation({ ...facts });
+      }
+    );
+    expect(enforceApprovalGate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          artifact_refs: ['active/shared/artifacts/confidential/runtime-tenant/host-review.json'],
         }),
       })
     );

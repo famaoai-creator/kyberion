@@ -31,6 +31,7 @@ export {
 export type { ExternalOperationGrant } from './external-operation-target.js';
 import {
   hasExternalOperationAuthority,
+  hasExplicitExternalApprovalRequest,
   withExternalOperationAuthority,
   withExternalOperationPipelineRun,
   type ExternalOperationAuthorityResolver,
@@ -213,7 +214,11 @@ export function createRuntimeExternalOperationAuthority(
     };
     // Review references participate in the approval payload hash. Recreate the
     // same scoped reference on headless resume too; presence is not effect data.
-    if (facts.requiresApproval && (authority.hasHuman || tenantSlug)) {
+    if (
+      facts.requiresApproval &&
+      (authority.hasHuman || tenantSlug) &&
+      !hasExplicitExternalApprovalRequest(facts.operationId)
+    ) {
       if (!tenantSlug) {
         throw new Error(
           '[EXTERNAL_REVIEW_SCOPE_REQUIRED] Bind a tenant before creating an external-operation review'
