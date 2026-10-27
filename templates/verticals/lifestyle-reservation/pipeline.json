@@ -1,89 +1,166 @@
 {
   "pipeline_id": "vertical-lifestyle-reservation",
-  "version": "1.0.0",
-  "description": "Search → propose → reserve. Customer fills in domains, preferences, and confirmation channel.",
+  "version": "2.0.0",
+  "description": "Search → propose → reserve. Customer fills in domains, preferences, the reservation procedure fragment (recorded once via the browser learning flow), and the confirmation channel. Writes go through core:await_decision — nothing is booked without an authenticated human decision.",
+  "_migration_note": "v2: rewritten onto real ops only — file:read_json / core:foreach / browser:goto / browser:distill_dom / reasoning:analyze / file:json_parse / core:await_decision / core:include / calendar:create_event / presence:dispatch. v1 used non-existent ops (load_json, browser:search_multi, wisdom:rank_candidates, approval:request, browser:reserve, service:calendar_create, presence:notify).",
   "action": "pipeline",
+  "options": {
+    "headless": false
+  },
   "inputs": {
     "INTENT": { "required": true, "description": "Natural-language reservation request" },
-    "RESERVATION_DOMAINS": { "required": true, "type": "array" },
-    "PREFERENCES_PATH": { "required": true },
-    "AUTO_CONFIRM_BELOW": { "required": false, "default": 5000 },
+    "RESERVATION_DOMAINS": {
+      "required": true,
+      "type": "array",
+      "description": "Search URLs to visit (one per candidate site)"
+    },
+    "PREFERENCES_PATH": {
+      "required": true,
+      "description": "JSON file with the requester's preferences"
+    },
+    "RESERVATION_PROCEDURE": {
+      "required": true,
+      "description": "Fragment under pipelines/fragments/ implementing the chosen site's booking flow (record & promote it once per site)"
+    },
+    "CANDIDATES_PATH": {
+      "required": false,
+      "default": "active/shared/tmp/reservation-candidates.jsonl"
+    },
     "NOTIFICATION_CHANNEL": { "required": true }
   },
   "steps": [
     {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/browser-runtime-preflight.json" }
+    },
+    {
       "id": "load-preferences",
-      "type": "transform",
-      "op": "load_json",
-      "params": {
-        "path": "{{PREFERENCES_PATH}}",
-        "export_as": "preferences"
-      }
+      "role": "source",
+      "op": "file:read_json",
+      "produces": { "channel": "preferences", "type": "PreferenceProfile" },
+      "params": { "path": "{{PREFERENCES_PATH}}" }
     },
     {
       "id": "search-candidates",
-      "type": "apply",
-      "op": "browser:search_multi",
+      "role": "gate",
+      "op": "core:foreach",
+      "consumes": "preferences",
       "params": {
-        "domains": "{{RESERVATION_DOMAINS}}",
-        "intent": "{{INTENT}}",
-        "preferences": "{{preferences}}",
-        "max_per_domain": 5,
-        "export_as": "raw_candidates"
-      },
-      "on_error": {
-        "strategy": "abort",
-        "remediation": "Search failed. Check connection to RESERVATION_DOMAINS."
+        "items": "{{RESERVATION_DOMAINS}}",
+        "as": "domain_url",
+        "do": [
+          {
+            "id": "visit-domain",
+            "role": "sink",
+            "op": "browser:goto",
+            "params": { "url": "{{domain_url}}" },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Domain unreachable — continue with the next candidate site."
+            }
+          },
+          {
+            "id": "read-page",
+            "role": "source",
+            "op": "browser:distill_dom",
+            "produces": { "channel": "page_dom", "type": "DomDistill" },
+            "params": { "max_elements": 200 }
+          },
+          {
+            "id": "record-candidate",
+            "role": "sink",
+            "op": "file:append",
+            "params": {
+              "path": "{{CANDIDATES_PATH}}",
+              "content": "{\"domain\": \"{{domain_url}}\", \"dom\": {{page_dom}}}\n"
+            },
+            "on_error": {
+              "strategy": "skip",
+              "remediation": "Candidate capture is best-effort; continue."
+            }
+          }
+        ]
       }
+    },
+    {
+      "id": "read-candidates",
+      "role": "source",
+      "op": "file:read_file",
+      "produces": { "channel": "raw_candidates", "type": "CandidatesJsonl" },
+      "params": { "path": "{{CANDIDATES_PATH}}" }
     },
     {
       "id": "rank-and-shortlist",
-      "type": "transform",
-      "op": "wisdom:rank_candidates",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "raw_candidates",
+      "produces": { "channel": "shortlist_raw", "type": "ShortlistJson" },
       "params": {
-        "candidates": "{{raw_candidates}}",
-        "preferences": "{{preferences}}",
-        "top_n": 3,
-        "export_as": "shortlist"
+        "instruction": "以下の候補と希望条件から最上位の予約候補を1件選び、JSON のみを返してください。\n\n依頼: {{INTENT}}\n希望条件: {{preferences}}\n候補: {{raw_candidates}}\n\n出力(JSON のみ): {\"title\": \"...\", \"url\": \"...\", \"datetime\": \"<ISO8601>\", \"party_size\": 1, \"rationale\": \"...\"}"
       }
     },
     {
+      "id": "parse-shortlist",
+      "role": "transform",
+      "op": "file:json_parse",
+      "consumes": "shortlist_raw",
+      "produces": { "channel": "shortlist", "type": "Shortlist" },
+      "params": { "from": "shortlist_raw" }
+    },
+    {
       "id": "confirm-with-user",
-      "type": "control",
-      "op": "approval:request",
+      "role": "gate",
+      "op": "core:await_decision",
+      "consumes": "shortlist",
+      "produces": { "channel": "user_choice", "type": "ApprovalDecision" },
       "params": {
-        "channel": "{{NOTIFICATION_CHANNEL}}",
-        "subject": "Reservation candidates for: {{INTENT}}",
-        "options": "{{shortlist}}",
-        "auto_confirm_below": "{{AUTO_CONFIRM_BELOW}}",
-        "export_as": "user_choice"
+        "approval": {
+          "summary": "予約候補の確認: {{INTENT}} — 候補: {{shortlist}}。承認すると予約実行ステップが走ります。"
+        },
+        "approval_for": "make-reservation"
       }
     },
     {
       "id": "make-reservation",
-      "type": "apply",
-      "op": "browser:reserve",
+      "role": "sink",
+      "op": "core:include",
+      "consumes": "user_choice",
+      "produces": { "channel": "reservation", "type": "ReservationResult" },
       "params": {
-        "candidate": "{{user_choice}}",
-        "export_as": "reservation"
+        "fragment": "{{RESERVATION_PROCEDURE}}",
+        "context": { "chosen_candidate": "{{shortlist}}" }
+      },
+      "on_error": {
+        "strategy": "abort",
+        "remediation": "Reservation procedure fragment missing or failed — record the site's booking flow once via the browser learning playbook, then set RESERVATION_PROCEDURE."
       }
     },
     {
       "id": "add-to-calendar",
-      "type": "apply",
-      "op": "service:calendar_create",
+      "role": "sink",
+      "op": "calendar:create_event",
+      "consumes": "reservation",
       "params": {
-        "connection": "google-workspace",
-        "event": "{{reservation}}"
+        "calendar_names": ["primary"],
+        "title": "{{shortlist.title}}",
+        "start_date": "{{shortlist.datetime}}"
+      },
+      "on_error": {
+        "strategy": "skip",
+        "remediation": "Calendar write failed; the reservation itself already succeeded — notify and continue."
       }
     },
     {
       "id": "notify",
-      "type": "apply",
-      "op": "presence:notify",
+      "role": "sink",
+      "op": "presence:dispatch",
       "params": {
         "channel": "{{NOTIFICATION_CHANNEL}}",
-        "message": "Reserved: {{reservation.title}} at {{reservation.time}}"
+        "payload": {
+          "text": "Reserved: {{shortlist.title}} at {{shortlist.datetime}} — {{reservation}}"
+        }
       }
     }
   ]

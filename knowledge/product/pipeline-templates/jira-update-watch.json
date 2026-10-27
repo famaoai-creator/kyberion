@@ -1,0 +1,89 @@
+{
+  "pipeline_id": "jira-update-watch",
+  "version": "1.0.0",
+  "action": "pipeline",
+  "description": "Periodic Jira watch: search issues updated within the lookback window via the canonical Jira REST preset (service:preset search_issues/JQL), let reasoning decide required actions and notify targets, and write a local digest. Slack delivery stays write-gated — add a service:preset slack post_message step only behind approval. Chronos pickup: copy to a tenant pipeline path and enable the schedule block (see pipeline-templates README).",
+  "schedule": {
+    "id": "jira-update-watch",
+    "cron": "*/30 * * * *",
+    "timezone": "Asia/Tokyo",
+    "enabled": false
+  },
+  "context": {
+    "jira_jql": "project = {{jira_project_key|DEMO}} AND updated >= -{{lookback_minutes|30}}m ORDER BY updated DESC",
+    "digest_output_path": "active/shared/tmp/jira-update-watch-digest.json",
+    "summary_output_path": "active/shared/tmp/jira-update-watch-summary.md",
+    "lookback_minutes": 30
+  },
+  "steps": [
+    {
+      "id": "preflight",
+      "role": "gate",
+      "op": "core:include",
+      "params": { "fragment": "fragments/runtime-preflight.json" }
+    },
+    {
+      "id": "search_updated_issues",
+      "role": "source",
+      "op": "service:preset",
+      "produces": { "channel": "jira_updates", "type": "JiraIssueList" },
+      "params": {
+        "service_id": "jira",
+        "auth": "secret-guard",
+        "action": "search_issues",
+        "params": {
+          "jql": "{{jira_jql}}",
+          "maxResults": 50,
+          "fields": ["summary", "status", "assignee", "updated", "priority"]
+        }
+      },
+      "on_error": {
+        "strategy": "abort",
+        "remediation": "Jira preset call failed. Check JIRA_HOST / JIRA_EMAIL / JIRA_API_TOKEN and the service-endpoints binding."
+      }
+    },
+    {
+      "id": "analyze_actions",
+      "role": "transform",
+      "op": "reasoning:analyze",
+      "consumes": "jira_updates",
+      "produces": { "channel": "action_plan", "type": "ActionPlanMarkdown" },
+      "params": {
+        "instruction": "以下は直近 {{lookback_minutes}} 分に更新された Jira チケットです。各更新について必要なアクション(担当者への確認依頼、レビュー依頼、エスカレーション、対応不要)を判定し、Markdown で出力してください。\n\n必須セクション:\n# Jira 更新サマリ\n## 要アクションのチケット\n| チケット | 更新内容 | 必要なアクション | 通知先 |\n|---|---|---|---|\n## 対応不要の更新\n\n要件:\n- 通知先はチケットの assignee / reporter / 関係メンバーから推定する\n- アクションが不要な更新は理由を一言で記す\n- 推測と事実を分ける\n\n更新一覧: {{jira_updates}}"
+      }
+    },
+    {
+      "id": "write_digest",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "action_plan",
+      "params": {
+        "path": "{{digest_output_path}}",
+        "content": {
+          "kind": "jira-update-watch",
+          "generated_at": "{{run_utc_now}}",
+          "jql": "{{jira_jql}}",
+          "issues": "{{jira_updates}}"
+        }
+      }
+    },
+    {
+      "id": "write_summary",
+      "role": "sink",
+      "op": "system:write_file",
+      "consumes": "action_plan",
+      "params": {
+        "path": "{{summary_output_path}}",
+        "content": "{{action_plan}}"
+      }
+    },
+    {
+      "id": "log_digest",
+      "role": "sink",
+      "op": "system:log",
+      "params": {
+        "message": "Jira update digest written to {{digest_output_path}} / {{summary_output_path}}. Member notification is not enabled in this template — add a write-gated slack post_message step after approval."
+      }
+    }
+  ]
+}
