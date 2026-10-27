@@ -1,8 +1,8 @@
 {
   "pipeline_id": "browser-session-start",
-  "version": "2.0.0",
-  "description": "Fragment demonstrating how to start a browser session with a specific managed profile and optional native chrome profile directory.",
-  "_migration_note": "v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
+  "version": "2.1.0",
+  "description": "Fragment demonstrating how to start a browser session with a specific managed profile and optional native chrome profile directory. Ops are fully qualified so the fragment can be included from generic pipelines (core:include).",
+  "_migration_note": "v2.1: qualified ops (browser:* / system:*) — bare 'goto' resolves to system:goto and fails under the generic engine. v2: Typed Flow format (role/produces/consumes). v1 used type without roles.",
   "action": "pipeline",
   "options": {
     "headless": false,
@@ -14,14 +14,14 @@
   "steps": [
     {
       "role": "sink",
-      "op": "log",
+      "op": "system:log",
       "params": {
         "message": "Browser started with dedicated profile."
       }
     },
     {
       "role": "sink",
-      "op": "goto",
+      "op": "browser:goto",
       "params": {
         "url": "about:blank"
       }
