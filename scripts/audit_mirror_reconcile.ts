@@ -46,6 +46,8 @@ const AUDIT_MIRROR_USAGE =
   'Usage: pnpm kyberion audit mirror-reconcile [--mission-id <id>] [--request-approval --requested-by <actor>] [--apply --approval-request-id <id>]';
 
 const AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
+/** Mirror-only entry ids named in a finding (the count is always exact). */
+export const AUDIT_MIRROR_ONLY_ID_LIMIT = 20;
 
 export interface AuditMirrorFinding {
   slug: string;
@@ -58,6 +60,14 @@ export interface AuditMirrorFinding {
   action: 'quarantine' | 'quarantine_and_rebuild';
   /** Unparseable mirror lines: rebuilt from the master, never parsed. */
   unreadable_lines?: number;
+  /**
+   * Readable mirror entries with no readable master entry (e.g. the master
+   * line is unreadable): the rebuild leaves them out of the live mirror, so
+   * they survive only in the archive. Part of the approved payload.
+   */
+  mirror_only_entries?: number;
+  /** The first {@link AUDIT_MIRROR_ONLY_ID_LIMIT} of their ids. */
+  mirror_only_ids?: string[];
 }
 
 export interface AuditMirrorReceipt {
@@ -220,6 +230,8 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
           entry.currentHash === masterEntries[index]?.currentHash
       );
     if (same) continue;
+    const masterIds = new Set(masterEntries.map((entry) => entry.id));
+    const mirrorOnly = mirrorEntries.filter((entry) => !masterIds.has(entry.id));
 
     findings.push({
       slug,
@@ -236,6 +248,14 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
             : 'mirror_out_of_sync',
       action: masterEntries.length === 0 ? 'quarantine' : 'quarantine_and_rebuild',
       ...(unreadable > 0 ? { unreadable_lines: unreadable } : {}),
+      ...(mirrorOnly.length > 0
+        ? {
+            mirror_only_entries: mirrorOnly.length,
+            mirror_only_ids: mirrorOnly
+              .slice(0, AUDIT_MIRROR_ONLY_ID_LIMIT)
+              .map((entry) => entry.id),
+          }
+        : {}),
     });
   }
 
@@ -290,6 +310,11 @@ export function openAuditMirrorApproval(input: {
     };
   }
 
+  const mirrorOnly = findings.reduce((sum, finding) => sum + (finding.mirror_only_entries ?? 0), 0);
+  const mirrorOnlyNote =
+    mirrorOnly > 0
+      ? ` ${mirrorOnly} mirror entr${mirrorOnly === 1 ? 'y has' : 'ies have'} no readable master copy: the rebuild leaves ${mirrorOnly === 1 ? 'it' : 'them'} out of the live mirror and ${mirrorOnly === 1 ? 'it survives' : 'they survive'} only in the archive.`
+      : '';
   const requester = input.requester
     ? resolveApprovalRequesterInput(input.requester)
     : { requestedBy: input.requestedBy || 'audit-mirror-controller' };
@@ -303,7 +328,7 @@ export function openAuditMirrorApproval(input: {
     kind: 'mission_gate',
     draft: {
       title: `SA-01 audit mirror reconciliation: ${missionId}`,
-      summary: 'Approve quarantine of stale stance mirrors and rebuild from the master chain.',
+      summary: `Approve quarantine of stale stance mirrors and rebuild from the master chain.${mirrorOnlyNote}`,
       details: JSON.stringify(findings, null, 2),
       severity: 'high',
     },
@@ -316,8 +341,7 @@ export function openAuditMirrorApproval(input: {
     },
     justification: {
       reason: 'SA-01 tenant audit mirrors no longer match the authoritative master chain.',
-      impactSummary:
-        'Only the existing customer/{slug}/logs/audit mirror is moved to recoverable archive; master audit records are retained.',
+      impactSummary: `Only the existing customer/{slug}/logs/audit mirror is moved to recoverable archive; master audit records are retained.${mirrorOnlyNote}`,
       requestedEffects: [AUDIT_MIRROR_EFFECT_BINDING],
     },
     risk: {

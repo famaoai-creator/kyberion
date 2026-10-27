@@ -508,6 +508,32 @@ describe('audit-chain — tenant mirror', () => {
     ]);
   });
 
+  it('seeds a --since window past a junk line at the end of the boundary file', async () => {
+    const day1 = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    day1.auditChain.record({
+      agentId: 'agent-1',
+      action: 'day-one',
+      operation: 'op',
+      result: 'completed',
+    });
+    // A torn write leaves junk after day one's last entry (no trailing newline).
+    fs.appendFileSync(auditFile('2026-07-01'), '{"id":"AUD-TORN"');
+    const day2 = await loadFreshAuditChain(new Date('2026-07-02T10:00:00.000Z'));
+    day2.auditChain.record({
+      agentId: 'agent-2',
+      action: 'day-two',
+      operation: 'op',
+      result: 'completed',
+    });
+
+    // Day two links to day one's last readable entry: the window is intact,
+    // and the junk line before it is reported, not used as the seed.
+    const result = day2.auditChain.verify({ since: '2026-07-02' });
+    expect(result.boundaryLimited).toBe(false);
+    expect(result.corrupted).toEqual(['audit-2026-07-01.jsonl:line:2:invalid_record']);
+    expect(result).toMatchObject({ total: 1, valid: 1 });
+  });
+
   it('reports an unreadable line instead of dropping the whole file', async () => {
     const run = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
     run.auditChain.record({
