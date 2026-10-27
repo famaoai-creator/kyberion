@@ -34,7 +34,26 @@ const SCOPE_ROUTES = [
   'tenant-design/route.ts',
   'intelligence/route.ts',
   'intelligence/stream/route.ts',
+  'customer-decisions/overview/route.ts',
+  'customer-decisions/case/route.ts',
+  'customer-decisions/learning/route.ts',
 ] as const;
+
+/**
+ * Shared scope resolvers a route may delegate its tenant / project parameters
+ * to: a delegating route is checked together with the resolver's source.
+ */
+const SCOPE_RESOLVERS: Record<string, string> = {
+  'resolveCustomerDecisionTenant(': 'lib/customer-decision-viewer-scope.ts',
+};
+
+function readChronosSource(relative: string): string {
+  return String(
+    safeReadFile(pathResolver.rootResolve(`presence/displays/chronos-mirror-v2/src/${relative}`), {
+      encoding: 'utf8',
+    })
+  );
+}
 
 describe('Chronos route request input boundary', () => {
   it('keeps path query values as URLSearchParams strings without implicit coercion', () => {
@@ -50,25 +69,21 @@ describe('Chronos route request input boundary', () => {
     }
   });
 
-  it('normalizes scope and listing query values before authorization or projection', () => {
-    for (const route of SCOPE_ROUTES) {
-      const source = String(
-        safeReadFile(
-          pathResolver.rootResolve(`presence/displays/chronos-mirror-v2/src/app/api/${route}`),
-          { encoding: 'utf8' }
-        )
-      );
-      expect(source).toMatch(/readChronos|workspaceSelectionFromSearchParams/);
+  // One case per route, so a regression in one route never hides the others.
+  it.each(SCOPE_ROUTES)(
+    'normalizes scope and listing query values before authorization or projection (%s)',
+    (route) => {
+      const routeSource = readChronosSource(`app/api/${route}`);
+      const source = [
+        routeSource,
+        ...Object.entries(SCOPE_RESOLVERS)
+          .filter(([call]) => routeSource.includes(call))
+          .map(([, resolver]) => readChronosSource(resolver)),
+      ].join('\n');
+      expect(source, route).toMatch(/readChronos|workspaceSelectionFromSearchParams/);
       if (source.includes('workspaceSelectionFromSearchParams')) {
         expect(source).toContain('workspaceSelectionFromSearchParams(req.nextUrl.searchParams)');
-        const workspace = String(
-          safeReadFile(
-            pathResolver.rootResolve(
-              'presence/displays/chronos-mirror-v2/src/lib/workspace-scope.ts'
-            ),
-            { encoding: 'utf8' }
-          )
-        );
+        const workspace = readChronosSource('lib/workspace-scope.ts');
         expect(workspace).toContain('search.getAll(field).length > 1');
         expect(workspace).toContain('const value = search.get(field)');
         expect(workspace).toContain(
@@ -79,5 +94,5 @@ describe('Chronos route request input boundary', () => {
         /searchParams\.get\('(?:tenant|organization_id|project_id)'\) \|\|/
       );
     }
-  });
+  );
 });

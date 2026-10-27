@@ -19,7 +19,7 @@ import { ChronosDiagram, ChronosInline, ChronosMeta, ChronosToolbar } from './ch
 import { useChronosLocale } from '../lib/hooks';
 import { uxMessage, uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import { parseOrganizationOperatingModelResponse } from '../lib/organization-operating-model-response';
-import { CustomerDecisionOverviewCard } from './CustomerDecisionOverviewCard';
+import { CustomerDecisionCard } from './CustomerDecisionDrilldown';
 
 type OrganizationHealth = 'healthy' | 'degraded' | 'critical' | 'unknown';
 type OrganizationPriority = 'high' | 'medium' | 'low';
@@ -537,7 +537,13 @@ export function OrganizationOperatingModel({
             )}
           </Section>
 
-          {tenant && !projectId ? <CustomerDecisionOverviewCard tenant={tenant} /> : null}
+          {tenant && !projectId ? (
+            <CustomerDecisionCard
+              tenant={tenant}
+              organizationId={view.organization_id}
+              learningCandidates={view.learning_candidates}
+            />
+          ) : null}
 
           <ChronosToolbar>
             <ChronosMeta>

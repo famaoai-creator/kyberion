@@ -107,6 +107,8 @@ export function usage(): string {
     'pnpm kyberion customer-decision remind    --tenant <slug> [--case <id>] [--dry-run] [--now <iso>]',
     'pnpm kyberion customer-decision reminders --tenant <slug> --install --by user:<member> [--force] [--dry-run]',
     'pnpm kyberion customer-decision overview  --tenant <slug> [--case <id>] [--now <iso>] [--summary] --json   (read-only)',
+    'pnpm kyberion customer-decision overview  --tenant <slug> --case <id> --detail [--now <iso>] --json   (read-only)',
+    'pnpm kyberion customer-decision overview  --tenant <slug> --learning [--date <YYYY-MM-DD>] --json   (read-only)',
     'pnpm kyberion customer-decision learning  --tenant <slug> [--since <date>] [--dry-run] [--now <iso>] [--organization-id <id>]',
     'pnpm kyberion customer-decision learning  --tenant <slug> --install --by user:<member> [--force] [--dry-run]',
     'pnpm kyberion customer-decision view      --tenant <slug> [--case <id>] --json   (stdin: {"token"})',

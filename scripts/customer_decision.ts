@@ -34,6 +34,13 @@
  *            deadlines, change requests, hand-offs, reminders and held tasks per agenda; never
  *            reconciles, routes or writes; refuses a --tenant other than a bound KYBERION_TENANT;
  *            --summary omits agenda entries and caps attention at 50 (totals.attention_total)
+ *   overview --case <id> --detail [--now <iso>]       one case for the drill-down views (JSON contract
+ *            `CustomerDecisionCaseDetail`, case-detail.ts): ids, statuses, dates and counts per agenda,
+ *            entry (question cut to 200 chars), change request, hand-off, reminder, invite, routing and
+ *            task; never values, options, rationale, comments or names; [CUSTOMER_DECISION_CASE_NOT_FOUND]
+ *   overview --learning [--date <YYYY-MM-DD>]          the stored learning report (latest when omitted) as
+ *            `CustomerDecisionLearningView` (learning-view.ts): counts, suggestions and candidate ids,
+ *            never values or defaults; report_date null when there is none; [CUSTOMER_DECISION_REPORT_NOT_FOUND]
  *   learning [--since <date>] [--dry-run] [--now <iso>] [--organization-id <id>]   count overturned
  *            decisions, recurring questions and change requests (CD-12), write the tenant report
  *            decisions/_reports/learning-<date>.json and queue organization learning candidates
