@@ -493,19 +493,36 @@ class AuditChainImpl {
    */
   verify(options: AuditVerifyOptions = {}): AuditVerifyResult {
     const allFiles = this.listAuditFiles();
-    const files = options.since
-      ? allFiles.filter((fileName) => {
-          const fileDate = this.extractAuditDate(fileName);
-          return !fileDate || fileDate >= String(options.since);
-        })
-      : allFiles;
-    const entries = this.loadEntriesFromFiles(files);
+    const inWindow = (fileName: string): boolean => {
+      const fileDate = this.extractAuditDate(fileName);
+      return !options.since || !fileDate || fileDate >= String(options.since);
+    };
+    const files = allFiles.filter(inWindow);
     const corrupted: string[] = [];
     let prevHash = GENESIS_HASH;
     let previousFileDate: string | null = null;
+    let total = 0;
     let invalidEntryCount = 0;
-    const boundaryLimited = Boolean(options.since);
     const algTracker = createChainAlgTracker({ requireKeyed: options.requireKeyed });
+
+    // A --since window continues from the last entry before it: its hash is
+    // the window's expected first link and its algorithm the chain's state,
+    // so a rewritten window cannot restart unkeyed from a real boundary hash.
+    let boundaryLimited = false;
+    if (options.since) {
+      const before = allFiles.filter((fileName) => !inWindow(fileName));
+      const lastBefore = before.length
+        ? this.readAuditFileForVerify(path.join(this.auditDir, before[before.length - 1])).entries
+        : [];
+      const boundary = lastBefore[lastBefore.length - 1];
+      if (boundary) {
+        prevHash = boundary.currentHash;
+        algTracker.seed(boundary.chain_alg);
+        previousFileDate = this.extractAuditDate(before[before.length - 1]);
+      } else {
+        boundaryLimited = before.length > 0;
+      }
+    }
 
     for (const fileName of files) {
       const fileDate = this.extractAuditDate(fileName);
@@ -515,20 +532,27 @@ class AuditChainImpl {
 
       previousFileDate = fileDate ?? previousFileDate;
 
-      for (const entry of this.readAuditFileEntries(path.join(this.auditDir, fileName))) {
+      const read = this.readAuditFileForVerify(path.join(this.auditDir, fileName));
+      // An unreadable line is a finding, never a silently dropped file.
+      for (const line of read.invalidLines)
+        corrupted.push(`${fileName}:line:${line}:invalid_record`);
+      total += read.entries.length + read.invalidLines.length;
+      invalidEntryCount += read.invalidLines.length;
+
+      for (const entry of read.entries) {
         if (boundaryLimited && prevHash === GENESIS_HASH && entry.previousHash !== GENESIS_HASH) {
           prevHash = entry.previousHash;
         }
         const chainAlg = entry.chain_alg ?? 'sha256';
         const algFinding = algTracker.observe(chainAlg);
-        if (algFinding) corrupted.push(`${entry.id}:${algFinding}`);
         const chainKey =
           chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
         const check = verifyAuditEntryHash(entry as unknown as Record<string, unknown>, prevHash, {
           alg: chainAlg,
           ...(chainKey ? { key: chainKey } : {}),
         });
-        if (!check.ok) corrupted.push(entry.id);
+        if (algFinding) corrupted.push(`${entry.id}:${algFinding}`);
+        else if (!check.ok) corrupted.push(entry.id);
         if (!check.ok || algFinding) invalidEntryCount++;
 
         prevHash = entry.currentHash;
@@ -536,9 +560,9 @@ class AuditChainImpl {
     }
 
     const result = {
-      valid: entries.length - invalidEntryCount,
+      valid: total - invalidEntryCount,
       corrupted,
-      total: entries.length,
+      total,
       checkedFiles: files,
       boundaryLimited,
       unkeyed: algTracker.unkeyed,
@@ -546,10 +570,10 @@ class AuditChainImpl {
 
     if (corrupted.length > 0) {
       logger.error(
-        `[AUDIT_CHAIN] Integrity check failed: ${corrupted.length}/${entries.length} entries corrupted`
+        `[AUDIT_CHAIN] Integrity check failed: ${invalidEntryCount}/${total} entries corrupted`
       );
     } else {
-      logger.info(`[AUDIT_CHAIN] Integrity verified: ${entries.length} entries OK`);
+      logger.info(`[AUDIT_CHAIN] Integrity verified: ${total} entries OK`);
     }
 
     return result;
@@ -698,6 +722,26 @@ class AuditChainImpl {
     if (Number.isNaN(previousDate.getTime())) return true;
     previousDate.setUTCDate(previousDate.getUTCDate() + 1);
     return previousDate.toISOString().slice(0, 10) === current;
+  }
+
+  /** Line-by-line read for verification: unreadable lines are reported, not dropped. */
+  private readAuditFileForVerify(filePath: string): {
+    entries: AuditEntry[];
+    invalidLines: number[];
+  } {
+    const entries: AuditEntry[] = [];
+    const invalidLines: number[] = [];
+    if (!auditIo || !auditIo.exists(filePath)) return { entries, invalidLines };
+    const lines = auditIo.read(filePath).split('\n');
+    for (const [index, line] of lines.entries()) {
+      if (!line.trim()) continue;
+      try {
+        entries.push(normalizePersistedAuditEntry(parseSafeJsonInput(line, 'audit chain entry')));
+      } catch {
+        invalidLines.push(index + 1);
+      }
+    }
+    return { entries, invalidLines };
   }
 
   private readAuditFileEntries(filePath: string): AuditEntry[] {

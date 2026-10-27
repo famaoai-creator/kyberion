@@ -513,14 +513,15 @@ export const verifyLedgerIntegrityDetailed = (
       }
       const chainAlg = (entry.chain_alg ?? 'sha256') as ChainAlg;
       const algFinding = algTracker.observe(chainAlg);
-      if (algFinding) corrupted.push(`line:${index + 1}:${algFinding}`);
       const chainKey =
         chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
       const check = verifyLedgerEntryHash(entry, expectedParentHash, {
         alg: chainAlg,
         ...(chainKey ? { key: chainKey } : {}),
       });
-      if (!check.ok) {
+      if (algFinding) {
+        corrupted.push(`line:${index + 1}:${algFinding}`);
+      } else if (!check.ok) {
         if (check.reason === 'missing_audit_chain_key') missingKey = true;
         corrupted.push(
           entry.id ? String(entry.id) : `line:${index + 1}:${check.reason ?? 'invalid'}`
