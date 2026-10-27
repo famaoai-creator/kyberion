@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
+  approvalEventLogicalPath,
   approvalRequestLogicalPath,
   decideApprovalRequest,
   loadApprovalRequest,
@@ -95,6 +96,10 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     for (const id of opened.splice(0)) {
       safeRmSync(approvalRequestLogicalPath(AUDIT_MIRROR_APPROVAL_CHANNEL, id), { force: true });
     }
+    // The vitest approval store is per run and pool (approvalStoreRoots), and
+    // the store guard requires each file to leave it empty: clear the events
+    // log the decisions above appended to.
+    safeRmSync(approvalEventLogicalPath(AUDIT_MIRROR_APPROVAL_CHANNEL), { force: true });
     safeRmSync(ROOT, { recursive: true, force: true });
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
