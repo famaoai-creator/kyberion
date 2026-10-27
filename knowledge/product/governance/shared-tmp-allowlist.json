@@ -403,9 +403,9 @@
     },
     {
       "file": "scripts/actuator_playground.ts",
-      "count": 1,
+      "count": 2,
       "classification": "legit-tmp",
-      "note": "playground scratch dir"
+      "note": "playground scratch dir + recorded-session/ADF-draft store"
     },
     {
       "file": "scripts/backup.ts",
