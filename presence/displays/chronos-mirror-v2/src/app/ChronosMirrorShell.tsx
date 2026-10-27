@@ -36,6 +36,7 @@ import {
 } from './chronos-page-config';
 import { ChronosHome } from '../components/ChronosHome';
 import { WorkspaceOverview } from '../components/WorkspaceOverview';
+import { OrganizationDashboard } from '../components/OrganizationDashboard';
 import { humanizeMissionId } from '../components/ChronosOffice';
 import { ChronosKbI18n } from '../components/chronos-kb-i18n';
 import { ChronosFieldScope, ChronosInline, ChronosToolbar } from '../components/chronos-ui';
@@ -341,6 +342,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
 
           {consoleSection === 'home' ? (
             <>
+              <OrganizationDashboard />
               <WorkspaceOverview />
               <ChronosHome
                 tenant={tenant}
