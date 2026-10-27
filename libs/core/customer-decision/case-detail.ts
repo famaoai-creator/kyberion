@@ -386,10 +386,26 @@ function taskDetail(lock: ConsumedDecisionLockRecord, input: CaseOverviewInput):
 
 /** One case in full for the drill-down views (see the file header for what is never emitted). */
 export function buildCustomerDecisionCaseDetail(
-  input: CaseOverviewInput & { tenant_slug: string }
+  source: CaseOverviewInput & { tenant_slug: string }
 ): CustomerDecisionCaseDetail {
-  const today = utcDate(input.now);
+  const today = utcDate(source.now);
   if (!today) throw new Error('[CUSTOMER_DECISION_OVERVIEW_NOW_INVALID] now is not a timestamp');
+  // One proof per lock: the counts and the task list must agree, and the
+  // facade's verifier reads the mission and approval stores.
+  const verify = source.isSuperseded;
+  const verified = new Map<ConsumedDecisionLockRecord, boolean>();
+  const input: typeof source = verify
+    ? {
+        ...source,
+        isSuperseded: (lock) => {
+          const known = verified.get(lock);
+          if (known !== undefined) return known;
+          const value = verify(lock);
+          verified.set(lock, value);
+          return value;
+        },
+      }
+    : source;
   const overview = buildCaseOverview(input);
   const { attention } = buildCustomerDecisionOverview({
     tenant_slug: input.tenant_slug,

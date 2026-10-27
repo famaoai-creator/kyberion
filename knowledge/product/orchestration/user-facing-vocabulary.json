@@ -881,6 +881,11 @@
         "ja": "まだ調整セットにない提案",
         "qps-ploc": "⟦Ṗřőṗőşȧŀş ñőŧ őñ ȧñ ȧɠėñḓȧ ẏėŧ ŀőřėɱ ïṗşů⟧"
       },
+      "chronos_cd_metric_frozen_locks": {
+        "en": "Frozen task locks",
+        "ja": "凍結されたタスクのロック",
+        "qps-ploc": "⟦Ƒřőẑėñ ŧȧşķ ŀőƈķş ŀőřėɱ⟧"
+      },
       "chronos_cd_agendas": {
         "en": "Agenda sets",
         "ja": "調整セット",

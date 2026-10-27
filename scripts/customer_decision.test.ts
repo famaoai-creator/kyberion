@@ -2059,9 +2059,13 @@ describe('customer-decision facade', () => {
         frozen_locks?: Array<Record<string, unknown>>;
         superseded?: unknown;
       };
-      // Still read as a live, held task — and named as frozen apart.
-      expect(status.awaiting_customer.map((item) => item.consumer)).toEqual([
-        'mission-MSN-CD09-FROZEN.release',
+      // Still read as a live, held task — whose writes are refused, so it
+      // points at the repair instead of resume / re-ask — and named apart.
+      expect(status.awaiting_customer).toEqual([
+        expect.objectContaining({
+          consumer: 'mission-MSN-CD09-FROZEN.release',
+          next: 'the lock is frozen: repair it first (see frozen_locks)',
+        }),
       ]);
       expect(status).not.toHaveProperty('superseded');
       expect(status.frozen_locks).toEqual([
@@ -2071,8 +2075,9 @@ describe('customer-decision facade', () => {
           task_id: 'release',
           claimed_by_task_id: 'release-v2',
           approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+          proof_reason: 'mission_not_found',
           next: expect.stringMatching(
-            /restore consumers\/mission-MSN-CD09-FROZEN\.release\.json of case .*pnpm mission resume MSN-CD09-FROZEN.*pnpm mission supersede-task MSN-CD09-FROZEN release/u
+            /^confirm the mission has no approved supersede of this task \(proof: mission_not_found\), then restore consumers\/mission-MSN-CD09-FROZEN\.release\.json of case .*pnpm mission resume MSN-CD09-FROZEN.*pnpm mission supersede-task MSN-CD09-FROZEN release/u
           ),
         },
       ]);
