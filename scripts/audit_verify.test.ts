@@ -93,9 +93,9 @@ describe('audit_verify', () => {
     const report = collectAuditVerifyReport();
 
     expect(report.ok).toBe(true);
-    expect(mocks.auditVerify).toHaveBeenCalledWith({ since: undefined });
+    expect(mocks.auditVerify).toHaveBeenCalledWith({ since: undefined, requireKeyed: true });
     expect(mocks.ledgerVerify).toHaveBeenCalledWith('active/audit/system-ledger.jsonl', {
-      requireKeyed: undefined,
+      requireKeyed: true,
     });
   });
 
@@ -137,9 +137,9 @@ describe('audit_verify', () => {
     });
 
     expect(report.ok).toBe(true);
-    expect(mocks.auditVerify).toHaveBeenCalledWith({ since: '2026-07-04' });
+    expect(mocks.auditVerify).toHaveBeenCalledWith({ since: '2026-07-04', requireKeyed: true });
     expect(mocks.ledgerVerify).toHaveBeenCalledWith('active/missions/demo/evidence/ledger.jsonl', {
-      requireKeyed: undefined,
+      requireKeyed: true,
     });
   });
 
@@ -184,7 +184,7 @@ describe('audit_verify', () => {
     expect(text).toContain('tenant ledgers withheld: 1');
   });
 
-  it('passes --require-keyed to every verifier and reports unkeyed legacy entries', async () => {
+  it('accepts an unkeyed legacy prefix only when explicitly allowed, and reports it', async () => {
     mocks.auditVerify.mockReturnValue({
       valid: 1,
       corrupted: [],
@@ -194,21 +194,21 @@ describe('audit_verify', () => {
       unkeyed: 3,
     });
     mocks.ledgerVerify.mockReturnValue({
-      ok: false,
+      ok: true,
       total: 2,
-      corrupted: ['line:1:unkeyed_entry'],
+      corrupted: [],
       missingKey: false,
       unkeyed: 1,
     });
     const { collectAuditVerifyReport, formatAuditVerifyReport } = await import('./audit_verify.js');
 
-    const report = collectAuditVerifyReport({ requireKeyed: true });
+    const report = collectAuditVerifyReport({ allowLegacyUnkeyed: true });
 
-    expect(mocks.auditVerify).toHaveBeenCalledWith({ since: undefined, requireKeyed: true });
+    expect(mocks.auditVerify).toHaveBeenCalledWith({ since: undefined, requireKeyed: false });
     expect(mocks.ledgerVerify).toHaveBeenCalledWith('active/audit/system-ledger.jsonl', {
-      requireKeyed: true,
+      requireKeyed: false,
     });
-    expect(report.ok).toBe(false);
+    expect(report.ok).toBe(true);
     expect(report.ledgers[0]).toMatchObject({ unkeyed: 1 });
     const text = formatAuditVerifyReport(report).join('\n');
     expect(text).toContain('unkeyed legacy entries: 3');

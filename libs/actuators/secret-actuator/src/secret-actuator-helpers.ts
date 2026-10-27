@@ -175,15 +175,18 @@ async function withGovernedMutation(
   try {
     result = await logic();
     if (result.status === 'success') {
-      // Without a mission the record lands in the untenanted system ledger:
-      // keep the account name (a personal-tier key name) out of it.
+      // The account name (a personal-tier key name) goes only into the
+      // evidence ledger of the ephemeral mission started above. An inherited
+      // MISSION_ID may name an archived mission, and no mission means the
+      // untenanted system ledger: both keep the full payload there.
       ledger.record('CONFIG_CHANGE', {
         mission_id: missionReady ? missionId : 'None',
         role: getRegisteredEnvText('MISSION_ROLE') || 'secret_guard',
         service_id: params.service,
         config_target: 'os-keychain',
         action: actionType,
-        ...(missionReady ? { changed_keys: [params.account] } : { changed_key_count: 1 }),
+        changed_key_count: 1,
+        ...(isEphemeral && missionReady ? { changed_keys: [params.account] } : {}),
       });
       if (missionReady) result.mission_id = missionId;
     }

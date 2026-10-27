@@ -182,6 +182,8 @@ export function verifyLedgerEntryHash(
 export interface ChainAlgTracker {
   /** The finding reason for this entry's algorithm, or undefined when allowed. */
   observe(alg: ChainAlg | undefined): 'chain_downgrade' | 'unkeyed_entry' | undefined;
+  /** Continue a chain whose earlier part was verified elsewhere (a --since boundary). */
+  seed(alg: ChainAlg | undefined): void;
   /** Unkeyed entries seen so far. */
   readonly unkeyed: number;
 }
@@ -198,6 +200,9 @@ export function createChainAlgTracker(options: { requireKeyed?: boolean } = {}):
       unkeyed += 1;
       if (keyedSeen) return 'chain_downgrade';
       return options.requireKeyed ? 'unkeyed_entry' : undefined;
+    },
+    seed(alg) {
+      if ((alg ?? 'sha256') === 'hmac-sha256') keyedSeen = true;
     },
     get unkeyed() {
       return unkeyed;
