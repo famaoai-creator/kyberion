@@ -352,17 +352,91 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     );
   }, 60_000);
 
+  it('overview --case --detail reads one case in full and writes nothing', async () => {
+    const before = snapshot(STORES);
+    const at = '2026-10-25T00:00:00.000Z';
+    const out = await run([
+      'overview',
+      '--tenant',
+      TENANT,
+      '--case',
+      CASE,
+      '--detail',
+      '--now',
+      at,
+    ]);
+    expect(snapshot(STORES)).toEqual(before);
+    expect(out).toMatchObject({
+      version: '1.0.0',
+      tenant_slug: TENANT,
+      case_id: CASE,
+      today: '2026-10-25',
+      draft_only: false,
+      tasks: [],
+      tasks_total: 0,
+    });
+    const [agenda] = out.agendas as Out[];
+    expect(agenda).toMatchObject({
+      agenda_id: agendaId,
+      title: TITLE,
+      entries_total: 3,
+      invites: { active: 1, expired: 0, revoked: 0, deciders: 1, contributors: 0 },
+      approval: { approved_at: expect.any(String) },
+    });
+    expect((agenda.entries as Out[]).map((entry) => entry.question)).toEqual([
+      'How long to keep data?',
+      'Which sign-in method?',
+      'Release to production?',
+    ]);
+    // Three receipts carried something for the operator (comments, the general question).
+    expect(agenda.handoffs_total).toBe(3);
+    // Counts only: off-option answers and the general question (never their text).
+    expect(
+      (agenda.handoffs as Out[]).map((item) => [item.off_option, item.general_question])
+    ).toEqual(
+      expect.arrayContaining([
+        [1, true],
+        [1, false],
+      ])
+    );
+    const text = JSON.stringify(out);
+    for (const secret of [...SECRETS, 'Hanako', ACTOR, '30 days', '90 days', 'user:boss'])
+      expect(text).not.toContain(secret);
+    for (const field of ['"value"', '"options"', '"comment"', '"participant"', '"approved_by"'])
+      expect(text).not.toContain(field);
+
+    await expect(run(['overview', '--tenant', TENANT, '--detail'])).rejects.toThrow(
+      /--detail needs --case/u
+    );
+    await expect(
+      run(['overview', '--tenant', TENANT, '--case', CASE, '--detail', '--summary'])
+    ).rejects.toThrow(/cannot be combined/u);
+    await expect(
+      run(['overview', '--tenant', TENANT, '--case', 'case-nope', '--detail'])
+    ).rejects.toThrow(/\[CUSTOMER_DECISION_CASE_NOT_FOUND\]/u);
+    expect(snapshot(STORES)).toEqual(before);
+  }, 60_000);
+
   it('refuses a tenant other than the bound one', async () => {
     process.env.KYBERION_TENANT = OTHER;
     try {
       await expect(run(['overview', '--tenant', TENANT])).rejects.toThrow(/TENANT_MISMATCH/u);
       await expect(run(['learning', '--tenant', TENANT])).rejects.toThrow(/TENANT_MISMATCH/u);
+      await expect(
+        run(['overview', '--tenant', TENANT, '--case', CASE, '--detail'])
+      ).rejects.toThrow(/TENANT_MISMATCH/u);
+      await expect(run(['overview', '--tenant', TENANT, '--learning'])).rejects.toThrow(
+        /TENANT_MISMATCH/u
+      );
     } finally {
       delete process.env.KYBERION_TENANT;
     }
     // The other tenant sees none of this tenant's cases.
     const other = await run(['overview', '--tenant', OTHER]);
     expect(other).toMatchObject({ totals: { cases: 0, agendas: 0 }, cases: [] });
+    await expect(run(['overview', '--tenant', OTHER, '--case', CASE, '--detail'])).rejects.toThrow(
+      /\[CUSTOMER_DECISION_CASE_NOT_FOUND\]/u
+    );
   }, 60_000);
 
   const reportFile = path.join(
@@ -395,6 +469,21 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
         }),
       ],
     });
+  }, 60_000);
+
+  it('overview --learning shows no report before the first learning run', async () => {
+    const out = await run(['overview', '--tenant', TENANT, '--learning']);
+    expect(out).toMatchObject({
+      version: '1.0.0',
+      tenant_slug: TENANT,
+      report_date: null,
+      available_dates: [],
+      generated_at: null,
+      suggestions: [],
+    });
+    await expect(
+      run(['overview', '--tenant', TENANT, '--learning', '--date', REPORT_DATE])
+    ).rejects.toThrow(/\[CUSTOMER_DECISION_REPORT_NOT_FOUND\]/u);
   }, 60_000);
 
   it('learning writes the tenant report and queues each candidate once, in the tenant scope only', async () => {
@@ -486,6 +575,63 @@ describe('customer-decision overview and learning (CD-12, real paths)', () => {
     // The report directory is never a case.
     const overview = await run(['overview', '--tenant', TENANT]);
     expect((overview.cases as Out[]).map((item) => item.case_id)).toEqual([CASE, DRAFT_CASE]);
+  }, 60_000);
+
+  it('overview --learning reads the stored reports without values and writes nothing', async () => {
+    const before = snapshot(STORES);
+    const latest = await run(['overview', '--tenant', TENANT, '--learning']);
+    expect(latest).toMatchObject({
+      tenant_slug: TENANT,
+      report_date: '2026-10-31',
+      available_dates: [REPORT_DATE, '2026-10-31'],
+    });
+    const out = await run(['overview', '--tenant', TENANT, '--learning', '--date', REPORT_DATE]);
+    expect(snapshot(STORES)).toEqual(before);
+    expect(out).toMatchObject({
+      report_date: REPORT_DATE,
+      metrics: { cases: 2 },
+      suggestions: [
+        expect.objectContaining({
+          suggestion_key: 'clarify_entry:NFR/auth.method',
+          kind: 'clarify_entry',
+          learning_id: expect.stringMatching(/^cdl-[a-f0-9]{16}$/u),
+          // The same-day re-run rewrote the report: the candidate now stands.
+          candidate: 'existing',
+          has_suggested_default: false,
+        }),
+      ],
+      overturns: expect.arrayContaining([
+        expect.objectContaining({
+          scope: 'template_entry',
+          template_id: 'aidlc-inception',
+          entry_id: 'retention',
+          overturned: 1,
+        }),
+      ]),
+    });
+    const text = JSON.stringify(out);
+    for (const secret of SECRETS) expect(text).not.toContain(secret);
+    for (const field of [
+      '"value"',
+      'customer_values',
+      'proposed_values',
+      'current_org_default',
+      'suggested_org_default',
+    ])
+      expect(text).not.toContain(field);
+    await expect(
+      run(['overview', '--tenant', TENANT, '--learning', '--date', '2026-01-01'])
+    ).rejects.toThrow(/\[CUSTOMER_DECISION_REPORT_NOT_FOUND\]/u);
+    await expect(
+      run(['overview', '--tenant', TENANT, '--learning', '--date', '2026-13-40'])
+    ).rejects.toThrow(/--date must be a date/u);
+    await expect(
+      run(['overview', '--tenant', TENANT, '--learning', '--case', CASE])
+    ).rejects.toThrow(/--learning takes no --case/u);
+    // Another tenant has no report of its own.
+    const other = await run(['overview', '--tenant', OTHER, '--learning']);
+    expect(other).toMatchObject({ tenant_slug: OTHER, report_date: null, available_dates: [] });
+    expect(snapshot(STORES)).toEqual(before);
   }, 60_000);
 
   it('learning --install needs --by and promotes the weekly template into the tenant catalog', async () => {

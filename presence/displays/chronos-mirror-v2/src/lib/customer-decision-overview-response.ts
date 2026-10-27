@@ -8,8 +8,23 @@
  * rebuilds every object from the fields it knows, so anything the contract
  * may gain later (or anything unexpected) never reaches the browser. Entry
  * rows are dropped: the card shows counts and dates, never questions,
- * decision values or the customer's free text.
+ * decision values or the customer's free text. (Its only import is the
+ * import-free field readers it shares with the drill-down parsers.)
  */
+import {
+  count,
+  days,
+  flag,
+  InvalidCustomerDecisionValue,
+  lengthOf,
+  list,
+  nullableText,
+  oneOf,
+  optionalText,
+  record,
+  text,
+  type JsonRecord,
+} from './customer-decision-parse';
 
 export const SUPPORTED_CUSTOMER_DECISION_OVERVIEW_VERSION = '1.0.0';
 
@@ -116,8 +131,6 @@ export interface CustomerDecisionOverviewView {
   case_failures: Array<{ case_id: string; diagnostic_code: string }>;
 }
 
-type JsonRecord = Record<string, unknown>;
-const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
 /**
  * Hard caps: an oversized list is truncated, never rejected, so a large
  * tenant still gets an overview (the totals stay exact; the card says how many
@@ -131,71 +144,14 @@ export const OVERVIEW_LIMITS = {
   case_failures: 50,
 } as const;
 
-class Invalid extends Error {}
-
-function record(value: unknown): JsonRecord {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Invalid();
-  if (Object.keys(value).some((key) => DANGEROUS_KEYS.has(key))) throw new Invalid();
-  return value as JsonRecord;
-}
-
-function text(source: JsonRecord, key: string): string {
-  const value = source[key];
-  if (typeof value !== 'string' || !value.trim()) throw new Invalid();
-  return value;
-}
-
-function optionalText(source: JsonRecord, key: string): string | undefined {
-  return source[key] === undefined ? undefined : text(source, key);
-}
-
-function nullableText(source: JsonRecord, key: string): string | null {
-  return source[key] === null ? null : text(source, key);
-}
-
-function count(source: JsonRecord, key: string): number {
-  const value = source[key];
-  if (typeof value !== 'number' || !Number.isInteger(value) || value < 0) throw new Invalid();
-  return value;
-}
-
-/** A day offset (negative when past). */
-function days(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isInteger(value)) throw new Invalid();
-  return value;
-}
-
-function flag(source: JsonRecord, key: string): boolean {
-  const value = source[key];
-  if (typeof value !== 'boolean') throw new Invalid();
-  return value;
-}
-
-function oneOf<T extends string>(source: JsonRecord, key: string, values: readonly T[]): T {
-  const value = source[key];
-  if (typeof value !== 'string' || !(values as readonly string[]).includes(value))
-    throw new Invalid();
-  return value as T;
-}
-
-function list<T>(value: unknown, parse: (entry: unknown) => T, cap: number): T[] {
-  if (!Array.isArray(value)) throw new Invalid();
-  return value.slice(0, cap).map(parse);
-}
-
-function lengthOf(value: unknown): number {
-  if (!Array.isArray(value)) throw new Invalid();
-  return value.length;
-}
-
-function counts(value: unknown): OverviewStatusCounts {
+export function parseOverviewStatusCounts(value: unknown): OverviewStatusCounts {
   const source = record(value);
   return Object.fromEntries(
     OVERVIEW_ENTRY_STATUSES.map((status) => [status, count(source, status)])
   ) as OverviewStatusCounts;
 }
 
-function attention(value: unknown): OverviewAttentionItemView {
+export function parseOverviewAttentionItem(value: unknown): OverviewAttentionItemView {
   const source = record(value);
   const agendaId = optionalText(source, 'agenda_id');
   const title = optionalText(source, 'title');
@@ -226,7 +182,7 @@ function agenda(value: unknown): AgendaOverviewView {
     locale: oneOf(source, 'locale', ['ja', 'en'] as const),
     answerable: flag(source, 'answerable'),
     active_invites: count(source, 'active_invites'),
-    counts: counts(source.counts),
+    counts: parseOverviewStatusCounts(source.counts),
     unanswered_deciders: count(source, 'unanswered_deciders'),
     respond_by: nullableText(source, 'respond_by'),
     respond_by_days: source.respond_by_days === null ? null : days(source.respond_by_days),
@@ -289,7 +245,7 @@ export function parseCustomerDecisionOverview(
         agendas: count(totals, 'agendas'),
         open_agendas: count(totals, 'open_agendas'),
         entries: count(totals, 'entries'),
-        counts: counts(totals.counts),
+        counts: parseOverviewStatusCounts(totals.counts),
         open_change_requests: count(totals, 'open_change_requests'),
         pending_handoffs: count(totals, 'pending_handoffs'),
         reminders_due: count(totals, 'reminders_due'),
@@ -300,7 +256,7 @@ export function parseCustomerDecisionOverview(
             ? lengthOf(source.attention)
             : count(totals, 'attention_total'),
       },
-      attention: list(source.attention, attention, OVERVIEW_LIMITS.attention),
+      attention: list(source.attention, parseOverviewAttentionItem, OVERVIEW_LIMITS.attention),
       cases: list(source.cases, caseOverview, OVERVIEW_LIMITS.cases),
       case_failures: list(
         source.case_failures,
@@ -315,7 +271,7 @@ export function parseCustomerDecisionOverview(
       ),
     };
   } catch (error) {
-    if (error instanceof Invalid) return undefined;
+    if (error instanceof InvalidCustomerDecisionValue) return undefined;
     throw error;
   }
 }

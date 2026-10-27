@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NextRequest } from 'next/server';
 
 const mocks = vi.hoisted(() => ({
-  readCustomerDecisionOverview: vi.fn(),
+  readCustomerDecisionFacade: vi.fn(),
   listTenantProfileSlugs: vi.fn(() => ['acme', 'globex']),
   guardRequest: vi.fn(() => null),
   requireChronosAccess: vi.fn(() => null),
@@ -19,7 +19,7 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../../lib/customer-decision-overview-facade', () => ({
-  readCustomerDecisionOverview: mocks.readCustomerDecisionOverview,
+  readCustomerDecisionFacade: mocks.readCustomerDecisionFacade,
 }));
 vi.mock('@agent/core/organization/tenant-registry', () => ({
   listTenantProfileSlugs: mocks.listTenantProfileSlugs,
@@ -69,7 +69,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     mocks.viewerErrorResponse.mockImplementation(
       (error: Error, status?: number) => new Response(error.message, { status: status ?? 403 })
     );
-    mocks.readCustomerDecisionOverview.mockResolvedValue({ ok: true, overview: OVERVIEW });
+    mocks.readCustomerDecisionFacade.mockResolvedValue({ ok: true, value: OVERVIEW });
     mocks.strictViewerTier.mockReturnValue('confidential');
     mocks.strictViewerScopeOrganizationIds.mockReturnValue('all');
   });
@@ -83,9 +83,9 @@ describe('customer-decisions overview route (CD-12)', () => {
     expect(mocks.resolveCompany).not.toHaveBeenCalled();
     const order = (mock: { mock: { invocationCallOrder: number[] } }) =>
       mock.mock.invocationCallOrder[0];
-    expect(order(mocks.strictViewerTier)).toBeLessThan(order(mocks.readCustomerDecisionOverview));
+    expect(order(mocks.strictViewerTier)).toBeLessThan(order(mocks.readCustomerDecisionFacade));
     expect(order(mocks.strictViewerScopeOrganizationIds)).toBeLessThan(
-      order(mocks.readCustomerDecisionOverview)
+      order(mocks.readCustomerDecisionFacade)
     );
   });
 
@@ -95,7 +95,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     });
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
     expect(response.status).toBe(403);
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
 
   it("refuses a viewer outside the tenant's organization", async () => {
@@ -104,7 +104,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     });
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
     expect(response.status).toBe(403);
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
 
   it('reads the overview of the tenant the parameter narrows an all-tenant viewer to', async () => {
@@ -112,7 +112,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     expect(response.status).toBe(200);
     expect(mocks.requireChronosAccess).toHaveBeenCalledWith(expect.anything(), 'readonly');
     expect(mocks.strictViewerScopeTenantSlugs).toHaveBeenCalledWith(ALL_VIEWER, 'acme');
-    expect(mocks.readCustomerDecisionOverview).toHaveBeenCalledWith('acme');
+    expect(mocks.readCustomerDecisionFacade).toHaveBeenCalledWith('overview', 'acme');
     expect(await response.json()).toEqual({ overview: OVERVIEW });
   });
 
@@ -120,7 +120,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     mocks.strictViewerScopeTenantSlugs.mockReturnValue(['globex']);
     const response = await GET(new NextRequest(URL_BASE));
     expect(response.status).toBe(200);
-    expect(mocks.readCustomerDecisionOverview).toHaveBeenCalledWith('globex');
+    expect(mocks.readCustomerDecisionFacade).toHaveBeenCalledWith('overview', 'globex');
   });
 
   it.each([
@@ -131,7 +131,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     const response = await GET(new NextRequest(URL_BASE));
     expect(response.status).toBe(400);
     expect((await response.json()).error).toMatch(/Select one tenant/u);
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
 
   it('refuses a tenant outside the viewer scope before any child runs', async () => {
@@ -140,7 +140,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     });
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=globex`));
     expect(response.status).toBe(403);
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
 
   it.each(['selected', 'grant'])('refuses %s project scope', async (mode) => {
@@ -148,17 +148,17 @@ describe('customer-decisions overview route (CD-12)', () => {
     const suffix = mode === 'selected' ? '?tenant=acme&project_id=PRJ-A' : '?tenant=acme';
     const response = await GET(new NextRequest(URL_BASE + suffix));
     expect(response.status).toBe(403);
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
 
   it('refuses an unregistered tenant', async () => {
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=ghost`));
     expect(response.status).toBe(403);
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
 
   it('passes a mapped facade failure through without detail', async () => {
-    mocks.readCustomerDecisionOverview.mockResolvedValue({
+    mocks.readCustomerDecisionFacade.mockResolvedValue({
       ok: false,
       status: 504,
       error: 'took too long',
@@ -173,7 +173,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
     expect(response.status).toBe(403);
     expect(mocks.resolveViewerContextForRequest).not.toHaveBeenCalled();
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
   });
 
   it('runs every authorization check on every request', async () => {
@@ -198,7 +198,7 @@ describe('customer-decisions overview route (CD-12)', () => {
     mocks.strictViewerTier.mockReturnValue('confidential');
     mocks.listTenantProfileSlugs.mockReturnValue(['globex']);
     expect((await GET(new NextRequest(`${URL_BASE}?tenant=acme`))).status).toBe(403);
-    expect(mocks.readCustomerDecisionOverview).toHaveBeenCalledTimes(3);
+    expect(mocks.readCustomerDecisionFacade).toHaveBeenCalledTimes(3);
     expect(mocks.resolveCompany).not.toHaveBeenCalled();
   });
 
@@ -208,6 +208,28 @@ describe('customer-decisions overview route (CD-12)', () => {
     });
     const response = await GET(new NextRequest(`${URL_BASE}?tenant=acme`));
     expect(response.status).toBe(401);
-    expect(mocks.readCustomerDecisionOverview).not.toHaveBeenCalled();
+    expect(mocks.readCustomerDecisionFacade).not.toHaveBeenCalled();
+  });
+
+  it('marks every answer no-store: data, refusals, the viewer-scope 400 and errors', async () => {
+    const statuses: number[] = [];
+    const check = async (query: string) => {
+      const response = await GET(new NextRequest(`${URL_BASE}${query}`));
+      statuses.push(response.status);
+      expect(response.headers.get('Cache-Control'), query).toBe('no-store');
+    };
+    await check('?tenant=acme');
+    mocks.readCustomerDecisionFacade.mockResolvedValue({ ok: false, status: 504, error: 'x' });
+    await check('?tenant=acme');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue(['acme', 'globex']);
+    await check('?');
+    mocks.strictViewerScopeTenantSlugs.mockReturnValue('all');
+    mocks.strictViewerTier.mockImplementation(() => {
+      throw new ViewerContextError(403, 'viewer tier scope denied');
+    });
+    await check('?tenant=acme');
+    mocks.requireChronosAccess.mockReturnValue(new Response('forbidden', { status: 403 }));
+    await check('?tenant=acme');
+    expect(statuses).toEqual([200, 504, 400, 403, 403]);
   });
 });
