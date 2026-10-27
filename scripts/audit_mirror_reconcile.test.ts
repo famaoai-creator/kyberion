@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
-  approvalEventLogicalPath,
   approvalRequestLogicalPath,
   decideApprovalRequest,
   loadApprovalRequest,
@@ -23,7 +22,8 @@ import {
   runAuditMirrorReconciliation,
 } from './audit_mirror_reconcile.js';
 
-const ROOT = pathResolver.sharedTmp('audit-mirror-reconcile-test');
+// Per file run: concurrent runs in one checkout never share the fixture.
+const ROOT = pathResolver.sharedTmp(`audit-mirror-reconcile-test-${randomUUID()}`);
 const MASTER = `${ROOT}/active/shared/logs/audit/audit-2026-07-01.jsonl`;
 const MIRROR = `${ROOT}/customer/acme/logs/audit/audit-2026-07-01.jsonl`;
 
@@ -95,7 +95,6 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     for (const id of opened.splice(0)) {
       safeRmSync(approvalRequestLogicalPath(AUDIT_MIRROR_APPROVAL_CHANNEL, id), { force: true });
     }
-    safeRmSync(approvalEventLogicalPath(AUDIT_MIRROR_APPROVAL_CHANNEL), { force: true });
     safeRmSync(ROOT, { recursive: true, force: true });
     if (previousRole === undefined) delete process.env.MISSION_ROLE;
     else process.env.MISSION_ROLE = previousRole;
@@ -153,6 +152,9 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     drift();
     const receipt = runAuditMirrorReconciliation({ missionId: MISSION, rootDir: ROOT });
     expect(receipt).toMatchObject({ mode: 'dry-run', archived: [], rebuilt: [] });
+    expect(
+      JSON.parse(safeReadFile(`${ROOT}/${receipt.receipt_path}`, { encoding: 'utf8' }) as string)
+    ).toMatchObject({ mode: 'dry-run', findings: receipt.findings });
     expect(receipt.findings.map((finding) => [finding.slug, finding.action])).toEqual([
       ['acme', 'quarantine_and_rebuild'],
       ['globex', 'quarantine'],
@@ -176,6 +178,7 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     // The findings changed after the approval: the hash no longer matches.
     safeWriteFile(MIRROR, lines(a, b, entry('AUD-C', b.currentHash)));
     expect(() => apply(pending)).toThrow(/different findings set/u);
+    expect(safeExistsSync(`${ROOT}/active/archive`)).toBe(false);
     safeWriteFile(MIRROR, lines(a));
     untouched();
   });
@@ -183,17 +186,38 @@ describe('audit mirror reconcile apply (SA-01)', () => {
   it('refuses an approval decided by a non-human or unauthenticated actor', () => {
     drift();
     const agent = request();
-    // The store refuses the decision itself; the request stays pending.
+    // The store refuses such a decision outright: the request stays pending.
     expect(() => decide(agent, { decidedByType: 'agent' })).toThrow(/human decider/u);
     expect(() => decide(agent, { authenticated: false })).toThrow(/POLICY_VIOLATION/u);
+    expect(loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, agent)?.status).toBe('pending');
+    untouched();
+  });
+
+  it.each([
+    ['an unauthenticated decider', { authenticated: false }],
+    ['an agent decider', { decidedByType: 'agent' }],
+  ])('rechecks the stored decision: an approved record with %s is refused', (_label, tamper) => {
+    drift();
+    const id = request();
+    decide(id);
+    // The record on disk says approved, but its decision entry is not a
+    // human-authenticated one (a hand-edited or forged record).
+    const file = approvalRequestLogicalPath(AUDIT_MIRROR_APPROVAL_CHANNEL, id);
+    const stored = JSON.parse(safeReadFile(file, { encoding: 'utf8' }) as string);
+    stored.workflow.approvals = stored.workflow.approvals.map((entry: object) => ({
+      ...entry,
+      ...tamper,
+    }));
+    safeWriteFile(file, JSON.stringify(stored));
+    expect(loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)?.status).toBe('approved');
     expect(() =>
       runAuditMirrorReconciliation({
         missionId: MISSION,
         apply: true,
-        approvalRequestId: agent,
+        approvalRequestId: id,
         rootDir: ROOT,
       })
-    ).toThrow(/POLICY_VIOLATION/u);
+    ).toThrow(/SA-01 requires an authenticated human approval/u);
     untouched();
   });
 
@@ -225,15 +249,19 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     expect(safeReadFile(MIRROR, { encoding: 'utf8' })).toBe(lines(a, b));
     expect(safeExistsSync(`${ROOT}/customer/globex/logs/audit`)).toBe(false);
     // Archived copies keep the exact old content.
-    for (const item of receipt.archived) {
-      const archived = `${ROOT}/${item.to}`;
-      const [file] = safeReaddir(archived);
-      expect(file).toBe('audit-2026-07-01.jsonl');
-    }
-    const globex = receipt.archived.find((item) => item.from.includes('globex'))!;
-    expect(safeReadFile(`${ROOT}/${globex.to}/audit-2026-07-01.jsonl`, { encoding: 'utf8' })).toBe(
-      lines(old)
+    const archivedContent = Object.fromEntries(
+      receipt.archived.map((item) => {
+        expect(safeReaddir(`${ROOT}/${item.to}`)).toEqual(['audit-2026-07-01.jsonl']);
+        return [
+          item.from,
+          safeReadFile(`${ROOT}/${item.to}/audit-2026-07-01.jsonl`, { encoding: 'utf8' }),
+        ];
+      })
     );
+    expect(archivedContent).toEqual({
+      'customer/acme/logs/audit': lines(a),
+      'customer/globex/logs/audit': lines(old),
+    });
     // The receipt is written where it says, and a second run finds nothing to do.
     expect(
       JSON.parse(safeReadFile(`${ROOT}/${receipt.receipt_path}`, { encoding: 'utf8' }) as string)
@@ -254,8 +282,8 @@ describe('audit mirror reconcile apply (SA-01)', () => {
       action: 'quarantine_and_rebuild',
       mirror_count: 2,
       master_count: 1,
-      mirror_only_entries: 1,
-      mirror_only_ids: ['AUD-B'],
+      archive_only_entries: 1,
+      archive_only_ids: ['AUD-B'],
     });
     const id = request();
     const record = loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)!;
@@ -279,5 +307,36 @@ describe('audit mirror reconcile apply (SA-01)', () => {
         encoding: 'utf8',
       })
     ).toBe(lines(a, b));
+  });
+
+  it('counts a differing copy, once per copy, and never an entry readable under another tenant', () => {
+    const c = entry('AUD-C', b.currentHash);
+    const tampered = { ...c, currentHash: 'AUD-C-other-hash' };
+    const foreign = entry('AUD-G', '0'.repeat(64), 'globex');
+    safeMkdir(`${ROOT}/customer/acme/logs/audit`, { recursive: true });
+    safeWriteFile(MASTER, lines(a, b, c, foreign));
+    // A duplicated line, a copy that differs from the master, and globex's
+    // entry (readable in the master) in acme's mirror.
+    safeWriteFile(MIRROR, lines(a, b, b, tampered, foreign));
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([
+      expect.objectContaining({
+        slug: 'acme',
+        action: 'quarantine_and_rebuild',
+        archive_only_entries: 1,
+        archive_only_ids: ['AUD-C'],
+      }),
+    ]);
+  });
+
+  it('names nothing for a quarantine-only finding: its whole mirror is archived on purpose', () => {
+    drift();
+    const findings = collectAuditMirrorFindings(ROOT);
+    expect(findings.find((finding) => finding.slug === 'globex')).not.toHaveProperty(
+      'archive_only_entries'
+    );
+    const id = request();
+    expect(loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)?.summary).not.toContain(
+      'only in the archive'
+    );
   });
 });
