@@ -1,7 +1,7 @@
 ---
 title: 'Scope-aware continuous workplaces'
 tags: [architecture, workspace, project, organization, autonomy, scope]
-last_updated: 2026-10-21
+last_updated: 2026-10-27
 ---
 
 # スコープを共有する継続的な仕事場
@@ -37,6 +37,28 @@ Project 資料を tenant 全体の knowledge card に変換しない。Operation
 
 API は取得失敗を `unavailable` で表し、画面は件数を `—` にする。scope の親を変更した場合は
 子選択と古い行選択を外し、遅延した応答や確認画面を別の範囲へ流用しない。
+
+## 組織ダッシュボード
+
+Chronos Home上部の仕事サマリーは「組織全体・担当範囲・自分」の3入口を持つ。
+切替対象はこのサマリーであり、下部の仕事場や他の画面の選択を暗黙に変えない。
+`/api/organization-dashboard` は既存workspace resolverと実ownerに基づくWorkItem visibilityを
+使い、tenant・organization・project・tierを確認してから件数を集計する。
+組織全体は明示した組織の選択が必要で、project限定viewerからは拒否する。
+「自分」は認証に紐付いた`memberId`と`assignee_user_id`の完全一致のみを数える。
+本人の紐付けがない場合は利用不可とし、principal IDやクライアント指定のユーザーIDで補わない。
+
+停滞・確認待ち・着手可能の順、次に優先度の順で先頭10件を表示し、件数は全件から計算する。
+ここでの確認待ちはWorkItemの`review`であり、approval-storeの未決承認数とは区別する。
+閲覧者・閲覧ロール・許可された選択範囲・取得時刻を表示する。取得失敗時は古い行や件数を外し、
+不明であることと更新方法を示す。自動更新や元データの最終同期時刻を保証する表示ではない。
+「自分」から仕事一覧へ移動した場合、一覧は既存の閲覧範囲を開くため他の担当者も含む。
+成果物・承認・顧客共有の権限は各既存APIが引き続き判定し、このサマリーは共有許可を発行しない。
+
+実ブラウザー検証は、Chronosをビルドした後に
+`KYBERION_TEST_CHRONOS_BROWSER=1 pnpm exec vitest run scripts/organization_dashboard.browser.integration.test.ts --maxWorkers 1`
+で実行する。合成組織の隔離rootと実際の認証・API・Chromiumを使い、本人・組織切替、表示件数、
+権限外の403、取得失敗時の表示撤去、390px幅への収まりを確認する。実テナントの閲覧許可とは区別する。
 
 ## 継続的な責任と有限の実行
 
