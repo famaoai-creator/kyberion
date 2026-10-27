@@ -341,6 +341,166 @@
       }
     },
     "chronos": {
+      "chronos_dashboard_title": {
+        "en": "Organization dashboard",
+        "ja": "組織ダッシュボード",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ḓȧşħƀőȧřḓ ŀőřėɱ ï⟧"
+      },
+      "chronos_dashboard_description": {
+        "en": "See work that needs attention within your authorized scope.",
+        "ja": "閲覧を許可された範囲で、対応が必要な仕事を確認します。",
+        "qps-ploc": "⟦Şėė ẇőřķ ŧħȧŧ ñėėḓş ȧŧŧėñŧïőñ ẇïŧħïñ ẏőůř ȧůŧħőřïẑėḓ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "chronos_dashboard_views": {
+        "en": "Dashboard views",
+        "ja": "ダッシュボードの表示範囲",
+        "qps-ploc": "⟦Ḓȧşħƀőȧřḓ ṽïėẇş ŀőřė⟧"
+      },
+      "chronos_dashboard_organization": {
+        "en": "Organization",
+        "ja": "組織全体",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "chronos_dashboard_scope": {
+        "en": "Assigned scope",
+        "ja": "担当範囲",
+        "qps-ploc": "⟦Ȧşşïɠñėḓ şƈőṗė ŀőřė⟧"
+      },
+      "chronos_dashboard_mine": {
+        "en": "My work",
+        "ja": "自分",
+        "qps-ploc": "⟦Ɱẏ ẇőřķ ŀőř⟧"
+      },
+      "chronos_dashboard_refresh": {
+        "en": "Refresh",
+        "ja": "更新",
+        "qps-ploc": "⟦Řėƒřėşħ ŀőř⟧"
+      },
+      "chronos_dashboard_access_hint": {
+        "en": "Organization requires an organization selection and access across its projects. My work requires a linked member identity. These controls change this work summary only.",
+        "ja": "「組織全体」は組織の選択と配下プロジェクトを閲覧する権限が必要です。「自分」は本人との紐付けが必要です。この切替はこの仕事サマリーに適用されます。",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ řėɋůïřėş ȧñ őřɠȧñïẑȧŧïőñ şėŀėƈŧïőñ ȧñḓ ȧƈƈėşş ȧƈřőşş ïŧş ṗřőĵėƈŧş. Ɱẏ ẇőřķ řėɋůïřėş ȧ ŀïñķėḓ ɱėɱƀėř ïḓėñŧïŧẏ. Ŧħėşė ƈőñŧřőŀş ƈħȧñɠė ŧħïş ẇőřķ şůɱɱȧřẏ őñŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_dashboard_unavailable": {
+        "en": "Could not retrieve this scope. Check your selection and access, then refresh. Counts are unknown.",
+        "ja": "この範囲の情報を取得できませんでした。選択範囲と閲覧権限を確認して更新してください。件数は不明です。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ řėŧřïėṽė ŧħïş şƈőṗė. Ƈħėƈķ ẏőůř şėŀėƈŧïőñ ȧñḓ ȧƈƈėşş, ŧħėñ řėƒřėşħ. Ƈőůñŧş ȧřė ůñķñőẇñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "chronos_dashboard_loading": {
+        "en": "Loading authorized work…",
+        "ja": "閲覧可能な仕事を取得しています…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ȧůŧħőřïẑėḓ ẇőřķ… ŀőřėɱ ï⟧"
+      },
+      "chronos_dashboard_all_authorized": {
+        "en": "All authorized",
+        "ja": "許可された全範囲",
+        "qps-ploc": "⟦Ȧŀŀ ȧůŧħőřïẑėḓ ŀőřė⟧"
+      },
+      "chronos_dashboard_viewer": {
+        "en": "Viewer",
+        "ja": "閲覧者",
+        "qps-ploc": "⟦Ṽïėẇėř ŀőř⟧"
+      },
+      "chronos_dashboard_role": {
+        "en": "Access role",
+        "ja": "閲覧ロール",
+        "qps-ploc": "⟦Ȧƈƈėşş řőŀė ŀőř⟧"
+      },
+      "chronos_dashboard_tenant": {
+        "en": "Tenant",
+        "ja": "テナント",
+        "qps-ploc": "⟦Ŧėñȧñŧ ŀőř⟧"
+      },
+      "chronos_dashboard_project": {
+        "en": "Project",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ŀőř⟧"
+      },
+      "chronos_dashboard_operation": {
+        "en": "Operation",
+        "ja": "定常業務",
+        "qps-ploc": "⟦Őṗėřȧŧïőñ ŀőř⟧"
+      },
+      "chronos_dashboard_tier": {
+        "en": "Information tiers",
+        "ja": "情報区分",
+        "qps-ploc": "⟦Ïñƒőřɱȧŧïőñ ŧïėřş ŀőřėɱ⟧"
+      },
+      "chronos_dashboard_updated": {
+        "en": "Retrieved at",
+        "ja": "取得時刻",
+        "qps-ploc": "⟦Řėŧřïėṽėḓ ȧŧ ŀőř⟧"
+      },
+      "chronos_dashboard_active": {
+        "en": "Active work",
+        "ja": "進行中・着手可能",
+        "qps-ploc": "⟦Ȧƈŧïṽė ẇőřķ ŀőř⟧"
+      },
+      "chronos_dashboard_blocked": {
+        "en": "Blocked",
+        "ja": "停滞",
+        "qps-ploc": "⟦Ƀŀőƈķėḓ ŀőř⟧"
+      },
+      "chronos_dashboard_review": {
+        "en": "Awaiting review",
+        "ja": "確認待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ řėṽïėẇ ŀőřė⟧"
+      },
+      "chronos_dashboard_work_ready": {
+        "en": "Ready to start",
+        "ja": "着手可能",
+        "qps-ploc": "⟦Řėȧḓẏ ŧő şŧȧřŧ ŀőřė⟧"
+      },
+      "chronos_dashboard_next": {
+        "en": "Where to act next",
+        "ja": "次に対応する仕事",
+        "qps-ploc": "⟦Ẇħėřė ŧő ȧƈŧ ñėẋŧ ŀőřėɱ⟧"
+      },
+      "chronos_dashboard_action_blocked": {
+        "en": "Check the blocker and coordinate a resolution with the owner.",
+        "ja": "阻害要因を確認し、担当者と解消方法を決めてください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ƀŀőƈķėř ȧñḓ ƈőőřḓïñȧŧė ȧ řėşőŀůŧïőñ ẇïŧħ ŧħė őẇñėř. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "chronos_dashboard_action_review": {
+        "en": "Review the result and record your decision in the work details.",
+        "ja": "結果を確認し、仕事の詳細画面で判断を記録してください。",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė řėşůŀŧ ȧñḓ řėƈőřḓ ẏőůř ḓėƈïşïőñ ïñ ŧħė ẇőřķ ḓėŧȧïŀş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_dashboard_action_ready": {
+        "en": "Confirm the owner and prerequisites before starting.",
+        "ja": "担当者と前提条件を確認して着手してください。",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ŧħė őẇñėř ȧñḓ ṗřėřėɋůïşïŧėş ƀėƒőřė şŧȧřŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "chronos_dashboard_empty": {
+        "en": "No blocked, review or ready work in this scope.",
+        "ja": "この範囲には停滞・確認待ち・着手可能な仕事はありません。",
+        "qps-ploc": "⟦Ñő ƀŀőƈķėḓ, řėṽïėẇ őř řėȧḓẏ ẇőřķ ïñ ŧħïş şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_dashboard_limited": {
+        "en": "Showing the first 10 by status and priority. Open work to see more.",
+        "ja": "状態と優先度の順に先頭10件を表示しています。続きは仕事一覧で確認できます。",
+        "qps-ploc": "⟦Şħőẇïñɠ ŧħė ƒïřşŧ 10 ƀẏ şŧȧŧůş ȧñḓ ṗřïőřïŧẏ. Őṗėñ ẇőřķ ŧő şėė ɱőřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "chronos_dashboard_open_work": {
+        "en": "Open authorized work list",
+        "ja": "閲覧範囲の仕事一覧を開く",
+        "qps-ploc": "⟦Őṗėñ ȧůŧħőřïẑėḓ ẇőřķ ŀïşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_dashboard_open_decisions": {
+        "en": "Open decisions",
+        "ja": "判断・承認を確認する",
+        "qps-ploc": "⟦Őṗėñ ḓėƈïşïőñş ŀőřė⟧"
+      },
+      "chronos_dashboard_open_resources": {
+        "en": "Open deliverables",
+        "ja": "成果物を確認する",
+        "qps-ploc": "⟦Őṗėñ ḓėŀïṽėřȧƀŀėş ŀőřėɱ⟧"
+      },
+      "chronos_dashboard_mine_hint": {
+        "en": "This summary counts only work assigned to your linked member ID. The work list opens your authorized scope and may include other assignees.",
+        "ja": "このサマリーは本人のメンバーIDに割り当てられた仕事だけを集計します。仕事一覧では閲覧を許可された範囲を開くため、他の担当者の仕事も含まれます。",
+        "qps-ploc": "⟦Ŧħïş şůɱɱȧřẏ ƈőůñŧş őñŀẏ ẇőřķ ȧşşïɠñėḓ ŧő ẏőůř ŀïñķėḓ ɱėɱƀėř ÏḒ. Ŧħė ẇőřķ ŀïşŧ őṗėñş ẏőůř ȧůŧħőřïẑėḓ şƈőṗė ȧñḓ ɱȧẏ ïñƈŀůḓė őŧħėř ȧşşïɠñėėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
       "chronos_cd_status_count": {
         "en": "{count} {status}",
         "ja": "{status} {count}",
