@@ -11,6 +11,7 @@ registerCliProviderBundle('codex-cli', (options) => {
   const codexOptions = {
     ...buildCodexCliQueryOptionsFromEnv(env),
     ...(options.model ? { model: options.model } : {}),
+    ...(options.timeoutMs ? { timeoutMs: options.timeoutMs } : {}),
   };
   const backend = new CodexCliReasoningBackend(codexOptions);
   return {

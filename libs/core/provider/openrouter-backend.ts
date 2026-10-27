@@ -1,4 +1,10 @@
 import { logger } from '../core.js';
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+  resolveProviderApiCredential,
+  selectProviderCredential,
+} from '../foundation/credential-binding.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveProductRepositoryUrl } from '../foundation/service-endpoints.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
@@ -339,7 +345,15 @@ export class OpenRouterBackend implements ReasoningBackend {
   readonly name = 'openrouter';
   readonly egressEndpoint: string;
   private readonly baseURL: string;
-  private readonly apiKey: string;
+  private readonly operatorApiKey: string;
+  private readonly credentialOwner = credentialExecutionIdentity();
+  private get apiKey(): string {
+    assertCredentialOwner(this.credentialOwner);
+    return resolveProviderApiCredential(
+      ['KYBERION_OPENROUTER_KEY', 'OPENROUTER_API_KEY'],
+      this.operatorApiKey
+    );
+  }
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly toolsEnabled: boolean;
@@ -349,7 +363,10 @@ export class OpenRouterBackend implements ReasoningBackend {
     this.baseURL = normalizeBaseUrl(options.baseURL || 'https://openrouter.ai/api/v1');
     validateUrl(this.baseURL);
     this.egressEndpoint = this.baseURL;
-    this.apiKey = options.apiKey;
+    this.operatorApiKey = resolveProviderApiCredential(
+      ['KYBERION_OPENROUTER_KEY', 'OPENROUTER_API_KEY'],
+      options.apiKey
+    );
     this.model = options.model;
     this.timeoutMs = options.timeoutMs ?? 60_000;
     this.toolsEnabled = options.toolsEnabled === true;
@@ -660,8 +677,12 @@ export function buildOpenRouterBackendFromEnv(
   modelOverride?: string,
   overrides: OpenRouterBackendOverrides = {}
 ): OpenRouterBackend | null {
-  const apiKey =
-    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() || envText(env, 'OPENROUTER_API_KEY')?.trim();
+  const apiKey = selectProviderCredential(
+    ['KYBERION_OPENROUTER_KEY', 'OPENROUTER_API_KEY'],
+    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() ||
+      envText(env, 'OPENROUTER_API_KEY')?.trim() ||
+      ''
+  );
   if (!apiKey) return null;
   const model = resolveOpenRouterModelPolicy(env, modelOverride).model;
   const baseURL = envText(env, 'KYBERION_OPENROUTER_URL')?.trim();
@@ -672,8 +693,12 @@ export function buildOpenRouterBackendFromEnv(
 export async function probeOpenRouterBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<{ available: boolean; reason?: string }> {
-  const apiKey =
-    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() || envText(env, 'OPENROUTER_API_KEY')?.trim();
+  const apiKey = selectProviderCredential(
+    ['KYBERION_OPENROUTER_KEY', 'OPENROUTER_API_KEY'],
+    envText(env, 'KYBERION_OPENROUTER_KEY')?.trim() ||
+      envText(env, 'OPENROUTER_API_KEY')?.trim() ||
+      ''
+  );
   if (!apiKey) {
     return {
       available: false,
@@ -685,6 +710,7 @@ export async function probeOpenRouterBackendAvailability(
   try {
     const normalizedBaseURL = baseURL.endsWith('/') ? baseURL : `${baseURL}/`;
     const modelsURL = new URL('models', normalizedBaseURL);
+    assertReasoningEgressAllowedAtEndpoint('openrouter', modelsURL.toString());
     if (modelsURL.protocol !== 'https:' && modelsURL.protocol !== 'http:') {
       return {
         available: false,

@@ -8,7 +8,7 @@
  * model: Kyberion owns the contract, the reasoning itself runs on Claude.
  */
 
-import { automaticReasoningRedispatchAllowed } from '../reasoning/reasoning-dispatch-scope.js';
+import { createAnthropicCredentialClient } from './anthropic-credential-client.js';
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
@@ -387,6 +387,7 @@ function modelSupportsEffort(model: string): boolean {
 }
 
 export class AnthropicReasoningBackend implements ReasoningBackend {
+  private readonly assertCredentialBinding: () => void;
   readonly name = 'anthropic';
   private readonly client: Anthropic;
   private readonly model: string;
@@ -398,7 +399,9 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     // Keep provider-level retries disabled. Retry/failover is owned by the
     // shared reasoning boundary; allowing the SDK default (currently 2)
     // would multiply attempts and hide quota/latency from that policy.
-    this.client = options.client ?? new Anthropic({ maxRetries: 0 });
+    const credentials = createAnthropicCredentialClient({ client: options.client });
+    this.client = credentials.client;
+    this.assertCredentialBinding = credentials.assertBinding;
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
     this.effort = options.effort;
@@ -498,6 +501,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     params: Parameters<typeof this.client.messages.parse>[0],
     options?: Pick<ReasoningCallOptions, 'signal' | 'effort'>
   ): Promise<Awaited<ReturnType<typeof this.client.messages.parse>>> {
+    this.assertCredentialBinding();
     if (options?.signal?.aborted) {
       throw options.signal.reason instanceof Error
         ? options.signal.reason
@@ -506,16 +510,15 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     assertReasoningEgressAllowed(this.name);
     const budgeted = this.applyCompletionBudget(this.applyEffort(params, options?.effort));
     const started = Date.now();
-    const noAutomaticRetry = !automaticReasoningRedispatchAllowed();
     try {
-      const result = await llmSemaphore.run(() =>
-        options?.signal || noAutomaticRetry
-          ? this.client.messages.parse(budgeted, {
-              ...(options?.signal ? { signal: options.signal } : {}),
-              ...(noAutomaticRetry ? { maxRetries: 0 } : {}),
-            })
-          : this.client.messages.parse(budgeted)
-      );
+      const result = await llmSemaphore.run(() => {
+        this.assertCredentialBinding();
+        assertReasoningEgressAllowed(this.name);
+        return this.client.messages.parse(budgeted, {
+          ...(options?.signal ? { signal: options.signal } : {}),
+          maxRetries: 0,
+        });
+      });
       this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
     } catch (err) {
@@ -529,6 +532,7 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
     params: Parameters<typeof this.client.messages.create>[0] & { stream?: false },
     options?: Pick<ReasoningCallOptions, 'signal' | 'effort'>
   ): Promise<Anthropic.Message> {
+    this.assertCredentialBinding();
     // The single outbound choke point for this backend. The SDK issues its own
     // HTTP, so `secureFetch`'s tier gate never sees these sends; checking here
     // is what keeps tenant material from reaching an unapproved provider.
@@ -540,17 +544,15 @@ export class AnthropicReasoningBackend implements ReasoningBackend {
         : new Error('[DELEGATION_CANCELLED] anthropic reasoning operation aborted');
     }
     const started = Date.now();
-    const noAutomaticRetry = !automaticReasoningRedispatchAllowed();
     try {
-      const result = await llmSemaphore.run(
-        () =>
-          (options?.signal || noAutomaticRetry
-            ? this.client.messages.create(budgeted, {
-                ...(options?.signal ? { signal: options.signal } : {}),
-                ...(noAutomaticRetry ? { maxRetries: 0 } : {}),
-              })
-            : this.client.messages.create(budgeted)) as Promise<Anthropic.Message>
-      );
+      const result = await llmSemaphore.run(() => {
+        this.assertCredentialBinding();
+        assertReasoningEgressAllowed(this.name);
+        return this.client.messages.create(budgeted, {
+          ...(options?.signal ? { signal: options.signal } : {}),
+          maxRetries: 0,
+        }) as Promise<Anthropic.Message>;
+      });
       this.recordSdkUsage(started, 'success', budgeted.model, result);
       return result;
     } catch (err) {

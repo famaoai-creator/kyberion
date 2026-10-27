@@ -22,6 +22,13 @@
 import { execFileSync } from 'node:child_process';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { resolveTaskCredential } from '../foundation/credential-binding.js';
+import type { TaskCredentialBinding } from '../foundation/credential-binding.js';
+import type { ScopeContext } from '../scope-context-validation.js';
+export {
+  withTaskCredentialBinding,
+  type TaskCredentialBinding,
+} from '../foundation/credential-binding.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 
 export interface ResolveSecretInput {
@@ -48,6 +55,10 @@ export interface SecretResolver {
   name: string;
   resolve(input: ResolveSecretInput): Promise<string | null> | string | null;
   describe?: () => SecretResolverDescription;
+  /** Trusted, current-claim dispatch only. Returning credentials never grants service/tool authority. */
+  bindTask?: (
+    input: Readonly<{ scope: Readonly<ScopeContext>; workItemId: string }>
+  ) => TaskCredentialBinding | null | Promise<TaskCredentialBinding | null>;
 }
 
 const secretResolverSeam = createSeam<SecretResolver>({
@@ -139,6 +150,8 @@ export async function resolveSecretReferenceAsync(
  * honored; async resolvers should be used through resolveSecretAsync.
  */
 export function resolveSecretSync(input: ResolveSecretInput): string | null {
+  const scoped = resolveTaskCredential(input.key);
+  if (scoped !== undefined) return scoped;
   const resolver = getSecretResolver();
   if (!resolver) return null;
   try {
@@ -163,6 +176,8 @@ export function resolveSecretSync(input: ResolveSecretInput): string | null {
 }
 
 export async function resolveSecretAsync(input: ResolveSecretInput): Promise<string | null> {
+  const scoped = resolveTaskCredential(input.key);
+  if (scoped !== undefined) return scoped;
   const resolver = getSecretResolver();
   if (!resolver) return null;
   try {

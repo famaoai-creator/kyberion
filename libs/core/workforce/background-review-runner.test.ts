@@ -149,6 +149,11 @@ describe('background-review-runner', () => {
 
     expect(result).toMatchObject({ status: 'queued', action: 'memory_candidate' });
     expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(delegateTask).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ role: 'background_review' })
+    );
     expect(loadMemoryPromotionCandidate(result.candidate_id!)).toMatchObject({
       source_type: 'task_session',
       sensitivity_tier: 'personal',

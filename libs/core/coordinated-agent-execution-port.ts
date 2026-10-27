@@ -2,6 +2,7 @@ import {
   claimWorkItem,
   quarantineWorkItemExecution,
   getWorkItem,
+  listActiveWorkLeases,
   releaseWorkItem,
   updateWorkItem,
   type WorkItem,
@@ -21,6 +22,7 @@ import { isUncertainSupervisorTransportFailure } from './agent/supervisor-transp
 import { stripCustomerDecisionsFromReply } from './task/task-result-contract.js';
 import { parseActorRef } from './actor.js';
 import { withActorContext } from './actor-context.js';
+import { withConfiguredTaskCredentials } from './secret/task-credential-dispatch.js';
 import {
   clampPolicyToRuntimeTier,
   currentScopeEnvelope,
@@ -159,7 +161,17 @@ export class CoordinatedAgentExecutionPort implements AgentExecutionPort {
     const attemptId = claimed.item.current_attempt_id;
     let receipt: AgentExecutionReceipt;
     try {
-      const delegate = () => this.delegatePort.delegate(request);
+      const delegate = () =>
+        withConfiguredTaskCredentials(claimed.item.item_id, () => {
+          const current = getWorkItem(claimed.item.item_id);
+          if (
+            current?.lease_id !== claimed.lease.lease_id ||
+            current.claimed_by_peer_id !== this.actorPeerId ||
+            !listActiveWorkLeases().some((lease) => lease.lease_id === claimed.lease.lease_id)
+          )
+            throw new Error('[CREDENTIAL_CLAIM_STALE] WorkItem claim changed before delegation');
+          return this.delegatePort.delegate(request);
+        });
       // Only a canonical claim holder is attributed. A legacy peer label is
       // never promoted to a human or to the requested child's identity.
       const actor = parseActorRef({

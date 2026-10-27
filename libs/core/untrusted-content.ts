@@ -108,7 +108,26 @@ ${content}
  */
 export function scanForInjection(content: string): ScanResult {
   const indicators: string[] = [];
-  const normalized = String(content || '').toLowerCase();
+  const raw = String(content || '');
+  const invisible = new Set<string>();
+  // Inspection view only: never rewrite the source/evidence returned to a caller.
+  const normalized = raw
+    .replace(
+      /[\u200B-\u200F\u2060\u2062-\u2064\u202A-\u202E\u2066-\u2069\uFEFF]/gu,
+      (char, offset: number) => {
+        if (
+          char === '\u200D' &&
+          /(?:\p{Extended_Pictographic}|\p{Emoji_Modifier}|\uFE0F)$/u.test(
+            raw.slice(Math.max(0, offset - 6), offset)
+          ) &&
+          /^\p{Extended_Pictographic}/u.test(raw.slice(offset + 1, offset + 5))
+        )
+          return char;
+        invisible.add(`U+${char.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`);
+        return '';
+      }
+    )
+    .toLowerCase();
 
   // 1. Instruction patterns (命令的フレーズ)
   const instructionPatterns = [
@@ -172,9 +191,14 @@ export function scanForInjection(content: string): ScanResult {
   }
 
   // 4. Hidden text (hidden text / zero-width characters)
-  const zeroWidthRegex = /[\u200B-\u200D\uFEFF\u200E\u200F]/;
-  if (zeroWidthRegex.test(content)) {
+  if (
+    [...invisible].some((code) =>
+      ['U+200B', 'U+200C', 'U+200D', 'U+FEFF', 'U+200E', 'U+200F'].includes(code)
+    )
+  ) {
     indicators.push('hidden_text:zero_width_chars');
+  } else if (invisible.size > 0) {
+    indicators.push(`hidden_text:invisible_unicode:${[...invisible].sort().join(',')}`);
   }
   const cssHiddenRegex = /display\s*:\s*none|visibility\s*:\s*hidden|opacity\s*:\s*0/i;
   if (cssHiddenRegex.test(content)) {

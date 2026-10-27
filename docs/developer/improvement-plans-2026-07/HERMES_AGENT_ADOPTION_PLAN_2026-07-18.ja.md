@@ -5,10 +5,12 @@ scope: core / knowledge / scheduler / execution-environment
 authority: planning
 status: active
 tags: [improvement-plan, 2026-07]
-last_updated: 2026-07-31
+last_updated: 2026-10-28
 ---
 
 # Hermes Agent 概念取り込み計画(HA-01〜09): 自律学習ループ・履歴全文検索・実行環境抽象・チャネル層硬化
+
+> 2026-10-28 追補: [UI/UX 再調査と実装](../../../knowledge/product/architecture/hermes-ui-ux-adoption-2026-10.md)に、ツール説明の予算化、承認参照を保護する知識候補の退避・復元、保存済み学習提案の表示、外部サービスの検索・認証導線、TUI の検索パレットを追記した。既存の HA 番号と承認・公開の境界は維持する。
 
 > **作成日**: 2026-07-18
 > **起点**: [NousResearch/hermes-agent](https://github.com/nousresearch/hermes-agent)(Python + JS TUI、gateway 含め ~120k LOC 超の大規模モノレポ、MIT、極めて活発 — 分析時点の HEAD は 2026-07-17)の実コード分析(2026-07-18、shallow clone にて実施)。
@@ -272,3 +274,18 @@ Hermes の gateway は最大サブシステム(`gateway/platforms/` 35k LOC + pl
 1. **HA-07 のグループ返信バグ修正**(現存バグ・即時着手可)→ 2. **HA-02**(独立・日本語運用での想起力を即改善)→ 3. **HA-01**(P1 本丸、HA-02 の検索を自省フォークが利用可能)→ 4. **HA-06 → HA-08**(承認と配信の channel 非依存化・相互補完)→ 5. **HA-07 残り**(gating・効率化・配線)→ 6. **HA-03**(chronos 拡張・独立)→ 7. **HA-04**(AR-02/AR-03 の op registry 成熟後が望ましい)→ 8. **HA-09** → 9. **HA-05**(需要待ち)。
 
 OH-01 実装時は §2.1 の補強詳細を必ず参照すること。HA-01 は KM-03(memory promotion governance)・LC-02(pipeline promote)、HA-03 は AA-02(mesh delivery)と実装状況を相互参照(重複着手禁止)。
+
+## 5. 2026-10-28 の追加比較調査
+
+既採用の UI/UX・CLI 費用・runtime 改善とは別に、固定 clone と現行 Kyberion の追加比較を [詳細レポート](../../../knowledge/product/architecture/hermes-additional-adoption-deep-dive-2026-10.md) に整理した。
+14件の差分候補と2件の横断改善案について、両側の source / test、既存機構の反証、成熟度、リスク、採用順を記載している。
+この追補は調査結果であり、追加機能の実装済み・本番での効果確認・公開承認を意味しない。既存番号の状態や当時の判断は変更しない。
+
+後続のユーザー依頼による A01–A09・A11–A13・X01/X02 の実装範囲と検証上の制限は [実装記録](../../../knowledge/product/architecture/hermes-additional-adoption-implementation-2026-10.md) を参照する。A10 / A14 と以前からの任意採用候補は、需要確認の条件を維持する。
+
+## 6. 2026-10-28 の実装状況
+
+UI/UX、CLI費用の区分表示、モデルroutingと継続実行、上記の追加採用項目、レビュー証跡と復旧replayを実装した。
+独立レビューとローカルのbuild・型検査・回帰テストを実施し、現状と制約を各実装記録に残した。
+実OAuth・実providerの費用比較・画面の目視検証は完了扱いにしない。A10入力キューとA14学習graphは需要確認後とする。
+公開・CI結果はPRの状態に従い、過去のHA番号や凍結した7月のSTATUSは変更しない。

@@ -19,6 +19,26 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
       );
     }
     const task = entry as Record<string, unknown>;
+    let compactionDurability: PlannedNextTask['compaction_durability'];
+    if (task.compaction_durability !== undefined) {
+      const policy = task.compaction_durability as Record<string, unknown>;
+      if (
+        !policy ||
+        typeof policy !== 'object' ||
+        Array.isArray(policy) ||
+        Object.keys(policy).some((key) => key !== 'retention_ms' && key !== 'restore') ||
+        typeof policy.retention_ms !== 'number' ||
+        !Number.isFinite(policy.retention_ms) ||
+        policy.retention_ms <= 0 ||
+        policy.retention_ms > 30 * 86_400_000 ||
+        (policy.restore !== undefined && typeof policy.restore !== 'boolean')
+      )
+        throw new Error('[COMPACTION_RETENTION] Invalid task compaction durability policy');
+      compactionDurability = {
+        retention_ms: policy.retention_ms,
+        ...(policy.restore !== undefined ? { restore: policy.restore as boolean } : {}),
+      };
+    }
     const taskId = String(task.task_id || '').trim();
     if (!taskId) {
       throw new Error(
@@ -269,6 +289,7 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
         : {}),
       // KD-01 adoption: opt-in goal-driven execution (default OFF).
       ...(task.goal_driven === true ? { goal_driven: true } : {}),
+      ...(compactionDurability ? { compaction_durability: compactionDurability } : {}),
       ...(drive ? { drive } : {}),
       ...(task.goal_budget && typeof task.goal_budget === 'object'
         ? (() => {

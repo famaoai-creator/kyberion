@@ -1,3 +1,6 @@
+import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
+import { withExecutionContext } from '../authority.js';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
 import { randomUUID } from 'node:crypto';
 import { EventEmitter } from 'node:events';
 import * as path from 'node:path';
@@ -61,6 +64,7 @@ import * as pathResolver from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
 import {
   CODEX_ISOLATED_EXEC_FLAGS,
+  buildCodexIsolatedEnv,
   CodexIsolatedQueryError,
   detectCodexToolAttempt,
   parseCodexCliMajorMinor,
@@ -173,6 +177,61 @@ function scratchDirs(): string[] {
   const root = path.join(mocks.base, 'workspaces');
   return calls.map((call) => call.options.cwd).filter((dir) => dir.startsWith(root));
 }
+
+describe('isolated Codex credential environment', () => {
+  it('rejects an unbound tenant before version or request spawn', async () => {
+    mocks.spawnMock.mockClear();
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'isolated-fixture' }, async () => {
+      expect(() =>
+        buildCodexIsolatedEnv({ HOME: '/operator', CODEX_HOME: '/operator/.codex' })
+      ).toThrow('CREDENTIAL_BINDING_REQUIRED');
+      await expect(
+        runCodexIsolatedQuery({ systemPrompt: 'system', userPrompt: 'must not send', schema })
+      ).rejects.toThrow('CREDENTIAL_BINDING_REQUIRED');
+    });
+    expect(mocks.spawnMock).not.toHaveBeenCalled();
+  });
+  it('uses only the validated tenant HOME even when a caller passes an operator profile', () => {
+    const tenant = 'isolated-fixture';
+    const home = pathResolver.rootResolve(
+      `active/shared/tmp/confidential/${tenant}/provider-auth/vitest-isolated-env`
+    );
+    withExecutionContext(
+      'sovereign_concierge',
+      () => {
+        safeMkdir(home, { recursive: true });
+        try {
+          withTaskCredentialBinding(
+            {
+              tenantSlug: tenant,
+              secrets: {},
+              providerEnvironments: {
+                codex: { HOME: home, CODEX_HOME: path.join(home, '.codex'), PATH: '/fixture/bin' },
+              },
+            },
+            () => {
+              expect(
+                buildCodexIsolatedEnv({
+                  HOME: '/operator',
+                  CODEX_HOME: '/operator/.codex',
+                  PATH: '/operator/bin',
+                })
+              ).toEqual({
+                PATH: '/fixture/bin',
+                HOME: home,
+                CODEX_HOME: path.join(home, '.codex'),
+              });
+            }
+          );
+        } finally {
+          safeRmSync(home, { recursive: true, force: true });
+        }
+      },
+      'sovereign',
+      tenant
+    );
+  });
+});
 
 describe('parseCodexCliMajorMinor', () => {
   it('reads major.minor from codex --version output', () => {

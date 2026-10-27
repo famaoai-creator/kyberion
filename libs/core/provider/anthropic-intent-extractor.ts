@@ -10,6 +10,8 @@ import { z } from 'zod';
 import type { IntentBody } from '../intent/intent-delta.js';
 import type { ExtractIntentInput, IntentExtractor } from '../intent/intent-extractor.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { createAnthropicCredentialClient } from './anthropic-credential-client.js';
+import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 
 const DEFAULT_MODEL = resolveRuntimeModelId('anthropic-default');
 const DEFAULT_MAX_TOKENS = 2000;
@@ -48,14 +50,18 @@ export class AnthropicIntentExtractor implements IntentExtractor {
   private readonly client: Anthropic;
   private readonly model: string;
   private readonly maxTokens: number;
+  private readonly assertCredentialBinding: () => void;
 
   constructor(options: AnthropicIntentExtractorOptions = {}) {
-    this.client = options.client ?? new Anthropic();
+    const credentials = createAnthropicCredentialClient({ client: options.client });
+    this.client = credentials.client;
+    this.assertCredentialBinding = credentials.assertBinding;
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
   }
 
   async extract(input: ExtractIntentInput): Promise<IntentBody> {
+    this.assertCredentialBinding();
     const text = input.text?.trim() ?? '';
     if (!text) {
       return { goal: '(no utterance)' };
@@ -71,14 +77,19 @@ export class AnthropicIntentExtractor implements IntentExtractor {
       .filter(Boolean)
       .join('\n');
 
-    const result = await this.client.messages.parse({
-      model: this.model,
-      max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
-      messages: [{ role: 'user', content: userPrompt }],
-      output_config: { format: zodOutputFormat(IntentBodySchema) },
-    });
+    this.assertCredentialBinding();
+    assertReasoningEgressAllowed('anthropic');
+    const result = await this.client.messages.parse(
+      {
+        model: this.model,
+        max_tokens: this.maxTokens,
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        thinking: { type: 'adaptive' },
+        messages: [{ role: 'user', content: userPrompt }],
+        output_config: { format: zodOutputFormat(IntentBodySchema) },
+      },
+      { maxRetries: 0 }
+    );
 
     const parsed = result.parsed_output!;
     // Drop empty arrays so IntentBody stays clean (matches the stub extractor shape).

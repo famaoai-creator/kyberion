@@ -8,7 +8,8 @@ import {
 } from '@agent/core/surface/workspace-scope';
 import * as path from 'node:path';
 import { MetricsCollector, metricsWithheldNotice } from '@agent/core/metrics';
-import { executionMetricsReadFor } from '@agent/core/cost-report';
+import { executionMetricsReadFor, resolveUsageCost } from '@agent/core/cost-report';
+import { hasUsageCostEvidence } from '@agent/core/usage-accounting';
 import { eventScopeMatches, type EventScopeFilter } from '@agent/core/event-scope';
 import {
   listGenerationCostSettlements,
@@ -21,6 +22,10 @@ import {
 } from '@agent/core/governance/approval-store';
 import { listArtifactRecords } from '@agent/core/workforce/artifact-record';
 import { loadMissionManagementConfig } from '@agent/core/mission/mission-management-config';
+import {
+  distillationDisclosure,
+  type DistillationDisclosure,
+} from '@agent/core/mission/mission-read-model';
 import { loadState, loadStateAtPath } from '@agent/core/mission/mission-state';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import type { ArtifactRecord } from '@agent/core/workforce/artifact-record';
@@ -38,6 +43,7 @@ import { recordField, stringField } from './json-record';
 export interface MissionHistoryEntry {
   missionId: string;
   status: MissionState['status'];
+  distillationDisclosure: DistillationDisclosure;
   tier: MissionState['tier'];
   missionType?: string;
   tenantSlug?: string;
@@ -71,7 +77,17 @@ export interface MissionHistoryQuery {
   limit?: number;
 }
 
-export interface CostSummary {
+export interface CostCoverageSummary {
+  referenceUsd?: number;
+  referenceCostCalls?: number;
+  includedCalls?: number;
+  unknownCostCalls?: number;
+  actualCostCalls?: number;
+  estimatedCostCalls?: number;
+  costComplete?: boolean;
+}
+
+export interface CostSummary extends CostCoverageSummary {
   totalTokens: number;
   totalUsd: number;
   entryCount: number;
@@ -89,13 +105,15 @@ export interface CostSummary {
     settledJobs: number;
     awaitingActualCost: number;
   };
-  missionBreakdown: Array<{
-    missionId: string;
-    tokens: number;
-    usd: number;
-    entryCount: number;
-    lastSeen?: string;
-  }>;
+  missionBreakdown: Array<
+    CostCoverageSummary & {
+      missionId: string;
+      tokens: number;
+      usd: number;
+      entryCount: number;
+      lastSeen?: string;
+    }
+  >;
 }
 
 export interface ApprovalQueueItem {
@@ -363,6 +381,7 @@ export function projectMissionHistoryItems(
       const item: MissionHistoryEntry = {
         missionId: state.mission_id,
         status: state.status,
+        distillationDisclosure: distillationDisclosure(state),
         tier: state.tier,
         missionType: state.mission_type,
         tenantId: state.tenant_id,
@@ -444,14 +463,42 @@ function getMetricTokens(entry: Record<string, unknown>): number {
   return Math.max(0, promptTokens + completionTokens);
 }
 
-function getMetricCost(entry: Record<string, unknown>): number {
-  const directCost = numericMetricValue(
-    entry.cost_usd ?? entry.sdk_cost_usd ?? entry.total_cost_usd ?? entry.estimated_cost_usd
-  );
-  if (Number.isFinite(directCost) && directCost > 0) return directCost;
-  const tokens = getMetricTokens(entry);
-  if (tokens <= 0) return 0;
-  return numericMetricValue(entry.estimated_cost_usd);
+function getMetricCost(entry: Record<string, unknown>): ReturnType<typeof resolveUsageCost> {
+  const numeric = (value: unknown): number | undefined => {
+    if (typeof value !== 'number' && !(typeof value === 'string' && value.trim())) return undefined;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : undefined;
+  };
+  return resolveUsageCost({
+    ...entry,
+    cost_usd: numeric(entry.cost_usd ?? entry.total_cost_usd ?? entry.estimated_cost_usd),
+    sdk_cost_usd: numeric(entry.sdk_cost_usd),
+  });
+}
+
+function emptyCostCoverage(): Required<CostCoverageSummary> {
+  return {
+    referenceUsd: 0,
+    referenceCostCalls: 0,
+    includedCalls: 0,
+    unknownCostCalls: 0,
+    actualCostCalls: 0,
+    estimatedCostCalls: 0,
+    costComplete: true,
+  };
+}
+
+function addCostCoverage(
+  coverage: Required<CostCoverageSummary>,
+  cost: ReturnType<typeof resolveUsageCost>
+): void {
+  coverage.referenceUsd += cost.referenceUsd ?? 0;
+  if (cost.referenceUsd !== null) coverage.referenceCostCalls += 1;
+  if (cost.costStatus === 'unknown') coverage.unknownCostCalls += 1;
+  else if (cost.costStatus === 'included') coverage.includedCalls += 1;
+  else if (cost.costStatus === 'actual') coverage.actualCostCalls += 1;
+  else coverage.estimatedCostCalls += 1;
+  coverage.costComplete = coverage.unknownCostCalls === 0;
 }
 
 export function buildCostSummary(input: {
@@ -490,31 +537,42 @@ export function buildCostSummary(input: {
 
   const byMission = new Map<
     string,
-    { missionId: string; tokens: number; usd: number; entryCount: number; lastSeen?: string }
+    Required<CostCoverageSummary> & {
+      missionId: string;
+      tokens: number;
+      usd: number;
+      entryCount: number;
+      lastSeen?: string;
+    }
   >();
 
   let totalTokens = 0;
   let totalUsd = 0;
+  const coverage = emptyCostCoverage();
   for (const entry of entries) {
     const missionId = (
       stringField(entry, 'mission_id') || stringField(entry, 'missionId', 'unassigned')
     ).toUpperCase();
     const tokens = getMetricTokens(entry);
-    const usd = getMetricCost(entry);
+    const cost = getMetricCost(entry);
+    const usd = cost.costUsd ?? 0;
     const record = byMission.get(missionId) || {
       missionId,
       tokens: 0,
       usd: 0,
       entryCount: 0,
       lastSeen: undefined,
+      ...emptyCostCoverage(),
     };
     record.tokens += tokens;
     record.usd += usd;
     record.entryCount += 1;
+    if (hasUsageCostEvidence(entry)) addCostCoverage(record, cost);
     record.lastSeen = timestampForMetricEntry(entry) || record.lastSeen || '';
     byMission.set(missionId, record);
     totalTokens += tokens;
     totalUsd += usd;
+    if (hasUsageCostEvidence(entry)) addCostCoverage(coverage, cost);
   }
 
   let generationActualUsd = 0;
@@ -531,6 +589,20 @@ export function buildCostSummary(input: {
     if (input.scopeFilter && !eventScopeMatches(settlement.scope, input.scopeFilter)) continue;
     if (settlement.status === 'unavailable') {
       awaitingGenerationCost += 1;
+      coverage.unknownCostCalls += 1;
+      coverage.costComplete = false;
+      const record = byMission.get(settlementMissionId) || {
+        missionId: settlementMissionId,
+        tokens: 0,
+        usd: 0,
+        entryCount: 0,
+        lastSeen: undefined,
+        ...emptyCostCoverage(),
+      };
+      record.unknownCostCalls += 1;
+      record.costComplete = false;
+      record.lastSeen = settlement.observed_at;
+      byMission.set(settlementMissionId, record);
       continue;
     }
     const usd = Number(settlement.actual_cost_usd);
@@ -541,13 +613,16 @@ export function buildCostSummary(input: {
       usd: 0,
       entryCount: 0,
       lastSeen: undefined,
+      ...emptyCostCoverage(),
     };
     record.usd += usd;
     record.entryCount += 1;
+    record.actualCostCalls += 1;
     record.lastSeen = settlement.observed_at;
     byMission.set(settlementMissionId, record);
     generationActualUsd += usd;
     settledGenerationJobs += 1;
+    coverage.actualCostCalls += 1;
     totalUsd += usd;
   }
 
@@ -558,11 +633,14 @@ export function buildCostSummary(input: {
       ? input.budgetUsd
       : undefined;
   const remainingUsd =
-    typeof budgetUsd === 'number'
+    typeof budgetUsd === 'number' && coverage.costComplete && awaitingGenerationCost === 0
       ? Math.max(0, Math.round((budgetUsd - totalUsd) * 1000) / 1000)
       : null;
 
   return {
+    ...coverage,
+    referenceUsd: Math.round(coverage.referenceUsd * 1000) / 1000,
+    costComplete: coverage.costComplete && awaitingGenerationCost === 0,
     totalTokens,
     totalUsd: Math.round(totalUsd * 1000) / 1000,
     entryCount: entries.length + generationEntryCount,
@@ -576,7 +654,12 @@ export function buildCostSummary(input: {
       settledJobs: settledGenerationJobs,
       awaitingActualCost: awaitingGenerationCost,
     },
-    missionBreakdown: Array.from(byMission.values()).sort((left, right) => right.usd - left.usd),
+    missionBreakdown: Array.from(byMission.values())
+      .map((record) => ({
+        ...record,
+        referenceUsd: Math.round(record.referenceUsd * 1000) / 1000,
+      }))
+      .sort((left, right) => right.usd - left.usd),
   };
 }
 
@@ -612,7 +695,15 @@ export function collectCostSummary(
     budgetUsd: input.budgetUsd,
     scopeFilter: input.scopeFilter,
   });
-  return partialNotice ? { ...summary, partialNotice, withheldPartitions: withheld } : summary;
+  return partialNotice
+    ? {
+        ...summary,
+        costComplete: false,
+        remainingUsd: null,
+        partialNotice,
+        withheldPartitions: withheld,
+      }
+    : summary;
 }
 
 export function buildApprovalQueueItems(query: ApprovalQueueQuery = {}): ApprovalQueueItem[] {

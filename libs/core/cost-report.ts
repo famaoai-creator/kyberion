@@ -7,25 +7,32 @@ import {
 } from './metrics.js';
 import { eventScopeMatches, type EventScope, type EventScopeFilter } from './event-scope.js';
 import { resolveScopeForRecord } from './scope-migration.js';
-import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
+import {
+  normalizeUsageCause,
+  resolveUsageCostAccounting,
+  type UsageCause,
+  type UsageCostAccounting,
+  type UsageCostStatus,
+} from './usage-accounting.js';
 
 /**
  * cost-report.ts — OP-01 Task 2: aggregate the usage ledger into
  * per-mission / per-model / per-day cost views.
  *
- * Cost source priority (Task 2.2): the Agent SDK's real total
- * (`sdk_cost_usd`) wins when present; otherwise the token×registry figure
- * (`cost_usd`) computed at record time. Entries flagged `estimated: true`
- * (CLI backends) are counted but also surfaced separately so operators can
- * see how much of the total is approximation.
+ * Cost certainty is separate from usage provenance and commitment lifecycle.
+ * Provider-reported cash (including zero) beats token-rate fallback. Included
+ * runs retain API reference estimates without adding incremental cash, and
+ * unpriced/unknown-billing runs remain counted with explicit incompleteness.
+ * Legacy sdk_cost_usd/cost_usd/estimated rows remain readable.
  */
 
-export interface CostLedgerEntry {
+export interface CostLedgerEntry extends UsageCostAccounting {
   timestamp?: string;
   component?: string;
   model?: string;
   mission_id?: string;
-  cost_usd?: number;
+  cost_usd?: number | null;
+  source?: string;
   sdk_cost_usd?: number;
   estimated?: boolean;
   usage?: {
@@ -48,6 +55,13 @@ export interface CostBucket {
   key: string;
   cost_usd: number;
   estimated_cost_usd: number;
+  reference_usd: number;
+  reference_cost_calls: number;
+  actual_cost_calls: number;
+  estimated_cost_calls: number;
+  included_calls: number;
+  unknown_cost_calls: number;
+  cost_complete: boolean;
   calls: number;
   prompt_tokens: number;
   completion_tokens: number;
@@ -61,6 +75,13 @@ export interface CostReport {
   until: string | null;
   total_usd: number;
   estimated_usd: number;
+  reference_usd: number;
+  reference_cost_calls: number;
+  actual_cost_calls: number;
+  estimated_cost_calls: number;
+  included_calls: number;
+  unknown_cost_calls: number;
+  cost_complete: boolean;
   calls: number;
   by_mission: CostBucket[];
   by_model: CostBucket[];
@@ -86,10 +107,20 @@ export interface CostReport {
 }
 
 export function effectiveCostUsd(entry: CostLedgerEntry): number {
-  const sdk = Number(entry.sdk_cost_usd);
-  if (Number.isFinite(sdk) && sdk > 0) return sdk;
-  const computed = Number(entry.cost_usd);
-  return Number.isFinite(computed) && computed > 0 ? computed : 0;
+  return resolveUsageCost(entry).costUsd ?? 0;
+}
+
+export function resolveUsageCost(entry: CostLedgerEntry): {
+  costUsd: number | null;
+  referenceUsd: number | null;
+  costStatus: UsageCostStatus;
+} {
+  const resolved = resolveUsageCostAccounting(entry);
+  return {
+    costUsd: resolved.cost_usd,
+    referenceUsd: resolved.reference_cost_usd ?? null,
+    costStatus: resolved.cost_status,
+  };
 }
 
 function round(value: number): number {
@@ -97,7 +128,9 @@ function round(value: number): number {
 }
 
 function statusOf(entry: CostLedgerEntry): ResourceUsageStatus {
-  return entry.status || (entry.estimated ? 'estimated' : 'actual');
+  return (
+    entry.status || (resolveUsageCost(entry).costStatus === 'estimated' ? 'estimated' : 'actual')
+  );
 }
 
 function bucketize(
@@ -113,6 +146,13 @@ function bucketize(
         key,
         cost_usd: 0,
         estimated_cost_usd: 0,
+        reference_usd: 0,
+        reference_cost_calls: 0,
+        actual_cost_calls: 0,
+        estimated_cost_calls: 0,
+        included_calls: 0,
+        unknown_cost_calls: 0,
+        cost_complete: true,
         calls: 0,
         prompt_tokens: 0,
         completion_tokens: 0,
@@ -123,6 +163,16 @@ function bucketize(
       buckets.set(key, bucket);
     }
     bucket.cost_usd += cost;
+    const resolved = resolveUsageCost(entry);
+    bucket.reference_usd += resolved.referenceUsd ?? 0;
+    if (resolved.referenceUsd !== null) bucket.reference_cost_calls++;
+    if (resolved.costStatus === 'actual') bucket.actual_cost_calls++;
+    if (resolved.costStatus === 'estimated') bucket.estimated_cost_calls++;
+    if (resolved.costStatus === 'included') bucket.included_calls++;
+    if (resolved.costStatus === 'unknown') {
+      bucket.unknown_cost_calls++;
+      bucket.cost_complete = false;
+    }
     if (statusOf(entry) === 'estimated') bucket.estimated_cost_usd += cost;
     bucket.calls += 1;
     bucket.prompt_tokens += entry.usage?.prompt_tokens ?? 0;
@@ -136,6 +186,7 @@ function bucketize(
       ...bucket,
       cost_usd: round(bucket.cost_usd),
       estimated_cost_usd: round(bucket.estimated_cost_usd),
+      reference_usd: round(bucket.reference_usd),
     }))
     .sort((left, right) => right.cost_usd - left.cost_usd);
 }
@@ -163,7 +214,17 @@ export function buildCostReport(
     if (options.scopeFilter && !eventScopeMatches(scopeOf(entry), options.scopeFilter)) continue;
     if (entry.type === 'resource_usage') resourceUsageEntries.push(entry);
     const cost = effectiveCostUsd(entry);
-    if (cost <= 0) continue;
+    const hasEvidence =
+      (entry.cost_usd !== undefined && entry.cost_usd !== 0) ||
+      entry.cost_status !== undefined ||
+      entry.billing_mode !== undefined ||
+      entry.usage !== undefined ||
+      entry.sdk_cost_usd !== undefined ||
+      entry.reported_cost_usd !== undefined ||
+      entry.reference_cost_usd !== undefined;
+    // Preserve legacy zero-only row filtering, but retain known zero reports,
+    // included runs and unknown evidence so they can never disappear as free.
+    if (cost <= 0 && !hasEvidence) continue;
     costed.push({ entry, cost });
   }
 
@@ -190,6 +251,23 @@ export function buildCostReport(
     until: options.until ?? null,
     total_usd: round(total),
     estimated_usd: round(estimated),
+    reference_usd: round(
+      costed.reduce((sum, item) => sum + (resolveUsageCost(item.entry).referenceUsd ?? 0), 0)
+    ),
+    reference_cost_calls: costed.filter(
+      (item) => resolveUsageCost(item.entry).referenceUsd !== null
+    ).length,
+    actual_cost_calls: costed.filter((item) => resolveUsageCost(item.entry).costStatus === 'actual')
+      .length,
+    estimated_cost_calls: costed.filter(
+      (item) => resolveUsageCost(item.entry).costStatus === 'estimated'
+    ).length,
+    included_calls: costed.filter((item) => resolveUsageCost(item.entry).costStatus === 'included')
+      .length,
+    unknown_cost_calls: costed.filter(
+      (item) => resolveUsageCost(item.entry).costStatus === 'unknown'
+    ).length,
+    cost_complete: costed.every((item) => resolveUsageCost(item.entry).costStatus !== 'unknown'),
     calls: costed.length,
     by_mission: bucketize(costed, (entry) => entry.mission_id || '(no mission)'),
     by_model: bucketize(costed, (entry) => entry.model || '(unknown model)'),
@@ -260,21 +338,39 @@ export function buildCostReportFromHistory(
     options
   );
   const notice = metricsWithheldNotice('cost report', withheld);
-  return notice ? { ...report, withheld_partitions: withheld, partial_notice: notice } : report;
+  return notice
+    ? { ...report, cost_complete: false, withheld_partitions: withheld, partial_notice: notice }
+    : report;
 }
 
 export function formatCostReport(report: CostReport, topN = 5): string[] {
   const lines: string[] = [
     `Cost report${report.since ? ` since ${report.since}` : ''}: ` +
-      `$${report.total_usd.toFixed(4)} across ${report.calls} call(s)` +
+      `${report.cost_complete ? 'incremental cash' : 'known incremental subtotal'} $${report.total_usd.toFixed(4)} across ${report.calls} call(s)` +
       (report.estimated_usd > 0 ? ` (incl. ~$${report.estimated_usd.toFixed(4)} estimated)` : ''),
   ];
   if (report.partial_notice) lines.push(`PARTIAL: ${report.partial_notice}`);
+  lines.push(
+    `Cost certainty: ${report.actual_cost_calls} actual, ${report.estimated_cost_calls} estimated, ${report.included_calls} included, ${report.unknown_cost_calls} unknown.`
+  );
+  lines.push(
+    report.reference_cost_calls > 0
+      ? `API-equivalent reference: $${report.reference_usd.toFixed(4)} across ${report.reference_cost_calls} call(s); not an incremental charge.`
+      : 'API-equivalent reference: unavailable.'
+  );
   const section = (title: string, buckets: CostBucket[]) => {
     lines.push(`${title}:`);
     for (const bucket of buckets.slice(0, topN)) {
+      const amount =
+        bucket.unknown_cost_calls > 0
+          ? `known subtotal $${bucket.cost_usd.toFixed(4)}; ${bucket.unknown_cost_calls} unknown`
+          : bucket.included_calls > 0 &&
+              bucket.actual_cost_calls === 0 &&
+              bucket.estimated_cost_calls === 0
+            ? 'included'
+            : `$${bucket.cost_usd.toFixed(4)}`;
       lines.push(
-        `  ${bucket.key}: $${bucket.cost_usd.toFixed(4)} ` +
+        `  ${bucket.key}: ${amount} ` +
           `(${bucket.calls} calls, ${bucket.prompt_tokens}+${bucket.completion_tokens} tokens)`
       );
     }

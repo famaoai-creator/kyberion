@@ -10,11 +10,11 @@ import {
 } from './approval-store-location.js';
 import { computeApprovalPayloadHash } from './approval-presentation.js';
 import { assertApprovalUsable } from './approval-separation-of-duties.js';
-import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
+import type { ApprovalStoreRole } from './approval-store-role.js';
 import { nowIso } from '../foundation/time.js';
 import type { ApprovalRequestRecord, ApprovalApplyClaim } from './approval-store.js';
 export function withApprovalRecordLock<T>(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: { channel: string; storageChannel?: string; requestId: string },
   fn: () => T
 ): T {
@@ -32,7 +32,7 @@ export function withApprovalRecordLock<T>(
   );
 }
 export function claimApprovalApply(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     channel: string;
     storageChannel?: string;

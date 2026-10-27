@@ -9,6 +9,7 @@ import { isRecord } from './foundation/text.js';
 import { nowIso } from './foundation/time.js';
 import { safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
 import { parseTestInventoryItem } from './software-quality.js';
+import { captureVerificationSourceSnapshot } from './verification-source-snapshot.js';
 import type {
   DefectCandidate,
   SoftwareQualityContract,
@@ -16,6 +17,7 @@ import type {
   TestExecutionResult,
   TestInventory,
   TestInventoryItem,
+  TestExecutionRecord,
 } from './software-quality.js';
 
 export interface TestViewpointDefinition {
@@ -265,6 +267,41 @@ export async function dispatchTestInventory(input: {
     results.push({ item_id: item.item_id, backend, ...result });
   }
   return results;
+}
+
+/** Execute on a declared source set; reports carry these execution-time bytes forward unchanged. */
+export async function executeQualityRun(
+  input: Parameters<typeof dispatchTestInventory>[0] & {
+    runId: string;
+    subjectRef: string;
+    sourcePaths: string[];
+    environment: string;
+    executor: NonNullable<TestExecutionRecord['executor']>;
+  }
+): Promise<TestExecutionRecord> {
+  const started = nowIso();
+  // Fail before running when the declared source set cannot be bound safely.
+  const before = captureVerificationSourceSnapshot(input.sourcePaths);
+  const results = await dispatchTestInventory(input);
+  let stable = false;
+  try {
+    const after = captureVerificationSourceSnapshot(input.sourcePaths);
+    stable = JSON.stringify(before) === JSON.stringify(after);
+  } catch {
+    /* A disappearing/unreadable source cannot earn a freshness receipt. */
+  }
+  return {
+    version: '1.0.0',
+    run_id: input.runId,
+    project_id: input.inventory.project_id,
+    subject_ref: input.subjectRef,
+    environment: input.environment,
+    executor: input.executor,
+    started_at: started,
+    finished_at: nowIso(),
+    results: toExecutionResults(results),
+    ...(stable ? { source_snapshot: before } : {}),
+  };
 }
 
 export type DefectStatus =
