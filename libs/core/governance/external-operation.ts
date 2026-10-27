@@ -103,6 +103,12 @@ export function withExplicitExternalApprovalRequest<T>(
     body
   );
 }
+/** True when a trusted host already produces governed review artifacts for this
+ * operation, so authority resolvers must not duplicate that store write under a
+ * caller ambient identity. */
+export function hasExplicitExternalApprovalRequest(operationId: string): boolean {
+  return explicitRequestContext.getStore()?.operationId === operationId;
+}
 const pipelineRunContext = new AsyncLocalStorage<string>();
 
 /** Trusted outer checkpoint boundary; never supplied by an action envelope. */
