@@ -200,6 +200,17 @@ export interface AuditVerifyResult {
 }
 
 /** Secure I/O capabilities supplied by the secure-io boundary. */
+/**
+ * Append one record as its own line. A file whose tail lacks a newline (a torn
+ * append, or a planted fragment) would otherwise swallow this record into one
+ * unparseable line; the fragment stays its own invalid line for verify.
+ */
+function appendRecordLine(io: AuditChainIo, filePath: string, entry: AuditEntry): void {
+  const content = io.exists(filePath) ? io.read(filePath) : '';
+  const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+  io.append(filePath, `${separator}${JSON.stringify(entry)}\n`);
+}
+
 export interface AuditChainIo {
   read(filePath: string): string;
   loadJson<T>(filePath: string): T;
@@ -792,7 +803,7 @@ class AuditChainImpl {
       if (!auditIo.exists(this.auditDir)) {
         auditIo.mkdir(this.auditDir);
       }
-      auditIo.append(this.getFilePath(entry.timestamp), `${JSON.stringify(entry)}\n`);
+      appendRecordLine(auditIo, this.getFilePath(entry.timestamp), entry);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
@@ -836,7 +847,7 @@ class AuditChainImpl {
       allowMissingLeaf: true,
     });
     if (!mirrorFile) return;
-    io.append(mirrorFile, `${JSON.stringify(entry)}\n`);
+    appendRecordLine(io, mirrorFile, entry);
   }
 
   private getFilePath(timestamp: string): string {

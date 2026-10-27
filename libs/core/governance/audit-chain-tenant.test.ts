@@ -575,4 +575,45 @@ describe('audit-chain — tenant mirror', () => {
       'tenant_mirror_unreadable:sbiss:audit-2026-07-01.jsonl:line:2:invalid_record',
     ]);
   });
+
+  it('reports a hidden middle entry: its junk line and the broken link after it', async () => {
+    const run = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    const ids = ['one', 'two', 'three'].map(
+      (action) =>
+        run.auditChain.record({ agentId: 'agent-1', action, operation: 'op', result: 'completed' })
+          .id
+    );
+    const file = auditFile('2026-07-01');
+    const content = fs.readFileSync(file, 'utf8').split('\n');
+    content[1] = 'not json';
+    fs.writeFileSync(file, content.join('\n'));
+
+    const result = run.auditChain.verify();
+    expect(result.corrupted).toEqual(['audit-2026-07-01.jsonl:line:2:invalid_record', ids[2]]);
+    // Readers keep the readable entries of a partly corrupt file.
+    expect(run.auditChain.loadAll().map((entry) => entry.id)).toEqual([ids[0], ids[2]]);
+  });
+
+  it('starts a new line after a tail fragment instead of swallowing the next record', async () => {
+    const run = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    const first = run.auditChain.record({
+      agentId: 'agent-1',
+      action: 'before',
+      operation: 'op',
+      result: 'completed',
+    });
+    fs.appendFileSync(auditFile('2026-07-01'), '{"x":');
+    const second = run.auditChain.record({
+      agentId: 'agent-1',
+      action: 'after',
+      operation: 'op',
+      result: 'completed',
+    });
+
+    expect(second.previousHash).toBe(first.currentHash);
+    expect(run.auditChain.loadAll().map((entry) => entry.id)).toEqual([first.id, second.id]);
+    expect(run.auditChain.verify().corrupted).toEqual([
+      'audit-2026-07-01.jsonl:line:2:invalid_record',
+    ]);
+  });
 });

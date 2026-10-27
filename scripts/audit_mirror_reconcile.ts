@@ -54,8 +54,10 @@ export interface AuditMirrorFinding {
   master_count: number;
   mirror_fingerprint: string;
   master_fingerprint: string;
-  reason: 'stale_mirror' | 'mirror_out_of_sync';
+  reason: 'stale_mirror' | 'mirror_out_of_sync' | 'mirror_unreadable';
   action: 'quarantine' | 'quarantine_and_rebuild';
+  /** Unparseable mirror lines: rebuilt from the master, never parsed. */
+  unreadable_lines?: number;
 }
 
 export interface AuditMirrorReceipt {
@@ -104,21 +106,35 @@ function entryFingerprint(entries: AuditEntry[]): string {
   return fingerprint(entries.map((entry) => ({ id: entry.id, currentHash: entry.currentHash })));
 }
 
-function parseMirrorFile(filePath: string, rootDir = pathResolver.rootDir()): AuditEntry[] {
-  const safePath = assertSafeRepositoryPath(filePath, { rootDir });
-  return readJsonLines<AuditEntry>(safePath, {
-    map: (value) => normalizePersistedAuditEntry(value),
-    onMalformed: (error, lineNumber) => {
-      throw new Error(
-        `[AUDIT_MIRROR_INVALID] ${safePath}:${lineNumber} is not valid JSON: ${String(error)}`
-      );
-    },
-  });
+interface ParsedAuditLines {
+  entries: AuditEntry[];
+  unreadable: number;
 }
 
-function loadMirrorEntries(mirrorDir: string, rootDir = pathResolver.rootDir()): AuditEntry[] {
+/** Readable entries of an audit file; an unparseable line is counted, never fatal. */
+function parseAuditFile(filePath: string, rootDir = pathResolver.rootDir()): ParsedAuditLines {
+  const safePath = assertSafeRepositoryPath(filePath, { rootDir });
+  let unreadable = 0;
+  const entries = readJsonLines<AuditEntry>(safePath, {
+    map: (value) => normalizePersistedAuditEntry(value),
+    onMalformed: () => {
+      unreadable += 1;
+    },
+  });
+  return { entries, unreadable };
+}
+
+function parseAuditFiles(files: string[], rootDir: string): ParsedAuditLines {
+  const parsed = files.map((filePath) => parseAuditFile(filePath, rootDir));
+  return {
+    entries: parsed.flatMap((file) => file.entries),
+    unreadable: parsed.reduce((sum, file) => sum + file.unreadable, 0),
+  };
+}
+
+function loadMirrorEntries(mirrorDir: string, rootDir = pathResolver.rootDir()): ParsedAuditLines {
   const safeMirrorDir = assertSafeRepositoryPath(mirrorDir, { rootDir });
-  return safeReaddir(safeMirrorDir)
+  const files = safeReaddir(safeMirrorDir)
     .filter((fileName) => AUDIT_FILE_RE.test(fileName))
     .filter((fileName) => {
       try {
@@ -129,8 +145,11 @@ function loadMirrorEntries(mirrorDir: string, rootDir = pathResolver.rootDir()):
         return false;
       }
     })
-    .sort((left, right) => left.localeCompare(right))
-    .flatMap((fileName) => parseMirrorFile(path.join(safeMirrorDir, fileName), rootDir));
+    .sort((left, right) => left.localeCompare(right));
+  return parseAuditFiles(
+    files.map((fileName) => path.join(safeMirrorDir, fileName)),
+    rootDir
+  );
 }
 
 function loadMasterEntries(rootDir: string): AuditEntry[] {
@@ -145,7 +164,7 @@ function loadMasterEntries(rootDir: string): AuditEntry[] {
     }
   );
   if (!safeExistsSync(auditDir)) return [];
-  return safeReaddir(auditDir)
+  const files = safeReaddir(auditDir)
     .filter((fileName) => AUDIT_FILE_RE.test(fileName))
     .filter((fileName) => {
       try {
@@ -156,8 +175,12 @@ function loadMasterEntries(rootDir: string): AuditEntry[] {
         return false;
       }
     })
-    .sort((left, right) => left.localeCompare(right))
-    .flatMap((fileName) => parseMirrorFile(path.join(auditDir, fileName), rootDir));
+    .sort((left, right) => left.localeCompare(right));
+  // Lenient like auditChain.loadAll(): an unreadable master line hides only itself.
+  return parseAuditFiles(
+    files.map((fileName) => path.join(auditDir, fileName)),
+    rootDir
+  ).entries;
 }
 
 function masterEntriesByTenant(rootDir = pathResolver.rootDir()): Map<string, AuditEntry[]> {
@@ -186,9 +209,10 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
       rootDir,
     });
     if (!safeExistsSync(mirrorDir)) continue;
-    const mirrorEntries = loadMirrorEntries(mirrorDir, rootDir);
+    const { entries: mirrorEntries, unreadable } = loadMirrorEntries(mirrorDir, rootDir);
     const masterEntries = masterByTenant.get(slug) || [];
     const same =
+      unreadable === 0 &&
       mirrorEntries.length === masterEntries.length &&
       mirrorEntries.every(
         (entry, index) =>
@@ -204,8 +228,14 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
       master_count: masterEntries.length,
       mirror_fingerprint: entryFingerprint(mirrorEntries),
       master_fingerprint: entryFingerprint(masterEntries),
-      reason: masterEntries.length === 0 ? 'stale_mirror' : 'mirror_out_of_sync',
+      reason:
+        masterEntries.length === 0
+          ? 'stale_mirror'
+          : unreadable > 0
+            ? 'mirror_unreadable'
+            : 'mirror_out_of_sync',
       action: masterEntries.length === 0 ? 'quarantine' : 'quarantine_and_rebuild',
+      ...(unreadable > 0 ? { unreadable_lines: unreadable } : {}),
     });
   }
 
