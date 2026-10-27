@@ -1,14 +1,20 @@
 import { describe, expect, it, vi } from 'vitest';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir, safeReadFile } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import * as discovery from '@agent/core/actuator/actuator-op-discovery';
+import * as nodePath from 'node:path';
 import {
   actuatorAcceptsPipeline,
   buildPipelineWrappedPayload,
   buildPlaygroundPayload,
+  buildSessionAdf,
+  emitPlaygroundSessionAdf,
   evaluatePlaygroundDryRun,
   lookupDiscoveryOpKind,
   parsePlaygroundParams,
+  recordPlaygroundStep,
+  resetPlaygroundSession,
+  resolveActuatorDomain,
   resolvePlaygroundCapabilities,
   resolvePlaygroundParamsInput,
   runPlayground,
@@ -370,5 +376,150 @@ describe('actuator playground discovery merge and pipeline wrap', () => {
   it('resolves discovery op kinds for wrapped payload typing', () => {
     expect(lookupDiscoveryOpKind('file-actuator', 'read', 'file-actuator')).toBe('capture');
     expect(lookupDiscoveryOpKind('file-actuator', 'no-such-op', 'file-actuator')).toBeNull();
+  });
+});
+
+describe('actuator playground session recording → ADF emit', () => {
+  const scratchDir = pathResolver.sharedTmp('ky-playground-test');
+  safeMkdir(scratchDir, { recursive: true });
+
+  it('maps actuator ids to ADF domains', () => {
+    expect(resolveActuatorDomain('browser-actuator')).toBe('browser');
+    expect(resolveActuatorDomain('file-actuator')).toBe('file');
+    expect(resolveActuatorDomain('meeting-browser-driver')).toBe('meeting-browser-driver');
+  });
+
+  it('records only successful live runs and emits a Typed Flow ADF', async () => {
+    const executeActuator = vi.fn(() => '{"status":"ok"}');
+    const args = (op: string, params: string) => [
+      '--record',
+      'e2e-flow',
+      '--actuator',
+      'file-actuator',
+      '--op',
+      op,
+      '--params',
+      params,
+    ];
+    const first = await runPlayground(args('read', '{"path":"package.json"}'), {
+      json: true,
+      quiet: true,
+      scratchDir,
+      resolveExecutable: () => '/tmp/fake-file.js',
+      executeActuator,
+    });
+    expect(first).toMatchObject({ recorded: { session: 'e2e-flow', steps: 1 } });
+
+    const second = await runPlayground(args('write', '{"path":"a.txt","content":"x"}'), {
+      json: true,
+      quiet: true,
+      scratchDir,
+      resolveExecutable: () => '/tmp/fake-file.js',
+      executeActuator,
+    });
+    expect(second).toMatchObject({ recorded: { session: 'e2e-flow', steps: 2 } });
+
+    const emitted = emitPlaygroundSessionAdf({ session: 'e2e-flow', scratchDir });
+    expect(emitted.steps).toBe(2);
+    expect(emitted.adf.action).toBe('pipeline');
+    expect(emitted.adf.steps).toEqual([
+      expect.objectContaining({ role: 'source', op: 'file:read' }),
+      expect.objectContaining({ role: 'sink', op: 'file:write' }),
+    ]);
+    const onDisk = JSON.parse(String(safeReadFile(emitted.output_path)));
+    expect(onDisk.pipeline_id).toBe('e2e-flow');
+  });
+
+  it('does not record dry-run executions', async () => {
+    resetPlaygroundSession('dry-guard', scratchDir);
+    await runPlayground(
+      [
+        '--record',
+        'dry-guard',
+        '--actuator',
+        'file-actuator',
+        '--op',
+        'read',
+        '--params',
+        '{"path":"package.json"}',
+      ],
+      {
+        json: true,
+        quiet: true,
+        dryRun: true,
+        scratchDir,
+        resolveExecutable: () => '/tmp/fake-file.js',
+        executeActuator: () => '{"status":"captured"}',
+      }
+    );
+    expect(() => emitPlaygroundSessionAdf({ session: 'dry-guard', scratchDir })).toThrow(
+      'has no recorded steps'
+    );
+  });
+
+  it('redacts sensitive params into placeholders on emit', () => {
+    resetPlaygroundSession('secrets-flow', scratchDir);
+    recordPlaygroundStep(
+      'secrets-flow',
+      {
+        actuator_id: 'browser-actuator',
+        domain: 'browser',
+        op: 'goto',
+        kind: 'capture',
+        params: { url: 'https://example.com', api_key: 'abc123' },
+      },
+      scratchDir
+    );
+    const { adf, redacted_keys } = buildSessionAdf(
+      JSON.parse(String(safeReadFile(nodePath.join(scratchDir, 'sessions', 'secrets-flow.json'))))
+    );
+    expect(redacted_keys).toEqual(['api_key']);
+    expect(adf.steps[0].params.api_key).toBe('{{api_key}}');
+    expect(adf.steps[0].params.url).toBe('https://example.com');
+    expect(adf.session_id).toBe('secrets-flow');
+  });
+
+  it('emits via the CLI boundary and prints the promote next step', async () => {
+    resetPlaygroundSession('cli-flow', scratchDir);
+    recordPlaygroundStep(
+      'cli-flow',
+      {
+        actuator_id: 'file-actuator',
+        domain: 'file',
+        op: 'read',
+        kind: 'capture',
+        params: { path: 'package.json' },
+      },
+      scratchDir
+    );
+    const printed: unknown[] = [];
+    const result = await runPlayground(['--emit-adf', 'cli-flow', '--name', 'cli-flow-pipe'], {
+      print: (value) => printed.push(value),
+      scratchDir,
+      resolveExecutable: () => {
+        throw new Error('emit must not resolve executables');
+      },
+    });
+    expect(result).toMatchObject({ ok: true, mode: 'emit-adf', steps: 1 });
+    const outPath = nodePath.join(scratchDir, 'cli-flow.adf.json');
+    expect(safeExistsSync(outPath)).toBe(true);
+    const adf = JSON.parse(String(safeReadFile(outPath)));
+    expect(adf.pipeline_id).toBe('cli-flow-pipe');
+    expect(String(printed.at(-1))).toContain('pipeline:promote');
+  });
+
+  it('rejects malformed session flags early', async () => {
+    await expect(runPlayground(['--emit-adf'], { json: true, scratchDir })).rejects.toThrow(
+      '--emit-adf requires a session name'
+    );
+    await expect(
+      runPlayground(['--reset', '--actuator', 'file-actuator', '--op', 'read'], {
+        json: true,
+        scratchDir,
+      })
+    ).rejects.toThrow('--reset requires --record');
+    await expect(
+      runPlayground(['--emit-adf', 'bad name!'], { json: true, scratchDir })
+    ).rejects.toThrow('Invalid session name');
   });
 });

@@ -3,6 +3,7 @@ import {
   safeExistsSync,
   safeExec,
   safeLstat,
+  safeMkdir,
   safeReadFile,
   safeReaddir,
   safeWriteFile,
@@ -19,9 +20,15 @@ import {
   resolveCliActionKind,
   type ActuatorPipelineStepType,
 } from '@agent/core/actuator/actuator-sdk';
-import { createAjv } from '@agent/core/foundation';
+import { createAjv, nowIso, readJsonIfPresent, slugify, writeJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import { compileSchemaFromPath } from '@agent/core/schema-loader';
+import { determineActuatorStepType } from '@agent/core/actuator/actuator-op-registry';
+import {
+  ROLE_FROM_TYPE,
+  validatePipelineAdf,
+  type PipelineAdf,
+} from '@agent/core/pipeline/pipeline-contract';
 import {
   loadActuatorOpDiscoveryAtPath,
   type ActuatorOpDiscoveryOperation,
@@ -55,13 +62,23 @@ Try a single op:
   --dry-run  capture ops run the handler; apply/transform/control validate only
   (neither)  live execution
 
+Record a session of successful live runs and emit a PipelineAdf draft:
+  --record <name>            append this run's step to session <name> (live runs only)
+  --record <name> --reset    clear session <name> before this run
+  --emit-adf <name>          write active/shared/tmp/actuator-playground/<name>.adf.json
+      [--name <slug>]        pipeline_id/name override (default: session name)
+      [--out <path>]         output path override (repo-relative)
+  Next step: pnpm pipeline:promote --input <adf>.json --source-is-public
+
 Other flags: --json (machine output) --quiet --help
 No flags:    interactive wizard
 
 Examples:
   pnpm playground -- --list --search browser --json
   pnpm playground -- --actuator file-actuator --op read --describe --json
-  pnpm playground -- --actuator file-actuator --op read --params '{"path":"package.json"}' --check`;
+  pnpm playground -- --actuator file-actuator --op read --params '{"path":"package.json"}' --check
+  pnpm playground -- --record login-flow --actuator browser-actuator --op goto --params '{"url":"https://example.com"}'
+  pnpm playground -- --emit-adf login-flow`;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -274,6 +291,204 @@ export function assertPlaygroundSecretMutationAllowed(args: {
   }
 }
 
+// --- Session recording → ADF emit -------------------------------------
+// `pnpm playground -- --record <name>` appends each successful live run to a
+// session file; `--emit-adf <name>` converts the recorded steps into a
+// PipelineAdf draft (`domain:op` + Typed Flow role) that `pnpm pipeline:promote`
+// can lift into pipelines/. Session files and drafts stay on the scratch floor
+// (active/shared/tmp/actuator-playground/) — review them before promoting.
+
+const PLAYGROUND_SESSION_NAME = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$/;
+/** Param keys whose recorded values are replaced by {{placeholders}} on emit. */
+const SENSITIVE_PARAM_KEY =
+  /pass|secret|token|otp|credential|api[-_]?key|private[-_]?key|cookie|authorization/i;
+/** Manifest-boundary ops that dispatch as ADF step ops without a registry row. */
+const NON_REGISTRY_STEP_OPS = new Set(['pipeline']);
+
+export interface PlaygroundRecordedStep {
+  id: string;
+  actuator_id: string;
+  domain: string;
+  op: string;
+  kind: string;
+  params: Record<string, unknown>;
+  recorded_at: string;
+}
+
+interface PlaygroundSessionFile {
+  session: string;
+  created_at: string;
+  steps: PlaygroundRecordedStep[];
+}
+
+/** ADF domain prefix for an actuator (`browser-actuator` → `browser`). */
+export function resolveActuatorDomain(actuatorId: string): string {
+  return actuatorId.replace(/-actuator$/u, '');
+}
+
+function playgroundScratchDir(scratchDir?: string): string {
+  return scratchDir ?? pathResolver.sharedTmp('actuator-playground');
+}
+
+export function resolvePlaygroundSessionPath(session: string, scratchDir?: string): string {
+  if (!PLAYGROUND_SESSION_NAME.test(session)) {
+    throw new Error(`Invalid session name '${session}' (use letters, digits, ., _, -).`);
+  }
+  return assertSafeRepositoryPath(
+    path.join(playgroundScratchDir(scratchDir), 'sessions', `${session}.json`),
+    { allowMissingLeaf: true }
+  );
+}
+
+function loadPlaygroundSession(
+  session: string,
+  scratchDir?: string
+): { filePath: string; file: PlaygroundSessionFile } {
+  const filePath = resolvePlaygroundSessionPath(session, scratchDir);
+  const file = readJsonIfPresent<PlaygroundSessionFile>(filePath) ?? {
+    session,
+    created_at: nowIso(),
+    steps: [],
+  };
+  if (!Array.isArray(file.steps)) file.steps = [];
+  return { filePath, file };
+}
+
+function writePlaygroundJson(filePath: string, value: unknown): void {
+  safeMkdir(path.dirname(filePath), { recursive: true });
+  writeJson(filePath, value);
+}
+
+export function resetPlaygroundSession(session: string, scratchDir?: string): void {
+  const { filePath } = loadPlaygroundSession(session, scratchDir);
+  writePlaygroundJson(filePath, { session, created_at: nowIso(), steps: [] });
+}
+
+export function recordPlaygroundStep(
+  session: string,
+  entry: Omit<PlaygroundRecordedStep, 'id' | 'recorded_at'>,
+  scratchDir?: string
+): PlaygroundSessionFile {
+  const { filePath, file } = loadPlaygroundSession(session, scratchDir);
+  const ordinal = file.steps.length + 1;
+  file.steps.push({
+    ...entry,
+    id: `step-${ordinal}-${entry.op}`,
+    recorded_at: nowIso(),
+  });
+  writePlaygroundJson(filePath, file);
+  return file;
+}
+
+function sanitizeRecordedParams(value: unknown, placeholders: Map<string, string>): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sanitizeRecordedParams(item, placeholders));
+  }
+  if (value && typeof value === 'object') {
+    const out: Record<string, unknown> = {};
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      if (typeof item === 'string' && SENSITIVE_PARAM_KEY.test(key)) {
+        const name = key.replace(/[^a-zA-Z0-9_]/g, '_');
+        placeholders.set(name, key);
+        out[key] = `{{${name}}}`;
+      } else {
+        out[key] = sanitizeRecordedParams(item, placeholders);
+      }
+    }
+    return out;
+  }
+  return value;
+}
+
+/**
+ * Convert a recorded session into a PipelineAdf draft. Steps carry the Typed
+ * Flow role mapped from the recorded op kind, and sensitive param values are
+ * replaced by {{placeholders}} declared in `parameters`.
+ */
+export function buildSessionAdf(
+  session: PlaygroundSessionFile,
+  options: { name?: string } = {}
+): { adf: PipelineAdf; redacted_keys: string[]; unverified_ops: string[] } {
+  const placeholders = new Map<string, string>();
+  const unverified = new Set<string>();
+  const steps = session.steps.map((step) => {
+    const qualifiedOp = `${step.domain}:${step.op}`;
+    if (!NON_REGISTRY_STEP_OPS.has(step.op)) {
+      try {
+        determineActuatorStepType(step.domain, step.op);
+      } catch {
+        unverified.add(qualifiedOp);
+      }
+    }
+    return {
+      id: step.id,
+      role: ROLE_FROM_TYPE[step.kind] ?? 'sink',
+      op: qualifiedOp,
+      params: sanitizeRecordedParams(step.params, placeholders) as Record<string, unknown>,
+    };
+  });
+  const slug = slugify(options.name || session.session) || 'playground-session';
+  const adf: Record<string, unknown> = {
+    action: 'pipeline',
+    pipeline_id: slug,
+    name: slug,
+    description:
+      `Recorded from playground session '${session.session}' (${steps.length} step(s)). ` +
+      `Review steps and params before promoting.`,
+    steps,
+  };
+  if (session.steps.some((step) => step.domain === 'browser')) {
+    adf.session_id = session.session;
+  }
+  if (placeholders.size > 0) {
+    adf.parameters = Object.fromEntries(
+      [...placeholders.keys()].map((key) => [
+        key,
+        {
+          type: 'string',
+          description: 'Redacted playground param value — supply at run time.',
+        },
+      ])
+    );
+  }
+  return {
+    adf: adf as unknown as PipelineAdf,
+    redacted_keys: [...placeholders.keys()],
+    unverified_ops: [...unverified],
+  };
+}
+
+export function emitPlaygroundSessionAdf(args: {
+  session: string;
+  name?: string;
+  out?: string;
+  scratchDir?: string;
+}): {
+  output_path: string;
+  steps: number;
+  redacted_keys: string[];
+  unverified_ops: string[];
+  adf: PipelineAdf;
+} {
+  const { file } = loadPlaygroundSession(args.session, args.scratchDir);
+  if (file.steps.length === 0) {
+    throw new Error(
+      `Playground session '${args.session}' has no recorded steps. ` +
+        `Record with: pnpm playground -- --record ${args.session} --actuator <id> --op <op> --params '{...}'`
+    );
+  }
+  const { adf, redacted_keys, unverified_ops } = buildSessionAdf(file, { name: args.name });
+  validatePipelineAdf(adf);
+  const outPath = args.out
+    ? assertSafeRepositoryPath(pathResolver.rootResolve(args.out), { allowMissingLeaf: true })
+    : assertSafeRepositoryPath(
+        path.join(playgroundScratchDir(args.scratchDir), `${file.session}.adf.json`),
+        { allowMissingLeaf: true }
+      );
+  writePlaygroundJson(outPath, adf);
+  return { output_path: outPath, steps: file.steps.length, redacted_keys, unverified_ops, adf };
+}
+
 export function evaluatePlaygroundDryRun(args: {
   actuatorId: string;
   operation: string;
@@ -369,6 +584,8 @@ interface PlaygroundRunOptions {
   resolveExecutable?: (actuatorId: string) => string | null;
   /** Test seam: intercept the compiled actuator process. */
   executeActuator?: PlaygroundExecuteActuator;
+  /** Test seam: redirect the scratch dir used for session files and ADF drafts. */
+  scratchDir?: string;
 }
 
 function defaultExecuteActuator(args: {
@@ -386,9 +603,14 @@ export async function runPlayground(
   options: PlaygroundRunOptions = {}
 ): Promise<Record<string, unknown> | undefined> {
   const cliParams = parseCliArgs(args);
+  const emitAdfOnly = cliParams['emit-adf'] !== undefined;
   const discoveryOnly = cliParams.list !== undefined || cliParams.describe !== undefined;
   const machineOutput =
-    discoveryOnly || options.json === true || options.dryRun === true || options.check === true;
+    discoveryOnly ||
+    emitAdfOnly ||
+    options.json === true ||
+    options.dryRun === true ||
+    options.check === true;
   const print = options.print ?? (() => undefined);
   if (cliParams.help !== undefined || args.includes('-h')) {
     rl.close();
@@ -402,6 +624,72 @@ export async function runPlayground(
   const logError = (...values: unknown[]) => {
     if (!machineOutput && !options.quiet) emit(...values);
   };
+
+  // --emit-adf needs no actuator, handler, or build — it rewrites a recorded
+  // session file into a PipelineAdf draft on the scratch floor.
+  if (emitAdfOnly) {
+    rl.close();
+    const session = cliParams['emit-adf'];
+    if (session === 'true') {
+      throw new ScriptExitError(1, '--emit-adf requires a session name.');
+    }
+    try {
+      const emitted = emitPlaygroundSessionAdf({
+        session,
+        name: cliParams.name,
+        out: cliParams.out,
+        scratchDir: options.scratchDir,
+      });
+      const result = {
+        ok: true,
+        mode: 'emit-adf',
+        session,
+        steps: emitted.steps,
+        redacted_keys: emitted.redacted_keys,
+        unverified_ops: emitted.unverified_ops,
+        output_path: emitted.output_path,
+      };
+      if (options.json) return result;
+      emit(`Wrote ADF draft (${emitted.steps} step(s)): ${emitted.output_path}`);
+      if (emitted.redacted_keys.length > 0) {
+        emit(`Redacted sensitive params → {{placeholders}}: ${emitted.redacted_keys.join(', ')}`);
+      }
+      if (emitted.unverified_ops.length > 0) {
+        emit(
+          `⚠️  Ops not in the actuator op registry — verify they dispatch as ADF steps: ${emitted.unverified_ops.join(', ')}`
+        );
+      }
+      emit(
+        `Review the draft, then: pnpm pipeline:promote --input ${emitted.output_path} --source-is-public`
+      );
+      return result;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      throw new ScriptExitError(1, message);
+    }
+  }
+
+  // Fail fast on malformed session flags before any op runs.
+  if (cliParams.reset !== undefined && cliParams.record === undefined) {
+    rl.close();
+    throw new ScriptExitError(1, '--reset requires --record <name>.');
+  }
+  if (cliParams.record !== undefined) {
+    if (cliParams.record === 'true') {
+      rl.close();
+      throw new ScriptExitError(1, '--record requires a session name.');
+    }
+    try {
+      resolvePlaygroundSessionPath(cliParams.record, options.scratchDir);
+      if (cliParams.reset !== undefined) {
+        resetPlaygroundSession(cliParams.record, options.scratchDir);
+      }
+    } catch (err) {
+      rl.close();
+      const message = err instanceof Error ? err.message : String(err);
+      throw new ScriptExitError(1, message);
+    }
+  }
 
   log(chalk.bold.cyan('\n🛠️  [KYBERION] Actuator Playground CLI\n'));
 
@@ -544,9 +832,7 @@ export async function runPlayground(
     const pick =
       !isNaN(idx) && idx >= 0 && idx < actuators.length
         ? actuators[idx]
-        : actuators.find(
-            (a) => a.id === choiceStr || a.manifest.actuator_id === choiceStr
-          );
+        : actuators.find((a) => a.id === choiceStr || a.manifest.actuator_id === choiceStr);
     if (!pick) {
       logError(chalk.red('\n❌ Invalid selection.'));
       rl.close();
@@ -562,10 +848,7 @@ export async function runPlayground(
   // Manifest is coarse (pipeline-style actuators list only `pipeline`);
   // union with describeOps from the discovery index so single ops work.
   const ops = resolvePlaygroundCapabilities(manifest, selectedActuator.id);
-  const opDetails = loadDiscoveryOpDetailsForActuator(
-    manifest.actuator_id,
-    selectedActuator.id
-  );
+  const opDetails = loadDiscoveryOpDetailsForActuator(manifest.actuator_id, selectedActuator.id);
   let selectedOpObj = ops.find((o) => o.op === targetOp);
 
   if (!selectedOpObj) {
@@ -602,14 +885,10 @@ export async function runPlayground(
       log(`  ${chalk.bold.cyan(idx + 1)}. ${chalk.bold(opObj.op)}${kindTag}${chalk.gray(desc)}`);
     });
 
-    const choiceStr = await question(
-      chalk.bold.blue('\nSelect an Operation by number or name: ')
-    );
+    const choiceStr = await question(chalk.bold.blue('\nSelect an Operation by number or name: '));
     const idx = parseInt(choiceStr, 10) - 1;
     const pick =
-      !isNaN(idx) && idx >= 0 && idx < ops.length
-        ? ops[idx]
-        : ops.find((o) => o.op === choiceStr);
+      !isNaN(idx) && idx >= 0 && idx < ops.length ? ops[idx] : ops.find((o) => o.op === choiceStr);
     if (!pick) {
       logError(chalk.red('\n❌ Invalid selection.'));
       rl.close();
@@ -822,6 +1101,27 @@ export async function runPlayground(
     const stdout = executeActuator({ execPath, inputPath: tempPath, extraArgs });
     log(chalk.bold.green('🎉 Execution completed successfully! Result output:'));
     log(chalk.white(stdout.trim()));
+    let recorded: Record<string, unknown> | undefined;
+    if (cliParams.record !== undefined && options.dryRun !== true) {
+      const sessionFile = recordPlaygroundStep(
+        cliParams.record,
+        {
+          actuator_id: manifest.actuator_id,
+          domain: resolveActuatorDomain(manifest.actuator_id),
+          op,
+          kind: resolvedKind,
+          params: paramsObject,
+        },
+        options.scratchDir
+      );
+      recorded = { session: cliParams.record, steps: sessionFile.steps.length };
+      log(
+        chalk.gray(
+          `  Recorded step ${sessionFile.steps.length} into session '${cliParams.record}'. ` +
+            `Export with: pnpm playground -- --emit-adf ${cliParams.record}`
+        )
+      );
+    }
     rl.close();
     return {
       ok: true,
@@ -835,6 +1135,7 @@ export async function runPlayground(
       input_path: tempPath,
       executable_path: execPath,
       stdout: stdout.trim(),
+      ...(recorded ? { recorded } : {}),
     };
   } catch (err: any) {
     logError(chalk.bold.red('\n❌ Execution error encountered:'));
