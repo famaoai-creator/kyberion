@@ -46,8 +46,8 @@ const AUDIT_MIRROR_USAGE =
   'Usage: pnpm kyberion audit mirror-reconcile [--mission-id <id>] [--request-approval --requested-by <actor>] [--apply --approval-request-id <id>]';
 
 const AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
-/** Mirror-only entry ids named in a finding (the count is always exact). */
-export const AUDIT_MIRROR_ONLY_ID_LIMIT = 20;
+/** Archive-only entry ids named in a finding (the count is always exact). */
+export const AUDIT_ARCHIVE_ONLY_ID_LIMIT = 20;
 
 export interface AuditMirrorFinding {
   slug: string;
@@ -61,13 +61,15 @@ export interface AuditMirrorFinding {
   /** Unparseable mirror lines: rebuilt from the master, never parsed. */
   unreadable_lines?: number;
   /**
-   * Readable mirror entries with no readable master entry (e.g. the master
-   * line is unreadable): the rebuild leaves them out of the live mirror, so
-   * they survive only in the archive. Part of the approved payload.
+   * Rebuild findings only: readable mirror entries (once per id and hash)
+   * with no readable master entry of the same id and hash in any tenant —
+   * the master line is unreadable, or the mirror's copy differs. The rebuild
+   * leaves them out of the live mirror, so they survive only in the archive.
+   * Part of the approved payload.
    */
-  mirror_only_entries?: number;
-  /** The first {@link AUDIT_MIRROR_ONLY_ID_LIMIT} of their ids. */
-  mirror_only_ids?: string[];
+  archive_only_entries?: number;
+  /** The first {@link AUDIT_ARCHIVE_ONLY_ID_LIMIT} of their ids. */
+  archive_only_ids?: string[];
 }
 
 export interface AuditMirrorReceipt {
@@ -211,6 +213,10 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
     rootDir,
   });
   const masterByTenant = masterEntriesByTenant(rootDir);
+  // Every readable master copy, any tenant: an entry readable there is not lost.
+  const masterCopies = new Set(
+    [...masterByTenant.values()].flat().map((entry) => `${entry.id}\u0000${entry.currentHash}`)
+  );
   const findings: AuditMirrorFinding[] = [];
 
   for (const slug of directories(customersRoot, rootDir)) {
@@ -230,8 +236,17 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
           entry.currentHash === masterEntries[index]?.currentHash
       );
     if (same) continue;
-    const masterIds = new Set(masterEntries.map((entry) => entry.id));
-    const mirrorOnly = mirrorEntries.filter((entry) => !masterIds.has(entry.id));
+    const rebuild = masterEntries.length > 0;
+    // A quarantine-only finding archives the whole mirror on purpose: nothing to name.
+    const archiveOnly = rebuild
+      ? [
+          ...new Set(
+            mirrorEntries
+              .map((entry) => `${entry.id}\u0000${entry.currentHash}`)
+              .filter((copy) => !masterCopies.has(copy))
+          ),
+        ].map((copy) => copy.split('\u0000')[0])
+      : [];
 
     findings.push({
       slug,
@@ -246,14 +261,12 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
           : unreadable > 0
             ? 'mirror_unreadable'
             : 'mirror_out_of_sync',
-      action: masterEntries.length === 0 ? 'quarantine' : 'quarantine_and_rebuild',
+      action: rebuild ? 'quarantine_and_rebuild' : 'quarantine',
       ...(unreadable > 0 ? { unreadable_lines: unreadable } : {}),
-      ...(mirrorOnly.length > 0
+      ...(archiveOnly.length > 0
         ? {
-            mirror_only_entries: mirrorOnly.length,
-            mirror_only_ids: mirrorOnly
-              .slice(0, AUDIT_MIRROR_ONLY_ID_LIMIT)
-              .map((entry) => entry.id),
+            archive_only_entries: archiveOnly.length,
+            archive_only_ids: archiveOnly.slice(0, AUDIT_ARCHIVE_ONLY_ID_LIMIT),
           }
         : {}),
     });
@@ -310,10 +323,13 @@ export function openAuditMirrorApproval(input: {
     };
   }
 
-  const mirrorOnly = findings.reduce((sum, finding) => sum + (finding.mirror_only_entries ?? 0), 0);
+  const archiveOnly = findings.reduce(
+    (sum, finding) => sum + (finding.archive_only_entries ?? 0),
+    0
+  );
   const mirrorOnlyNote =
-    mirrorOnly > 0
-      ? ` ${mirrorOnly} mirror entr${mirrorOnly === 1 ? 'y has' : 'ies have'} no readable master copy: the rebuild leaves ${mirrorOnly === 1 ? 'it' : 'them'} out of the live mirror and ${mirrorOnly === 1 ? 'it survives' : 'they survive'} only in the archive.`
+    archiveOnly > 0
+      ? ` ${archiveOnly} mirror entr${archiveOnly === 1 ? 'y has' : 'ies have'} no readable master copy: the rebuild leaves ${archiveOnly === 1 ? 'it' : 'them'} out of the live mirror and ${archiveOnly === 1 ? 'it survives' : 'they survive'} only in the archive.`
       : '';
   const requester = input.requester
     ? resolveApprovalRequesterInput(input.requester)

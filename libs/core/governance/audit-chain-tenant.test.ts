@@ -508,26 +508,29 @@ describe('audit-chain — tenant mirror', () => {
     ]);
   });
 
-  it('seeds a --since window past a junk line at the end of the boundary file', async () => {
+  it.each([
+    ['a torn line', '{"id":"AUD-TORN"'],
+    ['a forged record carrying a hash', `{"id":"AUD-FORGED","currentHash":"${'f'.repeat(64)}"}\n`],
+  ])('seeds a --since window past %s at the end of the boundary file', async (_label, junk) => {
     const day1 = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
-    day1.auditChain.record({
+    const first = day1.auditChain.record({
       agentId: 'agent-1',
       action: 'day-one',
       operation: 'op',
       result: 'completed',
     });
-    // A torn write leaves junk after day one's last entry (no trailing newline).
-    fs.appendFileSync(auditFile('2026-07-01'), '{"id":"AUD-TORN"');
+    fs.appendFileSync(auditFile('2026-07-01'), junk);
     const day2 = await loadFreshAuditChain(new Date('2026-07-02T10:00:00.000Z'));
-    day2.auditChain.record({
+    const second = day2.auditChain.record({
       agentId: 'agent-2',
       action: 'day-two',
       operation: 'op',
       result: 'completed',
     });
 
-    // Day two links to day one's last readable entry: the window is intact,
-    // and the junk line before it is reported, not used as the seed.
+    // The writer and the --since walk-back both seed from day one's last
+    // readable entry, never from the junk after it; the junk is reported.
+    expect(second.previousHash).toBe(first.currentHash);
     const result = day2.auditChain.verify({ since: '2026-07-02' });
     expect(result.boundaryLimited).toBe(false);
     expect(result.corrupted).toEqual(['audit-2026-07-01.jsonl:line:2:invalid_record']);
