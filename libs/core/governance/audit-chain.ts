@@ -206,8 +206,14 @@ export interface AuditVerifyResult {
  * unparseable line; the fragment stays its own invalid line for verify.
  */
 function appendRecordLine(io: AuditChainIo, filePath: string, entry: AuditEntry): void {
-  const content = io.exists(filePath) ? io.read(filePath) : '';
-  const separator = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
+  let separator = '';
+  try {
+    const content = io.exists(filePath) ? io.read(filePath) : '';
+    if (content.length > 0 && !content.endsWith('\n')) separator = '\n';
+  } catch {
+    // An unreadable tail must not cost the record: readers skip blank lines.
+    separator = '\n';
+  }
   io.append(filePath, `${separator}${JSON.stringify(entry)}\n`);
 }
 

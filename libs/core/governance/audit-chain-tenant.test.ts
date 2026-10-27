@@ -616,4 +616,31 @@ describe('audit-chain — tenant mirror', () => {
       'audit-2026-07-01.jsonl:line:2:invalid_record',
     ]);
   });
+
+  it('starts a new mirror line after a mirror tail fragment', async () => {
+    const run = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    const record = () =>
+      run.auditChain.record({
+        agentId: 'agent-1',
+        action: 'mirrored',
+        operation: 'op',
+        result: 'completed',
+        tenantSlug: 'sbiss',
+      });
+    record();
+    const mirror = path.join(
+      testRoot,
+      'customer',
+      'sbiss',
+      'logs',
+      'audit',
+      'audit-2026-07-01.jsonl'
+    );
+    fs.appendFileSync(mirror, '{"x":');
+    const second = record();
+
+    const mirrorLines = fs.readFileSync(mirror, 'utf8').trim().split('\n');
+    expect(mirrorLines).toHaveLength(3);
+    expect(JSON.parse(mirrorLines[2]).id).toBe(second.id);
+  });
 });
