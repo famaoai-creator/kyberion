@@ -136,7 +136,7 @@ template task is recorded while the work happens**. Verified end to end on 2026-
      `customer-decision status --case <c>` lists it under `frozen_locks` with the proof's
      failure reason and the repair step (an unreadable proof — `proof_unreadable:*` — is
      no evidence either way: fix the store and rerun, never restore on it). Repair: confirm the mark has no
-     approved supersede (the `SUPERSEDE_UNPROVEN` warning), restore
+     approved supersede (`proof_reason`, or the `SUPERSEDE_UNPROVEN` warning), restore
      `consumers/<consumer>.json` in the tenant's decision case from its revision before
      the mark (an operator with authority over the tenant's confidential knowledge),
      then `pnpm mission resume <MISSION_ID>`; or supersede the task properly and
