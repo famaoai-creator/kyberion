@@ -576,7 +576,7 @@ function relinkOnLock(
  * lock's owner can write: it is echoed only when it is a well-formed task of
  * the same mission (the consumer id charset), never as free text.
  */
-function frozenLockStatus(
+export function frozenLockStatus(
   lock: ConsumedDecisionLockRecord,
   reason: string,
   caseId: string
@@ -692,7 +692,7 @@ export function taskProposalStatus(
       : {}),
     ...(pending.length > 0
       ? {
-          next: `pnpm kyberion customer-decision draft --tenant ${tenant} --case ${caseId} --from-tasks --customer <slug>`,
+          next: `pnpm kyberion customer-decision draft --tenant ${tenant} --case ${caseId} --from-tasks --customer <slug>${frozen.length > 0 ? ' (proposals of a frozen lock are collected only after its repair: see frozen_locks)' : ''}`,
         }
       : {}),
   };
