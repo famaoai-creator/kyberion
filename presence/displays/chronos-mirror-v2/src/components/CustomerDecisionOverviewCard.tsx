@@ -42,6 +42,7 @@ export const CUSTOMER_DECISION_ATTENTION_LIMIT = 8;
 const REFRESH_MS = 30_000;
 
 const REASON_TONE: Record<OverviewAttentionReason, KbTone> = {
+  frozen_locks: 'danger',
   respond_by_overdue: 'danger',
   awaiting_operator_confirmation: 'danger',
   open_change_requests: 'warning',

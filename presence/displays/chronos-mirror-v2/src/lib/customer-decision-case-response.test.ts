@@ -226,6 +226,16 @@ describe('customer-decision case detail projection (CD-12 drill-down)', () => {
     expect(JSON.stringify(parsed)).not.toContain(SECRET);
   });
 
+  it('keeps a frozen task mark and rejects any other value for it', () => {
+    const value = real();
+    value.tasks[0].frozen = true;
+    expect(parseCustomerDecisionCaseDetail(value, 'acme')?.tasks[0].frozen).toBe(true);
+    value.tasks[0].frozen = false;
+    expect(parseCustomerDecisionCaseDetail(value, 'acme')).toBeUndefined();
+    delete value.tasks[0].frozen;
+    expect(parseCustomerDecisionCaseDetail(value, 'acme')?.tasks[0]).not.toHaveProperty('frozen');
+  });
+
   it('cuts an entry question to 200 characters', () => {
     const value = real();
     value.agendas[0].entries[1].question = 'q'.repeat(500);

@@ -30,7 +30,7 @@ import {
 } from './overview.js';
 import { handoffTargets, isHandoffDone, upcomingAgendaReminders, utcDate } from './reminders.js';
 import { openChangeRequests } from './respond.js';
-import type { ConsumedDecisionLockRecord } from './store.js';
+import { isConsumedDecisionLockSuperseded, type ConsumedDecisionLockRecord } from './store.js';
 
 export const CUSTOMER_DECISION_CASE_DETAIL_VERSION = '1.0.0';
 /** Entry questions are cut to this many characters (whitespace normalized). */
@@ -141,6 +141,12 @@ export interface CaseDetailTask {
   proposals: CaseDetailTaskProposal[];
   proposals_total: number;
   rework: { count: number; work_item_ids: string[] };
+  /**
+   * The lock carries a `superseded` mark the mission does not prove: the task
+   * is shown live, but no later write to its lock succeeds (see
+   * `CaseOverview.tasks.frozen_locks`).
+   */
+  frozen?: true;
 }
 
 /**
@@ -373,15 +379,33 @@ function taskDetail(lock: ConsumedDecisionLockRecord, input: CaseOverviewInput):
       count: rework.length,
       work_item_ids: rework.slice(0, CASE_DETAIL_RECORD_LIMIT).map((item) => item.work_item_id),
     },
+    // Proven supersedes were filtered out before: a mark left here is unproven.
+    ...(isConsumedDecisionLockSuperseded(lock) ? { frozen: true as const } : {}),
   };
 }
 
 /** One case in full for the drill-down views (see the file header for what is never emitted). */
 export function buildCustomerDecisionCaseDetail(
-  input: CaseOverviewInput & { tenant_slug: string }
+  source: CaseOverviewInput & { tenant_slug: string }
 ): CustomerDecisionCaseDetail {
-  const today = utcDate(input.now);
+  const today = utcDate(source.now);
   if (!today) throw new Error('[CUSTOMER_DECISION_OVERVIEW_NOW_INVALID] now is not a timestamp');
+  // One proof per lock: the counts and the task list must agree, and the
+  // facade's verifier reads the mission and approval stores.
+  const verify = source.isSuperseded;
+  const verified = new Map<ConsumedDecisionLockRecord, boolean>();
+  const input: typeof source = verify
+    ? {
+        ...source,
+        isSuperseded: (lock) => {
+          const known = verified.get(lock);
+          if (known !== undefined) return known;
+          const value = verify(lock);
+          verified.set(lock, value);
+          return value;
+        },
+      }
+    : source;
   const overview = buildCaseOverview(input);
   const { attention } = buildCustomerDecisionOverview({
     tenant_slug: input.tenant_slug,
