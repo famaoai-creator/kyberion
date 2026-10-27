@@ -46,6 +46,8 @@ const AUDIT_MIRROR_USAGE =
   'Usage: pnpm kyberion audit mirror-reconcile [--mission-id <id>] [--request-approval --requested-by <actor>] [--apply --approval-request-id <id>]';
 
 const AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
+/** Archive-only entry ids named in a finding (the count is always exact). */
+export const AUDIT_ARCHIVE_ONLY_ID_LIMIT = 20;
 
 export interface AuditMirrorFinding {
   slug: string;
@@ -58,6 +60,16 @@ export interface AuditMirrorFinding {
   action: 'quarantine' | 'quarantine_and_rebuild';
   /** Unparseable mirror lines: rebuilt from the master, never parsed. */
   unreadable_lines?: number;
+  /**
+   * Rebuild findings only: readable mirror entries (once per id and hash)
+   * with no readable master entry of the same id and hash in any tenant —
+   * the master line is unreadable, or the mirror's copy differs. The rebuild
+   * leaves them out of the live mirror, so they survive only in the archive.
+   * Part of the approved payload.
+   */
+  archive_only_entries?: number;
+  /** The first {@link AUDIT_ARCHIVE_ONLY_ID_LIMIT} of their ids. */
+  archive_only_ids?: string[];
 }
 
 export interface AuditMirrorReceipt {
@@ -183,9 +195,12 @@ function loadMasterEntries(rootDir: string): AuditEntry[] {
   ).entries;
 }
 
-function masterEntriesByTenant(rootDir = pathResolver.rootDir()): Map<string, AuditEntry[]> {
+function masterEntriesByTenant(
+  rootDir = pathResolver.rootDir(),
+  entries = loadMasterEntries(rootDir)
+): Map<string, AuditEntry[]> {
   const result = new Map<string, AuditEntry[]>();
-  for (const entry of loadMasterEntries(rootDir)) {
+  for (const entry of entries) {
     if (!entry.tenantSlug) continue;
     const entries = result.get(entry.tenantSlug) || [];
     entries.push(entry);
@@ -200,7 +215,10 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
     allowMissingLeaf: true,
     rootDir,
   });
-  const masterByTenant = masterEntriesByTenant(rootDir);
+  const master = loadMasterEntries(rootDir);
+  const masterByTenant = masterEntriesByTenant(rootDir, master);
+  // Every readable master copy, of any tenant or none: an entry readable there is not lost.
+  const masterCopies = new Set(master.map((entry) => `${entry.id}\u0000${entry.currentHash}`));
   const findings: AuditMirrorFinding[] = [];
 
   for (const slug of directories(customersRoot, rootDir)) {
@@ -220,6 +238,17 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
           entry.currentHash === masterEntries[index]?.currentHash
       );
     if (same) continue;
+    const rebuild = masterEntries.length > 0;
+    // A quarantine-only finding archives the whole mirror on purpose: nothing to name.
+    const archiveOnly = rebuild
+      ? [
+          ...new Set(
+            mirrorEntries
+              .map((entry) => `${entry.id}\u0000${entry.currentHash}`)
+              .filter((copy) => !masterCopies.has(copy))
+          ),
+        ].map((copy) => copy.split('\u0000')[0])
+      : [];
 
     findings.push({
       slug,
@@ -234,8 +263,14 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
           : unreadable > 0
             ? 'mirror_unreadable'
             : 'mirror_out_of_sync',
-      action: masterEntries.length === 0 ? 'quarantine' : 'quarantine_and_rebuild',
+      action: rebuild ? 'quarantine_and_rebuild' : 'quarantine',
       ...(unreadable > 0 ? { unreadable_lines: unreadable } : {}),
+      ...(archiveOnly.length > 0
+        ? {
+            archive_only_entries: archiveOnly.length,
+            archive_only_ids: archiveOnly.slice(0, AUDIT_ARCHIVE_ONLY_ID_LIMIT),
+          }
+        : {}),
     });
   }
 
@@ -290,6 +325,14 @@ export function openAuditMirrorApproval(input: {
     };
   }
 
+  const archiveOnly = findings.reduce(
+    (sum, finding) => sum + (finding.archive_only_entries ?? 0),
+    0
+  );
+  const mirrorOnlyNote =
+    archiveOnly > 0
+      ? ` ${archiveOnly} mirror entr${archiveOnly === 1 ? 'y has' : 'ies have'} no matching readable master copy: the rebuild leaves ${archiveOnly === 1 ? 'it' : 'them'} out of the live mirror and ${archiveOnly === 1 ? 'it survives' : 'they survive'} only in the archive.`
+      : '';
   const requester = input.requester
     ? resolveApprovalRequesterInput(input.requester)
     : { requestedBy: input.requestedBy || 'audit-mirror-controller' };
@@ -303,7 +346,7 @@ export function openAuditMirrorApproval(input: {
     kind: 'mission_gate',
     draft: {
       title: `SA-01 audit mirror reconciliation: ${missionId}`,
-      summary: 'Approve quarantine of stale stance mirrors and rebuild from the master chain.',
+      summary: `Approve quarantine of stale stance mirrors and rebuild from the master chain.${mirrorOnlyNote}`,
       details: JSON.stringify(findings, null, 2),
       severity: 'high',
     },
@@ -316,8 +359,7 @@ export function openAuditMirrorApproval(input: {
     },
     justification: {
       reason: 'SA-01 tenant audit mirrors no longer match the authoritative master chain.',
-      impactSummary:
-        'Only the existing customer/{slug}/logs/audit mirror is moved to recoverable archive; master audit records are retained.',
+      impactSummary: `Only the existing customer/{slug}/logs/audit mirror is moved to recoverable archive; master audit records are retained.${mirrorOnlyNote}`,
       requestedEffects: [AUDIT_MIRROR_EFFECT_BINDING],
     },
     risk: {
