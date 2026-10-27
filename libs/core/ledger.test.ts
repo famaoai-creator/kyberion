@@ -13,6 +13,27 @@ import {
   verifyLedgerIntegrityDetailed,
 } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
+import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
+
+/** Append an unkeyed (`sha256`) entry — what anyone can compute without the chain key. */
+function appendUnkeyedEntry(ledgerPath: string, type: string): void {
+  const lines = fs.existsSync(ledgerPath)
+    ? fs.readFileSync(ledgerPath, 'utf8').trim().split('\n').filter(Boolean)
+    : [];
+  const parent = lines.length ? String(JSON.parse(lines[lines.length - 1]).hash) : GENESIS_HASH;
+  const entry = {
+    id: `forged-${lines.length + 1}`,
+    timestamp: '2026-10-28T00:00:00.000Z',
+    type,
+    role: 'forger',
+    mission_id: 'None',
+    payload: {},
+    parent_hash: parent,
+    chain_alg: 'sha256',
+  };
+  const hash = computeLedgerEntryHash(entry, { alg: 'sha256' });
+  fs.writeFileSync(ledgerPath, [...lines, JSON.stringify({ ...entry, hash })].join('\n') + '\n');
+}
 
 // Under Vitest the ledger resolves into the vitest-live sandbox (path-resolver),
 // never the operator's real active/audit/system-ledger.jsonl.
@@ -162,6 +183,43 @@ describe('ledger core', () => {
     expect(loadForScope({ tenant_slug: 'client-c' }).map((entry) => entry.type)).toEqual([
       'PUBLIC_TENANT',
     ]);
+  });
+
+  it('flags an unkeyed entry after a keyed one as a chain downgrade', () => {
+    record('KEYED_EVENT', { data: 'keyed' });
+    appendUnkeyedEntry(LEDGER_FILE, 'REWRITTEN_TAIL');
+
+    const report = verifyLedgerIntegrityDetailed();
+    expect(report.ok).toBe(false);
+    expect(report.unkeyed).toBe(1);
+    expect(report.corrupted).toEqual(['line:2:chain_downgrade']);
+  });
+
+  it('accepts an unkeyed legacy prefix unless keyed entries are required', () => {
+    appendUnkeyedEntry(LEDGER_FILE, 'LEGACY_1');
+    appendUnkeyedEntry(LEDGER_FILE, 'LEGACY_2');
+    record('KEYED_EVENT', { data: 'keyed' });
+
+    const legacy = verifyLedgerIntegrityDetailed();
+    expect(legacy).toMatchObject({ ok: true, total: 3, unkeyed: 2, corrupted: [] });
+
+    const strict = verifyLedgerIntegrityDetailed(LEDGER_FILE, { requireKeyed: true });
+    expect(strict.ok).toBe(false);
+    expect(strict.corrupted).toEqual(['line:1:unkeyed_entry', 'line:2:unkeyed_entry']);
+  });
+
+  it('never accepts an unkeyed entry in a tenant partition', () => {
+    const partition = tenantLedgerPath('confidential', 'client-a');
+    fs.mkdirSync(path.dirname(partition), { recursive: true });
+    // A fully rewritten partition: valid sha256 links, no keyed entry at all.
+    appendUnkeyedEntry(partition, 'FORGED_1');
+    appendUnkeyedEntry(partition, 'FORGED_2');
+
+    const all = verifyAllLedgerIntegrity();
+    const tenant = all.ledgers.find((entry) => entry.tenant_slug === 'client-a');
+    expect(all.ok).toBe(false);
+    expect(tenant).toMatchObject({ ok: false, unkeyed: 2 });
+    expect(tenant?.corrupted).toEqual(['line:1:unkeyed_entry', 'line:2:unkeyed_entry']);
   });
 
   it('rejects a non-slug tenant ledger path', () => {

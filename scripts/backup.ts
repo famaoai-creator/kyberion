@@ -699,6 +699,44 @@ export function pruneBackups(
   };
 }
 
+/**
+ * The archive's manifest. Tenant archives name their runtime partitions so a
+ * restore can stage them; `chain_key_id` (never the key, D2) lets a restore
+ * verify the chains only on a host holding the same key.
+ */
+export function buildBackupManifest(
+  plan: BackupPlan,
+  options: Pick<BackupCliOptions, 'mission' | 'tenant' | 'encrypt'>,
+  context: { missionGitBundles: string[]; chainKeyId?: string; warnings: string[] }
+) {
+  return {
+    format: 'kyberion-backup-v1',
+    created_at: nowIso(),
+    scope: plan.scope,
+    mission: options.mission || null,
+    tenant: options.tenant || null,
+    encrypted: Boolean(options.encrypt),
+    includes_sensitive: plan.includesSensitive,
+    entries: plan.entries,
+    mission_git_repos: plan.missionGitRepos.map((repo, index) => ({
+      repo_relative_path: repo.repoRelativePath,
+      bundle_path: context.missionGitBundles[index] || null,
+    })),
+    ...(plan.scope === 'tenant'
+      ? {
+          tenant_runtime_partitions: plan.tenantRuntimePartitions.map((partition) => ({
+            key: partition.key,
+            path: partition.path,
+            append_only: partition.appendOnly,
+            hash_chained: partition.hashChained,
+          })),
+        }
+      : {}),
+    ...(context.chainKeyId ? { chain_key_id: context.chainKeyId } : {}),
+    warnings: context.warnings,
+  };
+}
+
 export function createBackup(options: BackupCliOptions): {
   archive: string;
   plan: BackupPlan;
@@ -733,32 +771,11 @@ export function createBackup(options: BackupCliOptions): {
     // restore verify the chains only on a host holding the same key.
     const chainKeyId = currentAuditChainKeyId();
 
-    const manifest = {
-      format: 'kyberion-backup-v1',
-      created_at: nowIso(),
-      scope: plan.scope,
-      mission: options.mission || null,
-      tenant: options.tenant || null,
-      encrypted: Boolean(options.encrypt),
-      includes_sensitive: plan.includesSensitive,
-      entries: plan.entries,
-      mission_git_repos: plan.missionGitRepos.map((repo, index) => ({
-        repo_relative_path: repo.repoRelativePath,
-        bundle_path: missionGitBundles[index] || null,
-      })),
-      ...(plan.scope === 'tenant'
-        ? {
-            tenant_runtime_partitions: plan.tenantRuntimePartitions.map((partition) => ({
-              key: partition.key,
-              path: partition.path,
-              append_only: partition.appendOnly,
-              hash_chained: partition.hashChained,
-            })),
-          }
-        : {}),
-      ...(chainKeyId ? { chain_key_id: chainKeyId } : {}),
+    const manifest = buildBackupManifest(plan, options, {
+      missionGitBundles,
+      chainKeyId,
       warnings,
-    };
+    });
     const manifestRepoPath = normalizeRepoRelative(pathResolver.rootDir(), manifestPath);
     safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
     safeWriteFile(

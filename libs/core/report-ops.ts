@@ -42,6 +42,8 @@ export interface AuditVerifyCliReport {
     total: number;
     corrupted: string[];
     missingKey: boolean;
+    /** Unkeyed (`sha256`) legacy entries: not tamper-evident without the key. */
+    unkeyed: number;
     missing?: boolean;
     /** Set for a tenant ledger partition (D9). */
     tier?: string;
@@ -66,20 +68,27 @@ export function collectAuditVerifyReport(
   input: {
     since?: string;
     ledgers?: string[];
+    /**
+     * Accept an unkeyed (`sha256`) legacy prefix. Off by default: a chain
+     * rewritten as unkeyed from genesis would otherwise verify.
+     */
+    allowLegacyUnkeyed?: boolean;
   } = {}
 ): AuditVerifyCliReport {
-  const audit = auditChain.verify({ since: input.since });
+  const requireKeyed = !input.allowLegacyUnkeyed;
+  const audit = auditChain.verify({ since: input.since, requireKeyed });
   const ledgerPaths = [GLOBAL_LEDGER_PATH, ...(input.ledgers ?? [])].filter(
     (item, index, all) => all.indexOf(item) === index
   );
   const ledgers: AuditVerifyCliReport['ledgers'] = ledgerPaths.map((ledgerPath) => {
-    const report = verifyLedgerIntegrityDetailed(ledgerPath);
+    const report = verifyLedgerIntegrityDetailed(ledgerPath, { requireKeyed });
     return {
       path: ledgerPath,
       ok: report.ok,
       total: report.total,
       corrupted: report.corrupted,
       missingKey: report.missingKey,
+      unkeyed: report.unkeyed,
       ...(safeExistsSync(ledgerPath) ? {} : { missing: true }),
     };
   });
@@ -95,6 +104,7 @@ export function collectAuditVerifyReport(
       total: tenantLedger.total,
       corrupted: tenantLedger.corrupted,
       missingKey: tenantLedger.missingKey,
+      unkeyed: tenantLedger.unkeyed,
       tier: tenantLedger.tier,
       tenant_slug: tenantLedger.tenant_slug,
     });
@@ -156,6 +166,11 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
   if (report.audit.boundaryLimited) {
     lines.push('  - since-boundary: earlier chain continuity was not checked');
   }
+  if (report.audit.unkeyed) {
+    lines.push(
+      `  - unkeyed legacy entries: ${report.audit.unkeyed} (not tamper-evident; accepted only with --allow-legacy-unkeyed)`
+    );
+  }
   if (report.audit.corrupted.length > 0) {
     lines.push(`  - findings: ${report.audit.corrupted.join(', ')}`);
   }
@@ -169,6 +184,11 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
     }
     if (ledger.missingKey) {
       lines.push('  - missing HMAC key for one or more ledger entries');
+    }
+    if (ledger.unkeyed) {
+      lines.push(
+        `  - unkeyed legacy entries: ${ledger.unkeyed} (not tamper-evident; accepted only with --allow-legacy-unkeyed)`
+      );
     }
   }
   if (report.tenantLedgersWithheld) {

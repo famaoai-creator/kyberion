@@ -534,6 +534,9 @@ export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOp
       [String(params.export_as ?? 'audit_report')]: collectAuditVerifyReport({
         since: params.since ? String(resolve(params.since)) : undefined,
         ledgers: Array.isArray(params.ledgers) ? params.ledgers.map(String) : undefined,
+        allowLegacyUnkeyed:
+          params.allow_legacy_unkeyed !== undefined &&
+          String(resolve(params.allow_legacy_unkeyed)) === 'true',
       }),
     };
   },
