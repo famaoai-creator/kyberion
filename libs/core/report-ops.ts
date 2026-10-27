@@ -68,18 +68,20 @@ export function collectAuditVerifyReport(
   input: {
     since?: string;
     ledgers?: string[];
-    /** Every unkeyed entry is a finding, not only one after a keyed entry. */
-    requireKeyed?: boolean;
+    /**
+     * Accept an unkeyed (`sha256`) legacy prefix. Off by default: a chain
+     * rewritten as unkeyed from genesis would otherwise verify.
+     */
+    allowLegacyUnkeyed?: boolean;
   } = {}
 ): AuditVerifyCliReport {
-  const audit = auditChain.verify({ since: input.since, requireKeyed: input.requireKeyed });
+  const requireKeyed = !input.allowLegacyUnkeyed;
+  const audit = auditChain.verify({ since: input.since, requireKeyed });
   const ledgerPaths = [GLOBAL_LEDGER_PATH, ...(input.ledgers ?? [])].filter(
     (item, index, all) => all.indexOf(item) === index
   );
   const ledgers: AuditVerifyCliReport['ledgers'] = ledgerPaths.map((ledgerPath) => {
-    const report = verifyLedgerIntegrityDetailed(ledgerPath, {
-      requireKeyed: input.requireKeyed,
-    });
+    const report = verifyLedgerIntegrityDetailed(ledgerPath, { requireKeyed });
     return {
       path: ledgerPath,
       ok: report.ok,
@@ -166,7 +168,7 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
   }
   if (report.audit.unkeyed) {
     lines.push(
-      `  - unkeyed legacy entries: ${report.audit.unkeyed} (not tamper-evident; --require-keyed makes them findings)`
+      `  - unkeyed legacy entries: ${report.audit.unkeyed} (not tamper-evident; accepted only with --allow-legacy-unkeyed)`
     );
   }
   if (report.audit.corrupted.length > 0) {
@@ -185,7 +187,7 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
     }
     if (ledger.unkeyed) {
       lines.push(
-        `  - unkeyed legacy entries: ${ledger.unkeyed} (not tamper-evident; --require-keyed makes them findings)`
+        `  - unkeyed legacy entries: ${ledger.unkeyed} (not tamper-evident; accepted only with --allow-legacy-unkeyed)`
       );
     }
   }
