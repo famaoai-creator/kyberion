@@ -33,6 +33,7 @@ import {
   type DecisionLedgerLocation,
 } from '@agent/core/decision-ledger';
 import {
+  CONSUMER_ID_PATTERN,
   TASK_PROPOSAL_ID_PATTERN,
   agendaContentHash,
   asCustomerDecisionConsumerOwner,
@@ -56,7 +57,10 @@ import {
   type TaskProposalLockEntry,
 } from '@agent/core/customer-decision';
 import { ScriptExitError } from '../lib/harness.js';
-import { isApprovedSupersededConsumerLock } from './superseded-locks.js';
+import {
+  consumerLockSupersedeProof,
+  isApprovedSupersededConsumerLock,
+} from './superseded-locks.js';
 import {
   agendaSummary,
   asLedgerWriter,
@@ -567,12 +571,44 @@ function relinkOnLock(
 }
 
 /**
+ * One frozen lock for `status`: ids, the proof's failure reason and the
+ * repair step. The claimed replacement task id comes from the mark, which the
+ * lock's owner can write: it is echoed only when it is a well-formed task of
+ * the same mission (the consumer id charset), never as free text.
+ */
+export function frozenLockStatus(
+  lock: ConsumedDecisionLockRecord,
+  reason: string,
+  caseId: string
+): Record<string, unknown> {
+  const mark = lock.superseded!;
+  // The task id is the tail of a well-formed consumer id: the id charset only.
+  const claimed =
+    CONSUMER_ID_PATTERN.test(mark.by_consumer) && mark.by_consumer.endsWith(`.${mark.by_task_id}`);
+  // An unreadable proof says nothing about the mark: never restore on it.
+  const next = reason.startsWith('proof_unreadable')
+    ? `the supersede proof could not be read (${reason}): fix the mission or approval store and rerun status — do not restore the lock while the proof is unread`
+    : `confirm the mission has no approved supersede of this task (proof: ${reason}), then restore consumers/${lock.consumer}.json of case ${caseId} from its revision before the mark (an operator with authority over the tenant's confidential knowledge) and run pnpm mission resume ${lock.mission_id}; or supersede the task with pnpm mission supersede-task ${lock.mission_id} ${lock.task_id} --by <new_task_id> --reason <text> --request-approval — the lock then stays frozen and listed here`;
+  return {
+    consumer: lock.consumer,
+    mission_id: lock.mission_id,
+    task_id: lock.task_id,
+    ...(claimed ? { claimed_by_task_id: mark.by_task_id } : {}),
+    approval_request_id: mark.approval_request_id,
+    proof_reason: reason,
+    next,
+  };
+}
+
+/**
  * The task proposal part of `status`: pending proposals (not on an agenda
  * yet), tasks holding on a requires_customer question, each `awaiting`,
  * `resolved` (every held question has a confirmed customer decision; resume
  * the mission to re-run the task) or `unresolvable` (re-ask it or replace
- * the task), and superseded tasks (frozen, listed apart). Ids and counts;
- * call as the ledger writer.
+ * the task), superseded tasks (frozen, listed apart) and tasks whose lock
+ * carries a `superseded` mark the mission does not prove (`frozen_locks`:
+ * still read as live, but the store guard refuses every later write to the
+ * lock). Ids and counts; call as the ledger writer.
  */
 export function taskProposalStatus(
   tenant: string,
@@ -580,12 +616,23 @@ export function taskProposalStatus(
   location: DecisionLedgerLocation,
   now: string
 ): Record<string, unknown> {
-  const all = readLocks(location);
-  // A superseded mark counts only when the mission side verified its approval.
-  const isSuperseded = (lock: ConsumedDecisionLockRecord) =>
-    isApprovedSupersededConsumerLock(tenant, lock);
-  const superseded = all.filter(isSuperseded);
-  const locks = all.filter((lock) => !isSuperseded(lock));
+  // One proof per marked lock: a superseded mark counts only when the
+  // mission side verified its approval; a mark it does not prove freezes the
+  // lock (CD-09 N3) and the lock is read as a live task.
+  const superseded: ConsumedDecisionLockRecord[] = [];
+  const locks: ConsumedDecisionLockRecord[] = [];
+  const frozen: Array<{ lock: ConsumedDecisionLockRecord; reason: string }> = [];
+  for (const lock of readLocks(location)) {
+    const mark = lock.superseded;
+    const proof = mark ? consumerLockSupersedeProof({ ...lock, superseded: mark }) : undefined;
+    if (proof?.verified === true) {
+      superseded.push(lock);
+      continue;
+    }
+    locks.push(lock);
+    if (proof && 'reason' in proof) frozen.push({ lock, reason: proof.reason });
+  }
+  const frozenConsumers = new Set(frozen.map((item) => item.lock.consumer));
   const pending = locks.flatMap((lock) =>
     pendingTaskProposals(lock).map((entry) => entry.proposal.proposal_id)
   );
@@ -600,6 +647,10 @@ export function taskProposalStatus(
       .filter((hold) => hold.unresolvable)
       .map((hold) => hold.proposal_id);
     const unresolvable = !resolved && unresolvableIds.length > 0;
+    // Resume, re-ask and release all write the lock: the guard refuses them.
+    const frozenNext = frozenConsumers.has(lock.consumer)
+      ? { next: 'the lock is frozen: repair it first (see frozen_locks)' }
+      : {};
     return {
       consumer: lock.consumer,
       mission_id: lock.mission_id,
@@ -618,6 +669,7 @@ export function taskProposalStatus(
             next: `ask again: pnpm kyberion customer-decision draft --tenant ${tenant} --case ${caseId} --from-tasks --reask ${unresolvableIds.join(',')} --customer <slug> --by user:<member>; or replace the task: pnpm mission supersede-task ${lock.mission_id} ${lock.task_id} --by <new_task_id> --reason <text> --request-approval`,
           }
         : {}),
+      ...frozenNext,
     };
   });
   return {
@@ -633,9 +685,14 @@ export function taskProposalStatus(
           })),
         }
       : {}),
+    ...(frozen.length > 0
+      ? {
+          frozen_locks: frozen.map(({ lock, reason }) => frozenLockStatus(lock, reason, caseId)),
+        }
+      : {}),
     ...(pending.length > 0
       ? {
-          next: `pnpm kyberion customer-decision draft --tenant ${tenant} --case ${caseId} --from-tasks --customer <slug>`,
+          next: `pnpm kyberion customer-decision draft --tenant ${tenant} --case ${caseId} --from-tasks --customer <slug>${frozen.length > 0 ? ' (proposals of a frozen lock are collected only after its repair: see frozen_locks)' : ''}`,
         }
       : {}),
   };
