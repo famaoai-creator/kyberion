@@ -189,6 +189,8 @@ export interface CaseTaskView {
   proposals: CaseTaskProposalView[];
   proposals_total: number;
   rework: { count: number; work_item_ids: string[] };
+  /** The lock carries an unproven superseded mark: no later write to it succeeds. */
+  frozen?: true;
 }
 
 export interface CustomerDecisionCaseDetailView {
@@ -198,7 +200,15 @@ export interface CustomerDecisionCaseDetailView {
   generated_at: string;
   today: string;
   draft_only: boolean;
-  task_counts: { pending_proposals: number; held: number; ready_to_resume: number };
+  task_counts: {
+    pending_proposals: number;
+    held: number;
+    ready_to_resume: number;
+    /** Held tasks nothing can release (re-ask or replace them). */
+    unresolvable: number;
+    /** Tasks whose lock an unproven superseded mark froze (0 from an older facade). */
+    frozen_locks: number;
+  };
   attention: OverviewAttentionItemView[];
   agendas: CaseAgendaView[];
   /** Agenda sets of the case before truncation. */
@@ -377,6 +387,8 @@ function proposal(value: unknown): CaseTaskProposalView {
 
 function task(value: unknown): CaseTaskView {
   const source = record(value);
+  if (source.frozen !== undefined && source.frozen !== true)
+    throw new InvalidCustomerDecisionValue();
   const hold = source.hold === undefined ? undefined : record(source.hold);
   const rework = record(source.rework);
   return {
@@ -406,6 +418,7 @@ function task(value: unknown): CaseTaskView {
         CASE_DETAIL_LIMITS.records
       ),
     },
+    ...(source.frozen === true ? { frozen: true as const } : {}),
   };
 }
 
@@ -438,6 +451,8 @@ export function parseCustomerDecisionCaseDetail(
         pending_proposals: count(taskCounts, 'pending_proposals'),
         held: count(taskCounts, 'held'),
         ready_to_resume: count(taskCounts, 'ready_to_resume'),
+        unresolvable: taskCounts.unresolvable === undefined ? 0 : count(taskCounts, 'unresolvable'),
+        frozen_locks: taskCounts.frozen_locks === undefined ? 0 : count(taskCounts, 'frozen_locks'),
       },
       attention: list(source.attention, parseOverviewAttentionItem, CASE_DETAIL_LIMITS.attention),
       agendas,

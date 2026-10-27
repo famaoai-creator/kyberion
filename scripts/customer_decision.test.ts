@@ -2024,6 +2024,60 @@ describe('customer-decision facade', () => {
       });
     });
 
+    it('lists a lock frozen by an unproven superseded mark, with the repair step', async () => {
+      const { markTaskDecisionLockSuperseded, recordTaskDecisionProposals } =
+        await import('@agent/core/mission/mission-decision-lock');
+      const task = { missionId: 'MSN-CD09-FROZEN', taskId: 'release' };
+      recordTaskDecisionProposals(
+        {
+          ...task,
+          requests: [
+            {
+              question: 'May we release on 11/1?',
+              item: 'RELEASE',
+              key: 'order.release',
+              requires_customer: true,
+            },
+          ],
+        },
+        { decisionCase: decisionCase(), now: NOW }
+      );
+      expect(await taskStatus()).not.toHaveProperty('frozen_locks');
+      // The lock's owner writes the mark itself, skipping the mission-side
+      // proof (the guard accepts the shape): the lock is frozen.
+      expect(
+        markTaskDecisionLockSuperseded(
+          {
+            ...task,
+            byTaskId: 'release-v2',
+            approvalRequestId: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+          },
+          { decisionCase: decisionCase(), now: NOW, verifySuperseded: () => true }
+        )
+      ).toMatchObject({ marked: true });
+      const status = (await taskStatus()) as TaskProposalStatus & {
+        frozen_locks?: Array<Record<string, unknown>>;
+        superseded?: unknown;
+      };
+      // Still read as a live, held task — and named as frozen apart.
+      expect(status.awaiting_customer.map((item) => item.consumer)).toEqual([
+        'mission-MSN-CD09-FROZEN.release',
+      ]);
+      expect(status).not.toHaveProperty('superseded');
+      expect(status.frozen_locks).toEqual([
+        {
+          consumer: 'mission-MSN-CD09-FROZEN.release',
+          mission_id: 'MSN-CD09-FROZEN',
+          task_id: 'release',
+          claimed_by_task_id: 'release-v2',
+          approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+          next: expect.stringMatching(
+            /restore consumers\/mission-MSN-CD09-FROZEN\.release\.json of case .*pnpm mission resume MSN-CD09-FROZEN.*pnpm mission supersede-task MSN-CD09-FROZEN release/u
+          ),
+        },
+      ]);
+    });
+
     it('re-asks an unresolvable question (--reask): refusals, ids-only audit, idempotent', async () => {
       const { recordTaskDecisionProposals } =
         await import('@agent/core/mission/mission-decision-lock');
