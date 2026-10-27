@@ -12,6 +12,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
+  buildBackupManifest,
   copyTree,
   parseBackupArgs,
   parseRestoredBackupManifest,
@@ -909,5 +910,100 @@ describe('restore drill dist fallback', () => {
     expect(safeReadFile(`${root}/dest/scripts/run_pipeline.js`)).toBe('run();');
     expect(safeReadFile(`${root}/dest/top.js`)).toBe('top();');
     expect(safeExistsSync(`${root}/dest/alias.js`)).toBe(false);
+  });
+});
+
+describe('backup manifest', () => {
+  const ledgerRoot = TENANT_RUNTIME_PARTITION_ROOTS.find((root) => root.family === 'ledger')!;
+  const tenantPlan = {
+    scope: 'tenant' as const,
+    includesSensitive: true,
+    entries: ['knowledge/confidential/acme', `${ledgerRoot.root}/confidential/acme`],
+    missionGitRepos: [],
+    tenantRuntimePartitions: [
+      {
+        ...ledgerRoot,
+        tier: 'confidential' as const,
+        tenant: 'acme',
+        path: `${ledgerRoot.root}/confidential/acme`,
+      },
+    ],
+    warnings: [],
+  };
+
+  it('names the tenant runtime partitions and the chain key id in a tenant archive', () => {
+    const chainKeyId = getAuditChainKeyId('backup-manifest-key');
+    const manifest = buildBackupManifest(
+      tenantPlan,
+      { tenant: 'acme', encrypt: true },
+      { missionGitBundles: [], chainKeyId, warnings: [] }
+    );
+    expect(manifest).toMatchObject({
+      scope: 'tenant',
+      tenant: 'acme',
+      encrypted: true,
+      tenant_runtime_partitions: [
+        {
+          key: ledgerRoot.key,
+          path: `${ledgerRoot.root}/confidential/acme`,
+          append_only: ledgerRoot.appendOnly,
+          hash_chained: ledgerRoot.hashChained,
+        },
+      ],
+      chain_key_id: chainKeyId,
+    });
+    // D2: the key itself never rides in the archive.
+    expect(JSON.stringify(manifest)).not.toContain('backup-manifest-key');
+    // What createBackup writes is what a restore accepts.
+    const restored = parseRestoredBackupManifest(JSON.stringify(manifest));
+    expect(restored.tenant_runtime_partitions).toEqual(manifest.tenant_runtime_partitions);
+    expect(restored.chain_key_id).toBe(chainKeyId);
+  });
+
+  it('omits the partitions outside tenant scope and the key id without a chain key', () => {
+    const manifest = buildBackupManifest(
+      {
+        ...tenantPlan,
+        scope: 'all',
+        includesSensitive: false,
+        entries: ['knowledge/public'],
+        tenantRuntimePartitions: [],
+      },
+      {},
+      { missionGitBundles: [], warnings: ['same device'] }
+    );
+    expect(manifest).not.toHaveProperty('tenant_runtime_partitions');
+    expect(manifest).not.toHaveProperty('chain_key_id');
+    expect(manifest).toMatchObject({ scope: 'all', tenant: null, warnings: ['same device'] });
+    expect(parseRestoredBackupManifest(JSON.stringify(manifest))).not.toHaveProperty(
+      'tenant_runtime_partitions'
+    );
+  });
+
+  it('pairs each mission repository with its bundle path', () => {
+    const manifest = buildBackupManifest(
+      {
+        ...tenantPlan,
+        scope: 'mission',
+        tenantRuntimePartitions: [],
+        missionGitRepos: [
+          { missionPath: '/x/a', repoRelativePath: 'active/missions/public/MSN-A' },
+          { missionPath: '/x/b', repoRelativePath: 'active/missions/public/MSN-B' },
+        ],
+      },
+      { mission: 'MSN-A' },
+      {
+        missionGitBundles: ['active/shared/tmp/backup-x/mission-git-bundles/a.bundle'],
+        warnings: [],
+      }
+    );
+    expect(manifest.mission_git_repos).toEqual([
+      {
+        repo_relative_path: 'active/missions/public/MSN-A',
+        bundle_path: 'active/shared/tmp/backup-x/mission-git-bundles/a.bundle',
+      },
+      { repo_relative_path: 'active/missions/public/MSN-B', bundle_path: null },
+    ]);
+    expect(manifest).not.toHaveProperty('tenant_runtime_partitions');
   });
 });

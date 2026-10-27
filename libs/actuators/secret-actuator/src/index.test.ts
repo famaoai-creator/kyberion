@@ -118,6 +118,7 @@ describe('secret-actuator: governed mutation', () => {
         mission_id: expect.stringContaining('MSN-SEC-'),
         service_id: 'slack',
         action: 'set',
+        changed_keys: ['test_user'],
       })
     );
   });
@@ -140,8 +141,17 @@ describe('secret-actuator: governed mutation', () => {
     expect(result.mission_id).toBeUndefined();
     expect(mocks.ledgerRecord).toHaveBeenCalledWith(
       'CONFIG_CHANGE',
-      expect.objectContaining({ mission_id: 'None', service_id: 'slack', action: 'set' })
+      expect.objectContaining({
+        mission_id: 'None',
+        service_id: 'slack',
+        action: 'set',
+        changed_key_count: 1,
+      })
     );
+    // The untenanted system ledger never receives the account name.
+    const [, recorded] = mocks.ledgerRecord.mock.calls[0];
+    expect(recorded).not.toHaveProperty('changed_keys');
+    expect(JSON.stringify(recorded)).not.toContain('test_user');
   });
 
   it('should use existing MISSION_ID and record to ledger without creating a new mission', async () => {
