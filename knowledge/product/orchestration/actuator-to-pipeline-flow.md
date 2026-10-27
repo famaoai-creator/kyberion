@@ -63,6 +63,23 @@ Rules that bite:
   `pnpm kyberion read|see|listen|watch` (see `perception-playbook.md`),
   actions in `action-playbook.md`.
 
+Recording a multi-step session (scratch → ADF draft):
+
+```bash
+pnpm playground -- --record <name> --actuator <id> --op <op> --params '{...}'  # each successful live run appends a step
+pnpm playground -- --record <name> --reset ...                                # clear the session first
+pnpm playground -- --emit-adf <name> [--name <slug>] [--out <path>]           # write a PipelineAdf draft
+pnpm pipeline:promote --input active/shared/tmp/actuator-playground/<name>.adf.json --source-is-public
+```
+
+Session files and drafts live under `active/shared/tmp/actuator-playground/`.
+Emitted steps use the ADF `domain:op` form with the Typed Flow role mapped
+from the recorded op kind; a shared `session_id` is set when browser steps
+are present; string params under sensitive-looking keys (password/secret/
+token/…) are redacted into `{{placeholders}}` declared in `parameters`.
+The draft is a starting point — review steps, selectors, and params before
+promoting (§4).
+
 ## 3. Collaborate (cowork / peer)
 
 Two systems, do not confuse:
