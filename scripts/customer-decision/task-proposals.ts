@@ -36,6 +36,7 @@ import {
   TASK_PROPOSAL_ID_PATTERN,
   agendaContentHash,
   asCustomerDecisionConsumerOwner,
+  isConsumedDecisionLockSuperseded,
   listAgendas,
   listConsumedDecisionLocks,
   newAgendaId,
@@ -571,8 +572,10 @@ function relinkOnLock(
  * yet), tasks holding on a requires_customer question, each `awaiting`,
  * `resolved` (every held question has a confirmed customer decision; resume
  * the mission to re-run the task) or `unresolvable` (re-ask it or replace
- * the task), and superseded tasks (frozen, listed apart). Ids and counts;
- * call as the ledger writer.
+ * the task), superseded tasks (frozen, listed apart) and tasks whose lock
+ * carries a `superseded` mark the mission does not prove (`frozen_locks`:
+ * still read as live, but the store guard refuses every later write to the
+ * lock). Ids and counts; call as the ledger writer.
  */
 export function taskProposalStatus(
   tenant: string,
@@ -586,6 +589,8 @@ export function taskProposalStatus(
     isApprovedSupersededConsumerLock(tenant, lock);
   const superseded = all.filter(isSuperseded);
   const locks = all.filter((lock) => !isSuperseded(lock));
+  // A mark left on a lock the mission does not prove freezes it (CD-09 N3).
+  const frozen = locks.filter(isConsumedDecisionLockSuperseded);
   const pending = locks.flatMap((lock) =>
     pendingTaskProposals(lock).map((entry) => entry.proposal.proposal_id)
   );
@@ -630,6 +635,18 @@ export function taskProposalStatus(
             mission_id: lock.mission_id,
             task_id: lock.task_id,
             by_task_id: lock.superseded!.by_task_id,
+          })),
+        }
+      : {}),
+    ...(frozen.length > 0
+      ? {
+          frozen_locks: frozen.map((lock) => ({
+            consumer: lock.consumer,
+            mission_id: lock.mission_id,
+            task_id: lock.task_id,
+            claimed_by_task_id: lock.superseded!.by_task_id,
+            approval_request_id: lock.superseded!.approval_request_id,
+            next: `the mark has no approved supersede: restore consumers/${lock.consumer}.json of case ${caseId} from its revision before the mark (an operator with authority over the tenant's confidential knowledge), then pnpm mission resume ${lock.mission_id}; or supersede the task with pnpm mission supersede-task ${lock.mission_id} ${lock.task_id} --by <new_task_id> --reason <text> --request-approval (the lock stays frozen)`,
           })),
         }
       : {}),

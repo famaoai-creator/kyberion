@@ -291,6 +291,14 @@ describe('CustomerDecisionCaseDetail (CD-12 drill-down)', () => {
     ).toBe('ready');
     expect(customerDecisionTaskState({ ...task, status: 'completed' })).toBe('completed');
   });
+
+  it('labels a frozen task frozen whatever its status', () => {
+    const [task] = detail().tasks;
+    expect(customerDecisionTaskState({ ...task, frozen: true })).toBe('frozen');
+    expect(customerDecisionTaskState({ ...task, status: 'completed', frozen: true })).toBe(
+      'frozen'
+    );
+  });
 });
 
 describe('CustomerDecisionAgendaDetail (CD-12 drill-down)', () => {

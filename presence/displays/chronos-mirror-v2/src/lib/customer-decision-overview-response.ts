@@ -39,6 +39,7 @@ export type OverviewEntryStatus = (typeof OVERVIEW_ENTRY_STATUSES)[number];
 export type OverviewStatusCounts = Record<OverviewEntryStatus, number>;
 
 export const OVERVIEW_ATTENTION_REASONS = [
+  'frozen_locks',
   'respond_by_overdue',
   'awaiting_operator_confirmation',
   'open_change_requests',
@@ -101,7 +102,15 @@ export interface AgendaOverviewView {
 export interface CaseOverviewView {
   case_id: string;
   draft_only: boolean;
-  tasks: { pending_proposals: number; held: number; ready_to_resume: number };
+  tasks: {
+    pending_proposals: number;
+    held: number;
+    ready_to_resume: number;
+    /** Held tasks nothing can release (re-ask or replace them). */
+    unresolvable: number;
+    /** Tasks whose lock an unproven superseded mark froze (0 from an older facade). */
+    frozen_locks: number;
+  };
   agendas: AgendaOverviewView[];
   /** Agenda sets of the case before truncation. */
   agendas_total: number;
@@ -123,6 +132,8 @@ export interface CustomerDecisionOverviewView {
     reminders_due: number;
     held_tasks: number;
     pending_task_proposals: number;
+    /** Tasks whose consumer lock is frozen by an unproven superseded mark. */
+    frozen_locks: number;
     /** Attention items before any cap (`--summary` caps the list at 50). */
     attention_total: number;
   };
@@ -215,6 +226,8 @@ function caseOverview(value: unknown): CaseOverviewView {
       pending_proposals: count(tasks, 'pending_proposals'),
       held: count(tasks, 'held'),
       ready_to_resume: count(tasks, 'ready_to_resume'),
+      unresolvable: tasks.unresolvable === undefined ? 0 : count(tasks, 'unresolvable'),
+      frozen_locks: tasks.frozen_locks === undefined ? 0 : count(tasks, 'frozen_locks'),
     },
     agendas: list(source.agendas, agenda, OVERVIEW_LIMITS.agendas_per_case),
     agendas_total: lengthOf(source.agendas),
@@ -251,6 +264,8 @@ export function parseCustomerDecisionOverview(
         reminders_due: count(totals, 'reminders_due'),
         held_tasks: count(totals, 'held_tasks'),
         pending_task_proposals: count(totals, 'pending_task_proposals'),
+        // Added after 1.0.0 shipped: a facade that predates it has none.
+        frozen_locks: totals.frozen_locks === undefined ? 0 : count(totals, 'frozen_locks'),
         attention_total:
           totals.attention_total === undefined
             ? lengthOf(source.attention)
