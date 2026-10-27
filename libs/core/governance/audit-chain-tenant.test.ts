@@ -482,7 +482,29 @@ describe('audit-chain — tenant mirror', () => {
     const restarted = await forgeUnkeyed(keyed, 'AUD-RESTART', '0'.repeat(64));
     fs.writeFileSync(auditFile('2026-07-02'), JSON.stringify(restarted) + '\n');
     expect(day2.auditChain.verify({ since: '2026-07-02' }).corrupted).toEqual([
-      'AUD-RESTART:chain_downgrade',
+      'AUD-RESTART:chain_downgrade+previous_hash_mismatch',
+    ]);
+  });
+
+  it('walks back past an unreadable file to the --since boundary', async () => {
+    const day1 = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    const keyed = day1.auditChain.record({
+      agentId: 'agent-1',
+      action: 'day-one',
+      operation: 'op',
+      result: 'completed',
+    });
+    // Day two emptied into junk, day three rewritten unkeyed from day one's hash.
+    fs.writeFileSync(auditFile('2026-07-02'), 'not json\n');
+    const forged = await forgeUnkeyed(keyed, 'AUD-DAY3', keyed.currentHash);
+    fs.writeFileSync(auditFile('2026-07-03'), JSON.stringify(forged) + '\n');
+
+    const result = day1.auditChain.verify({ since: '2026-07-03' });
+    expect(result.boundaryLimited).toBe(false);
+    expect(result.corrupted).toEqual([
+      'audit-2026-07-02.jsonl:line:1:invalid_record',
+      'audit-gap:2026-07-01->2026-07-03',
+      'AUD-DAY3:chain_downgrade',
     ]);
   });
 

@@ -520,7 +520,9 @@ export const verifyLedgerIntegrityDetailed = (
         ...(chainKey ? { key: chainKey } : {}),
       });
       if (algFinding) {
-        corrupted.push(`line:${index + 1}:${algFinding}`);
+        corrupted.push(
+          `line:${index + 1}:${algFinding}${check.ok ? '' : `+${check.reason ?? 'invalid'}`}`
+        );
       } else if (!check.ok) {
         if (check.reason === 'missing_audit_chain_key') missingKey = true;
         corrupted.push(

@@ -505,23 +505,28 @@ class AuditChainImpl {
     let invalidEntryCount = 0;
     const algTracker = createChainAlgTracker({ requireKeyed: options.requireKeyed });
 
-    // A --since window continues from the last entry before it: its hash is
-    // the window's expected first link and its algorithm the chain's state,
-    // so a rewritten window cannot restart unkeyed from a real boundary hash.
+    // A --since window continues from the last readable entry before it: its
+    // hash is the window's expected first link, and any keyed entry before the
+    // window marks the chain keyed, so a rewritten window cannot restart
+    // unkeyed from a real boundary hash. Files walked back over to find that
+    // entry report their unreadable lines.
     let boundaryLimited = false;
     if (options.since) {
       const before = allFiles.filter((fileName) => !inWindow(fileName));
-      const lastBefore = before.length
-        ? this.readAuditFileForVerify(path.join(this.auditDir, before[before.length - 1])).entries
-        : [];
-      const boundary = lastBefore[lastBefore.length - 1];
-      if (boundary) {
-        prevHash = boundary.currentHash;
-        algTracker.seed(boundary.chain_alg);
-        previousFileDate = this.extractAuditDate(before[before.length - 1]);
-      } else {
-        boundaryLimited = before.length > 0;
+      let boundary: AuditEntry | undefined;
+      for (let index = before.length - 1; index >= 0; index -= 1) {
+        const read = this.readAuditFileForVerify(path.join(this.auditDir, before[index]));
+        if (!boundary) {
+          corrupted.push(...this.readFindings(before[index], read));
+          boundary = read.entries[read.entries.length - 1];
+          if (boundary) previousFileDate = this.extractAuditDate(before[index]);
+        }
+        const keyed = read.entries.find((entry) => entry.chain_alg === 'hmac-sha256');
+        if (keyed) algTracker.seed(keyed.chain_alg);
+        if (boundary && keyed) break;
       }
+      if (boundary) prevHash = boundary.currentHash;
+      else boundaryLimited = before.length > 0;
     }
 
     for (const fileName of files) {
@@ -534,8 +539,7 @@ class AuditChainImpl {
 
       const read = this.readAuditFileForVerify(path.join(this.auditDir, fileName));
       // An unreadable line is a finding, never a silently dropped file.
-      for (const line of read.invalidLines)
-        corrupted.push(`${fileName}:line:${line}:invalid_record`);
+      corrupted.push(...this.readFindings(fileName, read));
       total += read.entries.length + read.invalidLines.length;
       invalidEntryCount += read.invalidLines.length;
 
@@ -551,8 +555,11 @@ class AuditChainImpl {
           alg: chainAlg,
           ...(chainKey ? { key: chainKey } : {}),
         });
-        if (algFinding) corrupted.push(`${entry.id}:${algFinding}`);
-        else if (!check.ok) corrupted.push(entry.id);
+        if (algFinding) {
+          corrupted.push(
+            `${entry.id}:${algFinding}${check.ok ? '' : `+${check.reason ?? 'invalid'}`}`
+          );
+        } else if (!check.ok) corrupted.push(entry.id);
         if (!check.ok || algFinding) invalidEntryCount++;
 
         prevHash = entry.currentHash;
@@ -724,15 +731,32 @@ class AuditChainImpl {
     return previousDate.toISOString().slice(0, 10) === current;
   }
 
+  private readFindings(
+    fileName: string,
+    read: { invalidLines: number[]; unreadable?: boolean }
+  ): string[] {
+    return [
+      ...(read.unreadable ? [`${fileName}:unreadable`] : []),
+      ...read.invalidLines.map((line) => `${fileName}:line:${line}:invalid_record`),
+    ];
+  }
+
   /** Line-by-line read for verification: unreadable lines are reported, not dropped. */
   private readAuditFileForVerify(filePath: string): {
     entries: AuditEntry[];
     invalidLines: number[];
+    unreadable?: boolean;
   } {
     const entries: AuditEntry[] = [];
     const invalidLines: number[] = [];
     if (!auditIo || !auditIo.exists(filePath)) return { entries, invalidLines };
-    const lines = auditIo.read(filePath).split('\n');
+    let content: string;
+    try {
+      content = auditIo.read(filePath);
+    } catch {
+      return { entries, invalidLines, unreadable: true };
+    }
+    const lines = content.split('\n');
     for (const [index, line] of lines.entries()) {
       if (!line.trim()) continue;
       try {
