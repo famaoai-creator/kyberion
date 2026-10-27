@@ -528,4 +528,51 @@ describe('audit-chain — tenant mirror', () => {
     expect(result).toMatchObject({ total: 3, valid: 2 });
     expect(result.corrupted).toEqual(['audit-2026-07-01.jsonl:line:3:invalid_record']);
   });
+
+  it('continues the chain from the last readable entry after a junk line', async () => {
+    const run = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    const first = run.auditChain.record({
+      agentId: 'agent-1',
+      action: 'before-junk',
+      operation: 'op',
+      result: 'completed',
+    });
+    fs.appendFileSync(auditFile('2026-07-01'), 'not json\n');
+
+    // A fresh process seeds from disk: the junk line must not hide the file.
+    const next = await loadFreshAuditChain(new Date('2026-07-01T11:00:00.000Z'));
+    const second = next.auditChain.record({
+      agentId: 'agent-1',
+      action: 'after-junk',
+      operation: 'op',
+      result: 'completed',
+    });
+
+    expect(second.previousHash).toBe(first.currentHash);
+    const result = next.auditChain.verify();
+    expect(result).toMatchObject({ total: 3, valid: 2 });
+    // Only the junk line is a finding; the chain itself does not fork.
+    expect(result.corrupted).toEqual(['audit-2026-07-01.jsonl:line:2:invalid_record']);
+  });
+
+  it('reports an unreadable tenant mirror line', async () => {
+    const run = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    run.auditChain.record({
+      agentId: 'agent-1',
+      action: 'mirrored',
+      operation: 'op',
+      result: 'completed',
+      tenantSlug: 'sbiss',
+    });
+    fs.appendFileSync(
+      path.join(testRoot, 'customer', 'sbiss', 'logs', 'audit', 'audit-2026-07-01.jsonl'),
+      'not json\n'
+    );
+
+    const mirrors = run.auditChain.verifyTenantMirrors();
+    expect(mirrors.ok).toBe(false);
+    expect(mirrors.findings).toEqual([
+      'tenant_mirror_unreadable:sbiss:audit-2026-07-01.jsonl:line:2:invalid_record',
+    ]);
+  });
 });
