@@ -1,6 +1,7 @@
 import {
   listMissionSummaries,
   buildMissionStatusView,
+  distillationDisclosure,
   type MissionSummary,
 } from '@agent/core/mission/mission-read-model';
 import { currentScope, type ScopeContext } from '@agent/core/scope-context';
@@ -43,6 +44,10 @@ export function missionDetail(id: string, i18n: I18n): DetailLine[] {
       { label: 'path', value: view.missionPath ?? '-' },
       { label: 'type', value: String(view.state.mission_type ?? '-') },
       { label: 'goal', value: String(view.state.intent?.goal_summary ?? '-') },
+      {
+        label: i18n.tr('mission:mission_distillation_label'),
+        value: i18n.tr(`mission:mission_distillation_${distillationDisclosure(view.state)}`),
+      },
     ];
     for (const event of (view.recentHistory ?? []).slice(-5)) {
       lines.push({ label: String(event.ts ?? ''), value: String(event.event ?? '') });

@@ -1,4 +1,10 @@
 import { createAjv } from '../foundation/ajv.js';
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+  resolveProviderApiCredential,
+  selectProviderCredential,
+} from '../foundation/credential-binding.js';
 import { logger } from '../core.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
 import { readTextFile } from '../foundation/text.js';
@@ -67,6 +73,8 @@ export type LocalLlmProviderPreset =
 export interface OpenAiCompatibleBackendOptions {
   baseURL: string;
   apiKey: string;
+  /** Trusted factory-selected credential names, never derived from model output. */
+  credentialKeys?: readonly string[];
   model: string;
   providerPreset?: LocalLlmProviderPreset;
   endpointPolicy?: 'local' | 'public';
@@ -558,11 +566,14 @@ function buildBackendFromEnvNames(
 ): OpenAiCompatibleBackend | null {
   const baseURL = firstConfiguredEnv(env, names.baseURL);
   if (!baseURL) return null;
-  const apiKey = firstConfiguredEnv(env, names.apiKey) || 'not-needed';
+  const apiKey =
+    selectProviderCredential(names.apiKey, firstConfiguredEnv(env, names.apiKey) ?? '') ||
+    'not-needed';
   const model = overrides.model || firstConfiguredEnv(env, names.model) || names.defaultModel;
   return new OpenAiCompatibleBackend({
     baseURL,
     apiKey,
+    credentialKeys: names.apiKey,
     model,
     providerPreset: names.providerPreset,
     endpointPolicy: names.endpointPolicy,
@@ -596,7 +607,10 @@ async function probeBackendAvailabilityFromEnvNames(
     const timer = setTimeout(() => controller.abort(), 4_000);
     try {
       const headers: Record<string, string> = {};
-      const apiKey = firstConfiguredEnv(env, names.apiKey);
+      const apiKey = selectProviderCredential(
+        names.apiKey,
+        firstConfiguredEnv(env, names.apiKey) ?? ''
+      );
       if (apiKey && apiKey !== 'not-needed') {
         headers.authorization = `Bearer ${apiKey}`;
       }
@@ -636,7 +650,14 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
   readonly providerPreset: LocalLlmProviderPreset;
   readonly supportsVision: boolean;
   private readonly baseURL: string;
-  private readonly apiKey: string;
+  private readonly operatorApiKey: string;
+  private readonly credentialKeys: readonly string[];
+  private readonly credentialOwner = credentialExecutionIdentity();
+
+  private get apiKey(): string {
+    assertCredentialOwner(this.credentialOwner);
+    return resolveProviderApiCredential(this.credentialKeys, this.operatorApiKey);
+  }
   private readonly model: string;
   private readonly timeoutMs: number;
   private readonly contextWindowTokens: number | undefined;
@@ -654,7 +675,8 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     else validateUrl(normalizedBaseURL);
     this.baseURL = normalizedBaseURL;
     this.egressEndpoint = normalizedBaseURL;
-    this.apiKey = options.apiKey;
+    this.credentialKeys = Object.freeze([...(options.credentialKeys ?? [])]);
+    this.operatorApiKey = resolveProviderApiCredential(this.credentialKeys, options.apiKey);
     this.model = options.model;
     this.timeoutMs = options.timeoutMs ?? 60_000;
     this.contextWindowTokens =

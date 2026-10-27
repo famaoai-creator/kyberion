@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { registerEmbeddingBackend, resetEmbeddingBackend } from '../embedding-backend.js';
+import * as knowledgeIndex from '../knowledge/knowledge-index.js';
 import { withExecutionContextAsync } from '../authority.js';
 import * as path from 'node:path';
 
@@ -10,6 +11,7 @@ import {
   buildTenantKnowledgeScopeSet,
   normalizeTenantKnowledgeSourcePath,
   queryTenantKnowledge,
+  queryTenantKnowledgeOutcome,
 } from './tenant-knowledge-retrieval.js';
 
 // DA-07: isolation choke point tests. The fixture plants documents with the
@@ -112,12 +114,61 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  vi.restoreAllMocks();
   if (originalDisableEmbeddings === undefined) delete process.env.KYBERION_DISABLE_EMBEDDINGS;
   else process.env.KYBERION_DISABLE_EMBEDDINGS = originalDisableEmbeddings;
   if (originalKiCacheDir === undefined) delete process.env.KYBERION_KI_CACHE_DIR;
   else process.env.KYBERION_KI_CACHE_DIR = originalKiCacheDir;
   if (safeExistsSync(fixtureRoot)) safeRmSync(fixtureRoot, { recursive: true, force: true });
   if (safeExistsSync(kiCacheDir)) safeRmSync(kiCacheDir, { recursive: true, force: true });
+});
+
+describe('retrieval outcome contract', () => {
+  const outcome = (tenantSlug: string, topic = TOPIC) =>
+    withExecutionContextAsync(
+      'worker',
+      () =>
+        queryTenantKnowledgeOutcome({
+          tenantSlug,
+          topic,
+          limit: 5,
+          rootDir: fixtureRoot,
+          env: fixtureEnv,
+        }),
+      'worker',
+      'tenant-x'
+    );
+  it('reports unavailable rather than an empty corpus on index failure', async () => {
+    vi.spyOn(knowledgeIndex, 'buildScopedIndex').mockRejectedValue(
+      new Error('private failure detail')
+    );
+    const result = await outcome('tenant-x');
+    expect(result).toEqual({
+      status: 'unavailable',
+      reason: 'retrieval_failed',
+      hits: [],
+      partial: true,
+    });
+    expect(JSON.stringify(result)).not.toContain('private failure detail');
+  });
+  it('does not reveal whether a foreign tenant exists', async () => {
+    const scan = vi.spyOn(knowledgeIndex, 'buildScopedIndex');
+    const foreign = await outcome('tenant-y');
+    expect(foreign).toEqual(await outcome('tenant-does-not-exist'));
+    expect(foreign).toEqual({
+      status: 'rejected',
+      reason: 'scope_unavailable',
+      hits: [],
+      partial: false,
+    });
+    expect(scan).not.toHaveBeenCalled();
+  });
+  it('distinguishes matched, empty and invalid queries while retaining legacy arrays', async () => {
+    expect((await outcome('tenant-x')).status).toBe('hits');
+    const empty = await outcome('tenant-x', 'unfindable_unique_nonsense_topic');
+    expect(empty.status).toBe('empty');
+    expect((await outcome('tenant-x', '')).status).toBe('rejected');
+  });
 });
 
 describe('buildTenantKnowledgeScopeSet (positive allowlist)', () => {

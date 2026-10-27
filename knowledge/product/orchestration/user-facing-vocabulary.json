@@ -3,6 +3,43 @@
   "default_locale": "en",
   "required_locales": ["en", "ja", "qps-ploc"],
   "domains": {
+    "mission": {
+      "mission_distillation_label": {
+        "en": "Knowledge extraction",
+        "ja": "学習抽出",
+        "qps-ploc": "⟦Ķñőẇŀėḓɠė ėẋŧřȧƈŧïőñ ŀőřėɱ ⟧"
+      },
+      "mission_distillation_llm": {
+        "en": "LLM extraction recorded; review is separate",
+        "ja": "LLMによる抽出を記録・レビューは別途",
+        "qps-ploc": "⟦ĿĿⱮ ėẋŧřȧƈŧïőñ řėƈőřḓėḓ; řėṽïėẇ ïş şėṗȧřȧŧė ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "mission_distillation_structural_stub": {
+        "en": "Structural extraction only (stub requested); no LLM extraction",
+        "ja": "構造的な抽出のみ（stub指定）・LLM抽出なし",
+        "qps-ploc": "⟦Şŧřůƈŧůřȧŀ ėẋŧřȧƈŧïőñ őñŀẏ (şŧůƀ řėɋůėşŧėḓ); ñő ĿĿⱮ ėẋŧřȧƈŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "mission_distillation_structural_fallback": {
+        "en": "Structural extraction only (LLM unavailable)",
+        "ja": "構造的な抽出のみ（LLM利用不可）",
+        "qps-ploc": "⟦Şŧřůƈŧůřȧŀ ėẋŧřȧƈŧïőñ őñŀẏ (ĿĿⱮ ůñȧṽȧïŀȧƀŀė) ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "mission_distillation_structural": {
+        "en": "Structural extraction only; no LLM extraction",
+        "ja": "構造的な抽出のみ・LLM抽出なし",
+        "qps-ploc": "⟦Şŧřůƈŧůřȧŀ ėẋŧřȧƈŧïőñ őñŀẏ; ñő ĿĿⱮ ėẋŧřȧƈŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "mission_distillation_unknown": {
+        "en": "Extraction method unverified",
+        "ja": "抽出方法は未確認",
+        "qps-ploc": "⟦Ėẋŧřȧƈŧïőñ ɱėŧħőḓ ůñṽėřïƒïėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "mission_distillation_not_recorded": {
+        "en": "Extraction not recorded",
+        "ja": "学習抽出の記録なし",
+        "qps-ploc": "⟦Ėẋŧřȧƈŧïőñ ñőŧ řėƈőřḓėḓ ŀőřėɱ ï⟧"
+      }
+    },
     "organization": {
       "organization_resolution_reason_incident": {
         "en": "The request contains terms associated with incident or emergency response.",
@@ -341,6 +378,76 @@
       }
     },
     "chronos": {
+      "chronos_quality_freshness_title": {
+        "en": "Verification scope and freshness",
+        "ja": "検証範囲と鮮度",
+        "qps-ploc": "⟦Ṽėřïƒïƈȧŧïőñ şƈőṗė ȧñḓ ƒřėşħñėşş ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_quality_freshness_current": {
+        "en": "The full source set recorded by the verification still matches. This does not expand its test scope.",
+        "ja": "検証に記録された全ソースの内容が一致しています。実施済みテストの範囲は変わりません。",
+        "qps-ploc": "⟦Ŧħė ƒůŀŀ şőůřƈė şėŧ řėƈőřḓėḓ ƀẏ ŧħė ṽėřïƒïƈȧŧïőñ şŧïŀŀ ɱȧŧƈħėş. Ŧħïş ḓőėş ñőŧ ėẋṗȧñḓ ïŧş ŧėşŧ şƈőṗė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "chronos_quality_freshness_partial": {
+        "en": "The targeted sources still match. The rest of the workspace is outside this verification.",
+        "ja": "限定検証の対象ソースは一致しています。それ以外の作業領域は検証対象外です。",
+        "qps-ploc": "⟦Ŧħė ŧȧřɠėŧėḓ şőůřƈėş şŧïŀŀ ɱȧŧƈħ. Ŧħė řėşŧ őƒ ŧħė ẇőřķşṗȧƈė ïş őůŧşïḓė ŧħïş ṽėřïƒïƈȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "chronos_quality_freshness_stale": {
+        "en": "Sources changed after verification. Verify the changed scope before relying on this result.",
+        "ja": "検証後にソースが変更されています。結果を利用する前に変更範囲を再検証してください。",
+        "qps-ploc": "⟦Şőůřƈėş ƈħȧñɠėḓ ȧƒŧėř ṽėřïƒïƈȧŧïőñ. Ṽėřïƒẏ ŧħė ƈħȧñɠėḓ şƈőṗė ƀėƒőřė řėŀẏïñɠ őñ ŧħïş řėşůŀŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "chronos_quality_freshness_unknown": {
+        "en": "Freshness is unknown: no readable content-bound receipt for this workspace is available.",
+        "ja": "この作業領域に対応する内容束縛の証跡を確認できないため、鮮度は不明です。",
+        "qps-ploc": "⟦Ƒřėşħñėşş ïş ůñķñőẇñ: ñő řėȧḓȧƀŀė ƈőñŧėñŧ-ƀőůñḓ řėƈėïṗŧ ƒőř ŧħïş ẇőřķşṗȧƈė ïş ȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "chronos_cost_known_subtotal": {
+        "en": "Recorded incremental cost",
+        "ja": "記録済みの追加費用",
+        "qps-ploc": "⟦Řėƈőřḓėḓ ïñƈřėɱėñŧȧŀ ƈőşŧ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_cost_unknown": {
+        "en": "Cost unavailable",
+        "ja": "費用不明",
+        "qps-ploc": "⟦Ƈőşŧ ůñȧṽȧïŀȧƀŀė ŀőřėɱ⟧"
+      },
+      "chronos_cost_included": {
+        "en": "Subscription-included",
+        "ja": "契約内",
+        "qps-ploc": "⟦Şůƀşƈřïṗŧïőñ-ïñƈŀůḓėḓ ŀőřėɱ ⟧"
+      },
+      "chronos_cost_reference": {
+        "en": "API-equivalent reference estimate",
+        "ja": "API相当の参考見積額",
+        "qps-ploc": "⟦ȦṖÏ-ėɋůïṽȧŀėñŧ řėƒėřėñƈė ėşŧïɱȧŧė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_cost_reference_hint": {
+        "en": "Reference estimate only, not a provider bill or an additional charge.",
+        "ja": "参考見積額です。請求額や追加料金ではありません。",
+        "qps-ploc": "⟦Řėƒėřėñƈė ėşŧïɱȧŧė őñŀẏ, ñőŧ ȧ ṗřőṽïḓėř ƀïŀŀ őř ȧñ ȧḓḓïŧïőñȧŀ ƈħȧřɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "chronos_cost_incomplete": {
+        "en": "Partial cost: {count} call(s) have no amount. This is not a verified total.",
+        "ja": "費用不明の呼び出しが {count} 件あります。確認済みの総額ではありません。",
+        "qps-ploc": "⟦Ṗȧřŧïȧŀ ƈőşŧ: {count} ƈȧŀŀ(ş) ħȧṽė ñő ȧɱőůñŧ. Ŧħïş ïş ñőŧ ȧ ṽėřïƒïėḓ ŧőŧȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "chronos_cost_included_hint": {
+        "en": "{count} call(s) are subscription-included. Fixed subscription fees are not counted here.",
+        "ja": "契約内の呼び出しが {count} 件あります。契約の固定料金はこの集計に含みません。",
+        "qps-ploc": "⟦{count} ƈȧŀŀ(ş) ȧřė şůƀşƈřïṗŧïőñ-ïñƈŀůḓėḓ. Ƒïẋėḓ şůƀşƈřïṗŧïőñ ƒėėş ȧřė ñőŧ ƈőůñŧėḓ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "chronos_cost_coverage_unavailable": {
+        "en": "Cost coverage has not been reported.",
+        "ja": "費用の確認状況が報告されていません。",
+        "qps-ploc": "⟦Ƈőşŧ ƈőṽėřȧɠė ħȧş ñőŧ ƀėėñ řėṗőřŧėḓ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "chronos_cost_budget_unknown": {
+        "en": "Remaining budget cannot be confirmed while costs are incomplete.",
+        "ja": "費用が不明なため、予算残額は確認できません。",
+        "qps-ploc": "⟦Řėɱȧïñïñɠ ƀůḓɠėŧ ƈȧññőŧ ƀė ƈőñƒïřɱėḓ ẇħïŀė ƈőşŧş ȧřė ïñƈőɱṗŀėŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
       "chronos_dashboard_title": {
         "en": "Organization dashboard",
         "ja": "組織ダッシュボード",
@@ -8205,6 +8312,21 @@
         "en": "Select a deliverable.",
         "ja": "成果物を選択してください",
         "qps-ploc": "⟦Şėŀėƈŧ ȧ ḓėŀïṽėřȧƀŀė. ŀőřėɱ ⟧"
+      },
+      "chronos_learning_saved_preview": {
+        "en": "Saved proposal for review",
+        "ja": "確認対象の保存済み提案",
+        "qps-ploc": "⟦Şȧṽėḓ ṗřőṗőşȧŀ ƒőř řėṽïėẇ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_learning_payload_digest": {
+        "en": "Review payload SHA-256",
+        "ja": "確認対象の SHA-256",
+        "qps-ploc": "⟦Řėṽïėẇ ṗȧẏŀőȧḓ ŞĦȦ-256 ŀőřėɱ ï⟧"
+      },
+      "chronos_learning_pending_not_published": {
+        "en": "This proposal is awaiting human review and has not been published.",
+        "ja": "この提案は人間による確認待ちです。まだ知識として公開されていません。",
+        "qps-ploc": "⟦Ŧħïş ṗřőṗőşȧŀ ïş ȧẇȧïŧïñɠ ħůɱȧñ řėṽïėẇ ȧñḓ ħȧş ñőŧ ƀėėñ ṗůƀŀïşħėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
       }
     },
     "cli": {
@@ -12926,6 +13048,51 @@
       }
     },
     "concierge": {
+      "setup.oauth_operation_title": {
+        "en": "Connection progress",
+        "ja": "接続の進捗",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ ṗřőɠřėşş ŀőřėɱ ⟧"
+      },
+      "setup.oauth_operation_waiting": {
+        "en": "Waiting for consent in the provider tab",
+        "ja": "プロバイダのタブで同意待ち",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ƈőñşėñŧ ïñ ŧħė ṗřőṽïḓėř ŧȧƀ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "setup.oauth_operation_confirming": {
+        "en": "Confirming the authorization",
+        "ja": "認可を確認中",
+        "qps-ploc": "⟦Ƈőñƒïřɱïñɠ ŧħė ȧůŧħőřïẑȧŧïőñ ŀőřėɱ ïṗş⟧"
+      },
+      "setup.oauth_operation_connected": {
+        "en": "Connected; the callback saved the credentials",
+        "ja": "接続済み：callback で認証情報を保存しました",
+        "qps-ploc": "⟦Ƈőññėƈŧėḓ; ŧħė ƈȧŀŀƀȧƈķ şȧṽėḓ ŧħė ƈřėḓėñŧïȧŀş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "setup.oauth_operation_failed": {
+        "en": "Connection did not complete. Start again when ready.",
+        "ja": "接続を完了できませんでした。必要なときに再度開始してください。",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ ḓïḓ ñőŧ ƈőɱṗŀėŧė. Şŧȧřŧ ȧɠȧïñ ẇħėñ řėȧḓẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "setup.oauth_operation_expired": {
+        "en": "This authorization attempt expired.",
+        "ja": "この認可操作の期限が切れました。",
+        "qps-ploc": "⟦Ŧħïş ȧůŧħőřïẑȧŧïőñ ȧŧŧėɱṗŧ ėẋṗïřėḓ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "setup.oauth_operation_unavailable": {
+        "en": "Progress is unavailable; completion has not been confirmed.",
+        "ja": "進捗を取得できません。完了は確認できていません。",
+        "qps-ploc": "⟦Ṗřőɠřėşş ïş ůñȧṽȧïŀȧƀŀė; ƈőɱṗŀėŧïőñ ħȧş ñőŧ ƀėėñ ƈőñƒïřɱėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "setup.oauth_operation_dismiss_hint": {
+        "en": "Closing this card does not cancel consent. Your unsaved settings are kept.",
+        "ja": "この表示を閉じても同意操作は取り消しません。未保存の設定は保持されます。",
+        "qps-ploc": "⟦Ƈŀőşïñɠ ŧħïş ƈȧřḓ ḓőėş ñőŧ ƈȧñƈėŀ ƈőñşėñŧ. Ẏőůř ůñşȧṽėḓ şėŧŧïñɠş ȧřė ķėṗŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "setup.oauth_operation_dismiss": {
+        "en": "Close progress",
+        "ja": "進捗表示を閉じる",
+        "qps-ploc": "⟦Ƈŀőşė ṗřőɠřėşş ŀőřė⟧"
+      },
       "people.member_reload": {
         "en": "Reload the people list to confirm the current owner and access scope before saving.",
         "ja": "人の一覧を再取得して、現在の所有者と操作できる範囲を確認してから保存してください。",
@@ -17777,9 +17944,9 @@
         "qps-ploc": "⟦Şėřṽïƈė ƈȧŧȧŀőɠ ŀőřė⟧"
       },
       "services.catalog_hint": {
-        "en": "Each service connects via its setup command; secrets go through Secret Guard.",
-        "ja": "各サービスはセットアップコマンドで接続します。秘密情報は Secret Guard 経由です。",
-        "qps-ploc": "⟦Ėȧƈħ şėřṽïƈė ƈőññėƈŧş ṽïȧ ïŧş şėŧůṗ ƈőɱɱȧñḓ; şėƈřėŧş ɠő ŧħřőůɠħ Şėƈřėŧ Ɠůȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+        "en": "Find a service and its connection method. This catalog shows available integrations, not verified accounts.",
+        "ja": "サービスと接続方法を探せます。この一覧は対応サービスを示しており、接続確認の結果ではありません。",
+        "qps-ploc": "⟦Ƒïñḓ ȧ şėřṽïƈė ȧñḓ ïŧş ƈőññėƈŧïőñ ɱėŧħőḓ. Ŧħïş ƈȧŧȧŀőɠ şħőẇş ȧṽȧïŀȧƀŀė ïñŧėɠřȧŧïőñş, ñőŧ ṽėřïƒïėḓ ȧƈƈőůñŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
       },
       "services.catalog_empty": {
         "en": "No services are registered in the catalog.",
@@ -17830,6 +17997,81 @@
         "en": "Forbid",
         "ja": "禁止",
         "qps-ploc": "⟦Ƒőřƀïḓ ŀőř⟧"
+      },
+      "services.search": {
+        "en": "Search services",
+        "ja": "サービスを検索",
+        "qps-ploc": "⟦Şėȧřƈħ şėřṽïƈėş ŀőřė⟧"
+      },
+      "services.auth_filter": {
+        "en": "Connection method",
+        "ja": "接続方法",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ ɱėŧħőḓ ŀőřėɱ⟧"
+      },
+      "services.filter_all": {
+        "en": "All methods",
+        "ja": "すべて",
+        "qps-ploc": "⟦Ȧŀŀ ɱėŧħőḓş ŀőř⟧"
+      },
+      "services.filter_oauth": {
+        "en": "Browser sign-in available",
+        "ja": "ブラウザーで認証できる",
+        "qps-ploc": "⟦Ƀřőẇşėř şïɠñ-ïñ ȧṽȧïŀȧƀŀė ŀőřėɱ ïṗ⟧"
+      },
+      "services.filter_other": {
+        "en": "Other setup methods",
+        "ja": "その他の設定方法",
+        "qps-ploc": "⟦Őŧħėř şėŧůṗ ɱėŧħőḓş ŀőřėɱ ⟧"
+      },
+      "services.catalog_loading": {
+        "en": "Loading available services…",
+        "ja": "利用可能なサービスを読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ȧṽȧïŀȧƀŀė şėřṽïƈėş… ŀőřėɱ ïṗ⟧"
+      },
+      "services.catalog_failed": {
+        "en": "Could not load the service catalog. Try again.",
+        "ja": "サービス一覧を読み込めませんでした。再読み込みしてください。",
+        "qps-ploc": "⟦Ƈőůŀḓ ñőŧ ŀőȧḓ ŧħė şėřṽïƈė ƈȧŧȧŀőɠ. Ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "services.retry": {
+        "en": "Try again",
+        "ja": "再読み込み",
+        "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
+      },
+      "services.result_count": {
+        "en": "{count} of {total} services",
+        "ja": "{total} 件中 {count} 件のサービス",
+        "qps-ploc": "⟦{count} őƒ {total} şėřṽïƈėş ŀőřėɱ ïṗ⟧"
+      },
+      "services.no_matches": {
+        "en": "No services match. Change the search or connection method.",
+        "ja": "一致するサービスがありません。検索語または接続方法を変えてください。",
+        "qps-ploc": "⟦Ñő şėřṽïƈėş ɱȧŧƈħ. Ƈħȧñɠė ŧħė şėȧřƈħ őř ƈőññėƈŧïőñ ɱėŧħőḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "services.manual_setup": {
+        "en": "Setup required",
+        "ja": "設定が必要",
+        "qps-ploc": "⟦Şėŧůṗ řėɋůïřėḓ ŀőřė⟧"
+      },
+      "services.oauth_next": {
+        "en": "Use Connect for services listed above, or open the setup guide. Sign-in starts only when you choose it.",
+        "ja": "上の一覧にあるサービスは接続ボタン、それ以外は設定手順を使います。認証は操作を選んだときに始まります。",
+        "qps-ploc": "⟦Ůşė Ƈőññėƈŧ ƒőř şėřṽïƈėş ŀïşŧėḓ ȧƀőṽė, őř őṗėñ ŧħė şėŧůṗ ɠůïḓė. Şïɠñ-ïñ şŧȧřŧş őñŀẏ ẇħėñ ẏőů ƈħőőşė ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧė⟧"
+      },
+      "services.manual_next": {
+        "en": "Open the setup guide to see how to connect this service.",
+        "ja": "設定手順で、このサービスの接続方法を確認できます。",
+        "qps-ploc": "⟦Őṗėñ ŧħė şėŧůṗ ɠůïḓė ŧő şėė ħőẇ ŧő ƈőññėƈŧ ŧħïş şėřṽïƈė. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "services.setup_details": {
+        "en": "Setup guide",
+        "ja": "設定手順",
+        "qps-ploc": "⟦Şėŧůṗ ɠůïḓė ŀőř⟧"
+      },
+      "services.connection_details": {
+        "en": "Connection details",
+        "ja": "接続の詳細",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ ḓėŧȧïŀş ŀőřėɱ⟧"
       }
     },
     "onboarding": {
@@ -23215,6 +23457,76 @@
       }
     },
     "tui": {
+      "tui_read_status": {
+        "en": "Read coverage",
+        "ja": "読み取り範囲",
+        "qps-ploc": "⟦Řėȧḓ ƈőṽėřȧɠė ŀőřė⟧"
+      },
+      "tui_read_unavailable": {
+        "en": "Trace history could not be read. This is not an empty history. Refresh to retry.",
+        "ja": "trace 履歴を読み取れません。履歴なしとは異なります。更新で再試行できます。",
+        "qps-ploc": "⟦Ŧřȧƈė ħïşŧőřẏ ƈőůŀḓ ñőŧ ƀė řėȧḓ. Ŧħïş ïş ñőŧ ȧñ ėɱṗŧẏ ħïşŧőřẏ. Řėƒřėşħ ŧő řėŧřẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "tui_read_missing": {
+        "en": "No trace file exists for today.",
+        "ja": "本日の trace ファイルはまだありません。",
+        "qps-ploc": "⟦Ñő ŧřȧƈė ƒïŀė ėẋïşŧş ƒőř ŧőḓȧẏ. ŀőřėɱ ïṗşů⟧"
+      },
+      "tui_read_bounded": {
+        "en": "Recent records only; at least {omitted} older lines omitted.",
+        "ja": "直近の記録のみ表示しています。少なくとも過去 {omitted} 行を省略しています。",
+        "qps-ploc": "⟦Řėƈėñŧ řėƈőřḓş őñŀẏ; ȧŧ ŀėȧşŧ {omitted} őŀḓėř ŀïñėş őɱïŧŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "tui_read_skipped": {
+        "en": "{count} incomplete or invalid records were skipped.",
+        "ja": "未完または不正な記録 {count} 件を除外しました。",
+        "qps-ploc": "⟦{count} ïñƈőɱṗŀėŧė őř ïñṽȧŀïḓ řėƈőřḓş ẇėřė şķïṗṗėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "tui_read_previous": {
+        "en": "Previous data; refresh failed",
+        "ja": "前回のデータ：更新に失敗",
+        "qps-ploc": "⟦Ṗřėṽïőůş ḓȧŧȧ; řėƒřėşħ ƒȧïŀėḓ ŀőřėɱ ïṗş⟧"
+      },
+      "tui_approval_review": {
+        "en": "Review approval",
+        "ja": "承認内容の確認",
+        "qps-ploc": "⟦Řėṽïėẇ ȧṗṗřőṽȧŀ ŀőřė⟧"
+      },
+      "tui_approval_expires": {
+        "en": "Expires",
+        "ja": "期限",
+        "qps-ploc": "⟦Ėẋṗïřėş ŀőř⟧"
+      },
+      "tui_approval_reason": {
+        "en": "Reason",
+        "ja": "理由",
+        "qps-ploc": "⟦Řėȧşőñ ŀőř⟧"
+      },
+      "tui_approval_review_hint": {
+        "en": "Review in Concierge. This view grants no approval.",
+        "ja": "Concierge で内容を確認してください。この表示で承認は行いません。",
+        "qps-ploc": "⟦Řėṽïėẇ ïñ Ƈőñƈïėřɠė. Ŧħïş ṽïėẇ ɠřȧñŧş ñő ȧṗṗřőṽȧŀ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "tui_schedule_incidents": {
+        "en": "Recurring job incidents",
+        "ja": "定期ジョブの原因別履歴",
+        "qps-ploc": "⟦Řėƈůřřïñɠ ĵőƀ ïñƈïḓėñŧş ŀőřėɱ ï⟧"
+      },
+      "tui_incident_superseded": {
+        "en": "Replaced by a different cause",
+        "ja": "原因変更により置換",
+        "qps-ploc": "⟦Řėṗŀȧƈėḓ ƀẏ ȧ ḓïƒƒėřėñŧ ƈȧůşė ŀőřėɱ ïṗş⟧"
+      },
+      "tui_incident_recovered": {
+        "en": "Recovered after a successful run",
+        "ja": "成功実行により復旧",
+        "qps-ploc": "⟦Řėƈőṽėřėḓ ȧƒŧėř ȧ şůƈƈėşşƒůŀ řůñ ŀőřėɱ ïṗşů⟧"
+      },
+      "tui_incident_ack_hint": {
+        "en": "Acknowledge this cause for 24h: :incident ack {id} {signature} {episode}",
+        "ja": "この原因を24時間確認済みにする：:incident ack {id} {signature} {episode}",
+        "qps-ploc": "⟦Ȧƈķñőẇŀėḓɠė ŧħïş ƈȧůşė ƒőř 24ħ: :ïñƈïḓėñŧ ȧƈķ {id} {signature} {episode} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
       "tui_cockpit_title": {
         "en": "Operator Cockpit",
         "ja": "オペレーター・コックピット",
@@ -23551,9 +23863,9 @@
         "qps-ploc": "⟦Ķėẏƀőȧřḓ Şħőřŧƈůŧş ŀőřėɱ⟧"
       },
       "tui_help_hint": {
-        "en": "? help · q quit",
-        "ja": "? ヘルプ · q 終了",
-        "qps-ploc": "⟦? ħėŀṗ · ɋ ɋůïŧ ŀőřė⟧"
+        "en": "Ctrl+P commands · ? help · q quit",
+        "ja": "Ctrl+P コマンド · ? ヘルプ · q 終了",
+        "qps-ploc": "⟦Ƈŧřŀ+Ṗ ƈőɱɱȧñḓş · ? ħėŀṗ · ɋ ɋůïŧ ŀőřėɱ ïṗşůɱ⟧"
       },
       "tui_loading": {
         "en": "Loading…",
@@ -24029,6 +24341,41 @@
         "en": "Change via {command}",
         "ja": "変更は {command} で",
         "qps-ploc": "⟦Ƈħȧñɠė ṽïȧ {command} ŀőřėɱ ⟧"
+      },
+      "tui_palette_search": {
+        "en": "Search panels and actions…",
+        "ja": "パネルや操作を検索…",
+        "qps-ploc": "⟦Şėȧřƈħ ṗȧñėŀş ȧñḓ ȧƈŧïőñş… ŀőřėɱ ïṗ⟧"
+      },
+      "tui_palette_navigation": {
+        "en": "Panels",
+        "ja": "パネル",
+        "qps-ploc": "⟦Ṗȧñėŀş ŀőř⟧"
+      },
+      "tui_palette_actions": {
+        "en": "Actions",
+        "ja": "操作",
+        "qps-ploc": "⟦Ȧƈŧïőñş ŀőř⟧"
+      },
+      "tui_palette_hint": {
+        "en": "↑/↓ select · Enter open · Esc return to draft",
+        "ja": "↑/↓ 選択 · Enter 開く · Esc 下書きへ戻る",
+        "qps-ploc": "⟦↑/↓ şėŀėƈŧ · Ėñŧėř őṗėñ · Ėşƈ řėŧůřñ ŧő ḓřȧƒŧ ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "tui_connections": {
+        "en": "Service connections",
+        "ja": "サービス接続",
+        "qps-ploc": "⟦Şėřṽïƈė ƈőññėƈŧïőñş ŀőřėɱ ⟧"
+      },
+      "tui_connections_hint": {
+        "en": "Manage accounts and credentials in Concierge settings. No connection check has run here.",
+        "ja": "アカウントや認証情報は Concierge の設定で管理します。この画面では接続確認を行っていません。",
+        "qps-ploc": "⟦Ɱȧñȧɠė ȧƈƈőůñŧş ȧñḓ ƈřėḓėñŧïȧŀş ïñ Ƈőñƈïėřɠė şėŧŧïñɠş. Ñő ƈőññėƈŧïőñ ƈħėƈķ ħȧş řůñ ħėřė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "tui_input_draft_busy": {
+        "en": "Reply in progress. Your draft is kept; send it after the reply.",
+        "ja": "応答生成中です。下書きは保持され、応答後に送信できます。",
+        "qps-ploc": "⟦Řėṗŀẏ ïñ ṗřőɠřėşş. Ẏőůř ḓřȧƒŧ ïş ķėṗŧ; şėñḓ ïŧ ȧƒŧėř ŧħė řėṗŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       }
     },
     "surface": {
@@ -33771,6 +34118,11 @@
       }
     },
     "mission_ops": {
+      "retro_cost_unknown": {
+        "en": "Costs are unavailable for {count} usage entry(ies). Recorded dollar amounts are a partial subtotal, not verified total spend.",
+        "ja": "費用が不明な使用量記録が {count} 件あります。記録済みの金額は一部の小計であり、確認済みの総額ではありません。",
+        "qps-ploc": "⟦Ƈőşŧş ȧřė ůñȧṽȧïŀȧƀŀė ƒőř {count} ůşȧɠė ėñŧřẏ(ïėş). Řėƈőřḓėḓ ḓőŀŀȧř ȧɱőůñŧş ȧřė ȧ ṗȧřŧïȧŀ şůƀŧőŧȧŀ, ñőŧ ṽėřïƒïėḓ ŧőŧȧŀ şṗėñḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗ⟧"
+      },
       "hygiene_rec_design_missing": {
         "en": "Tasks not expanded yet. To continue, start from process design: pnpm mission-controller start <ID> / otherwise: pnpm mission-controller cancel <ID>",
         "ja": "タスク未展開。続けるなら process 設計から: pnpm mission-controller start <ID> / 不要なら: pnpm mission-controller cancel <ID>",

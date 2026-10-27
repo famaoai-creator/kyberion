@@ -14,6 +14,7 @@ import type { OrganizationWorkLoopSummary } from '../workforce/work-design.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { physicalScopedPath, assertPhysicalScopeSegment } from '../physical-namespace.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import * as path from 'node:path';
 
 export interface DistillCandidateRecord {
@@ -225,25 +226,58 @@ export function updateDistillCandidateRecord(
   patch: Partial<Omit<DistillCandidateRecord, 'candidate_id' | 'created_at'>>,
   scope?: MemoryScopeEnvelope
 ): DistillCandidateRecord | null {
-  const current = loadDistillCandidateRecord(candidateId, scope);
-  if (!current) return null;
-  if (
-    Object.hasOwn(patch, 'scope') &&
-    (!patch.scope ||
-      JSON.stringify(assertMemoryScope(patch.scope)) !==
-        JSON.stringify(current.scope ? assertMemoryScope(current.scope) : null))
-  )
-    throw new Error('[DISTILL_SCOPE_MISMATCH] Scope cannot change during update');
-  const next: DistillCandidateRecord = {
-    ...current,
-    ...patch,
-    ...(current.scope ? { scope: current.scope } : {}),
-    candidate_id: current.candidate_id,
-    created_at: current.created_at,
-    updated_at: nowIso(),
-  };
-  saveDistillCandidateRecord(next);
-  return next;
+  return mutateDistillCandidateRecord(candidateId, () => patch, scope);
+}
+
+/** Serialize a candidate mutation with references created in other governed stores. */
+export function withDistillCandidateRecordLock<T>(
+  candidateId: string,
+  action: () => T,
+  scope?: MemoryScopeEnvelope
+): T {
+  const key = createHash('sha256')
+    .update(distillCandidateRecordPath(candidateId, scope))
+    .digest('hex');
+  return withLockSync(`distill-candidate:${key}`, action);
+}
+
+/** Conditional read/modify/write under the exact candidate's storage lock.
+ * The callback must not acquire the same candidate lock recursively.
+ */
+export function mutateDistillCandidateRecord(
+  candidateId: string,
+  mutate: (
+    current: DistillCandidateRecord
+  ) => Partial<Omit<DistillCandidateRecord, 'candidate_id' | 'created_at'>> | null,
+  scope?: MemoryScopeEnvelope
+): DistillCandidateRecord | null {
+  return withDistillCandidateRecordLock(
+    candidateId,
+    () => {
+      const current = loadDistillCandidateRecord(candidateId, scope);
+      if (!current) return null;
+      const patch = mutate(structuredClone(current));
+      if (!patch) return current;
+      if (
+        Object.hasOwn(patch, 'scope') &&
+        (!patch.scope ||
+          JSON.stringify(assertMemoryScope(patch.scope)) !==
+            JSON.stringify(current.scope ? assertMemoryScope(current.scope) : null))
+      )
+        throw new Error('[DISTILL_SCOPE_MISMATCH] Scope cannot change during update');
+      const next: DistillCandidateRecord = {
+        ...current,
+        ...patch,
+        ...(current.scope ? { scope: current.scope } : {}),
+        candidate_id: current.candidate_id,
+        created_at: current.created_at,
+        updated_at: nowIso(),
+      };
+      saveDistillCandidateRecord(next);
+      return next;
+    },
+    scope
+  );
 }
 
 /** Explicit bounded discovery, separate from the legacy global reader.

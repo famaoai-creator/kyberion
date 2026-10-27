@@ -46,7 +46,7 @@ import {
 } from '../workforce/artifact-store-reader.js';
 // Type only: the artifact-store writer module must stay out of this module's
 // runtime graph (the read path below is imported by light readers).
-import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
+import type { ApprovalStoreRole } from './approval-store-role.js';
 import {
   approvalEventLogicalPath,
   approvalPasskeyChallengesLogicalDir,
@@ -316,7 +316,7 @@ function assertCallerChannelWrite(
   access: 'write' | 'mkdir',
   partition: ApprovalTenantPartition,
   logicalPath: string,
-  role: GovernedArtifactRole
+  role: ApprovalStoreRole
 ): void {
   const live = liveSystemPathFor(partition, logicalPath);
   const decision = withExecutionContext(role, () => validateWritePermission(live, access));
@@ -334,7 +334,7 @@ function assertCallerChannelWrite(
  * the tenant-bound store role.
  */
 function asPartitionWriter<T>(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   partition: ApprovalPartition,
   logicalPath: string,
   access: 'write' | 'mkdir',
@@ -377,7 +377,7 @@ export function listApprovalDirAt(partition: ApprovalPartition, logicalDir: stri
 
 /** Create a directory in a location. */
 export function ensureApprovalDirAt(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   partition: ApprovalPartition,
   logicalDir: string
 ): string {
@@ -390,7 +390,7 @@ export function ensureApprovalDirAt(
 
 /** Write a JSON file in a location; `fsync` flushes it before returning. */
 export function writeApprovalJsonAt(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   partition: ApprovalPartition,
   logicalPath: string,
   value: unknown,
@@ -406,7 +406,7 @@ export function writeApprovalJsonAt(
 
 /** Append one JSON line in a location. */
 export function appendApprovalJsonlAt(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   partition: ApprovalPartition,
   logicalPath: string,
   value: unknown
@@ -425,7 +425,7 @@ export function appendApprovalJsonlAt(
  * tree. A tenant this process may not bind reports false.
  */
 export function approvalFileExistsAt(
-  role: GovernedArtifactRole | undefined,
+  role: ApprovalStoreRole | undefined,
   partition: ApprovalPartition,
   logicalPath: string
 ): boolean {
@@ -442,7 +442,7 @@ export function approvalFileExistsAt(
  * Absent files are a no-op; returns whether a file was removed.
  */
 export function removeApprovalFileAt(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   partition: ApprovalPartition,
   logicalPath: string
 ): boolean {
@@ -461,7 +461,7 @@ export function removeApprovalFileAt(
  * {@link approvalFileExistsAt} (tenant binding, then the store role).
  */
 export function readApprovalJsonlAt<T = Record<string, unknown>>(
-  role: GovernedArtifactRole | undefined,
+  role: ApprovalStoreRole | undefined,
   partition: ApprovalPartition,
   logicalPath: string
 ): T[] {
@@ -639,7 +639,7 @@ export function assertApprovalLocationAgrees(
 
 /** Write an updated record back to where it was found (after the agreement check). */
 export function writeLocatedApprovalRequest(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   located: Pick<LocatedApprovalRequest, 'partition' | 'storageChannel'>,
   updated: ApprovalRequestRecord,
   options: { fsync?: boolean } = {}
@@ -656,7 +656,7 @@ export function writeLocatedApprovalRequest(
 
 /** Append an event line to the event log of the location a record lives in. */
 export function appendLocatedApprovalEvent(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   located: Pick<LocatedApprovalRequest, 'partition' | 'storageChannel'>,
   event: Record<string, unknown>
 ): string {

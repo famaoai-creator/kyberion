@@ -6,7 +6,6 @@ import { getServicePresetRecord } from './service/service-preset-registry.js';
 import { assertAuthConfigMutationSource } from './cloudflare-os-control-plane.js';
 import {
   buildCodeChallenge,
-  clearPendingOAuthSession,
   findPendingOAuthSessionByState,
   normalizeScopes,
   randomUrlSafe,
@@ -14,6 +13,8 @@ import {
   assertSafeOAuthState,
   OAUTH_INITIATION_TTL_MS,
   acquirePendingOAuthCallback,
+  finishOAuthOperation,
+  isOAuthSessionExpired,
 } from './oauth-session-store.js';
 
 export interface ServiceOAuthProfile {
@@ -48,6 +49,7 @@ export function loadServiceOAuthProfile(serviceId: string): ServiceOAuthProfile 
 }
 
 interface ServiceOAuthBeginOptions {
+  observerPrincipalId?: string;
   state?: string;
   scopes?: string[];
   redirectUri?: string;
@@ -114,9 +116,13 @@ function beginServiceOAuthInternal(
     query.set(key, value);
   }
 
+  const operationId = options.observerPrincipalId ? randomUrlSafe(24) : undefined;
   if (options.persistSession !== false) {
     const createdAt = nowIso();
     savePendingOAuthSession({
+      ...(options.observerPrincipalId
+        ? { observerPrincipalId: options.observerPrincipalId, operationId }
+        : {}),
       serviceId,
       state,
       codeVerifier,
@@ -134,6 +140,9 @@ function beginServiceOAuthInternal(
     redirectUri,
     codeVerifier,
     authorizationUrl: `${profile.authorize_url}?${query.toString()}`,
+    ...(operationId
+      ? { operationId, expiresAt: nowIso(new Date(Date.now() + OAUTH_INITIATION_TTL_MS)) }
+      : {}),
   };
 }
 
@@ -198,6 +207,7 @@ async function exchangeOAuthCodeWithState(
     throw new Error('OAuth callback state is invalid or expired');
   }
   const pending = claimed.session;
+  let connected = false;
 
   try {
     if (input.redirectUri && pending.redirectUri && input.redirectUri !== pending.redirectUri) {
@@ -223,7 +233,11 @@ async function exchangeOAuthCodeWithState(
       'secret-guard'
     );
 
+    if (isOAuthSessionExpired(pending)) throw new Error('OAuth callback expired during exchange');
+    if (typeof result.access_token !== 'string' || !result.access_token.trim())
+      throw new Error('OAuth token response missing access token');
     const persisted = persistOAuthTokens(serviceId, result, redirectUri);
+    connected = true;
     return {
       serviceId,
       ...result,
@@ -231,8 +245,11 @@ async function exchangeOAuthCodeWithState(
       persisted_keys: persisted.persisted?.changedKeys || [],
     };
   } finally {
-    if (pending?.state) clearPendingOAuthSession(serviceId, pending.state);
-    claimed.release();
+    try {
+      finishOAuthOperation(pending, connected ? 'connected' : 'failed');
+    } finally {
+      claimed.release();
+    }
   }
 }
 
@@ -305,10 +322,10 @@ export async function completeOAuthCallback(input: {
   if (input.error) {
     const abandoned = input.state ? findPendingOAuthSessionByState(input.state) : null;
     if (input.serviceId && abandoned && input.serviceId !== abandoned.serviceId) {
-      clearPendingOAuthSession(abandoned.serviceId, abandoned.state);
+      finishOAuthOperation(abandoned, 'failed');
       throw new Error('OAuth callback service does not match state');
     }
-    if (abandoned) clearPendingOAuthSession(abandoned.serviceId, abandoned.state);
+    if (abandoned) finishOAuthOperation(abandoned, 'failed');
     return {
       ok: false,
       serviceId: input.serviceId,
@@ -327,12 +344,12 @@ export async function completeOAuthCallback(input: {
   }
 
   if (!input.code) {
-    clearPendingOAuthSession(pending.serviceId, pending.state);
+    finishOAuthOperation(pending, 'failed');
     throw new Error('OAuth callback requires a code');
   }
 
   if (input.serviceId && input.serviceId !== pending.serviceId) {
-    clearPendingOAuthSession(pending.serviceId, pending.state);
+    finishOAuthOperation(pending, 'failed');
     throw new Error('OAuth callback service does not match state');
   }
   const serviceId = input.serviceId || pending.serviceId;

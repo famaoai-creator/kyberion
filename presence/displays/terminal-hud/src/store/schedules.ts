@@ -1,3 +1,4 @@
+import { listSchedulerIncidents, type SchedulerIncident } from '@agent/core/scheduler-incidents';
 import {
   listScheduledPipelines,
   isScheduledPipelineDue,
@@ -12,6 +13,7 @@ import type { PanelViewModel } from './types.js';
 export interface SchedulesData {
   schedules: Array<ScheduledPipeline & { due: boolean }>;
   generationLines: string[];
+  incidents?: SchedulerIncident[];
 }
 
 export function loadSchedules(): SchedulesData {
@@ -32,11 +34,17 @@ export function loadSchedules(): SchedulesData {
   } catch {
     // media generation schedules are optional context
   }
-  return { schedules, generationLines };
+  const incidents = listSchedulerIncidents().filter((incident) =>
+    schedules.some((schedule) => schedule.id === incident.scheduleId)
+  );
+  return { schedules, generationLines, incidents };
 }
 
 export function schedulesWatchPaths(): string[] {
-  return [pathResolver.active('shared/runtime/pipeline-schedules.json')];
+  return [
+    pathResolver.active('shared/runtime/pipeline-schedules.json'),
+    pathResolver.shared('observability/ops-alerts.jsonl'),
+  ];
 }
 
 export function schedulesViewModel(data: SchedulesData, i18n: I18n): PanelViewModel {
@@ -76,9 +84,29 @@ export function schedulesViewModel(data: SchedulesData, i18n: I18n): PanelViewMo
         },
       ],
     })),
-    sections:
-      data.generationLines.length > 0
+    sections: [
+      ...(data.generationLines.length
         ? [{ title: 'media-generation', lines: data.generationLines }]
-        : undefined,
+        : []),
+      ...((data.incidents || []).length
+        ? [
+            {
+              title: i18n.tr('tui:tui_schedule_incidents'),
+              lines: data.incidents!.slice(0, 8).flatMap((incident) => [
+                `${incident.scheduleId} · ${incident.cause} · ${incident.resolvedBy === 'superseded' ? i18n.tr('tui:tui_incident_superseded') : incident.resolvedBy === 'recovered' ? i18n.tr('tui:tui_incident_recovered') : incident.status} · ${incident.occurrences} · ${incident.lastSeenAt}`,
+                ...(incident.status === 'detected' && incident.episodeId
+                  ? [
+                      i18n.tr('tui:tui_incident_ack_hint', {
+                        id: incident.scheduleId,
+                        signature: incident.signature,
+                        episode: incident.episodeId,
+                      }),
+                    ]
+                  : []),
+              ]),
+            },
+          ]
+        : []),
+    ],
   };
 }

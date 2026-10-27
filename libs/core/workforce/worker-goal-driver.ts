@@ -61,6 +61,7 @@ registerTaskGoalLoop(runGoalDrivenLoop);
  */
 
 import { logger } from '../core.js';
+import { awaitGoalOperation, goalTurnLimit } from './goal-execution-control.js';
 import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import {
   ManualDriveActionController,
@@ -91,6 +92,8 @@ import type {
 } from '../reasoning/reasoning-backend.js';
 import {
   advanceToolCallRepeatGovernor,
+  advanceToolCallOutcomeGovernor,
+  createToolCallOutcomeState,
   createToolCallRepeatGovernorState,
   type ToolCallRepeatGovernorConfig,
   type ToolCallRepeatGovernorState,
@@ -210,6 +213,10 @@ export function estimateGoalTurnTokensFromText(input: {
 /** Result of executing a non-goal, non-rewind tool call inside a goal turn. */
 export interface GoalToolExecution {
   resultText: string;
+  /** Trusted tool/manifest classification, never copied from model input. */
+  repeatable?: boolean;
+  /** The executor verified meaningful progress (not just a different clock string). */
+  progress?: boolean;
   /**
    * Set true when the tool performed a real-world effect (write/apply). It is
    * recorded on the rewind context so a later `context_rewind` cannot rewind
@@ -223,6 +230,8 @@ export interface GoalTurnContext {
   goal: GoalRuntimeState;
   turnNumber: number;
   checkpointId: string;
+  /** Cooperative tool cancellation; a cancellation request never proves rollback. */
+  signal?: AbortSignal;
 }
 
 export interface GoalTurnYieldContext {
@@ -255,6 +264,9 @@ export type GoalPreStepHook = (
 
 export interface RunGoalDrivenLoopOptions {
   objective: string;
+  /** Continuous mode removes only the implicit turn ceiling; admission renews every step. */
+  executionMode?: 'bounded' | 'continuous';
+  signal?: AbortSignal;
   goalId?: string;
   missionId?: string;
   /** Stable system framing prepended to every turn's prompt. */
@@ -505,7 +517,7 @@ export async function runGoalDrivenLoop(
   const source: WorkerEventSource | undefined = options.missionId
     ? { mission_id: options.missionId }
     : undefined;
-  const maxTurns = options.maxTurns ?? DEFAULT_MAX_TURNS;
+  const maxTurns = goalTurnLimit(options, DEFAULT_MAX_TURNS);
 
   // Establish the goal state, honoring a resume from a persisted record.
   let goal: GoalRuntimeState;
@@ -562,6 +574,7 @@ export async function runGoalDrivenLoop(
   const estimateTurnTokens = options.estimateTurnTokens ?? estimateGoalTurnTokensFromText;
   let graceStepUsed = false;
   let finalReport: string | undefined;
+  let inFlightTool: string | undefined;
 
   const rewindContext = options.rewindContext ?? new RewindableWorkerContext([], options.missionId);
   const registry = resolveInjectionRegistry(options.injectionRegistry, options.missionId);
@@ -604,6 +617,7 @@ export async function runGoalDrivenLoop(
       ? new ManualDriveActionController({ approvalGate: options.manualDrive?.approvalGate })
       : undefined;
   let govState: ToolCallRepeatGovernorState = createToolCallRepeatGovernorState();
+  let outcomeState = createToolCallOutcomeState();
   let turnsRun = 0;
 
   /**
@@ -649,10 +663,11 @@ export async function runGoalDrivenLoop(
         .join('\n\n');
 
       options.onPromptVisible?.(gracePrompt, 'goal_grace_step');
-      const graceResult = await backend.generateWithTools(
-        gracePrompt,
-        tools,
-        buildToolLoadingOptions(options)
+      const graceResult = await awaitGoalOperation(options.signal, () =>
+        backend.generateWithTools!(gracePrompt, tools, {
+          ...buildToolLoadingOptions(options),
+          ...(options.signal ? { signal: options.signal } : {}),
+        })
       );
       for (const call of graceResult.toolCalls ?? []) {
         // Synthetic rejection: never executed, never applied (not even
@@ -730,12 +745,14 @@ export async function runGoalDrivenLoop(
       const preStepMessages: string[] = [];
       let preStepRejection: string | undefined;
       for (const preStep of options.preStep ?? []) {
-        const decision = await preStep({
-          goal,
-          turnNumber,
-          checkpointId,
-          messages: preStepMessages,
-        });
+        const decision = await awaitGoalOperation(options.signal, () =>
+          preStep({
+            goal,
+            turnNumber,
+            checkpointId,
+            messages: preStepMessages,
+          })
+        );
         if (decision.decision === 'reject') {
           preStepRejection = decision.reason.trim() || 'pre-step admission rejected';
           break;
@@ -770,7 +787,11 @@ export async function runGoalDrivenLoop(
 
       const injections = collectInjections({ step: goal.turnCount });
       const queuedTurnPrompt = options.getTurnPrompt
-        ? (await options.getTurnPrompt({ goal, turnNumber, checkpointId }))?.trim()
+        ? (
+            await awaitGoalOperation(options.signal, () =>
+              options.getTurnPrompt!({ goal, turnNumber, checkpointId })
+            )
+          )?.trim()
         : undefined;
       const prompt = [
         options.systemPrompt ?? '',
@@ -792,13 +813,15 @@ export async function runGoalDrivenLoop(
       options.onPromptVisible?.(prompt, 'goal_turn');
 
       if (manualDriveController) {
-        const admission = await manualDriveController.requestAction({
-          action_id: `${goal.goalId}:turn:${turnNumber}`,
-          kind: 'stream_assistant',
-          title: 'Run the next goal turn',
-          operation_id: `goal_turn:${turnNumber}`,
-          execute: async () => ({ admitted: true }),
-        });
+        const admission = await awaitGoalOperation(options.signal, () =>
+          manualDriveController.requestAction({
+            action_id: `${goal.goalId}:turn:${turnNumber}`,
+            kind: 'stream_assistant',
+            title: 'Run the next goal turn',
+            operation_id: `goal_turn:${turnNumber}`,
+            execute: async () => ({ admitted: true }),
+          })
+        );
         if (manualDriveAdmissionBlocked(admission)) {
           const reason = `manual drive ${admission.status} before goal turn ${turnNumber}`;
           goal = pauseGoal(goal, reason, now);
@@ -826,17 +849,26 @@ export async function runGoalDrivenLoop(
       // ever settles) is never awaited further or applied to the goal.
       const turnStartMs = wallClockScheduler.now();
       let result: GenerateWithToolsResult;
-      const toolLoadingOptions = buildToolLoadingOptions(options);
+      const toolLoadingOptions = {
+        ...buildToolLoadingOptions(options),
+        ...(options.signal ? { signal: options.signal } : {}),
+      };
       let wallClockDeadlineHit = false;
       if (budgetLimits?.wallClockBudgetMs !== undefined) {
         const remainingMs =
           budgetLimits.wallClockBudgetMs - (goal.budgetStats?.wallClockMsUsed ?? 0);
         const deadline = armWallClockDeadline(wallClockScheduler, remainingMs);
-        const raced = await Promise.race([
-          backend.generateWithTools(prompt, tools, toolLoadingOptions),
-          deadline.promise,
-        ]);
-        deadline.cancel();
+        let raced: GenerateWithToolsResult | typeof WALL_CLOCK_DEADLINE;
+        try {
+          raced = await Promise.race([
+            awaitGoalOperation(options.signal, () =>
+              backend.generateWithTools!(prompt, tools, toolLoadingOptions)
+            ),
+            deadline.promise,
+          ]);
+        } finally {
+          deadline.cancel();
+        }
         if (raced === WALL_CLOCK_DEADLINE) {
           wallClockDeadlineHit = true;
           result = {};
@@ -844,7 +876,9 @@ export async function runGoalDrivenLoop(
           result = raced as GenerateWithToolsResult;
         }
       } else {
-        result = await backend.generateWithTools(prompt, tools, toolLoadingOptions);
+        result = await awaitGoalOperation(options.signal, () =>
+          backend.generateWithTools!(prompt, tools, toolLoadingOptions)
+        );
       }
 
       if (wallClockDeadlineHit) {
@@ -878,11 +912,13 @@ export async function runGoalDrivenLoop(
         for (const reference of result.deferredToolReferences) {
           const query = String(reference || '').trim();
           if (!query) continue;
-          const discovered = await options.toolSearch(query, {
-            goal,
-            turnNumber,
-            checkpointId,
-          });
+          const discovered = await awaitGoalOperation(options.signal, () =>
+            options.toolSearch!(query, {
+              goal,
+              turnNumber,
+              checkpointId,
+            })
+          );
           promoted.push(...addDiscoveredTools(tools, discovered, options.toolRole));
         }
         if (promoted.length > 0) {
@@ -959,30 +995,39 @@ export async function runGoalDrivenLoop(
             const input = call.input as Record<string, unknown>;
             const query = String(input.query ?? '').trim();
             if (!query) throw new Error('[TOOL_SEARCH_INPUT] query is required.');
-            const discovered = await options.toolSearch(query, {
-              goal,
-              turnNumber,
-              checkpointId,
-            });
+            const discovered = await awaitGoalOperation(options.signal, () =>
+              options.toolSearch!(query, {
+                goal,
+                turnNumber,
+                checkpointId,
+              })
+            );
             const added = addDiscoveredTools(tools, discovered, options.toolRole);
             toolSearchAnnouncement = renderToolSearchResults(added);
           } else if (options.executeTool) {
-            const exec = manualDriveController
-              ? await manualDriveController.requestAction({
-                  action_id: `${goal.goalId}:turn:${turnNumber}:tool:${toolIndex}:${call.name}`,
-                  kind: 'execute_tool',
-                  title: `Execute ${call.name}`,
-                  operation_id: call.name,
-                  requires_approval: true,
-                  approval_payload: call.input,
-                  execute: () =>
-                    options.executeTool!(call, {
-                      goal,
-                      turnNumber,
-                      checkpointId,
-                    }),
-                })
-              : await options.executeTool(call, { goal, turnNumber, checkpointId });
+            const executeCurrentTool = () => {
+              inFlightTool = call.name;
+              return options.executeTool!(call, {
+                goal,
+                turnNumber,
+                checkpointId,
+                signal: options.signal,
+              });
+            };
+            const exec = await awaitGoalOperation(options.signal, () =>
+              manualDriveController
+                ? manualDriveController.requestAction({
+                    action_id: `${goal.goalId}:turn:${turnNumber}:tool:${toolIndex}:${call.name}`,
+                    kind: 'execute_tool',
+                    title: `Execute ${call.name}`,
+                    operation_id: call.name,
+                    requires_approval: true,
+                    approval_payload: call.input,
+                    execute: executeCurrentTool,
+                  })
+                : executeCurrentTool()
+            );
+            inFlightTool = undefined;
             if (manualDriveAdmissionBlocked(exec)) {
               manualDriveStopReason = `manual drive ${exec.status} before tool ${call.name}`;
               recordToolCall(call, 'refused', `manual_drive_${exec.status}`);
@@ -1005,6 +1050,22 @@ export async function runGoalDrivenLoop(
             });
             if (toolExecution.externalEffect) {
               rewindContext.recordExternalEffect(toolExecution.effectDescription);
+            }
+            const outcome = advanceToolCallOutcomeGovernor(
+              outcomeState,
+              call.name,
+              call.input,
+              toolExecution,
+              options.repeatGovernorConfig
+            );
+            outcomeState = outcome.state;
+            if (outcome.made_progress)
+              govState = { ...govState, streak: 0, last_signature: undefined };
+            if (outcome.reminder) rewindContext.append({ role: 'user', content: outcome.reminder });
+            if (outcome.should_force_stop) {
+              forceStopTool = `${call.name} (result cycle period ${outcome.period})`;
+              recordToolCall(call, 'ok', 'result_cycle_force_stop');
+              break;
             }
           } else {
             [status, reason] = ['refused', 'no_executor'];
@@ -1123,7 +1184,11 @@ export async function runGoalDrivenLoop(
           source
         );
         if (await maybeTerminateOnBudget(result, thisTurnHadToolCalls)) break;
-        if (await options.shouldStopAfterTurn?.({ goal, turnNumber })) {
+        if (
+          await awaitGoalOperation(options.signal, () =>
+            options.shouldStopAfterTurn?.({ goal, turnNumber })
+          )
+        ) {
           goal = pauseGoal(goal, `cooperative yield requested after turn ${turnNumber}`, now);
           stream.emit(
             'status_update',
@@ -1143,7 +1208,11 @@ export async function runGoalDrivenLoop(
         source
       );
       if (await maybeTerminateOnBudget(result, thisTurnHadToolCalls)) break;
-      if (await options.shouldStopAfterTurn?.({ goal, turnNumber })) {
+      if (
+        await awaitGoalOperation(options.signal, () =>
+          options.shouldStopAfterTurn?.({ goal, turnNumber })
+        )
+      ) {
         goal = pauseGoal(goal, `cooperative yield requested after turn ${turnNumber}`, now);
         stream.emit(
           'status_update',
@@ -1163,6 +1232,25 @@ export async function runGoalDrivenLoop(
         source
       );
     }
+  } catch (error) {
+    if (!options.signal?.aborted) throw error;
+    if (inFlightTool) {
+      rewindContext.recordExternalEffect('Cancellation left an in-flight tool outcome unconfirmed');
+    }
+    goal = pauseGoal(
+      goal,
+      'cancellation requested; in-flight outcome requires reconciliation',
+      now
+    );
+    stream.emit(
+      'status_update',
+      {
+        goal_event: 'paused',
+        goal_id: goal.goalId,
+        reason: goal.terminalReason ?? '',
+      },
+      source
+    );
   } finally {
     manualDriveController?.cancel();
     for (const off of unregister) {

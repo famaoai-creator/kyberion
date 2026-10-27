@@ -8,6 +8,11 @@
 
 ## 1. Completed by roadmap
 
+### Hermes Agent 追加採用（2026-10-28）
+
+- UI/UX、CLI費用区分、モデルrouting・継続実行と、追加比較のA01–A09・A11–A13・X01/X02を実装。[追加採用の実装記録](../knowledge/product/architecture/hermes-additional-adoption-implementation-2026-10.md)を参照する。
+- レビュー証跡・抽出方法の明示・別プロセス復旧replay、承認保存APIのrole型を補強。[レビュー・復旧の記録](../knowledge/product/architecture/review-provenance-and-recovery-2026-10.md)に検証範囲を記載。A10/A14、実OAuth、実provider比較と目視QAは完了対象に含めない。
+
 ### PRODUCTIZATION_ROADMAP
 
 完了済み:

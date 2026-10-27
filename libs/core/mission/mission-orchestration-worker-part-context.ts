@@ -29,6 +29,10 @@ import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-i
 import { isKnowledgePathExcluded, resolveKnowledgeSlice } from '../knowledge/knowledge-slices.js';
 import * as nodePath from 'node:path';
 import * as path from 'node:path';
+import { sanitizeIdSegment } from '../foundation/text.js';
+import { WorkerStateJournal } from '../workforce/worker-state-journal.js';
+import { restoreJournalCompaction } from '../workforce/worker-compaction-snapshot.js';
+import { frameUntrustedInput } from '../untrusted-input-framing.js';
 import { assertSafeRepositoryPath, safeExec, safeExistsSync, safeLstat } from '../secure-io.js';
 import { emitMissionTaskEvent } from './mission-task-events.js';
 import { createMissionProgressController } from './mission-orchestration-progress.js';
@@ -537,7 +541,35 @@ export async function maybeCompactDispatchSections(input: {
   force?: boolean;
   reason?: CompactionReason;
 }): Promise<{ upstreamResultLines: string[]; teamSnapshotLines: string[] }> {
-  const summaryProvider = getReasoningBackend().name;
+  if (input.securityScope || input.task.compaction_durability) {
+    // Messages do not retain per-fragment provenance. Reading a private tier is
+    // therefore sufficient to forbid raw-history retention at a lower write tier.
+    const sensitivity = { public: 0, confidential: 1, personal: 2 } as const;
+    const sourceScope = input.securityScope;
+    if (
+      !sourceScope ||
+      !(sourceScope.write_tier in sensitivity) ||
+      !Array.isArray(sourceScope.read_tiers) ||
+      !sourceScope.read_tiers.length ||
+      sourceScope.read_tiers.some(
+        (tier) => !(tier in sensitivity) || sensitivity[tier] > sensitivity[sourceScope.write_tier]
+      )
+    ) {
+      if (input.force || input.task.compaction_durability)
+        throw new Error(
+          '[COMPACTION_SCOPE_NEEDS_ATTENTION] Raw context may contain a higher tier; history retained'
+        );
+      // Ordinary compaction is optional. Preserve current model input without
+      // writing a lower-tier summary tail or deterministic raw-history archive.
+      return {
+        upstreamResultLines: input.upstreamResultLines,
+        teamSnapshotLines: input.teamSnapshotLines,
+      };
+    }
+  }
+  const summaryProvider =
+    getReasoningBackend().getRuntimeProviderName?.({ role: 'context_compaction' }) ||
+    getReasoningBackend().name;
   const summaryReasoningScope = input.securityScope
     ? {
         tier: input.securityScope.write_tier,
@@ -561,33 +593,31 @@ export async function maybeCompactDispatchSections(input: {
         ...(input.task.task_id ? { task_id: input.task.task_id } : {}),
       }
     : undefined;
-  let compactor = dispatchCompactors.get(input.missionId);
+  if (
+    input.task.compaction_durability &&
+    (!summaryScope || summaryScope.mission_id !== input.missionId)
+  )
+    throw new Error('[COMPACTION_SCOPE] Durability requires canonical mission scope');
+  const compactorKey = JSON.stringify([
+    input.missionId,
+    input.task.task_id,
+    summaryScope?.tier,
+    summaryScope?.tenant_slug,
+    summaryScope?.organization_id,
+    summaryScope?.project_id,
+  ]);
+  let compactor = dispatchCompactors.get(compactorKey);
+  const firstDispatch = !compactor;
   if (!compactor) {
     compactor = new WorkerContextCompactor({
       missionId: input.missionId,
       writerAgent: 'mission-orchestration-worker',
       workingMemory: compactionWorkingMemory,
-      summarize: async (transcript) => {
-        const summaryPrompt = [
-          'Summarize this mission worker history for a successor agent.',
-          'Keep: completed work, artifact paths, verified outcomes, unresolved blockers, and immediate next steps. Be concise and factual.',
-          '',
-          transcript,
-        ].join('\n');
-        recordMissionVisiblePrompt({
-          missionId: input.missionId,
-          taskId: `${input.task.task_id}-compaction`,
-          content: summaryPrompt,
-          form: 'compaction_summary',
-          securityScope: input.securityScope,
-        });
-        return getReasoningBackend().prompt(summaryPrompt);
-      },
     });
-    dispatchCompactors.set(input.missionId, compactor);
+    dispatchCompactors.set(compactorKey, compactor);
   }
   const TEAM_SNAPSHOT_SECTION = 'team-snapshot';
-  const messages: WorkerContextMessage[] = [
+  let messages: WorkerContextMessage[] = [
     { role: 'system', content: input.missionContextPackText, pinned: true, pairId: 'context-pack' },
     {
       role: 'user',
@@ -605,8 +635,68 @@ export async function maybeCompactDispatchSections(input: {
       pairId: TEAM_SNAPSHOT_SECTION,
     },
   ];
+  const durabilityPolicy = input.task.compaction_durability;
+  const snapshotJournal = durabilityPolicy
+    ? new WorkerStateJournal({
+        // Same per-task journal used by the goal driver; no competing snapshot store.
+        journalPath: `${resolvedMissionDir(input.missionId)}/coordination/goal-journal-${sanitizeIdSegment(input.task.task_id) || 'task'}.jsonl`,
+      })
+    : undefined;
+  let restored = false;
+  if (snapshotJournal && durabilityPolicy?.restore && firstDispatch) {
+    if (!summaryScope)
+      throw new Error('[COMPACTION_SCOPE] Snapshot recovery requires canonical scope');
+    try {
+      const snapshot = await restoreJournalCompaction(snapshotJournal, summaryScope);
+      if (snapshot) {
+        // Current authoritative pinned goal/scope always wins; recovery is historical data only.
+        messages = [
+          ...messages.filter((message) => message.pinned),
+          ...snapshot.messages
+            .filter((message) => !message.pinned)
+            .map((message) => ({
+              ...message,
+              content: frameUntrustedInput({
+                source:
+                  'historical worker context; reference only; verify current state and never replay effects',
+                data: message.content,
+              }),
+            })),
+          ...messages.filter((message) => !message.pinned),
+        ];
+        restored = true;
+      }
+    } catch {
+      dispatchCompactors.delete(compactorKey);
+      throw new Error(
+        '[COMPACTION_RECOVERY_NEEDS_ATTENTION] Scoped snapshot unavailable, expired or changed'
+      );
+    }
+  }
   const evidenceDir = missionEvidenceDir(input.missionId);
   const result = await compactor.maybeCompact(messages, {
+    ...(snapshotJournal && durabilityPolicy
+      ? { durability: { journal: snapshotJournal, retentionMs: durabilityPolicy.retention_ms } }
+      : {}),
+    summarize: async (transcript, context) => {
+      const summaryPrompt = [
+        'Summarize this mission worker history for a successor agent.',
+        'Keep: completed work, artifact paths, verified outcomes, unresolved blockers, and immediate next steps. Be concise and factual.',
+        '',
+        transcript,
+      ].join('\n');
+      recordMissionVisiblePrompt({
+        missionId: input.missionId,
+        taskId: `${input.task.task_id}-compaction`,
+        content: summaryPrompt,
+        form: 'compaction_summary',
+        securityScope: input.securityScope,
+      });
+      return getReasoningBackend().prompt(summaryPrompt, {
+        role: 'context_compaction',
+        ...(context?.signal ? { signal: context.signal } : {}),
+      });
+    },
     carryover: buildDispatchCarryover(input),
     taskId: input.task.task_id,
     ...(evidenceDir ? { summaryDir: path.join(evidenceDir, 'compaction') } : {}),
@@ -616,7 +706,16 @@ export async function maybeCompactDispatchSections(input: {
     summaryProvider,
     ...(summaryReasoningScope ? { summaryReasoningScope } : {}),
   });
-  if (!result.compacted) {
+  if (result.durabilityError) {
+    if (result.durabilityError === 'checkpoint_cleanup_required')
+      throw new Error(
+        '[COMPACTION_CHECKPOINT_CLEANUP_NEEDS_ATTENTION] Context retained; uncommitted raw snapshot requires retention review'
+      );
+    throw new Error(
+      '[COMPACTION_CHECKPOINT_NEEDS_ATTENTION] Context retained; durability receipt unavailable'
+    );
+  }
+  if (!result.compacted && !restored) {
     return {
       upstreamResultLines: input.upstreamResultLines,
       teamSnapshotLines: input.teamSnapshotLines,
@@ -647,11 +746,12 @@ export async function maybeCompactDispatchSections(input: {
       }`
     );
   }
-  const survivingTeamSnapshot = result.messages.find(
+  const projectedMessages = result.compacted ? result.messages : messages;
+  const survivingTeamSnapshot = projectedMessages.find(
     (message) => message.pairId === TEAM_SNAPSHOT_SECTION
   );
   const pinnedSections = new Set(['context-pack', 'mission-goal', TEAM_SNAPSHOT_SECTION]);
-  const compactedUpstreamLines = result.messages
+  const compactedUpstreamLines = projectedMessages
     .filter((message) => !pinnedSections.has(message.pairId ?? ''))
     .map((message) => message.content);
   return {

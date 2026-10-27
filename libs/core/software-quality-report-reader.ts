@@ -1,8 +1,10 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
+import type { VerificationSourceSnapshot } from './verification-source-snapshot.js';
 
 export interface PersistedSoftwareQualityReport {
+  source_snapshot?: VerificationSourceSnapshot;
   version: string;
   report_id: string;
   project_id: string;

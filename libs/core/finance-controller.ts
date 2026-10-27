@@ -2,9 +2,13 @@ import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
 import { resolveFinancialModel, type FinancialModel } from './financial-model.js';
 import { resolveOkrTracker, type OkrTracker } from './okr-tracker.js';
-import { loadFinanceControllerCostReportAtPath } from './finance-controller-cost-report.js';
+import {
+  financeControllerCostCoverage,
+  loadFinanceControllerCostReportAtPath,
+  type FinanceControllerCostCoverage,
+} from './finance-controller-cost-report.js';
 
-export interface FinanceControllerCostReport {
+export interface FinanceControllerCostReport extends FinanceControllerCostCoverage {
   totalCostUsd: number | null;
   totalTokens: number | null;
   promptTokens: number | null;
@@ -41,6 +45,11 @@ export interface FinanceControllerDecision {
     okrProgressPercent: number | null;
     costReportTotalUsd: number | null;
     costReportTotalTokens: number | null;
+    costReportKnownSubtotalUsd?: number | null;
+    costReportReferenceUsd?: number | null;
+    costReportCostComplete?: boolean | null;
+    costReportUnknownCostCalls?: number;
+    costReportIncludedCalls?: number;
   };
   thresholds: FinanceControllerThresholds;
   sources: {
@@ -155,6 +164,7 @@ function resolveCostReport(baseDir: string): FinanceControllerCostReport | null 
         completionTokens,
         sourcePath: candidate,
         withheldPartitions: toNumber(totals.withheld_partitions ?? parsed.withheld_partitions),
+        ...financeControllerCostCoverage(totals, parsed, nestedUsage),
       };
     }
   }
@@ -238,6 +248,15 @@ export function resolveFinanceControllerDecision(
       `Cost report is partial (${costReport?.withheldPartitions} metrics partition(s) withheld) — totals understate spend`
     );
   }
+  const incompleteCosts =
+    costReport?.costComplete === false ||
+    (costReport?.unknownCostCalls ?? 0) > 0 ||
+    (costReport?.withheldPartitions ?? 0) > 0;
+  if (incompleteCosts) {
+    reasons.push(
+      `Cost report is incomplete (${costReport?.unknownCostCalls ?? 0} call(s) with unknown amounts) — the recorded subtotal is not verified total spend`
+    );
+  }
 
   const shouldCutCosts = Boolean(
     (budgetUtilization != null && budgetUtilization >= thresholds.budgetUtilizationCritical) ||
@@ -271,8 +290,16 @@ export function resolveFinanceControllerDecision(
       budgetJpy: budget,
       budgetUtilization,
       okrProgressPercent,
-      costReportTotalUsd: costReport?.totalCostUsd ?? null,
+      costReportTotalUsd: incompleteCosts ? null : (costReport?.totalCostUsd ?? null),
       costReportTotalTokens: costReport?.totalTokens ?? null,
+      costReportKnownSubtotalUsd: costReport?.totalCostUsd ?? null,
+      costReportReferenceUsd:
+        (costReport?.referenceCostCalls ?? 0) > 0 || (costReport?.referenceCostUsd ?? 0) > 0
+          ? (costReport?.referenceCostUsd ?? null)
+          : null,
+      costReportCostComplete: incompleteCosts ? false : (costReport?.costComplete ?? null),
+      costReportUnknownCostCalls: costReport?.unknownCostCalls ?? 0,
+      costReportIncludedCalls: costReport?.includedCalls ?? 0,
     },
     thresholds,
     sources: {
