@@ -161,6 +161,19 @@ describe('focused operator response boundary', () => {
     ).toBeDefined();
   });
 
+  it('carries the superseded task count when present and refuses a malformed one', () => {
+    const progress = { ...valid.missionProgress[0], nextTasksSuperseded: 2 };
+    expect(
+      parseFocusedOperatorResponse({ ...valid, missionProgress: [progress] })?.missionProgress[0]
+    ).toMatchObject({ nextTasksSuperseded: 2 });
+    expect(
+      parseFocusedOperatorResponse({
+        ...valid,
+        missionProgress: [{ ...progress, nextTasksSuperseded: -1 }],
+      })
+    ).toBeUndefined();
+  });
+
   it('rejects invalid enum values and counters', () => {
     expect(
       parseFocusedOperatorResponse({

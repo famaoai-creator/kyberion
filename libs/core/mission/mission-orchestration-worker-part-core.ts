@@ -71,6 +71,14 @@ import {
   recordTaskDecisionProposals,
   CUSTOMER_DECISION_BLOCKED_REASONS,
 } from './mission-decision-lock.js';
+import {
+  CUSTOMER_DECISION_PIN_ESCALATION_THRESHOLD,
+  isCustomerDecisionPinEscalated,
+  nextCustomerDecisionPinFailures,
+  notifyCustomerDecisionPinFailedRepeatedly,
+  PIN_FAILED_REPEATEDLY,
+  readCustomerDecisionPinFailures,
+} from './mission-decision-escalation.js';
 
 export async function dispatchPlannedMissionTaskCore(
   input: DispatchPlannedMissionTaskInput,
@@ -85,6 +93,42 @@ export async function dispatchPlannedMissionTaskCore(
   const previousWorkItem = listWorkItems({ source: 'local' }).find(
     (entry) => entry.source_ref === workItemSourceRef
   );
+  // CD-09: pin the customer decisions this task starts on (no-op without a
+  // decision case). A failed pin is retried once. Pinned before the WorkItem
+  // import so the import carries this round's pin-failure count.
+  const pinOnce = () =>
+    pinTaskDecisions({ missionId: input.missionId, taskId: input.task.task_id, mode: 'start' });
+  let decisionPin = pinOnce();
+  if (decisionPin?.failed) decisionPin = pinOnce();
+  const previousBlockedReason = previousWorkItem?.metadata?.blocked_reason;
+  const previousHoldRecord = previousWorkItem?.metadata?.customer_decision_hold;
+  const previousHoldReason =
+    previousHoldRecord && typeof previousHoldRecord === 'object'
+      ? (previousHoldRecord as Record<string, unknown>).reason
+      : undefined;
+  // Blocked by an earlier escalation: the streak goes on counting (one notification).
+  const escalatedBefore = previousHoldReason === PIN_FAILED_REPEATEDLY;
+  // Is this task known to carry customer-decision proposals or holds? Only
+  // its WorkItem can say so when the case cannot be read.
+  const knownDecisionTask =
+    !escalatedBefore &&
+    (Boolean(previousHoldRecord) ||
+      (typeof previousBlockedReason === 'string' &&
+        CUSTOMER_DECISION_BLOCKED_REASONS.includes(previousBlockedReason)));
+  // Consecutive failed rounds of a task not known to wait for anything (WorkItem
+  // metadata is replaced on every import, so the record is carried forward).
+  const previousPinFailures = readCustomerDecisionPinFailures(previousWorkItem?.metadata);
+  const pinFailures =
+    decisionPin?.failed && !knownDecisionTask
+      ? nextCustomerDecisionPinFailures(previousPinFailures, decisionPin.failed, nowIso())
+      : undefined;
+  const pinEscalated = isCustomerDecisionPinEscalated(pinFailures);
+  const previousRewrites = previousWorkItem?.metadata?.dependencies_rewritten_from;
+  const rewrittenFrom = input.task.dependencies_rewritten_from?.length
+    ? input.task.dependencies_rewritten_from
+    : Array.isArray(previousRewrites) && previousRewrites.length > 0
+      ? previousRewrites
+      : undefined;
   const workItem = importExternalWorkItem({
     source: 'local',
     sourceRef: workItemSourceRef,
@@ -113,26 +157,17 @@ export async function dispatchPlannedMissionTaskCore(
       estimated_scope: input.task.estimated_scope,
       task_id: input.task.task_id,
       mission_id: input.missionId,
+      ...(pinFailures ? { customer_decision_pin_failures: pinFailures } : {}),
+      // m6: the supersede-task rewrite note survives the wholesale re-import.
+      ...(rewrittenFrom ? { dependencies_rewritten_from: rewrittenFrom } : {}),
     },
   });
-  // CD-09: pin the customer decisions this task starts on (no-op without a
-  // decision case). A failed pin is retried once.
-  const pinOnce = () =>
-    pinTaskDecisions({ missionId: input.missionId, taskId: input.task.task_id, mode: 'start' });
-  let decisionPin = pinOnce();
-  if (decisionPin?.failed) decisionPin = pinOnce();
-  const previousBlockedReason = previousWorkItem?.metadata?.blocked_reason;
-  // Is this task known to carry customer-decision proposals or holds? Only
-  // its WorkItem can say so when the case cannot be read.
-  const knownDecisionTask =
-    Boolean(previousWorkItem?.metadata?.customer_decision_hold) ||
-    (typeof previousBlockedReason === 'string' &&
-      CUSTOMER_DECISION_BLOCKED_REASONS.includes(previousBlockedReason));
-  if (decisionPin?.failed && !knownDecisionTask) {
+  if (decisionPin?.failed && !knownDecisionTask && !pinEscalated) {
     // Not known to wait for anything: not blocked, not run on a guess either —
-    // left planned for the next dispatch round.
+    // left planned for the next dispatch round (escalated after
+    // CUSTOMER_DECISION_PIN_ESCALATION_THRESHOLD consecutive rounds).
     logger.warn(
-      `task ${input.task.task_id} not dispatched — its customer decision pin failed twice${decisionPin.failed.case_found ? ' on a known case' : ''} | it stays planned and is retried on the next dispatch; check that the decision case is readable | mission=${input.missionId} consumer=${decisionPin.consumer}${decisionPin.failed.case_id ? ` case=${decisionPin.failed.case_id}` : ''}`
+      `task ${input.task.task_id} not dispatched — its customer decision pin failed twice${decisionPin.failed.case_found ? ' on a known case' : ''} (round ${pinFailures?.count ?? 1} of ${CUSTOMER_DECISION_PIN_ESCALATION_THRESHOLD} before it is blocked) | it stays planned and is retried on the next dispatch; check that the decision case is readable | mission=${input.missionId} consumer=${decisionPin.consumer}${decisionPin.failed.case_id ? ` case=${decisionPin.failed.case_id}` : ''}`
     );
     input.task.status = 'planned';
     return null;
@@ -171,10 +206,9 @@ export async function dispatchPlannedMissionTaskCore(
     const nextStep = pinFailed
       ? `resume the mission once the decision case is readable: pnpm mission resume ${input.missionId}`
       : unresolvable
-        ? // No customer-decision verb asks a collected question again or lets the
-          // operator decide a requires_customer entry, and the lock (keyed by
-          // mission and task id) never drops a proposal: only a new task id helps.
-          `the question's agenda was closed or withdrawn with no confirmed answer and cannot be asked again: replace it with a task under a new task id in NEXT_TASKS, then pnpm mission resume ${input.missionId}`
+        ? // The question's agenda was closed or withdrawn with no confirmed
+          // answer: ask it again on an open agenda, or replace the task.
+          `the question's agenda was closed or withdrawn with no confirmed answer: ask it again (customer-decision draft --from-tasks --reask <proposal-id> --by user:<member>), or replace the task with another task (pnpm mission supersede-task ${input.missionId} ${input.task.task_id} --by <new_task_id> --reason <text> --request-approval), then pnpm mission resume ${input.missionId}`
         : `collect and send the question if it is not on an agenda yet (customer-decision draft --from-tasks), confirm the customer's answer (customer-decision confirm), then pnpm mission resume ${input.missionId}`;
     if (pinFailed) {
       logger.warn(
@@ -207,9 +241,25 @@ export async function dispatchPlannedMissionTaskCore(
             hold_proposal_ids: pinnedHold.proposal_ids,
             reason: pinnedHold.reason,
           }
-        : { reason: 'pin_failed' }),
+        : { reason: pinEscalated ? PIN_FAILED_REPEATEDLY : 'pin_failed' }),
       next: nextStep,
     };
+    // The streak reached the threshold this round: tell the mission owner once
+    // (a task blocked by an earlier escalation keeps counting, silently).
+    if (
+      pinFailed &&
+      pinFailures &&
+      pinEscalated &&
+      !isCustomerDecisionPinEscalated(previousPinFailures)
+    ) {
+      notifyCustomerDecisionPinFailedRepeatedly({
+        missionId: input.missionId,
+        taskId: input.task.task_id,
+        teamRole: input.teamRole,
+        consumer: decisionPin.consumer,
+        failures: pinFailures,
+      });
+    }
     updateWorkItem({
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
@@ -225,6 +275,7 @@ export async function dispatchPlannedMissionTaskCore(
         task_id: input.task.task_id,
         team_role: input.teamRole,
         customer_decision_hold: hold,
+        ...(pinFailures ? { customer_decision_pin_failures: pinFailures } : {}),
       },
     });
     input.task.status = 'blocked';

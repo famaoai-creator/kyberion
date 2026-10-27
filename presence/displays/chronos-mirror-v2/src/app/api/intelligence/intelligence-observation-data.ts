@@ -79,6 +79,7 @@ export interface MissionProgressSummary {
   nextTasksTotal: number;
   nextTasksPending: number;
   nextTasksCompleted: number;
+  nextTasksSuperseded?: number;
   dependencies: string[];
   generatedAssets: Array<{
     path: string;

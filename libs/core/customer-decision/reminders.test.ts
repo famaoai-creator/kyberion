@@ -622,3 +622,42 @@ describe('held reminders after their day (CD-11 follow-up: approval after the sw
     expect(lapsedAgendaReminders(input(a, D_PLUS_1))).toEqual([]);
   });
 });
+
+describe('hourly sweeps (CD-11 lifecycle: 30 9-18 * * * Asia/Tokyo)', () => {
+  /** The UTC instant of a JST wall-clock time on 2026-10-30 (JST = UTC+9). */
+  const jst = (hour: number) =>
+    new Date(
+      Date.parse(`2026-10-30T${String(hour).padStart(2, '0')}:30:00.000+09:00`)
+    ).toISOString();
+  const SWEEPS = [9, 10, 11, 12, 13, 14, 15, 16, 17, 18].map(jst);
+  const id = reminderId('agd-0123456789abcdef', ACTOR, 'due', '2026-10-30');
+  const record = (status: AgendaReminderRecord['status'], at: string): AgendaReminderRecord => ({
+    reminder_id: id,
+    kind: 'due',
+    actor_id: ACTOR,
+    target_date: '2026-10-30',
+    status,
+    approval_request_id: 'apr-1',
+    at,
+  });
+
+  it('every sweep of a day falls on the same UTC date', () => {
+    expect(new Set(SWEEPS.map(utcDate))).toEqual(new Set(['2026-10-30']));
+  });
+
+  it('a held due is asked again by each later sweep that day and sent once', () => {
+    const [first, second, third, ...rest] = SWEEPS;
+    // 09:30: due; the gate holds it.
+    expect(kinds(dueAgendaReminders(input(agenda(), first)))).toEqual(['due']);
+    const held = agenda({ reminders: [record('approval_pending', first)] });
+    // 10:30, not approved yet: planned again (same key, same request), never lapsed.
+    expect(dueAgendaReminders(input(held, second)).map((item) => item.reminder_id)).toEqual([id]);
+    expect(lapsedAgendaReminders(input(held, second))).toEqual([]);
+    // 11:30, approved since: sent; every later sweep that day plans nothing.
+    const sent = agenda({ reminders: [record('sent', third)] });
+    for (const at of rest) {
+      expect(dueAgendaReminders(input(sent, at))).toEqual([]);
+      expect(lapsedAgendaReminders(input(sent, at))).toEqual([]);
+    }
+  });
+});

@@ -7,7 +7,11 @@ import {
   createWorkItem,
   setWorkCoordinationNamespace,
 } from './work-coordination.js';
-import { projectWorkGraphToNextTasks, readCanonicalWorkGraph } from './work-graph-projection.js';
+import {
+  projectWorkGraphToNextTasks,
+  readCanonicalWorkGraph,
+  readCanonicalWorkGraphTasks,
+} from './work-graph-projection.js';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../index.js';
 
 const missionPath = pathResolver.sharedTmp('work-graph-projection-test');
@@ -41,6 +45,35 @@ describe('work graph projection', () => {
     expect(canonical.items.map((entry) => entry.item_id)).toEqual([item.item_id]);
     expect(canonical.graph.ready_item_ids).toEqual([item.item_id]);
     expect(safeExistsSync(nodePath.join(missionPath, 'NEXT_TASKS.json'))).toBe(false);
+  });
+
+  it('projects an item archived by supersede-task as superseded, a plain archived one as completed', () => {
+    createWorkItem({
+      itemId: 'superseded-item',
+      title: 'Replaced task',
+      description: 'Replaced task.',
+      projectId: 'PRJ-SUPERSEDE',
+      status: 'archived',
+      context: { project_id: 'PRJ-SUPERSEDE', task_id: 'task-old' },
+      metadata: {
+        superseded_by: 'task-new',
+        superseded: { by_task_id: 'task-new', at: '2026-10-26T00:00:00.000Z' },
+      },
+    });
+    createWorkItem({
+      itemId: 'archived-item',
+      title: 'Archived task',
+      description: 'Archived task.',
+      projectId: 'PRJ-SUPERSEDE',
+      status: 'archived',
+      context: { project_id: 'PRJ-SUPERSEDE', task_id: 'task-archived' },
+    });
+    const tasks = readCanonicalWorkGraphTasks('PRJ-SUPERSEDE');
+    expect(tasks.find((task) => task.task_id === 'task-old')).toMatchObject({
+      status: 'superseded',
+      superseded: { by_task_id: 'task-new' },
+    });
+    expect(tasks.find((task) => task.task_id === 'task-archived')?.status).toBe('completed');
   });
 
   it('keeps canonical reads tenant-scoped when project IDs overlap', () => {

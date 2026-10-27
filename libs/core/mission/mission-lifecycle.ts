@@ -59,9 +59,14 @@ import {
   buildMissionCompletionReconciliationInput,
   collectMissionEvidence,
   extractPromotableMissionMemory,
+  isTaskClosedForGate,
   isTaskDeliverableSatisfied,
+  isTaskProvenSuperseded,
+  isTaskSuperseded,
+  MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
   publishMeetingDeliverablesIfNeeded,
+  supersededTaskRefusal,
   readMissionNextTasks,
   tryAutoCompleteTaskFromEvidence,
   updateMissionMemorySidecar,
@@ -75,7 +80,11 @@ export {
   collectMissionEvidence,
   readMissionNextTasks,
   writeMissionNextTasks,
+  isTaskProvenSuperseded,
+  isTaskSuperseded,
+  MISSION_TASK_CLOSED_STATUSES,
   MISSION_TASK_COMPLETED_STATUSES,
+  supersededTaskRefusal,
   tryAutoCompleteTaskFromEvidence,
 };
 export type { MissionCompletionReconciliationContext } from './mission-lifecycle-completion.js';
@@ -169,7 +178,9 @@ export function evaluateMissionFinishExitGate(
   pendingTasks: string[];
 } {
   const nextTasks = readMissionNextTasks(missionDir);
-  const completedStatuses = MISSION_TASK_COMPLETED_STATUSES;
+  // A superseded task (supersede-task, human-approved) is closed; its
+  // replacement still has to complete.
+  const closedStatuses = MISSION_TASK_CLOSED_STATUSES;
   const statusByTaskId = new Map(
     nextTasks.map((task) => [
       String(task.task_id || ''),
@@ -180,6 +191,9 @@ export function evaluateMissionFinishExitGate(
   for (const task of nextTasks) {
     const taskId = String(task.task_id || '');
     if (!taskId.startsWith('repair-') && !taskId.startsWith('goal-gap-')) continue;
+    // A superseded repair task is never auto-resolved (that would erase the
+    // record); an unproven one still counts as pending below.
+    if (isTaskSuperseded(task)) continue;
     const staleCircularGoalRepair =
       taskId === 'repair-goal-satisfaction' &&
       Boolean(state) &&
@@ -197,7 +211,9 @@ export function evaluateMissionFinishExitGate(
   const pendingTasks = nextTasks
     .filter((task) => {
       const status = String(task.status || 'planned').toLowerCase();
-      return !completedStatuses.has(status);
+      return (
+        !closedStatuses.has(status) || !isTaskClosedForGate(missionDir, task, 'the finish gate')
+      );
     })
     .map((task) => String(task.task_id || task.description || 'unknown-task'));
 

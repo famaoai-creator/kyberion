@@ -115,6 +115,24 @@
         }
       }
     },
+    "reasked_proposals": {
+      "description": "CD-09 re-ask: the task proposals the operator facade re-asked onto this agenda (customer-decision draft --from-tasks --reask). Only the facade writes agendas, so the consumer store guard accepts a relink only onto an agenda that names the proposal, its consumer and the member here. Ids only, outside the content hash, append-only.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["proposal_id", "consumer", "by", "at"],
+        "properties": {
+          "proposal_id": { "type": "string", "pattern": "^tp-[a-f0-9]{16}$" },
+          "consumer": {
+            "type": "string",
+            "pattern": "^mission-[A-Za-z0-9][A-Za-z0-9_-]{0,100}\\.[A-Za-z0-9][A-Za-z0-9._-]{0,120}$"
+          },
+          "by": { "type": "string", "pattern": "^user:[a-z][a-z0-9-]{1,30}$" },
+          "at": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
     "milestones_passed": {
       "type": "array",
       "items": { "type": "string", "minLength": 1 },

@@ -323,6 +323,21 @@ export interface MissionControllerRoutingContext {
     manifestPath: string,
     requestedBy?: string
   ) => Awaitable<unknown>;
+  requestMissionTaskSupersedeApproval: (input: {
+    missionId: string;
+    taskId: string;
+    byTaskId: string;
+    reason: string;
+    requestedBy?: string;
+  }) => Awaitable<unknown>;
+  supersedeMissionTask: (input: {
+    missionId: string;
+    taskId: string;
+    byTaskId: string;
+    reason: string;
+    dryRun: boolean;
+    approvalRequestId?: string;
+  }) => Awaitable<unknown>;
   reenterMissionFromReview: (missionId: string) => Awaitable<unknown>;
   purgeMissions: (dryRun?: boolean) => Awaitable<void>;
   archiveMissions: (options: { missionId?: string; execute?: boolean }) => Awaitable<void>;
@@ -517,6 +532,7 @@ export function assertMissionIdArgument(
     'dispatch-tickets',
     'dispatch-workitems',
     'reconcile-work',
+    'supersede-task',
     'review-reenter',
     'review-worker-output',
   ]);
@@ -540,6 +556,7 @@ export function assertMissionIdArgument(
     'dispatch-tickets',
     'dispatch-workitems',
     'reconcile-work',
+    'supersede-task',
     'review-reenter',
     'review-worker-output',
     'handoff',
@@ -706,6 +723,9 @@ export async function runMissionControllerAction(
   // consumed by the human decision verbs below (start/kickoff/pause/cancel/
   // memory-approve/memory-reject) — every other command ignores it.
   const decidedBy = resolveDecidedByFromArgv(context.argv);
+  // The approval-mediated verbs (scope-approve, triage, reconcile-work,
+  // supersede-task, …) file a human approval request instead of applying.
+  const requestApproval = context.argv.includes('--request-approval');
 
   switch (action) {
     case 'create': {
@@ -861,7 +881,7 @@ export async function runMissionControllerAction(
       }
       break;
     case 'scope-approve':
-      if (context.argv.includes('--request-approval')) {
+      if (requestApproval) {
         // Positional order matches the apply half below (arg2=reason,
         // arg3=goal, arg4=success-condition) so both sides bind identically.
         await context.requestMissionScopeApproval(arg1!, {
@@ -883,7 +903,7 @@ export async function runMissionControllerAction(
     case 'triage':
       await context.triageMission(arg1!, {
         json: context.argv.includes('--json'),
-        requestApproval: context.argv.includes('--request-approval'),
+        requestApproval,
         goal: getValue('--goal', context.argv),
         reason: getValue('--reason', context.argv),
         successCondition: getValue('--success-condition', context.argv),
@@ -1068,7 +1088,7 @@ export async function runMissionControllerAction(
         ),
         context.print,
         {
-          requestApproval: context.argv.includes('--request-approval'),
+          requestApproval,
           approvalRef: getValue('--approval-ref', context.argv),
         }
       );
@@ -1185,7 +1205,7 @@ export async function runMissionControllerAction(
       }
       const manifestPath = getValue('--manifest', context.argv);
       if (!manifestPath) throw new Error('reconcile-work requires --manifest <PATH>');
-      if (context.argv.includes('--request-approval')) {
+      if (requestApproval) {
         await context.requestMissionWorkReconciliationApproval(
           arg1!,
           manifestPath,
@@ -1199,6 +1219,37 @@ export async function runMissionControllerAction(
         context.hasDryRun,
         getValue('--approval-request-id', context.argv)
       );
+      break;
+    }
+    case 'supersede-task': {
+      // Always human-approved (PI-05): --request-approval opens the hash-bound
+      // request; the apply run needs --approval-request-id; --dry-run checks.
+      const taskId = arg2;
+      const byTaskId = getValue('--by', context.argv);
+      const reason = getValue('--reason', context.argv);
+      if (!taskId || !byTaskId || !reason) {
+        throw new Error(
+          'supersede-task requires: supersede-task <MISSION_ID> <task_id> --by <new_task_id> --reason <text> (--request-approval | --approval-request-id <id> | --dry-run)'
+        );
+      }
+      if (requestApproval) {
+        await context.requestMissionTaskSupersedeApproval({
+          missionId: arg1!,
+          taskId,
+          byTaskId,
+          reason,
+          requestedBy: getValue('--requested-by', context.argv),
+        });
+        break;
+      }
+      await context.supersedeMissionTask({
+        missionId: arg1!,
+        taskId,
+        byTaskId,
+        reason,
+        dryRun: hasDryRun,
+        approvalRequestId: getValue('--approval-request-id', context.argv),
+      });
       break;
     }
     case 'review-reenter':

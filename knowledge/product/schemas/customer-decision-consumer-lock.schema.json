@@ -83,6 +83,25 @@
         "stale_count": { "type": "integer", "minimum": 0 }
       }
     },
+    "superseded": {
+      "description": "The task was replaced by another task of the same mission (mission_controller supersede-task, a human-approved mission_gate decision). Set once by the owner-bound consumer store, in a write that adds only this field; the lock is frozen afterwards. Every boundary skips a superseded lock (no hold, no release, no rework, no re-ask).",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["by_consumer", "by_task_id", "at", "approval_request_id"],
+      "properties": {
+        "by_consumer": {
+          "type": "string",
+          "pattern": "^mission-[A-Za-z0-9][A-Za-z0-9_-]{0,100}\\.[A-Za-z0-9][A-Za-z0-9._-]{0,120}$"
+        },
+        "by_task_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "at": { "type": "string", "minLength": 1 },
+        "approval_request_id": {
+          "description": "The authenticated human mission_gate approval (channel mission-task-supersede) that authorized the supersede. A mark is honoured only after the mission side verifies this approval; the guard requires it to be present.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+        }
+      }
+    },
     "rework": {
       "description": "Rework WorkItems filed for this consumer. `refs` name the current decisions the stale result must move to (ledger ids, or <agenda>/<entry>:<layer> where the layer has no ledger record), so the completion check and the response sweep file one item for one switch.",
       "type": "array",
@@ -104,7 +123,7 @@
   },
   "definitions": {
     "proposal": {
-      "description": "CD-09: a customer-judgment question the task raised (TaskDecisionProposal). The proposed value is the entry's value; a requires_customer proposal has none. collected_at is set when the operator collected it into an agenda (the entry's agenda_id / entry_id name that agenda entry).",
+      "description": "CD-09: a customer-judgment question the task raised (TaskDecisionProposal). The proposed value is the entry's value; a requires_customer proposal has none. collected_at is set when the operator collected it into an agenda (the entry's agenda_id / entry_id name that agenda entry). previous_links are the earlier links of a re-asked proposal (customer-decision draft --from-tasks --reask: its agenda was closed, withdrawn or gone with no confirmed answer), oldest first, append-only.",
       "type": "object",
       "additionalProperties": false,
       "required": ["proposal_id", "question", "requires_customer", "proposed_at"],
@@ -129,15 +148,35 @@
         "topic": { "type": "string", "minLength": 1, "maxLength": 60 },
         "proposed_at": { "type": "string", "minLength": 1 },
         "collected_at": { "type": "string", "minLength": 1 },
-        "resolved": {
-          "type": "object",
-          "additionalProperties": false,
-          "required": ["decision_id", "at"],
-          "properties": {
-            "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
-            "at": { "type": "string", "minLength": 1 }
-          }
+        "resolved": { "$ref": "#/definitions/resolution" },
+        "previous_links": {
+          "type": "array",
+          "maxItems": 10,
+          "items": { "$ref": "#/definitions/previous_link" }
         }
+      }
+    },
+    "previous_link": {
+      "description": "One earlier agenda link of a re-asked task proposal and who re-asked it when.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["agenda_id", "entry_id", "collected_at", "relinked_at", "relinked_by"],
+      "properties": {
+        "agenda_id": { "type": "string", "pattern": "^agd-[A-Za-z0-9][A-Za-z0-9_-]{3,80}$" },
+        "entry_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,80}$" },
+        "collected_at": { "type": "string", "minLength": 1 },
+        "resolved": { "$ref": "#/definitions/resolution" },
+        "relinked_at": { "type": "string", "minLength": 1 },
+        "relinked_by": { "type": "string", "pattern": "^user:[a-z][a-z0-9-]{1,30}$" }
+      }
+    },
+    "resolution": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision_id", "at"],
+      "properties": {
+        "decision_id": { "type": "string", "pattern": "^D-[0-9]{4,}$" },
+        "at": { "type": "string", "minLength": 1 }
       }
     }
   }

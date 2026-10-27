@@ -141,6 +141,14 @@ Maintenance Commands:
                                  --request-approval [--requested-by <ACTOR>] creates a hash-bound human approval request
                                  --generate [--output <PATH>] scaffolds a manifest from current git state
                                  Validate and adopt verified work completed outside dispatch-workitems
+  supersede-task <ID> <task_id> --by <new_task_id> --reason <TEXT>
+                                 Close a task that can no longer complete (e.g. its customer decision
+                                 is unresolvable) in favour of another task of the mission: dependents
+                                 move to the replacement, the finish gate stops waiting for it.
+                                 Always human-approved: --request-approval [--requested-by <ACTOR>]
+                                 files the hash-bound request (decide via 'pnpm kyberion approvals
+                                 --approve <id>'), then apply with --approval-request-id <id>;
+                                 --dry-run checks the preconditions only
   review-reenter <ID>            Turn pending human review rejections into rework tasks and reactivate the mission
   scope-approve <ID> [--goal <TEXT>] [--reason <TEXT>] [--success-condition <TEXT>]
                                  Approve a scope change and rebaseline the origin intent.

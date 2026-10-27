@@ -329,6 +329,7 @@ export const BOOLEAN_FLAGS = new Set([
   '--ready-only',
   '--missing-only',
   '--selected-only',
+  '--request-approval',
 ]);
 export const VALUE_FLAGS = new Set([
   '--expected-snapshot',
@@ -401,6 +402,10 @@ export const VALUE_FLAGS = new Set([
   '--severity',
   '--manifest',
   '--output',
+  // supersede-task / approval-mediated verbs: their values are never positional.
+  '--by',
+  '--approval-request-id',
+  '--requested-by',
 ]);
 
 export const ACTIVE_TIERS: readonly string[] = ['personal', 'confidential', 'public'];

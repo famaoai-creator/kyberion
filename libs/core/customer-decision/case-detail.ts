@@ -390,12 +390,15 @@ export function buildCustomerDecisionCaseDetail(
   });
   const agendas = new Map(input.agendas.map((agenda) => [agenda.agenda_id, agenda]));
   const tasks = capped(
-    [...input.consumers].sort(
-      (a, b) =>
-        a.mission_id.localeCompare(b.mission_id) ||
-        a.task_id.localeCompare(b.task_id) ||
-        a.consumer.localeCompare(b.consumer)
-    ),
+    // Approved-superseded locks are left out, as in the overview's task counts.
+    input.consumers
+      .filter((lock) => !input.isSuperseded?.(lock))
+      .sort(
+        (a, b) =>
+          a.mission_id.localeCompare(b.mission_id) ||
+          a.task_id.localeCompare(b.task_id) ||
+          a.consumer.localeCompare(b.consumer)
+      ),
     CASE_DETAIL_TASK_LIMIT
   );
   return {

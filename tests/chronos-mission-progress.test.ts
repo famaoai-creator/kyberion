@@ -47,6 +47,18 @@ describe('Chronos mission progress helpers', () => {
       nextTasksTotal: 4,
       nextTasksPending: 2,
       nextTasksCompleted: 2,
+      nextTasksSuperseded: 0,
+    });
+  });
+
+  it('counts superseded tasks apart from pending and completed', () => {
+    expect(
+      summarizeNextTasks([{ status: 'superseded' }, { status: 'planned' }, { status: 'done' }])
+    ).toEqual({
+      nextTasksTotal: 3,
+      nextTasksPending: 1,
+      nextTasksCompleted: 1,
+      nextTasksSuperseded: 1,
     });
   });
 

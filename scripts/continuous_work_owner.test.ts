@@ -137,6 +137,8 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
     brief: (file) =>
       files.get(file) as ReturnType<NonNullable<ContinuousOwnerAdapterDeps['brief']>>,
     tasks: () => tasks,
+    // A superseded row with task_id 'proven' carries the mission-side proof.
+    supersedeProven: (_missionId, taskId) => taskId === 'proven',
     workItems,
     updateItem,
   };
@@ -432,6 +434,7 @@ describe('continuous work production owner ports', () => {
     const h = harness({ gated: true });
     h.setTasks([
       { task_id: 'done', phase: 'execution', status: 'completed' },
+      { task_id: 'proven', phase: 'execution', status: 'superseded' },
       { task_id: 'open-review', phase: 'review', status: 'pending' },
     ]);
     await h.ports.advanceMission(advanceInput);
@@ -574,6 +577,29 @@ describe('continuous work production owner ports', () => {
     { tasks: [{ status: 'pending' }], verification: { status: 'verified' }, result: 'blocked' },
     { tasks: [{ status: 'completed' }], verification: { status: 'pending' }, result: 'blocked' },
     { tasks: [{ status: 'completed' }], verification: { status: 'verified' }, result: 'completed' },
+    // A superseded contract (supersede-task, human-approved) is closed; its
+    // replacement must still complete.
+    {
+      tasks: [{ task_id: 'proven', status: 'superseded' }, { status: 'completed' }],
+      verification: { status: 'verified' },
+      result: 'completed',
+    },
+    // An unproven superseded status (hand-edited, no approved request) is pending.
+    {
+      tasks: [{ task_id: 'forged', status: 'superseded' }, { status: 'completed' }],
+      verification: { status: 'verified' },
+      result: 'blocked',
+    },
+    {
+      tasks: [{ task_id: 'proven', status: 'superseded' }, { status: 'pending' }],
+      verification: { status: 'verified' },
+      result: 'blocked',
+    },
+    {
+      tasks: [{ task_id: 'proven', status: 'superseded' }],
+      verification: { status: 'verified' },
+      result: 'blocked',
+    },
   ])(
     'requires all contracts and verified evidence before accepting terminal success: $result',
     async ({ tasks, verification, result }) => {

@@ -139,3 +139,27 @@ describe('obtainBestOfProvidersJudgeVerdict (XP-07 wiring)', () => {
     expect(outcome?.verdict).toBeNull();
   });
 });
+
+describe('restoreMissionGraphRunTaskSnapshots', () => {
+  it('never restores a task superseded after the snapshot was taken', async () => {
+    const { restoreMissionGraphRunTaskSnapshots } =
+      await import('./mission-orchestration-worker-part-results.js');
+    const tasks = [
+      { task_id: 'old', status: 'superseded' },
+      { task_id: 'other', status: 'planned' },
+    ];
+    const journal = {
+      state: () => ({
+        node_states: new Map([
+          ['old', { task_id: 'old', task_snapshot: { status: 'blocked' } }],
+          ['other', { task_id: 'other', task_snapshot: { status: 'completed' } }],
+        ]),
+      }),
+    };
+    restoreMissionGraphRunTaskSnapshots(
+      tasks,
+      journal as unknown as Parameters<typeof restoreMissionGraphRunTaskSnapshots>[1]
+    );
+    expect(tasks.map((task) => task.status)).toEqual(['superseded', 'completed']);
+  });
+});

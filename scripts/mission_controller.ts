@@ -581,6 +581,42 @@ async function requestMissionWorkReconciliationApproval(
   return result;
 }
 
+async function requestMissionTaskSupersedeApproval(input: {
+  missionId: string;
+  taskId: string;
+  byTaskId: string;
+  reason: string;
+  requestedBy?: string;
+}) {
+  const { createMissionTaskSupersedeApprovalRequest } =
+    await import('@agent/core/mission/mission-task-supersede');
+  const { missionControllerRequester } = await import('./lib/cli-approval-requester.js');
+  const result = createMissionTaskSupersedeApprovalRequest({
+    missionId: input.missionId,
+    taskId: input.taskId,
+    byTaskId: input.byTaskId,
+    reason: input.reason,
+    requester: missionControllerRequester(input.requestedBy),
+  });
+  printOutput(JSON.stringify(result, null, 2));
+  return result;
+}
+
+async function supersedeMissionTask(input: {
+  missionId: string;
+  taskId: string;
+  byTaskId: string;
+  reason: string;
+  dryRun: boolean;
+  approvalRequestId?: string;
+}) {
+  const { supersedeMissionTask: supersede } =
+    await import('@agent/core/mission/mission-task-supersede');
+  const result = await supersede(input);
+  printOutput(JSON.stringify(result, null, 2));
+  return result;
+}
+
 async function reconcileExistingWork(
   missionId: string,
   manifestPath: string,
@@ -1524,6 +1560,8 @@ async function mainImpl(
     recordArtifactReview,
     requestMissionWorkReconciliationApproval,
     reconcileExistingWork,
+    requestMissionTaskSupersedeApproval,
+    supersedeMissionTask,
     reenterMissionFromReview,
     purgeMissions,
     archiveMissions,

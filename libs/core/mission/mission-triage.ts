@@ -19,7 +19,7 @@ import { safeExistsSync, safeReaddir } from '../secure-io.js';
 import { loadMissionStateIncludingArchive, loadState } from './mission-state.js';
 import {
   readMissionNextTasks,
-  MISSION_TASK_COMPLETED_STATUSES,
+  MISSION_TASK_CLOSED_STATUSES,
 } from './mission-lifecycle-completion.js';
 import { evaluateMissionIntentDrift } from './mission-intent-delta.js';
 import type { MissionState } from './mission-types.js';
@@ -92,7 +92,7 @@ function pendingTaskIds(missionDir: string): {
   const tasks = readMissionNextTasks(missionDir);
   const pending = tasks
     .filter(
-      (task) => !MISSION_TASK_COMPLETED_STATUSES.has(String(task.status || 'planned').toLowerCase())
+      (task) => !MISSION_TASK_CLOSED_STATUSES.has(String(task.status || 'planned').toLowerCase())
     )
     .map((task) => String(task.task_id || task.description || 'unknown-task'));
   return { total: tasks.length, completed: tasks.length - pending.length, pending };

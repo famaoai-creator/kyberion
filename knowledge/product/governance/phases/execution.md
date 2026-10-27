@@ -100,6 +100,43 @@ template task is recorded while the work happens**. Verified end to end on 2026-
    dropped) when the provider is not the `--actor-id` prefix, so the retrospective can tell unrecorded usage
    (`usage_unrecorded`) from free work.
 
+   A task that waited on a customer's decision (CD-09 `requires_customer` question)
+   gets the confirmed values in its dispatch prompt. Done directly there is no prompt:
+   read them with
+   `KYBERION_TENANT=<tenant> pnpm kyberion customer-decision task-decisions --tenant <tenant> --mission <MISSION_ID> --task <TASK_ID> --json`
+   (read-only; values on stdout only, the audit records ids; refused unless bound to a
+   registered, active tenant). Never copy the values into public evidence or notes.
+
+   A task that can never complete (e.g. its customer decision is unresolvable) is not
+   edited in NEXT_TASKS: re-ask the question (`pnpm kyberion customer-decision draft --tenant <t> --case <c> --from-tasks --reask <tp-id> --by user:<member>`)
+   or replace it with another task of the mission through
+   `pnpm mission supersede-task <MISSION_ID> <TASK_ID> --by <NEW_TASK_ID> --reason <text> --request-approval`
+   — a human approves with `pnpm kyberion approvals --approve <id>` — then rerun with
+   `--approval-request-id <id>`. A run that stopped part-way is finished by rerunning it
+   with the same approval, even after the approval expired (expiry gates only the start).
+
+   Known limits of a supersede:
+   - **Proof, not status.** The finish gate, record-evidence and the continuous owner count a
+     `superseded` task as closed only when the mission proves it: the NEXT_TASKS record names
+     an approved, human `mission_gate` request on `mission-task-supersede` with a matching
+     payload, and the supersede receipt or `task_superseded` ledger entry exists. A
+     hand-edited `superseded` status stays pending (warned once per mission) and is never
+     completed by record-evidence; restore its status or supersede it properly.
+   - **Worker writes.** Only the worker's NEXT_TASKS write path refuses to introduce
+     `superseded`; another raw writer could still set it. That can only block the mission
+     (every gate requires the proof), never close it.
+   - **A forged lock mark freezes the lock.** The consumer store guard checks only the
+     shape of a lock's `superseded` mark: it cannot locate the mission and approval
+     stores (tier- and tenant-partitioned, configured roots) with its raw reader. A worker
+     that marks its own lock therefore gains nothing — every reader ignores an unproven
+     mark and the task stays held — but no later write to that lock (re-pin, release,
+     rework, re-ask) succeeds, and each logs the refusal. Repair: confirm the mark has no
+     approved supersede (the `SUPERSEDE_UNPROVEN` warning), restore
+     `consumers/<consumer>.json` in the tenant's decision case from its revision before
+     the mark (an operator with authority over the tenant's confidential knowledge),
+     then `pnpm mission resume <MISSION_ID>`; or supersede the task properly and
+     accept the frozen lock.
+
 4. **Review with a different agent.** After an independent reviewer (a distinct subagent,
    or the agent reviewing the PR) has reviewed, record its verdict, then close the review
    task with its own deliverable:

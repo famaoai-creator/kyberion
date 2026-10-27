@@ -247,6 +247,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/customer-decision/store.ts#asCustomerDecisionConsumerOwner",
+      "roles": ["customer_decision_consumer_store"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/discussion/discussion-mission.ts#requestMissionStart",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -1292,6 +1297,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/mission/mission-decision-escalation.ts#notifyCustomerDecisionPinFailedRepeatedly",
+      "roles": ["deliverable_inbox_writer"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/mission/mission-decision-lock.ts#asConsumerStore",
       "roles": ["customer_decision_consumer_store"],
       "unresolved": []
@@ -1408,6 +1418,16 @@
     },
     {
       "site": "libs/core/mission/mission-task-recovery.ts#reissueBlockedMissionTasks",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission/mission-task-supersede.ts#createMissionTaskSupersedeApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/mission/mission-task-supersede.ts#createMissionTaskSupersedeApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
       "roles": ["mission_controller"],
       "unresolved": []
     },

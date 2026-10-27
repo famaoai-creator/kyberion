@@ -167,13 +167,21 @@ export function areMissionTaskDependenciesSatisfied(state: MissionState, item: W
   if (dependencies.length === 0) return true;
   const missionId = state.mission_id.toUpperCase();
   const canonicalStatusById = new Map<string, WorkItemStatus>();
+  const supersededIds = new Set<string>();
   for (const candidate of readMissionWorkGraph(state).items) {
     if (getMissionLabel(candidate) !== missionId) continue;
     canonicalStatusById.set(candidate.item_id, candidate.status);
     const candidateTaskId = getWorkItemTaskId(candidate);
     if (candidateTaskId) canonicalStatusById.set(candidateTaskId, candidate.status);
+    // An item archived by supersede-task never ran to success: it does not
+    // satisfy a dependency (dependents were rewritten onto the replacement).
+    if (candidate.metadata?.superseded_by) {
+      supersededIds.add(candidate.item_id);
+      if (candidateTaskId) supersededIds.add(candidateTaskId);
+    }
   }
   return dependencies.every((dependency) => {
+    if (supersededIds.has(dependency)) return false;
     const canonicalStatus = canonicalStatusById.get(dependency);
     return canonicalStatus === 'done' || canonicalStatus === 'archived';
   });
