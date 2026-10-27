@@ -34,7 +34,8 @@ export {
   type ContextWindowProfile,
 } from './context-window-profile.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
-import { readTextFile } from '../foundation/text.js';
+import { estimateTokens, readTextFile } from '../foundation/text.js';
+export { estimateTokens } from '../foundation/text.js';
 import { metrics } from '../metrics.js';
 import type { MissionWorkingMemory } from '../mission/mission-working-memory.js';
 import { pathResolver } from '../path-resolver.js';
@@ -229,15 +230,6 @@ export function isPromptTooLongError(error: unknown): boolean {
 
 export function compactionThresholdTokens(profile: ContextWindowProfile): number {
   return Math.max(1024, profile.contextWindowTokens - profile.reserveTokens - profile.bufferTokens);
-}
-
-/**
- * The legacy estimate remains intentionally conservative for callers outside
- * compaction. PI-04's hybrid path uses a separate /4 estimate for its
- * unmeasured tail below.
- */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3);
 }
 
 function estimateHybridTailTokens(text: string): number {

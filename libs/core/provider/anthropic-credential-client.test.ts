@@ -109,6 +109,9 @@ describe('Anthropic credential client isolation', () => {
         content: [{ type: 'text', text: 'done' }],
       } as never);
       await backend.generateWithTools!('fixture', []);
+      expect(clientOf(backend).messages.create).toHaveBeenCalledWith(expect.any(Object), {
+        maxRetries: 0,
+      });
       expect(await intent.extract({ text: 'fixture' })).toMatchObject({ goal: 'fixture' });
       await voice.runRoleplaySession(roleplay);
       await voice.runOneOnOneSession(oneOnOne);
@@ -215,5 +218,12 @@ describe('Anthropic credential client isolation', () => {
     await bundle.intentExtractor!.extractor.extract({ text: 'fixture' });
     await bundle.voiceBridge!.bridge.runRoleplaySession(roleplay);
     expect(parse).toHaveBeenCalledWith(expect.any(Object), { maxRetries: 0 });
+  });
+
+  it('preserves the SDK default retry configuration for an operator-created client', () => {
+    const baseline = new Anthropic({ apiKey: 'operator-fixture' });
+    const credentials = createAnthropicCredentialClient({ operatorApiKey: 'operator-fixture' });
+    expect(credentials.tenantScoped).toBe(false);
+    expect(credentials.client.maxRetries).toBe(baseline.maxRetries);
   });
 });

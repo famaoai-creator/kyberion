@@ -4,6 +4,7 @@ import { safeWriteFile, safeRmSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { logger } from '@agent/core/core';
+import { getSecret } from '@agent/core/secret/secret-guard';
 import {
   currentScopeEnvelope,
   mintScopeEnvelope,
@@ -72,6 +73,14 @@ describe('protected library execution approval continuation', () => {
       const id = randomUUID();
       vi.stubEnv('MISSION_ID', '');
       vi.stubEnv('KYBERION_TASK_ID', '');
+      const secret = `synthetic-approval-redaction-${id}`;
+      vi.stubEnv('PIPELINE_RESUME_FIXTURE_SECRET', secret);
+      await withExecutionContextAsync(
+        'mission_controller',
+        async () => expect(getSecret('PIPELINE_RESUME_FIXTURE_SECRET')).toBe(secret),
+        undefined,
+        ''
+      );
       const tenant = 'pipeline-delegation';
       const file = pathResolver.rootResolve(`active/shared/tmp/library-resume-${id}.json`);
       paths.push(file);
@@ -88,7 +97,11 @@ describe('protected library execution approval continuation', () => {
               role: 'source',
               produces: 'answer',
               op: 'core:transform',
-              params: { input: 21, script: 'return Number(input) * 2;', export_as: 'answer' },
+              params: {
+                input: 21,
+                script: `/* ${secret} */ return Number(input) * 2;`,
+                export_as: 'answer',
+              },
             },
             { id: 'after', role: 'sink', op: 'system:log', params: { message: `after-${id}` } },
           ],
@@ -103,6 +116,9 @@ describe('protected library execution approval continuation', () => {
       await withExecutionContextAsync(
         'mission_controller',
         async () => {
+          expect(() => getSecret('PIPELINE_RESUME_FIXTURE_SECRET')).toThrow(
+            'CREDENTIAL_BINDING_REQUIRED'
+          );
           createWorkItem({
             itemId: id,
             title: 'Pipeline continuation',
@@ -188,6 +204,8 @@ describe('protected library execution approval continuation', () => {
             },
           });
           const approval = loadApprovalRequest(pending.storageChannel, pending.approvalRequestId)!;
+          expect(approval.details).toContain('[REDACTED_SECRET]');
+          expect(approval.details).not.toContain(secret);
           if (decision === 'expired') {
             vi.useFakeTimers({ toFake: ['Date'] });
             vi.setSystemTime(Date.parse(approval.expiresAt!) + 1);

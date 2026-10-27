@@ -47,6 +47,58 @@ afterEach(() => {
 });
 
 describe('task-local credential binding', () => {
+  it('honors a trusted explicit public tenant clear without reopening a parent credential binding', () => {
+    vi.stubEnv('KYBERION_TENANT', 'alpha');
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_TASK_ID', '');
+    withExecutionContext(
+      'infrastructure_sentinel',
+      () => {
+        expect(credentialExecutionIdentity().tenantSlug).toBeUndefined();
+      },
+      undefined,
+      ''
+    );
+    tenant('alpha', () =>
+      withTaskCredentialBinding(
+        {
+          tenantSlug: 'alpha',
+          secrets: { TEST_BOUND_KEY: 'tenant-secret' },
+        },
+        () =>
+          withExecutionContext(
+            'infrastructure_sentinel',
+            () => {
+              expect(() => resolveTaskCredential('TEST_BOUND_KEY')).toThrow(
+                '[CREDENTIAL_SCOPE_DENIED]'
+              );
+            },
+            undefined,
+            ''
+          )
+      )
+    );
+    runInExecutionScope({ tenantBound: true }, () => {
+      expect(() => credentialExecutionIdentity()).toThrow('Missing runtime tenant');
+    });
+    withExecutionContext(
+      'infrastructure_sentinel',
+      () =>
+        runInResourceAccessScope(
+          {
+            tenantSlug: 'alpha',
+            readExact: [],
+            writeExact: [],
+            mkdirExact: [],
+          },
+          () => {
+            expect(() => credentialExecutionIdentity()).toThrow('[CREDENTIAL_SCOPE_DENIED]');
+          }
+        ),
+      undefined,
+      ''
+    );
+  });
   it('uses the canonical persisted identity and still refuses ambient credentials', () => {
     safeWriteFile(
       credentialScopePath,
@@ -122,6 +174,14 @@ describe('task-local credential binding', () => {
       const before = currentScopeEnvelope();
       withScopeEnvelope(envelope, () => {
         expect(currentScopeEnvelope()).toBe(envelope);
+        withExecutionContext(
+          'infrastructure_sentinel',
+          () => {
+            expect(() => credentialExecutionIdentity()).toThrow('[CREDENTIAL_SCOPE_DENIED]');
+          },
+          undefined,
+          ''
+        );
         // Omitted lineage may still use the active envelope consistently.
         expect(credentialExecutionIdentity()).toEqual({ tenantSlug: 'alpha', ...lineage });
         withTaskCredentialBinding(

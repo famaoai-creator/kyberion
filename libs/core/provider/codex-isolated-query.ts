@@ -266,8 +266,10 @@ export async function runCodexIsolatedQuery<T>(
 ): Promise<CodexIsolatedQueryResult<T>> {
   assertReasoningEgressAllowed('codex-cli');
   const owner = credentialExecutionIdentity();
-  const bin = params.bin ?? resolveCodexBinary();
+  // Validate the task's credential scope before probing ambient installations.
+  // An unbound tenant must fail identically on hosts with or without a CLI.
   const env = buildCodexIsolatedEnv();
+  const bin = params.bin ?? resolveCodexBinary();
   const signal = params.abortController?.signal;
   const workspace = createScratchWorkspace({});
   const startedAt = Date.now();
