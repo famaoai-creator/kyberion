@@ -1,4 +1,5 @@
 import type { DotWorkResultRow } from '../../dot/dot-state-paths.js';
+import { appendActionRecord } from '../../dot/dot-action-ledger.js';
 import { physicalScopedPath } from '../../physical-namespace.js';
 /** Source-loaded child fixture. Every store, authority check and lock is real. */
 import * as path from 'node:path';
@@ -210,6 +211,7 @@ function seed() {
   const persistedApproval = loadApprovalRequest('autonomy', approval.id)!;
   const proposal = frontDeskExecutionProposal(binding);
   const original: DotActionRecord = {
+    scope: charter.scope,
     action_ref: 'frontdesk-' + binding.work_item_id,
     dot_id: charter.dot_id,
     actor_id: 'dot:' + charter.dot_id,
@@ -228,7 +230,7 @@ function seed() {
     at: nowIso(),
   };
   safeMkdir(path.dirname(DOT_ACTION_LEDGER_PATH), { recursive: true });
-  appendJsonLine(DOT_ACTION_LEDGER_PATH, original);
+  appendActionRecord(original, {});
   const item = createWorkItem({
     itemId: 'unrelated-fixture',
     title: 'Unrelated',
@@ -395,6 +397,7 @@ function seedRevision(validChildProof = false) {
   const persistedApproval = loadApprovalRequest('autonomy', approval.id)!;
   const proposal = frontDeskExecutionProposal(binding);
   const original: DotActionRecord = {
+    scope: charter.scope,
     action_ref: 'frontdesk-' + binding.work_item_id,
     dot_id: charter.dot_id,
     actor_id: 'dot:' + charter.dot_id,
@@ -412,7 +415,7 @@ function seedRevision(validChildProof = false) {
     front_desk_execution: binding,
     at: nowIso(),
   };
-  appendJsonLine(DOT_ACTION_LEDGER_PATH, original);
+  appendActionRecord(original, {});
   const receipt: FrontDeskExecutionRecoveryReceipt = {
     version: 1,
     binding,

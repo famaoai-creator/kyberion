@@ -89,6 +89,36 @@ describe('launchd manager plans', () => {
 });
 
 describe('systemd-user manager plans', () => {
+  it('keeps whitespace, percent specifiers and dollar strings literal in the bound root and executable arguments', () => {
+    const unit = buildSystemdServiceUnit(chronos, {
+      ...ctx,
+      repoRoot: '/repo/Space %n $HOME',
+      nodePath: '/opt/Node Bin/node',
+      env: { KYBERION_ROOT: '/hostile', KYBERION_PERSONA: 'worker with spaces %n $HOME' },
+    });
+    expect(unit).toContain('WorkingDirectory=/repo/Space %%n $HOME\n');
+    expect(unit).toContain('Environment="KYBERION_ROOT=/repo/Space %%n $HOME"\n');
+    expect(unit).toContain('Environment="KYBERION_PERSONA=worker with spaces %%n $HOME"\n');
+    expect(unit).toContain(
+      'ExecStart="/opt/Node Bin/node" "/repo/Space %%n $$HOME/dist/scripts/chronos_daemon.js"\n'
+    );
+    expect(unit).not.toContain('/hostile');
+  });
+
+  it('refuses control-character directive injection and ambiguous path spelling before planning effects', () => {
+    for (const repoRoot of [
+      '/repo/bad\nEnvironment=KYBERION_ROOT=/other',
+      '/repo/bad\rroot',
+      '/repo/ends ',
+    ]) {
+      expect(() => buildSystemdServiceUnit(chronos, { ...ctx, repoRoot })).toThrow(
+        'DAEMON_UNIT_VALUE_UNSUPPORTED'
+      );
+    }
+    expect(() => buildSystemdServiceUnit(chronos, { ...ctx, env: { 'BAD\nKEY': 'v' } })).toThrow(
+      'DAEMON_UNIT_VALUE_UNSUPPORTED'
+    );
+  });
   const manager = resolveDaemonManager('linux')!;
 
   it('maps the com.kyberion.* label to a systemd-safe unit stem', () => {

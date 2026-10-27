@@ -80,7 +80,16 @@ describe('Chronos route request input boundary', () => {
           .filter(([call]) => routeSource.includes(call))
           .map(([, resolver]) => readChronosSource(resolver)),
       ].join('\n');
-      expect(source, route).toContain('readChronos');
+      expect(source, route).toMatch(/readChronos|workspaceSelectionFromSearchParams/);
+      if (source.includes('workspaceSelectionFromSearchParams')) {
+        expect(source).toContain('workspaceSelectionFromSearchParams(req.nextUrl.searchParams)');
+        const workspace = readChronosSource('lib/workspace-scope.ts');
+        expect(workspace).toContain('search.getAll(field).length > 1');
+        expect(workspace).toContain('const value = search.get(field)');
+        expect(workspace).toContain(
+          'if (value !== null) Object.assign(result, { [target]: value })'
+        );
+      }
       expect(source).not.toMatch(
         /searchParams\.get\('(?:tenant|organization_id|project_id)'\) \|\|/
       );

@@ -6,6 +6,7 @@ import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir } from '@agent/core';
 import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
+import { normalizeSupervisorResult } from '@agent/core/agent/agent-runtime-supervisor-client';
 
 const mocks = vi.hoisted(() => ({
   ensureAgentRuntime: vi.fn(),
@@ -481,6 +482,30 @@ describe('agent_runtime_supervisor_daemon', () => {
         payload: { agentId: 'agent-1', prompt: 'healthy', requestedBy: 'test' },
       })
     ).resolves.toMatchObject({ ok: true, result: { text: 'healthy response' } });
+  });
+
+  it('projects a lifecycle refresh into the public client wire contract', async () => {
+    mocks.refreshAgentRuntime.mockResolvedValueOnce({
+      mode: 'soft',
+      snapshot: { agentId: 'agent-1' },
+    });
+    instance = await startAgentRuntimeSupervisorDaemon({
+      transport: 'unix',
+      socketPath,
+      lockPath,
+      exitOnFatalError: false,
+      exitOnExistingHealthyDaemon: false,
+    });
+    const response = await sendRequest(socketPath, {
+      id: 'refresh-contract',
+      method: 'refresh',
+      payload: { agentId: 'agent-1', requestedBy: 'test' },
+    });
+    expect(response).toMatchObject({ ok: true, result: { refreshed: true, reason: 'soft' } });
+    expect(normalizeSupervisorResult('refresh', response.result)).toEqual({
+      refreshed: true,
+      reason: 'soft',
+    });
   });
 
   it('rejects malformed IPC request envelopes before dispatch', async () => {

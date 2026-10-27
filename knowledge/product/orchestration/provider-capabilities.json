@@ -402,8 +402,17 @@
       }
     },
     "codex": {
+      "provenance": {
+        "source": "manual",
+        "updated_by": "agent:codex",
+        "updated_at": "2026-10-26",
+        "note": "Reasoning/planning/strategy reflect the native CLI's existing structured reasoning, task decomposition, design/test planning and branch simulation backend (libs/core/provider/codex-cli-reasoning-backend.ts); these capabilities confer no tool authority."
+      },
       "models": ["codex"],
       "capabilities": [
+        "reasoning",
+        "planning",
+        "strategy",
         "code",
         "implementation",
         "refactoring",
@@ -414,6 +423,9 @@
       ],
       "modelCapabilities": {
         "codex": [
+          "reasoning",
+          "planning",
+          "strategy",
           "code",
           "implementation",
           "refactoring",

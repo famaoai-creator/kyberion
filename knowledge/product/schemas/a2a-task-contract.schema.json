@@ -20,6 +20,7 @@
       "type": "array",
       "items": { "type": "string", "minLength": 1 }
     },
+    "task_model_hint": { "type": "object" },
     "context": {
       "type": "object",
       "required": ["mission_id", "team_role"],
@@ -34,10 +35,45 @@
         "task_model_hint": { "type": "object" },
         "model_hint": { "type": "object" },
         "work_item_id": { "type": "string", "minLength": 1 },
+        "lease_id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "capability_profile": { "enum": ["planner", "explorer", "implementer"] },
+        "requested_selection": { "$ref": "mission-team-role-selection.schema.json" },
+        "selection_resolution": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["source", "reason"],
+          "properties": {
+            "source": { "enum": ["legacy", "auto", "requested", "fallback", "blocked"] },
+            "reason": { "type": "string", "minLength": 1 }
+          }
+        },
+        "required_capabilities": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        },
+        "task_id": { "type": "string" },
+        "provider": { "type": "string", "minLength": 1 },
+        "provider_model_id": { "type": "string", "minLength": 1 },
+        "user_language": { "type": "string" },
+        "dispatch_timeout_ms": { "type": "integer", "minimum": 1 },
+        "security_scope": { "type": "object" },
+        "delegation_chain": { "type": "array", "items": { "type": "object" } },
         "context_mode": { "type": "string", "enum": ["fresh", "continue"] }
       },
-      "additionalProperties": true
+      "allOf": [
+        {
+          "if": { "anyOf": [{ "required": ["lease_id"] }, { "required": ["capability_profile"] }] },
+          "then": {
+            "required": ["work_item_id", "task_id", "lease_id", "capability_profile"],
+            "properties": {
+              "work_item_id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+              "task_id": { "type": "string", "minLength": 1, "pattern": "\\S" }
+            }
+          }
+        }
+      ],
+      "additionalProperties": false
     }
   },
-  "additionalProperties": true
+  "additionalProperties": false
 }

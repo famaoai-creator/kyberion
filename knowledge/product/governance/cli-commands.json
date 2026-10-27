@@ -1860,6 +1860,17 @@
       "group": "operate"
     },
     {
+      "id": "script.dot.migrate-state",
+      "module": "scripts/dot_charters.ts",
+      "command": "dot migrate-state",
+      "args": ["migrate-state"],
+      "noun": "dot",
+      "verb": "migrate-state",
+      "audience": "operator",
+      "description": "cli_cmd_script_dot_migrate_state",
+      "group": "operate"
+    },
+    {
       "id": "script.dot.activate",
       "module": "scripts/dot_charters.ts",
       "command": "dot activate",

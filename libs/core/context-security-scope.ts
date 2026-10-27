@@ -79,13 +79,19 @@ export function resolveTenantAlias(input: {
 export function validateContextSecurityScope(scope: ContextSecurityScope): string[] {
   const errors: string[] = [];
   const tenantSlug = resolveTenantAlias(scope);
-  if (!tenantSlug) {
+  const publicOnly =
+    scope.write_tier === 'public' &&
+    Array.isArray(scope.read_tiers) &&
+    scope.read_tiers.length > 0 &&
+    scope.read_tiers.every((tier) => tier === 'public');
+  if (!tenantSlug && !(publicOnly && !scope.tenant_slug && !scope.tenant_id)) {
     errors.push(
       scope.tenant_slug && scope.tenant_id
         ? 'tenant_slug and tenant_id must match'
         : 'tenant_slug (or legacy tenant_id) is required'
     );
-  } else if (!isValidTenantSlug(tenantSlug)) errors.push('tenant_slug is invalid');
+  } else if (tenantSlug && (!isValidTenantSlug(tenantSlug) || tenantSlug === 'system'))
+    errors.push('tenant_slug is invalid');
   if (!nonEmpty(scope.mission_id)) errors.push('mission_id is required');
   if (!nonEmpty(scope.purpose)) errors.push('purpose is required');
   if (!Array.isArray(scope.read_tiers) || scope.read_tiers.length === 0) {

@@ -18,6 +18,10 @@ import type {
   ExecutionFeedbackRequest,
 } from '../execution-feedback.js';
 import type { EventScope, EventScopeInput } from '../event-scope.js';
+import type {
+  MissionTeamRoleSelection,
+  MissionTeamSelectionResolution,
+} from '../organization/team-role-assignment-selection.js';
 
 export type SurfaceRole = GovernedArtifactRole;
 
@@ -280,6 +284,11 @@ export interface A2ATaskContext {
   // Set by WorkItem dispatch so runtime results can be attributed to the
   // canonical WorkItem without overloading the mission task id.
   work_item_id?: string;
+  lease_id?: string;
+  capability_profile?: 'planner' | 'explorer' | 'implementer';
+  requested_selection?: MissionTeamRoleSelection;
+  selection_resolution?: MissionTeamSelectionResolution;
+  required_capabilities?: string[];
   // Set by dispatchMissionNextTasks so the worker runtime can attribute the
   // ask to a NEXT_TASKS entry; consumed by the a2a bridge for scoping.
   task_id?: string;

@@ -49,6 +49,10 @@ import type { TaskModelHint } from '../reasoning/reasoning-model-routing.js';
 import type { TaskModelPhaseKind, TaskModelTier } from '../reasoning/reasoning-level-policy.js';
 import type { TierLevel } from '../types.js';
 import * as nodePath from 'node:path';
+import {
+  isSupervisorRefreshContractFailure,
+  isUncertainSupervisorTransportFailure,
+} from '../agent/supervisor-transport-uncertainty.js';
 
 const logger = createLogger('task-routing-judgment');
 
@@ -180,21 +184,60 @@ const NOT_ATTEMPTED_CODES = [
   'PROVIDER_EGRESS_DENIED',
   'EXECUTION_SURFACE_UNAVAILABLE',
   'AGENT_RUNTIME_AWAITING_HUMAN',
+  'AGENT_APPROVAL_PENDING',
+  'PROVIDER_PROFILE_REFUSED',
+  'ADVISORY_BACKEND_DENIED',
+  'TASK_TOOL_BINDING',
+  'TASK_TOOL_SCOPE_DENIED',
+  'TASK_TOOL_LEASE_LOST',
+  'TASK_TOOL_UNAVAILABLE',
   // A person declined a prompt the agent stopped on. Mid-turn the model has
   // run, but what ended the turn was a person's decision, not its capability.
   'AGENT_RUNTIME_PROMPT_DECLINED',
   'MISSION_WORKITEM_SCOPE_REQUIRED',
   'SCOPE_CONTEXT_INVALID',
+  'SCOPE_ENVELOPE_INVALID',
+  'EVENT_SCOPE_LINEAGE_CONFLICT',
+  'EVENT_SCOPE_INVALID',
+  'A2A_SCOPE_INVALID',
+  'RUNTIME_SCOPE_MISMATCH',
+  'AGENT_RUNTIME_BINDING_CONFLICT',
+  'MISSION_TEAM_SELECTION_INVALID',
+  'AGENT_RUNTIME_PREWARM_FAILED',
+  'SUPERVISOR_PREASK_FAILED',
 ];
 
-/** The code that stopped dispatch before the model, if any. */
+/** Infrastructure/policy failure code; transport loss does not prove a pre-model failure. */
 export function classifyDispatchFailure(notes: readonly string[]): string | undefined {
   for (const note of notes) {
     for (const code of NOT_ATTEMPTED_CODES) {
       if (note.includes(`[${code}]`)) return code;
     }
+    if (/A2A task contract validation failed:/iu.test(note)) return 'A2A_TASK_CONTRACT_INVALID';
+    if (isSupervisorRefreshContractFailure(note)) return 'SUPERVISOR_REFRESH_CONTRACT_INVALID';
+    if (isUncertainSupervisorTransportFailure(note)) return 'SUPERVISOR_TRANSPORT_UNAVAILABLE';
+    // These provider diagnostics mean no model could attempt the task.
+    // Raising the model tier cannot repair login or workspace trust.
+    if (
+      /\[auth\]|not signed in|not logged in|workspace has not been trusted|hasTrustDialogAccepted/iu.test(
+        note
+      )
+    )
+      return 'PROVIDER_AUTH_REQUIRED';
   }
   return undefined;
+}
+
+/** A lost transport reply does not prove whether the model or its tools ran. */
+export function classifyDispatchAttemptOutcome(
+  notes: readonly string[]
+): 'attempted' | 'not_attempted' | 'unknown' {
+  const failure = classifyDispatchFailure(notes);
+  return failure === 'SUPERVISOR_TRANSPORT_UNAVAILABLE'
+    ? 'unknown'
+    : failure
+      ? 'not_attempted'
+      : 'attempted';
 }
 
 export interface RoutingOutcome {
@@ -219,13 +262,15 @@ export interface RoutingOutcome {
    * failures would teach a router that small models are bad at things they
    * were not allowed to attempt.
    *
-   * `not_attempted` entries stay in the ledger, because they are useful for
+   * `unknown` retains transport loss without asserting whether effects ran;
+   * it never becomes a model capability label. `not_attempted` entries stay in the ledger, because they are useful for
    * seeing what keeps blocking dispatch, and `exportRoutingCorpus()` ignores
    * them. Absent on older entries; read as `attempted`.
    */
-  outcome?: 'attempted' | 'not_attempted';
+  outcome?: 'attempted' | 'not_attempted' | 'unknown';
   /** Why a `not_attempted` entry never reached the model. */
   not_attempted_reason?: string;
+  unknown_reason?: string;
   /** The tier that did complete it, when the chosen one did not. */
   escalated_to?: TaskModelTier;
   recorded_at: string;
@@ -267,6 +312,7 @@ export function recordRoutingOutcome(
       ...(outcome.not_attempted_reason
         ? { not_attempted_reason: outcome.not_attempted_reason }
         : {}),
+      ...(outcome.unknown_reason ? { unknown_reason: outcome.unknown_reason } : {}),
       ...(outcome.escalated_to ? { escalated_to: outcome.escalated_to } : {}),
       recorded_at: nowIso(),
     };
@@ -316,7 +362,7 @@ function collapseRoutingCorpus(outcomes: readonly RoutingOutcome[]): RoutingCorp
   const byTask = new Map<string, RoutingOutcome[]>();
   for (const outcome of outcomes) {
     // A policy refusal or a missing route is not evidence about any tier.
-    if (outcome.outcome === 'not_attempted') continue;
+    if (outcome.outcome === 'not_attempted' || outcome.outcome === 'unknown') continue;
     const list = byTask.get(outcome.task_excerpt) || [];
     list.push(outcome);
     byTask.set(outcome.task_excerpt, list);

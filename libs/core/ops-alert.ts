@@ -20,6 +20,7 @@ import {
   ensureRegularOpsAlertLogFile,
   resolveOpsAlertLogPath,
   validateOpsAlertLogRecord,
+  withOpsAlertFileStore,
 } from './ops-alert-log.js';
 
 export type OpsAlertSeverity = 'info' | 'warning' | 'critical';
@@ -78,7 +79,9 @@ function dedupeStatePathFor(alertLogPath: string): string {
 /** Load `key -> last-sent epochMs`, pruning entries older than 30 days. */
 function loadDedupeState(filePath: string, nowMs: number): Map<string, number> {
   const state = new Map<string, number>();
-  const raw = loadJsonIfPresent<Record<string, unknown>>(filePath);
+  const raw = withOpsAlertFileStore(filePath, () =>
+    loadJsonIfPresent<Record<string, unknown>>(filePath)
+  );
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return state;
   for (const [key, value] of Object.entries(raw)) {
     if (typeof value !== 'number' || !Number.isFinite(value)) continue;
@@ -91,7 +94,7 @@ function loadDedupeState(filePath: string, nowMs: number): Map<string, number> {
 /** Best-effort persist — dedupe persistence must never break alerting. */
 function persistDedupeState(filePath: string, state: Map<string, number>): void {
   try {
-    writeJson(filePath, Object.fromEntries(state));
+    withOpsAlertFileStore(filePath, () => writeJson(filePath, Object.fromEntries(state)));
   } catch (err) {
     logger.debug(
       `[ops-alert] failed to persist dedupe state: ${err instanceof Error ? err.message : String(err)}`

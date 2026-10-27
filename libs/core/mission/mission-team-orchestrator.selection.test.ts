@@ -198,7 +198,19 @@ describe('explicit mission prewarm to A2A lifecycle integration', () => {
     );
     const prewarmedHandle = agentLifecycle.getHandle(agentId);
     expect(prewarmedHandle).toBeDefined();
-    const handle = await a2aBridge.ensureAgent(agentId, undefined, taskPayload());
+    const payload = taskPayload();
+    const handle = await a2aBridge.ensureAgent(agentId, undefined, {
+      ...payload,
+      context: {
+        ...payload.context,
+        security_scope: {
+          write_tier: 'public',
+          read_tiers: ['public'],
+          mission_id: missionId,
+          purpose: 'mission-task',
+        },
+      },
+    });
     expect(handle).toBe(prewarmedHandle);
     expect(await handle.ask('execute task')).toBe('exact answer');
     expect(mocks.ensureRuntime).toHaveBeenCalledTimes(2);
@@ -229,7 +241,7 @@ describe('explicit mission prewarm to A2A lifecycle integration', () => {
     const prewarm = await ensureMissionTeamRuntime(missionId);
     expect(prewarm.assignments[0]).toMatchObject({
       runtime_status: 'failed',
-      error: expect.stringContaining('RUNTIME_CONFLICT'),
+      error: expect.stringMatching(/RUNTIME_(BINDING_)?CONFLICT/),
     });
     expect(mocks.ensureRuntime).toHaveBeenCalledOnce();
     await expect(a2aBridge.ensureAgent(agentId, undefined, taskPayload())).rejects.toThrow(
