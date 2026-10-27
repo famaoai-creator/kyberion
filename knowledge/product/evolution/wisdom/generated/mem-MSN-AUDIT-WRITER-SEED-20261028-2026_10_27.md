@@ -1,0 +1,44 @@
+---
+record_id: mem-MSN-AUDIT-WRITER-SEED-20261028-2026_10_27
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-AUDIT-WRITER-SEED-20261028-2026_10_27
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-27T16:45:14.883Z
+source_branch: fix/audit-writer-seed-20261028
+source_commit: b7e6dffe3af666c879dbcb0e1ec21c3582933c5b
+---
+
+# Append-only JSONL chains: read line by line, append on a fresh line
+
+For an append-only, hash-chained JSONL file, one unparseable line must hide only itself: writers seed from the last readable entry, appends start a new line after a tail fragment, and every verifier or repair tool reports the bad line instead of throwing or dropping the file.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- Lessons from MSN-AUDIT-WRITER-SEED-20261028 (audit chain, libs/core/governance/audit-chain.ts):
+
+1. Never parse a whole JSONL file all-or-nothing. A reader that returns [] when one line fails lets a single junk line hide a whole day: the writer then seeds from an earlier file and forks the chain, and lookups (idempotency, promotion audit refs) miss real entries. Read line by line; skip and count bad lines.
+2. Before appending, check the tail: if the file is non-empty and does not end in a newline (torn write or planted fragment), prefix a newline. Otherwise the next, properly signed record is concatenated into the fragment and becomes unreadable. If the tail cannot be read, still append with a leading newline; readers skip blank lines, so an extra newline is harmless while a dropped record is not.
+3. The verifier keeps the junk line as a permanent finding (<file>:line:N:invalid_record); the chain itself stays continuous because links are checked between readable entries. A hidden middle entry still shows as the junk line plus a previous_hash_mismatch on the next entry.
+4. When a verifier starts reporting a new finding class, check that the repair tool for that store can consume it. Here audit_mirror_reconcile threw on exactly the malformed mirror line verifyTenantMirrors began to report; it now emits a mirror_unreadable finding with quarantine_and_rebuild.
+
+## Recommended References
+
+- active/missions/public/MSN-AUDIT-WRITER-SEED-20261028/evidence/distillation.md
+
+## Evidence
+
+- active/missions/public/MSN-AUDIT-WRITER-SEED-20261028/evidence/distillation.md
+
+## Artifacts
