@@ -170,6 +170,14 @@ export interface DecisionAgenda {
    */
   operator_confirmations?: OperatorConfirmation[];
   /**
+   * CD-09 re-ask: the task proposals the operator facade re-asked onto this
+   * agenda (`customer-decision draft --from-tasks --reask`). Only the facade
+   * (`decision_ledger`) writes agendas, so the consumer store guard accepts a
+   * relink only onto an agenda naming that proposal, consumer and member here
+   * (`taskProposalRelinkProblem`). Ids only, outside the content hash, append-only.
+   */
+  reasked_proposals?: ReaskedProposalMarker[];
+  /**
    * CD-11: customer reminders sent or held for approval (one record per
    * agenda × actor × kind × target date). Ids, dates and statuses only,
    * outside the content hash (like `bolt_routing`); written by the facade's
@@ -396,7 +404,41 @@ export interface TaskDecisionProposal {
   collected_at?: string;
   /** `requires_customer`: the confirmed customer decision that released the hold. */
   resolved?: { decision_id: string; at: string };
+  /**
+   * Earlier agenda links of a re-asked proposal (`customer-decision draft
+   * --from-tasks --reask`), oldest first, append-only, at most
+   * {@link TASK_PROPOSAL_MAX_PREVIOUS_LINKS}: the link it had when its agenda
+   * was closed, withdrawn or gone with no confirmed answer, and who re-asked
+   * it when. The proposal's current link is the lock entry's own
+   * `agenda_id` / `entry_id`.
+   */
+  previous_links?: TaskProposalPreviousLink[];
 }
+
+/** One earlier agenda link of a re-asked task proposal (see {@link TaskDecisionProposal.previous_links}). */
+export interface TaskProposalPreviousLink {
+  agenda_id: string;
+  entry_id: string;
+  collected_at: string;
+  /** The release stamp the old link carried (its decision is superseded or gone). */
+  resolved?: { decision_id: string; at: string };
+  relinked_at: string;
+  /** The member who re-asked it (`user:<member>`). */
+  relinked_by: string;
+}
+
+/** One re-ask the facade recorded on its target agenda ({@link DecisionAgenda.reasked_proposals}). */
+export interface ReaskedProposalMarker {
+  proposal_id: string;
+  consumer: string;
+  /** The member who re-asked it (`user:<member>`), equal to the lock link's `relinked_by`. */
+  by: string;
+  /** Equal to the lock link's `relinked_at`. */
+  at: string;
+}
+
+/** How many times one task proposal may be re-asked. */
+export const TASK_PROPOSAL_MAX_PREVIOUS_LINKS = 10;
 
 /** What a task consumed at its start (same shape idea as the SSOD `DecisionLock`). */
 export interface ConsumedDecisionLock {

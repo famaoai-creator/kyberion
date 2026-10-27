@@ -34,6 +34,7 @@ export interface Payload {
     nextTasksTotal: number;
     nextTasksPending: number;
     nextTasksCompleted: number;
+    nextTasksSuperseded?: number;
     dependencies: string[];
     generatedAssets: Array<{
       path: string;

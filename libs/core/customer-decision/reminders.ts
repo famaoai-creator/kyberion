@@ -10,16 +10,24 @@
  *   - `override_closing` from two days before a date `override_until`
  *     deadline until the window closes — to each decider with a valid invite,
  *     while an entry with that deadline still follows our side (layer `ours`
- *     or `org_default`). Starting two days early lets a missed daily run
+ *     or `org_default`). Starting two days early lets a missed day of sweeps
  *     catch up; the record key keeps it to one notice per deadline.
  * Only an agenda with invites whose approval matches its content gets reminders
  * (closed, withdrawn and edited-but-not-re-approved agendas get none).
  *
+ * Sweeps: the tenant pipeline runs hourly from 09:30 to 18:30 Asia/Tokyo
+ * (`30 9-18 * * *`, 00:30–09:30 UTC, so every sweep of a day falls on the same
+ * UTC date). Running more than once a day changes nothing about what is sent:
+ * the records below keep each reminder to one send. It lets a held reminder
+ * approved after one sweep go out later the same day — which matters for a
+ * `due` reminder, which is never carried over to the next day.
+ *
  * One record per agenda × actor × kind × target date (`reminder_id`), kept
  * on the agenda outside the content hash (`agenda.reminders`). A record in
  * `approval_pending` is planned again (the sweep re-asks the gate with the
- * same correlation id), also after its send day (an approval granted after
- * the day's sweep) for at most `REMINDER_CARRY_OVER_DAYS` and never after the
+ * same correlation id): on its send day by every later sweep, and after it
+ * (an approval granted after the day's last sweep) for at most
+ * `REMINDER_CARRY_OVER_DAYS` and never after the
  * date it is about; a held reminder no longer due is `lapsed` (dropped, its
  * request withdrawn, nothing sent) and planned again only if it becomes due
  * again. Every other status is final. A `due` reminder is not sent on a day a

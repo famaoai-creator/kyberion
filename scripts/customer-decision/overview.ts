@@ -39,6 +39,7 @@ import {
 } from '@agent/core/customer-decision';
 import { ScriptExitError } from '../lib/harness.js';
 import { asLedgerWriter, diagnosticCode, tenantOf, usageError } from './common.js';
+import { isApprovedSupersededConsumerLock } from './superseded-locks.js';
 
 /**
  * `--tenant` (bound-tenant check in `tenantOf`); tenant-wide verbs take no
@@ -89,6 +90,7 @@ function caseInput(
       )
     ),
     now,
+    isSuperseded: (lock) => isApprovedSupersededConsumerLock(tenant, lock),
   }));
 }
 

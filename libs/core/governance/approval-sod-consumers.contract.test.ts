@@ -35,6 +35,7 @@ const SOD_CONSUMERS: ReadonlyArray<{ file: string; consumer: string }> = [
   { file: 'scripts/pipeline-execution-part-control.ts', consumer: 'pipeline_bound_approval' },
   { file: 'libs/core/mission/mission-maintenance.ts', consumer: 'mission_scope_approve' },
   { file: 'libs/core/mission/mission-work-reconciliation.ts', consumer: 'mission_reconcile_work' },
+  { file: 'libs/core/mission/mission-task-supersede.ts', consumer: 'mission_task_supersede' },
   { file: 'libs/core/secret/secret-introduction.ts', consumer: 'secret_introduction' },
   { file: 'libs/core/workforce/background-review-patch.ts', consumer: 'background_review_patch' },
   { file: 'libs/core/mesh/peer-runtime-recovery.ts', consumer: 'peer_runtime_recovery' },

@@ -584,4 +584,176 @@ describe('customer-decision confirm releases a held task (CD-09, governed entry,
     },
     240_000
   );
+
+  it.skipIf(STALE_DIST !== null)(
+    `re-ask (CD-09 lifecycle): a question whose agenda was withdrawn unanswered is asked again, answered, confirmed through the CLI and released; the resumed task gets the value${STALE_DIST ? ` (skipped: ${STALE_DIST} — run pnpm -s build)` : ''}`,
+    async () => {
+      const coordination = await import('@agent/core/workforce/work-coordination');
+      const lockApi = await import('@agent/core/mission/mission-decision-lock');
+      const { readLedger } = await import('@agent/core/decision-ledger');
+      const { readConsumedDecisionLock } = await import('@agent/core/customer-decision');
+      const { DECISION_LEDGER_ROLES } = await import('@agent/core/decision-ledger');
+      const mission = 'MSN-CD09-REASK';
+      const consumer = `mission-${mission}.${TASK}`;
+      const task = { missionId: mission, taskId: TASK };
+      const awaiting = () =>
+        lockApi.isTaskAwaitingCustomerDecision(task, { decisionCase: decisionCase(), now: NOW });
+      const reaskLock = () =>
+        initialContext(
+          DECISION_LEDGER_ROLES.write,
+          () => readConsumedDecisionLock({ tenantSlug: TENANT, caseId: CASE }, consumer),
+          undefined,
+          TENANT
+        );
+      const workItem = coordination.createWorkItem({
+        title: TASK,
+        description: TASK,
+        status: 'blocked',
+        metadata: { blocked_reason: 'awaiting_customer_decision' },
+      });
+      const held = lockApi.recordTaskDecisionProposals(
+        {
+          ...task,
+          requests: [
+            {
+              question: 'May we open the portal to all branches?',
+              item: 'RELEASE',
+              key: 'portal.rollout',
+              requires_customer: true,
+            },
+          ],
+          workItemId: workItem.item_id,
+        },
+        { decisionCase: decisionCase(), now: NOW }
+      );
+      const [proposalId] = held.hold_proposal_ids;
+      const first = await run(['draft', ...base(), '--from-tasks', '--customer', 'acme']);
+      const firstAgenda = String(first.agenda_id);
+      // The operator withdraws that agenda before the customer answers: nothing can release it.
+      await run(['withdraw', ...base(), '--agenda', firstAgenda, '--by', OPERATOR]);
+      expect(awaiting()).toBe(true);
+      const unresolvable = (
+        (await run(['status', ...base()])).task_proposals as { awaiting_customer: Out[] }
+      ).awaiting_customer.find((item) => item.consumer === consumer);
+      expect(unresolvable).toMatchObject({
+        status: 'unresolvable',
+        unresolvable_proposal_ids: [proposalId],
+      });
+
+      // Re-asked: a new draft agenda; the lock is written as the content-checked consumer store.
+      const reasked = await run([
+        'draft',
+        ...base(),
+        '--from-tasks',
+        '--reask',
+        proposalId,
+        '--by',
+        OPERATOR,
+        '--customer',
+        'acme',
+      ]);
+      expect(reasked).toMatchObject({ reasked: 1, added: 1 });
+      const agendaId = String(reasked.agenda_id);
+      expect(agendaId).not.toBe(firstAgenda);
+      const relinked = (await reaskLock())?.decisions.find(
+        (entry) => entry.proposal?.proposal_id === proposalId
+      );
+      expect(relinked).toMatchObject({
+        agenda_id: agendaId,
+        proposal: {
+          previous_links: [
+            expect.objectContaining({ agenda_id: firstAgenda, relinked_by: OPERATOR }),
+          ],
+        },
+      });
+      expect(awaiting()).toBe(true);
+
+      await run(['submit', ...base(), '--agenda', agendaId, '--by', OPERATOR]);
+      await run(['actor-add', ...base(), '--customer', 'acme', '--actor', ACTOR, '--name', 'CTO']);
+      const sent = await run([
+        'send',
+        ...base(),
+        '--agenda',
+        agendaId,
+        '--name',
+        'Hanako',
+        '--role',
+        'decider',
+        '--actor',
+        ACTOR,
+      ]);
+      const token = String(sent.link).split('#t=')[1];
+      const view = await customer('view', { token });
+      expect(
+        await customer('respond', {
+          token,
+          content_hash: view.content_hash,
+          answers: [{ entry_id: proposalId, choice: 'approve' }],
+        })
+      ).toMatchObject({ ok: true });
+      const decisionId = initialContext(
+        'ecosystem_architect',
+        () =>
+          readLedger({ tenantSlug: TENANT, caseId: CASE }).find(
+            (record) => record.key === 'portal.rollout'
+          )?.id
+      );
+      expect(decisionId).toEqual(expect.any(String));
+      expect(awaiting()).toBe(true);
+
+      // Confirmed through the governed CLI with a human approval: released.
+      const confirmArgs = [
+        '--tenant',
+        TENANT,
+        '--case',
+        CASE,
+        '--agenda',
+        agendaId,
+        '--entry',
+        proposalId,
+        '--by',
+        OPERATOR,
+      ];
+      const pending = await confirmChild(confirmArgs, TENANT);
+      expect(pending.status, pending.stderr).toBe(0);
+      const requestId = String(pending.out?.approval_request_id);
+      const { loadApprovalRequest } = await vi.importActual<
+        typeof import('@agent/core/governance/approval-store')
+      >('@agent/core/governance/approval-store');
+      const { decideApprovalRequest } = await import('@agent/core/governance/approval-store');
+      const request = loadApprovalRequest('terminal', requestId);
+      decideApprovalRequest('mission_controller', {
+        channel: 'terminal',
+        requestId,
+        decision: 'approved',
+        decidedBy: OPERATOR,
+        decidedByType: 'human',
+        authenticated: true,
+        authMethod: 'surface_session',
+        payloadHash: request?.accountability?.payloadHash,
+        effectBinding: request?.accountability?.effectBinding,
+      });
+      const confirmed = await confirmChild(confirmArgs, TENANT);
+      expect(confirmed.status, confirmed.stderr).toBe(0);
+      expect(confirmed.out).toMatchObject({ decision_id: decisionId, status: 'confirmed' });
+      expect(awaiting()).toBe(false);
+      const released = await reaskLock();
+      expect(released?.hold?.resolved_at).toEqual(expect.any(String));
+      expect(coordination.getWorkItem(workItem.item_id)?.metadata).toMatchObject({
+        customer_decision_hold: { status: 'resolved', decision_ids: [decisionId] },
+      });
+
+      // Resume: the re-pin delivers the confirmed decision of the re-asked question.
+      const resumed = lockApi.pinTaskDecisions(
+        { ...task, mode: 'start' },
+        { decisionCase: decisionCase(), now: NOW }
+      );
+      expect(JSON.parse(JSON.stringify(resumed))).toMatchObject({
+        consumer,
+        decision_values: { count: 1, decision_ids: [decisionId] },
+      });
+      expect(resumed).not.toHaveProperty('held');
+    },
+    240_000
+  );
 });

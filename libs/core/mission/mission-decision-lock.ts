@@ -64,11 +64,13 @@ import { ConfidentialTaskDecisionValues } from '../customer-decision/task-decisi
 import type { TaskCustomerDecisionRequest } from '../surface/channel-surface-types.js';
 import type { DecisionAgenda, DecisionSwitch } from '../customer-decision/model.js';
 import {
+  isConsumedDecisionLockSuperseded,
   listAgendaIds,
   listConsumedDecisionLockIds,
   readAgenda,
   readConsumedDecisionLock,
   readSwitches,
+  supersededConsumedDecisionLock,
   withCustomerDecisionCaseLock,
   writeConsumedDecisionLock,
   type ConsumedDecisionLockRecord,
@@ -92,6 +94,7 @@ import {
 } from './mission-state.js';
 import { readMissionStateAtPath } from './mission-state-reader.js';
 import { boundTenant } from '../owner-scope.js';
+import { isTaskVerifiablySuperseded } from './mission-task-supersede-proof.js';
 import type { MissionState } from './mission-types.js';
 
 export interface MissionDecisionCase {
@@ -121,6 +124,16 @@ export interface MissionDecisionLockOptions {
   lockTimeoutMs?: number;
   /** Work coordination root (tests). */
   workItemRootDir?: string;
+  /**
+   * The mission-side supersede proof (tests); defaults to
+   * {@link isTaskVerifiablySuperseded}. A lock's `superseded` mark counts
+   * only when it holds.
+   */
+  verifySuperseded?: (
+    missionId: string,
+    taskId: string,
+    options: { byTaskId?: string; approvalRequestId?: string }
+  ) => boolean;
 }
 
 export interface PinTaskDecisionsResult {
@@ -225,6 +238,34 @@ function asConsumerStore<T>(
 
 /** Reads exactly `knowledge/personal/tenants/<tenant>.json` (shared core role). */
 const TENANT_REGISTRY_READER_ROLE = 'workspace_tenant_registry_reader';
+
+/**
+ * Is the lock superseded, with proof on the mission side (review B1)? The
+ * `superseded` mark alone is not trusted: the lock's owner (a worker) could
+ * write it on its own held lock. Only a task the mission superseded under an
+ * approved, authenticated human `mission_gate` request counts; an unproven
+ * mark is ignored (the lock keeps its hold) and logged once.
+ */
+export function isDecisionLockVerifiablySuperseded(
+  lock: ConsumedDecisionLockRecord,
+  options: Pick<MissionDecisionLockOptions, 'verifySuperseded'> = {}
+): boolean {
+  if (!isConsumedDecisionLockSuperseded(lock) || !lock.superseded) return false;
+  const verify = options.verifySuperseded ?? isTaskVerifiablySuperseded;
+  const verified = verify(lock.mission_id, lock.task_id, {
+    byTaskId: lock.superseded.by_task_id,
+    approvalRequestId: lock.superseded.approval_request_id,
+  });
+  if (!verified) {
+    warnOnce(
+      lock.mission_id,
+      'customer decision lock superseded mark ignored',
+      new Error('[SUPERSEDE_UNPROVEN] the mission has no approved supersede of this task'),
+      `${lock.consumer} by=${lock.superseded.by_task_id} — the lock keeps its hold; supersede the task with pnpm mission supersede-task ${lock.mission_id} ${lock.task_id} --by <new_task_id> --reason <text> --request-approval`
+    );
+  }
+  return verified;
+}
 
 const consumerFile = (consumer: string) => `consumers/${consumer}.json`;
 
@@ -899,6 +940,9 @@ function releaseResolvedHolds(
   const released: string[] = [];
   for (const lock of snapshot.locks) {
     if (!lock.hold || lock.hold.resolved_at) continue;
+    // A superseded task never resumes: its lock is frozen, nothing to release
+    // (only a supersede the mission proves; an unproven mark is ignored).
+    if (isDecisionLockVerifiablySuperseded(lock, options)) continue;
     try {
       const holds = taskProposalHolds(lock, snapshot.agendas, snapshot.ledger, now);
       const resolved = new Map(
@@ -1141,6 +1185,8 @@ export function isTaskAwaitingCustomerDecision(
   try {
     const now = options.now ?? nowIso();
     const { agendas, ledger, locks } = readCase(decisionCase, { owner: consumer });
+    // A superseded task waits for nothing (its replacement carries the work).
+    if (locks[0] && isDecisionLockVerifiablySuperseded(locks[0], options)) return false;
     return Boolean(locks[0] && unresolvedHoldIds(locks[0], agendas, ledger, now).length > 0);
   } catch (error) {
     // The case exists but the lock cannot be read: never close on a guess.
@@ -1249,6 +1295,9 @@ export function sweepDecisionConsumers(
               ? []
               : findStaleConsumersForSwitches({
                   locks: snapshot.locks,
+                  // A superseded task's lock is frozen: no rework is filed for it
+                  // (only a supersede the mission proves).
+                  isSuperseded: (lock) => isDecisionLockVerifiablySuperseded(lock, options),
                   switches,
                   agendas: snapshot.agendas,
                   ledger: snapshot.ledger,
@@ -1282,4 +1331,94 @@ export function sweepDecisionConsumers(
   }
   result.rework_work_item_ids = [...new Set(result.rework_work_item_ids)].sort();
   return result;
+}
+
+export interface TaskDecisionLockSupersedeResult {
+  /** false: the mission has no decision case; nothing was marked. */
+  case_found: boolean;
+  consumer: string;
+  case_id?: string;
+  /** The lock now carries the supersede mark (false: no lock, or the write failed). */
+  marked: boolean;
+  /** The mark was already on the lock (an idempotent re-run). */
+  already_marked?: boolean;
+  /** Finding the case or writing the lock failed (logged); the supersede goes on. */
+  failed?: boolean;
+}
+
+/**
+ * `mission_controller supersede-task`: mark the replaced task's consumer lock
+ * superseded (`superseded: {by_consumer, by_task_id, at}`, top level). The lock
+ * is written by its own owner under the narrow consumer store role; the guard
+ * accepts the mark only on an existing lock, alone in that write, naming
+ * another task of the same mission, and freezes the lock afterwards. A
+ * superseded lock is never released, re-held or reworked. No case or no lock:
+ * nothing to mark. Never throws (a failure is logged; ids only).
+ */
+export function markTaskDecisionLockSuperseded(
+  input: { missionId: string; taskId: string; byTaskId: string; approvalRequestId: string },
+  options: MissionDecisionLockOptions = {}
+): TaskDecisionLockSupersedeResult {
+  const consumer = missionTaskConsumerId(input.missionId, input.taskId);
+  const byConsumer = missionTaskConsumerId(input.missionId, input.byTaskId);
+  let caseId: string | undefined;
+  try {
+    const decisionCase = resolveMissionDecisionCase(input.missionId, options);
+    if (!decisionCase) return { case_found: false, consumer, marked: false };
+    caseId = decisionCase.caseId;
+    // Only a supersede the mission already proves is mirrored onto the lock.
+    const verify = options.verifySuperseded ?? isTaskVerifiablySuperseded;
+    if (
+      !verify(input.missionId, input.taskId, {
+        byTaskId: input.byTaskId,
+        approvalRequestId: input.approvalRequestId,
+      })
+    ) {
+      throw new Error('[SUPERSEDE_UNPROVEN] the mission has no approved supersede of this task');
+    }
+    const now = options.now ?? nowIso();
+    return withCustomerDecisionCaseLock(
+      decisionCase.location,
+      () => {
+        const { locks } = readCase(decisionCase, { owner: consumer });
+        const lock = locks[0];
+        if (!lock) {
+          return { case_found: true, consumer, case_id: decisionCase.caseId, marked: false };
+        }
+        if (lock.superseded) {
+          return {
+            case_found: true,
+            consumer,
+            case_id: decisionCase.caseId,
+            marked:
+              lock.superseded.by_consumer === byConsumer &&
+              lock.superseded.approval_request_id === input.approvalRequestId,
+            already_marked: true,
+          };
+        }
+        writeLock(
+          decisionCase,
+          supersededConsumedDecisionLock(lock, {
+            by_consumer: byConsumer,
+            by_task_id: input.byTaskId,
+            at: now,
+            approval_request_id: input.approvalRequestId,
+          })
+        );
+        return { case_found: true, consumer, case_id: decisionCase.caseId, marked: true };
+      },
+      ...(options.lockTimeoutMs !== undefined ? [options.lockTimeoutMs] : [])
+    );
+  } catch (error) {
+    logger.warn(
+      `customer decision lock not marked superseded — ${diagnosticCode(error)} | the task is superseded on the mission; the lock keeps its hold until marked — re-run supersede-task with the same approval to retry | ${consumer}${caseId ? ` case=${caseId}` : ''} by=${byConsumer}`
+    );
+    return {
+      case_found: caseId !== undefined,
+      consumer,
+      ...(caseId ? { case_id: caseId } : {}),
+      marked: false,
+      failed: true,
+    };
+  }
 }

@@ -33,6 +33,20 @@ describe('task dispatch timeout (MO-03)', () => {
     expect(byId.get('e')).toBe('completed'); // terminal states untouched
   });
 
+  it('leaves a superseded task and its (rewritten) dependents alone', () => {
+    const tasks = [
+      { task_id: 'old', status: 'superseded', dependencies: [] },
+      { task_id: 'new', status: 'planned', dependencies: [] },
+      { task_id: 'after', status: 'planned', dependencies: ['new'] },
+    ] as never[];
+    expect(cascadeBlockedDependents(tasks as never)).toEqual([]);
+    expect((tasks as Array<{ status: string }>).map((task) => task.status)).toEqual([
+      'superseded',
+      'planned',
+      'planned',
+    ]);
+  });
+
   it('returns empty when nothing is blocked', () => {
     const tasks = [
       { task_id: 'a', status: 'planned', dependencies: [] },

@@ -50,9 +50,31 @@ export type TaskResultBlock = NonNullable<
   ReturnType<typeof extractSurfaceBlocks>['taskResults']
 >[number];
 
+/**
+ * `mission_controller supersede-task` closed this task in favour of another
+ * (authenticated human approval). Ids and the reason's SHA-256 only — the
+ * reason text stays in the mission receipt `evidence/task-supersede/<task>.json`.
+ */
+export interface MissionTaskSupersededRecord {
+  by_task_id: string;
+  at: string;
+  actor_id: string;
+  reason_sha256: string;
+  approval_request_id: string;
+}
+
+/** A dependency `supersede-task` moved from the replaced task to its replacement. */
+export interface MissionTaskDependencyRewrite {
+  from: string;
+  to: string;
+  at: string;
+}
+
 export interface PlannedNextTask {
   task_id: string;
   status?: string;
+  superseded?: MissionTaskSupersededRecord;
+  dependencies_rewritten_from?: MissionTaskDependencyRewrite[];
   rework_count?: number;
   assigned_to?: {
     role?: string;

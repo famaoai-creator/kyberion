@@ -2,14 +2,14 @@
   "action": "pipeline",
   "name": "customer-decision-reminders",
   "version": "1.0.0",
-  "description": "CD-11 daily customer decision reminders for one tenant: answer reminders the day before and on an agenda's respond-by date, and override-closing notices two days before a date deadline, sent through each decider's bound channel (fixed templates via sendToCustomer and the outbound approval gate); deciders without a bound channel become operator inbox tasks. Install into a tenant with `pnpm kyberion customer-decision reminders --install --tenant <slug> --by user:<member>`; Chronos runs it only after a human approves its project trust.",
+  "description": "CD-11 customer decision reminders for one tenant, swept hourly from 09:30 to 18:30 Asia/Tokyo (each reminder is sent once per day; a held reminder approved after one sweep goes out on the next): answer reminders the day before and on an agenda's respond-by date, and override-closing notices two days before a date deadline, sent through each decider's bound channel (fixed templates via sendToCustomer and the outbound approval gate); deciders without a bound channel become operator inbox tasks. Install into a tenant with `pnpm kyberion customer-decision reminders --install --tenant <slug> --by user:<member>`; Chronos runs it only after a human approves its project trust. A tenant installed with the earlier once-a-day schedule re-installs with `--force` and re-approves the project trust.",
   "_refs": {
     "plan": "docs/developer/improvement-plans-2026-10/CUSTOMER_DECISION_HEARING_PLAN_2026-10-24.ja.md",
     "cli": "pnpm kyberion customer-decision remind --tenant <slug> [--dry-run]"
   },
   "schedule": {
     "id": "customer-decision-reminders",
-    "cron": "30 9 * * *",
+    "cron": "30 9-18 * * *",
     "timezone": "Asia/Tokyo",
     "enabled": true
   },
