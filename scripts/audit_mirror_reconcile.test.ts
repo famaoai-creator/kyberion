@@ -288,7 +288,7 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     const id = request();
     const record = loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)!;
     expect(record.summary).toContain(
-      '1 mirror entry has no readable master copy: the rebuild leaves it out of the live mirror and it survives only in the archive.'
+      '1 mirror entry has no matching readable master copy: the rebuild leaves it out of the live mirror and it survives only in the archive.'
     );
     expect(record.justification?.impactSummary).toContain('survives only in the archive');
     expect(record.details).toContain('AUD-B');
