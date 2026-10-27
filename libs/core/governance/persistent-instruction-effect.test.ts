@@ -5,7 +5,7 @@ import {
   describePersistentInstructionWrite,
   describeOpaqueInstructionExecution,
   isPersistentInstructionPath,
-} from './persistent-instruction-effect.js';
+} from '../foundation/persistent-instruction-effect.js';
 import { policyEngine } from './policy-engine.js';
 import { auditChain } from './audit-chain.js';
 import {

@@ -41,11 +41,12 @@ export function credentialExecutionIdentity(): CredentialIdentity {
   if (!scope?.tenantBound && isBoundTenantInvalid())
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Invalid configured tenant');
   const runtimeTenant = scope?.tenantBound ? scope.tenantSlug : projectScope.tenantSlug;
-  if (scope?.tenantBound && !scope.tenantSlug)
+  if (scope?.tenantBound && !scope.tenantSlug && !scope.tenantCleared)
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Missing runtime tenant');
   const tenantSlug = runtimeTenant || envelope?.tenantSlug;
   const resourceTenant = currentResourceAccessScope()?.tenantSlug;
   if (
+    (scope?.tenantCleared && (scope.tenantSlug || envelope?.tenantSlug || resourceTenant)) ||
     (tenantSlug && !isValidTenantSlug(tenantSlug)) ||
     (runtimeTenant && envelope?.tenantSlug && runtimeTenant !== envelope.tenantSlug) ||
     (resourceTenant && resourceTenant !== tenantSlug)

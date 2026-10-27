@@ -22,6 +22,7 @@ const ENV_KEYS = [
   'KYBERION_PERSONA',
   'MISSION_ID',
   'KYBERION_SECRET_ENCRYPTION',
+  'KYBERION_TENANT',
 ] as const;
 const REGISTRY_RELATIVE = 'knowledge/personal/connections/chronos-access.json';
 
@@ -130,6 +131,35 @@ describe('TR-01 chronos_token_registry_reader', () => {
     });
   });
 
+  it('authenticates from system scope without exposing other personal connections to a tenant', async () => {
+    const { authority, registry, secureIo } = await loadModules();
+    process.env.KYBERION_TENANT = 'acme-corp';
+    expect(() =>
+      authority.withExecutionContext(registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
+        registry.readChronosTokenRegistrations()
+      )
+    ).toThrow('CREDENTIAL_CONNECTION_DENIED');
+    const registrations = authority.withExecutionContext(
+      registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+      () => {
+        expect(() =>
+          secureIo.withSensitivePathMediation(() =>
+            secureIo.safeReadFile(
+              path.join(root, 'knowledge/personal/connections/other-service.json')
+            )
+          )
+        ).toThrow();
+        return registry.readChronosTokenRegistrations();
+      },
+      undefined,
+      ''
+    );
+    expect(registry.findChronosTokenRegistration(issued.token, registrations ?? [])?.role).toBe(
+      'readonly'
+    );
+    expect(authority.resolveIdentityContext().tenantSlug).toBe('acme-corp');
+  });
+
   it('may be assumed only by the surfaces that read the registry', async () => {
     const { authority, registry } = await loadModules();
     for (const systemRole of ['chronos_mirror_v2', 'concierge']) {
@@ -226,6 +256,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
 
   it('reads the registry as the reader role through the authn seam (deps.registrations unset)', async () => {
     process.env.SYSTEM_ROLE = 'concierge';
+    process.env.KYBERION_TENANT = 'acme-corp';
     // No vi.resetModules(): nothing else in this file loads surface-authn, so
     // its first import below binds the mocked registry while authority stays
     // the shared instance. A second module generation here would re-register

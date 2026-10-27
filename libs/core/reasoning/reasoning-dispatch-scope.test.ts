@@ -87,6 +87,11 @@ describe('lexical no-redispatch scope', () => {
     expect(create.mock.calls[0][1]).toMatchObject({ maxRetries: 0 });
     await backend.delegateTask('two');
     expect(create.mock.calls[1][1]).toBeUndefined();
+    const controller = new AbortController();
+    await withoutAutomaticReasoningRedispatch(() =>
+      backend.delegateTask('cancel-aware', undefined, { signal: controller.signal })
+    );
+    expect(create.mock.calls[2][1]).toEqual({ signal: controller.signal, maxRetries: 0 });
     await withoutAutomaticReasoningRedispatch(() =>
       backend.crossCritique({ topic: 'synthetic', personas: [], hypotheses: [] })
     );

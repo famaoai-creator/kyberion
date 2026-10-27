@@ -46,6 +46,8 @@ export interface ExecutionIdentityBinding {
 export interface ExecutionScope {
   readonly tenantBound: boolean;
   readonly tenantSlug?: string;
+  /** Trusted authority helper explicitly cleared inherited tenant identity. */
+  readonly tenantCleared?: true;
   /** Organization whose governed state the current store-writer may access. */
   readonly organizationId?: string;
   readonly executionIdentity?: ExecutionIdentityBinding;

@@ -156,7 +156,7 @@ describe('runtime recovery replay across abrupt process termination', () => {
 
   it('restores a committed compaction in a fresh process without appending or replaying tool effects', () => {
     const f = fixture();
-    const missionId = `MSN-RECOVERY-FIXTURE-${randomUUID()}`;
+    const missionId = `MSN-RECOVERY-FIXTURE-${randomUUID()}`.toUpperCase();
     const missionDir = pathResolver.missionDir(missionId, 'public');
     cleanup.push(missionDir);
     const scope = { tier: 'public', mission_id: missionId, task_id: 'restore-task' };

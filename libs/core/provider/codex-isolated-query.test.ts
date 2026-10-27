@@ -61,6 +61,7 @@ vi.mock('../workforce/workspace-ledger.js', async (importOriginal) => {
 });
 
 import * as pathResolver from '../path-resolver.js';
+import * as codexQuery from './codex-cli-query.js';
 import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '../secure-io.js';
 import {
   CODEX_ISOLATED_EXEC_FLAGS,
@@ -181,15 +182,23 @@ function scratchDirs(): string[] {
 describe('isolated Codex credential environment', () => {
   it('rejects an unbound tenant before version or request spawn', async () => {
     mocks.spawnMock.mockClear();
-    await runInExecutionScope({ tenantBound: true, tenantSlug: 'isolated-fixture' }, async () => {
-      expect(() =>
-        buildCodexIsolatedEnv({ HOME: '/operator', CODEX_HOME: '/operator/.codex' })
-      ).toThrow('CREDENTIAL_BINDING_REQUIRED');
-      await expect(
-        runCodexIsolatedQuery({ systemPrompt: 'system', userPrompt: 'must not send', schema })
-      ).rejects.toThrow('CREDENTIAL_BINDING_REQUIRED');
+    const discover = vi.spyOn(codexQuery, 'resolveCodexBinary').mockImplementation(() => {
+      throw new Error('ambient binary discovery must not precede tenant authorization');
     });
-    expect(mocks.spawnMock).not.toHaveBeenCalled();
+    try {
+      await runInExecutionScope({ tenantBound: true, tenantSlug: 'isolated-fixture' }, async () => {
+        expect(() =>
+          buildCodexIsolatedEnv({ HOME: '/operator', CODEX_HOME: '/operator/.codex' })
+        ).toThrow('CREDENTIAL_BINDING_REQUIRED');
+        await expect(
+          runCodexIsolatedQuery({ systemPrompt: 'system', userPrompt: 'must not send', schema })
+        ).rejects.toThrow('CREDENTIAL_BINDING_REQUIRED');
+      });
+      expect(discover).not.toHaveBeenCalled();
+      expect(mocks.spawnMock).not.toHaveBeenCalled();
+    } finally {
+      discover.mockRestore();
+    }
   });
   it('uses only the validated tenant HOME even when a caller passes an operator profile', () => {
     const tenant = 'isolated-fixture';

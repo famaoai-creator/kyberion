@@ -903,6 +903,7 @@ function prepareExecutionContext(
     scope: {
       tenantBound: tenantSlug !== undefined,
       ...(tenantSlug ? { tenantSlug } : {}),
+      ...(tenantSlug === '' ? { tenantCleared: true as const } : {}),
       ...(organizationId ? { organizationId } : {}),
       ...(Object.keys(executionIdentity).length
         ? { executionIdentity: Object.freeze(executionIdentity) }
