@@ -13,6 +13,7 @@ import { withLockSync } from '../foundation/lock-utils.js';
 export { registerLockIo } from '../foundation/lock-utils.js';
 import {
   computeAuditEntryHash,
+  createChainAlgTracker,
   GENESIS_HASH,
   getAuditChainKeyId,
   resolveAuditChainKey,
@@ -184,6 +185,8 @@ export function normalizePersistedAuditEntry(value: unknown): AuditEntry {
 
 export interface AuditVerifyOptions {
   since?: string;
+  /** Treat every unkeyed (`sha256`) entry as a finding, not only a downgrade. */
+  requireKeyed?: boolean;
 }
 
 export interface AuditVerifyResult {
@@ -192,6 +195,8 @@ export interface AuditVerifyResult {
   total: number;
   checkedFiles?: string[];
   boundaryLimited?: boolean;
+  /** Unkeyed (`sha256`) entries checked: a legacy prefix anyone could recompute. */
+  unkeyed?: number;
 }
 
 /** Secure I/O capabilities supplied by the secure-io boundary. */
@@ -500,6 +505,7 @@ class AuditChainImpl {
     let previousFileDate: string | null = null;
     let invalidEntryCount = 0;
     const boundaryLimited = Boolean(options.since);
+    const algTracker = createChainAlgTracker({ requireKeyed: options.requireKeyed });
 
     for (const fileName of files) {
       const fileDate = this.extractAuditDate(fileName);
@@ -514,16 +520,16 @@ class AuditChainImpl {
           prevHash = entry.previousHash;
         }
         const chainAlg = entry.chain_alg ?? 'sha256';
+        const algFinding = algTracker.observe(chainAlg);
+        if (algFinding) corrupted.push(`${entry.id}:${algFinding}`);
         const chainKey =
           chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
         const check = verifyAuditEntryHash(entry as unknown as Record<string, unknown>, prevHash, {
           alg: chainAlg,
           ...(chainKey ? { key: chainKey } : {}),
         });
-        if (!check.ok) {
-          corrupted.push(entry.id);
-          invalidEntryCount++;
-        }
+        if (!check.ok) corrupted.push(entry.id);
+        if (!check.ok || algFinding) invalidEntryCount++;
 
         prevHash = entry.currentHash;
       }
@@ -535,6 +541,7 @@ class AuditChainImpl {
       total: entries.length,
       checkedFiles: files,
       boundaryLimited,
+      unkeyed: algTracker.unkeyed,
     };
 
     if (corrupted.length > 0) {

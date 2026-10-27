@@ -59,6 +59,11 @@ async function main(args: string[] = []) {
       type: 'array',
       describe: 'Additional ledger path(s), repeatable or comma-separated',
     })
+    .option('require-keyed', {
+      type: 'boolean',
+      default: false,
+      describe: 'Treat every unkeyed (sha256) legacy entry as a finding, not only a downgrade',
+    })
     .option('warn-only', {
       type: 'boolean',
       default: false,
@@ -76,6 +81,7 @@ async function main(args: string[] = []) {
           : undefined
     ),
     ledgers: parseLedgerArgs(argv.ledger ?? readArgValue(args, '--ledger')),
+    requireKeyed: Boolean(argv.requireKeyed) || hasArg(args, '--require-keyed'),
   });
   // TODO(SA-01): historical chain data written before HMAC hardening (and by
   // concurrent appenders) fails verification. Per README §5, fail-closed

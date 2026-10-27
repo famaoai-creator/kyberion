@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import {
   computeLedgerEntryHash,
+  createChainAlgTracker,
   GENESIS_HASH,
   getAuditChainKeyId,
   resolveAuditChainKey,
@@ -467,6 +468,13 @@ export interface LedgerIntegrityReport {
   total: number;
   corrupted: string[];
   missingKey: boolean;
+  /** Unkeyed (`sha256`) entries: a legacy prefix anyone could recompute. */
+  unkeyed: number;
+}
+
+export interface LedgerIntegrityOptions {
+  /** Every entry must be keyed: for chains born after HMAC hardening (tenant partitions). */
+  requireKeyed?: boolean;
 }
 
 /**
@@ -477,11 +485,12 @@ export const verifyIntegrity = (ledgerPath: string = GLOBAL_LEDGER_PATH): boolea
 };
 
 export const verifyLedgerIntegrityDetailed = (
-  ledgerPath: string = GLOBAL_LEDGER_PATH
+  ledgerPath: string = GLOBAL_LEDGER_PATH,
+  options: LedgerIntegrityOptions = {}
 ): LedgerIntegrityReport => {
   const safePath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(safePath)) {
-    return { ok: true, total: 0, corrupted: [], missingKey: false };
+    return { ok: true, total: 0, corrupted: [], missingKey: false, unkeyed: 0 };
   }
   ensureRegularLedgerFile(safePath);
 
@@ -491,6 +500,7 @@ export const verifyLedgerIntegrityDetailed = (
   const corrupted: string[] = [];
   let total = 0;
   let missingKey = false;
+  const algTracker = createChainAlgTracker(options);
 
   for (const [index, line] of lines.entries()) {
     if (!line) continue;
@@ -502,6 +512,8 @@ export const verifyLedgerIntegrityDetailed = (
         continue;
       }
       const chainAlg = (entry.chain_alg ?? 'sha256') as ChainAlg;
+      const algFinding = algTracker.observe(chainAlg);
+      if (algFinding) corrupted.push(`line:${index + 1}:${algFinding}`);
       const chainKey =
         chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
       const check = verifyLedgerEntryHash(entry, expectedParentHash, {
@@ -524,6 +536,7 @@ export const verifyLedgerIntegrityDetailed = (
     total,
     corrupted,
     missingKey,
+    unkeyed: algTracker.unkeyed,
   };
 };
 
@@ -582,7 +595,10 @@ export function verifyTenantLedgerIntegrity(
   tenantSlug: string
 ): ScopedLedgerIntegrityReport {
   const ledgerPath = tenantLedgerPath(tier, tenantSlug);
-  const report = asTenantLedgerStore(tenantSlug, () => verifyLedgerIntegrityDetailed(ledgerPath));
+  // Partitions were born after HMAC hardening (D9): no unkeyed legacy prefix.
+  const report = asTenantLedgerStore(tenantSlug, () =>
+    verifyLedgerIntegrityDetailed(ledgerPath, { requireKeyed: true })
+  );
   return {
     ...report,
     path: ledgerPath,
