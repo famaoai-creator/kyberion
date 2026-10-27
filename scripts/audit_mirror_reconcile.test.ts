@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   approvalEventLogicalPath,
   approvalRequestLogicalPath,
   decideApprovalRequest,
   loadApprovalRequest,
+  type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
 import {
   safeExistsSync,
@@ -22,6 +23,18 @@ import {
   openAuditMirrorApproval,
   runAuditMirrorReconciliation,
 } from './audit_mirror_reconcile.js';
+
+// A stand-in for an apply that read the record before another apply consumed
+// it: the script's pre-check sees this copy, the consume reads the store.
+const staleRead = vi.hoisted(() => ({ record: undefined as ApprovalRequestRecord | undefined }));
+vi.mock('@agent/core/governance/approval-store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/governance/approval-store')>();
+  return {
+    ...actual,
+    loadApprovalRequest: (...args: Parameters<typeof actual.loadApprovalRequest>) =>
+      staleRead.record ?? actual.loadApprovalRequest(...args),
+  };
+});
 
 // Per file run: concurrent runs in one checkout never share the fixture.
 const ROOT = pathResolver.sharedTmp(`audit-mirror-reconcile-test-${randomUUID()}`);
@@ -272,6 +285,65 @@ describe('audit mirror reconcile apply (SA-01)', () => {
       JSON.parse(safeReadFile(`${ROOT}/${receipt.receipt_path}`, { encoding: 'utf8' }) as string)
     ).toMatchObject({ mode: 'apply', approval_request_id: id });
     expect(collectAuditMirrorFindings(ROOT)).toEqual([]);
+  });
+
+  it('uses an approval once: the same drift recurring needs a new approval', () => {
+    drift();
+    const findings = collectAuditMirrorFindings(ROOT);
+    const id = request();
+    decide(id);
+    const apply = () =>
+      runAuditMirrorReconciliation({
+        missionId: MISSION,
+        apply: true,
+        approvalRequestId: id,
+        rootDir: ROOT,
+      });
+    const receipt = apply();
+    expect(loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)?.consumption).toMatchObject({
+      consumer: 'audit_mirror_reconcile',
+      consumedBy: 'human-mirror-operator',
+      effectRef: receipt.archived[0].to.split('/').slice(0, 4).join('/'),
+    });
+
+    // The identical drift comes back: the findings, and so the payload hash, match again.
+    drift();
+    expect(collectAuditMirrorFindings(ROOT)).toEqual(findings);
+    const archives = safeReaddir(`${ROOT}/active/archive/.trash`);
+    expect(() => apply()).toThrow(/was already used by audit_mirror_reconcile/u);
+    // Refused before any effect: nothing more archived, the mirrors are as drifted.
+    expect(safeReaddir(`${ROOT}/active/archive/.trash`)).toEqual(archives);
+    expect(safeReadFile(MIRROR, { encoding: 'utf8' })).toBe(lines(a));
+    expect(safeReadFile(STALE_MIRROR, { encoding: 'utf8' })).toBe(lines(old));
+
+    // A fresh request for the same findings is a new approval, not the consumed one.
+    expect(request()).not.toBe(id);
+  });
+
+  it('a racing apply that passed the pre-check is still stopped by the consume', () => {
+    drift();
+    const id = request();
+    decide(id);
+    const approved = loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)!;
+    const apply = () =>
+      runAuditMirrorReconciliation({
+        missionId: MISSION,
+        apply: true,
+        approvalRequestId: id,
+        rootDir: ROOT,
+      });
+    expect(apply().approved_by).toBe('human-mirror-operator');
+    drift();
+    const archives = safeReaddir(`${ROOT}/active/archive/.trash`);
+    staleRead.record = approved;
+    try {
+      // The store lock refuses the second consumer before anything moves.
+      expect(() => apply()).toThrow(/approvals are used once/u);
+    } finally {
+      staleRead.record = undefined;
+    }
+    expect(safeReaddir(`${ROOT}/active/archive/.trash`)).toEqual(archives);
+    expect(safeReadFile(MIRROR, { encoding: 'utf8' })).toBe(lines(a));
   });
 
   it('names mirror entries the master can no longer read, in the finding and the approval', () => {
