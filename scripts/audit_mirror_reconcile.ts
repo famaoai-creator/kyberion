@@ -195,9 +195,12 @@ function loadMasterEntries(rootDir: string): AuditEntry[] {
   ).entries;
 }
 
-function masterEntriesByTenant(rootDir = pathResolver.rootDir()): Map<string, AuditEntry[]> {
+function masterEntriesByTenant(
+  rootDir = pathResolver.rootDir(),
+  entries = loadMasterEntries(rootDir)
+): Map<string, AuditEntry[]> {
   const result = new Map<string, AuditEntry[]>();
-  for (const entry of loadMasterEntries(rootDir)) {
+  for (const entry of entries) {
     if (!entry.tenantSlug) continue;
     const entries = result.get(entry.tenantSlug) || [];
     entries.push(entry);
@@ -212,11 +215,10 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
     allowMissingLeaf: true,
     rootDir,
   });
-  const masterByTenant = masterEntriesByTenant(rootDir);
-  // Every readable master copy, any tenant: an entry readable there is not lost.
-  const masterCopies = new Set(
-    [...masterByTenant.values()].flat().map((entry) => `${entry.id}\u0000${entry.currentHash}`)
-  );
+  const master = loadMasterEntries(rootDir);
+  const masterByTenant = masterEntriesByTenant(rootDir, master);
+  // Every readable master copy, of any tenant or none: an entry readable there is not lost.
+  const masterCopies = new Set(master.map((entry) => `${entry.id}\u0000${entry.currentHash}`));
   const findings: AuditMirrorFinding[] = [];
 
   for (const slug of directories(customersRoot, rootDir)) {
@@ -329,7 +331,7 @@ export function openAuditMirrorApproval(input: {
   );
   const mirrorOnlyNote =
     archiveOnly > 0
-      ? ` ${archiveOnly} mirror entr${archiveOnly === 1 ? 'y has' : 'ies have'} no readable master copy: the rebuild leaves ${archiveOnly === 1 ? 'it' : 'them'} out of the live mirror and ${archiveOnly === 1 ? 'it survives' : 'they survive'} only in the archive.`
+      ? ` ${archiveOnly} mirror entr${archiveOnly === 1 ? 'y has' : 'ies have'} no matching readable master copy: the rebuild leaves ${archiveOnly === 1 ? 'it' : 'them'} out of the live mirror and ${archiveOnly === 1 ? 'it survives' : 'they survive'} only in the archive.`
       : '';
   const requester = input.requester
     ? resolveApprovalRequesterInput(input.requester)
