@@ -621,6 +621,771 @@
         "ja": "対応はコマンドで:",
         "qps-ploc": "⟦Ŧő ȧƈŧ, ůşė ŧħė ƇĿÏ: ŀőřėɱ ⟧"
       },
+      "chronos_cd_open_learning": {
+        "en": "Open learning",
+        "ja": "学習を開く",
+        "qps-ploc": "⟦Őṗėñ ŀėȧřñïñɠ ŀőřė⟧"
+      },
+      "chronos_cd_open_case": {
+        "en": "Open case {case}",
+        "ja": "案件 {case} を開く",
+        "qps-ploc": "⟦Őṗėñ ƈȧşė {case} ŀőřėɱ⟧"
+      },
+      "chronos_cd_breadcrumb": {
+        "en": "Customer decisions location",
+        "ja": "顧客の決定内の現在地",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñş ŀőƈȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_cd_back": {
+        "en": "Back to customer decisions",
+        "ja": "顧客の決定に戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő ƈůşŧőɱėř ḓėƈïşïőñş ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_cd_back_to_case": {
+        "en": "Back to the case",
+        "ja": "案件に戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő ŧħė ƈȧşė ŀőřėɱ⟧"
+      },
+      "chronos_cd_retry": {
+        "en": "Try again",
+        "ja": "再試行",
+        "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
+      },
+      "chronos_cd_loading_detail": {
+        "en": "Loading the details",
+        "ja": "詳細を読み込んでいます",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ ŧħė ḓėŧȧïŀş ŀőřėɱ ⟧"
+      },
+      "chronos_cd_detail_failed": {
+        "en": "The details could not be loaded",
+        "ja": "詳細を読み込めませんでした",
+        "qps-ploc": "⟦Ŧħė ḓėŧȧïŀş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_cd_forbidden_title": {
+        "en": "You cannot see these customer decisions",
+        "ja": "この顧客の決定を見る権限がありません",
+        "qps-ploc": "⟦Ẏőů ƈȧññőŧ şėė ŧħėşė ƈůşŧőɱėř ḓėƈïşïőñş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chronos_cd_forbidden_body": {
+        "en": "Your access does not cover this tenant's confidential customer decisions, or it is limited to a project. Ask an administrator to widen your access.",
+        "ja": "このテナントの機密の顧客の決定にアクセスできないか、アクセスがプロジェクト単位に限られています。管理者にアクセス範囲の拡大を依頼してください。",
+        "qps-ploc": "⟦Ẏőůř ȧƈƈėşş ḓőėş ñőŧ ƈőṽėř ŧħïş ŧėñȧñŧ'ş ƈőñƒïḓėñŧïȧŀ ƈůşŧőɱėř ḓėƈïşïőñş, őř ïŧ ïş ŀïɱïŧėḓ ŧő ȧ ṗřőĵėƈŧ. Ȧşķ ȧñ ȧḓɱïñïşŧřȧŧőř ŧő ẇïḓėñ ẏőůř ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "chronos_cd_not_found_title": {
+        "en": "Not found",
+        "ja": "見つかりません",
+        "qps-ploc": "⟦Ñőŧ ƒőůñḓ ŀőř⟧"
+      },
+      "chronos_cd_not_built_title": {
+        "en": "Customer decisions are not available on this server",
+        "ja": "このサーバーでは顧客の決定を表示できません",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ḓėƈïşïőñş ȧřė ñőŧ ȧṽȧïŀȧƀŀė őñ ŧħïş şėřṽėř ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "chronos_cd_not_built_body": {
+        "en": "The governed customer-decision command is not built. Run pnpm build on the server, then reload.",
+        "ja": "顧客の決定のコマンドがビルドされていません。サーバーで pnpm build を実行してから再読み込みしてください。",
+        "qps-ploc": "⟦Ŧħė ɠőṽėřñėḓ ƈůşŧőɱėř-ḓėƈïşïőñ ƈőɱɱȧñḓ ïş ñőŧ ƀůïŀŧ. Řůñ ṗñṗɱ ƀůïŀḓ őñ ŧħė şėřṽėř, ŧħėñ řėŀőȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "chronos_cd_as_of": {
+        "en": "As of {date}",
+        "ja": "{date} 時点",
+        "qps-ploc": "⟦Ȧş őƒ {date} ŀőř⟧"
+      },
+      "chronos_cd_case_heading": {
+        "en": "Case {case}",
+        "ja": "案件 {case}",
+        "qps-ploc": "⟦Ƈȧşė {case} ŀőř⟧"
+      },
+      "chronos_cd_case_loaded": {
+        "en": "{agendas, plural, one {1 agenda set} other {# agenda sets}} and {tasks, plural, one {1 task} other {# tasks}} loaded",
+        "ja": "調整セット {agendas} 件とタスク {tasks} 件を読み込みました",
+        "qps-ploc": "⟦{agendas, plural, one {1 agenda set} other {# agenda sets}} ȧñḓ {tasks, plural, one {1 task} other {# tasks}} ŀőȧḓėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧ⟧"
+      },
+      "chronos_cd_metric_agendas": {
+        "en": "Agenda sets",
+        "ja": "調整セット",
+        "qps-ploc": "⟦Ȧɠėñḓȧ şėŧş ŀőř⟧"
+      },
+      "chronos_cd_metric_ready_tasks": {
+        "en": "Ready to resume",
+        "ja": "再開できるタスク",
+        "qps-ploc": "⟦Řėȧḓẏ ŧő řėşůɱė ŀőřė⟧"
+      },
+      "chronos_cd_metric_pending_proposals": {
+        "en": "Proposals not on an agenda yet",
+        "ja": "まだ調整セットにない提案",
+        "qps-ploc": "⟦Ṗřőṗőşȧŀş ñőŧ őñ ȧñ ȧɠėñḓȧ ẏėŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_cd_agendas": {
+        "en": "Agenda sets",
+        "ja": "調整セット",
+        "qps-ploc": "⟦Ȧɠėñḓȧ şėŧş ŀőř⟧"
+      },
+      "chronos_cd_agendas_caption": {
+        "en": "Agenda sets of {case}",
+        "ja": "{case} の調整セット",
+        "qps-ploc": "⟦Ȧɠėñḓȧ şėŧş őƒ {case} ŀőřėɱ ⟧"
+      },
+      "chronos_cd_no_agendas": {
+        "en": "This case has no agenda sets yet.",
+        "ja": "この案件にはまだ調整セットがありません。",
+        "qps-ploc": "⟦Ŧħïş ƈȧşė ħȧş ñő ȧɠėñḓȧ şėŧş ẏėŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_cd_tasks": {
+        "en": "Mission tasks",
+        "ja": "ミッションのタスク",
+        "qps-ploc": "⟦Ɱïşşïőñ ŧȧşķş ŀőřė⟧"
+      },
+      "chronos_cd_tasks_description": {
+        "en": "Tasks that used or wait on this case's decisions. Open a mission to see it in the missions section.",
+        "ja": "この案件の決定を使った、または決定を待っているタスク。ミッションを開くとミッション画面で確認できます。",
+        "qps-ploc": "⟦Ŧȧşķş ŧħȧŧ ůşėḓ őř ẇȧïŧ őñ ŧħïş ƈȧşė'ş ḓėƈïşïőñş. Őṗėñ ȧ ɱïşşïőñ ŧő şėė ïŧ ïñ ŧħė ɱïşşïőñş şėƈŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "chronos_cd_no_tasks": {
+        "en": "No mission task uses this case yet.",
+        "ja": "この案件を使うミッションのタスクはまだありません。",
+        "qps-ploc": "⟦Ñő ɱïşşïőñ ŧȧşķ ůşėş ŧħïş ƈȧşė ẏėŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_cd_col_mission": {
+        "en": "Mission / task",
+        "ja": "ミッション / タスク",
+        "qps-ploc": "⟦Ɱïşşïőñ / ŧȧşķ ŀőřė⟧"
+      },
+      "chronos_cd_col_proposals": {
+        "en": "Proposals",
+        "ja": "提案",
+        "qps-ploc": "⟦Ṗřőṗőşȧŀş ŀőř⟧"
+      },
+      "chronos_cd_col_held_since": {
+        "en": "Held since",
+        "ja": "保留開始",
+        "qps-ploc": "⟦Ħėŀḓ şïñƈė ŀőř⟧"
+      },
+      "chronos_cd_col_rework": {
+        "en": "Rework",
+        "ja": "手戻り",
+        "qps-ploc": "⟦Řėẇőřķ ŀőř⟧"
+      },
+      "chronos_cd_task_held": {
+        "en": "Held",
+        "ja": "保留中",
+        "qps-ploc": "⟦Ħėŀḓ ŀőř⟧"
+      },
+      "chronos_cd_task_ready": {
+        "en": "Ready to resume",
+        "ja": "再開可能",
+        "qps-ploc": "⟦Řėȧḓẏ ŧő řėşůɱė ŀőřė⟧"
+      },
+      "chronos_cd_task_in_progress": {
+        "en": "In progress",
+        "ja": "進行中",
+        "qps-ploc": "⟦Ïñ ṗřőɠřėşş ŀőř⟧"
+      },
+      "chronos_cd_task_completed": {
+        "en": "Completed",
+        "ja": "完了",
+        "qps-ploc": "⟦Ƈőɱṗŀėŧėḓ ŀőř⟧"
+      },
+      "chronos_cd_task_proposals": {
+        "en": "{count, plural, one {1 proposal} other {# proposals}} · {waiting} waiting for the customer",
+        "ja": "提案 {count} 件 · 顧客待ち {waiting}",
+        "qps-ploc": "⟦{count, plural, one {1 proposal} other {# proposals}} · {waiting} ẇȧïŧïñɠ ƒőř ŧħė ƈůşŧőɱėř ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "chronos_cd_agenda_loaded": {
+        "en": "{entries, plural, one {1 entry} other {# entries}} loaded",
+        "ja": "項目 {entries} 件を読み込みました",
+        "qps-ploc": "⟦{entries, plural, one {1 entry} other {# entries}} ŀőȧḓėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_cd_agenda_meta": {
+        "en": "Customer {customer} · phase {phase} · {locale}",
+        "ja": "顧客 {customer} · フェーズ {phase} · {locale}",
+        "qps-ploc": "⟦Ƈůşŧőɱėř {customer} · ṗħȧşė {phase} · {locale} ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "chronos_cd_agenda_summary": {
+        "en": "Agenda set summary",
+        "ja": "調整セットの概要",
+        "qps-ploc": "⟦Ȧɠėñḓȧ şėŧ şůɱɱȧřẏ ŀőřėɱ⟧"
+      },
+      "chronos_cd_agenda_not_found_title": {
+        "en": "This agenda set is not in the case",
+        "ja": "この調整セットは案件にありません",
+        "qps-ploc": "⟦Ŧħïş ȧɠėñḓȧ şėŧ ïş ñőŧ ïñ ŧħė ƈȧşė ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_cd_agenda_not_found_body": {
+        "en": "{agenda} is not an agenda set of {case}. It may have been withdrawn or the link is out of date.",
+        "ja": "{agenda} は {case} の調整セットではありません。取り下げられたか、リンクが古い可能性があります。",
+        "qps-ploc": "⟦{agenda} ïş ñőŧ ȧñ ȧɠėñḓȧ şėŧ őƒ {case}. Ïŧ ɱȧẏ ħȧṽė ƀėėñ ẇïŧħḓřȧẇñ őř ŧħė ŀïñķ ïş őůŧ őƒ ḓȧŧė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "chronos_cd_entries": {
+        "en": "Entries",
+        "ja": "項目",
+        "qps-ploc": "⟦Ėñŧřïėş ŀőř⟧"
+      },
+      "chronos_cd_entries_caption": {
+        "en": "Entries of {title}",
+        "ja": "{title} の項目",
+        "qps-ploc": "⟦Ėñŧřïėş őƒ {title} ŀőřėɱ⟧"
+      },
+      "chronos_cd_no_entries": {
+        "en": "This agenda set has no entries.",
+        "ja": "この調整セットには項目がありません。",
+        "qps-ploc": "⟦Ŧħïş ȧɠėñḓȧ şėŧ ħȧş ñő ėñŧřïėş. ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_cd_col_question": {
+        "en": "Question",
+        "ja": "質問",
+        "qps-ploc": "⟦Ɋůėşŧïőñ ŀőř⟧"
+      },
+      "chronos_cd_col_layer": {
+        "en": "Decided by",
+        "ja": "決定の出どころ",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ƀẏ ŀőř⟧"
+      },
+      "chronos_cd_col_confirmed": {
+        "en": "Confirmed by you",
+        "ja": "担当者の確認",
+        "qps-ploc": "⟦Ƈőñƒïřɱėḓ ƀẏ ẏőů ŀőřėɱ⟧"
+      },
+      "chronos_cd_col_extras": {
+        "en": "Attachments",
+        "ja": "添付",
+        "qps-ploc": "⟦Ȧŧŧȧƈħɱėñŧş ŀőř⟧"
+      },
+      "chronos_cd_entry_extras": {
+        "en": "{attachments} files · {links} links",
+        "ja": "ファイル {attachments} · リンク {links}",
+        "qps-ploc": "⟦{attachments} ƒïŀėş · {links} ŀïñķş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_cd_entry_status_confirmed": {
+        "en": "Confirmed",
+        "ja": "確定",
+        "qps-ploc": "⟦Ƈőñƒïřɱėḓ ŀőř⟧"
+      },
+      "chronos_cd_entry_status_provisional": {
+        "en": "Provisional",
+        "ja": "暫定",
+        "qps-ploc": "⟦Ṗřőṽïşïőñȧŀ ŀőř⟧"
+      },
+      "chronos_cd_entry_status_awaiting_customer": {
+        "en": "Awaiting customer",
+        "ja": "顧客待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ƈůşŧőɱėř ŀőřėɱ⟧"
+      },
+      "chronos_cd_entry_status_awaiting_operator_confirmation": {
+        "en": "Awaiting your confirmation",
+        "ja": "担当者の確認待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ẏőůř ƈőñƒïřɱȧŧïőñ ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_cd_entry_status_undecided": {
+        "en": "Undecided",
+        "ja": "未決",
+        "qps-ploc": "⟦Ůñḓėƈïḓėḓ ŀőř⟧"
+      },
+      "chronos_cd_layer_customer": {
+        "en": "Customer",
+        "ja": "顧客",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ŀőř⟧"
+      },
+      "chronos_cd_layer_ours": {
+        "en": "Our decision",
+        "ja": "こちらの決定",
+        "qps-ploc": "⟦Őůř ḓėƈïşïőñ ŀőř⟧"
+      },
+      "chronos_cd_layer_org_default": {
+        "en": "Organization default",
+        "ja": "組織の既定",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ḓėƒȧůŀŧ ŀőřėɱ ⟧"
+      },
+      "chronos_cd_layer_none": {
+        "en": "Nothing yet",
+        "ja": "まだなし",
+        "qps-ploc": "⟦Ñőŧħïñɠ ẏėŧ ŀőř⟧"
+      },
+      "chronos_cd_yes": {
+        "en": "Yes",
+        "ja": "はい",
+        "qps-ploc": "⟦Ẏėş ŀőř⟧"
+      },
+      "chronos_cd_no": {
+        "en": "No",
+        "ja": "いいえ",
+        "qps-ploc": "⟦Ñő ŀőř⟧"
+      },
+      "chronos_cd_change_requests_summary": {
+        "en": "{count, plural, one {1 open change request} other {# open change requests}}",
+        "ja": "未対応の変更要求 {count} 件",
+        "qps-ploc": "⟦{count, plural, one {1 open change request} other {# open change requests}} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "chronos_cd_col_entry": {
+        "en": "Entry",
+        "ja": "項目",
+        "qps-ploc": "⟦Ėñŧřẏ ŀőř⟧"
+      },
+      "chronos_cd_col_receipt": {
+        "en": "Answer",
+        "ja": "回答",
+        "qps-ploc": "⟦Ȧñşẇėř ŀőř⟧"
+      },
+      "chronos_cd_col_at": {
+        "en": "Date",
+        "ja": "日付",
+        "qps-ploc": "⟦Ḓȧŧė ŀőř⟧"
+      },
+      "chronos_cd_handoffs_summary": {
+        "en": "{count, plural, one {1 hand-off} other {# hand-offs}}",
+        "ja": "引き継ぎ {count} 件",
+        "qps-ploc": "⟦{count, plural, one {1 hand-off} other {# hand-offs}} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "chronos_cd_col_what": {
+        "en": "To read",
+        "ja": "読むもの",
+        "qps-ploc": "⟦Ŧő řėȧḓ ŀőř⟧"
+      },
+      "chronos_cd_col_inbox": {
+        "en": "Inbox entry",
+        "ja": "受信箱の項目",
+        "qps-ploc": "⟦Ïñƀőẋ ėñŧřẏ ŀőř⟧"
+      },
+      "chronos_cd_handoff_what": {
+        "en": "{off} off-option answers · {comments} comments · {question} general questions",
+        "ja": "選択肢外の回答 {off} · コメント {comments} · 全体への質問 {question}",
+        "qps-ploc": "⟦{off} őƒƒ-őṗŧïőñ ȧñşẇėřş · {comments} ƈőɱɱėñŧş · {question} ɠėñėřȧŀ ɋůėşŧïőñş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "chronos_cd_handoff_done": {
+        "en": "Handed off",
+        "ja": "引き継ぎ済み",
+        "qps-ploc": "⟦Ħȧñḓėḓ őƒƒ ŀőř⟧"
+      },
+      "chronos_cd_handoff_notified": {
+        "en": "Notified",
+        "ja": "通知済み",
+        "qps-ploc": "⟦Ñőŧïƒïėḓ ŀőř⟧"
+      },
+      "chronos_cd_handoff_pending": {
+        "en": "Not handed off",
+        "ja": "未引き継ぎ",
+        "qps-ploc": "⟦Ñőŧ ħȧñḓėḓ őƒƒ ŀőřė⟧"
+      },
+      "chronos_cd_reminders_summary": {
+        "en": "{count, plural, one {1 reminder} other {# reminders}}",
+        "ja": "リマインダー {count} 件",
+        "qps-ploc": "⟦{count, plural, one {1 reminder} other {# reminders}} ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "chronos_cd_reminders_counts": {
+        "en": "{due} due now · {approval} awaiting approval · {manual} to send by hand · next send {next}",
+        "ja": "今送るもの {due} · 承認待ち {approval} · 手動送付 {manual} · 次回送付 {next}",
+        "qps-ploc": "⟦{due} ḓůė ñőẇ · {approval} ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ · {manual} ŧő şėñḓ ƀẏ ħȧñḓ · ñėẋŧ şėñḓ {next} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "chronos_cd_reminders_upcoming": {
+        "en": "Upcoming reminders",
+        "ja": "予定のリマインダー",
+        "qps-ploc": "⟦Ůṗƈőɱïñɠ řėɱïñḓėřş ŀőřėɱ⟧"
+      },
+      "chronos_cd_reminders_sent": {
+        "en": "Reminder records",
+        "ja": "リマインダーの記録",
+        "qps-ploc": "⟦Řėɱïñḓėř řėƈőřḓş ŀőřėɱ⟧"
+      },
+      "chronos_cd_col_kind": {
+        "en": "Kind",
+        "ja": "種類",
+        "qps-ploc": "⟦Ķïñḓ ŀőř⟧"
+      },
+      "chronos_cd_col_send_on": {
+        "en": "Send on",
+        "ja": "送付日",
+        "qps-ploc": "⟦Şėñḓ őñ ŀőř⟧"
+      },
+      "chronos_cd_col_target_date": {
+        "en": "About the date",
+        "ja": "対象の日付",
+        "qps-ploc": "⟦Ȧƀőůŧ ŧħė ḓȧŧė ŀőřė⟧"
+      },
+      "chronos_cd_col_detail": {
+        "en": "Detail",
+        "ja": "詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀ ŀőř⟧"
+      },
+      "chronos_cd_reminder_kind_before_due": {
+        "en": "Before the answer date",
+        "ja": "回答日の前",
+        "qps-ploc": "⟦Ƀėƒőřė ŧħė ȧñşẇėř ḓȧŧė ŀőřėɱ ï⟧"
+      },
+      "chronos_cd_reminder_kind_due": {
+        "en": "On the answer date",
+        "ja": "回答日当日",
+        "qps-ploc": "⟦Őñ ŧħė ȧñşẇėř ḓȧŧė ŀőřėɱ⟧"
+      },
+      "chronos_cd_reminder_kind_override_closing": {
+        "en": "Change window closing",
+        "ja": "変更期限の前",
+        "qps-ploc": "⟦Ƈħȧñɠė ẇïñḓőẇ ƈŀőşïñɠ ŀőřėɱ ⟧"
+      },
+      "chronos_cd_reminder_status_sent": {
+        "en": "Sent",
+        "ja": "送付済み",
+        "qps-ploc": "⟦Şėñŧ ŀőř⟧"
+      },
+      "chronos_cd_reminder_status_approval_pending": {
+        "en": "Awaiting approval",
+        "ja": "承認待ち",
+        "qps-ploc": "⟦Ȧẇȧïŧïñɠ ȧṗṗřőṽȧŀ ŀőřėɱ⟧"
+      },
+      "chronos_cd_reminder_status_manual": {
+        "en": "Send by hand",
+        "ja": "手動送付",
+        "qps-ploc": "⟦Şėñḓ ƀẏ ħȧñḓ ŀőř⟧"
+      },
+      "chronos_cd_reminder_status_denied": {
+        "en": "Denied",
+        "ja": "却下",
+        "qps-ploc": "⟦Ḓėñïėḓ ŀőř⟧"
+      },
+      "chronos_cd_reminder_status_lapsed": {
+        "en": "Lapsed",
+        "ja": "失効",
+        "qps-ploc": "⟦Ŀȧṗşėḓ ŀőř⟧"
+      },
+      "chronos_cd_reminder_reason_no_channel": {
+        "en": "No channel for the decider",
+        "ja": "決定者への連絡手段なし",
+        "qps-ploc": "⟦Ñő ƈħȧññėŀ ƒőř ŧħė ḓėƈïḓėř ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_cd_reminder_reason_binding_missing": {
+        "en": "Channel binding missing",
+        "ja": "連絡手段の紐付けなし",
+        "qps-ploc": "⟦Ƈħȧññėŀ ƀïñḓïñɠ ɱïşşïñɠ ŀőřėɱ ï⟧"
+      },
+      "chronos_cd_reminder_reason_surface_unsupported": {
+        "en": "Channel cannot send it",
+        "ja": "連絡手段が未対応",
+        "qps-ploc": "⟦Ƈħȧññėŀ ƈȧññőŧ şėñḓ ïŧ ŀőřėɱ ï⟧"
+      },
+      "chronos_cd_reminder_reason_template_refused": {
+        "en": "Message template refused",
+        "ja": "文面テンプレートが拒否された",
+        "qps-ploc": "⟦Ɱėşşȧɠė ŧėɱṗŀȧŧė řėƒůşėḓ ŀőřėɱ ï⟧"
+      },
+      "chronos_cd_reminder_reason_approval_unreachable": {
+        "en": "Approval could not be requested",
+        "ja": "承認を依頼できなかった",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ƈőůŀḓ ñőŧ ƀė řėɋůėşŧėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_cd_invites_summary": {
+        "en": "{count, plural, one {1 active invite} other {# active invites}}",
+        "ja": "有効な招待 {count} 件",
+        "qps-ploc": "⟦{count, plural, one {1 active invite} other {# active invites}} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_cd_invites_active": {
+        "en": "Active invites",
+        "ja": "有効な招待",
+        "qps-ploc": "⟦Ȧƈŧïṽė ïñṽïŧėş ŀőřė⟧"
+      },
+      "chronos_cd_invites_deciders": {
+        "en": "Deciders",
+        "ja": "決定者",
+        "qps-ploc": "⟦Ḓėƈïḓėřş ŀőř⟧"
+      },
+      "chronos_cd_invites_contributors": {
+        "en": "Contributors",
+        "ja": "協力者",
+        "qps-ploc": "⟦Ƈőñŧřïƀůŧőřş ŀőř⟧"
+      },
+      "chronos_cd_invites_expired": {
+        "en": "Expired invites",
+        "ja": "期限切れの招待",
+        "qps-ploc": "⟦Ėẋṗïřėḓ ïñṽïŧėş ŀőřė⟧"
+      },
+      "chronos_cd_invites_revoked": {
+        "en": "Revoked invites",
+        "ja": "取り消した招待",
+        "qps-ploc": "⟦Řėṽőķėḓ ïñṽïŧėş ŀőřė⟧"
+      },
+      "chronos_cd_approved_at": {
+        "en": "Approved to send",
+        "ja": "送付の承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŧő şėñḓ ŀőřėɱ⟧"
+      },
+      "chronos_cd_approver_human": {
+        "en": "by a person",
+        "ja": "人による",
+        "qps-ploc": "⟦ƀẏ ȧ ṗėřşőñ ŀőř⟧"
+      },
+      "chronos_cd_approver_ai_agent": {
+        "en": "by an AI agent",
+        "ja": "AI エージェントによる",
+        "qps-ploc": "⟦ƀẏ ȧñ ȦÏ ȧɠėñŧ ŀőřė⟧"
+      },
+      "chronos_cd_approver_service": {
+        "en": "by a service",
+        "ja": "サービスによる",
+        "qps-ploc": "⟦ƀẏ ȧ şėřṽïƈė ŀőř⟧"
+      },
+      "chronos_cd_routing": {
+        "en": "Review routing",
+        "ja": "レビューの振り分け",
+        "qps-ploc": "⟦Řėṽïėẇ řőůŧïñɠ ŀőřė⟧"
+      },
+      "chronos_cd_routing_summary": {
+        "en": "{count, plural, one {1 routed review answer} other {# routed review answers}}",
+        "ja": "振り分けたレビュー回答 {count} 件",
+        "qps-ploc": "⟦{count, plural, one {1 routed review answer} other {# routed review answers}} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "chronos_cd_col_outcome": {
+        "en": "Outcome",
+        "ja": "結果",
+        "qps-ploc": "⟦Őůŧƈőɱė ŀőř⟧"
+      },
+      "chronos_cd_col_work_item": {
+        "en": "Work item",
+        "ja": "作業項目",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱ ŀőř⟧"
+      },
+      "chronos_cd_col_notified": {
+        "en": "Notified",
+        "ja": "通知",
+        "qps-ploc": "⟦Ñőŧïƒïėḓ ŀőř⟧"
+      },
+      "chronos_cd_routing_request_changes": {
+        "en": "Changes requested",
+        "ja": "修正依頼",
+        "qps-ploc": "⟦Ƈħȧñɠėş řėɋůėşŧėḓ ŀőřėɱ⟧"
+      },
+      "chronos_cd_routing_reject": {
+        "en": "Rejected",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "chronos_cd_learning_title": {
+        "en": "Learning from customer decisions",
+        "ja": "顧客の決定からの学習",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ ƒřőɱ ƈůşŧőɱėř ḓėƈïşïőñş ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_cd_learning_description": {
+        "en": "What the weekly learning run found and the candidates it queued. Values and defaults are not shown here; review a candidate with the CLI.",
+        "ja": "週次の学習で見つかったことと、登録された学習候補。値や既定値はここには出しません。候補はコマンドで確認してください。",
+        "qps-ploc": "⟦Ẇħȧŧ ŧħė ẇėėķŀẏ ŀėȧřñïñɠ řůñ ƒőůñḓ ȧñḓ ŧħė ƈȧñḓïḓȧŧėş ïŧ ɋůėůėḓ. Ṽȧŀůėş ȧñḓ ḓėƒȧůŀŧş ȧřė ñőŧ şħőẇñ ħėřė; řėṽïėẇ ȧ ƈȧñḓïḓȧŧė ẇïŧħ ŧħė ƇĿÏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈï⟧"
+      },
+      "chronos_cd_learning_loaded": {
+        "en": "{count, plural, one {1 suggestion} other {# suggestions}} loaded",
+        "ja": "提案 {count} 件を読み込みました",
+        "qps-ploc": "⟦{count, plural, one {1 suggestion} other {# suggestions}} ŀőȧḓėḓ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "chronos_cd_learning_empty_title": {
+        "en": "No learning report yet",
+        "ja": "学習レポートはまだありません",
+        "qps-ploc": "⟦Ñő ŀėȧřñïñɠ řėṗőřŧ ẏėŧ ŀőřėɱ ï⟧"
+      },
+      "chronos_cd_learning_empty_body": {
+        "en": "The weekly learning run writes one. Install it with pnpm kyberion customer-decision learning --tenant {tenant} --install --by user:<member>.",
+        "ja": "週次の学習が作成します。pnpm kyberion customer-decision learning --tenant {tenant} --install --by user:<member> で設定してください。",
+        "qps-ploc": "⟦Ŧħė ẇėėķŀẏ ŀėȧřñïñɠ řůñ ẇřïŧėş őñė. Ïñşŧȧŀŀ ïŧ ẇïŧħ ṗñṗɱ ķẏƀėřïőñ ƈůşŧőɱėř-ḓėƈïşïőñ ŀėȧřñïñɠ --ŧėñȧñŧ {tenant} --ïñşŧȧŀŀ --ƀẏ ůşėř:<ɱėɱƀėř>. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñ⟧"
+      },
+      "chronos_cd_learning_report_date": {
+        "en": "Report {date}",
+        "ja": "レポート {date}",
+        "qps-ploc": "⟦Řėṗőřŧ {date} ŀőřė⟧"
+      },
+      "chronos_cd_learning_report": {
+        "en": "Report {date} · since {since}",
+        "ja": "レポート {date} · 対象期間の開始 {since}",
+        "qps-ploc": "⟦Řėṗőřŧ {date} · şïñƈė {since} ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_cd_learning_dates": {
+        "en": "Learning reports",
+        "ja": "学習レポート",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ řėṗőřŧş ŀőřėɱ⟧"
+      },
+      "chronos_cd_learning_cases": {
+        "en": "Cases",
+        "ja": "案件",
+        "qps-ploc": "⟦Ƈȧşėş ŀőř⟧"
+      },
+      "chronos_cd_learning_agendas": {
+        "en": "Agenda sets",
+        "ja": "調整セット",
+        "qps-ploc": "⟦Ȧɠėñḓȧ şėŧş ŀőř⟧"
+      },
+      "chronos_cd_learning_receipts": {
+        "en": "Answers",
+        "ja": "回答",
+        "qps-ploc": "⟦Ȧñşẇėřş ŀőř⟧"
+      },
+      "chronos_cd_learning_suggestions": {
+        "en": "Suggestions",
+        "ja": "提案",
+        "qps-ploc": "⟦Şůɠɠėşŧïőñş ŀőř⟧"
+      },
+      "chronos_cd_learning_none": {
+        "en": "No suggestions in this report",
+        "ja": "このレポートに提案はありません",
+        "qps-ploc": "⟦Ñő şůɠɠėşŧïőñş ïñ ŧħïş řėṗőřŧ ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_cd_learning_overturns": {
+        "en": "Where customers chose differently",
+        "ja": "顧客が別の選択をしたところ",
+        "qps-ploc": "⟦Ẇħėřė ƈůşŧőɱėřş ƈħőşė ḓïƒƒėřėñŧŀẏ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "chronos_cd_learning_questions": {
+        "en": "Entries that raised questions",
+        "ja": "質問が出た項目",
+        "qps-ploc": "⟦Ėñŧřïėş ŧħȧŧ řȧïşėḓ ɋůėşŧïőñş ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_cd_learning_change_requests": {
+        "en": "Entries with change requests",
+        "ja": "変更要求が出た項目",
+        "qps-ploc": "⟦Ėñŧřïėş ẇïŧħ ƈħȧñɠė řėɋůėşŧş ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_cd_col_subject": {
+        "en": "Item / key",
+        "ja": "項目 / キー",
+        "qps-ploc": "⟦Ïŧėɱ / ķėẏ ŀőř⟧"
+      },
+      "chronos_cd_col_suggestion": {
+        "en": "Suggestion",
+        "ja": "提案",
+        "qps-ploc": "⟦Şůɠɠėşŧïőñ ŀőř⟧"
+      },
+      "chronos_cd_col_evidence": {
+        "en": "Evidence",
+        "ja": "根拠",
+        "qps-ploc": "⟦Ėṽïḓėñƈė ŀőř⟧"
+      },
+      "chronos_cd_col_learning_id": {
+        "en": "Learning candidate",
+        "ja": "学習候補",
+        "qps-ploc": "⟦Ŀėȧřñïñɠ ƈȧñḓïḓȧŧė ŀőřėɱ⟧"
+      },
+      "chronos_cd_col_candidate": {
+        "en": "Candidate status",
+        "ja": "候補の状態",
+        "qps-ploc": "⟦Ƈȧñḓïḓȧŧė şŧȧŧůş ŀőřėɱ⟧"
+      },
+      "chronos_cd_col_decided": {
+        "en": "Decided",
+        "ja": "決定数",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ŀőř⟧"
+      },
+      "chronos_cd_col_overturned": {
+        "en": "Chose differently",
+        "ja": "別の選択",
+        "qps-ploc": "⟦Ƈħőşė ḓïƒƒėřėñŧŀẏ ŀőřėɱ⟧"
+      },
+      "chronos_cd_col_rate": {
+        "en": "Rate",
+        "ja": "割合",
+        "qps-ploc": "⟦Řȧŧė ŀőř⟧"
+      },
+      "chronos_cd_col_other_values": {
+        "en": "Free-text answers",
+        "ja": "自由記述の回答",
+        "qps-ploc": "⟦Ƒřėė-ŧėẋŧ ȧñşẇėřş ŀőřėɱ⟧"
+      },
+      "chronos_cd_col_off_option": {
+        "en": "Off-option answers",
+        "ja": "選択肢外の回答",
+        "qps-ploc": "⟦Őƒƒ-őṗŧïőñ ȧñşẇėřş ŀőřėɱ⟧"
+      },
+      "chronos_cd_col_comments": {
+        "en": "Comments",
+        "ja": "コメント",
+        "qps-ploc": "⟦Ƈőɱɱėñŧş ŀőř⟧"
+      },
+      "chronos_cd_col_answers": {
+        "en": "Answers",
+        "ja": "回答数",
+        "qps-ploc": "⟦Ȧñşẇėřş ŀőř⟧"
+      },
+      "chronos_cd_suggestion_change_org_default": {
+        "en": "Change the default",
+        "ja": "既定を変更",
+        "qps-ploc": "⟦Ƈħȧñɠė ŧħė ḓėƒȧůŀŧ ŀőřėɱ⟧"
+      },
+      "chronos_cd_suggestion_revise_options": {
+        "en": "Revise the options",
+        "ja": "選択肢を見直す",
+        "qps-ploc": "⟦Řėṽïşė ŧħė őṗŧïőñş ŀőřėɱ⟧"
+      },
+      "chronos_cd_suggestion_clarify_entry": {
+        "en": "Clarify the question",
+        "ja": "質問を明確にする",
+        "qps-ploc": "⟦Ƈŀȧřïƒẏ ŧħė ɋůėşŧïőñ ŀőřėɱ ⟧"
+      },
+      "chronos_cd_suggestion_default_change": {
+        "en": "A default change is suggested. Review the candidate with pnpm organization learning transition.",
+        "ja": "既定の変更が提案されています。pnpm organization learning transition で候補を確認してください。",
+        "qps-ploc": "⟦Ȧ ḓėƒȧůŀŧ ƈħȧñɠė ïş şůɠɠėşŧėḓ. Řėṽïėẇ ŧħė ƈȧñḓïḓȧŧė ẇïŧħ ṗñṗɱ őřɠȧñïẑȧŧïőñ ŀėȧřñïñɠ ŧřȧñşïŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "chronos_cd_suggestion_change_org_default_detail": {
+        "en": "Customers often choose something other than the default.",
+        "ja": "顧客が既定と違うものをよく選んでいます。",
+        "qps-ploc": "⟦Ƈůşŧőɱėřş őƒŧėñ ƈħőőşė şőɱėŧħïñɠ őŧħėř ŧħȧñ ŧħė ḓėƒȧůŀŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "chronos_cd_suggestion_revise_options_detail": {
+        "en": "Customers often ask to change this entry.",
+        "ja": "この項目に変更要求がよく出ています。",
+        "qps-ploc": "⟦Ƈůşŧőɱėřş őƒŧėñ ȧşķ ŧő ƈħȧñɠė ŧħïş ėñŧřẏ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chronos_cd_suggestion_clarify_entry_detail": {
+        "en": "Customers often answer outside the options or comment.",
+        "ja": "選択肢外の回答やコメントがよく出ています。",
+        "qps-ploc": "⟦Ƈůşŧőɱėřş őƒŧėñ ȧñşẇėř őůŧşïḓė ŧħė őṗŧïőñş őř ƈőɱɱėñŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "chronos_cd_evidence": {
+        "en": "{count} of {samples}",
+        "ja": "{samples} 件中 {count} 件",
+        "qps-ploc": "⟦{count} őƒ {samples} ŀőřėɱ ⟧"
+      },
+      "chronos_cd_evidence_rate": {
+        "en": "{count} of {samples} ({rate})",
+        "ja": "{samples} 件中 {count} 件 ({rate})",
+        "qps-ploc": "⟦{count} őƒ {samples} ({rate}) ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_cd_candidate_created": {
+        "en": "Queued now",
+        "ja": "今回登録",
+        "qps-ploc": "⟦Ɋůėůėḓ ñőẇ ŀőř⟧"
+      },
+      "chronos_cd_candidate_existing": {
+        "en": "Already queued",
+        "ja": "登録済み",
+        "qps-ploc": "⟦Ȧŀřėȧḓẏ ɋůėůėḓ ŀőřė⟧"
+      },
+      "chronos_cd_candidate_refused": {
+        "en": "Refused",
+        "ja": "登録を拒否",
+        "qps-ploc": "⟦Řėƒůşėḓ ŀőř⟧"
+      },
+      "chronos_cd_candidate_failed": {
+        "en": "Not queued (retried next run)",
+        "ja": "未登録 (次回再試行)",
+        "qps-ploc": "⟦Ñőŧ ɋůėůėḓ (řėŧřïėḓ ñėẋŧ řůñ) ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_cd_candidate_proposed": {
+        "en": "Proposed",
+        "ja": "提案中",
+        "qps-ploc": "⟦Ṗřőṗőşėḓ ŀőř⟧"
+      },
+      "chronos_cd_candidate_approved": {
+        "en": "Approved",
+        "ja": "承認済み",
+        "qps-ploc": "⟦Ȧṗṗřőṽėḓ ŀőř⟧"
+      },
+      "chronos_cd_candidate_rejected": {
+        "en": "Rejected",
+        "ja": "却下",
+        "qps-ploc": "⟦Řėĵėƈŧėḓ ŀőř⟧"
+      },
+      "chronos_cd_candidate_promoted": {
+        "en": "Promoted",
+        "ja": "反映済み",
+        "qps-ploc": "⟦Ṗřőɱőŧėḓ ŀőř⟧"
+      },
+      "chronos_cd_candidate_unknown": {
+        "en": "Unknown",
+        "ja": "不明",
+        "qps-ploc": "⟦Ůñķñőẇñ ŀőř⟧"
+      },
       "chronos_workspace_clear_selection_retry": {
         "en": "Clear selection and retry",
         "ja": "選択を解除して再読み込み",
