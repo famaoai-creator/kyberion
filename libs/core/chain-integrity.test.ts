@@ -4,6 +4,7 @@ import { pathResolver } from './path-resolver.js';
 import {
   computeAuditEntryHash,
   computeLedgerEntryHash,
+  createChainAlgTracker,
   verifyAuditEntryHash,
   verifyLedgerEntryHash,
   registerChainIntegrityIo,
@@ -109,5 +110,23 @@ describe('chain-integrity', () => {
         key: 'secret-b',
       }).ok
     ).toBe(false);
+  });
+
+  it('allows unkeyed entries only as a legacy prefix', () => {
+    const tracker = createChainAlgTracker();
+    expect(tracker.observe(undefined)).toBeUndefined();
+    expect(tracker.observe('sha256')).toBeUndefined();
+    expect(tracker.observe('hmac-sha256')).toBeUndefined();
+    expect(tracker.observe('sha256')).toBe('chain_downgrade');
+    expect(tracker.observe(undefined)).toBe('chain_downgrade');
+    expect(tracker.unkeyed).toBe(4);
+  });
+
+  it('rejects every unkeyed entry when keyed entries are required', () => {
+    const tracker = createChainAlgTracker({ requireKeyed: true });
+    expect(tracker.observe('sha256')).toBe('unkeyed_entry');
+    expect(tracker.observe('hmac-sha256')).toBeUndefined();
+    expect(tracker.observe('sha256')).toBe('chain_downgrade');
+    expect(tracker.unkeyed).toBe(2);
   });
 });

@@ -397,4 +397,34 @@ describe('audit-chain — tenant mirror', () => {
     expect(result.total).toBe(2);
     expect(result.corrupted).toContain('audit-gap:2026-07-01->2026-07-03');
   });
+
+  it('flags an unkeyed entry appended after keyed ones as a chain downgrade', async () => {
+    const run = await loadFreshAuditChain(new Date('2026-07-01T10:00:00.000Z'));
+    const keyed = run.auditChain.record({
+      agentId: 'agent-1',
+      action: 'keyed',
+      operation: 'op',
+      result: 'completed',
+    });
+    expect(keyed.chain_alg).toBe('hmac-sha256');
+    const { computeAuditEntryHash } = await import('../chain-integrity.js');
+    const { chain_key_id: _keyId, ...rest } = keyed;
+    const forged = {
+      ...rest,
+      id: 'AUD-FORGED',
+      action: 'rewritten',
+      previousHash: keyed.currentHash,
+      chain_alg: 'sha256' as const,
+      currentHash: '',
+    };
+    forged.currentHash = computeAuditEntryHash(forged, keyed.currentHash, { alg: 'sha256' });
+    fs.appendFileSync(
+      path.join(testRoot, 'active', 'shared', 'logs', 'audit', 'audit-2026-07-01.jsonl'),
+      JSON.stringify(forged) + '\n'
+    );
+
+    const result = run.auditChain.verify();
+    expect(result).toMatchObject({ total: 2, valid: 1, unkeyed: 1 });
+    expect(result.corrupted).toEqual(['AUD-FORGED:chain_downgrade']);
+  });
 });

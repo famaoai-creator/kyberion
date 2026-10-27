@@ -172,3 +172,35 @@ export function verifyLedgerEntryHash(
     };
   }
 }
+
+/**
+ * Keyed-chain discipline for a verifier walking one chain in order. Unkeyed
+ * (`sha256`) entries are legal only as a legacy prefix: anyone can recompute
+ * them, so an unkeyed entry after a keyed one is a downgrade (a rewritten
+ * tail), and a chain born keyed (`requireKeyed`) may hold none at all.
+ */
+export interface ChainAlgTracker {
+  /** The finding reason for this entry's algorithm, or undefined when allowed. */
+  observe(alg: ChainAlg | undefined): 'chain_downgrade' | 'unkeyed_entry' | undefined;
+  /** Unkeyed entries seen so far. */
+  readonly unkeyed: number;
+}
+
+export function createChainAlgTracker(options: { requireKeyed?: boolean } = {}): ChainAlgTracker {
+  let keyedSeen = false;
+  let unkeyed = 0;
+  return {
+    observe(alg) {
+      if ((alg ?? 'sha256') === 'hmac-sha256') {
+        keyedSeen = true;
+        return undefined;
+      }
+      unkeyed += 1;
+      if (keyedSeen) return 'chain_downgrade';
+      return options.requireKeyed ? 'unkeyed_entry' : undefined;
+    },
+    get unkeyed() {
+      return unkeyed;
+    },
+  };
+}

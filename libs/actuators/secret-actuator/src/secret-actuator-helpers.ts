@@ -175,13 +175,15 @@ async function withGovernedMutation(
   try {
     result = await logic();
     if (result.status === 'success') {
+      // Without a mission the record lands in the untenanted system ledger:
+      // keep the account name (a personal-tier key name) out of it.
       ledger.record('CONFIG_CHANGE', {
         mission_id: missionReady ? missionId : 'None',
         role: getRegisteredEnvText('MISSION_ROLE') || 'secret_guard',
         service_id: params.service,
         config_target: 'os-keychain',
         action: actionType,
-        changed_keys: [params.account],
+        ...(missionReady ? { changed_keys: [params.account] } : { changed_key_count: 1 }),
       });
       if (missionReady) result.mission_id = missionId;
     }
