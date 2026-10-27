@@ -60,6 +60,7 @@ Kyberion に対する指示例:
 | 29  | 生活・予約       | [家族・子ども関連の予定管理](#29-家族子ども関連の予定管理)                                           |
 | 30  | 生活・予約       | [サブスク・契約更新・解約管理](#30-サブスク契約更新解約管理)                                         |
 | 31  | 横断業務         | [カレンダー・会議・メール・資料・ブラウザの一括計画](#31-カレンダー会議メール資料ブラウザの一括計画) |
+| 32  | 開発・運用       | [チケットシステムの定期監視とメンバー通知](#32-チケットシステムの定期監視とメンバー通知)             |
 
 ---
 
@@ -1036,6 +1037,12 @@ pnpm pipeline --input knowledge/product/pipeline-templates/productivity-task-orc
   ④ 必要に応じてセッションを export_session_handoff で保持
 ```
 
+**MFA / パスキーの扱い（実装済みの経路）**:
+
+- **パスキー**: `setup_passkey_authenticator` → `authenticate_passkey`（CDP の WebAuthn 仮想認証器）で自動化できます。`pipelines/fragments/browser-login-passkey.json` が参照実装です。
+- **TOTP（認証アプリの6桁コード）**: 自動入力する op はありません。`pause_for_operator` で人間に委ねるか、許可されたプロファイル再利用（`user_data_dir`）または `export_session_handoff` でセッションを保持してください。
+- **ログイン情報**: 平文のパスワードは ADF に書かず、secret store のキーを `browser:fill_secret_ref` で参照します（action_trail では自動的に秘匿化されます）。`pipelines/fragments/intra-login.json` がひな形です。
+
 ### パターン C: 判断分岐あり
 
 金額・条件に応じて、自動処理と人間確認を分けるケース。
@@ -1164,3 +1171,37 @@ For an approval-bound local publication dry-run, execute `scripts/marketing_publ
 The publication approval JSON must also reference a shared approval-store request. The request is loaded by storage channel and request ID, and its human-only accountability payload hash, effect binding, and authenticated workflow decisions must match the publication record exactly.
 
 For executable independent review aggregation, run `scripts/marketing_review_aggregate.ts --review-package <review-package.json> --reviews <review-a.json,review-b.json> --output <mission-evidence-path>/publication-review.json`. Required reviewer roles come from the resolved Risk Level policy. The command does not approve or publish content.
+
+---
+
+## 32. チケットシステムの定期監視とメンバー通知
+
+**課題**: Jira 等のチケット更新を人が巡回で確認しており、対応漏れが起きる。
+
+**対象システム例**: Jira Cloud（`service:preset jira`、JQL 検索）、Backlog、Linear、Zendesk — `knowledge/product/orchestration/service-presets/` の各サービス。
+
+### 実行イメージ
+
+```text
+Kyberion（定期実行・JQLで30分以内の更新を取得）:
+  更新チケット 4 件:
+    - PROJ-123 ステータス変更: In Review → Done（対応不要）
+    - PROJ-124 コメント追加: レビュー依頼 → 通知先: 田中（レビューア）
+    - PROJ-125 優先度変更: Highest → エスカレーション要
+    - PROJ-126 担当者未割当: 要アサイン → 通知先: リード
+```
+
+### 構成（正本テンプレート）
+
+`knowledge/product/pipeline-templates/jira-update-watch.json`:
+
+```text
+① service:preset jira search_issues で更新チケットを定期取得（JQL: updated >= -30m）
+② reasoning:analyze が必要アクションと通知先を判定
+③ system:write_file で digest を出力
+④ メンバー通知（Slack post_message 等）は承認ゲート付きの書き込みとして別途追加
+```
+
+定期実行は pipeline の `schedule` ブロック（cron）+ Chronos が担います。テンプレートは `enabled: false` で出荷されるため、テナント pipeline へコピーして有効化してください（`pipeline-templates/README.md` 参照）。
+
+**ポイント**: 通知などの外部書き込みは既存の approval gate に接続されてから有効化します。読み取り（search_issues）は `read` リスクで承認不要です。
