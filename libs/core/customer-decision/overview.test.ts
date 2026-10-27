@@ -348,6 +348,7 @@ describe('buildCaseOverview (CD-12)', () => {
       held: 1,
       ready_to_resume: 0,
       unresolvable: 0,
+      frozen_locks: 0,
     });
     // Collected onto the price entry; the customer's answer (D-0002) is in force once confirmed.
     const resolvedLock = lock({
@@ -380,6 +381,7 @@ describe('buildCaseOverview (CD-12)', () => {
       held: 0,
       ready_to_resume: 1,
       unresolvable: 0,
+      frozen_locks: 0,
     });
     // Released before, but the decision is no longer confirmed: held again.
     const unconfirmed = buildCaseOverview(caseInput({ consumers: [resolvedLock] }));
@@ -388,6 +390,7 @@ describe('buildCaseOverview (CD-12)', () => {
       held: 1,
       ready_to_resume: 0,
       unresolvable: 0,
+      frozen_locks: 0,
     });
     // Its agenda withdrawn with no standing confirmed answer: unresolvable, with how to clear it.
     const gone = buildCaseOverview(
@@ -410,13 +413,23 @@ describe('buildCaseOverview (CD-12)', () => {
         approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
       },
     }));
-    expect(buildCaseOverview(caseInput({ consumers: marked })).tasks).toMatchObject({
-      pending_proposals: 2,
-      held: 1,
-    });
+    // The unproven mark still freezes the lock: counted, with the repair step.
+    const unverified = buildCaseOverview(caseInput({ consumers: marked })).tasks;
+    expect(unverified).toMatchObject({ pending_proposals: 2, held: 1, frozen_locks: 2 });
+    // Confirm first (an unreadable proof is no evidence), then restore as an
+    // operator with authority over the tenant's confidential knowledge.
+    expect(unverified.frozen_locks_next).toMatch(
+      /customer-decision status --case .*confirm the mission has no approved supersede \(never restore while the proof is unreadable\).*revision before the mark \(an operator with authority over the tenant's confidential knowledge\).*mission resume/u
+    );
     expect(
       buildCaseOverview(caseInput({ consumers: marked, isSuperseded: () => false })).tasks
-    ).toMatchObject({ pending_proposals: 2, held: 1 });
+    ).toMatchObject({ pending_proposals: 2, held: 1, frozen_locks: 2 });
+    // A verifier that proves one mark leaves only the other frozen.
+    const [proven] = marked;
+    expect(
+      buildCaseOverview(caseInput({ consumers: marked, isSuperseded: (lock) => lock === proven }))
+        .tasks.frozen_locks
+    ).toBe(1);
     const superseded = buildCaseOverview(
       caseInput({ consumers: marked, isSuperseded: (lock) => lock.superseded !== undefined })
     );
@@ -425,6 +438,7 @@ describe('buildCaseOverview (CD-12)', () => {
       held: 0,
       ready_to_resume: 0,
       unresolvable: 0,
+      frozen_locks: 0,
     });
   });
 
@@ -491,6 +505,7 @@ describe('buildCustomerDecisionOverview (CD-12)', () => {
         pending_handoffs: 1,
         held_tasks: 1,
         pending_task_proposals: 2,
+        frozen_locks: 0,
       },
       case_failures: [{ case_id: 'case-z', diagnostic_code: 'DECISION_LEDGER_X' }],
     });
@@ -518,6 +533,37 @@ describe('buildCustomerDecisionOverview (CD-12)', () => {
     // Within one reason, the soonest first.
     const awaiting = overview.attention.filter((item) => item.reason === 'awaiting_customer');
     expect(awaiting.map((item) => item.case_id)).toEqual(['case-a', 'case-b']);
+  });
+
+  it('puts a frozen lock first: an unproven superseded mark blocks every write to it', () => {
+    const marked = caseInput().consumers.map((item, index) =>
+      index === 0
+        ? {
+            ...item,
+            superseded: {
+              by_consumer: `${item.consumer}-v2`,
+              by_task_id: 'v2',
+              at: CREATED,
+              approval_request_id: '0f6c2a4e-8b1d-4c3a-9e2f-1a2b3c4d5e6f',
+            },
+          }
+        : item
+    );
+    const overview = buildCustomerDecisionOverview({
+      tenant_slug: 'acme-corp',
+      cases: [buildCaseOverview(caseInput({ consumers: marked }))],
+      now: NOW,
+    });
+    expect(overview.totals.frozen_locks).toBe(1);
+    expect(overview.attention[0]).toEqual({ reason: 'frozen_locks', case_id: 'case-a', count: 1 });
+    // A clean case raises no frozen_locks item.
+    const clean = buildCustomerDecisionOverview({
+      tenant_slug: 'acme-corp',
+      cases: [buildCaseOverview(caseInput())],
+      now: NOW,
+    });
+    expect(clean.totals.frozen_locks).toBe(0);
+    expect(clean.attention.some((item) => item.reason === 'frozen_locks')).toBe(false);
   });
 
   it('the summary form drops entries, caps attention and keeps the full count', () => {

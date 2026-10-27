@@ -148,16 +148,22 @@ export function CustomerDecisionViewNotice<T>({
 }
 
 const TASK_TONE: Record<string, KbTone> = {
+  frozen: 'danger',
   held: 'warning',
   ready: 'success',
   in_progress: 'info',
   completed: 'neutral',
 };
 
-/** held (waits on a customer answer), ready (every answer is in), in progress, completed. */
+/**
+ * frozen (an unproven superseded mark blocks every write to its lock), held
+ * (waits on a customer answer), ready (every answer is in), in progress,
+ * completed.
+ */
 export function customerDecisionTaskState(
   task: CaseTaskView
-): 'held' | 'ready' | 'in_progress' | 'completed' {
+): 'frozen' | 'held' | 'ready' | 'in_progress' | 'completed' {
+  if (task.frozen) return 'frozen';
   if (task.status === 'completed') return 'completed';
   if (task.hold && !task.hold.resolved_at) {
     const waiting = task.proposals.filter((proposal) => proposal.requires_customer);
@@ -285,6 +291,13 @@ export function CustomerDecisionCasePanel({
                 label={uxText('chronos_cd_metric_pending_proposals', locale)}
                 value={tasks.pending_proposals}
               />
+              {tasks.frozen_locks > 0 ? (
+                <Metric
+                  label={uxText('chronos_cd_metric_frozen_locks', locale)}
+                  value={tasks.frozen_locks}
+                  tone="danger"
+                />
+              ) : null}
             </div>
 
             {detail.attention.length > 0 ? (
