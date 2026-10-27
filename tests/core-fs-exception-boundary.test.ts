@@ -147,6 +147,8 @@ const allowedCoreFsImports = [
   'libs/core/reasoning/model-registry-directory.test.ts',
   'libs/core/provider/openai-compatible-backend.test.ts',
   'libs/core/provider/openrouter-backend.test.ts',
+  // The hostile Git-helper child sentinel intentionally uses raw fs; fixture setup uses secure-io.
+  'libs/core/shell/git-probe-hardening.test.ts',
   'libs/core/knowledge/procedure-registry.test.ts',
   'libs/core/tool/runtime-health-history.test.ts',
   'libs/core/organization/tenant-design-resolver.test.ts',

@@ -23,6 +23,7 @@ import { removeMissionFixture } from '../testing/mission-fixture.js';
 import { inferProviderFromActorId, recordDirectCliTaskUsage } from './mission-direct-cli-usage.js';
 import { createHash } from 'node:crypto';
 import { acquireLock, releaseLock } from '../foundation/lock-utils.js';
+import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
 import {
   createWorkItem,
   claimWorkItem,
@@ -524,7 +525,8 @@ describe('direct-CLI usage accounting', () => {
       actor_id: 'codex-implementer',
       mission_id: missionId,
       quantity: 0,
-      cost_usd: 0,
+      cost_usd: null,
+      cost_status: 'unknown',
       status: 'estimated',
       source: 'direct_cli',
       scope: { scope_kind: 'task', tier: 'public', mission_id: missionId, task_id: 'impl' },
@@ -639,6 +641,168 @@ describe('direct-CLI usage accounting', () => {
     const entries = collector.loadResourceUsageHistory();
     expect(entries.map((entry) => entry.metadata?.task_id)).toEqual(['design', 'build']);
     expect(entries[1].metadata).toMatchObject({ cascaded_from: 'design' });
+  });
+
+  it('does not invent an author for a cascaded review target; explicit evidence registers its author', async (ctx) => {
+    const { missionId, missionPath, readTasks } = seedMission(
+      ctx,
+      [
+        { task_id: 'design', status: 'planned', deliverable: 'evidence/design.md' },
+        {
+          task_id: 'build',
+          status: 'planned',
+          deliverable: 'evidence/build.md',
+          dependencies: ['design'],
+        },
+        {
+          task_id: 'build-review',
+          status: 'planned',
+          review_target: 'build',
+          deliverable: 'evidence/review.md',
+          dependencies: ['build'],
+        },
+      ],
+      ['evidence/design.md', 'evidence/build.md', 'evidence/review.md']
+    );
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'design' });
+    expect(readTasks().find((task) => task.task_id === 'build')?.status).toBe('planned');
+    const reviewArgs = {
+      missionId,
+      reviewTaskId: 'build-review',
+      reviewerAgentId: 'claude-reviewer',
+      findings: [],
+      getGitHash: () => 'hash',
+    };
+    const missing = await recordArtifactReview(reviewArgs);
+    expect(missing.status).toBe('blocked');
+    expect(missing.next_step).toContain(`record-evidence ${missionId} build `);
+    expect(missing.next_step).toContain('--actor-id <actual-author-id>');
+    const receipt = JSON.parse(String(safeReadFile(`${missionPath}/${missing.receiptPath}`)));
+    expect(receipt.reviewer.independence_verified).toBe(false);
+    expect(receipt.reviewer.independent_from).toEqual([]);
+
+    await recordEvidence({
+      ...evidenceArgs(missionId),
+      taskId: 'build',
+      actorId: 'actual-builder',
+    });
+    const reviewed = await recordArtifactReview(reviewArgs);
+    expect(reviewed).toMatchObject({ status: 'recorded', taskCompleted: true });
+    const adopted = JSON.parse(String(safeReadFile(`${missionPath}/${reviewed.receiptPath}`)));
+    expect(adopted.reviewer.independent_from).toEqual(['actual-builder']);
+  });
+
+  it('repairs legacy completed targets only with target-specific author evidence and rejects self-review', async (ctx) => {
+    const { missionId, missionPath } = seedMission(
+      ctx,
+      [
+        { task_id: 'impl', status: 'completed', deliverable: 'evidence/report.md' },
+        {
+          task_id: 'impl-review',
+          status: 'planned',
+          review_target: 'impl',
+          deliverable: 'evidence/review.md',
+          dependencies: ['impl'],
+        },
+      ],
+      ['evidence/report.md', 'evidence/review.md']
+    );
+    appendMissionExecutionLedgerEntry({
+      mission_id: missionId,
+      mission_path_hint: missionPath,
+      event_type: 'artifact_review_recorded',
+      task_id: 'impl',
+      actor_id: 'unrelated-observer',
+    });
+    const reviewArgs = {
+      missionId,
+      reviewTaskId: 'impl-review',
+      reviewerAgentId: 'codex-implementer',
+      findings: [],
+      getGitHash: () => 'hash',
+    };
+    expect((await recordArtifactReview(reviewArgs)).status).toBe('blocked');
+    // Evidence for the review task never supplies the target's author.
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl-review' });
+    expect((await recordArtifactReview(reviewArgs)).next_step).toContain('<actual-author-id>');
+    await recordEvidence({ ...evidenceArgs(missionId), taskId: 'impl' });
+    const selfReview = await recordArtifactReview(reviewArgs);
+    expect(selfReview.status).toBe('blocked');
+    expect(selfReview.next_step).toContain('<independent-reviewer-id>');
+    expect(
+      await recordArtifactReview({ ...reviewArgs, reviewerAgentId: 'other-reviewer' })
+    ).toMatchObject({ status: 'recorded', taskCompleted: true });
+  });
+
+  it('registers the verified claim holder automatically when redundant actor-id is omitted', async (ctx) => {
+    const { missionId, missionPath, collector, readTasks } = seedMission(
+      ctx,
+      [{ task_id: 'impl', status: 'planned', deliverable: 'evidence/report.md' }],
+      ['evidence/report.md']
+    );
+    setWorkCoordinationNamespace(`evidence-author-${process.pid}`);
+    ctx.onTestFinished(() => {
+      clearWorkCoordinationStore();
+      setWorkCoordinationNamespace(null);
+    });
+    const actorId = 'claimed-builder';
+    const item = createWorkItem({
+      title: 'Claim-bound author',
+      description: 'Record actual runtime author',
+      status: 'ready',
+      projectId: missionId,
+      context: { mission_id: missionId, task_id: 'impl' },
+    });
+    const { lease } = claimWorkItem({
+      itemId: item.item_id,
+      actorPeerId: actorId,
+      purpose: 'author proof',
+    });
+    const taskBinding = {
+      actorId,
+      workItemId: item.item_id,
+      leaseId: lease.lease_id,
+      scope: {
+        tier: 'public' as const,
+        scope_kind: 'task' as const,
+        mission_id: missionId,
+        task_id: 'impl',
+      },
+      artifactPath: 'evidence/report.md',
+      artifactSha256: createHash('sha256')
+        .update(safeReadFile(`${missionPath}/evidence/report.md`))
+        .digest('hex'),
+    };
+    await expect(
+      recordEvidence({
+        ...evidenceArgs(missionId),
+        taskId: 'impl',
+        actorId: 'spoofed-author',
+        taskBinding,
+      })
+    ).rejects.toThrow('TASK_EVIDENCE_SCOPE_DENIED');
+    await expect(
+      recordEvidence({
+        ...evidenceArgs(missionId),
+        taskId: 'impl',
+        actorId: undefined,
+        taskBinding: { ...taskBinding, actorId: 'forged-claim-holder' },
+      })
+    ).rejects.toThrow('TASK_EVIDENCE_LEASE_LOST');
+    expect(readTasks()[0].status).toBe('planned');
+    expect(safeExistsSync(`${missionPath}/execution-ledger.jsonl`)).toBe(false);
+    await recordEvidence({
+      ...evidenceArgs(missionId),
+      taskId: 'impl',
+      actorId: undefined,
+      taskBinding,
+    });
+    const ledger = String(safeReadFile(`${missionPath}/execution-ledger.jsonl`))
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line));
+    expect(ledger.find((entry) => entry.event_type === 'evidence_recorded').actor_id).toBe(actorId);
+    expect(collector.loadResourceUsageHistory()[0].actor_id).toBe(actorId);
   });
 
   it('a throwing usage collector does not block evidence recording', async (ctx) => {

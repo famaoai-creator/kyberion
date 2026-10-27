@@ -473,6 +473,16 @@
     }
   },
   "roles": {
+    "context_compaction": {
+      "inherit_default": true,
+      "candidates": ["default-codex", "agy-default"],
+      "requires": ["text"]
+    },
+    "background_review": {
+      "inherit_default": true,
+      "candidates": ["default-codex", "agy-default"],
+      "requires": ["text"]
+    },
     "default": { "candidates": ["default-codex", "agy-default"], "requires": ["text"] },
     "subagent": {
       "candidates": ["subagent-local", "default-codex", "agy-default"],

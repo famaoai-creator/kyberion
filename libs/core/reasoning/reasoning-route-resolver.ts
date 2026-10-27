@@ -93,6 +93,7 @@ export interface RuntimeProfileConfig {
   sampling?: SamplingParams;
 }
 export interface RoleRouteConfig {
+  inherit_default?: boolean;
   candidates: string[];
   requires?: ReasoningCapability[];
   sampling?: SamplingParams;
@@ -471,6 +472,30 @@ export interface ResolveReasoningRouteInput {
   brokerPin?: { provider: string; modelId?: string } | null;
 }
 
+/** Auxiliary roles share the exact default binding until explicitly configured. */
+export function reasoningRoleInheritsDefault(input: ResolveReasoningRouteInput = {}): boolean {
+  const policy = resolveScopedReasoningRoutePolicy(
+    input.policy ?? loadReasoningRoutePolicy(),
+    input.scope ?? currentScope()
+  );
+  const role = String(input.role || 'default')
+    .trim()
+    .toLowerCase()
+    .replace(/[-\s]+/g, '_');
+  if (!policy.roles[role]) return false;
+  const user = input.userConfig ?? loadReasoningRouteUserConfig();
+  const env = input.env ?? process.env;
+  return (
+    role !== 'default' &&
+    policy.roles[role]?.inherit_default === true &&
+    !user.roles?.[role] &&
+    !input.requestedProfile &&
+    !input.requestedMode &&
+    !input.requestedModel &&
+    !env[`KYBERION_REASONING_ROLE_${role.toUpperCase()}`]
+  );
+}
+
 function resolveLegacyReasoningRoute(
   input: ResolveReasoningRouteInput = {}
 ): ResolvedReasoningRoute {
@@ -768,6 +793,8 @@ function sameSelectionModel(left: string, right: string, adapter: RuntimeAdapter
 export function resolveReasoningRouteCandidates(
   input: ResolveReasoningRouteInput = {}
 ): ResolvedReasoningRoute[] {
+  if (reasoningRoleInheritsDefault(input))
+    return resolveReasoningRouteCandidates({ ...input, role: 'default' });
   const policy = resolveScopedReasoningRoutePolicy(
     input.policy ?? loadReasoningRoutePolicy(),
     input.scope ?? currentScope()
@@ -1058,6 +1085,8 @@ export function resolveReasoningRouteCandidates(
 export function resolveReasoningRoute(
   input: ResolveReasoningRouteInput = {}
 ): ResolvedReasoningRoute {
+  if (reasoningRoleInheritsDefault(input))
+    return resolveReasoningRoute({ ...input, role: 'default' });
   const user = input.userConfig ?? loadReasoningRouteUserConfig();
   const role = normalizeReasoningRole(input.role, input.policy);
   if (!user.roles?.[role]?.selection)
@@ -1078,7 +1107,11 @@ export function resolveScopedReasoningRoutePolicy(
   return layers.reduce<ReasoningRoutePolicy>((resolved, layer) => {
     const roles = { ...resolved.roles };
     for (const [role, overlay] of Object.entries(layer.roles || {})) {
-      roles[role] = { ...(roles[role] || { candidates: [] }), ...overlay } as RoleRouteConfig;
+      roles[role] = {
+        ...(roles[role] || { candidates: [] }),
+        inherit_default: false,
+        ...overlay,
+      } as RoleRouteConfig;
     }
     const profiles = { ...resolved.profiles };
     for (const [profile, overlay] of Object.entries(layer.profiles || {})) {

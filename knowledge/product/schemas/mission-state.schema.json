@@ -133,8 +133,37 @@
       "properties": {
         "status": { "type": "string", "enum": ["completed"] },
         "completed_at": { "type": "string", "minLength": 1 },
+        "mode": { "type": "string", "enum": ["llm", "structural"] },
+        "llm_used": { "type": "boolean" },
+        "structural_reason": {
+          "type": "string",
+          "enum": ["stub_requested", "llm_unavailable"]
+        },
         "output_path": { "type": "string", "minLength": 1 }
       },
+      "allOf": [
+        {
+          "if": { "required": ["mode"], "properties": { "mode": { "const": "llm" } } },
+          "then": {
+            "properties": { "llm_used": { "const": true } },
+            "not": { "required": ["structural_reason"] }
+          }
+        },
+        {
+          "if": {
+            "required": ["mode"],
+            "properties": { "mode": { "const": "structural" } }
+          },
+          "then": { "properties": { "llm_used": { "const": false } } }
+        },
+        {
+          "if": { "required": ["structural_reason"] },
+          "then": {
+            "required": ["mode", "llm_used"],
+            "properties": { "mode": { "const": "structural" }, "llm_used": { "const": false } }
+          }
+        }
+      ],
       "additionalProperties": true
     },
     "completed_at": { "type": "string", "minLength": 1 },

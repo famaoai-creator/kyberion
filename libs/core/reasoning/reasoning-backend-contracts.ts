@@ -346,6 +346,12 @@ export interface ReasoningPromptVisibilityContext {
 }
 
 export interface ReasoningCallOptions {
+  /** Parent-owned projection hints; structured payloads are always preserved. */
+  delegation_result?: import('../agent/delegation-result-projection.js').DelegationResultProjection;
+  /** Opt-in semantic inactivity timeout, independent of the hard wall-clock ceiling. */
+  delegation_inactivity?: { timeoutMs: number; lateResultGraceMs?: number };
+  /** Continuous execution requires a semantic-progress-capable dispatcher. */
+  delegation_execution?: 'bounded' | 'continuous';
   /** Governed role used to resolve a runtime/model profile. */
   role?: string;
   /** Optional resolved profile override; security constraints still apply. */
@@ -571,6 +577,8 @@ export interface ReasoningBackendCandidate {
   backend: ReasoningBackend;
   provider?: string;
   label?: string;
+  model?: string;
+  instance?: string;
 }
 
 export interface ReasoningFailoverPolicy {

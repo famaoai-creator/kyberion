@@ -1,3 +1,8 @@
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+} from '../foundation/credential-binding.js';
+import { buildProviderChildEnv } from './provider-permission-profiles.js';
 /* eslint-disable no-restricted-imports -- isolated child needs an exact minimal env; safeSpawn's buildSafeExecEnv would add MISSION_ROLE/KYBERION_* (gated via assertGovernedExec + withWallClockBudget instead) */
 /**
  * Codex Isolated Query — one-shot structured-output generation through the
@@ -198,9 +203,10 @@ interface ChildRun {
 export function buildCodexIsolatedEnv(
   baseEnv: NodeJS.ProcessEnv = process.env
 ): Record<string, string> {
+  const scopedEnv = buildProviderChildEnv({ provider: 'codex', baseEnv });
   const env: Record<string, string> = {};
   for (const key of CODEX_ISOLATED_ENV_KEYS) {
-    const value = baseEnv[key];
+    const value = scopedEnv[key];
     if (typeof value === 'string' && value !== '') env[key] = value;
   }
   return env;
@@ -259,6 +265,7 @@ export async function runCodexIsolatedQuery<T>(
   params: RunCodexIsolatedQueryParams<T>
 ): Promise<CodexIsolatedQueryResult<T>> {
   assertReasoningEgressAllowed('codex-cli');
+  const owner = credentialExecutionIdentity();
   const bin = params.bin ?? resolveCodexBinary();
   const env = buildCodexIsolatedEnv();
   const signal = params.abortController?.signal;
@@ -269,6 +276,11 @@ export async function runCodexIsolatedQuery<T>(
   try {
     await assertTestedCodexVersion(bin, workspace.path, env, params.allowUntestedVersion === true);
 
+    assertCredentialOwner(owner);
+    if (owner.tenantSlug && JSON.stringify(buildCodexIsolatedEnv()) !== JSON.stringify(env))
+      throw new Error(
+        '[CREDENTIAL_OWNER_DENIED] Isolated provider environment changed during preflight'
+      );
     const schemaPath = path.join(workspace.path, SCHEMA_FILE);
     const jsonSchema = normalizeCodexSchema(
       z.toJSONSchema(params.schema) as Record<string, unknown>

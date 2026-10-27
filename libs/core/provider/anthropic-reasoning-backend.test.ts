@@ -13,6 +13,7 @@ import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.j
 import { evaluateBudgetThrottle } from '../governance/org-budget-governor.js';
 import type { LoadedDotCharter } from '../dot/dot-charter.js';
 import { withExecutionContextAsync } from '../authority.js';
+import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
 
 describe('AnthropicReasoningBackend', () => {
   afterEach(() => {
@@ -101,7 +102,10 @@ describe('AnthropicReasoningBackend', () => {
 
     await backend.delegateTask('do it', undefined, { signal: controller.signal });
 
-    expect(create).toHaveBeenCalledWith(expect.any(Object), { signal: controller.signal });
+    expect(create).toHaveBeenCalledWith(expect.any(Object), {
+      signal: controller.signal,
+      maxRetries: 0,
+    });
   });
 
   it('shrinks max_tokens when the estimated input nears the context window', async () => {
@@ -200,13 +204,23 @@ describe('AnthropicReasoningBackend', () => {
       client: { messages: { create, parse: vi.fn() } } as unknown as Anthropic,
     });
     const collector = new MetricsCollector({
-      persist: false,
-      costRegistry: { models: {}, default: { prompt: 1, completion: 1 } },
+      persist: true,
+      // Price this fixture explicitly; unknown model names are never priced by a default.
+      costRegistry: {
+        models: { [resolveRuntimeModelId('anthropic-default')]: { prompt: 1, completion: 1 } },
+        default: { prompt: 1, completion: 1 },
+      },
     });
     const rows: Array<Record<string, unknown>> = [];
+    // Observe priced ledger records, not mutation of the caller's input object.
+    vi.spyOn(
+      collector as unknown as { _appendToFile(entry: Record<string, unknown>): void },
+      '_appendToFile'
+    ).mockImplementation((entry) => {
+      rows.push({ ...entry, timestamp: '2026-10-04T10:00:00Z' });
+    });
     vi.spyOn(metrics, 'record').mockImplementation((component, duration, status, extra) => {
       collector.record(component, duration, status, extra);
-      rows.push({ timestamp: '2026-10-04T10:00:00Z', component, ...extra });
     });
     const scopes = [
       { tier: 'confidential' as const, tenant_slug: 'acme', organization_id: 'o1' },
@@ -271,20 +285,21 @@ describe('AnthropicReasoningBackend', () => {
 
   it('uses canonical execution scope for non-dot SDK usage without inventing a dot actor', async () => {
     const record = vi.spyOn(metrics, 'record').mockImplementation(() => undefined);
-    const backend = new AnthropicReasoningBackend({
-      client: {
-        messages: {
-          create: vi.fn().mockResolvedValue({
-            content: [{ type: 'text', text: 'ok' }],
-            usage: { input_tokens: 1, output_tokens: 1 },
-          }),
-          parse: vi.fn(),
-        },
-      } as unknown as Anthropic,
-    });
     await withExecutionContextAsync(
       'infrastructure_sentinel',
-      () => backend.generateWithTools('wake', []),
+      () =>
+        withTaskCredentialBinding(
+          { tenantSlug: 'acme', secrets: { ANTHROPIC_API_KEY: 'test-only-key' } },
+          () => {
+            const backend = new AnthropicReasoningBackend();
+            const client = (backend as unknown as { client: Anthropic }).client;
+            vi.spyOn(client.messages, 'create').mockResolvedValue({
+              content: [{ type: 'text', text: 'ok' }],
+              usage: { input_tokens: 1, output_tokens: 1 },
+            } as never);
+            return backend.generateWithTools('wake', []);
+          }
+        ),
       undefined,
       'acme',
       'o1'

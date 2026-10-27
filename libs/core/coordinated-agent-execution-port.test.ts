@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AgentExecutionPort, AgentTaskEnvelope } from './agent/agent-execution-port.js';
 import { logger } from './core.js';
+import { registerSecretResolver, resetSecretResolver } from './secret/secret-resolver.js';
+import { resolveTaskCredential } from './foundation/credential-binding.js';
 import { currentActor, type ActorContext } from './actor-context.js';
 import {
   clearWorkCoordinationStore,
@@ -94,8 +96,117 @@ describe('CoordinatedAgentExecutionPort', () => {
   });
 
   afterEach(() => {
+    resetSecretResolver();
     clearWorkCoordinationStore();
     setWorkCoordinationNamespace(null);
+  });
+
+  it('binds configured credentials only after the current claim inside the narrowed envelope', async () => {
+    const item = createWorkItem({
+      itemId: 'WI-CREDENTIAL-BIND',
+      title: 'bound dispatch',
+      description: 'credential composition fixture',
+      status: 'ready',
+    });
+    const bindTask = vi.fn(async function (
+      this: { name: string },
+      input: {
+        workItemId: string;
+        scope: { tenant_slug?: string; mission_id?: string; task_id?: string };
+      }
+    ) {
+      expect(this.name).toBe('trusted-test-resolver');
+      expect(getWorkItem(input.workItemId)?.lease_id).toBeTruthy();
+      expect(currentScopeEnvelope()?.identity.task_id).toBe('task-bind');
+      return {
+        tenantSlug: input.scope.tenant_slug!,
+        missionId: input.scope.mission_id,
+        taskId: input.scope.task_id,
+        secrets: { TEST_BOUND_KEY: 'task-secret' },
+      };
+    });
+    registerSecretResolver({ name: 'trusted-test-resolver', resolve: () => null, bindTask });
+    const parent = mintScopeEnvelope({
+      env: {
+        KYBERION_TIER: 'confidential',
+        KYBERION_TENANT: 'alpha',
+        MISSION_ID: 'MSN-CREDENTIAL-BIND',
+      },
+      policy: { purpose: 'credential dispatch' },
+    });
+    const port = new CoordinatedAgentExecutionPort({
+      delegate: async (request) => {
+        expect(resolveTaskCredential('TEST_BOUND_KEY')).toBe('task-secret');
+        return {
+          execution_kind: 'agent_delegation',
+          task_id: request.task_id,
+          agent_id: 'agent-a',
+          status: 'succeeded',
+          output: 'done',
+        };
+      },
+    });
+    await withScopeEnvelope(parent, () =>
+      port.delegate({
+        work_item_id: item.item_id,
+        task_id: 'task-bind',
+        mission_id: 'MSN-CREDENTIAL-BIND',
+        instruction: 'read',
+        security_scope: {
+          tenant_id: 'alpha',
+          mission_id: 'MSN-CREDENTIAL-BIND',
+          read_tiers: ['confidential'],
+          write_tier: 'confidential',
+          purpose: 'credential dispatch',
+        },
+      })
+    );
+    expect(bindTask).toHaveBeenCalledTimes(1);
+    expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeUndefined();
+  });
+
+  it('closes the claim and never delegates when the configured binder fails', async () => {
+    const item = createWorkItem({
+      itemId: 'WI-CREDENTIAL-FAIL',
+      title: 'bound dispatch',
+      description: 'credential composition fixture',
+      status: 'ready',
+    });
+    registerSecretResolver({
+      name: 'failing-test-resolver',
+      resolve: () => null,
+      bindTask: async () => {
+        throw new Error('private secret value');
+      },
+    });
+    const parent = mintScopeEnvelope({
+      env: {
+        KYBERION_TIER: 'confidential',
+        KYBERION_TENANT: 'alpha',
+        MISSION_ID: 'MSN-CREDENTIAL-FAIL',
+      },
+      policy: { purpose: 'credential dispatch' },
+    });
+    const delegate = vi.fn();
+    await expect(
+      withScopeEnvelope(parent, () =>
+        new CoordinatedAgentExecutionPort({ delegate }).delegate({
+          work_item_id: item.item_id,
+          task_id: 'task-fail',
+          mission_id: 'MSN-CREDENTIAL-FAIL',
+          instruction: 'read',
+          security_scope: {
+            tenant_id: 'alpha',
+            mission_id: 'MSN-CREDENTIAL-FAIL',
+            read_tiers: ['confidential'],
+            write_tier: 'confidential',
+            purpose: 'credential dispatch',
+          },
+        })
+      )
+    ).rejects.toThrow('CREDENTIAL_BINDING_UNAVAILABLE');
+    expect(delegate).not.toHaveBeenCalled();
+    expect(getWorkItem(item.item_id)?.status).toBe('blocked');
   });
 
   it('claims and closes a work item around agent-runtime execution', async () => {

@@ -13,6 +13,8 @@ import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
 import { nowIso } from '../foundation/time.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { createAnthropicCredentialClient } from './anthropic-credential-client.js';
+import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import type {
   OneOnOneSessionInput,
   OneOnOneSessionResult,
@@ -66,14 +68,19 @@ export class AnthropicVoiceBridge implements VoiceBridge {
   private readonly client: Anthropic;
   private readonly model: string;
   private readonly maxTokens: number;
+  private readonly assertCredentialBinding: () => void;
 
   constructor(options: AnthropicVoiceBridgeOptions = {}) {
-    this.client = options.client ?? new Anthropic();
+    const credentials = createAnthropicCredentialClient({ client: options.client });
+    this.client = credentials.client;
+    this.assertCredentialBinding = credentials.assertBinding;
     this.model = options.model ?? DEFAULT_MODEL;
     this.maxTokens = options.maxTokens ?? DEFAULT_MAX_TOKENS;
   }
 
   async runRoleplaySession(input: RoleplaySessionInput): Promise<RoleplaySessionResult> {
+    this.assertCredentialBinding();
+    assertReasoningEgressAllowed('anthropic');
     const userPrompt = [
       `TASK: Generate a rehearsal roleplay transcript.`,
       `OBJECTIVE: ${input.objective}`,
@@ -84,14 +91,19 @@ export class AnthropicVoiceBridge implements VoiceBridge {
       `Produce turns with speaker in {sovereign, counterparty}.`,
     ].join('\n');
 
-    const result = await this.client.messages.parse({
-      model: this.model,
-      max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
-      messages: [{ role: 'user', content: userPrompt }],
-      output_config: { format: zodOutputFormat(RoleplayResultSchema) },
-    });
+    this.assertCredentialBinding();
+    assertReasoningEgressAllowed('anthropic');
+    const result = await this.client.messages.parse(
+      {
+        model: this.model,
+        max_tokens: this.maxTokens,
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        thinking: { type: 'adaptive' },
+        messages: [{ role: 'user', content: userPrompt }],
+        output_config: { format: zodOutputFormat(RoleplayResultSchema) },
+      },
+      { maxRetries: 0 }
+    );
 
     return {
       written_to: input.outputPath,
@@ -101,6 +113,8 @@ export class AnthropicVoiceBridge implements VoiceBridge {
   }
 
   async runOneOnOneSession(input: OneOnOneSessionInput): Promise<OneOnOneSessionResult> {
+    this.assertCredentialBinding();
+    assertReasoningEgressAllowed('anthropic');
     const userPrompt = [
       `TASK: Run a 1-on-1 session simulation with the counterparty referenced below.`,
       `The Sovereign wants to test the proposal draft and surface dissent before a formal ask.`,
@@ -114,14 +128,19 @@ export class AnthropicVoiceBridge implements VoiceBridge {
       `Return OneOnOneSessionResult with transcript, stance, conditions, dissent_signals.`,
     ].join('\n');
 
-    const result = await this.client.messages.parse({
-      model: this.model,
-      max_tokens: this.maxTokens,
-      system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
-      thinking: { type: 'adaptive' },
-      messages: [{ role: 'user', content: userPrompt }],
-      output_config: { format: zodOutputFormat(OneOnOneResultSchema) },
-    });
+    this.assertCredentialBinding();
+    assertReasoningEgressAllowed('anthropic');
+    const result = await this.client.messages.parse(
+      {
+        model: this.model,
+        max_tokens: this.maxTokens,
+        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        thinking: { type: 'adaptive' },
+        messages: [{ role: 'user', content: userPrompt }],
+        output_config: { format: zodOutputFormat(OneOnOneResultSchema) },
+      },
+      { maxRetries: 0 }
+    );
 
     const parsed = result.parsed_output!;
     const lastSegment = input.counterpartyRef.split(/[/\\]/u).pop() ?? '';

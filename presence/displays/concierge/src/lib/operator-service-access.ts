@@ -15,7 +15,7 @@ export function operatorServiceError(error: string, status = 400): NextResponse 
 export function resolveOperatorServiceAccess(
   req: NextRequest
 ):
-  | { principal: OperatorServiceConnectionPrincipal; response?: never }
+  | { principal: OperatorServiceConnectionPrincipal & { principalId: string }; response?: never }
   | { principal?: never; response: NextResponse } {
   if (req.method !== 'GET') {
     const denied = requireConciergeMutationAccess(req);

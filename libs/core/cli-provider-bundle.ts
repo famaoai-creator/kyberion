@@ -20,6 +20,7 @@ export interface CliProviderBuildOptions {
   mode: ReasoningBackendMode;
   provider?: string;
   model?: string;
+  timeoutMs?: number;
   force?: boolean;
   env?: NodeJS.ProcessEnv;
 }

@@ -23,6 +23,11 @@ import { assertSandboxNetworkAllowed } from './shell/sandbox-policy.js';
 import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { nowIso } from './foundation/time.js';
+import {
+  describePersistentInstructionWrite,
+  describeOpaqueInstructionExecution,
+  isPersistentInstructionPath,
+} from './governance/persistent-instruction-effect.js';
 import { validateWritePermission, validateReadPermission, detectTier } from './tier-guard.js';
 import { PARTITIONED_RUNTIME_STATE_ROOTS } from './foundation/runtime-state-roots.js';
 // The policy gate is intentionally part of secure-io bootstrap; policy-engine
@@ -496,6 +501,21 @@ export function safeWriteFile(
   // Tier for the policy decision only; the canonical permission check runs
   // after policy evaluation, as close to the write as possible.
   const tierPath = canonicalGuardPath(resolved, 'follow');
+  let instructionEffect: ReturnType<typeof describePersistentInstructionWrite>;
+  if (isPersistentInstructionPath(resolved, tierPath)) {
+    let before: Buffer | null | 'unavailable' = 'unavailable';
+    try {
+      before = safeExistsSync(resolved) ? safeReadFileSnapshot(resolved, 1_048_576) : null;
+    } catch {
+      /* A write-only caller does not gain read authority for diagnostics. */
+    }
+    instructionEffect = describePersistentInstructionWrite({
+      logicalPath: resolved,
+      canonicalPath: tierPath,
+      before,
+      after: Buffer.isBuffer(data) ? data : Buffer.from(data, options.encoding ?? 'utf8'),
+    });
+  }
 
   // Policy engine gate (with re-entrancy guard to avoid infinite loop
   // since policyEngine.evaluate -> loadFromFile -> safeReadFile)
@@ -505,6 +525,12 @@ export function safeWriteFile(
       const policyDecision = policyEngine.evaluate({
         agentId: executionPersonaText() || 'unknown',
         operation: 'file_write',
+        ...(instructionEffect
+          ? {
+              persistent_instruction_effect: instructionEffect,
+              effect_class: instructionEffect.effect_class,
+            }
+          : {}),
         // The tier where the bytes land: the canonical path, not a link in a lower tier.
         target_tier: detectTier(tierPath),
         // Root operator processes are sovereign-tier by default; subagent
@@ -611,6 +637,19 @@ export function safeWriteFile(
       if (mkdir && !fs.existsSync(dir)) mkdirGuarded(dir, path.dirname(canonical), filePath);
       if (!fs.existsSync(dir)) throw firstErr;
       writeAtomically();
+    }
+    if (instructionEffect) {
+      try {
+        auditChain.record({
+          agentId: executionPersonaText() || 'unknown',
+          action: 'persistent_instruction_write',
+          operation: 'file_write',
+          result: 'completed',
+          metadata: { ...instructionEffect },
+        });
+      } catch {
+        // A completed write must not be retried because advisory telemetry failed.
+      }
     }
     return;
   } catch (err) {
@@ -1015,12 +1054,13 @@ export function safeExistsSync(filePath: string): boolean {
 // actually fire. The message carries only the executable name — free-text
 // command scanning is shell-command-policy's job (SA-02), and duplicating
 // it here would double-regulate and false-positive on argument content.
-function assertExecPolicy(command: string): void {
+function assertExecPolicy(command: string, args: readonly string[] = []): void {
   const ringRaw = getRegisteredEnvText('KYBERION_AGENT_RING');
   const ring = ringRaw !== undefined && ringRaw !== '' ? Number(ringRaw) : Number.NaN;
   const decision = policyEngine.evaluate({
     agentId: executionPersonaText() || 'unknown',
     operation: 'execute_command',
+    ...(describeOpaqueInstructionExecution(command, args) ?? {}),
     message: `Execute ${command}`,
     ...(Number.isFinite(ring) ? { agent_ring: ring } : {}),
   });
@@ -1079,7 +1119,7 @@ function prepareGovernedSyncExec(
   } = options;
 
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
-  assertExecPolicy(command);
+  assertExecPolicy(command, args);
   return {
     encoding,
     cwd,
@@ -1119,7 +1159,7 @@ function assertNotShellScriptInvocation(command: string, args: readonly string[]
 export function assertGovernedExec(command: string, args: readonly string[] = []): void {
   assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
-  assertExecPolicy(command);
+  assertExecPolicy(command, args);
 }
 
 /**
@@ -1181,7 +1221,7 @@ export function safeExecResultAsync(
   } = options;
   assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
-  assertExecPolicy(command);
+  assertExecPolicy(command, args);
   return new Promise((resolve) => {
     // `input` (like safeExecResult's) is written to stdin and closed; without
     // it stdin stays ignored.
@@ -1404,7 +1444,7 @@ export function safeSpawn(
 ): ChildProcess {
   assertNotShellScriptInvocation(command, args);
   assertSensitiveTextAllowed(`${command} ${args.join(' ')}`, 'execute');
-  assertExecPolicy(command);
+  assertExecPolicy(command, args);
   return spawn(command, args, {
     cwd: options.cwd ?? process.cwd(),
     env: buildSafeExecEnv(options.env ?? {}),

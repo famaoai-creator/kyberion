@@ -61,6 +61,7 @@ export function PanelView({ vm, loading, error, isActive, detailFor, onAction }:
         setShowDetail(false);
         return;
       }
+      if (error) return;
       if (onAction && selectedRow !== undefined) {
         onAction(input, selectedRow.id);
       } else if (onAction) {
@@ -70,7 +71,7 @@ export function PanelView({ vm, loading, error, isActive, detailFor, onAction }:
     { isActive: isActive && isRawModeSupported }
   );
 
-  if (error) {
+  if (error && !vm) {
     return (
       <Text color={theme.err}>
         {tr('tui:tui_error')}: {error}
@@ -91,6 +92,11 @@ export function PanelView({ vm, loading, error, isActive, detailFor, onAction }:
 
   return (
     <Box flexDirection="column">
+      {error ? (
+        <Text color={theme.err}>
+          {tr('tui:tui_read_previous')}: {error}
+        </Text>
+      ) : null}
       {vm.columns && rows.length > 0 ? (
         <ListTable
           columns={vm.columns}

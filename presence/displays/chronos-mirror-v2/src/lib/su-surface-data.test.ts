@@ -75,6 +75,78 @@ describe('su surface data', () => {
     expect(summary.totalTokens).toBe(0);
     expect(summary.totalUsd).toBe(0);
     expect(summary.missionBreakdown[0]?.usd).toBe(0);
+    expect(summary.unknownCostCalls).toBe(1);
+    expect(summary.costComplete).toBe(false);
+  });
+
+  it('keeps unknown and subscription-included calls visible with a separate reference estimate', () => {
+    const summary = buildCostSummary({
+      history: [
+        {
+          mission_id: 'MSN-CLI',
+          cost_status: 'unknown',
+          billing_mode: 'unknown',
+          reference_cost_usd: 0.4,
+          usage: { prompt_tokens: 30, completion_tokens: 20 },
+        },
+        {
+          mission_id: 'MSN-CLI',
+          cost_status: 'included',
+          billing_mode: 'subscription_included',
+          reference_cost_usd: 0.6,
+          usage: { prompt_tokens: 50, completion_tokens: 50 },
+        },
+      ],
+      budgetUsd: 5,
+    });
+    expect(summary).toMatchObject({
+      totalUsd: 0,
+      totalTokens: 150,
+      entryCount: 2,
+      referenceUsd: 1,
+      referenceCostCalls: 2,
+      includedCalls: 1,
+      unknownCostCalls: 1,
+      costComplete: false,
+      remainingUsd: null,
+    });
+    expect(summary.missionBreakdown[0]).toMatchObject({
+      usd: 0,
+      entryCount: 2,
+      referenceUsd: 1,
+      includedCalls: 1,
+      unknownCostCalls: 1,
+      costComplete: false,
+    });
+  });
+
+  it('respects provider-reported zero and excludes unrelated tenant accounting metadata', () => {
+    const summary = buildCostSummary({
+      history: [
+        {
+          mission_id: 'MSN-A',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-a' },
+          sdk_cost_usd: 0,
+          cost_usd: 9,
+        },
+        {
+          mission_id: 'MSN-B',
+          scope: { scope_kind: 'tenant', tier: 'confidential', tenant_slug: 'tenant-b' },
+          cost_status: 'unknown',
+          reference_cost_usd: 100,
+        },
+      ],
+      scopeFilter: { tenant_slugs: ['tenant-a'] },
+      budgetUsd: 5,
+    });
+    expect(summary).toMatchObject({
+      totalUsd: 0,
+      actualCostCalls: 1,
+      unknownCostCalls: 0,
+      costComplete: true,
+      entryCount: 1,
+      remainingUsd: 5,
+    });
   });
 
   it('excludes unscoped and cross-tenant usage from a tenant cost view', () => {
@@ -155,6 +227,22 @@ describe('su surface data', () => {
       settledJobs: 1,
       awaitingActualCost: 1,
     });
+    expect(summary).toMatchObject({ costComplete: false, unknownCostCalls: 1 });
+    expect(summary.missionBreakdown[0]).toMatchObject({ costComplete: false, unknownCostCalls: 1 });
+  });
+
+  it('keeps ordinary operational metric rows out of monetary certainty counts', () => {
+    const summary = buildCostSummary({
+      history: [{ component: 'catalog-refresh', duration_ms: 10, mission_id: 'MSN-OPS' }],
+    });
+    expect(summary).toMatchObject({
+      entryCount: 1,
+      unknownCostCalls: 0,
+      actualCostCalls: 0,
+      estimatedCostCalls: 0,
+      costComplete: true,
+    });
+    expect(summary.missionBreakdown[0]).toMatchObject({ unknownCostCalls: 0 });
   });
 
   it('filters approval queue items by mission and query text', () => {

@@ -7,16 +7,45 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "timestamp": { "type": "string", "format": "date-time" },
-        "suppressed": { "type": "boolean" },
-        "severity": { "enum": ["info", "warning", "critical"] },
-        "title": { "type": "string", "minLength": 1 },
-        "context": { "type": "object" },
-        "recommendation": { "type": "string", "minLength": 1 },
-        "options": { "type": "array", "items": { "type": "string" } },
-        "dedupe_key": { "type": "string", "minLength": 1 },
-        "category": { "type": "string", "minLength": 1 }
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "suppressed": {
+          "type": "boolean"
+        },
+        "severity": {
+          "enum": ["info", "warning", "critical"]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "context": {
+          "type": "object"
+        },
+        "recommendation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dedupe_key": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "required": [
         "id",
@@ -32,17 +61,49 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "ts": { "type": "string", "format": "date-time" },
-        "kind": { "const": "operator_notification_undelivered" },
-        "event": { "type": "string", "minLength": 1 },
-        "title": { "type": "string", "minLength": 1 },
-        "reason": { "type": "string", "minLength": 1 },
-        "correlation_id": { "type": "string", "minLength": 1 },
-        "alert_id": { "type": "string", "minLength": 1 },
-        "severity": { "enum": ["info", "warning", "critical"] },
-        "context": { "type": "object" },
-        "recommendation": { "type": "string", "minLength": 1 },
-        "options": { "type": "array", "items": { "type": "string" } }
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "kind": {
+          "const": "operator_notification_undelivered"
+        },
+        "event": {
+          "type": "string",
+          "minLength": 1
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "alert_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "enum": ["info", "warning", "critical"]
+        },
+        "context": {
+          "type": "object"
+        },
+        "recommendation": {
+          "type": "string",
+          "minLength": 1
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
       },
       "required": ["ts", "kind", "event", "title", "reason"]
     },
@@ -50,10 +111,21 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "ts": { "type": "string", "format": "date-time" },
-        "kind": { "const": "ops_alert_ack" },
-        "before": { "type": "string", "format": "date-time" },
-        "acked_count": { "type": "integer", "minimum": 0 }
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "kind": {
+          "const": "ops_alert_ack"
+        },
+        "before": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "acked_count": {
+          "type": "integer",
+          "minimum": 0
+        }
       },
       "required": ["ts", "kind", "before", "acked_count"]
     },
@@ -61,14 +133,93 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "ts": { "type": "string", "format": "date-time" },
-        "kind": { "const": "ops_alert_redelivery" },
-        "ref": { "type": "string", "minLength": 1 },
-        "channel": { "const": "webhook" },
-        "delivered": { "type": "boolean" },
-        "error": { "type": "string", "minLength": 1, "maxLength": 300 }
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "kind": {
+          "const": "ops_alert_redelivery"
+        },
+        "ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "channel": {
+          "const": "webhook"
+        },
+        "delivered": {
+          "type": "boolean"
+        },
+        "error": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
       },
       "required": ["ts", "kind", "ref", "channel", "delivered"]
+    },
+    {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ts", "kind", "schedule_id", "signature", "cause", "event", "scope"],
+      "properties": {
+        "ts": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "kind": {
+          "const": "scheduler_incident"
+        },
+        "event_id": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "episode_id": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+        "schedule_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "signature": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{24}$"
+        },
+        "cause": {
+          "enum": [
+            "rate_limit",
+            "authentication",
+            "timeout",
+            "delivery",
+            "configuration",
+            "execution"
+          ]
+        },
+        "event": {
+          "enum": ["failed", "recovered", "acknowledged"]
+        },
+        "ack_until": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "scope": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["tier"],
+          "properties": {
+            "tenant_slug": {
+              "type": "string",
+              "minLength": 1
+            },
+            "organization_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "project_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "tier": {
+              "enum": ["public", "confidential", "personal"]
+            }
+          }
+        }
+      }
     }
   ]
 }

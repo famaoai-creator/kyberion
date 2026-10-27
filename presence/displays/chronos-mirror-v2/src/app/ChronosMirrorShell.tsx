@@ -1,6 +1,7 @@
 'use client';
 
 import { normalizeLocale } from '@agent/core/locale-normalize';
+import type { ClientMissionHistoryEntry } from '../lib/mission-history-response';
 import { DiscussionRoom } from '../components/DiscussionRoom';
 import { Suspense, useCallback, type ReactNode } from 'react';
 import Link from 'next/link';
@@ -43,6 +44,7 @@ import { ChronosFieldScope, ChronosInline, ChronosToolbar } from '../components/
 import type { KbStatus } from '@agent/core/surface/a2ui-catalog';
 import { uxText as uxTextStatic, type SupportedLocale } from '../lib/ux-vocabulary';
 import type { ChronosThemeMode } from '../lib/chronos-theme';
+import { costAmountLabel, referenceAmountLabel } from '../lib/cost-summary-presentation';
 
 type ViewModel = Record<string, any>;
 
@@ -427,7 +429,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                   ]}
                   row_key="id"
                   empty={uxText('chronos_mh_no_match', locale)}
-                  rows={missionHistory.map((mission: any) => {
+                  rows={missionHistory.map((mission: ClientMissionHistoryEntry) => {
                     const typeLabel =
                       mission.missionType === 'product_delivery'
                         ? uxText('chronos_mission_type_product_delivery', locale)
@@ -460,6 +462,13 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                           {mission.successCondition ? (
                             <span className="chronos-meta">{mission.successCondition}</span>
                           ) : null}
+                          <span className="chronos-meta">
+                            {uxText('mission:mission_distillation_label', locale)}:{' '}
+                            {uxText(
+                              `mission:mission_distillation_${mission.distillationDisclosure ?? 'unknown'}`,
+                              locale
+                            )}
+                          </span>
                         </span>
                       ),
                       status: isKbStatus(mission.status)
@@ -491,16 +500,45 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                 }
               >
                 {costSummaryError ? <Callout tone="danger" title={costSummaryError} /> : null}
+                {costSummary && costSummary.costComplete !== true ? (
+                  <Callout
+                    tone="warning"
+                    title={uxText('chronos_cost_unknown', locale)}
+                    body={
+                      costSummary.unknownCostCalls > 0
+                        ? uxMessage(
+                            'chronos_cost_incomplete',
+                            { count: String(costSummary.unknownCostCalls) },
+                            '',
+                            locale
+                          )
+                        : uxText('chronos_cost_coverage_unavailable', locale)
+                    }
+                  />
+                ) : null}
                 <div className="chronos-metrics">
                   <Metric
-                    label={uxText('chronos_diagnostics_currency', locale)}
-                    value={
-                      typeof costSummary?.totalUsd === 'number'
-                        ? `$${costSummary.totalUsd.toFixed(3)}`
-                        : '-'
-                    }
+                    label={uxText('chronos_cost_known_subtotal', locale)}
+                    value={costAmountLabel(costSummary?.totalUsd, costSummary, locale)}
                     description={`${costSummary?.entryCount || 0} ${uxText('chronos_diagnostics_entries', locale)}`}
                   />
+                  <Metric
+                    label={uxText('chronos_cost_reference', locale)}
+                    value={referenceAmountLabel(costSummary, locale)}
+                    description={uxText('chronos_cost_reference_hint', locale)}
+                  />
+                  {costSummary?.includedCalls > 0 ? (
+                    <Metric
+                      label={uxText('chronos_cost_included', locale)}
+                      value={String(costSummary.includedCalls)}
+                      description={uxMessage(
+                        'chronos_cost_included_hint',
+                        { count: String(costSummary.includedCalls) },
+                        '',
+                        locale
+                      )}
+                    />
+                  ) : null}
                   <Metric
                     label={uxText('chronos_diagnostics_tokens', locale)}
                     value={
@@ -529,14 +567,16 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                         : uxText('chronos_diagnostics_budget_unset', locale)
                     }
                     description={
-                      typeof costSummary?.remainingUsd === 'number'
-                        ? uxMessage(
-                            'chronos_diagnostics_budget_remaining',
-                            { amount: `$${costSummary.remainingUsd.toFixed(3)}` },
-                            'remaining {amount}',
-                            locale
-                          )
-                        : uxText('chronos_no_budget_guard', locale)
+                      costSummary && costSummary.costComplete !== true
+                        ? uxText('chronos_cost_budget_unknown', locale)
+                        : typeof costSummary?.remainingUsd === 'number'
+                          ? uxMessage(
+                              'chronos_diagnostics_budget_remaining',
+                              { amount: `$${costSummary.remainingUsd.toFixed(3)}` },
+                              'remaining {amount}',
+                              locale
+                            )
+                          : uxText('chronos_no_budget_guard', locale)
                     }
                   />
                   <Metric
@@ -561,7 +601,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                       { key: 'mission', label: uxText('chronos_col_mission', locale) },
                       {
                         key: 'usd',
-                        label: uxText('chronos_diagnostics_currency', locale),
+                        label: uxText('chronos_cost_known_subtotal', locale),
                         align: 'end',
                       },
                       {
@@ -599,7 +639,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
                           )}
                         </span>
                       ),
-                      usd: `$${item.usd.toFixed(3)}`,
+                      usd: costAmountLabel(item.usd, item, locale),
                       tokens: item.tokens.toLocaleString(chronosSpeechLocale()),
                       entries: item.entryCount,
                     }))}

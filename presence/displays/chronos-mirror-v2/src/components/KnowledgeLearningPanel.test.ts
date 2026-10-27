@@ -91,6 +91,32 @@ describe('learning panel static markup (not rendered-browser interaction evidenc
     expect(html).toContain('no execution authority');
     expect(html).not.toContain('Publish approved SOP');
   });
+  it('keeps the saved review snapshot separate from the editor and names its real payload', () => {
+    const html = render();
+    const snapshot = html.match(/<details\b[^>]*>[\s\S]*?<\/details>/)?.[0];
+    expect(snapshot).toBeDefined();
+    for (const text of [
+      'Saved proposal for review',
+      'Reviewed title',
+      'Reviewed summary',
+      'Exact SOP text',
+      'trace:one',
+      'task_session:one',
+      'Review payload SHA-256',
+      'b'.repeat(64),
+    ])
+      expect(snapshot).toContain(text);
+    expect(snapshot).not.toContain('<textarea');
+    expect(snapshot).not.toContain('<button');
+    expect(html.indexOf('</fieldset>')).toBeLessThan(html.indexOf('<details'));
+    expect(render({ ...candidate, curation: undefined })).not.toContain('<details');
+  });
+  it('does not manufacture a payload digest for a read-only historical proposal', () => {
+    const html = render({ ...candidate, learning: { state: 'unsupported' } });
+    expect(html).toContain('Exact SOP text');
+    expect(html).toContain('task_session:one');
+    expect(html).not.toContain('Review payload SHA-256');
+  });
   it('opens the canonical request without embedding another approval control', () => {
     const html = render({
       ...candidate,
@@ -106,6 +132,9 @@ describe('learning panel static markup (not rendered-browser interaction evidenc
     expect(html).toContain('candidateKey=');
     expect(html).not.toContain('Publish approved SOP');
     expect(html).not.toContain('Save draft');
+    expect(html).toContain('awaiting human review and has not been published');
+    expect(html).toContain('Review payload SHA-256');
+    expect(html).toContain('b'.repeat(64));
   });
   it('requires an explicit publish action and never calls it while rendering', () => {
     const onAction = vi.fn();
@@ -167,5 +196,20 @@ describe('learning panel static markup (not rendered-browser interaction evidenc
     expect(render(candidate, { locale: 'ja' })).toContain('下書きを保存');
     expect(render(candidate, { locale: 'ja' })).toContain('人間による確認を依頼');
     expect(render(candidate, { locale: 'ja' })).toContain('実行権限は付与されません');
+    expect(render(candidate, { locale: 'ja' })).toContain('確認対象の保存済み提案');
+    expect(render(candidate, { locale: 'ja' })).toContain('確認対象の SHA-256');
+    expect(
+      render(
+        {
+          ...candidate,
+          learning: {
+            state: 'pending',
+            payloadDigest: 'b'.repeat(64),
+            approvalRef: 'terminal:approval-1',
+          },
+        },
+        { locale: 'ja' }
+      )
+    ).toContain('まだ知識として公開されていません');
   });
 });

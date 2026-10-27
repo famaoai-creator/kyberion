@@ -731,9 +731,18 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
   refuses one, because tenant authorization is the scope layer's job (brokered missions, warn
   posture). An unbound process evaluates the requested tenant, else globally. Compare slugs
   trimmed and lower-cased. Any enforcement cache is keyed by tenant/day/mission, bounded, and kept
-  current by adding the process's own costed appends (zero-cost rows never invalidate it); only an
-  unattributable costed row invalidates. A budget evaluated over a scope wider
+  current by adding the process's own costed appends. An explicit unknown-cost append must also
+  invalidate or mark the affected cached total incomplete; it cannot become a free call through
+  a zero/default conversion. A confirmed zero-cost row need not invalidate a complete cache.
+  An unattributable costed row invalidates. A budget evaluated over a scope wider
   than what the process could read is `cost_status: 'partial'` with `withheld_partitions`.
+- **Token measurement is not invoice evidence.** CLI adapters parse only provider transport
+  envelopes, keep cached input out of the uncached bucket, and count aggregate usage once.
+  Record the source of usage and cost separately. API-equivalent reference amounts never add to
+  incremental spend; a CLI binary name does not prove subscription entitlement. Unknown pricing
+  remains unknown, and a report displays known subtotal plus missing coverage instead of a
+  verified zero. Gates: `cli-usage-metering.test.ts`, `cost-report.test.ts`,
+  `metrics-enforcement-aggregate.test.ts`, and `spend-guard.test.ts` under `libs/core/`.
 - **Never rewrite a hot ledger from a stale plan.** A prune of an append-only ledger (tenant
   offboarding) recomputes, exports and rewrites under the same lock its appenders take
   (`metricsLedgerLockId` + `withLockSync`); a plan computed earlier only sizes the dry run.
@@ -2254,3 +2263,98 @@ installed host and a fixed synthetic callback before enabling it. Prove the
 chosen model can call the governed tools in a real turn. References:
 [App Server dynamic tools](https://learn.chatgpt.com/docs/app-server#dynamic-tool-calls-experimental)
 and [configuration reference](https://learn.chatgpt.com/docs/config-file/config-reference).
+
+## Model routing, compaction and delegated progress
+
+Keep the scope of a failure as narrow as its evidence permits. A model entitlement
+refusal does not prove a sibling model is unavailable; a provider authentication
+failure has broader scope. Respect an explicit provider reset or Retry-After when
+setting a cooldown, and keep this state in the existing health registry. Auxiliary
+compaction and background-review routes inherit the same egress, tenant and
+permission checks as the primary route.
+
+Detect a stalled goal from bounded call-and-result history, including alternating
+cycles. Repeated polling with changing observations is progress; repeating an
+unchanged error is not. A cycle stop never certifies that the goal succeeded.
+Compaction must have a local deadline and discard stale generations. A degraded
+handoff explicitly says it is incomplete and preserves structured carryover and
+pinned context without rolling back or replaying external effects.
+
+Budget child text results using current parent prompt occupancy and reserved output,
+not cumulative session usage. Retain full output in a scoped artifact before
+returning a bounded summary; structured execution data must remain valid. If a
+safe full-output reference cannot be created, do not silently discard data.
+An inactivity watchdog observes semantic progress. Governed continuous work may
+omit an implicit total-runtime or turn-count ceiling when a progress-capable
+runtime and renewed step admission supervise it; preserve explicitly requested
+budgets, limits and cancellation. Bounded operations retain finite wait deadlines.
+Neither progress nor a late result revokes cancellation, overrides an explicit
+limit or overwrites a terminal attempt. Do not represent a silent, unobservable
+provider as continuously supervised.
+
+See [Hermes runtime adoption](../architecture/hermes-runtime-adoption-2026-10.md)
+for the six acceptance criteria and pinned upstream sources. Verify these at real
+caller boundaries as well as in helper tests; provider-free fixtures must retain
+tenant scope, permission profiles and cancellation semantics.
+
+## Review authorship, extraction disclosure and restart evidence
+
+- Writer types must describe the existing domain operation without granting new runtime authority. Approval-store local-admin identity belongs in its approval-specific role seam; never substitute another identity or widen the global artifact writer catalog just to silence a frontend type error. Verify human-auth and channel/tenant denial paths with the positive decision path.
+
+- Reviewed artifacts require task-specific producer evidence. Never infer a downstream author from an upstream task recording or a dispatcher/observer event. Valid task-bound claims may supply the actor; conflicts still fail the existing evidence fence.
+- Before reviewing a legacy auto-completed task with unknown authorship, record evidence on the target task as the actual producer, then repeat the independent review. Do not close the review task to bypass missing authorship.
+- Structural distillation (including explicit stub profiles and unavailable LLMs) must disclose that no LLM extraction occurred. Persist categorical reasons, retain truthful output on retry, and show legacy missing provenance as unknown. Extraction is not independent review or approval.
+- Recovery evidence must identify the persisted interruption boundary and whether a fresh process was used. Synthetic transaction fixtures do not establish coverage of every crash point or external exactly-once effects.
+- Enforcing regressions: `libs/core/mission/mission-maintenance.test.ts`, `mission-distill.test.ts`, `mission-state.test.ts`, `mission-read-model.test.ts` and `libs/core/harnessing/runtime-recovery-replay.test.ts`; the recovery battery is included in `eval/runtime-replay/probe.json` through its existing runner.
+
+## Scoped recovery, credential misses and operator observations
+
+Automatic repository probes must use the closed object/index argument grammar
+in `shell/git-probe-hardening.ts`. Configuration discovery cannot fence a later
+worktree/configuration change: do not expand this helper to arbitrary status,
+worktree diff or executable Git options. Gate: Git sentinel and session-index
+regressions. Unicode detection uses a normalized inspection view and retains raw
+source; it never grants permission.
+
+Tenant credential resolution must retain the runtime tenant, mission and task.
+A resource ceiling cannot change that identity. Scoped misses must not continue
+to operator environment, personal connection cache, vault or platform keychain.
+Bind through the trusted resolver/dispatch seam, check cached service/API client
+ownership at use, and validate CLI auth homes before spawning. Unconfigured
+tenant credentials fail closed; never repair that failure by sharing an operator
+client. Gates: credential-binding, provider-auth-home and coordinated-dispatch
+regressions, including parallel scopes and same-tenant task drift.
+
+Preserve the old plugin code and install/approval identity until a digest-bound
+publication commits. Serialize by canonical plugin target and retain recovery
+state across interruption. Unknown bytes require explicit recovery, never a
+guessed rollback. Gates: plugin-publication failure/race tests and managed install.
+
+Distinguish retrieval-empty from unavailable/rejected, and truncated/failed TUI
+reads from a healthy empty list. OAuth completion is reported only by its broker,
+with a principal-bound, secret-free receipt; observing or dismissing a card does
+not authorize a retry or cancel consent. A job acknowledgement is neither recovery
+nor execution approval: reopen after recovery or cause changes. Gates: retrieval,
+tail, OAuth broker/store/API/card, and scheduler incident caller regressions.
+Bind acknowledgements and recovery observations to the episode that was observed;
+an old observation must not mute or resolve a newer recurrence. A cause replacement
+is not proof that the job recovered. Explicit approval scopes must pass every
+viewer constraint; mission labels may not rescue a contradictory tier or tenant.
+
+Before discarding context under a durability policy, verify an immutable same-scope
+artifact and commit its exact parent/generation receipt to the existing worker
+journal. Failed persistence retains history. Restore only the unambiguous current
+tip with a valid hash and unexpired receipt, never replaying effects. Expiry blocks
+restore; physical cleanup of a dormant scope requires scheduled maintenance.
+When message-level provenance is absent, do not persist raw context below the
+most sensitive readable tier. Keep the original context, or stop with an explicit
+scope-needs-attention outcome when forced persistence is requested.
+Gates: compaction snapshot/recovery, journal and mission caller tests.
+
+Verification freshness describes execution-time source bytes, not a successful
+test verdict or expanded coverage. Missing receipts, another worktree and unreadable
+sources are unknown. Never snapshot current bytes while formatting an old result.
+Replay fake provider transport through the real goal loop and existing graders;
+preserve delivery quality before accepting cost/latency gains. Gates: source-snapshot
+and runtime-replay battery. See the [implementation record](../architecture/hermes-additional-adoption-implementation-2026-10.md)
+for adoption conditions and unmeasured real-service behavior.

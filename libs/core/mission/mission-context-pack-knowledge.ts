@@ -13,8 +13,9 @@ import {
 } from '../knowledge/knowledge-slices.js';
 import {
   buildTenantKnowledgeScopeSet,
-  queryTenantKnowledge,
+  queryTenantKnowledgeOutcome,
 } from '../organization/tenant-knowledge-retrieval.js';
+import { getDefaultWorkerEventStream } from '../workforce/worker-event-stream.js';
 import {
   findChangedSinceVerified,
   resolveKnowledgeVerification,
@@ -561,13 +562,28 @@ export async function loadKnowledgeHintsIfPossible(
   let tenantHints: MissionContextPackKnowledgeHint[] = [];
   if (tenantSlug && retrievalScope) {
     const tenantFetchLimit = slice.exclude.length > 0 ? candidateCap * 2 : candidateCap;
-    const tenantHits = await queryTenantKnowledge({
+    const retrieval = await queryTenantKnowledgeOutcome({
       tenantSlug,
       topic,
       limit: tenantFetchLimit,
       scope: retrievalScope,
       ...(input.tenantKnowledgeRootDir ? { rootDir: input.tenantKnowledgeRootDir } : {}),
     });
+    try {
+      getDefaultWorkerEventStream().emit(
+        'status_update',
+        {
+          knowledge_retrieval: retrieval.status,
+          reason: retrieval.reason,
+          partial: retrieval.partial,
+          hit_count: retrieval.hits.length,
+        },
+        { mission_id: input.missionState.mission_id }
+      );
+    } catch {
+      /* observability must not widen scope or block pack construction */
+    }
+    const tenantHits = retrieval.hits;
     tenantHints = tenantHits
       .filter((hit) => !isKnowledgePathExcluded(hit.path, slice.exclude))
       .map((hit) => ({

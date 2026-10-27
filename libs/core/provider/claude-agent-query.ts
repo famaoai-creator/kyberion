@@ -1,3 +1,5 @@
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
+import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-fence.js';
 /**
  * Claude Agent Query Helper — thin wrapper around @anthropic-ai/claude-agent-sdk
  * for one-shot structured-output reasoning tasks.
@@ -29,7 +31,7 @@ import {
   PROVIDER_ENV_ALLOWLIST_ESCAPE_HATCH_VAR,
 } from './provider-permission-profiles.js';
 import { logger } from '../core.js';
-import { metrics } from '../metrics.js';
+import { parseClaudeCliUsage, recordCliUsage } from '../cli-usage-metering.js';
 import { childDelegationEnv } from '../operation-policy-gate.js';
 import {
   createScratchWorkspace,
@@ -37,26 +39,6 @@ import {
 } from '../workforce/workspace-ledger.js';
 import { assertReasoningEgressAllowed } from '../reasoning/reasoning-egress-scope.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
-
-/** Pull billable token counts from a result message's `usage` block (defensive). */
-function extractUsageTokens(message: unknown): {
-  prompt_tokens: number;
-  completion_tokens: number;
-  cache_read_tokens?: number;
-  cache_write_tokens?: number;
-} {
-  const usage = (message as { usage?: Record<string, number> })?.usage ?? {};
-  return {
-    prompt_tokens: usage.input_tokens ?? 0,
-    completion_tokens: usage.output_tokens ?? 0,
-    ...(usage.cache_read_input_tokens === undefined
-      ? {}
-      : { cache_read_tokens: usage.cache_read_input_tokens }),
-    ...(usage.cache_creation_input_tokens === undefined
-      ? {}
-      : { cache_write_tokens: usage.cache_creation_input_tokens }),
-  };
-}
 
 /**
  * Record a claude-agent sub-agent call into the metrics collector so completed
@@ -68,16 +50,16 @@ function recordClaudeAgentMetrics(
   model: string,
   durationMs: number,
   status: 'success' | 'error',
-  message: unknown,
-  totalCostUsd: number
+  message: unknown
 ): void {
   try {
-    metrics.record(label, durationMs, status, {
-      model,
+    recordCliUsage(label, model, Date.now() - durationMs, status, {
+      report: message ? parseClaudeCliUsage(JSON.stringify(message)) : undefined,
       agent: 'claude-agent',
       cause: 'subagent',
-      usage: extractUsageTokens(message),
-      sdk_cost_usd: totalCostUsd,
+      promptChars: 0,
+      completionChars: 0,
+      allowCharacterEstimate: false,
     });
   } catch {
     // metrics is best-effort; never disrupt reasoning
@@ -297,6 +279,7 @@ export class ClaudeAgentQueryError extends Error {
 export async function runClaudeAgentQuery<T>(
   params: ClaudeAgentQueryParams<T>
 ): Promise<ClaudeAgentQueryResult<T>> {
+  assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
   assertReasoningEgressAllowed('claude-agent');
   const jsonSchema = z.toJSONSchema(params.schema) as Record<string, unknown>;
   // The Agent SDK's json_schema output format expects a raw JSON Schema
@@ -335,6 +318,7 @@ async function runStructuredQuery<T>(
     abortController: params.abortController,
   };
 
+  assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
   const iterator = query({ prompt: params.userPrompt, options });
   const startedAt = Date.now();
 
@@ -374,8 +358,7 @@ async function runStructuredQuery<T>(
     String(options.model ?? resolveRuntimeModelId('anthropic-default')),
     Date.now() - startedAt,
     lastError || toolAttempt ? 'error' : 'success',
-    resultMessage,
-    totalCostUsd
+    resultMessage
   );
 
   if (toolAttempt) {
@@ -476,6 +459,7 @@ export interface ClaudeAgentTaskResult {
 export async function runClaudeAgentTask(
   params: ClaudeAgentTaskParams
 ): Promise<ClaudeAgentTaskResult> {
+  assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
   assertReasoningEgressAllowed('claude-agent');
   const options: Options = {
     ...sanitizeClaudeAgentExtraOptions(params.extraOptions),
@@ -490,6 +474,7 @@ export async function runClaudeAgentTask(
     abortController: params.abortController,
   };
 
+  assertOperatorNativeCredentialOwner(credentialExecutionIdentity());
   const iterator = query({ prompt: params.userPrompt, options });
   const startedAt = Date.now();
 
@@ -525,8 +510,7 @@ export async function runClaudeAgentTask(
     String(options.model ?? resolveRuntimeModelId('anthropic-default')),
     Date.now() - startedAt,
     lastError ? 'error' : 'success',
-    resultMessage,
-    totalCostUsd
+    resultMessage
   );
 
   if (lastError) {

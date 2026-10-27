@@ -11,7 +11,15 @@ import * as path from 'node:path';
 import chalk from 'chalk';
 import { createLogger } from './logger.js';
 import { normalizeEventScope, type EventScope, type EventScopeInput } from './event-scope.js';
-import { normalizeUsageCause, type UsageCause } from './usage-accounting.js';
+import {
+  normalizeUsageCause,
+  resolveUsageCostAccounting,
+  finiteNonNegativeUsageCost,
+  hasUsageCostEvidence,
+  type UsageCause,
+  type UsageCostAccounting,
+  type UsageCostStatus,
+} from './usage-accounting.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { clamp } from './foundation/text.js';
@@ -587,8 +595,10 @@ function resolvePer1kRate(reg: ModelCostRegistry, model: string, inputTokens: nu
  * at the default rate as if it were measured. Callers that persist a price
  * record which one they got.
  */
-export function resolveCostRateModelKey(model: string): string | null {
-  const reg = loadModelCostRegistry();
+export function resolveCostRateModelKey(
+  model: string,
+  reg = loadModelCostRegistry()
+): string | null {
   const id = (model || '').trim();
   if (!id) return null;
   if (reg.models[id]) return id;
@@ -661,7 +671,7 @@ export interface MetricsOptions {
 export type ResourceUsageKind = 'llm' | 'api' | 'compute' | 'saas' | 'human_time' | 'other';
 export type ResourceUsageStatus = 'actual' | 'estimated' | 'committed';
 
-export interface ResourceUsageRecord {
+export interface ResourceUsageRecord extends UsageCostAccounting {
   type: 'resource_usage';
   usage_id: string;
   timestamp: string;
@@ -673,7 +683,7 @@ export interface ResourceUsageRecord {
   quantity: number;
   unit: string;
   unit_cost_usd?: number;
-  cost_usd: number;
+  cost_usd: number | null;
   status: ResourceUsageStatus;
   source: string;
   /** Canonical containment scope; legacy records may omit it. */
@@ -750,7 +760,7 @@ export class MetricsCollector {
     input: Omit<ResourceUsageRecord, 'type' | 'usage_id' | 'timestamp' | 'cost_usd' | 'scope'> & {
       usage_id?: string;
       timestamp?: string;
-      cost_usd?: number;
+      cost_usd?: number | null;
       scope?: EventScopeInput;
     }
   ): ResourceUsageRecord {
@@ -762,11 +772,23 @@ export class MetricsCollector {
     if (unitCost !== undefined && (!Number.isFinite(unitCost) || unitCost < 0)) {
       throw new Error('resource usage unit_cost_usd must be a finite non-negative number');
     }
-    const explicitCost = input.cost_usd === undefined ? undefined : Number(input.cost_usd);
-    const cost = explicitCost ?? (unitCost === undefined ? 0 : quantity * unitCost);
-    if (!Number.isFinite(cost) || cost < 0) {
+    const explicitUnknown = input.cost_usd === null;
+    const explicitCost = input.cost_usd == null ? undefined : Number(input.cost_usd);
+    const cost = explicitUnknown
+      ? undefined
+      : (explicitCost ?? (unitCost === undefined ? undefined : quantity * unitCost));
+    if (cost !== undefined && (!Number.isFinite(cost) || cost < 0)) {
       throw new Error('resource usage cost_usd must be a finite non-negative number');
     }
+    for (const field of ['reported_cost_usd', 'reference_cost_usd'] as const) {
+      if (input[field] !== undefined && finiteNonNegativeUsageCost(input[field]) === undefined)
+        throw new Error(`resource usage ${field} must be a finite non-negative number`);
+    }
+    const accounting = resolveUsageCostAccounting({
+      ...input,
+      cost_usd: cost,
+      ...(explicitUnknown ? { cost_status: 'unknown' } : {}),
+    });
     const missionId = input.mission_id || getRegisteredEnvText('MISSION_ID') || undefined;
     // An invalid scope throws to the caller (its contract: e.g. direct-CLI
     // usage warns and records nothing rather than downgrading a tier).
@@ -784,7 +806,9 @@ export class MetricsCollector {
       quantity,
       unit: input.unit,
       unit_cost_usd: unitCost,
-      cost_usd: Math.round(cost * 100000) / 100000,
+      ...accounting,
+      cost_usd:
+        accounting.cost_usd === null ? null : Math.round(accounting.cost_usd * 100000) / 100000,
       status: input.status,
       source: input.source,
       cause: normalizeUsageCause(input.cause),
@@ -796,6 +820,7 @@ export class MetricsCollector {
   }
 
   record(componentName: string, durationMs: number, status: 'success' | 'error', extra: any = {}) {
+    extra = { ...extra };
     const mem = process.memoryUsage();
     const memory = {
       heapUsedMB: Math.round((mem.heapUsed / 1024 / 1024) * 100) / 100,
@@ -828,6 +853,13 @@ export class MetricsCollector {
         recoveries: 0,
         interventions: 0,
         totalCostUSD: 0,
+        referenceCostUSD: 0,
+        referenceCostCalls: 0,
+        actualCostCalls: 0,
+        estimatedCostCalls: 0,
+        includedCalls: 0,
+        unknownCostCalls: 0,
+        costComplete: true,
         cacheIntegrityFailures: 0,
         outputSizeKB: 0,
         promptTokens: 0,
@@ -852,13 +884,15 @@ export class MetricsCollector {
     agg.peakRssMB = Math.max(agg.peakRssMB, memory.rssMB);
 
     if (extra.usage) {
-      const pTokens = extra.usage.prompt_tokens || 0;
-      const cTokens = extra.usage.completion_tokens || 0;
-      const cacheReadTokens =
-        extra.usage.cache_read_tokens ?? extra.usage.cache_read_input_tokens ?? 0;
-      const cacheWriteTokens =
-        extra.usage.cache_write_tokens ?? extra.usage.cache_creation_input_tokens ?? 0;
-      const cacheWrite1hTokens = extra.usage.cache_write_1h_tokens ?? 0;
+      const pTokens = tokenCount(extra.usage.prompt_tokens ?? extra.usage.input_tokens);
+      const cTokens = tokenCount(extra.usage.completion_tokens ?? extra.usage.output_tokens);
+      const cacheReadTokens = tokenCount(
+        extra.usage.cache_read_tokens ?? extra.usage.cache_read_input_tokens
+      );
+      const cacheWriteTokens = tokenCount(
+        extra.usage.cache_write_tokens ?? extra.usage.cache_creation_input_tokens
+      );
+      const cacheWrite1hTokens = tokenCount(extra.usage.cache_write_1h_tokens);
       const inputTokens = pTokens + cacheReadTokens + cacheWriteTokens + cacheWrite1hTokens;
       agg.promptTokens += pTokens;
       agg.completionTokens += cTokens;
@@ -868,19 +902,54 @@ export class MetricsCollector {
       agg.totalTokens += inputTokens + cTokens;
 
       const model = extra.model || 'default';
-      const rates = resolveCostRatesFromRegistry(
-        this._costRegistry ?? loadModelCostRegistry(),
-        model,
-        inputTokens
-      );
-      const cost =
-        pTokens * rates.prompt +
-        cTokens * rates.completion +
-        cacheReadTokens * (rates.cache_read ?? 0) +
-        cacheWriteTokens * (rates.cache_write ?? 0) +
-        cacheWrite1hTokens * (rates.cache_write_1h ?? 0);
-      agg.totalCostUSD += cost;
-      extra.cost_usd = Math.round(cost * 100000) / 100000;
+      const registry = this._costRegistry ?? loadModelCostRegistry();
+      const rates = resolveCostRatesFromRegistry(registry, model, inputTokens);
+      const priced =
+        resolveCostRateModelKey(model, registry) !== null &&
+        [rates.prompt, rates.completion].every(
+          (rate) => finiteNonNegativeUsageCost(rate) !== undefined
+        ) &&
+        (!cacheReadTokens || finiteNonNegativeUsageCost(rates.cache_read) !== undefined) &&
+        (!cacheWriteTokens || finiteNonNegativeUsageCost(rates.cache_write) !== undefined) &&
+        (!cacheWrite1hTokens || finiteNonNegativeUsageCost(rates.cache_write_1h) !== undefined);
+      const cost = priced
+        ? pTokens * rates.prompt +
+          cTokens * rates.completion +
+          cacheReadTokens * (rates.cache_read ?? 0) +
+          cacheWriteTokens * (rates.cache_write ?? 0) +
+          cacheWrite1hTokens * (rates.cache_write_1h ?? 0)
+        : undefined;
+      if (cost !== undefined && Number.isFinite(cost)) {
+        extra.reference_cost_usd ??= cost;
+        if (extra.cost_usd === undefined) {
+          extra.cost_usd = cost;
+          extra.cost_status ??= 'estimated';
+          extra.cost_source ??= 'model_registry';
+        }
+      } else if (
+        finiteNonNegativeUsageCost(extra.reported_cost_usd) === undefined &&
+        finiteNonNegativeUsageCost(extra.sdk_cost_usd) === undefined &&
+        extra.cost_usd === undefined
+      ) {
+        extra.cost_status = 'unknown';
+        if (finiteNonNegativeUsageCost(extra.reference_cost_usd) === undefined)
+          extra.cost_source = 'none';
+      }
+    }
+
+    if (hasUsageCostEvidence(extra)) {
+      const accounting = resolveUsageCostAccounting(extra);
+      Object.assign(extra, accounting);
+      agg.totalCostUSD += accounting.cost_usd ?? 0;
+      agg.referenceCostUSD += accounting.reference_cost_usd ?? 0;
+      if (accounting.reference_cost_usd !== undefined) agg.referenceCostCalls++;
+      if (accounting.cost_status === 'actual') agg.actualCostCalls++;
+      if (accounting.cost_status === 'estimated') agg.estimatedCostCalls++;
+      if (accounting.cost_status === 'included') agg.includedCalls++;
+      if (accounting.cost_status === 'unknown') {
+        agg.unknownCostCalls++;
+        agg.costComplete = false;
+      }
     }
 
     if (extra.outputSize) {
@@ -968,6 +1037,13 @@ export class MetricsCollector {
         cacheWriteTokens: agg.cacheWriteTokens,
         cacheWrite1hTokens: agg.cacheWrite1hTokens,
         totalCostUSD: Math.round(agg.totalCostUSD * 1000) / 1000,
+        referenceCostUSD: Math.round(agg.referenceCostUSD * 1000) / 1000,
+        referenceCostCalls: agg.referenceCostCalls,
+        actualCostCalls: agg.actualCostCalls,
+        estimatedCostCalls: agg.estimatedCostCalls,
+        includedCalls: agg.includedCalls,
+        unknownCostCalls: agg.unknownCostCalls,
+        costComplete: agg.costComplete,
         interventions: agg.interventions || 0,
         interventionRate: agg.count > 0 ? Math.round((agg.interventions / agg.count) * 100) : 0,
       });
@@ -1313,8 +1389,9 @@ function ensureRegularFile(filePath: string): void {
  * the shared execution-metrics ledgers: numbers and placement only.
  */
 export interface ExecutionAppendNotice {
-  /** Finite, > 0; rows without a cost are never announced. */
+  /** Known incremental cash amount; zero when this notice invalidates an unknown-cost cache. */
   cost_usd: number;
+  cost_status?: UsageCostStatus;
   /** Epoch ms of the row's timestamp, or NaN when unparseable. */
   at: number;
   mission_id?: string;
@@ -1336,10 +1413,12 @@ export function onExecutionMetricsAppend(listener: ExecutionAppendListener): () 
 }
 
 function notifyExecutionAppend(row: Record<string, unknown>, partition: StoragePartition): void {
-  const cost = row.cost_usd;
-  if (typeof cost !== 'number' || !Number.isFinite(cost) || cost <= 0) return;
+  const resolved = resolveUsageCostAccounting(row);
+  const cost = resolved.cost_usd;
+  if ((cost === null || cost <= 0) && row.cost_status !== 'unknown') return;
   const notice: ExecutionAppendNotice = {
-    cost_usd: cost,
+    cost_usd: cost ?? 0,
+    cost_status: resolved.cost_status,
     at: Date.parse(String(row.timestamp ?? '')),
     ...(typeof row.mission_id === 'string' ? { mission_id: row.mission_id } : {}),
     partition,
@@ -1402,6 +1481,7 @@ export interface EnforcementRowView {
   readonly timestamp?: string;
   /** Number when finite; null when present but not a finite number; undefined when absent. */
   readonly cost_usd?: number | null;
+  readonly cost_status?: UsageCostStatus;
   readonly usage?: Readonly<{
     prompt_tokens: number;
     completion_tokens: number;
@@ -1431,7 +1511,8 @@ export interface EnforcementRowView {
 
 const text = (value: unknown): string | undefined =>
   typeof value === 'string' && value.trim() ? value : undefined;
-const tokenCount = (value: unknown): number => (Number(value) > 0 ? Number(value) : 0);
+const tokenCount = (value: unknown): number =>
+  Number.isFinite(Number(value)) && Number(value) > 0 ? Number(value) : 0;
 
 /** Project a raw ledger row onto the enforcement whitelist. */
 export function projectEnforcementRow(row: unknown): EnforcementRowView {
@@ -1439,7 +1520,9 @@ export function projectEnforcementRow(row: unknown): EnforcementRowView {
   const scope =
     r.scope && typeof r.scope === 'object' ? (r.scope as Record<string, unknown>) : null;
   const u = r.usage && typeof r.usage === 'object' ? (r.usage as Record<string, unknown>) : null;
-  const cost = r.cost_usd;
+  const resolved = resolveUsageCostAccounting(r);
+  const hasCostEvidence = hasUsageCostEvidence(r);
+  const cost = resolved.cost_usd;
   const dotActor = [r.actor_id, r.agent, r.component].find(
     (value): value is string => typeof value === 'string' && value.startsWith('dot:')
   );
@@ -1447,9 +1530,7 @@ export function projectEnforcementRow(row: unknown): EnforcementRowView {
   const organization = text(scope?.organization_id) ?? text(r.organization_id);
   return Object.freeze({
     ...(typeof r.timestamp === 'string' ? { timestamp: r.timestamp } : {}),
-    ...(cost === undefined
-      ? {}
-      : { cost_usd: typeof cost === 'number' && Number.isFinite(cost) ? cost : null }),
+    ...(!hasCostEvidence ? {} : { cost_usd: cost, cost_status: resolved.cost_status }),
     ...(u
       ? {
           usage: Object.freeze({
@@ -1493,6 +1574,8 @@ export interface MetricsEnforcementTotals<M extends string> {
   rows: number;
   /** Partitions still withheld (e.g. another tenant's, for a tenant-bound caller). */
   withheld_partitions: number;
+  /** Numeric-only completeness evidence; no row labels leave this boundary. */
+  unknown_cost_rows: number;
 }
 
 /**
@@ -1564,11 +1647,21 @@ export function aggregateMetricsForEnforcement<M extends string>(input: {
     tenant
   );
   // The classifier sees the whitelisted projection only, never the raw row.
-  for (const row of rows) input.accumulate(projectEnforcementRow(row), add);
+  let unknownCostRows = 0;
+  for (const row of rows) {
+    const projected = projectEnforcementRow(row);
+    if (projected.cost_status === 'unknown') unknownCostRows++;
+    input.accumulate(projected, add);
+  }
   logger.debug(
     `metrics enforcement aggregate — ${input.enforcer} read ${input.ledger} as ${METRICS_CAP_READER_ROLE} | next: none | evidence: rows=${rows.length} withheld=${withheld} tenant=${tenant ?? '(unbound)'}`
   );
-  return { measures, rows: rows.length, withheld_partitions: withheld };
+  return {
+    measures,
+    rows: rows.length,
+    withheld_partitions: withheld,
+    unknown_cost_rows: unknownCostRows,
+  };
 }
 
 const MALFORMED_DAY = /"timestamp"\s*:\s*"(\d{4}-\d{2}-\d{2})/;

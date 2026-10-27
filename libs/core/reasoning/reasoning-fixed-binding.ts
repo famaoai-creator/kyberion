@@ -2,6 +2,7 @@ import type { ReasoningBackend, ReasoningCallOptions } from './reasoning-backend
 import { loadModelRegistry } from './reasoning-model-routing.js';
 import {
   loadReasoningRouteUserConfig,
+  reasoningRoleInheritsDefault,
   resolveReasoningRoute,
   ReasoningSelectionError,
   type ResolvedReasoningRoute,
@@ -134,12 +135,72 @@ export function pickRoleBackend(
       ?.trim()
       .toLowerCase()
       .replace(/[-\s]+/g, '_') || 'default';
-  const roleBackend = roleBackends.get(role) || defaultBackend;
-  if (loadReasoningRouteUserConfig().roles?.[role]?.selection?.mode === 'fixed') {
-    assertFixedReasoningBinding(roleBackend, role, options);
+  const inherited = reasoningRoleInheritsDefault({ role });
+  const effectiveRole = inherited ? 'default' : role;
+  const roleBackend = inherited ? defaultBackend : roleBackends.get(role) || defaultBackend;
+  if (loadReasoningRouteUserConfig().roles?.[effectiveRole]?.selection?.mode === 'fixed') {
+    assertFixedReasoningBinding(roleBackend, effectiveRole, options);
     return roleBackend;
   }
   const profile = options?.route_profile?.trim();
   if (profile) return profileBackends.get(profile) || defaultBackend;
   return roleBackend;
+}
+
+/** Bound one configured auxiliary request; this does not cap an ongoing agent session. */
+export function bindReasoningRequestTimeout(
+  backend: ReasoningBackend,
+  timeoutMs?: number
+): ReasoningBackend {
+  if (!timeoutMs || !Number.isFinite(timeoutMs) || timeoutMs <= 0) return backend;
+  return new Proxy(backend, {
+    get(target, property, receiver) {
+      const value: unknown = Reflect.get(target, property, receiver);
+      if (typeof value !== 'function') return value;
+      if (property !== 'prompt' && property !== 'delegateTask') return value.bind(target);
+      const index = property === 'prompt' ? 1 : 2;
+      return async (...args: unknown[]) => {
+        const options = args[index] as ReasoningCallOptions | undefined;
+        const controller = new AbortController();
+        const callerSignal = options?.signal;
+        if (callerSignal?.aborted)
+          throw callerSignal.reason || new Error('[DELEGATION_CANCELLED] caller aborted');
+        let rejectAbort: (error: unknown) => void = () => {};
+        const cancelled = new Promise<never>((_, reject) => {
+          rejectAbort = reject;
+        });
+        const abort = (reason: unknown) => {
+          controller.abort(reason);
+          rejectAbort(reason);
+        };
+        const onAbort = () =>
+          abort(callerSignal?.reason || new Error('[DELEGATION_CANCELLED] caller aborted'));
+        callerSignal?.addEventListener('abort', onAbort, { once: true });
+        const timer = setTimeout(
+          () =>
+            abort(
+              new Error(
+                `[REASONING_REQUEST_TIMEOUT] auxiliary request timed out after ${timeoutMs}ms`
+              )
+            ),
+          timeoutMs
+        );
+        args[index] = { ...options, signal: controller.signal };
+        try {
+          const result = await Promise.race([
+            Promise.resolve().then(() => {
+              if (controller.signal.aborted) throw controller.signal.reason;
+              return Reflect.apply(value, target, args);
+            }),
+            cancelled,
+          ]);
+          if (controller.signal.aborted) throw controller.signal.reason;
+          return result;
+        } finally {
+          clearTimeout(timer);
+          callerSignal?.removeEventListener('abort', onAbort);
+        }
+      };
+    },
+  });
 }

@@ -24,6 +24,11 @@ import type { StoragePartition } from './storage-layout.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
 import { sendOpsAlert } from './ops-alert.js';
 import { pathResolver } from './path-resolver.js';
+import {
+  resolveUsageCostAccounting,
+  hasUsageCostEvidence,
+  type UsageCostAccounting,
+} from './usage-accounting.js';
 
 export interface SpendPolicyOverride {
   posture?: 'warn' | 'block';
@@ -47,12 +52,14 @@ export interface SpendGuardResult {
   mission_spent_usd?: number;
   mission_cap_usd?: number;
   breached: Array<'daily' | 'mission'>;
+  cost_complete: boolean;
+  unknown_cost_calls: number;
 }
 
 export class SpendCapExceededError extends Error {
   constructor(public readonly result: SpendGuardResult) {
     super(
-      `[spend-guard] cap reached (${result.breached.join(', ')}): ` +
+      `[spend-guard] ${result.cost_complete ? `cap reached (${result.breached.join(', ')})` : 'spend unavailable'}: ` +
         `daily $${result.daily_spent_usd.toFixed(2)}/$${result.daily_cap_usd} — ` +
         'approve to continue or raise the cap in spend-policy.json'
     );
@@ -103,27 +110,40 @@ export function resolveSpendPolicyForTenant(policy: SpendPolicy, tenantId?: stri
   };
 }
 
-interface UsageEntry {
+interface UsageEntry extends UsageCostAccounting {
   timestamp?: string;
-  cost_usd?: number;
+  cost_usd?: number | null;
+  sdk_cost_usd?: number;
+  usage?: unknown;
   mission_id?: string;
 }
 
 export function sumSpend(
   entries: UsageEntry[],
   input: { sinceMs: number; missionId?: string }
-): { daily: number; mission: number } {
+): { daily: number; mission: number; unknown: number } {
   let daily = 0;
   let mission = 0;
+  let unknown = 0;
   for (const entry of entries) {
-    const cost = Number(entry.cost_usd);
-    if (!Number.isFinite(cost) || cost <= 0) continue;
+    const evidence = hasUsageCostEvidence(entry);
     const at = Date.parse(String(entry.timestamp || ''));
-    if (!Number.isFinite(at) || at < input.sinceMs) continue;
+    if (!Number.isFinite(at)) {
+      if (evidence) unknown++;
+      continue;
+    }
+    if (at < input.sinceMs) continue;
+    const resolved = resolveUsageCostAccounting(entry);
+    if (resolved.cost_usd === null && evidence) {
+      unknown++;
+      continue;
+    }
+    const cost = resolved.cost_usd ?? 0;
+    if (cost <= 0) continue;
     daily += cost;
     if (input.missionId && entry.mission_id === input.missionId) mission += cost;
   }
-  return { daily, mission };
+  return { daily, mission, unknown };
 }
 
 // Reading the metrics ledgers is file I/O; cache briefly so the guard adds
@@ -143,7 +163,7 @@ interface CachedSpend {
   scope: SpendReadScope;
   sinceMs: number;
   missionId?: string;
-  spend: { daily: number; mission: number };
+  spend: { daily: number; mission: number; unknown: number };
 }
 const cachedSpend = new Map<string, CachedSpend>();
 let cacheReads = 0;
@@ -197,6 +217,12 @@ function applyOwnAppend(notice: ExecutionAppendNotice): void {
       continue;
     }
     if (notice.at < entry.sinceMs) continue;
+    if (notice.cost_status === 'unknown') {
+      // Missing cash evidence can change permission even when the known subtotal
+      // is unchanged. Re-read through the governed scope rather than cache $0.
+      cachedSpend.delete(key);
+      continue;
+    }
     entry.spend.daily += notice.cost_usd;
     if (entry.missionId && notice.mission_id === entry.missionId) {
       entry.spend.mission += notice.cost_usd;
@@ -228,13 +254,14 @@ function loadSpend(now: number, input: { sinceMs: number; missionId?: string; te
     enforcer: 'spend_guard',
     ledger: 'execution_metrics',
     read: input.tenant ? { tenants: [input.tenant], includeSystem: true } : { all: true },
-    measures: ['daily', 'mission'] as const,
+    measures: ['daily', 'mission', 'unknown'] as const,
     accumulate: (row, add) => {
       const spend = sumSpend(
         [
           {
             timestamp: row.timestamp,
-            cost_usd: row.cost_usd ?? undefined,
+            cost_usd: row.cost_usd,
+            cost_status: row.cost_status,
             mission_id: row.mission_id,
           },
         ],
@@ -242,6 +269,7 @@ function loadSpend(now: number, input: { sinceMs: number; missionId?: string; te
       );
       add('daily', spend.daily);
       add('mission', spend.mission);
+      add('unknown', spend.unknown);
     },
   });
   if (totals.withheld_partitions > 0) {
@@ -249,7 +277,11 @@ function loadSpend(now: number, input: { sinceMs: number; missionId?: string; te
       `[spend-guard] spend for ${input.tenant ?? 'the global cap'} is partial — ${totals.withheld_partitions} metrics partition(s) withheld | next: evaluate global caps from an unbound operator process | evidence: tenant ${input.tenant ?? '(unbound)'}`
     );
   }
-  const spend = { daily: totals.measures.daily, mission: totals.measures.mission };
+  const spend = {
+    daily: totals.measures.daily,
+    mission: totals.measures.mission,
+    unknown: totals.measures.unknown + (totals.withheld_partitions > 0 ? 1 : 0),
+  };
   rememberSpend(key, {
     at: now,
     scope,
@@ -300,7 +332,7 @@ export function checkSpendGuard(
   if (missionId && spend.mission >= policy.mission_cap_usd) breached.push('mission');
 
   const result: SpendGuardResult = {
-    allowed: breached.length === 0 || policy.posture === 'warn',
+    allowed: (breached.length === 0 && spend.unknown === 0) || policy.posture === 'warn',
     posture: policy.posture,
     daily_spent_usd: Math.round(spend.daily * 100000) / 100000,
     daily_cap_usd: policy.daily_cap_usd,
@@ -311,20 +343,25 @@ export function checkSpendGuard(
         }
       : {}),
     breached,
+    cost_complete: spend.unknown === 0,
+    unknown_cost_calls: spend.unknown,
   };
 
-  if (breached.length > 0) {
-    const dedupeKey = `spend-guard:${tenantId || 'default'}:${breached.join('+')}:${new Date(startOfUtcDay).toISOString().slice(0, 10)}`;
+  if (breached.length > 0 || !result.cost_complete) {
+    const dedupeKey = `spend-guard:${tenantId || 'default'}:${result.cost_complete ? breached.join('+') : 'unknown-cost'}:${new Date(startOfUtcDay).toISOString().slice(0, 10)}`;
     if (!alertedBreaches.has(dedupeKey)) {
       alertedBreaches.add(dedupeKey);
       const send = options.alert ?? sendOpsAlert;
       try {
         send({
           severity: policy.posture === 'block' ? 'critical' : 'warning',
-          title: `LLM spend cap reached (${breached.join(', ')})`,
+          title: result.cost_complete
+            ? `LLM spend cap reached (${breached.join(', ')})`
+            : 'LLM spend cannot be determined',
           context: { ...result },
-          recommendation:
-            policy.posture === 'block'
+          recommendation: !result.cost_complete
+            ? 'Review unavailable cost evidence before allowing further metered calls under block posture.'
+            : policy.posture === 'block'
               ? 'Reasoning calls are blocked. Approve continuation or raise the cap in spend-policy.json.'
               : 'Warn posture: calls continue. Review the spend distribution before tightening to block.',
           dedupe_key: dedupeKey,
@@ -334,7 +371,7 @@ export function checkSpendGuard(
       }
     }
     logger.warn(
-      `[spend-guard] ${policy.posture}: ${breached.join(', ')} cap reached ` +
+      `[spend-guard] ${policy.posture}: ${result.cost_complete ? `${breached.join(', ')} cap reached` : 'cost evidence incomplete'} ` +
         `(daily $${result.daily_spent_usd}/$${result.daily_cap_usd})`
     );
   }

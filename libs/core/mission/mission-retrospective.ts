@@ -17,7 +17,12 @@ import { notifyOperator } from '../surface/operator-notifications.js';
 import { deriveMissionOutcome, validateMissionHeuristics } from '../heuristic-feedback.js';
 import { recordAgentRoleOutcomes } from '../agent/agent-performance-index.js';
 import { recordModelRoleOutcomes } from '../reasoning/model-performance-index.js';
-import { MetricsCollector, resolveCostRates } from '../metrics.js';
+import { MetricsCollector } from '../metrics.js';
+import {
+  resolveUsageCostAccounting,
+  hasUsageCostEvidence,
+  type ResolvedUsageCostAccounting,
+} from '../usage-accounting.js';
 import { isRecord } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
@@ -65,6 +70,14 @@ function regularProcessImprovementQueuePath(filePath: string): string {
  *    apply), mirroring the memory-promotion ratification pattern.
  */
 
+export interface MissionCostCoverage {
+  cost_complete?: boolean;
+  unknown_cost_entries?: number;
+  included_entries?: number;
+  reference_cost_usd?: number;
+  reference_cost_entries?: number;
+}
+
 export interface MissionExecutionStats {
   mission_id: string;
   task_total: number;
@@ -96,7 +109,7 @@ export interface MissionExecutionStats {
      *  call — the artifact was touched after the task closed. */
     edited_after_record: string[];
   };
-  token_usage: {
+  token_usage: MissionCostCoverage & {
     prompt_tokens: number;
     completion_tokens: number;
     total_tokens: number;
@@ -105,10 +118,15 @@ export interface MissionExecutionStats {
     entries: number;
     by_model: Record<
       string,
-      { prompt_tokens: number; completion_tokens: number; total_tokens: number; cost_usd: number }
+      MissionCostCoverage & {
+        prompt_tokens: number;
+        completion_tokens: number;
+        total_tokens: number;
+        cost_usd: number;
+      }
     >;
   };
-  resource_usage: {
+  resource_usage: MissionCostCoverage & {
     entries: number;
     cost_usd: number;
   };
@@ -158,6 +176,31 @@ function missionUsageScope(
   return { tier: state.tier, ...(state.tenant_slug ? { tenant_slug: state.tenant_slug } : {}) };
 }
 
+function emptyMissionCostCoverage(): Required<MissionCostCoverage> {
+  return {
+    cost_complete: true,
+    unknown_cost_entries: 0,
+    included_entries: 0,
+    reference_cost_usd: 0,
+    reference_cost_entries: 0,
+  };
+}
+
+function accumulateMissionCost(
+  target: MissionCostCoverage & { cost_usd: number },
+  cost: ResolvedUsageCostAccounting
+): void {
+  target.cost_usd += cost.cost_usd ?? 0;
+  if (cost.cost_status === 'unknown')
+    target.unknown_cost_entries = (target.unknown_cost_entries ?? 0) + 1;
+  if (cost.cost_status === 'included') target.included_entries = (target.included_entries ?? 0) + 1;
+  if (cost.reference_cost_usd !== undefined) {
+    target.reference_cost_usd = (target.reference_cost_usd ?? 0) + cost.reference_cost_usd;
+    target.reference_cost_entries = (target.reference_cost_entries ?? 0) + 1;
+  }
+  target.cost_complete = (target.unknown_cost_entries ?? 0) === 0;
+}
+
 function collectMissionUsageStats(
   missionId: string,
   missionScope?: { tier: MissionState['tier']; tenant_slug?: string }
@@ -167,11 +210,12 @@ function collectMissionUsageStats(
     completion_tokens: 0,
     total_tokens: 0,
     cost_usd: 0,
+    ...emptyMissionCostCoverage(),
     estimated_entries: 0,
     entries: 0,
     by_model: {},
   };
-  const resourceUsage = { entries: 0, cost_usd: 0 };
+  const resourceUsage = { entries: 0, cost_usd: 0, ...emptyMissionCostCoverage() };
   const metricsCollector = new MetricsCollector({ persist: false });
   const metricCorrelationIds = new Set<string>();
 
@@ -186,32 +230,30 @@ function collectMissionUsageStats(
       : undefined;
   for (const entry of metricsCollector.loadHistory({ read: missionRead })) {
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
+    if (!hasUsageCostEvidence(entry)) continue;
     if (entry.correlation_id) metricCorrelationIds.add(String(entry.correlation_id));
-    const usage = entry.usage as Record<string, unknown> | undefined;
-    if (!usage) continue;
+    const usage = isRecord(entry.usage) ? entry.usage : {};
     const promptTokens = Number(usage.prompt_tokens ?? usage.input_tokens ?? 0);
     const completionTokens = Number(usage.completion_tokens ?? usage.output_tokens ?? 0);
     if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens)) continue;
     const model = String(entry.model || 'default');
-    const rates = resolveCostRates(model);
-    const cost = Number(
-      entry.cost_usd ?? promptTokens * rates.prompt + completionTokens * rates.completion
-    );
+    const cost = resolveUsageCostAccounting(entry);
     const modelStats = tokenUsage.by_model[model] || {
       prompt_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,
       cost_usd: 0,
+      ...emptyMissionCostCoverage(),
     };
     modelStats.prompt_tokens += promptTokens;
     modelStats.completion_tokens += completionTokens;
     modelStats.total_tokens += promptTokens + completionTokens;
-    modelStats.cost_usd += Number.isFinite(cost) ? cost : 0;
+    accumulateMissionCost(modelStats, cost);
     tokenUsage.by_model[model] = modelStats;
     tokenUsage.prompt_tokens += promptTokens;
     tokenUsage.completion_tokens += completionTokens;
     tokenUsage.total_tokens += promptTokens + completionTokens;
-    tokenUsage.cost_usd += Number.isFinite(cost) ? cost : 0;
+    accumulateMissionCost(tokenUsage, cost);
     tokenUsage.entries += 1;
     if (entry.estimated === true) tokenUsage.estimated_entries += 1;
   }
@@ -227,23 +269,28 @@ function collectMissionUsageStats(
     const completionTokens = Number(entry.output_tokens || 0);
     if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens)) continue;
     const model = String(entry.model_id || 'default');
-    const rates = resolveCostRates(model);
-    const cost = promptTokens * rates.prompt + completionTokens * rates.completion;
+    // Supervisor events without monetary evidence are usage observations,
+    // not a provider bill. A model-rate fallback must never become cash cost.
+    const cost = resolveUsageCostAccounting({
+      ...entry,
+      cost_status: entry.cost_status ?? 'unknown',
+    });
     const modelStats = tokenUsage.by_model[model] || {
       prompt_tokens: 0,
       completion_tokens: 0,
       total_tokens: 0,
       cost_usd: 0,
+      ...emptyMissionCostCoverage(),
     };
     modelStats.prompt_tokens += promptTokens;
     modelStats.completion_tokens += completionTokens;
     modelStats.total_tokens += promptTokens + completionTokens;
-    modelStats.cost_usd += cost;
+    accumulateMissionCost(modelStats, cost);
     tokenUsage.by_model[model] = modelStats;
     tokenUsage.prompt_tokens += promptTokens;
     tokenUsage.completion_tokens += completionTokens;
     tokenUsage.total_tokens += promptTokens + completionTokens;
-    tokenUsage.cost_usd += cost;
+    accumulateMissionCost(tokenUsage, cost);
     tokenUsage.entries += 1;
   }
 
@@ -252,7 +299,7 @@ function collectMissionUsageStats(
   for (const entry of metricsCollector.loadResourceUsageHistory(missionRead)) {
     if (String(entry.mission_id || '').toUpperCase() !== missionId.toUpperCase()) continue;
     resourceUsage.entries += 1;
-    resourceUsage.cost_usd += Number(entry.cost_usd) || 0;
+    accumulateMissionCost(resourceUsage, resolveUsageCostAccounting(entry));
   }
 
   tokenUsage.cost_usd = Math.round(tokenUsage.cost_usd * 100000) / 100000;
@@ -915,6 +962,18 @@ export async function runMissionRetrospective(
     '',
     ...(stats.usage_unrecorded
       ? [t('mission_ops:retro_usage_unrecorded', { count: stats.tasks_completed }), '']
+      : []),
+    ...((stats.token_usage.unknown_cost_entries ?? 0) +
+      (stats.resource_usage.unknown_cost_entries ?? 0) >
+    0
+      ? [
+          t('mission_ops:retro_cost_unknown', {
+            count:
+              (stats.token_usage.unknown_cost_entries ?? 0) +
+              (stats.resource_usage.unknown_cost_entries ?? 0),
+          }),
+          '',
+        ]
       : []),
     ...(stats.evidence_timing.closing_burst || stats.evidence_timing.edited_after_record.length > 0
       ? [

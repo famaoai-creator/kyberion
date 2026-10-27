@@ -1,4 +1,5 @@
 import { secureFetch } from '../network.js';
+import { selectProviderCredential } from '../foundation/credential-binding.js';
 import { assertReasoningEgressAllowedAtEndpoint } from '../reasoning/reasoning-egress-scope.js';
 import { trimEndChars } from '../foundation/text.js';
 
@@ -8,7 +9,10 @@ const DEFAULT_ANTHROPIC_BASE_URL = 'https://api.anthropic.com';
 export async function probeAnthropicApiBackendAvailability(
   env: NodeJS.ProcessEnv = process.env
 ): Promise<{ available: boolean; reason?: string }> {
-  const apiKey = env.ANTHROPIC_API_KEY?.trim();
+  const apiKey = selectProviderCredential(
+    ['ANTHROPIC_API_KEY'],
+    env.ANTHROPIC_API_KEY?.trim() ?? ''
+  );
   if (!apiKey) {
     return { available: false, reason: 'ANTHROPIC_API_KEY is not set' };
   }

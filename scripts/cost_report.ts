@@ -50,7 +50,7 @@ export function main(args = currentProcessArgv()): ReturnType<typeof buildCostRe
   });
 
   if (report.calls === 0) {
-    logger.info('[cost-report] no costed usage entries in the window');
+    logger.info('[cost-report] no usage entries in the window');
   }
   return report;
 }

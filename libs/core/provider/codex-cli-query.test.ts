@@ -8,6 +8,11 @@ import {
   runCodexCliQuery,
 } from './codex-cli-query.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
+import { metrics } from '../metrics.js';
+
+beforeEach(() => {
+  vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+});
 
 const mocks = vi.hoisted(() => ({
   safeExecResult: vi.fn(),
@@ -78,7 +83,7 @@ vi.mock('../mission/delegation-concurrency.js', () => ({
   DelegationWallClockExceededError: class DelegationWallClockExceededError extends Error {},
 }));
 
-function createChild(exitCode = 0): any {
+function createChild(exitCode = 0, stdoutText = ''): any {
   const child = new EventEmitter() as any;
   child.stdout = new PassThrough();
   child.stderr = new PassThrough();
@@ -86,6 +91,7 @@ function createChild(exitCode = 0): any {
   child.kill = vi.fn();
 
   queueMicrotask(() => {
+    if (stdoutText) child.stdout.write(stdoutText);
     child.stdout.end();
     child.stderr.end();
     child.emit('close', exitCode);
@@ -107,6 +113,52 @@ describe('codex-cli-query', () => {
       stderr: '',
       status: 0,
     });
+  });
+
+  it('reads actual usage from the JSONL transport while validating only the output file', async () => {
+    mocks.safeReadFile.mockReturnValue(JSON.stringify({ ok: true }));
+    mocks.spawnMock.mockReturnValueOnce(
+      createChild(
+        0,
+        JSON.stringify({
+          type: 'turn.completed',
+          usage: { input_tokens: 120, cached_input_tokens: 80, output_tokens: 10 },
+        })
+      )
+    );
+    const result = await runCodexCliQuery({
+      systemPrompt: 'sys',
+      userPrompt: 'usr',
+      schema: z.object({ ok: z.boolean() }),
+      options: { bin: 'codex' },
+    });
+    expect(result).toEqual({ ok: true });
+    expect(mocks.spawnMock.mock.calls[0][1]).toContain('--json');
+    expect(metrics.record).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(metrics.record).mock.calls[0][3]).toMatchObject({
+      usage_source: 'provider',
+      billing_mode: 'unknown',
+      usage: { prompt_tokens: 40, cache_read_tokens: 80, completion_tokens: 10 },
+    });
+  });
+
+  it('keeps a missing CLI binary unpriced instead of charging the prompt estimate', async () => {
+    const child = new EventEmitter() as any;
+    child.stdout = new PassThrough();
+    child.stderr = new PassThrough();
+    child.stdin = new PassThrough();
+    child.kill = vi.fn();
+    mocks.spawnMock.mockReturnValueOnce(child);
+    queueMicrotask(() => child.emit('error', new Error('ENOENT')));
+    await expect(
+      runCodexCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+        options: { bin: 'codex' },
+      })
+    ).rejects.toThrow('spawn failed');
+    expect(metrics.record).not.toHaveBeenCalled();
   });
 
   afterEach(() => {
@@ -514,6 +566,32 @@ describe('codex-cli-query', () => {
       mocks.safeRmSync.mockReset();
       mocks.spawnMock.mockReset();
       mocks.withWallClockBudgetMock.mockClear();
+    });
+
+    it('carries a configured auxiliary CLI bundle deadline to the spawned request', async () => {
+      await import('./bundles/codex-cli.js');
+      const { buildCliProviderBundle } = await import('../cli-provider-bundle.js');
+      mocks.safeReadFile.mockReturnValue(JSON.stringify({ answer: 'compact result' }));
+      mocks.spawnMock.mockReturnValueOnce(createChild());
+      const bundle = buildCliProviderBundle({
+        mode: 'codex-cli',
+        provider: 'codex',
+        model: 'codex-default',
+        timeoutMs: 1234,
+        env: {},
+      });
+      const controller = new AbortController();
+      await expect(
+        bundle!.backend.backend.prompt('compact', {
+          role: 'context_compaction',
+          signal: controller.signal,
+        })
+      ).resolves.toBe('compact result');
+      expect(mocks.withWallClockBudgetMock).toHaveBeenCalledWith(
+        expect.objectContaining({ provider: 'codex', budgetMs: 1234, signal: controller.signal }),
+        expect.any(Function)
+      );
+      expect(mocks.spawnMock).toHaveBeenCalledTimes(1);
     });
 
     it('wraps the spawned child in withWallClockBudget with the codex provider and configured timeout', async () => {

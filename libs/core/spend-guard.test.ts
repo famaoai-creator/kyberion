@@ -31,7 +31,7 @@ describe('sumSpend', () => {
       ],
       { sinceMs: Date.parse(`${TODAY}00:00:00.000Z`), missionId: 'MSN-1' }
     );
-    expect(spend).toEqual({ daily: 5, mission: 2 });
+    expect(spend).toEqual({ daily: 5, mission: 2, unknown: 1 });
   });
 });
 
@@ -46,6 +46,83 @@ describe('spend policy loading', () => {
 });
 
 describe('checkSpendGuard', () => {
+  it('does not grant cap headroom when observed costs are unknown', () => {
+    const entries = [
+      { timestamp: `${TODAY}01:00:00.000Z`, cost_status: 'unknown' as const, cost_usd: null },
+    ];
+    const alert = vi.fn();
+    const blocked = checkSpendGuard({
+      now: NOW,
+      policy: BLOCK_POLICY,
+      entries,
+      tenantId: 'unknown-cost-block',
+      alert: alert as never,
+    });
+    expect(blocked).toMatchObject({
+      allowed: false,
+      daily_spent_usd: 0,
+      cost_complete: false,
+      unknown_cost_calls: 1,
+      breached: [],
+    });
+    expect(new SpendCapExceededError(blocked).message).toContain('spend unavailable');
+    expect(alert).toHaveBeenCalledOnce();
+    const warned = checkSpendGuard({
+      now: NOW,
+      policy: WARN_POLICY,
+      entries,
+      tenantId: 'unknown-cost-warn',
+      alert: vi.fn() as never,
+    });
+    expect(warned).toMatchObject({ allowed: true, cost_complete: false });
+    for (const evidence of [
+      { reference_cost_usd: 1, cost_source: 'provider_report' as const },
+      { usage_source: 'provider' as const },
+      { usage: { prompt_tokens: 10 } },
+    ])
+      expect(
+        checkSpendGuard({
+          now: NOW,
+          policy: BLOCK_POLICY,
+          entries: [{ timestamp: `${TODAY}01:00:00.000Z`, ...evidence }],
+          tenantId: 'unknown-cost-reference',
+          alert: vi.fn() as never,
+        })
+      ).toMatchObject({ allowed: false, cost_complete: false, unknown_cost_calls: 1 });
+    expect(
+      checkSpendGuard({
+        now: NOW,
+        policy: BLOCK_POLICY,
+        entries: [{ cost_status: 'unknown', timestamp: 'unparseable' }],
+        tenantId: 'unknown-cost-time',
+        alert: vi.fn() as never,
+      })
+    ).toMatchObject({ allowed: false, cost_complete: false });
+  });
+
+  it('treats known reported zero and verified included runs as complete without charging reference costs', () => {
+    const result = checkSpendGuard({
+      now: NOW,
+      policy: BLOCK_POLICY,
+      entries: [
+        { timestamp: `${TODAY}01:00:00.000Z`, reported_cost_usd: 0, cost_usd: 99 },
+        {
+          timestamp: `${TODAY}02:00:00.000Z`,
+          cost_status: 'included',
+          billing_mode: 'subscription_included',
+          reference_cost_usd: 99,
+        },
+        { timestamp: '2026-07-10T00:00:00Z', cost_status: 'unknown' },
+      ],
+      alert: vi.fn() as never,
+    });
+    expect(result).toMatchObject({
+      allowed: true,
+      daily_spent_usd: 0,
+      cost_complete: true,
+      unknown_cost_calls: 0,
+    });
+  });
   it('allows and stays silent under the caps', () => {
     const alert = vi.fn();
     const result = checkSpendGuard({

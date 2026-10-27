@@ -58,6 +58,12 @@ import {
 import { isValidTenantSlug } from '../foundation/scope.js';
 import { setManagedPluginGrantLookup } from './plugin-grant-runtime.js';
 import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
+import {
+  PLUGIN_PUBLICATION_DIRECTORY,
+  publishPluginDirectory,
+  recoverPluginPublication,
+  withPluginPublicationLock,
+} from './plugin-publication.js';
 
 // Re-exported so install surfaces can render/handle narrowing through this
 // module's existing package export.
@@ -81,7 +87,6 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeMoveSync,
   safeReadFile,
   safeReaddir,
   safeRmSync,
@@ -601,6 +606,16 @@ function writeManagedRecord(managedDir: string, record: ManagedPluginRecord): vo
   safeWriteFile(recordPath, JSON.stringify(validated, null, 2));
 }
 
+/** Includes the approval/grant record as well as code, so concurrent metadata edits conflict. */
+function publicationFingerprint(dir: string): string {
+  const recordPath = path.join(dir, MANAGED_RECORD_FILENAME);
+  return createHash('sha256')
+    .update(computePluginContentDigest(dir))
+    .update('\0')
+    .update(safeExistsSync(recordPath) ? safeReadFile(recordPath, { encoding: 'utf8' }) : '')
+    .digest('hex');
+}
+
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim() !== '';
 }
@@ -931,8 +946,8 @@ function resolveManagedRoot(managedRoot?: string): string {
 /**
  * Installs a plugin: stage -> validate (containment + manifest diagnostics,
  * no execution) -> atomic rename into the managed directory. Trust is
- * derived from `params.sourcePath` alone. A broken manifest never throws —
- * it degrades to a diagnostic listing entry with `blocked_broken_manifest`.
+ * derived from `params.sourcePath` alone. A broken first install degrades to
+ * a diagnostic entry; a broken replacement is refused, retaining the old install.
  */
 export function installPluginManaged(params: InstallPluginManagedParams): ManagedPluginRecord {
   // Managed installs own the shared plugin tree the way mission-controller
@@ -950,137 +965,165 @@ export function installPluginManaged(params: InstallPluginManagedParams): Manage
       allowMissingLeaf: true,
     });
     const approvalChannel = params.approvalChannel?.trim() || DEFAULT_APPROVAL_CHANNEL;
+    safeMkdir(managedRoot, { recursive: true });
 
-    const trust = derivePluginTrustLabel(params.sourcePath, {
-      curatedOriginPrefixes: params.curatedOriginPrefixes,
-    });
+    return withPluginPublicationLock(managedDir, () => {
+      recoverPluginPublication(managedDir, publicationFingerprint);
+      const expectedPrevious = safeExistsSync(managedDir)
+        ? publicationFingerprint(managedDir)
+        : null;
 
-    const stagingDir = assertSafeRepositoryPath(
-      pathResolver.sharedTmp(`plugin-install/${pluginId}-${randomUUID()}`),
-      { allowMissingLeaf: true }
-    );
-    safeRmSync(stagingDir);
-    stagePluginDirectory(path.resolve(params.sourcePath), stagingDir);
+      const trust = derivePluginTrustLabel(params.sourcePath, {
+        curatedOriginPrefixes: params.curatedOriginPrefixes,
+      });
 
-    // Manifest is only ever JSON.parse'd — never required/imported/executed.
-    const { manifest, diagnostics } = readPluginManifestSafely(stagingDir);
+      const stagingDir = assertSafeRepositoryPath(
+        pathResolver.sharedTmp(`plugin-install/${pluginId}-${randomUUID()}`),
+        { allowMissingLeaf: true }
+      );
+      safeRmSync(stagingDir);
+      stagePluginDirectory(path.resolve(params.sourcePath), stagingDir);
 
-    // EP-02: narrow declared permissions before anything lands in the
-    // managed tree. A malformed declaration is a broken manifest; a critical
-    // capability narrowed to nothing aborts the install (nothing is staged).
-    let request = parsePluginPermissionRequest(undefined);
-    if (manifest) {
-      try {
-        const resolved = manifestPermissionRequest(manifest);
-        request = resolved.request;
-        if (resolved.legacyBlockIgnored) {
+      // Manifest is only ever JSON.parse'd — never required/imported/executed.
+      const { manifest, diagnostics } = readPluginManifestSafely(stagingDir);
+
+      // EP-02: narrow declared permissions before anything lands in the
+      // managed tree. A malformed declaration is a broken manifest; a critical
+      // capability narrowed to nothing aborts the install (nothing is staged).
+      let request = parsePluginPermissionRequest(undefined);
+      if (manifest) {
+        try {
+          const resolved = manifestPermissionRequest(manifest);
+          request = resolved.request;
+          if (resolved.legacyBlockIgnored) {
+            diagnostics.push({
+              code: 'manifest_legacy_permissions_ignored',
+              message:
+                "Manifest 'permissions' uses the Cowork v1 descriptive shape; it is not an EP-02 declaration, so no runtime permissions are granted.",
+              severity: 'warning',
+            });
+          }
+        } catch (err: unknown) {
           diagnostics.push({
-            code: 'manifest_legacy_permissions_ignored',
-            message:
-              "Manifest 'permissions' uses the Cowork v1 descriptive shape; it is not an EP-02 declaration, so no runtime permissions are granted.",
-            severity: 'warning',
+            code: 'manifest_invalid_permissions',
+            message: err instanceof Error ? err.message : String(err),
+            severity: 'error',
           });
         }
-      } catch (err: unknown) {
+      }
+      const provides = manifest?.raw.provides;
+      const officialOnlySeam = findDisallowedOfficialOnlySeam(
+        isRecord(provides) && Array.isArray(provides.seams) ? provides.seams : [],
+        trust.label
+      );
+      if (officialOnlySeam) {
         diagnostics.push({
-          code: 'manifest_invalid_permissions',
-          message: err instanceof Error ? err.message : String(err),
+          code: 'manifest_official_only_seam',
+          message: `Manifest declares the official-only seam '${officialOnlySeam}', which a ${trust.label} plugin may not provide.`,
           severity: 'error',
         });
       }
-    }
-    const provides = manifest?.raw.provides;
-    const officialOnlySeam = findDisallowedOfficialOnlySeam(
-      isRecord(provides) && Array.isArray(provides.seams) ? provides.seams : [],
-      trust.label
-    );
-    if (officialOnlySeam) {
-      diagnostics.push({
-        code: 'manifest_official_only_seam',
-        message: `Manifest declares the official-only seam '${officialOnlySeam}', which a ${trust.label} plugin may not provide.`,
-        severity: 'error',
-      });
-    }
-    const brokenManifest = diagnostics.some((d) => d.severity === 'error');
-    let narrowed: NarrowPluginPermissionsResult;
-    try {
-      narrowed = narrowPluginPermissions(
-        brokenManifest ? parsePluginPermissionRequest(undefined) : request,
-        loadPluginPermissionPolicy(),
-        { trust: trust.label, ...(tenantSlug ? { tenantSlug } : {}) }
-      );
-    } catch (err) {
-      safeRmSync(stagingDir);
-      throw err;
-    }
-    if (!brokenManifest) {
-      params.onPermissionsResolved?.({ pluginId, trust: trust.label, request, ...narrowed });
-    }
-
-    // Bind and, when a new approval request is needed, resolve its requester
-    // on the staging copy (the digest is path-independent). A requester that
-    // refuses (for example no stable operator identity under separation of
-    // duties) then fails the install before anything lands in the managed tree.
-    let binding: PluginApprovalBinding;
-    let approval: ApprovalRequestRecord | undefined;
-    let newRequester: ApprovalRequesterRef | undefined;
-    try {
-      binding = {
-        pluginId,
-        trust: trust.label,
-        resolvedSourcePath: trust.resolvedSourcePath,
-        contentDigest: computePluginContentDigest(stagingDir),
-        manifestVersion: manifest?.version ?? null,
-        permissionsDigest: permissionsDigest(narrowed.granted),
-      };
-      if (trust.label !== 'official' && !brokenManifest) {
-        approval = findPluginApprovalRequest(binding, approvalChannel);
-        if (!approval) newRequester = resolvePluginApprovalRequester(params.requestedBy);
+      const brokenManifest = diagnostics.some((d) => d.severity === 'error');
+      if (brokenManifest && expectedPrevious !== null) {
+        safeRmSync(stagingDir);
+        throw new Error(
+          '[PLUGIN_UPDATE_MANIFEST_INVALID] Previous plugin retained; updated manifest is invalid'
+        );
       }
-    } catch (err) {
-      safeRmSync(stagingDir);
-      throw err;
-    }
+      let narrowed: NarrowPluginPermissionsResult;
+      try {
+        narrowed = narrowPluginPermissions(
+          brokenManifest ? parsePluginPermissionRequest(undefined) : request,
+          loadPluginPermissionPolicy(),
+          { trust: trust.label, ...(tenantSlug ? { tenantSlug } : {}) }
+        );
+      } catch (err) {
+        safeRmSync(stagingDir);
+        throw err;
+      }
+      if (!brokenManifest) {
+        try {
+          params.onPermissionsResolved?.({ pluginId, trust: trust.label, request, ...narrowed });
+        } catch (error) {
+          safeRmSync(stagingDir);
+          throw error;
+        }
+      }
 
-    safeMkdir(managedRoot, { recursive: true });
-    if (safeExistsSync(managedDir)) safeRmSync(managedDir);
-    safeMoveSync(stagingDir, managedDir);
+      // Bind and, when a new approval request is needed, resolve its requester
+      // on the staging copy (the digest is path-independent). A requester that
+      // refuses (for example no stable operator identity under separation of
+      // duties) then fails the install before anything lands in the managed tree.
+      let binding: PluginApprovalBinding;
+      let approval: ApprovalRequestRecord | undefined;
+      let newRequester: ApprovalRequesterRef | undefined;
+      try {
+        binding = {
+          pluginId,
+          trust: trust.label,
+          resolvedSourcePath: trust.resolvedSourcePath,
+          contentDigest: computePluginContentDigest(stagingDir),
+          manifestVersion: manifest?.version ?? null,
+          permissionsDigest: permissionsDigest(narrowed.granted),
+        };
+        if (trust.label !== 'official' && !brokenManifest) {
+          approval = findPluginApprovalRequest(binding, approvalChannel);
+          if (!approval) newRequester = resolvePluginApprovalRequester(params.requestedBy);
+        }
+      } catch (err) {
+        safeRmSync(stagingDir);
+        throw err;
+      }
 
-    if (newRequester) {
-      approval = openPluginApprovalRequest({
-        binding,
-        permissionSummary: summarizePermissionDiff(narrowed.diff),
-        requester: newRequester,
-        channel: approvalChannel,
-        missionId: params.missionId,
-      });
-    }
+      try {
+        if (newRequester) {
+          approval = openPluginApprovalRequest({
+            binding,
+            permissionSummary: summarizePermissionDiff(narrowed.diff),
+            requester: newRequester,
+            channel: approvalChannel,
+            missionId: params.missionId,
+          });
+        }
 
-    const record: ManagedPluginRecord = {
-      pluginId,
-      trust: trust.label,
-      trustReason: trust.reason,
-      resolvedSourcePath: trust.resolvedSourcePath,
-      managedPath: managedDir,
-      manifest,
-      diagnostics,
-      activationStatus: resolveActivationStatus({
-        diagnostics,
-        trust: trust.label,
-        integrity: 'verified',
-        approval,
-      }),
-      approvalChannel: approval ? approvalChannel : undefined,
-      approvalRequestId: approval?.id,
-      installedAt: nowIso(),
-      contentDigest: binding.contentDigest,
-      manifestVersion: binding.manifestVersion,
-      grantedPermissions: narrowed.granted,
-      permissionsDigest: binding.permissionsDigest,
-      ...(tenantSlug ? { tenantSlug } : {}),
-    };
-    writeManagedRecord(managedDir, record);
-    return record;
+        const record: ManagedPluginRecord = {
+          pluginId,
+          trust: trust.label,
+          trustReason: trust.reason,
+          resolvedSourcePath: trust.resolvedSourcePath,
+          managedPath: managedDir,
+          manifest,
+          diagnostics,
+          activationStatus: resolveActivationStatus({
+            diagnostics,
+            trust: trust.label,
+            integrity: 'verified',
+            approval,
+          }),
+          approvalChannel: approval ? approvalChannel : undefined,
+          approvalRequestId: approval?.id,
+          installedAt: nowIso(),
+          contentDigest: binding.contentDigest,
+          manifestVersion: binding.manifestVersion,
+          grantedPermissions: narrowed.granted,
+          permissionsDigest: binding.permissionsDigest,
+          ...(tenantSlug ? { tenantSlug } : {}),
+        };
+        // The candidate already carries the new exact digest/grant/approval identity
+        // when its directory becomes visible. Never inherit the old record.
+        writeManagedRecord(stagingDir, record);
+        publishPluginDirectory({
+          target: managedDir,
+          staged: stagingDir,
+          expectedPrevious,
+          fingerprint: publicationFingerprint,
+        });
+        return record;
+      } catch (error) {
+        safeRmSync(stagingDir);
+        throw error;
+      }
+    });
   });
 }
 
@@ -1094,13 +1137,25 @@ export function refreshManagedPluginActivation(
   managedRoot?: string
 ): ManagedPluginRecord | null {
   const root = resolveManagedRoot(managedRoot);
+  if (!safeExistsSync(root)) return null;
   const managedDir = assertSafeRepositoryPath(path.join(root, normalizePluginId(pluginId)), {
     allowMissingLeaf: true,
   });
+  // Preserve the caller's metadata visibility check before installer-owned
+  // recovery. A missing target still undergoes the scoped read-path guard.
+  safeExistsSync(managedDir);
+  withExecutionContext('mission_controller', () =>
+    withPluginPublicationLock(managedDir, () =>
+      recoverPluginPublication(managedDir, publicationFingerprint)
+    )
+  );
+  if (!safeExistsSync(managedDir)) return null;
+  const expected = publicationFingerprint(managedDir);
   // readManagedRecord re-verifies trust, content/permission digests and the
   // bound approval; only persist when the verified status differs.
   const record = readManagedRecord(managedDir);
   if (!record) return null;
+  if (publicationFingerprint(managedDir) !== expected) return null;
   let persistedStatus: PluginActivationStatus | undefined;
   try {
     persistedStatus = loadManagedPluginRecordAtPath(
@@ -1112,10 +1167,14 @@ export function refreshManagedPluginActivation(
   }
   if (persistedStatus === record.activationStatus) return record;
 
-  return withExecutionContext('mission_controller', () => {
-    writeManagedRecord(managedDir, record);
-    return record;
-  });
+  return withExecutionContext('mission_controller', () =>
+    withPluginPublicationLock(managedDir, () => {
+      if (!safeExistsSync(managedDir) || publicationFingerprint(managedDir) !== expected)
+        return null;
+      writeManagedRecord(managedDir, record);
+      return record;
+    })
+  );
 }
 
 export interface ManagedPluginRecordHeader {
@@ -1151,6 +1210,7 @@ export function listManagedPlugins(
   const tenantAllow = options.tenantAllow ? new Set(options.tenantAllow) : undefined;
   const entries: ManagedPluginRecord[] = [];
   for (const name of safeReaddir(root).sort(codepointCompare)) {
+    if (name === PLUGIN_PUBLICATION_DIRECTORY) continue;
     const managedDir = path.join(root, name);
     if (!safeLstat(managedDir).isDirectory()) continue; // never treat stray files as plugins
 

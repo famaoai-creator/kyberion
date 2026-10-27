@@ -1,3 +1,8 @@
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+} from '../foundation/credential-binding.js';
+import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-fence.js';
 import { z } from 'zod';
 import {
   buildCodexCliQueryOptionsFromEnv,
@@ -66,6 +71,7 @@ export interface CodexCliReasoningBackendOptions extends CodexCliQueryOptions {
 
 export class CodexCliReasoningBackend implements ReasoningBackend {
   readonly name = 'codex-cli';
+  private readonly nativeCredentialOwner = credentialExecutionIdentity();
   private readonly options: CodexCliQueryOptions;
   private readonly injectedHarnessSession?: CodexHarnessSession;
   private harnessSession?: CodexHarnessSession;
@@ -188,6 +194,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
+    assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
     assertReasoningEgressAllowed(this.name);
     const profile = resolveProfile(options);
     const permission = resolveProviderPermissionArgs(profile.name, 'codex');
@@ -202,6 +209,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     });
     await previous;
     try {
+      assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
       const session = await this.getHarnessSession(permission.args, options?.model);
       if (!this.harnessBoot) this.harnessBoot = session.boot();
       await this.harnessBoot;
@@ -214,6 +222,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
       if (shouldRefreshContext) {
         await session.refreshContext?.();
       }
+      assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
       const ask = session.askNativeSubagent?.bind(session) || session.ask.bind(session);
       const response = await ask(
         [
@@ -254,7 +263,9 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
     }
   }
 
-  getNativeSubagentAdopter(): NativeSubagentAdopter {
+  getNativeSubagentAdopter(): NativeSubagentAdopter | null {
+    if (credentialExecutionIdentity().tenantSlug) return null;
+    assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
     return this.nativeSubagentAdopter;
   }
 
@@ -271,6 +282,7 @@ export class CodexCliReasoningBackend implements ReasoningBackend {
    * boot memo is cleared so boot() re-runs (review C2).
    */
   async resetSession(): Promise<void> {
+    assertCredentialOwner(this.nativeCredentialOwner);
     const session = this.harnessSession;
     this.harnessSession = undefined;
     this.harnessBoot = undefined;

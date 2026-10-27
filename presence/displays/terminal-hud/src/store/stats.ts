@@ -9,7 +9,7 @@ import {
 import { pathResolver } from '@agent/core/path-resolver';
 import { traceLogDir } from '@agent/core/trace';
 import { validateTraceReplay } from '@agent/core/analysis/trace-schema';
-import { tailJsonl } from './tail.js';
+import { readTailJsonl, type TailRead } from './tail.js';
 import { theme, statusColor } from '../theme.js';
 import type { I18n } from '../i18n.js';
 import type { PanelViewModel } from './types.js';
@@ -36,6 +36,7 @@ export interface StatsData {
   traces: TraceLine[];
   /** Set when tier-guard withheld metrics partitions from this persona: counts are partial. */
   partialNotice?: string;
+  traceRead?: Omit<TailRead<unknown>, 'records'>;
 }
 
 function parseTraceRecord(value: unknown): Record<string, unknown> | null {
@@ -111,18 +112,17 @@ export function loadStats(): StatsData {
   } catch {
     // no resource usage history yet
   }
-  const traces = tailJsonl<Record<string, unknown>>(todaysTraceFile(), 10, parseTraceRecord).map(
-    (trace) => {
-      const rootSpan = isRecord(trace.rootSpan) ? trace.rootSpan : {};
-      const metadata = isRecord(trace.metadata) ? trace.metadata : {};
-      return {
-        name: String(rootSpan.name ?? '-'),
-        status: String(rootSpan.status ?? '-'),
-        startedAt: String(metadata.startedAt ?? ''),
-        context: String(metadata.pipelineId ?? metadata.actuator ?? ''),
-      };
-    }
-  );
+  const traceRead = readTailJsonl<Record<string, unknown>>(todaysTraceFile(), 10, parseTraceRecord);
+  const traces = traceRead.records.map((trace) => {
+    const rootSpan = isRecord(trace.rootSpan) ? trace.rootSpan : {};
+    const metadata = isRecord(trace.metadata) ? trace.metadata : {};
+    return {
+      name: String(rootSpan.name ?? '-'),
+      status: String(rootSpan.status ?? '-'),
+      startedAt: String(metadata.startedAt ?? ''),
+      context: String(metadata.pipelineId ?? metadata.actuator ?? ''),
+    };
+  });
   const partialNotice = metricsWithheldNotice(
     'terminal HUD stats',
     executionWithheld + usageWithheld
@@ -132,6 +132,12 @@ export function loadStats(): StatsData {
     regressions,
     usageByKind,
     traces,
+    traceRead: {
+      status: traceRead.status,
+      truncated: traceRead.truncated,
+      omittedLines: traceRead.omittedLines,
+      skippedLines: traceRead.skippedLines,
+    },
     ...(partialNotice ? { partialNotice } : {}),
   };
 }
@@ -147,6 +153,22 @@ export function statsWatchPaths(): string[] {
 
 export function statsViewModel(data: StatsData, i18n: I18n): PanelViewModel {
   const sections = [];
+  const read = data.traceRead;
+  if (read && (read.status !== 'ok' || read.truncated || read.omittedLines || read.skippedLines)) {
+    sections.push({
+      title: i18n.tr('tui:tui_read_status'),
+      lines: [
+        ...(read.status === 'unavailable' ? [i18n.tr('tui:tui_read_unavailable')] : []),
+        ...(read.status === 'missing' ? [i18n.tr('tui:tui_read_missing')] : []),
+        ...(read.truncated || read.omittedLines
+          ? [i18n.tr('tui:tui_read_bounded', { omitted: read.omittedLines })]
+          : []),
+        ...(read.skippedLines
+          ? [i18n.tr('tui:tui_read_skipped', { count: read.skippedLines })]
+          : []),
+      ],
+    });
+  }
   if (data.traces.length > 0) {
     sections.push({
       title: i18n.tr('tui:tui_stats_traces'),

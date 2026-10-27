@@ -37,6 +37,7 @@
  */
 
 import * as path from 'node:path';
+import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { resolveScopedLearningRetrieval } from '../knowledge/scoped-learning-retrieval.js';
 import * as pathResolver from '../path-resolver.js';
 import {
@@ -267,11 +268,32 @@ function toHit(
  * repo-relative path (codepoint order); de-duplicated by path. Fail-open:
  * any error yields `[]`.
  */
+export type TenantKnowledgeOutcome = {
+  status: 'hits' | 'empty' | 'unavailable' | 'rejected';
+  reason: 'matched' | 'no_match' | 'invalid_request' | 'scope_unavailable' | 'retrieval_failed';
+  hits: TenantKnowledgeHit[];
+  partial: boolean;
+};
+
+/** Compatibility facade; outcome-aware callers should use the explicit result. */
 export async function queryTenantKnowledge(
   input: QueryTenantKnowledgeInput
 ): Promise<TenantKnowledgeHit[]> {
+  return (await queryTenantKnowledgeOutcome(input)).hits;
+}
+
+export async function queryTenantKnowledgeOutcome(
+  input: QueryTenantKnowledgeInput
+): Promise<TenantKnowledgeOutcome> {
+  const caller = currentExecutionScope();
+  if (
+    (caller?.tenantBound && caller.tenantSlug !== input.tenantSlug) ||
+    (input.scope?.tenant_slug && input.scope.tenant_slug !== input.tenantSlug)
+  )
+    return { status: 'rejected', reason: 'scope_unavailable', hits: [], partial: false };
   const limit = Math.max(0, Math.floor(input.limit));
-  if (limit === 0 || !input.topic.trim() || !input.tenantSlug.trim()) return [];
+  if (!Number.isFinite(limit) || limit === 0 || !input.topic.trim() || !input.tenantSlug.trim())
+    return { status: 'rejected', reason: 'invalid_request', hits: [], partial: false };
 
   try {
     const scopeSet = buildTenantKnowledgeScopeSet(input.tenantSlug, {
@@ -279,13 +301,15 @@ export async function queryTenantKnowledge(
       ...(input.env ? { env: input.env } : {}),
       ...(input.scope ? { scope: input.scope } : {}),
     });
-    if (!scopeSet) return [];
+    if (!scopeSet)
+      return { status: 'rejected', reason: 'scope_unavailable', hits: [], partial: false };
 
     const knowledgeBase = input.rootDir
       ? path.join(input.rootDir, 'knowledge')
       : pathResolver.knowledge();
 
     const byPath = new Map<string, TenantKnowledgeHit>();
+    let failedScopes = 0;
     for (const scope of scopeSet.scopes) {
       // A scope the reader may not see (e.g. a tenant-bound surface without
       // the customer overlay grant) contributes nothing; it never fails the
@@ -294,6 +318,7 @@ export async function queryTenantKnowledge(
       try {
         index = await buildScopedIndex(scope, knowledgeBase, { hydrateEmbeddings: false });
       } catch (error) {
+        failedScopes++;
         const message = `[DA-07] tenant knowledge scope ${scope.tiers.join('+')}:${
           scope.customerId ?? '-'
         } skipped for '${input.tenantSlug}' (fail-open): ${(error as Error)?.message || String(error)}`;
@@ -323,7 +348,11 @@ export async function queryTenantKnowledge(
     const hits = Array.from(byPath.values())
       .sort((a, b) => b.score - a.score || (a.path < b.path ? -1 : a.path > b.path ? 1 : 0))
       .slice(0, limit);
-    if (input.scope?.mission_id && (hits.length === 0 || (hits[0]?.score ?? 0) < 0.2)) {
+    if (
+      failedScopes === 0 &&
+      input.scope?.mission_id &&
+      (hits.length === 0 || (hits[0]?.score ?? 0) < 0.2)
+    ) {
       try {
         recordKnowledgeGap({
           topic: input.topic,
@@ -339,7 +368,12 @@ export async function queryTenantKnowledge(
         );
       }
     }
-    return hits;
+    return {
+      status: hits.length ? 'hits' : failedScopes ? 'unavailable' : 'empty',
+      reason: hits.length ? 'matched' : failedScopes ? 'retrieval_failed' : 'no_match',
+      hits,
+      partial: failedScopes > 0,
+    };
   } catch (error) {
     warnOncePerTenant(
       input.tenantSlug,
@@ -347,6 +381,6 @@ export async function queryTenantKnowledge(
         (error as Error)?.message || String(error)
       }`
     );
-    return [];
+    return { status: 'unavailable', reason: 'retrieval_failed', hits: [], partial: false };
   }
 }

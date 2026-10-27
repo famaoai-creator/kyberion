@@ -1,3 +1,7 @@
+import {
+  reasoningRoleInheritsDefault,
+  loadReasoningRouteUserConfig,
+} from '../reasoning/reasoning-route-resolver.js';
 /**
  * HA-01 asynchronous background-review fork.
  *
@@ -175,7 +179,8 @@ export interface BackgroundReviewForkInput {
    * "provider unknown" and skips the gate (see
    * `buildBackgroundReviewKnowledgeContext`).
    */
-  backend?: Pick<ReasoningBackend, 'delegateTask'> & { name?: string };
+  backend?: Pick<ReasoningBackend, 'delegateTask'> &
+    Partial<Pick<ReasoningBackend, 'name' | 'getRuntimeProviderName'>>;
   callOptions?: ReasoningCallOptions;
 }
 
@@ -455,6 +460,17 @@ export async function runBackgroundReviewFork(
 ): Promise<BackgroundReviewForkResult> {
   const sourceRef = canonicalSourceRef(input);
   const backend = input.backend || getReasoningBackend();
+  const callOptions: ReasoningCallOptions = {
+    ...(input.callOptions || {
+      effort: 'low',
+      ...(reasoningRoleInheritsDefault({ role: 'background_review' }) &&
+      loadReasoningRouteUserConfig().roles?.default?.selection?.mode !== 'fixed'
+        ? { model_tier: 'fast' as const }
+        : {}),
+      budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
+    }),
+    role: input.callOptions?.role || 'background_review',
+  };
   try {
     const raw = await withReasoningPayloadScope(
       {
@@ -464,18 +480,18 @@ export async function runBackgroundReviewFork(
       },
       async () => {
         const prompt = buildForkPrompt(input);
-        const context = await buildBackgroundReviewKnowledgeContext(input, backend.name || '');
-        if (!input.workItemId)
-          return backend.delegateTask(
-            prompt,
-            context,
-            input.callOptions || {
-              effort: 'low',
-              model_tier: 'fast',
-              budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
-            }
-          );
-        const coordinatedBackend = { ...getReasoningBackend(), ...backend } as ReasoningBackend;
+        const context = await buildBackgroundReviewKnowledgeContext(
+          input,
+          backend.getRuntimeProviderName?.(callOptions) || backend.name || ''
+        );
+        if (!input.workItemId) return backend.delegateTask(prompt, context, callOptions);
+        const coordinatedBackend = {
+          ...getReasoningBackend(),
+          ...backend,
+          getNativeSubagentAdopter: () => null,
+          delegateTask: (instruction: string, context?: string, options?: ReasoningCallOptions) =>
+            backend.delegateTask(instruction, context, { ...callOptions, ...options }),
+        } as ReasoningBackend;
         const workItem = getWorkItem(input.workItemId);
         const scope = workItem?.context;
         const tenantId = scope?.tenant_slug?.trim();

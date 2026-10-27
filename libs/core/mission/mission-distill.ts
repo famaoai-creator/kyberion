@@ -34,6 +34,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
 import { readJsonIfPresent, writeJson } from '../foundation/json.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 
 export const DISTILL_MEMORY_OUTBOX_FILE = 'memory-promotion-outbox.json';
 
@@ -301,7 +302,14 @@ export function buildFallbackWisdom(missionId: string, state: MissionState): any
   };
 }
 
-export function formatWisdomMarkdown(wisdom: any, missionId: string): string {
+export function formatWisdomMarkdown(
+  wisdom: any,
+  missionId: string,
+  provenance?: Pick<
+    NonNullable<MissionState['distillation']>,
+    'mode' | 'llm_used' | 'structural_reason'
+  >
+): string {
   const distillPolicy = resolveMissionDistillMarkdownPolicy();
   const now = nowIso().slice(0, 10);
   const tags = (wisdom.tags || []).map((t: string) => `"${t}"`).join(', ');
@@ -316,11 +324,27 @@ export function formatWisdomMarkdown(wisdom: any, missionId: string): string {
     `source_mission: ${missionId}`,
     `author: Kyberion Wisdom Distiller`,
     `last_updated: ${now}`,
+    ...(provenance?.mode
+      ? [
+          `distillation_mode: ${provenance.mode}`,
+          `llm_used: ${provenance.llm_used === true}`,
+          ...(provenance.structural_reason
+            ? [`structural_reason: ${provenance.structural_reason}`]
+            : []),
+        ]
+      : []),
     '---',
     '',
     `# ${wisdom.title || `Distillation: ${missionId}`}`,
     '',
   ];
+
+  if (provenance?.mode === 'structural') {
+    lines.push(
+      '> Structural extraction only; no LLM distillation was performed. This is not independent review or approval.',
+      ''
+    );
+  }
 
   if (sections.summary) {
     lines.push(`## ${distillPolicy.section_titles.summary}`, sections.summary, '');
@@ -401,6 +425,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   );
   if (state.status === 'completed' || state.status === 'archived') {
     deliverDistillMemoryOutbox(outboxPath, state);
+    logDistillationOutcome(upperId, state.distillation, true);
     return;
   }
 
@@ -441,6 +466,8 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
 
   let wisdom: any = null;
   let llmUsed = false;
+  let structuralReason: 'stub_requested' | 'llm_unavailable' | undefined;
+  const stubRequested = getRegisteredEnvText('KYBERION_WISDOM_LLM_PROFILE')?.trim() === 'stub';
   try {
     const llmPolicy: LlmPolicyConfig | undefined = wisdomPolicy?.llm;
     wisdom = await runAdaptiveStructuredLlmProfile('distill', fullPrompt, WISDOM_SCHEMA, {
@@ -456,8 +483,11 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
         "You are Kyberion's Wisdom Distiller. Return exactly one JSON object matching the schema.",
     });
     llmUsed = true;
-  } catch (err: any) {
-    logger.warn(`⚠️ LLM distillation failed: ${err.message}`);
+  } catch {
+    structuralReason = stubRequested ? 'stub_requested' : 'llm_unavailable';
+    logger.warn(
+      `LLM distillation unavailable — ${structuralReason} | next: inspect wisdom profile configuration or review structural evidence | evidence: mission ${upperId}`
+    );
     logger.info('Falling back to structural distillation (no LLM)...');
     wisdom = buildFallbackWisdom(upperId, state);
   }
@@ -472,7 +502,12 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
 
   if (!safeExistsSync(wisdomDirPath)) safeMkdir(wisdomDirPath, { recursive: true });
 
-  const wisdomMd = formatWisdomMarkdown(wisdom, upperId);
+  const provenance = {
+    mode: llmUsed ? ('llm' as const) : ('structural' as const),
+    llm_used: llmUsed,
+    ...(structuralReason ? { structural_reason: structuralReason } : {}),
+  };
+  const wisdomMd = formatWisdomMarkdown(wisdom, upperId, provenance);
   safeWriteFile(wisdomFilePath, wisdomMd);
   logger.info(`📝 Wisdom written to ${path.relative(rootDir, wisdomFilePath)}`);
 
@@ -482,8 +517,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   state.distillation = {
     status: 'completed',
     completed_at: completedAt,
-    mode: llmUsed ? 'llm' : 'structural',
-    llm_used: llmUsed,
+    ...provenance,
     output_path: wisdomFilePath,
   };
   state.context = {
@@ -494,7 +528,7 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
   state.history.push({
     ts: nowIso(),
     event: 'DISTILL',
-    note: `Knowledge distillation completed. Output: ${wisdomFileName}`,
+    note: `Knowledge extraction completed (${provenance.mode}${structuralReason ? `: ${structuralReason}; no LLM distillation` : ''}). Output: ${wisdomFileName}`,
   });
 
   // Auto-enqueue the distilled wisdom into the memory-promotion queue so the
@@ -562,7 +596,30 @@ export async function distillMission(id: string, rootDir: string): Promise<void>
     output_dir: path.relative(rootDir, wisdomDirPath),
     llm_used: llmUsed,
     distillation_mode: llmUsed ? 'llm' : 'structural',
+    ...(structuralReason ? { structural_reason: structuralReason } : {}),
   });
 
-  logger.success(`✅ Wisdom distilled for ${upperId}. Mission ready for finishing.`);
+  logDistillationOutcome(upperId, state.distillation);
+}
+
+/** Lifecycle completion is distinct from the kind of knowledge extraction and review. */
+function logDistillationOutcome(
+  missionId: string,
+  provenance: MissionState['distillation'],
+  replay = false
+): void {
+  const action = replay ? 'Stored extraction' : 'Knowledge extraction completed';
+  if (provenance?.mode === 'structural' && provenance.llm_used === false) {
+    logger.warn(
+      `${action} for ${missionId}: structural only (${provenance.structural_reason || 'reason unknown'}); no LLM distillation or independent review performed by this step. Inspect the evidence before promotion.`
+    );
+  } else if (provenance?.mode === 'llm' && provenance.llm_used === true) {
+    logger.success(
+      `✅ ${action} for ${missionId}: LLM distillation. Independent review and finish gates remain separate.`
+    );
+  } else {
+    logger.warn(
+      `${action} for ${missionId}: provenance unknown (legacy or incomplete record). Do not infer LLM distillation or independent review.`
+    );
+  }
 }

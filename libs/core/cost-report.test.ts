@@ -25,6 +25,75 @@ describe('effectiveCostUsd (source priority, Task 2.2)', () => {
 });
 
 describe('buildCostReport', () => {
+  it('counts zero provider reports, included runs, and unknown prices without calling them free', () => {
+    const report = buildCostReport([
+      entry({ sdk_cost_usd: 0, cost_usd: 99 }),
+      entry({ reported_cost_usd: 2, cost_usd: 99 }),
+      entry({
+        billing_mode: 'subscription_included',
+        reference_cost_usd: 4,
+        cost_status: 'included',
+      }),
+      entry({ cost_status: 'unknown', billing_mode: 'unknown', reference_cost_usd: 3 }),
+      entry({ cost_status: 'unknown', usage: { prompt_tokens: 10 } }),
+    ]);
+    expect(report).toMatchObject({
+      total_usd: 2,
+      calls: 5,
+      actual_cost_calls: 2,
+      included_calls: 1,
+      unknown_cost_calls: 2,
+      cost_complete: false,
+      reference_usd: 7,
+      reference_cost_calls: 2,
+    });
+    expect(report.by_model[0]).toMatchObject({
+      calls: 5,
+      included_calls: 1,
+      unknown_cost_calls: 2,
+      cost_complete: false,
+      reference_cost_calls: 2,
+    });
+  });
+
+  it('keeps unavailable reference estimates distinct from a known zero reference', () => {
+    const unavailable = buildCostReport([
+      entry({ cost_status: 'included', billing_mode: 'subscription_included' }),
+    ]);
+    const zero = buildCostReport([
+      entry({
+        cost_status: 'included',
+        billing_mode: 'subscription_included',
+        reference_cost_usd: 0,
+      }),
+    ]);
+    expect(unavailable).toMatchObject({
+      total_usd: 0,
+      included_calls: 1,
+      reference_usd: 0,
+      reference_cost_calls: 0,
+      cost_complete: true,
+    });
+    expect(zero.reference_cost_calls).toBe(1);
+  });
+
+  it('labels each unknown or included bucket without presenting it as a free priced call', () => {
+    const lines = formatCostReport(
+      buildCostReport([
+        entry({ mission_id: 'MSN-UNKNOWN', model: 'unpriced', cost_status: 'unknown' }),
+        entry({
+          mission_id: 'MSN-INCLUDED',
+          model: 'subscription',
+          cost_status: 'included',
+          billing_mode: 'subscription_included',
+        }),
+      ])
+    ).join('\n');
+    expect(lines).toContain('MSN-UNKNOWN: known subtotal $0.0000; 1 unknown');
+    expect(lines).toContain('unpriced: known subtotal $0.0000; 1 unknown');
+    expect(lines).toContain('MSN-INCLUDED: included');
+    expect(lines).not.toContain('MSN-INCLUDED: $0.0000');
+  });
   const entries: CostLedgerEntry[] = [
     entry({
       mission_id: 'MSN-A',

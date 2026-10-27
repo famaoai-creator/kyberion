@@ -2,6 +2,10 @@ import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { assertSafeRepositoryPath, safeLstat } from './secure-io.js';
 import { pathResolver } from './path-resolver.js';
+import {
+  parseVerificationSourceSnapshot,
+  type VerificationSourceSnapshot,
+} from './verification-source-snapshot.js';
 
 export type QualityCheckStatus = 'pending' | 'passed' | 'failed' | 'waived';
 
@@ -95,6 +99,7 @@ export interface TestExecutionResult {
 }
 
 export interface TestExecutionRecord {
+  source_snapshot?: VerificationSourceSnapshot;
   version?: string;
   run_id: string;
   project_id?: string;
@@ -637,6 +642,7 @@ export function parseTestExecutionRecord(value: unknown): TestExecutionRecord | 
         'started_at',
         'finished_at',
         'results',
+        'source_snapshot',
       ])
     ) {
       return null;
@@ -651,6 +657,8 @@ export function parseTestExecutionRecord(value: unknown): TestExecutionRecord | 
     const results = Array.isArray(record.results)
       ? record.results.map(parseTestExecutionResult)
       : null;
+    const sourceSnapshot = parseVerificationSourceSnapshot(record.source_snapshot);
+    if (record.source_snapshot !== undefined && !sourceSnapshot) return null;
     if (
       !version ||
       !runId ||
@@ -694,6 +702,7 @@ export function parseTestExecutionRecord(value: unknown): TestExecutionRecord | 
       started_at: startedAt,
       finished_at: finishedAt,
       results: results as TestExecutionResult[],
+      ...(sourceSnapshot ? { source_snapshot: sourceSnapshot } : {}),
     };
   } catch {
     return null;
@@ -712,6 +721,7 @@ export interface DefectCandidate {
 }
 
 export interface SoftwareQualityReportSummary {
+  source_snapshot?: VerificationSourceSnapshot;
   gate_status: {
     dor: 'pass' | 'fail' | 'insufficient_evidence';
     acceptance_criteria: 'pass' | 'fail' | 'insufficient_evidence';
@@ -1000,5 +1010,8 @@ export function buildSoftwareQualityReport(input: {
     evidence_refs: evidenceRefs,
     accountable_human_id: input.contract.accountable_human_id,
     human_decision: 'pending',
+    ...(input.execution.source_snapshot
+      ? { source_snapshot: input.execution.source_snapshot }
+      : {}),
   };
 }

@@ -39,6 +39,7 @@ export const GLOBAL_HELP: HelpRow[] = [
   { keys: 'r', labelKey: 'tui:tui_key_refresh' },
   { keys: 'i', labelKey: 'tui:tui_key_input' },
   { keys: ':', labelKey: 'tui:tui_key_palette' },
+  { keys: 'Ctrl+P', labelKey: 'tui:tui_key_palette' },
   { keys: 'v', labelKey: 'tui:tui_key_voice' },
   { keys: '?', labelKey: 'tui:tui_key_help' },
   { keys: 'q', labelKey: 'tui:tui_key_quit' },

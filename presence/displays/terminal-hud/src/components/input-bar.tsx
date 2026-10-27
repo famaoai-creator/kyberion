@@ -26,27 +26,35 @@ export function InputBar({ focused, value, onChange, onSubmit, busy, voiceState 
         ? theme.warn
         : theme.accent;
   return (
-    <Box borderStyle="round" borderColor={focused ? theme.accent : theme.dim} paddingX={1}>
-      <Text color={markerColor}>{marker} </Text>
-      {busy ? (
-        <Text dimColor>{tr('tui:tui_input_thinking')}</Text>
-      ) : voiceState === 'recording' ? (
-        <Text color={theme.err}>{tr('tui:tui_voice_recording')}</Text>
-      ) : voiceState === 'transcribing' ? (
-        <Text color={theme.warn}>{tr('tui:tui_voice_transcribing')}</Text>
-      ) : (
-        <TextInput
-          // TextInput renders through ink's own <Text>, bypassing the
-          // sanitized wrapper — scrub the value here as well (voice
-          // transcripts and pasted bytes are arbitrary text).
-          value={sanitizeTerminalText(value)}
-          onChange={onChange}
-          onSubmit={onSubmit}
-          focus={focused}
-          placeholder={tr('tui:tui_input_placeholder')}
-        />
-      )}
-      <Text dimColor> · {tr('tui:tui_cockpit_input_hint')}</Text>
+    <Box
+      flexDirection="column"
+      borderStyle="round"
+      borderColor={focused ? theme.accent : theme.dim}
+      paddingX={1}
+    >
+      <Box>
+        <Text color={markerColor}>{marker} </Text>
+        {voiceState === 'recording' ? (
+          <Text color={theme.err}>{tr('tui:tui_voice_recording')}</Text>
+        ) : voiceState === 'transcribing' ? (
+          <Text color={theme.warn}>{tr('tui:tui_voice_transcribing')}</Text>
+        ) : (
+          <TextInput
+            // TextInput renders through ink's own <Text>, bypassing the
+            // sanitized wrapper — scrub the value here as well (voice
+            // transcripts and pasted bytes are arbitrary text).
+            value={sanitizeTerminalText(value)}
+            onChange={onChange}
+            onSubmit={(nextValue) => {
+              if (!busy) onSubmit(nextValue);
+            }}
+            focus={focused}
+            placeholder={tr('tui:tui_input_placeholder')}
+          />
+        )}
+        <Text dimColor> · {tr('tui:tui_cockpit_input_hint')}</Text>
+      </Box>
+      {busy ? <Text dimColor>{tr('tui:tui_input_draft_busy')}</Text> : null}
     </Box>
   );
 }

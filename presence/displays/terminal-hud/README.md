@@ -30,13 +30,15 @@ pnpm tui --dev  # ソース実行 (@agent/core の dist は事前ビルドが必
 | 8    | 設定                           | 推論バックエンド・顧客・ロケール（L でセッション内切替。永続変更は CLI 誘導）                                                                                            |
 | 9    | 連携                           | mission → task → agent → child の木、`waiting_on`（承認待ち/子の完了待ち/クレーム待ち/ブロック/レビュー待ち/停滞）。Enter で直近イベント・handoff の詳細（読み取り専用） |
 
-グローバル: `[` `]` / Tab 巡回, `Enter` 詳細, `j/k` 移動, `r` 再読込, `?` ヘルプ, `q` 終了。
+グローバル: `[` `]` / Tab 巡回, `Enter` 詳細, `j/k` 移動, `r` 再読込, `Ctrl+P` 検索パレット, `?` ヘルプ, `q` 終了。
+
+`Ctrl+P` は入力中にも開けます。パネル名・操作名を日本語または英語で検索し、`↑/↓` と `Enter` で移動します。パレットの `Esc` は元の入力フォーカスに戻り、下書きとパネル内の選択は保持します。検索パレットの操作はパネル移動・再読込・ヘルプ・サービス接続設定への案内に限り、インストールや認証は実行しません。
 
 ## 入力欄
 
-- 起動時は入力欄にフォーカス済みです。自由文は `runSurfaceMessageConversation`（cli surface / channel `terminal-hud`）経由で推論バックエンドへ。`Esc` でパネル操作に戻り、`i` / `/` で再フォーカスできます。
+- 起動時は入力欄にフォーカス済みです。自由文は `runSurfaceMessageConversation`（cli surface / channel `terminal-hud`）経由で推論バックエンドへ。`Esc` で下書きを保持したままパネル操作に戻り、`i` / `/` で再フォーカスできます。応答生成中も次の下書きを編集できますが、送信は応答完了後に行います。未送信の下書きをキュー投入済みとは表示しません。
 - 入力中は全 surface 共通の Intent Resolution Contract のプレビュー（意図、実行形状、成果形状、権限境界、不足情報）を表示します。送信後も同じ gateway 結果を保持し、プレビューは実行経路の承認・ADF・mission gate を置き換えません。
-- `:` でコマンドパレット（whitelist 動詞のみ、任意シェル不可）: `:panel` `:mission` `:task` `:schedule` `:surface`。
+- `:` でコマンド入力（whitelist 動詞のみ、任意シェル不可）: `:panel` `:mission` `:task` `:schedule` `:surface`。`:connections` は設定パネルに移動し、登録済み Concierge のサービス設定 URL を案内します。リンクを表示するだけで、到達性や認証状態の確認は行いません。
 - 入力欄フォーカス中は `Ctrl+V`、パネル操作中は `v` で push-to-talk 音声入力: mic-capture（ffmpeg/arecord）→ STT ブリッジ → 入力欄へ転記（自動送信しない）。STT/mic 不在時は理由を表示して劣化。
 
 ## 設計上の制約

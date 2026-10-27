@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { captureDelegationProgressReporter } from './delegation-progress.js';
 import * as path from 'node:path';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
@@ -74,6 +75,7 @@ import {
   withDelegationSlot,
   getDelegationConcurrencyStats,
   withWallClockBudget,
+  DelegationInactivityExceededError,
   DelegationWallClockExceededError,
   terminateAllActiveDelegationChildren,
   wireDelegationKillSwitchIntegration,
@@ -117,6 +119,158 @@ describe('delegation-concurrency', () => {
     vi.useRealTimers();
     resetDelegationConcurrencyStateForTests();
     fs.rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  it('does not launch an already cancelled delegation', async () => {
+    const controller = new AbortController();
+    controller.abort();
+    const run = vi.fn();
+    await expect(withWallClockBudget({ signal: controller.signal }, run)).rejects.toThrow(
+      'CANCELLED'
+    );
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('the existing kill cascade cancels handle-less continuous native waits', async () => {
+    const done = makeDeferred<string>();
+    let aborted = false;
+    const pending = withWallClockBudget(
+      { executionMode: 'continuous', inactivity: { timeoutMs: 5000 } },
+      (signal) => {
+        signal.addEventListener('abort', () => {
+          aborted = true;
+        });
+        return done.promise;
+      }
+    );
+    const assertion = expect(pending).rejects.toThrow('kill switch');
+    terminateAllActiveDelegationChildren('test stop');
+    await assertion;
+    expect(aborted).toBe(true);
+    done.resolve('late');
+  });
+
+  it('continuous execution renews inactivity supervision without a total runtime cap', async () => {
+    vi.useFakeTimers();
+    const done = makeDeferred<string>();
+    let report = () => {};
+    const pending = withWallClockBudget(
+      { executionMode: 'continuous', budgetMs: 25, inactivity: { timeoutMs: 40 } },
+      () => {
+        const emit = captureDelegationProgressReporter();
+        report = () => emit('tool_completed');
+        return done.promise;
+      }
+    );
+    for (let i = 0; i < 5; i++) {
+      await vi.advanceTimersByTimeAsync(30);
+      report();
+    }
+    done.resolve('completed after 150ms');
+    await expect(pending).resolves.toBe('completed after 150ms');
+    expect(getRecordedDelegationTimeouts()).toHaveLength(0);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('semantic progress resets idle detection without extending the hard deadline', async () => {
+    vi.useFakeTimers();
+    let report = () => {};
+    const pending = withWallClockBudget(
+      { budgetMs: 100, inactivity: { timeoutMs: 40, lateResultGraceMs: 10 } },
+      async () => {
+        const emit = captureDelegationProgressReporter();
+        report = () => emit('tool_completed');
+        return new Promise<string>(() => {});
+      }
+    );
+    const assertion = expect(pending).rejects.toBeInstanceOf(DelegationWallClockExceededError);
+    await vi.advanceTimersByTimeAsync(30);
+    report();
+    await vi.advanceTimersByTimeAsync(30);
+    report();
+    await vi.advanceTimersByTimeAsync(30);
+    report();
+    await vi.advanceTimersByTimeAsync(10);
+    await assertion;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('accepts a real result in idle grace but fences late terminal results and kills a stuck child', async () => {
+    vi.useFakeTimers();
+    const fast = makeDeferred<string>();
+    const recovering = withWallClockBudget(
+      { budgetMs: 100, inactivity: { timeoutMs: 20, lateResultGraceMs: 10 } },
+      () => fast.promise
+    );
+    await vi.advanceTimersByTimeAsync(21);
+    fast.resolve('real completed result');
+    await expect(recovering).resolves.toBe('real completed result');
+    expect(vi.getTimerCount()).toBe(0);
+
+    const late = makeDeferred<string>();
+    const kill = vi.fn();
+    let mayAccept = () => true;
+    const stuck = withWallClockBudget(
+      {
+        budgetMs: 100,
+        killGraceMs: 5,
+        child: { kill },
+        inactivity: { timeoutMs: 20, lateResultGraceMs: 10 },
+      },
+      (_signal, accept) => {
+        mayAccept = accept;
+        return late.promise;
+      }
+    );
+    const assertion = expect(stuck).rejects.toBeInstanceOf(DelegationInactivityExceededError);
+    await vi.advanceTimersByTimeAsync(30);
+    await assertion;
+    expect(kill).toHaveBeenCalledWith('SIGTERM');
+    expect(mayAccept()).toBe(false);
+    late.resolve('too late');
+    await vi.advanceTimersByTimeAsync(5);
+    expect(kill).toHaveBeenCalledWith('SIGKILL');
+    expect(peekPersistedDelegationChildrenRegistry()).toHaveLength(0);
+  });
+
+  it('explicit cancellation remains terminal during idle grace', async () => {
+    vi.useFakeTimers();
+    const controller = new AbortController();
+    const late = makeDeferred<string>();
+    const pending = withWallClockBudget(
+      {
+        signal: controller.signal,
+        budgetMs: 100,
+        inactivity: { timeoutMs: 20, lateResultGraceMs: 10 },
+      },
+      () => late.promise
+    );
+    const assertion = expect(pending).rejects.toThrow('CANCELLED');
+    await vi.advanceTimersByTimeAsync(21);
+    controller.abort();
+    late.resolve('cancelled result');
+    await assertion;
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('keeps an idle child tracked through escalation when cooperative cancellation rejects', async () => {
+    vi.useFakeTimers();
+    const kill = vi.fn();
+    const pending = withWallClockBudget(
+      { budgetMs: 100, killGraceMs: 5, child: { kill }, inactivity: { timeoutMs: 20 } },
+      (signal) =>
+        new Promise<string>((_resolve, reject) =>
+          signal.addEventListener('abort', () => reject(new Error('provider stopped')))
+        )
+    );
+    const assertion = expect(pending).rejects.toBeInstanceOf(DelegationInactivityExceededError);
+    await vi.advanceTimersByTimeAsync(20);
+    await assertion;
+    expect(kill).toHaveBeenCalledWith('SIGTERM');
+    expect(peekPersistedDelegationChildrenRegistry()).toHaveLength(1);
+    await vi.advanceTimersByTimeAsync(5);
+    expect(kill).toHaveBeenCalledWith('SIGKILL');
+    expect(peekPersistedDelegationChildrenRegistry()).toHaveLength(0);
   });
 
   describe('withDelegationSlot', () => {
@@ -301,8 +455,12 @@ describe('delegation-concurrency', () => {
       const childB: DelegationChildHandle = { pid: 2, kill: vi.fn() };
       const never = new Promise<void>(() => {});
 
-      void withWallClockBudget({ provider: 'claude', budgetMs: 60000, child: childA }, () => never);
-      void withWallClockBudget({ provider: 'codex', budgetMs: 60000, child: childB }, () => never);
+      const first = expect(
+        withWallClockBudget({ provider: 'claude', budgetMs: 60000, child: childA }, () => never)
+      ).rejects.toThrow('kill switch');
+      const second = expect(
+        withWallClockBudget({ provider: 'codex', budgetMs: 60000, child: childB }, () => never)
+      ).rejects.toThrow('kill switch');
 
       const { terminatedIds } = terminateAllActiveDelegationChildren('test-reason');
       expect(terminatedIds).toHaveLength(2);
@@ -313,6 +471,7 @@ describe('delegation-concurrency', () => {
       await vi.advanceTimersByTimeAsync(200);
       expect(childA.kill).toHaveBeenCalledWith('SIGKILL');
       expect(childB.kill).toHaveBeenCalledWith('SIGKILL');
+      await Promise.all([first, second]);
     });
 
     it('wireDelegationKillSwitchIntegration registers a listener that cascades kill-switch firings to active children', async () => {
@@ -322,12 +481,15 @@ describe('delegation-concurrency', () => {
       await wireDelegationKillSwitchIntegration();
       expect(onKillSwitchTermination).toHaveBeenCalledTimes(1);
 
-      void withWallClockBudget({ provider: 'claude', budgetMs: 60000, child }, () => never);
+      const cancelled = expect(
+        withWallClockBudget({ provider: 'claude', budgetMs: 60000, child }, () => never)
+      ).rejects.toThrow('kill switch');
 
       expect(killSwitchListeners).toHaveLength(1);
       killSwitchListeners[0]('some-agent-id', 'anomaly detected');
 
       expect(child.kill).toHaveBeenCalledWith('SIGTERM');
+      await cancelled;
     });
 
     it('is idempotent — repeated calls only wire once', async () => {

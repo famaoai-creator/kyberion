@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { pathResolver } from '../path-resolver.js';
@@ -11,6 +11,11 @@ import {
   runGeminiCliQuery,
 } from './gemini-cli-backend.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from '../shell/sandbox-policy.js';
+import { metrics } from '../metrics.js';
+
+beforeEach(() => {
+  vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+});
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
 
@@ -43,6 +48,63 @@ function createChild(stdoutText: string, exitCode = 0): FakeChild {
 }
 
 describe('gemini-cli-backend sandbox projection', () => {
+  it('records native stats for both backend and standalone structured calls', async () => {
+    const output = JSON.stringify({
+      response: '{"ok":true}',
+      stats: {
+        models: {
+          'gemini-actual': {
+            tokens: { prompt: 100, input: 60, cached: 40, candidates: 5, thoughts: 15 },
+          },
+        },
+      },
+    });
+    spawnMock.mockReturnValueOnce(createChild(output));
+    expect(await new GeminiCliBackend({ model: 'requested-model' }).prompt('question')).toBe(
+      '{"ok":true}'
+    );
+    spawnMock.mockReturnValueOnce(createChild(output));
+    expect(
+      await runGeminiCliQuery({
+        systemPrompt: 'sys',
+        userPrompt: 'usr',
+        schema: z.object({ ok: z.boolean() }),
+      })
+    ).toEqual({ ok: true });
+    expect(metrics.record).toHaveBeenCalledTimes(2);
+    for (const call of vi.mocked(metrics.record).mock.calls)
+      expect(call[3]).toMatchObject({
+        model: 'gemini-actual',
+        usage_source: 'provider',
+        billing_mode: 'unknown',
+        usage: { prompt_tokens: 60, cache_read_tokens: 40, completion_tokens: 20 },
+      });
+  });
+
+  it('keeps observed usage on CLI failure but never guesses a charge for a failed usage-less run', async () => {
+    spawnMock.mockReturnValueOnce(
+      createChild(
+        JSON.stringify({
+          error: { message: 'failed after response' },
+          stats: { models: { gemini: { tokens: { prompt: 10, cached: 4, candidates: 2 } } } },
+        }),
+        1
+      )
+    );
+    await expect(new GeminiCliBackend().prompt('question')).rejects.toThrow('CLI exited');
+    expect(vi.mocked(metrics.record).mock.calls[0][3]).toMatchObject({
+      usage_source: 'provider',
+      usage: { prompt_tokens: 6, cache_read_tokens: 4, completion_tokens: 2 },
+    });
+    spawnMock.mockReturnValueOnce(createChild('', 1));
+    await expect(new GeminiCliBackend().prompt('question')).rejects.toThrow('CLI exited');
+    expect(vi.mocked(metrics.record).mock.calls[1][3]).toMatchObject({
+      cost_status: 'unknown',
+      usage_source: 'unknown',
+    });
+    expect(vi.mocked(metrics.record).mock.calls[1][3]).not.toHaveProperty('usage');
+  });
+
   it('projects advisory planner calls to plan mode and strips caller YOLO overrides', async () => {
     spawnMock.mockReturnValue(createChild('{"response":"plan"}'));
     const backend = new GeminiCliBackend({ extraArgs: ['-y', '--approval-mode=yolo'] });

@@ -207,6 +207,7 @@ describe('mission_controller argument parsing', () => {
     // can never silently fall back to the stub.
     expect(shouldSkipReasoningBootstrap('record-task')).toBe(true);
     expect(shouldSkipReasoningBootstrap('record-evidence')).toBe(true);
+    expect(shouldSkipReasoningBootstrap('review-task')).toBe(true);
     expect(shouldSkipReasoningBootstrap('help')).toBe(true);
     expect(shouldSkipReasoningBootstrap('list')).toBe(true);
     // kickoff shares the start path and must bootstrap reasoning like start —

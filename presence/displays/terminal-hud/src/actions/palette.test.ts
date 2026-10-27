@@ -1,6 +1,12 @@
-import { afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { setHudExecForTesting, resetHudExec, distScript } from './exec.js';
 import { runPaletteCommand, PALETTE_USAGE } from './palette.js';
+
+const incidentAck = vi.hoisted(() => vi.fn());
+vi.mock('@agent/core/scheduler-incidents', async (original) => ({
+  ...(await original<typeof import('@agent/core/scheduler-incidents')>()),
+  acknowledgeSchedulerIncident: incidentAck,
+}));
 
 beforeAll(() => {
   process.env.KYBERION_TUI_DISABLE_AUDIT = '1';
@@ -15,6 +21,27 @@ describe('runPaletteCommand', () => {
     const outcome = await runPaletteCommand(':panel tasks');
     expect(outcome.switchPanel).toBe('tasks');
     expect(outcome.result.ok).toBe(true);
+  });
+
+  it('hands connection management off to settings without running authentication', async () => {
+    const exec = vi.fn();
+    setHudExecForTesting(exec);
+    expect((await runPaletteCommand(':connections')).switchPanel).toBe('settings');
+    expect((await runPaletteCommand(':connections install')).result.ok).toBe(false);
+    expect(exec).not.toHaveBeenCalled();
+  });
+
+  it('requires an observed episode and passes it to the governed acknowledgement facade', async () => {
+    incidentAck.mockReset().mockReturnValue(true);
+    const old = await runPaletteCommand(':incident ack job signature');
+    expect(old.result.ok).toBe(false);
+    expect(old.result.message).toContain('SCHEDULER_INCIDENT_EPISODE_REQUIRED');
+    expect(incidentAck).not.toHaveBeenCalled();
+    const episode = 'a'.repeat(32);
+    const current = await runPaletteCommand(`:incident ack job signature ${episode}`);
+    expect(incidentAck).toHaveBeenCalledWith('job', 'signature', episode);
+    expect(current.result.ok).toBe(true);
+    expect(current.switchPanel).toBe('schedules');
   });
 
   it('routes :mission verbs through the mission controller argv', async () => {

@@ -9,7 +9,12 @@ import { ClaudeCliVoiceBridge } from '../claude-cli-voice-bridge.js';
 registerCliProviderBundle('claude-cli', (options) => {
   const env = cliProviderEnv(options);
   const { mode, provider } = options;
-  const backend = buildShellClaudeCliBackendFromEnv(env, undefined, options.model);
+  const backend = buildShellClaudeCliBackendFromEnv(
+    env,
+    undefined,
+    options.model,
+    options.timeoutMs
+  );
   if (!backend) return null;
   const cliOptions = {
     ...buildClaudeCliOptionsFromEnv(env),

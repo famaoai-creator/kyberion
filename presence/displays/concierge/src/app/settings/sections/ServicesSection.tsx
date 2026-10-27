@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import { OAuthOperationCard, type OAuthOperationHandle } from './OAuthOperationCard';
 import { SettingsSaveFeedback, type SettingsSaveFeedbackState } from './SettingsSaveFeedback';
 import { Badge, Button, SettingsGroup, Switch } from '@agent/shared-ui';
 import { frontDeskText } from '../../../lib/i18n';
@@ -26,6 +27,8 @@ export type ServicesSectionProps = {
   busy: boolean;
   saveFeedback?: SettingsSaveFeedbackState | null;
   hasUnsavedChanges?: boolean;
+  oauthOperation?: OAuthOperationHandle | null;
+  onDismissOAuthOperation?: () => void;
   oauthBusyId: string | null;
   oauthMessage: string | null;
   oauthError?: boolean;
@@ -45,6 +48,8 @@ export function ServicesSection({
   busy,
   saveFeedback,
   hasUnsavedChanges,
+  oauthOperation,
+  onDismissOAuthOperation,
   oauthBusyId,
   oauthMessage,
   oauthError = false,
@@ -89,6 +94,7 @@ export function ServicesSection({
                 <div className="settings-integration" key={service.id} data-service={service.id}>
                   <div className="kb-setting-row__text">
                     <p className="kb-text kb-text--body">{service.label}</p>
+                    <p className="kb-text kb-text--muted">{service.auth}</p>
                     <Badge
                       label={t(
                         service.configured
@@ -116,6 +122,14 @@ export function ServicesSection({
               );
             })}
           </div>
+          {oauthOperation ? (
+            <OAuthOperationCard
+              key={oauthOperation.operationId}
+              operation={oauthOperation}
+              t={t}
+              onDismiss={() => onDismissOAuthOperation?.()}
+            />
+          ) : null}
           {oauthBusyId ? <p role="status">{t('authority.connecting')}</p> : null}
           {oauthMessage ? <p role={oauthError ? 'alert' : 'status'}>{oauthMessage}</p> : null}
           <p>{t('authority.browser_connection')}</p>
@@ -137,7 +151,14 @@ export function ServicesSection({
         </SettingsGroup>
       </FormScope>
       <ReasoningSection t={t} />
-      <ServiceCatalogPane t={t} />
+      <ServiceCatalogPane
+        t={t}
+        busy={busy}
+        onConnectOAuth={onConnectOAuth}
+        oauthBusyId={oauthBusyId}
+        oauthMessage={oauthMessage}
+        oauthError={oauthError}
+      />
       <OperatorServiceRegistrationPanel t={t} />
       <OnboardingAuthorityPanel
         locale={locale}
@@ -163,20 +184,30 @@ function ConnectionsByOwner({ t, setup }: { t: SettingsTranslate; setup: Setup }
     setup.service_catalog.find((service) => service.id === serviceId)?.label ?? serviceId;
   const rows = (items: ConnectionViewItem[]) =>
     items.map((item) => (
-      <p key={item.binding_id} className="kb-text kb-text--body">
-        {label(item.service_id)}{' '}
-        <Badge
-          label={
-            item.group === 'organization'
-              ? t('setup.connection_owner_organization', { tenant: item.owner_ref ?? '' })
-              : t('setup.connection_owner_person')
-          }
-          tone={item.group === 'organization' ? 'info' : 'neutral'}
-        />{' '}
-        {item.readiness === 'needs_credential' ? (
-          <Badge label={t('setup.connection_needs_credential')} tone="warning" />
-        ) : null}
-      </p>
+      <div key={item.binding_id} className="settings-integration">
+        <p className="kb-text kb-text--body">
+          {label(item.service_id)}{' '}
+          <Badge
+            label={
+              item.group === 'organization'
+                ? t('setup.connection_owner_organization', { tenant: item.owner_ref ?? '' })
+                : t('setup.connection_owner_person')
+            }
+            tone={item.group === 'organization' ? 'info' : 'neutral'}
+          />{' '}
+          {item.readiness === 'needs_credential' ? (
+            <Badge label={t('setup.connection_needs_credential')} tone="warning" />
+          ) : (
+            <Badge label={t('settings.operator_metadata_configured')} tone="neutral" />
+          )}
+        </p>
+        <details>
+          <summary>{t('services.connection_details')}</summary>
+          <p className="kb-text kb-text--caption">
+            <code>{item.binding_id}</code>
+          </p>
+        </details>
+      </div>
     ));
   return (
     <>

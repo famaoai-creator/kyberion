@@ -1,3 +1,8 @@
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+} from '../foundation/credential-binding.js';
+import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-fence.js';
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 /**
  * Shell Claude CLI Backend — spawns the local `claude` CLI in `-p --output-format json`
@@ -19,6 +24,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import { cliOptionValue } from '../cli-guard.js';
 import { memoizedCliSpawnSync } from '../provider/provider-discovery.js';
 import * as readline from 'node:readline';
 import {
@@ -44,6 +50,7 @@ import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveProviderCliCommand } from '../provider/provider-managed-env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { cliOutputFormat, parseClaudeCliUsage, recordCliUsage } from '../cli-usage-metering.js';
 import { isClaudeCliAuthenticated } from '../provider/claude-cli-auth-status.js';
 import {
   CLAUDE_CLI_PLACEHOLDER_SIGNATURE,
@@ -182,6 +189,7 @@ export interface DocumentAgentTaskInput {
 
 export class ShellClaudeCliBackend implements ReasoningBackend {
   readonly name = 'shell-claude-cli';
+  private readonly nativeCredentialOwner = credentialExecutionIdentity();
   private readonly bin: string;
   private readonly model: string;
   private readonly timeoutMs: number;
@@ -214,6 +222,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     }
     this.nativeSubagentAdopter = {
       id: 'claude-cli',
+      supportsSemanticProgress: !options.harnessSession,
       dispatch: (instruction, context, callOptions) =>
         this.dispatchNativeSubagent(instruction, context, callOptions),
       getInfo: () => (this.lastHarnessSubagentInfo ? { ...this.lastHarnessSubagentInfo } : null),
@@ -616,6 +625,11 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
       ...this.resolvePermissionArgs(options?.advisory ? 'planner' : undefined),
       ...this.extraArgs,
     ];
+    const started = Date.now();
+    const usageEvents: string[] = [];
+    let completionChars = 0;
+    let meteringStatus: 'success' | 'error' = 'error';
+    let requestNotSent = false;
     // Keep the same provider-scoped child environment as the batch path.
     const spawnEnv = buildDelegationSpawnEnv({
       provider: 'claude',
@@ -637,7 +651,10 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     });
 
     const closePromise = new Promise<number>((resolve, reject) => {
-      child.once('error', reject);
+      child.once('error', (error) => {
+        requestNotSent = usageEvents.length === 0;
+        reject(error);
+      });
       child.once('close', (code) => resolve(code ?? 1));
     });
     const boundedClose = withWallClockBudget(
@@ -670,6 +687,26 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
           const parsed = parseSafeJsonInput(String(line), 'Claude CLI stream response');
           if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
           const record = parsed as Record<string, unknown>;
+          if (record.type === 'result' || record.type === 'assistant') {
+            const message =
+              record.message && typeof record.message === 'object'
+                ? (record.message as Record<string, unknown>)
+                : undefined;
+            // Keep only provider metadata; do not retain model-authored text
+            // as evidence or count partial text events as separate requests.
+            usageEvents.push(
+              JSON.stringify({
+                type: record.type,
+                usage: record.usage,
+                modelUsage: record.modelUsage,
+                total_cost_usd: record.total_cost_usd,
+                is_error: record.is_error,
+                ...(message
+                  ? { message: { id: message.id, model: message.model, usage: message.usage } }
+                  : {}),
+              })
+            );
+          }
           const event = record.event;
           if (record.type === 'stream_event' && event && typeof event === 'object') {
             const eventRecord = event as Record<string, unknown>;
@@ -679,6 +716,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
               if (deltaRecord.type === 'text_delta' && typeof deltaRecord.text === 'string') {
                 emittedPartialText = true;
                 yielded = true;
+                completionChars += deltaRecord.text.length;
                 yield deltaRecord.text;
               }
             }
@@ -702,6 +740,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
                 .join('');
               if (text) {
                 yielded = true;
+                completionChars += text.length;
                 yield text;
               }
             }
@@ -712,6 +751,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
             typeof record.result === 'string'
           ) {
             yielded = true;
+            completionChars += record.result.length;
             yield record.result;
           }
         }
@@ -726,7 +766,17 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         );
       }
       if (!yielded) throw new Error('[shell-claude-cli] streaming CLI returned no text');
+      meteringStatus = 'success';
     } finally {
+      recordCliUsage('claude-cli', model, started, meteringStatus, {
+        report:
+          cliOutputFormat(args) === 'stream-json'
+            ? parseClaudeCliUsage(usageEvents.join('\n'))
+            : undefined,
+        promptChars: prompt.length,
+        completionChars,
+        requestNotSent,
+      });
       options?.signal?.removeEventListener('abort', onAbort);
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
       spawnEnv.dispose();
@@ -767,6 +817,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
+    assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
     assertReasoningEgressAllowed(this.name);
     const profile = resolveClaudeSubagentProfile(options);
     const model = options?.model ?? resolveClaudeModelForTier(options?.model_tier, this.model);
@@ -778,6 +829,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
     });
     await previous;
     try {
+      assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
       const session = this.getHarnessSession(profile, model, options?.effort);
       if (!session.askNativeSubagent) {
         throw new Error(
@@ -791,6 +843,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
         });
       }
       await this.harnessBoot;
+      assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
       const response = await session.askNativeSubagent(
         buildClaudeNativeDelegationPrompt({
           profileName: profile,
@@ -827,6 +880,8 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * default delegation path stays the historical per-task spawn.
    */
   getNativeSubagentAdopter(): NativeSubagentAdopter | null {
+    if (credentialExecutionIdentity().tenantSlug) return null;
+    assertOperatorNativeCredentialOwner(this.nativeCredentialOwner);
     return this.nativeSubagentEnabled ? this.nativeSubagentAdopter : null;
   }
 
@@ -840,6 +895,7 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * backend's own bookkeeping is cleared.
    */
   async resetSession(): Promise<void> {
+    assertCredentialOwner(this.nativeCredentialOwner);
     const session = this.harnessSession;
     this.harnessSession = undefined;
     this.harnessSignature = undefined;
@@ -987,64 +1043,110 @@ export class ShellClaudeCliBackend implements ReasoningBackend {
    * this backend's CLI process is actually SIGTERM'd then (after the grace
    * window) SIGKILL'd, not just abandoned.
    */
-  private spawnCli(
+  private async spawnCli(
     args: string[],
     stdin: string,
     signal?: AbortSignal,
     profile?: ProviderPermissionProfileName
   ): Promise<string> {
-    // XP-02: minimal allowlisted env (no cross-provider credential
-    // leakage); SA-05: one delegation hop deeper than us; WS-02: private git
-    // index for implementer delegations.
-    const spawnEnv = buildDelegationSpawnEnv({
-      provider: 'claude',
-      sessionId: newDelegationSessionId('claude'),
-      ...(profile ? { profile } : {}),
-    });
-    const child = spawnWithDelegationEnv(spawnEnv, () =>
-      spawn(this.bin, args, {
-        stdio: ['pipe', 'pipe', 'pipe'],
-        env: spawnEnv.env,
-      })
-    );
-
-    return withWallClockBudget(
-      {
+    if (signal?.aborted) throw new Error('[shell-claude-cli] query aborted before spawn');
+    const started = Date.now();
+    const format = cliOutputFormat(args);
+    // Request a machine envelope for text calls too, then unwrap only its
+    // result field. Arbitrary model-authored JSON is never billing evidence.
+    const cliArgs = format ? args : [...args, '--output-format', 'json'];
+    const nativeJson = !format || format === 'json' || format === 'stream-json';
+    const model = cliOptionValue(args, '--model') || this.model;
+    const selectedPrompt = cliOptionValue(args, '-p');
+    const inlinePrompt = selectedPrompt && !selectedPrompt.startsWith('-') ? selectedPrompt : '';
+    const promptChars =
+      stdin.length + inlinePrompt.length + (cliOptionValue(args, '--system-prompt')?.length ?? 0);
+    let stdout = '';
+    let completionChars = 0;
+    let status: 'success' | 'error' = 'error';
+    let requestNotSent = true;
+    try {
+      // XP-02: minimal allowlisted env (no cross-provider credential
+      // leakage); SA-05: one delegation hop deeper than us; WS-02: private git
+      // index for implementer delegations.
+      const spawnEnv = buildDelegationSpawnEnv({
         provider: 'claude',
-        budgetMs: this.timeoutMs,
-        child: delegationChildHandleFromChildProcess(child),
-        signal,
-      },
-      () =>
-        new Promise<string>((resolve, reject) => {
-          let stdout = '';
-          let stderr = '';
-          child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
-          child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
-          child.on('close', (code) => {
-            if (code !== 0) {
-              reject(
-                new Error(
-                  `[shell-claude-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 500)}`
-                )
-              );
-              return;
-            }
-            resolve(stdout);
-          });
-          child.on('error', (err) => {
-            reject(new Error(`[shell-claude-cli] spawn failed: ${err.message}`));
-          });
-          child.stdin.write(stdin);
-          child.stdin.end();
+        sessionId: newDelegationSessionId('claude'),
+        ...(profile ? { profile } : {}),
+      });
+      const child = spawnWithDelegationEnv(spawnEnv, () =>
+        spawn(this.bin, cliArgs, {
+          stdio: ['pipe', 'pipe', 'pipe'],
+          env: spawnEnv.env,
         })
-    ).catch((err) => {
-      if (err instanceof DelegationWallClockExceededError) {
-        spawnEnv.dispose();
-        throw new Error(`[shell-claude-cli] timed out after ${this.timeoutMs}ms`);
+      );
+      requestNotSent = false;
+
+      const raw = await withWallClockBudget(
+        {
+          provider: 'claude',
+          budgetMs: this.timeoutMs,
+          child: delegationChildHandleFromChildProcess(child),
+          signal,
+        },
+        () =>
+          new Promise<string>((resolve, reject) => {
+            let stderr = '';
+            let spawned = false;
+            child.once('spawn', () => {
+              spawned = true;
+            });
+            child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
+            child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
+            child.on('close', (code) => {
+              if (code !== 0) {
+                reject(
+                  new Error(
+                    `[shell-claude-cli] CLI exited with code ${code}. stderr: ${stderr.slice(0, 500)}`
+                  )
+                );
+                return;
+              }
+              resolve(stdout);
+            });
+            child.on('error', (err) => {
+              if (!spawned && !stdout) requestNotSent = true;
+              reject(new Error(`[shell-claude-cli] spawn failed: ${err.message}`));
+            });
+            child.stdin.write(stdin);
+            child.stdin.end();
+          })
+      ).catch((err) => {
+        if (err instanceof DelegationWallClockExceededError) {
+          spawnEnv.dispose();
+          throw new Error(`[shell-claude-cli] timed out after ${this.timeoutMs}ms`);
+        }
+        throw err;
+      });
+      let text = raw;
+      if (!format) {
+        try {
+          const parsed = parseSafeJsonInput(raw, 'Claude CLI text envelope') as Record<
+            string,
+            unknown
+          >;
+          if (parsed && parsed.type === 'result' && typeof parsed.result === 'string')
+            text = parsed.result;
+        } catch {
+          // Old CLI text output remains usable, but carries no provider usage.
+        }
       }
-      throw err;
-    });
+      completionChars = text.length;
+      status = 'success';
+      return text;
+    } finally {
+      recordCliUsage('claude-cli', model, started, status, {
+        ...(nativeJson ? { report: parseClaudeCliUsage(stdout) } : {}),
+        promptChars,
+        completionChars,
+        requestNotSent,
+      });
+    }
   }
 }
 
@@ -1205,7 +1307,8 @@ export function buildClaudeCliOptionsFromEnv(
 export function buildShellClaudeCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
   probe: (env: NodeJS.ProcessEnv) => ShellClaudeCliAvailability = probeShellClaudeCliAvailability,
-  modelOverride?: string
+  modelOverride?: string,
+  timeoutOverrideMs?: number
 ): ShellClaudeCliBackend | null {
   const availability = probe(env);
   if (!availability.available) {
@@ -1220,7 +1323,7 @@ export function buildShellClaudeCliBackendFromEnv(
   const bin = envText(env, 'KYBERION_CLAUDE_CLI_BIN')?.trim() || availability.bin?.trim();
   const model = modelOverride?.trim() || envText(env, 'KYBERION_CLAUDE_CLI_MODEL')?.trim();
   const timeoutRaw = envText(env, 'KYBERION_CLAUDE_CLI_TIMEOUT_MS')?.trim();
-  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
+  const timeoutMs = timeoutOverrideMs ?? (timeoutRaw ? parseInt(timeoutRaw, 10) : undefined);
   const extraRaw = envText(env, 'KYBERION_CLAUDE_CLI_EXTRA_ARGS')?.trim();
   const extraArgs = extraRaw ? extraRaw.split(/\s+/).filter(Boolean) : undefined;
   const backend = new ShellClaudeCliBackend({

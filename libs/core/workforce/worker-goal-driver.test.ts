@@ -888,3 +888,214 @@ describe('runGoalDrivenLoop — KD-02 acceptance #3: wall-clock deadline cancels
     expect(wallClock.armedCount).toBe(0);
   });
 });
+
+describe('supervised continuous goals', () => {
+  it.each(['tool_search', 'native_reference'] as const)(
+    'cancels stalled %s discovery without promoting late tools',
+    async (kind) => {
+      const controller = new AbortController();
+      let release!: (value: never[]) => void;
+      const search = vi.fn(
+        () =>
+          new Promise<never[]>((resolve) => {
+            release = resolve;
+          })
+      );
+      const backend = scriptedBackend([
+        kind === 'tool_search'
+          ? { toolCalls: [{ name: 'tool_search', input: { query: 'tools' } }] }
+          : { deferredToolReferences: ['tools'] },
+      ]);
+      const run = runGoalDrivenLoop({
+        objective: 'x',
+        signal: controller.signal,
+        backend,
+        executionMode: 'continuous',
+        preStep: [() => ({ decision: 'enter' })],
+        toolSearch: search,
+      });
+      await vi.waitFor(() => expect(search).toHaveBeenCalledOnce());
+      controller.abort();
+      expect((await run).finalState).toBe('paused');
+      release([]);
+      await Promise.resolve();
+      expect(
+        events.some(
+          (e) => e.type === 'status_update' && e.payload.goal_event === 'deferred_tools_promoted'
+        )
+      ).toBe(false);
+      expect(backend.prompts).toHaveLength(1);
+    }
+  );
+
+  it('cancels a pending manual model admission before any provider call', async () => {
+    const controller = new AbortController();
+    const backend = scriptedBackend([goalUpdate({ status: 'complete' })]);
+    let driver: AgentRuntimeManualDriver | undefined;
+    const run = runGoalDrivenLoop({
+      objective: 'x',
+      signal: controller.signal,
+      backend,
+      executionMode: 'continuous',
+      preStep: [() => ({ decision: 'enter' })],
+      manualDrive: {
+        agentId: 'cancel-manual',
+        scope: { scope_kind: 'system', tier: 'public' },
+        onReady: (value) => {
+          driver = value;
+        },
+      },
+    });
+    await vi.waitFor(() => expect(driver).toBeDefined());
+    controller.abort();
+    expect((await run).finalState).toBe('paused');
+    expect(backend.prompts).toHaveLength(0);
+    expect(getAgentRuntimeManualDriverRegistration('cancel-manual')).toBeUndefined();
+  });
+
+  it('cancels a stalled cooperative-yield callback', async () => {
+    const controller = new AbortController();
+    const stop = vi.fn(() => new Promise<boolean>(() => {}));
+    const run = runGoalDrivenLoop({
+      objective: 'x',
+      signal: controller.signal,
+      executionMode: 'continuous',
+      preStep: [() => ({ decision: 'enter' })],
+      backend: scriptedBackend([{ text: 'working' }]),
+      shouldStopAfterTurn: stop,
+    });
+    await vi.waitFor(() => expect(stop).toHaveBeenCalledOnce());
+    controller.abort();
+    expect((await run).finalState).toBe('paused');
+  });
+
+  it('renews admission beyond the legacy 100-turn ceiling and stops on a structured result', async () => {
+    let turns = 0;
+    const admission = vi.fn(() => ({ decision: 'enter' as const }));
+    const result = await runGoalDrivenLoop({
+      objective: 'long-running supervised work',
+      executionMode: 'continuous',
+      preStep: [admission],
+      backend: {
+        generateWithTools: async () =>
+          ++turns === 103
+            ? goalUpdate({ status: 'complete', reason: 'verified' })
+            : { text: `step ${turns}` },
+      },
+    });
+    expect(result).toMatchObject({ finalState: 'complete', turnsRun: 103 });
+    expect(admission).toHaveBeenCalledTimes(103);
+  });
+
+  it('refuses unsupervised continuous execution and respects explicit turn limits', async () => {
+    const backend = scriptedBackend([{ text: 'working' }]);
+    await expect(
+      runGoalDrivenLoop({ objective: 'x', executionMode: 'continuous', backend })
+    ).rejects.toThrow('GOAL_CONTINUOUS_ADMISSION_REQUIRED');
+    expect(backend.prompts).toHaveLength(0);
+    const result = await runGoalDrivenLoop({
+      objective: 'x',
+      executionMode: 'continuous',
+      preStep: [() => ({ decision: 'enter' })],
+      maxTurns: 2,
+      backend,
+    });
+    expect(result).toMatchObject({ finalState: 'paused', turnsRun: 2 });
+  });
+
+  it('revalidates admission before every turn and stops before a revoked step', async () => {
+    const backend = scriptedBackend([{ text: 'working' }]);
+    const result = await runGoalDrivenLoop({
+      objective: 'x',
+      executionMode: 'continuous',
+      backend,
+      preStep: [
+        ({ turnNumber }) =>
+          turnNumber === 3
+            ? { decision: 'reject', reason: 'ownership revoked' }
+            : { decision: 'enter' },
+      ],
+    });
+    expect(result.finalState).toBe('paused');
+    expect(result.goal.terminalReason).toContain('ownership revoked');
+    expect(backend.prompts).toHaveLength(2);
+  });
+
+  it('cancels an unresponsive model and fences a late completion', async () => {
+    const controller = new AbortController();
+    let release!: (value: GenerateWithToolsResult) => void;
+    const backend = {
+      generateWithTools: vi.fn(
+        (_prompt: string, _tools: unknown, options?: ReasoningCallOptions) => {
+          expect(options?.signal).toBe(controller.signal);
+          return new Promise<GenerateWithToolsResult>((resolve) => {
+            release = resolve;
+          });
+        }
+      ),
+    };
+    const run = runGoalDrivenLoop({
+      objective: 'x',
+      executionMode: 'continuous',
+      preStep: [() => ({ decision: 'enter' })],
+      backend,
+      signal: controller.signal,
+    });
+    await vi.waitFor(() => expect(backend.generateWithTools).toHaveBeenCalledOnce());
+    controller.abort();
+    const result = await run;
+    expect(result.finalState).toBe('paused');
+    expect(result.goal.terminalReason).toContain('reconciliation');
+    release(goalUpdate({ status: 'complete', reason: 'too late' }));
+    await Promise.resolve();
+    expect(result.finalState).toBe('paused');
+    expect(appliedSequence()).not.toContain('complete');
+  });
+
+  it('keeps an uncertain cancelled tool behind the external-effect rewind fence', async () => {
+    const controller = new AbortController();
+    const context = new RewindableWorkerContext();
+    const checkpoint = context.checkpoint();
+    const audit = vi.fn();
+    const executeTool = vi.fn((_call: unknown, ctx: { signal?: AbortSignal }) => {
+      expect(ctx.signal).toBe(controller.signal);
+      return new Promise<{ resultText: string }>(() => {});
+    });
+    const run = runGoalDrivenLoop({
+      objective: 'x',
+      executionMode: 'continuous',
+      signal: controller.signal,
+      preStep: [() => ({ decision: 'enter' })],
+      rewindContext: context,
+      auditToolCall: audit,
+      backend: scriptedBackend([{ toolCalls: [{ name: 'write', input: {} }] }]),
+      executeTool,
+    });
+    await vi.waitFor(() => expect(executeTool).toHaveBeenCalledOnce());
+    controller.abort();
+    expect((await run).finalState).toBe('paused');
+    expect(context.rewindTo(checkpoint, 'Do not repeat an unconfirmed write.')).toMatchObject({
+      rewound: false,
+      refusal: 'external_effects_since_checkpoint',
+    });
+  });
+
+  it('preserves immediate tool-error termination without applying a success signal', async () => {
+    const backend = scriptedBackend([{ toolCalls: [{ name: 'broken', input: {} }] }]);
+    const audit = vi.fn();
+    await expect(
+      runGoalDrivenLoop({
+        objective: 'x',
+        executionMode: 'continuous',
+        backend,
+        preStep: [() => ({ decision: 'enter' })],
+        auditToolCall: audit,
+        executeTool: () => {
+          throw new Error('private failure details');
+        },
+      })
+    ).rejects.toThrow('private failure details');
+    expect(backend.prompts).toHaveLength(1);
+    expect(JSON.stringify(audit.mock.calls)).not.toContain('private failure details');
+  });
+});
