@@ -118,6 +118,7 @@ describe('secret-actuator: governed mutation', () => {
         mission_id: expect.stringContaining('MSN-SEC-'),
         service_id: 'slack',
         action: 'set',
+        changed_keys: ['test_user'],
       })
     );
   });
@@ -140,8 +141,17 @@ describe('secret-actuator: governed mutation', () => {
     expect(result.mission_id).toBeUndefined();
     expect(mocks.ledgerRecord).toHaveBeenCalledWith(
       'CONFIG_CHANGE',
-      expect.objectContaining({ mission_id: 'None', service_id: 'slack', action: 'set' })
+      expect.objectContaining({
+        mission_id: 'None',
+        service_id: 'slack',
+        action: 'set',
+        changed_key_count: 1,
+      })
     );
+    // The untenanted system ledger never receives the account name.
+    const [, recorded] = mocks.ledgerRecord.mock.calls[0];
+    expect(recorded).not.toHaveProperty('changed_keys');
+    expect(JSON.stringify(recorded)).not.toContain('test_user');
   });
 
   it('should use existing MISSION_ID and record to ledger without creating a new mission', async () => {
@@ -177,8 +187,32 @@ describe('secret-actuator: governed mutation', () => {
         mission_id: 'EXISTING-MISSION-123',
         service_id: 'slack',
         action: 'set',
+        changed_key_count: 1,
       })
     );
+    // An inherited MISSION_ID may name an archived mission, whose records
+    // land in the system ledger: the account name stays out.
+    const [, recorded] = mocks.ledgerRecord.mock.calls[0];
+    expect(JSON.stringify(recorded)).not.toContain('test_user');
+  });
+
+  it('withholds the account name when the ephemeral mission was created but not started', async () => {
+    delete process.env.MISSION_ID;
+    mocks.safeExec.mockImplementation((_bin: string, args: string[]) => {
+      if (args.includes('start')) throw new Error('start refused');
+      return '';
+    });
+    mocks.storeSecret.mockResolvedValue(undefined);
+
+    const { handleAction } = await import('./index.js');
+    await handleAction({
+      action: 'set' as const,
+      params: { account: 'test_user', service: 'slack', value: 'secret123' },
+    });
+
+    const [, recorded] = mocks.ledgerRecord.mock.calls[0];
+    expect(recorded).toMatchObject({ mission_id: 'None', changed_key_count: 1 });
+    expect(JSON.stringify(recorded)).not.toContain('test_user');
   });
 
   it('emits secret actions that satisfy the schema', () => {

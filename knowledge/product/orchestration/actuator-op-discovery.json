@@ -31947,6 +31947,9 @@
                   "minLength": 1
                 }
               },
+              "allow_legacy_unkeyed": {
+                "type": ["boolean", "string"]
+              },
               "export_as": {
                 "type": "string",
                 "minLength": 1
