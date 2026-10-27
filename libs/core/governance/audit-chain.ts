@@ -200,6 +200,23 @@ export interface AuditVerifyResult {
 }
 
 /** Secure I/O capabilities supplied by the secure-io boundary. */
+/**
+ * Append one record as its own line. A file whose tail lacks a newline (a torn
+ * append, or a planted fragment) would otherwise swallow this record into one
+ * unparseable line; the fragment stays its own invalid line for verify.
+ */
+function appendRecordLine(io: AuditChainIo, filePath: string, entry: AuditEntry): void {
+  let separator = '';
+  try {
+    const content = io.exists(filePath) ? io.read(filePath) : '';
+    if (content.length > 0 && !content.endsWith('\n')) separator = '\n';
+  } catch {
+    // An unreadable tail must not cost the record: readers skip blank lines.
+    separator = '\n';
+  }
+  io.append(filePath, `${separator}${JSON.stringify(entry)}\n`);
+}
+
 export interface AuditChainIo {
   read(filePath: string): string;
   loadJson<T>(filePath: string): T;
@@ -634,7 +651,13 @@ class AuditChainImpl {
           findings.push(`tenant_mirror_path_unsafe:${slug}:${fileName}`);
           continue;
         }
-        mirrorEntries.push(...this.readAuditFileEntries(mirrorFile));
+        const read = this.readAuditFileForVerify(mirrorFile);
+        mirrorEntries.push(...read.entries);
+        findings.push(
+          ...this.readFindings(fileName, read).map(
+            (finding) => `tenant_mirror_unreadable:${slug}:${finding}`
+          )
+        );
       }
 
       const masterSet = masterByTenant.get(slug) || [];
@@ -768,18 +791,13 @@ class AuditChainImpl {
     return { entries, invalidLines };
   }
 
+  /**
+   * Readable entries of one file. One unparseable line never hides the rest:
+   * the writer seeds from the last readable entry (so a junk line cannot fork
+   * the chain) and verify reports the junk line itself.
+   */
   private readAuditFileEntries(filePath: string): AuditEntry[] {
-    if (!auditIo || !auditIo.exists(filePath)) return [];
-    try {
-      const content = auditIo.read(filePath);
-      return content
-        .trim()
-        .split('\n')
-        .filter(Boolean)
-        .map((line) => normalizePersistedAuditEntry(parseSafeJsonInput(line, 'audit chain entry')));
-    } catch (_) {
-      return [];
-    }
+    return this.readAuditFileForVerify(filePath).entries;
   }
 
   private appendToFile(entry: AuditEntry): void {
@@ -791,7 +809,7 @@ class AuditChainImpl {
       if (!auditIo.exists(this.auditDir)) {
         auditIo.mkdir(this.auditDir);
       }
-      auditIo.append(this.getFilePath(entry.timestamp), `${JSON.stringify(entry)}\n`);
+      appendRecordLine(auditIo, this.getFilePath(entry.timestamp), entry);
     } catch (err: any) {
       logger.error(`[AUDIT_CHAIN] Failed to persist: ${err.message}`);
     }
@@ -835,7 +853,7 @@ class AuditChainImpl {
       allowMissingLeaf: true,
     });
     if (!mirrorFile) return;
-    io.append(mirrorFile, `${JSON.stringify(entry)}\n`);
+    appendRecordLine(io, mirrorFile, entry);
   }
 
   private getFilePath(timestamp: string): string {
