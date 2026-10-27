@@ -5,13 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeLstat, safeReadFileRange, safeReadFileSnapshot, safeWriteFile } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import {
-  dotStatePath,
-  DOT_STATE_ROOT,
-  DOT_EVENTS_FILE,
-  type DotInboundEvent,
-} from './dot-state-paths.js';
-import { physicalScopedPath } from '../physical-namespace.js';
+import { dotStatePath, DOT_EVENTS_FILE, type DotInboundEvent } from './dot-state-paths.js';
 import type { DotCharter, DotTrigger } from './dot-charter.js';
 import type { DotRuntimeDeps, DotWakeLedgerEntry, DueDotTrigger } from './dot-runtime.js';
 
@@ -53,6 +47,7 @@ export function eventContinuationIdentity(c: DotCharter): string {
     c.scope.tenant_slug ?? null,
     c.scope.organization_id ?? null,
     c.scope.project_id ?? null,
+    c.scope.owner_nhi ?? null,
     c.dot_id,
   ]);
 }
@@ -63,9 +58,12 @@ export function eventContinuationPath(c: DotCharter, rootDir = pathResolver.root
   );
 }
 export function eventContinuationLedger(c: DotCharter, rootDir = pathResolver.rootDir()): string {
-  const rel = c.scope.tenant_slug
-    ? physicalScopedPath(DOT_STATE_ROOT, { tenant_slug: c.scope.tenant_slug }, DOT_EVENTS_FILE)
-    : DOT_STATE_ROOT + '/' + DOT_EVENTS_FILE;
+  const rel = dotStatePath(
+    {
+      scope: { tier: c.scope.tier, tenant_slug: c.scope.tenant_slug, owner_nhi: c.scope.owner_nhi },
+    } as DotCharter,
+    DOT_EVENTS_FILE
+  );
   return path.join(rootDir, rel);
 }
 export function eventIntakeLockId(file: string): string {

@@ -7,6 +7,8 @@
 
 import type { AgentAdapter } from './agent-adapter.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import type { TaskToolRuntime } from '../workforce/task-tool-runtime.js';
+import type { EventScopeInput } from '../event-scope.js';
 
 export interface AgentExecAdapterRequest {
   provider: string;
@@ -21,10 +23,18 @@ export interface AgentExecAdapterRequest {
   deniedActuators?: string[];
   /** Team Channel E: launch with every tool disabled (adapters that cannot must not be used). */
   toolsDisabled?: boolean;
+  /** Resolved from the claimed WorkItem, never from provider text. */
+  taskToolRuntime?: TaskToolRuntime;
+  capabilityProfile?: string;
+  agentId?: string;
+  missionId?: string;
+  scope?: EventScopeInput;
 }
 
 export interface AgentExecAdapterBridge {
   readonly bridge_id: string;
+  /** The adapter disables native escape hatches and executes only live task-bound tools. */
+  readonly governedTaskTools?: boolean;
   createAdapter(request: AgentExecAdapterRequest): AgentAdapter;
 }
 
@@ -68,6 +78,16 @@ export function resetAgentExecAdapterBridges(): void {
 
 export function listAgentExecAdapterBridges(): AgentExecAdapterBridge[] {
   return execAdapterSeam.list().map((provider) => provider.implementation);
+}
+
+export function canProvideGovernedTaskTools(provider: string | undefined): boolean {
+  return Boolean(
+    provider &&
+    listAgentExecAdapterBridges().some(
+      (bridge) =>
+        bridge.bridge_id === provider.trim().toLowerCase() && bridge.governedTaskTools === true
+    )
+  );
 }
 
 async function ensureBuiltinExecAdapters(): Promise<void> {

@@ -208,9 +208,17 @@ export async function handleAction(input: AgentAction | AgentPipelineDispatch) {
 
     case 'delegate': {
       if (!params.task) throw new Error('task envelope is required for delegate');
+      if (
+        'work_item_id' in params.task &&
+        (typeof params.task.work_item_id !== 'string' || !params.task.work_item_id.trim())
+      )
+        throw new Error('work_item_id must be a nonempty string for coordinated delegation');
       const receipt =
-        'work_item_id' in params.task
-          ? await delegateCoordinatedAgentTask(params.task)
+        typeof params.task.work_item_id === 'string'
+          ? await delegateCoordinatedAgentTask({
+              ...params.task,
+              work_item_id: params.task.work_item_id,
+            })
           : await getAgentExecutionPort().delegate(params.task);
       return { status: receipt.status, execution_kind: 'agent_delegation', receipt };
     }

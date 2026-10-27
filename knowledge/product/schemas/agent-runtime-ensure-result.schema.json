@@ -4,14 +4,13 @@
   "title": "Agent Runtime Ensure Result v1",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "request_id",
-    "mission_id",
-    "scope",
-    "requested_by",
-    "created_at",
-    "completed_at",
-    "runtime_plan"
+  "required": ["request_id", "mission_id", "scope", "requested_by", "created_at", "completed_at"],
+  "oneOf": [
+    {
+      "required": ["runtime_plan"],
+      "not": { "anyOf": [{ "required": ["status"] }, { "required": ["error"] }] }
+    },
+    { "required": ["status", "error"], "not": { "required": ["runtime_plan"] } }
   ],
   "properties": {
     "request_id": { "type": "string", "minLength": 1 },
@@ -25,6 +24,8 @@
     "reason": { "type": "string" },
     "created_at": { "type": "string", "minLength": 1 },
     "completed_at": { "type": "string", "minLength": 1 },
+    "status": { "const": "failed" },
+    "error": { "type": "string", "minLength": 1, "maxLength": 4000 },
     "organization_profile": { "$ref": "#/definitions/organization_profile" },
     "runtime_plan": { "$ref": "#/definitions/runtime_plan" }
   },
@@ -120,6 +121,17 @@
         "delegation_contract": { "$ref": "#/definitions/delegation_contract_or_null" },
         "provider": { "type": ["string", "null"] },
         "modelId": { "type": ["string", "null"] },
+        "requested_selection": {
+          "$ref": "mission-team-role-selection.schema.json"
+        },
+        "selection_resolution": {
+          "type": "object",
+          "required": ["source", "reason"],
+          "properties": {
+            "source": { "enum": ["legacy", "auto", "requested", "fallback", "blocked"] },
+            "reason": { "type": "string" }
+          }
+        },
         "required_capabilities": {
           "type": "array",
           "items": { "type": "string" }

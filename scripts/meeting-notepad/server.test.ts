@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -33,7 +34,9 @@ describe('meeting notepad server harness boundary', () => {
     expect(scoped).toContain('/artifacts/personal/tenant-acme/evidence/meeting-notepad');
     // The tmp floor hard-deletes at 24h with no trash grace, so a pad that
     // has an owning scope must never default there.
-    expect(scoped).not.toContain('/active/shared/tmp/');
+    expect(path.relative(pathResolver.rootDir(), scoped).replaceAll('\\', '/')).not.toMatch(
+      /^active\/shared\/tmp(?:\/|$)/u
+    );
   });
 
   it('falls back to the tmp floor only when nothing owns the pads', () => {

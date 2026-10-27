@@ -2,6 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 import * as path from 'node:path';
 
 let missionPath = '';
+let archiveLookupRoot = '';
 
 vi.mock('./mission-llm.js', () => ({
   inspectLlmResolution: vi.fn(),
@@ -21,9 +22,16 @@ vi.mock('../knowledge/knowledge-index.js', () => ({
 // same specifiers or vitest won't intercept the real calls.
 vi.mock('../path-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../path-resolver.js')>();
+  const archiveLookup: typeof actual.findArchivedMissionDir = (id, options) =>
+    actual.findArchivedMissionDir(id, {
+      ...options,
+      ...(archiveLookupRoot ? { archiveRoot: archiveLookupRoot } : {}),
+    });
   return {
     ...actual,
-    findMissionPath: vi.fn(() => missionPath),
+    findMissionPath: vi.fn(() => missionPath || undefined),
+    findArchivedMissionDir: archiveLookup,
+    pathResolver: { ...actual.pathResolver, findArchivedMissionDir: archiveLookup },
   };
 });
 vi.mock('../ledger.js', async (importOriginal) => {
@@ -41,6 +49,7 @@ import * as pathResolver from '../path-resolver.js';
 import {
   safeExistsSync,
   safeMkdir,
+  safeMoveSync,
   safeReadFile,
   safeRmSync,
   safeSymlinkSync,
@@ -55,7 +64,7 @@ import {
   updateMemoryPromotionCandidateStatus,
 } from '../knowledge/memory-promotion-queue.js';
 import { loadDistillCandidateRecord } from '../knowledge/distill-candidate-registry.js';
-import { loadState } from './mission-state.js';
+import { loadMissionStateIncludingArchive, loadState } from './mission-state.js';
 import {
   gatherDistillContext,
   distillMission,
@@ -66,6 +75,9 @@ import {
 } from './mission-distill.js';
 import { promoteMemoryCandidateToKnowledge } from '../knowledge/memory-promotion-workflow.js';
 import { safeExec } from '../secure-io.js';
+import * as memoryQueue from '../knowledge/memory-promotion-queue.js';
+import { runAdaptiveStructuredLlmProfile } from './mission-llm.js';
+import { readJson, writeJson } from '../foundation/json.js';
 
 // Namespace the promotion queue so parallel test files never clobber the
 // real shared queue (root cause of combined-run flakes).
@@ -270,6 +282,136 @@ describe('mission-distill end-to-end promotion flow', () => {
       '[MISSION_DISTILL_RESOURCE] evidence ledger must be a regular file'
     );
   });
+
+  it('replays a persisted failed enqueue after completion without running the LLM again', async () => {
+    const enqueue = vi.spyOn(memoryQueue, 'enqueueMemoryPromotionCandidate');
+    enqueue.mockImplementationOnce(() => {
+      throw new Error('queue unavailable');
+    });
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    try {
+      await distillMission(missionId, pathResolver.rootDir());
+      const outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
+      const pending = readJson<{ status: string; candidate: { candidate_id: string } }>(outboxPath);
+      expect(loadState(missionId)?.status).toBe('completed');
+      expect(pending.status).toBe('pending');
+      expect(listMemoryPromotionCandidates()).toHaveLength(0);
+      const llmCalls = vi.mocked(runAdaptiveStructuredLlmProfile).mock.calls.length;
+
+      await distillMission(missionId, pathResolver.rootDir());
+      expect(readJson<{ status: string }>(outboxPath).status).toBe('delivered');
+      expect(listMemoryPromotionCandidates()).toHaveLength(1);
+      expect(listMemoryPromotionCandidates()[0].candidate_id).toBe(pending.candidate.candidate_id);
+      expect(vi.mocked(runAdaptiveStructuredLlmProfile).mock.calls).toHaveLength(llmCalls);
+      await distillMission(missionId, pathResolver.rootDir());
+      expect(enqueue).toHaveBeenCalledTimes(2);
+    } finally {
+      enqueue.mockRestore();
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+
+  it('preserves an approved candidate when delivery acknowledgement was lost', async () => {
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    try {
+      await distillMission(missionId, pathResolver.rootDir());
+      const outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
+      const outbox = readJson<Record<string, unknown>>(outboxPath);
+      const queued = listMemoryPromotionCandidates()[0];
+      updateMemoryPromotionCandidateStatus({
+        candidateId: queued.candidate_id,
+        status: 'approved',
+        knowledgeDomain: 'organization',
+        ratificationNote: 'Approved before replay',
+        curation: {
+          title: 'Durable lesson',
+          summary: 'Curated lesson',
+          content: 'Keep this approved content.',
+          evidence_refs: queued.evidence_refs,
+        },
+      });
+      const approved = listMemoryPromotionCandidates()[0];
+      writeJson(outboxPath, { ...outbox, status: 'pending' });
+      await distillMission(missionId, pathResolver.rootDir());
+      expect(listMemoryPromotionCandidates()).toEqual([approved]);
+      expect(readJson<{ status: string }>(outboxPath).status).toBe('delivered');
+    } finally {
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
+
+  it('recovers a physically archived mission through visible archive state and rejects mismatched scope', async () => {
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    const activePath = missionPath;
+    const archiveRoot = pathResolver.shared('tmp/mission-distill-archive');
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    try {
+      await distillMission(missionId, pathResolver.rootDir());
+      let outboxPath = `${missionPath}/evidence/memory-promotion-outbox.json`;
+      const outbox = readJson<{ candidate: Record<string, unknown> }>(outboxPath);
+      const statePath = `${missionPath}/mission-state.json`;
+      const state = readJson<Record<string, unknown>>(statePath);
+      writeJson(statePath, { ...state, status: 'archived' });
+      writeJson(outboxPath, { ...outbox, status: 'pending' });
+
+      const archivedPath = path.join(archiveRoot, 'public', 'shared', missionId);
+      safeMkdir(path.dirname(archivedPath), { recursive: true });
+      safeMoveSync(activePath, archivedPath);
+      missionPath = '';
+      archiveLookupRoot = archiveRoot;
+      outboxPath = `${archivedPath}/evidence/memory-promotion-outbox.json`;
+      expect(safeExistsSync(activePath)).toBe(false);
+      expect(loadState(missionId)).toBeNull();
+      expect(pathResolver.findArchivedMissionDir(missionId)).toBe(archivedPath);
+      await distillMission(missionId, pathResolver.rootDir());
+      expect(loadMissionStateIncludingArchive(missionId)?.status).toBe('archived');
+      expect(readJson<{ status: string }>(outboxPath).status).toBe('delivered');
+
+      writeJson(outboxPath, {
+        ...outbox,
+        status: 'pending',
+        candidate: {
+          ...outbox.candidate,
+          sensitivity_tier: 'confidential',
+          ratification_required: true,
+        },
+      });
+      await expect(distillMission(missionId, pathResolver.rootDir())).rejects.toThrow(
+        'identity or scope'
+      );
+      expect(readJson<{ status: string }>(outboxPath).status).toBe('pending');
+
+      writeJson(`${archivedPath}/mission-state.json`, {
+        ...state,
+        status: 'archived',
+        tenant_slug: 'unbound-tenant',
+      });
+      expect(loadMissionStateIncludingArchive(missionId)).toBeNull();
+      await expect(distillMission(missionId, pathResolver.rootDir())).rejects.toThrow('not found');
+    } finally {
+      missionPath = activePath;
+      archiveLookupRoot = '';
+      safeRmSync(archiveRoot, { recursive: true, force: true });
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
+  });
 });
 
 describe('resolveWisdomOutputPath', () => {
@@ -316,6 +458,19 @@ describe('WISDOM_SCHEMA harness2 experience contract', () => {
 
   it('accepts a wisdom object without the new optional fields (backward compatible)', () => {
     expect(WISDOM_SCHEMA.safeParse(baseWisdom).success).toBe(true);
+  });
+
+  it('accepts explicit null optional lessons from structured-output providers', () => {
+    expect(
+      WISDOM_SCHEMA.safeParse({ ...baseWisdom, experience: null, edit_rows: null }).success
+    ).toBe(true);
+    expect(
+      WISDOM_SCHEMA.safeParse({
+        ...baseWisdom,
+        experience: { cue: 'c', lesson: 'l', confidence: 'high' },
+        edit_rows: null,
+      }).success
+    ).toBe(false);
   });
 
   it('accepts a complete experience block and edit rows', () => {

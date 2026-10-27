@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { getUsageAttribution } from '../usage-accounting.js';
+import { getReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
 import { getFoundationIo } from '../foundation/io.js';
 import * as secureIo from '../secure-io.js';
 import { readJsonLines } from '../foundation/json.js';
@@ -12,6 +13,7 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
+import { personalDotCharterDir } from './dot-charter.js';
 import {
   DOT_INBOX_PATH,
   DOT_WAKE_LEDGER_PATH,
@@ -24,6 +26,7 @@ import {
   evaluateDotTriggersDue,
   listActiveDotHeartbeatIds,
   readDotWakeLedger,
+  readScopedDotWakeLedger,
   recordDotTokenUsage,
   recordDotWatchSnapshot,
   runDotWake,
@@ -163,10 +166,10 @@ describe('evaluateDotTriggersDue', () => {
     safeWriteFile(
       `${TEST_ROOT}/${DOT_INBOX_PATH}`,
       [
-        JSON.stringify({ channel: 'slack', text: 'ping' }),
-        JSON.stringify({ channel: 'telegram', text: 'other channel' }),
-        JSON.stringify({ dot_id: 'repo-guardian', text: 'direct' }),
-        JSON.stringify({ dot_id: 'other-dot', text: 'not ours' }),
+        JSON.stringify({ scope: { tier: 'public' }, channel: 'slack', text: 'ping' }),
+        JSON.stringify({ scope: { tier: 'public' }, channel: 'telegram', text: 'other channel' }),
+        JSON.stringify({ scope: { tier: 'public' }, dot_id: 'repo-guardian', text: 'direct' }),
+        JSON.stringify({ scope: { tier: 'public' }, dot_id: 'other-dot', text: 'not ours' }),
       ].join('\n') + '\n'
     );
     const due = evaluateDotTriggersDue(wakeCharter, { rootDir: TEST_ROOT });
@@ -176,6 +179,21 @@ describe('evaluateDotTriggersDue', () => {
 });
 
 describe('classified wake failure reasons', () => {
+  it('keeps private summaries and error prose out of the shared control index', () => {
+    const privateDot = { ...CHARTER, scope: { tier: 'personal' as const, owner_nhi: 'owner-a' } };
+    recordDotWakeOutcome(privateDot, undefined, 'failed', {
+      rootDir: TEST_ROOT,
+      reason: 'synthetic private failure detail',
+      summary: 'synthetic private response',
+    });
+    const shared = String(safeReadFile(`${TEST_ROOT}/${DOT_WAKE_LEDGER_PATH}`));
+    expect(shared).not.toContain('synthetic private');
+    expect(readDotWakeLedger({ rootDir: TEST_ROOT })[0].summary).toBeUndefined();
+    expect(readScopedDotWakeLedger(privateDot, { rootDir: TEST_ROOT })[0]).toMatchObject({
+      reason: 'synthetic private failure detail',
+      summary: 'synthetic private response',
+    });
+  });
   it.each([
     ['delegated wake exceeded wall_clock budget 900000ms', 'wall_clock_exceeded'],
     [
@@ -910,7 +928,7 @@ describe('runtime reliability (DL-02)', () => {
       ...CHARTER,
       dot_id: 'tenant-dot',
       scope: { tier: 'confidential', tenant_slug: 'acme' },
-      runtime: { heartbeat_id: 'dot-tenant-dot' },
+      runtime: { heartbeat_id: 'dot-tenant-dot', reasoning_training_use: 'no_training' },
     };
     const dir = `${TEST_ROOT}/knowledge/confidential/acme/dots`;
     safeMkdir(dir, { recursive: true });
@@ -1086,7 +1104,7 @@ describe('runtime reliability (DL-02)', () => {
           payload: { report_from: 'dot-executor', work_item_id: 'WI-2' },
         },
       ]
-        .map((row) => JSON.stringify(row))
+        .map((row) => JSON.stringify({ scope: { tier: 'public' }, ...row }))
         .join('\n') + '\n'
     );
     const notCron = new Date('2026-10-02T10:16:00Z');
@@ -1128,13 +1146,24 @@ describe('runtime reliability (DL-02)', () => {
         rootDir: TEST_ROOT,
         hasRole: () => true,
         runLoop: async () => {
+          expect(getReasoningPayloadScope()).toMatchObject({
+            tier: 'public',
+            training_use: 'training_eligible',
+            purpose: 'dot-wake',
+          });
           throw new Error(
             '[reasoning-backend:failover] generateWithTools failed across 0 candidate(s): '
           );
         },
         backend: {
-          delegateTask: async () =>
-            'Fallback.\n```dot-proposals\n[{"title":"Fix","objective":"Do it.","work_shape":"task_session"}]\n```',
+          delegateTask: async () => {
+            expect(getReasoningPayloadScope()).toMatchObject({
+              tier: 'public',
+              training_use: 'training_eligible',
+              purpose: 'dot-wake',
+            });
+            return 'Fallback.\n```dot-proposals\n[{"title":"Fix","objective":"Do it.","work_shape":"task_session"}]\n```';
+          },
         },
         dispatch: (_charter, proposals) => {
           governed.push(...proposals.map((p) => p.title));
@@ -1215,12 +1244,48 @@ describe('runtime reliability (DL-02)', () => {
     expect(dotTokensUsedToday(CHARTER.dot_id, { rootDir: TEST_ROOT })).toBe(100);
   });
 
+  it('reloads and wakes personal charters only as their authenticated owner with private egress scope', async () => {
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-a');
+    const personal: DotCharter = { ...CHARTER, scope: { tier: 'personal', owner_nhi: 'owner-a' } };
+    const dir = personalDotCharterDir('owner-a', TEST_ROOT);
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(`${dir}/dot.json`, JSON.stringify(personal));
+    try {
+      const receipt = await runDotWake(
+        { path: `${dir}/dot.json`, charter: personal },
+        {
+          rootDir: TEST_ROOT,
+          hasRole: () => true,
+          runLoop: async () => {
+            expect(getReasoningPayloadScope()).toMatchObject({
+              tier: 'personal',
+              training_use: 'local_only',
+            });
+            return fakeResult(1, 5);
+          },
+        }
+      );
+      expect(receipt.outcome).toBe('delivered');
+      vi.stubEnv('KYBERION_NHI_ID', 'owner-b');
+      expect(
+        (
+          await runDotWake(
+            { path: `${dir}/dot.json`, charter: personal },
+            { rootDir: TEST_ROOT, hasRole: () => true }
+          )
+        ).outcome
+      ).toBe('failed');
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
   it('keeps tenant failure prose out of the shared ledger and heartbeat', async () => {
     const tenant: DotCharter = {
       ...CHARTER,
       dot_id: 'tenant-dot',
       scope: { tier: 'confidential', tenant_slug: 'acme' },
-      runtime: { heartbeat_id: 'dot-tenant-dot' },
+      runtime: { heartbeat_id: 'dot-tenant-dot', reasoning_training_use: 'no_training' },
     };
     const dir = `${TEST_ROOT}/knowledge/confidential/acme/dots`;
     safeMkdir(dir, { recursive: true });
@@ -1231,6 +1296,11 @@ describe('runtime reliability (DL-02)', () => {
         rootDir: TEST_ROOT,
         hasRole: () => true,
         runLoop: async () => {
+          expect(getReasoningPayloadScope()).toMatchObject({
+            tier: 'confidential',
+            tenant_slug: 'acme',
+            training_use: 'no_training',
+          });
           throw new Error('Acme merger memo leaked into the error');
         },
         backend: { delegateTask: async () => 'unused' },

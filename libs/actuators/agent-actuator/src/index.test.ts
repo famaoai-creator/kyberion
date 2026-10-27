@@ -239,6 +239,32 @@ describe('agent-actuator team composition actions', () => {
     expect(mocks.getAgentExecutionPort).not.toHaveBeenCalled();
     expect(result).toEqual({ status: 'succeeded', execution_kind: 'agent_delegation', receipt });
   });
+  it.each([undefined, ''])(
+    'refuses an explicitly malformed work-item binding instead of using the unclaimed route: %s',
+    async (workItemId) => {
+      const { handleAction } = await import('./agent-actuator-helpers.js');
+      const delegate = vi.fn();
+      mocks.getAgentExecutionPort.mockReturnValue({ delegate });
+      const task: AgentTaskEnvelope = {
+        work_item_id: workItemId,
+        task_id: 'task-invalid-work-item',
+        mission_id: 'MSN-ACTUATOR-INVALID',
+        security_scope: {
+          mission_id: 'MSN-ACTUATOR-INVALID',
+          write_tier: 'public',
+          read_tiers: ['public'],
+          purpose: 'test',
+        },
+        instruction: 'Do not bypass a malformed binding',
+        idempotency_key: 'invalid-binding',
+      };
+      await expect(handleAction({ action: 'delegate', params: { task } })).rejects.toThrow(
+        'work_item_id must be a nonempty string'
+      );
+      expect(delegate).not.toHaveBeenCalled();
+      expect(mocks.delegateCoordinatedAgentTask).not.toHaveBeenCalled();
+    }
+  );
 
   it('propagates coordinated execution failures for WorkItem closure', async () => {
     mocks.delegateCoordinatedAgentTask.mockRejectedValue(new Error('coordinated failure'));

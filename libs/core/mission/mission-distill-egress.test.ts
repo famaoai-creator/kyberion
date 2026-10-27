@@ -59,8 +59,10 @@ vi.mock('./mission-llm.js', async (importOriginal) => {
   };
 });
 vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
-vi.mock('../knowledge/memory-promotion-queue.js', () => ({
+vi.mock('../knowledge/memory-promotion-queue.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../knowledge/memory-promotion-queue.js')>()),
   enqueueMemoryPromotionCandidate: vi.fn(),
+  loadMemoryPromotionCandidate: vi.fn(() => null),
 }));
 vi.mock('../path-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../path-resolver.js')>();

@@ -36,9 +36,22 @@ import {
   resolveAgentRuntimeLaunchMode,
   type AgentRuntimeLaunchMode,
 } from './agent-pane-runtime-bridge.js';
-import { createAgentExecAdapter, hasAgentExecAdapter } from './agent-exec-adapter-bridge.js';
+import {
+  createAgentExecAdapter,
+  hasAgentExecAdapter,
+  canProvideGovernedTaskTools,
+} from './agent-exec-adapter-bridge.js';
 import './agent-exec-adapter-providers.js';
 import './agent-pane-runtime-herdr.js';
+import { createRuntimeForTask } from '../workforce/task-tool-runtime.js';
+import { registerTaskApiAdapters } from '../workforce/task-api-adapter.js';
+import { AgentRuntimeApprovalPendingError } from './agent-prompt-approval-port.js';
+import type { TaskToolRuntime } from '../workforce/task-tool-runtime.js';
+import { withExecutionContextAsync } from '../authority.js';
+import {
+  withReasoningPayloadScope,
+  assertReasoningEgressAllowed,
+} from '../reasoning/reasoning-egress-scope.js';
 
 export type { AgentRuntimeLaunchMode as AgentRuntimeBackend };
 
@@ -62,6 +75,49 @@ function asError(error: unknown): Error {
 
 /** Providers whose exec adapter can launch with every tool disabled (`toolAccess: 'none'`). */
 const TOOL_LOCKDOWN_PROVIDERS: ReadonlySet<string> = new Set(['claude']);
+
+/** The daemon's ambient mission/tenant is never a delegated task's authority. */
+export async function withTaskRuntimeExecution<T>(
+  runtime: TaskToolRuntime,
+  provider: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const { binding } = runtime;
+  runtime.assertCurrent();
+  return withExecutionContextAsync(
+    'task_runtime_worker',
+    () =>
+      withReasoningPayloadScope(
+        {
+          tier: binding.scope.tier ?? 'confidential',
+          tenant_slug: binding.scope.tenant_slug,
+          purpose: 'mission-task',
+          training_use:
+            binding.externalEgress === 'deny'
+              ? 'local_only'
+              : binding.scope.tier === 'public'
+                ? 'training_eligible'
+                : binding.externalEgress === 'allow'
+                  ? 'no_training'
+                  : 'local_only',
+          external_egress: binding.externalEgress,
+          allowed_reasoning_backends: binding.allowedReasoningBackends,
+        },
+        () => {
+          assertReasoningEgressAllowed(provider);
+          return fn();
+        }
+      ),
+    undefined,
+    binding.scope.tenant_slug ?? '',
+    binding.scope.organization_id,
+    {
+      missionId: binding.missionId,
+      projectId: binding.scope.project_id ?? null,
+      taskId: binding.taskId,
+    }
+  );
+}
 
 export interface SpawnOptions {
   agentId?: string;
@@ -310,16 +366,47 @@ function resolveExplicitLifecycleTarget(
 
 const loadProviderLifecycle = () => loadProviderConfig().lifecycle;
 
+function spawnAuthorityKey(options: SpawnOptions, manifestAgentId: string): string {
+  const scope = options.scope ? normalizeEventScope(options.scope) : undefined;
+  return JSON.stringify([
+    manifestAgentId,
+    options.missionId?.trim().toUpperCase(),
+    scope && Object.entries(scope).sort(([a], [b]) => a.localeCompare(b)),
+    options.runtimeOwnerId,
+    options.runtimeOwnerType,
+    options.parentAgentId,
+    options.cwd ?? pathResolver.rootDir(),
+    resolveAgentRuntimeLaunchMode({
+      runtimeBackend: options.runtimeBackend,
+      runtimeMetadata: options.runtimeMetadata,
+    }),
+    options.toolAccess ?? 'default',
+    Boolean(options.hasHuman),
+    Boolean(options.hasUI),
+    Boolean(options.nonInteractive),
+  ]);
+}
+
+function spawnTaskBindingKey(metadata?: Record<string, unknown>): string {
+  return JSON.stringify([
+    metadata?.work_item_id,
+    metadata?.lease_id,
+    metadata?.capability_profile,
+    metadata?.team_role,
+  ]);
+}
+
 class AgentLifecycleManagerImpl {
   private mediators: Map<string, ACPMediator> = new Map();
   private execAdapters: Map<string, AgentAdapter> = new Map();
   private handles: Map<string, AgentHandle> = new Map();
   private pendingSpawns: Map<string, Promise<AgentHandle>> = new Map();
+  private spawnBindings = new Map<string, { authority: string; task: string }>();
   // Canonical supervisor-side admission survives surface-process restarts.
   // Failed stops retain reservations even if an idle sweep forgets its resource.
   private scopedSurfaceReservations = new Map<string, string>();
-  private stoppingScopedRuntimes = new Set<string>();
-  private pendingScopedStops = new Map<string, Promise<void>>();
+  private stoppingRuntimes = new Set<string>();
+  private pendingStops = new Map<string, Promise<void>>();
   private healthInterval: ReturnType<typeof setInterval> | null = null;
   private spawnOptions: Map<string, SpawnOptions> = new Map();
   private runtimeMetrics: Map<string, AgentRuntimeMetrics> = new Map();
@@ -448,9 +535,9 @@ class AgentLifecycleManagerImpl {
     const explicitTarget = resolveExplicitLifecycleTarget(options);
     const requestedProvider = explicitTarget?.provider || options.provider;
     const requestedModelId = explicitTarget?.modelId || options.modelId;
-    if (this.stoppingScopedRuntimes.has(agentId)) {
+    if (this.stoppingRuntimes.has(agentId)) {
       throw new Error(
-        '[AGENT_SURFACE_RUNTIME_STOPPING] Scoped runtime shutdown is pending or uncertain'
+        `[${options.manifestAgentId ? 'AGENT_SURFACE_RUNTIME_STOPPING' : 'AGENT_RUNTIME_STOPPING'}] Runtime shutdown is pending or uncertain`
       );
     }
     if (options.manifestAgentId) {
@@ -476,12 +563,36 @@ class AgentLifecycleManagerImpl {
     }
     const existingHandle = this.handles.get(agentId);
     const existingRecord = agentRegistry.get(agentId);
+    const binding = {
+      authority: spawnAuthorityKey(options, manifestAgentId),
+      task: spawnTaskBindingKey(options.runtimeMetadata),
+    };
+    const heldBinding = this.spawnBindings.get(agentId);
+    if (existingHandle && heldBinding?.authority !== binding.authority)
+      throw new Error(
+        '[AGENT_RUNTIME_BINDING_CONFLICT] A live runtime belongs to a different scope, owner or launch contract'
+      );
     const requestedRuntimeBackend = resolveAgentRuntimeLaunchMode({
       runtimeBackend: options.runtimeBackend,
       runtimeMetadata: options.runtimeMetadata,
     });
     const existingRuntimeBackend =
       parseAgentRuntimeLaunchMode(existingRecord?.metadata?.runtime_backend) || 'pipe';
+    const retainedTask = this.spawnOptions.get(agentId)?.runtimeMetadata;
+    const requestedTask = options.runtimeMetadata;
+    const taskBindingChanged =
+      Boolean(retainedTask?.work_item_id || requestedTask?.work_item_id) &&
+      spawnTaskBindingKey(retainedTask) !== spawnTaskBindingKey(requestedTask);
+    if (existingHandle && taskBindingChanged) {
+      if (existingRecord?.status === 'busy' || existingRecord?.status === 'booting')
+        throw new Error(
+          '[AGENT_TASK_RUNTIME_BUSY] Cannot replace a task tool binding during an active turn'
+        );
+      // Prewarmed runtimes have no WorkItem lease. Tool bindings are immutable
+      // for a process lifetime, so attach a task (or fresh lease) by recreating.
+      await this.shutdown(agentId);
+      return this.spawn(options);
+    }
     if (
       existingHandle &&
       (existingRecord?.status === 'ready' ||
@@ -540,7 +651,13 @@ class AgentLifecycleManagerImpl {
     }
     const pending = this.pendingSpawns.get(agentId);
     if (pending) {
+      if (heldBinding?.authority !== binding.authority || heldBinding.task !== binding.task)
+        throw new Error(
+          '[AGENT_RUNTIME_BINDING_CONFLICT] Concurrent spawn belongs to a different task, scope or owner'
+        );
       const handle = await pending;
+      if (this.spawnBindings.get(agentId) !== heldBinding || this.handles.get(agentId) !== handle)
+        throw new Error('[AGENT_RUNTIME_BINDING_CONFLICT] Concurrent runtime generation changed');
       const record = handle.getRecord();
       if (
         explicitTarget &&
@@ -555,12 +672,18 @@ class AgentLifecycleManagerImpl {
       return handle;
     }
 
-    const pendingSpawn = this.spawnInternal(agentId, options, explicitTarget);
+    this.spawnBindings.set(agentId, binding);
+    const pendingSpawn = Promise.resolve().then(() =>
+      this.spawnInternal(agentId, options, explicitTarget)
+    );
     this.pendingSpawns.set(agentId, pendingSpawn);
     try {
       return await pendingSpawn;
+    } catch (error) {
+      if (this.spawnBindings.get(agentId) === binding) this.spawnBindings.delete(agentId);
+      throw error;
     } finally {
-      this.pendingSpawns.delete(agentId);
+      if (this.pendingSpawns.get(agentId) === pendingSpawn) this.pendingSpawns.delete(agentId);
     }
   }
 
@@ -671,6 +794,21 @@ class AgentLifecycleManagerImpl {
 
     const lifecycleMap = loadProviderLifecycle();
     const config = lifecycleMap[resolvedOptions.provider];
+    // Validate the claimed task before publishing a booting runtime. A missing
+    // or expired lease is a preflight refusal, not a stranded booting agent.
+    registerTaskApiAdapters();
+    const taskToolRuntime = createRuntimeForTask(runtimeMetadata, resolvedScope, {
+      actorId: agentId,
+    });
+    if (
+      taskToolRuntime &&
+      (resolvedOptions.toolAccess === 'none' ||
+        runtimeBackend === 'pane' ||
+        !canProvideGovernedTaskTools(resolvedOptions.provider))
+    )
+      throw new Error(
+        '[TASK_TOOL_CAPABILITY_UNAVAILABLE] Claimed tasks require a verified governed task-tool host; pane, raw ACP, and dropped bindings are unsupported'
+      );
 
     // Register in registry
     agentRegistry.register({
@@ -810,18 +948,7 @@ class AgentLifecycleManagerImpl {
             throw e;
           }
         },
-        shutdown: async () => {
-          if (resolvedOptions.manifestAgentId) return this.shutdown(agentId);
-          await paneBackend.shutdown();
-          this.execAdapters.delete(agentId);
-          this.handles.delete(agentId);
-          runtimeSupervisor.unregister(agentId);
-          this.releaseIdentityInstance(agentId, 'shutdown');
-          agentRegistry.updateStatus(agentId, 'shutdown');
-          agentRegistry.unregister(agentId);
-          this.spawnOptions.delete(agentId);
-          this.runtimeMetrics.delete(agentId);
-        },
+        shutdown: async () => this.shutdownHandle(agentId, handle),
         getRecord: () => agentRegistry.get(agentId),
       };
       this.handles.set(agentId, handle);
@@ -829,6 +956,7 @@ class AgentLifecycleManagerImpl {
     }
 
     // Pipe/exec adapters (Claude, Codex, Agy, …) resolve via the exec-adapter seam
+    registerTaskApiAdapters();
     if (await hasAgentExecAdapter(resolvedOptions.provider)) {
       const taskModelHint = readTaskModelHint(runtimeMetadata);
       const adapter = await createAgentExecAdapter({
@@ -839,15 +967,34 @@ class AgentLifecycleManagerImpl {
         effort: taskModelHint?.effort,
         allowedActuators: manifest?.allowedActuators,
         deniedActuators: manifest?.deniedActuators,
+        taskToolRuntime,
+        capabilityProfile: taskToolRuntime?.binding.capabilityProfile,
+        agentId,
+        missionId: resolvedOptions.missionId,
+        scope: resolvedScope,
         ...(resolvedOptions.toolAccess === 'none' ? { toolsDisabled: true } : {}),
       });
 
       // A failed/slow boot still belongs to the scoped stop request. Keep the
       // adapter reachable before awaiting boot, so cleanup cannot acknowledge
       // a stop while abandoning the partially created provider resource.
-      if (resolvedOptions.manifestAgentId) this.execAdapters.set(agentId, adapter);
-      await adapter.boot();
       this.execAdapters.set(agentId, adapter);
+      try {
+        await adapter.boot();
+      } catch (error) {
+        try {
+          await this.shutdownRuntime(agentId);
+          if (resolvedOptions.manifestAgentId && resolvedOptions.runtimeOwnerId)
+            this.scopedSurfaceReservations.delete(resolvedOptions.runtimeOwnerId);
+        } catch (cleanupError) {
+          this.stoppingRuntimes.add(agentId);
+          agentRegistry.updateStatus(agentId, 'error');
+          throw new Error(
+            `[AGENT_BOOT_CLEANUP_UNCERTAIN] Provider boot failed and cleanup could not be confirmed: ${errorMessage(cleanupError)}`
+          );
+        }
+        throw error;
+      }
       runtimeSupervisor.register({
         resourceId: agentId,
         kind: 'agent',
@@ -878,32 +1025,69 @@ class AgentLifecycleManagerImpl {
           agentRegistry.updateStatus(agentId, 'busy');
           agentRegistry.touch(agentId);
           runtimeSupervisor.touch(agentId);
+          const controller = new AbortController();
+          const timeoutMs = options.timeoutMs ?? resolvedOptions.turnTimeoutMs;
+          let timedOut = false;
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          const deadline = new Promise<never>((_resolve, reject) => {
+            if (timeoutMs !== undefined && Number.isFinite(timeoutMs) && timeoutMs > 0)
+              timer = setTimeout(() => {
+                timedOut = true;
+                const error = new Error(
+                  '[AGENT_TURN_TIMEOUT] Provider task exceeded its dispatch deadline'
+                );
+                controller.abort(error);
+                reject(error);
+              }, timeoutMs);
+          });
           try {
-            const res = await adapter.ask(prompt);
+            taskToolRuntime?.assertCurrent();
+            const turn = taskToolRuntime
+              ? await withTaskRuntimeExecution(
+                  taskToolRuntime,
+                  resolvedOptions.provider,
+                  async () => {
+                    const result = await Promise.race([
+                      adapter.ask(prompt, { signal: controller.signal }),
+                      deadline,
+                    ]);
+                    taskToolRuntime.assertComplete?.();
+                    return result;
+                  }
+                )
+              : await Promise.race([adapter.ask(prompt, { signal: controller.signal }), deadline]);
+            const res = turn;
             agentRegistry.updateStatus(agentId, 'ready');
             this.observeSuccess(agentId, prompt, res.text, res.stopReason, options.model_tier);
             return res.text;
           } catch (e: unknown) {
+            if (
+              e instanceof AgentRuntimeApprovalPendingError ||
+              (isRecord(e) && e.code === 'AGENT_APPROVAL_PENDING')
+            ) {
+              agentRegistry.updateStatus(agentId, 'ready');
+              throw e;
+            }
             agentRegistry.updateStatus(agentId, 'error');
             this.observeFailure(agentId, prompt, asError(e));
+            if (timedOut) {
+              // A socket deadline alone leaves the remote model occupying the
+              // runtime. Confirm shutdown before a new claim may reuse it.
+              try {
+                await this.shutdown(agentId);
+              } catch {
+                this.stoppingRuntimes.add(agentId);
+                throw new Error(
+                  '[AGENT_CANCEL_UNCERTAIN] Timed-out runtime cleanup could not be confirmed; inspect the provider before retrying'
+                );
+              }
+            }
             throw e;
+          } finally {
+            if (timer) clearTimeout(timer);
           }
         },
-        shutdown: async () => {
-          if (resolvedOptions.manifestAgentId) return this.shutdown(agentId);
-          await adapter.shutdown();
-          this.execAdapters.delete(agentId);
-          this.handles.delete(agentId);
-          runtimeSupervisor.unregister(agentId);
-          // NI-01: release the runtime-instance binding (identity persists
-          // until explicitly retired). Must run before unregister — the
-          // nhi_id lives in the registry record's metadata.
-          this.releaseIdentityInstance(agentId, 'shutdown');
-          agentRegistry.updateStatus(agentId, 'shutdown');
-          agentRegistry.unregister(agentId);
-          this.spawnOptions.delete(agentId);
-          this.runtimeMetrics.delete(agentId);
-        },
+        shutdown: async () => this.shutdownHandle(agentId, handle),
         getRecord: () => agentRegistry.get(agentId),
       };
       this.handles.set(agentId, handle);
@@ -1013,7 +1197,7 @@ class AgentLifecycleManagerImpl {
           throw e;
         }
       },
-      shutdown: async () => this.shutdown(agentId),
+      shutdown: async () => this.shutdownHandle(agentId, handle),
       getRecord: () => agentRegistry.get(agentId),
     };
     this.handles.set(agentId, handle);
@@ -1032,29 +1216,32 @@ class AgentLifecycleManagerImpl {
     if (nhiId) releaseAgentRuntimeInstanceBestEffort(nhiId, agentId, reason);
   }
 
+  private async shutdownHandle(agentId: string, handle: AgentHandle): Promise<void> {
+    if (this.handles.get(agentId) === handle) await this.shutdown(agentId);
+  }
+
   async shutdown(agentId: string): Promise<void> {
     const reservation = [...this.scopedSurfaceReservations.entries()].find(
       ([, runtimeId]) => runtimeId === agentId
     );
-    if (!reservation) return this.shutdownRuntime(agentId);
-    const existingStop = this.pendingScopedStops.get(agentId);
+    const existingStop = this.pendingStops.get(agentId);
     if (existingStop) return existingStop;
-    this.stoppingScopedRuntimes.add(agentId);
+    this.stoppingRuntimes.add(agentId);
     const pendingSpawn = this.pendingSpawns.get(agentId);
-    const stop = (async () => {
+    const stop = Promise.resolve().then(async () => {
       // Ensure publication settles BEFORE acknowledging stop. In particular,
       // a timed-out daemon ensure may still be waiting in adapter.boot().
       // A boot rejection is not itself successful cleanup of the adapter.
       if (pendingSpawn) await pendingSpawn.catch(() => undefined);
       await this.shutdownRuntime(agentId);
-      this.scopedSurfaceReservations.delete(reservation[0]);
-      this.stoppingScopedRuntimes.delete(agentId);
-    })();
-    this.pendingScopedStops.set(agentId, stop);
+      if (reservation) this.scopedSurfaceReservations.delete(reservation[0]);
+      this.stoppingRuntimes.delete(agentId);
+    });
+    this.pendingStops.set(agentId, stop);
     try {
       await stop;
     } finally {
-      this.pendingScopedStops.delete(agentId);
+      if (this.pendingStops.get(agentId) === stop) this.pendingStops.delete(agentId);
     }
   }
 
@@ -1071,6 +1258,7 @@ class AgentLifecycleManagerImpl {
     }
     this.handles.delete(agentId);
     this.pendingSpawns.delete(agentId);
+    this.spawnBindings.delete(agentId);
     runtimeSupervisor.unregister(agentId);
     this.releaseIdentityInstance(agentId, 'shutdown');
     agentRegistry.updateStatus(agentId, 'shutdown');

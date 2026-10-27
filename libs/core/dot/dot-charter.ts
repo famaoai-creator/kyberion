@@ -12,9 +12,12 @@ import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
  * Layout mirrors the pipeline convention: repo-level charters live in `dots/`,
  * tenant-scoped charters in `knowledge/confidential/{tenant}/dots/` (scanned
  * and executed by the tenant-bound runner, same as scheduled pipelines).
+ * Personal charters live in `knowledge/personal/dots/<owner-hash>/` and are
+ * discovered only for the current authenticated owner identity.
  */
 
 import * as path from 'node:path';
+import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
@@ -133,6 +136,8 @@ export interface DotCharter {
     tenant_slug?: string;
     organization_id?: string;
     project_id?: string;
+    /** Personal charters are bound to one authenticated process identity. */
+    owner_nhi?: string;
   };
   goal: {
     statement: string;
@@ -215,6 +220,8 @@ export interface DotCharter {
     execution_mode?: 'front_desk_diagnostic';
     heartbeat_id: string;
     reasoning_backend?: string;
+    /** Operator-authored data posture; provider attestation and egress gates still apply. */
+    reasoning_training_use?: 'local_only' | 'no_training' | 'zero_retention';
     max_idle_wake_ms?: number;
     /** Hours of missed cron runs coalesced into one catch-up wake (1-24, default 6). */
     cron_catch_up_hours?: number;
@@ -345,6 +352,29 @@ export interface DotCharterSource {
   path: string;
   /** Set for `knowledge/confidential/<slug>/dots/*.json`; absent for repo-level `dots/`. */
   tenant_slug?: string;
+  owner_nhi?: string;
+}
+
+export function personalDotCharterDir(ownerNhi: string, rootDir = pathResolver.rootDir()): string {
+  if (!ownerNhi.trim()) throw new Error('[DOT_PERSONAL_OWNER] owner_nhi is required');
+  return path.join(
+    rootDir,
+    'knowledge/personal/dots',
+    createHash('sha256').update(ownerNhi).digest('hex')
+  );
+}
+
+function listPersonalDotCharterSources(rootDir: string): DotCharterSource[] {
+  const owner = getRegisteredEnvText('KYBERION_NHI_ID')?.trim();
+  if (!owner) return [];
+  try {
+    const dir = personalDotCharterDir(owner, rootDir);
+    return safeExistsSync(dir)
+      ? jsonChildren(dir).map((filePath) => ({ path: filePath, owner_nhi: owner }))
+      : [];
+  } catch {
+    return [];
+  } // An unprivileged process never assumes the personal owner's role to discover it.
 }
 
 /**
@@ -397,9 +427,11 @@ export function listDotCharterSources(rootDir = pathResolver.rootDir()): DotChar
   const repoLevel: DotCharterSource[] = safeExistsSync(dir)
     ? jsonChildren(dir).map((filePath) => ({ path: filePath }))
     : [];
-  return [...repoLevel, ...listTenantDotCharterSources(rootDir)].sort((a, b) =>
-    a.path < b.path ? -1 : a.path > b.path ? 1 : 0
-  );
+  return [
+    ...repoLevel,
+    ...listTenantDotCharterSources(rootDir),
+    ...listPersonalDotCharterSources(rootDir),
+  ].sort((a, b) => (a.path < b.path ? -1 : a.path > b.path ? 1 : 0));
 }
 
 export function listDotCharterPaths(rootDir = pathResolver.rootDir()): string[] {
@@ -415,9 +447,48 @@ export function listDotCharterPaths(rootDir = pathResolver.rootDir()): string[] 
  * `dots/` charters keep their declared scope (e.g. an org dot bound to the
  * operator's own tenant).
  */
+export function rereadOwnDotCharter(loaded: LoadedDotCharter): DotCharter {
+  const normalized = loaded.path.split(path.sep).join('/');
+  const dirTenant = normalized.match(/(?:^|\/)knowledge\/confidential\/([^/]+)\/dots\/[^/]+$/)?.[1];
+  const owner = loaded.charter.scope.owner_nhi;
+  const personalSuffix = owner
+    ? personalDotCharterDir(owner, '').split(path.sep).join('/') + '/'
+    : undefined;
+  const personalSource =
+    personalSuffix &&
+    (normalized.includes('/' + personalSuffix) || normalized.startsWith(personalSuffix));
+  return loadDotCharterSource({
+    path: loaded.path,
+    ...(dirTenant ? { tenant_slug: dirTenant } : {}),
+    ...(personalSource ? { owner_nhi: owner } : {}),
+  });
+}
+
 export function loadDotCharterSource(source: DotCharterSource): DotCharter {
+  if (source.owner_nhi) {
+    if (source.owner_nhi !== getRegisteredEnvText('KYBERION_NHI_ID')?.trim())
+      throw new Error('[DOT_PERSONAL_OWNER] personal charter is not owned by this process');
+    const normalized = path.resolve(source.path).split(path.sep).join('/');
+    const ownerSuffix = personalDotCharterDir(source.owner_nhi, '').split(path.sep).join('/') + '/';
+    if (
+      !normalized.includes('/' + ownerSuffix) ||
+      normalized.slice(normalized.indexOf('/' + ownerSuffix) + ownerSuffix.length + 1).includes('/')
+    )
+      throw new Error(
+        '[DOT_PERSONAL_OWNER] personal charter must live directly in its owner directory'
+      );
+    const charter = loadDotCharter(source.path);
+    if (charter.scope.tier !== 'personal' || charter.scope.owner_nhi !== source.owner_nhi)
+      throw new Error('[DOT_PERSONAL_OWNER] personal charter must match its owner directory');
+    return charter;
+  }
   const slug = source.tenant_slug;
-  if (!slug) return loadDotCharter(source.path);
+  if (!slug) {
+    const charter = loadDotCharter(source.path);
+    if (charter.scope.tier === 'personal')
+      throw new Error('[DOT_PERSONAL_OWNER] personal charter must live in its owner directory');
+    return charter;
+  }
   const charter = withExecutionContext(
     DOT_TENANT_SCAN_ROLE,
     () => loadDotCharter(source.path),

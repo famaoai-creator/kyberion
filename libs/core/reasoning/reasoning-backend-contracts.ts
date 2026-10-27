@@ -304,6 +304,7 @@ export interface ToolDefinition {
   inputSchema: {
     type: 'object';
     properties: Record<string, any>;
+    additionalProperties?: boolean;
     required?: string[];
   };
 }

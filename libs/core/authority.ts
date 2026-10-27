@@ -56,9 +56,15 @@ import {
   runInExecutionScope,
   scopedAssumedRole,
   type ExecutionScope,
+  type ExecutionIdentityBinding,
 } from './foundation/execution-scope.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
 import { traceRoleAssumption } from './organization/role-assumption-trace.js';
+import { resolveTenant } from './organization/tenant-registry.js';
+import {
+  registerOperationalTenantMembership,
+  registerOperationalAlertStore,
+} from './foundation/operational-store-policy.js';
 const logger = createLogger('authority');
 
 type RolePersonaIndex = {
@@ -73,6 +79,8 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   integration_steward: 'ecosystem_architect',
   reliability_engineer: 'worker',
   infrastructure_sentinel: 'worker',
+  ops_alert_store: 'worker',
+  task_runtime_worker: 'worker',
   // mission roles
   sovereign_concierge: 'sovereign',
   mission_controller: 'worker',
@@ -603,6 +611,17 @@ export function buildExecutionEnv(
   persona?: Persona
 ): NodeJS.ProcessEnv {
   const nextEnv: NodeJS.ProcessEnv = { ...baseEnv };
+  const identity = currentExecutionScope()?.executionIdentity;
+  if (identity) {
+    for (const [field, keys] of [
+      ['missionId', ['MISSION_ID']],
+      ['projectId', ['KYBERION_PROJECT_ID']],
+      ['taskId', ['KYBERION_TASK_ID', 'TASK_ID']],
+    ] as const) {
+      if (identity[field] !== undefined)
+        for (const key of keys) nextEnv[key] = identity[field] ?? '';
+    }
+  }
   if (!role && !persona && baseEnv === process.env) {
     const scope = currentExecutionScope();
     if (scope?.assumedRole) {
@@ -759,9 +778,15 @@ function prepareExecutionContext(
   role: string,
   persona: Persona | undefined,
   tenantSlug: string | undefined,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  identity?: ExecutionIdentityBinding
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
+  const executionIdentity = { ...currentExecutionScope()?.executionIdentity, ...identity };
+  for (const value of Object.values(executionIdentity)) {
+    if (value !== null && value !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value))
+      throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
+  }
   assertRoleAssumptionAllowed(normalizedRole);
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
   if (normalizedRole === MEMORY_PROVENANCE_READER_ROLE) {
@@ -879,6 +904,9 @@ function prepareExecutionContext(
       tenantBound: tenantSlug !== undefined,
       ...(tenantSlug ? { tenantSlug } : {}),
       ...(organizationId ? { organizationId } : {}),
+      ...(Object.keys(executionIdentity).length
+        ? { executionIdentity: Object.freeze(executionIdentity) }
+        : {}),
       assumedRole: normalizedRole,
       assumedPersona,
     },
@@ -937,9 +965,10 @@ export function withExecutionContext<T>(
   fn: () => T,
   persona?: Persona,
   tenantSlug?: string,
-  organizationId?: string
+  organizationId?: string,
+  identity?: ExecutionIdentityBinding
 ): T {
-  const prepared = prepareExecutionContext(role, persona, tenantSlug, organizationId);
+  const prepared = prepareExecutionContext(role, persona, tenantSlug, organizationId, identity);
   const previousRole = getRegisteredEnvText('MISSION_ROLE');
   const previousPersona = getRegisteredEnvText('KYBERION_PERSONA');
   const written = applyExecutionEnv(prepared.role, persona, prepared.resolvedPersona);
@@ -965,9 +994,10 @@ export async function withExecutionContextAsync<T>(
   fn: () => Promise<T> | T,
   persona?: Persona,
   tenantSlug?: string,
-  organizationId?: string
+  organizationId?: string,
+  identity?: ExecutionIdentityBinding
 ): Promise<T> {
-  const prepared = prepareExecutionContext(role, persona, tenantSlug, organizationId);
+  const prepared = prepareExecutionContext(role, persona, tenantSlug, organizationId, identity);
   return await runInExecutionScope(prepared.scope, fn);
 }
 
@@ -1079,7 +1109,11 @@ function resolveGrantActorNhiId(role: string | undefined): string | undefined {
 
 export function resolveIdentityContext(tenantOverride?: string): IdentityContext {
   const projectScope = resolveProjectScope();
-  const missionId = getRegisteredEnvText('MISSION_ID')?.trim() || projectScope.missionId;
+  const identity = currentExecutionScope()?.executionIdentity;
+  const missionId =
+    identity?.missionId !== undefined
+      ? (identity.missionId ?? undefined)
+      : getRegisteredEnvText('MISSION_ID')?.trim() || projectScope.missionId;
   const envPersona = resolveExecutionPersona();
   const envRole = resolveRole();
 
@@ -1211,7 +1245,10 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
       if (taskGrantsPath && rawExistsSync(taskGrantsPath)) {
         const actorNhiId = resolveGrantActorNhiId(envRole);
         if (actorNhiId) {
-          const taskId = getRegisteredEnvText('TASK_ID')?.trim() || projectScope.taskId;
+          const taskId =
+            identity?.taskId !== undefined
+              ? (identity.taskId ?? undefined)
+              : getRegisteredEnvText('TASK_ID')?.trim() || projectScope.taskId;
           const latestGrants = new Map<string, JsonRecord>();
           for (const line of rawReadTextFile(taskGrantsPath).split('\n')) {
             const trimmed = line.trim();
@@ -1317,6 +1354,15 @@ export function resolveIdentityContext(tenantOverride?: string): IdentityContext
 }
 
 registerIdentityContextResolver(resolveIdentityContext);
+registerOperationalTenantMembership((tenant, rootDir) =>
+  withExecutionContext(
+    'workspace_tenant_registry_reader',
+    () => Boolean(resolveTenant(tenant, { rootDir })),
+    'worker',
+    tenant
+  )
+);
+registerOperationalAlertStore((fn) => withExecutionContext('ops_alert_store', fn, 'worker'));
 
 /**
  * G17: the audit chain's tenant mirror (customer/{slug}/logs/audit/) is written

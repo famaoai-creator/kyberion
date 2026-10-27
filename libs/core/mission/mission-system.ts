@@ -262,7 +262,8 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
       teamRole?: string,
       actorId?: string,
       actorType?: 'agent' | 'human' | 'service',
-      provider?: string
+      provider?: string,
+      taskBinding?: import('./mission-task-evidence-binding.js').TaskEvidenceBinding
     ) {
       return _recordEvidence({
         missionId,
@@ -273,6 +274,7 @@ export function buildMissionSystem(rootDir = pathResolver.rootDir()) {
         actorId,
         actorType,
         provider,
+        taskBinding,
         getGitHash,
         syncProjectLedgerIfLinked: syncProjectLedgerIfLinkedInternal,
       }).then(() => syncProjectOperationalStateIfLinked(missionId));

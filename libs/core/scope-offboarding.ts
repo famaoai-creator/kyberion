@@ -56,7 +56,11 @@ import {
   PARTITIONED_RUNTIME_STATE_ROOTS,
   metricsLedgerLockId,
   metricsRowTenant,
+  tenantRuntimePartitionOf,
+  tenantRuntimePartitionPaths,
+  type TenantRuntimePartitionKey,
 } from './storage-layout.js';
+import { isValidTenantSlug } from './foundation/scope.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { retireIdentitiesForScopeBestEffort } from './nhi-lifecycle-governance.js';
 import { revokeGrantsForTenantBestEffort } from './task/task-scoped-grants.js';
@@ -301,7 +305,13 @@ export type OffboardTargetKind =
   /** The tenant's approval store partition (requests, passkey challenges, event logs; one per tier). */
   | 'tenant_approvals'
   /** The tenant's customer decision invite records (CD-06; one partition per tier). */
-  | 'customer_decision_invites';
+  | 'customer_decision_invites'
+  /**
+   * The tenant's partition of another registered runtime state root (pipeline
+   * library runs, autonomy learning, external operations, hearing, discussion
+   * create requests, standing grants; one partition per root and tier).
+   */
+  | 'tenant_runtime_state';
 
 export interface OffboardTarget {
   /** Repo-relative POSIX path. */
@@ -324,6 +334,8 @@ export interface OffboardVerification {
   clean: boolean;
   /** Repo-relative paths (or annotated registry refs) still carrying scope traces. */
   leftovers: string[];
+  /** Set when the leftover scan itself failed: the scope is not proven clean. */
+  error?: string;
 }
 
 export interface OffboardScopeResult {
@@ -424,6 +436,30 @@ const METRICS_LEDGERS: readonly MetricsLedgerOffboarding[] = [
 ];
 
 const SCOPE_TIERS = ['personal', 'confidential', 'public'] as const;
+
+/**
+ * Offboarding disposition of every tenant-partitioned runtime root. `null`
+ * leaves the partition in place. The `satisfies` clause makes a newly
+ * registered root fail to compile until its disposition is decided here.
+ */
+export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
+  // Resident-dot state: load-bearing append-only state; the retention catalog
+  // requires audited review before tenant offboarding deletes it.
+  dot: 'not_offboarded',
+  resource_usage: 'tenant_usage_ledger',
+  execution_metrics: 'tenant_execution_metrics',
+  tenant_ledger: 'tenant_ledger',
+  tenant_approvals: 'tenant_approvals',
+  customer_decision_invites: 'customer_decision_invites',
+  pipeline_library_runs: 'tenant_runtime_state',
+  autonomy_learning: 'tenant_runtime_state',
+  external_operations: 'tenant_runtime_state',
+  // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
+  hearing: 'not_offboarded',
+  // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
+  discussion_create_requests: 'not_offboarded',
+  grants: 'tenant_runtime_state',
+} as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**
  * Repo-relative knowledge root for a tenant slug. Deliberately the
@@ -843,45 +879,39 @@ export function collectScopeTargets(
         targets.push({ path: subtree, kind: 'ingest_cursors_tree' });
       }
     }
-    // The tenant's metrics-ledger partitions must not outlive the tenant.
-    for (const ledger of METRICS_LEDGERS) {
-      for (const tier of SCOPE_TIERS) {
-        const subtree = `${ledger.partition_root}/${tier}/${id}`;
+    // Every tenant-partitioned runtime root (storage-layout registry): the
+    // tenant's `<root>/<tier>/<tenant>` partitions must not outlive the tenant;
+    // other tenants' partitions stay. Notes per root:
+    // - D9 hybrid ledger: rows written before D9 still hold tenant mission ids
+    //   in the hash-chained system ledger; that file is append-only, so
+    //   offboarding leaves those rows (not pruned).
+    // - Approval store: tenant records written before the partition existed may
+    //   still sit in the system approval tree until the hygiene migration moves
+    //   them (approval_store_hygiene --migrate-tenant-partitions); their
+    //   append-only event-log lines stay.
+    // - Metrics ledgers: pre-partition rows of the system file are pruned below
+    //   (METRICS_LEDGERS).
+    if (isValidTenantSlug(id)) {
+      // A partition this process cannot even probe is listed (fail loud: its
+      // removal then fails visibly) rather than silently skipped.
+      // Null-disposition roots are never probed, listed or counted as leftovers.
+      const offboarded = (subtree: string): boolean => {
+        const key = tenantRuntimePartitionOf(subtree)?.key;
+        return key !== undefined && TENANT_RUNTIME_PARTITION_TARGET_KINDS[key] !== 'not_offboarded';
+      };
+      const present = (subtree: string): boolean => {
+        if (!offboarded(subtree)) return false;
         const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-        if (subtreePath && safeExistsSync(subtreePath)) {
-          targets.push({ path: subtree, kind: ledger.target_kind });
+        if (!subtreePath) return false;
+        try {
+          return safeExistsSync(subtreePath);
+        } catch {
+          return true;
         }
-      }
-    }
-    // D9: the tenant's hybrid-ledger partitions (tenant mission events). New
-    // records never reach the system ledger, but rows written before D9 still
-    // hold tenant mission ids (and some tenant slugs) there; that hash-chained
-    // file is append-only, so offboarding leaves those rows (not pruned).
-    for (const tier of SCOPE_TIERS) {
-      const subtree = `${TENANT_LEDGER_REPO_SUBPATH}/${tier}/${id}`;
-      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-      if (subtreePath && safeExistsSync(subtreePath)) {
-        targets.push({ path: subtree, kind: 'tenant_ledger' });
-      }
-    }
-    // The tenant's approval store partitions. Tenant records written before
-    // the partition existed may still sit in the system approval tree until
-    // the hygiene migration moves them (approval_store_hygiene
-    // --migrate-tenant-partitions); their append-only event-log lines stay.
-    for (const tier of SCOPE_TIERS) {
-      const subtree = `${TENANT_APPROVALS_REPO_SUBPATH}/${tier}/${id}`;
-      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-      if (subtreePath && safeExistsSync(subtreePath)) {
-        targets.push({ path: subtree, kind: 'tenant_approvals' });
-      }
-    }
-    // CD-10: the tenant's customer decision invites (hashed secrets, participant
-    // names) must not outlive the tenant; other tenants' partitions stay.
-    for (const tier of SCOPE_TIERS) {
-      const subtree = `${CUSTOMER_DECISION_INVITES_REPO_SUBPATH}/${tier}/${id}`;
-      const subtreePath = safeOptionalRepositoryPath(pathResolver.rootResolve(subtree));
-      if (subtreePath && safeExistsSync(subtreePath)) {
-        targets.push({ path: subtree, kind: 'customer_decision_invites' });
+      };
+      for (const partition of tenantRuntimePartitionPaths(id, present)) {
+        const kind = TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key];
+        if (kind !== 'not_offboarded') targets.push({ path: partition.path, kind });
       }
     }
   }
@@ -1029,10 +1059,8 @@ export function verifyScopeOffboarded(
   try {
     leftovers = collectScopeTargets(scopeType, id, filter).map((target) => target.path);
   } catch (error) {
-    return {
-      clean: false,
-      leftovers: [error instanceof Error ? error.message : String(error)],
-    };
+    const message = error instanceof Error ? error.message : String(error);
+    return { clean: false, leftovers: [message], error: message };
   }
 
   if (scopeType === 'tenant' && id) {
@@ -1440,11 +1468,32 @@ export function offboardScope(input: OffboardScopeInput): OffboardScopeResult {
             `leftovers: ${result.verification.leftovers.join(', ')}`
         );
       }
+      // A tenant runtime partition that survived is a failed offboarding, not
+      // a warning: its records (ledgers, grants, approvals) outlive the tenant.
+      const partitionLeftovers =
+        scopeType === 'tenant'
+          ? result.verification.leftovers.filter((leftover) => {
+              const partition = tenantRuntimePartitionOf(leftover);
+              return (
+                partition?.tenant === scopeId &&
+                TENANT_RUNTIME_PARTITION_TARGET_KINDS[partition.key] !== 'not_offboarded'
+              );
+            })
+          : [];
+      if (result.verification.error) {
+        result.status = 'error';
+        result.reason = `[OFFBOARD_VERIFICATION_FAILED] post-offboard verification could not run — the scope may still hold data | next: fix the cause and rerun the offboarding (idempotent) | evidence: ${result.verification.error}`;
+      } else if (partitionLeftovers.length > 0) {
+        result.status = 'error';
+        result.reason = `[OFFBOARD_PARTITION_LEFTOVER] tenant runtime partition(s) were not removed — the tenant's records outlive it | next: check this process's write grant on the partitions (tenant ledger and approval partitions need the sovereign persona), then rerun the offboarding | evidence: ${partitionLeftovers.join(', ')}`;
+      }
     } catch (err) {
+      // An offboarding that cannot prove itself clean is not reported as done.
+      const message = err instanceof Error ? err.message : String(err);
+      result.status = 'error';
+      result.reason = `[OFFBOARD_VERIFICATION_FAILED] post-offboard verification could not run — the scope may still hold data | next: fix the cause and rerun the offboarding (idempotent) | evidence: ${message}`;
       logger.warn(
-        `[scope-offboarding] post-offboard verification failed for ${scopeType} '${scopeId}': ${
-          err instanceof Error ? err.message : String(err)
-        }`
+        `[scope-offboarding] post-offboard verification failed for ${scopeType} '${scopeId}': ${message}`
       );
     }
 
