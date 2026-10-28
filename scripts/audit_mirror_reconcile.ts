@@ -24,6 +24,7 @@ import {
   validateHumanFinalDecision,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
+import { markApprovalConsumed } from '@agent/core/governance/approval-revocation';
 import { missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -389,7 +390,7 @@ function assertAuditMirrorApproval(
   approvalRequestId: string,
   missionId: string,
   findings: AuditMirrorFinding[]
-): ApprovalRequestRecord {
+): { approval: ApprovalRequestRecord; humanDecider: string } {
   const approval = loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, approvalRequestId);
   const humanApproval = approval?.workflow?.approvals?.find(
     (entry) =>
@@ -398,6 +399,13 @@ function assertAuditMirrorApproval(
   if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
     throw new Error(
       `[POLICY_VIOLATION] SA-01 requires an approved mission_gate request: ${approvalRequestId}`
+    );
+  }
+  // The same drift can recur with identical findings, so the payload hash
+  // alone does not stop a replay: an approval authorizes one apply.
+  if (approval.consumption || approval.applyClaim || approval.applyResult) {
+    throw new Error(
+      `[POLICY_VIOLATION] SA-01 approval ${approval.id} was already used${approval.consumption ? ` by ${approval.consumption.consumer} at ${approval.consumption.consumedAt}` : ''}; request a new one with \`pnpm kyberion audit mirror-reconcile --request-approval\``
     );
   }
   assertApprovalUsable(approval, { consumer: 'audit_mirror_reconcile' });
@@ -425,7 +433,11 @@ function assertAuditMirrorApproval(
     effectBinding: humanApproval.effectBinding,
     phase: 'recheck',
   });
-  return approval;
+  const humanDecider = humanApproval.approvedBy || approval.decidedBy;
+  if (!humanDecider) {
+    throw new Error('[POLICY_VIOLATION] SA-01 approval does not name its human decider');
+  }
+  return { approval, humanDecider };
 }
 
 function rebuildMirror(
@@ -470,17 +482,18 @@ export function runAuditMirrorReconciliation(input: {
 }): AuditMirrorReceipt {
   const rootDir = input.rootDir || pathResolver.rootDir();
   const findings = collectAuditMirrorFindings(rootDir);
-  const approval = input.apply
+  const checked = input.apply
     ? input.approvalRequestId
       ? assertAuditMirrorApproval(input.approvalRequestId, input.missionId, findings)
       : (() => {
           throw new Error('--approval-request-id is required with --apply');
         })()
     : undefined;
+  const approval = checked?.approval;
   const receipt: AuditMirrorReceipt = {
     mission_id: input.missionId,
     mode: input.apply ? 'apply' : 'dry-run',
-    ...(approval?.decidedBy ? { approved_by: approval.decidedBy } : {}),
+    ...(checked ? { approved_by: checked.humanDecider } : {}),
     ...(approval ? { approval_request_id: approval.id } : {}),
     generated_at: nowIso(),
     findings,
@@ -488,12 +501,22 @@ export function runAuditMirrorReconciliation(input: {
     rebuilt: [],
   };
 
-  if (input.apply) {
+  if (checked) {
     const masterByTenant = masterEntriesByTenant(rootDir);
     const archiveRoot = assertSafeRepositoryPath(
       path.join(rootDir, 'active/archive/.trash', `audit-mirror-${Date.now().toString(36)}`),
       { allowMissingLeaf: true, rootDir }
     );
+    // Consume before the effect: the store lock refuses a second consumer, so
+    // two concurrent applies cannot both run, and a failed apply needs a new
+    // approval rather than a retry on the old one.
+    markApprovalConsumed('mission_controller', {
+      channel: AUDIT_MIRROR_APPROVAL_CHANNEL,
+      requestId: checked.approval.id,
+      consumer: 'audit_mirror_reconcile',
+      consumedBy: checked.humanDecider,
+      effectRef: path.relative(rootDir, archiveRoot).replaceAll(path.sep, '/'),
+    });
     withExecutionContext(
       'mission_controller',
       () => {
