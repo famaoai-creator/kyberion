@@ -110,7 +110,11 @@ describe('describeImage with the reasoning_vision provider', () => {
         media_type: 'image/png',
       },
     ]);
-    expect(calls[0].scope).toMatchObject({ tier: 'public', purpose: 'image description' });
+    expect(calls[0].scope).toMatchObject({
+      tier: 'public',
+      purpose: 'image description',
+      attachment_count: 1,
+    });
   });
 
   it('raises a declared tier to the tier implied by the image path, never lowers it', async () => {

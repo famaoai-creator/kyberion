@@ -13,6 +13,7 @@ import {
   runVisualReview,
   visualReviewResponseSchema,
 } from './visual-review.js';
+import { getReasoningPayloadScope } from './reasoning/reasoning-egress-scope.js';
 import { runVisualReviewLoop } from './visual-review-loop.js';
 import type { ContextSecurityScope } from './context-security-scope.js';
 
@@ -87,7 +88,10 @@ describe('egress control', () => {
       artifactKind: 'pptx',
       scope: LOCKED_SCOPE,
       backendName: 'ollama',
-      critique: CLEAN_CRITIQUE,
+      critique: async (prompt, images) => {
+        expect(getReasoningPayloadScope()?.attachment_count).toBe(IMAGES.length);
+        return CLEAN_CRITIQUE(prompt, images);
+      },
     });
     expect(report.status).toBe('reviewed');
   });

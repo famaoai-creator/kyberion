@@ -79,6 +79,7 @@ export class AppleNativeImageDescriptionProvider implements ImageDescriptionProv
           tier: effectiveTier(inputPath, tier),
           ...(this.options.tenant_slug ? { tenant_slug: this.options.tenant_slug } : {}),
           purpose: 'image description',
+          attachment_count: 1,
         },
         () => appleFmPromptWithImage(prompt, inputPath)
       );
@@ -175,6 +176,7 @@ export class OllamaVisionImageDescriptionProvider implements ImageDescriptionPro
         tier: effectiveTier(absolutePath, this.visionOptions.tier),
         ...(this.visionOptions.tenant_slug ? { tenant_slug: this.visionOptions.tenant_slug } : {}),
         purpose: 'image description',
+        attachment_count: 1,
       },
       () =>
         secureFetch<unknown>({
@@ -346,6 +348,7 @@ export class ReasoningVisionImageDescriptionProvider implements ImageDescription
           tier: prepared ? effectiveTier(prepared.path, tier) : tier,
           ...(this.options.tenant_slug ? { tenant_slug: this.options.tenant_slug } : {}),
           purpose: 'image description',
+          attachment_count: 1,
         },
         () =>
           backend.promptWithImages!(prompt, [

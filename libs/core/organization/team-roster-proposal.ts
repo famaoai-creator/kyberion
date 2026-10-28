@@ -215,6 +215,7 @@ export async function proposeMissionTeamRoster(input: {
     tier: plan.tier as 'personal' | 'confidential' | 'public',
     ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
     purpose: 'mission roster proposal',
+    attachment_count: 0,
   } as const;
 
   let raw: string;

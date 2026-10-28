@@ -206,6 +206,7 @@ export async function consultMissionAdvisors(input: {
     tier: plan.tier as 'personal' | 'confidential' | 'public',
     ...(plan.tenant_slug ? { tenant_slug: plan.tenant_slug } : {}),
     purpose: `mission advisory:${input.topic}`,
+    attachment_count: 0,
   } as const;
   for (const advisor of eligiblePanel) {
     try {

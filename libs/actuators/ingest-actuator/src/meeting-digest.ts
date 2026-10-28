@@ -393,6 +393,7 @@ async function askStructured<T>(
         tier: 'confidential',
         tenant_slug: tenantSlug,
         purpose: 'ingest:meeting_digest',
+        attachment_count: 0,
         training_use: trainingUse,
       },
       () =>
