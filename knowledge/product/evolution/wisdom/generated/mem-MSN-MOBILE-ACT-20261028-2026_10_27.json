@@ -1,0 +1,28 @@
+{
+  "record_id": "mem-MSN-MOBILE-ACT-20261028-2026_10_27",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Mobile actuator live mirror: FrameSource/InputInjector boundaries + AXe bridging",
+  "summary": "Keep platform boundaries in libs/shared-mobile (FrameSource, InputInjector) and bridge iOS input via AXe; verify the observe-to-act loop on a live simulator.",
+  "candidate_id": "mem-MSN-MOBILE-ACT-20261028-2026_10_27",
+  "evidence_refs": [
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/implementation-report.md",
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/test-report.md",
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/distillation.md"
+  ],
+  "created_at": "2026-10-28T03:21:56.175Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "See knowledge/product/architecture/mobile-actuator-live-mirror.md — hybrid design, AXe-over-XcodeBuildMCP rationale, CoreSimulator EPERM on /Volumes/data, AXe label keys (AXLabel/AXValue), post-boot SpringBoard retry, smallest-frame tap matching, stable mirror state file + daemon identity check before SIGTERM, async grab loop to keep the event loop responsive."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/implementation-report.md",
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/test-report.md",
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-MOBILE-ACT-20261028/evidence/distillation.md"
+  ],
+  "source_branch": "feat/mobile-mirror-actuators-20261028",
+  "source_commit": "ea23466372e2e7c21a7db50a46bb9bae130de421"
+}

@@ -104,7 +104,22 @@
       "title": "Android CLI Visual Workflow",
       "path": "libs/actuators/android-actuator/examples/android-cli-visual-workflow.json",
       "description": "Captures a JSON UI layout and annotated screenshot via Android CLI, then resolves a target label to screen coordinates and taps it.",
-      "tags": ["android", "android-cli", "layout", "screen-capture", "screen-resolve", "visual", "template"]
+      "tags": [
+        "android",
+        "android-cli",
+        "layout",
+        "screen-capture",
+        "screen-resolve",
+        "visual",
+        "template"
+      ]
+    },
+    {
+      "id": "android-screen-stream-template",
+      "title": "Android Screen Stream Template",
+      "path": "libs/actuators/android-actuator/examples/android-screen-stream-template.json",
+      "description": "Starts a loopback MJPEG live-mirror of the connected Android device/emulator (click-to-tap via adb input) and reports the viewer URL.",
+      "tags": ["android", "adb", "stream", "mirror", "live-view", "template"]
     }
   ]
 }

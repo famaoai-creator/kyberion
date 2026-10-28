@@ -515,6 +515,20 @@
           ]
         },
         {
+          "op": "describe_ui",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
           "op": "extract_ui_tree",
           "kind": "capture",
           "input_schema": {
@@ -1101,6 +1115,58 @@
               "url": "example://home"
             }
           ]
+        },
+        {
+          "op": "start_screen_stream",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "fps": {
+                "type": "number"
+              },
+              "no_input": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "fps": 3
+            }
+          ]
+        },
+        {
+          "op": "stop_screen_stream",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "stream_status",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
         },
         {
           "op": "swipe",
@@ -8398,6 +8464,20 @@
           ]
         },
         {
+          "op": "describe_ui",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
           "op": "read_json",
           "kind": "capture",
           "input_schema": {
@@ -8529,6 +8609,25 @@
           ]
         },
         {
+          "op": "input_text",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": ["text"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "text": "user@example.com"
+            }
+          ]
+        },
+        {
           "op": "install_app",
           "kind": "apply",
           "input_schema": {
@@ -8604,6 +8703,27 @@
           ]
         },
         {
+          "op": "press_button",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "button": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "name": "home"
+            }
+          ]
+        },
+        {
           "op": "shutdown_simulator",
           "kind": "apply",
           "input_schema": {
@@ -8612,6 +8732,161 @@
             "additionalProperties": false
           },
           "examples": [{}]
+        },
+        {
+          "op": "start_screen_stream",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "fps": {
+                "type": "number"
+              },
+              "no_input": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "fps": 3
+            }
+          ]
+        },
+        {
+          "op": "stop_screen_stream",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "stream_status",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "swipe",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "x1": {
+                "type": "number"
+              },
+              "y1": {
+                "type": "number"
+              },
+              "x2": {
+                "type": "number"
+              },
+              "y2": {
+                "type": "number"
+              },
+              "start_x": {
+                "type": "number"
+              },
+              "start_y": {
+                "type": "number"
+              },
+              "end_x": {
+                "type": "number"
+              },
+              "end_y": {
+                "type": "number"
+              },
+              "duration_ms": {
+                "type": "number"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "x1": 200,
+              "y1": 600,
+              "x2": 200,
+              "y2": 200,
+              "duration_ms": 350
+            }
+          ]
+        },
+        {
+          "op": "tap",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "x": {
+                "type": "number"
+              },
+              "y": {
+                "type": "number"
+              }
+            },
+            "required": ["x", "y"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "x": 200,
+              "y": 480
+            }
+          ]
+        },
+        {
+          "op": "tap_ui_node",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "identifier": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "text": "Sign in"
+            },
+            {
+              "identifier": "login-button",
+              "dry_run": true
+            }
+          ]
         },
         {
           "op": "uninstall_app",
