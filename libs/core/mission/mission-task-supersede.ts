@@ -801,7 +801,7 @@ export async function supersedeMissionTask(
       };
     });
     if (nextTasksChanged) {
-      writeMissionNextTasks(plan.missionPath, nextTasks);
+      writeMissionNextTasks(plan.missionPath, nextTasks, { allowSupersede: true });
       changed = true;
     }
 
