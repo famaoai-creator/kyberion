@@ -49,6 +49,20 @@
       "path": "libs/actuators/ios-actuator/examples/ios-runtime-webview-handoff-template.json",
       "description": "Reads a runtime-exported WebView session handoff artifact from the iOS simulator app container.",
       "tags": ["ios", "webview", "runtime-export", "session-handoff", "template"]
+    },
+    {
+      "id": "ios-interactive-flow-template",
+      "title": "iOS Interactive Flow Template",
+      "path": "libs/actuators/ios-actuator/examples/ios-interactive-flow-template.json",
+      "description": "Reads the simulator UI tree via AXe, resolves a node tap target (dry-run), and captures a screenshot. Requires AXe (brew install cameroncooke/axe/axe).",
+      "tags": ["ios", "simulator", "axe", "ui-tree", "tap", "interactive", "template"]
+    },
+    {
+      "id": "ios-screen-stream-template",
+      "title": "iOS Screen Stream Template",
+      "path": "libs/actuators/ios-actuator/examples/ios-screen-stream-template.json",
+      "description": "Starts a loopback MJPEG live-mirror of the booted simulator (click-to-tap when AXe is installed) and reports the viewer URL.",
+      "tags": ["ios", "simulator", "stream", "mirror", "live-view", "template"]
     }
   ]
 }

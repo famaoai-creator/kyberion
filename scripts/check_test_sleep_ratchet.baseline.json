@@ -1,7 +1,7 @@
 {
   "version": 1,
   "generated_at": "2026-10-19T12:48:04.246Z",
-  "total": 76,
+  "total": 78,
   "files": {
     "libs/core/agent/agent-adapter.test.ts": 1,
     "libs/core/agent/agent-input-queue.test.ts": 1,
@@ -40,6 +40,7 @@
     "scripts/oauth_callback_surface.test.ts": 1,
     "scripts/run_checks.concurrency.test.ts": 1,
     "tests/best-of-n-judge.test.ts": 1,
-    "tests/resource-arbitration.test.ts": 2
+    "tests/resource-arbitration.test.ts": 2,
+    "libs/shared-mobile/src/mirror-server.test.ts": 2
   }
 }
