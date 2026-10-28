@@ -21,6 +21,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { assertSafeRepositoryPath } from '../secure-io.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
+import { buildMissionAiDlcFailureLines } from './mission-aidlc-gate-projection.js';
 import {
   evaluateContextFragment,
   resolveTenantAlias,
@@ -257,7 +258,11 @@ export async function buildTaskDispatchContext(input: {
     force: input.forceContextCompaction,
     ...(input.forceContextCompaction ? { reason: 'overflow' as const } : {}),
   });
-  const upstreamResultLines = compactedSections.upstreamResultLines;
+  // Gate failure evidence is bounded separately and must survive compaction.
+  const upstreamResultLines = [
+    ...compactedSections.upstreamResultLines,
+    ...buildMissionAiDlcFailureLines(input.missionId),
+  ];
   const teamSnapshotLines = compactedSections.teamSnapshotLines;
   const reviewFindingsLines = buildReviewFindingsLines(input.task);
   const canonicalTeamRole = canonicalizeTeamRole(input.teamRole);

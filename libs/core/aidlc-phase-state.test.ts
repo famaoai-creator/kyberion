@@ -7,6 +7,7 @@ import {
   createAiDlcPhaseState,
   loadAiDlcPhaseState,
   loadAiDlcPhaseStateAtPath,
+  projectAiDlcGateReceipt,
   resumeAiDlcPhaseState,
   saveAiDlcPhaseState,
   tripAiDlcCircuitBreaker,
@@ -94,6 +95,24 @@ describe('aidlc-phase-state (HO-02 Task 1)', () => {
     expect(state.failure_context?.attempted).toContain('execution:passed');
     // The failed test output is preserved for the re-planning phase.
     expect(state.test_output?.artifact_refs).toEqual(['artifact:fail-log']);
+    expect(state.attempts.filter((attempt) => attempt.outcome === 'failed')).toHaveLength(1);
+    expect(state.failure_context?.artifact_refs).toEqual(['artifact:fail-log']);
+  });
+
+  it('projects the same receipt only once without manufacturing preceding successful phases', () => {
+    const receipt = {
+      receipt_id: 'gate-record:one',
+      phase: 'test' as const,
+      verdict: 'fail' as const,
+      checked_at: NOW,
+      summary: 'schema mismatch',
+      artifact_refs: ['evidence/gates/test.json'],
+    };
+    const first = projectAiDlcGateReceipt(createAiDlcPhaseState('MSN-AIDLC-REPLAY'), receipt);
+    expect(projectAiDlcGateReceipt(first, receipt)).toBe(first);
+    expect(first.attempts).toHaveLength(1);
+    expect(first.execution_result).toBeUndefined();
+    expect(first.failure_context?.artifact_refs).toEqual(receipt.artifact_refs);
   });
 
   it('manual circuit-breaker trips carry open questions', () => {

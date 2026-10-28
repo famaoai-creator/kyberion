@@ -8,14 +8,14 @@
  * phases receive the upstream structured result (no diff re-derivation),
  * payloads stay summary+refs shaped (MO-04 budget principle — full outputs
  * live in the artifact store and travel as refs), and every transition is
- * recorded in attempts[]. Wiring into the MO-01 code_change template and
- * MO-02 gates consumes this module next.
+ * recorded in attempts[]. Mission gate receipts project into this shape;
+ * gate/task-board authority remains with the existing mission controller.
  */
 
 import * as path from 'node:path';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { nowIso } from './foundation/time.js';
-import { pathResolver } from './path-resolver.js';
+import { missionEvidenceDir, pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -32,6 +32,10 @@ export interface AiDlcAttempt {
   at: string;
   outcome: 'passed' | 'failed';
   note?: string;
+  /** Durable gate receipt identity; replay never invents a second attempt. */
+  receipt_id?: string;
+  gate_id?: string;
+  artifact_refs?: string[];
 }
 
 export interface AiDlcPhaseResult {
@@ -40,10 +44,12 @@ export interface AiDlcPhaseResult {
 }
 
 export interface AiDlcFailureContext {
+  gate_id?: string;
   failed_phase: AiDlcPhase;
   what_failed: string;
   attempted: string[];
   open_questions: string[];
+  artifact_refs?: string[];
 }
 
 export interface AiDlcPhaseState {
@@ -179,12 +185,13 @@ export function advanceAiDlcPhase(
 
   if (failedGate) {
     return tripAiDlcCircuitBreaker(
-      next,
+      { ...next, attempts: state.attempts },
       {
         failed_phase: input.phase,
         what_failed: input.result.summary,
         attempted: state.attempts.map((attempt) => `${attempt.phase}:${attempt.outcome}`),
         open_questions: [],
+        artifact_refs: input.result.artifact_refs,
       },
       now
     );
@@ -211,15 +218,108 @@ export function tripAiDlcCircuitBreaker(
   };
 }
 
+export interface AiDlcGateReceipt {
+  receipt_id: string;
+  sequence?: number;
+  gate_id?: string;
+  phase: Exclude<AiDlcPhase, 'complete'>;
+  verdict: 'pass' | 'fail';
+  checked_at: string;
+  summary: string;
+  artifact_refs: string[];
+  open_questions?: string[];
+}
+
+/**
+ * Read-model projection of canonical mission gate receipts. Unlike advance,
+ * this does not decide whether work may proceed or fabricate missing phases.
+ * The mission gate and task board remain the authority for that decision.
+ */
+export function projectAiDlcGateReceipt(
+  state: AiDlcPhaseState,
+  receipt: AiDlcGateReceipt
+): AiDlcPhaseState {
+  if (state.attempts.some((attempt) => attempt.receipt_id === receipt.receipt_id)) return state;
+  const result = { summary: receipt.summary, artifact_refs: receipt.artifact_refs };
+  const next: AiDlcPhaseState = {
+    ...state,
+    phase:
+      receipt.verdict === 'fail'
+        ? 'alignment'
+        : receipt.phase === 'self_review'
+          ? 'complete'
+          : receipt.phase,
+    attempts: [
+      ...state.attempts,
+      {
+        phase: receipt.phase,
+        at: receipt.checked_at,
+        outcome: receipt.verdict === 'pass' ? 'passed' : 'failed',
+        note: receipt.summary,
+        receipt_id: receipt.receipt_id,
+        ...(receipt.gate_id ? { gate_id: receipt.gate_id } : {}),
+        artifact_refs: receipt.artifact_refs,
+      },
+    ],
+    updated_at: receipt.checked_at,
+  };
+  if (receipt.phase === 'execution') next.execution_result = result;
+  if (receipt.phase === 'test')
+    next.test_output = { ...result, passed: receipt.verdict === 'pass' };
+  if (receipt.phase === 'self_review')
+    next.review_findings = { ...result, approved: receipt.verdict === 'pass' };
+  if (receipt.verdict === 'fail') {
+    next.failure_context = {
+      ...(receipt.gate_id ? { gate_id: receipt.gate_id } : {}),
+      failed_phase: receipt.phase,
+      what_failed: receipt.summary,
+      attempted: next.attempts.map((attempt) => `${attempt.phase}:${attempt.outcome}`),
+      open_questions: receipt.open_questions ?? [],
+      artifact_refs: receipt.artifact_refs,
+    };
+  }
+  // A fresh alignment receipt is the explicit re-plan boundary. Passing an
+  // unrelated later gate never silently erases the failure's provenance.
+  if (receipt.phase === 'alignment' && receipt.verdict === 'pass') delete next.failure_context;
+  if (
+    receipt.verdict === 'pass' &&
+    receipt.gate_id &&
+    receipt.gate_id === state.failure_context?.gate_id
+  )
+    delete next.failure_context;
+  // More than one phase gate may fail in a completion sweep. Passing one
+  // must not hide an independently unresolved failure from another gate.
+  const pending = new Map<string, AiDlcAttempt>();
+  for (const attempt of next.attempts) {
+    if (attempt.phase === 'alignment' && attempt.outcome === 'passed') pending.clear();
+    else if (attempt.gate_id) {
+      if (attempt.outcome === 'failed') pending.set(attempt.gate_id, attempt);
+      else pending.delete(attempt.gate_id);
+    }
+  }
+  const unresolved = [...pending.values()].at(-1);
+  if (unresolved && unresolved.gate_id !== next.failure_context?.gate_id) {
+    next.failure_context = {
+      gate_id: unresolved.gate_id,
+      failed_phase: unresolved.phase,
+      what_failed: unresolved.note ?? 'Mission gate failed',
+      attempted: next.attempts.map((attempt) => `${attempt.phase}:${attempt.outcome}`),
+      open_questions: [],
+      artifact_refs: unresolved.artifact_refs ?? [],
+    };
+  }
+  if (next.failure_context) next.phase = 'alignment';
+  return next;
+}
+
 // ─── Persistence (mission evidence) ──────────────────────────────────────────
 
 export function aiDlcPhaseStatePath(missionId: string, baseDir?: string): string {
   pathResolver.assertMissionIdArgument(missionId);
   // baseDir substitutes the missions root (tests); the per-mission evidence
   // namespace is preserved either way.
-  const root = baseDir
-    ? path.join(baseDir, missionId, 'evidence')
-    : pathResolver.active(`missions/${missionId}/evidence`);
+  const root = baseDir ? path.join(baseDir, missionId, 'evidence') : missionEvidenceDir(missionId);
+  if (!root) throw new Error(`[aidlc-phase-state] existing mission required: ${missionId}`);
   return assertSafeRepositoryPath(path.join(root, 'aidlc-phase-state.json'), {
     allowMissingLeaf: true,
   });
