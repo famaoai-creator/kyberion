@@ -45,7 +45,7 @@ export function renderViewerHtml(options: { deviceLabel: string; interactive: bo
   </div>
 </header>
 <div class="stage">
-  <img id="screen" src="/stream.mjpeg" alt="Live screen of ${escapeHtml(deviceLabel)}">
+  <img id="screen" alt="Live screen of ${escapeHtml(deviceLabel)}">
 </div>
 <p class="notice" id="notice">${
     interactive
@@ -54,7 +54,9 @@ export function renderViewerHtml(options: { deviceLabel: string; interactive: bo
   }</p>
 <script>
 (function () {
+  var token = new URLSearchParams(location.search).get('token') || '';
   var img = document.getElementById('screen');
+  img.src = '/stream.mjpeg?token=' + encodeURIComponent(token);
   var stage = document.querySelector('.stage');
   var fpsEl = document.getElementById('fps');
   var dot = document.getElementById('dot');
@@ -79,7 +81,7 @@ export function renderViewerHtml(options: { deviceLabel: string; interactive: bo
     setTimeout(function () { r.remove(); }, 500);
     fetch('/tap', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-kyberion-mirror-token': token },
       body: JSON.stringify({ x: dx, y: dy })
     }).then(function (res) {
       if (!res.ok) notice.innerHTML = '<b>tap failed</b> — device rejected the input';
@@ -88,7 +90,7 @@ export function renderViewerHtml(options: { deviceLabel: string; interactive: bo
     });
   });
   setInterval(function () {
-    fetch('/status').then(function (r) { return r.json(); }).then(function (s) {
+    fetch('/status?token=' + encodeURIComponent(token)).then(function (r) { return r.json(); }).then(function (s) {
       fpsEl.textContent = (s.fps || 0).toFixed(1) + ' fps';
       dot.className = 'dot' + (s.state === 'degraded' ? ' degraded' : '');
       if (s.state === 'degraded') notice.textContent = 'degraded — ' + (s.last_error || 'frame capture failing');
