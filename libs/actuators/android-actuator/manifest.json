@@ -1,7 +1,7 @@
 {
   "actuator_id": "android-actuator",
-  "version": "1.1.0",
-  "description": "Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search)",
+  "version": "1.2.0",
+  "description": "Android Device Actuator \u2014 ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search)",
   "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -18,8 +18,8 @@
         "env": ["ANDROID_HOME"],
         "platforms": ["darwin", "linux", "win32"],
         "install": {
-          "darwin": "Android Studio または cmdline-tools を導入し ANDROID_HOME を設定",
-          "linux": "Android cmdline-tools を導入し ANDROID_HOME を設定"
+          "darwin": "Android Studio \u307e\u305f\u306f cmdline-tools \u3092\u5c0e\u5165\u3057 ANDROID_HOME \u3092\u8a2d\u5b9a",
+          "linux": "Android cmdline-tools \u3092\u5c0e\u5165\u3057 ANDROID_HOME \u3092\u8a2d\u5b9a"
         }
       },
       "effect": "write"

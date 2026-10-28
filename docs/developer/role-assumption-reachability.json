@@ -4387,6 +4387,9 @@
     "libs/core/workforce/task-tool-runtime.ts#createRuntimeForTask": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
+    "libs/shared-mobile/src/mirror-session.ts#startMirrorDaemonSession": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
     "libs/shared-network/src/mcp-mission-lifecycle.ts#executeMcpMissionLifecycle": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
@@ -9440,6 +9443,7 @@
         "libs/core/video/video-frame-archive.ts#writeVideoFramesToMp4",
         "libs/core/video/video-render-backend.ts#runCancellableCommand",
         "libs/core/workforce/task-tool-runtime.ts#createRuntimeForTask",
+        "libs/shared-mobile/src/mirror-session.ts#startMirrorDaemonSession",
         "scripts/backup.ts#runRequired",
         "scripts/check_doc_examples.ts#runBashCheck",
         "scripts/check_doc_examples.ts#runBashSyntax",
