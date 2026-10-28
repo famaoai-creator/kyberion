@@ -1,11 +1,20 @@
 export type ReasoningFailureClass =
-  'transient' | 'capacity' | 'capability' | 'auth' | 'policy' | 'request' | 'cancelled' | 'unknown';
+  | 'transient'
+  | 'capacity'
+  | 'capability'
+  | 'auth'
+  | 'entitlement'
+  | 'policy'
+  | 'request'
+  | 'cancelled'
+  | 'unknown';
 
 export interface ReasoningFailureClassification {
   class: ReasoningFailureClass;
   retryable: boolean;
   allowFailover: boolean;
   demoteProvider: boolean;
+  demoteModel?: boolean;
 }
 
 function messageOf(error: unknown): string {
@@ -14,6 +23,18 @@ function messageOf(error: unknown): string {
 
 export function classifyReasoningFailure(error: unknown): ReasoningFailureClassification {
   const message = messageOf(error);
+  // A local scope/cached-client/HOME refusal is not evidence that a provider's
+  // credentials failed. Never poison global health or switch tenants on retry.
+  const credentialCodes = message.match(/\[CREDENTIAL_[A-Z_]+\]/g) ?? [];
+  if (credentialCodes.some((code) => code !== '[CREDENTIAL_NATIVE_UNSUPPORTED]')) {
+    return { class: 'policy', retryable: false, allowFailover: false, demoteProvider: false };
+  }
+  if (credentialCodes.length) {
+    return { class: 'capability', retryable: false, allowFailover: true, demoteProvider: false };
+  }
+  if (message.includes('[SUBAGENT_UNAVAILABLE]')) {
+    return { class: 'capability', retryable: false, allowFailover: true, demoteProvider: false };
+  }
   // A governed CLI wall-clock deadline is already the final attempt for this
   // call. Retrying the same prompt only recreates the user-visible "waiting"
   // state and multiplies the delay. Fail over, when policy allows it, but do
@@ -41,6 +62,19 @@ export function classifyReasoningFailure(error: unknown): ReasoningFailureClassi
     /egress|tier.?mismatch|spend.?cap|policy|approval.?required|forbidden|denied by/i.test(message)
   ) {
     return { class: 'policy', retryable: false, allowFailover: false, demoteProvider: false };
+  }
+  if (
+    /model.{0,100}(?:not (?:available|supported|enabled).{0,50}(?:account|subscription|plan)|not entitled|access denied)|(?:account|subscription|plan).{0,100}(?:no access|does not have access|not entitled).{0,50}model/i.test(
+      message
+    )
+  ) {
+    return {
+      class: 'entitlement',
+      retryable: false,
+      allowFailover: true,
+      demoteProvider: false,
+      demoteModel: true,
+    };
   }
   if (
     /authenticat|unauthorized|invalid api key|login required|credential|permission denied|ineligible tier/i.test(
@@ -76,6 +110,19 @@ export function classifyReasoningFailure(error: unknown): ReasoningFailureClassi
       message
     )
   ) {
+    const scope =
+      error && typeof error === 'object'
+        ? ((error as { rateLimitScope?: unknown; rate_limit_scope?: unknown }).rateLimitScope ??
+          (error as { rate_limit_scope?: unknown }).rate_limit_scope)
+        : undefined;
+    if (scope === 'model')
+      return {
+        class: 'transient',
+        retryable: true,
+        allowFailover: true,
+        demoteProvider: false,
+        demoteModel: true,
+      };
     return { class: 'transient', retryable: true, allowFailover: true, demoteProvider: true };
   }
   return { class: 'unknown', retryable: false, allowFailover: true, demoteProvider: true };

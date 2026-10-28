@@ -1,3 +1,7 @@
+import {
+  reasoningRoleInheritsDefault,
+  loadReasoningRouteUserConfig,
+} from '../reasoning/reasoning-route-resolver.js';
 /**
  * HA-01 asynchronous background-review fork.
  *
@@ -175,7 +179,8 @@ export interface BackgroundReviewForkInput {
    * "provider unknown" and skips the gate (see
    * `buildBackgroundReviewKnowledgeContext`).
    */
-  backend?: Pick<ReasoningBackend, 'delegateTask'> & { name?: string };
+  backend?: Pick<ReasoningBackend, 'delegateTask'> &
+    Partial<Pick<ReasoningBackend, 'name' | 'getRuntimeProviderName' | 'getNativeSubagentAdopter'>>;
   callOptions?: ReasoningCallOptions;
 }
 
@@ -454,7 +459,19 @@ export async function runBackgroundReviewFork(
   input: BackgroundReviewForkInput
 ): Promise<BackgroundReviewForkResult> {
   const sourceRef = canonicalSourceRef(input);
-  const backend = input.backend || getReasoningBackend();
+  const defaultBackend = getReasoningBackend();
+  const backend = input.backend || defaultBackend;
+  const callOptions: ReasoningCallOptions = {
+    ...(input.callOptions || {
+      effort: 'low',
+      ...(reasoningRoleInheritsDefault({ role: 'background_review' }) &&
+      loadReasoningRouteUserConfig().roles?.default?.selection?.mode !== 'fixed'
+        ? { model_tier: 'fast' as const }
+        : {}),
+      budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
+    }),
+    role: input.callOptions?.role || 'background_review',
+  };
   try {
     const raw = await withReasoningPayloadScope(
       {
@@ -464,18 +481,53 @@ export async function runBackgroundReviewFork(
       },
       async () => {
         const prompt = buildForkPrompt(input);
-        const context = await buildBackgroundReviewKnowledgeContext(input, backend.name || '');
-        if (!input.workItemId)
-          return backend.delegateTask(
-            prompt,
-            context,
-            input.callOptions || {
-              effort: 'low',
-              model_tier: 'fast',
-              budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
-            }
-          );
-        const coordinatedBackend = { ...getReasoningBackend(), ...backend } as ReasoningBackend;
+        const context = await buildBackgroundReviewKnowledgeContext(
+          input,
+          backend.getRuntimeProviderName?.(callOptions) || backend.name || ''
+        );
+        if (!input.workItemId) return backend.delegateTask(prompt, context, callOptions);
+        // The native getter has no routing arguments. Reuse its default adopter
+        // only when this role inherits that exact route, and never borrow an
+        // unrelated global adopter for a caller-injected delegate.
+        const nativeRouteInherited =
+          reasoningRoleInheritsDefault({
+            role: callOptions.role,
+            requestedProfile: callOptions.route_profile || callOptions.profile,
+            requestedModel: callOptions.model,
+          }) && !input.callOptions?.model_tier;
+        const nativeBackend = input.backend?.getNativeSubagentAdopter
+          ? input.backend
+          : !input.backend || input.backend.delegateTask === defaultBackend.delegateTask
+            ? defaultBackend
+            : undefined;
+        const nativeAdopter = nativeRouteInherited
+          ? nativeBackend?.getNativeSubagentAdopter?.()
+          : undefined;
+        const dispatchOptions = (options?: ReasoningCallOptions): ReasoningCallOptions => ({
+          ...callOptions,
+          ...options,
+          model: options?.model ?? callOptions.model,
+          signal: options?.signal ?? callOptions.signal,
+        });
+        const coordinatedBackend = {
+          ...defaultBackend,
+          ...backend,
+          getNativeSubagentAdopter: () =>
+            nativeAdopter
+              ? {
+                  id: nativeAdopter.id,
+                  supportsSemanticProgress: nativeAdopter.supportsSemanticProgress,
+                  dispatch: (
+                    instruction: string,
+                    context?: string,
+                    options?: ReasoningCallOptions
+                  ) => nativeAdopter.dispatch(instruction, context, dispatchOptions(options)),
+                  getInfo: nativeAdopter.getInfo?.bind(nativeAdopter),
+                }
+              : null,
+          delegateTask: (instruction: string, context?: string, options?: ReasoningCallOptions) =>
+            backend.delegateTask(instruction, context, dispatchOptions(options)),
+        } as ReasoningBackend;
         const workItem = getWorkItem(input.workItemId);
         const scope = workItem?.context;
         const tenantId = scope?.tenant_slug?.trim();

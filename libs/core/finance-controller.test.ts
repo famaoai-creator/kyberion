@@ -154,4 +154,34 @@ describe('finance-controller', () => {
     expect(growthDecision.mode).toBe('growth');
     expect(growthDecision.reasons).toHaveLength(0);
   });
+
+  it('does not present an unknown-only zero subtotal as confirmed total spend', () => {
+    const decision = resolveFinanceControllerDecision({
+      financial: baseFinancial,
+      okr: baseOkr,
+      costReport: {
+        totalCostUsd: 0,
+        totalTokens: 100,
+        promptTokens: 60,
+        completionTokens: 40,
+        sourcePath: '/tmp/cost-report.json',
+        unknownCostCalls: 2,
+        includedCalls: 1,
+        costComplete: false,
+        referenceCostUsd: 0.75,
+        referenceCostCalls: 2,
+      },
+    });
+    expect(decision.signals).toMatchObject({
+      costReportTotalUsd: null,
+      costReportKnownSubtotalUsd: 0,
+      costReportReferenceUsd: 0.75,
+      costReportCostComplete: false,
+      costReportUnknownCostCalls: 2,
+      costReportIncludedCalls: 1,
+    });
+    expect(decision.reasons.some((reason) => reason.includes('not verified total spend'))).toBe(
+      true
+    );
+  });
 });

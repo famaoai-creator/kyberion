@@ -163,8 +163,11 @@ function registrations(): ChronosTokenRegistration[] | null {
     // every token viewer is rejected as unknown.
     // TR-01: the narrow reader role (only grant: chronos-access.json) instead
     // of the broad sovereign_concierge.
-    return withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
-      readChronosTokenRegistrations()
+    return withExecutionContext(
+      CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+      () => readChronosTokenRegistrations(),
+      undefined,
+      ''
     );
   } catch {
     throw new ConciergeViewerError(401, 'Concierge viewer token registry is unavailable.');

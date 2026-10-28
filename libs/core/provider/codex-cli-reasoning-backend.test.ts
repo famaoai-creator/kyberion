@@ -1,3 +1,4 @@
+import { runInExecutionScope } from '../foundation/execution-scope.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // Mock the codex CLI query layer so these tests run without the `codex` binary.
@@ -194,6 +195,26 @@ describe('CodexCliReasoningBackend — structured ops via shared specs (no codex
           mode: 'read-only',
         })
       );
+    });
+  });
+
+  it('hides native capability in tenants and rejects a retained operator/injected adopter before dispatch', async () => {
+    const session = {
+      boot: vi.fn(),
+      ask: vi.fn(),
+      askNativeSubagent: vi.fn(),
+    } as unknown as CodexHarnessSession;
+    const backend = new CodexCliReasoningBackend({ harnessSession: session });
+    const retained = backend.getNativeSubagentAdopter()!;
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'native-fixture' }, async () => {
+      expect(backend.getNativeSubagentAdopter()).toBeNull();
+      await expect(retained.dispatch('do not send')).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+      await expect(backend.resetSession()).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+      const tenantBackend = new CodexCliReasoningBackend({ harnessSession: session });
+      expect(tenantBackend.getNativeSubagentAdopter()).toBeNull();
+      expect(session.boot).not.toHaveBeenCalled();
+      expect(session.ask).not.toHaveBeenCalled();
+      expect(session.askNativeSubagent).not.toHaveBeenCalled();
     });
   });
 

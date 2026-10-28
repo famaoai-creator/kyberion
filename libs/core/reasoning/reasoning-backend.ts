@@ -34,6 +34,7 @@ import {
 } from '../structured-output-contracts.js';
 import {
   healthyInstances,
+  isInstanceDemoted,
   listDemotedProviders,
   reportProviderHealthy,
   getProviderHealthDemotionTtlMs,
@@ -78,6 +79,7 @@ export {
 import {
   DEFAULT_IN_PLACE_RETRIES,
   resolveDemotionRetryAfterMs,
+  AUTH_FAILURE_DEMOTION_MS,
   resolveInPlaceRetryCount,
   resolveInPlaceRetryDelayMs,
   sleep,
@@ -451,10 +453,34 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     }
   }
 
+  private candidateModel(
+    candidate: ReasoningBackendCandidate,
+    options?: ReasoningCallOptions
+  ): string | undefined {
+    const effective = optionsForCandidate(this.candidates, candidate, options);
+    // Tier routing may select another model inside the adapter; never cache a
+    // rejection against the configured default when its identity is unknown.
+    return effective?.model || (effective?.model_tier ? undefined : candidate.model);
+  }
+
+  private candidateDemoted(
+    candidate: ReasoningBackendCandidate,
+    options?: ReasoningCallOptions
+  ): boolean {
+    const provider = normalizeProviderName(candidate.provider);
+    if (!provider) return false;
+    const model = this.candidateModel(candidate, options);
+    return (
+      isInstanceDemoted(provider, candidate.instance) ||
+      Boolean(model && isInstanceDemoted(provider, candidate.instance, Date.now(), model))
+    );
+  }
+
   private async runWithFailover<T>(
     operation: string,
     invoke: (backend: ReasoningBackend, candidate: ReasoningBackendCandidate) => Promise<T>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: ReasoningCallOptions
   ): Promise<T> {
     throwIfReasoningAborted(signal);
     // OP-01: the spend cap is real control, not prompt text. Warn posture
@@ -474,7 +500,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
     for (const candidate of this.candidates.slice(0, this.failoverPolicy.max_attempts)) {
       const provider = normalizeProviderName(candidate.provider);
-      if (provider && skippedProviders.has(provider)) continue;
+      if (provider && (skippedProviders.has(provider) || this.candidateDemoted(candidate, options)))
+        continue;
       const label = candidateLabel(candidate);
       const isSwitch = this.lastServedLabel !== null && label !== this.lastServedLabel;
       if (isSwitch) await this.resetBackendSession(label, 'incoming');
@@ -483,7 +510,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         candidate,
         provider,
         invoke,
-        signal
+        signal,
+        options
       );
       if (attempt.ok === false) {
         errors.push(`${label}: ${attempt.message}`);
@@ -515,7 +543,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     candidate: ReasoningBackendCandidate,
     provider: string | undefined,
     invoke: (backend: ReasoningBackend, candidate: ReasoningBackendCandidate) => Promise<T>,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    options?: ReasoningCallOptions
   ): Promise<{ ok: true; result: T } | { ok: false; message: string; stop: boolean }> {
     const maxInPlaceRetries = resolveInPlaceRetryCount(this.failoverPolicy.max_in_place_retries);
     for (let retryAttempt = 0; ; retryAttempt++) {
@@ -526,7 +555,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         if (endpoint) assertReasoningEgressAllowedAtEndpoint(candidate.backend.name, endpoint);
         else assertReasoningEgressAllowed(candidate.backend.name);
         const result = await invoke(candidate.backend, candidate);
-        if (provider) reportProviderHealthy(provider);
+        if (provider) reportProviderHealthy(provider, candidate.instance);
         try {
           metrics.record('reasoning:route-served', 0, 'success', {
             operation,
@@ -564,8 +593,20 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           continue;
         }
 
+        const demotedModel = classification.demoteModel
+          ? this.candidateModel(candidate, options)
+          : undefined;
+        const shouldDemote = Boolean(provider && (classification.demoteProvider || demotedModel));
+        const cooldownMs =
+          resolveDemotionRetryAfterMs(error) ??
+          (classification.class === 'entitlement' ? AUTH_FAILURE_DEMOTION_MS : undefined);
+        const nextAction = !classification.allowFailover
+          ? 'stopping without fallback'
+          : shouldDemote
+            ? `cooling down ${demotedModel ? 'selected model' : 'provider instance'} for ${cooldownMs ?? getProviderHealthDemotionTtlMs()}ms`
+            : 'trying next candidate without health demotion';
         logger.warn(
-          `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; class=${classification.class}; ${classification.allowFailover ? `demoting for ${getProviderHealthDemotionTtlMs()}ms` : 'stopping without fallback'}: ${message}`
+          `[reasoning-backend:failover] ${operation} failed on ${candidateLabel(candidate)}${provider ? ` (${provider})` : ''}; class=${classification.class}; ${nextAction}: ${message}`
         );
         try {
           metrics.record('reasoning:route-failure', 0, 'error', {
@@ -577,10 +618,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         } catch {
           // Metrics must never change failure handling.
         }
-        if (provider && classification.demoteProvider) {
+        if (provider && shouldDemote) {
           reportProviderTemporarilyUnhealthy(provider, {
             reason: `${operation}:${message}`,
-            retryAfterMs: resolveDemotionRetryAfterMs(message),
+            instance: candidate.instance,
+            ...(demotedModel ? { model: demotedModel } : {}),
+            retryAfterMs: cooldownMs,
           });
         }
         return {
@@ -596,14 +639,22 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: DivergeHypothesisInput,
     options?: ReasoningCallOptions
   ): Promise<HypothesisSketch[]> {
-    return this.runWithFailover('divergePersonas', (backend, candidate) =>
-      backend.divergePersonas(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'divergePersonas',
+      (backend, candidate) =>
+        backend.divergePersonas(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
   crossCritique(input: CritiqueInput, options?: ReasoningCallOptions): Promise<CritiqueResult> {
-    return this.runWithFailover('crossCritique', (backend, candidate) =>
-      backend.crossCritique(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'crossCritique',
+      (backend, candidate) =>
+        backend.crossCritique(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
@@ -611,14 +662,22 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: PersonaSynthesisInput,
     options?: ReasoningCallOptions
   ): Promise<SynthesizedPersona> {
-    return this.runWithFailover('synthesizePersona', (backend, candidate) =>
-      backend.synthesizePersona(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'synthesizePersona',
+      (backend, candidate) =>
+        backend.synthesizePersona(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
   forkBranches(input: BranchForkInput, options?: ReasoningCallOptions): Promise<ForkedBranch[]> {
-    return this.runWithFailover('forkBranches', (backend, candidate) =>
-      backend.forkBranches(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'forkBranches',
+      (backend, candidate) =>
+        backend.forkBranches(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
@@ -626,8 +685,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: SimulationInput,
     options?: ReasoningCallOptions
   ): Promise<SimulationResult> {
-    return this.runWithFailover('simulateBranches', (backend, candidate) =>
-      backend.simulateBranches(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'simulateBranches',
+      (backend, candidate) =>
+        backend.simulateBranches(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
@@ -635,8 +698,15 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: ExtractRequirementsInput,
     options?: ReasoningCallOptions
   ): Promise<ExtractedRequirements> {
-    return this.runWithFailover('extractRequirements', (backend, candidate) =>
-      backend.extractRequirements(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'extractRequirements',
+      (backend, candidate) =>
+        backend.extractRequirements(
+          input,
+          optionsForCandidate(this.candidates, candidate, options)
+        ),
+      options?.signal,
+      options
     );
   }
 
@@ -644,8 +714,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: ExtractDesignSpecInput,
     options?: ReasoningCallOptions
   ): Promise<ExtractedDesignSpec> {
-    return this.runWithFailover('extractDesignSpec', (backend, candidate) =>
-      backend.extractDesignSpec(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'extractDesignSpec',
+      (backend, candidate) =>
+        backend.extractDesignSpec(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
@@ -653,8 +727,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: ExtractTestPlanInput,
     options?: ReasoningCallOptions
   ): Promise<ExtractedTestPlan> {
-    return this.runWithFailover('extractTestPlan', (backend, candidate) =>
-      backend.extractTestPlan(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'extractTestPlan',
+      (backend, candidate) =>
+        backend.extractTestPlan(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
@@ -662,8 +740,12 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     input: DecomposeIntoTasksInput,
     options?: ReasoningCallOptions
   ): Promise<DecomposedTaskPlan> {
-    return this.runWithFailover('decomposeIntoTasks', (backend, candidate) =>
-      backend.decomposeIntoTasks(input, optionsForCandidate(this.candidates, candidate, options))
+    return this.runWithFailover(
+      'decomposeIntoTasks',
+      (backend, candidate) =>
+        backend.decomposeIntoTasks(input, optionsForCandidate(this.candidates, candidate, options)),
+      options?.signal,
+      options
     );
   }
 
@@ -689,7 +771,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           optionsForCandidate(this.candidates, candidate, options)
         );
       },
-      options?.signal
+      options?.signal,
+      options
     );
     if (
       !automaticReasoningRedispatchAllowed() ||
@@ -718,7 +801,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
           optionsForCandidate(this.candidates, candidate, options)
         );
       },
-      options?.signal
+      options?.signal,
+      options
     );
   }
 
@@ -744,7 +828,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
       'prompt',
       (backend, candidate) =>
         backend.prompt(prompt, optionsForCandidate(this.candidates, candidate, options)),
-      options?.signal
+      options?.signal,
+      options
     );
   }
 
@@ -759,7 +844,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
     const errors: string[] = [];
     for (const candidate of candidates) {
       const provider = normalizeProviderName(candidate.provider);
-      if (provider && demotedProviders.has(provider)) continue;
+      if (provider && (demotedProviders.has(provider) || this.candidateDemoted(candidate, options)))
+        continue;
       const stream = candidate.backend.streamPrompt;
       if (!stream) continue;
       if (!primaryCandidate) primaryCandidate = candidate;
@@ -780,7 +866,7 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         )) {
           if (!yielded) {
             yielded = true;
-            if (provider) reportProviderHealthy(provider);
+            if (provider) reportProviderHealthy(provider, candidate.instance);
             if (primaryCandidate) {
               recordCandidateServed('streamPrompt', primaryCandidate, candidate, errors);
             }
@@ -808,10 +894,20 @@ export class FailoverReasoningBackend implements ReasoningBackend {
         logger.warn(
           `[reasoning-backend:failover] streamPrompt failed on ${label}${provider ? ` (${provider})` : ''}; class=${classification.class}: ${message}`
         );
-        if (provider && classification.demoteProvider) {
+        if (
+          provider &&
+          (classification.demoteProvider ||
+            (classification.demoteModel && this.candidateModel(candidate, options)))
+        ) {
           reportProviderTemporarilyUnhealthy(provider, {
             reason: `streamPrompt:${message}`,
-            retryAfterMs: resolveDemotionRetryAfterMs(message),
+            instance: candidate.instance,
+            ...(classification.demoteModel
+              ? { model: this.candidateModel(candidate, options) }
+              : {}),
+            retryAfterMs:
+              resolveDemotionRetryAfterMs(error) ??
+              (classification.class === 'entitlement' ? AUTH_FAILURE_DEMOTION_MS : undefined),
           });
         }
         if (!classification.allowFailover) throw error;
@@ -858,7 +954,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
     for (const candidate of this.candidates) {
       const provider = normalizeProviderName(candidate.provider);
-      if (provider && skippedProviders.has(provider)) continue;
+      if (provider && (skippedProviders.has(provider) || this.candidateDemoted(candidate, options)))
+        continue;
       if (!candidate.backend.generateWithTools) continue;
       if (!primaryCandidate) primaryCandidate = candidate;
       const attempt = await this.attemptCandidateWithRetries(
@@ -875,7 +972,9 @@ export class FailoverReasoningBackend implements ReasoningBackend {
                   deferred_tool_definitions: toolPlan.deferred,
                 }
               : optionsForCandidate(this.candidates, candidate, options)
-          )
+          ),
+        options?.signal,
+        options
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);
@@ -926,7 +1025,8 @@ export class FailoverReasoningBackend implements ReasoningBackend {
 
     for (const candidate of this.candidates) {
       const provider = normalizeProviderName(candidate.provider);
-      if (provider && skippedProviders.has(provider)) continue;
+      if (provider && (skippedProviders.has(provider) || this.candidateDemoted(candidate, options)))
+        continue;
       // Skipping a text-only candidate matters more here than elsewhere:
       // failing over to one would drop the images and return an answer about
       // pictures the model never received.
@@ -941,7 +1041,9 @@ export class FailoverReasoningBackend implements ReasoningBackend {
             prompt,
             images,
             optionsForCandidate(this.candidates, candidate, options)
-          )
+          ),
+        options?.signal,
+        options
       );
       if (attempt.ok === false) {
         errors.push(`${candidateLabel(candidate)}: ${attempt.message}`);

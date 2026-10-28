@@ -42,6 +42,14 @@ import { nowIso } from '../foundation/time.js';
  */
 
 import { z } from 'zod';
+import { createHash } from 'node:crypto';
+import { withLockSync } from '../foundation/lock-utils.js';
+import type { ScopeContext } from '../scope-context.js';
+import {
+  compactionScopeKey,
+  compactionSnapshotReceiptSchema,
+  type CompactionSnapshotReceipt,
+} from './worker-compaction-receipt.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
@@ -208,6 +216,8 @@ export class EventSourcingKernel {
       try {
         payload = op.schema.parse(event.payload);
       } catch {
+        if (event.op === 'compaction.committed')
+          throw new Error('[COMPACTION_LINEAGE] Invalid snapshot receipt');
         continue; // a payload that no longer validates must not poison replay
       }
       const current = states.get(op.model);
@@ -381,6 +391,8 @@ export interface OneShotReminder {
 
 /** The full worker state reconstructable from the journal. */
 export interface WorkerRestorableState {
+  /** Per-exact-scope immutable context receipts; never raw transcript payloads. */
+  compactionSnapshots?: Record<string, CompactionSnapshotReceipt[]>;
   goal: GoalRuntimeState | null;
   delegations: Record<string, DelegationLedgerEntry>;
   pendingApprovals: Record<string, PendingApprovalRef>;
@@ -460,6 +472,7 @@ const workerModel = workerStateKernel.defineModel<WorkerRestorableState>(
 
 /** op names as constants so callers/tests never guess the strings. */
 export const WORKER_STATE_OPS = {
+  compactionCommit: 'compaction.committed',
   goalUpsert: 'goal.upsert',
   goalCancel: 'goal.cancel',
   delegationUpsert: 'delegation.upsert',
@@ -468,6 +481,31 @@ export const WORKER_STATE_OPS = {
   missionFork: 'mission.fork',
   reminderConsume: 'reminder.consume',
 } as const;
+
+workerStateKernel.defineOp(WORKER_STATE_OPS.compactionCommit, {
+  model: workerModel,
+  schema: compactionSnapshotReceiptSchema,
+  apply: (state, receipt) => {
+    const snapshots = state.compactionSnapshots?.[receipt.scopeKey] ?? [];
+    const previous = snapshots.at(-1);
+    if (snapshots.some((row) => row.id === receipt.id)) {
+      if (
+        JSON.stringify(snapshots.find((row) => row.id === receipt.id)) !== JSON.stringify(receipt)
+      )
+        throw new Error('[COMPACTION_LINEAGE] Conflicting receipt');
+      return state;
+    }
+    if (receipt.parentId !== previous?.id || receipt.generation !== (previous?.generation ?? 0) + 1)
+      throw new Error('[COMPACTION_LINEAGE] Ambiguous or stale snapshot parent');
+    return {
+      ...state,
+      compactionSnapshots: {
+        ...state.compactionSnapshots,
+        [receipt.scopeKey]: [...snapshots, receipt],
+      },
+    };
+  },
+});
 
 workerStateKernel.defineOp(WORKER_STATE_OPS.goalUpsert, {
   model: workerModel,
@@ -673,6 +711,47 @@ export class WorkerStateJournal {
 
   recordGoal(goal: GoalRuntimeState): JournalEventEnvelope {
     return this.append(WORKER_STATE_OPS.goalUpsert, goal);
+  }
+
+  private compactionState(): WorkerRestorableState {
+    const read = this.readJournal();
+    return (
+      (this.kernel.project(read.events).get('worker') as WorkerRestorableState) ??
+      initialWorkerState()
+    );
+  }
+
+  compactionTip(scope: ScopeContext): CompactionSnapshotReceipt | undefined {
+    return this.compactionState().compactionSnapshots?.[compactionScopeKey(scope)]?.at(-1);
+  }
+
+  recordCompaction(receipt: CompactionSnapshotReceipt): JournalEventEnvelope {
+    assertNotDuringRestore('recordCompaction');
+    return withLockSync(
+      `worker-compaction:${createHash('sha256').update(this.journalPath).digest('hex')}`,
+      () => {
+        const previous = this.compactionState().compactionSnapshots?.[receipt.scopeKey]?.at(-1);
+        compactionSnapshotReceiptSchema.parse(receipt);
+        if (
+          receipt.parentId !== previous?.id ||
+          receipt.generation !== (previous?.generation ?? 0) + 1
+        )
+          throw new Error('[COMPACTION_LINEAGE] Stale snapshot commit');
+        // Reload sequence after another process may have appended journal events.
+        this.seq = this.readJournal().maxSeq + 1;
+        this.seqLoaded = true;
+        return this.append(WORKER_STATE_OPS.compactionCommit, receipt);
+      }
+    );
+  }
+
+  /** Receipt references only; artifact lifecycle stays outside the journal/kernel module. */
+  compactionHistory(
+    scope: ScopeContext,
+    maintenance = false
+  ): readonly CompactionSnapshotReceipt[] {
+    if (maintenance) assertNotDuringRestore('purgeExpiredCompactions');
+    return this.compactionState().compactionSnapshots?.[compactionScopeKey(scope)] ?? [];
   }
 
   cancelGoal(goalId: string, reminderId: string): JournalEventEnvelope {

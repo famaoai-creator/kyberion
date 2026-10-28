@@ -2,6 +2,25 @@ import { describe, expect, it } from 'vitest';
 import { validatePlannedNextTasks } from './mission-orchestration-task-validation.js';
 
 describe('goal-driven task drive contract', () => {
+  it('preserves explicit finite compaction retention policy and rejects unsafe values', () => {
+    const raw = [
+      { task_id: 'SNAPSHOT', compaction_durability: { retention_ms: 86400000, restore: true } },
+    ];
+    expect(validatePlannedNextTasks(raw, 'MSN-POLICY')[0].compaction_durability).toEqual(
+      raw[0].compaction_durability
+    );
+    for (const policy of [
+      { retention_ms: 0 },
+      { retention_ms: Infinity },
+      { retention_ms: 31 * 86400000 },
+      { retention_ms: 1000, restore: 'yes' },
+      { retention_ms: 1000, publish: true },
+    ]) {
+      expect(() =>
+        validatePlannedNextTasks([{ task_id: 'T', compaction_durability: policy }], 'MSN-POLICY')
+      ).toThrow('COMPACTION_RETENTION');
+    }
+  });
   it('preserves owner-authored tool grants across validation and progress round trips', () => {
     for (const approval of [true, false]) {
       const raw = [

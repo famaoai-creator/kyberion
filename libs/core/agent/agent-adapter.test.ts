@@ -1,5 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { AgyAdapter, ClaudeAdapter, CodexAdapter, CodexAppServerAdapter } from './agent-adapter.js';
+import {
+  AgyAdapter,
+  ClaudeAdapter,
+  CodexAdapter,
+  CodexAppServerAdapter,
+  GeminiAdapter,
+  GrokAdapter,
+} from './agent-adapter.js';
 import {
   normalizeCodexAppServerMessage,
   resolveCodexTaskIsolationArgs,
@@ -751,9 +758,9 @@ describe('CodexAppServerAdapter', () => {
     expect(runtime.execute).not.toHaveBeenCalled();
   });
 
-  it('replays the asking task scope for early dynamic tools emitted by the boot resource', async () => {
+  it('replays the asking operator scope for early dynamic tools emitted by a different boot resource', async () => {
     const boot = runInExecutionScope(
-      { tenantBound: true, tenantSlug: 'boot-a' },
+      { tenantBound: false, executionIdentity: { taskId: 'boot-a' } },
       () => new AsyncResource('codex-boot-stdout')
     );
     const observed: unknown[] = [];
@@ -810,7 +817,7 @@ describe('CodexAppServerAdapter', () => {
         },
       },
     };
-    await runInExecutionScope({ tenantBound: true, tenantSlug: 'ask-b' }, () =>
+    await runInExecutionScope({ tenantBound: false, executionIdentity: { taskId: 'ask-b' } }, () =>
       withReasoningPayloadScope(
         { tier: 'personal', tenant_slug: 'ask-b', external_egress: 'deny' },
         () => adapter.ask('use bound tool')
@@ -818,7 +825,7 @@ describe('CodexAppServerAdapter', () => {
     );
     expect(observed).toEqual([
       {
-        execution: expect.objectContaining({ tenantSlug: 'ask-b' }),
+        execution: expect.objectContaining({ tenantBound: false }),
         payload: expect.objectContaining({
           tier: 'personal',
           tenant_slug: 'ask-b',
@@ -1197,5 +1204,73 @@ describe('CodexAppServerAdapter', () => {
     expect(requests.map((request) => request.method)).toEqual(['thread/fork', 'turn/start']);
     expect(requests[1].params.threadId).toBe('thread-child');
     expect(requests[1].params.effort).toBe('medium');
+  });
+});
+
+describe('native transport credential scope fence', () => {
+  it.each([
+    ['codex-app-server', () => new CodexAppServerAdapter()],
+    ['codex-exec', () => new CodexAdapter()],
+    ['gemini-acp', () => new GeminiAdapter()],
+    ['grok-acp', () => new GrokAdapter()],
+    ['agy', () => new AgyAdapter()],
+    ['claude-legacy', () => new ClaudeAdapter()],
+  ] as const)(
+    'rejects %s boot and cached ask in a tenant before any process or request',
+    async (_name, create) => {
+      codexMocks.spawnManagedProcess.mockClear();
+      codexMocks.safeExecResult.mockClear();
+      const operatorAdapter = create();
+      await runInExecutionScope({ tenantBound: true, tenantSlug: 'native-fixture' }, async () => {
+        await expect(operatorAdapter.boot()).rejects.toThrow(
+          /CREDENTIAL_(?:OWNER_DENIED|NATIVE_UNSUPPORTED)/
+        );
+        await expect(operatorAdapter.ask('must not send')).rejects.toThrow(
+          /CREDENTIAL_(?:OWNER_DENIED|NATIVE_UNSUPPORTED)/
+        );
+        const tenantAdapter = create();
+        await expect(tenantAdapter.boot()).rejects.toThrow('CREDENTIAL_NATIVE_UNSUPPORTED');
+        await expect(tenantAdapter.ask('must not send')).rejects.toThrow(
+          'CREDENTIAL_NATIVE_UNSUPPORTED'
+        );
+        expect(codexMocks.spawnManagedProcess).not.toHaveBeenCalled();
+        expect(codexMocks.safeExecResult).not.toHaveBeenCalled();
+      });
+    }
+  );
+});
+
+describe('cached native request ownership', () => {
+  it('rejects a cached app-server across tasks of the same tenant before stdin, refresh or diagnostics', async () => {
+    const adapter = runInExecutionScope(
+      {
+        tenantBound: true,
+        tenantSlug: 'native-fixture',
+        assumedRole: 'mission_controller',
+        executionIdentity: { missionId: 'mission-a', taskId: 'task-a' },
+      },
+      () => new CodexAppServerAdapter()
+    );
+    const write = vi.fn();
+    Object.assign(adapter, {
+      threadId: 'cached-thread',
+      child: { stdin: { writable: true, write } },
+    });
+    await runInExecutionScope(
+      {
+        tenantBound: true,
+        tenantSlug: 'native-fixture',
+        assumedRole: 'mission_controller',
+        executionIdentity: { missionId: 'mission-a', taskId: 'task-b' },
+      },
+      async () => {
+        await expect(adapter.ask('must not send')).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+        await expect(adapter.refreshContext()).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+        await expect(adapter.shutdown()).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+        expect(() => adapter.getRuntimeInfo()).toThrow('CREDENTIAL_OWNER_DENIED');
+        expect(() => adapter.getLog()).toThrow('CREDENTIAL_OWNER_DENIED');
+      }
+    );
+    expect(write).not.toHaveBeenCalled();
   });
 });

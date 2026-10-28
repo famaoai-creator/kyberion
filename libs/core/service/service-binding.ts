@@ -11,6 +11,10 @@ import {
   resolveServiceSecretReferences,
 } from './service-secret-resolver.js';
 import type { SecretReference } from '../secret/secret-resolver.js';
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+} from '../foundation/credential-binding.js';
 
 export interface ServiceBinding {
   serviceId: string;
@@ -74,7 +78,7 @@ export function resolveServiceBinding(
     throw new Error(`Access denied: no service binding secret found for "${serviceId}"`);
   }
 
-  return {
+  const binding: ServiceBinding = {
     serviceId,
     authMode,
     secretReferences,
@@ -94,4 +98,29 @@ export function resolveServiceBinding(
       hasRedirectUri: Boolean(redirectUri),
     },
   };
+  const owner = credentialExecutionIdentity();
+  const captured = { accessToken, appToken, refreshToken, clientId, clientSecret, redirectUri };
+  // A cached service binding cannot carry another task's token into a later
+  // request. Resolve again so a scoped revocation/miss never uses an old value.
+  for (const key of [
+    'accessToken',
+    'appToken',
+    'refreshToken',
+    'clientId',
+    'clientSecret',
+    'redirectUri',
+  ] as const) {
+    Object.defineProperty(binding, key, {
+      enumerable: true,
+      configurable: false,
+      get: () => {
+        assertCredentialOwner(owner);
+        return (
+          (owner.tenantSlug ? resolveServiceSecret(serviceId, selected(key)) : captured[key]) ??
+          undefined
+        );
+      },
+    });
+  }
+  return binding;
 }

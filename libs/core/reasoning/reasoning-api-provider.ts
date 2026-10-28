@@ -1,6 +1,7 @@
 /** DH-04: governed provider module for hosted API reasoning runtimes. */
 
 import Anthropic from '@anthropic-ai/sdk';
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
 import { AnthropicIntentExtractor } from '../provider/anthropic-intent-extractor.js';
 import { AnthropicReasoningBackend } from '../provider/anthropic-reasoning-backend.js';
 import { AnthropicVoiceBridge } from '../provider/anthropic-voice-bridge.js';
@@ -44,10 +45,20 @@ type ApiAdapterBuilder = (
 const API_ADAPTER_BUILDERS: Partial<Record<ReasoningProviderAdapterId, ApiAdapterBuilder>> = {
   'anthropic-api': (options, env) => {
     const { mode, provider } = options;
-    if (!options.anthropicClient && !env.ANTHROPIC_API_KEY && !options.force) return null;
-    const client =
-      options.anthropicClient ??
-      (env.ANTHROPIC_API_KEY ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }) : new Anthropic());
+    const tenant = credentialExecutionIdentity().tenantSlug;
+    if (tenant && options.anthropicClient) {
+      throw new Error(
+        '[CREDENTIAL_OWNER_DENIED] Tenant factory cannot accept an opaque Anthropic client'
+      );
+    }
+    if (!tenant && !options.anthropicClient && !env.ANTHROPIC_API_KEY && !options.force)
+      return null;
+    const client = tenant
+      ? undefined
+      : (options.anthropicClient ??
+        (env.ANTHROPIC_API_KEY
+          ? new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 0 })
+          : new Anthropic({ maxRetries: 0 })));
     return {
       mode,
       backend: {

@@ -7,6 +7,7 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeReaddir,
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
@@ -182,6 +183,7 @@ describe('plugin_install CLI', () => {
 
   it('exits non-zero with the required elevation and installs nothing when a critical capability narrows to nothing', () => {
     const managedRoot = managedRootDir('narrowed');
+    const pluginId = `cli-narrowed-${process.pid}-${randomUUID()}`;
     const src = sourceDir('narrowed');
     safeMkdir(src, { recursive: true });
     safeWriteFile(
@@ -197,7 +199,7 @@ describe('plugin_install CLI', () => {
       '--source',
       src,
       '--id',
-      `cli-narrowed-${process.pid}-${randomUUID()}`,
+      pluginId,
       '--managed-root',
       managedRoot,
     ];
@@ -212,7 +214,10 @@ describe('plugin_install CLI', () => {
       "Required elevation: trust level 'third-party' must be allowed network"
     );
     expect(rendered).not.toContain('Approval request id:');
-    expect(safeExistsSync(managedRoot)).toBe(false);
+    // The canonical publication lock needs a parent directory. Its existence
+    // is not an installation: no code, install record or candidate may remain.
+    expect(safeExistsSync(path.join(managedRoot, pluginId))).toBe(false);
+    expect(safeReaddir(managedRoot)).toEqual([]);
   });
 
   it('connects the plugin CLI to the shared script printer', () => {

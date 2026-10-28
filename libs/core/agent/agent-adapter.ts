@@ -1,3 +1,8 @@
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+} from '../foundation/credential-binding.js';
+import { assertOperatorNativeCredentialOwner } from './native-credential-fence.js';
 import { createLogger } from '../logger.js';
 const logger = createLogger('agent-adapter');
 import { pathResolver } from '../path-resolver.js';
@@ -324,6 +329,7 @@ interface ACPDialect {
 }
 
 abstract class BaseACPAdapter implements AgentAdapter {
+  protected readonly credentialOwner = credentialExecutionIdentity();
   protected child: ChildProcess | null = null;
   protected connection: ACPConnection | null = null;
   protected acpSessionId: string | null = null;
@@ -361,6 +367,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   protected handleSessionUpdate(_params: SessionNotification): void {}
 
   public async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     logger.info(`[UAA] Spawning: ${this.bootCommand} ${this.bootArgs.join(' ')}`);
     this.runtimeResourceId = `adapter:${this.bootCommand}`;
     const managed = spawnManagedProcess({
@@ -524,6 +531,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   }
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (!this.connection || !this.acpSessionId) throw new Error('Agent not booted.');
 
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
@@ -532,6 +540,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
     this.accumulatedResponse = '';
     this.accumulatedThought = '';
 
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     const response = await this.connection.extMethod(this.dialect.prompt, {
       sessionId: this.acpSessionId,
       threadId: this.acpSessionId,
@@ -567,6 +576,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   }
 
   public async shutdown(): Promise<void> {
+    assertCredentialOwner(this.credentialOwner);
     if (this.child) {
       if (this.runtimeResourceId) {
         stopManagedProcess(this.runtimeResourceId, this.child);
@@ -577,6 +587,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   }
 
   public getRuntimeInfo(): Record<string, unknown> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return {
       pid: this.child?.pid,
       sessionId: this.acpSessionId,
@@ -586,6 +597,7 @@ abstract class BaseACPAdapter implements AgentAdapter {
   }
 
   public async refreshContext(): Promise<{ mode: 'soft'; sessionId?: string | null }> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (!this.connection) throw new Error('Agent not booted.');
     const sessionRes = await this.connection.extMethod(this.dialect.newSession, {
       cwd: PROJECT_ROOT,
@@ -626,6 +638,7 @@ export class GeminiAdapter extends BaseACPAdapter {
   }
 
   public async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     await super.boot();
     const targetModel = this.options.model || resolveRuntimeModelId('gemini-default');
     try {
@@ -674,6 +687,7 @@ export class GrokAdapter extends BaseACPAdapter {
   }
 
   public async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     await super.boot();
     if (this.model) {
       try {
@@ -771,6 +785,7 @@ export class GrokAdapter extends BaseACPAdapter {
     prompt: string,
     options: AgentAskOptions = {}
   ): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (getRegisteredEnvText('GROK_SUBAGENTS') === '0') {
       throw new Error(
         '[SUBAGENT_UNAVAILABLE] Grok native subagents are disabled by GROK_SUBAGENTS=0.'
@@ -821,6 +836,7 @@ export class GrokAdapter extends BaseACPAdapter {
   }
 
   public getRuntimeInfo(): Record<string, unknown> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return {
       ...super.getRuntimeInfo(),
       supportsNativeSubagents: getRegisteredEnvText('GROK_SUBAGENTS') !== '0',
@@ -955,6 +971,7 @@ ${prompt}`;
 
 export type BuiltinAgentProvider = 'gemini' | 'codex' | 'claude' | 'agy' | 'grok';
 export class CodexAdapter implements AgentAdapter {
+  protected readonly credentialOwner = credentialExecutionIdentity();
   protected enhancers: AgentEnhancer[] = [];
 
   constructor(private readonly options: { model?: string } = {}) {
@@ -966,10 +983,12 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   public async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     logger.info('[UAA] Codex (Exec mode) ready.');
   }
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     const trace: Array<{ enhancer: string; action: string; details?: string }> = [];
     const enhanced = await applyEnhancersBeforeAsk(this.enhancers, prompt, options, trace);
     logger.debug(`[UAA] Codex executing prompt (${enhanced.prompt.length} chars)`);
@@ -978,6 +997,7 @@ export class CodexAdapter implements AgentAdapter {
     try {
       // Pass the text as a single argument to npx/codex exec
       const activePermissionArgs = resolveActiveProviderPermissionArgs('codex') ?? [];
+      assertOperatorNativeCredentialOwner(this.credentialOwner);
       const res = await runCliProcess(
         'npx',
         [
@@ -1017,9 +1037,12 @@ export class CodexAdapter implements AgentAdapter {
     }
   }
 
-  public async shutdown(): Promise<void> {}
+  public async shutdown(): Promise<void> {
+    assertCredentialOwner(this.credentialOwner);
+  }
 
   public getRuntimeInfo(): Record<string, unknown> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return {
       supportsSoftRefresh: false,
       stateless: true,
@@ -1027,6 +1050,7 @@ export class CodexAdapter implements AgentAdapter {
   }
 
   public async refreshContext(): Promise<{ mode: 'stateless' }> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return { mode: 'stateless' };
   }
 }
@@ -1040,6 +1064,7 @@ export interface AgyAdapterOptions {
 }
 
 export class AgyAdapter implements AgentAdapter {
+  protected readonly credentialOwner = credentialExecutionIdentity();
   private options: AgyAdapterOptions;
   private logBuffer: { ts: number; type: string; content: string }[] = [];
   private usageSummary: Record<string, unknown> | null = null;
@@ -1050,14 +1075,17 @@ export class AgyAdapter implements AgentAdapter {
   }
 
   public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return this.logBuffer.slice(-limit);
   }
 
   public async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     logger.info(`[UAA] Agy CLI ready (bin: ${this.options.bin || 'agy'})`);
   }
 
   public async ask(text: string, options?: AgentAskOptions): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     const isInteractive = options?.interactive === true;
     logger.info(
       `[UAA] Agy asking (${isInteractive ? 'interactive' : 'non-interactive'}, ${text.length} chars)`
@@ -1117,6 +1145,7 @@ export class AgyAdapter implements AgentAdapter {
         args.push(...this.options.extraArgs);
       }
 
+      assertOperatorNativeCredentialOwner(this.credentialOwner);
       const res = await runCliProcess(bin, args, {
         env: safeChildEnv() as NodeJS.ProcessEnv,
         cwd: this.options.cwd || PROJECT_ROOT,
@@ -1166,9 +1195,12 @@ export class AgyAdapter implements AgentAdapter {
     }
   }
 
-  public async shutdown(): Promise<void> {}
+  public async shutdown(): Promise<void> {
+    assertCredentialOwner(this.credentialOwner);
+  }
 
   public getRuntimeInfo(): Record<string, unknown> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return {
       usage: this.usageSummary,
       supportsSoftRefresh: true,
@@ -1178,6 +1210,7 @@ export class AgyAdapter implements AgentAdapter {
   }
 
   public async refreshContext(): Promise<{ mode: 'soft' | 'stateless'; sessionId: string | null }> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (this.activeSessionId) {
       return { mode: 'soft', sessionId: this.activeSessionId };
     }
@@ -1226,6 +1259,7 @@ const ACTUATOR_TO_CLAUDE_TOOLS: Record<string, string[]> = {
 };
 
 export class ClaudeAdapter implements AgentAdapter {
+  protected readonly credentialOwner = credentialExecutionIdentity();
   private options: ClaudeAdapterOptions;
   private logBuffer: { ts: number; type: string; content: string }[] = [];
   private usageSummary: Record<string, unknown> | null = null;
@@ -1235,16 +1269,19 @@ export class ClaudeAdapter implements AgentAdapter {
   }
 
   public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return this.logBuffer.slice(-limit);
   }
 
   public async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     logger.info(
       `[UAA] Claude Code ready (model: ${this.options.model || 'default'}, session: ${this.options.sessionId || 'new'})`
     );
   }
 
   public async ask(text: string): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     logger.debug(`[UAA] Claude asking (${text.length} chars)`);
     this.logBuffer.push({ ts: Date.now(), type: 'prompt', content: text });
     assertReasoningEgressAllowed('claude-cli');
@@ -1315,6 +1352,7 @@ export class ClaudeAdapter implements AgentAdapter {
         args.push('--disallowedTools', ...this.options.disallowedTools);
       }
 
+      assertOperatorNativeCredentialOwner(this.credentialOwner);
       const result = await runCliProcess('claude', args, {
         env: safeChildEnv() as NodeJS.ProcessEnv,
         cwd: this.options.cwd || PROJECT_ROOT,
@@ -1349,9 +1387,12 @@ export class ClaudeAdapter implements AgentAdapter {
     }
   }
 
-  public async shutdown(): Promise<void> {}
+  public async shutdown(): Promise<void> {
+    assertCredentialOwner(this.credentialOwner);
+  }
 
   public getRuntimeInfo(): Record<string, unknown> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return {
       sessionId: this.options.sessionId || null,
       usage: this.usageSummary,

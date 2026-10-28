@@ -2708,6 +2708,24 @@ describe('mission-orchestration-worker', { timeout: 60_000 }, () => {
   // mocked, so provenance can only be observed if the worker reads the accessor
   // itself rather than deriving it from the (mocked) a2a response.
   describe('task_result.provenance stamping (XP-05)', () => {
+    let previousHealthPath: string | undefined;
+    beforeEach(async () => {
+      // These fixtures exercise an actual failover chain. Intentional failures
+      // in earlier cases must not leave either synthetic provider in cooldown.
+      const { clearProviderHealth } = await import('../provider/provider-health-registry.js');
+      const { pathResolver } = await import('../path-resolver.js');
+      previousHealthPath = process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH;
+      process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH = pathResolver.sharedTmp(
+        `vitest-provenance-health-${process.pid}.json`
+      );
+      clearProviderHealth();
+    });
+    afterEach(async () => {
+      const { clearProviderHealth } = await import('../provider/provider-health-registry.js');
+      clearProviderHealth();
+      if (previousHealthPath === undefined) delete process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH;
+      else process.env.KYBERION_PROVIDER_HEALTH_STATE_PATH = previousHealthPath;
+    });
     async function writeProvenanceFixtureTask(taskId: string): Promise<void> {
       const { missionDir } = await import('../path-resolver.js');
       const { safeWriteFile } = await import('../secure-io.js');

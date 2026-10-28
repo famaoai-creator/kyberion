@@ -6,6 +6,7 @@ import type { ReasoningCallOptions } from '../reasoning/reasoning-backend.js';
  * cancellation, and provider metadata; dispatchers only see this contract.
  */
 export interface NativeSubagentAdopter {
+  readonly supportsSemanticProgress?: boolean;
   readonly id: string;
   dispatch(instruction: string, context?: string, options?: ReasoningCallOptions): Promise<string>;
   getInfo?(): Record<string, unknown> | null;

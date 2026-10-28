@@ -334,6 +334,7 @@ export type OpsAlertLogRecordKind =
   | 'operator_notification_undelivered'
   | 'ops_alert_redelivery'
   | 'ops_alert_ack'
+  | 'scheduler_incident'
   | 'unknown';
 
 export interface ParsedOpsAlertRecord {
@@ -354,7 +355,8 @@ function classifyOpsAlertRecord(raw: Record<string, unknown>): OpsAlertLogRecord
   if (
     kind === 'operator_notification_undelivered' ||
     kind === 'ops_alert_redelivery' ||
-    kind === 'ops_alert_ack'
+    kind === 'ops_alert_ack' ||
+    kind === 'scheduler_incident'
   ) {
     return kind;
   }

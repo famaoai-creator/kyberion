@@ -106,6 +106,7 @@ function kyberionEnv(name: string): string | undefined {
 }
 import {
   loadReasoningRoutePolicy,
+  reasoningRoleInheritsDefault,
   loadReasoningRouteUserConfig,
   resolveReasoningRoute,
   resolveReasoningRouteCandidates,
@@ -122,6 +123,7 @@ import {
 
 import {
   bindFixedReasoningBackend,
+  bindReasoningRequestTimeout,
   reasoningSelectionWireModel,
 } from './reasoning-fixed-binding.js';
 
@@ -258,6 +260,7 @@ function buildReasoningRuntimeBundle(
     mode,
     provider,
     model: options.model,
+    timeoutMs: options.timeoutMs,
     force: options.force,
   });
   if (cliBundle !== undefined) return cliBundle;
@@ -402,8 +405,10 @@ function buildReasoningRuntimeChain(
           timeoutMs: route.limits.timeoutMs ?? options.timeoutMs,
         }
       );
-      if (candidate) candidates.push(candidate);
-      else if (fixed)
+      if (candidate) {
+        candidate.backend.model = reasoningSelectionWireModel(route.model);
+        candidates.push(candidate);
+      } else if (fixed)
         throw new ReasoningSelectionError('unavailable', 'Fixed backend could not be constructed');
     }
     const filtered = filterChainByProviderCapability(candidates);
@@ -425,7 +430,10 @@ function buildReasoningRuntimeChain(
     if (seen.has(normalized)) continue;
     seen.add(normalized);
     const candidate = buildReasoningRuntimeBundle(normalized, options);
-    if (candidate) candidates.push(candidate);
+    if (candidate) {
+      candidate.backend.model ??= options.model;
+      candidates.push(candidate);
+    }
   }
 
   return filterChainByProviderCapability(candidates);
@@ -715,6 +723,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     const roleBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
     const profileBackends = new Map<string, ReturnType<typeof buildFailoverReasoningBackend>>();
     for (const role of Object.keys(loadReasoningRoutePolicy().roles)) {
+      if (reasoningRoleInheritsDefault({ role })) continue;
       try {
         const roleChain = buildReasoningRuntimeChain(mode, {
           ...effectiveOptions,
@@ -731,9 +740,13 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
             roleChain.map((candidate) => candidate.backend),
             fixedRoute?.failover || governedFailoverPolicy
           );
+          const roleBackend = bindReasoningRequestTimeout(
+            backend,
+            resolveReasoningRoute({ role }).limits.timeoutMs
+          );
           roleBackends.set(
             role,
-            fixedRoute ? bindFixedReasoningBackend(backend, fixedRoute) : backend
+            fixedRoute ? bindFixedReasoningBackend(roleBackend, fixedRoute) : roleBackend
           );
         }
       } catch (error) {

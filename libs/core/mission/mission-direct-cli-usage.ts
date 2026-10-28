@@ -9,8 +9,8 @@ import { PROVIDER_IDS } from '../provider/provider-permission-profiles.js';
  * retrospective would otherwise report `entries: 0` — indistinguishable from
  * "free". Each completed task appends one ESTIMATED entry to the existing
  * resource-usage ledger (`MetricsCollector.recordResourceUsage`) so the work is
- * at least counted. Token counts are never fabricated: quantity and cost are 0
- * and the token fields are null.
+ * at least counted. Token counts and cash costs are never fabricated:
+ * quantity is 0, cost certainty is unknown and the token fields are null.
  */
 export const DIRECT_CLI_USAGE_SOURCE = 'direct_cli';
 
@@ -81,7 +81,10 @@ export function recordDirectCliTaskUsage(input: DirectCliUsageInput): ResourceUs
           mission_id: missionId,
           quantity: 0,
           unit: 'task',
-          cost_usd: 0,
+          cost_status: 'unknown',
+          billing_mode: 'unknown',
+          usage_source: 'unknown',
+          cost_source: 'none',
           status: 'estimated',
           source: DIRECT_CLI_USAGE_SOURCE,
           scope: {

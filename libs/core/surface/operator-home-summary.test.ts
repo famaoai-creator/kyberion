@@ -209,6 +209,51 @@ describe('operator home summary', () => {
     expect(summary.inboxEntries).toHaveLength(1);
   });
 
+  it('preserves CLI cost uncertainty and subscription reference amounts without confirming the remaining budget', async () => {
+    const { MetricsCollector } = await import('../metrics.js');
+    const spy = vi.spyOn(MetricsCollector.prototype, 'loadHistory').mockReturnValue([
+      {
+        timestamp: '2026-10-28T00:00:00Z',
+        mission_id: 'MSN-CLI',
+        cost_status: 'unknown',
+        billing_mode: 'unknown',
+        reference_cost_usd: 0.4,
+        usage: { prompt_tokens: 30, completion_tokens: 20 },
+      },
+      {
+        timestamp: '2026-10-28T00:00:01Z',
+        mission_id: 'MSN-CLI',
+        cost_status: 'included',
+        billing_mode: 'subscription_included',
+        reference_cost_usd: 0.6,
+        usage: { prompt_tokens: 50, completion_tokens: 50 },
+      },
+      { mission_id: 'MSN-CLI', component: 'catalog-refresh', duration_ms: 10 },
+    ] as never);
+    try {
+      const { collectOperatorHomeSummary } = await import('./operator-home-summary.js');
+      const summary = collectOperatorHomeSummary({ budgetUsd: 5 });
+      expect(summary.costSummary).toMatchObject({
+        totalUsd: 0,
+        totalTokens: 150,
+        referenceUsd: 1,
+        referenceCostCalls: 2,
+        unknownCostCalls: 1,
+        includedCalls: 1,
+        costComplete: false,
+        remainingUsd: null,
+        entryCount: 3,
+      });
+      expect(summary.costSummary.missionBreakdown[0]).toMatchObject({
+        unknownCostCalls: 1,
+        includedCalls: 1,
+        costComplete: false,
+      });
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('surfaces a pending software quality decision for the accountable human', async () => {
     const qualityDir = path.join(tmpRoot, 'active/shared/runtime/qa');
     fs.mkdirSync(qualityDir, { recursive: true });
@@ -260,6 +305,16 @@ describe('operator home summary', () => {
       listApprovalRequests: () => [
         approval('APR-TENANT', { tier: 'public', tenant_slug: 'tenant-a' }),
         approval('APR-TIER-ONLY', { tier: 'public' }),
+        approval('APR-CONTRADICTORY-MISSION', {
+          tier: 'personal',
+          tenant_slug: 'tenant-b',
+          mission_id: 'MSN-TENANT',
+        }),
+        approval('APR-HIGHER-TIER-MISSION', {
+          tier: 'personal',
+          tenant_slug: 'tenant-a',
+          mission_id: 'MSN-TENANT',
+        }),
         approval('APR-UNSCOPED', undefined),
         approval(
           'APR-CONTEXT-TENANT',

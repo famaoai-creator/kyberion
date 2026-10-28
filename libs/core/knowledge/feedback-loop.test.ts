@@ -1,3 +1,8 @@
+import {
+  acknowledgeSchedulerIncident,
+  listSchedulerIncidents,
+  schedulerIncidentLogForRoot,
+} from '../scheduler-incidents.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
@@ -264,6 +269,34 @@ describe('failed-schedule sweep (LC-01c)', () => {
     expect(result.failed).toEqual([]);
     expect(result.alert).toBeNull();
     expect(emitAlert).not.toHaveBeenCalled();
+  });
+
+  it('wires recorded causes to the sweep: exact-cause ack suppresses repeats but not a new cause', () => {
+    const rootDir = seedRegistryRoot(
+      makeRegistry([{ id: 'cause-job', lastStatus: 'succeeded' } as never])
+    );
+    const registryOptions = { rootDir };
+    const incidentOptions = { alertLogPath: schedulerIncidentLogForRoot(rootDir) };
+    const timeout = makeTrace();
+    timeout.rootSpan.error = 'Timed out after 300s';
+    recordPipelineResult('cause-job', 'failed', timeout, registryOptions);
+    const cause = listSchedulerIncidents(incidentOptions)[0]!;
+    expect(cause).toMatchObject({ scheduleId: 'cause-job', cause: 'timeout', status: 'detected' });
+    expect(
+      acknowledgeSchedulerIncident('cause-job', cause.signature, cause.episodeId!, incidentOptions)
+    ).toBe(true);
+    const emitAlert = vi.fn().mockReturnValue({ id: 'changed-cause' });
+    expect(sweepFailedSchedules({ registryOptions, emitAlert }).alert).toBeNull();
+    expect(emitAlert).not.toHaveBeenCalled();
+    const auth = makeTrace();
+    auth.rootSpan.error = '401 authentication failed';
+    recordPipelineResult('cause-job', 'failed', auth, registryOptions);
+    expect(sweepFailedSchedules({ registryOptions, emitAlert }).alert?.id).toBe('changed-cause');
+    expect(emitAlert).toHaveBeenCalledOnce();
+    recordPipelineResult('cause-job', 'succeeded', undefined, registryOptions);
+    expect(
+      listSchedulerIncidents(incidentOptions).some((incident) => incident.status === 'detected')
+    ).toBe(false);
   });
 
   it('records and auto-disables failures through the governed scheduler registry', () => {

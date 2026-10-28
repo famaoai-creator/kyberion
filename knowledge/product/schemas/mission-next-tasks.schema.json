@@ -5,6 +5,17 @@
   "type": "array",
   "items": {
     "type": "object",
+    "properties": {
+      "compaction_durability": {
+        "type": "object",
+        "required": ["retention_ms"],
+        "properties": {
+          "retention_ms": { "type": "number", "exclusiveMinimum": 0, "maximum": 2592000000 },
+          "restore": { "type": "boolean" }
+        },
+        "additionalProperties": false
+      }
+    },
     "additionalProperties": true
   }
 }

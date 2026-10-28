@@ -15,6 +15,7 @@ import { assertBackgroundReviewOperationAllowed } from './background-review-poli
 import {
   loadDistillCandidateRecord,
   updateDistillCandidateRecord,
+  withDistillCandidateRecordLock,
   type DistillCandidateRecord,
 } from '../knowledge/distill-candidate-registry.js';
 import { pathResolver } from '../path-resolver.js';
@@ -384,6 +385,16 @@ export function inspectBackgroundReviewProposal(
 }
 
 export function createBackgroundReviewApprovalRequest(
+  input: BackgroundReviewApprovalRequestInput
+): ApprovalRequestRecord {
+  // Reference creation and curator archival share one candidate lock: an
+  // approval can never appear after the curator's final reference check.
+  return withDistillCandidateRecordLock(String(input.candidateId || '').trim(), () =>
+    createBackgroundReviewApprovalRequestLocked(input)
+  );
+}
+
+function createBackgroundReviewApprovalRequestLocked(
   input: BackgroundReviewApprovalRequestInput
 ): ApprovalRequestRecord {
   const candidateId = String(input.candidateId || '').trim();

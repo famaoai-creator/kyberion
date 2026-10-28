@@ -7,7 +7,7 @@ const SOURCES = [
   ['libs/core/provider/agy-cli-backend.ts', /process\.env\.NODE_ENV/u],
   ['libs/core/knowledge/memory-promotion-queue.ts', /process\.env\.NODE_ENV/u],
   ['libs/core/ops-alert.ts', /process\.env\[OPS_ALERT_WEBHOOK_ENV\]/u],
-  ['libs/core/workforce/worker-context-compaction.ts', /process\.env\[name\]/u],
+  ['libs/core/workforce/context-window-profile.ts', /process\.env/u],
   ['libs/core/media/media-backend-registry.ts', /process\.env\[name\]/u],
   ['libs/core/actuator/actuator-capability.ts', /process\.env\[envName\]/u],
   [
@@ -51,6 +51,18 @@ const SOURCES = [
 ] as const;
 
 describe('environment access boundary', () => {
+  it('keeps compaction capacity settings behind the shared context-window profile', () => {
+    const source = String(
+      safeReadFile(pathResolver.rootResolve('libs/core/workforce/worker-context-compaction.ts'), {
+        encoding: 'utf8',
+      })
+    );
+    expect(source).not.toMatch(/process\.env/u);
+    expect(source).toMatch(
+      /import\s*\{[^}]*\bresolveContextWindowProfile\b[^}]*\}\s*from\s*['"]\.\/context-window-profile\.js['"]/su
+    );
+    expect(source).toMatch(/\bresolveContextWindowProfile\(options\.profile\)/u);
+  });
   it('keeps shared runtime settings behind the registered environment API', () => {
     for (const [relativePath, directAccessPattern] of SOURCES) {
       const source = String(

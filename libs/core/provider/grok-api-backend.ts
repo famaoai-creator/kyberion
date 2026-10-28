@@ -8,6 +8,7 @@
  */
 
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import { selectProviderCredential } from '../foundation/credential-binding.js';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
@@ -26,10 +27,11 @@ export function grokDefaultModel(env: NodeJS.ProcessEnv = process.env): string {
 }
 
 export function resolveGrokApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return (
+  return selectProviderCredential(
+    ['XAI_API_KEY', 'KYBERION_GROK_API_KEY'],
     getRegisteredEnvText('XAI_API_KEY', { env })?.trim() ||
-    getRegisteredEnvText('KYBERION_GROK_API_KEY', { env })?.trim() ||
-    undefined
+      getRegisteredEnvText('KYBERION_GROK_API_KEY', { env })?.trim() ||
+      ''
   );
 }
 
@@ -61,6 +63,7 @@ export function buildGrokApiBackendFromEnv(
   const backend = new OpenAiCompatibleBackend({
     baseURL,
     apiKey,
+    credentialKeys: ['XAI_API_KEY', 'KYBERION_GROK_API_KEY'],
     model: overrides.model || resolveGrokApiModel(env),
     endpointPolicy: 'public',
     supportsVision: true,

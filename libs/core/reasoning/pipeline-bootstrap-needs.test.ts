@@ -2,6 +2,15 @@ import { describe, expect, it } from 'vitest';
 import { pipelineBootstrapNeeds } from './pipeline-bootstrap-needs.js';
 
 describe('pipelineBootstrapNeeds', () => {
+  it('does not discover provider credentials for deterministic logging and transforms', () => {
+    expect(
+      pipelineBootstrapNeeds([
+        { op: 'system:log', params: { message: 'before' } },
+        { op: 'core:transform', params: { input: 21, script: 'return Number(input) * 2;' } },
+        { op: 'system:log', params: { message: 'after' } },
+      ])
+    ).toEqual({ required: false, reasons: [] });
+  });
   it('skips the bootstrap for volatile GC', () => {
     const needs = pipelineBootstrapNeeds([
       { op: 'working-memory:run-gc', params: { export_as: 'gc_result' } },

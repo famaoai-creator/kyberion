@@ -62,6 +62,22 @@ describe('provider-health-registry', () => {
     delete process.env.KYBERION_PROVIDER_DEMOTION_TTL_MS;
   });
 
+  it('persists model cooldowns without excluding sibling models or instances', () => {
+    reportProviderTemporarilyUnhealthy('codex', {
+      instance: 'work',
+      model: 'restricted',
+      retryAfterMs: 120_000,
+      now: T0,
+    });
+    reloadProviderHealthFromDisk(T0 + 1);
+    expect(isInstanceDemoted('codex', 'work', T0 + 1)).toBe(false);
+    expect(isInstanceDemoted('codex', 'work', T0 + 1, 'restricted')).toBe(true);
+    reportProviderHealthy('codex', 'work');
+    expect(isInstanceDemoted('codex', 'work', T0 + 1, 'restricted')).toBe(true);
+    expect(isInstanceDemoted('codex', 'personal', T0 + 1, 'restricted')).toBe(false);
+    expect(isInstanceDemoted('codex', 'work', T0 + 120_001, 'restricted')).toBe(false);
+  });
+
   it('demotes an instance for a TTL and recovers after it expires', () => {
     reportProviderRateLimited('codex', { retryAfterMs: 5000, now: T0 });
     expect(isInstanceDemoted('codex', 'default', T0 + 1000)).toBe(true);

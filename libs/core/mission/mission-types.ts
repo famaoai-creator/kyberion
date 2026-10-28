@@ -107,6 +107,8 @@ export interface MissionState {
     completed_at: string;
     mode?: 'llm' | 'structural';
     llm_used?: boolean;
+    /** Safe categorical reason; provider errors and credentials are never persisted here. */
+    structural_reason?: 'stub_requested' | 'llm_unavailable';
     output_path: string;
   };
   /** Set when governed distillation closes the mission lifecycle. */

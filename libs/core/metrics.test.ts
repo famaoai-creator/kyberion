@@ -13,6 +13,124 @@ import {
 } from './metrics.js';
 
 describe('metrics core', () => {
+  it('never prices unknown models at generic default rates, and keeps reported zero authoritative', () => {
+    const metricsDir = pathResolver.sharedTmp('metrics-cost-certainty');
+    const mc = new MetricsCollector({
+      metricsDir,
+      costRegistry: {
+        models: { known: { prompt: 1, completion: 2 } },
+        default: { prompt: 99, completion: 99 },
+      },
+    });
+    try {
+      mc.record('unknown', 1, 'success', {
+        model: 'unregistered-model',
+        usage: { prompt_tokens: 100, completion_tokens: 10 },
+      });
+      mc.record('reported-zero', 1, 'success', {
+        model: 'known',
+        usage: { prompt_tokens: 100 },
+        reported_cost_usd: 0,
+      });
+      mc.record('included', 1, 'success', {
+        model: 'known',
+        usage: { prompt_tokens: 100 },
+        billing_mode: 'subscription_included',
+        usage_source: 'provider',
+      });
+      mc.record('unknown-billing', 1, 'success', {
+        model: 'known',
+        usage: { prompt_tokens: 100 },
+        billing_mode: 'unknown',
+        usage_source: 'provider',
+      });
+      mc.record('native-reference', 1, 'success', {
+        model: 'unregistered-model',
+        usage: { prompt_tokens: 10 },
+        reference_cost_usd: 0.02,
+        cost_source: 'provider_report',
+        billing_mode: 'unknown',
+      });
+      const rows = mc.loadHistory();
+      expect(rows[0]).toMatchObject({
+        cost_usd: null,
+        cost_status: 'unknown',
+        cost_source: 'none',
+      });
+      expect(rows[0].reference_cost_usd).toBeUndefined();
+      expect(rows[1]).toMatchObject({
+        cost_usd: 0,
+        reported_cost_usd: 0,
+        cost_status: 'actual',
+        cost_source: 'provider_report',
+      });
+      expect(rows[2]).toMatchObject({
+        cost_usd: 0,
+        reference_cost_usd: 0.1,
+        cost_status: 'included',
+        usage_source: 'provider',
+      });
+      expect(rows[3]).toMatchObject({
+        cost_usd: null,
+        reference_cost_usd: 0.1,
+        cost_status: 'unknown',
+        usage_source: 'provider',
+      });
+      expect(rows[4]).toMatchObject({
+        cost_usd: null,
+        cost_status: 'unknown',
+        reference_cost_usd: 0.02,
+        cost_source: 'provider_report',
+      });
+      expect(mc.getCapabilityMetrics('unknown')).toMatchObject({
+        totalCostUSD: 0,
+        unknownCostCalls: 1,
+        costComplete: false,
+      });
+      expect(mc.summarize().find((summary) => summary.component === 'unknown')).toMatchObject({
+        totalCostUSD: 0,
+        unknownCostCalls: 1,
+        costComplete: false,
+        referenceCostCalls: 0,
+      });
+      expect(mc.getCapabilityMetrics('included')).toMatchObject({
+        totalCostUSD: 0,
+        referenceCostUSD: 0.1,
+        includedCalls: 1,
+        costComplete: true,
+      });
+    } finally {
+      safeRmSync(metricsDir, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps unknown resource prices null and preserves commitment lifecycle separately', () => {
+    const mc = new MetricsCollector({ persist: false });
+    const base = {
+      resource_kind: 'llm' as const,
+      quantity: 1,
+      unit: 'call',
+      status: 'committed' as const,
+      source: 'test',
+    };
+    expect(mc.recordResourceUsage({ ...base, cost_status: 'unknown' })).toMatchObject({
+      cost_usd: null,
+      cost_status: 'unknown',
+      status: 'committed',
+    });
+    expect(mc.recordResourceUsage({ ...base, cost_usd: null, unit_cost_usd: 99 })).toMatchObject({
+      cost_usd: null,
+      cost_status: 'unknown',
+    });
+    expect(mc.recordResourceUsage({ ...base, cost_usd: 3, reported_cost_usd: 0 })).toMatchObject({
+      cost_usd: 0,
+      cost_status: 'actual',
+      status: 'committed',
+    });
+    expect(() => mc.recordResourceUsage({ ...base, reference_cost_usd: Number.NaN })).toThrow(
+      'reference_cost_usd'
+    );
+  });
   it('strict history distinguishes absent, corrupt and non-file evidence while preserving legacy reads', () => {
     const metricsDir = 'active/shared/tmp/metrics-strict-history-tests';
     const historyPath = `${metricsDir}/history.jsonl`;

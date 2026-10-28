@@ -84,14 +84,18 @@ export async function POST(req: NextRequest) {
     const redirectUri = `http://${callbackHost}:${callbackPort}${callbackPath}`;
 
     await ensureOAuthCallbackSurface();
-    const session = beginInteractiveServiceOAuth(serviceId, { redirectUri });
+    const session = beginInteractiveServiceOAuth(serviceId, {
+      redirectUri,
+      observerPrincipalId: access.principal.principalId,
+    });
     return NextResponse.json({
       ok: true,
       service_id: serviceId,
       catalog_id: serviceRaw,
       authorization_url: session.authorizationUrl,
       redirect_uri: redirectUri,
-      state: session.state,
+      operation_id: session.operationId,
+      expires_at: session.expiresAt,
     });
   } catch {
     return operatorServiceError('unavailable', 503);

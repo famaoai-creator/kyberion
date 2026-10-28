@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import * as path from 'node:path';
+import {
+  captureVerificationSourceSnapshot,
+  verificationFreshness,
+} from '@agent/core/verification-source-snapshot';
 
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import {
@@ -69,7 +74,13 @@ describe('software quality report CLI core', () => {
         },
       ],
     });
+    const sourcePath = write('verified-source.ts', 'before verification');
+    const sourceSnapshot = captureVerificationSourceSnapshot([
+      path.relative(pathResolver.rootDir(), sourcePath).split(path.sep).join('/'),
+    ]);
+    safeWriteFile(sourcePath, 'edited after verification');
     const executionPath = write('execution.json', {
+      source_snapshot: sourceSnapshot,
       version: '1.0.0',
       run_id: 'RUN-1',
       project_id: 'project-1',
@@ -97,10 +108,12 @@ describe('software quality report CLI core', () => {
     expect(result.defectCount).toBe(1);
     const report = JSON.parse(safeReadFile(outputPath, { encoding: 'utf8' }) as string);
     expect(report).toMatchObject({
+      source_snapshot: sourceSnapshot,
       report_id: 'QUALITY-RUN-1',
       human_decision: 'pending',
       recommendation: 'no_go',
     });
+    expect(verificationFreshness(report.source_snapshot).status).toBe('stale');
     expect(JSON.parse(safeReadFile(publishSummaryPath, { encoding: 'utf8' }) as string)).toEqual(
       report
     );

@@ -664,6 +664,8 @@ export function tryAutoCompleteTaskFromEvidence(
      * requires_customer hold) is never auto-completed, nor cascaded.
      */
     isHeld?: (taskId: string) => boolean;
+    /** A caller may require task-specific provenance before adopting a dependent's output. */
+    canCascade?: (taskId: string) => boolean;
     /** Only supplied after the canonical claim fence hashes this exact source target. Never cascaded. */
     verifiedSourceTarget?: string;
   } = {}
@@ -746,6 +748,7 @@ export function tryAutoCompleteTaskFromEvidence(
       );
       if (
         isTaskDeliverableSatisfied(missionDir, candidate, refreshedStatuses) &&
+        (options.canCascade?.(candidateId) ?? true) &&
         !options.isHeld?.(candidateId)
       ) {
         candidate.status = 'completed';

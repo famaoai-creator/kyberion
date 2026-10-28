@@ -46,8 +46,11 @@ function loadChronosTokenRegistrations(): ChronosTokenRegistration[] {
   try {
     // TR-01: read under the narrow registry reader role (see viewer-context.ts).
     return (
-      withExecutionContext(CHRONOS_TOKEN_REGISTRY_READER_ROLE, () =>
-        readChronosTokenRegistrations()
+      withExecutionContext(
+        CHRONOS_TOKEN_REGISTRY_READER_ROLE,
+        () => readChronosTokenRegistrations(),
+        undefined,
+        ''
       ) || []
     );
   } catch {

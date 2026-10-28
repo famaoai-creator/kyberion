@@ -67,6 +67,7 @@ function overview(over: Partial<CustomerDecisionOverviewView> = {}): CustomerDec
       reminders_due: 0,
       held_tasks: 3,
       pending_task_proposals: 0,
+      frozen_locks: 0,
       attention_total: 2,
     },
     attention: [
@@ -85,7 +86,13 @@ function overview(over: Partial<CustomerDecisionOverviewView> = {}): CustomerDec
       {
         case_id: 'case-a',
         draft_only: false,
-        tasks: { pending_proposals: 0, held: 3, ready_to_resume: 0 },
+        tasks: {
+          pending_proposals: 0,
+          held: 3,
+          ready_to_resume: 0,
+          unresolvable: 0,
+          frozen_locks: 0,
+        },
         agendas: [agenda],
         agendas_total: 1,
       },

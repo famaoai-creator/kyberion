@@ -17,13 +17,33 @@
 
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
+import {
+  writeCompactionSnapshot,
+  discardUncommittedCompactionSnapshot,
+  purgeJournalCompactions,
+  type CompactionSnapshotReceipt,
+} from './worker-compaction-snapshot.js';
+import type { WorkerStateJournal } from './worker-state-journal.js';
 import { logger } from '../core.js';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import {
+  resolveContextWindowProfile,
+  type ContextWindowProfile,
+} from './context-window-profile.js';
+export {
+  resolveContextWindowProfile,
+  type ContextWindowProfile,
+} from './context-window-profile.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
-import { readTextFile } from '../foundation/text.js';
+import { estimateTokens, readTextFile } from '../foundation/text.js';
+export { estimateTokens } from '../foundation/text.js';
 import { metrics } from '../metrics.js';
 import type { MissionWorkingMemory } from '../mission/mission-working-memory.js';
 import { pathResolver } from '../path-resolver.js';
+import {
+  CompactionSummaryTimeout,
+  runSummaryWithDeadline,
+  persistIncompleteHandoff,
+} from './worker-compaction-recovery.js';
 import {
   assertSafeRepositoryPath,
   safeExistsSync,
@@ -91,15 +111,11 @@ export interface CompactionSummaryContext {
   details: CompactionDetails;
   retainedTail: WorkerContextMessage[];
   reason: CompactionReason;
-}
-
-export interface ContextWindowProfile {
-  /** Total model context window, in tokens. */
-  contextWindowTokens: number;
-  /** Tokens reserved for the model's output. */
-  reserveTokens: number;
-  /** Safety buffer below the hard limit. */
-  bufferTokens: number;
+  /** Cancellation belongs to this attempt, never a reusable global controller. */
+  signal?: AbortSignal;
+  /** Only meaningful streamed progress should refresh the idle deadline. */
+  reportProgress?: () => void;
+  attemptId?: number;
 }
 
 export interface CompactionEvent {
@@ -108,6 +124,8 @@ export interface CompactionEvent {
 }
 
 export interface CompactWorkerContextOptions {
+  /** Explicit scoped raw-history retention; no publication or memory promotion. */
+  durability?: { journal: WorkerStateJournal; retentionMs?: number; now?: () => number };
   profile?: Partial<ContextWindowProfile>;
   /** Recent tool_result messages kept verbatim by microcompact. Default 5. */
   keepRecentToolResults?: number;
@@ -142,6 +160,16 @@ export interface CompactWorkerContextOptions {
   details?: Partial<CompactionDetails>;
   /** Explicit reason; reactive overflow compaction sets this automatically. */
   reason?: CompactionReason;
+  /** Compaction-local deadlines; progress refreshes idle only, never the total ceiling. */
+  summaryTimeoutMs?: number;
+  summaryIdleTimeoutMs?: number;
+  signal?: AbortSignal;
+  /** Trusted compactor ownership fence, checked before publishing any result. */
+  commitGuard?: () => boolean;
+  attemptId?: number;
+  /** Trusted degraded mode after repeated summary stalls. No provider call is made. */
+  forceDeterministicHandoff?: boolean;
+  deterministicHandoffOnTimeout?: boolean;
 }
 
 export interface ContextTokenEstimate {
@@ -153,9 +181,11 @@ export interface ContextTokenEstimate {
 }
 
 export interface CompactWorkerContextResult {
+  snapshotReceipt?: CompactionSnapshotReceipt;
+  durabilityError?: 'checkpoint_unavailable' | 'checkpoint_cleanup_required';
   messages: WorkerContextMessage[];
   compacted: boolean;
-  stage: 'none' | 'microcompact' | 'summary';
+  stage: 'none' | 'microcompact' | 'summary' | 'deterministic_handoff';
   tokensBefore: number;
   tokensAfter: number;
   thresholdTokens: number;
@@ -163,6 +193,9 @@ export interface CompactWorkerContextResult {
   summaryArtifactPath?: string;
   /** Set when the summarize stage was attempted and failed (microcompact still applied). */
   summaryError?: string;
+  summaryFailureKind?: 'timeout' | 'error';
+  /** Deterministic handoffs preserve anchors, not a verified account of completed work. */
+  incomplete?: boolean;
   tokenEstimate: ContextTokenEstimate;
   reason?: CompactionReason;
   /** Tail copied into the summary entry and available for standalone recovery. */
@@ -170,14 +203,13 @@ export interface CompactWorkerContextResult {
   details: CompactionDetails;
 }
 
-const DEFAULT_CONTEXT_WINDOW_TOKENS = 200_000;
-const DEFAULT_RESERVE_TOKENS = 32_000;
-const DEFAULT_BUFFER_TOKENS = 8_000;
 const DEFAULT_KEEP_RECENT_TOOL_RESULTS = 5;
 const ELIDE_MIN_CHARS = 200;
 /** Fraction of the threshold kept as verbatim recent history by the summary stage. */
 const SUMMARY_TAIL_FRACTION = 0.25;
 const MAX_CONSECUTIVE_SUMMARY_FAILURES = 3;
+const DETERMINISTIC_HANDOFF_AFTER_STALLS = 2;
+
 const UPDATE_SUMMARY_PROMPT_PATH = pathResolver.knowledge(
   'product/prompts/worker-context-update-summary.md'
 );
@@ -196,43 +228,8 @@ export function isPromptTooLongError(error: unknown): boolean {
   return PROMPT_TOO_LONG_PATTERN.test(message);
 }
 
-function readEnvTokens(name: string): number | undefined {
-  const raw = getRegisteredEnvText(name);
-  if (!raw?.trim()) return undefined;
-  const value = Number(raw);
-  return Number.isFinite(value) && value > 0 ? Math.floor(value) : undefined;
-}
-
-export function resolveContextWindowProfile(
-  overrides?: Partial<ContextWindowProfile>
-): ContextWindowProfile {
-  return {
-    contextWindowTokens:
-      overrides?.contextWindowTokens ??
-      readEnvTokens('KYBERION_CONTEXT_WINDOW_TOKENS') ??
-      DEFAULT_CONTEXT_WINDOW_TOKENS,
-    reserveTokens:
-      overrides?.reserveTokens ??
-      readEnvTokens('KYBERION_CONTEXT_RESERVE_TOKENS') ??
-      DEFAULT_RESERVE_TOKENS,
-    bufferTokens:
-      overrides?.bufferTokens ??
-      readEnvTokens('KYBERION_CONTEXT_BUFFER_TOKENS') ??
-      DEFAULT_BUFFER_TOKENS,
-  };
-}
-
 export function compactionThresholdTokens(profile: ContextWindowProfile): number {
   return Math.max(1024, profile.contextWindowTokens - profile.reserveTokens - profile.bufferTokens);
-}
-
-/**
- * The legacy estimate remains intentionally conservative for callers outside
- * compaction. PI-04's hybrid path uses a separate /4 estimate for its
- * unmeasured tail below.
- */
-export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 3);
 }
 
 function estimateHybridTailTokens(text: string): number {
@@ -576,6 +573,20 @@ export async function compactWorkerContext(
     providerUsageMessageCount: options.providerUsageMessageCount,
   });
   const tokensBefore = tokenEstimate.tokens;
+  const canCommit = () => !options.signal?.aborted && options.commitGuard?.() !== false;
+  const unchanged = (): CompactWorkerContextResult => ({
+    messages: [...messages],
+    compacted: false,
+    stage: 'none',
+    tokensBefore,
+    tokensAfter: tokensBefore,
+    thresholdTokens,
+    tokenEstimate,
+    retainedTail: [],
+    details,
+    reason,
+  });
+  if (!canCommit()) return unchanged();
 
   if (!options.force && tokensBefore <= thresholdTokens) {
     return {
@@ -622,6 +633,7 @@ export async function compactWorkerContext(
     tokens_before: tokensBefore,
     threshold_tokens: thresholdTokens,
   });
+  if (!canCommit()) return unchanged();
   try {
     getDefaultWorkerEventStream().emit(
       'compaction_begin',
@@ -638,11 +650,13 @@ export async function compactWorkerContext(
   let stage: CompactWorkerContextResult['stage'] = 'microcompact';
   let summaryArtifactPath: string | undefined;
   let summaryError: string | undefined;
+  let summaryFailureKind: CompactWorkerContextResult['summaryFailureKind'];
+  let incomplete = false;
   let retainedTail: WorkerContextMessage[] = [];
 
   // Stage 2 — LLM summary over the older history.
   const stillOver = estimateContextTokens(compactedMessages) > thresholdTokens;
-  if (stillOver && options.summarize) {
+  if (stillOver && (options.summarize || options.forceDeterministicHandoff)) {
     const pinned = compactedMessages.filter((message) => message.pinned);
     const flow = compactedMessages.filter((message) => !message.pinned);
     const tailBudget = Math.max(1, Math.floor(thresholdTokens * SUMMARY_TAIL_FRACTION));
@@ -650,69 +664,109 @@ export async function compactWorkerContext(
     const head = flow.slice(0, tailStart);
     const tail = flow.slice(tailStart);
     retainedTail = tail;
-    if (head.length > 0) {
-      try {
-        if (options.summaryProvider && options.scope) {
-          const egress = checkProviderEgress({
-            provider: options.summaryProvider,
-            dataTier: options.scope.tier,
-            ...(options.scope.tenant_slug ? { tenant_slug: options.scope.tenant_slug } : {}),
-          });
-          if (!egress.allowed) throw new Error(egress.reason || 'summary egress denied');
-        }
-        const summaryContext: CompactionSummaryContext = {
-          ...(options.previousSummary || extractPreviousSummary(messages)
-            ? { previousSummary: options.previousSummary || extractPreviousSummary(messages) }
-            : {}),
-          details,
-          retainedTail: tail,
-          reason,
-        };
-        const summaryInput = renderUpdateSummaryInput(
-          renderTranscriptForSummary(head),
-          summaryContext
-        );
-        const runSummary = () => options.summarize!(summaryInput, summaryContext);
-        const summary = options.summaryReasoningScope
-          ? await withReasoningPayloadScope(options.summaryReasoningScope, runSummary)
-          : await runSummary();
-        summaryArtifactPath = persistSummaryArtifact({
-          summary,
-          carryover,
-          details,
-          reason,
-          retainedTail: tail,
-          missionId: options.missionId,
-          summaryDir: options.summaryDir,
-          recordArtifact: options.recordArtifact,
-          scope: options.scope,
-        });
-        const summaryMessage: WorkerContextMessage = {
+    const deterministicHandoff = () => {
+      if (!canCommit()) return false;
+      const archive = persistIncompleteHandoff(messages, options, details, carryover);
+      if (!archive || !canCommit()) return false;
+      summaryArtifactPath = archive;
+      compactedMessages = [
+        ...pinned,
+        {
           role: 'user',
-          content: [
-            '<summary>',
-            summary,
-            '</summary>',
-            summaryArtifactPath ? `(full summary artifact: ${summaryArtifactPath})` : '',
-          ]
-            .filter(Boolean)
-            .join('\n'),
+          content: `INCOMPLETE DETERMINISTIC HANDOFF\nThe summarizer stalled. This is not a verified narrative of completed work.\nPreserve the pinned goal and structured carryover; verify current state before acting.\nExact prior context: ${archive}`,
           retained_tail: tail,
-        };
-        compactedMessages = [...pinned, summaryMessage, ...tail];
-        stage = 'summary';
-      } catch (error) {
-        summaryError = error instanceof Error ? error.message : String(error);
-        options.onEvent?.({
-          name: 'compact.summary_failed',
-          attributes: {
-            error: summaryError,
-            ...(options.missionId ? { mission_id: options.missionId } : {}),
-          },
-        });
+        },
+        ...tail,
+      ];
+      stage = 'deterministic_handoff';
+      incomplete = true;
+      return true;
+    };
+    if (head.length > 0) {
+      if (options.forceDeterministicHandoff) {
+        if (!deterministicHandoff()) {
+          summaryError = 'Deterministic handoff requires an available scoped archive';
+          summaryFailureKind = 'error';
+        }
+      } else {
+        try {
+          if (options.summaryProvider && options.scope) {
+            const egress = checkProviderEgress({
+              provider: options.summaryProvider,
+              dataTier: options.scope.tier,
+              ...(options.scope.tenant_slug ? { tenant_slug: options.scope.tenant_slug } : {}),
+            });
+            if (!egress.allowed) throw new Error(egress.reason || 'summary egress denied');
+          }
+          const summaryContext: CompactionSummaryContext = {
+            ...(options.previousSummary || extractPreviousSummary(messages)
+              ? { previousSummary: options.previousSummary || extractPreviousSummary(messages) }
+              : {}),
+            details,
+            retainedTail: tail,
+            reason,
+          };
+          const summaryInput = renderUpdateSummaryInput(
+            renderTranscriptForSummary(head),
+            summaryContext
+          );
+          const summary = await runSummaryWithDeadline(async (signal, reportProgress) => {
+            const runSummary = () =>
+              options.summarize!(summaryInput, {
+                ...summaryContext,
+                signal,
+                reportProgress,
+                ...(options.attemptId !== undefined ? { attemptId: options.attemptId } : {}),
+              });
+            return options.summaryReasoningScope
+              ? withReasoningPayloadScope(options.summaryReasoningScope, runSummary)
+              : runSummary();
+          }, options);
+          if (!canCommit()) return unchanged();
+          summaryArtifactPath = persistSummaryArtifact({
+            summary,
+            carryover,
+            details,
+            reason,
+            retainedTail: tail,
+            missionId: options.missionId,
+            summaryDir: options.summaryDir,
+            recordArtifact: options.recordArtifact,
+            scope: options.scope,
+          });
+          const summaryMessage: WorkerContextMessage = {
+            role: 'user',
+            content: [
+              '<summary>',
+              summary,
+              '</summary>',
+              summaryArtifactPath ? `(full summary artifact: ${summaryArtifactPath})` : '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            retained_tail: tail,
+          };
+          compactedMessages = [...pinned, summaryMessage, ...tail];
+          stage = 'summary';
+        } catch (error) {
+          if (!canCommit()) return unchanged();
+          summaryError = error instanceof Error ? error.message : String(error);
+          summaryFailureKind = error instanceof CompactionSummaryTimeout ? 'timeout' : 'error';
+          options.onEvent?.({
+            name: 'compact.summary_failed',
+            attributes: {
+              error: summaryError,
+              ...(options.missionId ? { mission_id: options.missionId } : {}),
+            },
+          });
+          if (summaryFailureKind === 'timeout' && options.deterministicHandoffOnTimeout)
+            deterministicHandoff();
+        }
       }
     }
   }
+
+  if (!canCommit()) return unchanged();
 
   // Carryover survives the boundary as structured data, independent of the
   // summary stage's outcome.
@@ -721,6 +775,54 @@ export async function compactWorkerContext(
       ...compactedMessages,
       { role: 'user', content: renderCarryoverBlock(carryover, details), pinned: true },
     ];
+  }
+  let snapshotReceipt: CompactionSnapshotReceipt | undefined;
+  if (options.durability) {
+    try {
+      if (
+        !options.scope ||
+        (options.missionId && options.scope.mission_id !== options.missionId) ||
+        (options.taskId && options.scope.task_id !== options.taskId)
+      )
+        throw new Error('Compaction scope is incomplete or contradictory');
+      const now = options.durability.now?.() ?? Date.now();
+      await purgeJournalCompactions(options.durability.journal, options.scope, now);
+      if (!canCommit()) return unchanged();
+      snapshotReceipt = await writeCompactionSnapshot({
+        source: messages,
+        messages: compactedMessages,
+        scope: options.scope,
+        parent: options.durability.journal.compactionTip(options.scope),
+        retentionMs: options.durability.retentionMs,
+        now,
+        canCommit,
+      });
+      if (!canCommit()) throw new Error('Snapshot attempt cancelled');
+      options.durability.journal.recordCompaction(snapshotReceipt);
+    } catch (error) {
+      if (snapshotReceipt && options.scope) {
+        try {
+          if (options.durability.journal.compactionTip(options.scope)?.id !== snapshotReceipt.id)
+            await discardUncommittedCompactionSnapshot(snapshotReceipt, options.scope);
+        } catch {
+          /* An unverified artifact is never deleted by a guessed path. */
+        }
+      }
+      return {
+        ...unchanged(),
+        ...(canCommit()
+          ? {
+              durabilityError:
+                error instanceof Error &&
+                error.message.startsWith('[COMPACTION_CLEANUP_NEEDS_ATTENTION]')
+                  ? ('checkpoint_cleanup_required' as const)
+                  : ('checkpoint_unavailable' as const),
+            }
+          : {}),
+      };
+    }
+  }
+  if (carryover) {
     if (options.workingMemory && options.missionId) {
       persistCarryover({
         workingMemory: options.workingMemory,
@@ -767,6 +869,7 @@ export async function compactWorkerContext(
     tokens_after: tokensAfter,
     stage,
   });
+  if (!canCommit()) return unchanged();
   try {
     getDefaultWorkerEventStream().emit(
       'compaction_end',
@@ -796,6 +899,7 @@ export async function compactWorkerContext(
   }
 
   return {
+    ...(snapshotReceipt ? { snapshotReceipt } : {}),
     messages: compactedMessages,
     compacted: true,
     stage,
@@ -804,6 +908,8 @@ export async function compactWorkerContext(
     thresholdTokens,
     summaryArtifactPath,
     summaryError,
+    ...(summaryFailureKind ? { summaryFailureKind } : {}),
+    ...(incomplete ? { incomplete: true } : {}),
     tokenEstimate,
     reason,
     retainedTail,
@@ -818,7 +924,10 @@ export async function compactWorkerContext(
  */
 export class WorkerContextCompactor {
   private consecutiveSummaryFailures = 0;
+  private consecutiveSummaryStalls = 0;
   private disabled = false;
+  private generation = 0;
+  private activeAttempt?: AbortController;
 
   constructor(private readonly baseOptions: CompactWorkerContextOptions = {}) {}
 
@@ -830,8 +939,27 @@ export class WorkerContextCompactor {
     messages: readonly WorkerContextMessage[],
     overrides: Partial<CompactWorkerContextOptions> = {}
   ): Promise<CompactWorkerContextResult> {
-    const options = { ...this.baseOptions, ...overrides };
+    const configured = { ...this.baseOptions, ...overrides };
+    const generation = ++this.generation;
+    this.activeAttempt?.abort(new Error('Summary attempt superseded'));
+    const controller = new AbortController();
+    this.activeAttempt = controller;
+    const options: CompactWorkerContextOptions = {
+      ...configured,
+      signal: configured.signal
+        ? AbortSignal.any([configured.signal, controller.signal])
+        : controller.signal,
+      attemptId: generation,
+      commitGuard: () => generation === this.generation && configured.commitGuard?.() !== false,
+      ...(this.consecutiveSummaryStalls >= DETERMINISTIC_HANDOFF_AFTER_STALLS
+        ? { forceDeterministicHandoff: true }
+        : {}),
+      ...(this.consecutiveSummaryStalls >= DETERMINISTIC_HANDOFF_AFTER_STALLS - 1
+        ? { deterministicHandoffOnTimeout: true }
+        : {}),
+    };
     if (this.disabled) {
+      if (this.activeAttempt === controller) this.activeAttempt = undefined;
       const profile = resolveContextWindowProfile(options.profile);
       const tokenEstimate = estimateContextTokenDetails(messages, {
         providerUsageTokens: options.lastProviderUsageTokens,
@@ -850,9 +978,24 @@ export class WorkerContextCompactor {
         details: resolveCompactionDetails(options),
       };
     }
-    const result = await compactWorkerContext(messages, options);
+    let result: CompactWorkerContextResult;
+    try {
+      result = await compactWorkerContext(messages, options);
+    } finally {
+      if (this.activeAttempt === controller) this.activeAttempt = undefined;
+    }
+    if (generation !== this.generation || options.signal?.aborted)
+      return {
+        ...result,
+        messages: [...messages],
+        compacted: false,
+        stage: 'none',
+        tokensAfter: result.tokensBefore,
+      };
     if (!result.compacted) return result;
+    if (result.summaryFailureKind === 'timeout') this.consecutiveSummaryStalls++;
     if (result.summaryError) {
+      if (result.stage === 'deterministic_handoff') return result;
       this.consecutiveSummaryFailures += 1;
       if (this.consecutiveSummaryFailures >= MAX_CONSECUTIVE_SUMMARY_FAILURES) {
         this.disabled = true;
@@ -870,6 +1013,7 @@ export class WorkerContextCompactor {
       }
     } else if (result.stage === 'summary') {
       this.consecutiveSummaryFailures = 0;
+      this.consecutiveSummaryStalls = 0;
     }
     return result;
   }

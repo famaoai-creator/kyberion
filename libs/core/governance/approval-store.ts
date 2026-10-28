@@ -53,7 +53,8 @@ import type * as assurance from './approval-assurance.js';
 export * from './approval-assurance.js';
 import { computeApprovalPayloadHash } from './approval-presentation.js';
 export * from './approval-presentation.js';
-import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
+import type { ApprovalStoreRole } from './approval-store-role.js';
+export type { ApprovalStoreRole } from './approval-store-role.js';
 import { nowIso } from '../foundation/time.js';
 import type { RejectionReasonCategory } from '../rejection-reason.js';
 import type { SurfaceAsyncChannel } from '../surface/channel-surface-types.js';
@@ -475,7 +476,7 @@ export function forgetSessionApprovalCacheFor(requestId: string): void {
 
 /** KC-03: make cache-based auto-approvals durable in the decision event stream. */
 export function recordSessionCacheAutoApproval(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     entry: SessionApprovalCacheEntry;
     operationId: string;
@@ -538,7 +539,7 @@ export {
  * audit chain and the channel's approval event log before it throws.
  */
 function enforceSeparationOfDutiesOnDecision(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     record: ApprovalRequestRecord;
     located: LocatedApprovalRequest;
@@ -631,13 +632,13 @@ export {
 export { withApprovalRecordLock } from './approval-apply-claim.js';
 /** Persist the terminal expiry transition exactly once. */
 export function expireApprovalRequest(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: Parameters<typeof expireApprovalRequestUnlocked>[1]
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => expireApprovalRequestUnlocked(role, params));
 }
 function expireApprovalRequestUnlocked(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     channel: string;
     storageChannel?: string;
@@ -682,13 +683,13 @@ function expireApprovalRequestUnlocked(
 
 /** KC-03: persist the terminal cancellation transition exactly once (mirrors expiry). */
 export function cancelApprovalRequest(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: Parameters<typeof cancelApprovalRequestUnlocked>[1]
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => cancelApprovalRequestUnlocked(role, params));
 }
 function cancelApprovalRequestUnlocked(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     channel: string;
     storageChannel?: string;
@@ -743,7 +744,7 @@ const APPROVAL_SOURCE_FIELDS = ['missionId', 'taskId', 'agentId', 'actionId'] as
  * mission's tasks; `{ taskId }` only that task's requests.
  */
 export function cancelApprovalRequestsBySource(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     source: ApprovalRequestSource;
     storageChannels?: string[];
@@ -789,7 +790,7 @@ export function cancelApprovalRequestsBySource(
  * learning/re-execution loops see the reason in the event stream.
  */
 export function annotateApprovalRejectionReason(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: Parameters<typeof annotateApprovalRejectionReasonUnlocked>[1]
 ): ApprovalRequestRecord {
   // Under the record lock, on a fresh read: a concurrent transition is never overwritten.
@@ -798,7 +799,7 @@ export function annotateApprovalRejectionReason(
   );
 }
 function annotateApprovalRejectionReasonUnlocked(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     channel: string;
     storageChannel?: string;
@@ -844,7 +845,7 @@ function annotateApprovalRejectionReasonUnlocked(
 }
 
 export function decideApprovalRequest(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: Parameters<typeof decideApprovalRequestUnlocked>[1]
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () => decideApprovalRequestUnlocked(role, params));
@@ -855,13 +856,13 @@ export function decideApprovalRequest(
  * step such as the veto-window tick). Never call it without the lock.
  */
 export function decideApprovalRequestUnderLock(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: Parameters<typeof decideApprovalRequestUnlocked>[1]
 ): ApprovalRequestRecord {
   return decideApprovalRequestUnlocked(role, params);
 }
 function decideApprovalRequestUnlocked(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     channel: string;
     storageChannel?: string;
@@ -1229,7 +1230,7 @@ function decideApprovalRequestUnlocked(
 const pendingPipelineApprovalResumes = new Set<Promise<void>>();
 
 function schedulePipelineApprovalResume(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   storageChannel: string,
   record: ApprovalRequestRecord
 ): void {
@@ -1292,7 +1293,7 @@ function schedulePipelineApprovalResume(
 const pendingSteeringApprovalExecutions = new Set<Promise<void>>();
 
 function scheduleSteeringApprovalExecution(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   storageChannel: string,
   record: ApprovalRequestRecord
 ): void {
@@ -1382,7 +1383,7 @@ export { claimApprovalApply } from './approval-apply-claim.js';
 
 /** Persist an approval request's terminal apply outcome (SO-04 Task 3). */
 export function recordApprovalApplyResult(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: Parameters<typeof recordApprovalApplyResultUnlocked>[1]
 ): ApprovalRequestRecord {
   return withApprovalRecordLock(role, params, () =>
@@ -1391,7 +1392,7 @@ export function recordApprovalApplyResult(
 }
 
 function recordApprovalApplyResultUnlocked(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     channel: string;
     storageChannel?: string;

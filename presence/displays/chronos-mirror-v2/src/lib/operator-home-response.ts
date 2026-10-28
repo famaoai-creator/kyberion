@@ -1,4 +1,5 @@
 import { isRecord } from '@agent/core/foundation/primitives';
+import { hasValidCostCoverage } from './cost-summary-response';
 import type {
   OperatorHomeSummary,
   OperatorHomeMissionItem,
@@ -100,7 +101,7 @@ function isMissionItem(value: unknown): value is OperatorHomeMissionItem {
 }
 
 function isCostSummary(value: unknown): value is OperatorHomeCostSummary {
-  if (!isRecord(value) || !hasSafeTree(value)) return false;
+  if (!isRecord(value) || !hasSafeTree(value) || !hasValidCostCoverage(value)) return false;
   if (
     !isFiniteNonNegative(value.totalTokens) ||
     !isFiniteNonNegative(value.totalUsd) ||
@@ -121,6 +122,7 @@ function isCostSummary(value: unknown): value is OperatorHomeCostSummary {
   return value.missionBreakdown.every(
     (entry) =>
       isRecord(entry) &&
+      hasValidCostCoverage(entry) &&
       isString(entry.missionId) &&
       Boolean(entry.missionId.trim()) &&
       isFiniteNonNegative(entry.tokens) &&
@@ -248,6 +250,14 @@ function isQualitySummary(value: unknown): boolean {
     isString(value.accountableHumanId) &&
     isString(value.generatedAt) &&
     isStringArray(value.residualRisks) &&
+    (value.verificationFreshness === undefined ||
+      (isRecord(value.verificationFreshness) &&
+        ['current', 'partial', 'stale', 'unknown'].includes(
+          String(value.verificationFreshness.status)
+        ) &&
+        ['targeted', 'full', 'unknown'].includes(String(value.verificationFreshness.coverage)) &&
+        Number.isInteger(value.verificationFreshness.checkedSources) &&
+        isFiniteNonNegative(value.verificationFreshness.checkedSources))) &&
     isStringArray(value.evidenceRefs)
   );
 }

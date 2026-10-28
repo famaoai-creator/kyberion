@@ -19,6 +19,8 @@ vi.mock('../profile-root.js', () => ({
 
 import {
   resolveReasoningRoute,
+  resolveReasoningRouteCandidates,
+  reasoningRoleInheritsDefault,
   resolveSamplingParams,
   normalizeReasoningRole,
   resolveStepReasoningRoute,
@@ -40,6 +42,56 @@ describe('reasoning-route-resolver', () => {
     } catch {
       // The fixture may not have been created.
     }
+  });
+
+  it('inherits default auxiliary routes until a named or scoped route is configured', () => {
+    const policy = {
+      version: 'test',
+      runtime_adapters: {
+        stub: {
+          adapter: 'test',
+          model_policy: 'local-unregistered' as const,
+          capabilities: ['text'],
+          supported_parameters: [],
+        },
+      },
+      profiles: {
+        main: { mode: 'stub', model: 'main' },
+        aux: { mode: 'stub', model: 'compact', timeout_ms: 1234 },
+      },
+      roles: {
+        default: { candidates: ['main'] },
+        context_compaction: { candidates: ['main'], inherit_default: true },
+        background_review: { candidates: ['main'], inherit_default: true },
+      },
+      tenant_overrides: { acme: { roles: { context_compaction: { candidates: ['aux'] } } } },
+      fallback: {
+        max_attempts: 2,
+        max_in_place_retries: 0,
+        on_unsupported_parameter: 'reject' as const,
+      },
+    };
+    for (const role of ['context_compaction', 'background_review']) {
+      const input = { role, policy, env: {}, userConfig: {} };
+      expect(reasoningRoleInheritsDefault(input)).toBe(true);
+      expect(resolveReasoningRoute(input)).toMatchObject({ role: 'default', model: 'main' });
+      expect(resolveReasoningRouteCandidates(input)).toHaveLength(1);
+      expect(
+        resolveReasoningRoute({ ...input, userConfig: { roles: { [role]: { profile: 'aux' } } } })
+      ).toMatchObject({ role, model: 'compact', limits: { timeoutMs: 1234 } });
+    }
+    const scoped = {
+      role: 'context_compaction',
+      policy,
+      env: {},
+      userConfig: {},
+      scope: { tenant_slug: 'acme' },
+    };
+    expect(reasoningRoleInheritsDefault(scoped)).toBe(false);
+    expect(resolveReasoningRoute(scoped)).toMatchObject({
+      model: 'compact',
+      limits: { timeoutMs: 1234 },
+    });
   });
 
   it('routes runtime environment reads through the governed accessor', () => {

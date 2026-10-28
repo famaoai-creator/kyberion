@@ -38,7 +38,12 @@ const STRUCTURAL_OPS: ReadonlySet<string> = new Set([
  * Ops verified not to call reasoning, speech, secret resolution, or embeddings.
  * Anything else stays on the full bootstrap.
  */
-const INERT_OPS: ReadonlySet<string> = new Set(['working-memory:run-gc', 'system:write_artifact']);
+const INERT_OPS: ReadonlySet<string> = new Set([
+  'working-memory:run-gc',
+  'system:write_artifact',
+  'system:log',
+  'core:transform',
+]);
 
 const NESTED_STEP_KEYS = ['do', 'then', 'else', 'default', 'pipeline', 'steps', 'calls'] as const;
 

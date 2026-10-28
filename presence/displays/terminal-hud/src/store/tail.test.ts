@@ -2,7 +2,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 import path from 'node:path';
 import { pathResolver } from '@agent/core';
 import { ensureDir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
-import { MAX_TAIL_BYTES, tailJsonl, tailLines } from './tail.js';
+import { MAX_TAIL_BYTES, tailJsonl, tailLines, readTailLines, readTailJsonl } from './tail.js';
 
 const tmpDir = pathResolver.active(`shared/tmp/terminal-hud-tail-test-${process.pid}`);
 
@@ -18,6 +18,27 @@ afterAll(() => {
 });
 
 describe('tailLines', () => {
+  it('reports missing, unreadable, bounded and rejected data separately', () => {
+    expect(readTailLines(path.join(tmpDir, 'missing-meta.jsonl'), 5)).toMatchObject({
+      status: 'missing',
+      records: [],
+    });
+    ensureDir(tmpDir);
+    expect(readTailLines(tmpDir, 5)).toMatchObject({ status: 'unavailable', records: [] });
+    const file = writeFixture('meta.jsonl', '{"n":1}\ninvalid\n{"n":2}\n{"wrong":true}\n');
+    expect(
+      readTailJsonl(file, 3, (value) =>
+        typeof value === 'object' && value !== null && 'n' in value ? value : null
+      )
+    ).toMatchObject({ omittedLines: 1, skippedLines: 2, status: 'ok', records: [{ n: 2 }] });
+    const bounded = writeFixture('meta-bounded.txt', 'x'.repeat(MAX_TAIL_BYTES + 1) + '\nlast\n');
+    expect(readTailLines(bounded, 5)).toMatchObject({ truncated: true, records: ['last'] });
+    expect(readTailLines(writeFixture('meta-empty.txt', ''), 5)).toMatchObject({
+      status: 'ok',
+      records: [],
+    });
+  });
+
   it('returns [] for a missing file', () => {
     expect(tailLines(path.join(tmpDir, 'missing.jsonl'), 5)).toEqual([]);
   });

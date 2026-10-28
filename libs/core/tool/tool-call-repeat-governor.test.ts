@@ -1,12 +1,69 @@
 import { describe, expect, it } from 'vitest';
 import {
   advanceToolCallRepeatGovernor,
+  advanceToolCallOutcomeGovernor,
+  createToolCallOutcomeState,
   buildToolCallRepeatForceStopMessage,
   canonicalizeToolCallArgs,
   createToolCallRepeatGovernorState,
   hydrateToolCallRepeatGovernorState,
   encodeToolCallRepeatGovernorState,
 } from './tool-call-repeat-governor.js';
+
+describe('result-aware cycles', () => {
+  it('stops unchanged alternating outcomes, including no-op mutations', () => {
+    let state = createToolCallOutcomeState();
+    let decision;
+    for (let i = 0; i < 10; i++) {
+      decision = advanceToolCallOutcomeGovernor(
+        state,
+        i % 2 ? 'B' : 'A',
+        {},
+        { resultText: 'unchanged', externalEffect: true }
+      );
+      state = decision.state;
+    }
+    expect(decision?.should_force_stop).toBe(true);
+    expect(decision?.period).toBe(2);
+    expect(JSON.stringify(state)).not.toContain('unchanged');
+  });
+
+  it('exempts trusted polling and resets on changing results or verified progress', () => {
+    for (const variant of ['poll', 'changed', 'progress']) {
+      let state = createToolCallOutcomeState();
+      for (let i = 0; i < 60; i++) {
+        const decision = advanceToolCallOutcomeGovernor(
+          state,
+          i % 2 ? 'B' : 'A',
+          {},
+          {
+            resultText: variant === 'changed' ? String(i) : 'same',
+            repeatable: variant === 'poll',
+            progress: variant === 'progress',
+          }
+        );
+        state = decision.state;
+        expect(decision.should_force_stop).toBe(false);
+      }
+      expect(state.history.length).toBeLessThanOrEqual(20);
+    }
+  });
+
+  it('does not exempt a mixed poll and stalled operation cycle', () => {
+    let state = createToolCallOutcomeState();
+    let decision;
+    for (let i = 0; i < 10; i++) {
+      decision = advanceToolCallOutcomeGovernor(
+        state,
+        i % 2 ? 'poll' : 'read',
+        {},
+        { resultText: 'same', repeatable: i % 2 === 1 }
+      );
+      state = decision.state;
+    }
+    expect(decision?.should_force_stop).toBe(true);
+  });
+});
 
 function advanceTimes(
   count: number,

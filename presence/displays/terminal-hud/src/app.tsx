@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { Box, useApp, useInput, useStdin } from 'ink';
 import { Text } from './components/text.js';
 import type { SupportedLocale } from '@agent/core/locale';
@@ -12,6 +12,8 @@ import { HudHeader } from './components/hud-header.js';
 import { StatusBar } from './components/status-bar.js';
 import { OperatorCockpit } from './components/operator-cockpit.js';
 import { HelpOverlay } from './components/help-overlay.js';
+import { CommandPalette } from './components/command-palette.js';
+import type { PaletteSelection } from './components/command-palette-model.js';
 import { PanelBoundary } from './components/panel-boundary.js';
 import { InputBar } from './components/input-bar.js';
 import { MissionsPanel } from './panels/missions-panel.js';
@@ -81,6 +83,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
   const i18n = useMemo(() => makeI18n(locale), [locale]);
   const [panel, setPanel] = useState<PanelId>(initialPanel ?? 'missions');
   const [showHelp, setShowHelp] = useState(false);
+  const [paletteFocus, setPaletteFocus] = useState<{ inputFocused: boolean } | null>(null);
   const [refreshNonce, setRefreshNonce] = useState(0);
   // Conversation is the primary entry point: launch with the composer ready.
   // Esc returns the operator to panel navigation and shortcuts.
@@ -91,6 +94,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
     ReturnType<typeof resolveIntentResolutionContract> | undefined
   >();
   const [askBusy, setAskBusy] = useState(false);
+  const askInFlight = useRef(false);
   const voice = useVoiceInput();
 
   const statusLine = usePollWatch({ load: loadStatusLine, intervalMs: 15000 });
@@ -140,6 +144,9 @@ export function App({ initialPanel, initialLocale }: AppProps) {
 
   const submitInput = useCallback(
     async (raw: string) => {
+      // A second draft may be composed during inference, but it is not queued
+      // or sent concurrently. Keep it intact until the active reply settles.
+      if (askInFlight.current) return;
       const text = raw.trim();
       setInputValue('');
       setInputFocused(false);
@@ -165,7 +172,9 @@ export function App({ initialPanel, initialLocale }: AppProps) {
         setRefreshNonce((current) => current + 1);
         return;
       }
+      setInputFocused(true);
       appendConversation({ who: 'you', text });
+      askInFlight.current = true;
       setAskBusy(true);
       try {
         const reply = await askKyberion(text, i18n.locale);
@@ -175,20 +184,52 @@ export function App({ initialPanel, initialLocale }: AppProps) {
           text: reply.text || i18n.tr('tui:tui_ask_empty_reply'),
         });
       } finally {
+        askInFlight.current = false;
         setAskBusy(false);
       }
     },
     [appendConversation, i18n]
   );
 
+  const choosePalette = useCallback(
+    (selection: PaletteSelection) => {
+      setPaletteFocus(null);
+      if (selection.kind === 'panel') {
+        setPanel(selection.panel);
+        setShowHelp(false);
+        setInputFocused(false);
+      } else if (selection.kind === 'connections') {
+        setPanel('settings');
+        setShowHelp(false);
+        setInputFocused(false);
+      } else if (selection.kind === 'help') {
+        setShowHelp(true);
+        setInputFocused(false);
+      } else {
+        setRefreshNonce((current) => current + 1);
+        setInputFocused(paletteFocus?.inputFocused ?? false);
+      }
+    },
+    [paletteFocus]
+  );
+
   useInput(
     (input, key) => {
+      if (paletteFocus) return;
+      if (key.ctrl && input.toLowerCase() === 'p') {
+        // ink-text-input treats unhandled Ctrl+letters as text. Restore the
+        // current value after that same input event so opening the picker
+        // cannot append a stray "p" to the operator's draft.
+        setInputValue(inputValue);
+        setPaletteFocus({ inputFocused });
+        return;
+      }
       if (inputFocused) {
         if (key.escape) {
           setInputFocused(false);
-          setInputValue('');
         }
         if (key.ctrl && input.toLowerCase() === 'v') {
+          setInputValue(inputValue);
           void toggleVoice();
         }
         return;
@@ -266,13 +307,26 @@ export function App({ initialPanel, initialLocale }: AppProps) {
         />
         <TabBar active={panel} />
         <Box flexDirection="column" borderStyle="round" paddingX={1} minHeight={8}>
-          {showHelp ? (
+          {paletteFocus ? (
+            <CommandPalette
+              onSelect={choosePalette}
+              onCancel={() => {
+                setInputFocused(paletteFocus.inputFocused);
+                setPaletteFocus(null);
+              }}
+            />
+          ) : showHelp ? (
             <HelpOverlay />
-          ) : (
+          ) : null}
+          <Box flexDirection="column" display={paletteFocus || showHelp ? 'none' : 'flex'}>
             <PanelBoundary key={panel} fallbackPrefix={i18n.tr('tui:tui_error')}>
-              <ActivePanel isActive={!showHelp && !inputFocused} refreshNonce={refreshNonce} />
+              <ActivePanel
+                isActive={!paletteFocus && !showHelp && !inputFocused}
+                refreshNonce={refreshNonce}
+                pendingApprovals={operatorHome.data?.summary.pendingApprovals}
+              />
             </PanelBoundary>
-          )}
+          </Box>
         </Box>
         {recentConversation.length > 0 || askBusy ? (
           <Box flexDirection="column" paddingX={1}>
@@ -290,7 +344,7 @@ export function App({ initialPanel, initialLocale }: AppProps) {
           </Box>
         ) : null}
         <InputBar
-          focused={inputFocused}
+          focused={inputFocused && !paletteFocus && !showHelp}
           value={inputValue}
           onChange={setInputValue}
           onSubmit={(value) => void submitInput(value)}

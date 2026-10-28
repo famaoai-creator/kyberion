@@ -19,6 +19,7 @@ import { auditChain } from './governance/audit-chain.js';
 import { createLogger } from './logger.js';
 import { shared } from './path-resolver.js';
 import { safeExecResult, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
+import { runHardenedGitProbe } from './shell/git-probe-hardening.js';
 import { checkWorkspaceBudget, type WorkspaceBudgetOptions } from './workforce/workspace-budget.js';
 import {
   annotateWorkspace,
@@ -117,6 +118,8 @@ function sleepSync(ms: number): void {
 const SESSION_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 
 function git(cwd: string, args: string[], env?: Record<string, string>) {
+  if (args[0] !== 'read-tree')
+    return runHardenedGitProbe(args, { cwd, timeoutMs: 30_000, ...(env ? { env } : {}) });
   return safeExecResult('git', args, { cwd, timeoutMs: 30_000, ...(env ? { env } : {}) });
 }
 
@@ -209,7 +212,7 @@ function sameEntry(a: TreeEntry | null | undefined, b: TreeEntry | null): boolea
 }
 
 function gitOrThrow(cwd: string, args: string[]): string {
-  const result = safeExecResult('git', args, { cwd, timeoutMs: 60_000, maxOutputMB: 256 });
+  const result = runHardenedGitProbe(args, { cwd, timeoutMs: 60_000, maxOutputMB: 256 });
   if (result.status !== 0) {
     throw new Error(`git ${args[0]} failed: ${result.stderr.trim() || String(result.status)}`);
   }

@@ -1,3 +1,4 @@
+import { acknowledgeSchedulerIncident } from '@agent/core/scheduler-incidents';
 import { runMissionAction, type MissionActionKind } from './mission-actions.js';
 import { runSurfaceAction, type SurfaceActionKind } from './surface-actions.js';
 import { claimItem, releaseItem, advanceItemStatus } from './work-actions.js';
@@ -28,7 +29,9 @@ const MISSION_VERBS: ReadonlySet<string> = new Set([
 const SURFACE_VERBS: ReadonlySet<string> = new Set(['start', 'stop', 'repair']);
 
 export const PALETTE_USAGE = [
-  ':panel <missions|tasks|schedules|processes|coordination|stats|profile|settings>',
+  ':panel <missions|tasks|schedules|processes|coordination|stats|profile|settings|agents>',
+  ':connections',
+  ':incident ack <schedule-ID> <cause-signature> <episode-ID>',
   ':mission <start|pause|resume|checkpoint|verify|finish|cancel> <ID>',
   ':task <new <title...>|claim <ID>|release <ID>|status <ID>>',
   ':schedule <run|toggle|remove> <ID>',
@@ -45,6 +48,34 @@ export async function runPaletteCommand(raw: string): Promise<PaletteOutcome> {
   const [group, verb, ...rest] = tokens;
   try {
     switch (group) {
+      case 'incident': {
+        if (verb === 'ack' && rest.length !== 3)
+          return {
+            result: {
+              ok: false,
+              message:
+                '[SCHEDULER_INCIDENT_EPISODE_REQUIRED] Refresh schedules and use :incident ack <job> <signature> <episode>',
+            },
+            switchPanel: 'schedules',
+          };
+        if (verb === 'ack' && rest.length === 3) {
+          const ok = acknowledgeSchedulerIncident(rest[0]!, rest[1]!, rest[2]!);
+          return {
+            result: auditAction('scheduler.incident.ack', {
+              ok,
+              message: ok
+                ? `${rest[0]}: acknowledged for 24h`
+                : 'Incident unavailable, already resolved or episode changed; refresh schedules',
+            }),
+            switchPanel: 'schedules',
+          };
+        }
+        break;
+      }
+      case 'connections': {
+        if (!verb) return { result: { ok: true, message: '→ settings' }, switchPanel: 'settings' };
+        break;
+      }
       case 'panel': {
         if (verb && isPanelId(verb)) {
           return { result: { ok: true, message: `→ ${verb}` }, switchPanel: verb };

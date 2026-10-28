@@ -7,6 +7,26 @@ import { findMissionPath } from '../path-resolver.js';
 import { listMissionsInSearchDirs, loadState } from './mission-state.js';
 import { readOrNullOnMissionRefusal } from '../mission-lookup.js';
 import type { MissionState } from './mission-types.js';
+
+export type DistillationDisclosure =
+  'llm' | 'structural_stub' | 'structural_fallback' | 'structural' | 'unknown' | 'not_recorded';
+
+/** Describes extraction only; it never certifies review or grants authority. */
+export function distillationDisclosure(
+  state: Pick<MissionState, 'distillation'>
+): DistillationDisclosure {
+  const receipt = state.distillation;
+  if (!receipt) return 'not_recorded';
+  if (receipt.mode === 'llm' && receipt.llm_used === true && !receipt.structural_reason) {
+    return 'llm';
+  }
+  if (receipt.mode === 'structural' && receipt.llm_used === false) {
+    if (receipt.structural_reason === 'stub_requested') return 'structural_stub';
+    if (receipt.structural_reason === 'llm_unavailable') return 'structural_fallback';
+    if (!receipt.structural_reason) return 'structural';
+  }
+  return 'unknown';
+}
 import { collectMissionTriageReport } from './mission-triage.js';
 import {
   formatMissionFlowNextAction,

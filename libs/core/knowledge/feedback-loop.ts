@@ -1,3 +1,9 @@
+import {
+  recordSchedulerIncident,
+  listSchedulerIncidents,
+  schedulerIncidentLogForRoot,
+  schedulerIncidentSweepKey,
+} from '../scheduler-incidents.js';
 /**
  * Feedback Loop
  * Automatically connects execution results back into the knowledge and scheduling systems.
@@ -287,20 +293,37 @@ export function sweepFailedSchedules(
   const registry = loadScheduleRegistry(options.registryOptions);
   const failed = collectFailedSchedules(registry);
   if (failed.length === 0) return { failed, alert: null };
+  const incidentOptions = {
+    alertLogPath:
+      options.alertOptions?.alertLogPath ||
+      schedulerIncidentLogForRoot(options.registryOptions?.rootDir),
+    now: options.alertOptions?.now,
+  };
+  const incidents = listSchedulerIncidents(incidentOptions);
+  const alertable = failed.filter((schedule) => {
+    const latest = incidents.find((incident) => incident.scheduleId === schedule.id);
+    return !latest || latest.status === 'detected';
+  });
+  if (alertable.length === 0) return { failed, alert: null };
   const emit = options.emitAlert ?? sendOpsAlert;
   const alert = emit(
     {
       severity: 'warning',
       category: 'scheduler',
-      title: `${failed.length} scheduled pipeline(s) in failed state`,
-      context: { failed_schedules: failed },
+      title: `${alertable.length} scheduled pipeline(s) in failed state`,
+      context: { failed_schedules: alertable },
       recommendation:
         'Inspect the failing pipelines (lastStatus/consecutiveFailures above), fix the root cause, and re-enable any auto-disabled schedule in active/shared/runtime/pipeline-schedules.json.',
       options: [
         'pnpm ops:alerts  # triage the alert backlog',
         'node dist/scripts/run_pipeline.js --input <pipelinePath>  # reproduce one failing run',
       ],
-      dedupe_key: 'scheduler:failed-schedule-sweep',
+      dedupe_key: schedulerIncidentSweepKey(
+        alertable.map(
+          (schedule) =>
+            `${schedule.id}:${incidents.find((incident) => incident.scheduleId === schedule.id)?.signature || 'unknown'}:${incidents.find((incident) => incident.scheduleId === schedule.id)?.episodeId || 'legacy'}`
+        )
+      ),
     },
     options.alertOptions
   );
@@ -340,6 +363,15 @@ export function recordPipelineResult(
     ).count;
 
     saveScheduleRegistry(registry, registryOptions);
+    try {
+      recordSchedulerIncident(scheduleId, status, trace?.rootSpan.error, {
+        alertLogPath: schedulerIncidentLogForRoot(registryOptions.rootDir),
+      });
+    } catch (error) {
+      logger.warn(
+        `[FEEDBACK] incident projection failed — schedule result retained | evidence: ${String(error)}`
+      );
+    }
 
     // Auto-extract and persist hints from trace
     if (trace) {

@@ -185,6 +185,25 @@ export function ChronosHome({
         <Skeleton shape="card" lines={3} label={uxText('chronos_cb_reading_state', locale)} />
       )}
 
+      {summary?.qualitySummary ? (
+        <Callout
+          tone={
+            summary.qualitySummary.verificationFreshness?.status === 'stale' ? 'warning' : 'info'
+          }
+          title={uxText('chronos_quality_freshness_title', locale)}
+          body={uxText(
+            summary.qualitySummary.verificationFreshness?.status === 'current'
+              ? 'chronos_quality_freshness_current'
+              : summary.qualitySummary.verificationFreshness?.status === 'partial'
+                ? 'chronos_quality_freshness_partial'
+                : summary.qualitySummary.verificationFreshness?.status === 'stale'
+                  ? 'chronos_quality_freshness_stale'
+                  : 'chronos_quality_freshness_unknown',
+            locale
+          )}
+        />
+      ) : null}
+
       {counters.length > 0 ? (
         <div className="chronos-counters">
           {counters.map((counter) => (

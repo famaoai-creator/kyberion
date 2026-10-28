@@ -1,6 +1,6 @@
 import * as nodePath from 'node:path';
 import { redactSensitiveValue } from '@agent/core/network';
-import { maskActiveSecrets } from '@agent/core/secret/secret-guard';
+import { redactActiveSecretsForHostLog } from '@agent/core/secret/secret-guard';
 import {
   assertHumanExecutionNotPreviouslyClaimed,
   claimHumanExecutionAuthorization,
@@ -732,7 +732,11 @@ async function awaitHumanExecutionAuthorization(
       title: `Approve operation: ${target.operationId}`,
       severity: 'high',
       summary: `Tenant ${target.tenantSlug}; resume original run ${opts.runId}, step ${step.id}.`,
-      details: maskActiveSecrets(JSON.stringify(redactSensitiveValue(target.params), null, 2)),
+      // Approval presentation is host-side redaction, not a tenant credential
+      // lookup. An unbound tenant must still be able to request authorization.
+      details: redactActiveSecretsForHostLog(
+        JSON.stringify(redactSensitiveValue(target.params), null, 2)
+      ),
     },
     justification: {
       reason: 'Operation exceeds verified delegated authority',

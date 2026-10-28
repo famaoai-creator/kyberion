@@ -1,4 +1,5 @@
 'use client';
+import type { OAuthOperationHandle } from './sections/OAuthOperationCard';
 
 import { frontDeskFetch as fetch } from '../../lib/front-desk-fetch';
 
@@ -169,6 +170,7 @@ export default function SettingsPage() {
   const [configInputs, setConfigInputs] = React.useState<Record<string, string>>({});
   const [configConfirm, setConfigConfirm] = React.useState(false);
   const [voiceRecording, setVoiceRecording] = React.useState(false);
+  const [oauthOperation, setOauthOperation] = React.useState<OAuthOperationHandle | null>(null);
   const [oauthBusyId, setOauthBusyId] = React.useState<string | null>(null);
   const [oauthMessage, setOauthMessage] = React.useState<string | null>(null);
   const [oauthError, setOauthError] = React.useState(false);
@@ -721,6 +723,9 @@ export default function SettingsPage() {
           ok?: boolean;
           error?: string;
           authorization_url?: string;
+          service_id?: string;
+          operation_id?: string;
+          expires_at?: string;
         } | null;
         if (!response.ok || !body?.ok || !body.authorization_url) {
           throw new Error(body?.error || `HTTP ${response.status}`);
@@ -734,6 +739,13 @@ export default function SettingsPage() {
           throw new Error(t('authority.oauth_invalid'));
         if (oauthWindow) oauthWindow.location.href = body.authorization_url;
         else window.location.assign(body.authorization_url);
+        if (body.operation_id && body.service_id && body.expires_at)
+          setOauthOperation({
+            operationId: body.operation_id,
+            serviceId: body.service_id,
+            label: serviceLabel || serviceId,
+            expiresAt: body.expires_at,
+          });
         setOauthMessage(t('setup.connect_oauth_started', { service: serviceLabel || serviceId }));
       } catch (err) {
         oauthWindow?.close();
@@ -1202,6 +1214,8 @@ export default function SettingsPage() {
             selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
             setServices={setServices}
             busy={busy}
+            oauthOperation={oauthOperation}
+            onDismissOAuthOperation={() => setOauthOperation(null)}
             oauthBusyId={oauthBusyId}
             oauthMessage={oauthMessage}
             oauthError={oauthError}

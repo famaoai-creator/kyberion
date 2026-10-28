@@ -53,6 +53,17 @@ Learnings ship in the same PR as the code — see
 [execution.md step 5](../governance/phases/execution.md) and
 [review.md](../governance/phases/review.md#product-lessons-ship-inside-the-code-pr).
 
+### Review-target authorship
+
+A deliverable's existence does not identify its producer. Tasks referenced by
+`review_target` need their own actor-bearing `record-evidence` before cascading
+completion; recording an earlier task does not assign its author to later work.
+For an older auto-completed target with missing provenance, record evidence on
+that target as its actual producer, then rerun `review-task` with a different
+reviewer. Recording evidence on the review task cannot establish target
+authorship. A verified current task claim may supply an omitted actor ID; an
+explicit conflicting actor or forged/stale claim is still rejected.
+
 ### Mission dependencies
 
 Declare missions that must finish first with `--prerequisites MSN-A,MSN-B` on
