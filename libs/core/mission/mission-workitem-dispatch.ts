@@ -28,6 +28,7 @@ import { issueTaskGrantBestEffort } from '../task/task-scoped-grants.js';
 import type { MissionState } from './mission-types.js';
 import { appendDispatchEvent, writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 import { evaluatePhaseEntryGate } from './mission-process-planning.js';
+import { unchangedAiDlcContractFailure } from './mission-aidlc-gate-projection.js';
 import { recordTask } from './mission-maintenance.js';
 import { type MissionExecutionSurface } from './mission-execution-surface.js';
 
@@ -370,6 +371,25 @@ async function dispatchMissionWorkItemsRound(
     // passes.
     const itemPhase = (item.metadata as Record<string, unknown> | undefined)?.phase;
     if (typeof itemPhase === 'string' && itemPhase) {
+      const failedContract = unchangedAiDlcContractFailure(missionId, itemPhase);
+      if (failedContract) {
+        record.status = 'deferred';
+        record.notes.push(
+          `${failedContract.reason} gate=${failedContract.gateId} evidence=${failedContract.receiptRef}`
+        );
+        recordRouting({ attempted: false, succeeded: false });
+        records.push(record);
+        appendDispatchEvent(dispatchEventPath(missionPath), {
+          event_type: 'workitem_dispatch_deferred',
+          mission_id: missionId,
+          item_id: item.item_id,
+          team_role: teamRole,
+          phase: itemPhase,
+          gate_id: failedContract.gateId,
+          notes: record.notes,
+        });
+        continue;
+      }
       const entryGate = await evaluatePhaseEntryGate({ missionId, phase: itemPhase });
       if (entryGate && entryGate.verdict === 'fail') {
         record.status = 'deferred';

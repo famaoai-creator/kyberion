@@ -43,6 +43,7 @@ import {
 } from '../promoted-memory.js';
 import { logger } from '../core.js';
 import { reviewMemoryPromotionCandidate } from './memory-promotion-review.js';
+import { assertReusableLearningBinding } from './reusable-learning-binding.js';
 import { laneApprovesWithoutSteward } from './promotion-lanes.js';
 import { resolvePromotionTargetRoot } from './memory-promotion-git.js';
 import { assessMissionMemoryCandidate } from '../mission/mission-assessment.js';
@@ -511,6 +512,7 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
   if (!candidateId) throw new Error('candidateId is required.');
   const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
   if (!candidate) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
+  assertReusableLearningBinding(candidate);
   if (
     input.expectedPayloadDigest !== undefined &&
     input.expectedPayloadDigest !== approvedLearningPayloadDigest(candidate)

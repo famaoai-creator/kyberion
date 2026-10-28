@@ -56,9 +56,14 @@ A tenant promotion lands a tenant asset, so it is recorded in the tenant's infor
 ## Promote an ADF (pipeline)
 
 ```bash
-pnpm pipeline:promote --input <adf.json> --tenant <slug>   # → knowledge/confidential/<slug>/pipelines/<name>.json
-pnpm pipeline:promote --input <adf.json> [--source-is-public]   # → pipelines/<name>.json (public catalog)
+pnpm pipeline:promote --input <adf.json> --run <run-id> --tenant <slug>   # → knowledge/confidential/<slug>/pipelines/<name>.json
+pnpm pipeline:promote --input <adf.json> --run <run-id> [--source-is-public]   # → pipelines/<name>.json (public catalog)
+pnpm pipeline:promote --input <adf.json> --draft [--tenant <slug>]   # inert proposal in scoped scratch; no catalog entry
 ```
+
+Run the exact ADF first in the target scope and use the engine's `run_id` (printed by `pnpm pipeline --input <adf.json> --json`). For a mission-owned run, also pass `--mission <id>`. Promotion resolves its protected journal and requires one successful terminal outcome, completed source steps, the same source bytes and data scope, and engine trace binding. An unknown, failed, interrupted, recovered-primary, cross-tenant, or legacy run cannot establish executable promotion. Use `--draft` while exploring; the draft wraps the ADF as proposal data outside executable catalogs. `--dry-run` previews the selected operation and does not bypass evidence verification.
+
+`promotion.status=verified_source` proves the original source run. The abstracted ADF receives its own contract digest and schema/guardrail validation; its first real execution still needs outcome verification. Installing a shipped repository template through the governed installer is a separate distribution operation, marked `unverified_template`, and does not claim run success or execute effects.
 
 Tenant mode adds a row to `knowledge/confidential/<slug>/pipelines/README.md` and creates that file if it is missing. It never touches the public `pipelines/README.md`. Without `--tenant`, a source in a personal or confidential tier, or in a tenant-partitioned path, is refused with a diagnostic pointing at `--tenant`. So is an unpartitioned scratch source, unless `--source-is-public` is given. A source from another tenant is refused in either mode.
 

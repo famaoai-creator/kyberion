@@ -88,7 +88,7 @@ import { sendToCustomer } from '@agent/core/customer-conversation';
 import { renderCustomerRoutineTemplate } from '@agent/core/customer-outbound-templates';
 import { enqueueSurfaceOutboxMessage } from '@agent/core/surface/surface-coordination-store';
 import { SWEEP_LOCK_TIMEOUT_MS } from '@agent/core/mission/mission-decision-lock';
-import { promotePipelineAdf } from '../pipeline_promote.js';
+import { installRepositoryPipelineTemplate } from '../pipeline_promote.js';
 import {
   LEDGER_ROLE,
   asLedgerWriter,
@@ -853,7 +853,7 @@ export async function runRemindersInstall(
     throw usageError('reminders needs --install (customer-decision remind sends them by hand)');
   }
   const by = memberActorId(opts.by);
-  const result = await promotePipelineAdf(
+  const result = await installRepositoryPipelineTemplate(
     [
       '--input',
       REMINDER_PIPELINE_TEMPLATE,

@@ -11,6 +11,7 @@ import {
   applyBackgroundReviewSkillPatch,
   applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
+  rollbackBackgroundReviewPatch,
 } from '@agent/core/workforce/background-review-patch';
 import {
   curateBackgroundReviewProposals,
@@ -24,7 +25,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 const USAGE = [
   'Usage: pnpm background-review <curate|status> [--dry-run] [--scope-json <exact scope>]',
   '  <pin|unpin|hold|manage|restore> --candidate <id> --actor-id <actor> [--dry-run] [--scope-json <exact scope>]',
-  '  <request|apply|apply-skill|apply-memory> --candidate <id> --expected-sha256 <digest> [--requested-by <actor>] [--mission-id <id>]',
+  '  <request|request-rollback|apply|apply-skill|apply-memory|rollback> --candidate <id> --expected-sha256 <digest> [--requested-by <actor>] [--mission-id <id>]',
   'status previews retention; curate archives eligible proposals; pin protects; hold disables automatic archival; manage re-enables it; restore returns a curator archive to review without applying changes.',
 ].join('\n');
 
@@ -114,14 +115,20 @@ export const main = defineScript({
     }
     // A dry run must never fall through to the effectful approval/apply path.
     if (context.dryRun || scopeJson !== undefined) usage();
-    if (!['request', 'apply', 'apply-skill', 'apply-memory'].includes(command) || !candidateId)
+    if (
+      !['request', 'request-rollback', 'apply', 'apply-skill', 'apply-memory', 'rollback'].includes(
+        command
+      ) ||
+      !candidateId
+    )
       usage();
-    if (command === 'request') {
+    if (command === 'request' || command === 'request-rollback') {
       const request = createBackgroundReviewApprovalRequest({
         candidateId,
         expectedSha256: String(parsed.options['--expected-sha256'] || '').trim(),
         requestedBy: String(parsed.options['--requested-by'] || '').trim() || undefined,
         missionId: String(parsed.options['--mission-id'] || '').trim() || undefined,
+        ...(command === 'request-rollback' ? { rollback: true } : {}),
       });
       context.print({
         ok: true,
@@ -136,11 +143,13 @@ export const main = defineScript({
     const approvalRef = String(parsed.options['--approval-ref'] || '').trim();
     if (!approvedBy || !approvalRef) usage();
     const apply =
-      command === 'apply-skill'
-        ? applyBackgroundReviewSkillPatch
-        : command === 'apply-memory'
-          ? applyBackgroundReviewMemoryConsolidationPatch
-          : applyBackgroundReviewPipelinePatch;
+      command === 'rollback'
+        ? rollbackBackgroundReviewPatch
+        : command === 'apply-skill'
+          ? applyBackgroundReviewSkillPatch
+          : command === 'apply-memory'
+            ? applyBackgroundReviewMemoryConsolidationPatch
+            : applyBackgroundReviewPipelinePatch;
     const result = apply({
       candidateId,
       expectedSha256: String(parsed.options['--expected-sha256'] || '').trim(),

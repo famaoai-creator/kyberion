@@ -51,3 +51,12 @@ If a question does not change the work shape, do not ask it in preflight.
 If a question keeps reappearing across runs, promote it into policy or profile
 knowledge instead of copying it into each surface.
 
+## Reuse and phase evidence
+
+Follow [the reusable learning playbook](./reusable-learning-playbook.ja.md) to turn
+a completed run into an existing-asset improvement or a verified-source pipeline.
+Canonical gate receipts drive the AI-DLC projection and failure context; the
+projection never grants authority or replaces a gate. Review failures return to
+planning with evidence references, and unchanged blocking contract inputs cannot
+be dispatched again. Keep source-run proof separate from validation of a newly
+abstracted contract and measure the next revision's actual reuse.

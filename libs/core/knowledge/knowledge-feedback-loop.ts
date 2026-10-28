@@ -52,7 +52,10 @@ import {
 import type { TaskResultKnowledgeFeedback } from '../surface/channel-surface-types.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
 import { physicalScopedPath } from '../physical-namespace.js';
-import { recordKnowledgeProblem } from './knowledge-verification.js';
+import {
+  recordKnowledgeProblem,
+  recordKnowledgeReuseObservation,
+} from './knowledge-verification.js';
 import {
   loadKnowledgeUsageAggregateAtPath,
   writeKnowledgeUsageAggregateAtPath,
@@ -608,6 +611,13 @@ export function recordKnowledgeDelivery(input: {
   try {
     ensureRegularFeedbackFile(filePath);
     appendJsonLine(filePath, record);
+    recordKnowledgeReuseObservation({
+      documentSnapshots: refs,
+      receiptId: knowledgeTextSha256(deliveryId),
+      kind: 'delivered',
+      scope: input.scope,
+      at: now,
+    });
     for (const ref of refs) {
       bumpUsageAggregate(ref.path, { delivered_count: 1 }, now, input.scope);
     }
@@ -775,6 +785,14 @@ function recordKnowledgeUsageFeedbackUnlocked(input: {
       missing_topics: missingTopics,
     });
     receiptRecorded = true;
+    if (receiptId)
+      recordKnowledgeReuseObservation({
+        documentSnapshots: usedRefs,
+        receiptId,
+        kind: input.outcome || 'incomplete',
+        scope: input.scope,
+        at: now,
+      });
     for (const documentPath of used) {
       bumpUsageAggregate(documentPath, { used_count: 1 }, now, input.scope);
       usageUpdated = true;

@@ -17,6 +17,7 @@ vi.mock('@agent/core/workforce/background-review-patch', () => ({
   applyBackgroundReviewSkillPatch: calls.apply,
   applyBackgroundReviewMemoryConsolidationPatch: calls.apply,
   createBackgroundReviewApprovalRequest: calls.request,
+  rollbackBackgroundReviewPatch: calls.apply,
 }));
 
 import { main } from './background_review.js';

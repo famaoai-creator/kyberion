@@ -1,6 +1,10 @@
 import { isRecord } from '@agent/core/foundation/primitives';
 import type { MemoryScopeEnvelope } from '@agent/core/knowledge/memory-scope';
 import type { ScopedLearningPublicationIdentity } from '@agent/core/knowledge/scoped-learning-contract';
+import {
+  parseKnowledgeReuseSummary,
+  type KnowledgeReuseSummary,
+} from '@agent/core/knowledge/knowledge-reuse-contract';
 
 export type ClientKnowledgeCuration = {
   title: string;
@@ -23,6 +27,8 @@ export type ClientKnowledgeLearning = {
   payloadDigest?: string;
   approvalRef?: string;
   publication?: ScopedLearningPublicationIdentity;
+  reuse?: KnowledgeReuseSummary;
+  reuseUnavailable?: boolean;
   reason?: string;
 };
 export type ClientKnowledgeCandidate = {
@@ -220,6 +226,17 @@ function parseLearning(value: unknown): ClientKnowledgeLearning | undefined {
   )
     return undefined;
   if (publication && value.state !== 'published') return undefined;
+  if (
+    value.reuseUnavailable !== undefined &&
+    (value.reuseUnavailable !== true || !publication || value.reuse !== undefined)
+  )
+    return undefined;
+  const reuse = value.reuse === undefined ? undefined : parseKnowledgeReuseSummary(value.reuse);
+  if (
+    value.reuse !== undefined &&
+    (!reuse || !publication || reuse.source_sha256 !== publication.markdown_sha256)
+  )
+    return undefined;
   if (['draft', 'pending', 'approved'].includes(value.state) && !value.payloadDigest)
     return undefined;
   if (['pending', 'approved'].includes(value.state) && !value.approvalRef) return undefined;
@@ -228,6 +245,8 @@ function parseLearning(value: unknown): ClientKnowledgeLearning | undefined {
     ...(value.payloadDigest !== undefined ? { payloadDigest: value.payloadDigest as string } : {}),
     ...(value.approvalRef !== undefined ? { approvalRef: value.approvalRef as string } : {}),
     ...(publication ? { publication } : {}),
+    ...(reuse ? { reuse } : {}),
+    ...(value.reuseUnavailable === true ? { reuseUnavailable: true } : {}),
     ...(value.reason !== undefined ? { reason: value.reason } : {}),
   };
 }

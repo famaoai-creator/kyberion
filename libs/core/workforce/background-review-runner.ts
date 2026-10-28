@@ -69,6 +69,7 @@ import {
 import { delegateWorkItemWithReasoningBackend } from '../reasoning/reasoning-backend-execution-adapter.js';
 import { getWorkItem } from './work-coordination.js';
 import { isValidTenantSlug } from '../entity-scope.js';
+import { findReusableLearningAssets } from '../knowledge/reusable-learning.js';
 
 const ProposalActionSchema = z.preprocess(
   (value) =>
@@ -344,10 +345,29 @@ async function buildBackgroundReviewKnowledgeContext(
 }
 
 function buildForkPrompt(input: BackgroundReviewForkInput): string {
+  // This inventory is public reference material only. A tenant hint is not a
+  // grant to search private catalogs, and the snapshot remains evidence for
+  // this review rather than a published skill body.
+  const query = boundedSnapshot(input.snapshot).slice(0, 4000).trim();
+  const inventory = query
+    ? (['skill', 'pipeline', 'knowledge'] as const).map((destination) => ({
+        destination,
+        ...findReusableLearningAssets({
+          scope: { tier: 'public' },
+          destination,
+          query,
+          limit: 2,
+        }),
+      }))
+    : [];
   return `${buildBackgroundReviewPrompt({
     sessionId: input.sessionId,
     snapshot: boundedSnapshot(input.snapshot),
   })}
+
+Reuse-first reference inventory (ref and current digest, not approval):
+${JSON.stringify(inventory)}
+Prefer a small improvement to an existing loaded skill, matching playbook or pipeline over creating a duplicate. Use no_action if it already covers the lesson. A truncated inventory is not proof that no matching asset exists. Keep incident details in evidence and propose only reusable, verified guidance. Never copy private source details into a public reference asset. Re-read any target before requesting a content-bound approval; an inventory digest is advisory only.
 
 Output JSON contract:
 {

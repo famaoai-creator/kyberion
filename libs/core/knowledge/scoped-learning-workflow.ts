@@ -27,6 +27,8 @@ import {
   assertMemoryPromotionReviewReady,
   reviewMemoryPromotionCandidate,
 } from './memory-promotion-review.js';
+import { inspectKnowledgeReuse } from './knowledge-verification.js';
+import type { KnowledgeReuseSummary } from './knowledge-reuse-contract.js';
 
 export interface ScopedLearningReview {
   candidate: MemoryCandidate;
@@ -44,6 +46,8 @@ export interface ScopedLearningReview {
     payloadDigest?: string;
     approvalRef?: string;
     publication?: ScopedLearningPublicationIdentity;
+    reuse?: KnowledgeReuseSummary;
+    reuseUnavailable?: boolean;
     reason?: string;
   };
 }
@@ -113,6 +117,15 @@ export function inspectScopedLearningReview(candidate: MemoryCandidate): ScopedL
         throw new Error('[LEARNING_PUBLICATION_INVALID] Stored publication proof does not verify');
       result.learning.state = 'published';
       result.learning.publication = publication;
+      try {
+        result.learning.reuse = inspectKnowledgeReuse({
+          documentPath: publication.markdown_path,
+          sourceSha256: publication.markdown_sha256,
+          scope: publication.scope,
+        });
+      } catch {
+        result.learning.reuseUnavailable = true;
+      }
       return result;
     }
     if (!record) {

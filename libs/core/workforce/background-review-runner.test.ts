@@ -120,6 +120,38 @@ afterAll(() => {
 });
 
 describe('background-review-runner', () => {
+  it('passes existing asset refs and same-read digests into a reuse-first review without publishing', async () => {
+    const sessionId = `runner-reuse-${process.pid}-${Date.now()}`;
+    sessionIds.add(sessionId);
+    const target = `pipelines/000-${sessionId}.json`;
+    const content = JSON.stringify({
+      description: `${sessionId} reproducible quasarfold release procedure`,
+      steps: [],
+    });
+    pipelineRefs.add(target);
+    withExecutionContext('ecosystem_architect', () =>
+      safeWriteFile(pathResolver.rootResolve(target), content)
+    );
+    const delegateTask = vi.fn(async (prompt: string) => {
+      expect(prompt).toContain('Reuse-first reference inventory');
+      expect(prompt).toContain(target);
+      expect(prompt).toContain(createHash('sha256').update(content).digest('hex'));
+      expect(prompt).toContain('Use no_action if it already covers the lesson');
+      expect(prompt).toContain('Never copy private source details into a public reference asset');
+      return JSON.stringify({ action: 'no_action' });
+    });
+    const result = await runBackgroundReviewFork({
+      sessionId,
+      surface: 'slack',
+      snapshot: `${sessionId} reproducible quasarfold release procedure`,
+      tenantSlug: 'untrusted-hint',
+      backend: { delegateTask },
+    });
+    expect(result.status).toBe('no_action');
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(String(safeReadFile(pathResolver.rootResolve(target)))).toBe(content);
+  });
+
   it('runs a detached review and queues a governed memory candidate', async () => {
     const sessionId = `runner-memory-${process.pid}-${Date.now()}`;
     sessionIds.add(sessionId);

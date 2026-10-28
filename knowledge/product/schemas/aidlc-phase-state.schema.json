@@ -66,7 +66,10 @@
         },
         "at": { "type": "string", "format": "date-time" },
         "outcome": { "type": "string", "enum": ["passed", "failed"] },
-        "note": { "type": "string" }
+        "note": { "type": "string" },
+        "receipt_id": { "type": "string", "minLength": 1 },
+        "gate_id": { "type": "string", "minLength": 1 },
+        "artifact_refs": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
     },
@@ -74,13 +77,15 @@
       "type": "object",
       "required": ["failed_phase", "what_failed", "attempted", "open_questions"],
       "properties": {
+        "gate_id": { "type": "string", "minLength": 1 },
         "failed_phase": {
           "type": "string",
           "enum": ["alignment", "execution", "test", "self_review", "complete"]
         },
         "what_failed": { "type": "string" },
         "attempted": { "type": "array", "items": { "type": "string" } },
-        "open_questions": { "type": "array", "items": { "type": "string" } }
+        "open_questions": { "type": "array", "items": { "type": "string" } },
+        "artifact_refs": { "type": "array", "items": { "type": "string" } }
       },
       "additionalProperties": false
     }

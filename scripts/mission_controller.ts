@@ -1188,7 +1188,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     await runMachineOnlyMissionGate(
       { missionId: missionId || '', gateId: gateFile },
       {
-        evaluateStored: evaluateStoredMissionGate,
+        evaluateStored: (args) => evaluateStoredMissionGate({ ...args, blocking: true }),
         advance: advanceCurrentPhase,
         markCompleted: markPhaseTasksCompleted,
         activate: activateMissionOnGateProgress,
