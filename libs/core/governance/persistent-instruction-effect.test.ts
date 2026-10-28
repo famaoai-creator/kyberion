@@ -92,7 +92,7 @@ describe('persistent instruction effect classification', () => {
     const evaluate = vi
       .spyOn(policyEngine, 'evaluate')
       .mockReturnValue({ allowed: true, action: 'allow' });
-    const audit = vi.spyOn(auditChain, 'record').mockImplementation(() => undefined as never);
+    const audit = vi.spyOn(auditChain, 'recordDeferrable').mockImplementation(() => undefined);
     const target = path.join(root, 'AGENTS.md');
     safeWriteFile(target, 'original private instructions');
     safeWriteFile(target, 'patched private instructions');
@@ -119,7 +119,7 @@ describe('persistent instruction effect classification', () => {
     const evaluate = vi
       .spyOn(policyEngine, 'evaluate')
       .mockReturnValue({ allowed: false, action: 'deny', message: 'fixture denied' });
-    const audit = vi.spyOn(auditChain, 'record').mockImplementation(() => undefined as never);
+    const audit = vi.spyOn(auditChain, 'recordDeferrable').mockImplementation(() => undefined);
     expect(() => safeWriteFile(path.join(root, 'AGENTS.md'), 'attempt')).toThrow('POLICY_BLOCKED');
     expect(evaluate).toHaveBeenCalledWith(
       expect.objectContaining({

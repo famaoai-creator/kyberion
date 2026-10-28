@@ -1,7 +1,7 @@
 ---
 title: テナントslugの改称手順（商号変更への追従）
 tags: [governance, tenant, rename, migration, procedure]
-last_updated: 2026-08-19
+last_updated: 2026-10-29
 role_affinity: [mission_controller, sovereign, operator]
 phase_affinity: [execution]
 ---
@@ -73,6 +73,27 @@ pnpm tenant rename <旧slug> --to <新slug> --display-name '<新商号>' --apply
 3. プロジェクト・ミッションのフィールドを書き換える
 4. 顧客スタンスのオーバーレイを移す
 5. **最後にテナントプロファイルを書く**（旧プロファイルは `.renamed` を付けて残す）
+
+オーバーレイ（手順4）には監査チェーンのテナント複製 `customer/{slug}/logs/audit/` が入っている。
+そのため移動は監査チェーンのロックを取って行い、同じロックの中で
+`tenant.audit_mirror_moved` エントリ（`metadata.previous_slug` に旧slug）をチェーンに記録する。
+監査の追記は移動の前か後のどちらかにしか入らない。`audit mirror-reconcile` はこの印より前の
+旧slugのエントリを新slugの複製のものとして数えるので、改称だけで不整合とは報告されない。
+改称は記録した印の監査IDをプロファイルの `metadata.audit_mirror_move_ids` に残す。
+印を信じるのは、そのIDがプロファイルに残っていて、かつ改称履歴にその改称
+（旧slug → 新slug の連続した一歩）があるときだけである。改称以外が記録した印は、
+履歴にある改称を名乗っていても使われない。旧slugを後から別のテナントが使っても、
+そのエントリが改称後の複製に混ざることはない。また、新slugを以前に使っていたテナントのエントリも
+改称後の複製には数えない。
+プロファイルの `metadata.previous_slugs` には、改称のたびに旧slugが追記されていく
+（この欄ができる前に改称したプロファイルは `tenant_id` と `metadata.previous_slug` から履歴を読む）。
+
+改称の前に、記録する監査エントリが拒否されないこと（現在のテナント文脈との衝突、チェーン鍵の欠落）を
+確かめてから動かし始める。途中で拒否されて半分だけ改称された状態にはならない。
+
+この印ができる前に行った改称には印がないため、`audit mirror-reconcile` は改称後の複製を不整合として
+報告する。承認して適用すると、旧slugのエントリは複製から外されて退避先（archive）に移る。
+マスターのチェーンからは消えない。
 
 プロファイルを先に書き換えると、移動に失敗したときレジストリだけが新slugを指し、
 実体は旧slugのまま、という状態になる。
