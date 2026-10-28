@@ -1,0 +1,20 @@
+{
+  "name": "@agent/shared-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Device-agnostic mobile runtime: frame sources, input injectors, and a loopback MJPEG live-mirror with click-to-tap.",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -b tsconfig.json && node ../../scripts/write_core_dist_scope.mjs --run"
+  },
+  "dependencies": {
+    "@agent/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.3"
+  }
+}

@@ -128,6 +128,7 @@
 - [Mission Runtime Primitives](./product/architecture/mission-runtime-primitives.md) (public | Ecosystem Architect)
 - [Mission Team Composition Model](./product/architecture/mission-team-composition-model.md) (public | ecosystem_architect)
 - [Mission and Task Classification Improvement Roadmap for GPT-5.4 mini](./product/architecture/mission-task-classification-roadmap-5.4-mini.md) (public | Ecosystem Architect)
+- [Mobile Actuator Live Mirror — interactive device streaming (MSN-MOBILE-ACT-20261028)](./product/architecture/mobile-actuator-live-mirror.md) (public | Unknown)
 - [Model and Harness Adaptation Phase](./product/architecture/model-adaptation-phase.md) (public | Ecosystem Architect)
 - [Multi-Tenant Operations](./product/architecture/multi-tenant-operations.md) (public | Unknown)
 - [OS Automation Bridge Model](./product/architecture/os-automation-bridge-model.md) (public | Unknown)

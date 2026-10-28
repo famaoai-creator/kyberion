@@ -304,6 +304,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-mobile':
+        specifier: workspace:*
+        version: link:../../shared-mobile
       yargs:
         specifier: ^17.7.3
         version: 17.7.3
@@ -434,6 +437,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:../../core
+      '@agent/shared-mobile':
+        specifier: workspace:*
+        version: link:../../shared-mobile
       yargs:
         specifier: ^17.7.3
         version: 17.7.3
@@ -752,6 +758,22 @@ importers:
       exceljs:
         specifier: ^4.4.0
         version: 4.4.0
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      tsx:
+        specifier: ^4.23.15
+        version: 4.23.15
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+
+  libs/shared-mobile:
+    dependencies:
+      '@agent/core':
+        specifier: workspace:*
+        version: link:../core
     devDependencies:
       '@types/node':
         specifier: ^26.6.5
