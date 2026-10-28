@@ -1,0 +1,26 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "apple-shortcut-approved-run",
+  "version": "1.0.0",
+  "name": "Human approved Apple Shortcut",
+  "description": "Run one named shortcut only after exact-content tenant-bound human approval. First invocation returns approval_required; rerun with the same input and approved request id. Failed/ambiguous launches consume the approval and require a new request.",
+  "context": {
+    "shortcut_name": "Example shortcut",
+    "approval_request_id": ""
+  },
+  "steps": [
+    {
+      "id": "run",
+      "role": "sink",
+      "op": "system:run_shortcut",
+      "produces": {
+        "channel": "shortcut_result",
+        "type": "ShortcutExecution"
+      },
+      "params": {
+        "name": "{{shortcut_name}}",
+        "approval_request_id": "{{approval_request_id}}"
+      }
+    }
+  ]
+}

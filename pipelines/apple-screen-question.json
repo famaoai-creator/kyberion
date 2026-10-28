@@ -1,0 +1,24 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "apple-screen-question",
+  "version": "1.0.0",
+  "name": "Apple Local Screen Question",
+  "description": "Operator-invoked local screen observation using the governed screenshot redaction path and on-device image prompt.",
+  "context": {
+    "question": "Summarize the visible screen."
+  },
+  "steps": [
+    {
+      "id": "ask",
+      "role": "source",
+      "op": "system:ask_screen",
+      "produces": {
+        "channel": "screen_answer",
+        "type": "AppleScreenAnswer"
+      },
+      "params": {
+        "question": "{{question}}"
+      }
+    }
+  ]
+}

@@ -632,6 +632,8 @@
     },
     "system": {
       "capture": [
+        "apple_capabilities",
+        "ask_screen",
         "audit_verify",
         "baseline_check",
         "capture_photo",
@@ -656,6 +658,7 @@
         "list_projects",
         "list_running_apps",
         "list_service_runtimes",
+        "list_shortcuts",
         "list_tool_runtimes",
         "macos_automation_probe",
         "narrated_report_preflight",
@@ -713,6 +716,7 @@
         "process_kill",
         "provider_preflight",
         "run_applescript",
+        "run_shortcut",
         "scroll",
         "standard_pr_lifecycle",
         "system_notify",

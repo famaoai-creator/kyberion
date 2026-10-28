@@ -286,3 +286,5 @@ human_only の依頼は `accountability.min_assurance`（A0〜A3）を持ち、�
 - **対象外の承認経路。** approval-store を通らない独自の承認は設定の対象外（`service_recording review`
   は store を通るようにした）。
 - 確実に分離するには、承認を依頼者とは別の認証済み member（chronos / presence-studio の `user:<member_id>`）が行う。
+
+- `apple_shortcut_run`: tenant-bound, human-only, expiring exact shortcut name/input-digest approval; atomically consumed before OS launch, no automatic retry.

@@ -1863,6 +1863,21 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/shortcut-bridge.ts#runAppleShortcut (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/shortcut-bridge.ts#runAppleShortcut (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/shortcut-bridge.ts#runAppleShortcut (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/stimuli-journal.ts#appendStimulus",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -4364,6 +4379,9 @@
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend.streamPromptFromCli": [
+      "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
+    ],
+    "libs/core/shortcut-bridge.ts#runProcess": [
       "child process may inherit SYSTEM_ROLE and its entry point could not be resolved"
     ],
     "libs/core/vcs/governance-host.ts#transport": [
@@ -9437,6 +9455,7 @@
         "libs/core/shell/shell-claude-cli-backend.ts#ShellClaudeCliBackend.streamPromptFromCli",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend.spawnCli",
         "libs/core/shell/shell-grok-cli-backend.ts#ShellGrokCliBackend.streamPromptFromCli",
+        "libs/core/shortcut-bridge.ts#runProcess",
         "libs/core/vcs/governance-host.ts#transport",
         "libs/core/video/ingest/video-fetch.ts#defaultVideoCommandRunner",
         "libs/core/video/video-frame-archive.ts#readVideoFramesFromMp4",
