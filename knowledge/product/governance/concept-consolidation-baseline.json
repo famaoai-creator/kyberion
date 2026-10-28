@@ -1874,6 +1874,13 @@
     "scripts/write_core_dist_scope.mjs": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 2
+    },
+    "libs/shared-mobile/src/mirror-daemon.ts": {
+      "bespoke_cli_parser_budget": 1,
+      "json_state_write_budget": 1
+    },
+    "libs/shared-mobile/src/mirror-session.ts": {
+      "json_state_write_budget": 0
     }
   },
   "exported_types": {
