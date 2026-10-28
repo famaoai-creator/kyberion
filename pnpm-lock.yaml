@@ -78,6 +78,9 @@ importers:
       '@agent/shared-media':
         specifier: workspace:*
         version: link:libs/shared-media
+      '@agent/shared-mobile':
+        specifier: workspace:*
+        version: link:libs/shared-mobile
       '@agent/shared-nerve':
         specifier: workspace:*
         version: link:libs/shared-nerve
