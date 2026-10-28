@@ -354,6 +354,157 @@ describe('mission lifecycle finish gate', () => {
     ).toThrow('Invalid catalog mission-next-tasks');
   });
 
+  it('keeps a supersede on disk that a stale board copy would undo (M2)', () => {
+    const superseded = {
+      by_task_id: 'task-2',
+      at: '2026-10-29T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    };
+    const rewrite = { from: 'task-1', to: 'task-2', at: '2026-10-29T00:00:00.000Z' };
+    // What supersede-task wrote: task-1 replaced by task-2, task-3 rewired.
+    writeMissionNextTasks(
+      missionPath,
+      [
+        { task_id: 'task-1', status: 'superseded', superseded },
+        { task_id: 'task-2', status: 'planned' },
+        {
+          task_id: 'task-3',
+          status: 'planned',
+          dependencies: ['task-2'],
+          dependencies_rewritten_from: [rewrite],
+        },
+      ],
+      { allowSupersede: true }
+    );
+    // A writer holding the board from before the supersede writes it back.
+    writeMissionNextTasks(missionPath, [
+      { task_id: 'task-1', status: 'planned' },
+      { task_id: 'task-3', status: 'in_progress', dependencies: ['task-1'] },
+    ]);
+    expect(readMissionNextTasks(missionPath)).toEqual([
+      { task_id: 'task-1', status: 'superseded', superseded },
+      {
+        task_id: 'task-3',
+        status: 'in_progress',
+        dependencies: ['task-2'],
+        dependencies_rewritten_from: [rewrite],
+      },
+      { task_id: 'task-2', status: 'planned' },
+    ]);
+
+    // Only supersede-task introduces a supersede.
+    writeMissionNextTasks(missionPath, [
+      { task_id: 'task-1', status: 'superseded', superseded },
+      { task_id: 'task-2', status: 'superseded', superseded },
+      { task_id: 'task-3', status: 'in_progress' },
+    ]);
+    expect(readMissionNextTasks(missionPath).find((task) => task.task_id === 'task-2')).toEqual({
+      task_id: 'task-2',
+      status: 'planned',
+    });
+  });
+
+  it('keeps every rewrite when two supersedes rewire the same dependent (M2)', () => {
+    const record = (by: string) => ({
+      by_task_id: by,
+      at: '2026-10-29T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    });
+    const first = { from: 'T1', to: 'T2', at: '2026-10-29T00:00:00.000Z' };
+    const second = { from: 'T5', to: 'T6', at: '2026-10-29T01:00:00.000Z' };
+    writeMissionNextTasks(
+      missionPath,
+      [
+        { task_id: 'T1', status: 'superseded', superseded: record('T2') },
+        { task_id: 'T2', status: 'planned' },
+        { task_id: 'T5', status: 'planned' },
+        {
+          task_id: 'D',
+          status: 'planned',
+          dependencies: ['T2', 'T5'],
+          dependencies_rewritten_from: [first],
+        },
+      ],
+      { allowSupersede: true }
+    );
+    // The second supersede: T5 by T6, D rewired again.
+    writeMissionNextTasks(
+      missionPath,
+      [
+        { task_id: 'T1', status: 'superseded', superseded: record('T2') },
+        { task_id: 'T2', status: 'planned' },
+        { task_id: 'T5', status: 'superseded', superseded: record('T6') },
+        { task_id: 'T6', status: 'planned' },
+        {
+          task_id: 'D',
+          status: 'planned',
+          dependencies: ['T2', 'T6'],
+          dependencies_rewritten_from: [first, second],
+        },
+      ],
+      { allowSupersede: true }
+    );
+    // A writer still holding the board from before the second supersede.
+    writeMissionNextTasks(missionPath, [
+      { task_id: 'T1', status: 'superseded', superseded: record('T2') },
+      { task_id: 'T2', status: 'planned' },
+      { task_id: 'T5', status: 'planned' },
+      {
+        task_id: 'D',
+        status: 'planned',
+        dependencies: ['T2', 'T5'],
+        dependencies_rewritten_from: [first],
+      },
+    ]);
+    const board = readMissionNextTasks(missionPath);
+    expect(board.find((task) => task.task_id === 'D')).toMatchObject({
+      dependencies: ['T2', 'T6'],
+      dependencies_rewritten_from: [first, second],
+    });
+    expect(board.find((task) => task.task_id === 'T5')?.status).toBe('superseded');
+    expect(board.some((task) => task.task_id === 'T6')).toBe(true);
+  });
+
+  it('follows a chain of supersedes for a stale dependent (M2)', () => {
+    const record = (by: string) => ({
+      by_task_id: by,
+      at: '2026-10-29T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    });
+    const t1 = { from: 'T1', to: 'T2', at: '2026-10-29T00:00:00.000Z' };
+    const t2 = { from: 'T2', to: 'T3', at: '2026-10-29T01:00:00.000Z' };
+    // T1 replaced by T2, then T2 replaced by T3.
+    writeMissionNextTasks(
+      missionPath,
+      [
+        { task_id: 'T1', status: 'superseded', superseded: record('T2') },
+        { task_id: 'T2', status: 'superseded', superseded: record('T3') },
+        { task_id: 'T3', status: 'planned' },
+        {
+          task_id: 'D',
+          status: 'planned',
+          dependencies: ['T3'],
+          dependencies_rewritten_from: [t1, t2],
+        },
+      ],
+      { allowSupersede: true }
+    );
+    // A writer holding the board from before both supersedes.
+    writeMissionNextTasks(missionPath, [
+      { task_id: 'T1', status: 'planned' },
+      { task_id: 'D', status: 'in_progress', dependencies: ['T1'] },
+    ]);
+    expect(
+      readMissionNextTasks(missionPath).find((task) => task.task_id === 'D')?.dependencies
+    ).toEqual(['T3']);
+  });
+
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {
     const reconciliation = reconcileLifecycleClosureCriteria(
       {

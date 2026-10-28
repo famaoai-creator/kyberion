@@ -217,6 +217,13 @@ export interface UpdateWorkItemInput {
   attempts?: WorkItemAttempt[];
   currentAttemptId?: string;
   context?: WorkItemContext;
+  /**
+   * With `status: 'blocked'`: end the running attempt as blocked and release
+   * its lease now. For a block that waits on someone else (a customer
+   * decision hold), not on the worker that holds the claim: otherwise the
+   * lease outlives the attempt and refuses a re-claim until it expires.
+   */
+  endAttempt?: boolean;
   rootDir?: string;
 }
 

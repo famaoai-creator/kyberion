@@ -1,3 +1,4 @@
+import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
 /**
  * scripts/refactor/mission-workitem-dispatch.ts
@@ -611,7 +612,6 @@ export function persistWorkItemArtifactReviewReceipt(input: {
     { missionId: input.missionId, missionPath: input.missionPath }
   );
 
-  const taskPath = missionNextTasksPath(input.missionPath);
   const tasks = loadReviewNextTasks(input.missionPath);
   const index = tasks.findIndex(
     (task) => String(task.task_id || '') === input.context.reviewTaskId
@@ -634,10 +634,8 @@ export function persistWorkItemArtifactReviewReceipt(input: {
       artifact_review_receipt: relativePath,
       review_findings: findings,
     };
-    writeDispatchArtifact(taskPath, tasks, {
-      missionId: input.missionId,
-      missionPath: input.missionPath,
-    });
+    // Through the one board writer: a supersede that landed since the read is kept (M2).
+    writeMissionNextTasks(input.missionPath, tasks);
   }
   return { relativePath, receipt };
 }

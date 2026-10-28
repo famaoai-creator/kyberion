@@ -13,6 +13,7 @@ import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readTextFile } from '../foundation/text.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
+import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 
 import { evaluateMissionGate, type MissionGateEvaluation } from './mission-gate-engine.js';
 import {
@@ -138,13 +139,12 @@ export function applyProcessTemplatePlan(input: {
     }
   }
 
-  writeProvisionedJson({
-    missionId,
-    filePath: nextTasksPath,
-    targetPath: missionRelativeArtifactPath(safeMissionDir, nextTasksPath),
-    missionPathHint: safeMissionDir,
-    provisioned: provisionMissionEntry(tasks),
-  });
+  // Through the one board writer: a task superseded on disk keeps its
+  // supersede record, its replacement and its dependents' rewrites (M2).
+  writeMissionNextTasks(
+    safeMissionDir,
+    tasks.map((task) => ({ ...task }))
+  );
 
   const gateDefsDir = safeMissionArtifactPath(safeMissionDir, 'gates/definitions');
   const gatePaths: string[] = [];
@@ -409,20 +409,18 @@ function markPhaseTasksStatus(missionId: string, phase: string, status: string):
   const tasks = readTasksSafe(nextTasksPath);
   let changed = 0;
   for (const task of tasks) {
-    if (task.phase === phase && task.origin === PROCESS_TEMPLATE_TASK_ORIGIN) {
+    // A superseded task was replaced: a gate verdict on its phase neither
+    // re-runs it (rework) nor counts it as done (completed).
+    if (
+      task.phase === phase &&
+      task.origin === PROCESS_TEMPLATE_TASK_ORIGIN &&
+      task.status !== 'superseded'
+    ) {
       task.status = status;
       changed += 1;
     }
   }
-  if (changed > 0) {
-    writeProvisionedJson({
-      missionId,
-      filePath: nextTasksPath,
-      targetPath: missionRelativeArtifactPath(missionDir, nextTasksPath),
-      missionPathHint: missionDir,
-      provisioned: provisionMissionEntry(tasks),
-    });
-  }
+  if (changed > 0) writeMissionNextTasks(missionDir, tasks);
   return changed;
 }
 

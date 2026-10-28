@@ -305,6 +305,39 @@ describe('work coordination', () => {
     expect(board.board_id).toBe('roadmap-review-board');
   });
 
+  it('releases the lease when a block ends the attempt, so the item can be claimed at once', () => {
+    const claimFor = (itemId: string, version: number) =>
+      claimWorkItem({
+        itemId,
+        actorPeerId: 'mission-orchestration-worker',
+        purpose: 'dispatch',
+        expectedVersion: version,
+      });
+    const held = createWorkItem({ title: 'held task', description: 'waits on a customer' });
+    const first = claimFor(held.item_id, held.version);
+    const blocked = updateWorkItem({
+      itemId: held.item_id,
+      expectedVersion: first.item.version,
+      status: 'blocked',
+      endAttempt: true,
+      metadata: { summary: 'Task waits for a customer decision', blocked_reason: 'awaiting' },
+    });
+    expect(blocked.lease_id).toBeUndefined();
+    expect(listWorkItemAttempts(held.item_id)[0]).toMatchObject({ status: 'blocked' });
+    // Released at once: the resumed task re-claims without waiting out the TTL.
+    expect(claimFor(held.item_id, blocked.version).item.status).toBe('in_progress');
+
+    // A block that does not end the attempt keeps the lease, as before.
+    const kept = createWorkItem({ title: 'kept task', description: 'worker still on it' });
+    const claimed = claimFor(kept.item_id, kept.version);
+    const stillLeased = updateWorkItem({
+      itemId: kept.item_id,
+      expectedVersion: claimed.item.version,
+      status: 'blocked',
+    });
+    expect(() => claimFor(kept.item_id, stillLeased.version)).toThrowError(/lease/i);
+  });
+
   it('claims, releases, and hands off leases with version checks', () => {
     const item = createWorkItem({
       title: 'Implement claim logic',

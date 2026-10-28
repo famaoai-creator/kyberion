@@ -1,3 +1,4 @@
+import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import * as nodePath from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { nowIso } from '../foundation/time.js';
@@ -11,7 +12,6 @@ import {
   listActiveWorkLeases,
   listWorkItemAttempts,
 } from '../workforce/work-coordination.js';
-import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
 
 export interface MissionRequestedTaskRecoveryRecord {
   task_id: string;
@@ -58,11 +58,8 @@ function readNextTasks(missionId: string): Array<Record<string, unknown>> {
 }
 
 function writeNextTasks(missionId: string, tasks: Array<Record<string, unknown>>): void {
-  const filePath = nextTasksPath(missionId);
-  writeDispatchArtifact(filePath, tasks, {
-    missionId,
-    missionPath: nodePath.dirname(filePath),
-  });
+  // Through the one board writer: a stale read never undoes a supersede (M2).
+  writeMissionNextTasks(nodePath.dirname(nextTasksPath(missionId)), tasks);
 }
 
 function isTerminalWorkItemStatus(status: unknown): boolean {
