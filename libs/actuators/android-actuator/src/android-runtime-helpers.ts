@@ -18,6 +18,12 @@ import { retry, sleep, getRetryDefaults } from '@agent/core/async-utils';
 import { defineCatalog, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
 import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import {
+  startMirrorDaemonSession,
+  stopMirrorDaemonSession,
+  readMirrorSession,
+  mirrorStateFilePath,
+} from '@agent/shared-mobile';
 import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import { DEFAULT_PIPELINE_TIMEOUT_MS } from '@agent/core/execution-bounds';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
@@ -322,6 +328,32 @@ async function opCapture(
         ...ctx,
         [String(params.export_as ?? 'last_ui_tree')]: xml,
         last_ui_tree_path: outPath,
+      };
+    }
+    case 'describe_ui': {
+      ensureAdbAvailable(ctx, options);
+      const serial = resolveSerial(ctx, options, params);
+      const remotePath = `/sdcard/kyberion-ui-${Date.now()}.xml`;
+      let xml = '';
+      try {
+        await retry(
+          async () => runAdb(['shell', 'uiautomator', 'dump', remotePath], serial, options),
+          buildRetryOptions()
+        );
+        xml = await retry(
+          async () => runAdb(['shell', 'cat', remotePath], serial, options),
+          buildRetryOptions()
+        );
+      } finally {
+        await retry(async () => {
+          safeCleanupRemote(serial, remotePath, options);
+          return undefined;
+        }, buildRetryOptions());
+      }
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'ui_tree')]: parseUiAutomatorNodes(xml),
+        android_serial: serial,
       };
     }
     case 'android_cli_health_check': {
@@ -794,12 +826,80 @@ async function opApply(
         session_handoff_path: outPath,
       };
     }
+    case 'start_screen_stream': {
+      ensureAdbAvailable(ctx, options);
+      const serial = resolveSerial(ctx, options, params);
+      const session = await startMirrorDaemonSession({
+        platform: 'android',
+        deviceId: serial,
+        stateFile: mirrorStateFilePath('android', serial),
+        daemonPath: pathResolver.rootResolve('libs/shared-mobile/dist/mirror-daemon.js'),
+        rootDir,
+        resourceId: `android-mirror-${serial || 'default'}`,
+        fps: Number(resolve(params.fps || 3)),
+        noInput: params.no_input === true,
+      });
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'screen_stream')]: session,
+        android_serial: serial,
+      };
+    }
+    case 'stop_screen_stream': {
+      const serial = resolveSerial(ctx, options, params);
+      const result = await stopMirrorDaemonSession(mirrorStateFilePath('android', serial));
+      return { ...ctx, [String(params.export_as ?? 'screen_stream_stop')]: result };
+    }
+    case 'stream_status': {
+      const serial = resolveSerial(ctx, options, params);
+      const state = readMirrorSession(mirrorStateFilePath('android', serial));
+      return { ...ctx, [String(params.export_as ?? 'screen_stream_status')]: state };
+    }
     case 'log':
       logger.info(`[ANDROID_LOG] ${resolve(params.message)}`);
       return ctx;
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
+}
+
+/**
+ * Flatten uiautomator dump XML into a normalized node list — same "agent-
+ * readable flat elements" shape as the iOS AXe path so cross-platform callers
+ * see one UI-tree contract.
+ */
+export function parseUiAutomatorNodes(xml: string): Array<Record<string, unknown>> {
+  const nodes: Array<Record<string, unknown>> = [];
+  const tagRe = /<node\b[^>]*>/g;
+  let match: RegExpExecArray | null;
+  while ((match = tagRe.exec(xml))) {
+    const tag = match[0];
+    const attrs: Record<string, string> = {};
+    const attrRe = /([\w-]+)="([^"]*)"/g;
+    let attr: RegExpExecArray | null;
+    while ((attr = attrRe.exec(tag))) {
+      attrs[attr[1]] = decodeEntities(attr[2]);
+    }
+    const bounds = /\[(\d+),(\d+)\]\[(\d+),(\d+)\]/.exec(attrs.bounds || '');
+    const entry: Record<string, unknown> = {
+      text: attrs.text || '',
+      content_desc: attrs['content-desc'] || '',
+      resource_id: attrs['resource-id'] || '',
+      class: attrs.class || '',
+      clickable: attrs.clickable === 'true',
+      enabled: attrs.enabled !== 'false',
+    };
+    if (bounds) {
+      const x1 = Number(bounds[1]);
+      const y1 = Number(bounds[2]);
+      const x2 = Number(bounds[3]);
+      const y2 = Number(bounds[4]);
+      entry.bounds = { x1, y1, x2, y2 };
+      entry.center = { x: (x1 + x2) / 2, y: (y1 + y2) / 2 };
+    }
+    nodes.push(entry);
+  }
+  return nodes;
 }
 
 function collectAdbHealth(ctx: Record<string, any>, options?: AndroidAction['options']) {

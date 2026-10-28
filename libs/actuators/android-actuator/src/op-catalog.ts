@@ -99,6 +99,11 @@ const ANDROID_CONTRACTS: Record<string, InputSchema> = {
     properties: { export_as: { type: 'string' }, path: { type: 'string' } },
     additionalProperties: false,
   },
+  describe_ui: {
+    type: 'object',
+    properties: { export_as: { type: 'string' } },
+    additionalProperties: false,
+  },
   read_json: {
     type: 'object',
     properties: {
@@ -141,6 +146,25 @@ const ANDROID_CONTRACTS: Record<string, InputSchema> = {
   emit_session_handoff: {
     type: 'object',
     properties: { export_as: { type: 'string' }, path: { type: 'string' } },
+    additionalProperties: false,
+  },
+  start_screen_stream: {
+    type: 'object',
+    properties: {
+      fps: { type: 'number' },
+      no_input: { type: 'boolean' },
+      export_as: { type: 'string' },
+    },
+    additionalProperties: false,
+  },
+  stop_screen_stream: {
+    type: 'object',
+    properties: { export_as: { type: 'string' } },
+    additionalProperties: false,
+  },
+  stream_status: {
+    type: 'object',
+    properties: { export_as: { type: 'string' } },
     additionalProperties: false,
   },
   input_text: {
@@ -306,6 +330,10 @@ const ANDROID_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
   android_cli_screen_capture: [{ path: 'active/shared/tmp/screen.png' }],
   capture_screen: [{ path: 'active/shared/tmp/screen.png' }],
   emit_session_handoff: [{ path: 'active/shared/tmp/handoff.json' }],
+  describe_ui: [{}],
+  start_screen_stream: [{ fps: 3 }],
+  stop_screen_stream: [{}],
+  stream_status: [{}],
   input_text: [{ text: 'hello' }],
   launch_app: [{ component: 'com.example/.MainActivity' }],
   open_deep_link: [{ url: 'example://home' }],
@@ -332,6 +360,7 @@ export const ANDROID_ACTUATOR_CAPTURE_OPS = [
   'android_cli_screen_resolve',
   'capture_foreground_activity',
   'capture_runtime_session_handoff',
+  'describe_ui',
   'extract_ui_tree',
   'read_json',
   'read_text_file',
@@ -355,6 +384,9 @@ export const ANDROID_ACTUATOR_APPLY_OPS = [
   'launch_app',
   'log',
   'open_deep_link',
+  'start_screen_stream',
+  'stop_screen_stream',
+  'stream_status',
   'swipe',
   'tap',
   'tap_ui_node',

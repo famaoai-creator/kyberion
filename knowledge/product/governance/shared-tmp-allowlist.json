@@ -628,6 +628,18 @@
       "count": 1,
       "classification": "legit-tmp",
       "note": "planRestart's DaemonRenderContext requires a stagingDir, but restart plans stage no unit files (unitFiles:[]) — the field is contract-only; nothing is written. Tmp floor is the sanctioned scratch root."
+    },
+    {
+      "file": "libs/shared-mobile/src/mirror-daemon.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "Per-daemon PNG frame scratch consumed by the MJPEG loop and deleted on grab; the durable artifact is the live stream itself. Frames are re-generable by definition."
+    },
+    {
+      "file": "libs/shared-mobile/src/mirror-session.ts",
+      "count": 1,
+      "classification": "legit-tmp",
+      "note": "Stable per-(platform,device) mirror state file shared across short-lived actuator invocations; regenerated whenever a stream restarts."
     }
   ],
   "pipeline_literals": [

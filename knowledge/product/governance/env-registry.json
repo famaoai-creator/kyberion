@@ -578,6 +578,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_AXE_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for axe bin; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_BACKUP_PASSPHRASE",
       "category": "secret",
       "type": "string",
