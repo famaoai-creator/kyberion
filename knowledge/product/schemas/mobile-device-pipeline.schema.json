@@ -5,55 +5,70 @@
   "type": "object",
   "required": ["action", "steps"],
   "properties": {
-    "action": { "const": "pipeline" },
-    "context": { "type": "object" },
-    "options": { "type": "object" },
+    "action": {
+      "const": "pipeline"
+    },
+    "context": {
+      "type": "object"
+    },
+    "options": {
+      "type": "object"
+    },
     "steps": {
       "type": "array",
       "items": {
         "type": "object",
         "required": ["type", "op", "params"],
         "properties": {
-          "type": { "enum": ["capture", "transform", "apply", "control"] },
+          "type": {
+            "enum": ["capture", "transform", "apply", "control"]
+          },
           "op": {
             "enum": [
-              "read_json",
-              "read_text_file",
               "adb_health_check",
-              "simctl_health_check",
-              "capture_foreground_activity",
-              "capture_runtime_session_handoff",
-              "extract_ui_tree",
-              "set",
-              "summarize_ui_tree",
-              "find_ui_nodes",
-              "launch_app",
-              "install_app",
-              "boot_simulator",
-              "shutdown_simulator",
-              "uninstall_app",
-              "open_deep_link",
-              "tap",
-              "tap_ui_node",
-              "input_text_into_ui_node",
-              "fill_login_form",
-              "swipe",
-              "input_text",
-              "capture_screen",
-              "wait_for_ui_text",
-              "wait_for_ui_node",
-              "authenticate_with_passkey",
-              "emit_session_handoff",
+              "android_cli_describe",
+              "android_cli_docs_search",
               "android_cli_health_check",
               "android_cli_layout",
               "android_cli_screen_capture",
               "android_cli_screen_resolve",
-              "android_cli_describe",
-              "android_cli_docs_search",
-              "log"
+              "authenticate_with_passkey",
+              "boot_simulator",
+              "capture_foreground_activity",
+              "capture_runtime_session_handoff",
+              "capture_screen",
+              "describe_ui",
+              "emit_session_handoff",
+              "extract_ui_tree",
+              "fill_login_form",
+              "find_ui_nodes",
+              "input_text",
+              "input_text_into_ui_node",
+              "install_app",
+              "launch_app",
+              "log",
+              "open_deep_link",
+              "press_button",
+              "read_json",
+              "read_text_file",
+              "set",
+              "shutdown_simulator",
+              "simctl_health_check",
+              "start_screen_stream",
+              "stop_screen_stream",
+              "stream_status",
+              "summarize_ui_tree",
+              "swipe",
+              "tap",
+              "tap_ui_node",
+              "uninstall_app",
+              "wait_for_ui_node",
+              "wait_for_ui_text"
             ]
           },
-          "params": { "type": "object" }
+          "params": {
+            "type": "object"
+          }
         }
       }
     }

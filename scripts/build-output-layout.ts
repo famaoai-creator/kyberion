@@ -4,6 +4,7 @@ export const PACKAGE_BUILD_OUTPUTS = [
   { id: 'libs/shared-ui', sourceRoot: 'libs/shared-ui/src', excludeTests: true },
   { id: 'libs/shared-media', sourceRoot: 'libs/shared-media/src', excludeTests: false },
   { id: 'libs/shared-nerve', sourceRoot: 'libs/shared-nerve/src', excludeTests: false },
+  { id: 'libs/shared-mobile', sourceRoot: 'libs/shared-mobile/src', excludeTests: false },
   { id: 'libs/shared-network', sourceRoot: 'libs/shared-network/src', excludeTests: false },
   { id: 'libs/shared-vision', sourceRoot: 'libs/shared-vision/src', excludeTests: false },
   {

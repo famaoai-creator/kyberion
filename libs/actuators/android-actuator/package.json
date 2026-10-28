@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@agent/core": "workspace:*",
+    "@agent/shared-mobile": "workspace:*",
     "yargs": "^17.7.3"
   }
 }

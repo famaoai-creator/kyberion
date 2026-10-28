@@ -185,6 +185,7 @@
     "@actuator/system": "workspace:*",
     "@agent/core": "workspace:*",
     "@agent/shared-media": "workspace:*",
+    "@agent/shared-mobile": "workspace:*",
     "@agent/shared-nerve": "workspace:*",
     "@agent/shared-network": "workspace:*",
     "@agent/shared-vision": "workspace:*",

@@ -1,0 +1,28 @@
+{
+  "action": "pipeline",
+  "context": {
+    "context_path": "active/shared/tmp/ios/ios-screen-stream-template.context.json"
+  },
+  "steps": [
+    {
+      "type": "capture",
+      "op": "simctl_health_check",
+      "params": { "export_as": "ios_health" }
+    },
+    {
+      "type": "apply",
+      "op": "boot_simulator",
+      "params": {}
+    },
+    {
+      "type": "apply",
+      "op": "start_screen_stream",
+      "params": { "fps": 3, "export_as": "screen_stream" }
+    },
+    {
+      "type": "apply",
+      "op": "stream_status",
+      "params": { "export_as": "stream_state" }
+    }
+  ]
+}
