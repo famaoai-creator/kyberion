@@ -3,6 +3,7 @@
  * Mission follow-up ticket registration for work items and external issue payloads.
  */
 
+import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import * as nodePath from 'node:path';
 import { executeServicePreset } from '../service/service-engine.js';
 import { ensureMissionTeamRuntimeViaSupervisor } from '../agent/agent-runtime-supervisor.js';
@@ -238,8 +239,6 @@ export async function dispatchMissionTickets(
   if (plannedTasks.length === 0) {
     throw new Error(`No planned tasks available for ${missionId}`);
   }
-  const nextTasksPath = nodePath.join(missionPath, 'NEXT_TASKS.json');
-
   const targets: MissionTicketDispatchTarget[] =
     options.targets && options.targets.length > 0
       ? ([...new Set(options.targets)] as MissionTicketDispatchTarget[])
@@ -650,7 +649,9 @@ export async function dispatchMissionTickets(
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = ticketEventPath(missionPath);
   writeDispatchArtifact(manifestFilePath, manifest, { missionId, missionPath });
-  writeDispatchArtifact(nextTasksPath, allTasks, { missionId, missionPath });
+  // Through the one board writer: the board was read before the ticket calls,
+  // so a supersede that landed meanwhile is kept (M2).
+  writeMissionNextTasks(missionPath, allTasks);
 
   ledger.record('MISSION_TICKETS_REGISTERED', {
     mission_id: missionId,
