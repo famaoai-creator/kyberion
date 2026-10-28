@@ -249,6 +249,14 @@ export function registerAuditForwarderPublisher(publisher: AuditForwarderPublish
 }
 
 /**
+ * Inter-process lock every append holds while it writes the master chain and
+ * the tenant mirror. A writer that must see no append in between (mirror
+ * reconcile) holds it too; it is not reentrant, so nothing inside may record
+ * an audit entry.
+ */
+export const AUDIT_CHAIN_LOCK_ID = 'audit-chain-global';
+
+/**
  * Runs `fn` as the tenant audit mirror's own store-writer, bound to `tenantSlug`.
  * authority.ts registers it (the audit chain sits below authority in the
  * import graph, so it cannot import withExecutionContext itself).
@@ -371,7 +379,7 @@ class AuditChainImpl {
     ) {
       throw new Error('[AUDIT_SCOPE_INVALID] explicit audit scope failed validation');
     }
-    const fullEntry = withLockSync('audit-chain-global', () => {
+    const fullEntry = withLockSync(AUDIT_CHAIN_LOCK_ID, () => {
       // Refresh the in-memory cursor while holding the inter-process lock;
       // another process may have appended since this module was loaded.
       this.seedFromDisk();
