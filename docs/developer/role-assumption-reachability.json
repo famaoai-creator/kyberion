@@ -2308,17 +2308,17 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewMemoryConsolidationPatch",
+      "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewMemoryConsolidationPatchLocked",
       "roles": ["ecosystem_architect"],
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewPipelinePatch",
+      "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewPipelinePatchLocked",
       "roles": ["ecosystem_architect"],
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewSkillPatch",
+      "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewSkillPatchLocked",
       "roles": ["ecosystem_architect"],
       "unresolved": []
     },
@@ -2330,6 +2330,11 @@
     {
       "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequestLocked (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/workforce/background-review-patch.ts#rollbackBackgroundReviewPatch",
+      "roles": ["ecosystem_architect"],
       "unresolved": []
     },
     {

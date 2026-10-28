@@ -18,6 +18,8 @@ export function projectKnowledgeCandidate(candidate: MemoryCandidate) {
         ...(review.payloadDigest ? { payloadDigest: review.payloadDigest } : {}),
         ...(review.approvalRef ? { approvalRef: review.approvalRef } : {}),
         ...(review.publication ? { publication: review.publication } : {}),
+        ...(review.reuse ? { reuse: review.reuse } : {}),
+        ...(review.reuseUnavailable ? { reuseUnavailable: true } : {}),
       }
     : undefined;
   return {
