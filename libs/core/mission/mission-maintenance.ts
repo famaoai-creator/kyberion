@@ -1241,6 +1241,7 @@ export async function recordArtifactReview(args: {
   const receiptPath = safeMissionArtifactPath(missionPath, receiptRelPath);
 
   let evaluation: { ready: boolean; reasons: string[] } = { ready: false, reasons: [] };
+  let autoComplete: ReturnType<typeof tryAutoCompleteTaskFromEvidence> | undefined;
   await withLock(`mission-${upperId}`, async () => {
     assertMissionSnapshotExpectation(upperId);
     const reviewsDir = safeMissionArtifactPath(missionPath, 'evidence/reviews');
@@ -1314,13 +1315,21 @@ export async function recordArtifactReview(args: {
       note: `${args.reviewTaskId}: ${receipt.verdict} (${evaluation.ready ? 'ready' : 'blocked'})`,
     });
     await saveState(upperId, currentState, { alreadyLocked: true });
+
+    // Under the same lock as the stamp: closing the task reads and writes the
+    // board, and outside the lock it could write back a copy read before a
+    // concurrent write. A task held for a customer decision stays open, as in
+    // record-evidence.
+    if (evaluation.ready) {
+      autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId, {
+        canCascade: reviewTargetCascadeGuard(missionPath),
+        isHeld: (taskId) => isTaskAwaitingCustomerDecision({ missionId: upperId, taskId }),
+      });
+    }
   });
 
   let taskCompleted = false;
-  if (evaluation.ready) {
-    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId, {
-      canCascade: reviewTargetCascadeGuard(missionPath),
-    });
+  if (autoComplete) {
     taskCompleted = autoComplete.completed;
     const reviewer = { taskId: args.reviewTaskId, actorId: args.reviewerAgentId, state };
     if (taskCompleted)
@@ -1330,9 +1339,13 @@ export async function recordArtifactReview(args: {
     }
   }
 
-  if (evaluation.ready) {
+  if (evaluation.ready && taskCompleted) {
     logger.success(
       `✅ Review recorded and task "${args.reviewTaskId}" satisfied: ${receipt.verdict}.`
+    );
+  } else if (evaluation.ready) {
+    logger.warn(
+      `⚠️ Review recorded (${receipt.verdict}) but task "${args.reviewTaskId}" stays open — it waits for a customer decision or another completion check | confirm the customer decision (customer-decision confirm), then resume the mission | mission=${upperId}`
     );
   } else {
     logger.warn(

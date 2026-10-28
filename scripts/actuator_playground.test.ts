@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from 'vitest';
-import { safeExistsSync, safeMkdir, safeReadFile } from '@agent/core/secure-io';
+import { randomUUID } from 'node:crypto';
+import { afterAll, describe, expect, it, vi } from 'vitest';
+import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import * as discovery from '@agent/core/actuator/actuator-op-discovery';
 import * as nodePath from 'node:path';
@@ -380,8 +381,11 @@ describe('actuator playground discovery merge and pipeline wrap', () => {
 });
 
 describe('actuator playground session recording → ADF emit', () => {
-  const scratchDir = pathResolver.sharedTmp('ky-playground-test');
+  // Per run: a fixed directory kept the recorded sessions of the last local
+  // run, so the next one appended to them and saw the wrong step counts.
+  const scratchDir = pathResolver.sharedTmp(`ky-playground-test-${randomUUID()}`);
   safeMkdir(scratchDir, { recursive: true });
+  afterAll(() => safeRmSync(scratchDir, { recursive: true, force: true }));
 
   it('maps actuator ids to ADF domains', () => {
     expect(resolveActuatorDomain('browser-actuator')).toBe('browser');

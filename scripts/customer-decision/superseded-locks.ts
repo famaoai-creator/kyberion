@@ -14,11 +14,11 @@
  * visible), and the mission side logs it once.
  */
 import type { ConsumedDecisionLockRecord } from '@agent/core/customer-decision';
-import { isDecisionLockVerifiablySuperseded } from '@agent/core/mission/mission-decision-lock';
 import {
-  missionTaskSupersedeProof,
-  type MissionTaskSupersedeProof,
-} from '@agent/core/mission/mission-task-supersede-proof';
+  decisionLockSupersedeProof,
+  isDecisionLockVerifiablySuperseded,
+} from '@agent/core/mission/mission-decision-lock';
+import type { MissionTaskSupersedeProof } from '@agent/core/mission/mission-task-supersede-proof';
 
 /** Is this lock superseded by an approval the mission side verified? */
 export function isApprovedSupersededConsumerLock(
@@ -41,8 +41,6 @@ export function consumerLockSupersedeProof(
     superseded: NonNullable<ConsumedDecisionLockRecord['superseded']>;
   }
 ): MissionTaskSupersedeProof {
-  return missionTaskSupersedeProof(lock.mission_id, lock.task_id, {
-    byTaskId: lock.superseded.by_task_id,
-    approvalRequestId: lock.superseded.approval_request_id,
-  });
+  // Same check as the mission side's boundaries; a marked lock always has one.
+  return decisionLockSupersedeProof(lock) ?? { verified: false, reason: 'not_marked' };
 }
