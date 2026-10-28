@@ -10,14 +10,11 @@
 
 import * as path from 'node:path';
 import { nowIso } from '../foundation/time.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { readTextFile } from '../foundation/text.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 
-import {
-  evaluateMissionGate,
-  type MissionGateDefinition,
-  type MissionGateEvaluation,
-} from './mission-gate-engine.js';
+import { evaluateMissionGate, type MissionGateEvaluation } from './mission-gate-engine.js';
 import {
   expandProcessTemplateTasks,
   processTemplateGateDefinitions,
@@ -39,6 +36,7 @@ import {
   safeReaddir,
 } from '../secure-io.js';
 import { loadMissionPhaseGateDefinitionAtPath } from './mission-phase-gate-definition-reader.js';
+import { normalizeMissionGateCheckPaths } from './mission-gate-input-fingerprint.js';
 import {
   type MissionClass,
   type MissionDeliveryShape,
@@ -321,40 +319,6 @@ function gateDefinitionPath(missionDir: string, gateId: string): string {
 }
 
 /**
- * Resolves mission-relative paths inside gate check params against the
- * mission directory so `evidence_exists` / `deliverable_quality` checks work
- * regardless of the process cwd.
- */
-function resolveGateCheckPaths(
-  gate: MissionGateDefinition,
-  missionDir: string,
-  humanConfirmed: boolean
-): MissionGateDefinition {
-  const PATH_KEYS = new Set(['path', 'paths', 'artifact_path', 'deliverable', 'evidence_paths']);
-  const resolveValue = (value: unknown): unknown => {
-    if (typeof value === 'string' && value && !path.isAbsolute(value)) {
-      return path.join(missionDir, value);
-    }
-    if (Array.isArray(value)) return value.map(resolveValue);
-    return value;
-  };
-  return {
-    ...gate,
-    checks: gate.checks.map((check) => {
-      const params: Record<string, unknown> = { ...(check.params || {}) };
-      for (const key of Object.keys(params)) {
-        if (PATH_KEYS.has(key)) params[key] = resolveValue(params[key]);
-      }
-      // The operator's explicit gate command IS the human confirmation:
-      // reviewer_approved / human_override checks are satisfied by it.
-      if (humanConfirmed && check.kind === 'reviewer_approved') params.approved = true;
-      if (humanConfirmed && check.kind === 'human_override') params.allow = true;
-      return { ...check, params };
-    }),
-  };
-}
-
-/**
  * Machine-evaluates a stored process-template gate definition
  * (`gates/definitions/<GATE_ID>.json`). Returns found:false when the mission
  * has no such definition, letting callers fall back to the legacy
@@ -364,6 +328,7 @@ export async function evaluateStoredMissionGate(args: {
   missionId: string;
   gateId: string;
   humanConfirmed?: boolean;
+  blocking?: boolean;
 }): Promise<StoredGateEvaluationResult> {
   const missionId = args.missionId.toUpperCase();
   const missionDir = findMissionPath(missionId);
@@ -373,11 +338,16 @@ export async function evaluateStoredMissionGate(args: {
 
   const definition = loadMissionPhaseGateDefinitionAtPath(definitionPath, missionId);
 
-  const gate = resolveGateCheckPaths(definition.gate, missionDir, args.humanConfirmed ?? false);
+  const gate = normalizeMissionGateCheckPaths(
+    definition.gate,
+    missionDir,
+    args.humanConfirmed ?? false
+  );
   const evaluation = await evaluateMissionGate({
     missionId,
     gate,
     evidenceDir: safeMissionArtifactPath(missionDir, 'gates/records'),
+    blocking: args.blocking ?? getRegisteredEnvText('KYBERION_PHASE_GATE_MODE') === 'enforce',
   });
   return {
     found: true,
@@ -420,7 +390,7 @@ export async function evaluatePhaseEntryGate(args: {
     }
     if (definition.phase !== args.phase || definition.position !== 'entry') continue;
     const gateId = definition.gate.id;
-    const stored = await evaluateStoredMissionGate({ missionId, gateId });
+    const stored = await evaluateStoredMissionGate({ missionId, gateId, blocking: true });
     if (!stored.found || !stored.evaluation) return undefined;
     return {
       gateId,

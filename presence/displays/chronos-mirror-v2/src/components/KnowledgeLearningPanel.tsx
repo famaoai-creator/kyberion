@@ -122,6 +122,50 @@ export function KnowledgeLearningPanel({
         }
       />
       <p className="kb-text kb-text--muted">{uxText('chronos_learning_no_authority', locale)}</p>
+      {learning.reuseUnavailable ? (
+        <Callout
+          tone="warning"
+          title={uxText('chronos_learning_reuse', locale)}
+          body={uxText('chronos_learning_reuse_unavailable', locale)}
+        />
+      ) : null}
+      {learning.reuse ? (
+        <section className="grid gap-2" aria-label={uxText('chronos_learning_reuse', locale)}>
+          <Badge
+            label={uxText(`chronos_learning_reuse_${learning.reuse.state}`, locale)}
+            tone={learning.reuse.state === 'verified' ? 'success' : 'neutral'}
+          />
+          <KeyValue
+            items={[
+              {
+                label: uxText('chronos_learning_reuse_deliveries', locale),
+                value: String(learning.reuse.deliveries),
+              },
+              {
+                label: uxText('chronos_learning_reuse_attempts', locale),
+                value: String(learning.reuse.attempts),
+              },
+              {
+                label: uxText('chronos_learning_reuse_checks', locale),
+                value: `${learning.reuse.verified_successes} / ${learning.reuse.verified_successes + learning.reuse.failed_checks}`,
+              },
+              {
+                label: uxText('chronos_learning_reuse_reports', locale),
+                value: String(learning.reuse.worker_reported_successes),
+              },
+              {
+                label: uxText('chronos_learning_reuse_unconfirmed', locale),
+                value: String(learning.reuse.unconfirmed),
+              },
+              {
+                label: uxText('chronos_learning_reuse_interventions', locale),
+                value: `${learning.reuse.interventions} (${learning.reuse.intervention_unknown} ${uxText('chronos_learning_reuse_unknown', locale)})`,
+              },
+            ]}
+          />
+          <p className="kb-text kb-text--muted">{uxText('chronos_learning_reuse_scope', locale)}</p>
+        </section>
+      ) : null}
       <KeyValue
         items={[
           {

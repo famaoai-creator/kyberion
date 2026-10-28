@@ -10,7 +10,11 @@ import { loadMissionStateAtPath } from './mission-state-reader.js';
  * Path inside the existing mission's own directory. Write paths use this: an
  * unknown mission fails closed (OwnerScopeError).
  */
-export function safeMissionPath(missionId: string, relativePath: string, allowMissingLeaf = true): string {
+export function safeMissionPath(
+  missionId: string,
+  relativePath: string,
+  allowMissingLeaf = true
+): string {
   const missionPath = assertSafeRepositoryPath(resolveMissionDir(missionId), { allowMissingLeaf });
   return assertSafeRepositoryPath(path.join(missionPath, relativePath), {
     allowMissingLeaf,
@@ -41,6 +45,10 @@ export type MissionGateRecord = {
   drift_score?: number;
   review_summary?: Record<string, unknown>;
   evidence_path?: string;
+  input_digest?: string;
+  blocking?: boolean;
+  /** Publication order assigned under the per-mission gate writer lock. */
+  sequence?: number;
   checks?: Array<{ kind: string; passed: boolean; reason?: string }>;
   override?: boolean;
   override_outcome?: 'passed' | 'rejected';
@@ -53,7 +61,6 @@ export type MissionGateRecord = {
 const MISSION_GATE_RECORD_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/mission-gate-record.schema.json'
 );
-
 
 /** Load one persisted gate result through schema and mission binding. */
 export function loadMissionGateRecordAtPath(
@@ -79,7 +86,6 @@ export function loadMissionGateRecordAtPath(
   }
   return record;
 }
-
 
 export function loadMissionStateSnapshot(missionId: string): Record<string, unknown> | null {
   const statePath = existingMissionPath(missionId, 'mission-state.json');

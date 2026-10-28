@@ -44,6 +44,13 @@ import {
   safeReadFile,
 } from '../secure-io.js';
 import type { ScopeContext } from '../scope-context.js';
+import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
+import {
+  summarizeKnowledgeReuse,
+  validKnowledgeReuseReceipt,
+  type KnowledgeReuseReceipt,
+  type KnowledgeReuseSummary,
+} from './knowledge-reuse-contract.js';
 
 export type KnowledgeVerificationState = 'verified' | 'changed_since_verified' | 'reported_problem';
 
@@ -59,6 +66,8 @@ export type KnowledgeProblemKind = 'wrong' | 'stale' | 'failed_check';
 
 export interface KnowledgeVerificationEntry {
   document_path: string;
+  /** Bounded observations, versioned by the bytes actually delivered. */
+  reuse_receipts?: KnowledgeReuseReceipt[];
   last_success_at?: string;
   /** Fingerprint of the document text at the last successful run. */
   last_success_fingerprint?: string;
@@ -89,6 +98,26 @@ const LEDGER_FILE = 'knowledge-verification.json';
 const MAX_ENTRIES = 5000;
 
 function ledgerPath(scope?: ScopeContext): string {
+  if (scope?.tier === 'personal') {
+    const canonical = assertMemoryScope(scope as MemoryScopeEnvelope);
+    if (!canonical.owner_nhi)
+      throw new Error(
+        '[KNOWLEDGE_REUSE_OWNER_REQUIRED] Personal verification needs an explicit owner'
+      );
+    const hash = (text: string) => createHash('sha256').update(text).digest('hex');
+    return assertSafeRepositoryPath(
+      pathResolver.rootResolve(
+        path.posix.join(
+          'active/personal/owners',
+          hash(canonical.owner_nhi),
+          'feedback-loop',
+          hash(JSON.stringify(canonical)),
+          LEDGER_FILE
+        )
+      ),
+      { allowMissingLeaf: true }
+    );
+  }
   const override = getRegisteredEnvText('KYBERION_KNOWLEDGE_FEEDBACK_DIR')?.trim();
   const base = override
     ? pathResolver.rootResolve(override)
@@ -111,13 +140,19 @@ export function knowledgeVerificationLedgerPath(scope?: ScopeContext): string {
   return ledgerPath(scope);
 }
 
-function loadLedger(scope?: ScopeContext): KnowledgeVerificationEntry[] {
+function loadLedger(scope?: ScopeContext, strict = false): KnowledgeVerificationEntry[] {
   const filePath = ledgerPath(scope);
-  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) return [];
+  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
+    if (strict) throw new Error('[KNOWLEDGE_REUSE] Ledger must be a regular file');
+    return [];
+  }
   try {
     const parsed = readJsonIfPresent<unknown>(filePath);
+    if (strict && safeExistsSync(filePath) && !Array.isArray(parsed))
+      throw new Error('[KNOWLEDGE_REUSE] Invalid ledger');
     return Array.isArray(parsed) ? (parsed as KnowledgeVerificationEntry[]) : [];
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     return [];
   }
 }
@@ -165,6 +200,70 @@ function upsert(
   return entry;
 }
 
+/** Append a revision observation to the existing verification ledger, not another store. */
+export function recordKnowledgeReuseObservation(input: {
+  documentSnapshots: DeliveredKnowledgeRef[];
+  receiptId: string;
+  kind: KnowledgeReuseReceipt['kind'];
+  scope?: ScopeContext;
+  humanIntervention?: boolean;
+  at?: string;
+}): void {
+  if (!/^[a-f0-9]{64}$/.test(input.receiptId)) return;
+  const scope = input.scope ? assertMemoryScope(input.scope) : undefined;
+  try {
+    withLockSync('knowledge-verification:' + ledgerPath(scope), () => {
+      const entries = loadLedger(scope);
+      for (const ref of input.documentSnapshots) {
+        if (!validKnowledgeDeliverySnapshot(ref.snapshot) || !ref.snapshot.source_sha256) continue;
+        const receipt: KnowledgeReuseReceipt = {
+          receipt_id: input.receiptId,
+          source_sha256: ref.snapshot.source_sha256,
+          kind: input.kind,
+          ...(scope ? { scope } : {}),
+          at: input.at ?? nowIso(),
+          ...(input.humanIntervention !== undefined
+            ? { human_intervention: input.humanIntervention }
+            : {}),
+        };
+        if (!validKnowledgeReuseReceipt(receipt)) continue;
+        const entry = upsert(entries, ref.path);
+        const previous = (entry.reuse_receipts || []).filter(validKnowledgeReuseReceipt);
+        if (
+          previous.some(
+            (row) =>
+              row.receipt_id === receipt.receipt_id &&
+              row.kind === receipt.kind &&
+              row.source_sha256 === receipt.source_sha256
+          )
+        )
+          continue;
+        entry.reuse_receipts = [...previous, receipt].slice(-1000);
+      }
+      saveLedger(entries, scope);
+    });
+  } catch (error) {
+    logger.warn(
+      `[knowledge-reuse] observation not recorded — ${String(error)} | next: inspect feedback ledger`
+    );
+  }
+}
+
+/** Read only an explicitly selected scope and revision. Publication is not a successful run. */
+export function inspectKnowledgeReuse(input: {
+  documentPath: string;
+  sourceSha256: string;
+  scope?: ScopeContext;
+}): KnowledgeReuseSummary {
+  const scope = input.scope ? assertMemoryScope(input.scope) : undefined;
+  if (!/^[a-f0-9]{64}$/.test(input.sourceSha256))
+    throw new Error('[KNOWLEDGE_REUSE] Invalid revision digest');
+  const entry = loadLedger(scope, true).find((row) => row.document_path === input.documentPath);
+  if (entry?.reuse_receipts !== undefined && !Array.isArray(entry.reuse_receipts))
+    throw new Error('[KNOWLEDGE_REUSE] Invalid receipt list');
+  return summarizeKnowledgeReuse(entry?.reuse_receipts || [], input.sourceSha256, scope);
+}
+
 /**
  * Record that a run using these documents finished successfully. Fails open:
  * verification is telemetry and never blocks the task it describes.
@@ -176,6 +275,15 @@ export function recordKnowledgeVerifiedRun(
     withLockSync('knowledge-verification:' + ledgerPath(input.scope), () =>
       recordKnowledgeVerifiedRunUnlocked(input)
     );
+    // A worker report is explicitly weaker than an independent golden check.
+    if (input.receiptId && input.documentSnapshots)
+      recordKnowledgeReuseObservation({
+        documentSnapshots: input.documentSnapshots,
+        receiptId: input.receiptId,
+        kind: input.evidence === 'golden' ? 'verified' : 'worker_report_complete',
+        scope: input.scope,
+        at: input.at,
+      });
   } catch (error) {
     logger.warn(
       '[knowledge-verification] receipt lock unavailable — ' +
