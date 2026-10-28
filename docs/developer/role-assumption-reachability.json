@@ -3231,6 +3231,21 @@
       "unresolved": []
     },
     {
+      "site": "scripts/audit_mirror_reconcile.ts#runAuditMirrorReconciliation (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/audit_mirror_reconcile.ts#runAuditMirrorReconciliation (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/audit_mirror_reconcile.ts#runAuditMirrorReconciliation (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
+      "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/auto_checkpoint.ts#runAutoCheckpoint",
       "roles": ["mission_controller"],
       "unresolved": []
