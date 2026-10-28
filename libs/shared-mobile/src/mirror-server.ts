@@ -10,6 +10,8 @@ export interface MirrorServerOptions {
   frameSource: FrameSource;
   injector?: InputInjector;
   deviceLabel?: string;
+  /** Session token issued at start_screen_stream; required on every endpoint. */
+  token: string;
   fps?: number;
   port?: number;
 }
@@ -36,11 +38,20 @@ const MAX_CLIENT_BUFFER_BYTES = 8 * 1024 * 1024;
  * Loopback MJPEG mirror. An async capture loop (never overlapping, never
  * blocking the event loop) feeds every connected /stream.mjpeg client;
  * POST /tap injects a device-point coordinate through the platform
- * InputInjector. Read-only when no injector is supplied. Loopback only —
- * an unauthenticated input-injection path must never reach the network.
+ * InputInjector. Read-only when no injector is supplied.
+ *
+ * Security boundary: loopback alone is NOT sufficient — any local process or
+ * cross-origin browser page could otherwise watch the screen and inject
+ * taps without an individual approval. Every endpoint therefore requires
+ * the per-session token issued at stream start (via ?token= or the
+ * x-kyberion-mirror-token header), browser requests must present a loopback
+ * Origin / a same-site fetch-site header, and every tap is audit-logged
+ * through the governed logger so the trail matches actuator audit rules.
  */
 export function startMirrorServer(options: MirrorServerOptions): Promise<MirrorServerHandle> {
   const host = '127.0.0.1';
+  const token = options.token;
+  if (!token) throw new Error('mirror server requires a session token');
   const rawFps = options.fps ?? 3;
   const targetFps = Number.isFinite(rawFps) ? Math.min(Math.max(rawFps, 0.5), 10) : 3;
   const intervalMs = Math.round(1000 / targetFps);
@@ -100,8 +111,34 @@ export function startMirrorServer(options: MirrorServerOptions): Promise<MirrorS
   };
   timer = setTimeout(() => void tick(), 0);
 
+  const authorized = (req: http.IncomingMessage, url: URL): boolean => {
+    if (req.headers['x-kyberion-mirror-token'] === token) return true;
+    return url.searchParams.get('token') === token;
+  };
+  const browserOriginOk = (req: http.IncomingMessage): boolean => {
+    const origin = req.headers['origin'];
+    if (origin && !/^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/i.test(origin)) return false;
+    const fetchSite = req.headers['sec-fetch-site'];
+    if (fetchSite && !['same-origin', 'same-site', 'none'].includes(fetchSite.toLowerCase())) {
+      return false;
+    }
+    return true;
+  };
+  const deny = (res: http.ServerResponse, status: number, error: string): void => {
+    res.writeHead(status, { 'content-type': 'application/json' });
+    res.end(JSON.stringify({ error }));
+  };
+
   const server = http.createServer((req, res) => {
     const url = new URL(req.url ?? '/', `http://${host}`);
+    if (!authorized(req, url)) {
+      deny(res, 403, 'mirror session token required');
+      return;
+    }
+    if (!browserOriginOk(req)) {
+      deny(res, 403, 'cross-origin request rejected');
+      return;
+    }
     if (req.method === 'GET' && url.pathname === '/') {
       const body = renderViewerHtml({ deviceLabel, interactive: Boolean(injector) });
       res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
@@ -148,6 +185,11 @@ export function startMirrorServer(options: MirrorServerOptions): Promise<MirrorS
               throw new Error('tap requires finite numeric x and y');
             }
             await injector.tap(parsed.x, parsed.y);
+            // Mirror-session audit trail: each HTTP tap is a device input
+            // injection — log it like an actuator apply op.
+            logger.info(
+              `[SHARED_MOBILE] mirror tap injected on ${deviceLabel} at (${parsed.x}, ${parsed.y})`
+            );
             res.writeHead(200, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ ok: true, x: parsed.x, y: parsed.y }));
           } catch (error: unknown) {

@@ -2,6 +2,7 @@ import { logger } from '@agent/core/core';
 import { safeWriteFile, safeMkdir } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import * as path from 'node:path';
+import { randomBytes } from 'node:crypto';
 import { SimctlScreenshotSource, AdbScreencapSource, type FrameSource } from './frame-source.js';
 import { AxeInjector, AdbInjector, type InputInjector } from './input-injector.js';
 import { startMirrorServer } from './mirror-server.js';
@@ -61,11 +62,18 @@ async function main() {
     injector = noInput ? undefined : new AdbInjector({ serial });
   }
 
+  // Per-session token = the authorization grant for this mirror. It lives
+  // only in the state file (repo-local, user-readable) and must be presented
+  // on every endpoint — the start_screen_stream approval covers the holder
+  // of this token, not every process able to reach loopback.
+  const token = randomBytes(24).toString('hex');
+
   const handle = await startMirrorServer({
     frameSource,
     injector,
     fps,
     port,
+    token,
     deviceLabel: frameSource.label,
   });
 
@@ -80,8 +88,9 @@ async function main() {
           platform,
           device: frameSource.label,
           port: handle.port,
-          viewer_url: handle.viewerUrl,
-          stream_url: handle.streamUrl,
+          token,
+          viewer_url: `${handle.viewerUrl}?token=${token}`,
+          stream_url: `${handle.streamUrl}?token=${token}`,
           tap_enabled: Boolean(injector),
           started_at: new Date().toISOString(),
           ...handle.status(),
