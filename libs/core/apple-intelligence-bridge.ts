@@ -1,12 +1,24 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { normalizeAppleVisionResult, type AppleVisionResult } from './apple-vision-result.js';
+export {
+  normalizeAppleVisionResult,
+  type AppleVisionResult,
+  type AppleVisionLine,
+} from './apple-vision-result.js';
 import { resolveLocale } from './locale.js';
 import { localeToBcp47 } from './locale-normalize.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeStat,
+  safeRealpath,
+  validateFileSize,
+} from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import {
   getSpeechToTextBridges,
@@ -124,9 +136,20 @@ function defaultRunner(
   });
 }
 
-let runner: AfmRunner = defaultRunner;
+let injectedRunner: AfmRunner | null = null;
+const runner: AfmRunner = async (command, args, options) => {
+  try {
+    return await (injectedRunner ?? defaultRunner)(command, args, options);
+  } catch (error) {
+    return {
+      ok: false,
+      stdout: '',
+      stderr: error instanceof Error ? error.message : String(error),
+    };
+  }
+};
 export function setAfmRunnerForTests(customRunner: AfmRunner | null): void {
-  runner = customRunner || defaultRunner;
+  injectedRunner = customRunner;
 }
 
 function bridgeDisabledByEnv(): boolean {
@@ -154,7 +177,8 @@ function binaryIsFresh(): boolean {
   }
 }
 
-async function ensureAfmBinary(): Promise<string | null> {
+async function ensureAfmBinary(options: { deadlineAtMs?: number } = {}): Promise<string | null> {
+  if (options.deadlineAtMs !== undefined && Date.now() >= options.deadlineAtMs) return null;
   const binary = afmBinaryPath();
   if (binaryIsFresh()) return binary;
   const source = bridgeSourcePath();
@@ -168,17 +192,27 @@ async function ensureAfmBinary(): Promise<string | null> {
     );
     return null;
   }
+  const compileTimeoutMs =
+    options.deadlineAtMs === undefined
+      ? 120_000
+      : Math.min(120_000, options.deadlineAtMs - Date.now());
+  if (compileTimeoutMs <= 0) return null;
   const compile = await runner(
     'swiftc',
     [
       '-O',
+      // Deployment target 26.0: forces every macOS-27-only API behind an
+      // `#available(macOS 27.0, *)` guard at COMPILE time, so a 27.2 build
+      // can never silently ship a 27-only call that crashes 26 hosts.
+      '-target',
+      'arm64-apple-macos26.0',
       '-module-cache-path',
       pathResolver.rootResolve(SWIFT_MODULE_CACHE_DIR),
       source,
       '-o',
       binary,
     ],
-    { timeoutMs: 120_000 }
+    { timeoutMs: compileTimeoutMs }
   );
   if (!compile.ok) {
     logger.warn(`[apple-fm] swiftc compile failed: ${compile.stderr.slice(0, 300)}`);
@@ -214,6 +248,7 @@ export function _resetAppleIntelligenceAvailabilityCacheForTests(): void {
  * Safe to call from any platform.
  */
 export async function probeAppleIntelligence(): Promise<AppleIntelligenceAvailability> {
+  if (bridgeDisabledByEnv()) return { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
   if (cachedAvailability && Date.now() - cachedAvailability.checkedAt < AVAILABILITY_TTL_MS) {
     return cachedAvailability.value;
   }
@@ -243,6 +278,79 @@ async function probeUncached(): Promise<AppleIntelligenceAvailability> {
     // fall through to the stable unavailable result below
   }
   return { available: false, reason: `unparseable probe output: ${result.stdout.slice(0, 120)}` };
+}
+
+export interface AppleSpeechAvailability extends AppleIntelligenceAvailability {
+  locale: string;
+  asset_status: 'installed' | 'supported' | 'downloading' | 'unsupported' | 'unknown';
+}
+
+const cachedSpeechAvailability = new Map<
+  string,
+  { checkedAt: number; value: AppleSpeechAvailability }
+>();
+
+export function _resetAppleSpeechAvailabilityCacheForTests(): void {
+  cachedSpeechAvailability.clear();
+}
+
+export function normalizeAppleSpeechAvailability(
+  value: unknown
+): AppleSpeechAvailability | undefined {
+  const base = normalizeAppleIntelligenceAvailability(value);
+  if (
+    !base ||
+    !isRecord(value) ||
+    typeof value.locale !== 'string' ||
+    !value.locale.trim() ||
+    !['installed', 'supported', 'downloading', 'unsupported', 'unknown'].includes(
+      String(value.asset_status)
+    ) ||
+    (base.available && value.asset_status !== 'installed')
+  )
+    return undefined;
+  return {
+    ...base,
+    locale: value.locale,
+    asset_status: value.asset_status as AppleSpeechAvailability['asset_status'],
+  };
+}
+
+/** Locale and installed-asset readiness, independent of the Foundation Models text model.
+ * The native probe only reads Speech metadata; it never downloads or reserves assets.
+ */
+export async function probeAppleSpeechAvailability(
+  options: { locale?: string } = {}
+): Promise<AppleSpeechAvailability> {
+  const locale = resolveAppleSpeechLocale(options.locale);
+  const unavailable = (reason: string): AppleSpeechAvailability => ({
+    available: false,
+    locale,
+    asset_status: 'unknown',
+    reason,
+  });
+  if (bridgeDisabledByEnv()) return unavailable('disabled via KYBERION_APPLE_FM');
+  const cached = cachedSpeechAvailability.get(locale);
+  if (cached && Date.now() - cached.checkedAt < AVAILABILITY_TTL_MS) return cached.value;
+  let value: AppleSpeechAvailability;
+  if (!isAppleSilicon()) {
+    value = unavailable('requires Apple Silicon macOS');
+  } else {
+    const binary = await ensureAfmBinary();
+    if (!binary) {
+      value = unavailable('bridge binary unavailable (swiftc/source missing)');
+    } else {
+      const result = await runner(binary, ['speech-availability', '--locale', locale], {
+        timeoutMs: 30_000,
+      });
+      value = result.ok
+        ? (parseLastJsonLine(result.stdout, '{"available"', normalizeAppleSpeechAvailability) ??
+          unavailable('unparseable speech readiness response'))
+        : unavailable('speech readiness probe failed');
+    }
+  }
+  cachedSpeechAvailability.set(locale, { checkedAt: Date.now(), value });
+  return value;
 }
 
 export interface AppleFmPromptOptions {
@@ -299,33 +407,7 @@ export async function classifyLocallyWithAppleFm(
   );
   if (!response) return null;
   const normalized = response.trim().toLowerCase();
-  return categories.find((category) => normalized.includes(category.toLowerCase())) || null;
-}
-
-export interface AppleVisionResult {
-  /** OCR text (line-joined). */
-  text: string;
-  labels: Array<{ label: string; confidence: number }>;
-}
-
-export function normalizeAppleVisionResult(value: unknown): AppleVisionResult | undefined {
-  if (!isRecord(value) || typeof value.text !== 'string' || !Array.isArray(value.labels)) {
-    return undefined;
-  }
-  return {
-    text: value.text,
-    labels: value.labels.flatMap((entry) => {
-      if (
-        !isRecord(entry) ||
-        typeof entry.label !== 'string' ||
-        typeof entry.confidence !== 'number' ||
-        !Number.isFinite(entry.confidence)
-      ) {
-        return [];
-      }
-      return [{ label: entry.label, confidence: entry.confidence }];
-    }),
-  };
+  return categories.find((category) => normalized === category.toLowerCase()) || null;
 }
 
 function normalizeTextPayload(value: unknown): { text: string } | undefined {
@@ -343,15 +425,24 @@ function normalizeTextPayload(value: unknown): { text: string } | undefined {
  */
 export async function recognizeImageLocallyWithAppleVision(
   imagePath: string,
-  options: { timeoutMs?: number } = {}
+  options: { timeoutMs?: number; language?: string } = {}
 ): Promise<AppleVisionResult | null> {
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) return null;
+  const deadlineAtMs = Date.now() + timeoutMs;
   if (bridgeDisabledByEnv()) return null;
   if (!isAppleSilicon()) return null;
-  const binary = await ensureAfmBinary();
+  const authorizedImage = authorizeNativeInput(imagePath);
+  if (!authorizedImage) return null;
+  const binary = await ensureAfmBinary({ deadlineAtMs });
   if (!binary) return null;
-  const result = await runner(binary, ['vision', '--image', imagePath], {
-    timeoutMs: options.timeoutMs ?? 60_000,
-  });
+  const currentImage = authorizeNativeInput(authorizedImage);
+  if (!currentImage || currentImage !== authorizedImage) return null;
+  const args = ['vision', '--image', currentImage];
+  if (options.language) args.push('--language', options.language);
+  const remainingMs = deadlineAtMs - Date.now();
+  if (remainingMs <= 0) return null;
+  const result = await runner(binary, args, { timeoutMs: remainingMs });
   if (!result.ok) {
     logger.warn(`[apple-fm] vision failed: ${result.stderr.slice(0, 200)}`);
     return null;
@@ -477,6 +568,7 @@ export function _resetAppleImageGenerationAvailabilityCacheForTests(): void {
  * still unavailable because its image model is not enabled for the device.
  */
 export async function probeAppleImageGeneration(): Promise<AppleImageGenerationAvailability> {
+  if (bridgeDisabledByEnv()) return { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
   if (
     cachedImageGenerationAvailability &&
     Date.now() - cachedImageGenerationAvailability.checkedAt < AVAILABILITY_TTL_MS
@@ -602,15 +694,16 @@ export function createAppleSpeechToTextBridge(): SpeechToTextBridge {
  * KYBERION_STT_COMMAND always wins over the implicit local capability.
  */
 export async function installAppleSpeechToTextBridgeIfAvailable(): Promise<boolean> {
-  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'apple-speech')) return true;
+  if (bridgeDisabledByEnv()) return false;
   if (
     getRegisteredEnvText('KYBERION_STT_COMMAND')?.trim() ||
     getRegisteredEnvText('KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
   ) {
     return false;
   }
-  const availability = await probeAppleIntelligence();
+  const availability = await probeAppleSpeechAvailability();
   if (!availability.available) return false;
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'apple-speech')) return true;
   registerSpeechToTextBridge(createAppleSpeechToTextBridge(), {
     provenance: 'builtin',
     source: 'apple-intelligence-bridge',
@@ -662,4 +755,720 @@ export async function summarizeLocallyWithAppleFm(
     ].join('\n'),
     { timeoutMs: options.timeoutMs ?? 30_000 }
   );
+}
+
+// ---------------------------------------------------------------------------
+// macOS 27.2 Apple Intelligence developer lanes (version-gated matrix)
+//
+// `afm capabilities` reports one JSON matrix: OS version, model availability,
+// and per-lane flags. Lanes that need a LIVE probe (Image Playground, PCC)
+// report `null` and are resolved through their dedicated probes on demand.
+// Every helper below degrades to null/{available:false,reason} — callers
+// keep their existing path, per the probe-and-degrade contract.
+// ---------------------------------------------------------------------------
+
+export interface AppleOsVersion {
+  major: number;
+  minor: number;
+  patch: number;
+}
+
+export interface AppleFmLaneStates {
+  text: boolean;
+  vision_ocr: boolean;
+  speech: boolean;
+  /** null = needs the live imagine-availability probe. */
+  imagine: boolean | null;
+  multimodal: boolean;
+  dynamic_profiles: boolean;
+  /** null = needs the live pcc-availability probe. */
+  pcc: boolean | null;
+  coreai: boolean;
+  shortcuts: boolean;
+}
+
+export interface AppleIntelligenceCapabilities {
+  os: AppleOsVersion;
+  model_available: boolean;
+  model_reason?: string;
+  lanes: AppleFmLaneStates;
+  is_27_or_later: boolean;
+}
+
+function normalizeOsVersion(value: unknown): AppleOsVersion | undefined {
+  if (
+    !isRecord(value) ||
+    typeof value.major !== 'number' ||
+    typeof value.minor !== 'number' ||
+    typeof value.patch !== 'number'
+  ) {
+    return undefined;
+  }
+  return { major: value.major, minor: value.minor, patch: value.patch };
+}
+
+/**
+ * Strict normalizer for the `afm capabilities` matrix. Boolean lanes must be
+ * booleans; `imagine`/`pcc` may additionally be `null` (live-probe lanes).
+ * Anything else makes the whole matrix unparseable → undefined.
+ */
+export function normalizeAppleIntelligenceCapabilities(
+  value: unknown
+): AppleIntelligenceCapabilities | undefined {
+  if (!isRecord(value)) return undefined;
+  const os = normalizeOsVersion(value.os);
+  if (!os || !isRecord(value.lanes)) return undefined;
+  const lanes = value.lanes;
+  const requiredBooleanLanes = [
+    'text',
+    'vision_ocr',
+    'speech',
+    'multimodal',
+    'dynamic_profiles',
+    'coreai',
+    'shortcuts',
+  ] as const;
+  for (const lane of requiredBooleanLanes) {
+    if (typeof lanes[lane] !== 'boolean') return undefined;
+  }
+  const nullableLane = (name: 'imagine' | 'pcc'): boolean | null | undefined => {
+    const raw: unknown = lanes[name];
+    if (typeof raw === 'boolean') return raw;
+    if (raw === null) return null;
+    return undefined;
+  };
+  const imagine = nullableLane('imagine');
+  const pcc = nullableLane('pcc');
+  if (imagine === undefined || pcc === undefined) return undefined;
+  const modelAvailable = value.model;
+  const model_available =
+    isRecord(modelAvailable) && typeof modelAvailable.available === 'boolean'
+      ? modelAvailable.available
+      : false;
+  return {
+    os,
+    model_available,
+    ...(isRecord(modelAvailable) &&
+    typeof modelAvailable.reason === 'string' &&
+    modelAvailable.reason
+      ? { model_reason: modelAvailable.reason }
+      : {}),
+    lanes: {
+      text: lanes.text as boolean,
+      vision_ocr: lanes.vision_ocr as boolean,
+      speech: lanes.speech as boolean,
+      imagine,
+      multimodal: lanes.multimodal as boolean,
+      dynamic_profiles: lanes.dynamic_profiles as boolean,
+      pcc,
+      coreai: lanes.coreai as boolean,
+      shortcuts: lanes.shortcuts as boolean,
+    },
+    is_27_or_later: os.major >= 27,
+  };
+}
+
+let cachedCapabilities: { checkedAt: number; value: AppleIntelligenceCapabilities | null } | null =
+  null;
+
+export function _resetAppleIntelligenceCapabilitiesCacheForTests(): void {
+  cachedCapabilities = null;
+}
+
+/**
+ * Version-gated capability matrix from `afm capabilities`, cached 10 minutes.
+ * Returns null on any failure (platform, opt-out, toolchain, probe) — the
+ * same degrade contract as every other entry point.
+ */
+export async function probeAppleIntelligenceCapabilities(): Promise<AppleIntelligenceCapabilities | null> {
+  if (bridgeDisabledByEnv()) return null;
+  if (cachedCapabilities && Date.now() - cachedCapabilities.checkedAt < AVAILABILITY_TTL_MS) {
+    return cachedCapabilities.value;
+  }
+  let value: AppleIntelligenceCapabilities | null = null;
+  if (!bridgeDisabledByEnv() && isAppleSilicon()) {
+    const binary = await ensureAfmBinary();
+    if (binary) {
+      const result = await runner(binary, ['capabilities'], { timeoutMs: 30_000 });
+      if (result.ok) {
+        try {
+          value =
+            normalizeAppleIntelligenceCapabilities(
+              parseSafeJsonInput(result.stdout.trim(), 'Apple Intelligence capabilities response')
+            ) ?? null;
+        } catch {
+          value = null;
+        }
+      }
+    }
+  }
+  cachedCapabilities = { checkedAt: Date.now(), value };
+  return value;
+}
+
+export type AppleLaneKey =
+  | 'text'
+  | 'vision_ocr'
+  | 'speech'
+  | 'imagine'
+  | 'multimodal'
+  | 'dynamic_profiles'
+  | 'pcc'
+  | 'coreai'
+  | 'shortcuts'
+  | 'evaluations';
+
+export interface AppleLaneGate {
+  available: boolean;
+  reason?: string;
+}
+
+const LANE_UNAVAILABLE_REASONS: Partial<Record<AppleLaneKey, string>> = {
+  text: 'on-device model unavailable',
+  vision_ocr: 'Vision framework unavailable',
+  speech: 'on-device speech unavailable',
+  multimodal: 'multimodal prompting requires macOS 27+ with an available model',
+  dynamic_profiles: 'dynamic sessions require macOS 27+ with an available model',
+  coreai: 'Core AI requires macOS 27+',
+  shortcuts: 'Shortcuts CLI unavailable',
+};
+
+/**
+ * Gate for one capability lane. `imagine`/`pcc`/`evaluations` fall through to
+ * their dedicated live/compile probes; every other lane reads the cached
+ * capability matrix. Never throws — callers branch on `available`.
+ */
+export async function gateAppleLane(lane: AppleLaneKey): Promise<AppleLaneGate> {
+  if (bridgeDisabledByEnv()) return { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
+  if (!isAppleSilicon()) return { available: false, reason: 'requires Apple Silicon macOS' };
+  if (lane === 'speech') {
+    const probe = await probeAppleSpeechAvailability();
+    return probe.available
+      ? { available: true }
+      : { available: false, reason: probe.reason || 'Speech assets unavailable for this locale' };
+  }
+  if (lane === 'imagine') {
+    const probe = await probeAppleImageGeneration();
+    return probe.available
+      ? { available: true }
+      : { available: false, reason: probe.reason || 'Image Playground unavailable' };
+  }
+  if (lane === 'pcc') {
+    const probe = await probeApplePcc();
+    return probe.available
+      ? { available: true }
+      : { available: false, reason: probe.reason || 'Private Cloud Compute unavailable' };
+  }
+  if (lane === 'coreai') {
+    return probeAppleCoreAi();
+  }
+  if (lane === 'evaluations') {
+    const probe = await probeAppleEvaluations();
+    return probe.available
+      ? { available: true }
+      : { available: false, reason: probe.reason || 'Evaluations framework unavailable' };
+  }
+  const caps = await probeAppleIntelligenceCapabilities();
+  if (!caps) return { available: false, reason: 'capability matrix unavailable (probe failed)' };
+  const value = caps.lanes[lane as keyof AppleFmLaneStates];
+  if (value === true) return { available: true };
+  const baseReason = LANE_UNAVAILABLE_REASONS[lane] || `lane ${lane} unavailable`;
+  const reason =
+    caps.model_available || !caps.model_reason
+      ? baseReason
+      : `${baseReason} (${caps.model_reason})`;
+  return { available: false, reason };
+}
+
+// ----- multimodal prompting (macOS 27+) -----
+
+/**
+ * One image+text round trip on the on-device model (macOS 27+ multimodal
+ * prompting). Gated by the `multimodal` lane; returns null when the OS,
+ * model, or image makes the lane unusable — callers fall back to the Vision
+ * OCR lane (recognizeImageLocallyWithAppleVision) for text-only extraction.
+ */
+function authorizeNativeInput(filePath: string): string | null {
+  try {
+    const lexical = pathResolver.rootResolve(filePath);
+    validateFileSize(lexical, 512);
+    const resolved = safeRealpath(lexical);
+    // Validate content permission on both lexical and canonical paths before
+    // letting a native framework read outside the Node I/O boundary.
+    validateFileSize(resolved, 512);
+    if (!safeStat(resolved).isFile()) return null;
+    return resolved;
+  } catch {
+    return null;
+  }
+}
+
+export async function appleFmPromptWithImage(
+  promptText: string,
+  imagePath: string,
+  options: AppleFmPromptOptions = {}
+): Promise<string | null> {
+  const authorizedImage = authorizeNativeInput(imagePath);
+  if (!authorizedImage) return null;
+  const gate = await gateAppleLane('multimodal');
+  if (!gate.available) {
+    logger.warn(`[apple-fm] multimodal gated: ${gate.reason}`);
+    return null;
+  }
+  const binary = await ensureAfmBinary();
+  if (!binary) return null;
+  const timeoutMs = options.timeoutMs ?? 60_000;
+  const args = ['prompt', '--timeout', String(Math.ceil(timeoutMs / 1000))];
+  if (options.instructions) args.push('--instructions', options.instructions);
+  const currentImage = authorizeNativeInput(authorizedImage);
+  if (!currentImage || currentImage !== authorizedImage) return null;
+  args.push('--image', currentImage);
+  const result = await runner(binary, args, {
+    stdin: promptText,
+    timeoutMs: timeoutMs + 5_000,
+  });
+  if (!result.ok) {
+    logger.warn(`[apple-fm] multimodal prompt failed: ${result.stderr.slice(0, 200)}`);
+    return null;
+  }
+  const text = result.stdout.trim();
+  return text.length > 0 ? text : null;
+}
+
+// ----- dynamic sessions (macOS 27+ DynamicInstructions) -----
+
+export interface AppleFmSessionRequest {
+  prompt: string;
+  /** Replaces the session instructions for this request (DynamicInstructions). */
+  instructions?: string;
+  /** Vision tools the model may call for this request: ocr / barcode. */
+  tools?: Array<'ocr' | 'barcode'>;
+}
+
+export interface AppleFmSessionResponse {
+  index: number;
+  content?: string;
+  error?: string;
+}
+
+/**
+ * Run a sequence of requests through ONE session whose instructions and
+ * tools are switched per request (macOS 27+ dynamic sessions). Each request
+ * becomes one stdin JSONL line; each response is one stdout JSONL line.
+ * Returns null when the lane is gated or the run fails; returns [] only for
+ * an empty request list.
+ */
+export async function appleFmSessionRequests(
+  requests: AppleFmSessionRequest[],
+  options: { timeoutMs?: number } = {}
+): Promise<AppleFmSessionResponse[] | null> {
+  const gate = await gateAppleLane('dynamic_profiles');
+  if (!gate.available) {
+    logger.warn(`[apple-fm] session gated: ${gate.reason}`);
+    return null;
+  }
+  if (requests.length === 0) return [];
+  const binary = await ensureAfmBinary();
+  if (!binary) return null;
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  const stdinPayload =
+    requests
+      .map((request) => {
+        const wire: Record<string, unknown> = { prompt: request.prompt };
+        if (request.instructions) wire.instructions = request.instructions;
+        if (request.tools?.length) wire.tools = request.tools;
+        return JSON.stringify(wire);
+      })
+      .join('\n') + '\n';
+  const result = await runner(
+    binary,
+    ['session', '--timeout', String(Math.ceil(timeoutMs / 1000))],
+    {
+      stdin: stdinPayload,
+      timeoutMs: timeoutMs + 5_000,
+    }
+  );
+  if (!result.ok) {
+    logger.warn(`[apple-fm] session failed: ${result.stderr.slice(0, 200)}`);
+    return null;
+  }
+  const responses: AppleFmSessionResponse[] = [];
+  const seen = new Set<number>();
+  for (const rawLine of result.stdout.split('\n')) {
+    const line = rawLine.trim();
+    if (!line.startsWith('{')) continue; // framework loader noise
+    try {
+      const parsed = parseSafeJsonInput(line, 'Apple Intelligence session response');
+      if (isRecord(parsed) && typeof parsed.index === 'number') {
+        if (
+          !Number.isInteger(parsed.index) ||
+          parsed.index < 0 ||
+          parsed.index >= requests.length ||
+          seen.has(parsed.index) ||
+          (typeof parsed.content !== 'string' && typeof parsed.error !== 'string')
+        )
+          return null;
+        seen.add(parsed.index);
+        responses.push({
+          index: parsed.index,
+          ...(typeof parsed.content === 'string' ? { content: parsed.content } : {}),
+          ...(typeof parsed.error === 'string' ? { error: parsed.error } : {}),
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+  return responses.length === requests.length ? responses.sort((a, b) => a.index - b.index) : null;
+}
+
+// ----- Private Cloud Compute (AFM 3 Cloud) probe -----
+
+export interface ApplePccQuota {
+  limit_reached: boolean;
+  approaching: boolean | null;
+  reset_date: string | null;
+}
+
+export interface ApplePccProbe {
+  available: boolean;
+  class:
+    | 'available'
+    | 'device_not_eligible'
+    | 'system_not_ready'
+    | 'unavailable_other'
+    | 'os_too_old'
+    | 'unknown';
+  reason?: string;
+  quota?: ApplePccQuota | null;
+}
+
+const PCC_PROBE_CLASSES = new Set([
+  'available',
+  'device_not_eligible',
+  'system_not_ready',
+  'unavailable_other',
+  'os_too_old',
+]);
+
+export function normalizeApplePccProbe(value: unknown): ApplePccProbe | undefined {
+  if (!isRecord(value) || typeof value.available !== 'boolean') return undefined;
+  const cls =
+    typeof value.class === 'string' && PCC_PROBE_CLASSES.has(value.class)
+      ? value.class
+      : 'unavailable_other';
+  let quota: ApplePccQuota | null = null;
+  if (isRecord(value.quota) && typeof value.quota.limit_reached === 'boolean') {
+    quota = {
+      limit_reached: value.quota.limit_reached,
+      approaching: typeof value.quota.approaching === 'boolean' ? value.quota.approaching : null,
+      reset_date: typeof value.quota.reset_date === 'string' ? value.quota.reset_date : null,
+    };
+  }
+  return {
+    available: value.available,
+    class: cls as ApplePccProbe['class'],
+    ...(typeof value.reason === 'string' && value.reason ? { reason: value.reason } : {}),
+    quota,
+  };
+}
+
+let cachedPccProbe: { checkedAt: number; value: ApplePccProbe } | null = null;
+
+export function _resetApplePccProbeCacheForTests(): void {
+  cachedPccProbe = null;
+}
+
+/**
+ * Private Cloud Compute (server-side AFM) availability probe. Managed
+ * entitlements are the normal gate here — an `unavailable` result with a
+ * classified reason is the EXPECTED outcome on most devices, not an error.
+ */
+export async function probeApplePcc(): Promise<ApplePccProbe> {
+  if (bridgeDisabledByEnv())
+    return { available: false, class: 'unknown', reason: 'disabled via KYBERION_APPLE_FM' };
+  if (cachedPccProbe && Date.now() - cachedPccProbe.checkedAt < AVAILABILITY_TTL_MS) {
+    return cachedPccProbe.value;
+  }
+  let value: ApplePccProbe;
+  if (bridgeDisabledByEnv()) {
+    value = { available: false, class: 'unknown', reason: 'disabled via KYBERION_APPLE_FM' };
+  } else if (!isAppleSilicon()) {
+    value = {
+      available: false,
+      class: 'device_not_eligible',
+      reason: 'requires Apple Silicon macOS',
+    };
+  } else {
+    const binary = await ensureAfmBinary();
+    if (!binary) {
+      value = {
+        available: false,
+        class: 'unknown',
+        reason: 'bridge binary unavailable (swiftc/source missing)',
+      };
+    } else {
+      const result = await runner(binary, ['pcc-availability'], { timeoutMs: 45_000 });
+      if (!result.ok) {
+        value = {
+          available: false,
+          class: 'unknown',
+          reason: `probe failed: ${result.stderr.slice(0, 200)}`,
+        };
+      } else {
+        value = parseLastJsonLine(result.stdout, '{"available"', normalizeApplePccProbe) || {
+          available: false,
+          class: 'unknown',
+          reason: `unparseable probe output: ${result.stdout.slice(0, 120)}`,
+        };
+      }
+    }
+  }
+  cachedPccProbe = { checkedAt: Date.now(), value };
+  return value;
+}
+
+// ----- Core AI lane (macOS 27+) -----
+
+export interface AppleCoreAiAvailability {
+  available: boolean;
+  reason?: string;
+}
+
+export function normalizeAppleCoreAiAvailability(
+  value: unknown
+): AppleCoreAiAvailability | undefined {
+  return normalizeAppleIntelligenceAvailability(value);
+}
+
+let cachedCoreAiAvailability: { checkedAt: number; value: AppleCoreAiAvailability } | null = null;
+
+export function _resetAppleCoreAiAvailabilityCacheForTests(): void {
+  cachedCoreAiAvailability = null;
+}
+
+/** Core AI framework availability (macOS 27+; dlopen probe on the Swift side). */
+export async function probeAppleCoreAi(): Promise<AppleCoreAiAvailability> {
+  if (bridgeDisabledByEnv()) return { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
+  if (
+    cachedCoreAiAvailability &&
+    Date.now() - cachedCoreAiAvailability.checkedAt < AVAILABILITY_TTL_MS
+  ) {
+    return cachedCoreAiAvailability.value;
+  }
+  let value: AppleCoreAiAvailability;
+  if (bridgeDisabledByEnv()) {
+    value = { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
+  } else if (!isAppleSilicon()) {
+    value = { available: false, reason: 'requires Apple Silicon macOS' };
+  } else {
+    const binary = await ensureAfmBinary();
+    if (!binary) {
+      value = { available: false, reason: 'bridge binary unavailable (swiftc/source missing)' };
+    } else {
+      const result = await runner(binary, ['coreai-availability'], { timeoutMs: 30_000 });
+      if (!result.ok) {
+        value = { available: false, reason: `probe failed: ${result.stderr.slice(0, 200)}` };
+      } else {
+        value = parseLastJsonLine(
+          result.stdout,
+          '{"available"',
+          normalizeAppleCoreAiAvailability
+        ) || {
+          available: false,
+          reason: `unparseable probe output: ${result.stdout.slice(0, 120)}`,
+        };
+      }
+    }
+  }
+  cachedCoreAiAvailability = { checkedAt: Date.now(), value };
+  return value;
+}
+
+export interface AppleCoreAiTensor {
+  shape: number[];
+  values: number[];
+}
+
+/**
+ * Run one inference function of a user-supplied .aimodel asset through Core
+ * AI (macOS 27+). Float32 NDArray inputs ride as
+ * `{"<name>":{"shape":[...],"values":[floats]}}`; the requested output comes
+ * back as `{"<name>":[floats]}`. Gated by the `coreai` lane; null on any
+ * failure (asset missing, function missing, OS gate) with the reason logged.
+ */
+export async function appleCoreAiRun(
+  assetPath: string,
+  functionName: string,
+  inputs: Record<string, AppleCoreAiTensor>,
+  outputName: string,
+  options: { timeoutMs?: number } = {}
+): Promise<Record<string, number[]> | null> {
+  const authorizedAsset = authorizeNativeInput(assetPath);
+  if (!authorizedAsset) return null;
+  for (const tensor of Object.values(inputs)) {
+    if (!isRecord(tensor) || !Array.isArray(tensor.shape) || !Array.isArray(tensor.values))
+      return null;
+    if (!tensor.shape.every((dimension) => Number.isSafeInteger(dimension) && dimension > 0))
+      return null;
+    const count = tensor.shape.reduce((product, dimension) => product * dimension, 1);
+    if (
+      !Number.isSafeInteger(count) ||
+      count !== tensor.values.length ||
+      !tensor.values.every(
+        (value) =>
+          typeof value === 'number' &&
+          Number.isFinite(value) &&
+          Math.abs(value) <= 3.4028234663852886e38
+      )
+    )
+      return null;
+  }
+  const gate = await gateAppleLane('coreai');
+  if (!gate.available) {
+    logger.warn(`[apple-fm] coreai gated: ${gate.reason}`);
+    return null;
+  }
+  const binary = await ensureAfmBinary();
+  if (!binary) return null;
+  const timeoutMs = options.timeoutMs ?? 300_000;
+  const currentAsset = authorizeNativeInput(authorizedAsset);
+  if (!currentAsset || currentAsset !== authorizedAsset) return null;
+  const result = await runner(
+    binary,
+    [
+      'coreai',
+      'run',
+      '--asset',
+      currentAsset,
+      '--function',
+      functionName,
+      '--inputs',
+      JSON.stringify(inputs),
+      '--output',
+      outputName,
+      '--timeout',
+      String(Math.ceil(timeoutMs / 1000)),
+    ],
+    { timeoutMs: timeoutMs + 5_000 }
+  );
+  if (!result.ok) {
+    logger.warn(`[apple-fm] coreai run failed: ${result.stderr.slice(0, 200)}`);
+    return null;
+  }
+  for (let index = result.stdout.split('\n').length - 1; index >= 0; index -= 1) {
+    const line = result.stdout.split('\n')[index].trim();
+    if (!line.startsWith('{')) continue;
+    try {
+      const parsed = parseSafeJsonInput(line, 'Apple Core AI response');
+      if (
+        isRecord(parsed) &&
+        typeof parsed[outputName] !== 'undefined' &&
+        Array.isArray(parsed[outputName]) &&
+        parsed[outputName].every((v) => typeof v === 'number' && Number.isFinite(v))
+      ) {
+        return { [outputName]: parsed[outputName] as number[] };
+      }
+    } catch {
+      continue;
+    }
+  }
+  logger.warn(`[apple-fm] coreai output unparseable: ${result.stdout.slice(0, 120)}`);
+  return null;
+}
+
+// ----- Evaluations lane (macOS 27+; toolchain-gated scaffold) -----
+
+let cachedEvaluationsProbe: { checkedAt: number; value: AppleIntelligenceAvailability } | null =
+  null;
+
+export function _resetAppleEvaluationsProbeCacheForTests(): void {
+  cachedEvaluationsProbe = null;
+}
+
+/**
+ * Evaluations framework probe. The framework is NOT bundled in every Xcode
+ * 27 toolchain (Xcode 27.1: absent — compile probe evidence in the mission
+ * ledger), so availability is decided by a one-shot `import Evaluations`
+ * compile probe, cached for the process lifetime (a toolchain does not
+ * change under a running process).
+ */
+export async function probeAppleEvaluations(): Promise<AppleIntelligenceAvailability> {
+  if (bridgeDisabledByEnv()) return { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
+  if (
+    cachedEvaluationsProbe &&
+    Date.now() - cachedEvaluationsProbe.checkedAt < AVAILABILITY_TTL_MS
+  ) {
+    return cachedEvaluationsProbe.value;
+  }
+  let value: AppleIntelligenceAvailability;
+  if (bridgeDisabledByEnv()) {
+    value = { available: false, reason: 'disabled via KYBERION_APPLE_FM' };
+  } else if (!isAppleSilicon()) {
+    value = { available: false, reason: 'requires Apple Silicon macOS' };
+  } else {
+    const caps = await probeAppleIntelligenceCapabilities();
+    if (!caps || caps.os.major < 27) {
+      value = { available: false, reason: 'requires macOS 27+' };
+    } else {
+      try {
+        const workDir = pathResolver.rootResolve(SWIFT_MODULE_CACHE_DIR);
+        safeMkdir(workDir, { recursive: true });
+        const probeSource = path.join(workDir, 'evaluations-probe.swift');
+        safeWriteFile(probeSource, 'import Evaluations\n', { encoding: 'utf8' });
+        const compile = await runner(
+          'swiftc',
+          [
+            '-module-cache-path',
+            workDir,
+            probeSource,
+            '-o',
+            path.join(workDir, 'evaluations-probe-out'),
+          ],
+          { timeoutMs: 120_000 }
+        );
+        value = compile.ok
+          ? {
+              available: false,
+              reason: 'Evaluations runner is not implemented in this toolchain bridge',
+            }
+          : {
+              available: false,
+              reason:
+                'Evaluations framework not present in this Xcode toolchain (compile probe failed)',
+            };
+      } catch (err) {
+        value = {
+          available: false,
+          reason: `compile probe failed: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    }
+  }
+  cachedEvaluationsProbe = { checkedAt: Date.now(), value };
+  return value;
+}
+
+/**
+ * Evaluations lane (R8) — GATED SCAFFOLD. The framework ships separately
+ * from FoundationModels and is absent from the Xcode 27.1 toolchain on this
+ * machine. `probeAppleEvaluations()` detects the moment a toolchain provides
+ * it; until then this entry point degrades with the explicit reason instead
+ * of pretending to evaluate. The Swift runner subcommand lands with the
+ * toolchain that ships the framework.
+ */
+export async function appleFmEvaluate(
+  datasetPath: string,
+  options: { timeoutMs?: number } = {}
+): Promise<{ status: 'unavailable'; reason: string } | null> {
+  void options;
+  const gate = await gateAppleLane('evaluations');
+  if (gate.available) {
+    return {
+      status: 'unavailable',
+      reason: `Evaluations framework probe passed but the afm runner subcommand is not implemented yet (dataset: ${datasetPath})`,
+    };
+  }
+  logger.warn(`[apple-fm] evaluate gated: ${gate.reason} (dataset: ${datasetPath})`);
+  return null;
 }

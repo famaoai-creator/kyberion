@@ -6,7 +6,7 @@ authority: reference
 phase: [alignment, execution]
 tags: [apple-intelligence, macos, vision, voice, computer-use, governance]
 owner: ecosystem_architect
-last_updated: 2026-10-05
+last_updated: 2026-10-29
 ---
 
 # Apple Intelligence Native Capability Bridge
@@ -172,4 +172,90 @@ Lane status (2026-07-09):
   emits PNG artifacts and falls back to local FLUX/ComfyUI when the Image
   Playground model is not enabled. The low-level helper still returns null on
   unsupported devices so non-generation callers keep their existing path.
-- **App Intents** — future lane; must go through the approval gate.
+- **App Intents** — see the governed Shortcuts operations below.
+
+## macOS 27 capability bridge integration (2026-10-29)
+
+The bridge exposes `probeAppleIntelligenceCapabilities()` to report OS version,
+local model availability, and version-gated lanes. `pnpm kyberion doctor` and
+`pnpm check:apple-fm` display this matrix even when the text model is unavailable.
+A matrix flag describes a lane prerequisite; it is not proof that an end-to-end
+operation or its required assets are ready. Image Playground and PCC retain
+separate live probes. Neither diagnostic automatically probes PCC: cloud access
+requires an explicit opt-in. `KYBERION_APPLE_FM=0` disables bridge use.
+
+The bridge includes image-prompt, dynamic-session, PCC and Core AI helpers.
+Native compile and round-trip evidence is recorded separately in the mission;
+mock-based tests alone do not establish device readiness. Core AI accepts a
+normal-file `.aimodel` asset; package directories are outside the supported asset contract, and actual model inference
+has not been verified. The live Evaluations compile probe found the framework
+unavailable in this SDK. Evaluations remains a gated scaffold: detecting an
+importable framework does not implement dataset evaluation.
+
+The system actuator exposes
+`apple_capabilities` for the local capability matrix and `ask_screen` for
+screenshot-to-multimodal questions, reusing the existing screenshot observation
+path. Their registration, schemas and controlled handler tests are part of the
+integration; a real screen-capture round trip has not been run.
+
+The `list_shortcuts` and `run_shortcut` operations require an active tenant.
+Execution requires a human-only approval, expiring after 15 minutes, bound to the
+exact shortcut name, input digest, tenant and timeout. The approval draft shows
+the input so the human can inspect what they authorize. The approval is consumed
+before launch; an audit receipt records the outcome, and confidential input
+scratch files are cleaned up. Focused combined handler and bridge tests passed
+94 cases using controlled runners. No real shortcut listing, shortcut execution
+or screen capture was performed by those tests. The capability matrix does not
+authorize cloud egress, screen capture or actions.
+
+### Integration lessons and verification boundaries
+
+An OS version check protects execution, while an SDK capability check protects
+compilation. New framework imports and symbols need compile-time guards as well
+as runtime availability checks so an optional lane does not disable older local
+lanes. Verify both the native compile target and the emitted framework linkage;
+a successful build against the current SDK with a macOS 26 deployment target
+does not establish compatibility with a macOS 26 SDK that was not tested.
+
+Keep capability discovery, operation readiness and authority separate. A live
+framework probe may confirm installation while an operation still lacks model
+assets or implementation. It must remain unavailable in that state. A cloud
+probe does not grant permission to send data; a screen-question helper does not
+grant screen-recording access; and finding a shortcut does not authorize its
+execution. Session requests use one overall deadline rather than advertising an
+unimplemented deadline for each request.
+
+## Shared perception integration (2026-10-29)
+
+The normal OCR provider can reuse the compiled native Vision bridge where it is
+supported, retaining line confidence and normalized bounding boxes for redaction.
+The legacy OCR path remains the fallback for unsupported hosts or toolchains.
+This avoids repeatedly interpreting Swift for each image: the public Concierge
+screenshot previously hit the legacy provider's 15-second startup deadline,
+while the cached native bridge returned readable Japanese text.
+
+Generative Apple image description remains an explicitly selected experimental
+provider. It is not the default for detailed descriptions or dirty-tile screen
+state: a real test incorrectly described a no-pending-decisions screen as a
+processing error. OCR grounding alone did not consistently prevent invented UI
+facts. Successful invocation and provider selection are not quality evidence.
+The configured reasoning vision backend remains the default for those tasks.
+
+Dirty-tile source-path tier and caller-declared tier are combined conservatively
+before temporary files are created. Nonpublic work/state directories must retain
+the source tier and tenant. Default perception entrypoints authorize the original
+content before preparation or provider selection; a redacted public copy cannot
+lower the source tier. Policy or redaction errors stop inference.
+
+Speech registration uses a dedicated locale/asset readiness probe instead of
+FoundationModels text availability. The probe never downloads assets. Explicit
+STT commands retain precedence, and unavailable SpeechAnalyzer assets leave the
+existing fallback in place. On this macOS 27.2 host, Japanese and English are
+supported but their SpeechAnalyzer assets are not installed. Doctor and the
+Apple check command display that state independently of the text model.
+
+The text classification helper accepts only an exact supplied category label;
+refusals and sentences containing a category do not become execution decisions.
+Automatic surface reply rewriting remains a future integration: cold compilation
+and probe latency need a total budget, and confirmation questions and approval
+metadata must survive any presentation rewrite.

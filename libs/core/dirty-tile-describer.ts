@@ -1,16 +1,28 @@
 import { randomUUID } from 'node:crypto';
+import { KNOWLEDGE_TIER_RANK } from './foundation/knowledge-tier.js';
 import path from 'node:path';
+import { classifyStorageFloorPath } from './storage-layout.js';
+import { resolveProjectScope } from './foundation/project-scope-env.js';
 import { Jimp } from 'jimp';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { dhashRegion, hamming } from './media/image-dhash.js';
 import {
   createReasoningVisionDescribeFn,
+  inferImagePayloadTier,
   type DescribeFn,
   type PayloadTier,
 } from './media/image-description-bridge.js';
 import { assertVolatileId, pathResolver } from './path-resolver.js';
 import { redactScreenCaptureFile } from './virtual/screen-frame-redaction.js';
-import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+  safeRealpath,
+  validateFileSize,
+} from './secure-io.js';
 
 /**
  * Dirty-tile screen description.
@@ -58,7 +70,7 @@ export interface DescribeScreenDeltaInput {
 export type RedactFn = (inputPath: string, outputPath: string) => Promise<void>;
 
 export interface DirtyTileDescriberDeps {
-  /** Defaults to the reasoning backend's vision channel. */
+  /** Defaults to the configured reasoning backend; native caption accuracy is not established. */
   describe?: DescribeFn;
   /** Must write a redacted copy to outputPath; may consume inputPath. */
   redact?: RedactFn;
@@ -229,6 +241,67 @@ function readImageBuffer(filePath: string): Buffer {
   return Buffer.isBuffer(payload) ? payload : Buffer.from(payload);
 }
 
+async function requireSourceTenant(
+  sourcePaths: string[],
+  declaredTenant?: string
+): Promise<string | undefined> {
+  const activeTenant = resolveProjectScope().tenantSlug;
+  if (declaredTenant && activeTenant && declaredTenant !== activeTenant)
+    throw new Error('[VISION_TIER_SCOPE] declared tenant differs from the active tenant');
+  const tenant = declaredTenant ?? activeTenant;
+  let sourceOwner: string | undefined;
+  for (const candidate of sourcePaths) {
+    const partition = classifyStorageFloorPath(candidate)?.partition;
+    const owner =
+      partition?.kind === 'tier'
+        ? partition.tenant
+        : (await import('./video/ingest/video-brief.js')).tenantOfPath(candidate);
+    if (!owner) continue;
+    if (sourceOwner && sourceOwner !== owner)
+      throw new Error('[VISION_TIER_SCOPE] lexical and canonical source tenants differ');
+    sourceOwner = owner;
+  }
+  if (sourceOwner && tenant !== sourceOwner)
+    throw new Error(
+      '[VISION_TIER_SCOPE] tenant-owned source requires its matching active or declared tenant'
+    );
+  return tenant;
+}
+
+async function requireScopedTileDirs(
+  tier: PayloadTier,
+  deps: DirtyTileDescriberDeps,
+  declaredTenant?: string
+): Promise<void> {
+  if (tier === 'public') return;
+  const activeTenant = resolveProjectScope().tenantSlug;
+  if (declaredTenant && activeTenant && declaredTenant !== activeTenant)
+    throw new Error('[VISION_TIER_SCOPE] declared tenant differs from the active tenant');
+  const tenant = declaredTenant ?? activeTenant;
+  for (const directory of [deps.work_dir, deps.state_dir]) {
+    if (!directory)
+      throw new Error(
+        `[VISION_TIER_SCOPE] ${tier} screen delta needs a scoped work_dir and state_dir`
+      );
+    const lexical = pathResolver.rootResolve(directory);
+    for (const candidate of [lexical, safeRealpath(lexical)]) {
+      if (KNOWLEDGE_TIER_RANK[inferImagePayloadTier(candidate)] < KNOWLEDGE_TIER_RANK[tier])
+        throw new Error(
+          '[VISION_TIER_SCOPE] tile work and state directories cannot lower source sensitivity'
+        );
+      const partition = classifyStorageFloorPath(candidate)?.partition;
+      if (tenant) {
+        const owner =
+          partition?.kind === 'tier'
+            ? partition.tenant
+            : (await import('./video/ingest/video-brief.js')).tenantOfPath(candidate);
+        if (owner !== tenant)
+          throw new Error('[VISION_TIER_SCOPE] tile directory belongs to a different tenant');
+      }
+    }
+  }
+}
+
 export async function describeScreenDelta(
   input: DescribeScreenDeltaInput,
   deps: DirtyTileDescriberDeps = {}
@@ -237,23 +310,32 @@ export async function describeScreenDelta(
     throw new Error('[SCREEN_DELTA_INVALID] session_id is required');
   }
   const sessionId = requireSessionId(input.session_id);
-  const tier: PayloadTier = input.tier ?? 'public';
-  if (tier !== 'public' && (!deps.work_dir || !deps.state_dir)) {
-    throw new Error(
-      `[VISION_TIER_SCOPE] ${tier} screen delta needs a mission-local work_dir and state_dir`
-    );
-  }
+  const inferredTier = inferImagePayloadTier(pathResolver.rootResolve(input.path));
+  let tier: PayloadTier =
+    input.tier && KNOWLEDGE_TIER_RANK[input.tier] > KNOWLEDGE_TIER_RANK[inferredTier]
+      ? input.tier
+      : inferredTier;
+  await requireScopedTileDirs(tier, deps, input.tenant_slug);
+  // Pin the source before reading, and retain the canonical target's tier too.
+  validateFileSize(input.path, 512);
+  const sourcePath = safeRealpath(input.path);
+  const tenant = await requireSourceTenant(
+    [pathResolver.rootResolve(input.path), sourcePath],
+    input.tenant_slug
+  );
+  const canonicalTier = inferImagePayloadTier(sourcePath);
+  if (KNOWLEDGE_TIER_RANK[canonicalTier] > KNOWLEDGE_TIER_RANK[tier]) tier = canonicalTier;
+  await requireScopedTileDirs(tier, deps, tenant);
   const budget = positiveInt(
     input.max_describe_per_call ?? DEFAULT_MAX_DESCRIBE_PER_CALL,
     'max_describe_per_call',
     MAX_TILES
   );
   const now = deps.now ?? Date.now;
-  const describe =
-    deps.describe ?? createReasoningVisionDescribeFn({ tier, tenant_slug: input.tenant_slug });
+  const describe = deps.describe ?? createReasoningVisionDescribeFn({ tier, tenant_slug: tenant });
   const redact = deps.redact ?? redactScreenCaptureFile;
 
-  const sourceBuffer = readImageBuffer(input.path);
+  const sourceBuffer = readImageBuffer(sourcePath);
   const source = await Jimp.read(sourceBuffer);
   const image = { width: source.bitmap.width, height: source.bitmap.height };
   const grid = resolveTileGrid(image, input);

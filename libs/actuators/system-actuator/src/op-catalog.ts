@@ -3,6 +3,9 @@ import { withCatalogInputContract } from '@agent/core/actuator/actuator-sdk';
 import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
+  'apple_capabilities',
+  'list_shortcuts',
+  'ask_screen',
   'screenshot',
   'record_screen',
   'record_audio',
@@ -57,6 +60,7 @@ export const SYSTEM_ACTUATOR_CAPTURE_OPS = [
 ] as const;
 
 export const SYSTEM_ACTUATOR_APPLY_OPS = [
+  'run_shortcut',
   'standard_pr_lifecycle',
   'provider_preflight',
   'scroll',
@@ -109,6 +113,42 @@ export interface SystemOpSpec {
 }
 
 const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
+  list_shortcuts: {
+    type: 'object',
+    properties: { export_as: { type: 'string' } },
+    additionalProperties: false,
+  },
+  run_shortcut: {
+    type: 'object',
+    properties: {
+      name: { type: 'string', minLength: 1 },
+      input: { type: 'string', maxLength: 1048576 },
+      approval_request_id: { type: 'string' },
+      timeout_ms: { type: 'number', minimum: 1, maximum: 300000 },
+      export_as: { type: 'string' },
+    },
+    required: ['name'],
+    additionalProperties: false,
+  },
+  apple_capabilities: {
+    type: 'object',
+    properties: { export_as: { type: 'string' } },
+    additionalProperties: false,
+  },
+  ask_screen: {
+    type: 'object',
+    properties: {
+      question: { type: 'string', minLength: 1 },
+      application: { type: 'string' },
+      capture_mode: { enum: ['screen', 'focused_window'] },
+      window_title: { type: 'string' },
+      window_match_policy: { enum: ['strict', 'prefix', 'contains'] },
+      timeout_ms: { type: 'number', minimum: 1, maximum: 300000 },
+      export_as: { type: 'string' },
+    },
+    required: ['question'],
+    additionalProperties: false,
+  },
   screenshot: {
     type: 'object',
     properties: {
@@ -601,6 +641,10 @@ const SYSTEM_EXTRA_CONTRACTS: Record<string, SystemOpSpec['input_schema']> = {
 };
 
 const SYSTEM_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
+  apple_capabilities: [{}],
+  list_shortcuts: [{}],
+  run_shortcut: [{ name: 'Example shortcut' }],
+  ask_screen: [{ question: 'Summarize the visible screen.' }],
   screenshot: [{ export_as: 'screenshot_path' }],
   window_list: [{ export_as: 'windows' }],
   chrome_tab_list: [{ export_as: 'tabs' }],
