@@ -5,6 +5,7 @@ import { safeWriteFile, safeExistsSync } from '../secure-io.js';
 import { logger } from '../core.js';
 import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { matchesCron, hasMissedCronOccurrence, sameZonedMinute } from './cron-utils.js';
 
 // ---------------------------------------------------------------------------
@@ -67,7 +68,7 @@ export interface PipelineSchedulerOptions {
 // Constants
 // ---------------------------------------------------------------------------
 
-const REGISTRY_PATH = 'active/shared/runtime/pipeline-schedules.json';
+const REGISTRY_PATH = runtimeStatePath('pipeline.scheduleRegistry').physicalPath;
 const REGISTRY_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/pipeline-schedule-registry.schema.json'
 );
@@ -75,7 +76,7 @@ const DEFAULT_RUN_LOCK_TTL_MS = 15 * 60 * 1000;
 
 function registryPath(options: PipelineSchedulerOptions = {}): string {
   return options.rootDir
-    ? path.join(options.rootDir, 'active/shared/runtime/pipeline-schedules.json')
+    ? path.join(options.rootDir, REGISTRY_PATH)
     : pathResolver.rootResolve(REGISTRY_PATH);
 }
 

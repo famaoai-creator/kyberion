@@ -14,6 +14,7 @@ import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { readTextFile } from '../foundation/text.js';
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { assertMemoryScope } from '../knowledge/memory-scope.js';
 import {
   loadDistillCandidateRecord,
@@ -127,7 +128,7 @@ function retentionReferences(scope?: MemoryScopeEnvelope): {
   const roots = [
     'pipelines',
     'knowledge/product/pipeline-templates',
-    'active/shared/runtime/pipeline-schedules.json',
+    runtimeStatePath('pipeline.scheduleRegistry').physicalPath,
     'knowledge/product/orchestration/procedures.json',
   ];
   if (scope) {

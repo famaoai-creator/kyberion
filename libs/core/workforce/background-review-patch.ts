@@ -23,6 +23,7 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
+import { writeJson } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { validatePipelineGuardrails } from '../pipeline/adf-guardrails.js';
 import { validatePipelineAdf } from '../pipeline/pipeline-contract.js';
@@ -1021,24 +1022,17 @@ export function rollbackBackgroundReviewPatch(
         allowMissingLeaf: true,
       });
       safeMkdir(path.dirname(backupPath), { recursive: true });
-      safeWriteFile(
-        backupPath,
-        JSON.stringify(
-          {
-            version: 1,
-            candidate_id: input.candidateId,
-            target_ref: preview.targetRef,
-            before_sha256: preview.expectedSha256,
-            after_sha256: sha256(material.content),
-            original_content: readTextFile(material.target.absolute),
-            approval_ref: input.approvalRef,
-            approved_by: input.approvedBy,
-            backed_up_at: nowIso(),
-          },
-          null,
-          2
-        ) + '\n'
-      );
+      writeJson(backupPath, {
+        version: 1,
+        candidate_id: input.candidateId,
+        target_ref: preview.targetRef,
+        before_sha256: preview.expectedSha256,
+        after_sha256: sha256(material.content),
+        original_content: readTextFile(material.target.absolute),
+        approval_ref: input.approvalRef,
+        approved_by: input.approvedBy,
+        backed_up_at: nowIso(),
+      });
       // Check under the same writer lock immediately before restoring.
       if (sha256(readTextFile(material.target.absolute)) !== preview.expectedSha256)
         throw new Error('[POLICY_VIOLATION] Target changed during rollback');
