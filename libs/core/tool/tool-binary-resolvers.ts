@@ -86,6 +86,11 @@ export function resolveXcrunBin(): string {
   return resolveExternalToolBin('xcrun', ['KYBERION_XCRUN_BIN'], 'xcrun');
 }
 
+/** AXe — SimulatorKit HID input injector for iOS simulators (iOS 26-safe). */
+export function resolveAxeBin(): string {
+  return resolveExternalToolBin('axe', ['KYBERION_AXE_BIN'], 'axe');
+}
+
 export function resolveXcodebuildBin(): string {
   return resolveExternalToolBin('xcodebuild', ['KYBERION_XCODEBUILD_BIN'], 'xcodebuild');
 }
