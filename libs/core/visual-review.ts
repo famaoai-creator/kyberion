@@ -351,6 +351,7 @@ export async function runVisualReview(input: RunVisualReviewInput): Promise<Visu
         tier: payloadTier,
         tenant_slug: input.scope.tenant_id,
         purpose: 'media visual review',
+        attachment_count: input.images.length,
       },
       () => critique!(prompt, input.images)
     );

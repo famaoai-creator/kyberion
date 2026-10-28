@@ -479,7 +479,12 @@ export async function generateVideoMotionDirection(
         return String(await getReasoningBackend().prompt(p));
       });
     const rawReply = await withReasoningPayloadScope(
-      input.scope ?? { tier: 'public', purpose: 'video motion direction' },
+      {
+        ...input.scope,
+        tier: input.scope?.tier ?? 'public',
+        purpose: input.scope?.purpose ?? 'video motion direction',
+        attachment_count: 0,
+      },
       () => generate(prompt)
     );
     const jsonText = rawReply.slice(rawReply.indexOf('{'), rawReply.lastIndexOf('}') + 1);

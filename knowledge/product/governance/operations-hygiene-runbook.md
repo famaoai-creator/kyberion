@@ -796,6 +796,8 @@ Legacy unscoped candidates retain their existing storage compatibility; this doe
 
 ## §7 LLM and provider calls
 
+**Explicit attachment facts.** Under an explicitly processor-scoped charter, the trusted send boundary supplies a non-negative integer `attachment_count`. Text-only leaf calls declare zero; image calls declare the number of outgoing images. Missing facts fail closed rather than implying zero. Generic task/pipeline envelopes must not invent a count before the concrete payload is known. When adding a processor scope, cover missing, negative and fractional counts and preserve task backend/egress restrictions. Gates: `reasoning-egress-scope.test.ts`, `media/image-description-bridge.test.ts` and `visual-review.test.ts`.
+
 **Host bookkeeping inside advisory execution.** A dot wake may stop before the provider call with
 `SANDBOX_WRITE_DENIED` on `observability/delegations.jsonl`: the planner's read-only sandbox also
 covers the host's delegation trace. Keep the planner sandbox in place. Serialize and validate

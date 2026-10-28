@@ -269,7 +269,12 @@ export async function generateVideoVisualDirection(
         return String(await getReasoningBackend().prompt(p));
       });
     const raw = await withReasoningPayloadScope(
-      input.scope ?? { tier: 'public', purpose: 'video visual direction' },
+      {
+        ...input.scope,
+        tier: input.scope?.tier ?? 'public',
+        purpose: input.scope?.purpose ?? 'video visual direction',
+        attachment_count: 0,
+      },
       () => generate(prompt)
     );
     const jsonText = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);

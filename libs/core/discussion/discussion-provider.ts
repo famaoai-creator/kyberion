@@ -155,6 +155,7 @@ export class DiscussionProviderSession {
       tier: room.scope.tier ?? ('confidential' as const),
       tenant_slug: room.scope.tenant_slug,
       purpose: 'discussion:' + operation,
+      attachment_count: 0,
       training_use:
         room.scope.tier === 'public' ? ('training_eligible' as const) : ('no_training' as const),
     };
