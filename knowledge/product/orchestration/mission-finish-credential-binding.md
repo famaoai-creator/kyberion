@@ -39,7 +39,7 @@ binding は決して生成されない — フラグでも env でも代替で�
    「委任に投げれば finish も binding 付きで走る」が設計意図。
 2. **resolver 未設定の確認** — 委任しても tenant の `SecretResolver` に
    `bindTask` が無いと同じエラーになる。`pnpm kyberion tenant show <slug>` と
-   `pnpm kyberion secret` 系で resolver の設定状態を確認し、必要なら secret を
+   `pnpm kyberion secret status <serviceId>`で resolver の設定状態を確認し、必要なら secret を
    登録・適用してから再委任する。
 3. **承認経路** — `pnpm kyberion approvals --approve <id>` が絡む
    approval-mediated フローは finish の binding を代替しない(人間承認は別レイヤ)。
