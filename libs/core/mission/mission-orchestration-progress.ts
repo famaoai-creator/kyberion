@@ -1,3 +1,4 @@
+import { guardSupersedeState } from './mission-next-tasks-supersede-guard.js';
 import * as path from 'node:path';
 import type { PlanningPacket } from '../surface/channel-surface.js';
 import {
@@ -7,7 +8,6 @@ import {
   type MissionTaskEventIdentity,
 } from './mission-task-events.js';
 import { ledger } from '../ledger.js';
-import { logger } from '../core.js';
 import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { readJsonLines } from '../foundation/json.js';
 import { readTextFile } from '../foundation/text.js';
@@ -130,20 +130,12 @@ export function createMissionProgressController(
           missionId
         )
       : [];
+    // Concurrent worker results: the higher-priority status and the larger
+    // rework count win. The supersede guard then keeps every supersede on disk.
     const existingById = new Map(existingTasks.map((task) => [task.task_id, task]));
-    const mergedTasks = tasks.map((task) => {
+    const prioritized = tasks.map((task) => {
       const existing = existingById.get(task.task_id);
-      // supersede-task owns `superseded` (human-approved): a worker write never
-      // introduces it — without a matching on-disk record it is dropped (M2).
-      if (task.status === 'superseded' && existing?.status !== 'superseded') {
-        logger.warn(
-          `task ${task.task_id} not written as superseded — a worker write cannot supersede a task | the status on disk is kept; supersede it with pnpm mission supersede-task ${missionId} ${task.task_id} --by <new_task_id> --reason <text> --request-approval | mission=${missionId}`
-        );
-        const rest: PlannedNextTask = { ...task, status: existing?.status ?? 'planned' };
-        delete rest.superseded;
-        return rest;
-      }
-      if (!existing) return task;
+      if (!existing || task.status === 'superseded') return task;
       const existingPriority =
         PLANNED_NEXT_TASK_STATUS_PRIORITY[String(existing.status || 'planned')] ?? 0;
       const incomingPriority =
@@ -153,47 +145,13 @@ export function createMissionProgressController(
         Number(existing.rework_count || 0),
         Number(task.rework_count || 0)
       );
-      // A stale in-memory board never undoes a supersede (M2): the on-disk
-      // record wins, and each dependency rewrite it made is re-applied to the
-      // incoming dependencies (old id → replacement) — the worker's other
-      // dependency edits are kept (N6).
-      const rewrites = existing.dependencies_rewritten_from ?? [];
-      const dependenciesOut = rewrites.length
-        ? [
-            ...new Set(
-              (task.dependencies ?? existing.dependencies ?? []).map(
-                (dependency) =>
-                  rewrites.find((rewrite) => rewrite.from === dependency)?.to ?? dependency
-              )
-            ),
-          ]
-        : undefined;
       return {
         ...task,
         ...(status ? { status } : {}),
         ...(rework_count > 0 ? { rework_count } : {}),
-        ...(existing.status === 'superseded' && existing.superseded
-          ? { superseded: existing.superseded }
-          : {}),
-        ...(dependenciesOut
-          ? { dependencies: dependenciesOut, dependencies_rewritten_from: rewrites }
-          : {}),
       };
     });
-    // N6: an on-disk task the incoming list lacks is kept when supersede-task
-    // owns it — superseded, or the replacement a supersede named.
-    const incomingIds = new Set(tasks.map((task) => task.task_id));
-    const replacementIds = new Set(
-      existingTasks
-        .map((task) => (task.status === 'superseded' ? task.superseded?.by_task_id : undefined))
-        .filter((id): id is string => Boolean(id))
-    );
-    for (const existing of existingTasks) {
-      if (incomingIds.has(existing.task_id)) continue;
-      if (existing.status === 'superseded' || replacementIds.has(existing.task_id)) {
-        mergedTasks.push(existing);
-      }
-    }
+    const mergedTasks = guardSupersedeState(missionId, prioritized, existingTasks);
     writeProvisionedJson({
       missionId,
       filePath: nextTasksPath,
@@ -413,23 +371,22 @@ export function createMissionProgressController(
     // MO-01: process-template-seeded tasks are the mission's fixed skeleton —
     // the planner may add tasks around them but never drop or restructure them.
     const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
-    // m3: a task superseded on disk (supersede-task, human-approved) keeps its
-    // entry; a new plan never resets it to planned.
-    const supersededOnDisk = new Map(
-      (safeExistsSync(nextTasksPath)
-        ? loadMissionNextTaskObjectsAtPath(
-            nextTasksPath,
-            path.basename(path.dirname(nextTasksPath))
-          ) || []
-        : []
-      )
+    // m3/M2: a new plan never undoes a supersede on disk (human-approved):
+    // the superseded task keeps its record, its replacement stays, and the
+    // dependents keep their rewrites — the same guard as every board writer.
+    const onDisk = safeExistsSync(nextTasksPath)
+      ? loadMissionNextTaskObjectsAtPath(
+          nextTasksPath,
+          path.basename(path.dirname(nextTasksPath))
+        ) || []
+      : [];
+    const supersededOnDisk = new Set(
+      onDisk
         .filter((task) => String(task.status || '') === 'superseded')
-        .map((task) => [String(task.task_id || ''), task as Record<string, unknown>])
+        .map((task) => String(task.task_id || ''))
     );
-    const keepSuperseded = <T extends { task_id?: unknown }>(tasks: T[]): T[] =>
-      tasks.map(
-        (task) => (supersededOnDisk.get(String(task.task_id || '')) as T | undefined) ?? task
-      );
+    const keepSuperseded = <T extends object>(tasks: T[]) =>
+      guardSupersedeState(missionId, tasks, onDisk);
     const seededTasks = readProcessTemplateSeededTasks(nextTasksPath);
     if (seededTasks.length > 0) {
       const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));

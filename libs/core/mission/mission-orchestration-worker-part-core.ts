@@ -264,6 +264,8 @@ export async function dispatchPlannedMissionTaskCore(
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
+      // The hold waits on the customer, not on this worker: release the claim.
+      endAttempt: true,
       metadata: {
         summary: pinFailed
           ? 'Task blocked: its customer decision holds could not be checked'
@@ -357,6 +359,8 @@ export async function dispatchPlannedMissionTaskCore(
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
+      // The hold waits on the customer, not on this worker: release the claim.
+      endAttempt: true,
       metadata: {
         summary:
           'Task blocked: its confirmed customer decisions may not be sent in this mission’s context',
@@ -787,6 +791,8 @@ export async function dispatchPlannedMissionTaskCore(
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
+      // The hold waits on the customer, not on this worker: release the claim.
+      endAttempt: true,
       metadata: {
         summary: decisionCheckFailed
           ? 'Task blocked: its customer decision holds could not be checked'

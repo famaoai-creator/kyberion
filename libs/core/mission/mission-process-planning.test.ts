@@ -1,3 +1,4 @@
+import { readMissionNextTasks, writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import * as pathResolver from '../path-resolver.js';
@@ -378,6 +379,38 @@ describe('mission process planning', () => {
     ) as Array<Record<string, unknown>>;
     const reviewTask = tasks.find((task) => task.phase === 'review');
     expect(reviewTask?.status).toBe('rework');
+  });
+
+  it('leaves a superseded phase task alone on a gate verdict (M2)', () => {
+    applyProcessTemplatePlan({ missionId, missionDir: missionPath, design: presentationDesign() });
+    const board = readMissionNextTasks(missionPath);
+    const review = board.find((task) => task.phase === 'review');
+    expect(review).toBeDefined();
+    writeMissionNextTasks(
+      missionPath,
+      board.map((task) =>
+        task === review
+          ? {
+              ...task,
+              status: 'superseded',
+              superseded: {
+                by_task_id: 'review-replacement',
+                at: '2026-10-29T00:00:00.000Z',
+                actor_id: 'operator',
+                reason_sha256: 'a'.repeat(64),
+                approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+              },
+            }
+          : task
+      ),
+      { allowSupersede: true }
+    );
+    // Neither re-run (rework) nor counted done (completed): it was replaced.
+    expect(markPhaseTasksForRework(missionId, 'review')).toBe(0);
+    expect(markPhaseTasksCompleted(missionId, 'review')).toBe(0);
+    expect(
+      readMissionNextTasks(missionPath).find((task) => task.task_id === review?.task_id)?.status
+    ).toBe('superseded');
   });
 
   it('marks phase tasks completed and activates planned missions on gate progress', async () => {

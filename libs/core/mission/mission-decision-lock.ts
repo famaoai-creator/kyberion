@@ -94,7 +94,11 @@ import {
 } from './mission-state.js';
 import { readMissionStateAtPath } from './mission-state-reader.js';
 import { boundTenant } from '../owner-scope.js';
-import { isTaskVerifiablySuperseded } from './mission-task-supersede-proof.js';
+import {
+  isTaskVerifiablySuperseded,
+  missionTaskSupersedeProof,
+  type MissionTaskSupersedeProof,
+} from './mission-task-supersede-proof.js';
 import type { MissionState } from './mission-types.js';
 
 export interface MissionDecisionCase {
@@ -250,12 +254,9 @@ export function isDecisionLockVerifiablySuperseded(
   lock: ConsumedDecisionLockRecord,
   options: Pick<MissionDecisionLockOptions, 'verifySuperseded'> = {}
 ): boolean {
-  if (!isConsumedDecisionLockSuperseded(lock) || !lock.superseded) return false;
-  const verify = options.verifySuperseded ?? isTaskVerifiablySuperseded;
-  const verified = verify(lock.mission_id, lock.task_id, {
-    byTaskId: lock.superseded.by_task_id,
-    approvalRequestId: lock.superseded.approval_request_id,
-  });
+  const proof = decisionLockSupersedeProof(lock, options);
+  if (!proof || !lock.superseded) return false;
+  const verified = proof.verified;
   if (!verified) {
     warnOnce(
       lock.mission_id,
@@ -265,6 +266,33 @@ export function isDecisionLockVerifiablySuperseded(
     );
   }
   return verified;
+}
+
+/**
+ * The mission-side proof behind a lock's `superseded` mark, or undefined when
+ * the lock carries none. Every reader that honours a mark — the boundaries
+ * above and the operator facade's `status` — goes through this one check, so
+ * they cannot disagree on which marks count.
+ */
+export function decisionLockSupersedeProof(
+  lock: ConsumedDecisionLockRecord,
+  options: Pick<MissionDecisionLockOptions, 'verifySuperseded'> = {}
+): MissionTaskSupersedeProof | undefined {
+  if (!isConsumedDecisionLockSuperseded(lock) || !lock.superseded) return undefined;
+  const target = {
+    byTaskId: lock.superseded.by_task_id,
+    approvalRequestId: lock.superseded.approval_request_id,
+  };
+  if (options.verifySuperseded) {
+    return options.verifySuperseded(lock.mission_id, lock.task_id, target)
+      ? {
+          verified: true,
+          by_task_id: target.byTaskId,
+          approval_request_id: target.approvalRequestId,
+        }
+      : { verified: false, reason: 'unproven' };
+  }
+  return missionTaskSupersedeProof(lock.mission_id, lock.task_id, target);
 }
 
 const consumerFile = (consumer: string) => `consumers/${consumer}.json`;
