@@ -15,11 +15,19 @@ import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import {
-  AUDIT_CHAIN_LOCK_ID,
   auditChain,
   normalizePersistedAuditEntry,
+  withAuditChainLock,
 } from '@agent/core/governance/audit-chain';
-import { withLockSync } from '@agent/core/foundation/lock-utils';
+import {
+  listTenantProfileSlugs,
+  readTenantProfile,
+} from '@agent/core/organization/tenant-registry';
+import {
+  auditMirrorMoveIds,
+  previousSlugs,
+  TENANT_AUDIT_MIRROR_MOVED_ACTION,
+} from '@agent/core/organization/tenant-rename';
 import {
   assertApprovalUsable,
   computeApprovalPayloadHash,
@@ -41,6 +49,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withExecutionContext } from '@agent/core/governance';
+import { logger } from '@agent/core/core';
 import type { AuditEntry } from '@agent/core/governance/audit-chain';
 import { nowIso, readJsonLines } from '@agent/core/foundation';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
@@ -201,18 +210,75 @@ function loadMasterEntries(rootDir: string): AuditEntry[] {
   ).entries;
 }
 
+/**
+ * The move markers the tenant registry backs: each marker audit id a profile
+ * recorded at rename time (`audit_mirror_move_ids`), mapped to the renames its
+ * history holds (consecutive slugs in `previousSlugs`, then the current slug).
+ * A profile that cannot be read backs no marker, so its mirror is reported.
+ */
+function registryMoveMarkers(rootDir: string): Map<string, Set<string>> {
+  const markers = new Map<string, Set<string>>();
+  for (const slug of listTenantProfileSlugs({ rootDir })) {
+    let profile: ReturnType<typeof readTenantProfile>;
+    try {
+      profile = readTenantProfile(slug, { rootDir });
+    } catch (err) {
+      logger.warn(
+        `[AUDIT_MIRROR] tenant profile ${slug} unreadable — ${err instanceof Error ? err.message : String(err)} | its renames are not followed`
+      );
+      continue;
+    }
+    if (!profile) continue;
+    const chain = [...previousSlugs(profile), profile.tenant_slug];
+    const pairs = new Set<string>();
+    for (let index = 1; index < chain.length; index++) {
+      if (chain[index - 1] !== chain[index]) pairs.add(`${chain[index - 1]}\u0000${chain[index]}`);
+    }
+    for (const id of auditMirrorMoveIds(profile)) markers.set(id, pairs);
+  }
+  return markers;
+}
+
+/**
+ * The master entries each mirror should hold, in master order. A tenant
+ * rename moves the old slug's mirror under the new slug and marks the move in
+ * the chain while holding the audit lock. At a trusted marker the new slug's
+ * mirror is exactly the old slug's entries so far (the new slug was unclaimed,
+ * so anything it held before belongs to some earlier owner), and later old-slug
+ * entries start a fresh mirror. A marker is trusted only by its own audit id,
+ * which the rename stored in the tenant's profile, and only when that
+ * profile's history holds the rename it names; so neither an audit entry
+ * alone nor a reused slug pulls another tenant's records into a mirror.
+ */
 function masterEntriesByTenant(
   rootDir = pathResolver.rootDir(),
   entries = loadMasterEntries(rootDir)
 ): Map<string, AuditEntry[]> {
-  const result = new Map<string, AuditEntry[]>();
-  for (const entry of entries) {
-    if (!entry.tenantSlug) continue;
-    const entries = result.get(entry.tenantSlug) || [];
-    entries.push(entry);
-    result.set(entry.tenantSlug, entries);
-  }
-  return result;
+  let backed: Map<string, Set<string>> | undefined;
+  const followed = new Set<string>();
+  const indexes = new Map<string, number[]>();
+  entries.forEach((entry, index) => {
+    if (!entry.tenantSlug) return;
+    const previous = entry.metadata?.previous_slug;
+    if (
+      entry.action === TENANT_AUDIT_MIRROR_MOVED_ACTION &&
+      entry.result === 'completed' &&
+      typeof previous === 'string' &&
+      previous !== entry.tenantSlug &&
+      !followed.has(entry.id) &&
+      (backed ??= registryMoveMarkers(rootDir))
+        .get(entry.id)
+        ?.has(`${previous}\u0000${entry.tenantSlug}`)
+    ) {
+      followed.add(entry.id);
+      indexes.set(entry.tenantSlug, indexes.get(previous) || []);
+      indexes.delete(previous);
+    }
+    const list = indexes.get(entry.tenantSlug) || [];
+    list.push(index);
+    indexes.set(entry.tenantSlug, list);
+  });
+  return new Map([...indexes].map(([slug, list]) => [slug, list.map((index) => entries[index])]));
 }
 
 /** Collect only mismatched existing mirrors; missing overlays are not created. */
@@ -220,10 +286,13 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
   return collectFindingsAndMaster(rootDir).findings;
 }
 
-/** The findings and the master entries they were computed from (parsed once). */
+/**
+ * The findings and the per-mirror master entries they were computed from
+ * (parsed and grouped once), so an apply rebuilds exactly what it checked.
+ */
 function collectFindingsAndMaster(rootDir: string): {
   findings: AuditMirrorFinding[];
-  master: AuditEntry[];
+  masterByTenant: Map<string, AuditEntry[]>;
 } {
   const customersRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
     allowMissingLeaf: true,
@@ -290,7 +359,7 @@ function collectFindingsAndMaster(rootDir: string): {
 
   return {
     findings: findings.sort((left, right) => left.slug.localeCompare(right.slug)),
-    master,
+    masterByTenant,
   };
 }
 
@@ -527,7 +596,8 @@ export function runAuditMirrorReconciliation(input: {
     // (which audit a refusal) run before the audit lock is taken. Under the
     // audit lock no append can land: every append writes the master and the
     // mirror under it, so what is archived and rebuilt is what was approved.
-    // Nothing under the audit lock records an audit entry (it is not reentrant).
+    // Nothing under the audit lock records an audit entry (it is not
+    // reentrant); a write denied under it is audited once the lock is released.
     consumeApprovalWithin(
       'mission_controller',
       {
@@ -538,7 +608,7 @@ export function runAuditMirrorReconciliation(input: {
         effectRef: path.relative(rootDir, archiveRoot).replaceAll(path.sep, '/'),
       },
       (consume) =>
-        withLockSync(AUDIT_CHAIN_LOCK_ID, () => {
+        withAuditChainLock(() => {
           // The record lock runs this bound to the caller's tenant; the scan
           // reads every tenant's mirror, so it runs in the apply's own context.
           const current = withExecutionContext(
@@ -554,7 +624,7 @@ export function runAuditMirrorReconciliation(input: {
               '[AUDIT_MIRROR_CHANGED] the audit mirrors changed after the approval check; nothing was applied and the approval is unused. Re-run the apply; if the findings differ, request a new approval.'
             );
           }
-          const masterByTenant = masterEntriesByTenant(rootDir, current.master);
+          const masterByTenant = current.masterByTenant;
           // Consume before the effect: a failed apply needs a new approval rather
           // than a retry on the old one.
           consume();
