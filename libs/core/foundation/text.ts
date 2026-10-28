@@ -15,6 +15,11 @@ export function normalizeText(value: unknown): string {
   return asString(value).trim().replace(/\s+/gu, ' ');
 }
 
+/** Conservative character-based fallback; provider-measured usage remains authoritative. */
+export function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3);
+}
+
 /** Normalize whitespace and bound a user-facing excerpt with an ellipsis. */
 export function truncateNormalizedText(value: unknown, max: number): string {
   const text = normalizeText(value);

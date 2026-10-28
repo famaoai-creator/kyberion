@@ -1,3 +1,4 @@
+import { runInExecutionScope } from '../foundation/execution-scope.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
@@ -13,6 +14,11 @@ import {
 } from './shell-claude-cli-backend.js';
 import { resolveSandboxPolicy, withSandboxPolicy } from './sandbox-policy.js';
 import { DelegationWallClockExceededError } from '../mission/delegation-concurrency.js';
+import { metrics } from '../metrics.js';
+
+beforeEach(() => {
+  vi.spyOn(metrics, 'record').mockImplementation(() => undefined as never);
+});
 
 const { spawnMock } = vi.hoisted(() => ({
   spawnMock: vi.fn(),
@@ -70,6 +76,70 @@ function createChild(stdoutText: string, exitCode = 0): any {
 }
 
 describe('shell-claude-cli-backend', () => {
+  it('unwraps the native text envelope and meters metadata without treating its price as cash', async () => {
+    spawnMock.mockReturnValueOnce(
+      createChild(
+        JSON.stringify({
+          type: 'result',
+          result: 'plain report',
+          total_cost_usd: 0.5,
+          usage: { input_tokens: 12, output_tokens: 6, cache_read_input_tokens: 30 },
+        })
+      )
+    );
+    const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
+    expect(await backend.delegateTask('task')).toBe('plain report');
+    expect(spawnMock.mock.calls[0][1]).toContain('json');
+    const extra = vi.mocked(metrics.record).mock.calls[0][3];
+    expect(extra).toMatchObject({
+      usage_source: 'provider',
+      billing_mode: 'unknown',
+      reference_cost_usd: 0.5,
+      usage: { prompt_tokens: 12, completion_tokens: 6, cache_read_tokens: 30 },
+    });
+    expect(extra).not.toHaveProperty('sdk_cost_usd');
+    expect(extra).not.toHaveProperty('reported_cost_usd');
+  });
+
+  it('records a streamed terminal aggregate once without adding partial or assistant usage again', async () => {
+    const output = [
+      {
+        type: 'stream_event',
+        event: { type: 'content_block_delta', delta: { type: 'text_delta', text: 'reply' } },
+      },
+      {
+        type: 'assistant',
+        message: {
+          id: 'm1',
+          usage: { input_tokens: 5, output_tokens: 2 },
+          content: [{ type: 'text', text: 'reply' }],
+        },
+      },
+      {
+        type: 'result',
+        result: 'reply',
+        total_cost_usd: 0,
+        usage: { input_tokens: 20, output_tokens: 6, cache_read_input_tokens: 40 },
+      },
+    ]
+      .map((row) => JSON.stringify(row))
+      .join('\n');
+    spawnMock.mockReturnValueOnce(createChild(output));
+    const deltas: string[] = [];
+    for await (const delta of new ShellClaudeCliBackend({
+      bin: 'claude',
+      model: 'opus',
+    }).streamPrompt('question'))
+      deltas.push(delta);
+    expect(deltas).toEqual(['reply']);
+    expect(metrics.record).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(metrics.record).mock.calls[0][3]).toMatchObject({
+      reference_cost_usd: 0,
+      usage_source: 'provider',
+      usage: { prompt_tokens: 20, completion_tokens: 6, cache_read_tokens: 40 },
+    });
+  });
+
   it('routes Claude CLI environment reads through the governed accessor', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('libs/core/shell/shell-claude-cli-backend.ts'), {
@@ -343,7 +413,7 @@ describe('shell-claude-cli-backend', () => {
       spawnMock.mockClear();
     });
 
-    it('no profile: argv is byte-identical to the pre-profile baseline', async () => {
+    it('no profile: preserves baseline permission argv while requesting the native JSON envelope', async () => {
       spawnMock.mockReturnValueOnce(createChild('ok'));
 
       const backend = new ShellClaudeCliBackend({ bin: 'claude', model: 'opus' });
@@ -351,7 +421,14 @@ describe('shell-claude-cli-backend', () => {
 
       expect(spawnMock).toHaveBeenCalledTimes(1);
       const [, argv] = spawnMock.mock.calls[0];
-      expect(argv).toEqual(['-p', 'do the thing\n\nContext: ctx', '--model', 'opus']);
+      expect(argv).toEqual([
+        '-p',
+        'do the thing\n\nContext: ctx',
+        '--model',
+        'opus',
+        '--output-format',
+        'json',
+      ]);
     });
 
     it('explorer profile: argv carries the read-only mapping and not write/exec flags', async () => {
@@ -399,6 +476,19 @@ describe('shell-claude-cli-backend', () => {
       expect(argv).toContain('--allowedTools');
       expect(argv).not.toContain('bypassPermissions');
       expect(argv).not.toContain('--dangerously-skip-permissions');
+    });
+  });
+
+  it('hides native capability in tenant execution and fences an earlier injected adopter', async () => {
+    const harness = { boot: vi.fn(), ask: vi.fn(), askNativeSubagent: vi.fn() };
+    const backend = new ShellClaudeCliBackend({ bin: 'claude', harnessSession: harness });
+    const retained = backend.getNativeSubagentAdopter()!;
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'native-fixture' }, async () => {
+      expect(backend.getNativeSubagentAdopter()).toBeNull();
+      await expect(retained.dispatch('must not send')).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+      await expect(backend.resetSession()).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+      expect(harness.boot).not.toHaveBeenCalled();
+      expect(harness.askNativeSubagent).not.toHaveBeenCalled();
     });
   });
 

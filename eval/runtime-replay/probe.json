@@ -1,0 +1,7 @@
+{
+  "name": "hermes-runtime-replay",
+  "workspace_dir": "eval/runtime-replay",
+  "command": ["node", "run.mjs"],
+  "expect_outputs": ["runtime-replay.json"],
+  "description": "Fake-provider runtime, usage, cancellation, model cooldown, compaction and fresh-process OAuth/plugin/snapshot recovery replay. Source mutations and adoption remain governed by the existing contrastive harness."
+}

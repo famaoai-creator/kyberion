@@ -5,7 +5,7 @@
  */
 
 import { spawn } from 'node:child_process';
-import { recordEstimatedCliUsage } from '../cli-usage-metering.js';
+import { cliOutputFormat, parseGeminiCliUsage, recordCliUsage } from '../cli-usage-metering.js';
 import { z, type ZodType } from 'zod';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -267,6 +267,8 @@ export class GeminiCliBackend implements ReasoningBackend {
     const args = [
       '-p',
       `${instruction}\n\nContext: ${context ?? 'none'}`,
+      '-o',
+      'json',
       ...(activePermissionArgs
         ? [
             ...(this.model ? ['--model', this.model] : []),
@@ -402,25 +404,28 @@ export class GeminiCliBackend implements ReasoningBackend {
 
   private async spawnCli(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
     const started = Date.now();
-    const promptChars = args.join(' ').length;
+    const promptChars = args[args.indexOf('-p') + 1]?.length ?? 0;
+    const capture = { stdout: '', requestNotSent: true };
+    let status: 'success' | 'error' = 'error';
     try {
-      const stdout = await this.spawnCliRaw(args, profile);
-      recordEstimatedCliUsage(
-        'gemini-cli',
-        this.model,
-        started,
-        'success',
-        promptChars,
-        stdout.length
-      );
+      const stdout = await this.spawnCliRaw(args, profile, capture);
+      status = 'success';
       return stdout;
-    } catch (err) {
-      recordEstimatedCliUsage('gemini-cli', this.model, started, 'error', promptChars, 0);
-      throw err;
+    } finally {
+      recordCliUsage('gemini-cli', this.model, started, status, {
+        report: cliOutputFormat(args) === 'json' ? parseGeminiCliUsage(capture.stdout) : undefined,
+        promptChars,
+        completionChars: geminiResponseLength(capture.stdout),
+        requestNotSent: capture.requestNotSent,
+      });
     }
   }
 
-  private spawnCliRaw(args: string[], profile?: ProviderPermissionProfileName): Promise<string> {
+  private spawnCliRaw(
+    args: string[],
+    profile?: ProviderPermissionProfileName,
+    capture: { stdout: string; requestNotSent: boolean } = { stdout: '', requestNotSent: true }
+  ): Promise<string> {
     return new Promise((resolve, reject) => {
       const spawnEnv = buildDelegationSpawnEnv({
         provider: 'gemini',
@@ -433,14 +438,22 @@ export class GeminiCliBackend implements ReasoningBackend {
           env: spawnEnv.env,
         })
       );
+      capture.requestNotSent = false;
       let stdout = '';
       let stderr = '';
+      let spawned = false;
+      child.once('spawn', () => {
+        spawned = true;
+      });
       const timer = setTimeout(() => {
         child.kill('SIGKILL');
         spawnEnv.dispose();
         reject(new Error(`[gemini-cli] timed out after ${this.timeoutMs}ms`));
       }, this.timeoutMs);
-      child.stdout.on('data', (chunk) => (stdout += chunk.toString()));
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+        capture.stdout = stdout;
+      });
       child.stderr.on('data', (chunk) => (stderr += chunk.toString()));
       child.on('close', (code) => {
         clearTimeout(timer);
@@ -452,6 +465,7 @@ export class GeminiCliBackend implements ReasoningBackend {
       });
       child.on('error', (err) => {
         clearTimeout(timer);
+        if (!spawned && !stdout) capture.requestNotSent = true;
         reject(new Error(`[gemini-cli] spawn failed: ${err.message}`));
       });
       child.stdin.end();
@@ -461,7 +475,8 @@ export class GeminiCliBackend implements ReasoningBackend {
 
 export function buildGeminiCliBackendFromEnv(
   env: NodeJS.ProcessEnv = process.env,
-  modelOverride?: string
+  modelOverride?: string,
+  timeoutOverrideMs?: number
 ): GeminiCliBackend | null {
   const bin =
     getRegisteredEnvText('KYBERION_GEMINI_CLI_BIN', { env })?.trim() ||
@@ -471,7 +486,7 @@ export function buildGeminiCliBackendFromEnv(
     getRegisteredEnvText('KYBERION_GEMINI_CLI_MODEL', { env })?.trim() ||
     resolveRuntimeModelId('gemini-default', env);
   const timeoutRaw = getRegisteredEnvText('KYBERION_GEMINI_CLI_TIMEOUT', { env })?.trim();
-  const timeoutMs = timeoutRaw ? parseInt(timeoutRaw, 10) : undefined;
+  const timeoutMs = timeoutOverrideMs ?? (timeoutRaw ? parseInt(timeoutRaw, 10) : undefined);
   const backend = new GeminiCliBackend({
     ...(bin ? { bin } : {}),
     ...(model ? { model } : {}),
@@ -548,6 +563,10 @@ export async function runGeminiCliQuery<T>(params: {
     ...callerArgs,
   ];
 
+  const started = Date.now();
+  let capturedOutput = '';
+  let requestNotSent = true;
+  let meteringStatus: 'success' | 'error' = 'error';
   const stdout = await new Promise<string>((resolve, reject) => {
     const spawnEnv = buildDelegationSpawnEnv({
       provider: 'gemini',
@@ -562,13 +581,21 @@ export async function runGeminiCliQuery<T>(params: {
         ...(params.cwd ? { cwd: params.cwd } : {}),
       })
     );
+    requestNotSent = false;
     let out = '';
     let err = '';
+    let spawned = false;
+    child.once('spawn', () => {
+      spawned = true;
+    });
     const timer = setTimeout(() => {
       child.kill('SIGKILL');
       reject(new Error(`[gemini-cli] timed out after ${timeoutMs}ms`));
     }, timeoutMs);
-    child.stdout.on('data', (chunk) => (out += chunk.toString()));
+    child.stdout.on('data', (chunk) => {
+      out += chunk.toString();
+      capturedOutput = out;
+    });
     child.stderr.on('data', (chunk) => (err += chunk.toString()));
     child.on('close', (code) => {
       clearTimeout(timer);
@@ -580,11 +607,24 @@ export async function runGeminiCliQuery<T>(params: {
     });
     child.on('error', (spawnErr) => {
       clearTimeout(timer);
+      if (!spawned && !out) requestNotSent = true;
       reject(new Error(`[gemini-cli] spawn failed: ${(spawnErr as Error).message}`));
     });
     if (viaStdin) child.stdin.write(prompt);
     child.stdin.end();
-  });
+  })
+    .then((out) => {
+      meteringStatus = 'success';
+      return out;
+    })
+    .finally(() => {
+      recordCliUsage('gemini-cli', model, started, meteringStatus, {
+        report: cliOutputFormat(args) === 'json' ? parseGeminiCliUsage(capturedOutput) : undefined,
+        promptChars: prompt.length,
+        completionChars: geminiResponseLength(capturedOutput),
+        requestNotSent,
+      });
+    });
 
   const lines = stdout.split('\n');
   const jsonStartIdx = lines.findIndex((l) => l.trim().startsWith('{'));
@@ -609,4 +649,21 @@ export async function runGeminiCliQuery<T>(params: {
     throw new Error(`[gemini-cli] schema validation failed: ${parsed.error.message}`);
   }
   return parsed.data;
+}
+
+function geminiResponseLength(stdout: string): number {
+  const lines = stdout.split('\n');
+  const first = lines.findIndex((line) => line.trim().startsWith('{'));
+  if (first >= 0) {
+    try {
+      const envelope = parseSafeJsonInput(
+        lines.slice(first).join('\n'),
+        'Gemini CLI completion length'
+      ) as { response?: unknown };
+      if (typeof envelope?.response === 'string') return envelope.response.length;
+    } catch {
+      /* Old plain-text output uses the explicitly estimated fallback. */
+    }
+  }
+  return stdout.length;
 }

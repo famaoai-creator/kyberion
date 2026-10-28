@@ -60,6 +60,35 @@ describe('workViewModel', () => {
 });
 
 describe('schedulesViewModel', () => {
+  it('shows episode-bound acknowledgement hints and distinguishes cause replacement from successful recovery', () => {
+    const base = {
+      signature: 'a'.repeat(24),
+      cause: 'timeout',
+      firstSeenAt: '2026-10-28T00:00:00Z',
+      lastSeenAt: '2026-10-28T00:00:01Z',
+      occurrences: 1,
+    };
+    const episode = 'b'.repeat(32);
+    const vm = schedulesViewModel(
+      {
+        schedules: [],
+        generationLines: [],
+        incidents: [
+          { ...base, scheduleId: 'active-job', episodeId: episode, status: 'detected' },
+          { ...base, scheduleId: 'legacy-job', status: 'detected' },
+          { ...base, scheduleId: 'old-cause', status: 'resolved', resolvedBy: 'superseded' },
+          { ...base, scheduleId: 'healthy-job', status: 'resolved', resolvedBy: 'recovered' },
+        ],
+      },
+      ja
+    );
+    const lines = vm.sections!.flatMap((section) => section.lines).join('\n');
+    expect(lines).toContain(`:incident ack active-job ${base.signature} ${episode}`);
+    expect(lines).not.toContain(':incident ack legacy-job');
+    expect(lines).toContain('原因変更により置換');
+    expect(lines).toContain('成功実行により復旧');
+  });
+
   it('renders cron and due marker', () => {
     const data: SchedulesData = {
       schedules: [
@@ -93,6 +122,22 @@ describe('settingsViewModel', () => {
     const reasoning = vm.rows?.find((row) => row.id === 'reasoning');
     expect(reasoning?.cells[1]).toBe('claude-cli');
     expect(reasoning?.cells[2]).toContain('pnpm reasoning:config');
+  });
+
+  it('offers the configured connection settings handoff without claiming service readiness', () => {
+    const vm = settingsViewModel(
+      {
+        reasoningMode: 'auto',
+        customer: '-',
+        profileRoot: '/p',
+        rootDir: '/r',
+        connectionsUrl: 'https://desk.example/settings#setup-services',
+      },
+      makeI18n('en')
+    );
+    const section = vm.sections?.find((entry) => entry.title === 'Service connections');
+    expect(section?.lines).toContain('https://desk.example/settings#setup-services');
+    expect(section?.lines.join(' ')).toContain('No connection check has run here');
   });
 });
 

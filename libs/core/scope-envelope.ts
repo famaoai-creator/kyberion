@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { randomUUID } from 'node:crypto';
+import { registerCredentialScopeReader } from './foundation/credential-binding.js';
 import type { TierLevel } from './types.js';
 import {
   normalizeScopeContext,
@@ -86,6 +87,17 @@ const envelopeStorage: AsyncLocalStorage<ScopeEnvelope> =
   ] as AsyncLocalStorage<ScopeEnvelope>) ??
   (((globalThis as Record<string, unknown>)[ENVELOPE_STORAGE_KEY] =
     new AsyncLocalStorage<ScopeEnvelope>()) as AsyncLocalStorage<ScopeEnvelope>);
+
+registerCredentialScopeReader(() => {
+  const identity = envelopeStorage.getStore()?.identity;
+  return (
+    identity && {
+      tenantSlug: identity.tenant_slug,
+      missionId: identity.mission_id,
+      taskId: identity.task_id,
+    }
+  );
+});
 
 let missingEnvelopeCount = 0;
 const missingEnvelopeOps = new Set<string>();

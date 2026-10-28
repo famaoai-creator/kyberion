@@ -51,6 +51,8 @@ import { runOpPreflight } from '../pipeline/op-preflight.js';
 import { ensureDefaultOpPreflight } from '../pipeline/op-preflight-defaults.js';
 import { recordGovernanceAction } from '../governance/governance-action-recorder.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { projectDelegationResult } from './delegation-result-projection.js';
+import { getUsageAttribution, type UsageAttribution } from '../usage-accounting.js';
 
 /** Default tier for an in-session delegation that does not name one (backward compatible). */
 const DEFAULT_SUBAGENT_PROFILE = 'implementer';
@@ -71,14 +73,54 @@ function resolveDelegationProvider(backend: ReasoningBackend): string {
  * `delegation-concurrency.ts` for the "why env config, why no real child
  * handle yet" design notes.
  */
-function dispatchWithConcurrencyGovernance<T>(
+function dispatchWithConcurrencyGovernance(
   backend: ReasoningBackend,
-  fn: () => Promise<T>
-): Promise<T> {
+  options: ReasoningCallOptions | undefined,
+  fn: (options?: ReasoningCallOptions) => Promise<string>,
+  nativeProgress = false
+): Promise<string> {
   // Fire-and-forget, memoized — cheap after the first call.
   wireDelegationKillSwitchIntegration();
   const provider = resolveDelegationProvider(backend);
-  return withDelegationSlot({ provider }, () => withWallClockBudget({ provider }, fn));
+  if (
+    options?.delegation_execution === 'continuous' &&
+    (!nativeProgress || !backend.getNativeSubagentAdopter?.()?.supportsSemanticProgress)
+  ) {
+    return Promise.reject(
+      new Error(
+        '[DELEGATION_PROGRESS_UNSUPPORTED] Continuous execution requires semantic provider progress'
+      )
+    );
+  }
+  return withDelegationSlot({ provider }, () =>
+    withWallClockBudget(
+      {
+        provider,
+        signal: options?.signal,
+        inactivity: options?.delegation_inactivity,
+        executionMode: options?.delegation_execution,
+      },
+      async (signal, canAcceptResult) => {
+        const result = await fn({ ...options, signal });
+        if (!canAcceptResult()) {
+          throw new Error('[DELEGATION_CANCELLED] result arrived after cancellation');
+        }
+        return projectDelegationResult(result, {
+          ...options?.delegation_result,
+          canAcceptResult,
+          ...(options?.constrainedSampling ? { format: 'structured' as const } : {}),
+          artifactScope:
+            options?.delegation_result?.artifactScope ??
+            (options?.prompt_visibility
+              ? {
+                  mission: options.prompt_visibility.missionId,
+                  task: options.prompt_visibility.taskId,
+                }
+              : undefined),
+        });
+      }
+    )
+  );
 }
 
 /**
@@ -305,8 +347,8 @@ export class ProcessSpawnDispatcher implements AgentDispatcher {
     backend: ReasoningBackend,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    return dispatchWithConcurrencyGovernance(backend, () =>
-      this.dispatchInner(instruction, context, backend, options)
+    return dispatchWithConcurrencyGovernance(backend, options, (governedOptions) =>
+      this.dispatchInner(instruction, context, backend, governedOptions)
     );
   }
 
@@ -390,8 +432,8 @@ export class InSessionDispatcher implements AgentDispatcher {
     backend: ReasoningBackend,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    return dispatchWithConcurrencyGovernance(backend, () =>
-      this.dispatchInner(instruction, context, backend, options)
+    return dispatchWithConcurrencyGovernance(backend, options, (governedOptions) =>
+      this.dispatchInner(instruction, context, backend, governedOptions)
     );
   }
 
@@ -621,8 +663,11 @@ export class HarnessSubagentDispatcher implements AgentDispatcher {
     backend: ReasoningBackend,
     options?: ReasoningCallOptions
   ): Promise<string> {
-    return dispatchWithConcurrencyGovernance(backend, () =>
-      this.dispatchInner(instruction, context, backend, options)
+    return dispatchWithConcurrencyGovernance(
+      backend,
+      options,
+      (governedOptions) => this.dispatchInner(instruction, context, backend, governedOptions),
+      true
     );
   }
 
@@ -967,6 +1012,28 @@ function propagateDelegationChainThroughContext(
  */
 export class DispatchingReasoningBackend implements ReasoningBackend {
   name: string;
+  private latestParentPrompts = new WeakMap<
+    UsageAttribution,
+    { bytes: number; options?: ReasoningCallOptions }
+  >();
+
+  private noteParentPrompt(
+    prompt: string,
+    tools?: ToolDefinition[],
+    options?: ReasoningCallOptions
+  ): void {
+    const attribution = getUsageAttribution();
+    // A shared backend must never reuse another execution's prompt occupancy.
+    // Weak keys follow the lifetime of the trusted ambient execution context.
+    if (attribution) {
+      this.latestParentPrompts.set(attribution, {
+        bytes:
+          Buffer.byteLength(prompt, 'utf8') +
+          (tools ? Buffer.byteLength(JSON.stringify(tools), 'utf8') : 0),
+        options,
+      });
+    }
+  }
 
   constructor(
     private readonly base: ReasoningBackend,
@@ -977,6 +1044,7 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
 
   /** QM-06: forward session resets to the wrapped base backend. */
   async resetSession(): Promise<void> {
+    this.latestParentPrompts = new WeakMap();
     await this.base.resetSession?.();
   }
 
@@ -993,6 +1061,42 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): Promise<string> {
+    const attribution = getUsageAttribution();
+    const latestPrompt = attribution ? this.latestParentPrompts.get(attribution) : undefined;
+    if (latestPrompt !== undefined && !options?.delegation_result?.parentContext) {
+      const { resolveContextWindowProfile } =
+        await import('../workforce/context-window-profile.js');
+      const profile = resolveContextWindowProfile();
+      const { resolveReasoningRoute } = await import('../reasoning/reasoning-route-resolver.js');
+      let windowTokens = profile.contextWindowTokens;
+      let outputReserve = profile.reserveTokens;
+      try {
+        const route = resolveReasoningRoute({
+          role: latestPrompt.options?.role,
+          requestedProfile: latestPrompt.options?.route_profile,
+          requestedModel: latestPrompt.options?.model,
+        });
+        if (route.limits.contextWindowTokens)
+          windowTokens = Math.min(windowTokens, route.limits.contextWindowTokens);
+        outputReserve = Math.max(outputReserve, route.limits.maxCompletionTokens ?? 0);
+      } catch {
+        // The execution-local latest occupancy remains valid; unavailable
+        // route metadata falls back to the configured conservative profile.
+      }
+      options = {
+        ...options,
+        delegation_result: {
+          ...options?.delegation_result,
+          parentContext: {
+            contextWindowTokens: windowTokens,
+            // UTF-8 bytes conservatively upper-bound prompt tokens. This is
+            // only the most recent prompt, never accrued usage or child output.
+            latestPromptTokens: latestPrompt.bytes,
+            reservedOutputTokens: outputReserve + profile.bufferTokens,
+          },
+        },
+      };
+    }
     ensureDefaultOpPreflight();
     const preflight = await runOpPreflight({
       op: 'delegateTask',
@@ -1031,6 +1135,18 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     context?: string,
     options?: ReasoningCallOptions
   ): DelegationHandle {
+    if (
+      options?.continuable &&
+      !options.delegation_execution &&
+      this.dispatcher.name === 'harness-subagent' &&
+      this.base.getNativeSubagentAdopter?.()?.supportsSemanticProgress
+    ) {
+      options = {
+        ...options,
+        delegation_execution: 'continuous',
+        delegation_inactivity: options.delegation_inactivity ?? { timeoutMs: 300_000 },
+      };
+    }
     return createDelegationHandle({
       instruction,
       ...(context ? { context } : {}),
@@ -1070,9 +1186,11 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     return this.base.decomposeIntoTasks(...a);
   }
   prompt(...a: Parameters<ReasoningBackend['prompt']>) {
+    this.noteParentPrompt(a[0], undefined, a[1]);
     return this.base.prompt(...a);
   }
   streamPrompt(prompt: string, options?: ReasoningCallOptions): ReasoningTextStream {
+    this.noteParentPrompt(prompt, undefined, options);
     if (this.base.streamPrompt) return this.base.streamPrompt(prompt, options);
     const base = this.base;
     return (async function* fallback(): AsyncGenerator<string> {
@@ -1085,6 +1203,7 @@ export class DispatchingReasoningBackend implements ReasoningBackend {
     tools: ToolDefinition[],
     options?: ReasoningCallOptions
   ): Promise<GenerateWithToolsResult> {
+    this.noteParentPrompt(prompt, tools, options);
     if (this.base.generateWithTools) return this.base.generateWithTools(prompt, tools, options);
     return this.base.prompt(prompt, options).then((text) => ({ text }));
   }

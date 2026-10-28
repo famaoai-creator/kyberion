@@ -148,7 +148,7 @@ describe('oauth-broker', () => {
     vi.clearAllMocks();
     mocks.safeExistsSync.mockReturnValue(false);
     mocks.safeReaddir.mockReturnValue([]);
-    mocks.safeLstat.mockReturnValue({ isFile: () => true });
+    mocks.safeLstat.mockReturnValue({ isFile: () => true, isDirectory: () => true });
     mocks.resolveServiceBinding.mockReturnValue({
       serviceId: 'canva',
       clientId: 'client-id',
@@ -479,6 +479,57 @@ describe('oauth-broker', () => {
     );
     expect(mocks.executeServicePreset).not.toHaveBeenCalled();
   });
+
+  it.each([{}, { access_token: '' }])(
+    'does not claim connection or persist redirect-only metadata for an invalid token response %j',
+    async (response) => {
+      mocks.safeExistsSync.mockImplementation((filePath: string) =>
+        filePath.includes('/active/shared/tmp/oauth')
+      );
+      mocks.safeReadFile.mockImplementation((filePath: string) => {
+        if (filePath.includes('service-presets/canva.json'))
+          return JSON.stringify({
+            service_id: 'canva',
+            operations: {},
+            oauth: {
+              authorize_url: 'https://www.canva.com/api/oauth/authorize',
+              token_operation: 'exchange_oauth_code',
+              pkce: true,
+            },
+          });
+        if (filePath.endsWith('/test-state.json'))
+          return JSON.stringify({
+            serviceId: 'canva',
+            state: 'test-state',
+            operationId: 'operation-fixture',
+            observerPrincipalId: 'operator-a',
+            codeVerifier: 'synthetic-verifier',
+            redirectUri: 'http://127.0.0.1:8787/oauth/callback',
+            scopes: [],
+            createdAt: '2026-03-23T00:00:00Z',
+            expiresAt: '2099-03-23T00:00:00Z',
+          });
+        return '';
+      });
+      mocks.executeServicePreset.mockResolvedValue(response);
+      const { exchangeServiceOAuthCode } = await import('./oauth-broker.js');
+      await expect(
+        exchangeServiceOAuthCode('canva', { code: 'synthetic-code', state: 'test-state' })
+      ).rejects.toThrow('missing access token');
+      expect(mocks.storeConnectionDocument).not.toHaveBeenCalled();
+      const receipt = mocks.safeWriteFile.mock.calls.find(([file]) =>
+        String(file).endsWith('/operation-fixture.json')
+      )?.[1];
+      expect(JSON.parse(String(receipt))).toMatchObject({
+        status: 'failed',
+        operationId: 'operation-fixture',
+      });
+      expect(String(receipt)).not.toContain('synthetic-verifier');
+      expect(mocks.safeUnlinkSync).toHaveBeenCalledWith(
+        expect.stringContaining('/test-state.json')
+      );
+    }
+  );
 
   it('self-destructs a pending session when token exchange fails', async () => {
     mocks.safeExistsSync.mockImplementation(

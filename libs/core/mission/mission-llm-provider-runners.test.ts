@@ -21,7 +21,11 @@ vi.mock('node:child_process', async (importOriginal) => {
 vi.mock('../ops-alert.js', () => ({ sendOpsAlert: vi.fn() }));
 // Usage metering and the wall-clock child registry persist runtime records;
 // this suite must not write them.
-vi.mock('../cli-usage-metering.js', () => ({ recordEstimatedCliUsage: vi.fn() }));
+vi.mock('../cli-usage-metering.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../cli-usage-metering.js')>()),
+  recordEstimatedCliUsage: vi.fn(),
+  recordCliUsage: vi.fn(),
+}));
 vi.mock('./delegation-concurrency.js', () => ({
   delegationChildHandleFromChildProcess: (child: FakeChild) => ({
     pid: child.pid,
@@ -32,6 +36,7 @@ vi.mock('./delegation-concurrency.js', () => ({
 }));
 
 import { llmShellScratchCwd, type LlmProfile, runStructuredLlmProfile } from './mission-llm.js';
+import { recordCliUsage } from '../cli-usage-metering.js';
 
 type FakeChild = EventEmitter & {
   pid?: number;
@@ -89,6 +94,7 @@ function captureSpawn(respond: (call: SpawnCall) => string): SpawnCall[] {
 
 afterEach(() => {
   mocks.spawnMock.mockReset();
+  vi.mocked(recordCliUsage).mockClear();
 });
 
 describe('mission-llm codex-cli runner (runbook §7)', () => {
@@ -113,6 +119,13 @@ describe('mission-llm codex-cli runner (runbook §7)', () => {
     );
 
     expect(result).toEqual({ answer: 1 });
+    expect(recordCliUsage).toHaveBeenCalledWith(
+      'codex-cli',
+      expect.any(String),
+      expect.any(Number),
+      'success',
+      expect.any(Object)
+    );
     expect(calls).toHaveLength(1);
     const [call] = calls;
     expect(call!.bin).toBe('fake-codex');
@@ -149,6 +162,13 @@ describe('mission-llm gemini-cli runner (runbook §7)', () => {
     );
 
     expect(result).toEqual({ answer: 2 });
+    expect(recordCliUsage).toHaveBeenCalledWith(
+      'gemini-cli',
+      expect.any(String),
+      expect.any(Number),
+      'success',
+      expect.any(Object)
+    );
     expect(calls).toHaveLength(1);
     const [call] = calls;
     expect(call!.bin).toBe('fake-gemini');

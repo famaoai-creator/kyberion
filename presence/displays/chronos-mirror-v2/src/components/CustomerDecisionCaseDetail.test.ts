@@ -134,7 +134,13 @@ function detail(
     generated_at: '2026-10-26T00:00:00.000Z',
     today: '2026-10-26',
     draft_only: false,
-    task_counts: { pending_proposals: 0, held: 1, ready_to_resume: 0 },
+    task_counts: {
+      pending_proposals: 0,
+      held: 1,
+      ready_to_resume: 0,
+      unresolvable: 0,
+      frozen_locks: 0,
+    },
     attention: [
       {
         reason: 'awaiting_operator_confirmation',

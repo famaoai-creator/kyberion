@@ -32,7 +32,7 @@ import {
 } from './approval-assurance.js';
 import { consumeApprovalPasskeyChallenge } from './approval-passkey-challenge.js';
 import { resolvePolicyAssuranceFloor } from './approval-policy.js';
-import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
+import type { ApprovalStoreRole } from './approval-store-role.js';
 
 /**
  * HA-02: agent-facing decision paths (MCP `kyberion.approval.decide`, the
@@ -203,7 +203,7 @@ export function settleUnpresentedHumanDecision(
  * refused too, so a proof is never silently discarded.
  */
 export function settlePasskeyDecisionProof(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   record: ApprovalRequestRecord,
   params: {
     storageChannel: string;

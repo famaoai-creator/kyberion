@@ -1394,6 +1394,8 @@ const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
   'help',
   'record-task',
   'record-evidence',
+  // Registers an already performed review; it does not run model inference.
+  'review-task',
   // Journal/state-only verbs: they never delegate to a reasoning backend, so
   // skipping the ~3s backend bootstrap keeps the triage loop cheap.
   'triage',

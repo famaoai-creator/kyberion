@@ -1,7 +1,9 @@
 import { isRecord } from '@agent/core/foundation/primitives';
+import type { DistillationDisclosure } from '@agent/core/mission/mission-read-model';
 
 export type ClientMissionHistoryEntry = {
   missionId: string;
+  distillationDisclosure?: DistillationDisclosure;
   status:
     | 'planned'
     | 'active'
@@ -35,6 +37,14 @@ export type MissionHistoryResponse = {
 };
 
 const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+const DISTILLATION_DISCLOSURES = new Set<DistillationDisclosure>([
+  'llm',
+  'structural_stub',
+  'structural_fallback',
+  'structural',
+  'unknown',
+  'not_recorded',
+]);
 const MISSION_STATUSES = new Set<ClientMissionHistoryEntry['status']>([
   'planned',
   'active',
@@ -61,6 +71,11 @@ function optionalString(value: unknown): value is string | undefined {
 
 function parseMissionHistoryEntry(value: unknown): ClientMissionHistoryEntry | undefined {
   if (!isRecord(value) || !hasSafeKeys(value)) return undefined;
+  if (
+    value.distillationDisclosure !== undefined &&
+    !DISTILLATION_DISCLOSURES.has(value.distillationDisclosure as DistillationDisclosure)
+  )
+    return undefined;
   if (
     typeof value.missionId !== 'string' ||
     !value.missionId.trim() ||

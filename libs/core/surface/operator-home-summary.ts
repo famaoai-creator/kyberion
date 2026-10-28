@@ -3,7 +3,13 @@ import {
   resolveScopedLearningApprovalCandidate,
 } from '../knowledge/scoped-learning-approval-visibility.js';
 import * as path from 'node:path';
+import {
+  verificationFreshness,
+  type VerificationFreshness,
+} from '../verification-source-snapshot.js';
 import { MetricsCollector, metricsWithheldNotice } from '../metrics.js';
+import { resolveUsageCost } from '../cost-report.js';
+import { hasUsageCostEvidence } from '../usage-accounting.js';
 import { listApprovalRequests } from '../governance/approval-store.js';
 import { listArtifactRecords } from '../workforce/artifact-record.js';
 import { buildNextAction, type NextAction } from '../next-action.js';
@@ -37,7 +43,17 @@ export interface OperatorHomeMissionItem {
   artifactCount: number;
 }
 
-export interface OperatorHomeCostSummary {
+export interface OperatorHomeCostCoverage {
+  referenceUsd?: number;
+  referenceCostCalls?: number;
+  includedCalls?: number;
+  unknownCostCalls?: number;
+  actualCostCalls?: number;
+  estimatedCostCalls?: number;
+  costComplete?: boolean;
+}
+
+export interface OperatorHomeCostSummary extends OperatorHomeCostCoverage {
   totalTokens: number;
   totalUsd: number;
   entryCount: number;
@@ -50,13 +66,15 @@ export interface OperatorHomeCostSummary {
   partialNotice?: string;
   /** Number of withheld partitions (set with partialNotice), for localized rendering. */
   withheldPartitions?: number;
-  missionBreakdown: Array<{
-    missionId: string;
-    tokens: number;
-    usd: number;
-    entryCount: number;
-    lastSeen?: string;
-  }>;
+  missionBreakdown: Array<
+    OperatorHomeCostCoverage & {
+      missionId: string;
+      tokens: number;
+      usd: number;
+      entryCount: number;
+      lastSeen?: string;
+    }
+  >;
 }
 
 export interface OperatorHomeWorkforceSummary {
@@ -97,6 +115,7 @@ export interface OperatorHomeActionItem {
 }
 
 export interface OperatorHomeQualitySummary {
+  verificationFreshness?: VerificationFreshness;
   reportId: string;
   projectId: string;
   subjectRef: string;
@@ -246,6 +265,7 @@ function collectQualitySummary(): OperatorHomeQualitySummary | undefined {
       generatedAt: report.generated_at,
       residualRisks: report.residual_risks,
       evidenceRefs: report.evidence_refs,
+      verificationFreshness: verificationFreshness(report.source_snapshot),
     };
   } catch {
     return undefined;
@@ -373,14 +393,23 @@ function getMetricTokens(entry: Record<string, any>): number {
   return Math.max(0, promptTokens + completionTokens);
 }
 
-function getMetricCost(entry: Record<string, any>): number {
-  const directCost = Number(
-    entry.cost_usd ?? entry.sdk_cost_usd ?? entry.total_cost_usd ?? entry.estimated_cost_usd ?? 0
-  );
-  if (Number.isFinite(directCost) && directCost > 0) return directCost;
-  const tokens = getMetricTokens(entry);
-  if (tokens <= 0) return 0;
-  return Number(entry.estimated_cost_usd ?? 0);
+function getMetricCost(entry: Record<string, any>): ReturnType<typeof resolveUsageCost> {
+  return resolveUsageCost({
+    ...entry,
+    cost_usd: entry.cost_usd ?? entry.total_cost_usd ?? entry.estimated_cost_usd,
+  });
+}
+
+function emptyHomeCostCoverage(): Required<OperatorHomeCostCoverage> {
+  return {
+    referenceUsd: 0,
+    referenceCostCalls: 0,
+    includedCalls: 0,
+    unknownCostCalls: 0,
+    actualCostCalls: 0,
+    estimatedCostCalls: 0,
+    costComplete: true,
+  };
 }
 
 function collectCostSummary(
@@ -416,22 +445,40 @@ function collectCostSummary(
 
   const byMission = new Map<
     string,
-    { missionId: string; tokens: number; usd: number; entryCount: number; lastSeen?: string }
+    Required<OperatorHomeCostCoverage> & {
+      missionId: string;
+      tokens: number;
+      usd: number;
+      entryCount: number;
+      lastSeen?: string;
+    }
   >();
 
   let totalTokens = 0;
   let totalUsd = 0;
+  const coverage = emptyHomeCostCoverage();
   for (const entry of entries) {
     const missionId = String(entry.mission_id || entry.missionId || 'UNASSIGNED').toUpperCase();
     const tokens = getMetricTokens(entry);
-    const usd = getMetricCost(entry);
+    const cost = getMetricCost(entry);
+    const usd = cost.costUsd ?? 0;
     const record = byMission.get(missionId) || {
       missionId,
       tokens: 0,
       usd: 0,
       entryCount: 0,
       lastSeen: undefined,
+      ...emptyHomeCostCoverage(),
     };
+    for (const target of hasUsageCostEvidence(entry) ? [record, coverage] : []) {
+      target.referenceUsd += cost.referenceUsd ?? 0;
+      if (cost.referenceUsd !== null) target.referenceCostCalls += 1;
+      if (cost.costStatus === 'unknown') target.unknownCostCalls += 1;
+      else if (cost.costStatus === 'included') target.includedCalls += 1;
+      else if (cost.costStatus === 'actual') target.actualCostCalls += 1;
+      else target.estimatedCostCalls += 1;
+      target.costComplete = target.unknownCostCalls === 0;
+    }
     record.tokens += tokens;
     record.usd += usd;
     record.entryCount += 1;
@@ -446,11 +493,14 @@ function collectCostSummary(
       ? input.budgetUsd
       : undefined;
   const remainingUsd =
-    typeof budgetUsd === 'number'
+    typeof budgetUsd === 'number' && coverage.costComplete && withheld === 0
       ? Math.max(0, Math.round((budgetUsd - totalUsd) * 1000) / 1000)
       : null;
 
   return {
+    ...coverage,
+    referenceUsd: Math.round(coverage.referenceUsd * 1000) / 1000,
+    costComplete: coverage.costComplete && withheld === 0,
     totalTokens,
     totalUsd: Math.round(totalUsd * 1000) / 1000,
     entryCount: entries.length,
@@ -588,7 +638,9 @@ export function collectOperatorHomeSummary(
     const projectId = scope?.project_id;
     if (scope?.tier || scope?.tenant_slug || scope?.organization_id || scope?.project_id) {
       if (Array.isArray(input.scope.tiers) && !scopeAllows(input.scope.tiers, tier)) {
-        return Boolean(missionId && scopedMissionIds.has(missionId.toUpperCase()));
+        // An explicit scope cannot be rescued by a visible mission label.
+        // Mission-only fallback below is reserved for legacy unscoped rows.
+        return false;
       }
       return (
         tenantScopeAllows(input.scope, tenantSlug, legacyTenant) &&

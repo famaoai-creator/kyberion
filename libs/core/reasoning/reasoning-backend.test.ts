@@ -13,7 +13,7 @@ import {
   stubReasoningBackend,
   type ReasoningBackend,
 } from './reasoning-backend.js';
-import { clearProviderHealth } from '../provider/provider-health-registry.js';
+import { clearProviderHealth, isInstanceDemoted } from '../provider/provider-health-registry.js';
 import { assertAdvisoryBackendPermission } from '../provider/provider-permission-profiles.js';
 import { z } from 'zod';
 import { pathResolver } from '../path-resolver.js';
@@ -23,6 +23,34 @@ import { withExecutionContextAsync } from '../authority.js';
 const visibilityRoot = pathResolver.sharedTmp(`reasoning-backend-visibility-${process.pid}`);
 
 describe('reasoning-backend', () => {
+  it('does not fail over or demote provider health after a local credential scope refusal', async () => {
+    clearProviderHealth();
+    let fallback = 0;
+    const backend = buildFailoverReasoningBackend([
+      {
+        provider: 'codex',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            throw new Error('[CREDENTIAL_SCOPE_DENIED] Runtime tenant changed');
+          },
+        },
+      },
+      {
+        provider: 'gemini',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            fallback += 1;
+            return 'wrong scope';
+          },
+        },
+      },
+    ]);
+    await expect(backend.prompt('hello')).rejects.toThrow('[CREDENTIAL_SCOPE_DENIED]');
+    expect(fallback).toBe(0);
+    expect(isInstanceDemoted('codex')).toBe(false);
+  });
   it('refuses unsupported planner candidates before any native invocation, including failover', async () => {
     const calls: string[] = [];
     const backend = buildFailoverReasoningBackend([
@@ -86,6 +114,97 @@ describe('reasoning-backend', () => {
     resetReasoningBackend();
     clearProviderHealth();
     safeRmSync(visibilityRoot, { recursive: true, force: true });
+  });
+
+  it('cools down only the rejected model and instance across calls', async () => {
+    let rejected = 0;
+    let sibling = 0;
+    const backend = buildFailoverReasoningBackend([
+      {
+        provider: 'codex',
+        instance: 'work',
+        model: 'restricted',
+        backend: {
+          ...stubReasoningBackend,
+          name: 'codex-cli',
+          prompt: async () => {
+            rejected++;
+            throw new Error('Model restricted is not supported for this account');
+          },
+        },
+      },
+      {
+        provider: 'codex',
+        instance: 'work',
+        model: 'available',
+        backend: {
+          ...stubReasoningBackend,
+          name: 'codex-cli',
+          prompt: async () => {
+            sibling++;
+            return 'ok';
+          },
+        },
+      },
+    ]);
+    await expect(backend.prompt('hello')).resolves.toBe('ok');
+    await expect(backend.prompt('hello again')).resolves.toBe('ok');
+    expect(rejected).toBe(1);
+    expect(sibling).toBe(2);
+    expect(isInstanceDemoted('codex', 'work')).toBe(false);
+    expect(isInstanceDemoted('codex', 'work', Date.now(), 'restricted')).toBe(true);
+    expect(isInstanceDemoted('codex', 'personal', Date.now(), 'restricted')).toBe(false);
+  });
+
+  it('honors provider reset headers for explicitly model-scoped rate limits', async () => {
+    process.env.KYBERION_REASONING_IN_PLACE_RETRIES = '0';
+    const started = Date.now();
+    const backend = buildFailoverReasoningBackend([
+      {
+        provider: 'anthropic',
+        model: 'limited',
+        backend: {
+          ...stubReasoningBackend,
+          name: 'anthropic',
+          prompt: async () => {
+            throw Object.assign(new Error('429 rate limit'), {
+              rateLimitScope: 'model',
+              response: { headers: new Headers({ 'Retry-After': '120' }) },
+            });
+          },
+        },
+      },
+      {
+        provider: 'anthropic',
+        model: 'other',
+        backend: { ...stubReasoningBackend, name: 'anthropic', prompt: async () => 'ok' },
+      },
+    ]);
+    await expect(backend.prompt('hello')).resolves.toBe('ok');
+    expect(isInstanceDemoted('anthropic')).toBe(false);
+    expect(isInstanceDemoted('anthropic', 'default', started + 90_000, 'limited')).toBe(true);
+    expect(isInstanceDemoted('anthropic', 'default', Date.now() + 120_001, 'limited')).toBe(false);
+  });
+
+  it('keeps ambiguous rate limits instance-wide and preserves their reset delay', async () => {
+    process.env.KYBERION_REASONING_IN_PLACE_RETRIES = '0';
+    const started = Date.now();
+    const backend = buildFailoverReasoningBackend([
+      {
+        provider: 'codex',
+        instance: 'work',
+        backend: {
+          ...stubReasoningBackend,
+          prompt: async () => {
+            throw Object.assign(new Error('429 rate limit'), { headers: { 'Retry-After': '120' } });
+          },
+        },
+      },
+      { provider: 'gemini', backend: { ...stubReasoningBackend, prompt: async () => 'ok' } },
+    ]);
+    await expect(backend.prompt('hello')).resolves.toBe('ok');
+    expect(isInstanceDemoted('codex', 'work', started + 90_000)).toBe(true);
+    expect(isInstanceDemoted('codex', 'personal', started + 90_000)).toBe(false);
   });
 
   it('defaults to the stub backend when none is registered', () => {

@@ -19,12 +19,28 @@ function isOptionalString(value: unknown): value is string | undefined {
   return value === undefined || typeof value === 'string';
 }
 
+export function hasValidCostCoverage(value: Record<string, unknown>): boolean {
+  return (
+    (value.referenceUsd === undefined || isFiniteNonNegative(value.referenceUsd)) &&
+    [
+      'includedCalls',
+      'unknownCostCalls',
+      'actualCostCalls',
+      'estimatedCostCalls',
+      'referenceCostCalls',
+    ].every((key) => value[key] === undefined || isNonNegativeInteger(value[key])) &&
+    (value.costComplete === undefined || typeof value.costComplete === 'boolean') &&
+    !(value.costComplete === true && Number(value.unknownCostCalls ?? 0) > 0)
+  );
+}
+
 function parseMissionBreakdown(value: unknown): CostSummary['missionBreakdown'] | undefined {
   if (!Array.isArray(value)) return undefined;
   const entries = value.map((entry) => {
     if (
       !isRecord(entry) ||
       !hasSafeKeys(entry) ||
+      !hasValidCostCoverage(entry) ||
       typeof entry.missionId !== 'string' ||
       !entry.missionId.trim() ||
       !isFiniteNonNegative(entry.tokens) ||
@@ -34,19 +50,28 @@ function parseMissionBreakdown(value: unknown): CostSummary['missionBreakdown'] 
     ) {
       return undefined;
     }
-    return entry as CostSummary['missionBreakdown'][number];
+    return {
+      ...entry,
+      missionId: entry.missionId,
+      tokens: entry.tokens,
+      usd: entry.usd,
+      entryCount: entry.entryCount,
+      ...(entry.lastSeen !== undefined ? { lastSeen: entry.lastSeen } : {}),
+    };
   });
   return entries.some((entry) => !entry) ? undefined : (entries as CostSummary['missionBreakdown']);
 }
 
 export function parseCostSummary(value: unknown): CostSummary | undefined {
-  if (!isRecord(value) || !hasSafeKeys(value)) return undefined;
+  if (!isRecord(value) || !hasSafeKeys(value) || !hasValidCostCoverage(value)) return undefined;
   if (
     !isFiniteNonNegative(value.totalTokens) ||
     !isFiniteNonNegative(value.totalUsd) ||
     !isNonNegativeInteger(value.entryCount) ||
     !isNonNegativeInteger(value.missionCount) ||
     !isOptionalString(value.since) ||
+    !isOptionalString(value.partialNotice) ||
+    (value.withheldPartitions !== undefined && !isNonNegativeInteger(value.withheldPartitions)) ||
     (value.budgetUsd !== undefined && !isFiniteNonNegative(value.budgetUsd)) ||
     (value.remainingUsd !== undefined &&
       value.remainingUsd !== null &&

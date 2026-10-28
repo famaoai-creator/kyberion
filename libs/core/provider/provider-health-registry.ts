@@ -52,6 +52,7 @@ export { listDemotedProviders } from './provider-health-view.js';
 export interface Demotion {
   provider: string;
   instance: string;
+  model?: string;
   until: number;
   reason: string;
 }
@@ -98,7 +99,7 @@ function ensureLoaded(now: number = Date.now()): void {
     for (const entry of parsed.demotions) {
       if (!entry?.provider || !entry.instance || !Number.isFinite(entry.until)) continue;
       if (entry.until <= now) continue; // TTL recovery across restarts
-      demotions.set(keyFor(entry.provider, entry.instance), entry);
+      demotions.set(keyFor(entry.provider, entry.instance, entry.model), entry);
     }
   } catch (err) {
     if (!/missing:/u.test(String(err))) {
@@ -141,8 +142,8 @@ export function getProviderHealthDemotionTtlMs(): number {
     : DEFAULT_DEMOTION_MS;
 }
 
-function keyFor(provider: string, instance: string): string {
-  return `${provider}#${instance}`;
+function keyFor(provider: string, instance: string, model?: string): string {
+  return JSON.stringify([provider, instance, model ?? null]);
 }
 
 /**
@@ -181,19 +182,26 @@ export function reportProviderRateLimited(
  */
 export function reportProviderTemporarilyUnhealthy(
   provider: string,
-  opts: { instance?: string; retryAfterMs?: number; reason?: string; now?: number } = {}
+  opts: {
+    instance?: string;
+    model?: string;
+    retryAfterMs?: number;
+    reason?: string;
+    now?: number;
+  } = {}
 ): void {
   const instance = opts.instance || DEFAULT_INSTANCE;
   const now = opts.now ?? Date.now();
   ensureLoaded(now);
   const ttl =
-    opts.retryAfterMs && opts.retryAfterMs > 0
+    opts.retryAfterMs !== undefined && Number.isFinite(opts.retryAfterMs) && opts.retryAfterMs >= 0
       ? opts.retryAfterMs
       : getProviderHealthDemotionTtlMs();
-  demotions.set(keyFor(provider, instance), {
+  demotions.set(keyFor(provider, instance, opts.model), {
     provider,
     instance,
-    until: now + ttl,
+    ...(opts.model ? { model: opts.model } : {}),
+    until: Math.ceil(now + ttl),
     reason: opts.reason || 'temporarily_unhealthy',
   });
   persist();
@@ -212,13 +220,14 @@ export function reportProviderHealthy(provider: string, instance: string = DEFAU
 export function isInstanceDemoted(
   provider: string,
   instance: string = DEFAULT_INSTANCE,
-  now: number = Date.now()
+  now: number = Date.now(),
+  model?: string
 ): boolean {
   ensureLoaded(now);
-  const entry = demotions.get(keyFor(provider, instance));
+  const entry = demotions.get(keyFor(provider, instance, model));
   if (!entry) return false;
   if (entry.until <= now) {
-    demotions.delete(keyFor(provider, instance));
+    demotions.delete(keyFor(provider, instance, model));
     return false;
   }
   return true;

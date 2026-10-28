@@ -4,6 +4,7 @@ import {
   applyCacheBreakpointToSystemBlocks,
   applyCacheBreakpointToTools,
   computeStablePrefixFingerprint,
+  DEFAULT_DEFERRED_TOOL_ANNOUNCEMENT_MAX_BYTES,
   appendDeferredToolAnnouncement,
   planDeferredToolLoading,
   promoteDeferredToolDeclarations,
@@ -102,6 +103,82 @@ describe('renderDeferredToolAnnouncement / promoteDeferredToolDeclarations', () 
     expect(text).toContain('compute_stats');
     expect(text).toContain('Computes summary statistics over a dataset.');
     expect(text).toContain('next context boundary');
+  });
+
+  it('drops descriptions before names when a catalog exceeds the complete announcement budget', () => {
+    const tools = Array.from({ length: 4 }, (_, index) => ({
+      name: `github_search_${index}`,
+      description: 'A lengthy description of GitHub issue searching. '.repeat(30),
+    }));
+    const text = renderDeferredToolAnnouncement(tools, { maxBytes: 400 })!;
+    for (const tool of tools) expect(text).toContain(tool.name);
+    expect(text).not.toContain('lengthy description');
+    expect(Buffer.byteLength(text, 'utf8')).toBeLessThanOrEqual(400);
+  });
+
+  it('summarizes thousands of tools by namespace without truncating their definitions', () => {
+    const tools = Array.from({ length: 5_000 }, (_, index) => ({
+      name: `mcp__${index % 2 ? 'github' : 'slack'}__operation_${index}`,
+      description: 'Search or update a remote object.',
+    }));
+    const plan = planDeferredToolLoading([], { deferredTools: tools });
+    expect(plan.deferred).toEqual(tools);
+    expect(plan.active).toEqual([]);
+    expect(plan.announcement).toContain('5000 deferred tools in 2 namespaces');
+    expect(plan.announcement).toContain('mcp:github: 2500 tools');
+    expect(plan.announcement).toContain('mcp:slack: 2500 tools');
+    expect(plan.announcement).toContain('Search the governed catalog');
+    expect(Buffer.byteLength(plan.announcement!, 'utf8')).toBeLessThanOrEqual(
+      DEFAULT_DEFERRED_TOOL_ANNOUNCEMENT_MAX_BYTES
+    );
+    expect(plan.announcement).toBe(renderDeferredToolAnnouncement(tools));
+  });
+
+  it('counts UTF-8 bytes and bounds an overview even with many long Unicode namespaces', () => {
+    const tools = Array.from({ length: 100 }, (_, index) => ({
+      name: `mcp__接続先${index}😀${'界'.repeat(100)}__操作`,
+      description: '日本語の説明😀'.repeat(100),
+    }));
+    const text = renderDeferredToolAnnouncement(tools, { maxBytes: 256 })!;
+    expect(Buffer.byteLength(text, 'utf8')).toBeLessThanOrEqual(256);
+    expect(text).toContain('100 deferred tools');
+    expect(text).toContain('100 other namespaces omitted');
+    expect(text).not.toContain('\uFFFD');
+  });
+
+  it('filters role-denied tools before counting and grouping a bounded catalog', () => {
+    const visible = Array.from({ length: 50 }, (_, index) => ({
+      name: `mcp__public__read_${index}`,
+      description: 'Read governed public data.',
+      allowed_roles: ['agent'],
+    }));
+    const plan = planDeferredToolLoading(
+      [
+        ...visible,
+        {
+          name: 'mcp__private__deploy',
+          description: 'Secret deployment.',
+          allowed_roles: ['admin'],
+        },
+      ],
+      {
+        role: 'agent',
+        deferredToolNames: visible.map((tool) => tool.name),
+        announcement: { maxBytes: 256 },
+      }
+    );
+    expect(plan.announcement).toContain('50 deferred tools in 1 namespaces');
+    expect(plan.announcement).not.toContain('private');
+    expect(plan.announcement).not.toContain('Secret');
+    expect(plan.deferred).toEqual(visible);
+  });
+
+  it('rejects invalid budgets rather than silently producing an unbounded catalog', () => {
+    for (const maxBytes of [NaN, Infinity, -1, 0, 255, 300.5]) {
+      expect(() =>
+        renderDeferredToolAnnouncement([{ name: 'read_file', description: 'Read.' }], { maxBytes })
+      ).toThrow(/DEFERRED_TOOL_BUDGET_INVALID/);
+    }
   });
 
   it('promotes deferred declarations after the stable ones, only when explicitly called', () => {

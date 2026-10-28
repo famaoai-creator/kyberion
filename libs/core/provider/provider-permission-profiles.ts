@@ -1,4 +1,7 @@
 import { getSubagentCapabilityProfile } from '../subagent-capability-profiles.js';
+import { resolveTaskProviderEnvironment } from '../foundation/credential-binding.js';
+import { credentialExecutionIdentity } from '../foundation/credential-binding.js';
+import { assertIsolatedProviderHome } from './provider-auth-home.js';
 import {
   listCliReasoningProviderDescriptors,
   resolveReasoningProviderDescriptor,
@@ -461,7 +464,14 @@ export function buildProviderChildEnv({
   provider,
   baseEnv = process.env,
 }: BuildProviderChildEnvInput): NodeJS.ProcessEnv {
-  if (isProviderEnvAllowlistDisabled(baseEnv)) {
+  const bound = resolveTaskProviderEnvironment(provider);
+  if (bound) {
+    const tenant = credentialExecutionIdentity().tenantSlug;
+    if (!tenant) throw new Error('[CREDENTIAL_HOME_INVALID] Runtime tenant is missing');
+    assertIsolatedProviderHome(bound, tenant);
+    baseEnv = bound;
+  }
+  if (!bound && isProviderEnvAllowlistDisabled(baseEnv)) {
     return { ...baseEnv };
   }
 
@@ -474,6 +484,13 @@ export function buildProviderChildEnv({
   const result: Record<string, string> = {};
   for (const [key, value] of Object.entries(baseEnv)) {
     if (value === undefined) continue;
+    // A credential resolver supplies credentials, never a new child authority or runtime identity.
+    if (
+      bound &&
+      (key.startsWith(KYBERION_PREFIX) || key === 'MISSION_ID') &&
+      !ownCredentialKeys.has(key)
+    )
+      continue;
 
     if (CREDENTIAL_ENV_PATTERN.test(key)) {
       // Deny-list: only this provider's own declared credential vars may
@@ -495,5 +512,11 @@ export function buildProviderChildEnv({
     }
   }
 
+  if (bound) {
+    const identity = credentialExecutionIdentity();
+    result.KYBERION_TENANT = identity.tenantSlug!;
+    if (identity.missionId) result.MISSION_ID = identity.missionId;
+    if (identity.taskId) result.KYBERION_TASK_ID = identity.taskId;
+  }
   return result as NodeJS.ProcessEnv;
 }

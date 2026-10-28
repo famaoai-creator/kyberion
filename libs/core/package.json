@@ -3988,6 +3988,10 @@
       "types": "./dist/oauth-broker.d.ts",
       "default": "./dist/oauth-broker.js"
     },
+    "./oauth-session-store": {
+      "types": "./dist/oauth-session-store.d.ts",
+      "default": "./dist/oauth-session-store.js"
+    },
     "./obs-virtual-camera-output": {
       "types": "./dist/obs-virtual-camera-output.d.ts",
       "default": "./dist/obs-virtual-camera-output.js"
@@ -4075,6 +4079,14 @@
     "./ops-alert": {
       "types": "./dist/ops-alert.d.ts",
       "default": "./dist/ops-alert.js"
+    },
+    "./scheduler-incidents": {
+      "types": "./dist/scheduler-incidents.d.ts",
+      "default": "./dist/scheduler-incidents.js"
+    },
+    "./verification-source-snapshot": {
+      "types": "./dist/verification-source-snapshot.d.ts",
+      "default": "./dist/verification-source-snapshot.js"
     },
     "./ops-health-probe": {
       "types": "./dist/ops-health-probe.d.ts",

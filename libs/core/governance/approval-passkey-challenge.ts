@@ -23,7 +23,7 @@
  */
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { withLockSync } from '../lock-utils.js';
-import type { GovernedArtifactRole } from '../workforce/artifact-store.js';
+import type { ApprovalStoreRole } from './approval-store-role.js';
 import {
   approvalPasskeyChallengesLogicalDirAt,
   locateApprovalRequest,
@@ -127,7 +127,7 @@ function challengeLogicalPath(location: ChallengeLocation, challengeId: string):
 }
 
 function writeChallenge(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   location: ChallengeLocation,
   record: ApprovalPasskeyChallengeRecord
 ): void {
@@ -228,7 +228,7 @@ function acceptsDecision(record: ApprovalRequestRecord): boolean {
  * request if that comes first.
  */
 export function issueApprovalPasskeyChallenge(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     record: ApprovalRequestRecord;
     storageChannel: string;
@@ -282,7 +282,7 @@ export function issueApprovalPasskeyChallenge(
 
 /** Claim the challenge for one verification attempt; a second attempt is refused. */
 export function claimApprovalPasskeyChallenge(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   expected: ChallengeExpectation
 ): ApprovalPasskeyChallengeRecord {
   return withChallengeLock(expected.storageChannel, expected.challengeId, () => {
@@ -298,7 +298,7 @@ export function claimApprovalPasskeyChallenge(
 
 /** Record that the claimed challenge's assertion verified against `credentialId`. */
 export function markApprovalPasskeyChallengeVerified(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   claimed: ApprovalPasskeyChallengeRecord,
   credentialId: string,
   now: Date = new Date()
@@ -321,7 +321,7 @@ export function markApprovalPasskeyChallengeVerified(
  * request, decision and presented digest.
  */
 export function consumeApprovalPasskeyChallenge(
-  role: GovernedArtifactRole,
+  role: ApprovalStoreRole,
   params: {
     storageChannel: string;
     challengeId: string | undefined;

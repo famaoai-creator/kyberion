@@ -244,6 +244,10 @@ describe('mission retrospective loop', () => {
   });
 
   it('collects deterministic execution stats from mission records', () => {
+    fs.appendFileSync(
+      path.join(tmpRoot, 'work', 'metrics', 'execution-metrics.jsonl'),
+      JSON.stringify({ mission_id: MISSION, component: 'catalog-refresh', duration_ms: 10 }) + '\n'
+    );
     const stats = mod.collectMissionExecutionStats(MISSION);
     expect(stats.task_total).toBe(3);
     expect(stats.tasks_by_role).toEqual({ implementer: 1, reviewer: 1, qa: 1 });
@@ -257,10 +261,11 @@ describe('mission retrospective loop', () => {
       prompt_tokens: 110,
       completion_tokens: 45,
       total_tokens: 155,
-      // The supervisor entry has no registry under KYBERION_ROOT, and the
-      // default cost rate is zero since the fallback registry was removed, so
-      // only the execution-metrics entry contributes cost.
+      // Supervisor token observations have no monetary evidence, so only the
+      // execution-metrics entry contributes a known cash subtotal.
       cost_usd: 0.0123,
+      unknown_cost_entries: 1,
+      cost_complete: false,
       entries: 2,
     });
     expect(stats.token_usage.by_model['agy-runtime-model']).toMatchObject({
@@ -268,7 +273,12 @@ describe('mission retrospective loop', () => {
       completion_tokens: 5,
       total_tokens: 15,
     });
-    expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0.02 });
+    expect(stats.resource_usage).toMatchObject({
+      entries: 1,
+      cost_usd: 0.02,
+      cost_complete: true,
+      unknown_cost_entries: 0,
+    });
   });
 
   it('merges the legacy supervisor file with rotated dated files (AC-10)', () => {
@@ -450,10 +460,20 @@ describe('mission retrospective loop', () => {
         state: { tier: 'public' },
         collector: new MetricsCollector({ metricsDir: path.join(tmpRoot, 'work', 'metrics') }),
       });
-      expect(entry).toMatchObject({ status: 'estimated', source: 'direct_cli', cost_usd: 0 });
+      expect(entry).toMatchObject({
+        status: 'estimated',
+        source: 'direct_cli',
+        cost_usd: null,
+        cost_status: 'unknown',
+      });
 
       const stats = mod.collectMissionExecutionStats(MISSION);
-      expect(stats.resource_usage).toEqual({ entries: 1, cost_usd: 0 });
+      expect(stats.resource_usage).toMatchObject({
+        entries: 1,
+        cost_usd: 0,
+        cost_complete: false,
+        unknown_cost_entries: 1,
+      });
       expect(stats.usage_unrecorded).toBe(false);
     });
 
@@ -495,7 +515,12 @@ describe('mission retrospective loop', () => {
       );
 
       const stats = mod.collectMissionExecutionStats(MISSION);
-      expect(stats.resource_usage).toEqual({ entries: 2, cost_usd: 0 });
+      expect(stats.resource_usage).toMatchObject({
+        entries: 2,
+        cost_usd: 0,
+        cost_complete: false,
+        unknown_cost_entries: 2,
+      });
       expect(stats.usage_unrecorded).toBe(false);
     });
 

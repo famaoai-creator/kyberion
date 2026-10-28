@@ -276,6 +276,28 @@ describe('acceptance #1: goal-driven work item runs multi-turn to structured com
     expect(journal.summary().goalState).toBeNull();
   });
 
+  it('uses continuous supervision for admitted work items beyond 100 turns', async () => {
+    const backend = scriptedBackend([
+      ...Array.from({ length: 102 }, (_, i) => ({ text: `verified progress ${i}` })),
+      goalUpdate({ status: 'complete', reason: 'acceptance verified' }),
+    ]);
+    const admission = vi.fn(() => ({ decision: 'enter' as const }));
+    const result = await runGoalDrivenWorkItem({
+      missionId: 'MSN-GD-1',
+      task: { task_id: 'T-continuous', goal_driven: true, description: 'continuous work' },
+      preStep: [admission],
+      seams: {
+        backend,
+        stream,
+        injectionRegistry,
+        journal: freshJournal(),
+        reportBlockerToMission: vi.fn(),
+      },
+    });
+    expect(result).toMatchObject({ finalState: 'complete', turnsRun: 103 });
+    expect(admission).toHaveBeenCalledTimes(103);
+  });
+
   it('honors an opt-in KD-02 turn budget without inventing one', async () => {
     // turnBudget of 1: after one continue turn the budget is reached; because the
     // turn ended in a tool call, a grace step runs and the goal settles blocked.
@@ -287,6 +309,7 @@ describe('acceptance #1: goal-driven work item runs multi-turn to structured com
 
     const result = await runGoalDrivenWorkItem({
       missionId: 'MSN-GD-BUDGET',
+      preStep: [() => ({ decision: 'enter' })],
       task: {
         task_id: 'TB',
         goal_driven: true,

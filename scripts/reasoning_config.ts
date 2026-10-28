@@ -104,7 +104,13 @@ function selectRole(
 function listRoutes(asJson: boolean, print: (value: unknown) => void): void {
   const routes = Object.keys(loadReasoningRoutePolicy().roles).map((role) => {
     try {
-      return resolveReasoningRoute({ role });
+      const route = resolveReasoningRoute({ role });
+      return {
+        ...route,
+        requestedRole: role,
+        effectiveRole: route.role,
+        inheritsDefault: role !== route.role && route.role === 'default',
+      };
     } catch (error) {
       return { role, error: error instanceof Error ? error.message : String(error) };
     }
@@ -115,7 +121,7 @@ function listRoutes(asJson: boolean, print: (value: unknown) => void): void {
       .map((route) =>
         'error' in route
           ? `${route.role}: ERROR ${route.error}`
-          : `${route.role}: ${route.profileRef} (${route.mode}${route.model ? `:${route.model}` : ''}) candidates=${route.candidates.join(' -> ')}`
+          : `${route.requestedRole}${route.inheritsDefault ? ' (inherits default)' : ''}: ${route.profileRef} (${route.mode}${route.model ? `:${route.model}` : ''}) candidates=${route.candidates.join(' -> ')}`
       )
       .join('\n')
   );
@@ -124,9 +130,14 @@ function listRoutes(asJson: boolean, print: (value: unknown) => void): void {
 function explainRoute(argv: string[], asJson: boolean, print: (value: unknown) => void): void {
   const role = normalizeReasoningRole(option(argv, '--role'));
   const route = resolveReasoningRoute({ role });
-  if (asJson) return print(route);
+  const identity = {
+    requestedRole: role,
+    effectiveRole: route.role,
+    inheritsDefault: role !== route.role && route.role === 'default',
+  };
+  if (asJson) return print({ ...route, ...identity });
   const lines = [
-    `role=${route.role}`,
+    `role=${role}${identity.inheritsDefault ? ' inherits=default' : ''} effective_role=${route.role}`,
     `selected=${route.profileRef} adapter=${route.adapter} mode=${route.mode} model=${route.model || '(provider default)'}`,
     `capabilities=${route.capabilities.join(',')}`,
     `candidates=${route.candidates.join(' -> ')}`,

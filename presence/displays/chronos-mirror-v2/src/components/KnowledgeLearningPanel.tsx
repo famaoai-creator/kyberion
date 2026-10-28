@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Badge, Button, Callout, KeyValue } from '@agent/shared-ui';
+import { Badge, Button, Callout, Disclosure, KeyValue } from '@agent/shared-ui';
 import { WsPreformatted, WsTextareaField } from './ChronosWsParts';
 import { uxText, type SupportedLocale } from '../lib/ux-vocabulary';
 import type {
@@ -77,6 +77,38 @@ export function KnowledgeLearningPanel({
         candidate.scope
       )
     : null;
+  // The review acts on saved server state, never on the unsaved editor values.
+  // Show the same payload and identity in editable and read-only views so a
+  // reviewer can tell which revision a shared approval actually covers.
+  const savedPreview = saved ? (
+    <div className="grid gap-2">
+      <h3 className="chronos-feed__title">{saved.title}</h3>
+      <p className="kb-text kb-text--body">{saved.summary}</p>
+      <WsPreformatted text={saved.content} title={uxText('chronos_learning_content', locale)} />
+      <WsPreformatted
+        text={saved.evidence_refs.join('\n')}
+        title={uxText('chronos_learning_evidence', locale)}
+      />
+      <KeyValue
+        items={[
+          {
+            label: uxText('chronos_ws_source', locale),
+            value: candidate.source_ref || '-',
+            mono: true,
+          },
+          ...(learning.payloadDigest
+            ? [
+                {
+                  label: uxText('chronos_learning_payload_digest', locale),
+                  value: learning.payloadDigest,
+                  mono: true,
+                },
+              ]
+            : []),
+        ]}
+      />
+    </div>
+  ) : null;
   return (
     <div className="grid gap-4">
       <Badge
@@ -121,6 +153,13 @@ export function KnowledgeLearningPanel({
         />
       ) : null}
       {learning.reason ? <p className="kb-text kb-text--muted">{learning.reason}</p> : null}
+      {learning.state === 'pending' ? (
+        <Callout
+          tone="info"
+          title={learningStateLabel(learning.state, locale)}
+          body={uxText('chronos_learning_pending_not_published', locale)}
+        />
+      ) : null}
       {editable && localAdmin ? (
         <fieldset
           disabled={blocked}
@@ -176,16 +215,13 @@ export function KnowledgeLearningPanel({
             <p className="kb-text kb-text--muted">{uxText('chronos_learning_unsaved', locale)}</p>
           ) : null}
         </fieldset>
-      ) : saved ? (
-        <div className="grid gap-2">
-          <h3 className="chronos-feed__title">{saved.title}</h3>
-          <p className="kb-text kb-text--body">{saved.summary}</p>
-          <WsPreformatted text={saved.content} title={uxText('chronos_learning_content', locale)} />
-          <WsPreformatted
-            text={saved.evidence_refs.join('\n')}
-            title={uxText('chronos_learning_evidence', locale)}
-          />
-        </div>
+      ) : (
+        savedPreview
+      )}
+      {editable && localAdmin && savedPreview ? (
+        <Disclosure summary={uxText('chronos_learning_saved_preview', locale)}>
+          {savedPreview}
+        </Disclosure>
       ) : null}
       <div className="flex flex-wrap gap-2">
         {onReject && ['queued', 'approved'].includes(candidate.status) ? (

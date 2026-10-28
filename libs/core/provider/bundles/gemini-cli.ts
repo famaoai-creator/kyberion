@@ -11,7 +11,7 @@ import { GeminiCliVoiceBridge } from '../gemini-cli-voice-bridge.js';
 registerCliProviderBundle('gemini-cli', (options) => {
   const env = cliProviderEnv(options);
   const { mode, provider } = options;
-  const backend = buildGeminiCliBackendFromEnv(env, options.model);
+  const backend = buildGeminiCliBackendFromEnv(env, options.model, options.timeoutMs);
   if (!backend && !options.force) return null;
   if (!backend) return null;
   const geminiOptions = {

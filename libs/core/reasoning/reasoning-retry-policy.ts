@@ -9,8 +9,12 @@ export const AUTH_FAILURE_PATTERN =
 export const AUTH_FAILURE_DEMOTION_MS = 6 * 60 * 60 * 1000;
 export const DEFAULT_IN_PLACE_RETRIES = 3;
 export const DEFAULT_RETRY_BASE_MS = 250;
-export function resolveDemotionRetryAfterMs(message: string): number | undefined {
-  return AUTH_FAILURE_PATTERN.test(message) ? AUTH_FAILURE_DEMOTION_MS : undefined;
+export function resolveDemotionRetryAfterMs(error: unknown): number | undefined {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    readRetryAfterMs(error) ??
+    (AUTH_FAILURE_PATTERN.test(message) ? AUTH_FAILURE_DEMOTION_MS : undefined)
+  );
 }
 
 export function readRetryAfterMs(error: unknown): number | undefined {
@@ -25,10 +29,13 @@ export function readRetryAfterMs(error: unknown): number | undefined {
   const direct = candidate.retryAfterMs ?? candidate.retry_after_ms;
   if (typeof direct === 'number' && Number.isFinite(direct) && direct >= 0) return direct;
 
+  const header = (headers: unknown): unknown => {
+    if (!headers || typeof headers !== 'object') return undefined;
+    if ('get' in headers && typeof headers.get === 'function') return headers.get('retry-after');
+    return Object.entries(headers).find(([key]) => key.toLowerCase() === 'retry-after')?.[1];
+  };
   const headerValue =
-    candidate.retryAfter ??
-    candidate.headers?.['retry-after'] ??
-    candidate.response?.headers?.['retry-after'];
+    candidate.retryAfter ?? header(candidate.headers) ?? header(candidate.response?.headers);
   if (typeof headerValue === 'number' && Number.isFinite(headerValue) && headerValue >= 0) {
     return headerValue * 1000;
   }

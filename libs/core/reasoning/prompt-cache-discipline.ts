@@ -168,6 +168,15 @@ export interface DeferredToolLoadingPlan<T extends DeferredToolDeclaration> {
   announcement: string | null;
 }
 
+/** A byte limit stays deterministic across providers and counts CJK/emoji safely.
+ * It deliberately does not pretend to be an exact model-token measurement. */
+export const DEFAULT_DEFERRED_TOOL_ANNOUNCEMENT_MAX_BYTES = 16_000;
+
+export interface DeferredToolAnnouncementOptions {
+  /** Includes the heading and discovery guidance, not just catalog rows. */
+  maxBytes?: number;
+}
+
 /**
  * Resolve a role-scoped tool surface without mutating the stable prefix.
  *
@@ -183,6 +192,7 @@ export function planDeferredToolLoading<T extends DeferredToolDeclaration>(
     role?: string;
     deferredToolNames?: readonly string[];
     deferredTools?: readonly T[];
+    announcement?: DeferredToolAnnouncementOptions;
   } = {}
 ): DeferredToolLoadingPlan<T> {
   const byName = new Map<string, T>();
@@ -241,7 +251,7 @@ export function planDeferredToolLoading<T extends DeferredToolDeclaration>(
   return {
     active: [...active],
     deferred: [...deferred],
-    announcement: renderDeferredToolAnnouncement(deferred),
+    announcement: renderDeferredToolAnnouncement(deferred, options.announcement),
   };
 }
 
@@ -269,15 +279,60 @@ export function appendDeferredToolAnnouncement(
  * `Tool.deferred` pattern and rule 4 above.
  */
 export function renderDeferredToolAnnouncement(
-  tools: readonly DeferredToolDeclaration[]
+  tools: readonly DeferredToolDeclaration[],
+  options: DeferredToolAnnouncementOptions = {}
 ): string | null {
   if (tools.length === 0) return null;
-  return [
+  const maxBytes = options.maxBytes ?? DEFAULT_DEFERRED_TOOL_ANNOUNCEMENT_MAX_BYTES;
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 256) {
+    throw new Error('[DEFERRED_TOOL_BUDGET_INVALID] maxBytes must be an integer of at least 256.');
+  }
+  const heading = [
     'New capability available starting this turn. It is not yet declared in the',
     'tool schema — describe your intended call in prose and it will be promoted',
     'to a schema-declared tool at the next context boundary:',
-    ...tools.map((tool) => `- ${tool.name}: ${tool.description}`),
   ].join('\n');
+  // A small catalog retains its descriptions. A large catalog first loses
+  // descriptions, then becomes an overview; the underlying definitions and
+  // their authority never change merely because their display is abbreviated.
+  for (const includeDescriptions of [true, false]) {
+    const listing = [
+      heading,
+      ...tools.map((tool) =>
+        includeDescriptions ? `- ${tool.name}: ${tool.description}` : `- ${tool.name}`
+      ),
+    ].join('\n');
+    if (Buffer.byteLength(listing, 'utf8') <= maxBytes) return listing;
+  }
+
+  const groups = new Map<string, number>();
+  for (const tool of tools) {
+    // Group only by an explicit namespace. An underscore in a local tool's
+    // name is not evidence of an external server or provider.
+    const parts = tool.name.trim().split('__');
+    const group =
+      parts.length >= 3
+        ? `${parts[0]}:${parts[1]}`
+        : tool.name.trim().match(/^([^:.]+)[:.]/u)?.[1] || 'local';
+    groups.set(group, (groups.get(group) ?? 0) + 1);
+  }
+  const rows = [...groups].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  const lines = [
+    `${tools.length} deferred tools in ${rows.length} namespaces (listing abbreviated).`,
+    'Search the governed catalog or describe the capability needed for activation at the next context boundary.',
+  ];
+  let omitted = rows.length;
+  for (const [group, count] of rows) {
+    const row = `- ${group}: ${count} tools`;
+    const remaining = omitted - 1;
+    const footer = remaining > 0 ? [`- ${remaining} other namespaces omitted.`] : [];
+    if (Buffer.byteLength([...lines, row, ...footer].join('\n'), 'utf8') <= maxBytes) {
+      lines.push(row);
+      omitted = remaining;
+    }
+  }
+  if (omitted > 0) lines.push(`- ${omitted} other namespaces omitted.`);
+  return lines.join('\n');
 }
 
 /**

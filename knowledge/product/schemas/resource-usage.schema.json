@@ -30,7 +30,13 @@
     "quantity": { "type": "number", "minimum": 0 },
     "unit": { "type": "string", "minLength": 1 },
     "unit_cost_usd": { "type": "number", "minimum": 0 },
-    "cost_usd": { "type": "number", "minimum": 0 },
+    "cost_usd": { "type": ["number", "null"], "minimum": 0 },
+    "cost_status": { "type": "string", "enum": ["actual", "estimated", "included", "unknown"] },
+    "billing_mode": { "type": "string", "enum": ["metered", "subscription_included", "unknown"] },
+    "usage_source": { "type": "string", "enum": ["provider", "character_estimate", "unknown"] },
+    "cost_source": { "type": "string", "enum": ["provider_report", "model_registry", "none"] },
+    "reported_cost_usd": { "type": "number", "minimum": 0 },
+    "reference_cost_usd": { "type": "number", "minimum": 0 },
     "status": { "type": "string", "enum": ["actual", "estimated", "committed"] },
     "source": { "type": "string", "minLength": 1 },
     "scope_invalid": {
@@ -73,5 +79,14 @@
       "additionalProperties": true
     },
     "metadata": { "type": "object", "additionalProperties": true }
-  }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "cost_usd": { "type": "null" } }, "required": ["cost_usd"] },
+      "then": {
+        "required": ["cost_status"],
+        "properties": { "cost_status": { "const": "unknown" } }
+      }
+    }
+  ]
 }
