@@ -19,6 +19,7 @@ const allowedManagedProcessConsumers = [
   'libs/core/managed-process.watch.test.ts',
   // Detached mobile-mirror daemon: owned, supervised child; ops coordinate via state file + SIGTERM.
   'libs/shared-mobile/src/mirror-session.ts',
+  'libs/shared-mobile/src/mirror-daemon.ts',
   // Real child-process races validate atomic WorkItem persistence and claims.
   'libs/core/workforce/work-coordination.atomic.test.ts',
   'libs/core/dot/dot-admission-recovery.test.ts',
