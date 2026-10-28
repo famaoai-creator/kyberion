@@ -10,6 +10,12 @@
 import { assertBackgroundReviewOperationAllowed } from './background-review-policy.js';
 import { listApprovalRequests } from '../governance/approval-store-reader.js';
 import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
+import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
+import { readTextFile } from '../foundation/text.js';
+import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
+import { assertMemoryScope } from '../knowledge/memory-scope.js';
 import {
   loadDistillCandidateRecord,
   listDistillCandidateRecords,
@@ -111,6 +117,83 @@ function timestampFor(record: DistillCandidateRecord): number {
   );
 }
 
+/** Read only public catalogs and this tenant's catalog; an incomplete scan protects all records. */
+function retentionReferences(scope?: MemoryScopeEnvelope): {
+  values: Set<string>;
+  complete: boolean;
+} {
+  const values = new Set<string>();
+  let complete = true;
+  let files = 0;
+  const roots = [
+    'pipelines',
+    'knowledge/product/pipeline-templates',
+    runtimeStatePath('pipeline.scheduleRegistry').physicalPath,
+    'knowledge/product/orchestration/procedures.json',
+  ];
+  if (scope) {
+    const canonical = assertMemoryScope(scope);
+    if (canonical.tenant_slug)
+      roots.push(`knowledge/confidential/${canonical.tenant_slug}/pipelines`);
+  }
+  const collect = (value: unknown): void => {
+    if (typeof value === 'string') values.add(value.replace(/^\.\//, ''));
+    else if (Array.isArray(value)) value.forEach(collect);
+    else if (value && typeof value === 'object') Object.values(value).forEach(collect);
+  };
+  const visit = (relative: string, depth = 0): void => {
+    if (depth > 12 || files > 2048) {
+      complete = false;
+      return;
+    }
+    const absolute = assertSafeRepositoryPath(pathResolver.rootResolve(relative), {
+      allowMissingLeaf: true,
+    });
+    if (!safeExistsSync(absolute)) return;
+    const stat = safeLstat(absolute);
+    if (stat.isSymbolicLink()) {
+      complete = false;
+      return;
+    }
+    if (stat.isDirectory()) {
+      for (const name of safeReaddir(absolute)) visit(path.posix.join(relative, name), depth + 1);
+    } else if (stat.isFile() && relative.endsWith('.json')) {
+      files += 1;
+      if (stat.size > 2 * 1024 * 1024) {
+        complete = false;
+        return;
+      }
+      try {
+        collect(JSON.parse(readTextFile(absolute)));
+      } catch {
+        complete = false;
+      }
+    }
+  };
+  for (const root of roots) {
+    try {
+      visit(root);
+    } catch {
+      complete = false;
+    }
+  }
+  return { values, complete };
+}
+
+function referenceProtection(
+  record: DistillCandidateRecord,
+  references: ReturnType<typeof retentionReferences>
+): string[] {
+  if (!references.complete) return ['reference_scan_incomplete'];
+  const refs = [
+    record.candidate_id,
+    `candidate:${record.candidate_id}`,
+    record.promoted_ref,
+    typeof record.metadata?.target_ref === 'string' ? record.metadata.target_ref : undefined,
+  ];
+  return refs.some((ref) => ref && references.values.has(ref)) ? ['referenced_by_workflow'] : [];
+}
+
 export interface BackgroundReviewMaintenanceInput {
   candidateId: string;
   actorId: string;
@@ -173,7 +256,7 @@ function maintenanceResult(
     changed,
     dry_run: dryRun,
     pinned: maintenance?.pinned === true,
-    automatic_archive: maintenance?.automatic_archive !== false,
+    automatic_archive: maintenance?.automatic_archive === true,
   };
 }
 
@@ -254,6 +337,7 @@ export function curateBackgroundReviewProposals(
   const limit = positiveInteger(input.limit, DEFAULT_LIMIT);
   if (!Number.isFinite(nowMs)) throw new Error('[BACKGROUND_REVIEW_CURATOR] Invalid now timestamp');
   const records = listDistillCandidateRecords(input.scope);
+  const references = retentionReferences(input.scope);
   // The existing approval store is authoritative for work awaiting a decision or
   // application. Do not archive a proposal out from under either state.
   const listActiveApprovals = () =>
@@ -294,7 +378,8 @@ export function curateBackgroundReviewProposals(
     const maintenance = maintenanceFor(record);
     if (!maintenance) reasons.push('invalid_maintenance');
     if (maintenance?.pinned) reasons.push('pinned');
-    if (maintenance?.automatic_archive === false) reasons.push('automatic_archive_disabled');
+    if (maintenance?.automatic_archive !== true) reasons.push('automatic_archive_disabled');
+    reasons.push(...referenceProtection(record, references));
     if (hasActiveApproval(record, approvals)) reasons.push('active_approval');
     if (reasons.length) {
       result.protected_records.push(record.candidate_id);
@@ -327,7 +412,7 @@ export function curateBackgroundReviewProposals(
           !isBackgroundReviewProposal(current) ||
           !liveMaintenance ||
           liveMaintenance.pinned ||
-          liveMaintenance.automatic_archive === false ||
+          liveMaintenance.automatic_archive !== true ||
           !Number.isFinite(timestamp) ||
           nowMs - timestamp < maxAgeMs
         )
@@ -335,6 +420,7 @@ export function curateBackgroundReviewProposals(
         // Approval request creation holds this same candidate lock. Re-read
         // references here, rather than trusting the earlier scan snapshot.
         if (hasActiveApproval(current, listActiveApprovals())) return null;
+        if (referenceProtection(current, retentionReferences(input.scope)).length) return null;
         archived = true;
         return {
           status: 'archived',

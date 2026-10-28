@@ -2579,6 +2579,28 @@
       "group": "inspect"
     },
     {
+      "id": "script.learning.prepare",
+      "module": "scripts/learning_prepare.ts",
+      "command": "learning prepare",
+      "noun": "learning",
+      "verb": "prepare",
+      "audience": "operator",
+      "description": "cli_cmd_script_learning_prepare",
+      "group": "inspect",
+      "native_help": true
+    },
+    {
+      "id": "script.learning.reuse",
+      "module": "scripts/learning_reuse.ts",
+      "command": "learning reuse",
+      "noun": "learning",
+      "verb": "reuse",
+      "audience": "operator",
+      "description": "cli_cmd_script_learning_reuse",
+      "group": "inspect",
+      "native_help": true
+    },
+    {
       "id": "script.license.audit",
       "script": "license:audit",
       "command": "license audit",

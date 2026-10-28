@@ -2379,3 +2379,45 @@ Replay fake provider transport through the real goal loop and existing graders;
 preserve delivery quality before accepting cost/latency gains. Gates: source-snapshot
 and runtime-replay battery. See the [implementation record](../architecture/hermes-additional-adoption-implementation-2026-10.md)
 for adoption conditions and unmeasured real-service behavior.
+
+## Reusable learning, phase receipts and safe maintenance
+
+Rule: a learning request authorizes preparation of a candidate, not publication or
+execution. Use the existing candidate/review/approval stores. Prefer an existing
+asset and preserve its base digest; a repeated observation must not auto-approve
+a user-directed learning plan. Unverified drafts stay outside executable catalogs.
+
+Procedure: promote an ADF with its engine run ID and matching source digest/scope.
+Do not turn a trace label or valid schema into a successful execution claim.
+Keep source-run proof separate from the abstracted contract's validation. Known
+repository template installation is explicitly unverified distribution and retains
+project trust. Record reuse against captured execution/delivery bytes, never a
+later read of a changed file. A supplied recording must match its source snapshot
+before attributing a procedure verdict to that revision. Delivery, worker report,
+independent golden check and pipeline engine completion are distinct observations.
+Unavailable telemetry must not revoke an otherwise verified publication.
+
+Gate receipts are durable ordered history: never overwrite same-millisecond
+evaluations or use random UUID order as execution order. Rebuild phase projections
+from canonical receipts; preserve unresolved failures. Blocking contract failures
+with unchanged declared inputs must not redispatch. CLI, worker and finish use
+the same mission-relative input normalization; advisory gates remain advisory.
+
+Automatic archival requires explicit maintenance consent and a complete check of
+approval, pipeline, schedule and canonical procedure-catalog references. Origin
+does not grant maintenance authority. Rollback is a separate human-approved effect;
+validate the backup and current post-image, preserve later edits, and archive the
+reverted proposal while retaining its history and reverse backup.
+
+Gates: pipeline promotion evidence/integration, reusable-learning and promotion-lanes,
+mission AI-DLC projection/retry, knowledge reuse/verification and procedure dispatch,
+background-review curator/patch, Chronos learning panel/response tests.
+See [the reusable learning playbook](../orchestration/reusable-learning-playbook.ja.md).
+
+Run golden checks and mission/runtime bookkeeping separately from strict live-state
+leak tests: those processes legitimately write the same runtime floors that the
+test guard snapshots. Every journal fixture must clean up, including intentionally
+corrupt ones; an unrelated corrupt journal must not blind all reuse observations.
+Report incomplete evidence explicitly. Golden semantic snapshots omit the engine's
+volatile top-level run ID while preserving result statuses and user context.
+Gates: pipeline-run-journal/reuse and golden-output normalization regressions.

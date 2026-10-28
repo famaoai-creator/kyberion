@@ -1,9 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { capturePipelineResumePolicyEnvironment } from './pipeline-resume-policy-env.js';
 import {
-  createPipelineRunJournal,
+  createPipelineRunJournal as createJournal,
   hashPipelineOutput,
   loadPipelineRunJournal,
   newPipelineRunId,
@@ -11,6 +11,18 @@ import {
   pipelineJournalChannelSnapshot,
   readPipelineRunJournal,
 } from './pipeline-run-journal.js';
+
+const createdJournalPaths = new Set<string>();
+function createPipelineRunJournal(...args: Parameters<typeof createJournal>) {
+  const journal = createJournal(...args);
+  createdJournalPaths.add(journal.path);
+  return journal;
+}
+afterEach(() => {
+  vi.unstubAllEnvs();
+  for (const file of createdJournalPaths) safeRmSync(file, { force: true });
+  createdJournalPaths.clear();
+});
 
 describe('pipeline run journal', () => {
   it('captures runtime authority and overwrites caller-supplied authority claims', () => {

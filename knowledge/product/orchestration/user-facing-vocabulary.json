@@ -1863,6 +1863,76 @@
         "ja": "下書き",
         "qps-ploc": "⟦Ḓřȧƒŧ ŀőř⟧"
       },
+      "chronos_learning_reuse": {
+        "en": "Reuse of this revision",
+        "ja": "この版の再利用実績",
+        "qps-ploc": "⟦Řėůşė őƒ ŧħïş řėṽïşïőñ ŀőřėɱ ï⟧"
+      },
+      "chronos_learning_reuse_unavailable": {
+        "en": "Publication is verified. Reuse observations are currently unavailable.",
+        "ja": "公開は検証済みです。再利用の実績は現在確認できません。",
+        "qps-ploc": "⟦Ṗůƀŀïƈȧŧïőñ ïş ṽėřïƒïėḓ. Řėůşė őƀşėřṽȧŧïőñş ȧřė ƈůřřėñŧŀẏ ůñȧṽȧïŀȧƀŀė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chronos_learning_reuse_unverified": {
+        "en": "Published; not yet demonstrated",
+        "ja": "公開済み・再利用は未実証",
+        "qps-ploc": "⟦Ṗůƀŀïşħėḓ; ñőŧ ẏėŧ ḓėɱőñşŧřȧŧėḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "chronos_learning_reuse_observed": {
+        "en": "Observed; no verified success",
+        "ja": "利用観測あり・成功確認なし",
+        "qps-ploc": "⟦Őƀşėřṽėḓ; ñő ṽėřïƒïėḓ şůƈƈėşş ŀőřėɱ ïṗş⟧"
+      },
+      "chronos_learning_reuse_worker_reported": {
+        "en": "Worker reported completion; no independent check",
+        "ja": "worker 完了報告あり・独立検証なし",
+        "qps-ploc": "⟦Ẇőřķėř řėṗőřŧėḓ ƈőɱṗŀėŧïőñ; ñő ïñḓėṗėñḓėñŧ ƈħėƈķ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "chronos_learning_reuse_verified": {
+        "en": "This revision passed a success check",
+        "ja": "この版の成功条件を検証済み",
+        "qps-ploc": "⟦Ŧħïş řėṽïşïőñ ṗȧşşėḓ ȧ şůƈƈėşş ƈħėƈķ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "chronos_learning_reuse_deliveries": {
+        "en": "Delivered to workers",
+        "ja": "worker への配信数",
+        "qps-ploc": "⟦Ḓėŀïṽėřėḓ ŧő ẇőřķėřş ŀőřėɱ ⟧"
+      },
+      "chronos_learning_reuse_attempts": {
+        "en": "Observed attempts",
+        "ja": "観測した試行数",
+        "qps-ploc": "⟦Őƀşėřṽėḓ ȧŧŧėɱṗŧş ŀőřėɱ⟧"
+      },
+      "chronos_learning_reuse_checks": {
+        "en": "Successful independent checks / all checks",
+        "ja": "独立検証の成功数 / 検証数",
+        "qps-ploc": "⟦Şůƈƈėşşƒůŀ ïñḓėṗėñḓėñŧ ƈħėƈķş / ȧŀŀ ƈħėƈķş ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "chronos_learning_reuse_reports": {
+        "en": "Worker completion reports",
+        "ja": "worker の完了報告数",
+        "qps-ploc": "⟦Ẇőřķėř ƈőɱṗŀėŧïőñ řėṗőřŧş ŀőřėɱ ïṗ⟧"
+      },
+      "chronos_learning_reuse_unconfirmed": {
+        "en": "Incomplete reports",
+        "ja": "未完了の報告数",
+        "qps-ploc": "⟦Ïñƈőɱṗŀėŧė řėṗőřŧş ŀőřėɱ⟧"
+      },
+      "chronos_learning_reuse_interventions": {
+        "en": "Human interventions (unknown attempts)",
+        "ja": "人手介入数（未確認の試行数）",
+        "qps-ploc": "⟦Ħůɱȧñ ïñŧėřṽėñŧïőñş (ůñķñőẇñ ȧŧŧėɱṗŧş) ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "chronos_learning_reuse_unknown": {
+        "en": "unknown",
+        "ja": "未確認",
+        "qps-ploc": "⟦ůñķñőẇñ ŀőř⟧"
+      },
+      "chronos_learning_reuse_scope": {
+        "en": "Only this published revision and selected scope are counted. Delivery and worker reports do not prove success.",
+        "ja": "公開されたこの版と選択中の scope の実績です。配信や worker 報告だけでは成功と判定しません。",
+        "qps-ploc": "⟦Őñŀẏ ŧħïş ṗůƀŀïşħėḓ řėṽïşïőñ ȧñḓ şėŀėƈŧėḓ şƈőṗė ȧřė ƈőůñŧėḓ. Ḓėŀïṽėřẏ ȧñḓ ẇőřķėř řėṗőřŧş ḓő ñőŧ ṗřőṽė şůƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř⟧"
+      },
       "chronos_learning_pending": {
         "en": "Awaiting human review",
         "ja": "人間による確認待ち",
@@ -10174,6 +10244,16 @@
         "en": "Propose recurring runtime failures as learning candidates",
         "ja": "繰り返す実行時の失敗を学習候補として提案",
         "qps-ploc": "⟦Ṗřőṗőşė řėƈůřřïñɠ řůñŧïɱė ƒȧïŀůřėş ȧş ŀėȧřñïñɠ ƈȧñḓïḓȧŧėş ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_learning_prepare": {
+        "en": "Prepare an evidence-backed reusable improvement for review",
+        "ja": "証跡から再利用可能な改善案を作り確認に回す",
+        "qps-ploc": "⟦Ṗřėṗȧřė ȧñ ėṽïḓėñƈė-ƀȧƈķėḓ řėůşȧƀŀė ïɱṗřőṽėɱėñŧ ƒőř řėṽïėẇ ŀőřėɱ ïṗşůɱ ḓőŀőř ş⟧"
+      },
+      "cli_cmd_script_learning_reuse": {
+        "en": "Inspect reuse outcomes for the current asset revision",
+        "ja": "現在の資産の版に対する再利用実績を確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ řėůşė őůŧƈőɱėş ƒőř ŧħė ƈůřřėñŧ ȧşşėŧ řėṽïşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
       },
       "cli_cmd_script_ops_alerts": {
         "en": "Triage undelivered alerts",

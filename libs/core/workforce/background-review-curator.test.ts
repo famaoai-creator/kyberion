@@ -39,6 +39,7 @@ function createRecord(input: {
       input.origin === 'background_review_fork'
         ? {
             origin: 'background_review_fork',
+            maintenance: { automatic_archive: true },
             provenance: {
               generated_by: 'background-review-fork',
               session_id: 'CURATOR-TEST-SESSION',
@@ -64,6 +65,71 @@ afterEach(() => {
 });
 
 describe('background-review-curator', () => {
+  it('requires explicit maintenance consent and preserves workflow references', () => {
+    const record = createRecord({
+      candidateId: `CURATOR-REF-${process.pid}`,
+      origin: 'background_review_fork',
+    });
+    const ref = `pipelines/curator-reference-test-${process.pid}.json`;
+    try {
+      withExecutionContext('ecosystem_architect', () =>
+        safeWriteFile(
+          pathResolver.rootResolve(ref),
+          JSON.stringify({
+            action: 'pipeline',
+            version: '1.0.0',
+            steps: [],
+            learning_candidate: record.candidate_id,
+          })
+        )
+      );
+      const result = withExecutionContext('surface_runtime', () =>
+        curateBackgroundReviewProposals({ now: new Date(Date.now() + 30 * 86400000) })
+      );
+      expect(result.protected_reasons[record.candidate_id]).toContain('referenced_by_workflow');
+      withExecutionContext('surface_runtime', () =>
+        updateDistillCandidateRecord(record.candidate_id, {
+          metadata: {
+            ...record.metadata,
+            maintenance: {},
+          },
+        })
+      );
+      const held = withExecutionContext('surface_runtime', () =>
+        curateBackgroundReviewProposals({ now: new Date(Date.now() + 30 * 86400000) })
+      );
+      expect(held.protected_reasons[record.candidate_id]).toContain('automatic_archive_disabled');
+    } finally {
+      withExecutionContext('ecosystem_architect', () =>
+        safeRmSync(pathResolver.rootResolve(ref), { force: true })
+      );
+    }
+  });
+  it('protects references found only in the canonical procedure catalog', () => {
+    const record = createRecord({
+      candidateId: `CURATOR-CATALOG-${process.pid}`,
+      origin: 'background_review_fork',
+    });
+    const fixture = pathResolver.sharedTmp(`curator-procedure-reference-${process.pid}.json`);
+    createdPaths.push(fixture);
+    withExecutionContext('surface_runtime', () =>
+      safeWriteFile(
+        fixture,
+        JSON.stringify({ procedures: [{ learning_candidate: record.candidate_id }] })
+      )
+    );
+    const rootResolve = pathResolver.rootResolve.bind(pathResolver);
+    vi.spyOn(pathResolver, 'rootResolve').mockImplementation((...parts: string[]) =>
+      parts.length === 1 && parts[0] === 'knowledge/product/orchestration/procedures.json'
+        ? fixture
+        : rootResolve(...parts)
+    );
+    const result = withExecutionContext('surface_runtime', () =>
+      curateBackgroundReviewProposals({ now: new Date(Date.now() + 30 * 86400000) })
+    );
+    expect(result.protected_reasons[record.candidate_id]).toContain('referenced_by_workflow');
+    expect(result.archived).not.toContain(record.candidate_id);
+  });
   it('archives only stale background-review proposals and keeps the record reversible', () => {
     const stale = createRecord({
       candidateId: 'CURATOR-STALE-1',

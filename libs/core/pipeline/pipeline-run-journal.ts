@@ -65,6 +65,8 @@ export interface PipelineRunStartedPayload {
   pipeline_id: string;
   input_path: string;
   pipeline_sha256?: string;
+  /** Engine-created trace correlation, not accepted from pipeline context. */
+  trace_id?: string;
   mission_id?: string;
   step_ids: string[];
   /** Captured by the journal writer, never accepted from a pipeline payload. */
@@ -258,6 +260,7 @@ const pipelineStartedSchema = z.object({
     .string()
     .regex(/^[a-f0-9]{64}$/u)
     .optional(),
+  trace_id: z.string().min(1).optional(),
   mission_id: z.string().optional(),
   step_ids: z.array(z.string()),
   execution_authority: z

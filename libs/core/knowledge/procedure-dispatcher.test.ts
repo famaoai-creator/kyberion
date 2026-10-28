@@ -1034,6 +1034,11 @@ describe('dispatchProcedure — golden-scenario verdicts', () => {
     procedure: ProcedureEntry,
     conditions: GoldenScenario['success_conditions']
   ): ProcedureEntry {
+    safeWriteFile(
+      path.join(root, 'recording.json'),
+      JSON.stringify(procedure.adapter.executor === 'service:preset' ? serviceRecording() : CLICK) +
+        '\n'
+    );
     const goldenRef = saveGoldenScenario(
       {
         schema_version: 'golden-scenario.v1',
@@ -1053,6 +1058,29 @@ describe('dispatchProcedure — golden-scenario verdicts', () => {
   }
 
   const ledgerState = () => resolveKnowledgeVerification([recordingRef]).get(recordingRef);
+
+  it('does not credit changed stored bytes when a stale supplied recording executes successfully', async () => {
+    vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({
+      allowed: true,
+      status: 'approved',
+    });
+    const procedure = withGolden(SERVICE_PROCEDURE, [
+      { kind: 'response_field', params: { channel: 'issue_key' } },
+    ]);
+    safeWriteFile(
+      path.join(root, 'recording.json'),
+      JSON.stringify({ ...serviceRecording(), title: 'a different revision' })
+    );
+    const result = await dispatchProcedure({
+      procedure,
+      agentId: 'test-agent',
+      missionId: 'msn-1',
+      serviceRecording: serviceRecording(),
+      executePreset: async () => ({ issue_key: 'JIRA-1' }),
+    });
+    expect(result.golden?.verdict).toBe('pass');
+    expect(ledgerState()).toBeUndefined();
+  });
 
   it('passes a service run that produced what the golden scenario names, and records it', async () => {
     vi.spyOn(approvalGate, 'enforceApprovalGate').mockReturnValue({
