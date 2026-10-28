@@ -52,6 +52,7 @@ export const WORK_COORDINATION_ROOT_PATH = 'active/shared/runtime/work-coordinat
 
 /** Logical names preserve existing layouts; registration never grants access. */
 export const RUNTIME_STATE_PATHS = {
+  'pipeline.scheduleRegistry': 'active/shared/runtime/pipeline-schedules.json',
   'dot.wakeLedger': 'active/shared/runtime/dot-wake-ledger.jsonl',
   'dot.actionLedger': 'active/shared/runtime/dot-action-ledger.jsonl',
   'task.workspacesRoot': 'active/shared/runtime/workspaces',

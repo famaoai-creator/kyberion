@@ -28,6 +28,7 @@ import {
   verifyScopedLearningPublication,
 } from './scoped-learning-publication.js';
 import * as memoryQueue from './memory-promotion-queue.js';
+import * as reuseTelemetry from './knowledge-verification.js';
 import {
   curateScopedLearningCandidate,
   inspectScopedLearningCandidate,
@@ -339,6 +340,14 @@ describe('scoped learning UI workflow', () => {
       Promise.all([publishScopedLearningCandidate(input), publishScopedLearningCandidate(input)])
     );
     expect(first.learning.state).toBe('published');
+    const unavailable = vi.spyOn(reuseTelemetry, 'inspectKnowledgeReuse').mockImplementation(() => {
+      throw new Error('malformed observation ledger');
+    });
+    expect(inspectScopedLearningCandidate(f.address).learning).toMatchObject({
+      state: 'published',
+      reuseUnavailable: true,
+    });
+    unavailable.mockRestore();
     expect(second.learning.publication).toEqual(first.learning.publication);
     expect((await publishScopedLearningCandidate(input)).learning.publication).toEqual(
       first.learning.publication
