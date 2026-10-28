@@ -5,12 +5,14 @@ import {
   presentServiceChannels,
   snapshotElementsFromBrowserContext,
   verifyProcedureRun,
+  procedureVerificationDocument,
   type GoldenVerdict,
 } from './golden-scenario-verdict.js';
 import type { ScopeContext } from '../scope-context.js';
 import { logger } from '../core.js';
 import { t } from '../t.js';
 import { randomUUID } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { enforceApprovalGate } from '../governance/approval-gate.js';
 import { recordGovernanceAction } from '../governance/kill-switch.js';
 import { matchesAllowedOrigin } from '../origin-policy.js';
@@ -56,7 +58,18 @@ import {
   type DesktopPipeline,
 } from '../virtual/desktop-pipeline.js';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeMkdir, safeRmSync } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeMkdir,
+  safeRmSync,
+  safeReadFile,
+  safeLstat,
+} from '../secure-io.js';
+import {
+  createKnowledgeDeliverySnapshot,
+  knowledgeTextSha256,
+} from './knowledge-delivery-snapshot.js';
+import type { DeliveredKnowledgeRef } from './knowledge-feedback-loop.js';
 import { redactScreenCaptureFile } from '../virtual/screen-frame-redaction.js';
 
 /** Approval-gate operation id for external-effect service actions. */
@@ -182,7 +195,41 @@ export interface DispatchResult {
  * Agent-C (Dispatcher) in the intent-driven automation design.
  * Design: docs/INTENT_DRIVEN_BROWSER_AUTOMATION_DESIGN.ja.md §7 Layer③
  */
+const verificationSnapshots = new WeakMap<
+  DispatchInput,
+  { snapshot: DeliveredKnowledgeRef; receiptId: string }
+>();
+
 export async function dispatchProcedure(input: DispatchInput): Promise<DispatchResult> {
+  // Engine-owned pre-execution snapshot; a caller cannot attest which version ran.
+  input = { ...input };
+  if (input.recording) input.recording = structuredClone(input.recording);
+  if (input.serviceRecording) input.serviceRecording = structuredClone(input.serviceRecording);
+  const ref = procedureVerificationDocument(input.procedure);
+  if (ref) {
+    try {
+      const file = assertSafeRepositoryPath(pathResolver.rootResolve(ref));
+      if (safeLstat(file).isFile() && safeLstat(file).size <= 2 * 1024 * 1024) {
+        const text = String(safeReadFile(file, { encoding: 'utf8' }));
+        const executedRecording = input.serviceRecording || input.recording;
+        if (!executedRecording || !isDeepStrictEqual(JSON.parse(text), executedRecording))
+          throw new Error('The supplied execution recording differs from the stored revision');
+        verificationSnapshots.set(input, {
+          snapshot: {
+            path: ref,
+            snapshot: createKnowledgeDeliverySnapshot({
+              text,
+              form: 'pack',
+              source_sha256: knowledgeTextSha256(text),
+            }),
+          },
+          receiptId: knowledgeTextSha256(randomUUID()),
+        });
+      }
+    } catch {
+      /* No source snapshot means no revision-specific verification claim. */
+    }
+  }
   // Layer C substrate branch (design doc §7/§9): an execution-substrate route
   // (e.g. browser procedures authored for Playwright) wins over the adapter
   // executor, so the existing `extension_session` path never has to be edited
@@ -756,6 +803,9 @@ function verifyPlaywrightRun(input: DispatchInput, context: unknown): GoldenVerd
   const snapshotElements = snapshotElementsFromBrowserContext(context);
   return verifyProcedureRun({
     procedure: input.procedure,
+    requireDocumentSnapshot: true,
+    documentSnapshot: verificationSnapshots.get(input)?.snapshot,
+    receiptId: verificationSnapshots.get(input)?.receiptId,
     evidence: { substrate: 'browser', ...(snapshotElements ? { snapshotElements } : {}) },
     ...(input.verificationScope ? { scope: input.verificationScope } : {}),
   });
@@ -1034,6 +1084,9 @@ async function dispatchServiceSession(input: DispatchInput): Promise<DispatchRes
 
   const golden = verifyProcedureRun({
     procedure,
+    requireDocumentSnapshot: true,
+    documentSnapshot: verificationSnapshots.get(input)?.snapshot,
+    receiptId: verificationSnapshots.get(input)?.receiptId,
     evidence: {
       substrate: 'service',
       serviceResults: exec.results,

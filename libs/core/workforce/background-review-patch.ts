@@ -8,7 +8,7 @@
  * the caller's expected pre-image hash, keeps a governed backup, then writes.
  */
 
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { assertBackgroundReviewOperationAllowed } from './background-review-policy.js';
@@ -23,6 +23,8 @@ import { defineCatalog } from '../foundation/governed-catalog.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
+import { writeJson } from '../foundation/json.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { validatePipelineGuardrails } from '../pipeline/adf-guardrails.js';
 import { validatePipelineAdf } from '../pipeline/pipeline-contract.js';
 import {
@@ -75,7 +77,8 @@ export interface BackgroundMemoryConsolidationPatch {
 export type BackgroundReviewPatch =
   | BackgroundPipelineAppendStepPatch
   | BackgroundSkillAppendSectionPatch
-  | BackgroundMemoryConsolidationPatch;
+  | BackgroundMemoryConsolidationPatch
+  | { operation: 'restore_backup'; backup_ref: string; restore_sha256: string };
 
 export interface ApplyBackgroundReviewPipelinePatchInput {
   candidateId: string;
@@ -108,11 +111,12 @@ export interface BackgroundReviewApprovalRequestInput {
   missionId?: string;
   approvalChannel?: string;
   approvalThreadTs?: string;
+  rollback?: boolean;
 }
 
 export interface BackgroundReviewApprovalPreview {
   candidateId: string;
-  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
+  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation' | 'rollback';
   targetRef: string;
   expectedSha256: string;
   patch: BackgroundReviewPatch;
@@ -269,12 +273,12 @@ function backupRef(candidateId: string): string {
   if (!CANDIDATE_ID_PATTERN.test(candidateId)) {
     throw new Error(`[POLICY_VIOLATION] Invalid background-review candidate id: ${candidateId}`);
   }
-  return `active/shared/runtime/background-review/patch-backups/${candidateId}-${Date.now()}.json`;
+  return `active/shared/runtime/background-review/patch-backups/${candidateId}-${Date.now()}-${randomUUID()}.json`;
 }
 
 function approvalPayload(input: {
   candidateId: string;
-  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
+  action: BackgroundReviewApprovalPreview['action'];
   targetRef: string;
   expectedSha256: string;
   patch: BackgroundReviewPatch;
@@ -299,7 +303,7 @@ function assertApprovedBackgroundReviewEffect(input: {
   expectedSha256: string;
   approvalRef: string;
   approvedBy: string;
-  action: 'pipeline_proposal' | 'skill_patch' | 'memory_consolidation';
+  action: BackgroundReviewApprovalPreview['action'];
   targetRef: string;
   patch: BackgroundReviewPatch;
 }): ApprovalRequestRecord {
@@ -404,7 +408,9 @@ function createBackgroundReviewApprovalRequestLocked(
   if (!candidateId || !SHA256_PATTERN.test(expectedSha256)) {
     throw new Error('[POLICY_VIOLATION] candidateId and expectedSha256 are required.');
   }
-  const preview = inspectBackgroundReviewProposal(candidateId);
+  const preview = input.rollback
+    ? inspectBackgroundReviewRollback(candidateId)
+    : inspectBackgroundReviewProposal(candidateId);
   if (preview.expectedSha256 !== expectedSha256) {
     throw new Error(
       `[POLICY_VIOLATION] Background-review approval pre-image hash mismatch for ${preview.targetRef}: expected ${expectedSha256}, got ${preview.expectedSha256}`
@@ -473,7 +479,7 @@ function createBackgroundReviewApprovalRequestLocked(
 }
 
 /** Apply one explicitly approved, hash-bound pipeline patch. */
-export function applyBackgroundReviewPipelinePatch(
+function applyBackgroundReviewPipelinePatchLocked(
   input: ApplyBackgroundReviewPipelinePatchInput
 ): ApplyBackgroundReviewPipelinePatchResult {
   assertBackgroundReviewOperationAllowed('pipeline:promote');
@@ -709,7 +715,7 @@ function applySkillSection(content: string, section: string): string {
 }
 
 /** Apply one explicitly approved, hash-bound consolidation to a notebook. */
-export function applyBackgroundReviewMemoryConsolidationPatch(
+function applyBackgroundReviewMemoryConsolidationPatchLocked(
   input: ApplyBackgroundReviewPipelinePatchInput
 ): ApplyBackgroundReviewPipelinePatchResult {
   assertBackgroundReviewOperationAllowed('memory:consolidate');
@@ -804,7 +810,7 @@ export function applyBackgroundReviewMemoryConsolidationPatch(
 }
 
 /** Apply one explicitly approved, provenance-bound append-only skill patch. */
-export function applyBackgroundReviewSkillPatch(
+function applyBackgroundReviewSkillPatchLocked(
   input: ApplyBackgroundReviewPipelinePatchInput
 ): ApplyBackgroundReviewPipelinePatchResult {
   assertBackgroundReviewOperationAllowed('skill:patch');
@@ -894,4 +900,172 @@ export function applyBackgroundReviewSkillPatch(
     after_sha256: afterSha256,
     approved_by: approvedBy,
   };
+}
+
+function targetForMetadata(metadata: BackgroundReviewMetadata) {
+  if (metadata.action === 'pipeline_proposal') return resolvePipelineTarget(metadata.target_ref);
+  if (metadata.action === 'skill_patch') return resolveManagedSkillTarget(metadata.target_ref);
+  if (metadata.action === 'memory_consolidation') return resolveMemoryTarget(metadata.target_ref);
+  throw new Error('[POLICY_VIOLATION] Unknown background-review target');
+}
+
+/** Serialize forward and reverse writes to the same asset across candidates. */
+function withPatchTargetLock<T>(candidateId: string, run: () => T): T {
+  const record = loadDistillCandidateRecord(candidateId);
+  if (!record) throw new Error('[POLICY_VIOLATION] Background-review candidate not found');
+  const target = targetForMetadata(metadataOf(record));
+  return withLockSync('background-review-target:' + sha256(target.ref), run);
+}
+
+export function applyBackgroundReviewPipelinePatch(input: ApplyBackgroundReviewPipelinePatchInput) {
+  return withPatchTargetLock(input.candidateId, () =>
+    applyBackgroundReviewPipelinePatchLocked(input)
+  );
+}
+export function applyBackgroundReviewSkillPatch(input: ApplyBackgroundReviewPipelinePatchInput) {
+  return withPatchTargetLock(input.candidateId, () => applyBackgroundReviewSkillPatchLocked(input));
+}
+export function applyBackgroundReviewMemoryConsolidationPatch(
+  input: ApplyBackgroundReviewPipelinePatchInput
+) {
+  return withPatchTargetLock(input.candidateId, () =>
+    applyBackgroundReviewMemoryConsolidationPatchLocked(input)
+  );
+}
+
+function rollbackMaterial(candidateId: string) {
+  const record = loadDistillCandidateRecord(candidateId);
+  const metadata = record && metadataOf(record);
+  const application = metadata?.patch_application as Record<string, unknown> | undefined;
+  if (
+    !record ||
+    record.status !== 'promoted' ||
+    metadata?.origin !== 'background_review_fork' ||
+    !metadata.provenance ||
+    typeof metadata.provenance !== 'object' ||
+    (metadata.provenance as Record<string, unknown>).generated_by !== 'background-review-fork' ||
+    !application ||
+    application.rollback ||
+    !CANDIDATE_ID_PATTERN.test(candidateId)
+  )
+    throw new Error('[POLICY_VIOLATION] No reversible applied background-review patch');
+  const target = targetForMetadata(metadata);
+  const backup = String(application.backup_ref || '');
+  const expectedPrefix = `active/shared/runtime/background-review/patch-backups/${candidateId}-`;
+  if (
+    !backup.startsWith(expectedPrefix) ||
+    !/^\d+(?:-[a-f0-9-]{36})?\.json$/.test(backup.slice(expectedPrefix.length))
+  )
+    throw new Error('[POLICY_VIOLATION] Invalid patch backup reference');
+  const backupPath = assertSafeRepositoryPath(pathResolver.rootResolve(backup));
+  assertRegularBackgroundTarget(backupPath, backup, 'Backup');
+  const payload = parseSafeJsonInput(readTextFile(backupPath), 'patch backup') as Record<
+    string,
+    unknown
+  >;
+  if (
+    !payload ||
+    typeof payload !== 'object' ||
+    payload.version !== 1 ||
+    payload.candidate_id !== candidateId ||
+    payload.target_ref !== target.ref ||
+    application.target_ref !== target.ref ||
+    typeof payload.original_content !== 'string' ||
+    !SHA256_PATTERN.test(String(application.before_sha256)) ||
+    !SHA256_PATTERN.test(String(application.after_sha256)) ||
+    payload.before_sha256 !== application.before_sha256 ||
+    payload.after_sha256 !== application.after_sha256 ||
+    sha256(payload.original_content) !== application.before_sha256 ||
+    sha256(readTextFile(target.absolute)) !== application.after_sha256
+  )
+    throw new Error(
+      '[POLICY_VIOLATION] Backup mismatch or target changed since patch; preserve current edits'
+    );
+  return { record, metadata, application, target, backup, content: payload.original_content };
+}
+
+/** A rollback is a new human-approved effect, never reuse of the forward approval. */
+export function inspectBackgroundReviewRollback(
+  candidateId: string
+): BackgroundReviewApprovalPreview {
+  const material = rollbackMaterial(candidateId);
+  return {
+    candidateId,
+    action: 'rollback',
+    targetRef: material.target.ref,
+    expectedSha256: String(material.application.after_sha256),
+    patch: {
+      operation: 'restore_backup',
+      backup_ref: material.backup,
+      restore_sha256: sha256(material.content),
+    },
+  };
+}
+
+export function rollbackBackgroundReviewPatch(
+  input: ApplyBackgroundReviewPipelinePatchInput
+): ApplyBackgroundReviewPipelinePatchResult {
+  return withPatchTargetLock(input.candidateId, () => {
+    const material = rollbackMaterial(input.candidateId);
+    const preview = inspectBackgroundReviewRollback(input.candidateId);
+    if (input.expectedSha256 !== preview.expectedSha256)
+      throw new Error('[POLICY_VIOLATION] Rollback pre-image hash mismatch');
+    assertApprovedBackgroundReviewEffect({
+      ...input,
+      action: 'rollback',
+      targetRef: preview.targetRef,
+      patch: preview.patch,
+    });
+    const reverseBackup = backupRef(input.candidateId);
+    withExecutionContext('ecosystem_architect', () => {
+      const backupPath = assertSafeRepositoryPath(pathResolver.rootResolve(reverseBackup), {
+        allowMissingLeaf: true,
+      });
+      safeMkdir(path.dirname(backupPath), { recursive: true });
+      writeJson(backupPath, {
+        version: 1,
+        candidate_id: input.candidateId,
+        target_ref: preview.targetRef,
+        before_sha256: preview.expectedSha256,
+        after_sha256: sha256(material.content),
+        original_content: readTextFile(material.target.absolute),
+        approval_ref: input.approvalRef,
+        approved_by: input.approvedBy,
+        backed_up_at: nowIso(),
+      });
+      // Check under the same writer lock immediately before restoring.
+      if (sha256(readTextFile(material.target.absolute)) !== preview.expectedSha256)
+        throw new Error('[POLICY_VIOLATION] Target changed during rollback');
+      safeWriteFile(material.target.absolute, material.content);
+    });
+    updateDistillCandidateRecord(input.candidateId, {
+      status: 'archived',
+      metadata: {
+        ...material.metadata,
+        archive: {
+          reason: 'human-approved patch rollback',
+          previous_status: 'promoted',
+          archived_at: nowIso(),
+          reversible: true,
+        },
+        patch_application: {
+          ...material.application,
+          rollback: {
+            approval_ref: input.approvalRef,
+            approved_by: input.approvedBy,
+            restored_at: nowIso(),
+            backup_ref: reverseBackup,
+          },
+        },
+      },
+    });
+    return {
+      candidate_id: input.candidateId,
+      target_ref: preview.targetRef,
+      backup_ref: reverseBackup,
+      before_sha256: preview.expectedSha256,
+      after_sha256: sha256(material.content),
+      approved_by: input.approvedBy,
+    };
+  });
 }

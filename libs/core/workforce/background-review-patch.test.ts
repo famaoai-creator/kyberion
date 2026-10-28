@@ -33,6 +33,8 @@ import {
   applyBackgroundReviewMemoryConsolidationPatch,
   createBackgroundReviewApprovalRequest,
   loadManagedSkillProvenanceAtPath,
+  rollbackBackgroundReviewPatch,
+  inspectBackgroundReviewRollback,
 } from './background-review-patch.js';
 import { approvalRequestLogicalPath, decideApprovalRequest } from '../governance/approval-store.js';
 
@@ -131,12 +133,13 @@ function saveProposal(input: {
   return record;
 }
 
-function approvePatch(candidateId: string, before: string): string {
+function approvePatch(candidateId: string, before: string, rollback = false): string {
   const request = createBackgroundReviewApprovalRequest({
     candidateId,
     expectedSha256: createHash('sha256').update(before).digest('hex'),
     requestedBy: 'background-review-fork-test',
     missionId: 'MSN-BACKGROUND-REVIEW-PATCH-TEST',
+    ...(rollback ? { rollback: true } : {}),
   });
   createdApprovalRefs.push(request.id);
   const decided = decideApprovalRequest('mission_controller', {
@@ -196,6 +199,58 @@ useSeparationOfDutiesOverlay(
 );
 
 describe('background-review-patch', () => {
+  it('requires a distinct human approval to rollback and refuses later human edits', () => {
+    const ref = targetRef('rollback');
+    const before = writePipeline(ref, {
+      action: 'pipeline',
+      version: '1.0.0',
+      steps: [{ id: 'before', role: 'sink', op: 'system:log', params: { message: 'before' } }],
+    });
+    const candidate = saveProposal({
+      candidateId: `PATCH-TEST-${process.pid}-ROLLBACK`,
+      targetRef: ref,
+      patch: {
+        operation: 'append_step',
+        step: { id: 'after', role: 'sink', op: 'system:log', params: { message: 'after' } },
+      },
+    });
+    const forwardApproval = approvePatch(candidate.candidate_id, before);
+    const forward = applyBackgroundReviewPipelinePatch({
+      candidateId: candidate.candidate_id,
+      expectedSha256: createHash('sha256').update(before).digest('hex'),
+      approvedBy: 'operator-test',
+      approvalRef: forwardApproval,
+    });
+    createdBackupRefs.push(forward.backup_ref);
+    const patched = String(safeReadFile(pathResolver.rootResolve(ref), { encoding: 'utf8' }));
+    const reverseInput = {
+      candidateId: candidate.candidate_id,
+      expectedSha256: forward.after_sha256,
+      approvedBy: 'operator-test',
+    };
+    expect(() =>
+      rollbackBackgroundReviewPatch({ ...reverseInput, approvalRef: forwardApproval })
+    ).toThrow(/bound to this human-approved effect/);
+    const approvalRef = approvePatch(candidate.candidate_id, patched, true);
+    withExecutionContext('ecosystem_architect', () =>
+      safeWriteFile(pathResolver.rootResolve(ref), patched + '\n')
+    );
+    expect(() => rollbackBackgroundReviewPatch({ ...reverseInput, approvalRef })).toThrow(
+      /target changed/
+    );
+    expect(inspectBackgroundReviewRollback.bind(null, candidate.candidate_id)).toThrow(
+      /target changed/
+    );
+    withExecutionContext('ecosystem_architect', () =>
+      safeWriteFile(pathResolver.rootResolve(ref), patched)
+    );
+    const result = rollbackBackgroundReviewPatch({ ...reverseInput, approvalRef });
+    createdBackupRefs.push(result.backup_ref);
+    expect(String(safeReadFile(pathResolver.rootResolve(ref), { encoding: 'utf8' }))).toBe(before);
+    expect(() => rollbackBackgroundReviewPatch({ ...reverseInput, approvalRef })).toThrow(
+      /No reversible/
+    );
+  });
   it('re-request never hands back a self-approval that separation of duties makes unusable', () => {
     const ref = targetRef('sod-rerequest');
     const before = writePipeline(ref, {

@@ -6,6 +6,10 @@ import { pathResolver } from '@agent/core';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { deriveAssetId, readAssetLedger } from '@agent/core/ingest-asset-ledger';
 import {
+  createPipelineRunJournal,
+  newPipelineRunId,
+} from '@agent/core/pipeline/pipeline-run-journal';
+import {
   buildTenantPipelineCatalog,
   keepPipelinePromotedAtWhenUnchanged,
   runPipelinePromotion,
@@ -37,7 +41,7 @@ describe('pipeline promotion resource boundaries', () => {
   it('uses the governed parser for model promotion advice', () => {
     const source = readTextFile(pathResolver.rootResolve('scripts/pipeline_promote.ts'));
     expect(source).toContain("parseSafeJsonInput(jsonText, 'pipeline promotion advice')");
-    expect(source).toContain('loadPipelineAdfAtPath(resolvedInput)');
+    expect(source).toContain("parseSafeJsonInput(sourceText, 'pipeline promotion source')");
     expect(source).not.toContain('readJson<unknown>(resolvedInput)');
     expect(source).not.toContain('JSON.parse(jsonText)');
     expect(source).toContain('readTextFile');
@@ -189,6 +193,8 @@ describe('pipeline promotion resource boundaries', () => {
     const sourcePath = `${fixture}/src/flow.json`;
     const target = `${knowledgeRoot}/pipelines/ledger-flow.json`;
     const ledger = () => readAssetLedger(tenant, { knowledgeRoot });
+    const journals: string[] = [];
+    let runId: string;
     const writeSource = (message: string) => {
       const absolute = pathResolver.rootResolve(sourcePath);
       safeMkdir(nodePath.dirname(absolute), { recursive: true });
@@ -201,6 +207,28 @@ describe('pipeline promotion resource boundaries', () => {
           steps: [{ op: 'core:log', params: { message } }],
         })
       );
+      vi.stubEnv('KYBERION_TIER', 'confidential');
+      vi.stubEnv('KYBERION_TENANT', tenant);
+      const journal = createPipelineRunJournal(
+        newPipelineRunId(),
+        {
+          pipeline_id: 'ledger-flow',
+          input_path: absolute,
+          pipeline_sha256: createHash('sha256').update(readTextFile(absolute)).digest('hex'),
+          trace_id: 'ledger-trace',
+          step_ids: ['log'],
+        },
+        undefined,
+        { tier: 'confidential', tenantSlug: tenant }
+      );
+      journal.append('node_completed', {
+        step_id: 'log',
+        output_channels_snapshot: {},
+        output_hash: 'a'.repeat(64),
+      });
+      journal.append('run_finished', { status: 'succeeded' });
+      runId = journal.runId;
+      journals.push(journal.path);
     };
     const promote = (extra: string[] = []) =>
       runPipelinePromotion([
@@ -211,6 +239,8 @@ describe('pipeline promotion resource boundaries', () => {
         '--tenant',
         tenant,
         '--no-llm',
+        '--run',
+        runId,
         ...extra,
       ]);
 
@@ -222,6 +252,7 @@ describe('pipeline promotion resource boundaries', () => {
     afterEach(() => {
       vi.unstubAllEnvs();
       safeRmSync(pathResolver.rootResolve(fixture), { recursive: true, force: true });
+      for (const file of journals.splice(0)) safeRmSync(file, { force: true });
     });
 
     it('writes no ledger record on --dry-run', async () => {

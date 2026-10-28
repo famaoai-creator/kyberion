@@ -12,6 +12,7 @@ import {
 } from './memory-promotion-queue.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
+import { assertReusableLearningBinding } from './reusable-learning-binding.js';
 
 export type MemoryPromotionReviewStatus =
   'ready_to_approve' | 'ready_to_promote' | 'hold' | 'promoted' | 'rejected';
@@ -27,7 +28,8 @@ export type MemoryPromotionReviewBlockerCode =
   | 'conflicting_records'
   | 'unclassified_domain'
   | 'invalid_domain_scope'
-  | 'missing_curation';
+  | 'missing_curation'
+  | 'stale_learning_source';
 
 export interface MemoryPromotionEvidenceReview {
   ref: string;
@@ -237,6 +239,14 @@ function findRecordConflicts(group: MemoryCandidate[]): string[] {
 
 function buildReview(candidate: MemoryCandidate, group: MemoryCandidate[]): MemoryPromotionReview {
   const blockers: MemoryPromotionReview['blockers'] = [];
+  try {
+    assertReusableLearningBinding(candidate);
+  } catch (error) {
+    blockers.push({
+      code: 'stale_learning_source',
+      detail: error instanceof Error ? error.message : String(error),
+    });
+  }
   const warnings: string[] = [];
   const evidence = reviewEvidence(candidate);
   const audit = reviewAudit(candidate);

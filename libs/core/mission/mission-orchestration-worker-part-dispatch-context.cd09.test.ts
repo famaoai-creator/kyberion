@@ -11,6 +11,12 @@ const mocks = vi.hoisted(() => ({
   provisionTaskKnowledge: vi.fn(),
   loadMissionStateSnapshot: vi.fn(),
   maybeCompactDispatchSections: vi.fn(),
+  aiDlcFailureLines: vi.fn(() => [] as string[]),
+}));
+
+vi.mock('./mission-aidlc-gate-projection.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./mission-aidlc-gate-projection.js')>()),
+  buildMissionAiDlcFailureLines: mocks.aiDlcFailureLines,
 }));
 
 vi.mock('../task/task-knowledge-provisioning.js', () => ({
@@ -111,6 +117,7 @@ describe('buildTaskDispatchContext CD-09 tier gate', { timeout: 60_000 }, () => 
     else process.env.MISSION_ROLE = savedRole;
   });
   beforeEach(() => {
+    mocks.aiDlcFailureLines.mockReturnValue([]);
     mocks.loadMissionStateSnapshot.mockReturnValue({
       mission_id: MISSION,
       tier: 'confidential',
@@ -235,5 +242,23 @@ describe('buildTaskDispatchContext CD-09 tier gate', { timeout: 60_000 }, () => 
     const context = await build({});
     expect(context).not.toHaveProperty('customerDecisionDelivery');
     expect(context.prompt).not.toContain('Confirmed customer decisions');
+  });
+
+  it('keeps canonical AI-DLC failure references in the prompt even when history is compacted away', async () => {
+    mocks.aiDlcFailureLines.mockReturnValue([
+      '## AI-DLC gate failure — re-plan before retrying',
+      'FAILED-CONTRACT-SENTINEL evidence/gates/failed-schema.json',
+    ]);
+    mocks.maybeCompactDispatchSections.mockResolvedValueOnce({
+      upstreamResultLines: [],
+      teamSnapshotLines: [],
+    });
+    const context = await build({});
+    expect(context.prompt).toContain('FAILED-CONTRACT-SENTINEL');
+    expect(context.prompt).toContain('evidence/gates/failed-schema.json');
+    expect(mocks.aiDlcFailureLines).toHaveBeenCalledWith(MISSION);
+    expect(JSON.stringify(mocks.maybeCompactDispatchSections.mock.lastCall)).not.toContain(
+      'FAILED-CONTRACT-SENTINEL'
+    );
   });
 });

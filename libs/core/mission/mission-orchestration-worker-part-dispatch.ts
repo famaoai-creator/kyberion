@@ -55,6 +55,7 @@ import { loadMissionStateForInference } from './mission-state-reader.js';
 import { findMissionPath } from '../path-resolver.js';
 import { missionPathOrNull } from '../mission-lookup.js';
 import { loadMissionStateSnapshot } from './mission-orchestration-phase-gates.js';
+import { unchangedAiDlcContractFailure } from './mission-aidlc-gate-projection.js';
 import {
   createApprovalBackedManualDriveGate,
   type ManualDriveApprovalGate,
@@ -1001,6 +1002,21 @@ export function originateMissionDispatchDelegationChain(input: {
 export async function dispatchPlannedMissionTask(
   input: DispatchPlannedMissionTaskInput
 ): Promise<DispatchMissionTaskOutcome | null> {
+  const failedContract = input.task.phase
+    ? unchangedAiDlcContractFailure(input.missionId, input.task.phase)
+    : null;
+  if (failedContract) {
+    return {
+      task_id: input.task.task_id,
+      team_role: input.teamRole,
+      agent_id: input.assignment.agent_id,
+      dispatched: false,
+      dispatch_error: `${failedContract.reason} gate=${failedContract.gateId} evidence=${failedContract.receiptRef}`,
+      rollup_used: false,
+      result_schema_ok: false,
+      needs_count: 1,
+    };
+  }
   // NI-02: stamp actor attribution on the dispatch trace. This is THE trace
   // creation point that knows which agent identity the task is dispatched to
   // (input.assignment.agent_id), so worker-attributed traces carry actorNhiId
