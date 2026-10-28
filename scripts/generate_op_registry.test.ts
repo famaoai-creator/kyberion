@@ -107,10 +107,9 @@ describe('generate_op_registry discovery output', () => {
     const operations = discovery.actuators.flatMap((entry) => entry.ops || []);
     // Ratchet count regenerated via `pnpm generate:op-registry` against the
     // ops actually registered on disk; update this when an actuator contract
-    // intentionally adds or removes operations. 637 = origin/main's 632 plus
-    // the media-actuator deck_from_geometry / deck_measurement_script ops and
-    // the three pptx scratch-promotion ops.
-    expect(operations).toHaveLength(637);
+    // intentionally adds or removes operations. 641 = the prior 637 plus
+    // apple_capabilities, ask_screen, list_shortcuts and run_shortcut.
+    expect(operations).toHaveLength(641);
     expect(operations.every((item) => item.input_schema)).toBe(true);
     expect(operations.every((item) => Array.isArray(item.examples))).toBe(true);
     expect(
