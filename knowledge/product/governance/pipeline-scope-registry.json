@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/pipeline-scope-registry.schema.json",
   "version": 1,
-  "last_updated": "2026-10-18",
+  "last_updated": "2026-10-29",
   "description": "Reviewed scope classification for every pipeline under pipelines/ (top level + browser/ + config/; fragments/ are parts, not pipelines). `audience` answers \"whose work is this for?\" and `placement` flags where the README scope rule says it should live. This is a triage/documentation aid only — the runtime never reads it, and no pipeline JSON is modified. Regenerate/refresh by hand when a pipeline is added, moved, or retired; the companion report is docs/developer/improvement-plans-2026-10/PIPELINE_VERIFICATION_INVENTORY_2026-10-17.ja.md.",
   "audiences": {
     "system": "Kyberion operating itself: health, self-repair, backup, mission/approval control, capability assimilation, audits, upgrade, soak/chaos, storage janitor, volatile-layer machinery.",
@@ -37,7 +37,31 @@
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/ai-audit.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/ai-audit.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/apple-native-capabilities.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/apple-screen-question.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/apple-shortcut-approved-run.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/apple-shortcuts-readiness.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/approval-store-hygiene.json",
       "audience": "organization",
@@ -68,19 +92,31 @@
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/backup-daily.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/backup-daily.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/backup-restore-drill.json",
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/baseline-check.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/baseline-check.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/browser-failure-evidence.json",
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/browser/sbi.json", "audience": "personal", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/browser/sbi.json",
+      "audience": "personal",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/browser/yahoo.json",
       "audience": "personal",
@@ -192,7 +228,11 @@
       "placement": "should_be_template",
       "reason": "Executive narrative deliverable, not a self-op."
     },
-    { "pipeline": "pipelines/exposure-check.json", "audience": "tenant", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/exposure-check.json",
+      "audience": "tenant",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/external-asset-ledger.json",
       "audience": "tenant",
@@ -274,7 +314,11 @@
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/knowledge-sync.json", "audience": "tenant", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/knowledge-sync.json",
+      "audience": "tenant",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/kyberion-autonomous-onboarding.json",
       "audience": "organization",
@@ -355,7 +399,11 @@
       "placement": "should_be_template",
       "reason": "User-facing calendar auto-join workflow."
     },
-    { "pipeline": "pipelines/mesh-delivery.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/mesh-delivery.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/mission-hygiene-weekly.json",
       "audience": "system",
@@ -462,13 +510,21 @@
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/setup-oauth.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/setup-oauth.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/soak-endurance-live.json",
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/soak-endurance.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/soak-endurance.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/soak-restart-e2e.json",
       "audience": "system",
@@ -509,7 +565,11 @@
       "audience": "tenant",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/tenant-ingest.json", "audience": "tenant", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/tenant-ingest.json",
+      "audience": "tenant",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/terraform-asset-inventory.json",
       "audience": "tenant",
@@ -546,22 +606,42 @@
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/verify-session.json", "audience": "system", "placement": "canonical" },
-    { "pipeline": "pipelines/vital-check.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/verify-session.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/vital-check.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/voice-health-check.json",
       "audience": "system",
       "placement": "canonical"
     },
-    { "pipeline": "pipelines/voice-hello.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/voice-hello.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/voice-onboarding.json",
       "audience": "personal",
       "placement": "should_be_personal",
       "reason": "Personal voice-profile onboarding."
     },
-    { "pipeline": "pipelines/volatile-gc.json", "audience": "system", "placement": "canonical" },
-    { "pipeline": "pipelines/volatile-index.json", "audience": "system", "placement": "canonical" },
+    {
+      "pipeline": "pipelines/volatile-gc.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
+    {
+      "pipeline": "pipelines/volatile-index.json",
+      "audience": "system",
+      "placement": "canonical"
+    },
     {
       "pipeline": "pipelines/weekly-review.json",
       "audience": "personal",

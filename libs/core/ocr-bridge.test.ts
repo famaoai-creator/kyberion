@@ -44,8 +44,17 @@ describe('OCR execution budget', () => {
 const mocks = vi.hoisted(() => {
   const spawn = vi.fn();
   const safeLstat = vi.fn(() => ({ isFile: () => true }));
-  return { safeLstat, spawn };
+  return {
+    safeLstat,
+    spawn,
+    appleVision: vi.fn().mockResolvedValue(null),
+    validateFileSize: vi.fn(),
+  };
 });
+
+vi.mock('./apple-intelligence-bridge.js', () => ({
+  recognizeImageLocallyWithAppleVision: mocks.appleVision,
+}));
 
 vi.mock('node:child_process', () => ({
   spawn: mocks.spawn,
@@ -75,6 +84,7 @@ vi.mock('./secure-io.js', async () => {
   return {
     ...actual,
     safeLstat: mocks.safeLstat,
+    validateFileSize: mocks.validateFileSize,
     safeReadFile: () => Buffer.from('dummy_png_bytes'),
   };
 });
@@ -176,6 +186,8 @@ describe('AppleVisionOcrProvider', () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    mocks.appleVision.mockReset().mockResolvedValue(null);
+    mocks.validateFileSize.mockReset();
   });
 
   afterEach(() => {
@@ -194,11 +206,189 @@ describe('AppleVisionOcrProvider', () => {
     return fakeChild;
   }
 
+  it('uses the compiled bridge without launching the Swift interpreter and keeps actual OCR geometry', async () => {
+    const lines = [
+      {
+        text: '判断待ちはありません',
+        confidence: 97.5,
+        boundingBox: { x: 0.1, y: 0.2, width: 0.7, height: 0.08 },
+      },
+    ];
+    mocks.appleVision.mockResolvedValue({
+      text: lines[0].text,
+      labels: [],
+      confidence: 97.5,
+      lines,
+    });
+    const result = await new AppleVisionOcrProvider().recognize({
+      path: 'test.png',
+      language: 'jpn+eng',
+      timeout_ms: 9000,
+    });
+    expect(result).toMatchObject({
+      status: 'succeeded',
+      provider: 'apple_vision',
+      text: lines[0].text,
+      confidence: 97.5,
+      lines,
+      boundingBoxUnits: 'normalized',
+    });
+    expect(mocks.appleVision).toHaveBeenCalledWith(expect.stringContaining('test.png'), {
+      language: 'jpn+eng',
+      timeoutMs: 9000,
+    });
+    expect(mocks.spawn).not.toHaveBeenCalled();
+    expect(mocks.validateFileSize).toHaveBeenCalledBefore(mocks.appleVision);
+  });
+
+  it('retains legacy Vision when the helper has no extended OCR result and forwards the requested language', async () => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+    mocks.appleVision.mockResolvedValue({ text: 'old text', labels: [] });
+    const promise = new AppleVisionOcrProvider().recognize({ path: 'test.png', language: 'ja+en' });
+    await Promise.resolve();
+    fakeChild.stdout.emit(
+      'data',
+      JSON.stringify({
+        status: 'succeeded',
+        text: 'legacy text',
+        confidence: 93,
+        lines: [],
+      })
+    );
+    fakeChild.emit('close', 0);
+    expect(await promise).toMatchObject({ text: 'legacy text', confidence: 93 });
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      'swift',
+      expect.arrayContaining(['jpn+eng']),
+      expect.any(Object)
+    );
+  });
+
+  it.each([
+    ['JA', 'jpn'],
+    ['JPN', 'jpn'],
+    ['JP', 'jpn'],
+    ['JA_jp', 'jpn'],
+    ['JPN+ENG', 'jpn+eng'],
+    ['JA_jp,en_US', 'jpn+eng'],
+  ])('normalizes legacy hint %s without changing the compiled hint', async (language, expected) => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+    mocks.appleVision.mockResolvedValue(null);
+    const promise = new AppleVisionOcrProvider().recognize({ path: 'test.png', language });
+    await Promise.resolve();
+    fakeChild.stdout.emit(
+      'data',
+      JSON.stringify({
+        status: 'succeeded',
+        text: '日本語の観測',
+        confidence: 93,
+        lines: [],
+      })
+    );
+    fakeChild.emit('close', 0);
+    await expect(promise).resolves.toMatchObject({ status: 'succeeded', text: '日本語の観測' });
+    expect(mocks.appleVision).toHaveBeenCalledWith(expect.stringContaining('test.png'), {
+      language,
+      timeoutMs: expect.any(Number),
+    });
+    expect(mocks.spawn).toHaveBeenCalledWith(
+      'swift',
+      expect.arrayContaining([expected]),
+      expect.any(Object)
+    );
+  });
+
+  it('does not silently change an explicit unsupported legacy locale to English', async () => {
+    mocks.appleVision.mockResolvedValue(null);
+    const result = await new AppleVisionOcrProvider().recognize({
+      path: 'test.png',
+      language: 'fr-FR',
+    });
+    expect(result).toMatchObject({
+      status: 'failed',
+      error: 'apple_vision_requested_language_unavailable',
+    });
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it('does not give a legacy fallback a new budget after the compiled attempt exhausts it', async () => {
+    mocks.appleVision.mockImplementationOnce(async () => {
+      vi.setSystemTime(Date.now() + 15000);
+      return null;
+    });
+    const result = await new AppleVisionOcrProvider().recognize({ path: 'test.png' });
+    expect(result).toMatchObject({
+      status: 'failed',
+      error: expect.stringContaining('shared deadline'),
+    });
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it('caps legacy execution at only the remaining budget', async () => {
+    const fakeChild = createFakeChild();
+    mocks.spawn.mockReturnValue(fakeChild);
+    mocks.appleVision.mockImplementationOnce(async () => {
+      vi.setSystemTime(Date.now() + 14000);
+      return null;
+    });
+    const promise = new AppleVisionOcrProvider().recognize({ path: 'test.png' });
+    const assertion = expect(promise).rejects.toThrow('apple_vision_ocr_timeout');
+    await Promise.resolve();
+    await vi.advanceTimersByTimeAsync(1001);
+    await assertion;
+    expect(fakeChild.kill).toHaveBeenCalledWith('SIGKILL');
+  });
+
+  it('does not start either tool path when original content authorization is denied', async () => {
+    mocks.validateFileSize.mockImplementationOnce(() => {
+      throw new Error('[POLICY_VIOLATION] source content denied');
+    });
+    await expect(new AppleVisionOcrProvider().recognize({ path: 'test.png' })).rejects.toThrow(
+      'source content denied'
+    );
+    expect(mocks.appleVision).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it('rejects content denial before routing so no fallback provider can consume the source', async () => {
+    mocks.validateFileSize.mockImplementationOnce(() => {
+      throw new Error('[POLICY_VIOLATION] source content denied');
+    });
+    const provider: OcrProvider = {
+      id: 'tesseract',
+      dataEgress: 'none',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      recognize: vi.fn(),
+    };
+    await expect(
+      ocrImageWithRouter({ path: 'test.png' }, new AdaptivePolicyRouter([provider]))
+    ).rejects.toThrow('source content denied');
+    expect(provider.isAvailable).not.toHaveBeenCalled();
+    expect(provider.recognize).not.toHaveBeenCalled();
+    expect(mocks.appleVision).not.toHaveBeenCalled();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
+  it('does not launch a legacy fallback after the outer deadline cancels the compiled attempt', async () => {
+    const controller = new AbortController();
+    mocks.appleVision.mockImplementationOnce(async () => {
+      controller.abort();
+      return null;
+    });
+    await expect(
+      new AppleVisionOcrProvider().recognize({ path: 'test.png', signal: controller.signal })
+    ).rejects.toThrow();
+    expect(mocks.spawn).not.toHaveBeenCalled();
+  });
+
   it('keeps the normalized boundingBox that native-ocr.swift emits', async () => {
     const fakeChild = createFakeChild();
     mocks.spawn.mockReturnValue(fakeChild);
 
     const promise = new AppleVisionOcrProvider().recognize({ path: 'test.png' });
+    await Promise.resolve();
     fakeChild.stdout.emit(
       'data',
       JSON.stringify({
@@ -232,6 +422,7 @@ describe('AppleVisionOcrProvider', () => {
 
     const provider = new AppleVisionOcrProvider();
     const promise = provider.recognize({ path: 'test.png' });
+    await Promise.resolve();
 
     fakeChild.stdout.emit(
       'data',
@@ -265,6 +456,7 @@ describe('AppleVisionOcrProvider', () => {
 
     const provider = new AppleVisionOcrProvider();
     const promise = provider.recognize({ path: 'test.png' });
+    await Promise.resolve();
 
     const assertionPromise = expect(promise).rejects.toThrow('apple_vision_ocr_timeout');
 
@@ -280,6 +472,7 @@ describe('AppleVisionOcrProvider', () => {
 
     const provider = new AppleVisionOcrProvider();
     const promise = provider.recognize({ path: 'test.png' });
+    await Promise.resolve();
 
     fakeChild.stdout.emit('data', '{"status":"succeeded","meta":{"__proto__":{}}}');
     fakeChild.emit('close', 0);

@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { appleFmPromptWithImage, gateAppleLane } from '../apple-intelligence-bridge.js';
 import {
   probeWindowsNativeImageRecognition,
   describeImageWithWindowsNativeApi,
@@ -10,7 +11,7 @@ import {
 } from './image-description-types.js';
 import { pathResolver } from '../path-resolver.js';
 import { secureFetch } from '../network.js';
-import { safeReadFile, assertSafeRepositoryPath } from '../secure-io.js';
+import { safeReadFile, assertSafeRepositoryPath, validateFileSize } from '../secure-io.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import {
   resolveRuntimeDefaultModelId,
@@ -43,6 +44,68 @@ export class WindowsNativeImageDescriptionProvider implements ImageDescriptionPr
           provider: this.id,
           description: '',
           error: 'windows_native_image_description_failed',
+          elapsedMs: Date.now() - startedAt,
+        };
+  }
+}
+
+/** Experimental, explicitly selected Apple captioning. Availability does not establish visual accuracy. */
+export class AppleNativeImageDescriptionProvider implements ImageDescriptionProvider {
+  readonly id = 'apple_native';
+
+  constructor(private readonly options: ReasoningVisionOptions = {}) {}
+
+  async isAvailable(): Promise<boolean> {
+    return (await gateAppleLane('multimodal')).available;
+  }
+
+  /** Policy and preparation errors propagate; only a native inference failure returns null. */
+  async describeWithPrompt(imagePath: string, prompt: string): Promise<string | null> {
+    const absolutePath = assertSafeRepositoryPath(pathResolver.rootResolve(imagePath));
+    // The native bridge deliberately degrades failures to null. Authorize first so
+    // denied input cannot be mistaken for an inference failure and sent elsewhere.
+    validateFileSize(absolutePath, 512);
+    const tier = effectiveTier(absolutePath, this.options.tier);
+    const prepared = this.options.prepare_egress_image
+      ? await this.options.prepare_egress_image(absolutePath)
+      : undefined;
+    try {
+      const inputPath = prepared
+        ? assertSafeRepositoryPath(pathResolver.rootResolve(prepared.path))
+        : absolutePath;
+      validateFileSize(inputPath, 512);
+      const description = await withReasoningPayloadScope(
+        {
+          tier: effectiveTier(inputPath, tier),
+          ...(this.options.tenant_slug ? { tenant_slug: this.options.tenant_slug } : {}),
+          purpose: 'image description',
+        },
+        () => appleFmPromptWithImage(prompt, inputPath)
+      );
+      // Recheck after the native await before allowing an inference-only fallback.
+      if (description === null) {
+        validateFileSize(absolutePath, 512);
+        validateFileSize(inputPath, 512);
+      }
+      return description?.trim() || null;
+    } finally {
+      prepared?.dispose();
+    }
+  }
+
+  async describe(request: ImageDescriptionRequest): Promise<ImageDescriptionResult> {
+    const startedAt = Date.now();
+    const description = await this.describeWithPrompt(
+      request.path,
+      imageDescriptionPrompt(request.kind)
+    );
+    return description
+      ? { status: 'succeeded', provider: this.id, description, elapsedMs: Date.now() - startedAt }
+      : {
+          status: 'failed',
+          provider: this.id,
+          description: '',
+          error: 'apple_native_image_description_failed',
           elapsedMs: Date.now() - startedAt,
         };
   }
@@ -339,6 +402,10 @@ export async function describeImage(
   request: ImageDescriptionRequest,
   options: DescribeImageOptions = {}
 ): Promise<ImageDescriptionResult> {
+  if (!options.providers) {
+    const original = assertSafeRepositoryPath(pathResolver.rootResolve(request.path));
+    validateFileSize(original, 512);
+  }
   const providers = options.providers ?? [
     new WindowsNativeImageDescriptionProvider(),
     new OllamaVisionImageDescriptionProvider(undefined, undefined, options),
@@ -372,5 +439,28 @@ export function createReasoningVisionDescribeFn(options: ReasoningVisionOptions 
       throw new Error('[VISION_EMPTY_DESCRIPTION] vision backend returned an empty description');
     }
     return description;
+  };
+}
+
+/** Explicit experimental opt-in only: Apple captions with the scoped reasoning fallback.
+ * Native captions can hallucinate text and UI state, so default perception never selects this factory.
+ */
+export function createExperimentalAppleImageDescribeFn(
+  options: ReasoningVisionOptions = {}
+): DescribeFn {
+  const apple = new AppleNativeImageDescriptionProvider(options);
+  const reasoning = createReasoningVisionDescribeFn(options);
+  return async (request) => {
+    // Authorize before capability detection or any caller-supplied preparation.
+    const original = assertSafeRepositoryPath(pathResolver.rootResolve(request.path));
+    validateFileSize(original, 512);
+    if (await apple.isAvailable()) {
+      const description = await apple.describeWithPrompt(
+        request.path,
+        request.prompt ?? imageDescriptionPrompt(request.kind)
+      );
+      if (description) return description;
+    }
+    return reasoning(request);
   };
 }

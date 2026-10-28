@@ -23,6 +23,10 @@
           "op": {
             "enum": [
               "screenshot",
+              "apple_capabilities",
+              "list_shortcuts",
+              "run_shortcut",
+              "ask_screen",
               "record_screen",
               "record_audio",
               "capture_photo",
@@ -104,6 +108,10 @@
               "if",
               "while",
               "system:screenshot",
+              "system:apple_capabilities",
+              "system:list_shortcuts",
+              "system:run_shortcut",
+              "system:ask_screen",
               "system:record_screen",
               "system:record_audio",
               "system:capture_photo",

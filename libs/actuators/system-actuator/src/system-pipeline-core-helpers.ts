@@ -1,3 +1,9 @@
+import {
+  appleFmPromptWithImage,
+  gateAppleLane,
+  probeAppleIntelligenceCapabilities,
+} from '@agent/core/apple-intelligence-bridge';
+import { listAppleShortcuts } from '@agent/core/shortcut-bridge';
 import { runStandardPrLifecycle } from './system-pr-lifecycle.js';
 /** Shared guards and control/display helpers for the system pipeline actuator. */
 
@@ -230,6 +236,44 @@ export const SYSTEM_PROCEDURE_OP_HANDLERS: Readonly<Record<string, SystemCapture
 };
 
 export const SYSTEM_CAPTURE_OP_HANDLERS: Readonly<Record<string, SystemCaptureOpHandler>> = {
+  list_shortcuts: async ({ params, ctx }) => ({
+    ...ctx,
+    [String(params.export_as ?? 'shortcuts')]: await listAppleShortcuts(),
+  }),
+  apple_capabilities: async ({ params, ctx }) => ({
+    ...ctx,
+    [String(params.export_as ?? 'apple_capabilities')]: await probeAppleIntelligenceCapabilities(),
+  }),
+  ask_screen: async (input) => {
+    const question = String(input.resolve(input.params.question) ?? '').trim();
+    if (!question) throw new Error('ask_screen requires a non-empty question');
+    const gate = await gateAppleLane('multimodal');
+    if (!gate.available) {
+      return {
+        ...input.ctx,
+        [String(input.params.export_as ?? 'screen_answer')]: {
+          available: false,
+          reason: gate.reason,
+        },
+      };
+    }
+    // Reuse the governed screenshot path; only its redacted output reaches the model.
+    const capture = await SYSTEM_CAPTURE_OP_HANDLERS.screenshot({
+      ...input,
+      op: 'screenshot',
+      params: { ...input.params, export_as: 'screenshot_path' },
+    });
+    const answer = await appleFmPromptWithImage(question, String(capture.screenshot_path), {
+      timeoutMs: typeof input.params.timeout_ms === 'number' ? input.params.timeout_ms : 60_000,
+    });
+    return {
+      ...capture,
+      [String(input.params.export_as ?? 'screen_answer')]:
+        answer === null
+          ? { available: false, reason: 'on-device image prompt failed' }
+          : { available: true, answer, screenshot_path: capture.screenshot_path },
+    };
+  },
   screenshot: async ({ params, ctx, resolve }) => {
     const displaySelection = await systemDisplayHelpers.resolveScreenDisplaySelection(
       params,

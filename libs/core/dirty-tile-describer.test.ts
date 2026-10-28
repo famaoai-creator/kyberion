@@ -1,5 +1,7 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { Jimp } from 'jimp';
+import { resolveStorageFloor } from './storage-layout.js';
+import { withExecutionContextAsync } from './authority.js';
 import {
   APPROX_TOKENS_PER_TILE,
   describeScreenDelta,
@@ -16,8 +18,41 @@ import {
 } from './media/image-description-bridge.js';
 import type { ReasoningBackend } from './reasoning/reasoning-backend-contracts.js';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeExistsSync,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+  safeSymlinkSync,
+} from './secure-io.js';
 
+const appleMocks = vi.hoisted(() => ({ gate: vi.fn(), prompt: vi.fn() }));
+vi.mock('./apple-intelligence-bridge.js', () => ({
+  gateAppleLane: appleMocks.gate,
+  appleFmPromptWithImage: appleMocks.prompt,
+}));
+beforeEach(() => {
+  appleMocks.gate.mockReset().mockResolvedValue({ available: false });
+  appleMocks.prompt.mockReset();
+});
+const defaultVisionMocks = vi.hoisted(() => ({ factory: vi.fn(), describe: vi.fn() }));
+vi.mock('./media/image-description-bridge.js', async (original) => {
+  const actual = await original<typeof import('./media/image-description-bridge.js')>();
+  return {
+    ...actual,
+    createReasoningVisionDescribeFn: (
+      options: Parameters<typeof actual.createReasoningVisionDescribeFn>[0]
+    ) => {
+      if (options?.resolveBackend) return actual.createReasoningVisionDescribeFn(options);
+      defaultVisionMocks.factory(options);
+      return defaultVisionMocks.describe;
+    },
+  };
+});
+beforeEach(() => {
+  defaultVisionMocks.factory.mockClear();
+  defaultVisionMocks.describe.mockReset();
+});
 const SIZE = 160; // 4x4 grid => 40px tiles
 const sessions: string[] = [];
 const files: string[] = [];
@@ -231,7 +266,12 @@ describe('describeScreenDelta', () => {
 });
 
 describe('tier-scoped tile memory', () => {
-  const scopeRoot = pathResolver.sharedTmp(`dirty-tile-scope-tests/${process.pid}`);
+  const scopeRoot = resolveStorageFloor(
+    'scratch',
+    { kind: 'tier', tier: 'confidential' },
+    'dirty-tile-scope-tests',
+    String(process.pid)
+  );
   const missionDeps = {
     work_dir: path.join(scopeRoot, 'mission', 'tmp', 'vision-tiles'),
     state_dir: path.join(scopeRoot, 'mission', 'tmp', 'vision-state'),
@@ -257,9 +297,14 @@ describe('tier-scoped tile memory', () => {
     const id = sessionId('tier-split');
     const screen = await writeScreen('tier-split');
     const { describe: describeFn, seen } = recordingDescriber();
-    const confidential = await describeScreenDelta(
-      { path: screen, session_id: id, tier: 'confidential', grid: 2 },
-      { describe: describeFn, redact: blackoutRedact, ...missionDeps }
+    const confidential = await withExecutionContextAsync(
+      'ecosystem_architect',
+      () =>
+        describeScreenDelta(
+          { path: screen, session_id: id, tier: 'confidential', grid: 2 },
+          { describe: describeFn, redact: blackoutRedact, ...missionDeps }
+        ),
+      'ecosystem_architect'
     );
     expect(confidential.state_path).toBe(
       path.join(missionDeps.state_dir, id, 'vision-tiles.confidential.json')
@@ -305,5 +350,218 @@ describe('resolveTileGrid', () => {
     expect(() => resolveTileGrid({ width: 800, height: 600 }, { grid: 0 })).toThrow(
       /SCREEN_DELTA_INVALID/
     );
+  });
+});
+
+describe('default configured screen description', () => {
+  it('uses configured vision for redacted crops without probing Apple and reuses unchanged descriptions', async () => {
+    appleMocks.gate.mockResolvedValue({ available: true });
+    const seen: number[] = [];
+    defaultVisionMocks.describe.mockImplementation(async (request: { path: string }) => {
+      const image = await Jimp.read(safeReadFile(request.path, { encoding: null }) as Buffer);
+      seen.push(image.bitmap.data[0]);
+      return 'Configured vision redacted tile.';
+    });
+    const id = sessionId('native-default');
+    const screen = await writeScreen('native-default');
+    const first = await describeScreenDelta(
+      { path: screen, session_id: id, grid: 1 },
+      { redact: blackoutRedact }
+    );
+    expect(first.stats.tiles_described).toBe(1);
+    expect(seen).toEqual([0]);
+    expect(defaultVisionMocks.describe.mock.calls[0][0].prompt).toContain('tile (row 1 of 1');
+    expect(appleMocks.gate).not.toHaveBeenCalled();
+    expect(appleMocks.prompt).not.toHaveBeenCalled();
+    const second = await describeScreenDelta(
+      { path: screen, session_id: id, grid: 1 },
+      { redact: blackoutRedact }
+    );
+    expect(second.stats.tiles_described).toBe(0);
+    expect(defaultVisionMocks.describe).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('screen source sensitivity', () => {
+  it.each([undefined, 'public'] as const)(
+    'does not downgrade a confidential path when tier is %s',
+    async (tier) => {
+      const redact = vi.fn();
+      const describe = vi.fn();
+      await expect(
+        describeScreenDelta(
+          {
+            path: 'active/missions/confidential/tenant-a/MSN-X/evidence/frame.png',
+            session_id: 'source-tier-test',
+            ...(tier ? { tier } : {}),
+          },
+          { redact, describe }
+        )
+      ).rejects.toThrow('[VISION_TIER_SCOPE]');
+      expect(redact).not.toHaveBeenCalled();
+      expect(describe).not.toHaveBeenCalled();
+      expect(appleMocks.gate).not.toHaveBeenCalled();
+      expect(appleMocks.prompt).not.toHaveBeenCalled();
+    }
+  );
+});
+
+describe('screen output sensitivity', () => {
+  it('refuses public directories for confidential data before source read or redaction', async () => {
+    const redact = vi.fn();
+    const describe = vi.fn();
+    await expect(
+      describeScreenDelta(
+        {
+          path: 'active/missions/confidential/tenant-a/MSN-X/evidence/frame.png',
+          session_id: 'bad-output-tier',
+        },
+        {
+          work_dir: pathResolver.rootResolve('active/shared/tmp/public/shared/vision-work'),
+          state_dir: pathResolver.rootResolve('active/shared/tmp/public/shared/vision-state'),
+          redact,
+          describe,
+        }
+      )
+    ).rejects.toThrow('[VISION_TIER_SCOPE]');
+    expect(redact).not.toHaveBeenCalled();
+    expect(describe).not.toHaveBeenCalled();
+    expect(appleMocks.gate).not.toHaveBeenCalled();
+  });
+  it('refuses a tenant mismatch on a governed storage floor before reading a source', async () => {
+    await expect(
+      describeScreenDelta(
+        {
+          path: 'active/missions/confidential/tenant-a/MSN-X/evidence/frame.png',
+          session_id: 'bad-output-tenant',
+          tenant_slug: 'tenant-a',
+        },
+        {
+          work_dir: resolveStorageFloor(
+            'scratch',
+            { kind: 'tier', tier: 'confidential', tenant: 'tenant-b' },
+            'vision-work'
+          ),
+          state_dir: resolveStorageFloor(
+            'scratch',
+            { kind: 'tier', tier: 'confidential', tenant: 'tenant-b' },
+            'vision-state'
+          ),
+        }
+      )
+    ).rejects.toThrow('[VISION_TIER_SCOPE]');
+    expect(appleMocks.gate).not.toHaveBeenCalled();
+  });
+});
+
+describe('source-owned tenant scope', () => {
+  const roots = ['alpha', 'beta'].map((tenant) =>
+    resolveStorageFloor(
+      'scratch',
+      { kind: 'tier', tier: 'confidential', tenant },
+      'dirty-tile-owner-tests',
+      String(process.pid)
+    )
+  );
+  const publicRoot = resolveStorageFloor(
+    'scratch',
+    { kind: 'tier', tier: 'public' },
+    'dirty-tile-owner-tests',
+    String(process.pid)
+  );
+  const dirs = (root: string) => ({
+    work_dir: path.join(root, 'work'),
+    state_dir: path.join(root, 'state'),
+  });
+  afterEach(() => {
+    for (const root of [...roots, publicRoot]) safeRmSync(root, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+  });
+  async function inUnscopedArchitect<T>(run: () => Promise<T>): Promise<T> {
+    vi.stubEnv('KYBERION_TENANT', undefined);
+    return withExecutionContextAsync('ecosystem_architect', run, 'ecosystem_architect');
+  }
+  async function ownedScreen(): Promise<string> {
+    const sample = await writeScreen('owned-source');
+    const target = path.join(roots[0], 'source.png');
+    safeWriteFile(target, safeReadFile(sample, { encoding: null }));
+    return target;
+  }
+
+  it('rejects alpha source to beta directories without any declared or active tenant before redaction or inference', async () => {
+    await inUnscopedArchitect(async () => {
+      const source = await ownedScreen();
+      const redact = vi.fn();
+      const describe = vi.fn();
+      await expect(
+        describeScreenDelta(
+          { path: source, session_id: 'owner-implicit-conflict' },
+          { ...dirs(roots[1]), redact, describe }
+        )
+      ).rejects.toThrow('[VISION_TIER_SCOPE]');
+      expect(redact).not.toHaveBeenCalled();
+      expect(describe).not.toHaveBeenCalled();
+      expect(defaultVisionMocks.factory).not.toHaveBeenCalled();
+      expect(appleMocks.gate).not.toHaveBeenCalled();
+      expect(safeExistsSync(dirs(roots[1]).work_dir)).toBe(false);
+      expect(safeExistsSync(dirs(roots[1]).state_dir)).toBe(false);
+    });
+  });
+
+  it('accepts matching explicit source and output ownership', async () => {
+    await inUnscopedArchitect(async () => {
+      const source = await ownedScreen();
+      const { describe, seen } = recordingDescriber();
+      const result = await describeScreenDelta(
+        { path: source, session_id: 'owner-explicit-match', tenant_slug: 'alpha', grid: 1 },
+        { ...dirs(roots[0]), redact: blackoutRedact, describe }
+      );
+      expect(result.stats.tiles_described).toBe(1);
+      expect(result.state_path).toContain(roots[0]);
+      expect(seen).toHaveLength(1);
+      expect(seen[0].firstPixel).toBe(0);
+    });
+  });
+
+  it('rejects differing lexical and canonical tenant owners even with an explicit target tenant', async () => {
+    await inUnscopedArchitect(async () => {
+      const source = await ownedScreen();
+      const betaSource = path.join(roots[1], 'source.png');
+      safeWriteFile(betaSource, safeReadFile(source, { encoding: null }));
+      const alias = path.join(roots[0], 'cross-owner-alias.png');
+      safeSymlinkSync(betaSource, alias, 'file');
+      const redact = vi.fn();
+      const describe = vi.fn();
+      await expect(
+        describeScreenDelta(
+          { path: alias, session_id: 'owner-alias-mismatch', tenant_slug: 'beta' },
+          { ...dirs(roots[1]), redact, describe }
+        )
+      ).rejects.toThrow('lexical and canonical source tenants differ');
+      expect(redact).not.toHaveBeenCalled();
+      expect(describe).not.toHaveBeenCalled();
+      expect(defaultVisionMocks.factory).not.toHaveBeenCalled();
+      expect(appleMocks.gate).not.toHaveBeenCalled();
+    });
+  });
+
+  it('uses canonical ownership behind a public symlink before choosing output scope', async () => {
+    await inUnscopedArchitect(async () => {
+      const source = await ownedScreen();
+      const alias = path.join(publicRoot, 'source.png');
+      safeSymlinkSync(source, alias, 'file');
+      const redact = vi.fn();
+      const describe = vi.fn();
+      await expect(
+        describeScreenDelta(
+          { path: alias, session_id: 'owner-symlink-conflict' },
+          { ...dirs(roots[1]), redact, describe }
+        )
+      ).rejects.toThrow('[VISION_TIER_SCOPE]');
+      expect(redact).not.toHaveBeenCalled();
+      expect(describe).not.toHaveBeenCalled();
+      expect(defaultVisionMocks.factory).not.toHaveBeenCalled();
+      expect(appleMocks.gate).not.toHaveBeenCalled();
+    });
   });
 });

@@ -1,6 +1,6 @@
 {
   "actuator_id": "system-actuator",
-  "version": "1.12.0",
+  "version": "1.13.0",
   "description": "OS-level control plane for diagnostics, input toggles, and short-lived OS actions",
   "contract_schema": "knowledge/product/schemas/system-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -54,6 +54,18 @@
         },
         "assert": {
           "effect": "none"
+        },
+        "apple_capabilities": {
+          "effect": "none"
+        },
+        "ask_screen": {
+          "effect": "read"
+        },
+        "list_shortcuts": {
+          "effect": "read"
+        },
+        "run_shortcut": {
+          "effect": "write"
         }
       }
     },
@@ -226,6 +238,26 @@
     {
       "op": "standard_pr_lifecycle",
       "platforms": ["darwin", "linux", "win32"],
+      "effect": "write"
+    },
+    {
+      "op": "apple_capabilities",
+      "platforms": ["darwin"],
+      "effect": "none"
+    },
+    {
+      "op": "ask_screen",
+      "platforms": ["darwin"],
+      "effect": "read"
+    },
+    {
+      "op": "list_shortcuts",
+      "platforms": ["darwin"],
+      "effect": "read"
+    },
+    {
+      "op": "run_shortcut",
+      "platforms": ["darwin"],
       "effect": "write"
     }
   ]

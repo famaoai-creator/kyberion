@@ -1,8 +1,14 @@
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { secureFetch } from './network.js';
+import { recognizeImageLocallyWithAppleVision } from './apple-intelligence-bridge.js';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeLstat, safeReadFile } from './secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeLstat,
+  safeReadFile,
+  validateFileSize,
+} from './secure-io.js';
 import { spawnManagedProcess } from './managed-process.js';
 import { resolveRuntimeModelId } from './tool/runtime-model-defaults.js';
 import { resolveRuntimeEndpoint } from './provider/provider-config.js';
@@ -317,13 +323,86 @@ export class AppleVisionOcrProvider implements OcrProvider {
 
   async recognize(request: OcrRequest): Promise<OcrResult> {
     const startedAt = Date.now();
-    const scriptPath = assertSafeRepositoryPath(pathResolver.resolve('libs/core/native-ocr.swift'));
+    const timeoutMs = Math.min(request.timeout_ms ?? 15000, 15000);
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0)
+      throw new Error('OCR timeout_ms must be positive');
+    const deadlineAtMs = startedAt + timeoutMs;
     const resolvedImagePath = resolveOcrImagePath(request.path);
+    // Content authorization precedes both native paths; a policy denial must
+    // never be interpreted as an unavailable compiled helper.
+    validateFileSize(resolvedImagePath, 512);
+    request.signal?.throwIfAborted();
+    const compiled = await recognizeImageLocallyWithAppleVision(resolvedImagePath, {
+      ...(request.language ? { language: request.language } : {}),
+      timeoutMs: Math.max(0, deadlineAtMs - Date.now()),
+    });
+    request.signal?.throwIfAborted();
+    const remainingMs = deadlineAtMs - Date.now();
+    if (remainingMs <= 0) {
+      return {
+        status: 'failed',
+        provider: this.id,
+        text: '',
+        confidence: 0,
+        error: 'apple_vision_ocr_timeout: Native OCR execution exhausted its shared deadline',
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+    // Older helper binaries may return only text/labels. Do not manufacture
+    // confidence or discard geometry: screen privacy masking needs real boxes.
+    if (
+      compiled &&
+      typeof compiled.confidence === 'number' &&
+      Number.isFinite(compiled.confidence) &&
+      compiled.confidence >= 0 &&
+      compiled.confidence <= 100 &&
+      Array.isArray(compiled.lines) &&
+      compiled.lines.every((line) => line.boundingBox !== undefined)
+    ) {
+      return {
+        status: 'succeeded',
+        provider: this.id,
+        text: compiled.text,
+        confidence: compiled.confidence,
+        lines: compiled.lines,
+        boundingBoxUnits: 'normalized',
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+    // The legacy script only understands Japanese/US English. Never silently
+    // turn an explicit French/German/etc. request into its English default.
+    const legacyLanguageSupported =
+      !request.language ||
+      request.language
+        .split(/[+,]/u)
+        .every((language) =>
+          /^(?:ja(?:-jp)?|jpn|jp|en(?:-us)?|eng)$/iu.test(language.trim().replaceAll('_', '-'))
+        );
+    if (!legacyLanguageSupported) {
+      return {
+        status: 'failed',
+        provider: this.id,
+        text: '',
+        confidence: 0,
+        error: 'apple_vision_requested_language_unavailable',
+        elapsedMs: Date.now() - startedAt,
+      };
+    }
+    // The legacy Swift parser is case-sensitive and recognizes jpn/eng.
+    // Canonicalize the already-validated hints rather than changing their meaning.
+    const legacyLanguage = request.language
+      ?.split(/[+,]/u)
+      .map((language) => (language.trim().toLowerCase().startsWith('j') ? 'jpn' : 'eng'))
+      .join('+');
+    // Retain the legacy Vision implementation for older hosts/toolchains and
+    // helpers without the extended OCR contract; it remains on-device.
+    validateFileSize(resolvedImagePath, 512);
+    const scriptPath = assertSafeRepositoryPath(pathResolver.resolve('libs/core/native-ocr.swift'));
 
     return new Promise((resolve, reject) => {
       const args = [scriptPath, resolvedImagePath];
-      if (request.language) {
-        args.push(request.language);
+      if (legacyLanguage) {
+        args.push(legacyLanguage);
       }
 
       const child = spawnManagedProcess({
@@ -345,17 +424,21 @@ export class AppleVisionOcrProvider implements OcrProvider {
       let stderr = '';
       let completed = false;
 
-      const timeoutMs = 15000;
-      const timer = setTimeout(() => {
-        if (completed) return;
-        completed = true;
-        try {
-          child.child.kill('SIGKILL');
-        } catch {
-          // ignore
-        }
-        reject(new Error(`apple_vision_ocr_timeout: Native OCR execution exceeded ${timeoutMs}ms`));
-      }, timeoutMs);
+      const timer = setTimeout(
+        () => {
+          if (completed) return;
+          completed = true;
+          try {
+            child.child.kill('SIGKILL');
+          } catch {
+            // ignore
+          }
+          reject(
+            new Error(`apple_vision_ocr_timeout: Native OCR execution exceeded ${timeoutMs}ms`)
+          );
+        },
+        Math.max(0, deadlineAtMs - Date.now())
+      );
 
       const cleanup = () => {
         completed = true;
@@ -904,6 +987,10 @@ export async function ocrImageWithRouter(
 ): Promise<OcrResult> {
   const timeout = request.timeout_ms ?? 120000;
   if (!Number.isFinite(timeout) || timeout <= 0) throw new Error('OCR timeout_ms must be positive');
+  // Authorize before resolving any provider: a native denial must not fall
+  // through the router into another process or an external OCR service.
+  validateFileSize(resolveOcrImagePath(request.path), 512);
+  request.signal?.throwIfAborted();
   const controller = new AbortController();
   let timer: ReturnType<typeof setTimeout> | undefined;
   let listener: (() => void) | undefined;
