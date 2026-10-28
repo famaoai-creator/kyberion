@@ -36,6 +36,7 @@ const LEGACY_JS_GUARDED_PREFIXES = [
   'libs/core/',
 
   'libs/shared-media/',
+  'libs/shared-mobile/',
   'libs/shared-network/',
   'libs/shared-nerve/',
   // shared-ui guards only its TS sources; vanilla/ ships a hand-written ES module.
