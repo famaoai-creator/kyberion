@@ -44,6 +44,12 @@ vi.mock('./app_preflight.js', () => ({
 // desktop sessions. Those probes have their own capability integration tests.
 vi.mock('@agent/core/apple-intelligence-bridge', () => ({
   probeAppleIntelligence: vi.fn(async () => ({ available: false, reason: 'test fixture' })),
+  probeAppleIntelligenceCapabilities: vi.fn(async () => null),
+  probeAppleSpeechAvailability: vi.fn(async () => ({
+    available: true,
+    locale: 'en-US',
+    asset_status: 'installed',
+  })),
 }));
 
 vi.mock('@agent/core/virtual/desktop-observation-readiness', () => ({
@@ -178,6 +184,19 @@ describe('run_doctor', () => {
     expect(mocks.loadEnvironmentManifest).not.toHaveBeenCalled();
     expect(report.appPreflight).toMatchObject({ platform: 'android', ready: true });
     expect(report.totalMissing).toBe(0);
+  });
+
+  it('reports speech readiness independently when the text model is unavailable', async () => {
+    const { collectDoctorReport } = await import('./run_doctor.js');
+    const report = await collectDoctorReport({});
+    expect(
+      report.localCapabilityLines.some((line) => line.includes('text assist: unavailable'))
+    ).toBe(true);
+    expect(
+      report.localCapabilityLines.some(
+        (line) => line.includes('Apple Speech readiness:') && line.includes('"available":true')
+      )
+    ).toBe(true);
   });
 
   it('reports surface outbox and dead-letter state in the doctor report', async () => {
