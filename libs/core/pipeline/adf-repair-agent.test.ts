@@ -77,6 +77,11 @@ function registerFakeRepairBackend(delegateTask: ReasoningBackend['delegateTask'
 }
 
 function registerNativeWorkItemBackend(delegateTask: ReasoningBackend['delegateTask']) {
+  const dispatch = vi.fn(async (instruction: string) =>
+    instruction.includes('background review')
+      ? JSON.stringify({ action: 'no_action' })
+      : JSON.stringify({ capability: 'demo', action: 'run' })
+  );
   registerReasoningBackend({
     ...stubReasoningBackend,
     name: 'legacy-test-backend',
@@ -84,11 +89,7 @@ function registerNativeWorkItemBackend(delegateTask: ReasoningBackend['delegateT
     delegateTask,
     getNativeSubagentAdopter: () => ({
       id: 'test-native-adopter',
-      dispatch: vi.fn(async (instruction: string) =>
-        instruction.includes('background review')
-          ? JSON.stringify({ action: 'no_action' })
-          : JSON.stringify({ capability: 'demo', action: 'run' })
-      ),
+      dispatch,
       getInfo: () => ({
         provider: 'test-native-provider',
         model: 'test-native-model',
@@ -97,6 +98,7 @@ function registerNativeWorkItemBackend(delegateTask: ReasoningBackend['delegateT
       }),
     }),
   });
+  return dispatch;
 }
 
 describe('validateAndRepairAdf', () => {
@@ -248,7 +250,7 @@ describe('validateAndRepairAdf', () => {
     const delegateTask = vi.fn(async () => {
       throw new Error('legacy delegateTask must not be called');
     });
-    registerNativeWorkItemBackend(delegateTask);
+    const nativeDispatch = registerNativeWorkItemBackend(delegateTask);
     const item = createWorkItem({
       itemId: 'WI-REVIEW-CALLER-ROUTING',
       title: 'Review caller routing',
@@ -277,6 +279,14 @@ describe('validateAndRepairAdf', () => {
 
     expect(result).toMatchObject({ status: 'no_action', action: 'no_action' });
     expect(delegateTask).not.toHaveBeenCalled();
+    expect(nativeDispatch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({
+        role: 'background_review',
+        budget: { max_prompt_chars: 16_000, max_response_chars: 4_000 },
+      })
+    );
     expect(stored.status).toBe('review');
     expect(attempt).toMatchObject({
       attempt_id: expect.any(String),
@@ -319,6 +329,114 @@ describe('validateAndRepairAdf', () => {
       project_id: 'project-canonical',
       task_id: 'task-canonical',
     });
+  });
+
+  it.each([
+    { model: 'explicit-review-model' },
+    { profile: 'explicit-review-profile' },
+    { route_profile: 'explicit-route-profile' },
+    { model_tier: 'deep' as const },
+  ])('keeps explicit auxiliary routing %j off the default native adopter', async (override) => {
+    const delegateTask = vi.fn(async () => JSON.stringify({ action: 'no_action' }));
+    const nativeDispatch = registerNativeWorkItemBackend(delegateTask);
+    const item = createWorkItem({
+      title: 'Explicit review route',
+      description: 'Use the requested auxiliary route',
+      projectId: 'PROJECT-CALLER',
+      status: 'ready',
+      context: {
+        tenant_slug: 'tenant-canonical',
+        mission_id: 'mission-canonical',
+        task_id: 'task-canonical',
+      },
+    });
+    const controller = new AbortController();
+    const callOptions = {
+      ...override,
+      signal: controller.signal,
+      budget: { max_response_chars: 300 },
+      delegation_inactivity: { timeoutMs: 5000 },
+    };
+    const result = await runBackgroundReviewFork({
+      sessionId: 'explicit-route-review',
+      surface: 'slack',
+      snapshot: 'review snapshot',
+      workItemId: item.item_id,
+      backend: { delegateTask },
+      callOptions,
+    });
+    expect(result).toMatchObject({ status: 'no_action', action: 'no_action' });
+    expect(nativeDispatch).not.toHaveBeenCalled();
+    expect(delegateTask).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(String),
+      expect.objectContaining({ ...callOptions, role: 'background_review' })
+    );
+  });
+
+  it('never borrows the global native adopter for an unrelated injected review backend', async () => {
+    const globalDelegate = vi.fn(async () => {
+      throw new Error('global backend must not run');
+    });
+    const nativeDispatch = registerNativeWorkItemBackend(globalDelegate);
+    const delegateTask = vi.fn(async () => JSON.stringify({ action: 'no_action' }));
+    const item = createWorkItem({
+      title: 'Injected review backend',
+      description: 'Use only the injected backend',
+      projectId: 'PROJECT-CALLER',
+      status: 'ready',
+      context: {
+        tenant_slug: 'tenant-canonical',
+        mission_id: 'mission-canonical',
+        task_id: 'task-canonical',
+      },
+    });
+    const result = await runBackgroundReviewFork({
+      sessionId: 'injected-backend-review',
+      surface: 'slack',
+      snapshot: 'review snapshot',
+      workItemId: item.item_id,
+      backend: { delegateTask },
+    });
+    expect(result.status).toBe('no_action');
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(nativeDispatch).not.toHaveBeenCalled();
+    expect(globalDelegate).not.toHaveBeenCalled();
+  });
+
+  it('keeps a configured auxiliary role off the default native adopter', async () => {
+    const delegateTask = vi.fn(async () => JSON.stringify({ action: 'no_action' }));
+    const nativeDispatch = registerNativeWorkItemBackend(delegateTask);
+    const item = createWorkItem({
+      title: 'Configured auxiliary review',
+      description: 'Preserve the configured background review route',
+      projectId: 'PROJECT-CALLER',
+      status: 'ready',
+      context: {
+        tenant_slug: 'tenant-canonical',
+        mission_id: 'mission-canonical',
+        task_id: 'task-canonical',
+      },
+    });
+    vi.stubEnv('KYBERION_REASONING_ROLE_BACKGROUND_REVIEW', 'anthropic');
+    try {
+      const result = await runBackgroundReviewFork({
+        sessionId: 'configured-auxiliary-review',
+        surface: 'slack',
+        snapshot: 'review snapshot',
+        workItemId: item.item_id,
+        backend: { delegateTask },
+      });
+      expect(result.status).toBe('no_action');
+      expect(nativeDispatch).not.toHaveBeenCalled();
+      expect(delegateTask).toHaveBeenCalledWith(
+        expect.any(String),
+        expect.any(String),
+        expect.objectContaining({ role: 'background_review' })
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it('passes valid ADF input through without repair', async () => {

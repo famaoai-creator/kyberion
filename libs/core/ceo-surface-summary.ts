@@ -86,6 +86,12 @@ export interface CeoSurfaceSummary {
   action_queue?: OperatorHomeSummary['actionQueue'];
   runway?: {
     total_usd: number;
+    cost_complete?: boolean;
+    unknown_cost_calls?: number;
+    included_calls?: number;
+    reference_usd?: number;
+    reference_cost_calls?: number;
+    partial_notice?: string;
     budget_usd?: number;
     remaining_usd?: number | null;
     over_budget: boolean;
@@ -310,10 +316,26 @@ export function composeCeoSurfaceSummary(input: {
     action_queue: home.actionQueue,
     runway: {
       total_usd: home.costSummary.totalUsd,
+      ...(home.costSummary.costComplete !== undefined
+        ? { cost_complete: home.costSummary.costComplete }
+        : {}),
+      ...(home.costSummary.unknownCostCalls !== undefined
+        ? { unknown_cost_calls: home.costSummary.unknownCostCalls }
+        : {}),
+      ...(home.costSummary.includedCalls !== undefined
+        ? { included_calls: home.costSummary.includedCalls }
+        : {}),
+      ...(home.costSummary.referenceUsd !== undefined
+        ? { reference_usd: home.costSummary.referenceUsd }
+        : {}),
+      ...(home.costSummary.referenceCostCalls !== undefined
+        ? { reference_cost_calls: home.costSummary.referenceCostCalls }
+        : {}),
+      ...(home.costSummary.partialNotice ? { partial_notice: home.costSummary.partialNotice } : {}),
       ...(home.costSummary.budgetUsd !== undefined
         ? { budget_usd: home.costSummary.budgetUsd }
         : {}),
-      remaining_usd: home.costSummary.remainingUsd,
+      remaining_usd: home.costSummary.costComplete === false ? null : home.costSummary.remainingUsd,
       over_budget: home.costSummary.overBudget,
     },
   };

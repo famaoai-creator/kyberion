@@ -84,6 +84,35 @@ function makeHomeSummary(): OperatorHomeSummary {
 }
 
 describe('ceo-surface-summary', () => {
+  it('carries cost uncertainty to runway without presenting a known subtotal as budget-safe', () => {
+    const home = makeHomeSummary();
+    home.costSummary = {
+      ...home.costSummary,
+      entryCount: 2,
+      totalUsd: 0,
+      costComplete: false,
+      unknownCostCalls: 1,
+      includedCalls: 1,
+      referenceUsd: 0.8,
+      referenceCostCalls: 2,
+      budgetUsd: 5,
+      remainingUsd: 5,
+    };
+    const summary = composeCeoSurfaceSummary({
+      home,
+      notifications: [],
+      now: '2026-10-28T00:00:00Z',
+    });
+    expect(summary.runway).toMatchObject({
+      total_usd: 0,
+      cost_complete: false,
+      unknown_cost_calls: 1,
+      included_calls: 1,
+      reference_usd: 0.8,
+      reference_cost_calls: 2,
+      remaining_usd: null,
+    });
+  });
   it('maps the operator home summary into the four CEO panes', () => {
     const summary = composeCeoSurfaceSummary({
       home: makeHomeSummary(),

@@ -1,6 +1,6 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
-import { recordEstimatedCliUsage } from '../cli-usage-metering.js';
+import { parseCodexCliUsage, recordCliUsage } from '../cli-usage-metering.js';
 import path from 'node:path';
 import { z, type ZodType } from 'zod';
 import { logger } from '../core.js';
@@ -98,6 +98,7 @@ class CodexCliQuery {
     // Resolved before any file I/O or spawn so a typed refusal (e.g.
     // planner, which codex has no safe no-exec mode for) never touches the
     // filesystem or attempts to spawn the CLI.
+    if (this.options.signal?.aborted) throw new Error('[codex-cli] query aborted before spawn');
     const effectiveProfile = resolveEffectiveProviderPermissionProfile('codex', params.profile);
     const sandboxArgs = effectiveProfile
       ? this.resolvePermissionArgs(effectiveProfile)
@@ -124,6 +125,7 @@ class CodexCliQuery {
         ...sandboxArgs,
         '--model',
         this.model,
+        '--json',
         ...(this.options.effort ? ['-c', `model_reasoning_effort=${this.options.effort}`] : []),
         '--output-schema',
         schemaPath,
@@ -139,43 +141,44 @@ class CodexCliQuery {
       ];
 
       const started = Date.now();
+      const capture = { stdout: '', requestNotSent: true };
+      let completionChars = 0;
+      let status: 'success' | 'error' = 'error';
       try {
         await this.spawnCli(
           args,
           prompt,
-          effectiveProfile ?? (params.mode === 'workspace-write' ? 'implementer' : undefined)
+          effectiveProfile ?? (params.mode === 'workspace-write' ? 'implementer' : undefined),
+          capture
         );
-      } catch (err) {
-        recordEstimatedCliUsage('codex-cli', this.model, started, 'error', prompt.length, 0);
-        throw err;
+        assertRegularCodexOutputPath(outputPath);
+        const raw = readTextFile(outputPath);
+        completionChars = raw.length;
+        const clean = extractJsonPayload(raw);
+        const parsedJson = parseSafeJsonInput(clean, 'Codex CLI structured response');
+        let parsed = params.schema.safeParse(parsedJson);
+        if (!parsed.success) {
+          // `normalizeCodexSchema` makes optional properties nullable for the
+          // strict output schema, so the model legitimately answers `null` for a
+          // declined optional field while zod `.optional()` only accepts absent.
+          // Strip null-valued properties (the inverse transform) and retry once
+          // before declaring a schema failure. See: distill `experience: null`.
+          const reparsed = params.schema.safeParse(stripNullObjectProperties(parsedJson));
+          if (reparsed.success) parsed = reparsed;
+        }
+        if (!parsed.success) {
+          throw new Error(`[codex-cli] schema validation failed: ${parsed.error.message}`);
+        }
+        status = 'success';
+        return parsed.data;
+      } finally {
+        recordCliUsage('codex-cli', this.model, started, status, {
+          report: parseCodexCliUsage(capture.stdout),
+          promptChars: prompt.length,
+          completionChars,
+          requestNotSent: capture.requestNotSent,
+        });
       }
-
-      assertRegularCodexOutputPath(outputPath);
-      const raw = readTextFile(outputPath);
-      recordEstimatedCliUsage(
-        'codex-cli',
-        this.model,
-        started,
-        'success',
-        prompt.length,
-        raw.length
-      );
-      const clean = extractJsonPayload(raw);
-      const parsedJson = parseSafeJsonInput(clean, 'Codex CLI structured response');
-      let parsed = params.schema.safeParse(parsedJson);
-      if (!parsed.success) {
-        // `normalizeCodexSchema` makes optional properties nullable for the
-        // strict output schema, so the model legitimately answers `null` for a
-        // declined optional field while zod `.optional()` only accepts absent.
-        // Strip null-valued properties (the inverse transform) and retry once
-        // before declaring a schema failure. See: distill `experience: null`.
-        const reparsed = params.schema.safeParse(stripNullObjectProperties(parsedJson));
-        if (reparsed.success) parsed = reparsed;
-      }
-      if (!parsed.success) {
-        throw new Error(`[codex-cli] schema validation failed: ${parsed.error.message}`);
-      }
-      return parsed.data;
     } catch (err: any) {
       throw new Error(`[codex-cli] structured query failed: ${err?.message ?? String(err)}`);
     } finally {
@@ -192,7 +195,8 @@ class CodexCliQuery {
   private spawnCli(
     args: string[],
     stdin: string,
-    profile?: ProviderPermissionProfileName
+    profile?: ProviderPermissionProfileName,
+    capture: { stdout: string; requestNotSent: boolean } = { stdout: '', requestNotSent: true }
   ): Promise<void> {
     // XP-02: minimal allowlisted env, scoped to codex's own required vars;
     // WS-02: private git index for write-capable runs.
@@ -213,6 +217,7 @@ class CodexCliQuery {
         cwd: this.cwd,
       })
     );
+    capture.requestNotSent = false;
 
     return withWallClockBudget(
       {
@@ -225,8 +230,13 @@ class CodexCliQuery {
         new Promise<void>((resolve, reject) => {
           let stderr = '';
           let stdout = '';
+          let spawned = false;
+          child.once('spawn', () => {
+            spawned = true;
+          });
           child.stdout.on('data', (chunk) => {
             stdout += chunk.toString();
+            capture.stdout = stdout;
           });
           child.stderr.on('data', (chunk) => {
             stderr += chunk.toString();
@@ -243,6 +253,7 @@ class CodexCliQuery {
             resolve();
           });
           child.on('error', (err) => {
+            if (!spawned && !stdout) capture.requestNotSent = true;
             reject(new Error(`[codex-cli] spawn failed: ${err.message}`));
           });
           child.stdin.write(stdin);

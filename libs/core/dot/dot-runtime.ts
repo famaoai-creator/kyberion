@@ -62,7 +62,7 @@ import type {
   ToolDefinition,
 } from '../reasoning/reasoning-backend-contracts.js';
 import { loadAuthorityRoleIndex } from '../organization/authority-role-registry.js';
-import { estimateTokens } from '../workforce/worker-context-compaction.js';
+import { estimateTokens } from '../foundation/text.js';
 import {
   dotGoalRefLabel,
   listDotCharters,

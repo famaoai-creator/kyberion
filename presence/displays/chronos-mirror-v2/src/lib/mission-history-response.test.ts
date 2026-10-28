@@ -15,12 +15,25 @@ describe('mission history response boundary', () => {
     expect(parseMissionHistoryResponse({ missions: [mission] })).toEqual({ missions: [mission] });
   });
 
+  it('preserves structural fallback disclosure independently of mission completion', () => {
+    const completed = {
+      ...mission,
+      status: 'completed',
+      distillationDisclosure: 'structural_stub',
+    };
+    expect(parseMissionHistoryResponse({ missions: [completed] })).toEqual({
+      missions: [completed],
+    });
+  });
+
   it.each([
     { missions: [{ ...mission, status: 'unknown' }] },
     { missions: [{ ...mission, tier: [] }] },
     { missions: [{ ...mission, artifactKinds: ['markdown', 42] }] },
     { missions: [{ ...mission, artifactCount: -1 }] },
     { missions: [{ ...mission, tenantSlug: 42 }] },
+    { missions: [{ ...mission, distillationDisclosure: 'review_approved' }] },
+    { missions: [{ ...mission, distillationDisclosure: {} }] },
     JSON.parse(
       '{"missions":[{"missionId":"M-1","status":"active","tier":"confidential","artifactKinds":[],"artifactCount":0,"__proto__":{}}]}'
     ),

@@ -25,6 +25,8 @@ import {
 import { registerOpPreflightListener, resetOpPreflight } from '../pipeline/op-preflight.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
+import { withUsageAttribution } from '../usage-accounting.js';
+import * as delegationObservability from '../delegated-task-observability.js';
 
 const a2aRoute = vi.hoisted(() =>
   vi.fn(async () => ({ payload: { content: 'sub-agent-result' } }))
@@ -102,6 +104,141 @@ function makeFakeBackend(opts: { withTools?: boolean } = {}): ReasoningBackend &
 }
 
 describe('agent-dispatch', () => {
+  it('keeps latest parent prompt occupancy isolated to the trusted execution attempt', async () => {
+    const backend = makeFakeBackend();
+    const observed: Array<
+      import('../reasoning/reasoning-backend.js').ReasoningCallOptions | undefined
+    > = [];
+    const wrapper = new DispatchingReasoningBackend(backend, {
+      name: 'capture',
+      dispatch: async (_instruction, _context, _backend, options) => {
+        observed.push(options);
+        return 'done';
+      },
+    });
+    let release!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    await Promise.all([
+      withUsageAttribution(
+        { actor_id: 'parent:a', accounting_id: 'attempt-a', scope: { tier: 'public' } },
+        async () => {
+          await wrapper.prompt('a'.repeat(600));
+          await barrier;
+          await wrapper.delegateTask('a child');
+          await wrapper.prompt('new');
+          await wrapper.delegateTask('new prompt child');
+        }
+      ),
+      withUsageAttribution(
+        { actor_id: 'parent:b', accounting_id: 'attempt-b', scope: { tier: 'public' } },
+        async () => {
+          await wrapper.prompt('b'.repeat(60));
+          await wrapper.delegateTask('b child');
+          release();
+        }
+      ),
+    ]);
+    expect(
+      observed.map((options) => options?.delegation_result?.parentContext?.latestPromptTokens)
+    ).toEqual([60, 600, 3]);
+    await withUsageAttribution(
+      { actor_id: 'parent:a', accounting_id: 'attempt-new', scope: { tier: 'public' } },
+      () => wrapper.delegateTask('new attempt')
+    );
+    expect(observed.at(-1)?.delegation_result?.parentContext).toBeUndefined();
+    await wrapper.delegateTask('unattributed');
+    expect(observed.at(-1)?.delegation_result?.parentContext).toBeUndefined();
+  });
+
+  it('requires semantic native progress for continuous execution', async () => {
+    await expect(
+      new ProcessSpawnDispatcher().dispatch('task', undefined, makeFakeBackend(), {
+        delegation_execution: 'continuous',
+        delegation_inactivity: { timeoutMs: 10 },
+      })
+    ).rejects.toThrow('PROGRESS_UNSUPPORTED');
+  });
+
+  it('applies projection on real process dispatch and preserves schema payloads', async () => {
+    const backend = makeFakeBackend();
+    const raw = 'x'.repeat(30_000);
+    backend.delegateTask.mockResolvedValueOnce(raw);
+    await expect(
+      new ProcessSpawnDispatcher().dispatch('task', undefined, backend)
+    ).rejects.toMatchObject({
+      name: 'DelegationResultProjectionError',
+      fullResult: raw,
+    });
+    const structured = '```task_result\n' + JSON.stringify({ result: raw }) + '\n```';
+    backend.delegateTask.mockResolvedValueOnce(structured);
+    await expect(new ProcessSpawnDispatcher().dispatch('task', undefined, backend)).resolves.toBe(
+      structured
+    );
+  });
+
+  it('fences a late oversized process result after explicit cancellation', async () => {
+    const backend = makeFakeBackend();
+    let finish!: (value: string) => void;
+    backend.delegateTask.mockImplementation(
+      () =>
+        new Promise<string>((resolve) => {
+          finish = resolve;
+        })
+    );
+    const controller = new AbortController();
+    const run = new ProcessSpawnDispatcher().dispatch('task', undefined, backend, {
+      signal: controller.signal,
+    });
+    const assertion = expect(run).rejects.toThrow('CANCELLED');
+    await vi.waitFor(() => expect(backend.delegateTask).toHaveBeenCalledOnce());
+    controller.abort();
+    await assertion;
+    finish('x'.repeat(30_000));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  it('continuable native handles select continuous execution while explicit bounded wins', async () => {
+    const createHandle = vi
+      .spyOn(delegationObservability, 'createDelegationHandle')
+      .mockImplementation(
+        (input) =>
+          ({
+            join: () => input.execute(new AbortController().signal),
+          }) as delegationObservability.DelegationHandle
+      );
+    const backend = makeFakeBackend();
+    const dispatch = vi.fn(async () => 'native result');
+    backend.getNativeSubagentAdopter = () => ({
+      id: 'tested-native',
+      supportsSemanticProgress: true,
+      dispatch,
+    });
+    const wrapper = new DispatchingReasoningBackend(backend, new HarnessSubagentDispatcher());
+    await wrapper.delegateTaskHandle('long task', undefined, { continuable: true }).join();
+    expect(dispatch).toHaveBeenLastCalledWith(
+      'long task',
+      expect.any(String),
+      expect.objectContaining({
+        delegation_execution: 'continuous',
+        delegation_inactivity: { timeoutMs: 300_000 },
+      })
+    );
+    await wrapper
+      .delegateTaskHandle('bounded task', undefined, {
+        continuable: true,
+        delegation_execution: 'bounded',
+      })
+      .join();
+    expect(dispatch).toHaveBeenLastCalledWith(
+      'bounded task',
+      expect.any(String),
+      expect.objectContaining({ delegation_execution: 'bounded' })
+    );
+    createHandle.mockRestore();
+  });
   it('routes dispatcher environment reads through the governed accessor', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('libs/core/agent/agent-dispatch.ts'), {
@@ -117,7 +254,11 @@ describe('agent-dispatch', () => {
     const options = { profile: 'explorer', effort: 'medium' as const };
     const out = await new ProcessSpawnDispatcher().dispatch('do X', 'ctx', backend, options);
     expect(out).toBe('spawned:do X');
-    expect(backend.delegateTask).toHaveBeenCalledWith('do X', 'ctx', options);
+    expect(backend.delegateTask).toHaveBeenCalledWith(
+      'do X',
+      'ctx',
+      expect.objectContaining({ ...options, signal: expect.any(AbortSignal) })
+    );
   });
 
   it('InSessionDispatcher falls back to process-spawn when the base lacks generateWithTools', async () => {
@@ -143,7 +284,7 @@ describe('agent-dispatch', () => {
     expect(backend.generateWithTools).toHaveBeenLastCalledWith(
       expect.stringContaining('Task: do scoped Z'),
       expect.any(Array),
-      options
+      expect.objectContaining({ ...options, signal: expect.any(AbortSignal) })
     );
 
     const wrapped = new DispatchingReasoningBackend(backend, new ProcessSpawnDispatcher());
@@ -162,7 +303,8 @@ describe('agent-dispatch', () => {
     // original context is preserved as the prefix.
     expect(backend.delegateTask).toHaveBeenCalledWith(
       'task',
-      expect.stringMatching(/^c\n<delegation-chain>\[.*\]<\/delegation-chain>$/)
+      expect.stringMatching(/^c\n<delegation-chain>\[.*\]<\/delegation-chain>$/),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
 
     await wrapped.prompt('hi');
@@ -186,7 +328,8 @@ describe('agent-dispatch', () => {
 
     expect(backend.delegateTask).toHaveBeenCalledWith(
       'repaired task',
-      expect.stringContaining('<delegation-chain>')
+      expect.stringContaining('<delegation-chain>'),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
     );
   });
 
@@ -436,7 +579,11 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
 
     const out = await dispatcher.dispatch('do X', 'ctx', backend);
     expect(out).toBe('spawned:do X');
-    expect(backend.delegateTask).toHaveBeenCalledWith('do X', 'ctx');
+    expect(backend.delegateTask).toHaveBeenCalledWith(
+      'do X',
+      'ctx',
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it('emits subagent_begin/subagent_end(status=success) on the KC-02 worker event stream', async () => {

@@ -1,6 +1,8 @@
+import { runInExecutionScope } from '../foundation/execution-scope.js';
 import { describe, expect, it, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { withDelegationProgress } from '../mission/delegation-progress.js';
 import {
   ClaudeCliSessionAdapter,
   normalizeClaudeStreamMessage,
@@ -46,6 +48,41 @@ const INIT = {
   agents: ['kyberion-explorer', 'general-purpose'],
   tools: ['Task'],
 };
+
+it('reports parsed semantic events per turn and continuous turns have no fixed timeout', async () => {
+  const { child } = createFakeChild();
+  const adapter = new ClaudeCliSessionAdapter({
+    profile: 'explorer',
+    timeoutMs: 1,
+    spawnProcess: () => child as never,
+  });
+  const first = vi.fn();
+  const pending = withDelegationProgress(first, () => adapter.ask('first'), 'continuous');
+  await flush();
+  child.stdout.write('not a protocol event\n');
+  child.stderr.write('still alive\n');
+  emit(child, INIT, { type: 'assistant', message: { content: [] } });
+  emit(child, { type: 'assistant', message: { content: [null, false, 4, 'noise'] } });
+  expect(first).not.toHaveBeenCalled();
+  emit(
+    child,
+    { type: 'assistant', message: { content: [{ type: 'text', text: 'working' }] } },
+    result('done')
+  );
+  expect((await pending).text).toBe('done');
+  expect(first).toHaveBeenCalledExactlyOnceWith('assistant_message');
+  const second = vi.fn();
+  const next = withDelegationProgress(second, () => adapter.ask('second'), 'continuous');
+  await flush();
+  emit(
+    child,
+    { type: 'assistant', message: { content: [{ type: 'text', text: 'next work' }] } },
+    result('next')
+  );
+  await next;
+  expect(second).toHaveBeenCalledExactlyOnceWith('assistant_message');
+  expect(first).toHaveBeenCalledTimes(1);
+});
 
 function toolUse(input: Record<string, unknown>): Record<string, unknown> {
   return {
@@ -434,5 +471,27 @@ describe('ClaudeCliSessionAdapter (CN-01)', () => {
       await flush();
       expect(written.join('')).toContain('"subtype":"interrupt"');
     });
+  });
+});
+
+describe('Claude persistent credential owner fence', () => {
+  it('rejects a cached operator child and new tenant session before any send or spawn', async () => {
+    const spawnProcess = vi.fn();
+    const adapter = new ClaudeCliSessionAdapter({ spawnProcess });
+    const write = vi.fn();
+    Object.assign(adapter, { child: { stdin: { writable: true, write } } });
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'native-fixture' }, async () => {
+      await expect(adapter.boot()).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+      await expect(adapter.ask('must not send')).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+      await expect(adapter.askNativeSubagent('must not send')).rejects.toThrow(
+        'CREDENTIAL_OWNER_DENIED'
+      );
+      await expect(adapter.shutdown()).rejects.toThrow('CREDENTIAL_OWNER_DENIED');
+      expect(() => adapter.getRuntimeInfo()).toThrow('CREDENTIAL_OWNER_DENIED');
+      const scoped = new ClaudeCliSessionAdapter({ spawnProcess });
+      await expect(scoped.boot()).rejects.toThrow('CREDENTIAL_NATIVE_UNSUPPORTED');
+    });
+    expect(write).not.toHaveBeenCalled();
+    expect(spawnProcess).not.toHaveBeenCalled();
   });
 });

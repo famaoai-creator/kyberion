@@ -19,6 +19,49 @@ describe('cost summary response boundary', () => {
     expect(parseCostSummaryResponse({ summary })).toEqual({ summary });
   });
 
+  it('accepts additive accounting fields while retaining old payload compatibility', () => {
+    const withCoverage = {
+      ...summary,
+      referenceUsd: 0.8,
+      referenceCostCalls: 1,
+      includedCalls: 1,
+      unknownCostCalls: 1,
+      actualCostCalls: 0,
+      estimatedCostCalls: 0,
+      costComplete: false,
+      partialNotice: 'Partial scope',
+      withheldPartitions: 1,
+    };
+    expect(parseCostSummaryResponse({ summary: withCoverage })).toEqual({ summary: withCoverage });
+    expect(parseCostSummaryResponse({ summary })).toEqual({ summary });
+  });
+
+  it.each([
+    { referenceUsd: -1 },
+    { referenceUsd: Infinity },
+    { referenceCostCalls: 0.5 },
+    { includedCalls: '1' },
+    { unknownCostCalls: -1 },
+    { actualCostCalls: NaN },
+    { estimatedCostCalls: null },
+    { costComplete: 'true' },
+    { costComplete: true, unknownCostCalls: 1 },
+  ])('rejects malformed optional accounting fields %j', (patch) => {
+    expect(parseCostSummaryResponse({ summary: { ...summary, ...patch } })).toBeUndefined();
+    expect(
+      parseCostSummaryResponse({
+        summary: { ...summary, missionBreakdown: [{ ...summary.missionBreakdown[0], ...patch }] },
+      })
+    ).toBeUndefined();
+  });
+
+  it.each([{ partialNotice: 3 }, { withheldPartitions: 0.5 }])(
+    'rejects malformed optional visibility metadata %j',
+    (patch) => {
+      expect(parseCostSummaryResponse({ summary: { ...summary, ...patch } })).toBeUndefined();
+    }
+  );
+
   it.each([
     { summary: { ...summary, totalUsd: Number.NaN } },
     { summary: { ...summary, entryCount: 1.5 } },

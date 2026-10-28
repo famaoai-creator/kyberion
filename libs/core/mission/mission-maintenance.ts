@@ -907,6 +907,9 @@ export async function recordEvidence(args: {
   if (!missionPathCandidate) throw new Error(`Mission ${upperId} not found.`);
   const missionPath = safeMissionRoot(missionPathCandidate);
 
+  // Runtime claims carry a verified actor. Reuse it when the caller did not
+  // redundantly pass --actor-id; the fence below still validates the claim.
+  const actorId = args.actorId ?? args.taskBinding?.actorId;
   const state = loadState(upperId);
   if (!state) throw new Error(`Mission ${upperId} state not found.`);
   if (state.status === 'archived') {
@@ -965,7 +968,7 @@ export async function recordEvidence(args: {
       {
         missionId: upperId,
         taskId: args.taskId,
-        actorId: args.actorId,
+        actorId,
         missionPath,
         tier: mutationState.tier,
         tenantSlug: mutationState.tenant_slug,
@@ -979,8 +982,8 @@ export async function recordEvidence(args: {
           event_type: 'evidence_recorded',
           task_id: args.taskId,
           team_role: args.teamRole,
-          actor_id: args.actorId,
-          actor_type: args.actorType || (args.actorId ? 'agent' : undefined),
+          actor_id: actorId,
+          actor_type: args.actorType || (actorId ? 'agent' : undefined),
           decision: args.note,
           evidence: args.evidence || [],
           payload: {
@@ -1027,6 +1030,7 @@ export async function recordEvidence(args: {
         }
         const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.taskId, {
           verifiedSourceTarget: verified.sourceTarget,
+          canCascade: reviewTargetCascadeGuard(missionPath),
           // The task's own check re-reads its lock too, so a failed reconcile never
           // lets a held task close (the hold check fails closed).
           isHeld: (taskId) =>
@@ -1035,7 +1039,13 @@ export async function recordEvidence(args: {
         });
         if (autoComplete.completed) {
           logger.info(`✅ Task "${args.taskId}" auto-completed (${autoComplete.reason}).`);
-          recordDirectCliTaskUsage({ ...args, ...autoComplete, state, event: 'record_evidence' });
+          recordDirectCliTaskUsage({
+            ...args,
+            actorId,
+            ...autoComplete,
+            state,
+            event: 'record_evidence',
+          });
           for (const cascadedId of autoComplete.cascaded) {
             logger.info(
               `✅ Task "${cascadedId}" auto-completed (dependencies satisfied via cascade).`
@@ -1081,7 +1091,11 @@ function findLedgerActorIdsForTask(missionPath: string, taskId: string): string[
         : null,
   });
   for (const entry of entries) {
-    if (entry?.task_id === taskId && entry.actor_id) actorIds.add(String(entry.actor_id));
+    // Dispatchers, observers and reviewers may also name this task. Only the
+    // task-scoped evidence assertion identifies its producer for direct work.
+    if (entry?.event_type !== 'evidence_recorded' || entry.task_id !== taskId) continue;
+    const actorId = typeof entry.actor_id === 'string' ? entry.actor_id.trim() : '';
+    if (actorId) actorIds.add(actorId);
   }
   return Array.from(actorIds);
 }
@@ -1098,6 +1112,17 @@ function assertReviewNotSuperseded(
     const refusal = supersededTaskRefusal(missionPath, task, 'review-task');
     if (refusal) throw new Error(refusal);
   }
+}
+
+/** File existence never identifies who produced a different task's output. */
+function reviewTargetCascadeGuard(missionPath: string): (taskId: string) => boolean {
+  const reviewTargets = new Set(
+    readMissionNextTasks(missionPath)
+      .map((task) => String(task.review_target || ''))
+      .filter(Boolean)
+  );
+  return (taskId) =>
+    !reviewTargets.has(taskId) || findLedgerActorIdsForTask(missionPath, taskId).length > 0;
 }
 
 export interface RecordArtifactReviewResult {
@@ -1293,7 +1318,9 @@ export async function recordArtifactReview(args: {
 
   let taskCompleted = false;
   if (evaluation.ready) {
-    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId);
+    const autoComplete = tryAutoCompleteTaskFromEvidence(missionPath, args.reviewTaskId, {
+      canCascade: reviewTargetCascadeGuard(missionPath),
+    });
     taskCompleted = autoComplete.completed;
     const reviewer = { taskId: args.reviewTaskId, actorId: args.reviewerAgentId, state };
     if (taskCompleted)
@@ -1318,7 +1345,16 @@ export async function recordArtifactReview(args: {
     taskCompleted,
     reasons: evaluation.reasons,
     receiptPath: receiptRelPath,
-    ...(taskCompleted ? {} : { next_step: buildReviewCloseOutStep(args, task, missionPath) }),
+    ...(taskCompleted
+      ? {}
+      : {
+          next_step:
+            implementerAgentIds.length === 0
+              ? `Record the actual author's evidence for review target ${reviewTargetId}: pnpm mission record-evidence ${upperId} ${reviewTargetId} "<author evidence>" --actor-id <actual-author-id>; then retry review-task with an independent reviewer. Recording evidence on ${args.reviewTaskId} cannot establish target authorship.`
+              : implementerAgentIds.includes(args.reviewerAgentId)
+                ? `Retry pnpm mission review-task ${upperId} ${args.reviewTaskId} <independent-reviewer-id> with a reviewer who did not produce ${reviewTargetId}.`
+                : buildReviewCloseOutStep(args, task, missionPath),
+        }),
   };
 }
 

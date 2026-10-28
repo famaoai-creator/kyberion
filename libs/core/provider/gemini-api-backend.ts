@@ -1,4 +1,10 @@
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+  resolveProviderApiCredential,
+  selectProviderCredential,
+} from '../foundation/credential-binding.js';
 import { secureFetch, type SecureFetchOptions } from '../network.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { isRecord, trimEndChars } from '../foundation/text.js';
@@ -49,11 +55,12 @@ function envText(env: NodeJS.ProcessEnv, name: string): string | undefined {
  * Prefer the Kyberion-namespaced secret, then community aliases.
  */
 export function resolveGeminiApiKey(env: NodeJS.ProcessEnv = process.env): string | undefined {
-  return (
+  return selectProviderCredential(
+    ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
     envText(env, 'KYBERION_GEMINI_API_KEY')?.trim() ||
-    envText(env, 'GEMINI_API_KEY')?.trim() ||
-    envText(env, 'GOOGLE_API_KEY')?.trim() ||
-    undefined
+      envText(env, 'GEMINI_API_KEY')?.trim() ||
+      envText(env, 'GOOGLE_API_KEY')?.trim() ||
+      ''
   );
 }
 
@@ -280,7 +287,15 @@ function normalizeModel(model: string): string {
 export class GeminiApiBackend implements ReasoningBackend {
   readonly name = 'gemini-api';
   readonly egressEndpoint: string;
-  private readonly apiKey: string;
+  private readonly operatorApiKey: string;
+  private readonly credentialOwner = credentialExecutionIdentity();
+  private get apiKey(): string {
+    assertCredentialOwner(this.credentialOwner);
+    return resolveProviderApiCredential(
+      ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+      this.operatorApiKey
+    );
+  }
   private readonly model: string;
   private readonly baseURL: string;
   private readonly timeoutMs: number;
@@ -290,7 +305,10 @@ export class GeminiApiBackend implements ReasoningBackend {
   constructor(options: GeminiApiBackendOptions) {
     if (!options.apiKey.trim()) throw new Error('Missing API key for Gemini API backend');
     if (!options.model.trim()) throw new Error('Missing model for Gemini API backend');
-    this.apiKey = options.apiKey.trim();
+    this.operatorApiKey = resolveProviderApiCredential(
+      ['KYBERION_GEMINI_API_KEY', 'GEMINI_API_KEY', 'GOOGLE_API_KEY'],
+      options.apiKey.trim()
+    );
     this.model = normalizeModel(options.model);
     this.baseURL = normalizeBaseUrl(options.baseURL || GEMINI_API_DEFAULT_BASE_URL);
     this.egressEndpoint = this.baseURL;

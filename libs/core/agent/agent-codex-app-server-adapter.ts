@@ -1,3 +1,8 @@
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+} from '../foundation/credential-binding.js';
+import { assertOperatorNativeCredentialOwner } from './native-credential-fence.js';
 /**
  * Codex App Server adapter.
  *
@@ -353,6 +358,7 @@ export interface CodexNativeSubagentInfo {
  * Codex App Server Adapter (JSON-RPC over stdio).
  */
 export class CodexAppServerAdapter implements AgentAdapter {
+  private readonly credentialOwner = credentialExecutionIdentity();
   private options: CodexAppServerAdapterOptions;
   private child: ChildProcess | null = null;
   private runtimeResourceId: string | null = null;
@@ -410,6 +416,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public getLog(limit = 50): { ts: number; type: string; content: string }[] {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return this.logBuffer.slice(-limit);
   }
 
@@ -438,6 +445,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     const cwd = this.resolveCwd();
     logger.info('[UAA] Codex App Server booting (cwd: ' + cwd + ')');
     this.runtimeResourceId = 'codex-app-server:' + cwd;
@@ -579,6 +587,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public async ask(prompt: string, options?: AgentAskOptions): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (!this.threadId) throw new Error('Codex app-server not booted.');
     return this.askOnThread(prompt, options, this.threadId);
   }
@@ -587,6 +596,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     prompt: string,
     options?: AgentAskOptions
   ): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (!this.threadId) throw new Error('Codex app-server not booted.');
     const parentThreadId = this.threadId;
     const effort = options?.effort ?? 'medium';
@@ -728,6 +738,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public async shutdown(): Promise<void> {
+    assertCredentialOwner(this.credentialOwner);
     if (this.child) {
       if (this.runtimeResourceId) stopManagedProcess(this.runtimeResourceId, this.child);
       this.child = null;
@@ -739,6 +750,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public getRuntimeInfo(): Record<string, unknown> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return {
       pid: this.child?.pid,
       codexBinary: this.codexBinary,
@@ -756,6 +768,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
   }
 
   public async refreshContext(): Promise<{ mode: 'soft'; threadId?: string | null }> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (!this.child) throw new Error('Codex app-server not booted.');
     const cwd = this.resolveCwd();
     const approvalMode = this.options.approvalMode || 'strict';
@@ -1049,6 +1062,7 @@ export class CodexAppServerAdapter implements AgentAdapter {
     params: Record<string, unknown>,
     timeoutMs?: number
   ): Promise<T> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (!this.child?.stdin?.writable) throw new Error('Codex app-server stdin not writable.');
     const id = this.nextId++;
     const payload = JSON.stringify({ jsonrpc: '2.0', id, method, params });

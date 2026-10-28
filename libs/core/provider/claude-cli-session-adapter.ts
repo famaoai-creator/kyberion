@@ -1,3 +1,8 @@
+import {
+  credentialExecutionIdentity,
+  assertCredentialOwner,
+} from '../foundation/credential-binding.js';
+import { assertOperatorNativeCredentialOwner } from '../agent/native-credential-fence.js';
 /* eslint-disable no-restricted-imports -- the provider boundary owns this managed CLI session process. */
 /**
  * Claude CLI session adapter (CN-01) — the concrete native-subagent surface
@@ -47,6 +52,11 @@ import {
   resolveClaudeNativeSessionPermission,
 } from './claude-native-subagent.js';
 import { resolveRuntimeModelId } from '../tool/runtime-model-defaults.js';
+import {
+  captureDelegationProgressReporter,
+  currentDelegationExecutionMode,
+  type DelegationProgress,
+} from '../mission/delegation-progress.js';
 
 export interface ClaudeCliSessionAdapterOptions {
   /** CLI binary. Defaults to `claude`. */
@@ -197,9 +207,10 @@ interface ObservedDelegation {
 }
 
 interface TurnState {
+  reportProgress: (event: DelegationProgress) => void;
   resolve: (response: AgentResponse) => void;
   reject: (error: Error) => void;
-  timer: ReturnType<typeof setTimeout>;
+  timer?: ReturnType<typeof setTimeout>;
   requireNative: boolean;
   /** The governed delegation observed in this turn, if any. */
   delegation?: ObservedDelegation;
@@ -217,6 +228,7 @@ function resolveEffortFlag(effort?: string): string | undefined {
 }
 
 export class ClaudeCliSessionAdapter {
+  private readonly credentialOwner = credentialExecutionIdentity();
   private readonly bin: string;
   private readonly model: string;
   private readonly profile: ProviderPermissionProfileName;
@@ -282,6 +294,7 @@ export class ClaudeCliSessionAdapter {
   }
 
   async boot(): Promise<void> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (this.child) return;
     if (this.bootPromise) return this.bootPromise;
     this.bootPromise = new Promise<void>((resolve, reject) => {
@@ -350,6 +363,7 @@ export class ClaudeCliSessionAdapter {
   }
 
   getRuntimeInfo(): Record<string, unknown> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     return {
       provider: 'claude',
       mode: 'cli-stream-json',
@@ -365,6 +379,7 @@ export class ClaudeCliSessionAdapter {
   }
 
   async shutdown(): Promise<void> {
+    assertCredentialOwner(this.credentialOwner);
     const child = this.child;
     this.forgetChild(child);
     this.failTurn(this.unavailable('claude CLI session was shut down.'));
@@ -413,33 +428,41 @@ export class ClaudeCliSessionAdapter {
     options: AgentAskOptions,
     requireNative: boolean
   ): Promise<AgentResponse> {
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     if (this.recoveryPromise) await this.recoveryPromise;
     await this.boot();
+    assertOperatorNativeCredentialOwner(this.credentialOwner);
     const child = this.child;
     if (!child) throw this.unavailable('claude CLI session is not running.');
     if (this.turn) throw this.unavailable('claude CLI session already has an active turn.');
     if (options.signal?.aborted) throw this.unavailable('claude CLI turn aborted before dispatch.');
 
     return new Promise<AgentResponse>((resolve, reject) => {
-      const timer = setTimeout(() => {
-        // A timeout cannot leave the old stream alive: without a per-turn
-        // protocol id, a late result would otherwise be consumed by the next
-        // turn. Reject first so shutdown cannot replace the useful error, then
-        // interrupt and drain the child before allowing another turn.
-        this.settleTurn(this.unavailable(`claude CLI turn timed out after ${this.timeoutMs}ms.`));
-        this.interrupt();
-        const recovery = this.shutdown();
-        this.recoveryPromise = recovery;
-        void recovery.then(
-          () => {
-            if (this.recoveryPromise === recovery) this.recoveryPromise = undefined;
-          },
-          () => {
-            if (this.recoveryPromise === recovery) this.recoveryPromise = undefined;
-          }
-        );
-      }, this.timeoutMs);
+      const timer =
+        currentDelegationExecutionMode() === 'continuous'
+          ? undefined
+          : setTimeout(() => {
+              // A timeout cannot leave the old stream alive: without a per-turn
+              // protocol id, a late result would otherwise be consumed by the next
+              // turn. Reject first so shutdown cannot replace the useful error, then
+              // interrupt and drain the child before allowing another turn.
+              this.settleTurn(
+                this.unavailable(`claude CLI turn timed out after ${this.timeoutMs}ms.`)
+              );
+              this.interrupt();
+              const recovery = this.shutdown();
+              this.recoveryPromise = recovery;
+              void recovery.then(
+                () => {
+                  if (this.recoveryPromise === recovery) this.recoveryPromise = undefined;
+                },
+                () => {
+                  if (this.recoveryPromise === recovery) this.recoveryPromise = undefined;
+                }
+              );
+            }, this.timeoutMs);
       const state: TurnState = {
+        reportProgress: captureDelegationProgressReporter(),
         resolve,
         reject,
         timer,
@@ -451,6 +474,15 @@ export class ClaudeCliSessionAdapter {
         state.onAbort = () => {
           this.interrupt();
           this.settleTurn(this.unavailable('claude CLI turn aborted.'));
+          // Protocol turns carry no correlation id: drain the interrupted
+          // process before reusing the pooled adapter, fencing late results.
+          const recovery = this.shutdown();
+          this.recoveryPromise = recovery;
+          void recovery
+            .finally(() => {
+              if (this.recoveryPromise === recovery) this.recoveryPromise = undefined;
+            })
+            .catch(() => undefined);
         };
         options.signal.addEventListener('abort', state.onAbort, { once: true });
       }
@@ -556,6 +588,14 @@ export class ClaudeCliSessionAdapter {
     const content = message.message?.content;
     if (!Array.isArray(content)) return;
     for (const raw of content) {
+      if (!raw || typeof raw !== 'object') continue;
+      if (raw.type === 'tool_use' && typeof raw.id === 'string' && typeof raw.name === 'string') {
+        turn.reportProgress('tool_started');
+      } else if (raw.type === 'tool_result' && typeof raw.tool_use_id === 'string') {
+        turn.reportProgress('tool_completed');
+      } else if (message.type === 'assistant' && raw.type === 'text' && raw.text?.trim()) {
+        turn.reportProgress('assistant_message');
+      }
       if (
         raw?.type === 'tool_use' &&
         typeof raw.name === 'string' &&
@@ -674,7 +714,7 @@ export class ClaudeCliSessionAdapter {
     if (!turn || turn.settled) return;
     turn.settled = true;
     this.turn = undefined;
-    clearTimeout(turn.timer);
+    if (turn.timer) clearTimeout(turn.timer);
     if (turn.onAbort && turn.signal) turn.signal.removeEventListener('abort', turn.onAbort);
     if (error) {
       turn.reject(error);

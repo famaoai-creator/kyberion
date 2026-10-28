@@ -1,3 +1,4 @@
+import { approvalReviewUrl } from '../store/settings.js';
 import { Box } from 'ink';
 import { Text } from './text.js';
 import type { IntentResolutionContract } from '@agent/core/intent/intent-resolution-contract';
@@ -89,6 +90,20 @@ export function OperatorCockpit({
             {summary.nextAction.title}
             <Text dimColor> — {summary.nextAction.reason}</Text>
           </Text>
+          {(summary.pendingApprovals ?? []).slice(0, 1).map((approval) => {
+            const reviewUrl = approvalReviewUrl(approval.id);
+            const title = Array.from(approval.title);
+            const shortTitle =
+              title.length > 30 ? title.slice(0, 29).join('') + '…' : approval.title;
+            return (
+              <Box key={approval.id} flexDirection="column">
+                <Text color={theme.warn} wrap="truncate">
+                  {tr('tui:tui_approval_review')}: {shortTitle} · {approval.expiresAt || '—'}
+                </Text>
+                {reviewUrl ? <Text>{reviewUrl}</Text> : null}
+              </Box>
+            );
+          })}
           {summary.actionQueue && summary.actionQueue.length > 0 ? (
             <Text dimColor>
               {tr('tui:tui_cockpit_attention')}: {summary.actionQueue[0].title} →{' '}

@@ -81,6 +81,7 @@
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import { Semaphore } from '../semaphore.js';
+import { withDelegationProgress } from './delegation-progress.js';
 import { logger } from '../core.js';
 import { recordGovernanceAction } from '../governance/governance-action-recorder.js';
 import { safeExecResult } from '../secure-io.js';
@@ -374,6 +375,8 @@ export interface DelegationTimeoutRecord {
 }
 
 const recordedTimeouts: DelegationTimeoutRecord[] = [];
+/** In-process cancellation listeners also cover native sessions with no child handle. */
+const activeDelegationAborts = new Set<() => void>();
 
 /** Test/ops-only: recorded wall-clock timeouts since the last reset. */
 export function getRecordedDelegationTimeouts(): DelegationTimeoutRecord[] {
@@ -408,6 +411,16 @@ export class DelegationWallClockExceededError extends Error {
   }
 }
 
+export class DelegationInactivityExceededError extends Error {
+  constructor(
+    readonly provider: string,
+    readonly timeoutMs: number
+  ) {
+    super(`delegation to provider '${provider}' made no semantic progress for ${timeoutMs}ms`);
+    this.name = 'DelegationInactivityExceededError';
+  }
+}
+
 export interface WithWallClockBudgetOptions {
   provider?: string;
   /** Default `KYBERION_DELEGATION_WALL_CLOCK_MS` (10 minutes). */
@@ -420,6 +433,9 @@ export interface WithWallClockBudgetOptions {
   id?: string;
   /** AbortSignal for explicit delegation cancellation. */
   signal?: AbortSignal;
+  /** Opt-in semantic progress timeout. Transport output does not reset it. */
+  inactivity?: { timeoutMs: number; lateResultGraceMs?: number };
+  executionMode?: 'bounded' | 'continuous';
 }
 
 /**
@@ -432,15 +448,34 @@ export interface WithWallClockBudgetOptions {
  */
 export async function withWallClockBudget<T>(
   opts: WithWallClockBudgetOptions,
-  fn: () => Promise<T>
+  fn: (signal: AbortSignal, canAcceptResult: () => boolean) => Promise<T>
 ): Promise<T> {
+  if (opts.signal?.aborted) throw new Error('[DELEGATION_CANCELLED] provider operation aborted');
   const provider = opts.provider?.trim() || UNKNOWN_DELEGATION_PROVIDER;
   const budgetMs = opts.budgetMs ?? resolveWallClockBudgetMs();
   const graceMs = opts.killGraceMs ?? resolveKillGraceMs();
   const id = opts.id ?? `${provider}-${++idCounter}`;
+  const inactivity = opts.inactivity;
+  if (opts.executionMode === 'continuous' && !inactivity) {
+    throw new Error('Continuous delegation requires semantic inactivity supervision');
+  }
+  if (
+    inactivity &&
+    (![inactivity.timeoutMs, inactivity.lateResultGraceMs ?? 2000].every(
+      (n) => Number.isSafeInteger(n) && n >= 0 && n <= 2_147_483_647
+    ) ||
+      inactivity.timeoutMs === 0)
+  ) {
+    throw new Error('Invalid delegation inactivity timeout/grace');
+  }
+  const controller = new AbortController();
 
   if (opts.child) {
     const now = Date.now();
+    const childLeaseMs =
+      opts.executionMode === 'continuous'
+        ? inactivity!.timeoutMs + (inactivity!.lateResultGraceMs ?? 2000)
+        : budgetMs;
     const pidStartedAt = resolveProcessStartTime(opts.child.pid);
     registerActiveChild(
       {
@@ -448,8 +483,8 @@ export async function withWallClockBudget<T>(
         provider,
         pid: opts.child.pid,
         startedAt: new Date(now).toISOString(),
-        deadlineAt: new Date(now + budgetMs).toISOString(),
-        budgetMs,
+        deadlineAt: new Date(now + childLeaseMs).toISOString(),
+        budgetMs: childLeaseMs,
         ...(pidStartedAt ? { pidStartedAt } : {}),
       },
       opts.child
@@ -459,26 +494,45 @@ export async function withWallClockBudget<T>(
   let timedOut = false;
   let sigtermTimer: ReturnType<typeof setTimeout> | undefined;
   let abortListener: (() => void) | undefined;
+  let killListener: (() => void) | undefined;
+  let idleTimer: ReturnType<typeof setTimeout> | undefined;
+  let lateTimer: ReturnType<typeof setTimeout> | undefined;
+  let inactive = false;
+  let terminal = false;
+  let armInactivity = () => {};
 
   const timeoutPromise = new Promise<never>((_resolve, reject) => {
-    sigtermTimer = setTimeout(() => {
+    killListener = () => {
+      terminal = true;
       timedOut = true;
-      recordDelegationTimeout(provider, budgetMs, id);
-      const child = opts.child;
-      if (child) {
-        safeKillChild(child, 'SIGTERM');
-        const sigkillTimer = setTimeout(() => {
-          safeKillChild(child, 'SIGKILL');
-          unregisterActiveChild(id);
-        }, graceMs);
-        sigkillTimer.unref?.();
-      }
-      reject(new DelegationWallClockExceededError(provider, budgetMs));
-    }, budgetMs);
-    sigtermTimer.unref?.();
+      controller.abort();
+      reject(new Error('[DELEGATION_CANCELLED] delegation terminated by kill switch'));
+    };
+    activeDelegationAborts.add(killListener);
+    if (opts.executionMode !== 'continuous') {
+      sigtermTimer = setTimeout(() => {
+        terminal = true;
+        timedOut = true;
+        controller.abort();
+        recordDelegationTimeout(provider, budgetMs, id);
+        const child = opts.child;
+        if (child) {
+          safeKillChild(child, 'SIGTERM');
+          const sigkillTimer = setTimeout(() => {
+            safeKillChild(child, 'SIGKILL');
+            unregisterActiveChild(id);
+          }, graceMs);
+          sigkillTimer.unref?.();
+        }
+        reject(new DelegationWallClockExceededError(provider, budgetMs));
+      }, budgetMs);
+      sigtermTimer.unref?.();
+    }
     if (opts.signal) {
       abortListener = () => {
+        terminal = true;
         timedOut = true;
+        controller.abort();
         if (opts.child) {
           safeKillChild(opts.child, 'SIGTERM');
           const sigkillTimer = setTimeout(() => {
@@ -492,13 +546,83 @@ export async function withWallClockBudget<T>(
       if (opts.signal.aborted) abortListener();
       else opts.signal.addEventListener('abort', abortListener, { once: true });
     }
+    if (inactivity) {
+      armInactivity = () => {
+        if (inactive || terminal) return;
+        if (opts.executionMode === 'continuous' && opts.child) {
+          const entry = activeChildren.get(id);
+          if (entry)
+            registerActiveChild(
+              {
+                ...entry.record,
+                deadlineAt: new Date(
+                  Date.now() + inactivity.timeoutMs + (inactivity.lateResultGraceMs ?? 2000)
+                ).toISOString(),
+              },
+              entry.handle
+            );
+        }
+        if (idleTimer) clearTimeout(idleTimer);
+        idleTimer = setTimeout(() => {
+          inactive = true;
+          // A cooperative stop may produce a real final result during this
+          // short grace; cancellation and hard timeout remain terminal.
+          controller.abort();
+          lateTimer = setTimeout(() => {
+            terminal = true;
+            timedOut = true;
+            if (opts.child) {
+              safeKillChild(opts.child, 'SIGTERM');
+              const sigkillTimer = setTimeout(() => {
+                safeKillChild(opts.child!, 'SIGKILL');
+                unregisterActiveChild(id);
+              }, graceMs);
+              sigkillTimer.unref?.();
+            }
+            reject(new DelegationInactivityExceededError(provider, inactivity.timeoutMs));
+          }, inactivity.lateResultGraceMs ?? 2000);
+          lateTimer.unref?.();
+        }, inactivity.timeoutMs);
+        idleTimer.unref?.();
+      };
+      armInactivity();
+    }
   });
 
   try {
-    return await Promise.race([fn(), timeoutPromise]);
+    const operation = withDelegationProgress(
+      armInactivity,
+      () => fn(controller.signal, () => !terminal && !opts.signal?.aborted),
+      opts.executionMode
+    );
+    const result = await Promise.race([operation, timeoutPromise]);
+    // A synchronous abort listener can settle fn before the race rejection.
+    if (terminal || opts.signal?.aborted) {
+      throw new Error('[DELEGATION_CANCELLED] result arrived after terminal cancellation');
+    }
+    return result;
+  } catch (error) {
+    if (inactive && !terminal) {
+      terminal = true;
+      timedOut = true;
+      if (opts.child) {
+        safeKillChild(opts.child, 'SIGTERM');
+        const sigkillTimer = setTimeout(() => {
+          safeKillChild(opts.child!, 'SIGKILL');
+          unregisterActiveChild(id);
+        }, graceMs);
+        sigkillTimer.unref?.();
+      }
+      throw new DelegationInactivityExceededError(provider, inactivity!.timeoutMs);
+    }
+    throw error;
   } finally {
+    terminal = true;
     if (sigtermTimer) clearTimeout(sigtermTimer);
+    if (idleTimer) clearTimeout(idleTimer);
+    if (lateTimer) clearTimeout(lateTimer);
     if (opts.signal && abortListener) opts.signal.removeEventListener('abort', abortListener);
+    if (killListener) activeDelegationAborts.delete(killListener);
     // On the timeout path, the SIGKILL escalation above owns unregistration
     // (it must stay tracked through the grace window). On any other settle
     // path (success or a normal `fn()` rejection), clean up immediately.
@@ -515,6 +639,7 @@ export async function withWallClockBudget<T>(
 export function terminateAllActiveDelegationChildren(reason: string): { terminatedIds: string[] } {
   const graceMs = resolveKillGraceMs();
   const terminatedIds: string[] = [];
+  for (const abort of activeDelegationAborts) abort();
   for (const [id, entry] of activeChildren) {
     terminatedIds.push(id);
     logger.warn(
@@ -581,6 +706,7 @@ export function resetDelegationConcurrencyStateForTests(): void {
   globalState = null;
   providerStates.clear();
   activeChildren.clear();
+  activeDelegationAborts.clear();
   recordedTimeouts.length = 0;
   idCounter = 0;
   killSwitchTerminationDisposer?.();

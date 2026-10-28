@@ -78,6 +78,7 @@ import { safeExec } from '../secure-io.js';
 import * as memoryQueue from '../knowledge/memory-promotion-queue.js';
 import { runAdaptiveStructuredLlmProfile } from './mission-llm.js';
 import { readJson, writeJson } from '../foundation/json.js';
+import { logger } from '../core.js';
 
 // Namespace the promotion queue so parallel test files never clobber the
 // real shared queue (root cause of combined-run flakes).
@@ -154,6 +155,21 @@ describe('mission-distill end-to-end promotion flow', () => {
         )
       );
     });
+  }
+
+  async function runDistillAsArchitect(): Promise<void> {
+    const previousRole = process.env.MISSION_ROLE;
+    const previousPersona = process.env.KYBERION_PERSONA;
+    process.env.MISSION_ROLE = 'ecosystem_architect';
+    process.env.KYBERION_PERSONA = 'ecosystem_architect';
+    try {
+      await distillMission(missionId, pathResolver.rootDir());
+    } finally {
+      if (previousRole === undefined) delete process.env.MISSION_ROLE;
+      else process.env.MISSION_ROLE = previousRole;
+      if (previousPersona === undefined) delete process.env.KYBERION_PERSONA;
+      else process.env.KYBERION_PERSONA = previousPersona;
+    }
   }
 
   beforeAll(() => {
@@ -263,7 +279,11 @@ describe('mission-distill end-to-end promotion flow', () => {
     expect(loadState(missionId)?.distillation).toMatchObject({
       mode: 'structural',
       llm_used: false,
+      structural_reason: 'llm_unavailable',
     });
+    expect(safeReadFile(wisdomFilePath, { encoding: 'utf8' })).toContain(
+      'Structural extraction only; no LLM distillation was performed.'
+    );
 
     const hints = safeReadFile(scratchHintsPath, { encoding: 'utf8' }) as string;
     expect(hints).not.toContain('Distilled wisdom from mission'); // risk_rule records do not pollute operational hints
@@ -273,6 +293,91 @@ describe('mission-distill end-to-end promotion flow', () => {
         .relative(pathResolver.rootDir(), path.join(missionPath, 'evidence', wisdomFileName))
         .replace(/\\/g, '/')
     );
+  });
+
+  it('persists explicit stub fallback and repeats the stored disclosure without regenerating it', async () => {
+    const previousProfile = process.env.KYBERION_WISDOM_LLM_PROFILE;
+    const warn = vi.spyOn(logger, 'warn');
+    process.env.KYBERION_WISDOM_LLM_PROFILE = 'stub';
+    try {
+      await runDistillAsArchitect();
+      expect(loadState(missionId)?.distillation).toMatchObject({
+        mode: 'structural',
+        llm_used: false,
+        structural_reason: 'stub_requested',
+      });
+      const markdown = safeReadFile(wisdomFilePath, { encoding: 'utf8' });
+      expect(markdown).toContain('structural_reason: stub_requested');
+      const calls = vi.mocked(runAdaptiveStructuredLlmProfile).mock.calls.length;
+      process.env.KYBERION_WISDOM_LLM_PROFILE = 'another-profile';
+      await runDistillAsArchitect();
+      expect(vi.mocked(runAdaptiveStructuredLlmProfile).mock.calls).toHaveLength(calls);
+      expect(safeReadFile(wisdomFilePath, { encoding: 'utf8' })).toBe(markdown);
+      expect(warn).toHaveBeenLastCalledWith(
+        expect.stringContaining(
+          'Stored extraction for MSN-DISTILL-E2E-001: structural only (stub_requested)'
+        )
+      );
+    } finally {
+      warn.mockRestore();
+      if (previousProfile === undefined) delete process.env.KYBERION_WISDOM_LLM_PROFILE;
+      else process.env.KYBERION_WISDOM_LLM_PROFILE = previousProfile;
+    }
+  });
+
+  it('discloses successful LLM extraction without claiming independent review', async () => {
+    const success = vi.spyOn(logger, 'success');
+    vi.mocked(runAdaptiveStructuredLlmProfile).mockResolvedValueOnce({
+      title: 'Observed lesson',
+      category: 'Operations',
+      tags: [],
+      importance: 3,
+      sections: { summary: 'Evidence-backed summary' },
+    });
+    try {
+      await runDistillAsArchitect();
+      expect(loadState(missionId)?.distillation).toMatchObject({ mode: 'llm', llm_used: true });
+      expect(loadState(missionId)?.distillation).not.toHaveProperty('structural_reason');
+      expect(safeReadFile(wisdomFilePath, { encoding: 'utf8' })).toContain(
+        'distillation_mode: llm'
+      );
+      expect(success).toHaveBeenLastCalledWith(
+        expect.stringContaining(
+          'LLM distillation. Independent review and finish gates remain separate.'
+        )
+      );
+    } finally {
+      success.mockRestore();
+    }
+  });
+
+  it('keeps legacy provenance unknown and rejects contradictory new provenance', async () => {
+    await runDistillAsArchitect();
+    const statePath = `${missionPath}/mission-state.json`;
+    const state = readJson<Record<string, any>>(statePath);
+    const {
+      mode: _mode,
+      llm_used: _used,
+      structural_reason: _reason,
+      ...legacy
+    } = state.distillation;
+    withExecutionContext('ecosystem_architect', () =>
+      writeJson(statePath, { ...state, distillation: legacy })
+    );
+    const warn = vi.spyOn(logger, 'warn');
+    try {
+      await runDistillAsArchitect();
+      expect(warn).toHaveBeenLastCalledWith(expect.stringContaining('provenance unknown'));
+      withExecutionContext('ecosystem_architect', () =>
+        writeJson(statePath, {
+          ...state,
+          distillation: { ...legacy, mode: 'llm', llm_used: false },
+        })
+      );
+      expect(loadState(missionId)).toBeNull();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it('rejects a directory replacing the evidence ledger before distillation reads it', () => {

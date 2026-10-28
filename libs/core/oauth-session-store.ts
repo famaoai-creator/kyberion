@@ -3,6 +3,7 @@ import * as path from 'node:path';
 
 import { pathResolver } from './path-resolver.js';
 import { defineCatalog } from './foundation/governed-catalog.js';
+import { writeJson } from './foundation/json.js';
 import { parseSafeJsonObjectValue } from './foundation/safe-json.js';
 import { readTextFile } from './foundation/text.js';
 import {
@@ -14,12 +15,13 @@ import {
   safeReaddir,
   safeLstat,
   safeUnlinkSync,
-  safeWriteFile,
 } from './secure-io.js';
 import { createLogger } from './logger.js';
 const logger = createLogger('oauth-session-store');
 
 export interface PendingOAuthSession {
+  operationId?: string;
+  observerPrincipalId?: string;
   serviceId: string;
   state: string;
   codeVerifier?: string;
@@ -36,6 +38,8 @@ export const OAUTH_INITIATION_TTL_MS = 10 * 60 * 1000;
 export const OAUTH_CALLBACK_TTL_MS = 2 * 60 * 1000;
 const OAUTH_STATE_PATTERN = /^[A-Za-z0-9_-]{8,256}$/;
 const PERSISTED_OAUTH_SESSION_FIELDS = [
+  'operationId',
+  'observerPrincipalId',
   'serviceId',
   'state',
   'codeVerifier',
@@ -118,12 +122,25 @@ function parsePersistedOAuthSession(
     return candidate;
   };
 
+  const operationId = record.operationId;
+  const observerPrincipalId = record.observerPrincipalId;
+  if (
+    operationId !== undefined &&
+    (typeof operationId !== 'string' ||
+      !isSafeOAuthState(operationId) ||
+      typeof observerPrincipalId !== 'string' ||
+      !observerPrincipalId.trim())
+  )
+    throw new Error('Invalid OAuth operation binding');
   const codeVerifier = optionalString('codeVerifier');
   const redirectUri = optionalString('redirectUri');
   const expiresAt = optionalTimestamp('expiresAt');
   const callbackStartedAt = optionalTimestamp('callbackStartedAt');
   const callbackExpiresAt = optionalTimestamp('callbackExpiresAt');
   return {
+    ...(typeof operationId === 'string'
+      ? { operationId, observerPrincipalId: observerPrincipalId as string }
+      : {}),
     serviceId,
     state,
     scopes: [...record.scopes] as string[],
@@ -186,13 +203,14 @@ export function buildCodeChallenge(codeVerifier: string): string {
 }
 
 export function savePendingOAuthSession(session: PendingOAuthSession): void {
+  pruneExpiredOAuthOperationReceipts(session.serviceId);
   const dir = serviceSessionDir(session.serviceId);
   if (!safeExistsSync(dir)) {
     safeMkdir(dir, { recursive: true });
   }
   const filePath = serviceSessionPath(session.serviceId, session.state);
   const validated = oauthSessionCatalogAtPath(filePath).validate(session, filePath);
-  safeWriteFile(filePath, JSON.stringify(validated, null, 2) + '\n');
+  writeJson(filePath, validated);
   try {
     safeFsyncFile(filePath);
   } catch (err) {
@@ -223,7 +241,7 @@ export function loadPendingOAuthSession(
         return null;
       }
       if (isOAuthSessionExpired(session)) {
-        clearPendingOAuthSession(serviceId, session.state);
+        finishOAuthOperation(session, 'failed');
         return null;
       }
       return session;
@@ -237,20 +255,24 @@ export function loadPendingOAuthSession(
       .filter((file) => file.endsWith('.json'))
       .sort()
       .reverse();
-    if (files.length === 0) return null;
-    const filePath = assertSafeRepositoryPath(path.join(dir, files[0]));
-    if (!safeLstat(filePath).isFile()) return null;
-    const session = parsePersistedOAuthSession(
-      oauthSessionCatalogAtPath(filePath).load(),
-      `OAuth session ${filePath}`,
-      serviceId
-    );
-    if (`${session.state}.json` !== files[0]) return null;
-    if (isOAuthSessionExpired(session)) {
-      clearPendingOAuthSession(serviceId, session.state);
-      return null;
+    for (const name of files) {
+      try {
+        const filePath = assertSafeRepositoryPath(path.join(dir, name));
+        if (!safeLstat(filePath).isFile()) continue;
+        const raw = oauthSessionCatalogAtPath(filePath).load();
+        if (!('state' in raw)) continue; // operation receipts are never resumable OAuth state
+        const session = parsePersistedOAuthSession(raw, `OAuth session ${filePath}`, serviceId);
+        if (`${session.state}.json` !== name) continue;
+        if (isOAuthSessionExpired(session)) {
+          finishOAuthOperation(session, 'failed');
+          continue;
+        }
+        return session;
+      } catch {
+        /* skip malformed rows without hiding another valid pending session */
+      }
     }
-    return session;
+    return null;
   } catch (_) {
     return null;
   }
@@ -283,6 +305,7 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
         continue;
       }
       if (!safeExistsSync(fullDir)) continue;
+      pruneExpiredOAuthOperationReceipts(serviceDir);
       for (const fileName of safeReaddir(fullDir)) {
         if (!fileName.endsWith('.json')) continue;
         try {
@@ -290,10 +313,9 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
             allowMissingLeaf: true,
           });
           if (!safeLstat(filePath).isFile()) continue;
-          const session = parsePersistedOAuthSession(
-            oauthSessionCatalogAtPath(filePath).load(),
-            `OAuth session ${filePath}`
-          );
+          const raw = oauthSessionCatalogAtPath(filePath).load();
+          if (!('state' in raw)) continue;
+          const session = parsePersistedOAuthSession(raw, `OAuth session ${filePath}`);
           if (
             serviceSessionDir(session.serviceId) !== fullDir ||
             `${session.state}.json` !== fileName
@@ -301,7 +323,7 @@ export function listPendingOAuthSessions(): PendingOAuthSession[] {
             continue;
           }
           if (isOAuthSessionExpired(session)) {
-            clearPendingOAuthSession(session.serviceId, session.state);
+            finishOAuthOperation(session, 'failed');
             continue;
           }
           sessions.push(session);
@@ -406,5 +428,148 @@ export function acquirePendingOAuthCallback(
   } catch (error) {
     release();
     throw error;
+  }
+}
+
+export interface OAuthOperationStatus {
+  operationId: string;
+  serviceId: string;
+  status: 'waiting' | 'confirming' | 'connected' | 'failed' | 'expired';
+  expiresAt: string;
+}
+const OPERATION_RECEIPT_TTL_MS = 5 * 60 * 1000;
+
+/** Replace the secret-bearing pending row with a short-lived, principal-bound receipt. */
+export function finishOAuthOperation(
+  session: PendingOAuthSession,
+  outcome: 'connected' | 'failed',
+  now = Date.now()
+): void {
+  if (!session.operationId || !session.observerPrincipalId) {
+    clearPendingOAuthSession(session.serviceId, session.state);
+    return;
+  }
+  const receipt = {
+    operationId: session.operationId,
+    observerPrincipalId: session.observerPrincipalId,
+    serviceId: session.serviceId,
+    status: isOAuthSessionExpired(session, now) ? 'expired' : outcome,
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + OPERATION_RECEIPT_TTL_MS).toISOString(),
+  };
+  // Remove verifier/state even when validation/publication fails; absence is unknown.
+  try {
+    const target = serviceSessionPath(session.serviceId, session.operationId);
+    const validated = oauthSessionCatalogAtPath(target).validate(receipt, target);
+    writeJson(target, validated);
+  } finally {
+    clearPendingOAuthSession(session.serviceId, session.state);
+  }
+}
+
+/** A read-only view, scoped to the initiating authenticated operator. Never returns OAuth state. */
+export function readOAuthOperation(
+  serviceId: string,
+  operationId: string,
+  principalId: string,
+  now = Date.now()
+): OAuthOperationStatus | null {
+  if (!isSafeOAuthState(operationId) || !principalId) return null;
+  pruneExpiredOAuthOperationReceipts(serviceId, now);
+  const dir = serviceSessionDir(serviceId);
+  if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) return null;
+  const receiptPath = serviceSessionPath(serviceId, operationId);
+  if (safeExistsSync(receiptPath) && safeLstat(receiptPath).isFile()) {
+    try {
+      const receipt = parseSafeJsonObjectValue(
+        oauthSessionCatalogAtPath(receiptPath).load(),
+        'OAuth operation'
+      );
+      if (
+        receipt.operationId === operationId &&
+        receipt.observerPrincipalId === principalId &&
+        receipt.serviceId === serviceId &&
+        ['connected', 'failed', 'expired'].includes(String(receipt.status))
+      ) {
+        if (typeof receipt.expiresAt !== 'string' || Date.parse(receipt.expiresAt) <= now) {
+          safeUnlinkSync(receiptPath);
+          return null;
+        }
+        return {
+          operationId,
+          serviceId,
+          status: receipt.status as OAuthOperationStatus['status'],
+          expiresAt: receipt.expiresAt,
+        };
+      }
+    } catch {
+      /* unknown, never infer success */
+    }
+  }
+  for (const name of safeReaddir(dir)
+    .filter((name) => name.endsWith('.json'))
+    .slice(0, 2000)) {
+    try {
+      const file = assertSafeRepositoryPath(path.join(dir, name));
+      if (!safeLstat(file).isFile()) continue;
+      const session = parsePersistedOAuthSession(
+        oauthSessionCatalogAtPath(file).load(),
+        'OAuth pending operation',
+        serviceId
+      );
+      if (
+        name !== `${session.state}.json` ||
+        session.operationId !== operationId ||
+        session.observerPrincipalId !== principalId
+      )
+        continue;
+      if (isOAuthSessionExpired(session, now)) {
+        finishOAuthOperation(session, 'failed', now);
+        return readOAuthOperation(serviceId, operationId, principalId, now);
+      }
+      return {
+        operationId,
+        serviceId,
+        status: session.callbackStartedAt ? 'confirming' : 'waiting',
+        expiresAt: new Date(
+          Math.min(
+            Date.parse(session.expiresAt!),
+            Date.parse(session.callbackExpiresAt || session.expiresAt!)
+          )
+        ).toISOString(),
+      };
+    } catch {
+      /* malformed/private rows are not operation evidence */
+    }
+  }
+  return null;
+}
+
+/** Lazy bounded retention for receipts, including cards dismissed before completion. */
+function pruneExpiredOAuthOperationReceipts(serviceId: string, now = Date.now()): void {
+  const dir = serviceSessionDir(serviceId);
+  if (!safeExistsSync(dir) || !safeLstat(dir).isDirectory()) return;
+  for (const name of safeReaddir(dir)
+    .filter((name) => name.endsWith('.json'))
+    .slice(0, 2000)) {
+    try {
+      const file = assertSafeRepositoryPath(path.join(dir, name));
+      if (!safeLstat(file).isFile()) continue;
+      const raw = parseSafeJsonObjectValue(
+        oauthSessionCatalogAtPath(file).load(),
+        'OAuth receipt retention'
+      );
+      if (
+        raw.serviceId === serviceId &&
+        typeof raw.operationId === 'string' &&
+        name === `${raw.operationId}.json` &&
+        !('state' in raw) &&
+        typeof raw.expiresAt === 'string' &&
+        Date.parse(raw.expiresAt) <= now
+      )
+        safeUnlinkSync(file);
+    } catch {
+      /* malformed rows are never treated as valid receipts */
+    }
   }
 }

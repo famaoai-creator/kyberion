@@ -109,6 +109,7 @@
     "libs/core/security-boundary.contract.test.ts",
     "libs/core/semantic-design-tokens.test.ts",
     "libs/core/service/service-connection-readiness.test.ts",
+    "libs/core/shell/git-probe-hardening.test.ts",
     "libs/core/stimuli-journal-rotation-role.test.ts",
     "libs/core/storage-janitor.test.ts",
     "libs/core/storage-retention-catalog.test.ts",

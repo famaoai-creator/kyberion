@@ -355,6 +355,34 @@ describe('governed enforcement aggregate over persona-gated metrics ledgers', ()
       expect(spendGuard.spendGuardLedgerReads()).toBe(reads);
     });
 
+    it('invalidates only matching spend caches when an unknown-cost execution is appended', () => {
+      setIdentity('worker');
+      process.env.KYBERION_TENANT = TENANT;
+      expect(check()).toMatchObject({ allowed: true, cost_complete: true });
+      const reads = spendGuard.spendGuardLedgerReads();
+      setIdentity('worker', 'mission_controller');
+      collector.record('unknown-other-tenant', 1, 'success', {
+        cost_status: 'unknown',
+        scope: { tier: 'confidential', tenant_slug: TENANT_B },
+      });
+      setIdentity('worker');
+      expect(check()).toMatchObject({ allowed: true, cost_complete: true });
+      expect(spendGuard.spendGuardLedgerReads()).toBe(reads);
+      setIdentity('worker', 'mission_controller');
+      collector.record('unknown-own-tenant', 1, 'success', {
+        cost_status: 'unknown',
+        scope: { tier: 'confidential', tenant_slug: TENANT },
+      });
+      setIdentity('worker');
+      expect(check()).toMatchObject({
+        allowed: false,
+        daily_spent_usd: 2,
+        cost_complete: false,
+        unknown_cost_calls: 1,
+      });
+      expect(spendGuard.spendGuardLedgerReads()).toBe(reads + 1);
+    });
+
     it('B2: a budget wider than the bound tenant is reported partial, never complete', () => {
       seedSpend(TENANT_B, 7);
       setIdentity('worker');

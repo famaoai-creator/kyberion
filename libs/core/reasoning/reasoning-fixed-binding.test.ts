@@ -35,6 +35,7 @@ import { installReasoningBackends, resetReasoningBootstrap } from './reasoning-b
 import { buildApiProviderBundle } from './reasoning-api-provider.js';
 import {
   bindFixedReasoningBackend,
+  bindReasoningRequestTimeout,
   reasoningSelectionWireModel,
 } from './reasoning-fixed-binding.js';
 import {
@@ -96,6 +97,71 @@ describe('fixed reasoning runtime dispatch', () => {
       ),
     };
   }
+
+  it('keeps inherited auxiliary calls on the fixed default and blocks profile escapes', async () => {
+    const { backend, create } = runtime();
+    for (const role of ['context_compaction', 'background_review']) {
+      await expect(backend.prompt('fixture prompt', { role })).resolves.toBe('fixture result');
+      expect(() => backend.prompt('fixture prompt', { role, route_profile: 'other' })).toThrow(
+        /SELECTION_CONFLICT/
+      );
+    }
+    expect(create).toHaveBeenCalledTimes(2);
+    expect(create.mock.calls[0]?.[0]).toMatchObject({ model: 'claude-opus-4-8' });
+  });
+
+  it('rejects an auxiliary result synchronously resolved by the abort listener', async () => {
+    vi.useFakeTimers();
+    const backend = bindReasoningRequestTimeout(
+      {
+        ...stubReasoningBackend,
+        prompt: async (_prompt, options) =>
+          new Promise<string>((resolve) => {
+            options?.signal?.addEventListener('abort', () => resolve('stale summary'));
+          }),
+      },
+      1234
+    );
+    try {
+      const result = backend.prompt('compact');
+      const rejected = expect(result).rejects.toThrow('REASONING_REQUEST_TIMEOUT');
+      await vi.advanceTimersByTimeAsync(1234);
+      await rejected;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('bounds one auxiliary request, forwards cancellation, and discards late results', async () => {
+    vi.useFakeTimers();
+    let signal: AbortSignal | undefined;
+    let complete: (value: string) => void = () => {};
+    const pending = new Promise<string>((resolve) => {
+      complete = resolve;
+    });
+    const backend = bindReasoningRequestTimeout(
+      {
+        ...stubReasoningBackend,
+        prompt: async (_prompt, options) => {
+          signal = options?.signal;
+          return pending;
+        },
+      },
+      1234
+    );
+    try {
+      const result = backend.prompt('compact', { role: 'context_compaction' });
+      const rejected = expect(result).rejects.toThrow('REASONING_REQUEST_TIMEOUT');
+      await vi.advanceTimersByTimeAsync(1234);
+      await rejected;
+      expect(signal?.aborted).toBe(true);
+      complete('late summary');
+      await Promise.resolve();
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 
   it('delivers the fixed exact model to the actual Anthropic adapter request through role dispatch', async () => {
     const { backend, create } = runtime();

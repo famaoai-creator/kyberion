@@ -197,6 +197,8 @@ export interface GoalDrivenWorkItemSeams {
   /** Explicitly resume a persisted `paused` goal (post-restart mission ceremony). */
   resume?: boolean;
   maxTurns?: number;
+  executionMode?: RunGoalDrivenLoopOptions['executionMode'];
+  signal?: AbortSignal;
   wallClockScheduler?: GoalWallClockScheduler;
   now?: () => string;
   /** PI-15/DH-10: ordered model-entry admission hooks. */
@@ -404,6 +406,7 @@ export async function runGoalDrivenWorkItem(input: {
       });
     });
 
+  const preStep = [...(seams.preStep ?? []), ...(input.preStep ?? [])];
   const loopOptions: RunGoalDrivenLoopOptions = {
     objective,
     goalId,
@@ -420,7 +423,9 @@ export async function runGoalDrivenWorkItem(input: {
     ...(input.turnPrompt ? { turnPrompt: input.turnPrompt } : {}),
     ...(input.onPromptVisible ? { onPromptVisible: input.onPromptVisible } : {}),
     ...(input.shouldStopAfterTurn ? { shouldStopAfterTurn: input.shouldStopAfterTurn } : {}),
-    ...(input.preStep ? { preStep: input.preStep } : {}),
+    ...(preStep.length ? { preStep } : {}),
+    executionMode: seams.executionMode ?? (preStep.length ? 'continuous' : 'bounded'),
+    ...(seams.signal ? { signal: seams.signal } : {}),
     ...(seams.manualDrive ? { manualDrive: seams.manualDrive } : {}),
     ...(input.inputQueue
       ? {

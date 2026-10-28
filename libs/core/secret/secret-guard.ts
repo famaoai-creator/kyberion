@@ -7,6 +7,11 @@ import * as path from 'node:path';
 import { createRequire } from 'node:module';
 import { resolveSecretSync } from './secret-resolver.js';
 import {
+  resolveTaskCredential,
+  credentialExecutionIdentity,
+  isCurrentTaskCredentialValue,
+} from '../foundation/credential-binding.js';
+import {
   decryptConnectionDocument,
   encryptConnectionDocument,
   isEncryptedConnectionEnvelope,
@@ -308,7 +313,7 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   assertPluginGrantAllows('secrets', key);
   const probeAccess = operatorProbeSecretAccess(key, scope, operation);
   if (probeAccess === false) throw new Error('[OPERATOR_SERVICE_PROBE_DENIED]');
-  const currentMission = getRegisteredEnvText('MISSION_ID');
+  const currentMission = credentialExecutionIdentity().missionId;
   const authorizedScope = getRegisteredEnvText('AUTHORIZED_SCOPE');
 
   if (scope) {
@@ -333,6 +338,14 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
 
   if (scope && !key.toUpperCase().startsWith(scope.toUpperCase() + '_')) {
     throw new Error(`SHIELD_VIOLATION: Key "${key}" does not match authorized scope "${scope}".`);
+  }
+
+  // Service/plugin/temporal grants above still apply. A scoped miss is final:
+  // neither the operator's environment nor personal vault is a tenant fallback.
+  const taskValue = resolveTaskCredential(key);
+  if (taskValue !== undefined) {
+    if (taskValue && taskValue.length > 8) _rememberActiveSecret(key, taskValue);
+    return taskValue;
   }
 
   // 0. Upstream resolver (external KMS — AWS Secrets Manager, Vault, etc.)
@@ -400,6 +413,7 @@ export function getSecretForIdentity(
   const value = getSecret(identity.envName, undefined, operation);
   if (value) return value;
   assertPluginGrantAllows('secrets', identity.envName);
+  if (resolveTaskCredential(identity.envName) !== undefined) return null;
   try {
     const { fetchSecretSync } = requireSecretModules(
       './secret-bridge.js'
@@ -417,6 +431,10 @@ export function getSecretForIdentity(
 
 export const loadConnectionDocument = (serviceId: string): Record<string, any> => {
   assertPluginGrantAllows('secrets', `connection:${serviceId}`);
+  if (credentialExecutionIdentity().tenantSlug)
+    throw new Error(
+      '[CREDENTIAL_CONNECTION_DENIED] Tenant execution cannot read personal connection documents'
+    );
   return _loadConnectionDocument(serviceId);
 };
 
@@ -426,6 +444,10 @@ export const storeConnectionDocument = (
   options: { backup?: boolean; missionId?: string; actor?: string } = {}
 ): { path: string; changedKeys: string[] } => {
   assertPluginGrantAllows('secrets', `connection:${serviceId}`);
+  if (credentialExecutionIdentity().tenantSlug)
+    throw new Error(
+      '[CREDENTIAL_CONNECTION_DENIED] Tenant execution cannot mutate personal connection documents'
+    );
   const fullPath = _connectionPath(serviceId);
   const existing = _loadConnectionDocument(serviceId);
   const next = { ...existing, ...patch };
@@ -504,7 +526,10 @@ function _saveGrants(grants: AuthGrant[]) {
 export const getActiveSecrets = (): string[] => {
   const context = getPluginExecutionContext();
   if (context) throw new PluginGrantDeniedError(context.pluginId, 'secrets', 'active-secrets');
-  return Array.from(_activeSecrets);
+  isCurrentTaskCredentialValue('');
+  return Array.from(_activeSecrets).filter(
+    (secret) => isCurrentTaskCredentialValue(secret) !== false
+  );
 };
 
 const DEFAULT_MASK_MIN_LENGTH = 5;
@@ -520,11 +545,13 @@ export const maskActiveSecrets = (
   replacement = '[REDACTED_SECRET]',
   minLength = DEFAULT_MASK_MIN_LENGTH
 ): string => {
+  isCurrentTaskCredentialValue('');
   const inPlugin = getPluginExecutionContext() !== undefined;
   const threshold = inPlugin ? Math.max(minLength, DEFAULT_MASK_MIN_LENGTH) : minLength;
   let masked = text;
   for (const secret of _activeSecrets) {
     if (!secret || secret.length <= threshold) continue;
+    if (isCurrentTaskCredentialValue(secret) === false) continue;
     if (inPlugin) {
       const names = _activeSecretNames.get(secret);
       const granted =
