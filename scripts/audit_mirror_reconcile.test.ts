@@ -16,6 +16,8 @@ import {
   safeRmSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { AUDIT_CHAIN_LOCK_ID } from '@agent/core/governance/audit-chain';
+import { revokeApprovalRequest } from '@agent/core/governance/approval-revocation';
 import {
   AUDIT_MIRROR_APPROVAL_CHANNEL,
   AUDIT_MIRROR_EFFECT_BINDING,
@@ -33,6 +35,36 @@ vi.mock('@agent/core/governance/approval-store', async (importOriginal) => {
     ...actual,
     loadApprovalRequest: (...args: Parameters<typeof actual.loadApprovalRequest>) =>
       staleRead.record ?? actual.loadApprovalRequest(...args),
+  };
+});
+
+// Runs when the apply takes the audit chain lock, before the locked work:
+// stands in for an audit append that lands between the approval check and the
+// lock. `byApply` counts audit-lock holds taken from the apply itself.
+const onLock = vi.hoisted(() => ({
+  byApply: 0,
+  before: undefined as (() => void) | undefined,
+}));
+vi.mock('@agent/core/foundation/lock-utils', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation/lock-utils')>();
+  return {
+    ...actual,
+    withLockSync: <T>(resourceId: string, fn: () => T, timeoutMs?: number): T =>
+      actual.withLockSync(
+        resourceId,
+        () => {
+          if (resourceId === 'audit-chain-global') {
+            const limit = Error.stackTraceLimit;
+            Error.stackTraceLimit = 100;
+            const stack = new Error().stack;
+            Error.stackTraceLimit = limit;
+            if (stack?.includes('runAuditMirrorReconciliation')) onLock.byApply++;
+            onLock.before?.();
+          }
+          return fn();
+        },
+        timeoutMs
+      ),
   };
 });
 
@@ -106,6 +138,8 @@ describe('audit mirror reconcile apply (SA-01)', () => {
   });
 
   afterEach(() => {
+    onLock.before = undefined;
+    staleRead.record = undefined;
     for (const id of opened.splice(0)) {
       safeRmSync(approvalRequestLogicalPath(AUDIT_MIRROR_APPROVAL_CHANNEL, id), { force: true });
     }
@@ -344,6 +378,65 @@ describe('audit mirror reconcile apply (SA-01)', () => {
     }
     expect(safeReaddir(`${ROOT}/active/archive/.trash`)).toEqual(archives);
     expect(safeReadFile(MIRROR, { encoding: 'utf8' })).toBe(lines(a));
+  });
+
+  it('rechecks the findings under the audit chain lock: a change after the check applies nothing', () => {
+    drift();
+    const id = request();
+    decide(id);
+    onLock.byApply = 0;
+    // An append lands on acme's mirror after the approval check, before the lock.
+    onLock.before = () => {
+      onLock.before = undefined;
+      safeWriteFile(MIRROR, lines(a, b));
+    };
+    expect(() =>
+      runAuditMirrorReconciliation({
+        missionId: MISSION,
+        apply: true,
+        approvalRequestId: id,
+        rootDir: ROOT,
+      })
+    ).toThrow(/AUDIT_MIRROR_CHANGED/u);
+    expect(onLock.byApply).toBe(1);
+    // Nothing moved and the approval is still unused.
+    expect(safeExistsSync(`${ROOT}/active/archive`)).toBe(false);
+    expect(safeReadFile(MIRROR, { encoding: 'utf8' })).toBe(lines(a, b));
+    expect(safeReadFile(STALE_MIRROR, { encoding: 'utf8' })).toBe(lines(old));
+    expect(loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)?.consumption).toBeUndefined();
+  });
+
+  it('takes the audit chain lock the appends take', () => {
+    // The mock above matches the id by value; keep it in step with the chain.
+    expect(AUDIT_CHAIN_LOCK_ID).toBe('audit-chain-global');
+  });
+
+  it('refuses an approval revoked after the check with the reason, without waiting on the audit lock', () => {
+    drift();
+    const id = request();
+    decide(id);
+    const approved = loadApprovalRequest(AUDIT_MIRROR_APPROVAL_CHANNEL, id)!;
+    revokeApprovalRequest('mission_controller', {
+      channel: AUDIT_MIRROR_APPROVAL_CHANNEL,
+      requestId: id,
+      revokedBy: 'human-mirror-operator',
+    });
+    // The pre-check still sees the approval as it was before the revoke.
+    staleRead.record = approved;
+    const started = Date.now();
+    expect(() =>
+      runAuditMirrorReconciliation({
+        missionId: MISSION,
+        apply: true,
+        approvalRequestId: id,
+        rootDir: ROOT,
+      })
+    ).toThrow(/was revoked by human-mirror-operator/u);
+    // Refused under the record lock, before the apply holds the audit lock:
+    // the refusal's own audit entry is written at once instead of waiting out
+    // the 5 s lock budget behind the apply and failing.
+    expect(Date.now() - started).toBeLessThan(4000);
+    untouched();
   });
 
   it('names mirror entries the master can no longer read, in the finding and the approval', () => {
