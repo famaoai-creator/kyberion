@@ -7,6 +7,10 @@ import { pathResolver, safeReaddir, safeReadFile } from '@agent/core';
  * each now has a minimal example pipeline under pipelines/.
  */
 const EXAMPLE_PIPELINE_OPS: Record<string, string> = {
+  'system:list_shortcuts': 'apple-shortcuts-readiness',
+  'system:run_shortcut': 'apple-shortcut-approved-run',
+  'system:apple_capabilities': 'apple-native-capabilities',
+  'system:ask_screen': 'apple-screen-question',
   'browser:action_trail': 'browser-failure-evidence',
   'browser:export_failure_bundle': 'browser-failure-evidence',
   'browser:session_health': 'browser-failure-evidence',

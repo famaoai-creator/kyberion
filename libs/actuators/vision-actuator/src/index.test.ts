@@ -197,7 +197,7 @@ describe('vision-actuator legacy facade', () => {
     const result = await handleAction({
       action: 'ocr_image',
       params: {
-        path: 'active/shared/tmp/example.png',
+        path: 'docs/assets/kyberion-social-preview.png',
         language: 'eng',
         provider_preference: ['tesseract'],
       },
@@ -205,7 +205,7 @@ describe('vision-actuator legacy facade', () => {
 
     expect(result).toEqual({
       status: 'succeeded',
-      path: 'active/shared/tmp/example.png',
+      path: 'docs/assets/kyberion-social-preview.png',
       language: 'eng',
       text: 'hello world',
       confidence: 93,

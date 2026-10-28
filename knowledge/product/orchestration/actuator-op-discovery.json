@@ -31262,6 +31262,74 @@
       "source": "describeOps",
       "ops": [
         {
+          "op": "apple_capabilities",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "list_shortcuts",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [{}]
+        },
+        {
+          "op": "ask_screen",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "question": {
+                "type": "string",
+                "minLength": 1
+              },
+              "application": {
+                "type": "string"
+              },
+              "capture_mode": {
+                "enum": ["screen", "focused_window"]
+              },
+              "window_title": {
+                "type": "string"
+              },
+              "window_match_policy": {
+                "enum": ["strict", "prefix", "contains"]
+              },
+              "timeout_ms": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 300000
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": ["question"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "question": "Summarize the visible screen."
+            }
+          ]
+        },
+        {
           "op": "screenshot",
           "kind": "capture",
           "input_schema": {
@@ -32549,6 +32617,41 @@
           "examples": [
             {
               "instruction": "Choose the safest next step."
+            }
+          ]
+        },
+        {
+          "op": "run_shortcut",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1
+              },
+              "input": {
+                "type": "string",
+                "maxLength": 1048576
+              },
+              "approval_request_id": {
+                "type": "string"
+              },
+              "timeout_ms": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 300000
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "required": ["name"],
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "name": "Example shortcut"
             }
           ]
         },

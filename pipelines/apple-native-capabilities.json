@@ -1,0 +1,19 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "apple-native-capabilities",
+  "version": "1.0.0",
+  "name": "Apple Native Capability Readiness",
+  "description": "Inspect local Apple Intelligence capabilities without capturing a screen or probing cloud services.",
+  "steps": [
+    {
+      "id": "probe",
+      "role": "source",
+      "op": "system:apple_capabilities",
+      "produces": {
+        "channel": "apple_capabilities",
+        "type": "AppleCapabilities"
+      },
+      "params": {}
+    }
+  ]
+}
