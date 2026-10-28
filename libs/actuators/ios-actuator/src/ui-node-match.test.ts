@@ -45,3 +45,23 @@ describe('findAxeNode', () => {
     expect(findAxeNode(TREE, { text: 'nonexistent', identifier: '' })).toBeNull();
   });
 });
+
+describe('op catalog registration', () => {
+  it('advertises the interactive + stream ops added by MSN-MOBILE-ACT-20261028', async () => {
+    const { describeOps } = await import('./op-catalog.js');
+    const names = new Set(describeOps().map((d) => (d as { op?: string }).op));
+    for (const step of [
+      { op: 'describe_ui' },
+      { op: 'tap' },
+      { op: 'tap_ui_node' },
+      { op: 'swipe' },
+      { op: 'input_text' },
+      { op: 'press_button' },
+      { op: 'start_screen_stream' },
+      { op: 'stop_screen_stream' },
+      { op: 'stream_status' },
+    ]) {
+      expect(names.has(step.op), `op ${step.op}`).toBe(true);
+    }
+  });
+});

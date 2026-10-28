@@ -33,3 +33,18 @@ describe('parseUiAutomatorNodes', () => {
     expect(parseUiAutomatorNodes('not xml')).toEqual([]);
   });
 });
+
+describe('op catalog registration', () => {
+  it('advertises describe_ui + stream ops added by MSN-MOBILE-ACT-20261028', async () => {
+    const { describeOps } = await import('./op-catalog.js');
+    const names = new Set(describeOps().map((d) => (d as { op?: string }).op));
+    for (const step of [
+      { op: 'describe_ui' },
+      { op: 'start_screen_stream' },
+      { op: 'stop_screen_stream' },
+      { op: 'stream_status' },
+    ]) {
+      expect(names.has(step.op), `op ${step.op}`).toBe(true);
+    }
+  });
+});
