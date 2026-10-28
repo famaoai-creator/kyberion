@@ -934,9 +934,10 @@ export async function main(args?: string[], print: Print = () => undefined) {
   let resumeState: PipelineRunJournalState | undefined;
   if (argv.resume) {
     const runtimeScope = currentScopeEnvelope()?.identity ?? runtimeScopeIdentity();
+    const resumeMissionId = resolveIdentityContext().missionId;
     let journalScope = argv['journal-tier']
       ? { tier: argv['journal-tier'], tenantSlug: argv['journal-tenant'] }
-      : !getRegisteredEnvText('MISSION_ID')
+      : !resumeMissionId
         ? { tier: runtimeScope.tier, tenantSlug: runtimeScope.tenant_slug }
         : undefined;
     // Existing resumable runs keep their legacy location. Promotion does not
@@ -947,11 +948,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
       !safeExistsSync(pipelineRunJournalPath(String(argv.resume), undefined, journalScope))
     )
       journalScope = undefined;
-    resumeState = loadPipelineRunJournal(
-      String(argv.resume),
-      getRegisteredEnvText('MISSION_ID'),
-      journalScope
-    );
+    resumeState = loadPipelineRunJournal(String(argv.resume), resumeMissionId, journalScope);
     if (resumeState.started?.library_execution) {
       if (
         !journalScope ||
