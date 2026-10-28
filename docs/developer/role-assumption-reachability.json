@@ -2323,12 +2323,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequestLocked (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequestLocked (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
+      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
@@ -4620,7 +4620,6 @@
         "presence/displays/chronos-mirror-v2/src/lib/connection-review-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/connection-review.ts",
         "presence/displays/chronos-mirror-v2/src/lib/connections-response.ts",
-        "presence/displays/chronos-mirror-v2/src/lib/cost-summary-presentation.ts",
         "presence/displays/chronos-mirror-v2/src/lib/cost-summary-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/customer-decision-case-response.ts",
         "presence/displays/chronos-mirror-v2/src/lib/customer-decision-learning-response.ts",
@@ -5805,7 +5804,6 @@
         "presence/displays/concierge/src/app/api/message/route.ts",
         "presence/displays/concierge/src/app/api/notification-preferences/route.ts",
         "presence/displays/concierge/src/app/api/oauth/begin/route.ts",
-        "presence/displays/concierge/src/app/api/oauth/operation/route.ts",
         "presence/displays/concierge/src/app/api/onboarding-authority/route.ts",
         "presence/displays/concierge/src/app/api/org-readiness/route.ts",
         "presence/displays/concierge/src/app/api/outcomes/[id]/files/[fileId]/route.ts",
@@ -5886,7 +5884,6 @@
         "presence/displays/concierge/src/app/settings/sections/MemberAdministrationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/MembersSection.tsx",
         "presence/displays/concierge/src/app/settings/sections/NotificationsSection.tsx",
-        "presence/displays/concierge/src/app/settings/sections/OAuthOperationCard.tsx",
         "presence/displays/concierge/src/app/settings/sections/OnboardingAuthorityPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/OperatorServiceRegistrationPanel.tsx",
         "presence/displays/concierge/src/app/settings/sections/OrgReadinessPane.tsx",
