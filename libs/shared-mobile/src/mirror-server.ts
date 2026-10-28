@@ -102,7 +102,10 @@ export function startMirrorServer(options: MirrorServerOptions): Promise<MirrorS
       }
     } catch (error: unknown) {
       failStreak += 1;
-      lastError = error instanceof Error ? error.message : String(error);
+      // First line only, bounded — never leak stack details to HTTP clients.
+      lastError = (error instanceof Error ? error.message : String(error))
+        .split('\n')[0]
+        .slice(0, 200);
       if (failStreak >= 3) state = 'degraded';
     } finally {
       capturing = false;
@@ -182,9 +185,22 @@ export function startMirrorServer(options: MirrorServerOptions): Promise<MirrorS
               !Number.isFinite(parsed.x) ||
               !Number.isFinite(parsed.y)
             ) {
-              throw new Error('tap requires finite numeric x and y');
+              res.writeHead(400, { 'content-type': 'application/json' });
+              res.end(JSON.stringify({ error: 'tap requires finite numeric x and y' }));
+              return;
             }
-            await injector.tap(parsed.x, parsed.y);
+            try {
+              await injector.tap(parsed.x, parsed.y);
+            } catch (error: unknown) {
+              // Log the real error, respond with a fixed string — exception
+              // text may carry stack/local path detail (CodeQL stack-exposure).
+              logger.warn(
+                `[SHARED_MOBILE] mirror tap on ${deviceLabel} failed: ${error instanceof Error ? error.message : String(error)}`
+              );
+              res.writeHead(502, { 'content-type': 'application/json' });
+              res.end(JSON.stringify({ error: 'tap injection failed' }));
+              return;
+            }
             // Mirror-session audit trail: each HTTP tap is a device input
             // injection — log it like an actuator apply op.
             logger.info(
@@ -193,10 +209,11 @@ export function startMirrorServer(options: MirrorServerOptions): Promise<MirrorS
             res.writeHead(200, { 'content-type': 'application/json' });
             res.end(JSON.stringify({ ok: true, x: parsed.x, y: parsed.y }));
           } catch (error: unknown) {
-            res.writeHead(400, { 'content-type': 'application/json' });
-            res.end(
-              JSON.stringify({ error: error instanceof Error ? error.message : String(error) })
+            logger.warn(
+              `[SHARED_MOBILE] mirror tap handler error: ${error instanceof Error ? error.message : String(error)}`
             );
+            res.writeHead(400, { 'content-type': 'application/json' });
+            res.end(JSON.stringify({ error: 'invalid tap request' }));
           }
         })();
       });
