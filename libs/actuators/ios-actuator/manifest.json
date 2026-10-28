@@ -1,6 +1,6 @@
 {
   "actuator_id": "ios-actuator",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "simctl-driven iOS Simulator Actuator",
   "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -17,7 +17,7 @@
         "binaries": ["xcrun", "xcodebuild"],
         "platforms": ["darwin"],
         "install": {
-          "darwin": "Xcode を App Store から導入し、`sudo xcode-select -s /Applications/Xcode.app` を実行"
+          "darwin": "Xcode \u3092 App Store \u304b\u3089\u5c0e\u5165\u3057\u3001`sudo xcode-select -s /Applications/Xcode.app` \u3092\u5b9f\u884c"
         }
       },
       "effect": "write"
