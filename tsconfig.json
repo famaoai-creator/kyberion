@@ -48,6 +48,10 @@
       "path": "./libs/shared-nerve"
     },
     {
+      "path": "./libs/shared-mobile"
+    },
+
+    {
       "path": "./libs/shared-network"
     },
     {
