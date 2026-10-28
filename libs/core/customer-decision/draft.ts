@@ -224,6 +224,7 @@ async function askBackend(
         tier: 'confidential',
         tenant_slug: agenda.tenant_slug,
         purpose: 'customer decision agenda draft',
+        attachment_count: 0,
       },
       () => backend.prompt(prompt, undefined as ReasoningCallOptions | undefined)
     );

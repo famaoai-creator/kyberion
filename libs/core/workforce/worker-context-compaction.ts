@@ -719,7 +719,10 @@ export async function compactWorkerContext(
                 ...(options.attemptId !== undefined ? { attemptId: options.attemptId } : {}),
               });
             return options.summaryReasoningScope
-              ? withReasoningPayloadScope(options.summaryReasoningScope, runSummary)
+              ? withReasoningPayloadScope(
+                  { ...options.summaryReasoningScope, attachment_count: 0 },
+                  runSummary
+                )
               : runSummary();
           }, options);
           if (!canCommit()) return unchanged();
