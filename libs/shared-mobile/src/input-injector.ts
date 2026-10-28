@@ -1,4 +1,4 @@
-import { safeExec, safeExecResultAsync } from '@agent/core/secure-io';
+import { safeExecResult, safeExecResultAsync } from '@agent/core/secure-io';
 import { resolveAdbBin, resolveAxeBin } from '@agent/core/tool/tool-binary-resolvers';
 
 /**
@@ -43,9 +43,18 @@ export class AxeInjector implements InputInjector {
   }
 
   static availability(timeoutMs = 10000): { available: boolean; version?: string; error?: string } {
+    // safeExecResult, not safeExec: callers embed this probe inside health
+    // checks, and actuator unit tests mock safeExec with fixed call
+    // sequences — a probe through it would desynchronize every simctl op.
     try {
-      const version = safeExec(resolveAxeBin(), ['--version'], { timeoutMs }).trim();
-      return { available: true, version };
+      const result = safeExecResult(resolveAxeBin(), ['--version'], { timeoutMs });
+      if (result.status !== 0) {
+        return {
+          available: false,
+          error: result.stderr || `exit ${result.status}`,
+        };
+      }
+      return { available: true, version: result.stdout.trim() };
     } catch (error: unknown) {
       return {
         available: false,
