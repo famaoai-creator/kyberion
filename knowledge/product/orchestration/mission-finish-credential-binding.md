@@ -1,6 +1,6 @@
 ---
 title: 'Mission finish と TaskCredentialBinding — CREDENTIAL_BINDING_REQUIRED の読み方と対処'
-kind: runbook
+tags: [orchestration, mission, lifecycle, credentials, runbook]
 last_updated: 2026-10-28
 ---
 
