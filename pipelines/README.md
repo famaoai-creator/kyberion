@@ -403,3 +403,13 @@ Output paths must be within the project root. Use `active/shared/tmp/` or `activ
 `continuous-managed-work.json` is the immutable admission marker for human-approved project / mission-group work. The mission owner executes the governed lifecycle; ordinary dot workers reject this binding.
 
 `continuous-operations-report.json` publishes scoped organization metric evidence through a verified dot WorkItem claim. Continuous cadence and recovery: [playbook](../knowledge/product/orchestration/continuous-operations-playbook.md).
+
+## Apple native capabilities
+
+| Pipeline                         | Purpose                                                                                       |
+| -------------------------------- | --------------------------------------------------------------------------------------------- |
+| `apple-native-capabilities.json` | Read local Apple capability flags; no screen capture or PCC request.                          |
+| `apple-screen-question.json`     | Operator-invoked screen question through screenshot redaction and local multimodal inference. |
+
+| `apple-shortcuts-readiness.json` | Operator-invoked shortcut inventory; names remain in caller context. |
+| `apple-shortcut-approved-run.json` | Tenant-bound, one-shot exact-content human approval before running a named shortcut. |

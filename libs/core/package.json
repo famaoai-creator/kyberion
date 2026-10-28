@@ -8027,6 +8027,10 @@
     "./runtime-control-policy": {
       "types": "./dist/runtime-control-policy.d.ts",
       "default": "./dist/runtime-control-policy.js"
+    },
+    "./shortcut-bridge": {
+      "types": "./dist/shortcut-bridge.d.ts",
+      "default": "./dist/shortcut-bridge.js"
     }
   },
   "dependencies": {

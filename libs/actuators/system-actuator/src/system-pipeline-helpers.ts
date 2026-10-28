@@ -1,3 +1,4 @@
+import { runAppleShortcut } from '@agent/core/shortcut-bridge';
 import { distillTextObservation } from '@agent/core/observation-distill';
 import { executeLlmDecideOp } from '@agent/core/semantic-decide';
 import { logger } from '@agent/core/core';
@@ -146,6 +147,19 @@ async function opApply(op: string, params: any, ctx: any, resolve: (value: any) 
     return opCapture(op === 'list' ? 'list_missions' : op, params, ctx, resolve);
   }
   switch (op) {
+    case 'run_shortcut': {
+      const result = await runAppleShortcut({
+        name: String(resolve(params.name)),
+        ...(params.input !== undefined ? { input: String(resolve(params.input)) } : {}),
+        ...(params.approval_request_id
+          ? { approval_request_id: String(resolve(params.approval_request_id)) }
+          : {}),
+        ...(params.timeout_ms !== undefined
+          ? { timeout_ms: Number(resolve(params.timeout_ms)) }
+          : {}),
+      });
+      return { ...ctx, [String(params.export_as ?? 'shortcut_result')]: result };
+    }
     case 'standard_pr_lifecycle':
     case 'provider_preflight':
       return opProcedure(op, params, ctx, resolve);

@@ -2421,3 +2421,30 @@ corrupt ones; an unrelated corrupt journal must not blind all reuse observations
 Report incomplete evidence explicitly. Golden semantic snapshots omit the engine's
 volatile top-level run ID while preserving result statuses and user context.
 Gates: pipeline-run-journal/reuse and golden-output normalization regressions.
+
+### Local perception fallback preserves source scope
+
+Rule: a local model is an observation provider, not authorization to lower data
+tier. Before any crop, copy, redaction callback or provider selection, authorize
+the original content and take the strictest tier from the declared scope and the
+lexical/canonical source paths. Nonpublic work and state directories must retain
+that tier and tenant, including mission-local directories. A public temporary
+copy never makes a confidential source public. Access or redaction failure stops
+both local inference and remote fallback.
+
+Procedure: preserve explicitly selected providers; fall back only on ordinary
+local unavailability or inference failure. Retain the original tier on every
+prepared image and record the provider actually used. Probe SpeechAnalyzer
+locale/asset readiness independently of text-model availability; metadata probes
+must not install assets. Explicit STT configuration wins over discovery.
+
+Native OCR reuse must retain real line confidence and normalized bounding boxes;
+text without geometry is insufficient for privacy masking. Cache the native
+executable rather than interpreting Swift on every call. Share the request's
+time budget across compilation, inference and fallback, and never silently change
+an explicit recognition language. A failed quality probe blocks automatic
+promotion of a generative provider even when invocation tests pass.
+
+Gates: image-description provider authorization/fallback regressions,
+dirty-tile source-tier/output-directory regressions, and Apple Speech
+locale/asset/explicit-provider selection tests.

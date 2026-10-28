@@ -28,7 +28,11 @@ import type { EnvValidationReport } from '@agent/core/env-validator';
 import type { LatencyRegression } from '@agent/core/health-degradation';
 import { getEmbeddingBackend } from '@agent/core/embedding-backend';
 import { installEmbeddingBackendIfAvailable } from '@agent/core/embedding-bootstrap';
-import { probeAppleIntelligence } from '@agent/core/apple-intelligence-bridge';
+import {
+  probeAppleIntelligence,
+  probeAppleIntelligenceCapabilities,
+  probeAppleSpeechAvailability,
+} from '@agent/core/apple-intelligence-bridge';
 import {
   collectMissionHygieneReport,
   formatMissionHygieneLine,
@@ -475,14 +479,23 @@ export async function collectDoctorReport(argv: {
 async function collectLocalCapabilityDoctorLines(): Promise<string[]> {
   try {
     const availability = await probeAppleIntelligence();
+    const capabilities = await probeAppleIntelligenceCapabilities();
+    const speech = await probeAppleSpeechAvailability();
+    const capabilityLines = [
+      `Apple Speech readiness: ${JSON.stringify(speech)}`,
+      `Apple Intelligence capability matrix: ${JSON.stringify(capabilities)}`,
+      'Apple Intelligence PCC: not probed automatically (cloud access requires opt-in).',
+    ];
     if (!availability.available) {
       return [
-        `Apple Intelligence: unavailable (${availability.reason || 'unknown'}) — cloud/configured backends handle all lanes`,
+        `Apple Intelligence text assist: unavailable (${availability.reason || 'unknown'}) — configured backends remain available`,
+        ...capabilityLines,
         formatMissionHygieneLine(collectMissionHygieneReport()),
       ];
     }
     return [
-      'Apple Intelligence: AVAILABLE — local lanes: text assist (classify/summarize), vision OCR, speech-to-text (zero-config bridge). Demo: pnpm check:apple-fm',
+      'Apple Intelligence text assist: AVAILABLE (classify/summarize). Demo: pnpm check:apple-fm',
+      ...capabilityLines,
       formatMissionHygieneLine(collectMissionHygieneReport()),
     ];
   } catch (err) {
