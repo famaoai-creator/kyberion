@@ -1,9 +1,11 @@
 import * as path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { stripAuthorityEnvOverrides } from '../authority.js';
 import { readJson } from '../foundation/json.js';
 import { parseSafeJsonInput, parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import { readTextFile } from '../foundation/text.js';
 
 import {
@@ -17,6 +19,7 @@ import {
   safeLstat,
   safeWriteFile,
   safeMkdir,
+  safeReaddir,
 } from '../secure-io.js';
 import { signA2AContent, verifyA2AContent } from '../mesh/a2a-envelope-signature.js';
 import { createLogger } from '../logger.js';
@@ -40,6 +43,9 @@ import {
   evaluateQualityEnforcement,
   type QualityEnforcementMode,
 } from '../software-quality-operations.js';
+import { persistMissionAiDlcGateProjection } from './mission-aidlc-gate-projection.js';
+import { fingerprintMissionGateInputs } from './mission-gate-input-fingerprint.js';
+import { existingMissionPath } from './mission-gate-record-reader.js';
 
 export type MissionGateCheckKind =
   | 'evidence_exists'
@@ -113,6 +119,8 @@ export interface MissionGateEvaluation {
   reasons: string[];
   checked_at: string;
   evidence_path?: string;
+  input_digest?: string;
+  blocking?: boolean;
   checks: Array<{
     kind: MissionGateCheckKind;
     passed: boolean;
@@ -178,28 +186,57 @@ export function writeMissionGateRecord(input: MissionGateRecordInput): string {
   if (!recordDir) {
     throw new Error('A recordPath or evidenceDir is required to write a mission gate record.');
   }
-  safeMkdir(recordDir, { recursive: true });
-  const targetPath =
-    recordPath ||
-    assertSafeRepositoryPath(
-      path.join(recordDir, `${input.gateId}-${Date.now().toString(36)}.json`),
-      {
-        allowMissingLeaf: true,
+  return withLockSync(`mission-gate-writer:${input.missionId.trim().toUpperCase()}`, () => {
+    safeMkdir(recordDir, { recursive: true });
+    // Ordering belongs to the durable gate receipts themselves, not a clock,
+    // UUID filename, in-memory counter or competing sequence store. All gate
+    // directories for this mission share the same publication lock.
+    const directories = new Set([
+      recordDir,
+      existingMissionPath(input.missionId, 'gates'),
+      existingMissionPath(input.missionId, 'gates/records'),
+    ]);
+    let previousSequence = 0;
+    for (const directory of directories) {
+      if (!directory || !safeExistsSync(directory)) continue;
+      for (const name of safeReaddir(directory)) {
+        if (!name.endsWith('.json')) continue;
+        const file = assertSafeRepositoryPath(path.join(directory, name));
+        if (!safeLstat(file).isFile()) continue;
+        const record = readJson<{ mission_id?: string; sequence?: number }>(file);
+        if (record.mission_id?.trim().toUpperCase() !== input.missionId.trim().toUpperCase())
+          continue;
+        if (Number.isSafeInteger(record.sequence) && record.sequence! > previousSequence)
+          previousSequence = record.sequence!;
       }
+    }
+    if (previousSequence >= Number.MAX_SAFE_INTEGER)
+      throw new Error('[MISSION_GATE_SEQUENCE_EXHAUSTED] Gate receipt sequence requires recovery');
+    const targetPath =
+      recordPath ||
+      assertSafeRepositoryPath(
+        path.join(
+          recordDir,
+          `${input.gateId}-${Date.now().toString(36)}${randomUUID().replaceAll('-', '')}.json`
+        ),
+        { allowMissingLeaf: true }
+      );
+    safeWriteFile(
+      targetPath,
+      JSON.stringify(
+        {
+          mission_id: input.missionId,
+          gate_id: input.gateId,
+          ...(input.payload as Record<string, unknown>),
+          sequence: previousSequence + 1,
+        },
+        null,
+        2
+      )
     );
-  safeWriteFile(
-    targetPath,
-    JSON.stringify(
-      {
-        mission_id: input.missionId,
-        gate_id: input.gateId,
-        ...(input.payload as Record<string, unknown>),
-      },
-      null,
-      2
-    )
-  );
-  return targetPath;
+    persistMissionAiDlcGateProjection(input.missionId);
+    return targetPath;
+  });
 }
 
 export function recordMissionGateOverride(input: MissionGateOverrideInput): string {
@@ -581,8 +618,11 @@ export async function evaluateMissionGate(input: {
   gate: MissionGateDefinition;
   evidenceDir?: string;
   recordPath?: string;
+  /** Actual caller enforcement, not a claim inferred later from an advisory record. */
+  blocking?: boolean;
 }): Promise<MissionGateEvaluation> {
   const checkedAt = nowIso();
+  const inputDigest = fingerprintMissionGateInputs(input.gate);
   const checks: MissionGateEvaluation['checks'] = [];
   const reasons: string[] = [];
   for (const check of input.gate.checks) {
@@ -601,6 +641,8 @@ export async function evaluateMissionGate(input: {
     verdict: reasons.length === 0 ? 'pass' : 'fail',
     reasons,
     checked_at: checkedAt,
+    input_digest: inputDigest,
+    blocking: input.blocking === true,
     checks,
   };
 

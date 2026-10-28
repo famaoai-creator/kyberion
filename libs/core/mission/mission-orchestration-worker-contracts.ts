@@ -71,6 +71,8 @@ export interface MissionTaskDependencyRewrite {
 }
 
 export interface PlannedNextTask {
+  /** Canonical process-template phase, used for phase gate admission. */
+  phase?: string;
   /** Owner-authored opt-in raw context retention; restore remains read-only. */
   compaction_durability?: { retention_ms: number; restore?: boolean };
   task_id: string;

@@ -48,6 +48,31 @@ const render = (
     })
   );
 describe('learning panel static markup (not rendered-browser interaction evidence)', () => {
+  it('separates revision reuse from publication, reports and independent checks', () => {
+    const html = render({
+      ...candidate,
+      learning: {
+        ...candidate.learning!,
+        reuse: {
+          source_sha256: 'a'.repeat(64),
+          state: 'worker_reported',
+          deliveries: 8,
+          attempts: 3,
+          verified_successes: 0,
+          worker_reported_successes: 2,
+          failed_checks: 0,
+          unconfirmed: 1,
+          interventions: 1,
+          intervention_unknown: 2,
+          verified_success_rate: null,
+        },
+      },
+    });
+    expect(html).toContain('Worker reported completion; no independent check');
+    expect(html).toContain('0 / 0');
+    expect(html).toContain('2 unknown');
+    expect(html).toContain('Only this published revision and selected scope');
+  });
   it.each(['queued', 'approved'] as const)(
     'permits rejecting %s unsupported scoped SOPs without offering positive authority',
     (status) => {
