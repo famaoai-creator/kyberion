@@ -33,6 +33,7 @@ export interface MirrorSessionInfo {
   platform?: string;
   device?: string;
   port?: number;
+  token?: string;
   viewer_url?: string;
   stream_url?: string;
   tap_enabled?: boolean;
@@ -59,9 +60,10 @@ export function readMirrorSession(stateFile: string): MirrorSessionInfo | null {
 async function verifyDaemonResponds(state: MirrorSessionInfo): Promise<boolean> {
   if (!state.port || !state.pid || !isPidAlive(state.pid)) return false;
   try {
-    const res = await fetch(`http://127.0.0.1:${state.port}/status`, {
-      signal: AbortSignal.timeout(1500),
-    });
+    const res = await fetch(
+      `http://127.0.0.1:${state.port}/status?token=${encodeURIComponent(state.token ?? '')}`,
+      { signal: AbortSignal.timeout(1500) }
+    );
     if (!res.ok) return false;
     const status = (await res.json()) as { device?: string; tap_enabled?: boolean };
     return typeof status.device === 'string' && status.device === state.device;

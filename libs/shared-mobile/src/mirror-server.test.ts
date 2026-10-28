@@ -8,6 +8,7 @@ const PNG_1PX = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
   'base64'
 );
+const TOKEN = 'test-token';
 
 function stubSource(label = 'stub-device'): FrameSource {
   return { label, grab: async () => PNG_1PX };
@@ -32,8 +33,8 @@ afterEach(async () => {
 
 describe('startMirrorServer', () => {
   it('serves the viewer page with the device label', async () => {
-    handle = await startMirrorServer({ frameSource: stubSource(), fps: 5 });
-    const res = await fetch(handle.viewerUrl);
+    handle = await startMirrorServer({ frameSource: stubSource(), token: TOKEN, fps: 5 });
+    const res = await fetch(`${handle.viewerUrl}?token=${TOKEN}`);
     const html = await res.text();
     expect(res.status).toBe(200);
     expect(html).toContain('stub-device');
@@ -41,8 +42,8 @@ describe('startMirrorServer', () => {
   });
 
   it('streams multipart frames and reports live status', async () => {
-    handle = await startMirrorServer({ frameSource: stubSource(), fps: 10 });
-    const res = await fetch(handle.streamUrl);
+    handle = await startMirrorServer({ frameSource: stubSource(), token: TOKEN, fps: 10 });
+    const res = await fetch(`${handle.streamUrl}?token=${TOKEN}`);
     expect(res.status).toBe(200);
     expect(res.headers.get('content-type')).toContain('multipart/x-mixed-replace');
     const reader = res.body!.getReader();
@@ -50,28 +51,76 @@ describe('startMirrorServer', () => {
     expect(value && value.length > 0).toBe(true);
     await reader.cancel();
     await new Promise((resolve) => setTimeout(resolve, 400));
-    const status = await (await fetch(`${handle.viewerUrl}status`)).json();
+    const status = await (await fetch(`${handle.viewerUrl}status?token=${TOKEN}`)).json();
     expect(status.state).toBe('live');
     expect(status.tap_enabled).toBe(false);
   });
 
   it('routes POST /tap device coordinates to the injector', async () => {
     const injector = new StubInjector();
-    handle = await startMirrorServer({ frameSource: stubSource(), injector, fps: 5 });
+    handle = await startMirrorServer({
+      frameSource: stubSource(),
+      injector,
+      token: TOKEN,
+      fps: 5,
+    });
     const res = await fetch(`${handle.viewerUrl}tap`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: { 'content-type': 'application/json', 'x-kyberion-mirror-token': TOKEN },
       body: JSON.stringify({ x: 123, y: 456 }),
     });
     expect(res.status).toBe(200);
     expect(injector.taps).toEqual([{ x: 123, y: 456 }]);
   });
 
-  it('rejects taps when read-only and rejects malformed payloads', async () => {
-    handle = await startMirrorServer({ frameSource: stubSource(), fps: 5 });
-    const res = await fetch(`${handle.viewerUrl}tap`, {
+  it('rejects every endpoint without the session token', async () => {
+    const injector = new StubInjector();
+    handle = await startMirrorServer({
+      frameSource: stubSource(),
+      injector,
+      token: TOKEN,
+      fps: 5,
+    });
+    for (const url of [handle.viewerUrl, handle.streamUrl, `${handle.viewerUrl}status`]) {
+      const res = await fetch(url);
+      expect(res.status, url).toBe(403);
+      res.body?.cancel();
+    }
+    const tap = await fetch(`${handle.viewerUrl}tap`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ x: 1, y: 2 }),
+    });
+    expect(tap.status).toBe(403);
+    expect(injector.taps).toEqual([]);
+  });
+
+  it('rejects cross-origin browser requests even with the token', async () => {
+    const injector = new StubInjector();
+    handle = await startMirrorServer({
+      frameSource: stubSource(),
+      injector,
+      token: TOKEN,
+      fps: 5,
+    });
+    const res = await fetch(`${handle.viewerUrl}tap`, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-kyberion-mirror-token': TOKEN,
+        origin: 'https://evil.example',
+      },
+      body: JSON.stringify({ x: 1, y: 2 }),
+    });
+    expect(res.status).toBe(403);
+    expect(injector.taps).toEqual([]);
+  });
+
+  it('rejects taps when read-only and rejects malformed payloads', async () => {
+    handle = await startMirrorServer({ frameSource: stubSource(), token: TOKEN, fps: 5 });
+    const res = await fetch(`${handle.viewerUrl}tap`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-kyberion-mirror-token': TOKEN },
       body: JSON.stringify({ x: 1, y: 2 }),
     });
     expect(res.status).toBe(403);
@@ -84,7 +133,7 @@ describe('startMirrorServer', () => {
         throw new Error('device unplugged');
       },
     };
-    handle = await startMirrorServer({ frameSource: broken, fps: 10 });
+    handle = await startMirrorServer({ frameSource: broken, token: TOKEN, fps: 10 });
     await new Promise((resolve) => setTimeout(resolve, 500));
     const status = handle.status();
     expect(status.state).toBe('degraded');
