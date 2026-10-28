@@ -3,6 +3,10 @@
  * task reconciliation, and goal/repair task materialization.
  */
 
+import {
+  guardSupersedeState,
+  type SupersedeGuardOptions,
+} from './mission-next-tasks-supersede-guard.js';
 import * as path from 'node:path';
 import { createActuatorTrace } from '../actuator/actuator-trace.js';
 import * as customerResolver from '../customer-resolver.js';
@@ -404,14 +408,25 @@ export function readMissionNextTasks(missionDir: string): Array<Record<string, u
   }
 }
 
+/**
+ * The one writer of a mission's NEXT_TASKS.json. The board on disk, read
+ * right before the write, keeps every supersede a stale in-memory copy would
+ * undo (M2, {@link guardSupersedeState}); only supersede-task passes
+ * `allowSupersede`.
+ */
 export function writeMissionNextTasks(
   missionDir: string,
-  tasks: Array<Record<string, unknown>>
+  tasks: Array<Record<string, unknown>>,
+  options: SupersedeGuardOptions = {}
 ): void {
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
-  const validated = validateMissionNextTaskObjects(tasks, nextTasksPath);
+  const missionId = path.basename(safeMissionDir(missionDir, true));
+  const validated = validateMissionNextTaskObjects(
+    guardSupersedeState(missionId, tasks, readMissionNextTasks(missionDir), options),
+    nextTasksPath
+  );
   writeProvisionedJson({
-    missionId: path.basename(safeMissionDir(missionDir, true)),
+    missionId,
     filePath: nextTasksPath,
     targetPath: 'NEXT_TASKS.json',
     missionPathHint: missionDir,

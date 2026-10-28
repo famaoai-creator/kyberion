@@ -505,7 +505,8 @@ function updateWorkItemInternal(input: UpdateWorkItemInput): WorkItem {
   }
 
   const nextStatus = input.status || current.status;
-  const shouldClearLease = isTerminalStatus(nextStatus);
+  const shouldClearLease =
+    isTerminalStatus(nextStatus) || (input.endAttempt === true && nextStatus === 'blocked');
   const attemptStatus: Exclude<WorkItemAttemptStatus, 'running'> =
     nextStatus === 'blocked'
       ? 'blocked'
