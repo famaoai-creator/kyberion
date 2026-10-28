@@ -1,5 +1,5 @@
 import { logger } from '@agent/core/core';
-import { resolveXcrunBin } from '@agent/core/tool/tool-binary-resolvers';
+import { resolveAxeBin, resolveXcrunBin } from '@agent/core/tool/tool-binary-resolvers';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -16,6 +16,13 @@ import { retry, getRetryDefaults } from '@agent/core/async-utils';
 import { isRecord, nowIso, parseSafeJsonInput, readJson } from '@agent/core/foundation';
 
 import { runAdfActuatorPipeline } from '@agent/core/actuator/actuator-sdk';
+import {
+  AxeInjector,
+  startMirrorDaemonSession,
+  stopMirrorDaemonSession,
+  readMirrorSession,
+  mirrorStateFilePath,
+} from '@agent/shared-mobile';
 import type { AdfEngineContext } from '@agent/core/pipeline/adf-engine';
 import {
   DEFAULT_MAX_PIPELINE_STEPS,
@@ -246,6 +253,17 @@ async function opCapture(
         runtime_session_handoff_path: outPath,
       };
     }
+    case 'describe_ui': {
+      ensureSimctlAvailable(ctx, options);
+      const device = resolveDeviceUdid(ctx, options, params);
+      const injector = new AxeInjector({ udid: device, timeoutMs: options?.timeout_ms });
+      const tree = await retry(async () => injector.describeUi(), buildRetryOptions());
+      return {
+        ...ctx,
+        [params.export_as || 'ui_tree']: tree,
+        ios_device_udid: device,
+      };
+    }
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
@@ -381,10 +399,19 @@ async function opApply(
         resolve(params.path || path.join(ctx.artifacts_dir, `ios-screen-${Date.now()}.png`))
       );
       ensureParentDir(outPath);
-      await retry(
-        async () => runSimctl(['io', device, 'screenshot', outPath], options),
-        buildRetryOptions()
-      );
+      await retry(async () => {
+        // AXe first: SimulatorKit writes in-process, so checkouts on volumes
+        // the CoreSimulator service cannot write to (e.g. /Volumes/data) still
+        // produce a screenshot; simctl remains the fallback path.
+        try {
+          safeExec(resolveAxeBin(), ['screenshot', '--udid', device, '--output', outPath], {
+            timeoutMs: options?.timeout_ms || 30000,
+          });
+        } catch {
+          runSimctl(['io', device, 'screenshot', outPath], options);
+        }
+        return undefined;
+      }, buildRetryOptions());
       return { ...ctx, last_screenshot_path: outPath, ios_device_udid: device };
     }
     case 'emit_session_handoff': {
@@ -406,6 +433,87 @@ async function opApply(
         session_handoff_path: outPath,
       };
     }
+    case 'tap': {
+      const injector = iosInjector(ctx, options, params);
+      const x = iosFiniteNumber(resolve(params.x), 'x');
+      const y = iosFiniteNumber(resolve(params.y), 'y');
+      await retry(async () => injector.tap(x, y), buildRetryOptions());
+      return ctx;
+    }
+    case 'tap_ui_node': {
+      const injector = iosInjector(ctx, options, params);
+      const target = await retry(
+        async () => resolveIosTapTarget(params, injector),
+        buildRetryOptions()
+      );
+      if (params.dry_run === true) {
+        return { ...ctx, [String(params.export_as ?? 'last_tap_target')]: target };
+      }
+      await retry(async () => injector.tap(target.center.x, target.center.y), buildRetryOptions());
+      return { ...ctx, [String(params.export_as ?? 'last_tap_target')]: target };
+    }
+    case 'swipe': {
+      const injector = iosInjector(ctx, options, params);
+      await retry(
+        async () =>
+          injector.swipe(
+            iosFiniteNumber(resolve(params.x1 ?? params.start_x), 'x1'),
+            iosFiniteNumber(resolve(params.y1 ?? params.start_y), 'y1'),
+            iosFiniteNumber(resolve(params.x2 ?? params.end_x), 'x2'),
+            iosFiniteNumber(resolve(params.y2 ?? params.end_y), 'y2'),
+            iosFiniteNumber(resolve(params.duration_ms ?? 300), 'duration_ms')
+          ),
+        buildRetryOptions()
+      );
+      return ctx;
+    }
+    case 'input_text': {
+      const injector = iosInjector(ctx, options, params);
+      const text = String(resolve(params.text || ''));
+      if (!text.trim()) throw new Error('input_text requires params.text');
+      await retry(async () => injector.inputText(text), buildRetryOptions());
+      return ctx;
+    }
+    case 'press_button': {
+      const injector = iosInjector(ctx, options, params);
+      const button = String(resolve(params.name || params.button || 'home'));
+      await retry(async () => injector.pressButton(button), buildRetryOptions());
+      return ctx;
+    }
+    case 'start_screen_stream': {
+      ensureSimctlAvailable(ctx, options);
+      const device = resolveDeviceUdid(ctx, options, params);
+      if (params.no_input !== true && !AxeInjector.availability().available) {
+        throw new Error(
+          'start_screen_stream with input enabled requires AXe (brew install cameroncooke/axe/axe); pass no_input:true for a read-only mirror'
+        );
+      }
+      const session = await startMirrorDaemonSession({
+        platform: 'ios',
+        deviceId: device,
+        stateFile: mirrorStateFilePath('ios', device),
+        daemonPath: pathResolver.rootResolve('libs/shared-mobile/dist/mirror-daemon.js'),
+        rootDir,
+        resourceId: `ios-mirror-${device}`,
+        fps: Number(resolve(params.fps || 3)),
+        noInput: params.no_input === true,
+      });
+      return {
+        ...ctx,
+        [String(params.export_as ?? 'screen_stream')]: session,
+        ios_device_udid: device,
+      };
+    }
+    case 'stop_screen_stream': {
+      const device = resolveDeviceUdid(ctx, options, params);
+      const result = await stopMirrorDaemonSession(mirrorStateFilePath('ios', device));
+      return { ...ctx, [String(params.export_as ?? 'screen_stream_stop')]: result };
+    }
+    case 'stream_status': {
+      const device = resolveDeviceUdid(ctx, options, params);
+      const state = readMirrorSession(mirrorStateFilePath('ios', device));
+      return { ...ctx, [String(params.export_as ?? 'screen_stream_status')]: state };
+    }
     case 'log': {
       logger.info(`[IOS_LOG] ${resolve(params.message)}`);
       return ctx;
@@ -413,6 +521,122 @@ async function opApply(
     default:
       throw new Error(`[UNKNOWN_OP] Unknown op: ${op}`);
   }
+}
+
+function iosFiniteNumber(value: unknown, name: string): number {
+  const num = Number(value);
+  if (!Number.isFinite(num)) {
+    throw new Error(`parameter ${name} must be a finite number (got ${JSON.stringify(value)})`);
+  }
+  return num;
+}
+
+function iosInjector(
+  ctx: Record<string, any>,
+  options: IOSAction['options'] | undefined,
+  params: any
+): AxeInjector {
+  ensureSimctlAvailable(ctx, options);
+  const device = resolveDeviceUdid(ctx, options, params);
+  return new AxeInjector({ udid: device, timeoutMs: options?.timeout_ms });
+}
+
+export interface IosTapTarget {
+  center: { x: number; y: number };
+  frame: { x: number; y: number; width: number; height: number };
+  label?: string;
+  identifier?: string;
+}
+
+async function resolveIosTapTarget(params: any, injector: AxeInjector): Promise<IosTapTarget> {
+  const tree = await injector.describeUi();
+  const wanted = {
+    text: String(params.text || '')
+      .trim()
+      .toLowerCase(),
+    identifier: String(params.identifier || params.id || '')
+      .trim()
+      .toLowerCase(),
+  };
+  if (!wanted.text && !wanted.identifier) {
+    throw new Error('tap_ui_node requires params.text or params.identifier');
+  }
+  const match = findAxeNode(tree, wanted);
+  if (!match) {
+    throw new Error(`tap_ui_node: no UI node matches ${JSON.stringify(wanted)}`);
+  }
+  return match;
+}
+
+/**
+ * Tolerant walker over AXe `describe-ui` output: collects nodes that carry a
+ * numeric frame plus a label/identifier-ish string, matches case-insensitive
+ * substring on `text` or exact-ish contains on `identifier`. Among multiple
+ * matches the smallest frame wins — outer containers (window/app groups)
+ * share labels with the leaf control, and tapping a container's center misses
+ * the real target.
+ */
+export function findAxeNode(
+  root: unknown,
+  wanted: { text: string; identifier: string }
+): IosTapTarget | null {
+  const queue: unknown[] = [root];
+  let bestId: IosTapTarget | null = null;
+  let bestText: IosTapTarget | null = null;
+  while (queue.length) {
+    const node = queue.shift();
+    if (Array.isArray(node)) {
+      queue.push(...node);
+      continue;
+    }
+    if (!isRecord(node)) continue;
+    for (const value of Object.values(node)) queue.push(value);
+
+    const frame = extractAxeFrame(node);
+    if (!frame) continue;
+    const label = firstString(node, ['AXLabel', 'label', 'title', 'name', 'AXValue', 'value']);
+    const identifier = firstString(node, ['AXIdentifier', 'identifier', 'id']);
+    const labelLower = label?.toLowerCase() ?? '';
+    const idLower = identifier?.toLowerCase() ?? '';
+    const textHit =
+      wanted.text && (labelLower.includes(wanted.text) || idLower.includes(wanted.text));
+    const idHit = wanted.identifier && idLower.includes(wanted.identifier);
+    if (idHit || textHit) {
+      const target: IosTapTarget = {
+        frame,
+        center: { x: frame.x + frame.width / 2, y: frame.y + frame.height / 2 },
+        label,
+        identifier,
+      };
+      if (idHit && (!bestId || frameArea(frame) < frameArea(bestId.frame))) bestId = target;
+      if (textHit && (!bestText || frameArea(frame) < frameArea(bestText.frame))) bestText = target;
+    }
+  }
+  return bestId ?? bestText;
+}
+
+function frameArea(frame: { width: number; height: number }): number {
+  return frame.width * frame.height;
+}
+
+function extractAxeFrame(
+  node: Record<string, unknown>
+): { x: number; y: number; width: number; height: number } | null {
+  const source = isRecord(node.frame) ? node.frame : node;
+  const x = Number(source.x);
+  const y = Number(source.y);
+  const width = Number(source.width);
+  const height = Number(source.height);
+  if ([x, y, width, height].some((v) => !Number.isFinite(v))) return null;
+  return { x, y, width, height };
+}
+
+function firstString(node: Record<string, unknown>, keys: string[]): string | undefined {
+  for (const key of keys) {
+    const value = node[key];
+    if (typeof value === 'string' && value.trim()) return value;
+  }
+  return undefined;
 }
 
 function collectSimctlHealth(ctx: Record<string, any>, options?: IOSAction['options']) {
@@ -431,6 +655,7 @@ function collectSimctlHealth(ctx: Record<string, any>, options?: IOSAction['opti
     return {
       available: true,
       xcrun_version: xcrunVersion,
+      axe: AxeInjector.availability(),
       devices,
       selected_udid: selected,
     };

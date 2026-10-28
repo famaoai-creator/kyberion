@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-21T19:18:47.592Z",
+  "generated_at": "2026-10-28T03:04:18.511Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
@@ -11,10 +11,10 @@
     },
     {
       "actuator_id": "android-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": ["pipeline"],
       "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
-      "contract_schema_sha256": "2f629450fe529eda6f4f4577d8d7a3294acf96e6affb3e0a8ec5e88aeed27c21"
+      "contract_schema_sha256": "b6177c8de394dba346d2f7fcf35a8a16c6bfaefdf5a4f2e638bba4ee9040968e"
     },
     {
       "actuator_id": "approval-actuator",
@@ -141,10 +141,10 @@
     },
     {
       "actuator_id": "ios-actuator",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "ops": ["pipeline"],
       "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
-      "contract_schema_sha256": "2f629450fe529eda6f4f4577d8d7a3294acf96e6affb3e0a8ec5e88aeed27c21"
+      "contract_schema_sha256": "b6177c8de394dba346d2f7fcf35a8a16c6bfaefdf5a4f2e638bba4ee9040968e"
     },
     {
       "actuator_id": "media-actuator",
