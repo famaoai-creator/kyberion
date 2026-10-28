@@ -112,3 +112,5 @@ export * from './workforce/task-tool-runtime.js';
 export * from './workforce/task-api-adapter.js';
 export * from './workforce/task-source-edit.js';
 export * from './workforce/task-pipeline-tool.js';
+export * from './knowledge/reusable-learning.js';
+export * from './knowledge/knowledge-reuse-contract.js';

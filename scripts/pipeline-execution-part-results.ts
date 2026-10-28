@@ -28,12 +28,13 @@ import {
   loadPipelineRunJournal,
   newPipelineRunId,
   openPipelineRunJournal,
+  pipelineRunJournalPath,
   type PipelineRunJournalHandle,
   type PipelineRunJournalState,
   type PipelineJournalScope,
 } from '@agent/core/pipeline/pipeline-run-journal';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile } from '@agent/core/secure-io';
 
 import * as nodePath from 'node:path';
 import {
@@ -442,7 +443,7 @@ async function executePipelineFileOnce(
         options.resumeState.finished ||
         resumed.source_sha256 !== sourceHash ||
         path.resolve(pathResolver.rootDir(), options.resumeState.started!.input_path) !==
-          path.resolve(inputPath)
+          pathResolver.rootResolve(inputPath)
       ) {
         throw new Error(
           '[PIPELINE_RESUME_DENIED] Original source identity changed or run is terminal'
@@ -480,7 +481,9 @@ async function executePipelineFileOnce(
         originalRunId,
         {
           pipeline_id: pipelineId,
-          input_path: path.resolve(inputPath),
+          input_path: pathResolver.rootResolve(inputPath),
+          pipeline_sha256: sourceHash,
+          trace_id: trace.traceId,
           ...(missionId ? { mission_id: missionId } : {}),
           step_ids: steps.map((step) => step.id),
           library_execution: {
@@ -511,6 +514,32 @@ async function executePipelineFileOnce(
         { tier: effectivePayloadScope.tier, tenantSlug: effectivePayloadScope.tenant_slug }
       );
     }
+  }
+  if (!libraryJournal && !options.executionMode) {
+    const scope = currentScopeEnvelope()?.identity ?? runtimeScopeIdentity();
+    if (
+      scope.tenant_slug &&
+      effectivePayloadScope.tenant_slug &&
+      scope.tenant_slug !== effectivePayloadScope.tenant_slug
+    )
+      throw new Error('[PIPELINE_JOURNAL] Payload tenant contradicts the execution scope');
+    const journalTier =
+      tierRank[scope.tier] > tierRank[effectivePayloadScope.tier]
+        ? scope.tier
+        : effectivePayloadScope.tier;
+    libraryJournal = createPipelineRunJournal(
+      newPipelineRunId(),
+      {
+        pipeline_id: pipelineId,
+        input_path: pathResolver.rootResolve(inputPath),
+        pipeline_sha256: createHash('sha256').update(loadedSource).digest('hex'),
+        trace_id: trace.traceId,
+        ...(missionId ? { mission_id: missionId } : {}),
+        step_ids: steps.map((step) => step.id),
+      },
+      missionId,
+      { tier: journalTier, tenantSlug: scope.tenant_slug ?? effectivePayloadScope.tenant_slug }
+    );
   }
   let result: Awaited<ReturnType<typeof run>>;
   try {
@@ -904,9 +933,20 @@ export async function main(args?: string[], print: Print = () => undefined) {
 
   let resumeState: PipelineRunJournalState | undefined;
   if (argv.resume) {
-    const journalScope = argv['journal-tier']
+    const runtimeScope = currentScopeEnvelope()?.identity ?? runtimeScopeIdentity();
+    let journalScope = argv['journal-tier']
       ? { tier: argv['journal-tier'], tenantSlug: argv['journal-tenant'] }
-      : undefined;
+      : !getRegisteredEnvText('MISSION_ID')
+        ? { tier: runtimeScope.tier, tenantSlug: runtimeScope.tenant_slug }
+        : undefined;
+    // Existing resumable runs keep their legacy location. Promotion does not
+    // use this discovery fallback: only new protected evidence is eligible.
+    if (
+      journalScope &&
+      !argv['journal-tier'] &&
+      !safeExistsSync(pipelineRunJournalPath(String(argv.resume), undefined, journalScope))
+    )
+      journalScope = undefined;
     resumeState = loadPipelineRunJournal(
       String(argv.resume),
       getRegisteredEnvText('MISSION_ID'),
@@ -1003,9 +1043,17 @@ export async function main(args?: string[], print: Print = () => undefined) {
   process.once('SIGINT', () => cleanupAndExit(130));
   process.once('SIGTERM', () => cleanupAndExit(143));
 
+  let loadedSource: string | undefined;
   const pipeline = await readValidatedWorkflowAdf(argv.input as string, {
     trustResolved: effectiveTrustResolved,
     projectTrustApprovalId,
+    ...(!String(argv.input).match(/\.(ts|js|mjs|cjs)$/u)
+      ? {
+          onValidatedInput: (_loaded: unknown, source: string) => {
+            loadedSource = source;
+          },
+        }
+      : {}),
   });
 
   const baseContext = (pipeline.context || {}) as Record<string, unknown>;
@@ -1110,6 +1158,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
     // step can reach it. Volatile GC and other inert pipelines skip the CLI probes.
     const reasoningRequired = await installReasoningBackendsForSteps(stepsToRun);
     const runId = resumeState?.run_id || newPipelineRunId();
+    const runtimeScope = currentScopeEnvelope()?.identity ?? runtimeScopeIdentity();
     const activeRunJournal = resumeState
       ? openPipelineRunJournal(resumeState)
       : createPipelineRunJournal(
@@ -1117,13 +1166,15 @@ export async function main(args?: string[], print: Print = () => undefined) {
           {
             pipeline_id: pipelineId,
             input_path: String(argv.input),
-            pipeline_sha256: createHash('sha256')
-              .update(safeReadFile(pathResolver.rootResolve(String(argv.input))) as Buffer)
-              .digest('hex'),
+            ...(loadedSource !== undefined
+              ? { pipeline_sha256: createHash('sha256').update(loadedSource).digest('hex') }
+              : {}),
+            trace_id: trace.traceId,
             ...(missionId ? { mission_id: missionId } : {}),
             step_ids: stepsToRun.map((step, index) => step.id || `__step_${index}`),
           },
-          missionId
+          missionId,
+          !missionId ? { tier: runtimeScope.tier, tenantSlug: runtimeScope.tenant_slug } : undefined
         );
     runJournal = activeRunJournal;
     if (resumeState) {
@@ -1252,6 +1303,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
     result.context.trace_persisted_path =
       nodePath.relative(pathResolver.rootDir(), persisted.path) || persisted.path;
     logger.info(`   [PIPELINE] Trace: ${result.context.trace_persisted_path}`);
+    logger.info(`   [PIPELINE] Run ID: ${runId}`);
     activeRunJournal.append('run_finished', { status: pipelineStatus });
     if (argv.json) {
       // Run summary only — never the full pipeline context, which can carry
@@ -1262,6 +1314,7 @@ export async function main(args?: string[], print: Print = () => undefined) {
         status: pipelineStatus,
         recovered,
         run_id: runId,
+        trace_id: trace.traceId,
         ...(missionId ? { mission_id: missionId } : {}),
         trace_path: result.context.trace_persisted_path,
         steps: result.results.map((entry) => ({

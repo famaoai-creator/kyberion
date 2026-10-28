@@ -44,6 +44,7 @@ const REGISTRY_PATH = path.join(ROOT, 'tests', 'golden', 'pipelines.json');
 const SNAPSHOTS_DIR = path.join(ROOT, 'tests', 'golden', 'snapshots');
 
 const DEFAULT_IGNORE_PATHS = [
+  'runId', // Engine journal identity is volatile, not a change to pipeline semantics.
   'timestamp',
   'session_id',
   'trace',
@@ -94,7 +95,7 @@ function elidePath(obj: any, dotPath: string): void {
   }
 }
 
-function normalizeResult(result: unknown, ignorePaths: string[]): unknown {
+export function normalizeGoldenOutputResult(result: unknown, ignorePaths: string[]): unknown {
   if (result === null || result === undefined) return result;
   const cloned = JSON.parse(JSON.stringify(result));
   for (const p of [...DEFAULT_IGNORE_PATHS, ...ignorePaths]) {
@@ -164,7 +165,7 @@ async function checkOne(
     return diags;
   }
 
-  const normalized = normalizeResult(result, entry.ignore_paths ?? []);
+  const normalized = normalizeGoldenOutputResult(result, entry.ignore_paths ?? []);
   const newHash = hashResult(normalized);
   const newSnap: GoldenOutputSnapshot = {
     generated_at: nowIso(),

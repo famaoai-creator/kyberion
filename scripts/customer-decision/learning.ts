@@ -56,7 +56,7 @@ import {
   type LearningCaseInput,
   type LearningSuggestion,
 } from '@agent/core/customer-decision';
-import { promotePipelineAdf } from '../pipeline_promote.js';
+import { installRepositoryPipelineTemplate } from '../pipeline_promote.js';
 import {
   LEDGER_ROLE,
   asLedgerWriter,
@@ -392,7 +392,7 @@ export async function runLearningInstall(
 ): Promise<unknown> {
   const tenant = boundTenantOf(opts);
   const by = memberActorId(opts.by);
-  const result = await promotePipelineAdf(
+  const result = await installRepositoryPipelineTemplate(
     [
       '--input',
       LEARNING_PIPELINE_TEMPLATE,

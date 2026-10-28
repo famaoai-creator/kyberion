@@ -7,7 +7,9 @@
  * promotion a one-command step instead of manual re-authoring:
  *
  *   pnpm pipeline:promote --input active/shared/tmp/my-run.json \
- *     [--name <slug>] [--tenant <slug> | --source-is-public] [--trace <traceId>] [--dry-run] [--no-llm] [--force]
+ *     --run <engine-run-id> [--mission <id>] [--trace <traceId>]
+ *     [--name <slug>] [--tenant <slug> | --source-is-public] [--dry-run] [--no-llm] [--force]
+ * Use --draft without a run to prepare an inert proposal outside executable catalogs.
  *
  * --tenant <slug>: land the pipeline in the tenant catalog
  * (knowledge/confidential/<slug>/pipelines/<name>.json + that directory's
@@ -42,6 +44,7 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
+  safeMkdir,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
@@ -55,7 +58,6 @@ import {
 } from '@agent/core/foundation';
 import { tryRepairJson } from '@agent/core/json-repair';
 import {
-  loadPipelineAdfAtPath,
   validatePipelineAdf,
   type PipelineAdf,
   type PipelineAdfStep,
@@ -63,6 +65,12 @@ import {
 import { validatePipelineGuardrails } from '@agent/core/pipeline/adf-guardrails';
 import { withExecutionContext } from '@agent/core/governance';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
+import { resolveStorageFloor } from '@agent/core/storage-layout';
+import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
+import {
+  verifyPipelinePromotionEvidence,
+  type VerifiedPipelinePromotionEvidence,
+} from '@agent/core/pipeline/pipeline-promotion-evidence';
 import * as nodePath from 'node:path';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { guardCliArgs, hasCliFlag, type CliGuardSpec } from './lib/cli-guard.js';
@@ -228,14 +236,19 @@ function setParamPath(params: Record<string, unknown>, paramPath: string, value:
   return true;
 }
 
-async function requestPromotionAdvice(pipeline: PipelineAdf): Promise<PromotionAdvice | null> {
+async function requestPromotionAdvice(
+  pipeline: PipelineAdf,
+  verifiedSource: boolean
+): Promise<PromotionAdvice | null> {
   const backend = getReasoningBackend();
   if (backend.name === 'stub') {
     logger.warn('[promote] reasoning backend is stub — skipping advisory pass (verbatim copy).');
     return null;
   }
   const prompt = [
-    'You are reviewing a Kyberion pipeline ADF that just ran successfully once, to promote it into a reusable catalog pipeline.',
+    verifiedSource
+      ? 'You are reviewing a Kyberion pipeline ADF whose exact source has a verified successful engine run, to promote it into a reusable catalog pipeline.'
+      : 'You are reviewing a Kyberion pipeline draft or shipped template. Successful execution has NOT been established; do not claim that it has run successfully.',
     'Identify (a) param values that are run-specific inputs and should become {{placeholder}} variables resolved from --context at run time,',
     'and (b) steps whose outcome depends on fresh model judgment (semantic steps) — these must NOT be frozen into deterministic form.',
     'Do not invent steps. Do not rename ops. Only report what should be parameterized or flagged.',
@@ -324,6 +337,7 @@ function fail(message: string): never {
 
 export interface PipelinePromotionResult {
   target: string;
+  status: 'draft' | 'verified_source' | 'unverified_template';
   dry_run: boolean;
   tenant?: string;
   next_steps: string[];
@@ -365,9 +379,26 @@ export async function promotePipelineAdf(
   return main(args, options);
 }
 
+/** Installing a shipped template is distribution, never proof of a successful run.
+ * Only repository-owned templates are eligible; project trust still gates execution.
+ */
+export async function installRepositoryPipelineTemplate(
+  args: string[],
+  options: { ingestedBy?: string } = {}
+): Promise<PipelinePromotionResult> {
+  const source = getFlag(args, '--input');
+  const relative = source ? repoRelative(pathResolver.rootResolve(source)) : '';
+  if (
+    !relative.startsWith('knowledge/product/pipeline-templates/') ||
+    !isBuiltinPipelineResource(relative)
+  )
+    throw new Error('[PIPELINE_TEMPLATE_INSTALL] A repository-owned pipeline template is required');
+  return main(args, { ...options, installRepositoryTemplate: true });
+}
+
 async function main(
   args: string[] = [],
-  options: { ingestedBy?: string } = {}
+  options: { ingestedBy?: string; installRepositoryTemplate?: boolean } = {}
 ): Promise<PipelinePromotionResult> {
   const argv = args;
   const inputPath = getFlag(argv, '--input');
@@ -382,6 +413,9 @@ async function main(
   const noLlm = hasCliFlag(argv, '--no-llm');
   const force = hasCliFlag(argv, '--force');
   const traceId = getFlag(argv, '--trace');
+  const runId = getFlag(argv, '--run');
+  const missionId = getFlag(argv, '--mission');
+  const draft = hasCliFlag(argv, '--draft');
   const tenant = getFlag(argv, '--tenant')?.trim().toLowerCase();
 
   // 0. Tier guard (lexical, before any disk access): never move tier- or
@@ -417,15 +451,19 @@ async function main(
     fail(err instanceof Error ? err.message : String(err));
   }
   // 1. Preflight the source exactly like run_pipeline would.
+  // Parse and hash the same immutable snapshot. A second read could otherwise
+  // verify one input while promoting a concurrently edited one.
+  const sourceText = tenant
+    ? withExecutionContext(
+        'asset_promoter',
+        () => readPipelinePromotionTextFile(resolvedInput),
+        undefined,
+        tenant
+      )
+    : readPipelinePromotionTextFile(resolvedInput);
+  const sourceSha256 = sha256Text(sourceText);
   const pipeline: PromotablePipeline = {
-    ...(tenant
-      ? withExecutionContext(
-          'asset_promoter',
-          () => loadPipelineAdfAtPath(resolvedInput),
-          undefined,
-          tenant
-        )
-      : loadPipelineAdfAtPath(resolvedInput)),
+    ...validatePipelineAdf(parseSafeJsonInput(sourceText, 'pipeline promotion source')),
   };
   const sourceGuardrails = validatePipelineGuardrails(pipeline, inputPath);
   if (!sourceGuardrails.ok) {
@@ -436,8 +474,28 @@ async function main(
     );
   }
 
+  let verified: VerifiedPipelinePromotionEvidence | undefined;
+  if (!draft && !options.installRepositoryTemplate) {
+    if (!runId)
+      throw new Error(
+        '[PIPELINE_PROMOTION_UNVERIFIED] --run <run-id> is required for catalog promotion; use --draft to prepare an inert proposal'
+      );
+    const verify = () =>
+      verifyPipelinePromotionEvidence({
+        runId,
+        inputPath: resolvedInput,
+        sourceSha256,
+        ...(tenant ? { tenantSlug: tenant } : {}),
+        ...(missionId ? { missionId } : {}),
+        ...(traceId ? { traceId } : {}),
+      });
+    verified = tenant
+      ? withExecutionContext('asset_promoter', verify, undefined, tenant)
+      : verify();
+  }
+
   // 2. Advisory pass (placeholders + semantic flags).
-  const advice = noLlm ? null : await requestPromotionAdvice(pipeline);
+  const advice = noLlm ? null : await requestPromotionAdvice(pipeline, Boolean(verified));
   const appliedPlaceholders: string[] = [];
   if (advice?.placeholders) {
     for (const entry of advice.placeholders) {
@@ -474,6 +532,9 @@ async function main(
   pipeline.promotion = {
     promoted_from: inputPath,
     promoted_at: nowIso(),
+    status: draft ? 'draft' : verified ? 'verified_source' : 'unverified_template',
+    source_sha256: sourceSha256,
+    ...(verified ? { evidence: verified } : {}),
     ...(traceId ? { trace_id: traceId } : {}),
     ...(advice?.rationale ? { rationale: String(advice.rationale).slice(0, 500) } : {}),
     ...(advice
@@ -490,6 +551,45 @@ async function main(
   const promotedGuardrails = validatePipelineGuardrails(promoted, targetRepoPath);
   if (!promotedGuardrails.ok) {
     fail('[promote] transformed pipeline fails guardrails — aborting (source untouched).');
+  }
+  // This digest is the abstracted contract, independent of mutable provenance.
+  // Source success is not falsely presented as a successful execution of the abstraction.
+  promoted.promotion = {
+    ...pipeline.promotion,
+    contract_sha256: sha256Text(JSON.stringify({ ...promoted, promotion: undefined })),
+    validation: 'schema_and_guardrails',
+  };
+  if (draft) {
+    const targetPath = resolveStorageFloor(
+      'scratch',
+      {
+        kind: 'tier',
+        tier: tenant ? 'confidential' : 'public',
+        ...(tenant ? { tenant } : {}),
+      },
+      'pipeline-promotion',
+      `${slug}.json`
+    );
+    if (safeExistsSync(targetPath) && !force)
+      fail('[promote] draft already exists — use --force to replace it');
+    if (!dryRun) {
+      safeMkdir(nodePath.dirname(targetPath), { recursive: true });
+      writeJson(targetPath, {
+        kind: 'pipeline_promotion_draft',
+        status: 'draft',
+        pipeline: promoted,
+        ...(tenant ? { tenant_slug: tenant } : {}),
+      });
+    }
+    return {
+      target: repoRelative(targetPath),
+      status: 'draft',
+      dry_run: dryRun,
+      ...(tenant ? { tenant } : {}),
+      next_steps: [
+        `Run the source ADF in the same scope, then promote it with --run <run-id>. Drafts are not executable catalog entries.`,
+      ],
+    };
   }
   const targetPath = assertSafeRepositoryPath(pathResolver.rootResolve(targetRepoPath), {
     allowMissingLeaf: true,
@@ -560,6 +660,7 @@ async function main(
     );
     return {
       target: targetRepoPath,
+      status: verified ? 'verified_source' : 'unverified_template',
       dry_run: dryRun,
       tenant,
       next_steps: nextSteps,
@@ -582,7 +683,12 @@ async function main(
   const runCommand = `pnpm pipeline --input pipelines/${slug}.json`;
   logPlaceholders(appliedPlaceholders, runCommand);
   appendCatalogRow(slug, description, dryRun);
-  return { target: `pipelines/${slug}.json`, dry_run: dryRun, next_steps: [runCommand] };
+  return {
+    target: `pipelines/${slug}.json`,
+    status: verified ? 'verified_source' : 'unverified_template',
+    dry_run: dryRun,
+    next_steps: [runCommand],
+  };
 }
 
 function logPlaceholders(appliedPlaceholders: string[], runCommand: string): void {
@@ -634,6 +740,9 @@ export const PIPELINE_PROMOTE_CLI: CliGuardSpec = {
     { flag: '--tenant', value: '<tenant-slug>' },
     { flag: '--source-is-public' },
     { flag: '--trace', value: '<trace-id>' },
+    { flag: '--run', value: '<run-id>' },
+    { flag: '--mission', value: '<mission-id>' },
+    { flag: '--draft' },
     { flag: '--dry-run' },
     { flag: '--no-llm' },
     { flag: '--force' },

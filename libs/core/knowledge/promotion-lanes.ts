@@ -80,6 +80,7 @@ export function resetPromotionLanePolicyCache(): void {
 }
 
 export interface LaneSubject {
+  source_ref?: string;
   target_kind?: string;
   /** MemoryCandidate vocabulary — same concept, different field name. */
   proposed_memory_kind?: string;
@@ -95,6 +96,13 @@ export function resolvePromotionLane(
   candidate: LaneSubject,
   policy: PromotionLanePolicy = loadPromotionLanePolicy()
 ): PromotionLane {
+  // Explicit reuse intake queues a plan, not a reviewed lesson or execution proof.
+  // Repeated requests cannot turn that plan into authority to publish an asset.
+  if (
+    candidate.metadata?.origin === 'learning_intake' ||
+    candidate.source_ref?.startsWith('artifact:learning_intake:')
+  )
+    return 'steward';
   const tier = candidate.tier ?? candidate.scope?.tier ?? 'public';
   if (tier === 'personal' || tier === 'confidential') return 'steward';
   const haystack = `${candidate.title ?? ''} ${candidate.summary ?? ''}`.toLowerCase();

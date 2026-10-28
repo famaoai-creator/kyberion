@@ -37,7 +37,12 @@ import { readJsonIfPresent } from '../foundation/json.js';
 import type { ScopeContext } from '../scope-context.js';
 import type { ServiceStepResult } from '../service/service-procedure-executor.js';
 import type { GoldenScenario, GoldenSuccessCondition, ProcedureEntry } from './procedure-types.js';
-import { recordKnowledgeProblem, recordKnowledgeVerifiedRun } from './knowledge-verification.js';
+import {
+  recordKnowledgeProblem,
+  recordKnowledgeVerifiedRun,
+  recordKnowledgeReuseObservation,
+} from './knowledge-verification.js';
+import type { DeliveredKnowledgeRef } from './knowledge-feedback-loop.js';
 
 const GOLDEN_SCHEMA_PATH = pathResolver.knowledge('product/schemas/golden-scenario.schema.json');
 const goldenValidator = defineCatalog<GoldenScenario>({
@@ -369,19 +374,39 @@ export function verifyProcedureRun(input: {
   procedure: ProcedureEntry;
   evidence: RunEvidence;
   scope?: ScopeContext;
+  documentSnapshot?: DeliveredKnowledgeRef;
+  receiptId?: string;
+  /** Engine dispatch requires source equality; old direct callers retain their legacy behavior. */
+  requireDocumentSnapshot?: boolean;
 }): GoldenVerdict | undefined {
   try {
     const scenario = loadGoldenScenario(input.procedure);
     if (!scenario) return undefined;
     const verdict = evaluateGoldenScenario(scenario, input.evidence);
     const documentPath = procedureVerificationDocument(input.procedure);
-    if (documentPath && verdict.verdict === 'pass') {
+    const boundDocument =
+      !input.requireDocumentSnapshot ||
+      (input.documentSnapshot?.path === documentPath && !!input.receiptId);
+    if (documentPath && boundDocument && verdict.verdict === 'pass') {
       recordKnowledgeVerifiedRun({
         documentPaths: [documentPath],
+        ...(input.documentSnapshot?.path === documentPath && input.receiptId
+          ? {
+              documentSnapshots: [input.documentSnapshot],
+              receiptId: input.receiptId,
+            }
+          : {}),
         evidence: 'golden',
         ...(input.scope ? { scope: input.scope } : {}),
       });
-    } else if (documentPath && verdict.verdict === 'fail') {
+    } else if (documentPath && boundDocument && verdict.verdict === 'fail') {
+      if (input.documentSnapshot?.path === documentPath && input.receiptId)
+        recordKnowledgeReuseObservation({
+          documentSnapshots: [input.documentSnapshot],
+          receiptId: input.receiptId,
+          kind: 'verification_failed',
+          scope: input.scope,
+        });
       const unmet = verdict.conditions.find((result) => result.outcome === 'unmet');
       recordKnowledgeProblem({
         documentPath,

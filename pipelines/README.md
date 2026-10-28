@@ -306,6 +306,8 @@ Minimal runnable pipelines that make an actuator op reachable (OW-05); run them 
 
 Pipelines promoted from successful one-off runs (LC-02). Provenance is recorded in each file under `promotion`. Tenant-scoped promotions (`pnpm pipeline:promote --tenant <slug>`) go to `knowledge/confidential/<slug>/pipelines/` with their own README and are never listed here; scratch builders are kept with `pnpm scratch:promote` — see [scratch-tool-promotion-playbook](../knowledge/product/orchestration/scratch-tool-promotion-playbook.md).
 
+Catalog promotion requires `--run <engine-run-id>` and verifies the protected successful run journal, exact source digest and scope. `--draft` instead writes an inert proposal into scoped scratch without publishing a catalog entry. Abstracted pipelines record `verified_source` separately from their later execution outcomes; template installation remains `unverified_template` until verified by a real run.
+
 | Pipeline | pnpm shortcut | Description |
 | -------- | ------------- | ----------- |
 

@@ -9,7 +9,13 @@ import {
   recordKnowledgeProblem,
   recordKnowledgeVerifiedRun,
   resolveKnowledgeVerification,
+  recordKnowledgeReuseObservation,
+  inspectKnowledgeReuse,
 } from './knowledge-verification.js';
+import {
+  createKnowledgeDeliverySnapshot,
+  knowledgeTextSha256,
+} from './knowledge-delivery-snapshot.js';
 
 const root = pathResolver.sharedTmp(`knowledge-verification-test-${process.pid}`);
 const feedbackDir = pathResolver.sharedTmp(`knowledge-verification-feedback-${process.pid}`);
@@ -41,8 +47,49 @@ const stateOf = (scope = tenantA) =>
   resolveKnowledgeVerification([RUNBOOK], scope, root).get(RUNBOOK);
 
 describe('knowledge verification ledger', () => {
+  it('persists exact-version reuse without crediting a changed revision or another tenant', () => {
+    const text = '# Verified reusable procedure';
+    const sha = knowledgeTextSha256(text);
+    const snapshots = [
+      {
+        path: RUNBOOK,
+        snapshot: createKnowledgeDeliverySnapshot({ text, form: 'pack', source_sha256: sha }),
+      },
+    ];
+    const input = { documentSnapshots: snapshots, receiptId: 'a'.repeat(64), scope: tenantA };
+    recordKnowledgeReuseObservation({ ...input, kind: 'delivered' });
+    recordKnowledgeReuseObservation({ ...input, kind: 'delivered' });
+    expect(
+      inspectKnowledgeReuse({ documentPath: RUNBOOK, sourceSha256: sha, scope: tenantA })
+    ).toMatchObject({ deliveries: 1, verified_successes: 0 });
+    recordKnowledgeVerifiedRun({ ...input, evidence: 'worker_report' });
+    expect(
+      inspectKnowledgeReuse({ documentPath: RUNBOOK, sourceSha256: sha, scope: tenantA })
+    ).toMatchObject({ worker_reported_successes: 1, verified_successes: 0 });
+    recordKnowledgeVerifiedRun({ ...input, receiptId: 'b'.repeat(64), evidence: 'golden' });
+    expect(
+      inspectKnowledgeReuse({ documentPath: RUNBOOK, sourceSha256: sha, scope: tenantA })
+    ).toMatchObject({ verified_successes: 1, state: 'verified' });
+    expect(
+      inspectKnowledgeReuse({ documentPath: RUNBOOK, sourceSha256: 'f'.repeat(64), scope: tenantA })
+    ).toMatchObject({ attempts: 0 });
+    expect(
+      inspectKnowledgeReuse({ documentPath: RUNBOOK, sourceSha256: sha, scope: tenantB })
+    ).toMatchObject({ attempts: 0 });
+  });
   it('has no state for a document that never ran', () => {
     expect(stateOf()).toBeUndefined();
+  });
+  it('reports malformed telemetry as unavailable rather than fabricating zero successes', () => {
+    const file = knowledgeVerificationLedgerPath(tenantA);
+    safeMkdir(path.dirname(file), { recursive: true });
+    safeWriteFile(
+      file,
+      JSON.stringify([{ document_path: RUNBOOK, success_count: 0, reuse_receipts: {} }])
+    );
+    expect(() =>
+      inspectKnowledgeReuse({ documentPath: RUNBOOK, sourceSha256: 'a'.repeat(64), scope: tenantA })
+    ).toThrow('Invalid receipt list');
   });
 
   it('marks the current text verified after a successful run', () => {

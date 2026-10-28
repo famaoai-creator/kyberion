@@ -16,6 +16,26 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
+    "./pipeline/pipeline-reuse": {
+      "types": "./dist/pipeline/pipeline-reuse.d.ts",
+      "default": "./dist/pipeline/pipeline-reuse.js"
+    },
+    "./pipeline/pipeline-promotion-evidence": {
+      "types": "./dist/pipeline/pipeline-promotion-evidence.d.ts",
+      "default": "./dist/pipeline/pipeline-promotion-evidence.js"
+    },
+    "./knowledge/reusable-learning": {
+      "types": "./dist/knowledge/reusable-learning.d.ts",
+      "default": "./dist/knowledge/reusable-learning.js"
+    },
+    "./knowledge/knowledge-reuse-contract": {
+      "types": "./dist/knowledge/knowledge-reuse-contract.d.ts",
+      "default": "./dist/knowledge/knowledge-reuse-contract.js"
+    },
+    "./knowledge/knowledge-verification": {
+      "types": "./dist/knowledge/knowledge-verification.d.ts",
+      "default": "./dist/knowledge/knowledge-verification.js"
+    },
     "./surface/workspace-work": {
       "types": "./dist/surface/workspace-work.d.ts",
       "default": "./dist/surface/workspace-work.js"
