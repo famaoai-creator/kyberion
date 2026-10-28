@@ -2323,12 +2323,12 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequest (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
+      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequestLocked (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
     {
-      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequest (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
+      "site": "libs/core/workforce/background-review-patch.ts#createBackgroundReviewApprovalRequestLocked (via libs/core/governance/approval-store-location.ts#assertCallerChannelWrite)",
       "roles": ["mission_controller"],
       "unresolved": []
     },
