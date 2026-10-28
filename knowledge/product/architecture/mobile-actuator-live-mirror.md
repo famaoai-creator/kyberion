@@ -36,6 +36,17 @@ Hybrid, per the mission decision:
     `spawnManagedProcess`; sibling ops coordinate through its state file +
     SIGTERM.
 
+## Security boundary
+
+Loopback alone is NOT the boundary. The daemon issues a per-session
+`randomBytes` token at start, written only to the repo-local state file.
+Every endpoint (viewer, `/stream.mjpeg`, `/status`, `POST /tap`) requires it
+via `?token=` or the `x-kyberion-mirror-token` header; browser requests must
+present a loopback `Origin` / same-site `Sec-Fetch-Site`, and each injected
+tap is audit-logged through the governed logger. The `start_screen_stream`
+approval therefore covers exactly the token holder — not every process able
+to reach 127.0.0.1.
+
 ## Ops added
 
 - ios-actuator: `describe_ui` (capture), `tap`, `tap_ui_node`, `swipe`,
