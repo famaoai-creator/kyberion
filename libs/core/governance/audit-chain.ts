@@ -32,6 +32,14 @@ import { parseActorRef, type ActorRef } from '../actor.js';
 
 const logger = createLogger('audit-chain');
 
+type AuditRecordInput = Omit<AuditEntry, 'id' | 'timestamp' | 'previousHash' | 'currentHash'>;
+
+/** A record checked against the identity it was made under, ready to append. */
+interface PreparedAuditRecord {
+  entry: AuditRecordInput;
+  requestedTenantSlug: string | undefined;
+}
+
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -251,10 +259,73 @@ export function registerAuditForwarderPublisher(publisher: AuditForwarderPublish
 /**
  * Inter-process lock every append holds while it writes the master chain and
  * the tenant mirror. A writer that must see no append in between (mirror
- * reconcile) holds it too; it is not reentrant, so nothing inside may record
- * an audit entry.
+ * reconcile, tenant rename, retention archive) holds it too, through
+ * {@link withAuditChainLock}.
  */
 export const AUDIT_CHAIN_LOCK_ID = 'audit-chain-global';
+
+let auditLockDepth = 0;
+let deferredAppends: Array<() => void> = [];
+let flushingDeferred = false;
+
+/**
+ * Runs `fn` holding the audit chain lock. The lock is not reentrant: a plain
+ * `record()` inside fails at once with AUDIT_REENTRANT instead of waiting out
+ * the lock timeout on itself. `recordDeferrable()` inside is queued and
+ * appended right after the lock is released.
+ */
+export function withAuditChainLock<T>(fn: () => T): T {
+  if (auditLockDepth > 0) {
+    throw new Error(
+      '[AUDIT_REENTRANT] this process already holds the audit chain lock — record the entry after the locked section ends'
+    );
+  }
+  try {
+    return withLockSync(AUDIT_CHAIN_LOCK_ID, () => {
+      auditLockDepth++;
+      try {
+        return fn();
+      } finally {
+        auditLockDepth--;
+      }
+    });
+  } finally {
+    flushDeferredAppends();
+  }
+}
+
+/** Whether this process is inside {@link withAuditChainLock}. */
+export function holdsAuditChainLock(): boolean {
+  return auditLockDepth > 0;
+}
+
+function flushDeferredAppends(): void {
+  if (flushingDeferred || auditLockDepth > 0 || deferredAppends.length === 0) return;
+  flushingDeferred = true;
+  try {
+    const pending = deferredAppends;
+    deferredAppends = [];
+    for (const append of pending) {
+      try {
+        append();
+      } catch (err) {
+        logger.warn(
+          `[AUDIT_CHAIN] deferred audit entry failed — ${errorMessage(err)} | the entry was not appended`
+        );
+      }
+    }
+    // An append that defers again would loop (a mirror write denied on every
+    // try); that entry is dropped, and the master already holds the first one.
+    if (deferredAppends.length > 0) {
+      logger.warn(
+        `[AUDIT_CHAIN] dropped ${deferredAppends.length} audit entr${deferredAppends.length === 1 ? 'y' : 'ies'} deferred while flushing — deferral does not nest`
+      );
+      deferredAppends = [];
+    }
+  } finally {
+    flushingDeferred = false;
+  }
+}
 
 /**
  * Runs `fn` as the tenant audit mirror's own store-writer, bound to `tenantSlug`.
@@ -345,7 +416,26 @@ class AuditChainImpl {
    * Auto-populates `tenantSlug` from the active identity context unless
    * the caller has already supplied one.
    */
-  record(entry: Omit<AuditEntry, 'id' | 'timestamp' | 'previousHash' | 'currentHash'>): AuditEntry {
+  record(entry: AuditRecordInput): AuditEntry {
+    return this.append(this.prepare(entry));
+  }
+
+  /**
+   * `record()` for a caller that may run inside {@link withAuditChainLock}
+   * (a policy denial raised by a write the locked section makes). Inside the
+   * lock the entry is checked now, against the current identity, and appended
+   * once the lock is released; it returns undefined then. Outside, it records.
+   */
+  recordDeferrable(entry: AuditRecordInput): AuditEntry | undefined {
+    const prepared = this.prepare(entry);
+    if (!holdsAuditChainLock()) return this.append(prepared);
+    deferredAppends.push(() => {
+      this.append(prepared);
+    });
+    return undefined;
+  }
+
+  private prepare(entry: AuditRecordInput): PreparedAuditRecord {
     const activeTenantSlug = resolveCurrentTenantSlug();
     if (entry.tenantSlug && activeTenantSlug && entry.tenantSlug !== activeTenantSlug) {
       throw new Error(
@@ -379,66 +469,41 @@ class AuditChainImpl {
     ) {
       throw new Error('[AUDIT_SCOPE_INVALID] explicit audit scope failed validation');
     }
-    const fullEntry = withLockSync(AUDIT_CHAIN_LOCK_ID, () => {
-      // Refresh the in-memory cursor while holding the inter-process lock;
-      // another process may have appended since this module was loaded.
-      this.seedFromDisk();
-      this.entryCount++;
-      const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
-      const timestamp = nowIso();
+    return {
+      entry,
+      requestedTenantSlug: entry.tenantSlug ?? entry.scope?.tenant_slug ?? activeTenantSlug,
+    };
+  }
 
-      const requestedTenantSlug =
-        entry.tenantSlug ?? entry.scope?.tenant_slug ?? resolveCurrentTenantSlug();
-      const tenantSlug =
-        requestedTenantSlug && isValidTenantSlug(requestedTenantSlug)
-          ? requestedTenantSlug
-          : undefined;
-      const chainKey = resolveAuditChainKey({ createIfMissing: true });
-      if (!chainKey) throw new Error('missing_audit_chain_key');
+  /**
+   * Throws whatever `record(entry)` would refuse before writing (scope checks
+   * against the current identity, a missing chain key), without appending. A
+   * multi-step change calls it before its first step, so a refused audit entry
+   * cannot leave the change half done.
+   */
+  assertRecordable(entry: AuditRecordInput): void {
+    this.prepare(entry);
+    if (!resolveAuditChainKey({ createIfMissing: true })) {
+      throw new Error('missing_audit_chain_key');
+    }
+  }
 
-      // Do not let an invalid caller-supplied tenantSlug survive through the
-      // object spread below. In particular, `public`/`shared` must not remain
-      // in the master chain merely because their mirror is skipped.
-      const entryWithoutTenantSlug = { ...entry };
-      delete entryWithoutTenantSlug.tenantSlug;
-      delete entryWithoutTenantSlug.scope;
+  /**
+   * Records an entry from inside {@link withAuditChainLock}, as one step of the
+   * locked section, so it lands in the chain right where the section put it
+   * (a tenant rename marks where its mirror moved). Throws outside the lock.
+   */
+  recordHeld(entry: AuditRecordInput): AuditEntry {
+    if (!holdsAuditChainLock()) {
+      throw new Error('[AUDIT_LOCK_NOT_HELD] recordHeld runs only inside withAuditChainLock');
+    }
+    const fullEntry = this.appendUnderLock(this.prepare(entry));
+    void this.fanOutToForwarder(fullEntry);
+    return fullEntry;
+  }
 
-      const scope = resolveAuditScope(entry.scope, tenantSlug);
-
-      // Hash the same field order the persisted reader reconstructs. Otherwise
-      // additive actor/scope fields supplied in a different order corrupt a
-      // freshly written chain on its first verification. Existing history is
-      // never changed; only new entries use this canonical construction.
-      const nextEntry: AuditEntry = normalizePersistedAuditEntry({
-        id,
-        timestamp,
-        ...entryWithoutTenantSlug,
-        correlationId:
-          entry.correlationId ??
-          (typeof entry.metadata?.correlationId === 'string'
-            ? entry.metadata.correlationId
-            : undefined),
-        ...(tenantSlug ? { tenantSlug } : {}),
-        ...(scope ? { scope } : {}),
-        chain_alg: 'hmac-sha256',
-        chain_key_id: getAuditChainKeyId(chainKey),
-        previousHash: this.lastHash,
-        currentHash: 'pending', // validated placeholder; excluded from the hash below
-      });
-
-      nextEntry.currentHash = computeAuditEntryHash(
-        nextEntry as unknown as Record<string, unknown>,
-        this.lastHash,
-        {
-          alg: 'hmac-sha256',
-          key: chainKey,
-        }
-      );
-      this.lastHash = nextEntry.currentHash;
-
-      this.appendToFile(nextEntry);
-      return nextEntry;
-    });
+  private append(prepared: PreparedAuditRecord): AuditEntry {
+    const fullEntry = withAuditChainLock(() => this.appendUnderLock(prepared));
 
     // Fan-out to the optional audit forwarder (SIEM / log sink). The
     // publisher is registered by audit-forwarder when that optional module is
@@ -446,6 +511,65 @@ class AuditChainImpl {
     void this.fanOutToForwarder(fullEntry);
 
     return fullEntry;
+  }
+
+  private appendUnderLock({ entry, requestedTenantSlug }: PreparedAuditRecord): AuditEntry {
+    // Refresh the in-memory cursor while holding the inter-process lock;
+    // another process may have appended since this module was loaded.
+    this.seedFromDisk();
+    this.entryCount++;
+    const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
+    const timestamp = nowIso();
+
+    const tenantSlug =
+      requestedTenantSlug && isValidTenantSlug(requestedTenantSlug)
+        ? requestedTenantSlug
+        : undefined;
+    const chainKey = resolveAuditChainKey({ createIfMissing: true });
+    if (!chainKey) throw new Error('missing_audit_chain_key');
+
+    // Do not let an invalid caller-supplied tenantSlug survive through the
+    // object spread below. In particular, `public`/`shared` must not remain
+    // in the master chain merely because their mirror is skipped.
+    const entryWithoutTenantSlug = { ...entry };
+    delete entryWithoutTenantSlug.tenantSlug;
+    delete entryWithoutTenantSlug.scope;
+
+    const scope = resolveAuditScope(entry.scope, tenantSlug);
+
+    // Hash the same field order the persisted reader reconstructs. Otherwise
+    // additive actor/scope fields supplied in a different order corrupt a
+    // freshly written chain on its first verification. Existing history is
+    // never changed; only new entries use this canonical construction.
+    const nextEntry: AuditEntry = normalizePersistedAuditEntry({
+      id,
+      timestamp,
+      ...entryWithoutTenantSlug,
+      correlationId:
+        entry.correlationId ??
+        (typeof entry.metadata?.correlationId === 'string'
+          ? entry.metadata.correlationId
+          : undefined),
+      ...(tenantSlug ? { tenantSlug } : {}),
+      ...(scope ? { scope } : {}),
+      chain_alg: 'hmac-sha256',
+      chain_key_id: getAuditChainKeyId(chainKey),
+      previousHash: this.lastHash,
+      currentHash: 'pending', // validated placeholder; excluded from the hash below
+    });
+
+    nextEntry.currentHash = computeAuditEntryHash(
+      nextEntry as unknown as Record<string, unknown>,
+      this.lastHash,
+      {
+        alg: 'hmac-sha256',
+        key: chainKey,
+      }
+    );
+    this.lastHash = nextEntry.currentHash;
+
+    this.appendToFile(nextEntry);
+    return nextEntry;
   }
 
   private fanOutToForwarder(entry: AuditEntry): void {

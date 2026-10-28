@@ -547,7 +547,10 @@ export function safeWriteFile(
           `${resolved}:denied`,
           true
         );
-        auditChain.record({
+        // A write made under the audit chain lock (mirror reconcile, tenant
+        // rename) would otherwise wait out the lock on itself and surface as
+        // a lock timeout instead of this denial.
+        auditChain.recordDeferrable({
           agentId: executionPersonaText() || 'unknown',
           action: 'policy_violation',
           operation: 'file_write',
@@ -641,7 +644,7 @@ export function safeWriteFile(
     }
     if (instructionEffect) {
       try {
-        auditChain.record({
+        auditChain.recordDeferrable({
           agentId: executionPersonaText() || 'unknown',
           action: 'persistent_instruction_write',
           operation: 'file_write',
@@ -1072,7 +1075,7 @@ function assertExecPolicy(command: string, args: readonly string[] = []): void {
       `${command}:denied`,
       true
     );
-    auditChain.record({
+    auditChain.recordDeferrable({
       agentId: executionPersonaText() || 'unknown',
       action: 'policy_violation',
       operation: 'execute_command',
