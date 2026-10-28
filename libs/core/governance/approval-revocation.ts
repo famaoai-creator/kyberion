@@ -242,6 +242,16 @@ export function revokeStandingEffectApproval(
   });
 }
 
+interface ConsumeParams {
+  channel: string;
+  storageChannel?: string;
+  requestId: string;
+  consumer: string;
+  consumedBy: string;
+  /** What the effect created (see {@link ApprovalConsumption.effectRef}). */
+  effectRef?: string;
+}
+
 /**
  * Record that a one-shot effect used an approved record (consumers that do not
  * take an apply claim: organization decisions, service recording promotion).
@@ -251,16 +261,25 @@ export function revokeStandingEffectApproval(
  */
 export function markApprovalConsumed(
   role: GovernedArtifactRole,
-  params: {
-    channel: string;
-    storageChannel?: string;
-    requestId: string;
-    consumer: string;
-    consumedBy: string;
-    /** What the effect created (see {@link ApprovalConsumption.effectRef}). */
-    effectRef?: string;
-  }
+  params: ConsumeParams
 ): ApprovalRequestRecord {
+  return consumeApprovalWithin(role, params, (consume) => consume());
+}
+
+/**
+ * {@link markApprovalConsumed} for an effect that must run under the approval's
+ * record lock: the record is checked (refusals are audited before `run`
+ * starts), then `run` decides when to `consume` it, at most once. While `run`
+ * holds the lock no revoke can land, so an effect that takes another lock
+ * (e.g. the audit chain's) inside `run` keeps the record → audit lock order
+ * that revoke uses. If `run` throws before calling `consume`, the approval
+ * stays unused.
+ */
+export function consumeApprovalWithin<T>(
+  role: GovernedArtifactRole,
+  params: ConsumeParams,
+  run: (consume: () => ApprovalRequestRecord) => T
+): T {
   return withApprovalRecordLock(role, params, () => {
     const storageChannel = params.storageChannel || params.channel;
     const located = locateApprovalRequest(storageChannel, params.requestId);
@@ -276,25 +295,42 @@ export function markApprovalConsumed(
       );
     }
     assertApprovalUsable(record, { consumer: params.consumer });
-    const consumption: ApprovalConsumption = {
-      consumer: params.consumer,
-      consumedBy: params.consumedBy,
-      consumedAt: nowIso(),
-      ...(params.effectRef ? { effectRef: params.effectRef } : {}),
+    // `used` is set before the first write, so a retry after a failed write
+    // cannot write twice; `closed` refuses a call kept past the record lock.
+    let used = false;
+    let closed = false;
+    const consume = (): ApprovalRequestRecord => {
+      if (used || closed) {
+        throw new Error(
+          `[POLICY_VIOLATION] Approval ${record.id} is consumed once, inside its record lock`
+        );
+      }
+      used = true;
+      const consumption: ApprovalConsumption = {
+        consumer: params.consumer,
+        consumedBy: params.consumedBy,
+        consumedAt: nowIso(),
+        ...(params.effectRef ? { effectRef: params.effectRef } : {}),
+      };
+      const updated: ApprovalRequestRecord = { ...record, consumption };
+      writeLocatedApprovalRequest(role, located, updated);
+      appendLocatedApprovalEvent(role, located, {
+        ts: consumption.consumedAt,
+        event: 'consumed',
+        request_id: record.id,
+        correlation_id: record.correlationId,
+        consumer: consumption.consumer,
+        consumed_by: consumption.consumedBy,
+        ...(consumption.effectRef ? { effect_ref: consumption.effectRef } : {}),
+        channel: record.channel,
+        thread_ts: record.threadTs,
+      });
+      return updated;
     };
-    const updated: ApprovalRequestRecord = { ...record, consumption };
-    writeLocatedApprovalRequest(role, located, updated);
-    appendLocatedApprovalEvent(role, located, {
-      ts: consumption.consumedAt,
-      event: 'consumed',
-      request_id: record.id,
-      correlation_id: record.correlationId,
-      consumer: consumption.consumer,
-      consumed_by: consumption.consumedBy,
-      ...(consumption.effectRef ? { effect_ref: consumption.effectRef } : {}),
-      channel: record.channel,
-      thread_ts: record.threadTs,
-    });
-    return updated;
+    try {
+      return run(consume);
+    } finally {
+      closed = true;
+    }
   });
 }

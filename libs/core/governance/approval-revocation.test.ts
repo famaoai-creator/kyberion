@@ -37,6 +37,7 @@ import {
   type ApprovalRequestRecord,
 } from './approval-store.js';
 import {
+  consumeApprovalWithin,
   markApprovalConsumed,
   revokeApprovalAsLocalOwner,
   revokeApprovalRequest,
@@ -243,6 +244,32 @@ describe('revoking an approved approval (further uses refused)', () => {
         consumedBy: 'organization-cli',
       })
     ).toThrow(/was revoked/);
+  });
+
+  it('consumeApprovalWithin consumes at most once and only inside its run', () => {
+    const approved = approve(track(openRequest()));
+    const params = {
+      channel,
+      requestId: approved.id,
+      consumer: 'organization_decision',
+      consumedBy: 'organization-cli',
+    };
+    // A run that throws before consuming leaves the approval unused.
+    expect(() =>
+      consumeApprovalWithin(role, params, () => {
+        throw new Error('effect precondition failed');
+      })
+    ).toThrow(/effect precondition failed/);
+    expect(events().some((e) => e.event === 'consumed')).toBe(false);
+
+    let kept: (() => unknown) | undefined;
+    consumeApprovalWithin(role, params, (consume) => {
+      kept = consume;
+      expect(consume().consumption).toMatchObject({ consumer: 'organization_decision' });
+      expect(() => consume()).toThrow(/consumed once, inside its record lock/);
+    });
+    expect(() => kept!()).toThrow(/consumed once, inside its record lock/);
+    expect(events().filter((e) => e.event === 'consumed')).toHaveLength(1);
   });
 
   it('refuses pending, claimed, already revoked and rejected records', () => {

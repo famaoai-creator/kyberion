@@ -14,7 +14,12 @@ import {
 import { cliApprovalRequester } from './lib/cli-approval-requester.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
-import { auditChain, normalizePersistedAuditEntry } from '@agent/core/governance/audit-chain';
+import {
+  AUDIT_CHAIN_LOCK_ID,
+  auditChain,
+  normalizePersistedAuditEntry,
+} from '@agent/core/governance/audit-chain';
+import { withLockSync } from '@agent/core/foundation/lock-utils';
 import {
   assertApprovalUsable,
   computeApprovalPayloadHash,
@@ -24,7 +29,7 @@ import {
   validateHumanFinalDecision,
   type ApprovalRequestRecord,
 } from '@agent/core/governance/approval-store';
-import { markApprovalConsumed } from '@agent/core/governance/approval-revocation';
+import { consumeApprovalWithin } from '@agent/core/governance/approval-revocation';
 import { missionEvidenceDir, pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -212,6 +217,14 @@ function masterEntriesByTenant(
 
 /** Collect only mismatched existing mirrors; missing overlays are not created. */
 export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): AuditMirrorFinding[] {
+  return collectFindingsAndMaster(rootDir).findings;
+}
+
+/** The findings and the master entries they were computed from (parsed once). */
+function collectFindingsAndMaster(rootDir: string): {
+  findings: AuditMirrorFinding[];
+  master: AuditEntry[];
+} {
   const customersRoot = assertSafeRepositoryPath(path.join(rootDir, 'customer'), {
     allowMissingLeaf: true,
     rootDir,
@@ -275,7 +288,10 @@ export function collectAuditMirrorFindings(rootDir = pathResolver.rootDir()): Au
     });
   }
 
-  return findings.sort((left, right) => left.slug.localeCompare(right.slug));
+  return {
+    findings: findings.sort((left, right) => left.slug.localeCompare(right.slug)),
+    master,
+  };
 }
 
 export function buildAuditMirrorApprovalPayload(
@@ -502,74 +518,101 @@ export function runAuditMirrorReconciliation(input: {
   };
 
   if (checked) {
-    const masterByTenant = masterEntriesByTenant(rootDir);
     const archiveRoot = assertSafeRepositoryPath(
       path.join(rootDir, 'active/archive/.trash', `audit-mirror-${Date.now().toString(36)}`),
       { allowMissingLeaf: true, rootDir }
     );
-    // Consume before the effect: the store lock refuses a second consumer, so
-    // two concurrent applies cannot both run, and a failed apply needs a new
-    // approval rather than a retry on the old one.
-    markApprovalConsumed('mission_controller', {
-      channel: AUDIT_MIRROR_APPROVAL_CHANNEL,
-      requestId: checked.approval.id,
-      consumer: 'audit_mirror_reconcile',
-      consumedBy: checked.humanDecider,
-      effectRef: path.relative(rootDir, archiveRoot).replaceAll(path.sep, '/'),
-    });
-    withExecutionContext(
+    // Locks in the order revoke takes them: the approval record, then the
+    // audit chain. Under the record lock no revoke can land, and its checks
+    // (which audit a refusal) run before the audit lock is taken. Under the
+    // audit lock no append can land: every append writes the master and the
+    // mirror under it, so what is archived and rebuilt is what was approved.
+    // Nothing under the audit lock records an audit entry (it is not reentrant).
+    consumeApprovalWithin(
       'mission_controller',
-      () => {
-        safeMkdir(archiveRoot, { recursive: true });
-        for (const finding of findings) {
-          const source = assertSafeRepositoryPath(path.join(rootDir, finding.path), {
-            allowMissingLeaf: true,
-            rootDir,
-          });
-          if (!safeExistsSync(source)) continue;
-          const destination = assertSafeRepositoryPath(path.join(archiveRoot, finding.path), {
-            allowMissingLeaf: true,
-            rootDir,
-          });
-          safeMkdir(path.dirname(destination), { recursive: true });
-          safeMoveSync(source, destination);
-          receipt.archived.push({
-            from: finding.path,
-            to: path.relative(rootDir, destination).replaceAll(path.sep, '/'),
-          });
-
-          if (finding.action === 'quarantine_and_rebuild') {
-            const mirrorDir = assertSafeRepositoryPath(path.join(rootDir, finding.path), {
-              allowMissingLeaf: true,
-              rootDir,
-            });
-            const entries = masterByTenant.get(finding.slug) || [];
-            rebuildMirror(mirrorDir, entries, rootDir);
-            receipt.rebuilt.push({
-              slug: finding.slug,
-              path: finding.path,
-              entries: entries.length,
-            });
-          }
-        }
-        const evidenceDir =
-          (path.resolve(rootDir) === path.resolve(pathResolver.rootDir())
-            ? missionEvidenceDir(input.missionId)
-            : undefined) ||
-          path.join(rootDir, 'active/missions/confidential', input.missionId, 'evidence');
-        const safeEvidenceDir = assertSafeRepositoryPath(evidenceDir, {
-          allowMissingLeaf: true,
-          rootDir,
-        });
-        safeMkdir(safeEvidenceDir, { recursive: true });
-        const receiptPath = assertSafeRepositoryPath(
-          path.join(safeEvidenceDir, 'audit-mirror-reconciliation-receipt.json'),
-          { allowMissingLeaf: true, rootDir }
-        );
-        receipt.receipt_path = path.relative(rootDir, receiptPath).replaceAll(path.sep, '/');
-        safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
+      {
+        channel: AUDIT_MIRROR_APPROVAL_CHANNEL,
+        requestId: checked.approval.id,
+        consumer: 'audit_mirror_reconcile',
+        consumedBy: checked.humanDecider,
+        effectRef: path.relative(rootDir, archiveRoot).replaceAll(path.sep, '/'),
       },
-      'sovereign'
+      (consume) =>
+        withLockSync(AUDIT_CHAIN_LOCK_ID, () => {
+          // The record lock runs this bound to the caller's tenant; the scan
+          // reads every tenant's mirror, so it runs in the apply's own context.
+          const current = withExecutionContext(
+            'mission_controller',
+            () => collectFindingsAndMaster(rootDir),
+            'sovereign'
+          );
+          if (
+            computeAuditMirrorApprovalPayloadHash(input.missionId, current.findings) !==
+            checked.approval.accountability?.payloadHash
+          ) {
+            throw new Error(
+              '[AUDIT_MIRROR_CHANGED] the audit mirrors changed after the approval check; nothing was applied and the approval is unused. Re-run the apply; if the findings differ, request a new approval.'
+            );
+          }
+          const masterByTenant = masterEntriesByTenant(rootDir, current.master);
+          // Consume before the effect: a failed apply needs a new approval rather
+          // than a retry on the old one.
+          consume();
+          withExecutionContext(
+            'mission_controller',
+            () => {
+              safeMkdir(archiveRoot, { recursive: true });
+              for (const finding of findings) {
+                const source = assertSafeRepositoryPath(path.join(rootDir, finding.path), {
+                  allowMissingLeaf: true,
+                  rootDir,
+                });
+                if (!safeExistsSync(source)) continue;
+                const destination = assertSafeRepositoryPath(path.join(archiveRoot, finding.path), {
+                  allowMissingLeaf: true,
+                  rootDir,
+                });
+                safeMkdir(path.dirname(destination), { recursive: true });
+                safeMoveSync(source, destination);
+                receipt.archived.push({
+                  from: finding.path,
+                  to: path.relative(rootDir, destination).replaceAll(path.sep, '/'),
+                });
+
+                if (finding.action === 'quarantine_and_rebuild') {
+                  const mirrorDir = assertSafeRepositoryPath(path.join(rootDir, finding.path), {
+                    allowMissingLeaf: true,
+                    rootDir,
+                  });
+                  const entries = masterByTenant.get(finding.slug) || [];
+                  rebuildMirror(mirrorDir, entries, rootDir);
+                  receipt.rebuilt.push({
+                    slug: finding.slug,
+                    path: finding.path,
+                    entries: entries.length,
+                  });
+                }
+              }
+              const evidenceDir =
+                (path.resolve(rootDir) === path.resolve(pathResolver.rootDir())
+                  ? missionEvidenceDir(input.missionId)
+                  : undefined) ||
+                path.join(rootDir, 'active/missions/confidential', input.missionId, 'evidence');
+              const safeEvidenceDir = assertSafeRepositoryPath(evidenceDir, {
+                allowMissingLeaf: true,
+                rootDir,
+              });
+              safeMkdir(safeEvidenceDir, { recursive: true });
+              const receiptPath = assertSafeRepositoryPath(
+                path.join(safeEvidenceDir, 'audit-mirror-reconciliation-receipt.json'),
+                { allowMissingLeaf: true, rootDir }
+              );
+              receipt.receipt_path = path.relative(rootDir, receiptPath).replaceAll(path.sep, '/');
+              safeWriteFile(receiptPath, JSON.stringify(receipt, null, 2));
+            },
+            'sovereign'
+          );
+        })
     );
   } else {
     const receiptPath = assertSafeRepositoryPath(
