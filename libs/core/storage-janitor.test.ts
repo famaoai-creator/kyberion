@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url';
 const readLog = vi.hoisted(() => ({ paths: [] as string[] }));
 
 // Stub secure-io to use real temp fs so we can test file operations
+// Lets a test observe each move as it happens (the audit-chain day archive
+// checks it runs under the audit chain lock).
+const moveHook = vi.hoisted(() => ({ onMove: undefined as undefined | ((src: string) => void) }));
+
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');
   return {
@@ -35,6 +39,7 @@ vi.mock('./secure-io.js', async () => {
       actual.appendFileSync(p, data);
     },
     safeMoveSync: (src: string, dest: string) => {
+      moveHook.onMove?.(src);
       actual.mkdirSync(path.dirname(dest), { recursive: true });
       actual.renameSync(src, dest);
     },
@@ -131,6 +136,7 @@ vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
 
+import { holdsAuditChainLock } from './governance/audit-chain.js';
 import {
   scanTmp,
   rotateLogs,
@@ -2359,6 +2365,198 @@ describe('storage-janitor', () => {
       expect(
         audit.some((r) => r.event === 'RETENTION_ARCHIVE' && r.path.includes('audit-2026-01-01'))
       ).toBe(true);
+    });
+
+    it('archives each tenant mirror day file with its master day under the audit lock', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/logs/audit',
+            artifact_class: 'evidence',
+            ttl_days: 60,
+            action: 'archive',
+            audit: true,
+          },
+        ],
+      });
+      const root = pathResolverMock.rootDir;
+      const masterDay = path.join(logsDir, 'audit', 'audit-2026-01-01.jsonl');
+      const liveDay = path.join(logsDir, 'audit', 'audit-2026-06-01.jsonl');
+      const mirrorDay = path.join(
+        root,
+        'customer',
+        'acme',
+        'logs',
+        'audit',
+        'audit-2026-01-01.jsonl'
+      );
+      const mirrorLive = path.join(
+        root,
+        'customer',
+        'acme',
+        'logs',
+        'audit',
+        'audit-2026-06-01.jsonl'
+      );
+      const otherDay = path.join(
+        root,
+        'customer',
+        'globex',
+        'logs',
+        'audit',
+        'audit-2026-01-01.jsonl'
+      );
+      for (const file of [masterDay, liveDay, mirrorDay, mirrorLive, otherDay]) writeFile(file);
+      // Only the master day is old: it decides, not a mirror's own mtime.
+      setMtime(masterDay, 65 * RETENTION_DAY_MS);
+      const moves: Array<{ src: string; locked: boolean }> = [];
+      moveHook.onMove = (src) => moves.push({ src, locked: holdsAuditChainLock() });
+      try {
+        const result = rotateLogs({ dryRun: false });
+        expect(result.archived).toEqual(expect.arrayContaining([masterDay, mirrorDay, otherDay]));
+      } finally {
+        moveHook.onMove = undefined;
+      }
+      // Mirrors first, so a mirror that cannot move keeps the master live too.
+      expect(moves).toEqual([
+        { src: mirrorDay, locked: true },
+        { src: otherDay, locked: true },
+        { src: masterDay, locked: true },
+      ]);
+      expect(fs.existsSync(archiveFileOf('customer/acme/logs/audit/audit-2026-01-01.jsonl'))).toBe(
+        true
+      );
+      expect(fs.existsSync(mirrorLive)).toBe(true);
+      expect(fs.existsSync(liveDay)).toBe(true);
+      expect(
+        readRetentionAudit().some(
+          (r) =>
+            r.event === 'RETENTION_ARCHIVE' &&
+            r.path === 'customer/acme/logs/audit/audit-2026-01-01.jsonl' &&
+            r.audit_master_day === 'active/shared/logs/audit/audit-2026-01-01.jsonl'
+        )
+      ).toBe(true);
+    });
+
+    it('moves an audit chain day back whole when one of its files cannot move', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/logs/audit',
+            artifact_class: 'evidence',
+            ttl_days: 60,
+            action: 'archive',
+            audit: true,
+          },
+        ],
+      });
+      const root = pathResolverMock.rootDir;
+      const masterDay = path.join(logsDir, 'audit', 'audit-2026-01-01.jsonl');
+      const acme = path.join(root, 'customer', 'acme', 'logs', 'audit', 'audit-2026-01-01.jsonl');
+      const globex = path.join(
+        root,
+        'customer',
+        'globex',
+        'logs',
+        'audit',
+        'audit-2026-01-01.jsonl'
+      );
+      for (const file of [masterDay, acme, globex]) writeFile(file);
+      setMtime(masterDay, 65 * RETENTION_DAY_MS);
+      moveHook.onMove = (src) => {
+        if (src === globex) throw new Error('EPERM: globex mirror');
+      };
+      let result: ReturnType<typeof rotateLogs>;
+      try {
+        result = rotateLogs({ dryRun: false });
+      } finally {
+        moveHook.onMove = undefined;
+      }
+      // The day stays live as a whole and the failure is reported, not swallowed.
+      for (const file of [masterDay, acme, globex]) expect(fs.existsSync(file)).toBe(true);
+      expect(result.archived).toEqual([]);
+      expect(result.errors).toEqual([expect.stringContaining('EPERM: globex mirror')]);
+      expect(
+        readRetentionAudit().some(
+          (r) =>
+            r.event === 'RETENTION_ROLLED_BACK' &&
+            r.path === 'customer/acme/logs/audit/audit-2026-01-01.jsonl'
+        )
+      ).toBe(true);
+    });
+
+    it('reports a file it could not move back alongside the original failure', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/logs/audit',
+            artifact_class: 'evidence',
+            ttl_days: 60,
+            action: 'archive',
+          },
+        ],
+      });
+      const root = pathResolverMock.rootDir;
+      const masterDay = path.join(logsDir, 'audit', 'audit-2026-01-01.jsonl');
+      const acme = path.join(root, 'customer', 'acme', 'logs', 'audit', 'audit-2026-01-01.jsonl');
+      const globex = path.join(
+        root,
+        'customer',
+        'globex',
+        'logs',
+        'audit',
+        'audit-2026-01-01.jsonl'
+      );
+      for (const file of [masterDay, acme, globex]) writeFile(file);
+      setMtime(masterDay, 65 * RETENTION_DAY_MS);
+      const acmeArchived = archiveFileOf('customer/acme/logs/audit/audit-2026-01-01.jsonl');
+      moveHook.onMove = (src) => {
+        if (src === globex) throw new Error('EPERM: globex mirror');
+        if (src === acmeArchived) throw new Error('EPERM: acme restore');
+      };
+      let result: ReturnType<typeof rotateLogs>;
+      try {
+        result = rotateLogs({ dryRun: false });
+      } finally {
+        moveHook.onMove = undefined;
+      }
+      expect(result.errors).toEqual([
+        expect.stringMatching(/EPERM: globex mirror.*could not be moved back.*acme restore/),
+      ]);
+      // The master is never moved when a mirror fails.
+      expect(fs.existsSync(masterDay)).toBe(true);
+    });
+
+    it('lists the mirror day files a dry run would archive', () => {
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/logs/audit',
+            artifact_class: 'evidence',
+            ttl_days: 60,
+            action: 'archive',
+          },
+        ],
+      });
+      const masterDay = path.join(logsDir, 'audit', 'audit-2026-01-01.jsonl');
+      const acme = path.join(
+        pathResolverMock.rootDir,
+        'customer',
+        'acme',
+        'logs',
+        'audit',
+        'audit-2026-01-01.jsonl'
+      );
+      writeFile(masterDay);
+      writeFile(acme);
+      setMtime(masterDay, 65 * RETENTION_DAY_MS);
+      const result = rotateLogs({ dryRun: true });
+      expect(result.expired).toEqual(expect.arrayContaining([masterDay, acme]));
+      expect(fs.existsSync(acme)).toBe(true);
     });
 
     it('keeps audit files younger than the audit TTL even when past the logs TTL', () => {

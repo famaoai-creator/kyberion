@@ -1,6 +1,6 @@
 import * as path from 'node:path';
 import { readConfiguredActorIdentity } from '../identity-context-bridge.js';
-import { auditChain } from '../governance/audit-chain.js';
+import { auditChain, withAuditChainLock } from '../governance/audit-chain.js';
 import { readJson, writeJson } from '../foundation/json.js';
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import {
@@ -192,14 +192,62 @@ function assertRenamePreconditions(input: TenantRenameInput, rootDir: string): T
  * point at the old one. Dry-run by default: the returned plan lists every move
  * and rewrite so it can be reviewed before anything is touched.
  */
+/** Audit action marking where a renamed tenant's audit mirror moved. */
+export const TENANT_AUDIT_MIRROR_MOVED_ACTION = 'tenant.audit_mirror_moved';
+
+/** Profile metadata key listing the audit ids of the tenant's move markers. */
+export const AUDIT_MIRROR_MOVE_IDS_KEY = 'audit_mirror_move_ids';
+
+/** The audit ids of the move markers this tenant's renames recorded. */
+export function auditMirrorMoveIds(profile: Pick<TenantProfile, 'metadata'>): string[] {
+  const ids = profile.metadata?.[AUDIT_MIRROR_MOVE_IDS_KEY];
+  return Array.isArray(ids) ? ids.filter((id): id is string => typeof id === 'string') : [];
+}
+
+/**
+ * Every slug the tenant was known by before, oldest first, repeats kept (a
+ * rename back to a former slug is a step of its own). A profile renamed before
+ * `previous_slugs` existed has its last previous slug, preceded by its
+ * identity slug when that differs (the slug it was created under).
+ */
+export function previousSlugs(
+  profile: Pick<TenantProfile, 'metadata' | 'tenant_id' | 'tenant_slug'>
+): string[] {
+  const metadata = profile.metadata || {};
+  if (Array.isArray(metadata.previous_slugs)) {
+    return metadata.previous_slugs.filter((slug): slug is string => typeof slug === 'string');
+  }
+  const last = typeof metadata.previous_slug === 'string' ? metadata.previous_slug : undefined;
+  if (!last) return [];
+  const first = profile.tenant_id;
+  return first && first !== last && first !== profile.tenant_slug ? [first, last] : [last];
+}
+
 export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResult {
   const rootDir = input.rootDir ?? pathResolver.rootDir();
   const options: TenantRegistryPathOptions = { rootDir: input.rootDir, env: input.env };
   const { fromSlug, toSlug } = input;
   const current = assertRenamePreconditions(input, rootDir);
   const apply = Boolean(input.apply);
+  const actorId = input.actor || readConfiguredActorIdentity().persona || 'operator';
   const renameOrg = input.renameOrganization !== false;
 
+  // Both audit entries this rename writes are checked before anything moves:
+  // one refused after the moves (an active tenant scope that conflicts with
+  // the new slug, a missing chain key) would leave the tenant half renamed.
+  const mirrorMovedEntry = {
+    agentId: actorId,
+    action: TENANT_AUDIT_MIRROR_MOVED_ACTION,
+    operation: `tenant:${fromSlug}->${toSlug}`,
+    result: 'completed',
+    tenantSlug: toSlug,
+    metadata: { previous_slug: fromSlug },
+  } as const;
+  if (apply) {
+    auditChain.assertRecordable(mirrorMovedEntry);
+  }
+
+  let mirrorMovedId: string | undefined;
   const moves: TenantRenameMove[] = [];
   const rewrites: TenantRenameRewrite[] = [];
   let organizationRenamed: string | undefined;
@@ -289,7 +337,16 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
       from: relative(rootDir, fromOverlay),
       to: relative(rootDir, toOverlay),
     });
-    if (apply) safeMoveSync(fromOverlay, toOverlay);
+    if (apply) {
+      // The overlay holds the tenant's audit mirror. Moving it under the audit
+      // chain lock keeps every append on one side of the move, and the marker
+      // records where: mirror reconcile counts the old slug's earlier entries
+      // as the new slug's (see audit_mirror_reconcile.ts).
+      withAuditChainLock(() => {
+        safeMoveSync(fromOverlay, toOverlay);
+        mirrorMovedId = auditChain.recordHeld(mirrorMovedEntry).id;
+      });
+    }
   }
 
   // 5. Profile last: it is the registry entry, so it flips only once the
@@ -301,7 +358,17 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
     tenant_id: current.tenant_id || fromSlug,
     display_name: input.displayName?.trim() || current.display_name,
     knowledge_root: defaultTenantKnowledgeRoot(toSlug),
-    metadata: { ...(current.metadata || {}), previous_slug: fromSlug },
+    metadata: {
+      ...(current.metadata || {}),
+      previous_slug: fromSlug,
+      previous_slugs: [...previousSlugs(current), fromSlug],
+      // The move markers this tenant's renames wrote. Mirror reconcile trusts
+      // a marker only by these ids, so a marker recorded by anything else —
+      // even one naming a rename in the history above — is never followed.
+      ...(mirrorMovedId
+        ? { [AUDIT_MIRROR_MOVE_IDS_KEY]: [...auditMirrorMoveIds(current), mirrorMovedId] }
+        : {}),
+    },
   };
   const fromProfilePath = tenantProfilePath(fromSlug, options);
   const toProfilePath = tenantProfilePath(toSlug, options);
@@ -340,7 +407,7 @@ export function renameTenantWithPlan(input: TenantRenameInput): TenantRenameResu
 
   if (apply) {
     auditChain.record({
-      agentId: input.actor || readConfiguredActorIdentity().persona || 'operator',
+      agentId: actorId,
       action: 'tenant.rename',
       operation: `tenant:${fromSlug}->${toSlug}`,
       result: 'completed',
