@@ -126,6 +126,130 @@ describe('audit mirror reconcile findings', () => {
   });
 });
 
+describe('audit mirror reconcile after a tenant rename', () => {
+  afterEach(() => safeRmSync(ROOT, { recursive: true, force: true }));
+
+  const moved = (id: string, previousHash: string, from: string, to: string) => ({
+    ...entry(id, previousHash, to),
+    action: 'tenant.audit_mirror_moved',
+    metadata: { previous_slug: from },
+  });
+
+  // oldco is renamed to acme: its mirror moved to customer/acme, and the move
+  // is marked in the chain. A later tenant reusing the slug oldco starts fresh.
+  function renamed(profile: object) {
+    const a = entry('AUD-A', '0'.repeat(64), 'oldco');
+    const b = entry('AUD-B', a.currentHash, 'oldco');
+    const m = moved('AUD-M', b.currentHash, 'oldco', 'acme');
+    const c = entry('AUD-C', m.currentHash, 'acme');
+    const d = entry('AUD-D', c.currentHash, 'oldco');
+    safeMkdir(`${ROOT}/customer/acme/logs/audit`, { recursive: true });
+    safeMkdir(`${ROOT}/customer/oldco/logs/audit`, { recursive: true });
+    safeWriteFile(MASTER, lines(a, b, m, c, d));
+    safeWriteFile(MIRROR, lines(a, b, m, c));
+    safeWriteFile(`${ROOT}/customer/oldco/logs/audit/audit-2026-07-01.jsonl`, lines(d));
+    safeWriteFile(
+      `${ROOT}/knowledge/personal/tenants/acme.json`,
+      JSON.stringify({ display_name: 'Acme', status: 'active', assigned_role: 'pm', ...profile }),
+      { mkdir: true }
+    );
+  }
+
+  it('counts the old slug entries before the move marker as the renamed mirror', () => {
+    renamed({
+      tenant_slug: 'acme',
+      tenant_id: 'oldco',
+      metadata: {
+        audit_mirror_move_ids: ['AUD-M'],
+        previous_slug: 'oldco',
+      },
+    });
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([]);
+  });
+
+  it('follows the slug history kept across renames', () => {
+    renamed({
+      tenant_slug: 'acme',
+      tenant_id: 'first',
+      metadata: {
+        audit_mirror_move_ids: ['AUD-M'],
+        previous_slugs: ['first', 'oldco'],
+        previous_slug: 'oldco',
+      },
+    });
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([]);
+  });
+
+  it('leaves an earlier owner of the new slug out of the renamed mirror', () => {
+    renamed({
+      tenant_slug: 'acme',
+      tenant_id: 'oldco',
+      metadata: {
+        audit_mirror_move_ids: ['AUD-M'],
+        previous_slugs: ['oldco'],
+      },
+    });
+    // A former tenant once held the slug acme; its entries are not oldco's.
+    const former = entry('AUD-0', '0'.repeat(64), 'acme');
+    const master = safeReadFile(MASTER, { encoding: 'utf8' }) as string;
+    safeWriteFile(MASTER, lines(former) + master);
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([]);
+  });
+
+  it('follows only the first marker of a rename, so a reused slug keeps its own entries', () => {
+    renamed({
+      tenant_slug: 'acme',
+      tenant_id: 'oldco',
+      metadata: {
+        audit_mirror_move_ids: ['AUD-M'],
+        previous_slugs: ['oldco'],
+      },
+    });
+    // A new tenant took the freed slug oldco; a second marker naming the same
+    // rename (forged or replayed) must not pull its entries into acme.
+    const master = safeReadFile(MASTER, { encoding: 'utf8' }) as string;
+    const again = moved('AUD-M2', 'AUD-D-hash', 'oldco', 'acme');
+    safeWriteFile(MASTER, master + lines(again));
+    const mirror = safeReadFile(MIRROR, { encoding: 'utf8' }) as string;
+    safeWriteFile(MIRROR, mirror + lines(again));
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([]);
+  });
+
+  it('ignores a move marker for a rename the registry history does not contain', () => {
+    // acme was renamed from first, never from oldco.
+    renamed({
+      tenant_slug: 'acme',
+      tenant_id: 'first',
+      metadata: {
+        audit_mirror_move_ids: ['AUD-M'],
+        previous_slugs: ['first'],
+      },
+    });
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([
+      expect.objectContaining({ slug: 'acme', reason: 'mirror_out_of_sync', master_count: 2 }),
+      expect.objectContaining({ slug: 'oldco', reason: 'mirror_out_of_sync', master_count: 3 }),
+    ]);
+  });
+
+  it('ignores a marker whose audit id the profile did not record', () => {
+    // The history holds oldco -> acme, but this marker is not the one the
+    // rename wrote (forged, or the real one has since been archived).
+    renamed({ tenant_slug: 'acme', tenant_id: 'oldco', metadata: { previous_slugs: ['oldco'] } });
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([
+      expect.objectContaining({ slug: 'acme', reason: 'mirror_out_of_sync', master_count: 2 }),
+      expect.objectContaining({ slug: 'oldco', reason: 'mirror_out_of_sync', master_count: 3 }),
+    ]);
+  });
+
+  it('ignores a move marker the tenant registry does not back', () => {
+    renamed({ tenant_slug: 'acme', tenant_id: 'acme' });
+    expect(collectAuditMirrorFindings(ROOT)).toEqual([
+      expect.objectContaining({ slug: 'acme', reason: 'mirror_out_of_sync', master_count: 2 }),
+      expect.objectContaining({ slug: 'oldco', reason: 'mirror_out_of_sync', master_count: 3 }),
+    ]);
+  });
+});
+
 describe('audit mirror reconcile apply (SA-01)', () => {
   const MISSION = 'MSN-AUDIT-MIRROR-APPLY-TEST';
   const STALE_MIRROR = `${ROOT}/customer/globex/logs/audit/audit-2026-07-01.jsonl`;

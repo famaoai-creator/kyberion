@@ -1,5 +1,5 @@
 import * as path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   defaultTenantKnowledgeRoot,
   mutateTenant,
@@ -11,7 +11,13 @@ import {
   safeWriteFile,
   tenantProfilePath,
 } from './index.js';
-import { renameTenantWithPlan } from './organization/tenant-rename.js';
+import {
+  previousSlugs,
+  renameTenantWithPlan,
+  TENANT_AUDIT_MIRROR_MOVED_ACTION,
+} from './organization/tenant-rename.js';
+import { auditChain, holdsAuditChainLock } from './governance/audit-chain.js';
+import { withExecutionContext } from './authority.js';
 
 const ROOT = pathResolver.rootDir();
 const FROM = 'zz-rename-src';
@@ -25,6 +31,8 @@ function allFixturePaths(): string[] {
     tenantProfilePath(TO),
     path.join(ROOT, defaultTenantKnowledgeRoot(FROM)),
     path.join(ROOT, defaultTenantKnowledgeRoot(TO)),
+    path.join(ROOT, 'customer', FROM),
+    path.join(ROOT, 'customer', TO),
   ];
 }
 
@@ -54,6 +62,7 @@ describe('renameTenant', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     removeFixtures();
     if (savedPersona === undefined) delete process.env.KYBERION_PERSONA;
     else process.env.KYBERION_PERSONA = savedPersona;
@@ -101,6 +110,77 @@ describe('renameTenant', () => {
     // Identity is preserved so pre-rename audit records still join.
     expect(renamed?.tenant_id).toBe(before?.tenant_id);
     expect(renamed?.metadata?.previous_slug).toBe(FROM);
+  });
+
+  it('moves the customer overlay under the audit lock and marks the move in the chain', () => {
+    const mirror = path.join(ROOT, 'customer', FROM, 'logs', 'audit', 'audit-2026-07-01.jsonl');
+    safeWriteFile(mirror, '', { mkdir: true });
+    const held: Array<{ locked: boolean; overlayMoved: boolean }> = [];
+    const recordHeld = auditChain.recordHeld.bind(auditChain);
+    const spy = vi.spyOn(auditChain, 'recordHeld').mockImplementation((entry) => {
+      held.push({
+        locked: holdsAuditChainLock(),
+        overlayMoved: safeExistsSync(path.join(ROOT, 'customer', TO, 'logs', 'audit')),
+      });
+      return recordHeld(entry);
+    });
+
+    renameTenantWithPlan({ fromSlug: FROM, toSlug: TO, scanResidual: false, apply: true });
+
+    expect(held).toEqual([{ locked: true, overlayMoved: true }]);
+    expect(spy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: TENANT_AUDIT_MIRROR_MOVED_ACTION,
+        tenantSlug: TO,
+        metadata: { previous_slug: FROM },
+      })
+    );
+    expect(safeExistsSync(path.join(ROOT, 'customer', FROM))).toBe(false);
+    // The profile keeps the marker's id: reconcile trusts the marker by it.
+    const markerId = spy.mock.results[0]?.value?.id;
+    expect(markerId).toMatch(/^AUD-/);
+    expect(readTenantProfile(TO)?.metadata?.audit_mirror_move_ids).toEqual([markerId]);
+  });
+
+  it('refuses before moving anything when its audit entries would be refused', () => {
+    const overlay = path.join(ROOT, 'customer', FROM);
+    safeWriteFile(path.join(overlay, 'logs', 'audit', 'audit-2026-07-01.jsonl'), '', {
+      mkdir: true,
+    });
+    // Bound to the old slug, the entries naming the new slug conflict with the
+    // active tenant. Refused after the moves, the tenant would be half renamed.
+    expect(() =>
+      withExecutionContext(
+        'mission_controller',
+        () =>
+          renameTenantWithPlan({ fromSlug: FROM, toSlug: TO, scanResidual: false, apply: true }),
+        'ecosystem_architect',
+        FROM
+      )
+    ).toThrow('[AUDIT_SCOPE_DENIED]');
+    expect(safeExistsSync(overlay)).toBe(true);
+    expect(safeExistsSync(path.join(ROOT, defaultTenantKnowledgeRoot(FROM), 'marker.json'))).toBe(
+      true
+    );
+    expect(readTenantProfile(FROM)).not.toBeNull();
+    expect(readTenantProfile(TO)).toBeNull();
+  });
+
+  it('keeps every earlier slug when a tenant is renamed again', () => {
+    renameTenantWithPlan({ fromSlug: FROM, toSlug: TO, scanResidual: false, apply: true });
+    const renamed = readTenantProfile(TO);
+    expect(renamed?.metadata?.previous_slugs).toEqual([FROM]);
+    // Repeats are kept: a rename back to a former slug is a step of its own.
+    expect(
+      previousSlugs({ tenant_slug: 'b', metadata: { previous_slugs: ['a', 'b', 'a'] } })
+    ).toEqual(['a', 'b', 'a']);
+    // A profile renamed before previous_slugs existed: identity slug, then its last slug.
+    expect(
+      previousSlugs({ tenant_slug: 'c', tenant_id: 'a', metadata: { previous_slug: 'b' } })
+    ).toEqual(['a', 'b']);
+    expect(
+      previousSlugs({ tenant_slug: 'b', tenant_id: 'a', metadata: { previous_slug: 'a' } })
+    ).toEqual(['a']);
   });
 
   it('rewrites structural slug fields inside moved records', () => {
