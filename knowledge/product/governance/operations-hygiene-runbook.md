@@ -2351,6 +2351,10 @@ Live video filter effects use the provider-neutral contract and dedicated
 encodings and credentials inside the provider adapter; never reuse camera-output
 authority for filter mutation. Validate cross-field settings before preparation
 so ignored crop geometry or custom colors cannot pass readback as success.
+Nested CLI command paths must resolve by the longest registered prefix, never a
+fixed noun/verb depth. Verify the canonical command through the real dispatcher,
+including payload forwarding and dry-run, rather than only testing its leaf
+handler or manifest entry. Gate: `scripts/kyberion.test.ts`.
 Live video filter effects validate and freeze their exact settings before approval,
 read settings back after commit, and never start camera output implicitly. An
 avatar projection must stop mouth animation on disconnect and dispose its stream
