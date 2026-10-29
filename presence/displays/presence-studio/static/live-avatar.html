@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="{{locale}}">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{t:presence_studio:partner_avatar_label}} — Kyberion</title>
+    <script src="/front-desk-prefs.js"></script>
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/live-avatar.css" />
+  </head>
+  <body>
+    <main id="live-avatar" aria-label="{{t:presence_studio:partner_avatar_label}}"></main>
+    <output
+      id="connection"
+      aria-live="polite"
+      data-offline="{{t:presence_studio:live_avatar_offline}}"
+      >{{t:presence_studio:live_avatar_connecting}}</output
+    >
+    <script type="module">
+      import { mountPartnerAvatar } from '/partner-avatar.js';
+      import { connectLiveAvatar } from '/live-avatar.js';
+      const avatar = mountPartnerAvatar(document.getElementById('live-avatar'), {
+        name: 'live-avatar',
+        label: 'Kyberion',
+        size: 'xl',
+        showState: false,
+      });
+      const dispose = connectLiveAvatar({
+        avatar,
+        EventSourceImpl: EventSource,
+        onConnection: (state) => {
+          document.getElementById('connection').textContent =
+            state === 'live' ? '' : document.getElementById('connection').dataset.offline;
+        },
+      });
+      window.addEventListener('pagehide', dispose, { once: true });
+    </script>
+  </body>
+</html>
