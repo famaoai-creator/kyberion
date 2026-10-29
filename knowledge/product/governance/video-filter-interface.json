@@ -1,4 +1,5 @@
 {
+  "$schema": "../schemas/operation-interface.schema.json",
   "version": "1.0.0",
   "description": "Provider-neutral live video filter mutation. Camera output and streaming are separate effects.",
   "capabilities": [
