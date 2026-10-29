@@ -495,5 +495,84 @@ describe(
       expect(blockedCall()?.metadata?.blocked_reason).toBe('customer_decision_check_failed');
       expect(doneCalled()).toBe(false);
     });
+
+    describe('hold, resume, re-claim', () => {
+      async function boardStatus(): Promise<string> {
+        const { missionDir } = await import('../path-resolver.js');
+        const { safeReadFile } = await import('../secure-io.js');
+        const missionPath = missionDir(MISSION_ID, 'public');
+        const tasks = JSON.parse(
+          String(safeReadFile(`${missionPath}/NEXT_TASKS.json`, { encoding: 'utf8' }))
+        );
+        return String(tasks[0].status);
+      }
+
+      async function leaseCount(): Promise<number> {
+        const { listActiveWorkLeases, listWorkItems } = await vi.importActual<
+          typeof import('../workforce/work-coordination.js')
+        >('../workforce/work-coordination.js');
+        const item = listWorkItems({ source: 'local' }).find(
+          (candidate) => candidate.source_ref === `mission:${MISSION_ID}:task-1`
+        );
+        expect(item).toBeDefined();
+        return listActiveWorkLeases().filter((lease) => lease.item_id === item?.item_id).length;
+      }
+
+      async function resumeAndRedispatch(): Promise<void> {
+        const { reissueBlockedMissionTasks } = await import('./mission-task-recovery.js');
+        expect(reissueBlockedMissionTasks(MISSION_ID).reissued_task_ids).toEqual(['task-1']);
+        mocks.updateWorkItem.mockClear();
+        mocks.recordTaskDecisionProposals.mockReturnValue({
+          case_found: true,
+          consumer: 'mission-MSN-CD09-PROPOSALS.task-1',
+          case_id: 'PRJ-1',
+          recorded: 0,
+          proposal_ids: [],
+          hold_proposal_ids: [],
+        });
+        await dispatch([]);
+      }
+
+      it('a task held on a customer decision releases its claim and is re-claimed after resume', async () => {
+        mocks.recordTaskDecisionProposals.mockReturnValue({
+          case_found: true,
+          consumer: 'mission-MSN-CD09-PROPOSALS.task-1',
+          case_id: 'PRJ-1',
+          recorded: 1,
+          proposal_ids: ['tp-fedcba9876543210'],
+          hold_proposal_ids: ['tp-fedcba9876543210'],
+        });
+        await dispatch([RELEASE_ASK]);
+        expect(blockedCall()?.metadata?.blocked_reason).toBe('awaiting_customer_decision');
+        expect(await boardStatus()).toBe('blocked');
+        expect(await leaseCount()).toBe(0);
+
+        // The customer decided; the operator resumes the mission.
+        await resumeAndRedispatch();
+        expect(blockedCall()).toBeUndefined();
+        expect(doneCalled()).toBe(true);
+        expect(await boardStatus()).toBe('completed');
+        expect(await leaseCount()).toBe(0);
+      });
+
+      it('a task blocked for another reason releases its claim and is re-claimed after resume', async () => {
+        mocks.recordTaskDecisionProposals.mockReturnValue({
+          case_found: false,
+          consumer: 'mission-MSN-CD09-PROPOSALS.task-1',
+          recorded: 0,
+          proposal_ids: [],
+          hold_proposal_ids: [],
+        });
+        // No decision case: the requires_customer question is an ordinary need.
+        await dispatch([RELEASE_ASK]);
+        expect(blockedCall()?.metadata?.blocked_reason).toBe('task_result_needs_input');
+        expect(await leaseCount()).toBe(0);
+
+        await resumeAndRedispatch();
+        expect(blockedCall()).toBeUndefined();
+        expect(doneCalled()).toBe(true);
+        expect(await boardStatus()).toBe('completed');
+      });
+    });
   }
 );

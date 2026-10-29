@@ -46,7 +46,10 @@ import {
   loadMissionNextTaskObjectsAtPath,
   validateMissionNextTaskObjects,
 } from './mission-next-task-reader.js';
-import { provisionMissionEntry, writeProvisionedJson } from './mission-orchestration-journal.js';
+import {
+  provisionMissionEntry,
+  writeProvisionedJsonFrom,
+} from './mission-orchestration-journal.js';
 
 const DELIVERY_PACK_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/delivery-pack.schema.json'
@@ -409,29 +412,46 @@ export function readMissionNextTasks(missionDir: string): Array<Record<string, u
 }
 
 /**
- * The one writer of a mission's NEXT_TASKS.json. The board on disk, read
- * right before the write, keeps every supersede a stale in-memory copy would
- * undo (M2, {@link guardSupersedeState}); only supersede-task passes
- * `allowSupersede`.
+ * The next board, given the board on disk; `undefined` leaves the board as it is.
+ * It runs under the board's writer lease, so it must not write the board itself.
+ */
+export type MissionNextTasksUpdate = (
+  onDisk: Array<Record<string, unknown>>
+) => Array<Record<string, unknown>> | undefined;
+
+/**
+ * The one writer of a mission's NEXT_TASKS.json. The board on disk is read
+ * under the writer lease, right before the write, and keeps every supersede a
+ * stale in-memory copy would undo (M2, {@link guardSupersedeState}); only
+ * supersede-task passes `allowSupersede`. An update function is applied to
+ * that same board, so no other writer lands between its read and its write.
+ * Returns whether the board was written.
  */
 export function writeMissionNextTasks(
   missionDir: string,
-  tasks: Array<Record<string, unknown>>,
+  tasks: Array<Record<string, unknown>> | MissionNextTasksUpdate,
   options: SupersedeGuardOptions = {}
-): void {
+): boolean {
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
   const missionId = path.basename(safeMissionDir(missionDir, true));
-  const validated = validateMissionNextTaskObjects(
-    guardSupersedeState(missionId, tasks, readMissionNextTasks(missionDir), options),
-    nextTasksPath
-  );
-  writeProvisionedJson({
+  const written = writeProvisionedJsonFrom({
     missionId,
     filePath: nextTasksPath,
     targetPath: 'NEXT_TASKS.json',
     missionPathHint: missionDir,
-    provisioned: provisionMissionEntry(validated),
+    build: () => {
+      const onDisk = readMissionNextTasks(missionDir);
+      const incoming = typeof tasks === 'function' ? tasks(onDisk) : tasks;
+      if (!incoming) return undefined;
+      return provisionMissionEntry(
+        validateMissionNextTaskObjects(
+          guardSupersedeState(missionId, incoming, onDisk, options),
+          nextTasksPath
+        )
+      );
+    },
   });
+  return written !== undefined;
 }
 
 export const MISSION_TASK_COMPLETED_STATUSES = new Set([

@@ -12,6 +12,9 @@ const ledgerFault = vi.hoisted(() => ({
   failAuditStamp: false,
   failReceipt: false,
   failArchive: false,
+  // Runs once before the next ledger append: another board writer between the
+  // supersede's plan (its board read) and its NEXT_TASKS write.
+  beforeAppend: undefined as (() => void) | undefined,
 }));
 // Fail the old WorkItem's archive once (a crash right after the receipt).
 vi.mock('../workforce/work-coordination.js', async (importOriginal) => {
@@ -57,6 +60,9 @@ vi.mock('./mission-team-binding.js', async (importOriginal) => {
         ledgerFault.failNext = false;
         throw new Error('[TEST_FAULT] ledger append failed');
       }
+      const beforeAppend = ledgerFault.beforeAppend;
+      ledgerFault.beforeAppend = undefined;
+      beforeAppend?.();
       return actual.appendMissionExecutionLedgerEntry(...args);
     },
   };
@@ -85,7 +91,11 @@ import {
   updateWorkItem,
 } from '../workforce/work-coordination.js';
 import { readCanonicalWorkGraphTasks } from '../workforce/work-graph-projection.js';
-import { evaluateMissionFinishExitGate, readMissionNextTasks } from './mission-lifecycle.js';
+import {
+  evaluateMissionFinishExitGate,
+  readMissionNextTasks,
+  writeMissionNextTasks,
+} from './mission-lifecycle.js';
 import { loadState } from './mission-state.js';
 import {
   createMissionTaskSupersedeApprovalRequest,
@@ -507,6 +517,59 @@ describe('mission_controller supersede-task', () => {
     expect(listActiveWorkLeases().some((lease) => lease.item_id === itemId('task-held'))).toBe(
       false
     );
+  });
+
+  it('keeps a board write that lands after its plan was read', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    ledgerFault.beforeAppend = () => {
+      // A worker result written while the supersede runs.
+      writeMissionNextTasks(missionPath, (onDisk) =>
+        onDisk.map((task) =>
+          task.task_id === 'task-replacement'
+            ? { ...task, status: 'in_progress', rework_count: 1 }
+            : task
+        )
+      );
+    };
+    const result = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(result.status).toBe('applied');
+    expect(ledgerFault.beforeAppend).toBeUndefined();
+    expect(boardTask('task-held')?.status).toBe('superseded');
+    expect(boardTask('task-after')?.dependencies).toEqual(['task-replacement']);
+    expect(boardTask('task-replacement')).toMatchObject({ status: 'in_progress', rework_count: 1 });
+  });
+
+  it('leaves a dependent that completed after its plan was read unrewired (m2)', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    ledgerFault.beforeAppend = () => {
+      writeMissionNextTasks(missionPath, (onDisk) =>
+        onDisk.map((task) =>
+          task.task_id === 'task-after' ? { ...task, status: 'completed' } : task
+        )
+      );
+    };
+    const result = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(result.status).toBe('applied');
+    expect(boardTask('task-held')?.status).toBe('superseded');
+    expect(boardTask('task-after')).toMatchObject({
+      status: 'completed',
+      dependencies: ['task-held'],
+    });
+    expect(boardTask('task-after')).not.toHaveProperty('dependencies_rewritten_from');
   });
 
   it('a run that stops part-way is finished by re-running it with the same approval', async () => {

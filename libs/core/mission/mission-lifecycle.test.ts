@@ -505,6 +505,30 @@ describe('mission lifecycle finish gate', () => {
     ).toEqual(['T3']);
   });
 
+  it('applies an update to the board it reads under the writer lease', () => {
+    writeMissionNextTasks(missionPath, [
+      { task_id: 'task-1', status: 'planned' },
+      { task_id: 'task-2', status: 'planned' },
+    ]);
+    const leasePath = `${missionPath}/coordination/writer-lease.json`;
+    let leaseHeldDuringRead = false;
+    const written = writeMissionNextTasks(missionPath, (onDisk) => {
+      const lease = JSON.parse(String(safeReadFile(leasePath, { encoding: 'utf8' })));
+      leaseHeldDuringRead = Number(lease.expires_at_ms) > Date.now();
+      return onDisk.map((task) =>
+        task.task_id === 'task-2' ? { ...task, status: 'completed' } : task
+      );
+    });
+    expect(written).toBe(true);
+    expect(leaseHeldDuringRead).toBe(true);
+    expect(readMissionNextTasks(missionPath).map((task) => task.status)).toEqual([
+      'planned',
+      'completed',
+    ]);
+    // No change: nothing is written.
+    expect(writeMissionNextTasks(missionPath, () => undefined)).toBe(false);
+  });
+
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {
     const reconciliation = reconcileLifecycleClosureCriteria(
       {
