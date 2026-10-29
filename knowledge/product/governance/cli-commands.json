@@ -3543,6 +3543,28 @@
       "native_help": true
     },
     {
+      "id": "script.video.filter.inspect",
+      "module": "scripts/video_filter.ts",
+      "args": ["inspect"],
+      "command": "video filter inspect",
+      "noun": "video",
+      "verb": "filter inspect",
+      "audience": "operator",
+      "description": "cli_cmd_video_filter_inspect",
+      "group": "inspect"
+    },
+    {
+      "id": "script.video.filter.apply",
+      "module": "scripts/video_filter.ts",
+      "args": ["apply"],
+      "command": "video filter apply",
+      "noun": "video",
+      "verb": "filter apply",
+      "audience": "operator",
+      "description": "cli_cmd_video_filter_apply",
+      "group": "operate"
+    },
+    {
       "id": "script.scope",
       "script": "scope",
       "command": "scope default",

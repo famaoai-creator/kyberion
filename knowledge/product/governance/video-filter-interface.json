@@ -1,0 +1,10 @@
+{
+  "version": "1.0.0",
+  "description": "Provider-neutral live video filter mutation. Camera output and streaming are separate effects.",
+  "capabilities": [
+    {
+      "op": "video:filter_apply",
+      "schema_ref": "knowledge/product/schemas/video-filter.schema.json"
+    }
+  ]
+}

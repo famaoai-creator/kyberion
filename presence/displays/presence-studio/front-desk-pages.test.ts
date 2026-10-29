@@ -21,7 +21,7 @@ import {
 } from './front-desk-pages.js';
 
 const STATIC_DIR = 'presence/displays/presence-studio/static';
-const PAGES = [
+const SHELL_PAGES = [
   'home.html',
   'ask.html',
   'progress.html',
@@ -29,6 +29,8 @@ const PAGES = [
   'index.html',
   'first-job.html',
 ];
+// The OBS projection has no navigation shell, but is still a localized template.
+const PAGES = [...SHELL_PAGES, 'live-avatar.html'];
 
 function readStatic(file: string): string {
   return String(
@@ -100,7 +102,7 @@ describe('renderFrontDeskPageTemplate', () => {
   });
 
   it('mounts every page on the shared shell: prefs before paint, tokens, rail, header controls', () => {
-    for (const page of PAGES) {
+    for (const page of SHELL_PAGES) {
       const source = readStatic(page);
       expect(source.indexOf('/front-desk-prefs.js'), page).toBeGreaterThan(-1);
       expect(source.indexOf('/front-desk-prefs.js'), page).toBeLessThan(
@@ -209,6 +211,19 @@ describe('raw template files are never served unrendered', () => {
       '/progress?tenant=acme#x'
     );
     expect(frontDeskTemplateRedirect('/ui-gallery.html')).toBeNull();
+  });
+
+  it('renders the live avatar with localized status and no raw placeholders', () => {
+    const { routes } = recordRoutes();
+    for (const locale of ['en', 'ja'] as const) {
+      const res = fakeRes();
+      routes.get('/live-avatar')!({ headers: { 'accept-language': locale } }, res);
+      const html = String(res.sent);
+      expect(html).toContain(`<html lang="${locale}"`);
+      expect(html).toContain(catalogT('presence_studio:live_avatar_connecting', undefined, locale));
+      expect(html).toContain(catalogT('presence_studio:live_avatar_offline', undefined, locale));
+      expect(html).not.toContain('{{');
+    }
   });
 
   it('registers redirects for /<page>.html and 404s for the shell partials, ahead of express.static', () => {

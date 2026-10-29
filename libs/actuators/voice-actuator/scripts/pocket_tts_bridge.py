@@ -1,21 +1,32 @@
 #!/usr/bin/env python3
 """Kyberion bridge for Kyutai Pocket TTS.
 
-The process is intentionally one-shot and JSON based so the existing governed
-voice actuator can select Pocket TTS without embedding a Python dependency in
-the TypeScript runtime. The model and voice state are cached for the lifetime
-of this process, which is used by the warm voice actuator path.
+The process renders one WAV per JSON invocation so the governed voice actuator
+can select Pocket TTS without embedding Python in the TypeScript runtime.
+Module-level caches support repeated in-process calls; this bridge does not
+create a resident worker or expose a PCM streaming protocol.
 """
 
 from __future__ import annotations
 
 import json
 import sys
+from collections import OrderedDict
 from pathlib import Path
 from json_boundary import JsonInputError, parse_json_object
 
 _MODEL = None
-_VOICE_CACHE: dict[str, object] = {}
+_MODEL_ID = None
+_VOICE_CACHE: OrderedDict[str, object] = OrderedDict()
+_MAX_VOICE_STATES = 8
+# Upstream packaged English configurations only: never accept a path/URL as a model.
+_MODEL_CONFIGS = {
+    "kyutai/pocket-tts": None,
+    "english": "english",
+    "english_18m_2026-10": "english_18m_2026-10",
+    "english_7m_2026-10": "english_7m_2026-10",
+    "english_2m_2026-10": "english_2m_2026-10",
+}
 
 
 def _health() -> dict:
@@ -31,18 +42,31 @@ def _health() -> dict:
     return {"status": "ok", "model": "kyutai/pocket-tts"}
 
 
-def _model():
-    global _MODEL
+def _model(model_id: str = "kyutai/pocket-tts"):
+    global _MODEL, _MODEL_ID
+    if model_id not in _MODEL_CONFIGS:
+        raise ValueError("Unsupported Pocket TTS model_id; select a packaged English configuration")
+    if _MODEL_ID != model_id:
+        # Voice state tensors belong to one model, and retaining both models
+        # defeats the small-model memory benefit in a warm process.
+        _MODEL = None
+        _VOICE_CACHE.clear()
+        _MODEL_ID = None
     if _MODEL is None:
         from pocket_tts import TTSModel
 
-        _MODEL = TTSModel.load_model()
+        config = _MODEL_CONFIGS[model_id]
+        _MODEL = TTSModel.load_model(**({"language": config} if config else {}))
+        _MODEL_ID = model_id
     return _MODEL
 
 
 def _voice_state(model, voice: str):
     if voice not in _VOICE_CACHE:
         _VOICE_CACHE[voice] = model.get_state_for_audio_prompt(voice)
+        if len(_VOICE_CACHE) > _MAX_VOICE_STATES:
+            _VOICE_CACHE.popitem(last=False)
+    _VOICE_CACHE.move_to_end(voice)
     return _VOICE_CACHE[voice]
 
 
@@ -62,7 +86,8 @@ def _generate(params: dict) -> dict:
     try:
         import scipy.io.wavfile
 
-        model = _model()
+        model_id = str(params.get("model_id") or "kyutai/pocket-tts").strip()
+        model = _model(model_id)
         voice = str(params.get("voice") or "alba").strip()
         ref_audio = str(params.get("ref_audio") or "").strip()
         voice_source = ref_audio or voice
@@ -74,7 +99,7 @@ def _generate(params: dict) -> dict:
         return {
             "status": "success",
             "output_path": str(out),
-            "model": "kyutai/pocket-tts",
+            "model": model_id,
             "mode": "voice_clone" if ref_audio else "tts",
             "voice": voice_source,
         }

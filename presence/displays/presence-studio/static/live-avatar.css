@@ -1,0 +1,31 @@
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+body {
+  display: grid;
+  place-items: center;
+}
+#live-avatar {
+  width: min(90vw, 90vh);
+}
+#live-avatar .kb-talking-avatar {
+  --kb-avatar-size: min(90vw, 90vh);
+}
+#connection {
+  position: fixed;
+  inset-block-end: 1rem;
+  color: var(--kb-ui-text-primary, currentColor);
+}
+#connection:empty {
+  display: none;
+}
+@media print {
+  #connection {
+    display: none;
+  }
+}
