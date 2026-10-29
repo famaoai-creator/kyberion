@@ -521,6 +521,24 @@ export function writeProvisionedJson<TContent>(input: {
   scope?: EventScope;
   missionPathHint?: string;
 }): TContent {
+  const { provisioned, ...target } = input;
+  return writeProvisionedJsonFrom({ ...target, build: () => provisioned }) as TContent;
+}
+
+/**
+ * {@link writeProvisionedJson} whose entry is built under the writer lease, so
+ * a read-modify-write of the artifact sees no other writer between its read
+ * and its write. `build` runs inside the lease and must not take it again;
+ * returning `undefined` writes nothing.
+ */
+export function writeProvisionedJsonFrom<TContent>(input: {
+  missionId: string;
+  filePath: string;
+  targetPath: string;
+  build: () => ProvisionedEntry<TContent> | undefined;
+  scope?: EventScope;
+  missionPathHint?: string;
+}): TContent | undefined {
   const writeDir = writeJournalDir(input.missionId, input.scope, input.missionPathHint);
   const recordPath = nodePath.join(writeDir, 'provisioned-entries.jsonl');
   const leasePath = nodePath.join(writeDir, 'writer-lease.json');
@@ -529,28 +547,30 @@ export function writeProvisionedJson<TContent>(input: {
     ownerId: `process:${process.pid}`,
     leasePath,
     fn: () => {
+      const provisioned = input.build();
+      if (!provisioned) return undefined;
       writeProvisionedEntryRecord(recordPath, {
         missionId: input.missionId,
-        entry: input.provisioned,
+        entry: provisioned,
         targetPath: input.targetPath,
         phase: 'provisioned',
       });
       const safeFilePath = artifactPath(input.filePath);
-      safeWriteFile(safeFilePath, `${JSON.stringify(input.provisioned.content, null, 2)}\n`);
+      safeWriteFile(safeFilePath, `${JSON.stringify(provisioned.content, null, 2)}\n`);
       let content: unknown;
       try {
         content = readJson<unknown>(assertRegularArtifactPath(safeFilePath));
       } catch {
         throw new Error('MISSION_LOG_CORRUPT:provisioned_entry_unreadable');
       }
-      verifyProvisionedEntry(input.provisioned, {
-        id: input.provisioned.id,
+      verifyProvisionedEntry(provisioned, {
+        id: provisioned.id,
         content,
-        content_hash: input.provisioned.content_hash,
+        content_hash: provisioned.content_hash,
       });
       writeProvisionedEntryRecord(recordPath, {
         missionId: input.missionId,
-        entry: input.provisioned,
+        entry: provisioned,
         targetPath: input.targetPath,
         phase: 'verified',
       });

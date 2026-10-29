@@ -750,6 +750,8 @@ export async function dispatchGoalDrivenMissionTask(
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
+      // The attempt is over: release the claim so a resume can re-claim it.
+      endAttempt: true,
       metadata: {
         summary: outcome.goal.terminalReason || input.task.description || input.task.task_id,
         blocked_reason: outcome.goal.terminalReason || 'goal blocked',
