@@ -14,7 +14,7 @@ import { readTextFile } from '../foundation/text.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import {
   provisionMissionEntry,
-  writeProvisionedJson,
+  writeProvisionedJsonFrom,
   writeProvisionedText,
 } from './mission-orchestration-journal.js';
 import { validatePlanningPacket } from '../planning-packet-contract.js';
@@ -121,6 +121,20 @@ export function createMissionProgressController(
 
   function writeNextTasks(missionId: string, tasks: PlannedNextTask[]): void {
     const nextTasksPath = safeMissionArtifactPath(missionId, 'NEXT_TASKS.json');
+    // Read, merged and written under the board's writer lease (no writer between).
+    writeProvisionedJsonFrom({
+      missionId,
+      filePath: nextTasksPath,
+      targetPath: 'NEXT_TASKS.json',
+      build: () => provisionMissionEntry(mergeWithBoard(missionId, nextTasksPath, tasks)),
+    });
+  }
+
+  function mergeWithBoard(
+    missionId: string,
+    nextTasksPath: string,
+    tasks: PlannedNextTask[]
+  ): PlannedNextTask[] {
     const existingTasks = safeExistsSync(nextTasksPath)
       ? dependencies.validatePlannedNextTasks(
           loadMissionNextTaskObjectsAtPath(
@@ -151,13 +165,7 @@ export function createMissionProgressController(
         ...(rework_count > 0 ? { rework_count } : {}),
       };
     });
-    const mergedTasks = guardSupersedeState(missionId, prioritized, existingTasks);
-    writeProvisionedJson({
-      missionId,
-      filePath: nextTasksPath,
-      targetPath: 'NEXT_TASKS.json',
-      provisioned: provisionMissionEntry(mergedTasks),
-    });
+    return guardSupersedeState(missionId, prioritized, existingTasks);
   }
 
   function syncPlanningArtifacts(missionId: string): void {
@@ -374,45 +382,55 @@ export function createMissionProgressController(
     // m3/M2: a new plan never undoes a supersede on disk (human-approved):
     // the superseded task keeps its record, its replacement stays, and the
     // dependents keep their rewrites — the same guard as every board writer.
-    const onDisk = safeExistsSync(nextTasksPath)
-      ? loadMissionNextTaskObjectsAtPath(
-          nextTasksPath,
-          path.basename(path.dirname(nextTasksPath))
-        ) || []
-      : [];
-    const supersededOnDisk = new Set(
-      onDisk
-        .filter((task) => String(task.status || '') === 'superseded')
-        .map((task) => String(task.task_id || ''))
-    );
-    const keepSuperseded = <T extends object>(tasks: T[]) =>
-      guardSupersedeState(missionId, tasks, onDisk);
-    const seededTasks = readProcessTemplateSeededTasks(nextTasksPath);
-    if (seededTasks.length > 0) {
-      const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
-      const additions = nextTasks.filter((task) => !seededIds.has(task.task_id));
-      registerCanonicalWorkItems([...seededTasks, ...additions]);
-      writeProvisionedJson({
-        missionId,
-        filePath: nextTasksPath,
-        targetPath: 'NEXT_TASKS.json',
-        provisioned: provisionMissionEntry(keepSuperseded([...seededTasks, ...additions])),
-      });
-      ledger.record('MISSION_PLAN_MERGED_WITH_PROCESS_TEMPLATE', {
-        mission_id: missionId,
-        seeded_task_count: seededTasks.length,
-        planner_addition_count: additions.length,
-        dropped_planner_task_count: nextTasks.length - additions.length,
-      });
-      return;
-    }
-    registerCanonicalWorkItems(nextTasks);
-    writeProvisionedJson({
+    // The board is read, guarded and written under its writer lease.
+    let supersededOnDisk = new Set<string>();
+    let planned: Array<Record<string, unknown>> = [];
+    let plannedIds = new Set<string>();
+    let seededMerge: { seeded: number; additions: number } | undefined;
+    writeProvisionedJsonFrom({
       missionId,
       filePath: nextTasksPath,
       targetPath: 'NEXT_TASKS.json',
-      provisioned: provisionMissionEntry(keepSuperseded(nextTasks)),
+      build: () => {
+        const onDisk = safeExistsSync(nextTasksPath)
+          ? loadMissionNextTaskObjectsAtPath(
+              nextTasksPath,
+              path.basename(path.dirname(nextTasksPath))
+            ) || []
+          : [];
+        supersededOnDisk = new Set(
+          onDisk
+            .filter((task) => String(task.status || '') === 'superseded')
+            .map((task) => String(task.task_id || ''))
+        );
+        const seededTasks = readProcessTemplateSeededTasks(nextTasksPath);
+        let base: Array<Record<string, unknown>> = nextTasks;
+        if (seededTasks.length > 0) {
+          const seededIds = new Set(seededTasks.map((task) => String(task.task_id)));
+          const additions = nextTasks.filter((task) => !seededIds.has(task.task_id));
+          base = [...seededTasks, ...additions];
+          seededMerge = { seeded: seededTasks.length, additions: additions.length };
+        }
+        plannedIds = new Set(base.map((task) => String(task.task_id || '')));
+        planned = guardSupersedeState(missionId, base, onDisk);
+        return provisionMissionEntry(planned);
+      },
     });
+    if (seededMerge) {
+      ledger.record('MISSION_PLAN_MERGED_WITH_PROCESS_TEMPLATE', {
+        mission_id: missionId,
+        seeded_task_count: seededMerge.seeded,
+        planner_addition_count: seededMerge.additions,
+        dropped_planner_task_count: nextTasks.length - seededMerge.additions,
+      });
+    }
+    // WorkItems from the guarded board: a dependency on a superseded task is
+    // registered as its replacement, never as the old id. Only this plan's
+    // tasks: a task the guard kept from disk (a replacement the plan left
+    // out) keeps its WorkItem as it is — re-importing it would reset it to ready.
+    registerCanonicalWorkItems(
+      planned.filter((task) => plannedIds.has(String(task.task_id || '')))
+    );
   }
 
   function readExistingTaskEventKeys(missionId: string): Set<string> {
