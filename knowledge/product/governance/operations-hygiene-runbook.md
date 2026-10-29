@@ -448,6 +448,11 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
   absent. Gate them with the owning module's probe (`probeHistorySearchBackend()`,
   `pickCjkFontSource()`, `detectRasterCapabilities()`), and make sure the CI workflows install the
   binary so coverage is kept.
+- Browser / GUI launches on hosted runners are cold-start host work. Keep an explicit bounded
+  startup, but size the bound for a contended runner rather than a fast local launch: a 20s
+  `chromium.launch` bound timed out on `main` and on an unrelated PR within a day (triage
+  signature `b680800d272d`, 2026-10). Keep the launch timeout inside the scenario's own abort
+  window so the smoke's cancellation path still runs.
 - Do not re-import the secure-io / tier-guard / authority stack in every test with
   `vi.resetModules()`. Set `KYBERION_ROOT` and the role env first, import once per file in
   `beforeAll`, and reset per-test state through the module's own hooks
