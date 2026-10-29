@@ -341,8 +341,10 @@ function planSupersede(
   }
   const oldItem = items.get(taskId);
   if (oldItem) {
-    // A blocked item's attempt has ended (a held task never ran) even while
-    // its scheduling lease has not expired yet; any other leased item is live.
+    // A blocked item's attempt has ended: the worker releases its claim when
+    // it blocks (endAttempt). A blocked item that still shows a lease was
+    // blocked by an older worker or a caller that kept the claim; its lease
+    // is not a live attempt either. Any other leased item is live.
     const live =
       oldItem.status !== 'blocked' &&
       listActiveWorkLeases().some((lease) => lease.item_id === oldItem.item_id);
@@ -782,28 +784,36 @@ export async function supersedeMissionTask(
     }
 
     // 4. NEXT_TASKS last: the finish gate and the supersede proof read it.
-    let nextTasksChanged = false;
-    const nextTasks = plan.nextTasks.map((task) => {
-      const id = String(task.task_id || '').trim();
-      if (id === input.taskId) {
-        if (isTaskSuperseded(task) && supersededRecordOf(task.superseded)) return task;
-        nextTasksChanged = true;
-        return { ...task, status: MISSION_TASK_SUPERSEDED_STATUS, superseded: record };
-      }
-      if (!dependents.has(id)) return task;
-      const next = rewriteDependencies(taskDependencies(task), input.taskId, input.byTaskId);
-      if (!next.changed) return task;
-      nextTasksChanged = true;
-      return {
-        ...task,
-        dependencies: next.dependencies,
-        dependencies_rewritten_from: withRewrite(task.dependencies_rewritten_from, rewrite),
-      };
-    });
-    if (nextTasksChanged) {
-      writeMissionNextTasks(plan.missionPath, nextTasks, { allowSupersede: true });
-      changed = true;
-    }
+    //    Applied to the board read under its writer lease, not to the plan's
+    //    copy: a worker result written since the plan was read is kept.
+    const nextTasksChanged = writeMissionNextTasks(
+      plan.missionPath,
+      (onDisk) => {
+        let boardChanged = false;
+        const nextTasks = onDisk.map((task) => {
+          const id = String(task.task_id || '').trim();
+          if (id === input.taskId) {
+            if (isTaskSuperseded(task) && supersededRecordOf(task.superseded)) return task;
+            boardChanged = true;
+            return { ...task, status: MISSION_TASK_SUPERSEDED_STATUS, superseded: record };
+          }
+          if (!dependents.has(id)) return task;
+          // A dependent closed since the plan keeps its history (m2).
+          if (isClosedTask({ ...task, task_id: id })) return task;
+          const next = rewriteDependencies(taskDependencies(task), input.taskId, input.byTaskId);
+          if (!next.changed) return task;
+          boardChanged = true;
+          return {
+            ...task,
+            dependencies: next.dependencies,
+            dependencies_rewritten_from: withRewrite(task.dependencies_rewritten_from, rewrite),
+          };
+        });
+        return boardChanged ? nextTasks : undefined;
+      },
+      { allowSupersede: true }
+    );
+    if (nextTasksChanged) changed = true;
 
     // 5. History (once per approval) and the commit, like record-evidence but
     //    only in the mission's own repository (never the enclosing checkout).
