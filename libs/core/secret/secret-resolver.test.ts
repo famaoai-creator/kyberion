@@ -111,6 +111,41 @@ describe('secret-resolver', () => {
   });
 
   describe('ChainSecretResolver', () => {
+    it('preserves the first task binding, including empty bindings, and fails closed on binder errors', async () => {
+      const input = {
+        scope: { tier: 'confidential' as const, tenant_slug: 'alpha' },
+        workItemId: 'WI-a',
+      };
+      const empty = { tenantSlug: 'alpha', secrets: {} };
+      let calls = 0;
+      const later = {
+        name: 'later',
+        resolve: () => null,
+        bindTask: () => {
+          calls += 1;
+          return { tenantSlug: 'alpha', secrets: { KEY: 'must-not-resolve' } };
+        },
+      };
+      const chain = new ChainSecretResolver([
+        { name: 'not-task-capable', resolve: () => null },
+        { name: 'empty', resolve: () => null, bindTask: () => empty },
+        later,
+      ]);
+      expect(await chain.bindTask(input)).toBe(empty);
+      expect(calls).toBe(0);
+      const denied = new ChainSecretResolver([
+        {
+          name: 'denied',
+          resolve: () => null,
+          bindTask: () => {
+            throw new Error('scope denied');
+          },
+        },
+        later,
+      ]);
+      await expect(denied.bindTask(input)).rejects.toThrow('scope denied');
+      expect(calls).toBe(0);
+    });
     it('returns the first non-null result', async () => {
       const chain = new ChainSecretResolver([
         { name: 'a', resolve: () => null },

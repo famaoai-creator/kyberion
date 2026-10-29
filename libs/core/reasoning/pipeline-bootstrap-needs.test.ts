@@ -1,7 +1,28 @@
 import { describe, expect, it } from 'vitest';
 import { pipelineBootstrapNeeds } from './pipeline-bootstrap-needs.js';
+import { readJson } from '../foundation/json.js';
 
 describe('pipelineBootstrapNeeds', () => {
+  it.each(['baseline-check', 'vital-check'])(
+    'keeps the canonical %s diagnostic provider-free',
+    (id) => {
+      const pipeline = readJson<{ steps: Parameters<typeof pipelineBootstrapNeeds>[0] }>(
+        `pipelines/${id}.json`
+      );
+      expect(pipelineBootstrapNeeds(pipeline.steps)).toEqual({ required: false, reasons: [] });
+    }
+  );
+  it('lets baseline report readiness without bootstrapping tenant credentials', () => {
+    const baseline = [
+      { op: 'system:baseline_check', params: { export_as: 'baseline_check' } },
+      { op: 'system:log', params: { message: '{{baseline_check.status}}' } },
+    ];
+    expect(pipelineBootstrapNeeds(baseline)).toEqual({ required: false, reasons: [] });
+    expect(pipelineBootstrapNeeds([...baseline, { op: 'reasoning:query', params: {} }])).toEqual({
+      required: true,
+      reasons: ['reasoning:query'],
+    });
+  });
   it('does not discover provider credentials for deterministic logging and transforms', () => {
     expect(
       pipelineBootstrapNeeds([

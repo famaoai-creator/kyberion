@@ -115,6 +115,11 @@ export function defaultOperationInterface(
     voice: 'libs/actuators/voice-actuator/manifest.json',
     media: 'libs/actuators/media-generation-actuator/manifest.json',
   };
+  if (operationId === 'video:filter_apply')
+    return operationInterfaceResolver({
+      op: operationId,
+      manifestPath: 'knowledge/product/governance/video-filter-interface.json',
+    })();
   if (operationId === 'tenant:attest_provider')
     return operationInterfaceResolver({
       op: operationId,

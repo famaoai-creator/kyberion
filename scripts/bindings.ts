@@ -17,6 +17,7 @@ import '@agent/core/governance/audit-forwarder';
 import '@agent/core/browser/browser-automation-runtime-bridge';
 import '@agent/core/meeting/calendar-provider-bridge';
 import '@agent/core/camera-output-bridge';
+import '@agent/core/video/video-filter';
 import '@agent/core/provider/bundles/index';
 import '@agent/core/actuator/deployment-adapter';
 import '@agent/core/embedding-backend';

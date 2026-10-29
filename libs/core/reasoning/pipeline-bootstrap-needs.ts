@@ -35,13 +35,18 @@ const STRUCTURAL_OPS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Ops verified not to call reasoning, speech, secret resolution, or embeddings.
+ * Ops that do not need provider installation. Baseline owns its readiness probes
+ * and must report missing credentials without first constructing a provider.
  * Anything else stays on the full bootstrap.
  */
 const INERT_OPS: ReadonlySet<string> = new Set([
   'working-memory:run-gc',
   'system:write_artifact',
   'system:log',
+  'system:baseline_check',
+  'system:probe',
+  'system:probe_active_profile',
+  'system:list_missions',
   'core:transform',
 ]);
 
