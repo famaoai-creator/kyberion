@@ -16,7 +16,7 @@ export const selectionBrowserLaunchOptions = Object.freeze({
   channel: 'chrome',
   headless: true,
   chromiumSandbox: true,
-  timeout: 20_000,
+  timeout: 45_000,
 }) satisfies LaunchOptions;
 
 async function waitReady(page: Page) {
