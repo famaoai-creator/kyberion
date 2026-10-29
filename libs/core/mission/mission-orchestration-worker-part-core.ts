@@ -636,6 +636,8 @@ export async function dispatchPlannedMissionTaskCore(
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
+      // The attempt is over: release the claim so a resume can re-claim it.
+      endAttempt: true,
       metadata: {
         summary: 'Task result needs clarification before completion',
         blocked_reason: 'task_result_needs_input',
@@ -707,6 +709,8 @@ export async function dispatchPlannedMissionTaskCore(
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
+      // The attempt is over: release the claim so a resume can re-claim it.
+      endAttempt: true,
       metadata: {
         summary: 'Task result did not satisfy the structured response contract',
         blocked_reason: 'task_result_unstructured',
@@ -910,6 +914,8 @@ export async function dispatchPlannedMissionTaskCore(
         itemId: claimed.item.item_id,
         expectedVersion: claimed.item.version,
         status: 'blocked',
+        // The attempt is over: release the claim so a resume can re-claim it.
+        endAttempt: true,
         metadata: {
           summary: response.taskResult?.summary || input.task.description || input.task.task_id,
           blocked_reason: `missing review target ${reviewTarget}`,
@@ -954,6 +960,8 @@ export async function dispatchPlannedMissionTaskCore(
         itemId: claimed.item.item_id,
         expectedVersion: claimed.item.version,
         status: 'blocked',
+        // The attempt is over: release the claim so a resume can re-claim it.
+        endAttempt: true,
         metadata: {
           summary: response.taskResult?.summary || input.task.description || input.task.task_id,
           blocked_reason: 'review_rework_round_limit',
@@ -1241,6 +1249,8 @@ export async function dispatchPlannedMissionTaskCore(
       itemId: claimed.item.item_id,
       expectedVersion: claimed.item.version,
       status: 'blocked',
+      // The attempt is over: release the claim so a resume can re-claim it.
+      endAttempt: true,
       metadata: {
         summary: response.taskResult?.summary || input.task.description || input.task.task_id,
         blocked_reason: gateReason,

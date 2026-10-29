@@ -226,17 +226,22 @@ export function reissueBlockedMissionTasks(missionId: string): {
   if (!upperMissionId) return { mission_id: upperMissionId, reissued_task_ids: [] };
 
   return withExecutionContext('mission_controller', () => {
-    const tasks = readNextTasks(upperMissionId);
-    const reissued: string[] = [];
-    const nextTasks = tasks.map((task) => {
-      if (String(task.status || 'planned') !== 'blocked') return task;
-      const taskId = String(task.task_id || '').trim();
-      if (taskId) reissued.push(taskId);
-      return { ...task, status: 'planned' };
-    });
-    if (reissued.length > 0) {
-      writeNextTasks(upperMissionId, nextTasks);
+    let reissued: string[] = [];
+    if (readNextTasks(upperMissionId).length === 0) {
+      return { mission_id: upperMissionId, reissued_task_ids: reissued };
     }
+    // Applied to the board read under its writer lease: a worker result
+    // written meanwhile is neither lost nor reissued.
+    writeMissionNextTasks(nodePath.dirname(nextTasksPath(upperMissionId)), (onDisk) => {
+      reissued = [];
+      const nextTasks = onDisk.map((task) => {
+        if (String(task.status || 'planned') !== 'blocked') return task;
+        const taskId = String(task.task_id || '').trim();
+        if (taskId) reissued.push(taskId);
+        return { ...task, status: 'planned' };
+      });
+      return reissued.length > 0 ? nextTasks : undefined;
+    });
     return { mission_id: upperMissionId, reissued_task_ids: reissued };
   });
 }
