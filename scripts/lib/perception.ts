@@ -1,3 +1,5 @@
+import { isRecord } from '@agent/core/foundation/text';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { resolveScopeContext } from '@agent/core/scope-context';
 import { resolveStorageFloor, classifyStorageFloorPath } from '@agent/core/storage-layout';
 import { resolvePerceptionScope } from '@agent/core/perception/observation';
@@ -24,6 +26,7 @@ import {
   safeRmSync,
   safeWriteFile,
   assertSafeRepositoryPath,
+  safeReadFileRange,
 } from '@agent/core/secure-io';
 import type { OcrRequest, OcrResult } from '@agent/core/ocr-types';
 import type { describeImage } from '@agent/core/media/image-description-bridge';
@@ -33,6 +36,13 @@ import type {
   TranscriptSegment,
 } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './harness.js';
+
+export const LOCAL_MEDIA_INPUT_ARGS = [
+  '-protocol_whitelist',
+  'file,pipe',
+  '-format_whitelist',
+  'wav,mp3,flac,ogg,aac,mov,matroska,webm,aiff,caf,avi',
+] as const;
 
 export type MediaTool = 'ffmpeg' | 'ffprobe';
 type ImageDescriptionRequest = Parameters<typeof describeImage>[0];
@@ -184,13 +194,15 @@ export class NoTranscriptError extends Error {}
 export async function extractSttWav(
   deps: PerceptionDeps,
   input: string,
-  output: string
+  output: string,
+  maxSeconds?: number
 ): Promise<void> {
   await deps.runMedia('ffmpeg', [
     '-y',
     '-hide_banner',
     '-loglevel',
     'error',
+    ...LOCAL_MEDIA_INPUT_ARGS,
     '-i',
     input,
     '-vn',
@@ -200,6 +212,7 @@ export async function extractSttWav(
     '16000',
     '-c:a',
     'pcm_s16le',
+    ...(maxSeconds === undefined ? [] : ['-t', String(maxSeconds)]),
     output,
   ]);
 }
@@ -342,4 +355,34 @@ export function assertPerceptionOutput(sourceFile: string | undefined, target: s
     if (destination.tenant_slug !== scope.tenant_slug)
       throw new ScriptExitError(1, '[PERCEPTION_SCOPE] output tenant differs');
   }
+}
+
+export async function assertAudioAnalysisDuration(
+  deps: PerceptionDeps,
+  input: string
+): Promise<void> {
+  const output = await deps.runMedia('ffprobe', [
+    '-v',
+    'error',
+    ...LOCAL_MEDIA_INPUT_ARGS,
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'json',
+    input,
+  ]);
+  const info = parseSafeJsonInput(output, 'audio analysis duration');
+  const raw = isRecord(info) && isRecord(info.format) ? info.format.duration : undefined;
+  const duration = typeof raw === 'string' || typeof raw === 'number' ? Number(raw) : NaN;
+  if (!Number.isFinite(duration) || duration <= 0 || duration > 600)
+    throw new ScriptExitError(
+      1,
+      '[perception] audio analysis requires a known positive duration <=600 seconds'
+    );
+}
+
+/** Authorize content before any native media loader receives the path. */
+export function assertPerceptionInput(file: string): void {
+  resolvePerceptionScope(file);
+  safeReadFileRange(file, 0, 1);
 }

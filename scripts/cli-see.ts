@@ -22,6 +22,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import { ScriptExitError } from './lib/harness.js';
 import {
   assertExtension,
+  assertPerceptionInput,
   defaultPerceptionDeps,
   emitOutput,
   IMAGE_EXTENSIONS,
@@ -175,6 +176,7 @@ export async function runSeeCommand(
   }
   const absolute = resolveRepositoryInput('see', args.file!);
   assertExtension('see', absolute, IMAGE_EXTENSIONS);
+  assertPerceptionInput(absolute);
   let buffer: Buffer;
   try {
     buffer = safeReadFile(absolute, { encoding: null }) as Buffer;

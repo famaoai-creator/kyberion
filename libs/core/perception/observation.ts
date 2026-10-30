@@ -135,10 +135,7 @@ export function ocrObservations(
       provider: ocr.provider,
       finality: 'final',
       text: line.text,
-      confidence: Math.max(
-        0,
-        Math.min(1, line.confidence > 1 ? line.confidence / 100 : line.confidence)
-      ),
+      confidence: line.confidence / 100,
       ...(region ? { region } : {}),
     });
   });

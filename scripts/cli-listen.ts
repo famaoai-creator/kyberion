@@ -22,6 +22,8 @@ import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge'
 import { ScriptExitError } from './lib/harness.js';
 import {
   assertExtension,
+  assertPerceptionInput,
+  assertAudioAnalysisDuration,
   AUDIO_EXTENSIONS,
   createPerceptionWorkDir,
   defaultPerceptionDeps,
@@ -123,11 +125,12 @@ export async function transcribeMediaFile(
   command: string,
   absolute: string,
   workDir: string,
-  options: { language?: string; timestamps: boolean }
+  options: { language?: string; timestamps: boolean; maxSeconds?: number }
 ): Promise<ListenResult> {
   const wav = path.join(workDir, 'audio-16k-mono.wav');
   try {
-    await extractSttWav(deps, absolute, wav);
+    await extractSttWav(deps, absolute, wav, options.maxSeconds);
+    if (options.maxSeconds !== undefined) await assertAudioAnalysisDuration(deps, wav);
   } catch (error) {
     explainMediaError(command, error);
   }
@@ -171,6 +174,7 @@ export async function runListenCommand(
     );
   }
   assertExtension('listen', absolute, AUDIO_EXTENSIONS);
+  assertPerceptionInput(absolute);
   const workDir = createPerceptionWorkDir('listen', absolute);
   try {
     const feature =
@@ -178,6 +182,7 @@ export async function runListenCommand(
         ? await enhancementDeps(deps)
         : undefined;
     const source = feature?.source?.(absolute) ?? feature?.perceptionSource(absolute);
+    if (options.diarize || options.events) await assertAudioAnalysisDuration(deps, absolute);
     const result: ListenResult = options.noTranscript
       ? {
           file: path.relative(pathResolver.rootDir(), absolute),
@@ -188,13 +193,14 @@ export async function runListenCommand(
       : await transcribeMediaFile(deps, 'listen', absolute, workDir, {
           ...(args.lang ? { language: args.lang } : {}),
           timestamps: args.timestamps || Boolean(options.diarize),
+          ...(options.diarize || options.events ? { maxSeconds: 601 } : {}),
         });
     if (source && feature) {
       result.source = source;
       result.observations = [];
       if (options.diarize || options.events) {
         const wav = path.join(workDir, 'analysis-16k-mono.wav');
-        await extractSttWav(deps, absolute, wav);
+        await extractSttWav(deps, absolute, wav, 601);
         const audio = await import('@agent/core/perception/audio-analysis');
         result.analysis = await (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
           path: wav,
