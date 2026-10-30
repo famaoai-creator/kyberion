@@ -1004,6 +1004,12 @@ function recordBridgeAudit(entry: {
  * poll_requests: deliverable mailbox requests (pending → delivered, lapsed →
  * expired) plus a read-only pending-approval summary. Only new deliveries are
  * audited so the side panel's 5 s fast poll does not flood the audit chain.
+ *
+ * Single-operator channel: this runs under the sovereign concierge role and
+ * returns the requests of every tier/tenant partition to the one operator's
+ * allowlisted extension. The mailbox's tier/tenant partitioning is placement,
+ * not viewer isolation — tenant observe requests are bounded instead by their
+ * mandatory allowed_origins (see browser-bridge-mailbox.ts).
  */
 function handlePollRequests(): HostResponse {
   const now = new Date();

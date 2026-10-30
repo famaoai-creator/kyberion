@@ -109,6 +109,58 @@ describe('pnpm kyberion browser-bridge', () => {
     await expect(run(['request', 'click'])).rejects.toThrow(/Unknown request kind/);
   });
 
+  it('rejects an --input-file from a higher tier or another tenant than the requested scope', async () => {
+    const readFile = vi.fn(() => 'file input');
+    const enqueue = vi.fn(((input) => ({
+      request_id: 'BBR-x',
+      ...input,
+    })) as typeof enqueueBrowserBridgeRequest);
+    const infer = (file: string, ...scope: string[]) =>
+      run(
+        ['request', 'infer', '--task', 'summarize', '--input-file', file, ...scope],
+        deps({ readFile, enqueue })
+      );
+    await expect(infer('knowledge/personal/notes.md')).resolves.toBeDefined();
+    await expect(infer('knowledge/personal/notes.md', '--tier', 'public')).rejects.toThrow(
+      /holds personal data .* cannot be sent in the lower public scope/
+    );
+    await expect(
+      infer('knowledge/confidential/acme/plan.md', '--tier', 'confidential', '--tenant', 'other')
+    ).rejects.toThrow(/belongs to tenant 'acme'/);
+    await expect(infer('knowledge/confidential/acme/plan.md', '--tier', 'public')).rejects.toThrow(
+      /holds confidential\/acme data/
+    );
+    await expect(
+      infer('active/shared/staging/confidential/acme/in.txt', '--tier', 'public')
+    ).rejects.toThrow(/cannot be sent in the lower public scope/);
+    await expect(
+      infer(
+        'active/shared/runtime/browser-bridge-mailbox/personal/shared/x.json',
+        '--tier',
+        'public'
+      )
+    ).rejects.toThrow(/holds personal data/);
+    await expect(
+      infer(pathResolver.rootResolve('knowledge/personal/notes.md'), '--tier', 'public')
+    ).rejects.toThrow(/holds personal data/);
+    await expect(infer('active/shared/tmp/job/in.txt', '--tier', 'public')).rejects.toThrow(
+      /unpartitioned storage location/
+    );
+    expect(readFile).toHaveBeenCalledTimes(1);
+    // Matching scopes and paths outside knowledge/ and the floors keep the requested scope.
+    await infer(
+      'knowledge/confidential/acme/plan.md',
+      '--tier',
+      'confidential',
+      '--tenant',
+      'acme'
+    );
+    await infer('active/shared/tmp/job/in.txt');
+    await infer('knowledge/public/guide.md', '--tier', 'public');
+    await infer('docs/README.md', '--tier', 'public');
+    expect(readFile).toHaveBeenCalledTimes(5);
+  });
+
   it('waits for the extension answer', async () => {
     const queued = enqueueBrowserBridgeRequest({
       request_kind: 'notify',

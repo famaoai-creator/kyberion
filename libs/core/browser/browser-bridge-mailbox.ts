@@ -9,8 +9,19 @@
  * Storage: `active/shared/runtime/browser-bridge-mailbox/<tier>/<tenant|shared>/<request_id>.json`
  * — a registered tier/tenant-partitioned runtime state root
  * (`PARTITIONED_RUNTIME_STATE_ROOTS.browser_bridge_mailbox`), so tier-guard
- * applies the `knowledge/<tier>/<tenant>/` rules to every read and write and
- * tenant requests never land in `system/`.
+ * maps each record path onto the `knowledge/<tier>/<tenant>/` rules for the
+ * calling identity and tenant requests never land in `system/`. That
+ * partitioning is *placement*, not viewer isolation.
+ *
+ * Single-operator channel: the native host is a local, single-operator
+ * channel. It runs under the sovereign concierge role and `poll_requests`
+ * returns the deliverable requests of *every* partition (all tiers, all
+ * tenants) to the one operator's allowlisted Chrome extension. There is no
+ * per-viewer filtering on that path — do not expose the poll surface to a
+ * second principal or a shared browser profile. Because the operator's
+ * currently open tab may belong to any tenant, a `confidential` (tenant)
+ * `observe_tab` must name non-empty `allowed_origins`; the response is then
+ * rejected unless the observed origin is one of them.
  *
  * Invariants:
  *   - A request never carries an executable instruction. `observe_tab` asks for
@@ -66,6 +77,10 @@ const MAX_APPROVAL_SUMMARIES = 20;
 
 const REQUEST_ID_PATTERN = /^BBR-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/browser-bridge-request.schema.json');
+const CONFIDENTIAL_OBSERVE_ORIGINS_ERROR =
+  'a confidential (tenant) observe_tab request requires non-empty payload.allowed_origins';
+/** Schema maxLength of the free-text payload fields redaction may lengthen. */
+const PAYLOAD_TEXT_LIMITS = { purpose: 300, input: 30000, title: 120, body: 1000 } as const;
 
 export type BrowserBridgeRequestKind = 'observe_tab' | 'local_infer' | 'notify';
 export type BrowserBridgeRequestStatus =
@@ -245,6 +260,9 @@ export function validateBrowserBridgeRequest(input: unknown): {
     if (origins.some((origin) => canonicalHttpOrigin(origin) !== origin)) {
       errors.push('payload.allowed_origins must be canonical http(s) origins');
     }
+    if (value.scope.tier === 'confidential' && origins.length === 0) {
+      errors.push(CONFIDENTIAL_OBSERVE_ORIGINS_ERROR);
+    }
   }
   if (value.request_kind === 'notify') {
     const payload = value.payload as BrowserBridgeNotifyPayload;
@@ -316,6 +334,19 @@ function readRequestAt(scope: BrowserBridgeScope, requestId: string): BrowserBri
     return null;
   }
   return record;
+}
+
+/** Unlocked, unvalidated peek: true only when the stored record says it is terminal. */
+function hasTerminalStatusOnDisk(scope: BrowserBridgeScope, requestId: string): boolean {
+  try {
+    const raw = readJsonIfPresent<{ status?: unknown }>(requestPath(scope, requestId));
+    return (
+      typeof raw?.status === 'string' &&
+      TERMINAL_STATUSES.has(raw.status as BrowserBridgeRequestStatus)
+    );
+  } catch {
+    return false;
+  }
 }
 
 /** Every partition (tier × tenant|shared) present on disk that this process may list. */
@@ -435,39 +466,45 @@ export function normalizeBrowserBridgeScope(
   return tenant ? { tier: scope.tier, tenant_slug: tenant } : { tier: scope.tier };
 }
 
-function normalizePayload(
+/**
+ * Redact, then clamp to the schema maxLength: a redaction token
+ * (`[redacted-email]`) can be longer than what it replaces, and an input that
+ * was valid as given must not fail because of redaction. Never ends on a
+ * lone high surrogate.
+ */
+function redactAndClamp(value: string, max: number): string {
+  const redacted = redactObservationText(value);
+  if (redacted.length <= max) return redacted;
+  const clipped = redacted.slice(0, max);
+  const last = clipped.charCodeAt(clipped.length - 1);
+  return last >= 0xd800 && last <= 0xdbff ? clipped.slice(0, -1) : clipped;
+}
+
+/**
+ * Redact the free-text fields of an already schema-validated payload (lengths
+ * were checked on the raw input) and clamp them back under maxLength.
+ */
+function redactPayload(
   kind: BrowserBridgeRequestKind,
   payload: BrowserBridgePayload
 ): BrowserBridgePayload {
-  if (!payload || typeof payload !== 'object') {
-    throw new BrowserBridgeMailboxError('invalid_input', 'payload must be an object');
-  }
   if (kind === 'local_infer') {
     const local = payload as BrowserBridgeLocalInferPayload;
     // The caller already governs the input; redact again so no PII shape
     // leaves Kyberion through the mailbox even if the caller forgot.
-    return {
-      ...local,
-      input: typeof local.input === 'string' ? redactObservationText(local.input) : local.input,
-    };
+    return { ...local, input: redactAndClamp(local.input, PAYLOAD_TEXT_LIMITS.input) };
   }
   if (kind === 'observe_tab') {
     const observe = payload as BrowserBridgeObservePayload;
-    return {
-      ...observe,
-      purpose:
-        typeof observe.purpose === 'string'
-          ? redactObservationText(observe.purpose)
-          : observe.purpose,
-    };
+    return { ...observe, purpose: redactAndClamp(observe.purpose, PAYLOAD_TEXT_LIMITS.purpose) };
   }
   // notify: only the declared display fields survive (schema rejects extras);
   // it never carries page data, so redact its free text as well.
   const notify = payload as BrowserBridgeNotifyPayload;
   return {
     ...notify,
-    title: typeof notify.title === 'string' ? redactObservationText(notify.title) : notify.title,
-    body: typeof notify.body === 'string' ? redactObservationText(notify.body) : notify.body,
+    title: redactAndClamp(notify.title, PAYLOAD_TEXT_LIMITS.title),
+    body: redactAndClamp(notify.body, PAYLOAD_TEXT_LIMITS.body),
   };
 }
 
@@ -482,7 +519,17 @@ export function enqueueBrowserBridgeRequest(
     throw new BrowserBridgeMailboxError('invalid_input', 'ttl must be > 0 and at most 60 minutes');
   }
   const scope = normalizeBrowserBridgeScope(input.scope, options);
-  const record: BrowserBridgeRequest = {
+  if (!input.payload || typeof input.payload !== 'object') {
+    throw new BrowserBridgeMailboxError('invalid_input', 'payload must be an object');
+  }
+  if (
+    input.request_kind === 'observe_tab' &&
+    scope.tier === 'confidential' &&
+    !((input.payload as BrowserBridgeObservePayload).allowed_origins?.length ?? 0)
+  ) {
+    throw new BrowserBridgeMailboxError('invalid_input', CONFIDENTIAL_OBSERVE_ORIGINS_ERROR);
+  }
+  const raw: BrowserBridgeRequest = {
     kind: BROWSER_BRIDGE_REQUEST_KIND,
     request_id: `BBR-${randomUUID()}`,
     request_kind: input.request_kind,
@@ -493,11 +540,17 @@ export function enqueueBrowserBridgeRequest(
       ...(input.requested_by?.mission_id ? { mission_id: input.requested_by.mission_id } : {}),
     },
     scope,
-    payload: normalizePayload(input.request_kind, input.payload),
+    payload: input.payload,
     status: 'pending',
   };
-  const check = validateBrowserBridgeRequest(record);
+  // Validate the caller's input as given (lengths included), then redact;
+  // writeRequest re-validates the redacted, clamped record.
+  const check = validateBrowserBridgeRequest(raw);
   if (!check.valid) throw new BrowserBridgeMailboxError('invalid_input', check.errors.join('; '));
+  const record: BrowserBridgeRequest = {
+    ...raw,
+    payload: redactPayload(raw.request_kind, raw.payload),
+  };
   writeRequest(record);
   try {
     auditChain.record({
@@ -543,6 +596,10 @@ export function listDeliverableBrowserBridgeRequests(
   const out: BrowserBridgeRequest[] = [];
   for (const scope of mailboxPartitions()) {
     for (const id of requestIdsIn(scope)) {
+      // Terminal is final (nothing moves a record out of it), so an unlocked
+      // status peek is enough to skip it — no lock, no schema validation.
+      // Anything else (or an unreadable file) takes the locked path below.
+      if (hasTerminalStatusOnDisk(scope, id)) continue;
       let record: BrowserBridgeRequest | null;
       try {
         record = withLockSync(lockId(id), () => {
@@ -588,17 +645,32 @@ export function toBrowserBridgeRequestView(record: BrowserBridgeRequest): Browse
   };
 }
 
+/**
+ * Redact every string — object keys included (an extraction keyed by an
+ * email is still an email) — and clip below depth 8. Keys that collide after
+ * redaction keep the first entry's key; later ones get ` (2)`, ` (3)`, … in
+ * input order, so the output is deterministic and nothing is dropped.
+ */
 function redactDeep(value: unknown, depth = 0): unknown {
   if (depth > 8) return null;
   if (typeof value === 'string') return redactObservationText(value);
   if (Array.isArray(value)) return value.map((item) => redactDeep(item, depth + 1));
   if (value && typeof value === 'object') {
-    return Object.fromEntries(
-      Object.entries(value as Record<string, unknown>).map(([key, item]) => [
-        key,
-        redactDeep(item, depth + 1),
-      ])
-    );
+    const out: Record<string, unknown> = {};
+    const used = new Set<string>();
+    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
+      const base = redactObservationText(key);
+      let unique = base;
+      for (let n = 2; used.has(unique); n += 1) unique = `${base} (${n})`;
+      used.add(unique);
+      Object.defineProperty(out, unique, {
+        value: redactDeep(item, depth + 1),
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+    }
+    return out;
   }
   return value;
 }

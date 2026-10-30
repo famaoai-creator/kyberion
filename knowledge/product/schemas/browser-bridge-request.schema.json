@@ -69,6 +69,30 @@
       "then": { "properties": { "payload": { "$ref": "#/definitions/observe_tab_payload" } } }
     },
     {
+      "description": "A confidential (tenant) observe_tab must bind the observation to named origins: the native host is a single-operator channel and the operator's open tab may belong to any tenant.",
+      "if": {
+        "type": "object",
+        "required": ["request_kind", "scope"],
+        "properties": {
+          "request_kind": { "const": "observe_tab" },
+          "scope": {
+            "type": "object",
+            "required": ["tier"],
+            "properties": { "tier": { "const": "confidential" } }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["allowed_origins"],
+            "properties": { "allowed_origins": { "type": "array", "minItems": 1 } }
+          }
+        }
+      }
+    },
+    {
       "if": { "properties": { "request_kind": { "const": "local_infer" } } },
       "then": { "properties": { "payload": { "$ref": "#/definitions/local_infer_payload" } } }
     },
