@@ -34,6 +34,14 @@
       "note": "PG-03 standing grants (governance/grant-store.ts), partitioned by tier and tenant. Expired and revoked records are kept as the evidence of what was allowed and when; never expire automatically. Removal requires an explicit retention review (tenant offboarding)."
     },
     {
+      "path": "active/shared/runtime/browser-bridge-mailbox",
+      "artifact_class": "tmp",
+      "ttl_days": 7,
+      "action": "delete",
+      "audit": true,
+      "note": "Kyberion -> Chrome extension pull mailbox (libs/core/browser/browser-bridge-mailbox.ts), one JSON per request under <tier>/<tenant|shared>/. Requests live at most 60 minutes and are swept to expired on the next poll; enqueue is audited on the audit chain, so the files are consumable request/response hand-offs. A 7d grace lets a caller read a late response; tenant offboarding purges the tenant partitions."
+    },
+    {
       "path": "active/shared/runtime/customer-decision-invites",
       "artifact_class": "state",
       "action": "review_required",
