@@ -12,8 +12,8 @@ import { distillDocxDesign } from '../docx-utils.js';
 import { generateNativeDocx } from '../native-docx-engine/engine.js';
 import { docxToMarkdown } from '../protocol-to-markdown.js';
 import { pathResolver } from '../../path-resolver.js';
+import { safeMkdir } from '../../secure-io.js';
 import * as path from 'node:path';
-import * as fs from 'node:fs';
 import AdmZip from 'adm-zip';
 import JSZip from 'jszip';
 import type { DocxDesignProtocol } from '../../contracts/docx-protocol.js';
@@ -46,7 +46,7 @@ describe('docx-xml (WordCraft-aligned)', () => {
 describe('docx specials round-trip', () => {
   it('writes and reads softHyphen / entity text / lvlOverride', async () => {
     const out = pathResolver.sharedTmp('tests/native-docx/wordcraft-port.docx');
-    fs.mkdirSync(path.dirname(out), { recursive: true });
+    safeMkdir(path.dirname(out), { recursive: true });
     const protocol: DocxDesignProtocol = {
       version: '1.0.0',
       generatedAt: new Date().toISOString(),
