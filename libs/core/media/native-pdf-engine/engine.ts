@@ -92,6 +92,8 @@ function decodePng(buf: Buffer): ImageInfo {
     h = buf.readUInt32BE(20);
   const bd = buf[24],
     ct = buf[25];
+  // Color types 4 (Gray+A) and 6 (RGBA) keep alpha as a soft mask on write
+  // (PdfCraft `from_images` pattern) rather than stuffing A into DeviceRGB.
   const compMap: Record<number, number> = { 0: 1, 2: 3, 3: 3, 4: 2, 6: 4 };
   const csMap: Record<number, string> = {
     0: '/DeviceGray',
@@ -101,6 +103,8 @@ function decodePng(buf: Buffer): ImageInfo {
     6: '/DeviceRGB',
   };
   const nc = compMap[ct] ?? 3;
+  const hasAlpha = ct === 4 || ct === 6;
+  const colorChannels = hasAlpha ? nc - 1 : nc;
 
   const idats: Buffer[] = [];
   let pos = 8;
@@ -142,13 +146,34 @@ function decodePng(buf: Buffer): ImageInfo {
     } else src.copy(dst);
   }
 
+  if (!hasAlpha) {
+    return {
+      width: w,
+      height: h,
+      colorSpace: csMap[ct] ?? '/DeviceRGB',
+      bitsPerComponent: bd,
+      filter: '/FlateDecode',
+      data: zlib.deflateSync(raw),
+    };
+  }
+
+  const color = Buffer.alloc(w * h * colorChannels);
+  const alpha = Buffer.alloc(w * h);
+  for (let i = 0; i < w * h; i += 1) {
+    const src = i * nc;
+    const dst = i * colorChannels;
+    for (let c = 0; c < colorChannels; c += 1) color[dst + c] = raw[src + c];
+    alpha[i] = raw[src + colorChannels];
+  }
+
   return {
     width: w,
     height: h,
     colorSpace: csMap[ct] ?? '/DeviceRGB',
     bitsPerComponent: bd,
     filter: '/FlateDecode',
-    data: zlib.deflateSync(raw),
+    data: zlib.deflateSync(color),
+    softMask: zlib.deflateSync(alpha),
   };
 }
 
@@ -1075,10 +1100,22 @@ export async function generateNativePdf(
     imgMap.set(imgPath, { id, name });
   }
 
-  // Write image XObjects
+  // Write image XObjects (PNG alpha → /SMask DeviceGray, PdfCraft create pattern)
   for (const [imgPath, { id, name: _name }] of imgMap) {
     try {
       const info = decodeImage(imgPath);
+      let softMaskId: number | undefined;
+      if (info.softMask && info.softMask.length > 0) {
+        softMaskId = writer.reserveId();
+        writer['reg'].push({ id: softMaskId, offset: writer.currentOffset });
+        const smBody = info.softMask;
+        writer['raw'](
+          `${softMaskId} 0 obj\n<<\n/Type /XObject\n/Subtype /Image\n/Width ${info.width}\n/Height ${info.height}\n/ColorSpace /DeviceGray\n/BitsPerComponent ${info.bitsPerComponent}\n/Filter /FlateDecode\n/Length ${smBody.length}\n>>\nstream\n`
+        );
+        writer['raw'](smBody);
+        writer['raw']('\nendstream\nendobj\n');
+      }
+
       const dictEntries: Record<string, string> = {
         '/Type': '/XObject',
         '/Subtype': '/Image',
@@ -1088,6 +1125,7 @@ export async function generateNativePdf(
         '/BitsPerComponent': String(info.bitsPerComponent),
       };
       if (info.filter) dictEntries['/Filter'] = info.filter;
+      if (softMaskId !== undefined) dictEntries['/SMask'] = `${softMaskId} 0 R`;
       const useCompress = !info.filter;
 
       writer['reg'].push({ id, offset: writer.currentOffset });

@@ -137,6 +137,42 @@ export interface XlsxTextRun {
   font?: XlsxFont;
 }
 
+/** Phonetic / furigana run on an SST item (ISO/IEC 29500-1 §18.4.6 `rPh`). */
+export interface XlsxPhoneticRun {
+  /** Zero-based start offset into the base string */
+  sb: number;
+  /** Zero-based end offset (exclusive) into the base string */
+  eb: number;
+  text: string;
+}
+
+export interface XlsxPhoneticString {
+  runs: XlsxPhoneticRun[];
+  props?: {
+    fontId?: number;
+    type?: string;
+    alignment?: string;
+  };
+}
+
+export interface XlsxHyperlink {
+  /** Cell or range ref, e.g. "A1" or "B2:D2" */
+  ref: string;
+  /** Resolved target (external URL / path, or internal location) */
+  target: string;
+  tooltip?: string;
+  /** Raw `location` attribute when present */
+  location?: string;
+  /** True when resolved via a relationship id */
+  external?: boolean;
+}
+
+export interface XlsxComment {
+  ref: string;
+  author?: string;
+  text: string;
+}
+
 // ─── Cell ────────────────────────────────────────────────────
 
 export interface XlsxCell {
@@ -340,6 +376,10 @@ export interface XlsxWorksheet {
   dataValidations: XlsxDataValidation[];
   autoFilter?: XlsxAutoFilter;
   pageSetup?: XlsxPageSetup;
+  hyperlinks?: XlsxHyperlink[];
+  comments?: XlsxComment[];
+  /** Relationship id on `<legacyDrawing>` when present (comment VML). */
+  legacyDrawingRId?: string;
   // Raw XML preservation
   sheetPrXml?: string;
   extensions?: string;
@@ -395,6 +435,8 @@ export interface XlsxDesignProtocol {
   };
   sharedStrings: string[]; // SST table (plain text)
   sharedStringsRich?: XlsxTextRun[][]; // Rich text SST entries
+  /** Parallel to `sharedStrings` — phonetic runs (`rPh` / `phoneticPr`), GridCraft-aligned. */
+  sharedStringsPhonetic?: Array<XlsxPhoneticString | undefined>;
   workbookProperties?: XlsxWorkbookProperties;
   definedNames: XlsxDefinedName[];
   sheets: XlsxWorksheet[];

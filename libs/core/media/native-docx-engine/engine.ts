@@ -7,7 +7,14 @@ import AdmZip from 'adm-zip';
 import * as path from 'path';
 import { nowIso } from '../../foundation/time.js';
 import { safeExistsSync, safeReadFile } from '../../secure-io.js';
-import { escapeXml as sharedEscapeXml, sanitizeXmlText } from '../../text-escaping.js';
+import { sanitizeXmlText } from '../../text-escaping.js';
+import {
+  DOCX_IMAGE_CONTENT_TYPES,
+  diagramPartContentType,
+  escapeDocxXml,
+  normalizeSymChar,
+  splitDocxTextToXml,
+} from '../docx-xml.js';
 import {
   KYBERION_BRAND_FONT_STACK,
   resolveEastAsianFontFamily,
@@ -40,7 +47,8 @@ const REL_NS = 'http://schemas.openxmlformats.org/officeDocument/2006/relationsh
 const PKG_REL_NS = 'http://schemas.openxmlformats.org/package/2006/relationships';
 const RT_BASE = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
 
-const escXml = sharedEscapeXml;
+/** WordCraft-aligned XML escape for WordML text and attributes. */
+const escXml = escapeDocxXml;
 
 // ─── XML Generators ─────────────────────────────────────────
 
@@ -105,11 +113,18 @@ function runPropertiesXml(rPr: DocxRunProperties | undefined): string {
 function runContentXml(content: DocxRunContent): string {
   switch (content.type) {
     case 'text':
-      return `<w:t xml:space="preserve">${escXml(content.text)}</w:t>`;
+      // Split tabs / breaks / soft hyphens into dedicated elements (WordCraft pieces).
+      return splitDocxTextToXml(content.text);
     case 'break':
       return content.breakType ? `<w:br w:type="${content.breakType}"/>` : '<w:br/>';
     case 'tab':
       return '<w:tab/>';
+    case 'cr':
+      return '<w:cr/>';
+    case 'softHyphen':
+      return '<w:softHyphen/>';
+    case 'noBreakHyphen':
+      return '<w:noBreakHyphen/>';
     case 'drawing': {
       const drawing = content.drawing;
       if (drawing.rawXml) return `<w:drawing>${drawing.rawXml}</w:drawing>`;
@@ -145,8 +160,10 @@ function runContentXml(content: DocxRunContent): string {
       return `<w:fldChar w:fldCharType="${content.fldCharType}"/>`;
     case 'instrText':
       return `<w:instrText xml:space="preserve">${escXml(content.text)}</w:instrText>`;
-    case 'sym':
-      return `<w:sym w:font="${escXml(content.font)}" w:char="${content.char}"/>`;
+    case 'sym': {
+      const char = normalizeSymChar(content.char);
+      return char ? `<w:sym w:font="${escXml(content.font)}" w:char="${char}"/>` : '';
+    }
     case 'rawXml':
       return content.xml;
     default:
@@ -462,15 +479,24 @@ function generateContentTypes(
   relationships: DocxDesignProtocol['relationships'],
   passthroughParts: DocxDesignProtocol['passthroughParts']
 ): string {
+  // Always declare common raster types; add extras from used media (WordCraft parts.rs).
+  const imageExts = new Set(['png', 'jpeg', 'gif', 'bmp', 'tiff']);
+  for (const rel of relationships) {
+    if (rel.type !== 'image') continue;
+    const ext = path.extname(rel.target).replace(/^\./, '').toLowerCase();
+    if (ext === 'jpg') imageExts.add('jpeg');
+    else if (DOCX_IMAGE_CONTENT_TYPES[ext]) imageExts.add(ext === 'tif' ? 'tiff' : ext);
+  }
+
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
   <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
-  <Default Extension="xml" ContentType="application/xml"/>
-  <Default Extension="png" ContentType="image/png"/>
-  <Default Extension="jpeg" ContentType="image/jpeg"/>
-  <Default Extension="gif" ContentType="image/gif"/>
-  <Default Extension="bmp" ContentType="image/bmp"/>
-  <Default Extension="tiff" ContentType="image/tiff"/>
+  <Default Extension="xml" ContentType="application/xml"/>`;
+  for (const ext of imageExts) {
+    const ct = DOCX_IMAGE_CONTENT_TYPES[ext] || (ext === 'jpeg' ? 'image/jpeg' : undefined);
+    if (ct) xml += `\n  <Default Extension="${ext}" ContentType="${ct}"/>`;
+  }
+  xml += `
   <Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>
   <Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/>
   <Override PartName="/word/fontTable.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.fontTable+xml"/>
@@ -494,9 +520,12 @@ function generateContentTypes(
   for (const part of passthroughParts || []) {
     const contentType =
       PASSTHROUGH_CONTENT_TYPES[part.path] ||
+      diagramPartContentType(part.path) ||
       (/^customXml\/itemProps\d*\.xml$/.test(part.path)
         ? 'application/vnd.openxmlformats-officedocument.customXmlProperties+xml'
-        : null);
+        : /^customXml\/item\d*\.xml$/.test(part.path)
+          ? 'application/xml'
+          : null);
     if (contentType) {
       xml += `\n  <Override PartName="/${part.path}" ContentType="${contentType}"/>`;
     }
