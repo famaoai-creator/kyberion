@@ -57,11 +57,6 @@ function readNextTasks(missionId: string): Array<Record<string, unknown>> {
   }
 }
 
-function writeNextTasks(missionId: string, tasks: Array<Record<string, unknown>>): void {
-  // Through the one board writer: a stale read never undoes a supersede (M2).
-  writeMissionNextTasks(nodePath.dirname(nextTasksPath(missionId)), tasks);
-}
-
 function isTerminalWorkItemStatus(status: unknown): boolean {
   return status === 'done' || status === 'archived' || status === 'blocked';
 }
@@ -101,10 +96,10 @@ export function recoverMissionRequestedTasks(
       records: [],
     };
 
-    let mutated = false;
-    const nextTasks = tasks.map((task) => ({ ...task }));
+    // Stamped onto the board at write time, under its writer lease.
+    const resumeStamps = new Map<string, Record<string, unknown>>();
 
-    for (const task of nextTasks) {
+    for (const task of tasks) {
       const taskStatus = String(task.status || 'planned');
       if (taskStatus !== 'requested') continue;
       summary.requested_count += 1;
@@ -179,16 +174,15 @@ export function recoverMissionRequestedTasks(
         },
       });
 
-      task.ticket_dispatch = {
+      resumeStamps.set(taskId, {
         ...dispatch,
         work_item_id: workItemId,
         resumed_at: now,
         lease_id: claimed.lease.lease_id,
         lease_expires_at: claimed.lease.expires_at,
         attempt_count: attemptCount,
-      };
+      });
 
-      mutated = true;
       summary.reissued_count += 1;
       summary.recovered_task_ids.push(taskId || workItemId);
       summary.records.push({
@@ -201,8 +195,26 @@ export function recoverMissionRequestedTasks(
       });
     }
 
-    if (mutated) {
-      writeNextTasks(upperMissionId, nextTasks);
+    if (resumeStamps.size > 0) {
+      // Applied to the board read under its writer lease, so a worker's status
+      // write since the read above is kept. A task whose dispatch moved to
+      // another WorkItem meanwhile keeps that dispatch.
+      writeMissionNextTasks(nodePath.dirname(nextTasksPath(upperMissionId)), (onDisk) => {
+        let stamped = false;
+        const next = onDisk.map((task) => {
+          const stamp = resumeStamps.get(String(task.task_id || '').trim());
+          const dispatch =
+            task.ticket_dispatch && typeof task.ticket_dispatch === 'object'
+              ? (task.ticket_dispatch as Record<string, unknown>)
+              : {};
+          if (!stamp || String(dispatch.work_item_id || '').trim() !== stamp.work_item_id) {
+            return task;
+          }
+          stamped = true;
+          return { ...task, ticket_dispatch: stamp };
+        });
+        return stamped ? next : undefined;
+      });
     }
 
     return summary;

@@ -126,25 +126,24 @@ export function applyProcessTemplatePlan(input: {
 
   // Re-planning must not lose progress: carry over the status of tasks whose
   // task_id survives the re-expansion (e.g. --refresh-catalog after a
-  // catalog fix on a partially completed mission).
-  const previousStatus = new Map(
-    existing
-      .filter((task) => typeof task.task_id === 'string' && typeof task.status === 'string')
-      .map((task) => [task.task_id as string, task.status as string])
-  );
-  for (const task of tasks) {
-    const carried = previousStatus.get(task.task_id);
-    if (carried && carried !== 'planned') {
-      (task as unknown as Record<string, unknown>).status = carried;
+  // catalog fix on a partially completed mission). The statuses are read
+  // under the board's writer lease, so a worker's write since is carried too;
+  // a task superseded on disk keeps its supersede record, its replacement and
+  // its dependents' rewrites (M2).
+  writeMissionNextTasks(safeMissionDir, (onDisk) => {
+    const previousStatus = new Map(
+      onDisk
+        .filter((task) => typeof task.task_id === 'string' && typeof task.status === 'string')
+        .map((task) => [task.task_id as string, task.status as string])
+    );
+    for (const task of tasks) {
+      const carried = previousStatus.get(task.task_id);
+      if (carried && carried !== 'planned') {
+        (task as unknown as Record<string, unknown>).status = carried;
+      }
     }
-  }
-
-  // Through the one board writer: a task superseded on disk keeps its
-  // supersede record, its replacement and its dependents' rewrites (M2).
-  writeMissionNextTasks(
-    safeMissionDir,
-    tasks.map((task) => ({ ...task }))
-  );
+    return tasks.map((task) => ({ ...task }));
+  });
 
   const gateDefsDir = safeMissionArtifactPath(safeMissionDir, 'gates/definitions');
   const gatePaths: string[] = [];
@@ -406,21 +405,22 @@ function markPhaseTasksStatus(missionId: string, phase: string, status: string):
   if (!missionDir) return 0;
   const nextTasksPath = safeMissionArtifactPath(missionDir, 'NEXT_TASKS.json');
   if (!safeExistsSync(nextTasksPath)) return 0;
-  const tasks = readTasksSafe(nextTasksPath);
   let changed = 0;
-  for (const task of tasks) {
-    // A superseded task was replaced: a gate verdict on its phase neither
-    // re-runs it (rework) nor counts it as done (completed).
-    if (
-      task.phase === phase &&
-      task.origin === PROCESS_TEMPLATE_TASK_ORIGIN &&
-      task.status !== 'superseded'
-    ) {
-      task.status = status;
-      changed += 1;
+  writeMissionNextTasks(missionDir, (tasks) => {
+    for (const task of tasks) {
+      // A superseded task was replaced: a gate verdict on its phase neither
+      // re-runs it (rework) nor counts it as done (completed).
+      if (
+        task.phase === phase &&
+        task.origin === PROCESS_TEMPLATE_TASK_ORIGIN &&
+        task.status !== 'superseded'
+      ) {
+        task.status = status;
+        changed += 1;
+      }
     }
-  }
-  if (changed > 0) writeMissionNextTasks(missionDir, tasks);
+    return changed > 0 ? tasks : undefined;
+  });
   return changed;
 }
 
