@@ -1336,10 +1336,18 @@ export function detectTier(filePath: string): TierLevel {
 /**
  * Validates read permission based on security-policy.json ADF and Persona.
  */
-export function validateReadPermission(
+export interface ReadPermissionDecision {
+  allowed: boolean;
+  reason?: string;
+  /** Only a generic personal-tier restriction, after resource/tenant/role checks. */
+  denialKind?: 'tier_restriction';
+}
+
+/** Inspect a read decision without broadening any grant or probing file existence. */
+export function inspectReadPermission(
   filePath: string,
   operation: 'read' | 'metadata' = 'read'
-): { allowed: boolean; reason?: string } {
+): ReadPermissionDecision {
   const resolvedPath = path.resolve(filePath);
   const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
   const resourceDenial = requestResourceDenial(relativePath, operation);
@@ -1508,6 +1516,15 @@ export function validateReadPermission(
   return personaTierReadDecision(policy, relativePath, identity);
 }
 
+/** Preserve the established public permission result shape. */
+export function validateReadPermission(
+  filePath: string,
+  operation: 'read' | 'metadata' = 'read'
+): { allowed: boolean; reason?: string } {
+  const { denialKind: _denialKind, ...decision } = inspectReadPermission(filePath, operation);
+  return decision;
+}
+
 /**
  * Tier of a partitioned runtime ledger or durable state's protected prefix
  * (`active/shared/runtime/<ledger>/<tier>/`), or undefined for any other prefix.
@@ -1626,7 +1643,7 @@ function personaTierReadDecision(
   policy: any,
   relativePath: string,
   identity: ReturnType<typeof resolvePolicyIdentityContext>
-): { allowed: boolean; reason?: string } {
+): ReadPermissionDecision {
   const {
     persona: currentPersona,
     role: currentRole,
@@ -1677,7 +1694,11 @@ function personaTierReadDecision(
   if (projectDenial) return projectDenial;
 
   if (pathStartsWith(relativePath, 'knowledge/personal')) {
-    return { allowed: false, reason: policy.tier_restrictions.personal.block_message };
+    return {
+      allowed: false,
+      reason: policy.tier_restrictions.personal.block_message,
+      denialKind: 'tier_restriction',
+    };
   }
   if (pathStartsWith(relativePath, 'knowledge/confidential')) {
     return { allowed: false, reason: policy.tier_restrictions.confidential.block_message };

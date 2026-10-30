@@ -1,4 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('./engine-runtime-preferences.js').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('./engine-runtime-preferences.js', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+}));
 import { pathResolver } from '../path-resolver.js';
 vi.mock('../governance/external-operation.js', () => ({
   runExternalOperation: vi.fn(async (_input, execute) => execute()),
@@ -226,5 +237,49 @@ describe('voice-sample-recorder', () => {
       'record-tool --out "/tmp/voice-sample-recording/rec-2/s2.wav" --sec 12',
       expect.objectContaining({ login: true, timeoutMs: 30000 })
     );
+  });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
+});
+
+describe('recording preference boundaries', () => {
+  const input = {
+    action: 'record_voice_sample' as const,
+    request_id: 'isolated',
+    sample_id: 'sample',
+    duration_sec: 1,
+    prompt_text: 'Read this.',
+  };
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+  it('never reads live personal defaults when an injected environment is provided', async () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    const original = process.platform;
+    Object.defineProperty(process, 'platform', { configurable: true, value: 'linux' });
+    try {
+      const result = await recordVoiceSample(input, {});
+      expect(result.status).toBe('blocked');
+      expect(preferencesReadiness).not.toHaveBeenCalled();
+      expect(mocks.safeExecShellScript).not.toHaveBeenCalled();
+    } finally {
+      Object.defineProperty(process, 'platform', { configurable: true, value: original });
+    }
+  });
+  it('skips lower priority preferences for an environment command and preserves genuine errors', async () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    mocks.recordingWritten = false;
+    vi.stubEnv('KYBERION_AUDIO_RECORD_COMMAND', 'record --out {{output}}');
+    await recordVoiceSample(input);
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+    vi.stubEnv('KYBERION_AUDIO_RECORD_COMMAND', '');
+    await expect(recordVoiceSample(input)).rejects.toThrow('profile denied');
   });
 });

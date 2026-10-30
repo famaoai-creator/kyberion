@@ -160,6 +160,7 @@
     "validation-bundle:export": "node scripts/run_built.mjs dist/scripts/export_validation_bundle.js",
     "verify": "pnpm run typecheck && pnpm run lint && pnpm run test:unit",
     "voice:conversation-config": "node scripts/run_built.mjs dist/scripts/realtime_voice_config.js",
+    "voice:engine-config": "node scripts/run_built.mjs dist/scripts/engine_runtime_config.js",
     "voice:route": "node scripts/run_built.mjs dist/scripts/voice_route_cli.js",
     "voice:upgrade": "node scripts/run_built.mjs dist/scripts/voice_upgrade.js",
     "work": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",

@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import type { AudioChunk } from '../meeting/meeting-session-types.js';
+import { engineRuntimePreferencesReadiness } from './engine-runtime-preferences.js';
 import { pathResolver } from '../path-resolver.js';
 import { logger } from '../core.js';
 import { t } from '../t.js';
@@ -58,7 +59,13 @@ interface AudioCaptureMetrics {
 }
 
 function getRecordingCommand(env: NodeJS.ProcessEnv = process.env): string {
-  return getRegisteredEnvText('KYBERION_AUDIO_RECORD_COMMAND', { env })?.trim() || '';
+  const envValue = getRegisteredEnvText('KYBERION_AUDIO_RECORD_COMMAND', { env })?.trim();
+  if (envValue) return envValue;
+  if (env !== process.env) return '';
+  const readiness = engineRuntimePreferencesReadiness();
+  return readiness.status === 'ready'
+    ? readiness.preferences.audio_record_command?.trim() || ''
+    : '';
 }
 
 function resolveOutputPath(input: RecordVoiceSampleRequest): string {

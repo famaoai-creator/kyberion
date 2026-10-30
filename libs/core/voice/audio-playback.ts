@@ -14,6 +14,7 @@
 
 import { spawn, spawnSync } from 'node:child_process';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { engineRuntimePreferencesReadiness } from './engine-runtime-preferences.js';
 import { coreSeamCatalog, createSeam } from '../seam.js';
 
 export interface PlaybackHandle {
@@ -123,8 +124,16 @@ const builtinAdapters: AudioPlaybackAdapter[] = [
 for (const adapter of builtinAdapters) registerAudioPlaybackAdapter(adapter, 'builtin');
 
 function resolveAudioPlaybackAdapter(backendId?: string): AudioPlaybackAdapter | undefined {
+  const preferred = () => {
+    const readiness = engineRuntimePreferencesReadiness();
+    return readiness.status === 'ready'
+      ? readiness.preferences.audio_playback_backend?.trim()
+      : undefined;
+  };
   const selectedId =
-    backendId?.trim() || getRegisteredEnvText('KYBERION_AUDIO_PLAYBACK_BACKEND')?.trim();
+    backendId?.trim() ||
+    getRegisteredEnvText('KYBERION_AUDIO_PLAYBACK_BACKEND')?.trim() ||
+    preferred();
   const candidates = audioPlaybackSeam
     .list()
     .map((record) => record.implementation)
