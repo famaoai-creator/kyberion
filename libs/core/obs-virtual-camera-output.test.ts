@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { WebSocketServer } from 'ws';
-import { createHash } from 'node:crypto';
 import {
   ObsVirtualCamera,
   validateObsSourceFilterRequest,
@@ -168,12 +167,12 @@ describe('ObsVirtualCamera', () => {
         'SetSourceFilterEnabled',
         'GetSourceFilter',
       ]);
-      const sha = (value: string) => createHash('sha256').update(value).digest('base64');
       expect(server.identifications).toEqual([
         {
           rpcVersion: 1,
           eventSubscriptions: 0,
-          authentication: sha(sha('fixture-passwordsa') + 'ch'),
+          // OBS WebSocket v5 wire vector: fixture-password, salt sa, challenge ch.
+          authentication: 'yDUOe/iLrYv+fMvmHHSMWYURKDIUQ/nrvwXnflGrf7U=',
         },
       ]);
     } finally {
