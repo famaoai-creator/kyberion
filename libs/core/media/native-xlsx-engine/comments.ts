@@ -50,7 +50,9 @@ export function generateVmlDrawing(comments: XlsxComment[], sheetSeq: number): s
     xml +=
       `<v:shape id="_x0000_s${id}" type="#_x0000_t202" ` +
       `style="position:absolute;margin-left:59.25pt;margin-top:1.5pt;width:100.5pt;height:60.75pt;z-index:${i + 1};visibility:hidden" ` +
+      // i18n-exempt: Excel sticky-note default fill (OOXML/VML convention, not UI chrome)
       `fillcolor="#ffffe1" o:insetmode="auto">` +
+      // i18n-exempt: Excel sticky-note default fill (OOXML/VML convention, not UI chrome)
       `<v:fill color2="#ffffe1"/><v:shadow on="t" color="black" obscured="t"/>` +
       `<v:path o:connecttype="none"/><v:textbox style="mso-direction-alt:auto"><div style="text-align:left"></div></v:textbox>` +
       `<x:ClientData ObjectType="Note"><x:MoveWithCells/><x:SizeWithCells/>` +
