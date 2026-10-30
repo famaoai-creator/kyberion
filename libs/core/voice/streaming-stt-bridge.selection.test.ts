@@ -1,6 +1,17 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('./engine-runtime-preferences.js').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('./engine-runtime-preferences.js', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+}));
+
 const record = vi.fn();
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
@@ -46,6 +57,49 @@ describe('streaming STT seam selection', () => {
     vi.unstubAllEnvs();
     resetStreamingSttBridges();
     safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('treats saved synthetic or remote IDs as defaults subject to hard eligibility', () => {
+    fakeBridge('mlx_whisper', { local_only: true, languages: ['ja'] });
+    fakeBridge('remote', { local_only: false, languages: ['ja'] });
+    for (const saved of ['stub', 'remote', 'removed']) {
+      preferencesReadiness.mockReturnValue({
+        status: 'ready',
+        preferences: { version: '1.0.0', streaming_stt_bridge: saved },
+      });
+      const selected = selectStreamingSttBridge({
+        requires: { allowSynthetic: false, localOnly: true, language: 'ja' },
+      });
+      expect(selected).toMatchObject({ bridge_id: 'mlx_whisper', source: 'selected' });
+      expect(selected.decision?.excluded).toContainEqual({
+        id: 'stub',
+        unmet: ['synthetic output not allowed'],
+      });
+      if (saved === 'removed') expect(selected.decision?.rationale).toContain('not registered');
+    }
+  });
+  it('uses eligible saved defaults but skips profile reads for explicit selection or purpose', () => {
+    fakeBridge('mlx_whisper', { local_only: true });
+    preferencesReadiness.mockReturnValue({
+      status: 'ready',
+      preferences: { version: '1.0.0', streaming_stt_bridge: 'mlx_whisper' },
+    });
+    expect(selectStreamingSttBridge().bridge_id).toBe('mlx_whisper');
+    preferencesReadiness.mockReset();
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    expect(selectStreamingSttBridge({ bridgeId: 'stub' }).bridge_id).toBe('stub');
+    selectStreamingSttBridge({ purpose: 'privacy' });
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+    expect(() => selectStreamingSttBridge()).toThrow('profile denied');
+  });
+  it('uses ordinary defaults for an unavailable personal profile', () => {
+    preferencesReadiness.mockReturnValue({
+      status: 'unavailable',
+      reason: 'personal_profile_not_authorized',
+    });
+    expect(selectStreamingSttBridge()).toMatchObject({ bridge_id: 'stub', source: 'default' });
   });
 
   it('declares capabilities: stub synthetic, loopback whisper local, shell undeclared', () => {
@@ -145,4 +199,9 @@ describe('streaming STT seam selection', () => {
     expect(synthetic.decision).toBeUndefined();
     expect(record).not.toHaveBeenCalled();
   });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
 });

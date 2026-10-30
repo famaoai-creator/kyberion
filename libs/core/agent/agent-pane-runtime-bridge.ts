@@ -11,7 +11,18 @@
 
 import type { AgentAdapter } from './agent-adapter.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { engineRuntimePreferencesReadiness } from '../voice/engine-runtime-preferences.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+
+/** Saved operator default; only consulted on the live environment, never on injected test envs. */
+function engineRuntimePreference(
+  key: 'agent_runtime_backend' | 'agent_pane_runtime_provider',
+  env: Record<string, string | undefined>
+): string | undefined {
+  if (env !== process.env) return undefined;
+  const readiness = engineRuntimePreferencesReadiness();
+  return readiness.status === 'ready' ? readiness.preferences[key]?.trim() || undefined : undefined;
+}
 
 export const AGENT_RUNTIME_LAUNCH_MODES = ['pipe', 'pane'] as const;
 export type AgentRuntimeLaunchMode = (typeof AGENT_RUNTIME_LAUNCH_MODES)[number];
@@ -108,7 +119,11 @@ export function resolveAgentRuntimeLaunchMode(
     getRegisteredEnvText('KYBERION_AGENT_RUNTIME_BACKEND', { env }) ||
       env.KYBERION_AGENT_RUNTIME_BACKEND
   );
-  return fromEnv ?? 'pipe';
+  return (
+    fromEnv ??
+    parseAgentRuntimeLaunchMode(engineRuntimePreference('agent_runtime_backend', env)) ??
+    'pipe'
+  );
 }
 
 export function isPaneRuntimeLaunchEnabled(
@@ -123,6 +138,7 @@ function preferredPaneProviderId(
   const raw =
     getRegisteredEnvText('KYBERION_AGENT_PANE_RUNTIME_PROVIDER', { env }) ||
     env.KYBERION_AGENT_PANE_RUNTIME_PROVIDER ||
+    engineRuntimePreference('agent_pane_runtime_provider', env) ||
     '';
   const trimmed = String(raw).trim();
   return trimmed || undefined;
