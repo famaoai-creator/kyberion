@@ -157,6 +157,7 @@ const VITEST_LIVE_SUBTREES = [
   // Internal runtime state a full test run would otherwise leave in the
   // operator's tree.
   'shared/runtime/task-sessions/',
+  'shared/runtime/realtime-voice-conversations/',
   'shared/runtime/work-coordination/',
   'shared/observability/work-coordination/',
   'shared/runtime/feedback-loop/',

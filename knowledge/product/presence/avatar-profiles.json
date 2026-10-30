@@ -2,9 +2,21 @@
   "defaultAgentId": "presence-surface-agent",
   "aliases": {
     "kyberion": "presence-surface-agent",
-    "chronos-mirror": "chronos-agent"
+    "chronos-mirror": "chronos-agent",
+    "aituber": "aituber-aoi"
   },
   "profiles": [
+    {
+      "agentId": "aituber-aoi",
+      "displayName": "Aoi",
+      "defaultAvatarAssetPath": "/assets/avatars/aoi-neutral.svg",
+      "expressionAvatarMap": {
+        "neutral": "/assets/avatars/aoi-neutral.svg",
+        "joy": "/assets/avatars/aoi-joy.svg",
+        "thinking": "/assets/avatars/aoi-thinking.svg",
+        "listening": "/assets/avatars/aoi-listening.svg"
+      }
+    },
     {
       "agentId": "presence-surface-agent",
       "displayName": "Kyberion",
