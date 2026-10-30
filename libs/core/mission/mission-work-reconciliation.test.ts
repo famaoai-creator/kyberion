@@ -15,6 +15,19 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
     await import('../governance/__tests__/sod-overlay-state.js');
   return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
 });
+// A worker's board write landing inside reconcile-work's WorkItem update.
+const workItemHook = vi.hoisted(() => ({ afterUpdate: undefined as undefined | (() => void) }));
+vi.mock('../workforce/work-coordination.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../workforce/work-coordination.js')>();
+  return {
+    ...actual,
+    updateWorkItem: (...args: Parameters<typeof actual.updateWorkItem>) => {
+      const result = actual.updateWorkItem(...args);
+      workItemHook.afterUpdate?.();
+      return result;
+    },
+  };
+});
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
@@ -58,6 +71,7 @@ import {
   reconcileMissionExistingWork,
   type MissionWorkReconciliationManifest,
 } from './mission-work-reconciliation.js';
+import { readMissionNextTasks, writeMissionNextTasks } from './mission-lifecycle-completion.js';
 
 const missionId = 'MSN-WORK-RECONCILIATION-TEST';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -757,6 +771,52 @@ describe('mission existing work reconciliation', () => {
         (entry) => entry.target_path === receiptTargetPath && entry.phase === 'verified'
       )
     ).toHaveLength(1);
+  });
+
+  it('keeps a worker status write made while the work is reconciled', async () => {
+    const workItem = importExternalWorkItem({
+      source: 'local',
+      sourceRef: `mission:${missionId}:implementation`,
+      title: 'Existing implementation',
+      description: 'Implementation completed outside dispatch.',
+      status: 'ready',
+      projectId: missionId,
+      metadata: { mission_id: missionId, task_id: 'implementation' },
+    });
+    prepareMission([
+      {
+        task_id: 'implementation',
+        status: 'planned',
+        description: 'Implement the reconciliation command.',
+        acceptance_criteria: ['The reconciliation command updates only verified tasks.'],
+        dependencies: [],
+        ticket_dispatch: { work_item_id: workItem.item_id },
+      },
+      {
+        task_id: 'worker-task',
+        status: 'in_progress',
+        description: 'Work a worker is finishing.',
+        acceptance_criteria: ['Done.'],
+        dependencies: [],
+      },
+    ]);
+    writeManifest(buildManifest());
+    const approvalRequestId = approveCurrentManifest();
+    workItemHook.afterUpdate = () =>
+      writeMissionNextTasks(missionPath, (onDisk) =>
+        onDisk.map((task) =>
+          task.task_id === 'worker-task' ? { ...task, status: 'completed' } : task
+        )
+      );
+    try {
+      await reconcileMissionExistingWork({ missionId, manifestPath, approvalRequestId });
+    } finally {
+      workItemHook.afterUpdate = undefined;
+    }
+    const statusById = Object.fromEntries(
+      readMissionNextTasks(missionPath).map((task) => [task.task_id, task.status])
+    );
+    expect(statusById).toEqual({ implementation: 'completed', 'worker-task': 'completed' });
   });
 
   it('rejects an artifact hash mismatch', async () => {
