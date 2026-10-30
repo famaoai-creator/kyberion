@@ -46,11 +46,41 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) =>
 // store an intent resolution).
 function routeMessage(message, sender) {
   const type = message?.type;
+  if (INBOX_MESSAGE_TYPES.has(type) || SIDE_PANEL_ONLY_MESSAGE_TYPES.has(type)) {
+    // Mailbox answers, page sends and WebMCP probes are Side Panel actions: a
+    // content script (or any other extension page) must never drive them.
+    if (!isSidePanelSender(sender)) {
+      return Promise.reject(new Error('この操作は Side Panel からのみ実行できます。'));
+    }
+  }
   if (INBOX_MESSAGE_TYPES.has(type)) return withInboxLock(() => handleInboxMessage(message));
   if (type === 'bridge:send-page') return sendPage(message.form || {});
   if (type === 'bridge:get-send-draft') return getSendDraft();
   if (type === 'bridge:probe-webmcp') return probeConnectedTabWebMcp();
   return withStateLock(() => handleMessage(message, sender));
+}
+
+const SIDE_PANEL_ONLY_MESSAGE_TYPES = new Set([
+  'bridge:send-page',
+  'bridge:get-send-draft',
+  'bridge:probe-webmcp',
+]);
+
+// The Side Panel is an extension page: it has no `sender.tab` and its URL is
+// this extension's sidepanel.html.
+function isSidePanelSender(sender) {
+  if (!sender || sender.tab) return false;
+  const url = typeof sender.url === 'string' ? sender.url : '';
+  let expected = '';
+  try {
+    expected = chrome.runtime.getURL('sidepanel.html');
+  } catch {
+    return false;
+  }
+  return (
+    Boolean(expected) &&
+    (url === expected || url.startsWith(`${expected}?`) || url.startsWith(`${expected}#`))
+  );
 }
 
 async function handleTabUpdate(tabId, changeInfo, tab) {
@@ -1755,6 +1785,10 @@ const OBSERVE_PROCEDURE_ID = 'browser-bridge-observe';
 // Leave headroom under the host's 64 KiB respond_request cap.
 const RESPONSE_BUDGET_BYTES = 60_000;
 const LOCAL_INFER_OUTPUT_BUDGET_BYTES = 48_000;
+// WebMCP discovery is page-controlled: bound the in-page wait and the
+// isolated-side wait so a hostile page can never hold the inbox lock.
+const WEBMCP_PAGE_TIMEOUT_MS = 1_500;
+const WEBMCP_PROBE_TIMEOUT_MS = 3_000;
 const NOTIFICATION_PREFIX = 'kyberion-bbr-';
 // 1x1 PNG: chrome.notifications 'basic' requires an iconUrl and the extension
 // ships no icon assets.
@@ -1800,7 +1834,9 @@ function scrubLine(value, max) {
 
 function scrubDeep(value, depth = 0) {
   if (typeof value === 'string') return scrubber()(value);
-  if (depth > 6 || value === null || typeof value !== 'object') return value;
+  if (value === null || typeof value !== 'object') return value;
+  // Past the depth limit nothing unscrubbed may survive: drop the subtree.
+  if (depth > 6) return null;
   if (Array.isArray(value)) return value.slice(0, 200).map((entry) => scrubDeep(entry, depth + 1));
   return Object.fromEntries(
     Object.entries(value)
@@ -2103,7 +2139,7 @@ async function respondRequest(message) {
     }
     wire = await buildObserveResponse(item);
   } else if (item.request_kind === 'local_infer') {
-    wire = buildLocalInferResponse(item, message);
+    return respondLocalInfer(item, message);
   } else if (item.request_kind === 'notify') {
     if (item.payload?.level === 'approval_pending') {
       throw new Error(
@@ -2135,7 +2171,7 @@ async function sendRequestResponse(item, wire) {
     ...(wire.origin ? { origin: wire.origin } : {}),
   };
   if (byteLength(payload) > 64 * 1024) {
-    throw new Error('応答が 64 KiB を超えるため送信できません。');
+    throw new ResponseTooLargeError('応答が 64 KiB を超えるため送信できません。');
   }
   const response = await callNativeHost(payload, 30_000);
   if (!response?.ok) {
@@ -2147,6 +2183,73 @@ async function sendRequestResponse(item, wire) {
     inbox: publicInbox(inbox),
     responded: { request_id: item.request_id, status: response.status || wire.status },
   };
+}
+
+// A completed local_infer answer that cannot be sent (too large even after
+// bounding) is answered as `failed` instead, so the requester is never left
+// waiting on a request the panel silently gave up on.
+async function respondLocalInfer(item, message) {
+  try {
+    return await sendRequestResponse(item, buildLocalInferResponse(item, message));
+  } catch (error) {
+    if (!error?.responseTooLarge) throw error;
+    return sendRequestResponse(item, {
+      status: 'failed',
+      error: `ローカル推論の結果が大きすぎるため送信できませんでした: ${errorText(error)}`,
+    });
+  }
+}
+
+class ResponseTooLargeError extends Error {
+  constructor(message) {
+    super(message);
+    this.responseTooLarge = true;
+  }
+}
+
+// Trim an object output (already scrubbed, plain JSON) until its serialized
+// size fits: shorten the longest string first, then halve the longest array.
+function boundObjectOutput(output, maxBytes) {
+  if (byteLength(output) <= maxBytes) return { output, truncated: false };
+  const bounded = structuredClone(output);
+  for (let guard = 0; guard < 400 && byteLength(bounded) > maxBytes; guard += 1) {
+    let longestString = null;
+    let longestArray = null;
+    const visit = (node) => {
+      if (Array.isArray(node)) {
+        if (!longestArray || node.length > longestArray.length) longestArray = node;
+        node.forEach((entry, index) => {
+          if (typeof entry === 'string') {
+            if (!longestString || entry.length > longestString.length)
+              longestString = { parent: node, key: index, length: entry.length };
+          } else if (entry && typeof entry === 'object') visit(entry);
+        });
+        return;
+      }
+      for (const [key, entry] of Object.entries(node)) {
+        if (typeof entry === 'string') {
+          if (!longestString || entry.length > longestString.length)
+            longestString = { parent: node, key, length: entry.length };
+        } else if (entry && typeof entry === 'object') visit(entry);
+      }
+    };
+    visit(bounded);
+    if (longestString && longestString.length > 256) {
+      const { parent, key } = longestString;
+      parent[key] = parent[key].slice(0, Math.floor(parent[key].length * 0.7));
+    } else if (longestArray && longestArray.length > 1) {
+      longestArray.length = Math.floor(longestArray.length / 2);
+    } else if (longestString && longestString.length > 0) {
+      const { parent, key } = longestString;
+      parent[key] = parent[key].slice(0, Math.floor(parent[key].length / 2));
+    } else {
+      break;
+    }
+  }
+  if (byteLength(bounded) > maxBytes) {
+    throw new ResponseTooLargeError('出力を上限内に収められません。');
+  }
+  return { output: bounded, truncated: true };
 }
 
 function buildLocalInferResponse(item, message) {
@@ -2173,6 +2276,11 @@ function buildLocalInferResponse(item, message) {
   if (typeof output !== 'string' && (output === null || typeof output !== 'object')) {
     throw new Error('ローカル推論の出力が不正です。');
   }
+  if (typeof output !== 'string') {
+    const bounded = boundObjectOutput(output, LOCAL_INFER_OUTPUT_BUDGET_BYTES);
+    output = bounded.output;
+    truncated = truncated || bounded.truncated;
+  }
   return { status: 'completed', result: { provider, task, output, truncated, executable: false } };
 }
 
@@ -2195,10 +2303,18 @@ async function buildObserveResponse(item) {
     );
   }
   await ensureContentScript(tab.id);
-  const fields =
+  const extracted =
     item.payload?.mode === 'structure'
       ? await observeStructureFields(tab.id)
       : await observeTextFields(tab.id);
+  // The tab may have navigated between the origin check above and the
+  // extraction: bind the content to the origin of the document it came from.
+  if (extracted.origin !== origin || (allowed.length > 0 && !allowed.includes(extracted.origin))) {
+    throw new Error(
+      '観測中にページの接続先が変わったため、応答を中止しました。対象のタブを開き直してから許可してください。'
+    );
+  }
+  const { fields } = extracted;
   const webmcp = await probeTabWebMcp(tab.id);
   const observation = {
     schema_version: 'browser-observation.v1',
@@ -2228,7 +2344,7 @@ async function observeTextFields(tabId) {
     { name: 'page_text', text: String(scrubber()(String(source.text || ''))).slice(0, 20_000) },
   ];
   if (source.truncated) fields.push({ name: 'note', text: '本文は上限で切り詰めています。' });
-  return fields;
+  return { fields, origin: originOf(String(source.origin || '')) };
 }
 
 function linkTarget(href) {
@@ -2279,7 +2395,10 @@ async function observeStructureFields(tabId) {
     },
     { name: 'excerpt', text: scrubLine(inspection.textExcerpt, 1000) },
   ];
-  return fields.filter((field) => field.name === 'title' || field.text);
+  return {
+    fields: fields.filter((field) => field.name === 'title' || field.text),
+    origin: originOf(String(inspection.origin || '')),
+  };
 }
 
 function fitObservationToBudget(result, budget) {
@@ -2301,12 +2420,24 @@ function fitObservationToBudget(result, budget) {
 // Runs in the page's MAIN world (serialized by chrome.scripting, so it must be
 // self-contained). Reads the tool list only — names, descriptions and the
 // top-level keys of each input schema. Never calls a tool, never registers one,
-// and never throws on pages without the API.
-async function probeWebMcpTools(limit) {
+// and never throws on pages without the API. Everything here is page-controlled
+// (the API object, the returned list, every property), so listTools() is raced
+// against a timeout, the walk stops at `max`, and only own data properties are
+// read (a getter is never invoked).
+async function probeWebMcpTools(limit, timeoutMs) {
   const max = Math.max(0, Math.min(Number(limit) || 50, 50));
+  const waitMs = Math.max(0, Math.min(Number(timeoutMs) || 1500, 5000));
   const tools = [];
-  let seen = 0;
+  let truncated = false;
   let supported = false;
+  const own = (object, key) => {
+    try {
+      const descriptor = Object.getOwnPropertyDescriptor(object, key);
+      return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    } catch {
+      return undefined;
+    }
+  };
   const text = (value, size) => (typeof value === 'string' ? value.slice(0, size) : '');
   const keysOf = (schema) => {
     let parsed = schema;
@@ -2318,60 +2449,96 @@ async function probeWebMcpTools(limit) {
         return [];
       }
     }
-    const properties = parsed && typeof parsed === 'object' ? parsed.properties : null;
+    if (!parsed || typeof parsed !== 'object') return [];
+    const properties = own(parsed, 'properties');
     if (!properties || typeof properties !== 'object') return [];
-    return Object.keys(properties)
-      .slice(0, 32)
-      .map((key) => key.slice(0, 80));
+    const keys = [];
+    for (const key in properties) {
+      if (keys.length >= 32) break;
+      if (typeof key === 'string' && Object.prototype.hasOwnProperty.call(properties, key)) {
+        keys.push(key.slice(0, 80));
+      }
+    }
+    return keys;
   };
   const collect = (list) => {
     if (!Array.isArray(list)) return;
-    for (const tool of list) {
-      seen += 1;
-      if (tools.length >= max) continue;
+    let length = 0;
+    try {
+      length = Math.max(0, Math.min(Number(list.length) || 0, 10_000));
+    } catch {
+      return;
+    }
+    // Bound the walk itself: skipped (invalid) entries count too.
+    const scanLimit = Math.min(length, max * 4);
+    for (let index = 0; index < scanLimit; index += 1) {
+      if (tools.length >= max) {
+        truncated = true;
+        break;
+      }
       try {
+        const tool = own(list, index);
         if (!tool || typeof tool !== 'object') continue;
-        const name = text(tool.name, 120);
+        const name = text(own(tool, 'name'), 120);
         if (!name) continue;
         tools.push({
           name,
-          description: text(tool.description, 500),
-          input_keys: keysOf(tool.inputSchema ?? tool.input_schema),
+          description: text(own(tool, 'description'), 500),
+          input_keys: keysOf(own(tool, 'inputSchema') ?? own(tool, 'input_schema')),
         });
       } catch {
-        // a hostile getter: skip this entry
+        // a hostile entry: skip it
       }
     }
+    if (length > scanLimit) truncated = true;
   };
+  const withTimeout = (promise) =>
+    Promise.race([
+      Promise.resolve(promise),
+      new Promise((resolve) => setTimeout(() => resolve(undefined), waitMs)),
+    ]);
   try {
     const testing = navigator.modelContextTesting;
     if (testing) supported = true;
-    if (testing && typeof testing.listTools === 'function') collect(await testing.listTools());
+    const listTools = testing ? testing.listTools : undefined;
+    if (typeof listTools === 'function') {
+      collect(await withTimeout(listTools.call(testing)));
+    }
   } catch {
-    // API absent or rejected
+    // API absent, rejected, or timed out
   }
   if (tools.length === 0) {
     try {
       const context = navigator.modelContext;
       if (context) {
         supported = true;
-        collect(Array.isArray(context.tools) ? context.tools : []);
+        collect(context.tools);
       }
     } catch {
       // API absent
     }
   }
-  return { supported, tools, truncated: seen > max };
+  return { supported, tools, truncated };
 }
 
 async function probeTabWebMcp(tabId) {
+  let timer;
   try {
-    const results = await chrome.scripting.executeScript({
+    const probe = chrome.scripting.executeScript({
       target: { tabId },
       world: 'MAIN',
       func: probeWebMcpTools,
-      args: [Inbox.MAX_WEBMCP_TOOLS],
+      args: [Inbox.MAX_WEBMCP_TOOLS, WEBMCP_PAGE_TIMEOUT_MS],
     });
+    // The page can wedge the MAIN-world call (e.g. a hostile setTimeout), so
+    // the isolated side never waits longer than this either.
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('WebMCP の確認がタイムアウトしました。')),
+        WEBMCP_PROBE_TIMEOUT_MS
+      );
+    });
+    const results = await Promise.race([probe, timeout]);
     const raw = results?.[0]?.result;
     // Scrub on the isolated side: page-provided strings are untrusted.
     const sanitized = Inbox.sanitizeWebMcpTools(raw?.tools, scrubber());
@@ -2382,6 +2549,8 @@ async function probeTabWebMcp(tabId) {
     };
   } catch (error) {
     return { supported: false, tools: [], truncated: false, error: errorText(error) };
+  } finally {
+    clearTimeout(timer);
   }
 }
 
@@ -2537,6 +2706,10 @@ Promise.resolve(chrome.alarms.get(MAILBOX_ALARM))
 
 chrome.runtime.onConnect.addListener((port) => {
   if (port?.name !== 'sidepanel') return;
+  if (!isSidePanelSender(port.sender)) {
+    port.disconnect?.();
+    return;
+  }
   sidePanelPorts.add(port);
   port.onDisconnect.addListener(() => {
     sidePanelPorts.delete(port);

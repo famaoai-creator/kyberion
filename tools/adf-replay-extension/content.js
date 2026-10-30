@@ -204,6 +204,9 @@ function inspectPageDOM() {
       inspection: {
         mode: 'extension',
         url: finalUrl,
+        // The document's own origin, so the extension can bind the content to
+        // the origin it checked (observe_tab).
+        origin: window.location.origin,
         title: safeText(title),
         headings,
         inputs,
@@ -889,6 +892,7 @@ function getAiPageSource() {
   return {
     ok: true,
     url: safeUrl,
+    origin: location.origin,
     title: safeTitle,
     text,
     truncated: redactedText.length > text.length,

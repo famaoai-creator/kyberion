@@ -177,6 +177,56 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
     expect(session.destroy).toHaveBeenCalledTimes(1);
   });
 
+  it('gives concurrent callers their own session when clone() is absent', async () => {
+    installBuiltInAi({ summary: 'ok' });
+    const sessions: Array<{ prompt: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }> =
+      [];
+    (g.LanguageModel as Api).create.mockImplementation(async () => {
+      const session = {
+        prompt: vi.fn(async () => JSON.stringify({ summary: 'ok' })),
+        destroy: vi.fn(),
+      };
+      sessions.push(session);
+      return session;
+    });
+    const adapter = await loadAdapter();
+
+    await Promise.all([
+      adapter.summarizeMeeting({ transcript: ['一'], previousSummary: 'x' }),
+      adapter.summarizeMeeting({ transcript: ['二'], previousSummary: 'x' }),
+    ]);
+
+    expect(sessions).toHaveLength(2);
+    sessions.forEach((session) => {
+      expect(session.prompt).toHaveBeenCalledTimes(1);
+      expect(session.destroy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('drops a base whose clone() rejects and retries once on a fresh base', async () => {
+    installBuiltInAi({ summary: 'ok' });
+    const clone = {
+      prompt: vi.fn(async () => JSON.stringify({ summary: 'ok' })),
+      destroy: vi.fn(),
+    };
+    const broken = {
+      clone: vi.fn(async () => Promise.reject(new Error('gone'))),
+      destroy: vi.fn(),
+    };
+    const healthy = { clone: vi.fn(async () => clone), destroy: vi.fn() };
+    (g.LanguageModel as Api).create
+      .mockImplementationOnce(async () => broken)
+      .mockImplementationOnce(async () => healthy);
+    const adapter = await loadAdapter();
+
+    await adapter.summarizeMeeting({ transcript: ['一'], previousSummary: 'x' });
+
+    expect(broken.destroy).toHaveBeenCalledTimes(1);
+    expect(clone.prompt).toHaveBeenCalledTimes(1);
+    expect(clone.destroy).toHaveBeenCalledTimes(1);
+    expect(healthy.destroy).not.toHaveBeenCalled();
+  });
+
   it('drops the oldest speech by token quota and reports truncated', async () => {
     const { session } = installBuiltInAi({ summary: 'ok' });
     Object.assign(session, {

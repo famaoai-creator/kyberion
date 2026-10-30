@@ -6,6 +6,10 @@ import { BROWSER_BRIDGE_OBSERVE_PROCEDURE_ID } from '@agent/core/browser/browser
 
 type MessageListener = (message: any, sender: any, respond: (value: any) => void) => boolean;
 const HASH = 'a'.repeat(64);
+const SIDE_PANEL_SENDER = {
+  id: 'kyberion-test',
+  url: 'chrome-extension://kyberion-test/sidepanel.html',
+};
 
 function recordedEvent(summary: string, ref = '@button_1_1') {
   return {
@@ -102,6 +106,8 @@ async function createHarness() {
         },
       },
       sendMessage: vi.fn(async () => undefined),
+      id: 'kyberion-test',
+      getURL: (resource: string) => `chrome-extension://kyberion-test/${resource}`,
       getManifest: () => ({ version: '0.1.0' }),
       lastError: undefined,
       connectNative: vi.fn(() => {
@@ -202,15 +208,18 @@ async function createHarness() {
   )
     throw new Error('Background listeners were not registered.');
 
-  const send = async (message: Record<string, unknown>, sender: any = {}) =>
+  // Messages default to the Side Panel (an extension page without a tab), the
+  // only sender allowed to drive mailbox / send / discovery messages.
+  const send = async (message: Record<string, unknown>, sender: any = SIDE_PANEL_SENDER) =>
     new Promise<any>((resolve) => {
       messageListener!(message, sender, resolve);
     });
   // A Side Panel `sidepanel` port, as chrome.runtime.connect would deliver it.
-  const connectSidePanel = () => {
+  const connectSidePanel = (sender: any = SIDE_PANEL_SENDER) => {
     const disconnectListeners: Array<() => void> = [];
     const port = {
       name: 'sidepanel',
+      sender,
       posted: [] as any[],
       postMessage: vi.fn((message: any) => port.posted.push(message)),
       onMessage: { addListener: vi.fn() },
@@ -813,6 +822,7 @@ function pageSourceHook(text = 'ページ本文 連絡先 user@example.com') {
       ? {
           ok: true,
           url: 'https://example.com/start',
+          origin: 'https://example.com',
           title: 'Example',
           text: (globalThis as any).__kyberionPiiScrub(text),
           truncated: false,
@@ -1002,6 +1012,7 @@ describe('Browser Bridge mailbox inbox (受信)', () => {
         ? {
             ok: true,
             inspection: {
+              origin: 'https://example.com',
               title: 'Shop',
               headings: [{ level: 'h1', text: '在庫' }],
               inputs: [{ tag: 'input', type: 'text', label: '検索' }],
@@ -1383,5 +1394,239 @@ describe('Browser Bridge WebMCP discovery (read-only)', () => {
     await harness.send({ type: 'bridge:poll-inbox' });
     await harness.send({ type: 'bridge:respond-request', requestId: RID, userAction: true });
     expect(respondCalls(harness)[0].result.webmcp_tools).toHaveLength(2);
+  });
+});
+
+describe('Browser Bridge mailbox hardening', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.unstubAllGlobals();
+  });
+
+  it('times out a WebMCP listTools() that never settles', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const harness = await createHarness();
+    vi.stubGlobal('navigator', {
+      modelContextTesting: { listTools: () => new Promise(() => undefined) },
+    });
+    await harness.send({ type: 'bridge:connect-active-tab' });
+
+    const pending = harness.send({ type: 'bridge:probe-webmcp' });
+    await vi.advanceTimersByTimeAsync(1_600);
+    const response = await pending;
+
+    expect(response.ok).toBe(true);
+    expect(response.webmcp).toMatchObject({ supported: true, tools: [] });
+  });
+
+  it('never lets a wedged WebMCP probe hold the inbox lock', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('observe_tab', { purpose: 'x', mode: 'text' })]);
+    harness.hooks.tabMessage = pageSourceHook();
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    await harness.send({ type: 'bridge:poll-inbox' });
+    harness.chrome.scripting.executeScript.mockImplementation(async (details: any) =>
+      details?.func?.name === 'probeWebMcpTools' ? new Promise(() => undefined) : []
+    );
+
+    const respond = harness.send({
+      type: 'bridge:respond-request',
+      requestId: RID,
+      userAction: true,
+    });
+    const inbox = harness.send({ type: 'bridge:get-inbox' });
+    await vi.advanceTimersByTimeAsync(3_100);
+
+    const answered = await respond;
+    expect(answered.ok).toBe(true);
+    expect(respondCalls(harness)[0].status).toBe('completed');
+    expect(respondCalls(harness)[0].result.webmcp_tools).toBeUndefined();
+    expect((await inbox).ok).toBe(true);
+  });
+
+  it('reads only own data fields of WebMCP tools and stops walking at the cap', async () => {
+    const harness = await createHarness();
+    let reads = 0;
+    const entries = Array.from({ length: 10_000 }, (_, index) => ({
+      name: `tool_${index}`,
+      inputSchema: { properties: { q: {} } },
+    }));
+    const list = new Proxy(entries, {
+      getOwnPropertyDescriptor(target, key) {
+        if (typeof key === 'string' && /^\d+$/.test(key)) reads += 1;
+        return Reflect.getOwnPropertyDescriptor(target, key);
+      },
+      get(target, key, receiver) {
+        if (typeof key === 'string' && /^\d+$/.test(key)) reads += 1;
+        return Reflect.get(target, key, receiver);
+      },
+    });
+    const getter = vi.fn(() => 'from_getter');
+    const hostile = {
+      get name() {
+        throw new Error('boom');
+      },
+    };
+    const sneaky = Object.defineProperty({}, 'name', { get: getter, enumerable: true });
+    vi.stubGlobal('navigator', {
+      modelContextTesting: { listTools: async () => [hostile, sneaky, { name: 'safe' }] },
+    });
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    const first = await harness.send({ type: 'bridge:probe-webmcp' });
+    expect(first.webmcp.tools).toEqual([{ name: 'safe', input_keys: [] }]);
+    expect(getter).not.toHaveBeenCalled();
+
+    vi.stubGlobal('navigator', { modelContextTesting: { listTools: async () => list } });
+    const capped = await harness.send({ type: 'bridge:probe-webmcp' });
+    expect(capped.webmcp.tools).toHaveLength(50);
+    expect(capped.webmcp.truncated).toBe(true);
+    expect(reads).toBeLessThanOrEqual(60);
+  });
+
+  it('accepts mailbox, send and discovery messages only from the Side Panel', async () => {
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('notify', { level: 'info', title: 't', body: 'b' })]);
+    const contentScript = { id: 'kyberion-test', tab: harness.tab, url: harness.tab.url };
+    const otherPage = { id: 'kyberion-test', url: 'chrome-extension://kyberion-test/options.html' };
+    for (const sender of [contentScript, otherPage, {}]) {
+      for (const type of [
+        'bridge:get-inbox',
+        'bridge:poll-inbox',
+        'bridge:respond-request',
+        'bridge:decline-request',
+        'bridge:dismiss-request',
+        'bridge:set-local-infer-auto',
+        'bridge:send-page',
+        'bridge:get-send-draft',
+        'bridge:probe-webmcp',
+      ]) {
+        const response = await harness.send({ type, requestId: RID }, sender);
+        expect(response.ok, type).toBe(false);
+        expect(response.error).toContain('Side Panel');
+      }
+    }
+    expect(harness.nativeCalls).toHaveLength(0);
+
+    // A content script still records events and reads state as before.
+    const state = await harness.send({ type: 'bridge:get-state' }, contentScript);
+    expect(state.ok).toBe(true);
+    // The genuine Side Panel is served.
+    expect((await harness.send({ type: 'bridge:poll-inbox' })).ok).toBe(true);
+  });
+
+  it('ignores a sidepanel port that does not come from the Side Panel', async () => {
+    const harness = await createHarness();
+    mailboxHost(harness, []);
+    const port = harness.connectSidePanel({
+      id: 'kyberion-test',
+      tab: harness.tab,
+      url: harness.tab.url,
+    });
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(0);
+    port.disconnect();
+    harness.connectSidePanel();
+    await flush();
+    expect(pollCalls(harness)).toHaveLength(1);
+  });
+
+  it('bounds an oversized object local_infer output and marks it truncated', async () => {
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('local_infer', { task: 'extract', input: 'x' })]);
+    await harness.send({ type: 'bridge:poll-inbox' });
+
+    const response = await harness.send({
+      type: 'bridge:respond-request',
+      requestId: RID,
+      result: {
+        provider: 'chrome-prompt',
+        task: 'extract',
+        output: {
+          body: 'あ'.repeat(40_000),
+          items: Array.from({ length: 150 }, (_, index) => `item ${index} ${'y'.repeat(400)}`),
+        },
+        truncated: false,
+        executable: false,
+      },
+    });
+
+    expect(response.ok).toBe(true);
+    const [call] = respondCalls(harness);
+    expect(call.status).toBe('completed');
+    expect(call.result.truncated).toBe(true);
+    expect(new TextEncoder().encode(JSON.stringify(call)).length).toBeLessThan(64 * 1024);
+  });
+
+  it('answers failed when an object local_infer output cannot fit', async () => {
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('local_infer', { task: 'extract', input: 'x' })]);
+    await harness.send({ type: 'bridge:poll-inbox' });
+    // Keys are never trimmed, so 64 x 64 long keys cannot be bounded.
+    const key = (index: number) => `${index}`.padEnd(120, 'k');
+    const output = Object.fromEntries(
+      Array.from({ length: 64 }, (_, outer) => [
+        key(outer),
+        Object.fromEntries(Array.from({ length: 64 }, (_, inner) => [key(inner), ''])),
+      ])
+    );
+
+    const response = await harness.send({
+      type: 'bridge:respond-request',
+      requestId: RID,
+      result: { provider: 'chrome-prompt', task: 'extract', output, executable: false },
+    });
+
+    expect(response.ok).toBe(true);
+    const [call] = respondCalls(harness);
+    expect(call.status).toBe('failed');
+    expect(call.error).toContain('大きすぎる');
+    expect(harness.store.browserBridgeInbox.requests).toHaveLength(0);
+  });
+
+  it('drops local_infer output nested past the scrub depth instead of passing it through', async () => {
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('local_infer', { task: 'extract', input: 'x' })]);
+    await harness.send({ type: 'bridge:poll-inbox' });
+    let deep: any = { mail: 'user@example.com' };
+    for (let level = 0; level < 9; level++) deep = { next: deep };
+
+    await harness.send({
+      type: 'bridge:respond-request',
+      requestId: RID,
+      result: {
+        provider: 'chrome-prompt',
+        task: 'extract',
+        output: { 'user@example.com': deep },
+        executable: false,
+      },
+    });
+
+    const [call] = respondCalls(harness);
+    expect(call.status).toBe('completed');
+    expect(JSON.stringify(call.result)).not.toContain('user@example.com');
+  });
+
+  it('aborts observe_tab when the extracted document is from another origin', async () => {
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('observe_tab', { purpose: 'x', mode: 'text' })]);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    await harness.send({ type: 'bridge:poll-inbox' });
+    const source = pageSourceHook();
+    for (const origin of ['https://evil.example', undefined]) {
+      harness.hooks.tabMessage = (message) => {
+        const response: any = source(message);
+        return response ? { ...response, origin } : undefined;
+      };
+      const response = await harness.send({
+        type: 'bridge:respond-request',
+        requestId: RID,
+        userAction: true,
+      });
+      expect(response.ok).toBe(false);
+      expect(response.error).toContain('接続先が変わった');
+    }
+    expect(respondCalls(harness)).toHaveLength(0);
+    expect(harness.store.browserBridgeInbox.requests).toHaveLength(1);
   });
 });
