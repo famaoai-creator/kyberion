@@ -65,8 +65,18 @@ describe('perception feature CLI integration', () => {
     );
     expect(output).not.toHaveBeenCalled();
   });
+  it.each(['601', 'NaN', undefined])(
+    'rejects analysis duration %s before STT or normalization',
+    async (duration) => {
+      const deps = createFakeDeps({ ffprobe: JSON.stringify({ format: { duration } }) });
+      await expect(
+        runListenCommand([audio, '--events', '--audio-model', 'model.tflite'], () => {}, deps)
+      ).rejects.toThrow('duration');
+      expect(deps.calls.filter((c) => c.tool === 'ffmpeg')).toHaveLength(0);
+    }
+  );
   it('analyzes non-speech audio without an installed STT backend', async () => {
-    const deps = createFakeDeps();
+    const deps = createFakeDeps({ ffprobe: JSON.stringify({ format: { duration: '4' } }) });
     const analyzeAudio = vi.fn(async () => ({
       provider: 'test-events',
       speakers: [],
@@ -89,6 +99,7 @@ describe('perception feature CLI integration', () => {
   });
   it('preserves all overlapping speaker labels and tentative attribution', async () => {
     const deps = createFakeDeps({
+      ffprobe: JSON.stringify({ format: { duration: '4' } }),
       bridges: [
         fakeBridge('local', { text: 'hi', segments: [{ start_sec: 0, end_sec: 2, text: 'hi' }] }),
       ],

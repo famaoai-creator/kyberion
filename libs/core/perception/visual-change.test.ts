@@ -79,6 +79,17 @@ describe('grounded visual perception', () => {
       )[0]!.id
     );
   });
+  it('normalizes the canonical OCR-wide 0..100 confidence even below one percent', () => {
+    expect(
+      ocrObservations(source, {
+        status: 'succeeded',
+        provider: 'native',
+        text: '?',
+        confidence: 1,
+        elapsedMs: 1,
+      })[0]!.confidence
+    ).toBe(0.01);
+  });
   it('rejects inverted time ranges and invalid boxes', () => {
     expect(() =>
       observation(source, {
