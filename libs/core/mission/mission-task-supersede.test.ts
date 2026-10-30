@@ -921,6 +921,124 @@ describe('mission_controller supersede-task', () => {
     });
   });
 
+  it('refuses a second approval once the board shows the supersede, whatever the WorkItem says', async () => {
+    prepareMission();
+    const first = approve();
+    await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId: first,
+    });
+    // A worker un-archives the old task's WorkItem.
+    const item = getWorkItem(itemId('task-held'))!;
+    updateWorkItem({ itemId: item.item_id, expectedVersion: item.version, status: 'blocked' });
+    // Refused before a human is asked (the request runs the same checks).
+    expect(() => approve({ reason: 'A second request for the same replacement.' })).toThrow(
+      'already superseded'
+    );
+    const receipt = JSON.parse(
+      String(
+        safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    expect(receipt).toMatchObject({ reason, superseded: { approval_request_id: first } });
+  });
+
+  it('sets aside a receipt naming this approval that a resumed run would not accept', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    // A crafted receipt: this approval's id, but another replacement and reason,
+    // already stamped as audited.
+    safeMkdir(nodePath.join(missionPath, 'evidence/task-supersede'), { recursive: true });
+    safeWriteFile(
+      nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'),
+      JSON.stringify({
+        kind: 'mission-task-supersede-receipt',
+        reason: 'crafted',
+        superseded: {
+          by_task_id: 'task-after',
+          at: '2026-10-01T00:00:00.000Z',
+          actor_id: 'someone',
+          reason_sha256: '0'.repeat(64),
+          approval_request_id: approvalRequestId,
+        },
+        audit_recorded_at: '2026-10-01T00:00:00.000Z',
+      })
+    );
+    const result = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(result.status).toBe('applied');
+    const receipt = JSON.parse(
+      String(
+        safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    expect(receipt).toMatchObject({
+      reason,
+      superseded: { by_task_id: 'task-replacement', approval_request_id: approvalRequestId },
+    });
+    const { auditChain } = await import('../governance/audit-chain.js');
+    expect(
+      auditChain
+        .loadAll()
+        .filter(
+          (entry) =>
+            entry.action === 'mission.task_superseded' &&
+            entry.metadata?.approval_request_id === approvalRequestId
+        )
+    ).toHaveLength(1);
+  });
+
+  it('names a WorkItem-only dependent in the ledger entry of a run that resumed after it was rewired', async () => {
+    prepareMission();
+    createWorkItem({
+      itemId: itemId('task-item-only'),
+      title: 'task-item-only',
+      description: 'task-item-only',
+      status: 'ready',
+      projectId: missionId,
+      source: 'local',
+      sourceRef: `mission:${missionId}:task-item-only`,
+      dependencies: ['task-held'],
+      context: { mission_id: missionId, project_id: missionId, task_id: 'task-item-only' },
+      metadata: { task_id: 'task-item-only', mission_id: missionId },
+    });
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    // The run rewires the WorkItems, then stops at its ledger entry.
+    ledgerFault.failNext = true;
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
+    expect(getWorkItem(itemId('task-item-only'))?.dependencies).toEqual(['task-replacement']);
+    await supersedeMissionTask(input);
+    const entry = String(
+      safeReadFile(nodePath.join(missionPath, 'execution-ledger.jsonl'), { encoding: 'utf8' })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .find((line) => line.event_type === 'task_superseded');
+    expect(
+      (entry?.payload as { rewritten_dependent_task_ids: string[] }).rewritten_dependent_task_ids
+    ).toEqual(['task-after', 'task-item-only']);
+  });
+
   it('never points a late dependent the replacement waits on at the replacement', async () => {
     prepareMission();
     const approvalRequestId = approve();
