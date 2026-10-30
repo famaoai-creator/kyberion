@@ -96,6 +96,8 @@ export async function emitMissionLifecycleIntentSnapshot(input: {
   text?: string;
   traceRef?: string;
   source?: 'user_prompt' | 'mission_state' | 'gate_evaluation' | 'worker_transition' | 'manual';
+  /** Keep provenance independent of whether a lifecycle caller may invoke a model. */
+  extraction?: 'allow_model' | 'canonical_only';
 }): Promise<void> {
   if (!input.missionId) return;
   const source = input.source || 'mission_state';
@@ -120,7 +122,7 @@ export async function emitMissionLifecycleIntentSnapshot(input: {
     const trimmed = String(input.text || '').trim();
     if (trimmed) {
       const intent =
-        source === 'user_prompt'
+        source === 'user_prompt' && input.extraction !== 'canonical_only'
           ? await getIntentExtractor()
               .extract({ text: trimmed })
               .catch(() => ({

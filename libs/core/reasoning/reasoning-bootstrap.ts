@@ -1,6 +1,11 @@
-import { registerTaskBackendFactory } from '../workforce/task-execution-port.js';
+import {
+  registerTaskBackendFactory,
+  registerTaskReasoningBackendFactory,
+} from '../workforce/task-execution-port.js';
+import { constructTaskReasoningBackend } from './reasoning-task-backend.js';
 
 registerTaskBackendFactory((mode) => buildReasoningBackendForMode(mode)?.backend);
+registerTaskReasoningBackendFactory((options) => buildTaskReasoningBackend(options));
 
 /**
  * Reasoning Bootstrap — installs a real reasoning / intent-extraction /
@@ -45,6 +50,11 @@ registerTaskBackendFactory((mode) => buildReasoningBackendForMode(mode)?.backend
 
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import {
+  credentialBindingReadiness,
+  assertCredentialOwner,
+  type CredentialIdentity,
+} from '../foundation/credential-binding.js';
 import type Anthropic from '@anthropic-ai/sdk';
 import { clearReasoningDegraded, markReasoningDegraded } from './reasoning-degradation.js';
 import { loadLlmSelectionPreferences } from '../llm-selection-preferences.js';
@@ -131,6 +141,7 @@ export type { ReasoningBackendMode } from './reasoning-backend-policy.js';
 
 let installed = false;
 let installedMode: ReasoningBackendMode | null = null;
+let installedIdentity: CredentialIdentity | undefined;
 let lastBrokerSelection: {
   resolvedMode: ReasoningBackendMode;
   provider: string;
@@ -515,14 +526,26 @@ export function consultCapabilityBrokerForMode(
  * explicit provider refresh requests a re-selection.
  */
 export function installReasoningBackends(options: InstallReasoningOptions = {}): boolean {
+  // Scope selection never supplies credential authority. Validate before both
+  // provider probes and cache reuse; a blocked refresh must not reset a live chain.
+  const readiness = credentialBindingReadiness();
+  if (readiness.status === 'binding_required') {
+    throw new Error(
+      '[CREDENTIAL_BINDING_REQUIRED] Tenant reasoning requires a trusted task binding; dispatch through a claimed WorkItem.'
+    );
+  }
   const shouldReselect =
     options.refreshProviders === true ||
     kyberionEnv('KYBERION_PROVIDER_CAPABILITY_REFRESH') === '1';
-  if (installed && !shouldReselect) return installedMode !== 'stub';
+  if (installed && !shouldReselect) {
+    if (installedIdentity) assertCredentialOwner(installedIdentity);
+    return installedMode !== 'stub';
+  }
   // A provider registered outside this bootstrap (test seam injection or a
   // custom host bootstrap) already satisfies callers — do not collide with it.
   if (!shouldReselect && hasRegisteredReasoningBackend()) {
     installed = true;
+    installedIdentity = readiness.identity;
     return true;
   }
   if (shouldReselect) {
@@ -535,9 +558,23 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
     resetVoiceBridge();
   }
   const result = _installReasoningBackendsCore(options);
+  installedIdentity = readiness.identity;
   // Python voice bridge must wrap the mode-specific bridge registered above.
   installPythonVoiceBridgeIfAvailable();
   return result;
+}
+
+/** Prepare a dispatch host without probing providers or borrowing operator credentials. */
+export function prepareReasoningExecutionHost(): void {
+  installSecretResolverIfAvailable();
+}
+
+/** Build a claimed task's private chain without replacing process-global reasoning/voice seams. */
+export function buildTaskReasoningBackend(options: InstallReasoningOptions = {}): ReasoningBackend {
+  return constructTaskReasoningBackend(options, {
+    buildBundle: buildReasoningRuntimeBundle,
+    filterChain: filterChainByProviderCapability,
+  });
 }
 
 /**
@@ -587,6 +624,9 @@ function reportResidualStubDegradation(mode: string, reason: string): void {
 }
 
 function _installReasoningBackendsCore(options: InstallReasoningOptions): boolean {
+  // Selection consults secret references, so install the configured resolver
+  // before resolving routes/mode; first and subsequent calls see the same source.
+  installSecretResolverIfAvailable();
   for (const [role, config] of Object.entries(loadReasoningRouteUserConfig().roles || {})) {
     if (config.selection?.mode === 'fixed') {
       resolveReasoningRoute({ role, requestedMode: options.mode, requestedModel: options.model });
@@ -648,7 +688,6 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
     installShellDeploymentAdapterFromConfigIfAvailable();
   }
   installAuditForwarderIfAvailable();
-  installSecretResolverIfAvailable();
   // Embedding backend is independent of reasoning mode; install early.
   installEmbeddingBackendIfAvailable();
 
@@ -874,6 +913,7 @@ export function installAnthropicBackendsIfAvailable(
 
 /** Reset the installed flag. Used by tests; do not call from production code. */
 export function resetReasoningBootstrap(): void {
+  installedIdentity = undefined;
   installed = false;
   installedMode = null;
   lastBrokerSelection = null;

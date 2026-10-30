@@ -58,7 +58,10 @@ import { evaluateDotFeedTriggers } from '@agent/core/dot/dot-feed-source';
 import {
   installReasoningBackends,
   reselectReasoningBackends,
+  prepareReasoningExecutionHost,
 } from '@agent/core/reasoning/reasoning-bootstrap';
+import { credentialBindingReadiness } from '@agent/core/secret/secret-guard';
+import { createSupervisorReasoningRefresh } from './lib/supervisor-reasoning-readiness.js';
 import {
   runDotSupervisorExtensions,
   triggerRunnerSource,
@@ -285,6 +288,12 @@ let lastDotCharterErrors: DotCharterLoadError[] = [];
 const warnedDotCharterErrors = new Set<string>();
 let lastFailureReselectAt = 0;
 let lastStaleCodeWarnAt = 0;
+const supervisorReasoningRefresh = createSupervisorReasoningRefresh({
+  inspect: credentialBindingReadiness,
+  install: installReasoningBackends,
+  reselect: reselectReasoningBackends,
+  logger,
+});
 
 /** Wake failures caused by the reasoning backend, not the dot (reselect may fix them). */
 export function isDotBackendFailure(reason: string | undefined): boolean {
@@ -315,6 +324,7 @@ export function dotSupervisorHeartbeatDetails(nowMs: number = Date.now()): Recor
     );
   }
   return {
+    reasoning_backend: supervisorReasoningRefresh.snapshot(),
     ...(lastDotCharterErrors.length
       ? {
           charter_errors: lastDotCharterErrors.map((entry) => ({
@@ -334,6 +344,7 @@ export function resetDotSweepStateForTests(): void {
   lastFailureReselectAt = 0;
   lastStaleCodeWarnAt = 0;
   dotSweepInFlight = false;
+  supervisorReasoningRefresh.reset();
 }
 
 export async function runDotSweepOnce(
@@ -594,13 +605,16 @@ async function runDotSweepWithStableOutputs(now: Date, deps: DotSweepDeps): Prom
     ) {
       lastFailureReselectAt = now.getTime();
       try {
-        (deps.reselectBackends ?? (() => void reselectReasoningBackends()))();
-        logger.warn(
-          `[dot-sweep] all ${wakeReasons.length} wake(s) failed on the reasoning backend — re-selected backends | next: check \`pnpm reasoning:setup\` if the next sweep fails the same way | evidence: active/shared/runtime/dot-wake-ledger.jsonl`
-        );
+        const refreshed = deps.reselectBackends
+          ? (deps.reselectBackends(), true)
+          : supervisorReasoningRefresh.refresh();
+        if (refreshed)
+          logger.warn(
+            `[dot-sweep] all ${wakeReasons.length} wake(s) failed on the reasoning backend — re-selected backends | next: check \`pnpm reasoning:setup\` if the next sweep fails the same way | evidence: active/shared/runtime/dot-wake-ledger.jsonl`
+          );
       } catch (error) {
         logger.warn(
-          `[dot-sweep] backend reselect failed — ${error instanceof Error ? error.message : error} | next: periodic reselect retries in 30 min | evidence: reasoning-bootstrap`
+          `[dot-sweep] backend reselect failed — ${error instanceof Error ? error.message : error} | next: repair policy/context failures before retrying; readiness is checked on the next refresh | evidence: reasoning-bootstrap`
         );
       }
     }
@@ -1542,28 +1556,14 @@ export async function startAgentRuntimeSupervisorDaemon(
 }
 
 async function main(_args: string[] = []) {
+  // Configure bindTask/factories without acquiring tenant provider credentials.
+  prepareReasoningExecutionHost();
   await startAgentRuntimeSupervisorDaemon();
-  // Dot wakes need a real backend in THIS process: without the bootstrap,
-  // getReasoningBackend() is the deterministic stub.
-  try {
-    if (!installReasoningBackends()) {
-      logger.warn(
-        '[agent-runtime-supervisor-daemon] no real reasoning backend installed — dot wakes fail as unavailable | next: pnpm reasoning:setup (re-selected every 30 min) | evidence: reasoning-bootstrap'
-      );
-    }
-  } catch (error) {
-    logger.warn(
-      `[agent-runtime-supervisor-daemon] reasoning bootstrap failed — ${error instanceof Error ? error.message : error} | next: pnpm reasoning:setup | evidence: reasoning-bootstrap`
-    );
-  }
+  // Daemon liveness and credential-dependent reasoning readiness are separate.
+  // Missing task bindings are re-inspected, not repeatedly sent to providers.
+  supervisorReasoningRefresh.refresh();
   setInterval(() => {
-    try {
-      reselectReasoningBackends();
-    } catch (error) {
-      logger.warn(
-        `[agent-runtime-supervisor-daemon] periodic backend reselect failed — ${error instanceof Error ? error.message : error} | next: retried in 30 min | evidence: reasoning-bootstrap`
-      );
-    }
+    supervisorReasoningRefresh.refresh();
   }, DOT_BACKEND_RESELECT_INTERVAL_MS).unref?.();
   setInterval(() => {
     recordDaemonHeartbeat('agent-runtime-supervisor-daemon', {

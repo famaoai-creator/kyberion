@@ -81,6 +81,33 @@ describe('error-classifier', () => {
     });
   });
 
+  describe('credential execution policy', () => {
+    it('classifies a missing tenant binding as a governed dispatch requirement', () => {
+      const result = classifyError(
+        '[CREDENTIAL_BINDING_REQUIRED] Tenant credentials require a trusted binding'
+      );
+      expect(result).toMatchObject({
+        category: 'governance_block',
+        ruleId: 'credential.binding-required',
+      });
+      expect(result.remediation).toContain('WorkItem dispatch');
+      expect(result.repairAction).toContain('bindTask');
+    });
+
+    it.each(['SCOPE_DENIED', 'OWNER_DENIED'])(
+      'keeps %s distinct from missing credentials',
+      (code) => {
+        const result = classifyError('[CREDENTIAL_' + code + '] Invalid tenant or cached client');
+        expect(result).toMatchObject({
+          category: 'governance_block',
+          ruleId: 'credential.scope-denied',
+        });
+        expect(result.remediation).toContain('conflicting context');
+        expect(result.remediation).not.toContain('API key');
+      }
+    );
+  });
+
   describe('auth / secret rules', () => {
     it('classifies invalid api key', () => {
       const c = classifyError(new Error('Invalid API key'));

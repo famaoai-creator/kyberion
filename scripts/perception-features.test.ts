@@ -193,6 +193,25 @@ describe('perception feature CLI integration', () => {
     );
     expect(query?.search).toHaveLength(1);
   });
+  it('indexes an image whose OCR text is empty', async () => {
+    const deps = createFakeDeps({ ocrText: () => '' });
+    const index = vi.fn(async (_options: unknown) => ({
+      index_id: 'demo',
+      entries: 1,
+      provider: 'test-semantic',
+      expires_at: 'x',
+      index_path: 'x',
+    }));
+    deps.enhancements = { index };
+    const r = await runSeeCommand(
+      [image, '--index', 'demo', '--embedding-model', 'model'],
+      () => {},
+      deps
+    );
+    expect((r?.index as { entries: number }).entries).toBe(1);
+    const entries = (index.mock.calls[0]?.[0] as { entries: Record<string, unknown>[] }).entries;
+    expect(entries[0]).not.toHaveProperty('text');
+  });
   it('rejects missing assets and contradictory switches before inference', async () => {
     for (const args of [
       [image, '--track'],

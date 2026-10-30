@@ -21,7 +21,12 @@ const host = globalThis as typeof globalThis & {
   [KEY]?: AsyncLocalStorage<TaskCredentialBinding>;
 };
 const storage = host[KEY] ?? (host[KEY] = new AsyncLocalStorage<TaskCredentialBinding>());
-type CredentialIdentity = { tenantSlug?: string; missionId?: string; taskId?: string };
+export type CredentialIdentity = { tenantSlug?: string; missionId?: string; taskId?: string };
+
+export interface CredentialBindingReadiness {
+  status: 'operator' | 'bound' | 'binding_required';
+  identity: CredentialIdentity;
+}
 const READER_KEY = Symbol.for('kyberion.core.credential-scope-reader.v1');
 const readerHost = globalThis as typeof globalThis & {
   [READER_KEY]?: () => CredentialIdentity | undefined;
@@ -90,6 +95,27 @@ function checkedBinding(): TaskCredentialBinding | undefined {
     throw new Error('[CREDENTIAL_BINDING_REQUIRED] Tenant credentials require a trusted binding');
   }
   return binding;
+}
+
+/**
+ * Inspect readiness without resolving credentials. A tenant scope is not itself
+ * a credential grant: direct CLI/discovery can report that dispatch binding is
+ * required. Contradictory scopes and stale existing bindings remain hard errors.
+ */
+export function credentialBindingReadiness(): CredentialBindingReadiness {
+  const identity = credentialExecutionIdentity();
+  if (storage.getStore() !== undefined) {
+    checkedBinding();
+    return { status: 'bound', identity };
+  }
+  return { status: identity.tenantSlug ? 'binding_required' : 'operator', identity };
+}
+
+/** Only a missing trusted binding can be treated as optional discovery absence. */
+export function isCredentialBindingRequired(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const codes = error.message.match(/\[CREDENTIAL_[A-Z_]+\]/gu) ?? [];
+  return codes.length > 0 && codes.every((code) => code === '[CREDENTIAL_BINDING_REQUIRED]');
 }
 
 export function hasTaskCredentialBinding(): boolean {

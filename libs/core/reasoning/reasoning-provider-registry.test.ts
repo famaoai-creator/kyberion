@@ -1,4 +1,8 @@
-import { describe, expect, it, afterEach } from 'vitest';
+import { describe, expect, it, afterEach, vi } from 'vitest';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
+import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import * as secretGuardModule from '../secret/secret-guard.js';
 import {
   buildRegisteredReasoningProvider,
   getReasoningProviderDescriptor,
@@ -6,9 +10,14 @@ import {
   parseReasoningProviderDescriptor,
   registerReasoningProvider,
   resetReasoningProviderRegistryForTests,
+  resolveReasoningProviderEnvironment,
 } from './reasoning-provider-registry.js';
 
-afterEach(() => resetReasoningProviderRegistryForTests());
+afterEach(() => {
+  resetReasoningProviderRegistryForTests();
+  vi.unstubAllEnvs();
+  vi.restoreAllMocks();
+});
 
 const STUB_PROFILE = {
   streaming: false,
@@ -134,5 +143,64 @@ describe('reasoning provider registry', () => {
     expect(buildRegisteredReasoningProvider('stub', { force: true })).toBeNull();
     expect(received).toMatchObject({ mode: 'stub', descriptor });
     dispose();
+  });
+
+  it('preserves scope denials and unrelated failures during provider secret discovery', () => {
+    const descriptor = getReasoningProviderDescriptor('anthropic')!;
+    vi.stubEnv('ANTHROPIC_API_KEY', undefined);
+    vi.stubEnv('KYBERION_TENANT', 'INVALID/TENANT');
+    expect(() => resolveReasoningProviderEnvironment(descriptor)).toThrow(
+      '[CREDENTIAL_SCOPE_DENIED]'
+    );
+    runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () =>
+      runInResourceAccessScope(
+        { tenantSlug: 'beta', readExact: [], writeExact: [], mkdirExact: [] },
+        () =>
+          expect(() => resolveReasoningProviderEnvironment(descriptor)).toThrow(
+            '[CREDENTIAL_SCOPE_DENIED]'
+          )
+      )
+    );
+    const failure = new Error('secret resolver unavailable');
+    vi.spyOn(secretGuardModule, 'getSecretForIdentity').mockImplementation(() => {
+      throw failure;
+    });
+    expect(() => resolveReasoningProviderEnvironment(descriptor)).toThrow(failure);
+  });
+
+  it('resolves a matching task binding without using ambient operator credentials', () => {
+    const descriptor = getReasoningProviderDescriptor('anthropic')!;
+    vi.stubEnv('ANTHROPIC_API_KEY', undefined);
+    runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () =>
+      withTaskCredentialBinding(
+        { tenantSlug: 'alpha', secrets: { ANTHROPIC_API_KEY: 'bound-test-key' } },
+        () => {
+          expect(resolveReasoningProviderEnvironment(descriptor).ANTHROPIC_API_KEY).toBe(
+            'bound-test-key'
+          );
+          expect(process.env.ANTHROPIC_API_KEY).toBeUndefined();
+        }
+      )
+    );
+  });
+
+  it('treats a missing credential binding as an unavailable provider secret', () => {
+    const descriptor = getReasoningProviderDescriptor('anthropic');
+    if (!descriptor?.secret_refs?.length)
+      throw new Error('anthropic descriptor must declare secret_refs');
+    const previousTenant = process.env.KYBERION_TENANT;
+    const previousKey = process.env.ANTHROPIC_API_KEY;
+    try {
+      delete process.env.ANTHROPIC_API_KEY;
+      process.env.KYBERION_TENANT = 'vitest-tenant';
+      const resolved = resolveReasoningProviderEnvironment(descriptor);
+      expect(resolved.ANTHROPIC_API_KEY).toBeUndefined();
+      expect(resolved).toBe(process.env);
+    } finally {
+      if (previousTenant === undefined) delete process.env.KYBERION_TENANT;
+      else process.env.KYBERION_TENANT = previousTenant;
+      if (previousKey === undefined) delete process.env.ANTHROPIC_API_KEY;
+      else process.env.ANTHROPIC_API_KEY = previousKey;
+    }
   });
 });

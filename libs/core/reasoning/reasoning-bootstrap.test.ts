@@ -1,3 +1,7 @@
+import * as secretResolver from '../secret/secret-resolver.js';
+import * as backendPolicy from './reasoning-backend-policy.js';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
+import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { logger } from '../core.js';
 import { getIntentExtractor, resetIntentExtractor } from '../intent/intent-extractor.js';
@@ -55,6 +59,50 @@ vi.mock('../provider/provider-capability-registry.js', () => ({
 }));
 
 describe('reasoning-bootstrap', () => {
+  it('installs the secret resolver before secret-aware mode selection', () => {
+    const resolver = vi
+      .spyOn(secretResolver, 'installSecretResolverIfAvailable')
+      .mockReturnValue(false);
+    const original = backendPolicy.resolveReasoningBackendSelectionFromContext;
+    vi.spyOn(backendPolicy, 'resolveReasoningBackendSelectionFromContext').mockImplementation(
+      (input) => {
+        expect(resolver).toHaveBeenCalledTimes(1);
+        return original(input);
+      }
+    );
+    expect(installReasoningBackends({ mode: 'stub' })).toBe(false);
+  });
+
+  it('blocks an unbound tenant refresh before probes without destroying the installed chain', () => {
+    const resolver = vi
+      .spyOn(secretResolver, 'installSecretResolverIfAvailable')
+      .mockReturnValue(false);
+    expect(installReasoningBackends({ mode: 'stub' })).toBe(false);
+    runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () => {
+      expect(() => installReasoningBackends({ refreshProviders: true })).toThrow(
+        '[CREDENTIAL_BINDING_REQUIRED]'
+      );
+    });
+    expect(resolver).toHaveBeenCalledTimes(1);
+    expect(getInstalledReasoningMode()).toBe('stub');
+    expect(installReasoningBackends({ mode: 'stub' })).toBe(false);
+  });
+
+  it('requires a validated refresh instead of reusing another execution identity', () => {
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_TASK_ID', '');
+    expect(installReasoningBackends({ mode: 'stub' })).toBe(false);
+    runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () =>
+      withTaskCredentialBinding({ tenantSlug: 'alpha', secrets: {} }, () => {
+        expect(() => installReasoningBackends({ mode: 'stub' })).toThrow(
+          '[CREDENTIAL_OWNER_DENIED]'
+        );
+        expect(installReasoningBackends({ mode: 'stub', refreshProviders: true })).toBe(false);
+        expect(installReasoningBackends({ mode: 'stub' })).toBe(false);
+      })
+    );
+    expect(() => installReasoningBackends({ mode: 'stub' })).toThrow('[CREDENTIAL_OWNER_DENIED]');
+  });
   function expectCodexExcludedFallback(): void {
     const selectedMode = getInstalledReasoningMode();
     expect(selectedMode).not.toBe('codex-cli');
@@ -71,6 +119,8 @@ describe('reasoning-bootstrap', () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
     if (savedClaudeCode === undefined) delete process.env.CLAUDECODE;
     else process.env.CLAUDECODE = savedClaudeCode;
     resetReasoningBootstrap();

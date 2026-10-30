@@ -2493,3 +2493,20 @@ not change an external handshake. Gates: CodeQL and the OBS virtual-camera tests
 ### Changelog fragment authoring authority
 
 Changelog fragment authoring uses the existing assemble_changelog authority, which owns CHANGELOG.md and changelog.d/. Do not add persistent changelog writes to ecosystem_architect or software_developer: historical one-time grants remain revoked. Verify both the developer denial and the changelog-owned authoring path. Gates: changelog-fragments, tier-guard-stt-changelog, tier-guard-durable-intake-changelog, dot-team-templates and tier-guard-perception-changelog tests.
+
+### Scope-consistent command initialization
+
+Classify and validate command arguments before capability initialization. Help and
+deterministic maintenance must not require provider credentials. Scope selection
+is not a task credential binding: use credentialBindingReadiness for discovery,
+keep service execution strict, and never treat contradictory identity as absence.
+Install the secret resolver before secret-aware backend selection. Cached
+bootstrap reuse is restricted to its creator identity; validate refresh
+prerequisites before resetting the old chain. Daemon heartbeat reports reasoning
+readiness separately from liveness. While binding prerequisites are absent or
+contradictory, inspect them without provider attempts and log state transitions;
+after a successful inspection, provider failures retain periodic recovery so
+same-identity configuration repairs are not stranded. Procedure:
+[command initialization scope](../orchestration/command-initialization-scope.ja.md).
+Gates: credential-binding, reasoning-bootstrap, pipeline-bootstrap-needs,
+voice_cli_bootstrap, supervisor-reasoning-readiness and error-classifier tests.

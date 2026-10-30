@@ -1184,9 +1184,7 @@ export function parseRealtimeVoiceConversationCli(
         : configured?.system_prompt,
     surfaceId: String(argv['surface-id'] || 'presence-studio'),
     sourceId: String(argv['source-id'] || 'local-mic'),
-    ...(argv['avatar-agent-id']
-      ? { avatarAgentId: String(argv['avatar-agent-id']) }
-      : {}),
+    ...(argv['avatar-agent-id'] ? { avatarAgentId: String(argv['avatar-agent-id']) } : {}),
     deliveryMode:
       (argv['delivery-mode'] as DeliveryMode) ??
       configured?.delivery_mode ??
@@ -1278,16 +1276,8 @@ export async function main(
   args: string[] = [],
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
-  await installReasoningBackends();
-  installAvailableSpeechToTextBridges();
-  if (getSpeechToTextBridge().name === 'stub') {
-    await installAppleSpeechToTextBridgeIfAvailable().catch(() => false);
-  }
-  if (getSpeechToTextBridge().name === 'stub') {
-    installAppleSpeechFileToTextBridgeIfAvailable();
-  }
-
   const argv = await createStandardYargs(['node', 'run_realtime_voice_conversation', ...args])
+    .exitProcess(false)
     .option('session-id', { type: 'string', demandOption: true })
     .option('audio', { type: 'string' })
     .option('profile-id', { type: 'string', alias: 'voice-profile-id' })
@@ -1495,7 +1485,17 @@ export async function main(
     .option('record-output-dir', { type: 'string' })
     .parse();
 
+  // Help and malformed commands must not initialize native devices or providers.
+  if (argv.help || argv.h) return;
   const options = parseRealtimeVoiceConversationCli(argv as Record<string, unknown>);
+  await installReasoningBackends();
+  installAvailableSpeechToTextBridges();
+  if (getSpeechToTextBridge().name === 'stub') {
+    await installAppleSpeechToTextBridgeIfAvailable().catch(() => false);
+  }
+  if (getSpeechToTextBridge().name === 'stub') {
+    installAppleSpeechFileToTextBridgeIfAvailable();
+  }
   if (options.interactive) {
     // VAD mode runs the full-duplex loop; 'fixed' keeps the legacy
     // press-Enter / fixed-duration turn recorder.

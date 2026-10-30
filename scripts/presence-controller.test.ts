@@ -37,7 +37,7 @@ describe('presence controller stimulus boundary', () => {
     await main(['--help'], print);
 
     expect(print).toHaveBeenCalledWith(
-      'Usage: pnpm presence-controller <resolve|perceive|prune> [args]'
+      'Usage: pnpm kyberion presence stimuli <resolve|perceive|prune> [args]'
     );
   });
 

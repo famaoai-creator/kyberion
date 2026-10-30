@@ -1,4 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { runInExecutionScope } from '../foundation/execution-scope.js';
+import { withTaskCredentialBinding } from '../foundation/credential-binding.js';
+import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
+import * as geminiApiModule from './gemini-api-backend.js';
 import {
   GeminiEmbeddingBackend,
   isGeminiEmbeddingAvailable,
@@ -15,6 +19,8 @@ describe('gemini embedding backend (KM-02)', () => {
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.restoreAllMocks();
     if (savedGemini === undefined) delete process.env.GEMINI_API_KEY;
     else process.env.GEMINI_API_KEY = savedGemini;
     if (savedGoogle === undefined) delete process.env.GOOGLE_API_KEY;
@@ -43,6 +49,38 @@ describe('gemini embedding backend (KM-02)', () => {
     expect(isGeminiEmbeddingAvailable()).toBe(false);
     process.env.GOOGLE_API_KEY = 'alt-key';
     expect(isGeminiEmbeddingAvailable()).toBe(true);
+  });
+
+  it('treats missing task binding as unavailable but keeps execution strict', async () => {
+    const fetcher = vi.fn();
+    const backend = new GeminiEmbeddingBackend({ fetcher: fetcher as never });
+    await runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, async () => {
+      expect(isGeminiEmbeddingAvailable()).toBe(false);
+      await expect(backend.embed('private input')).rejects.toThrow('[CREDENTIAL_BINDING_REQUIRED]');
+      expect(fetcher).not.toHaveBeenCalled();
+      withTaskCredentialBinding(
+        { tenantSlug: 'alpha', secrets: { GEMINI_API_KEY: 'bound-test-key' } },
+        () => {
+          expect(isGeminiEmbeddingAvailable()).toBe(true);
+        }
+      );
+    });
+  });
+
+  it('rethrows scope denials and unrelated availability failures', () => {
+    vi.stubEnv('KYBERION_TENANT', 'INVALID/TENANT');
+    expect(() => isGeminiEmbeddingAvailable()).toThrow('[CREDENTIAL_SCOPE_DENIED]');
+    runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () =>
+      runInResourceAccessScope(
+        { tenantSlug: 'beta', readExact: [], writeExact: [], mkdirExact: [] },
+        () => expect(() => isGeminiEmbeddingAvailable()).toThrow('[CREDENTIAL_SCOPE_DENIED]')
+      )
+    );
+    const failure = new Error('provider key resolution failed');
+    vi.spyOn(geminiApiModule, 'resolveGeminiApiKey').mockImplementation(() => {
+      throw failure;
+    });
+    expect(() => isGeminiEmbeddingAvailable()).toThrow(failure);
   });
 
   it('embeds a single text and normalizes the vector', async () => {
