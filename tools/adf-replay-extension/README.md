@@ -11,7 +11,7 @@ Chrome の現在タブで操作意図を記録し、Kyberion が review でき�
 - 操作の直後に `role="status"` の完了表示（例：「保存しました」）が出て落ち着くと、それを待つ `wait_for_ref` ステップとして自動で記録（Review で承認/除外できます）。手順の golden シナリオはこの表示を成功条件に使うため、実行後に本当に成功したかを判定できます。記録の対象外：`role="alert"`、操作前から出ていた表示、PII 除去で伏せ字になった文言
 - Native Messaging host 経由で Kyberion の preflight / 承認 / lease 発行 / Chrome 実行 / receipt 生成に接続
 - preflight は browser-actuator の `browser` パイプライン step `op: extension_session`（`actuator-op-registry.json`）で検証
-- Chrome 138 以降で利用可能な Built-in AI（`Summarizer` / `LanguageModel`）による、redaction 済みページ本文・抽出観測のローカル要約とシナリオ候補抽出（候補は実行不可）
+- Chrome 138 以降で利用可能な Built-in AI（Prompt API〔トークン残量の確認・ストリーミング・中断に対応〕、Summarizer、Translator、LanguageDetector、および機能検出できる場合のみ Writer / Rewriter / Proofreader と画像入力）による、redaction 済みページ本文・抽出観測のローカル要約とシナリオ候補抽出（候補は実行不可）
 - シナリオ候補の目的を確認して intent 入力へ渡し、既存の Pattern B（照合・承認・実行）または Pattern A（記録・Review）へ進む導線
 - **受信タブ**: Kyberion からの依頼（ページ観測・ローカル推論・お知らせ）と承認待ちを表示。ページ観測は「許可して応答」を押したときだけ応答
 - **送信タブ / 右クリック「Kyberion に送る」**: ページ本文または選択範囲を、PII 除去済みで intent またはナレッジとして送る（右クリックは下書きを入れるだけで、自動送信しない）
@@ -39,6 +39,16 @@ Kyberion から拡張への連絡は、拡張が Native Messaging host に問い
 2. 送信方法を選ぶ: **intent**（やりたいことを書くと登録済み手順と照合し、見つかれば Intent タブから Pattern B で実行できます）または **knowledge**（ナレッジとして取り込みます）。
 3. 保存先の区分を選ぶ: personal（既定）/ confidential（テナント slug が必要）/ public（「公開してよい内容です」の確認が必要）。
 4. PII 除去済みのプレビューを確認して「Kyberion に送信」。
+
+## 既存の導入を更新する
+
+すでに拡張を読み込み済みの環境で、この版へ更新する手順です。
+
+1. Kyberion 側を更新したら `pnpm build`（または `pnpm build:actuators`）で `dist/scripts/browser_bridge_host.js` を作り直します。host スクリプトに `poll_requests` / `respond_request` / `send_page` が加わったためです。
+2. `chrome://extensions` で、読み込み済みの拡張（unpacked）の「再読み込み」を押します。
+3. Chrome が新しい権限 `alarms` / `contextMenus` / `notifications` の承認を求めるので受け入れます。拒否すると受信箱の定期問い合わせ、右クリック送信、通知が動きません。
+4. native host の再導入（`native-host/install.sh`）は、通常は不要です。host の manifest（`com.kyberion.browser_bridge.json`）は変わっておらず、Chrome が起動するのは同じ `launch.sh` です。拡張 ID を変えた、リポジトリの場所を移した、`node` を入れ替えたなど、manifest の `path` や `allowed_origins` が変わる場合だけ再実行し、Chrome を完全に終了して開き直します。
+5. 確認: Side Panel に「受信」タブが表示されること。続けて `pnpm kyberion browser-bridge request notify --title test --body hello` を実行し、1 分以内（Side Panel を開いていれば 5 秒以内）に受信タブへ届けば完了です。
 
 ## 権限
 

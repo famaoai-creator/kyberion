@@ -15,26 +15,36 @@ preflight · approval gate · lease issuance · receipt validation
 
 ## Messages
 
-| type                    | input                                                                         | output                                                                                                                               |
-| ----------------------- | ----------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `ping`                  | –                                                                             | `{ ok, pong, host_version }`                                                                                                         |
-| `preflight`             | `recording`, `session`                                                        | `{ ok, status, approval_required, candidate }`                                                                                       |
-| `request_execution`     | `recording`, `session`, `agentId?`                                            | `{ ok, status: 'authorized' \| 'approval_required', lease? }`                                                                        |
-| `compile_pipeline`      | `recording`, `pipelineId?`                                                    | `{ ok, status: 'draft', draft }`                                                                                                     |
-| `extend_lease`          | `lease`, `recording`, `session`                                               | `{ ok, status: 'extended', lease }`                                                                                                  |
-| `submit_receipt`        | `receipt`                                                                     | `{ ok, status: 'recorded', receipt_id, evidence_path }`                                                                              |
-| `resolve_intent`        | `intent`, `origin?`, `substrate?`                                             | `{ ok, resolution }`                                                                                                                 |
-| `prepare_procedure`     | `procedure_id`                                                                | `{ ok, inputs, has_inputs }` (no side effects)                                                                                       |
-| `dispatch_procedure`    | `procedure_id`, `origin`, `tab_id`                                            | `{ ok, status: 'dispatched' \| 'dispatched_segmented' \| 'approval_required', lease?/segments?, compiled_steps?, golden_scenario? }` |
-| `save_recording`        | `recording`                                                                   | `{ ok, recording_ref, recording_id }`                                                                                                |
-| `promote_procedure`     | `recording`, `procedure_id`, `intent_phrases[]`                               | `{ ok, status: 'registered', procedure_id, recording_ref, procedure }`                                                               |
-| `save_procedure_delta`  | `procedure_id`, `anchor_step_index`, `error`, `step?`, `delta_recording_ref?` | `{ ok, status: 'classified' \| 'delta_saved', reason, delta_path? }`                                                                 |
-| `apply_procedure_delta` | `procedure_id`, `delta_path`                                                  | `{ ok, status: 'merged', merged_recording_ref }`                                                                                     |
+| type                    | input                                                                                                  | output                                                                                                                                       |
+| ----------------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ping`                  | –                                                                                                      | `{ ok, pong, host_version }`                                                                                                                 |
+| `preflight`             | `recording`, `session`                                                                                 | `{ ok, status, approval_required, candidate }`                                                                                               |
+| `request_execution`     | `recording`, `session`, `agentId?`                                                                     | `{ ok, status: 'authorized' \| 'approval_required', lease? }`                                                                                |
+| `compile_pipeline`      | `recording`, `pipelineId?`                                                                             | `{ ok, status: 'draft', draft }`                                                                                                             |
+| `extend_lease`          | `lease`, `recording`, `session`                                                                        | `{ ok, status: 'extended', lease }`                                                                                                          |
+| `submit_receipt`        | `receipt`                                                                                              | `{ ok, status: 'recorded', receipt_id, evidence_path }`                                                                                      |
+| `resolve_intent`        | `intent`, `origin?`, `substrate?`                                                                      | `{ ok, resolution }`                                                                                                                         |
+| `prepare_procedure`     | `procedure_id`                                                                                         | `{ ok, inputs, has_inputs }` (no side effects)                                                                                               |
+| `dispatch_procedure`    | `procedure_id`, `origin`, `tab_id`                                                                     | `{ ok, status: 'dispatched' \| 'dispatched_segmented' \| 'approval_required', lease?/segments?, compiled_steps?, golden_scenario? }`         |
+| `save_recording`        | `recording`                                                                                            | `{ ok, recording_ref, recording_id }`                                                                                                        |
+| `promote_procedure`     | `recording`, `procedure_id`, `intent_phrases[]`                                                        | `{ ok, status: 'registered', procedure_id, recording_ref, procedure }`                                                                       |
+| `save_procedure_delta`  | `procedure_id`, `anchor_step_index`, `error`, `step?`, `delta_recording_ref?`                          | `{ ok, status: 'classified' \| 'delta_saved', reason, delta_path? }`                                                                         |
+| `apply_procedure_delta` | `procedure_id`, `delta_path`                                                                           | `{ ok, status: 'merged', merged_recording_ref }`                                                                                             |
+| `poll_requests`         | –                                                                                                      | `{ ok, requests[], ... }` — deliverable mailbox requests (pending → delivered; lapsed ones expire) plus a read-only pending-approval summary |
+| `respond_request`       | `request_id`, `status`, `result?`, `error?`, `origin?`                                                 | `{ ok, ... }` — the extension's answer, validated and re-redacted by the mailbox                                                             |
+| `send_page`             | `mode: 'intent' \| 'knowledge'`, `tier`, `tenant_slug?`, `confirm_public?`, page `title`/`text`/origin | `{ ok, ... }` — the operator explicitly sends the current page or selection (PII-redacted) for intent matching or knowledge ingestion        |
 
 `request_execution` / `dispatch_procedure` return `approval_required` (with a
 `request_id`) when the recording contains high-risk actions that have no granted
 approval yet. Once the approval is granted in Kyberion, calling again returns an
 `authorized`/`dispatched` lease.
+
+Kyberion → extension traffic is a **pull mailbox**: the host never listens, the
+extension asks via `poll_requests`. Requests are created with
+`pnpm kyberion browser-bridge request observe|infer|notify` and stored at
+`active/shared/runtime/browser-bridge-mailbox/<tier>/<tenant|shared>/<request_id>.json`.
+Response outputs are never executable, and approvals shown in the extension are
+display-only (approve in the terminal with `pnpm kyberion approvals --approve <id>`).
 
 `dispatch_procedure` is the Pattern B (resolve-and-execute) entry point: it loads
 the reviewed recording referenced by the catalog entry's `adapter.recording_ref`
