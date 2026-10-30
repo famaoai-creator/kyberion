@@ -1185,7 +1185,9 @@ export async function reconcileMissionExistingWork(input: {
       };
     }
 
-    // A re-run repairing an earlier partial run records only what that run did not.
+    // Once per task and manifest: a re-run after an earlier run stopped part-way
+    // (WorkItems closed, or a board-only mission whose board write failed)
+    // records only what that run did not.
     const ledger = readMissionExecutionLedger(missionId, missionPath);
     const ledgerHas = (eventType: string, taskId: string): boolean =>
       ledger.some(
@@ -1202,12 +1204,7 @@ export async function reconcileMissionExistingWork(input: {
       ) {
         continue;
       }
-      if (
-        boardRepairedTaskIds.includes(manifestTask.task_id) &&
-        ledgerHas('existing_work_reconciled', manifestTask.task_id)
-      ) {
-        continue;
-      }
+      if (ledgerHas('existing_work_reconciled', manifestTask.task_id)) continue;
       appendMissionExecutionLedgerEntry({
         mission_id: missionId,
         mission_path_hint: missionPath,
@@ -1229,12 +1226,7 @@ export async function reconcileMissionExistingWork(input: {
       ...resultBase.auto_completed_repair_task_ids,
       ...boardRepairedTaskIds.filter((taskId) => taskId === 'repair-finish-exit'),
     ]) {
-      if (
-        boardRepairedTaskIds.includes(repairTaskId) &&
-        ledgerHas('existing_work_reconciliation_repair_completed', repairTaskId)
-      ) {
-        continue;
-      }
+      if (ledgerHas('existing_work_reconciliation_repair_completed', repairTaskId)) continue;
       appendMissionExecutionLedgerEntry({
         mission_id: missionId,
         mission_path_hint: missionPath,
