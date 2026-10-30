@@ -34,7 +34,7 @@ import {
 } from '@agent/core/governance/cli-operator-principal';
 import { pathResolver } from '@agent/core/path-resolver';
 import { classifyPromotionSourceScope, isUnknownTierSource } from '@agent/core/scratch-promotion';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeReadFile, safeRealpath } from '@agent/core/secure-io';
 import {
   partitionedRuntimeStateKnowledgePath,
   type StorageDataTier,
@@ -154,29 +154,19 @@ function fail(message: string): never {
 
 const TIER_RANK: Record<StorageDataTier, number> = { public: 0, confidential: 1, personal: 2 };
 
-/**
- * Refuse an `--input-file` whose location carries a higher tier than the
- * requested scope, or another tenant's data. Classification reuses the
- * governed helpers: tiered trees (`knowledge/`, `active/{missions,projects,
- * organizations}/`), the storage floors, and the partitioned runtime state
- * roots (mapped onto their `knowledge/<tier>/<tenant>/` rules). An
- * unpartitioned (legacy) floor path has an unknown tier, so it may not be sent
- * as public. Anything else keeps the requested scope.
- */
-export function assertInputFileScope(
+function toRepoRelative(absolute: string, root: string): string | undefined {
+  const relative = path.relative(root, absolute).split(path.sep).join('/');
+  if (relative === '..' || relative.startsWith('../') || path.isAbsolute(relative))
+    return undefined;
+  return relative;
+}
+
+/** Fails when one repo-relative location carries a stricter scope than requested. */
+function assertLocationWithinScope(
+  relative: string,
   filePath: string,
   scope: { tier: StorageDataTier; tenant_slug?: string }
 ): void {
-  // Classify the logical repo-relative location (rootResolve may relocate
-  // runtime roots, e.g. per test pool); an absolute path is made repo-relative.
-  const relative = (
-    path.isAbsolute(filePath)
-      ? path.relative(pathResolver.rootResolve('.'), path.resolve(filePath))
-      : path.normalize(filePath)
-  )
-    .split(path.sep)
-    .join('/');
-  if (relative.startsWith('../') || relative === '..' || path.isAbsolute(relative)) return;
   const source = classifyPromotionSourceScope(
     partitionedRuntimeStateKnowledgePath(relative) ?? relative
   );
@@ -205,6 +195,51 @@ export function assertInputFileScope(
         `it cannot be sent in the ${requested} scope. Pass --tenant ${source.tenant}.`
     );
   }
+}
+
+/**
+ * Refuse an `--input-file` whose location carries a higher tier than the
+ * requested scope, or another tenant's data, and return the canonical path to
+ * read. Classification reuses the governed helpers: tiered trees
+ * (`knowledge/`, `active/{missions,projects,organizations}/`), the storage
+ * floors, and the partitioned runtime state roots (mapped onto their
+ * `knowledge/<tier>/<tenant>/` rules). An unpartitioned (legacy) floor path
+ * has an unknown tier, so it may not be sent as public. Anything else keeps
+ * the requested scope.
+ *
+ * Both the written path and its canonical path (`safeRealpath`, every symlink
+ * — leaf or parent — resolved) are classified and the stricter wins, so a
+ * link in `active/shared/tmp/` cannot launder `knowledge/confidential/<a>/`.
+ * The written form still counts because `rootResolve` may relocate runtime
+ * roots (e.g. per test pool), where only the logical path classifies. A path
+ * that does not resolve inside the repository is refused.
+ */
+export function assertInputFileScope(
+  filePath: string,
+  scope: { tier: StorageDataTier; tenant_slug?: string }
+): string {
+  const root = pathResolver.rootResolve('.');
+  const absolute = path.isAbsolute(filePath)
+    ? path.resolve(filePath)
+    : pathResolver.rootResolve(filePath);
+  let canonical: string;
+  let canonicalRoot: string;
+  try {
+    canonical = safeRealpath(absolute);
+    canonicalRoot = safeRealpath(root);
+  } catch {
+    fail(`--input-file ${filePath} does not resolve to a readable path inside the repository`);
+  }
+  const written = path.isAbsolute(filePath)
+    ? toRepoRelative(absolute, root)
+    : path.normalize(filePath).split(path.sep).join('/');
+  const real = toRepoRelative(canonical, canonicalRoot);
+  if (written === undefined || written.startsWith('../') || written === '..' || !real) {
+    fail(`--input-file ${filePath} does not resolve to a readable path inside the repository`);
+  }
+  assertLocationWithinScope(written, filePath, scope);
+  if (real !== written) assertLocationWithinScope(real, filePath, scope);
+  return canonical;
 }
 
 function text(options: Record<string, string | boolean>, flag: string): string | undefined {
@@ -256,7 +291,8 @@ function buildRequest(
     const inline = text(options, '--input');
     const file = text(options, '--input-file');
     if (Boolean(inline) === Boolean(file)) fail('give exactly one of --input or --input-file');
-    if (file) assertInputFileScope(file, common.scope);
+    // Read the canonical path that was classified, not the link that named it.
+    const canonicalFile = file ? assertInputFileScope(file, common.scope) : undefined;
     let taskOptions: Record<string, unknown> | undefined;
     const rawOptions = text(options, '--options-json');
     if (rawOptions) {
@@ -272,7 +308,7 @@ function buildRequest(
       request_kind: 'local_infer',
       payload: {
         task,
-        input: inline ?? deps.readFile(file as string),
+        input: inline ?? deps.readFile(canonicalFile as string),
         ...(taskOptions ? { options: taskOptions } : {}),
       },
       ...common,

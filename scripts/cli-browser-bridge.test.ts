@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeRmSync } from '@agent/core/secure-io';
+import { withExecutionContext } from '@agent/core/authority';
+import { safeMkdir, safeRmSync, safeSymlinkSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   BROWSER_BRIDGE_MAILBOX_ROOT,
   awaitBrowserBridgeResponse,
@@ -159,6 +160,61 @@ describe('pnpm kyberion browser-bridge', () => {
     await infer('knowledge/public/guide.md', '--tier', 'public');
     await infer('docs/README.md', '--tier', 'public');
     expect(readFile).toHaveBeenCalledTimes(5);
+  });
+
+  it('classifies the symlink target of an --input-file, not just the written path', async () => {
+    const job = `bb-cli-symlink-${process.pid}-${Date.now()}`;
+    const tmpDir = `active/shared/tmp/${job}`;
+    const targetDir = `active/shared/staging/confidential/acme/${job}`;
+    const sovereign = (fn: () => void) =>
+      withExecutionContext('sovereign_concierge', fn, 'sovereign');
+    try {
+      sovereign(() => {
+        safeMkdir(pathResolver.rootResolve(targetDir), { recursive: true });
+        safeWriteFile(pathResolver.rootResolve(`${targetDir}/secret.txt`), 'acme secret');
+        safeMkdir(pathResolver.rootResolve(tmpDir), { recursive: true });
+        safeSymlinkSync(
+          pathResolver.rootResolve(`${targetDir}/secret.txt`),
+          pathResolver.rootResolve(`${tmpDir}/leaf.txt`),
+          'file'
+        );
+        safeSymlinkSync(
+          pathResolver.rootResolve(targetDir),
+          pathResolver.rootResolve(`${tmpDir}/dir`),
+          'dir'
+        );
+      });
+      const readFile = vi.fn((filePath: string) => `read:${filePath}`);
+      const enqueue = vi.fn(((input) => ({
+        request_id: 'BBR-x',
+        ...input,
+      })) as typeof enqueueBrowserBridgeRequest);
+      const infer = (file: string, ...scope: string[]) =>
+        run(
+          ['request', 'infer', '--task', 'summarize', '--input-file', file, ...scope],
+          deps({ readFile, enqueue })
+        );
+      // The written path is plain legacy scratch; the target is acme's confidential staging.
+      await expect(infer(`${tmpDir}/leaf.txt`)).rejects.toThrow(/belongs to tenant 'acme'/);
+      await expect(infer(`${tmpDir}/dir/secret.txt`)).rejects.toThrow(/belongs to tenant 'acme'/);
+      await expect(
+        infer(`${tmpDir}/leaf.txt`, '--tier', 'confidential', '--tenant', 'other')
+      ).rejects.toThrow(/belongs to tenant 'acme'/);
+      // Outside the repository is refused outright.
+      await expect(infer('/etc/hosts')).rejects.toThrow(/inside the repository/);
+      expect(readFile).not.toHaveBeenCalled();
+      // The owning scope is accepted, and the canonical (checked) path is what gets read.
+      await infer(`${tmpDir}/leaf.txt`, '--tier', 'confidential', '--tenant', 'acme');
+      expect(readFile).toHaveBeenCalledTimes(1);
+      expect(readFile.mock.calls[0][0]).toMatch(
+        new RegExp(`active/shared/staging/confidential/acme/${job}/secret\\.txt$`)
+      );
+    } finally {
+      sovereign(() => {
+        safeRmSync(pathResolver.rootResolve(tmpDir), { recursive: true, force: true });
+        safeRmSync(pathResolver.rootResolve(targetDir), { recursive: true, force: true });
+      });
+    }
   });
 
   it('waits for the extension answer', async () => {
