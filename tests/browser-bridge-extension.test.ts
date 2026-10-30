@@ -1631,3 +1631,98 @@ describe('Browser Bridge mailbox hardening', () => {
     expect(harness.store.browserBridgeInbox.requests).toHaveLength(1);
   });
 });
+
+describe('Browser Bridge observe_tab page stalls', () => {
+  afterEach(() => vi.useRealTimers());
+
+  const never = () => new Promise<never>(() => undefined);
+
+  it('does not block concurrent polls or declines while the page is stalled', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const harness = await createHarness();
+    mailboxHost(harness, [
+      mailboxRequest('observe_tab', { purpose: 'x', mode: 'text' }),
+      mailboxRequest('notify', { level: 'info', title: 'i', body: 'b' }, { request_id: RID2 }),
+    ]);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    await harness.send({ type: 'bridge:poll-inbox' });
+    // An open alert() in the page: the content script never answers.
+    harness.hooks.tabMessage = (message: { type: string }) =>
+      message.type === 'bridge:ping' ? never() : undefined;
+
+    let settled = false;
+    const respond = harness.send({
+      type: 'bridge:respond-request',
+      requestId: RID,
+      userAction: true,
+    });
+    void respond.then(() => {
+      settled = true;
+    });
+    await vi.advanceTimersByTimeAsync(0);
+
+    expect((await harness.send({ type: 'bridge:poll-inbox' })).ok).toBe(true);
+    const declined = await harness.send({ type: 'bridge:decline-request', requestId: RID2 });
+    expect(declined.ok).toBe(true);
+    expect(respondCalls(harness)).toEqual([
+      expect.objectContaining({ request_id: RID2, status: 'declined' }),
+    ]);
+    expect(settled).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(10_100);
+    expect((await respond).ok).toBe(false);
+  });
+
+  it('fails an observe_tab with a timeout error and sends nothing when extraction stalls', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('observe_tab', { purpose: 'x', mode: 'text' })]);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    await harness.send({ type: 'bridge:poll-inbox' });
+    harness.hooks.tabMessage = (message: { type: string }) =>
+      message.type === 'bridge:get-ai-page-source' ? never() : undefined;
+
+    const respond = harness.send({
+      type: 'bridge:respond-request',
+      requestId: RID,
+      userAction: true,
+    });
+    await vi.advanceTimersByTimeAsync(10_100);
+    const response = await respond;
+
+    expect(response.ok).toBe(false);
+    expect(response.error).toContain('ページの応答がない');
+    expect(respondCalls(harness)).toHaveLength(0);
+    expect(harness.store.browserBridgeInbox.requests).toHaveLength(1);
+  });
+
+  it('does not answer an observe_tab that was declined while its page was read', async () => {
+    const harness = await createHarness();
+    mailboxHost(harness, [mailboxRequest('observe_tab', { purpose: 'x', mode: 'text' })]);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    await harness.send({ type: 'bridge:poll-inbox' });
+    let release: (value: unknown) => void = () => undefined;
+    const source = pageSourceHook();
+    harness.hooks.tabMessage = (message: { type: string }) =>
+      message.type === 'bridge:get-ai-page-source'
+        ? new Promise((resolve) => {
+            release = () => resolve(source(message));
+          })
+        : undefined;
+
+    const respond = harness.send({
+      type: 'bridge:respond-request',
+      requestId: RID,
+      userAction: true,
+    });
+    await flush();
+    expect((await harness.send({ type: 'bridge:decline-request', requestId: RID })).ok).toBe(true);
+    release(undefined);
+    const response = await respond;
+
+    expect(response.ok).toBe(false);
+    expect(respondCalls(harness)).toEqual([
+      expect.objectContaining({ request_id: RID, status: 'declined' }),
+    ]);
+  });
+});

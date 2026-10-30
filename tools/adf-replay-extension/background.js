@@ -53,6 +53,9 @@ function routeMessage(message, sender) {
       return Promise.reject(new Error('この操作は Side Panel からのみ実行できます。'));
     }
   }
+  // Answering observe_tab reads the page, which the page can stall (an open
+  // alert(), a busy main thread): that part runs outside the inbox lock.
+  if (type === 'bridge:respond-request') return routeRespondRequest(message);
   if (INBOX_MESSAGE_TYPES.has(type)) return withInboxLock(() => handleInboxMessage(message));
   if (type === 'bridge:send-page') return sendPage(message.form || {});
   if (type === 'bridge:get-send-draft') return getSendDraft();
@@ -1789,6 +1792,8 @@ const LOCAL_INFER_OUTPUT_BUDGET_BYTES = 48_000;
 // isolated-side wait so a hostile page can never hold the inbox lock.
 const WEBMCP_PAGE_TIMEOUT_MS = 1_500;
 const WEBMCP_PROBE_TIMEOUT_MS = 3_000;
+// Overall bound on all page interaction for one observe_tab answer.
+const OBSERVE_TIMEOUT_MS = 10_000;
 const NOTIFICATION_PREFIX = 'kyberion-bbr-';
 // 1x1 PNG: chrome.notifications 'basic' requires an iconUrl and the extension
 // ships no icon assets.
@@ -2129,15 +2134,50 @@ async function dismissRequest(requestId) {
   return { inbox: publicInbox(await removeInboxItem(requestId)) };
 }
 
-async function respondRequest(message) {
+// respond-request in three steps for observe_tab: check the item under a short
+// inbox lock, collect the observation with no lock held (bounded by one overall
+// timeout), then re-take the lock to re-check the item and send the answer.
+async function routeRespondRequest(message) {
+  const item = await withInboxLock(() => takeInboxItem(message.requestId));
+  if (item.request_kind !== 'observe_tab') {
+    return withInboxLock(() => respondRequest(message));
+  }
+  // Reading the page needs a per-request click in the Side Panel.
+  if (message.userAction !== true) {
+    throw new Error('ページ観測の依頼には、受信タブでの明示的な許可が必要です。');
+  }
+  const wire = await withTimeout(
+    buildObserveResponse(item),
+    OBSERVE_TIMEOUT_MS,
+    'ページの応答がないため観測を中止しました（ダイアログが開いているか、ページが応答していません）。ページを確認してから、もう一度許可してください。'
+  );
+  return withInboxLock(() => respondRequest(message, wire));
+}
+
+function withTimeout(promise, timeoutMs, errorMessage) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function respondRequest(message, observeWire) {
+  // Re-checked here (under the inbox lock): the item may have been answered,
+  // declined or expired while an observation was being collected.
   const item = await takeInboxItem(message.requestId);
   let wire;
   if (item.request_kind === 'observe_tab') {
-    // Reading the page needs a per-request click in the Side Panel.
-    if (message.userAction !== true) {
+    if (message.userAction !== true || !observeWire) {
       throw new Error('ページ観測の依頼には、受信タブでの明示的な許可が必要です。');
     }
-    wire = await buildObserveResponse(item);
+    const allowed = Array.isArray(item.payload?.allowed_origins)
+      ? item.payload.allowed_origins
+      : [];
+    if (allowed.length > 0 && !allowed.includes(observeWire.origin)) {
+      throw new Error('観測中に依頼の対象サイトが変わったため、応答を中止しました。');
+    }
+    wire = observeWire;
   } else if (item.request_kind === 'local_infer') {
     return respondLocalInfer(item, message);
   } else if (item.request_kind === 'notify') {
