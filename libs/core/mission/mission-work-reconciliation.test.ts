@@ -829,6 +829,15 @@ describe('mission existing work reconciliation', () => {
     const ledgerPath = nodePath.join(missionPath, 'execution-ledger.jsonl');
     const ledgerAfterFailure = String(safeReadFile(ledgerPath, { encoding: 'utf8' }));
 
+    // A dry run reports the repair (the finish repair task included) and writes nothing.
+    const preflight = await reconcileMissionExistingWork({ missionId, manifestPath, dryRun: true });
+    expect(preflight.status).toBe('dry_run_ready');
+    expect(preflight.board_repaired_task_ids).toEqual(['implementation', 'repair-finish-exit']);
+    expect(readMissionNextTasks(missionPath).map((task) => task.status)).toEqual([
+      'planned',
+      'planned',
+    ]);
+
     const rerun = await reconcileMissionExistingWork({
       missionId,
       manifestPath,
@@ -865,6 +874,54 @@ describe('mission existing work reconciliation', () => {
     });
     expect(third.board_repaired_task_ids).toEqual([]);
     expect(third.already_reconciled_task_ids).toEqual(['implementation']);
+  });
+
+  it('a re-run re-validates the board repair against the task contract', async () => {
+    const workItem = importExternalWorkItem({
+      source: 'local',
+      sourceRef: `mission:${missionId}:implementation`,
+      title: 'Existing implementation',
+      description: 'Implementation completed outside dispatch.',
+      status: 'ready',
+      projectId: missionId,
+      metadata: {
+        mission_id: missionId,
+        task_id: 'implementation',
+        acceptance_criteria: ['The reconciliation command updates only verified tasks.'],
+      },
+    });
+    prepareMission([
+      {
+        task_id: 'implementation',
+        status: 'planned',
+        description: 'Implement the reconciliation command.',
+        acceptance_criteria: ['The reconciliation command updates only verified tasks.'],
+        dependencies: [],
+        ticket_dispatch: { work_item_id: workItem.item_id },
+      },
+    ]);
+    writeManifest(buildManifest());
+    const approvalRequestId = approveCurrentManifest();
+    boardFault.failNextReconcileWrite = true;
+    await expect(
+      reconcileMissionExistingWork({ missionId, manifestPath, approvalRequestId })
+    ).rejects.toThrow('[TEST_FAULT] board write failed');
+
+    // The task's contract changes after the WorkItem was closed: the approved
+    // manifest no longer proves it, so the board is not repaired from it.
+    const closed = getWorkItem(workItem.item_id)!;
+    updateWorkItem({
+      itemId: closed.item_id,
+      expectedVersion: closed.version,
+      metadata: {
+        ...(closed.metadata || {}),
+        acceptance_criteria: ['A criterion the manifest never mapped.'],
+      },
+    });
+    await expect(
+      reconcileMissionExistingWork({ missionId, manifestPath, approvalRequestId })
+    ).rejects.toThrow('does not map acceptance criterion');
+    expect(readMissionNextTasks(missionPath)[0].status).toBe('planned');
   });
 
   it('keeps a worker status write made while the work is reconciled', async () => {

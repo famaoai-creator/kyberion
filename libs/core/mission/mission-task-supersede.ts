@@ -668,6 +668,9 @@ export async function supersedeMissionTask(
       rewritten_dependent_task_ids: Array.isArray(existingReceipt?.rewritten_dependent_task_ids)
         ? existingReceipt.rewritten_dependent_task_ids
         : plan.dependents,
+      ...(Array.isArray(existingReceipt?.late_rewritten_dependent_task_ids)
+        ? { late_rewritten_dependent_task_ids: existingReceipt.late_rewritten_dependent_task_ids }
+        : {}),
       ...(auditRecordedAt ? { audit_recorded_at: auditRecordedAt } : {}),
     });
     const writeReceipt = (auditRecordedAt?: string) =>
@@ -890,6 +893,52 @@ export async function supersedeMissionTask(
       logger.info(
         `supersede-task: ${[...lateDependents].sort().join(', ')} came to depend on ${input.taskId} during this run and now depend on ${input.byTaskId}.`
       );
+      // The receipt, audit entry and ledger entry above name the plan's
+      // dependents only: record the late ones in all three (once each).
+      const currentReceipt = readJson<Record<string, unknown>>(receiptPath);
+      const recordedLate = Array.isArray(currentReceipt.late_rewritten_dependent_task_ids)
+        ? currentReceipt.late_rewritten_dependent_task_ids.map(String)
+        : [];
+      const newlyLate = [...lateDependents].filter((id) => !recordedLate.includes(id)).sort();
+      if (newlyLate.length > 0) {
+        writeDispatchArtifact(
+          receiptPath,
+          {
+            ...currentReceipt,
+            late_rewritten_dependent_task_ids: [...recordedLate, ...newlyLate].sort(),
+          },
+          { missionId: input.missionId, missionPath: plan.missionPath }
+        );
+        auditChain.record({
+          agentId: executor,
+          action: 'mission.task_supersede_dependents_rewired',
+          operation: `supersede-task:${input.missionId}`,
+          result: 'completed',
+          metadata: {
+            mission_id: input.missionId,
+            task_id: input.taskId,
+            by_task_id: input.byTaskId,
+            approval_request_id: approvalId,
+            late_rewritten_dependent_task_ids: newlyLate,
+            receipt_path: receiptRelative,
+          },
+        });
+        appendMissionExecutionLedgerEntry({
+          mission_id: input.missionId,
+          mission_path_hint: plan.missionPath,
+          event_type: 'task_supersede_dependents_rewired',
+          task_id: input.taskId,
+          actor_id: executor,
+          actor_type: 'human',
+          decision: `dependents added during the supersede now depend on ${input.byTaskId}`,
+          evidence: [receiptRelative],
+          payload: {
+            by_task_id: input.byTaskId,
+            approval_request_id: approvalId,
+            late_rewritten_dependent_task_ids: newlyLate,
+          },
+        });
+      }
     }
 
     // 5. History (once per approval) and the commit, like record-evidence but
