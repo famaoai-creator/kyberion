@@ -90,6 +90,8 @@ export interface RealtimeVoiceConversationTurnInput {
   reasoningEffort?: 'low' | 'medium' | 'high';
   /** Per-turn TTS engine override; see RealtimeVoiceSynthesisInput.engineId. */
   ttsEngineId?: string;
+  /** Presence avatar agent id shown on the surface (defaults to the surface agent). */
+  avatarAgentId?: string;
 }
 
 export interface RealtimeVoiceConversationTurnResult {
@@ -719,13 +721,13 @@ export async function runRealtimeVoiceConversationTurn(
     surfaceId: input.surfaceId,
     text: userText,
     speaker: 'User',
-    agentId: 'presence-surface-agent',
+    agentId: input.avatarAgentId || 'presence-surface-agent',
   });
   const replyTimeline = buildPresenceAssistantReplyTimeline({
     surfaceId: input.surfaceId,
     text: assistantText,
     speaker: session.assistant_name,
-    agentId: 'presence-surface-agent',
+    agentId: input.avatarAgentId || 'presence-surface-agent',
     speaking_ms: estimateSpeechDurationMs(assistantText),
   });
 
