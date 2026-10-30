@@ -612,11 +612,13 @@ export function persistWorkItemArtifactReviewReceipt(input: {
     { missionId: input.missionId, missionPath: input.missionPath }
   );
 
-  const tasks = loadReviewNextTasks(input.missionPath);
-  const index = tasks.findIndex(
-    (task) => String(task.task_id || '') === input.context.reviewTaskId
-  );
-  if (index >= 0) {
+  // Stamped on the board read under its writer lease: a supersede (M2) or a
+  // worker's status write since the review started is kept.
+  writeMissionNextTasks(input.missionPath, (tasks) => {
+    const index = tasks.findIndex(
+      (task) => String(task.task_id || '') === input.context.reviewTaskId
+    );
+    if (index < 0) return undefined;
     const task = tasks[index];
     const assignedTo =
       task.assigned_to && typeof task.assigned_to === 'object'
@@ -634,9 +636,8 @@ export function persistWorkItemArtifactReviewReceipt(input: {
       artifact_review_receipt: relativePath,
       review_findings: findings,
     };
-    // Through the one board writer: a supersede that landed since the read is kept (M2).
-    writeMissionNextTasks(input.missionPath, tasks);
-  }
+    return tasks;
+  });
   return { relativePath, receipt };
 }
 

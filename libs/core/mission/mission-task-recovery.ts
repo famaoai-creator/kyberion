@@ -1,6 +1,7 @@
 import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import * as nodePath from 'node:path';
 import { withExecutionContext } from '../authority.js';
+import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
@@ -57,11 +58,6 @@ function readNextTasks(missionId: string): Array<Record<string, unknown>> {
   }
 }
 
-function writeNextTasks(missionId: string, tasks: Array<Record<string, unknown>>): void {
-  // Through the one board writer: a stale read never undoes a supersede (M2).
-  writeMissionNextTasks(nodePath.dirname(nextTasksPath(missionId)), tasks);
-}
-
 function isTerminalWorkItemStatus(status: unknown): boolean {
   return status === 'done' || status === 'archived' || status === 'blocked';
 }
@@ -101,10 +97,10 @@ export function recoverMissionRequestedTasks(
       records: [],
     };
 
-    let mutated = false;
-    const nextTasks = tasks.map((task) => ({ ...task }));
+    // Stamped onto the board at write time, under its writer lease.
+    const resumeStamps = new Map<string, Record<string, unknown>>();
 
-    for (const task of nextTasks) {
+    for (const task of tasks) {
       const taskStatus = String(task.status || 'planned');
       if (taskStatus !== 'requested') continue;
       summary.requested_count += 1;
@@ -179,16 +175,15 @@ export function recoverMissionRequestedTasks(
         },
       });
 
-      task.ticket_dispatch = {
+      resumeStamps.set(taskId, {
         ...dispatch,
         work_item_id: workItemId,
         resumed_at: now,
         lease_id: claimed.lease.lease_id,
         lease_expires_at: claimed.lease.expires_at,
         attempt_count: attemptCount,
-      };
+      });
 
-      mutated = true;
       summary.reissued_count += 1;
       summary.recovered_task_ids.push(taskId || workItemId);
       summary.records.push({
@@ -201,8 +196,39 @@ export function recoverMissionRequestedTasks(
       });
     }
 
-    if (mutated) {
-      writeNextTasks(upperMissionId, nextTasks);
+    if (resumeStamps.size > 0) {
+      // Applied to the board read under its writer lease, so a worker's status
+      // write since the read above is kept. A task no longer requested, or
+      // whose dispatch moved to another WorkItem meanwhile, is left as it is.
+      const unstamped = new Set(resumeStamps.keys());
+      writeMissionNextTasks(nodePath.dirname(nextTasksPath(upperMissionId)), (onDisk) => {
+        unstamped.clear();
+        resumeStamps.forEach((_, taskId) => unstamped.add(taskId));
+        const next = onDisk.map((task) => {
+          const taskId = String(task.task_id || '').trim();
+          const stamp = resumeStamps.get(taskId);
+          const dispatch =
+            task.ticket_dispatch && typeof task.ticket_dispatch === 'object'
+              ? (task.ticket_dispatch as Record<string, unknown>)
+              : {};
+          if (
+            !stamp ||
+            String(task.status || 'planned') !== 'requested' ||
+            String(dispatch.work_item_id || '').trim() !== stamp.work_item_id
+          ) {
+            return task;
+          }
+          unstamped.delete(taskId);
+          return { ...task, ticket_dispatch: stamp };
+        });
+        return unstamped.size < resumeStamps.size ? next : undefined;
+      });
+      for (const taskId of unstamped) {
+        const stamp = resumeStamps.get(taskId);
+        logger.warn(
+          `[mission-task-recovery] resume claim not recorded on task ${taskId} — the task changed while it was claimed | the claim on ${String(stamp?.work_item_id)} lapses at ${String(stamp?.lease_expires_at)}; resume again if the task is still requested | mission=${upperMissionId} lease=${String(stamp?.lease_id)}`
+        );
+      }
     }
 
     return summary;
