@@ -2323,6 +2323,11 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/voice/engine-runtime-preferences-operator.ts#run",
+      "roles": ["engine_runtime_preferences_operator"],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewMemoryConsolidationPatchLocked",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -11139,6 +11144,14 @@
             "libs/core/reasoning/reasoning-bootstrap.ts#_installReasoningBackendsCore",
             "libs/core/actuator/deployment-adapter.ts#installShellDeploymentAdapterFromConfigIfAvailable",
             "libs/core/actuator/deployment-adapter.ts#loadShellDeploymentAdapterConfig"
+          ]
+        },
+        "engine_runtime_preferences_operator": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/engine-config-route.ts#registerEngineConfigRoute",
+            "libs/core/voice/engine-runtime-preferences-operator.ts#getOperatorEngineRuntimePreferences",
+            "libs/core/voice/engine-runtime-preferences-operator.ts#run"
           ]
         },
         "infrastructure_sentinel": {
