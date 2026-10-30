@@ -17,6 +17,14 @@ const VIDEO_BUNDLE_DIR = pathResolver.sharedTmp('video-render-backend-tests/demo
 const NARRATION_PATH = pathResolver.sharedTmp('video-render-backend-tests/narration.aiff');
 const MUSIC_PATH = pathResolver.sharedTmp('video-render-backend-tests/music.mp3');
 
+// These tests assert the default CLI protocol, not profile/tool discovery.
+// Their broad filesystem fixtures must not manufacture an engine profile.
+vi.mock('../tool/tool-binary-resolvers.js', () => ({
+  resolveFfmpegBin: () => 'ffmpeg',
+  resolveFfprobeBin: () => 'ffprobe',
+  resolvePython3Bin: () => 'python3',
+}));
+
 vi.mock('../secure-io.js', async () => {
   const actual = (await vi.importActual('../secure-io.js')) as any;
   return {
