@@ -15,6 +15,8 @@
  */
 
 import { Buffer } from 'node:buffer';
+import { createHash, randomUUID } from 'node:crypto';
+import * as path from 'node:path';
 import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {
   buildBrowserExtensionPipelineCandidate,
@@ -64,7 +66,19 @@ import {
   createDistillCandidateRecord,
   saveDistillCandidateRecord,
 } from '@agent/core/knowledge/distill-candidate-registry';
-import { withExecutionContext } from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
+import {
+  BrowserBridgeMailboxError,
+  listDeliverableBrowserBridgeRequests,
+  listPendingApprovalsForBridge,
+  normalizeBrowserBridgeScope,
+  respondBrowserBridgeRequest,
+  toBrowserBridgeRequestView,
+  type BrowserBridgeApprovalSummary,
+  type BrowserBridgeScope,
+} from '@agent/core/browser/browser-bridge-mailbox';
+import { redactObservationText } from '@agent/core/browser/browser-extension-bridge';
+import { resolveStorageFloor } from '@agent/core/storage-layout';
 import {
   getReasoningBackend,
   delegateTaskWithUntrustedData,
@@ -950,7 +964,385 @@ async function handleAnalyzeObservation(message: any): Promise<HostResponse> {
   };
 }
 
-function handle(message: any): HostResponse | Promise<HostResponse> {
+// ---------------------------------------------------------------------------
+// Pull mailbox (Kyberion -> extension) and page send (extension -> Kyberion)
+// ---------------------------------------------------------------------------
+
+/** Mailbox errors carry a code and a message written for the wire; others are masked. */
+function mailboxFailure(err: unknown, fallback: string): HostResponse {
+  if (err instanceof BrowserBridgeMailboxError) {
+    return { ok: false, code: err.code, error: describeMailboxError(err) };
+  }
+  return { ok: false, error: formatWireError(err, fallback) };
+}
+
+function describeMailboxError(err: BrowserBridgeMailboxError): string {
+  return String(err.message);
+}
+
+function recordBridgeAudit(entry: {
+  action: string;
+  operation: string;
+  result: 'completed' | 'denied' | 'failed';
+  reason: string;
+  metadata: Record<string, unknown>;
+}): void {
+  withExecutionContext(
+    'sovereign_concierge',
+    () => {
+      try {
+        auditChain.record({ agentId: 'browser-bridge', ...entry });
+      } catch {
+        /* audit enrichment is best-effort */
+      }
+    },
+    'sovereign'
+  );
+}
+
+/**
+ * poll_requests: deliverable mailbox requests (pending → delivered, lapsed →
+ * expired) plus a read-only pending-approval summary. Only new deliveries are
+ * audited so the side panel's 5 s fast poll does not flood the audit chain.
+ */
+function handlePollRequests(): HostResponse {
+  const now = new Date();
+  const requests = withExecutionContext(
+    'sovereign_concierge',
+    () => listDeliverableBrowserBridgeRequests({ now }),
+    'sovereign'
+  );
+  let approvals: BrowserBridgeApprovalSummary[] = [];
+  let approvalsUnavailable = false;
+  try {
+    approvals = withExecutionContext(
+      'sovereign_concierge',
+      () => listPendingApprovalsForBridge({ now }),
+      'sovereign'
+    );
+  } catch {
+    approvalsUnavailable = true;
+  }
+  const delivered = requests.filter((request) => request.delivered_at === now.toISOString());
+  if (delivered.length > 0) {
+    recordBridgeAudit({
+      action: 'browser_bridge_deliver',
+      operation: 'browser:bridge:poll',
+      result: 'completed',
+      reason: `Delivered ${delivered.length} mailbox request(s) to the extension`,
+      metadata: {
+        request_ids: delivered.map((request) => request.request_id),
+        request_kinds: delivered.map((request) => request.request_kind),
+      },
+    });
+  }
+  return {
+    ok: true,
+    requests: requests.map(toBrowserBridgeRequestView),
+    approvals,
+    ...(approvalsUnavailable ? { approvals_unavailable: true } : {}),
+  };
+}
+
+/** respond_request: the extension's answer, validated and re-redacted by the mailbox. */
+function handleRespondRequest(message: any): HostResponse {
+  const requestId = typeof message.request_id === 'string' ? message.request_id.trim() : '';
+  const status = message.status;
+  if (!requestId)
+    return { ok: false, code: 'invalid_input', error: 'respond_request requires request_id' };
+  try {
+    const updated = withExecutionContext(
+      'sovereign_concierge',
+      () =>
+        respondBrowserBridgeRequest(requestId, {
+          status,
+          ...(message.result !== undefined ? { result: message.result } : {}),
+          ...(message.error !== undefined ? { error: String(message.error) } : {}),
+          ...(message.origin !== undefined ? { origin: String(message.origin) } : {}),
+        }),
+      'sovereign'
+    );
+    recordBridgeAudit({
+      action: 'browser_bridge_respond',
+      operation: `browser:bridge:respond:${updated.request_kind}`,
+      result: updated.status === 'completed' ? 'completed' : 'denied',
+      reason: `Extension answered ${updated.request_kind} request with ${updated.status}`,
+      metadata: {
+        request_id: updated.request_id,
+        request_kind: updated.request_kind,
+        status: updated.status,
+        ...(updated.response?.origin ? { origin: updated.response.origin } : {}),
+      },
+    });
+    return { ok: true, request_id: updated.request_id, status: updated.status };
+  } catch (err) {
+    recordBridgeAudit({
+      action: 'browser_bridge_respond',
+      operation: 'browser:bridge:respond',
+      result: 'denied',
+      reason: 'Extension response rejected by the mailbox',
+      metadata: {
+        request_id: requestId.slice(0, 80),
+        code: err instanceof BrowserBridgeMailboxError ? err.code : 'internal',
+      },
+    });
+    return mailboxFailure(err, 'respond_request failed');
+  }
+}
+
+const SEND_PAGE_MAX_TEXT = 30_000;
+
+function canonicalPageOrigin(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    return url.origin === value ? url.origin : null;
+  } catch {
+    return null;
+  }
+}
+
+interface SendPageInput {
+  mode: 'intent' | 'knowledge';
+  scope: BrowserBridgeScope;
+  title: string;
+  urlOrigin: string;
+  text: string;
+  selectionOnly: boolean;
+  note?: string;
+}
+
+function parseSendPage(message: any): SendPageInput | { error: string } {
+  if (message.mode !== 'intent' && message.mode !== 'knowledge') {
+    return { error: 'send_page mode must be intent|knowledge' };
+  }
+  if (message.tier === 'public' && message.confirm_public !== true) {
+    return { error: 'public tier requires confirm_public: true' };
+  }
+  let scope: BrowserBridgeScope;
+  try {
+    scope = normalizeBrowserBridgeScope({
+      tier: message.tier,
+      ...(typeof message.tenant_slug === 'string' && message.tenant_slug.trim()
+        ? { tenant_slug: message.tenant_slug }
+        : {}),
+    });
+  } catch (err) {
+    return {
+      error: err instanceof BrowserBridgeMailboxError ? describeMailboxError(err) : 'invalid scope',
+    };
+  }
+  const urlOrigin = canonicalPageOrigin(message.url_origin);
+  if (!urlOrigin) return { error: 'url_origin must be a canonical http(s) origin' };
+  if (typeof message.title !== 'string' || message.title.length > 300) {
+    return { error: 'title must be a string of at most 300 characters' };
+  }
+  if (typeof message.text !== 'string' || !message.text.trim()) {
+    return { error: 'text must be a non-empty string' };
+  }
+  if (message.text.length > SEND_PAGE_MAX_TEXT) {
+    return { error: `text exceeds ${SEND_PAGE_MAX_TEXT} characters` };
+  }
+  if (typeof message.selection_only !== 'boolean') {
+    return { error: 'selection_only must be a boolean' };
+  }
+  if (
+    message.note !== undefined &&
+    (typeof message.note !== 'string' || message.note.length > 1000)
+  ) {
+    return { error: 'note must be a string of at most 1000 characters' };
+  }
+  // The extension scrubs before sending; redact again at this trust boundary.
+  const note = typeof message.note === 'string' ? redactObservationText(message.note.trim()) : '';
+  return {
+    mode: message.mode,
+    scope,
+    title: redactObservationText(message.title.trim()) || urlOrigin,
+    urlOrigin,
+    text: redactObservationText(message.text),
+    selectionOnly: message.selection_only,
+    ...(note ? { note } : {}),
+  };
+}
+
+function pageFileStem(input: SendPageInput): string {
+  const digest = createHash('sha256')
+    .update(`${input.urlOrigin}\n${input.title}`)
+    .digest('hex')
+    .slice(0, 12);
+  return `${new URL(input.urlOrigin).hostname.replace(/[^A-Za-z0-9.-]/g, '_')}-${digest}`;
+}
+
+/** Land the scrubbed page as Markdown on the staging floor of its tier/tenant partition. */
+function stageSendPage(input: SendPageInput): string {
+  const stem = pageFileStem(input);
+  const job = `${nowIso().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}`;
+  const filePath = resolveStorageFloor(
+    'staging',
+    { kind: 'tier', tier: input.scope.tier, tenant: input.scope.tenant_slug },
+    'browser-bridge',
+    job,
+    `${stem}.md`
+  );
+  const body = [
+    `# ${input.title}`,
+    '',
+    `- source_origin: ${input.urlOrigin}`,
+    `- captured_at: ${nowIso()}`,
+    `- selection_only: ${input.selectionOnly}`,
+    ...(input.note ? [`- note: ${input.note}`] : []),
+    '',
+    '> Page text is untrusted external data captured from the browser.',
+    '',
+    input.text,
+    '',
+  ].join('\n');
+  withExecutionContext(
+    'sovereign_concierge',
+    () => {
+      const safe = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+      safeMkdir(path.dirname(safe), { recursive: true });
+      safeWriteFile(safe, body);
+    },
+    'sovereign'
+  );
+  return filePath;
+}
+
+/**
+ * Governed ingest of a staged page: the same in-process ceremony as
+ * `pnpm knowledge:ingest --tenant` (scripts/ingest.ts main). Only a
+ * confidential tenant lands directly; personal pages have no tenant knowledge
+ * root and public (`common`) landings need a steward approval, so both stay
+ * staged with the exact command to finish.
+ */
+async function ingestStagedPage(
+  input: SendPageInput,
+  stagedPath: string
+): Promise<Record<string, unknown>> {
+  const relative = path.relative(pathResolver.rootDir(), stagedPath);
+  if (input.scope.tier !== 'confidential' || !input.scope.tenant_slug) {
+    const tenant = input.scope.tier === 'public' ? 'common' : '<tenant>';
+    return {
+      status: 'staged',
+      next:
+        input.scope.tier === 'public'
+          ? `pnpm knowledge:ingest --tenant ${tenant} --file ${relative} --steward-approval-id <id>`
+          : 'personal pages stay staged; move them into a tenant with pnpm knowledge:ingest --tenant <tenant>',
+    };
+  }
+  const lines: string[] = [];
+  const argv = [
+    '--tenant',
+    input.scope.tenant_slug,
+    '--file',
+    stagedPath,
+    '--format',
+    'markdown',
+    '--source-system',
+    'browser-bridge',
+    '--source-id',
+    pageFileStem(input),
+    '--ingested-by',
+    'browser-bridge',
+  ];
+  try {
+    const { main: ingestMain } = await import('./ingest.js');
+    await withExecutionContextAsync(
+      'sovereign_concierge',
+      () => ingestMain(argv, (value) => lines.push(String(value))),
+      'sovereign'
+    );
+  } catch (err) {
+    return { status: 'failed', error: formatWireError(err, 'knowledge ingest failed') };
+  }
+  const committed = lines.find((line) => line.startsWith('[ingest] committed '));
+  return committed
+    ? { status: 'committed', detail: committed.replace('[ingest] ', '') }
+    : {
+        status: 'not_committed',
+        detail: (lines.find((line) => line.startsWith('[ingest] NOT committed')) ?? '').replace(
+          '[ingest] ',
+          ''
+        ),
+      };
+}
+
+/**
+ * send_page (B3): the user explicitly sends the current page (or selection)
+ * from the side panel. `intent` resolves the user's note through the same
+ * procedure resolver as resolve_intent; `knowledge` stages the scrubbed text
+ * and runs the governed ingest ceremony.
+ */
+async function handleSendPage(message: any): Promise<HostResponse> {
+  const parsed = parseSendPage(message);
+  if ('error' in parsed) {
+    recordBridgeAudit({
+      action: 'browser_bridge_send_page',
+      operation: 'browser:bridge:send_page',
+      result: 'denied',
+      reason: parsed.error,
+      metadata: { mode: String(message.mode ?? ''), tier: String(message.tier ?? '') },
+    });
+    return { ok: false, code: 'invalid_input', error: parsed.error };
+  }
+  const page = {
+    title: parsed.title,
+    url_origin: parsed.urlOrigin,
+    text_chars: parsed.text.length,
+    selection_only: parsed.selectionOnly,
+  };
+  const auditBase = {
+    mode: parsed.mode,
+    tier: parsed.scope.tier,
+    ...(parsed.scope.tenant_slug ? { tenant_slug: parsed.scope.tenant_slug } : {}),
+    origin: parsed.urlOrigin,
+    text_chars: parsed.text.length,
+    selection_only: parsed.selectionOnly,
+  };
+
+  if (parsed.mode === 'intent') {
+    const intent = parsed.note || parsed.title;
+    const resolved = await handleResolveIntent({ intent, origin: parsed.urlOrigin });
+    recordBridgeAudit({
+      action: 'browser_bridge_send_page',
+      operation: 'browser:bridge:send_page:intent',
+      result: resolved.ok ? 'completed' : 'failed',
+      reason: `Page sent as intent from ${parsed.urlOrigin}`,
+      metadata: auditBase,
+    });
+    return resolved.ok
+      ? { ok: true, mode: 'intent', resolution: resolved.resolution, page }
+      : resolved;
+  }
+
+  let stagedPath: string;
+  try {
+    stagedPath = stageSendPage(parsed);
+  } catch (err) {
+    recordBridgeAudit({
+      action: 'browser_bridge_send_page',
+      operation: 'browser:bridge:send_page:knowledge',
+      result: 'failed',
+      reason: 'Staging the page failed',
+      metadata: auditBase,
+    });
+    return { ok: false, error: formatWireError(err, 'Failed to stage page') };
+  }
+  const ingest = await ingestStagedPage(parsed, stagedPath);
+  const stagedRef = path.relative(pathResolver.rootDir(), stagedPath);
+  recordBridgeAudit({
+    action: 'browser_bridge_send_page',
+    operation: 'browser:bridge:send_page:knowledge',
+    result: ingest.status === 'failed' ? 'failed' : 'completed',
+    reason: `Page from ${parsed.urlOrigin} staged for knowledge (${String(ingest.status)})`,
+    metadata: { ...auditBase, staged_ref: stagedRef, ingest_status: ingest.status },
+  });
+  return { ok: true, mode: 'knowledge', staged_ref: stagedRef, ingest, page };
+}
+
+export function handle(message: any): HostResponse | Promise<HostResponse> {
   switch (message?.type) {
     case 'ping':
       return { ok: true, pong: true, host_version: HOST_VERSION };
@@ -984,6 +1376,12 @@ function handle(message: any): HostResponse | Promise<HostResponse> {
       return handleAnalyzeObservation(message);
     case 'submit_golden_evidence':
       return handleSubmitGoldenEvidence(message);
+    case 'poll_requests':
+      return handlePollRequests();
+    case 'respond_request':
+      return handleRespondRequest(message);
+    case 'send_page':
+      return handleSendPage(message);
     default:
       return { ok: false, error: `Unsupported message type: ${String(message?.type)}` };
   }

@@ -1,0 +1,126 @@
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeRmSync } from '@agent/core/secure-io';
+import {
+  BROWSER_BRIDGE_MAILBOX_ROOT,
+  awaitBrowserBridgeResponse,
+  enqueueBrowserBridgeRequest,
+  loadBrowserBridgeRequest,
+  respondBrowserBridgeRequest,
+  type BrowserBridgeRequest,
+} from '@agent/core/browser/browser-bridge-mailbox';
+import { runBrowserBridgeCommand, type BrowserBridgeCliDeps } from './cli-browser-bridge.js';
+
+afterEach(() => {
+  safeRmSync(pathResolver.rootResolve(BROWSER_BRIDGE_MAILBOX_ROOT), {
+    recursive: true,
+    force: true,
+  });
+});
+
+function deps(overrides: Partial<BrowserBridgeCliDeps> = {}): BrowserBridgeCliDeps {
+  return {
+    enqueue: enqueueBrowserBridgeRequest,
+    load: loadBrowserBridgeRequest,
+    await: awaitBrowserBridgeResponse,
+    actor: () => 'agent:cli-test',
+    readFile: () => 'file input',
+    ...overrides,
+  };
+}
+
+async function run(argv: string[], d = deps()): Promise<string> {
+  const out: string[] = [];
+  await runBrowserBridgeCommand(argv, (text) => out.push(text), d);
+  return out.join('\n');
+}
+
+describe('pnpm kyberion browser-bridge', () => {
+  it('queues an observe request and reports its status as JSON', async () => {
+    const queued = JSON.parse(
+      await run([
+        'request',
+        'observe',
+        '--purpose',
+        'Read the invoice table',
+        '--origins',
+        'https://example.com,https://app.example.com',
+        '--mission',
+        'MSN-CLI-1',
+        '--json',
+      ])
+    ) as BrowserBridgeRequest;
+    expect(queued).toMatchObject({
+      request_kind: 'observe_tab',
+      status: 'pending',
+      scope: { tier: 'personal' },
+      requested_by: { actor_id: 'agent:cli-test', mission_id: 'MSN-CLI-1' },
+      payload: {
+        purpose: 'Read the invoice table',
+        mode: 'text',
+        allowed_origins: ['https://example.com', 'https://app.example.com'],
+      },
+    });
+    const status = await run(['status', queued.request_id]);
+    expect(status).toContain(`## Browser bridge request ${queued.request_id}`);
+    expect(status).toContain('- status: pending');
+  });
+
+  it('builds infer and notify payloads and refuses invalid flags', async () => {
+    const enqueue = vi.fn(enqueueBrowserBridgeRequest);
+    await run(
+      ['request', 'infer', '--task', 'summarize', '--input-file', 'x.txt'],
+      deps({ enqueue })
+    );
+    expect(enqueue.mock.calls[0][0].payload).toEqual({ task: 'summarize', input: 'file input' });
+    await run(
+      [
+        'request',
+        'notify',
+        '--title',
+        'Approval needed',
+        '--body',
+        'Deploy waits for you',
+        '--level',
+        'approval_pending',
+        '--approval',
+        'a1b2',
+        '--progress',
+        '2/5',
+      ],
+      deps({ enqueue })
+    );
+    expect(enqueue.mock.calls[1][0].payload).toEqual({
+      level: 'approval_pending',
+      title: 'Approval needed',
+      body: 'Deploy waits for you',
+      approval_request_id: 'a1b2',
+      progress: { done: 2, total: 5 },
+    });
+    await expect(run(['request', 'infer', '--task', 'execute', '--input', 'x'])).rejects.toThrow(
+      /--task must be one of/
+    );
+    await expect(run(['request', 'observe', '--purpose', 'p', '--tier', 'secret'])).rejects.toThrow(
+      /--tier must be/
+    );
+    await expect(
+      run(['request', 'observe', '--purpose', 'p', '--tier', 'confidential'])
+    ).rejects.toThrow(/confidential scope requires tenant_slug/);
+    await expect(run(['request', 'click'])).rejects.toThrow(/Unknown request kind/);
+  });
+
+  it('waits for the extension answer', async () => {
+    const queued = enqueueBrowserBridgeRequest({
+      request_kind: 'notify',
+      payload: { level: 'info', title: 'Hello', body: 'World' },
+      requested_by: { actor_id: 'agent:cli-test' },
+      scope: { tier: 'personal' },
+    });
+    respondBrowserBridgeRequest(queued.request_id, { status: 'completed' });
+    const out = await run(['wait', queued.request_id, '--timeout-sec', '1']);
+    expect(out).toContain('- status: completed');
+    await expect(run(['status', 'BBR-00000000-0000-4000-8000-000000000000'])).rejects.toThrow(
+      /No browser bridge request/
+    );
+  });
+});

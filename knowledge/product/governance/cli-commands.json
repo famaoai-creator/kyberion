@@ -516,6 +516,46 @@
       "group": "inspect"
     },
     {
+      "id": "operator-cli.browser-bridge",
+      "command": "browser-bridge",
+      "noun": "browser-bridge",
+      "verb": "default",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser_bridge",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.browser-bridge.request",
+      "command": "browser-bridge request",
+      "noun": "browser-bridge",
+      "verb": "request",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser_bridge_request",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.browser-bridge.status",
+      "command": "browser-bridge status",
+      "noun": "browser-bridge",
+      "verb": "status",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser_bridge_status",
+      "group": "operate"
+    },
+    {
+      "id": "operator-cli.browser-bridge.wait",
+      "command": "browser-bridge wait",
+      "noun": "browser-bridge",
+      "verb": "wait",
+      "entry": "operator-cli",
+      "audience": "operator",
+      "description": "cli_cmd_operator_cli_browser_bridge_wait",
+      "group": "operate"
+    },
+    {
       "id": "operator-cli.grants",
       "command": "grants",
       "noun": "grants",
@@ -1008,6 +1048,10 @@
         "diff",
         "see",
         "listen",
+        "browser-bridge",
+        "browser-bridge request",
+        "browser-bridge status",
+        "browser-bridge wait",
         "grants",
         "grants list",
         "grants check",
