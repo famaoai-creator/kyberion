@@ -28,6 +28,7 @@ const SHELL_PAGES = [
   'help.html',
   'index.html',
   'first-job.html',
+  'engine-config.html',
 ];
 // The OBS projection has no navigation shell, but is still a localized template.
 const PAGES = [...SHELL_PAGES, 'live-avatar.html'];
@@ -206,11 +207,31 @@ describe('raw template files are never served unrendered', () => {
     expect(Object.keys(FRONT_DESK_TEMPLATE_FILE_REDIRECTS).sort()).toEqual(
       PAGES.map((page) => `/${page}`).sort()
     );
+    expect(frontDeskTemplateRedirect('/engine-config.html')).toBe('/engine-config');
     expect(frontDeskTemplateRedirect('/home.html')).toBe('/');
     expect(frontDeskTemplateRedirect('/progress.html?tenant=acme#x')).toBe(
       '/progress?tenant=acme#x'
     );
     expect(frontDeskTemplateRedirect('/ui-gallery.html')).toBeNull();
+  });
+
+  it('renders the settings editor in the requested locale with a disabled form and shared navigation', () => {
+    const { routes } = recordRoutes();
+    for (const locale of ['en', 'ja'] as const) {
+      const res = fakeRes();
+      routes.get('/engine-config')!({ headers: { 'accept-language': locale } }, res);
+      const html = String(res.sent);
+      expect(html).toContain('<html lang="' + locale + '"');
+      expect(html).toContain(catalogT('presence_studio:engine_config_title', undefined, locale));
+      expect(html).not.toMatch(/{{(t|partial|locale)[:}]/);
+      expect(html).toMatch(/id="engine-fields"[^>]*disabled/);
+      expect(html).toContain('name="agent_runtime_backend"');
+      expect(html).toContain('value="pipe"');
+      expect(html).toContain('value="pane"');
+      expect(html).toContain('aria-live="polite"');
+      expect(html).toContain('href="/help"');
+    }
+    expect(readStatic('help.html')).toContain('href="/engine-config"');
   });
 
   it('renders the live avatar with localized status and no raw placeholders', () => {

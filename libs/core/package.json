@@ -8075,6 +8075,10 @@
     "./perception/image-dimensions": {
       "types": "./dist/perception/image-dimensions.d.ts",
       "default": "./dist/perception/image-dimensions.js"
+    },
+    "./voice/engine-runtime-preferences-operator": {
+      "types": "./dist/voice/engine-runtime-preferences-operator.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences-operator.js"
     }
   },
   "dependencies": {

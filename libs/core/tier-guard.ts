@@ -1,3 +1,4 @@
+import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
 import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
 import {
   prPublicationResourceAllowed,
@@ -64,7 +65,6 @@ import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
 import {
   currentResourceAccessScope,
-  resourceAccessDenial,
   type ResourceAccessOperation,
 } from './foundation/resource-access-scope.js';
 import type {

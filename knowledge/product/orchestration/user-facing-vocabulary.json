@@ -23559,6 +23559,196 @@
         "en": "There is no recording session in progress",
         "ja": "録音中のセッションがありません",
         "qps-ploc": "⟦Ŧħėřė ïş ñő řėƈőřḓïñɠ şėşşïőñ ïñ ṗřőɠřėşş ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "engine_config_title": {
+        "en": "Engine settings",
+        "ja": "エンジン設定",
+        "qps-ploc": "⟦Ėñɠïñė şėŧŧïñɠş ŀőřė⟧"
+      },
+      "engine_config_description": {
+        "en": "Set defaults for this profile’s media tools, voice bridges and agent runtime. Environment overrides take priority.",
+        "ja": "このプロファイルのメディアツール・音声・エージェント実行の既定値です。環境変数の指定が優先されます。",
+        "qps-ploc": "⟦Şėŧ ḓėƒȧůŀŧş ƒőř ŧħïş ṗřőƒïŀė’ş ɱėḓïȧ ŧőőŀş, ṽőïƈė ƀřïḓɠėş ȧñḓ ȧɠėñŧ řůñŧïɱė. Ėñṽïřőñɱėñŧ őṽėřřïḓėş ŧȧķė ṗřïőřïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ⟧"
+      },
+      "engine_config_back": {
+        "en": "Back to help",
+        "ja": "ヘルプに戻る",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő ħėŀṗ ŀőř⟧"
+      },
+      "engine_config_profile": {
+        "en": "Current profile",
+        "ja": "現在のプロファイル",
+        "qps-ploc": "⟦Ƈůřřėñŧ ṗřőƒïŀė ŀőřė⟧"
+      },
+      "engine_config_profile_unknown": {
+        "en": "Not loaded",
+        "ja": "未読み込み",
+        "qps-ploc": "⟦Ñőŧ ŀőȧḓėḓ ŀőř⟧"
+      },
+      "engine_config_profile_personal": {
+        "en": "Personal",
+        "ja": "個人",
+        "qps-ploc": "⟦Ṗėřşőñȧŀ ŀőř⟧"
+      },
+      "engine_config_profile_customer": {
+        "en": "Customer",
+        "ja": "顧客",
+        "qps-ploc": "⟦Ƈůşŧőɱėř ŀőř⟧"
+      },
+      "engine_config_fields": {
+        "en": "Saved defaults",
+        "ja": "保存する既定値",
+        "qps-ploc": "⟦Şȧṽėḓ ḓėƒȧůŀŧş ŀőřė⟧"
+      },
+      "engine_config_clear_help": {
+        "en": "Clear a saved field to restore its default. Only changed fields are saved. Reload discards unsaved edits.",
+        "ja": "保存済みの欄を空にすると既定値に戻ります。変更した項目だけを保存します。再読み込みすると未保存の変更は破棄されます。",
+        "qps-ploc": "⟦Ƈŀėȧř ȧ şȧṽėḓ ƒïėŀḓ ŧő řėşŧőřė ïŧş ḓėƒȧůŀŧ. Őñŀẏ ƈħȧñɠėḓ ƒïėŀḓş ȧřė şȧṽėḓ. Řėŀőȧḓ ḓïşƈȧřḓş ůñşȧṽėḓ ėḓïŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "engine_config_save": {
+        "en": "Save changes",
+        "ja": "変更を保存",
+        "qps-ploc": "⟦Şȧṽė ƈħȧñɠėş ŀőř⟧"
+      },
+      "engine_config_reload": {
+        "en": "Reload latest",
+        "ja": "最新の設定を再読み込み",
+        "qps-ploc": "⟦Řėŀőȧḓ ŀȧŧėşŧ ŀőřė⟧"
+      },
+      "engine_config_loading": {
+        "en": "Loading settings…",
+        "ja": "設定を読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ şėŧŧïñɠş… ŀőřėɱ⟧"
+      },
+      "engine_config_ready": {
+        "en": "Settings loaded.",
+        "ja": "設定を読み込みました。",
+        "qps-ploc": "⟦Şėŧŧïñɠş ŀőȧḓėḓ. ŀőřėɱ⟧"
+      },
+      "engine_config_saving": {
+        "en": "Saving changes…",
+        "ja": "変更を保存中…",
+        "qps-ploc": "⟦Şȧṽïñɠ ƈħȧñɠėş… ŀőřė⟧"
+      },
+      "engine_config_saved": {
+        "en": "Changes saved.",
+        "ja": "変更を保存しました。",
+        "qps-ploc": "⟦Ƈħȧñɠėş şȧṽėḓ. ŀőřė⟧"
+      },
+      "engine_config_unchanged": {
+        "en": "No changes to save.",
+        "ja": "保存する変更はありません。",
+        "qps-ploc": "⟦Ñő ƈħȧñɠėş ŧő şȧṽė. ŀőřėɱ ⟧"
+      },
+      "engine_config_load_failed": {
+        "en": "Settings could not be loaded. Check your connection and reload.",
+        "ja": "設定を読み込めませんでした。接続を確認して再読み込みしてください。",
+        "qps-ploc": "⟦Şėŧŧïñɠş ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ. Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ ȧñḓ řėŀőȧḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "engine_config_save_failed": {
+        "en": "Changes could not be saved. Your edits have been kept.",
+        "ja": "変更を保存できませんでした。編集内容は保持しています。",
+        "qps-ploc": "⟦Ƈħȧñɠėş ƈőůŀḓ ñőŧ ƀė şȧṽėḓ. Ẏőůř ėḓïŧş ħȧṽė ƀėėñ ķėṗŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "engine_config_denied": {
+        "en": "You do not have access to edit this profile.",
+        "ja": "このプロファイルを編集する権限がありません。",
+        "qps-ploc": "⟦Ẏőů ḓő ñőŧ ħȧṽė ȧƈƈėşş ŧő ėḓïŧ ŧħïş ṗřőƒïŀė. ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "engine_config_conflict": {
+        "en": "Settings or the active profile changed elsewhere. Reload latest before saving; your edits are still shown.",
+        "ja": "設定または利用中のプロファイルが別の操作で変更されました。保存前に最新の設定を再読み込みしてください。編集内容は表示したままです。",
+        "qps-ploc": "⟦Şėŧŧïñɠş őř ŧħė ȧƈŧïṽė ṗřőƒïŀė ƈħȧñɠėḓ ėŀşėẇħėřė. Řėŀőȧḓ ŀȧŧėşŧ ƀėƒőřė şȧṽïñɠ; ẏőůř ėḓïŧş ȧřė şŧïŀŀ şħőẇñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
+      "engine_config_invalid": {
+        "en": "Check the entered values and try saving again.",
+        "ja": "入力した値を確認して、もう一度保存してください。",
+        "qps-ploc": "⟦Ƈħėƈķ ŧħė ėñŧėřėḓ ṽȧŀůėş ȧñḓ ŧřẏ şȧṽïñɠ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "engine_config_ffmpeg_bin": {
+        "en": "Video processing executable",
+        "ja": "動画処理コマンド",
+        "qps-ploc": "⟦Ṽïḓėő ṗřőƈėşşïñɠ ėẋėƈůŧȧƀŀė ŀőřėɱ ïṗ⟧"
+      },
+      "engine_config_ffprobe_bin": {
+        "en": "Media inspection executable",
+        "ja": "メディア情報取得コマンド",
+        "qps-ploc": "⟦Ɱėḓïȧ ïñşṗėƈŧïőñ ėẋėƈůŧȧƀŀė ŀőřėɱ ïṗ⟧"
+      },
+      "engine_config_python_bin": {
+        "en": "Python executable",
+        "ja": "Python コマンド",
+        "qps-ploc": "⟦Ṗẏŧħőñ ėẋėƈůŧȧƀŀė ŀőřėɱ⟧"
+      },
+      "engine_config_audio_record_command": {
+        "en": "Audio recording command",
+        "ja": "音声録音コマンド",
+        "qps-ploc": "⟦Ȧůḓïő řėƈőřḓïñɠ ƈőɱɱȧñḓ ŀőřėɱ ï⟧"
+      },
+      "engine_config_audio_playback_backend": {
+        "en": "Audio playback backend",
+        "ja": "音声再生バックエンド",
+        "qps-ploc": "⟦Ȧůḓïő ṗŀȧẏƀȧƈķ ƀȧƈķėñḓ ŀőřėɱ ï⟧"
+      },
+      "engine_config_fluid_audio_stt_command": {
+        "en": "FluidAudio transcription command",
+        "ja": "FluidAudio 文字起こしコマンド",
+        "qps-ploc": "⟦ƑŀůïḓȦůḓïő ŧřȧñşƈřïṗŧïőñ ƈőɱɱȧñḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "engine_config_streaming_stt_bridge": {
+        "en": "Streaming transcription bridge",
+        "ja": "ストリーミング文字起こしブリッジ",
+        "qps-ploc": "⟦Şŧřėȧɱïñɠ ŧřȧñşƈřïṗŧïőñ ƀřïḓɠė ŀőřėɱ ïṗşů⟧"
+      },
+      "engine_config_streaming_tts_bridge": {
+        "en": "Streaming speech bridge",
+        "ja": "ストリーミング音声合成ブリッジ",
+        "qps-ploc": "⟦Şŧřėȧɱïñɠ şṗėėƈħ ƀřïḓɠė ŀőřėɱ ï⟧"
+      },
+      "engine_config_agent_runtime_backend": {
+        "en": "Agent runtime mode",
+        "ja": "エージェント実行方式",
+        "qps-ploc": "⟦Ȧɠėñŧ řůñŧïɱė ɱőḓė ŀőřėɱ⟧"
+      },
+      "engine_config_agent_pane_runtime_provider": {
+        "en": "Pane runtime provider",
+        "ja": "ペイン実行プロバイダー",
+        "qps-ploc": "⟦Ṗȧñė řůñŧïɱė ṗřőṽïḓėř ŀőřėɱ ⟧"
+      },
+      "engine_config_mode_default": {
+        "en": "Use default",
+        "ja": "既定値を利用",
+        "qps-ploc": "⟦Ůşė ḓėƒȧůŀŧ ŀőř⟧"
+      },
+      "engine_config_mode_pipe": {
+        "en": "Pipe (standard input/output)",
+        "ja": "Pipe（標準入出力）",
+        "qps-ploc": "⟦Ṗïṗė (şŧȧñḓȧřḓ ïñṗůŧ/őůŧṗůŧ) ŀőřėɱ ïṗş⟧"
+      },
+      "engine_config_mode_pane": {
+        "en": "Pane (interactive terminal)",
+        "ja": "Pane（対話ターミナル）",
+        "qps-ploc": "⟦Ṗȧñė (ïñŧėřȧƈŧïṽė ŧėřɱïñȧŀ) ŀőřėɱ ïṗ⟧"
+      },
+      "engine_config_binary_help": {
+        "en": "Use an executable name or absolute path. This page does not install engines.",
+        "ja": "実行ファイル名または絶対パスを指定します。この画面ではエンジンをインストールしません。",
+        "qps-ploc": "⟦Ůşė ȧñ ėẋėƈůŧȧƀŀė ñȧɱė őř ȧƀşőŀůŧė ṗȧŧħ. Ŧħïş ṗȧɠė ḓőėş ñőŧ ïñşŧȧŀŀ ėñɠïñėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "engine_config_record_help": {
+        "en": "Command template: {{output}} is the output file and {{duration_sec}} the recording length.",
+        "ja": "コマンドの {{output}} は出力ファイル、{{duration_sec}} は録音する秒数に置き換わります。",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓ ŧėɱṗŀȧŧė: {{output}} ïş ŧħė őůŧṗůŧ ƒïŀė ȧñḓ {{duration_sec}} ŧħė řėƈőřḓïñɠ ŀėñɠŧħ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
+      "engine_config_bridge_help": {
+        "en": "Use a registered bridge or provider ID. Selection still respects task requirements and policy.",
+        "ja": "登録済みのブリッジまたはプロバイダーの ID を指定します。選択にはタスクの要件とポリシーが適用されます。",
+        "qps-ploc": "⟦Ůşė ȧ řėɠïşŧėřėḓ ƀřïḓɠė őř ṗřőṽïḓėř ÏḒ. Şėŀėƈŧïőñ şŧïŀŀ řėşṗėƈŧş ŧȧşķ řėɋůïřėɱėñŧş ȧñḓ ṗőŀïƈẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "engine_config_fluid_help": {
+        "en": "Command template: {{audio}} is the input audio file and {{language}} the requested language.",
+        "ja": "コマンドの {{audio}} は入力音声ファイル、{{language}} は指定した言語に置き換わります。",
+        "qps-ploc": "⟦Ƈőɱɱȧñḓ ŧėɱṗŀȧŧė: {{audio}} ïş ŧħė ïñṗůŧ ȧůḓïő ƒïŀė ȧñḓ {{language}} ŧħė řėɋůėşŧėḓ ŀȧñɠůȧɠė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
       }
     },
     "tui": {
