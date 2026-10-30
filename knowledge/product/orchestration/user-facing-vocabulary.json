@@ -9930,6 +9930,11 @@
         "ja": "リアルタイム音声会話の設定を表示",
         "qps-ploc": "⟦Şħőẇ řėȧŀŧïɱė ṽőïƈė ƈőñṽėřşȧŧïőñ ƈőñƒïɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
       },
+      "cli_cmd_script_voice_engine_config": {
+        "en": "Show or set engine runtime defaults",
+        "ja": "エンジン実行時の既定値を表示・設定",
+        "qps-ploc": "⟦Şħőẇ őř şėŧ ėñɠïñė řůñŧïɱė ḓėƒȧůŀŧş ŀőřėɱ ïṗşůɱ⟧"
+      },
       "cli_cmd_script_typecheck": {
         "en": "Typecheck the repository",
         "ja": "リポジトリを型チェック",

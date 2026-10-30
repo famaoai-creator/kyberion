@@ -4193,6 +4193,17 @@
       "native_help": true
     },
     {
+      "id": "script.voice.engine-config",
+      "script": "voice:engine-config",
+      "command": "voice engine-config",
+      "noun": "voice",
+      "verb": "engine-config",
+      "audience": "operator",
+      "description": "cli_cmd_script_voice_engine_config",
+      "group": "inspect",
+      "native_help": true
+    },
+    {
       "id": "script.voice.conversation.turn",
       "module": "scripts/run_realtime_voice_conversation.ts",
       "command": "voice conversation-turn",
