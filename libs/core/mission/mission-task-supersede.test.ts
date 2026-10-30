@@ -697,8 +697,9 @@ describe('mission_controller supersede-task', () => {
     expect(lateAudits()).toHaveLength(1);
     expect(isTaskVerifiablySuperseded(missionId, 'task-held', { approvalRequestId })).toBe(true);
 
-    // A re-run with the same approval records nothing again.
-    await supersedeMissionTask({
+    // A re-run with the same approval records nothing again, and reports every
+    // dependent the supersede rewired.
+    const resumed = await supersedeMissionTask({
       missionId,
       taskId: 'task-held',
       byTaskId: 'task-replacement',
@@ -706,6 +707,11 @@ describe('mission_controller supersede-task', () => {
       approvalRequestId,
     });
     expect(readReceipt().late_rewritten_dependent_task_ids).toEqual([
+      'task-late',
+      'task-late-item',
+    ]);
+    expect(resumed.rewritten_dependent_task_ids).toEqual([
+      'task-after',
       'task-late',
       'task-late-item',
     ]);
@@ -794,6 +800,124 @@ describe('mission_controller supersede-task', () => {
       receipt: ['task-late', 'task-late-item'],
       ledger: ['task-late', 'task-late-item'],
       audit: ['task-late', 'task-late-item'],
+    });
+  });
+
+  it('records a dependency that came back and was rewritten again, once, and reports it on a resumed run', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    await supersedeMissionTask(input);
+    expect(await lateRecords(approvalRequestId)).toEqual({
+      receipt: undefined,
+      ledger: [],
+      audit: [],
+    });
+    // task-after's WorkItem comes to wait on the superseded task again (the
+    // board writer's guard keeps the board's rewrite, so it cannot come back there).
+    writeMissionNextTasks(missionPath, (onDisk) =>
+      onDisk.map((task) =>
+        task.task_id === 'task-after' ? { ...task, dependencies: ['task-held'] } : task
+      )
+    );
+    expect(boardTask('task-after')?.dependencies).toEqual(['task-replacement']);
+    const item = getWorkItem(itemId('task-after'))!;
+    updateWorkItem({
+      itemId: item.item_id,
+      expectedVersion: item.version,
+      dependencies: ['task-held'],
+    });
+    const rerun = await supersedeMissionTask(input);
+    expect(rerun.rewritten_dependent_task_ids).toEqual(['task-after']);
+    expect(getWorkItem(itemId('task-after'))?.dependencies).toEqual(['task-replacement']);
+    const markers = getWorkItem(itemId('task-after'))?.metadata
+      ?.dependencies_rewritten_from as Array<{ at: string }>;
+    expect(markers).toHaveLength(2);
+    expect(markers[1].at).not.toBe(markers[0].at);
+    // Recorded as a late rewrite of its own time, in all three records; a
+    // further re-run records nothing again.
+    await supersedeMissionTask(input);
+    expect(await lateRecords(approvalRequestId)).toEqual({
+      receipt: ['task-after'],
+      ledger: ['task-after'],
+      audit: ['task-after'],
+    });
+    const receipt = JSON.parse(
+      String(
+        safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as { late_rewrites: Array<{ task_id: string; at: string }> };
+    expect(receipt.late_rewrites).toEqual([{ task_id: 'task-after', at: markers[1].at }]);
+  });
+
+  it('a second approval after an abandoned run writes its own receipt and audit entry', async () => {
+    // A board-only mission: the abandoned run stamped its receipt's audit
+    // entry, then stopped before its ledger entry and board write.
+    prepareMission(defaultTasks(), { workItems: false });
+    const abandonedApproval = approve();
+    ledgerFault.failNext = true;
+    await expect(
+      supersedeMissionTask({
+        missionId,
+        taskId: 'task-held',
+        byTaskId: 'task-replacement',
+        reason,
+        approvalRequestId: abandonedApproval,
+      })
+    ).rejects.toThrow(/TEST_FAULT/u);
+    expect(boardTask('task-held')?.status).toBe('blocked');
+
+    const otherReason = 'The agenda moved to the replacement after a second review.';
+    const approvalRequestId = approve({ reason: otherReason });
+    const result = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason: otherReason,
+      approvalRequestId,
+    });
+    expect(result.status).toBe('applied');
+    const receipt = JSON.parse(
+      String(
+        safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    expect(receipt).toMatchObject({
+      reason: otherReason,
+      superseded: { approval_request_id: approvalRequestId },
+      audit_recorded_at: expect.any(String),
+    });
+    expect(
+      safeExistsSync(
+        nodePath.join(
+          missionPath,
+          `evidence/task-supersede/task-held.abandoned-${abandonedApproval}.json`
+        )
+      )
+    ).toBe(true);
+    const { auditChain } = await import('../governance/audit-chain.js');
+    expect(
+      auditChain
+        .loadAll()
+        .filter(
+          (entry) =>
+            entry.action === 'mission.task_superseded' &&
+            entry.metadata?.approval_request_id === approvalRequestId
+        )
+    ).toHaveLength(1);
+    expect(missionTaskSupersedeProof(missionId, 'task-held')).toMatchObject({
+      verified: true,
+      approval_request_id: approvalRequestId,
     });
   });
 
