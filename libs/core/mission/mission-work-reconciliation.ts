@@ -1065,6 +1065,7 @@ export async function reconcileMissionExistingWork(input: {
     for (const task of tasks) {
       if (
         task.task_id === 'repair-finish-exit' &&
+        !boardRepairedTaskIds.includes(task.task_id) &&
         String(task.status || '').toLowerCase() === 'completed' &&
         task.reconciliation?.manifest_sha256 === manifestHash &&
         !boardCarriesReconciliation(task.task_id)
