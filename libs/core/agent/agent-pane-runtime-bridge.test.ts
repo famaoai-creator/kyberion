@@ -1,4 +1,15 @@
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('../voice/engine-runtime-preferences.js').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('../voice/engine-runtime-preferences.js', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+}));
 import {
   parseAgentRuntimeLaunchMode,
   resetAgentPaneRuntimeBridges,
@@ -435,5 +446,44 @@ describe('pane adapter: an agent that stops to ask is not finished', () => {
     }).ask('update the header');
     const start = exec.mock.calls.find(([, args]) => (args as string[])[1] === 'start');
     expect(start?.[1]).toEqual(expect.arrayContaining(['--', '--permission-mode', 'acceptEdits']));
+  });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe('runtime backend preference boundaries', () => {
+  it('isolates injected environments and skips lower priority profile reads', () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    expect(resolveAgentRuntimeLaunchMode({ env: {} })).toBe('pipe');
+    expect(resolveAgentRuntimeLaunchMode({ runtimeBackend: 'pane' })).toBe('pane');
+    vi.stubEnv('KYBERION_AGENT_RUNTIME_BACKEND', 'pipe');
+    expect(resolveAgentRuntimeLaunchMode()).toBe('pipe');
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+  });
+  it('uses a readable preference, permits unavailable defaults, and propagates real errors', () => {
+    vi.stubEnv('KYBERION_AGENT_RUNTIME_BACKEND', '');
+    preferencesReadiness.mockReturnValue({
+      status: 'ready',
+      preferences: { version: '1.0.0', agent_runtime_backend: 'pane' },
+    });
+    expect(resolveAgentRuntimeLaunchMode()).toBe('pane');
+    preferencesReadiness.mockReturnValue({
+      status: 'unavailable',
+      reason: 'personal_profile_not_authorized',
+    });
+    expect(resolveAgentRuntimeLaunchMode()).toBe('pipe');
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('scope mismatch');
+    });
+    expect(() => resolveAgentRuntimeLaunchMode()).toThrow('scope mismatch');
   });
 });

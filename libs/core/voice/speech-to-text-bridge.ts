@@ -21,6 +21,10 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { logger } from '../core.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import {
+  engineRuntimePreferencesReadiness,
+  getEngineRuntimePreferencesPath,
+} from './engine-runtime-preferences.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { isRecord, readTextFile } from '../foundation/text.js';
 import {
@@ -131,6 +135,12 @@ const speechToTextSeam = createSeam<SpeechToTextBridge>({
     )[0]?.implementation,
 });
 const registeredDisposers = new Map<string, () => void>();
+let ownedFluidAudio:
+  { fingerprint: string; bridge: SpeechToTextBridge; dispose: () => void } | undefined;
+function releaseOwnedFluidAudio(): void {
+  ownedFluidAudio?.dispose();
+  ownedFluidAudio = undefined;
+}
 const RUNTIME_STT_METADATA: SeamProviderMetadata = {
   provenance: 'generated',
   source: 'speech-to-text-runtime-discovery',
@@ -400,6 +410,7 @@ export function selectSpeechToTextBridges(
 export function resetSpeechToTextBridge(): void {
   for (const dispose of registeredDisposers.values()) dispose();
   registeredDisposers.clear();
+  ownedFluidAudio = undefined;
 }
 
 export function normalizeSpeechToTextResult(
@@ -668,20 +679,50 @@ export class ShellSpeechToTextBridge implements SpeechToTextBridge {
  * must print {"text":"..."}; this keeps the Swift package optional while
  * making the Kyberion boundary concrete and testable.
  */
+function fluidAudioConfiguration(
+  env: NodeJS.ProcessEnv
+): { command: string; owner: string } | undefined {
+  const command = envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
+  if (command) return { command, owner: 'environment' };
+  if (env !== process.env) return undefined;
+  const readiness = engineRuntimePreferencesReadiness();
+  const saved =
+    readiness.status === 'ready'
+      ? readiness.preferences.fluid_audio_stt_command?.trim()
+      : undefined;
+  return saved ? { command: saved, owner: getEngineRuntimePreferencesPath() } : undefined;
+}
+
+function fluidAudioSttCommandConfigured(env: NodeJS.ProcessEnv): string {
+  return fluidAudioConfiguration(env)?.command || '';
+}
+
 export function installFluidAudioSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  if (envText(env, 'KYBERION_STT_COMMAND')?.trim()) return false;
-  const command = envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim();
-  if (!command) return false;
-  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'fluid-audio-parakeet')) {
-    return true;
+  if (envText(env, 'KYBERION_STT_COMMAND')?.trim()) {
+    releaseOwnedFluidAudio();
+    return false;
   }
+  const configured = fluidAudioConfiguration(env);
   const timeoutText = envText(env, 'KYBERION_FLUID_AUDIO_STT_TIMEOUT_MS');
-  registerSpeechToTextBridge(
+  const fingerprint = configured
+    ? JSON.stringify([configured.owner, configured.command, timeoutText])
+    : undefined;
+  const current = getSpeechToTextBridges().find((bridge) => bridge.name === 'fluid-audio-parakeet');
+  if (
+    ownedFluidAudio &&
+    (current !== ownedFluidAudio.bridge || ownedFluidAudio.fingerprint !== fingerprint)
+  )
+    releaseOwnedFluidAudio();
+  if (!configured) return false;
+  // A host/plugin's same-name registration is not ours to replace or remove.
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'fluid-audio-parakeet'))
+    return true;
+  const dispose = registerSpeechToTextBridge(
     new ShellSpeechToTextBridge({
       name: 'fluid-audio-parakeet',
-      command,
+      command: configured.command,
       structuredOutput: true,
       priority:
         Math.max(100, ...getSpeechToTextBridges().map((bridge) => bridge.priority || 0)) + 1,
@@ -690,6 +731,11 @@ export function installFluidAudioSpeechToTextBridgeIfAvailable(
     }),
     RUNTIME_STT_METADATA
   );
+  ownedFluidAudio = {
+    fingerprint: fingerprint!,
+    bridge: getSpeechToTextBridges().find((bridge) => bridge.name === 'fluid-audio-parakeet')!,
+    dispose,
+  };
   logger.success('[stt-bridge] installed FluidAudio Parakeet bridge');
   return true;
 }
@@ -704,6 +750,7 @@ export function installShellSpeechToTextBridgeIfAvailable(
 ): boolean {
   const command = envText(env, 'KYBERION_STT_COMMAND')?.trim();
   if (!command) return false;
+  releaseOwnedFluidAudio();
   if (getSpeechToTextBridges().some((bridge) => bridge.name === 'shell')) return true;
   let capabilities: SpeechToTextCapabilities | undefined;
   const capabilitiesText = envText(env, 'KYBERION_STT_CAPABILITIES')?.trim();
@@ -773,7 +820,7 @@ export function installWhisperKitSpeechToTextBridgeIfAvailable(
   if (
     getSpeechToTextBridges().some((bridge) => bridge.name === 'whisperkit-cli') ||
     envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
-    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
+    fluidAudioSttCommandConfigured(env)
   ) {
     return false;
   }
@@ -834,10 +881,7 @@ export function installWhisperKitSpeechToTextBridgeIfAvailable(
 export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  if (
-    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
-    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
-  ) {
+  if (envText(env, 'KYBERION_STT_COMMAND')?.trim() || fluidAudioSttCommandConfigured(env)) {
     return false;
   }
   if (getSpeechToTextBridges().some((bridge) => bridge.name === 'mlx_whisper')) return true;
@@ -908,10 +952,7 @@ export function installManagedMlxWhisperSpeechToTextBridgeIfAvailable(
 export function installManagedFasterWhisperSpeechToTextBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
 ): boolean {
-  if (
-    envText(env, 'KYBERION_STT_COMMAND')?.trim() ||
-    envText(env, 'KYBERION_FLUID_AUDIO_STT_COMMAND')?.trim()
-  ) {
+  if (envText(env, 'KYBERION_STT_COMMAND')?.trim() || fluidAudioSttCommandConfigured(env)) {
     return false;
   }
   if (getSpeechToTextBridges().some((bridge) => bridge.name === 'faster_whisper')) return true;

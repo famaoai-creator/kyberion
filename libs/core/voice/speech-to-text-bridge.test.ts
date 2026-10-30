@@ -1,4 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('./engine-runtime-preferences.js').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('./engine-runtime-preferences.js', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+  getEngineRuntimePreferencesPath: () => profilePath.value,
+}));
+const profilePath = { value: '/profile/default.json' };
 vi.mock('../governance/external-operation.js', () => ({
   runExternalOperation: vi.fn(async (_input, execute) => execute()),
 }));
@@ -583,5 +596,75 @@ describe('speech-to-text-bridge', () => {
     );
     expect(source).not.toMatch(/env\.KYBERION_/u);
     expect(source).toContain('getRegisteredEnvText');
+  });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
+});
+
+describe('owned FluidAudio runtime defaults', () => {
+  afterEach(() => {
+    resetSpeechToTextBridge();
+    vi.unstubAllEnvs();
+  });
+  beforeEach(() => {
+    vi.stubEnv('KYBERION_STT_COMMAND', '');
+    vi.stubEnv('KYBERION_FLUID_AUDIO_STT_COMMAND', '');
+  });
+  it('replaces owned factories on command/profile changes and removes them on reset configuration', () => {
+    const configure = (command: string) =>
+      preferencesReadiness.mockReturnValue({
+        status: 'ready',
+        preferences: { version: '1.0.0', fluid_audio_stt_command: command },
+      });
+    configure('parakeet-a {{audio}}');
+    expect(installFluidAudioSpeechToTextBridgeIfAvailable()).toBe(true);
+    const first = getSpeechToTextBridges().find((b) => b.name === 'fluid-audio-parakeet');
+    installFluidAudioSpeechToTextBridgeIfAvailable();
+    expect(getSpeechToTextBridges().find((b) => b.name === 'fluid-audio-parakeet')).toBe(first);
+    configure('parakeet-b {{audio}}');
+    installFluidAudioSpeechToTextBridgeIfAvailable();
+    const second = getSpeechToTextBridges().find((b) => b.name === 'fluid-audio-parakeet');
+    expect(second).not.toBe(first);
+    profilePath.value = '/profile/another.json';
+    installFluidAudioSpeechToTextBridgeIfAvailable();
+    expect(getSpeechToTextBridges().find((b) => b.name === 'fluid-audio-parakeet')).not.toBe(
+      second
+    );
+    preferencesReadiness.mockReturnValue({ status: 'missing' });
+    expect(installFluidAudioSpeechToTextBridgeIfAvailable()).toBe(false);
+    expect(getSpeechToTextBridges().some((b) => b.name === 'fluid-audio-parakeet')).toBe(false);
+  });
+  it('preserves a registration supplied by another owner when preferences are removed', () => {
+    registerSpeechToTextBridge(
+      new ShellSpeechToTextBridge({ name: 'fluid-audio-parakeet', command: 'plugin {{audio}}' })
+    );
+    const plugin = getSpeechToTextBridges().find((b) => b.name === 'fluid-audio-parakeet');
+    preferencesReadiness.mockReturnValue({
+      status: 'ready',
+      preferences: { version: '1.0.0', fluid_audio_stt_command: 'saved {{audio}}' },
+    });
+    expect(installFluidAudioSpeechToTextBridgeIfAvailable()).toBe(true);
+    preferencesReadiness.mockReturnValue({
+      status: 'unavailable',
+      reason: 'personal_profile_not_authorized',
+    });
+    expect(installFluidAudioSpeechToTextBridgeIfAvailable()).toBe(false);
+    expect(getSpeechToTextBridges().find((b) => b.name === 'fluid-audio-parakeet')).toBe(plugin);
+  });
+  it('isolates injected environments and propagates genuine preference errors', () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    expect(installFluidAudioSpeechToTextBridgeIfAvailable({})).toBe(false);
+    expect(
+      installFluidAudioSpeechToTextBridgeIfAvailable({
+        KYBERION_FLUID_AUDIO_STT_COMMAND: 'env {{audio}}',
+      })
+    ).toBe(true);
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+    expect(() => installFluidAudioSpeechToTextBridgeIfAvailable()).toThrow('profile denied');
   });
 });
