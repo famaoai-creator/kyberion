@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { safeReadFile } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateBrowserExtensionObservation } from '@agent/core/browser/browser-extension-bridge';
@@ -838,7 +838,11 @@ describe('Browser Bridge mailbox inbox (受信)', () => {
 
   it('declares only the alarms, contextMenus and notifications permissions it adds', () => {
     const manifest = JSON.parse(
-      readFileSync(path.resolve(__dirname, '../tools/adf-replay-extension/manifest.json'), 'utf8')
+      String(
+        safeReadFile(path.resolve(__dirname, '../tools/adf-replay-extension/manifest.json'), {
+          encoding: 'utf8',
+        })
+      )
     );
     expect(manifest.permissions).toEqual(
       expect.arrayContaining(['alarms', 'contextMenus', 'notifications', 'nativeMessaging'])

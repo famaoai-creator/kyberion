@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { safeReadFile } from '@agent/core/secure-io';
 import * as path from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 
@@ -192,9 +192,10 @@ describe('Browser Bridge send form', () => {
 });
 
 describe('Browser Bridge side panel inbox wiring', () => {
-  const source = readFileSync(
-    path.resolve(__dirname, '../tools/adf-replay-extension/sidepanel.js'),
-    'utf8'
+  const source = String(
+    safeReadFile(path.resolve(__dirname, '../tools/adf-replay-extension/sidepanel.js'), {
+      encoding: 'utf8',
+    })
   );
 
   it('auto-answers through the model gate and keeps Built-in AI in the panel', () => {
