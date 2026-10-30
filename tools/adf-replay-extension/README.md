@@ -13,8 +13,45 @@ Chrome の現在タブで操作意図を記録し、Kyberion が review でき�
 - preflight は browser-actuator の `browser` パイプライン step `op: extension_session`（`actuator-op-registry.json`）で検証
 - Chrome 138 以降で利用可能な Built-in AI（`Summarizer` / `LanguageModel`）による、redaction 済みページ本文・抽出観測のローカル要約とシナリオ候補抽出（候補は実行不可）
 - シナリオ候補の目的を確認して intent 入力へ渡し、既存の Pattern B（照合・承認・実行）または Pattern A（記録・Review）へ進む導線
+- **受信タブ**: Kyberion からの依頼（ページ観測・ローカル推論・お知らせ）と承認待ちを表示。ページ観測は「許可して応答」を押したときだけ応答
+- **送信タブ / 右クリック「Kyberion に送る」**: ページ本文または選択範囲を、PII 除去済みで intent またはナレッジとして送る（右クリックは下書きを入れるだけで、自動送信しない）
+- **このページが公開している AI ツール（WebMCP）**: ツール名・説明・入力項目名だけを表示（呼び出しはしない）
 
 > 注: pipeline 上の operation 名は `browser` action 内の step `op: "extension_session"` です（`browser:extension_session` という単独 op ではありません）。
+
+## Kyberion からの依頼（受信タブ）
+
+Kyberion から拡張への連絡は、拡張が Native Messaging host に問い合わせる **pull 型の受信箱** です。拡張は待ち受けポートを開きません。
+
+- 1 分ごとに問い合わせます（`chrome.alarms`）。Side Panel を開いている間は 5 秒ごとです。
+- 要対応の件数を拡張アイコンのバッジに出します。新しいページ観測の依頼と承認待ちは Chrome の通知でも知らせます。
+- **ページ観測**（`observe_tab`）: 依頼元・目的・対象サイト・残り時間を確認し、「許可して応答」で、Live タブで接続中の現在タブを PII 除去して返します。対象サイトが指定されている依頼は、そのサイトのタブでしか応答できません。押さなければ何も返しません。
+- **ローカル推論**（`local_infer`）: Chrome 内蔵 AI でこの端末内で処理し、結果だけを返します。既定ではクリックが必要です。「ローカル推論依頼を自動応答」をオンにすると、このブラウザを閉じるまでローカル推論だけ自動で応答します（ページ観測には適用しません）。内蔵 AI が使えない場合は、理由を添えて失敗として返します。
+- **お知らせ**（`notify`）: 情報・進捗は「確認」で既読にします。承認待ちは表示だけです。拡張では承認できず、表示されたコマンド（`pnpm kyberion approvals --approve <id>`）をコピーしてターミナルで実行します。
+- 期限を過ぎた依頼は手元で消え、応答しません。
+
+依頼は `pnpm kyberion browser-bridge request observe|infer|notify ...` で作成し、`pnpm kyberion browser-bridge status <id>` / `wait <id>` で結果を確認します。
+
+## Kyberion に送る（送信タブ）
+
+1. ページ上で右クリック →「Kyberion に送る」（選択中ならその範囲、なければページ本文）、または送信タブの「接続中のページを取り込む」。
+2. 送信方法を選ぶ: **intent**（やりたいことを書くと登録済み手順と照合し、見つかれば Intent タブから Pattern B で実行できます）または **knowledge**（ナレッジとして取り込みます）。
+3. 保存先の区分を選ぶ: personal（既定）/ confidential（テナント slug が必要）/ public（「公開してよい内容です」の確認が必要）。
+4. PII 除去済みのプレビューを確認して「Kyberion に送信」。
+
+## 権限
+
+| 権限                      | 用途                                                                               |
+| ------------------------- | ---------------------------------------------------------------------------------- |
+| `activeTab` / `scripting` | 接続したタブへの content script 注入、WebMCP ツール一覧の読み取り                  |
+| `storage`                 | 記録・受信箱・送信下書きの一時保存（`chrome.storage.session`、ブラウザ終了で破棄） |
+| `sidePanel`               | Side Panel の表示                                                                  |
+| `nativeMessaging`         | Kyberion（native host）との唯一の通信経路                                          |
+| `alarms`                  | 受信箱の定期問い合わせ（1 分ごと）                                                 |
+| `contextMenus`            | 右クリックの「Kyberion に送る」                                                    |
+| `notifications`           | 新しいページ観測の依頼と承認待ちの通知                                             |
+
+サイトへのアクセス（`optional_host_permissions`）は従来どおり、接続時に明示的に許可したサイトだけです。新しい host permission は追加していません。
 
 ## 実行フロー（Run タブ）
 
@@ -31,7 +68,7 @@ Chrome の現在タブで操作意図を記録し、Kyberion が review でき�
 - 高リスク操作（送信・購入・削除等）は Kyberion の承認なしには実行されません。
 - `chrome://`、Chrome Web Store、file URL、incognito は対象外です。
 - 記録ドラフトは `chrome.storage.session` に保持され、ブラウザ終了で破棄されます（永続保存は Kyberion 側 tier 指定で行います）。
-- Built-in AI は任意機能です。API 非対応、モデル未取得、端末要件未達の場合は Built-in AI の処理を停止しますが、既存の Native host による実行・分析経路は変更されず利用できます。AI の結果だけで操作や承認は行いません。
+- Built-in AI は任意機能です。Prompt API / Summarizer / Translator / LanguageDetector と、利用できる場合だけ Writer / Rewriter / Proofreader を機能検出で使います。API 非対応、モデル未取得、端末要件未達の場合は Built-in AI の処理を停止しますが、既存の Native host による実行・分析経路は変更されず利用できます。AI の結果だけで操作や承認は行いません。
 
 Native Messaging host の導入は [native-host/README.md](./native-host/README.md) を参照してください。
 
