@@ -534,13 +534,13 @@ export async function approveScopeChange(args: {
     // NEXT_TASKS.json, and leaving it open re-blocks the finish exit gate
     // and bounces the mission back to active. Close it with evidence.
     const driftRepairTaskId = 'repair-intent-drift';
-    const tasks = readMissionNextTasks(missionPathCandidate);
-    const driftRepair = tasks.find(
-      (task) =>
-        String(task.task_id || '') === driftRepairTaskId &&
-        !MISSION_TASK_CLOSED_STATUSES.has(String(task.status || 'planned').toLowerCase())
-    );
-    if (driftRepair) {
+    writeMissionNextTasks(missionPathCandidate, (tasks) => {
+      const driftRepair = tasks.find(
+        (task) =>
+          String(task.task_id || '') === driftRepairTaskId &&
+          !MISSION_TASK_CLOSED_STATUSES.has(String(task.status || 'planned').toLowerCase())
+      );
+      if (!driftRepair) return undefined;
       const reportPath = safeMissionArtifactPath(
         missionPathCandidate,
         `evidence/${driftRepairTaskId}.md`
@@ -562,8 +562,8 @@ export async function approveScopeChange(args: {
         ].join('\n')
       );
       driftRepair.status = 'completed';
-      writeMissionNextTasks(missionPathCandidate, tasks);
-    }
+      return tasks;
+    });
   });
 
   try {
@@ -1251,26 +1251,27 @@ export async function recordArtifactReview(args: {
       missionPath,
     });
 
-    // Re-read the board under the mission lock: writing back the copy read
-    // before it would undo a supersede-task (or any other write) made since.
-    const lockedTasks = readMissionNextTasks(missionPath);
-    assertReviewNotSuperseded(missionPath, lockedTasks, args.reviewTaskId, reviewTargetId);
-    const lockedTask = lockedTasks.find(
-      (entry) => String(entry.task_id || '') === args.reviewTaskId
-    );
-    if (!lockedTask) throw new Error(`Task "${args.reviewTaskId}" not found in NEXT_TASKS.json.`);
-    // Stamp the task so both isReviewTaskSatisfied (record-evidence-time) and
-    // validateMissionArtifactReviewGate (finish-time) see the same receipt.
-    lockedTask.artifact_review_receipt = receiptRelPath;
-    lockedTask.artifact_review_profile = {
-      artifact_kind: kind,
-      artifact_path: artifactReference,
-      artifact_sha256: sha256Value,
-      required_reviewer_roles: [],
-      independence_required: true,
-      implementer_agent_ids: implementerAgentIds,
-    };
-    writeMissionNextTasks(missionPath, lockedTasks);
+    // Read and stamped under the board's writer lease: writing back an earlier
+    // copy would undo a supersede-task or a worker's status write made since.
+    writeMissionNextTasks(missionPath, (lockedTasks) => {
+      assertReviewNotSuperseded(missionPath, lockedTasks, args.reviewTaskId, reviewTargetId);
+      const lockedTask = lockedTasks.find(
+        (entry) => String(entry.task_id || '') === args.reviewTaskId
+      );
+      if (!lockedTask) throw new Error(`Task "${args.reviewTaskId}" not found in NEXT_TASKS.json.`);
+      // Stamp the task so both isReviewTaskSatisfied (record-evidence-time) and
+      // validateMissionArtifactReviewGate (finish-time) see the same receipt.
+      lockedTask.artifact_review_receipt = receiptRelPath;
+      lockedTask.artifact_review_profile = {
+        artifact_kind: kind,
+        artifact_path: artifactReference,
+        artifact_sha256: sha256Value,
+        required_reviewer_roles: [],
+        independence_required: true,
+        implementer_agent_ids: implementerAgentIds,
+      };
+      return lockedTasks;
+    });
 
     appendMissionExecutionLedgerEntry({
       mission_id: upperId,
