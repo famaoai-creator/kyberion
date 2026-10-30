@@ -9,7 +9,10 @@ import {
   type ApprovalRequesterRef,
 } from '../governance/approval-requester.js';
 import * as nodePath from 'node:path';
-import { appendMissionExecutionLedgerEntry } from './mission-team-binding.js';
+import {
+  appendMissionExecutionLedgerEntry,
+  readMissionExecutionLedger,
+} from './mission-team-binding.js';
 import {
   evaluateArtifactReviews,
   inferArtifactReviewKind,
@@ -57,7 +60,7 @@ import { loadState, saveState } from './mission-state.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { readCanonicalWorkGraphTasks } from '../workforce/work-graph-projection.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
-import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
+import { readMissionNextTasks, writeMissionNextTasks } from './mission-lifecycle-completion.js';
 
 // `superseded` (supersede-task) is terminal: a replaced task is never adoptable.
 const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed', 'superseded']);
@@ -113,6 +116,11 @@ export interface MissionWorkReconciliationResult {
   source_commit: string;
   reconciled_task_ids: string[];
   already_reconciled_task_ids: string[];
+  /**
+   * Tasks an earlier run of this manifest closed in WorkItems but whose board
+   * entry it did not write (the run stopped part-way): adopted onto the board again.
+   */
+  board_repaired_task_ids: string[];
   auto_completed_repair_task_ids: string[];
   work_item_ids_updated: string[];
   approval_request_id?: string;
@@ -969,6 +977,21 @@ export async function reconcileMissionExistingWork(input: {
     const adoptedTaskIds = new Set(manifestTaskIds);
     const reconciledTaskIds: string[] = [];
     const alreadyReconciledTaskIds: string[] = [];
+    const boardRepairedTaskIds: string[] = [];
+    // An earlier run of this manifest may have closed WorkItems and stopped
+    // before its board write: such a task is adopted onto the board again.
+    const boardById = new Map(
+      readMissionNextTasks(missionPath).map((task) => [String(task.task_id || ''), task])
+    );
+    const boardCarriesReconciliation = (taskId: string): boolean => {
+      const entry = boardById.get(taskId);
+      const reconciliation = entry?.reconciliation as { manifest_sha256?: unknown } | undefined;
+      return (
+        Boolean(entry) &&
+        TERMINAL_TASK_STATUSES.has(String(entry?.status || '').toLowerCase()) &&
+        reconciliation?.manifest_sha256 === manifestHash
+      );
+    };
     const reconciledArtifactReviews = new Map<string, ReconciledArtifactReview>();
     const missionRiskProfile = String(
       ((state as unknown as { classification?: Record<string, unknown> }).classification || {})
@@ -985,7 +1008,12 @@ export async function reconcileMissionExistingWork(input: {
         throw new Error(`Task ${manifestTask.task_id} not found in canonical WorkItems`);
       const status = String(plannedTask.status || 'planned').toLowerCase();
       const previousManifestHash = String(plannedTask.reconciliation?.manifest_sha256 || '');
-      if (TERMINAL_TASK_STATUSES.has(status)) {
+      // Only a task completed by that run (never superseded, never in review).
+      const boardRepair =
+        status === 'completed' &&
+        previousManifestHash === manifestHash &&
+        !boardCarriesReconciliation(manifestTask.task_id);
+      if (TERMINAL_TASK_STATUSES.has(status) && !boardRepair) {
         if (previousManifestHash === manifestHash) {
           alreadyReconciledTaskIds.push(manifestTask.task_id);
           continue;
@@ -994,7 +1022,7 @@ export async function reconcileMissionExistingWork(input: {
           `Task ${manifestTask.task_id} is already terminal without this reconciliation manifest`
         );
       }
-      if (!ADOPTABLE_TASK_STATUSES.has(status)) {
+      if (!boardRepair && !ADOPTABLE_TASK_STATUSES.has(status)) {
         throw new Error(`Task ${manifestTask.task_id} cannot be reconciled from status ${status}`);
       }
       validateTaskContract({ plannedTask, manifestTask });
@@ -1016,7 +1044,7 @@ export async function reconcileMissionExistingWork(input: {
       });
       if (artifactReview) reconciledArtifactReviews.set(manifestTask.task_id, artifactReview);
       assertDependenciesResolved(plannedTask, taskById, adoptedTaskIds);
-      reconciledTaskIds.push(manifestTask.task_id);
+      (boardRepair ? boardRepairedTaskIds : reconciledTaskIds).push(manifestTask.task_id);
     }
 
     const resultBase = {
@@ -1026,6 +1054,7 @@ export async function reconcileMissionExistingWork(input: {
       source_commit: manifest.source.commit,
       reconciled_task_ids: reconciledTaskIds,
       already_reconciled_task_ids: alreadyReconciledTaskIds,
+      board_repaired_task_ids: boardRepairedTaskIds,
       auto_completed_repair_task_ids: [] as string[],
       work_item_ids_updated: [] as string[],
       ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
@@ -1079,7 +1108,17 @@ export async function reconcileMissionExistingWork(input: {
     );
     for (const task of tasks) {
       if (task.task_id !== 'repair-finish-exit') continue;
-      if (TERMINAL_TASK_STATUSES.has(String(task.status || '').toLowerCase())) continue;
+      if (TERMINAL_TASK_STATUSES.has(String(task.status || '').toLowerCase())) {
+        // Completed by an earlier run of this manifest that stopped before its board write.
+        if (
+          String(task.status || '').toLowerCase() === 'completed' &&
+          task.reconciliation?.manifest_sha256 === manifestHash &&
+          !boardCarriesReconciliation(task.task_id)
+        ) {
+          boardRepairedTaskIds.push(task.task_id);
+        }
+        continue;
+      }
       const dependencies = (task.dependencies || []).filter(
         (dependency) => dependency !== task.task_id
       );
@@ -1132,8 +1171,11 @@ export async function reconcileMissionExistingWork(input: {
 
     const hasMutation =
       reconciledTaskIds.length > 0 ||
+      boardRepairedTaskIds.length > 0 ||
       resultBase.auto_completed_repair_task_ids.length > 0 ||
-      resultBase.work_item_ids_updated.length > 0;
+      resultBase.work_item_ids_updated.length > 0 ||
+      // An earlier run stopped after its board write, before its receipt.
+      !safeExistsSync(receiptPath);
     if (!hasMutation) {
       logger.info(`Mission ${missionId} already reflects reconciliation ${manifestHash}.`);
       return {
@@ -1143,8 +1185,26 @@ export async function reconcileMissionExistingWork(input: {
       };
     }
 
+    // Once per task and manifest: a re-run after an earlier run stopped part-way
+    // (WorkItems closed, or a board-only mission whose board write failed)
+    // records only what that run did not.
+    const ledger = readMissionExecutionLedger(missionId, missionPath);
+    const ledgerHas = (eventType: string, taskId: string): boolean =>
+      ledger.some(
+        (entry) =>
+          entry.event_type === eventType &&
+          entry.task_id === taskId &&
+          (entry.payload as { manifest_sha256?: unknown } | undefined)?.manifest_sha256 ===
+            manifestHash
+      );
     for (const manifestTask of manifest.tasks) {
-      if (!reconciledTaskIds.includes(manifestTask.task_id)) continue;
+      if (
+        !reconciledTaskIds.includes(manifestTask.task_id) &&
+        !boardRepairedTaskIds.includes(manifestTask.task_id)
+      ) {
+        continue;
+      }
+      if (ledgerHas('existing_work_reconciled', manifestTask.task_id)) continue;
       appendMissionExecutionLedgerEntry({
         mission_id: missionId,
         mission_path_hint: missionPath,
@@ -1162,7 +1222,11 @@ export async function reconcileMissionExistingWork(input: {
         },
       });
     }
-    for (const repairTaskId of resultBase.auto_completed_repair_task_ids) {
+    for (const repairTaskId of [
+      ...resultBase.auto_completed_repair_task_ids,
+      ...boardRepairedTaskIds.filter((taskId) => taskId === 'repair-finish-exit'),
+    ]) {
+      if (ledgerHas('existing_work_reconciliation_repair_completed', repairTaskId)) continue;
       appendMissionExecutionLedgerEntry({
         mission_id: missionId,
         mission_path_hint: missionPath,
@@ -1180,7 +1244,11 @@ export async function reconcileMissionExistingWork(input: {
       });
     }
 
-    if (reconciledTaskIds.length > 0 || resultBase.auto_completed_repair_task_ids.length > 0) {
+    if (
+      reconciledTaskIds.length > 0 ||
+      boardRepairedTaskIds.length > 0 ||
+      resultBase.auto_completed_repair_task_ids.length > 0
+    ) {
       // Written under the board's writer lease: the adopted and repair tasks
       // carry this reconciliation; every other task keeps the board's current
       // entry (a worker's status write since the read above is kept), with the
@@ -1188,6 +1256,7 @@ export async function reconcileMissionExistingWork(input: {
       // supersede-task stays so when the mission proves the supersede.
       const changedIds = new Set([
         ...reconciledTaskIds,
+        ...boardRepairedTaskIds,
         ...resultBase.auto_completed_repair_task_ids,
       ]);
       // `reviewed` is left out: a WorkItem still in review projects to it.
@@ -1230,7 +1299,11 @@ export async function reconcileMissionExistingWork(input: {
       existing_work_reconciliation_summary: {
         manifest_sha256: manifestHash,
         source_commit: manifest.source.commit,
-        task_ids: [...reconciledTaskIds, ...alreadyReconciledTaskIds],
+        task_ids: [
+          ...reconciledTaskIds,
+          ...boardRepairedTaskIds.filter((taskId) => manifestTaskIds.includes(taskId)),
+          ...alreadyReconciledTaskIds,
+        ],
         ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
         receipt_path: receiptRelative,
       },
@@ -1248,7 +1321,7 @@ export async function reconcileMissionExistingWork(input: {
     currentState.history.push({
       ts: adoptedAt,
       event: 'RECONCILE_EXISTING_WORK',
-      note: `Adopted ${reconciledTaskIds.length} task(s) from ${manifest.source.commit}: ${manifest.reason}`,
+      note: `Adopted ${reconciledTaskIds.length} task(s) from ${manifest.source.commit}${boardRepairedTaskIds.length > 0 ? ` (board repaired for ${boardRepairedTaskIds.join(', ')})` : ''}: ${manifest.reason}`,
     });
     await saveState(missionId, currentState, { alreadyLocked: true });
 
@@ -1262,6 +1335,7 @@ export async function reconcileMissionExistingWork(input: {
         manifest_sha256: manifestHash,
         source_commit: manifest.source.commit,
         task_ids: reconciledTaskIds,
+        board_repaired_task_ids: boardRepairedTaskIds,
         ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
         receipt_path: receiptRelative,
       },

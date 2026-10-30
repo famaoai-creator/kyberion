@@ -14,7 +14,10 @@ import {
 } from '@agent/core/requirements-draft-store';
 import { assertSafeRepositoryPath } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
-import { writeMissionNextTasks } from '@agent/core/mission/mission-lifecycle-completion';
+import {
+  isTaskProvenSuperseded,
+  writeMissionNextTasks,
+} from '@agent/core/mission/mission-lifecycle-completion';
 
 function resolveTaskPlanInputPath(ref: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
@@ -120,14 +123,30 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
   // new plan replaces the board, but a task superseded on disk keeps its
   // record (M2), and a plan task that depends on (or reviews) a superseded id
   // is pointed at its replacement, which a superseded task never satisfies.
+  // Only a supersede the mission proves is followed: an unproven one (a hand
+  // edit) keeps the plan's own id, which stays pending until it is repaired.
   let boardTaskCount = nextTasks.length;
   writeMissionNextTasks(missionDir, (onDisk) => {
     const replacedBy = new Map<string, string>();
+    const unproven: string[] = [];
     for (const task of onDisk) {
       const by = (task.superseded as { by_task_id?: unknown } | undefined)?.by_task_id;
-      if (task.status === 'superseded' && typeof by === 'string' && by) {
-        replacedBy.set(String(task.task_id || ''), by);
+      if (
+        String(task.status || '').toLowerCase() === 'superseded' &&
+        typeof by === 'string' &&
+        by
+      ) {
+        if (isTaskProvenSuperseded(missionDir, task, 'task_plan_to_next_tasks')) {
+          replacedBy.set(String(task.task_id || ''), by);
+        } else {
+          unproven.push(String(task.task_id || ''));
+        }
       }
+    }
+    if (unproven.length > 0) {
+      logger.warn(
+        `[task_plan_to_next_tasks] superseded tasks ${unproven.join(', ')} are not proven — plan tasks that depend on them are not pointed at a replacement | repair the supersede (pnpm mission supersede-task) or restore the task | mission=${input.mission_id}`
+      );
     }
     const resolve = (taskId: string): string => {
       const seen = new Set([taskId]);
@@ -167,7 +186,10 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
       onDisk.filter((task) => {
         const taskId = String(task.task_id || '');
         if (plannedIds.has(taskId)) return false;
-        return task.status === 'superseded' || [...replacedBy.values()].includes(taskId);
+        return (
+          String(task.status || '').toLowerCase() === 'superseded' ||
+          [...replacedBy.values()].includes(taskId)
+        );
       }).length;
     return planned;
   });
