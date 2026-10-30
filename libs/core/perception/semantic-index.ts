@@ -1,4 +1,4 @@
-import { readJson } from '../foundation/json.js';
+import { readJson, writeJson } from '../foundation/json.js';
 /** Local multimodal retrieval. Index scope is checked against runtime authority on every call. */
 import path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -16,7 +16,6 @@ import {
   safeReadFile,
   safeReadFileRange,
   safeReaddir,
-  safeWriteFile,
 } from '../secure-io.js';
 
 export interface SemanticScope {
@@ -417,10 +416,10 @@ export async function indexMedia(
     expires_at: now + ttl * 1000,
     entries: rows,
   };
-  const serialized = JSON.stringify(stored);
+  const serialized = JSON.stringify(stored, null, 2) + '\n';
   if (Buffer.byteLength(serialized) > MAX_INDEX_BYTES)
     throw new Error('[SEMANTIC_INDEX] Encoded index exceeds 32 MiB; reduce entry count');
-  safeWriteFile(output, serialized);
+  writeJson(output, stored);
   return {
     index_id: options.indexId,
     entries: rows.length,
