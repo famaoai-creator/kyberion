@@ -2492,4 +2492,4 @@ not change an external handshake. Gates: CodeQL and the OBS virtual-camera tests
 
 ### Changelog fragment authoring authority
 
-Repository code-change authors using the ecosystem_architect persona need the narrow changelog.d/ write prefix to follow the required per-PR fragment ceremony. Keep the grant limited to fragments; do not widen root-file access to work around a missing path. Gate: changelog-fragments and security-policy contract validation.
+Changelog fragment authoring uses the existing assemble_changelog authority, which owns CHANGELOG.md and changelog.d/. Do not add persistent changelog writes to ecosystem_architect or software_developer: historical one-time grants remain revoked. Verify both the developer denial and the changelog-owned authoring path. Gates: changelog-fragments, tier-guard-stt-changelog, tier-guard-durable-intake-changelog, dot-team-templates and tier-guard-perception-changelog tests.

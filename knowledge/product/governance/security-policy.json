@@ -223,8 +223,7 @@
         "active/INDEX.volatile.json",
         "active/projects/",
         "active/personal/",
-        "evidence/browser/",
-        "changelog.d/"
+        "evidence/browser/"
       ]
     },
     "worker": {
