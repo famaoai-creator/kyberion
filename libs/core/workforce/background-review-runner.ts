@@ -498,6 +498,7 @@ export async function runBackgroundReviewFork(
         tier: input.missionId ? 'confidential' : 'personal',
         tenant_slug: getRegisteredEnvText('KYBERION_CUSTOMER')?.trim() || undefined,
         purpose: 'background review snapshot',
+        attachment_count: 0,
       },
       async () => {
         const prompt = buildForkPrompt(input);
