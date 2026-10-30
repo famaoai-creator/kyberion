@@ -231,7 +231,8 @@ async function runPythonTtsBridge(
   language: string,
   profile?: any,
   runtimeId: VoicePythonTool = 'mlx_audio',
-  voice?: string
+  voice?: string,
+  modelId?: string
 ): Promise<void> {
   const bridgeScript = assertSafeRepositoryPath(pathResolver.rootResolve(bridgeScriptPath), {
     allowMissingLeaf: true,
@@ -260,6 +261,7 @@ async function runPythonTtsBridge(
       output_path: safeOutputPath,
       lang_code: language.trim().toLowerCase().startsWith('ja') ? 'ja' : 'en',
       ...(voice ? { voice } : {}),
+      ...(modelId ? { model_id: modelId } : {}),
       ...(refAudio ? { ref_audio: refAudio } : {}),
       ...(refText ? { ref_text: refText } : {}),
     },
@@ -297,6 +299,7 @@ async function runPythonTtsBridge(
               profile,
               runtimeId,
               voice,
+              modelId,
             },
           },
           requiresApproval: true,
@@ -1091,7 +1094,8 @@ async function renderVoiceArtifactWithEngine(
       options.language,
       options.profile,
       (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
-      options.voice
+      options.voice,
+      engine.runtime_id === 'pocket_tts' ? engine.model_id : undefined
     );
     return artifactPath;
   }
@@ -1229,7 +1233,8 @@ async function performPlayback(
         options.language,
         options.profile,
         (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
-        options.voice
+        options.voice,
+        engine.runtime_id === 'pocket_tts' ? engine.model_id : undefined
       );
     }
     await openPlaybackArtifact(tmpPath);

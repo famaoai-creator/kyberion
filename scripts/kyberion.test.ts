@@ -11,7 +11,8 @@ import {
   validateKyberionStartupEnvironment,
 } from './kyberion.js';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeReadFile } from '@agent/core/secure-io';
+import { safeReadFile, safeWriteFile, safeRmSync } from '@agent/core/secure-io';
+import { randomUUID } from 'node:crypto';
 import { loadCliManifest } from './check_cli_manifest.js';
 
 describe('kyberion command router', () => {
@@ -54,6 +55,66 @@ describe('kyberion command router', () => {
     expect(resolveCommandPath(['task', 'plan', 'prepare the report'])).toBe('task plan');
     expect(resolveCommandPath(['task', 'scenario', 'list'])).toBe('task scenario');
     expect(selectEntrypoint('email status').id).toBe('operator-cli');
+  });
+
+  it('resolves the longest registered path at arbitrary depth without consuming payload args', () => {
+    const manifest = {
+      version: 1,
+      commands: [],
+      entrypoints: [],
+      script_commands: [
+        {
+          id: 'short',
+          command: 'sample inspect',
+          noun: 'sample',
+          verb: 'inspect',
+          audience: 'operator' as const,
+          script: 'unused',
+        },
+        {
+          id: 'deep',
+          command: 'sample inspect nested detail',
+          noun: 'sample',
+          verb: 'inspect nested detail',
+          audience: 'operator' as const,
+          script: 'unused',
+        },
+      ],
+    };
+    expect(
+      resolveCommandPath(['sample', 'inspect', 'nested', 'detail', '--json', 'payload'], manifest)
+    ).toBe('sample inspect nested detail');
+    expect(resolveCommandPath(['sample', 'inspect', 'payload'], manifest)).toBe('sample inspect');
+    expect(resolveCommandPath(['unknown', 'inspect'], manifest)).toBe('unknown');
+  });
+
+  it('dispatches the canonical three-token video filter command and preserves dry-run arguments', async () => {
+    const file = `active/shared/tmp/vitest-video-router-${randomUUID()}.json`;
+    safeWriteFile(
+      file,
+      JSON.stringify({
+        source_id: 'Camera',
+        filter_id: 'Color',
+        type: 'color_correction',
+        settings: { saturation: -1 },
+      })
+    );
+    try {
+      const output: unknown[] = [];
+      expect(resolveCommandPath(['video', 'filter', 'apply', '--input', file])).toBe(
+        'video filter apply'
+      );
+      await main(['video', 'filter', 'apply', '--input', file, '--dry-run', '--json'], (value) =>
+        output.push(value)
+      );
+      expect(JSON.parse(String(output.at(-1)))).toMatchObject({
+        dry_run: true,
+        validation: 'contract_only',
+        request: { source_id: 'Camera', type: 'color_correction', settings: { saturation: -1 } },
+      });
+    } finally {
+      safeRmSync(file, { force: true });
+    }
   });
 
   it('routes organization and project controllers through the governed registry', () => {

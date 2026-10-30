@@ -38,6 +38,7 @@ describe('live operation interface and argument-origin protection', () => {
         'deployment:deploy_release',
         'voice:speak',
         'voice:record_sample',
+        'video:filter_apply',
         'media:image:fixture:generate',
         'media:video:fixture:submit',
       ]) {
@@ -46,6 +47,7 @@ describe('live operation interface and argument-origin protection', () => {
         expect(binding?.schema_digest).toMatch(/^[a-f0-9]{64}$/);
       }
       expect(defaultOperationInterface('unreviewed:execute')).toBeUndefined();
+      expect(defaultOperationInterface('video:unreviewed')).toBeUndefined();
     }));
   it('fingerprints transitive schema bytes and current candidate/description changes without catalog cache', () =>
     governed(() => {

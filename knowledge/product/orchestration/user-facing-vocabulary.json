@@ -9585,6 +9585,16 @@
         "ja": "テナント knowledge スコープを整合",
         "qps-ploc": "⟦Řėƈőñƈïŀė ŧėñȧñŧ ķñőẇŀėḓɠė şƈőṗėş ŀőřėɱ ïṗşůɱ⟧"
       },
+      "cli_cmd_video_filter_inspect": {
+        "en": "Inspect live video filter providers and source filters",
+        "ja": "ライブ映像加工のプロバイダとフィルタを確認",
+        "qps-ploc": "⟦Ïñşṗėƈŧ ŀïṽė ṽïḓėő ƒïŀŧėř ṗřőṽïḓėřş ȧñḓ şőůřƈė ƒïŀŧėřş ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "cli_cmd_video_filter_apply": {
+        "en": "Apply an approved live video filter",
+        "ja": "承認したライブ映像フィルタを適用",
+        "qps-ploc": "⟦Ȧṗṗŀẏ ȧñ ȧṗṗřőṽėḓ ŀïṽė ṽïḓėő ƒïŀŧėř ŀőřėɱ ïṗşůɱ⟧"
+      },
       "cli_cmd_script_scope": {
         "en": "Inspect the active scope",
         "ja": "現在のスコープを確認",
@@ -23429,6 +23439,16 @@
         "en": "Kyberion avatar",
         "ja": "Kyberion のアバター",
         "qps-ploc": "⟦Ķẏƀėřïőñ ȧṽȧŧȧř ŀőřė⟧"
+      },
+      "live_avatar_connecting": {
+        "en": "Connecting",
+        "ja": "接続中",
+        "qps-ploc": "⟦Ƈőññėƈŧïñɠ ŀőř⟧"
+      },
+      "live_avatar_offline": {
+        "en": "Connection lost. Check your Presence Studio sign-in.",
+        "ja": "接続が切れました。Presence Studioへのログインを確認してください。",
+        "qps-ploc": "⟦Ƈőññėƈŧïőñ ŀőşŧ. Ƈħėƈķ ẏőůř Ṗřėşėñƈė Şŧůḓïő şïɠñ-ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "partner_avatar_personal_label": {
         "en": "Your avatar",

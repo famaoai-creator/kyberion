@@ -112,7 +112,13 @@ export function resolveCommand(
 
 /** Resolve the longest governed noun/verb prefix without consuming payload args. */
 export function resolveCommandPath(args: string[], manifest = loadCliManifest()): string {
-  for (let length = Math.min(2, args.length); length >= 1; length -= 1) {
+  const declaredPaths = [
+    ...manifest.commands,
+    ...(manifest.script_commands ?? []),
+    ...(manifest.deprecated_command_aliases ?? []),
+  ];
+  const maxDepth = Math.max(1, ...declaredPaths.map((entry) => entry.command.split(' ').length));
+  for (let length = Math.min(maxDepth, args.length); length >= 1; length -= 1) {
     const candidate = args.slice(0, length).join(' ');
     if (
       findUniqueCommand(candidate, manifest) ||

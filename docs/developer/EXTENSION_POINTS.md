@@ -3,7 +3,7 @@ title: Kyberion Extension Points
 category: Developer
 tags: [extension, semver, contract, plugin, actuator]
 importance: 10
-last_updated: 2026-08-17
+last_updated: 2026-10-29
 ---
 
 # Kyberion Extension Points
@@ -17,6 +17,25 @@ This is the contract between Kyberion core and:
 - Core maintainers who must not break stable surfaces without a major version bump.
 
 ## 1. Stability Tiers
+
+### Live video filtering — Beta
+
+`@agent/core/video/video-filter` exposes the named `VideoFilterProvider` seam,
+neutral `color_correction`, `chroma_key` and `crop` requests, capability inspection,
+and the governed apply facade. Register providers explicitly; ambiguous selection,
+unsupported settings and failed availability probes do not fall back to another
+provider. A provider prepares a nonsecret target digest and a commit callback;
+the shared `video:filter_apply` boundary binds that target, provider and immutable
+request to the reviewed JSON schema before admitting mutation.
+
+Keep credentials, transport and native settings inside the provider. The builtin
+OBS adapter translates RGB colors and crop settings; a trusted host can register
+another implementation without changing the public CLI. `video-filter-bootstrap`
+is the host composition root and preserves already registered implementations.
+Filtering is separate from `CameraOutputBridge`, which owns camera output.
+The public CLI is `video filter inspect` / `video filter apply`. The governance
+operation ID is not an ADF actuator registration. See
+[the operations guide](../../knowledge/product/orchestration/realtime-av-operations.ja.md).
 
 ### Payment provider integration — Beta
 

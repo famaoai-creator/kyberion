@@ -210,6 +210,17 @@ export class ChainSecretResolver implements SecretResolver {
     }
     return null;
   }
+  async bindTask(
+    input: Readonly<{ scope: Readonly<ScopeContext>; workItemId: string }>
+  ): Promise<TaskCredentialBinding | null> {
+    for (const resolver of this.resolvers) {
+      if (!resolver.bindTask) continue;
+      // An invalid binding is a denial, not a reason to consult another authority.
+      const binding = await resolver.bindTask(input);
+      if (binding !== null) return binding;
+    }
+    return null;
+  }
 }
 
 export interface ShellSecretResolverOptions {
@@ -237,15 +248,40 @@ export class ShellSecretResolver implements SecretResolver {
   }
 
   resolve(input: ResolveSecretInput): string | null {
-    const cmd = this.options.command
+    return this.runCommand(input);
+  }
+
+  async bindTask(
+    input: Readonly<{ scope: Readonly<ScopeContext>; workItemId: string }>
+  ): Promise<TaskCredentialBinding | null> {
+    // Capture trusted command configuration before loading/awaiting any adapter.
+    const options = { ...this.options };
+    const { bindShellTaskCredentials, TASK_BINDING_SECRET_KEY } =
+      await import('./shell-task-credential-binding.js');
+    return bindShellTaskCredentials(input, (request) =>
+      this.runCommand(
+        { key: TASK_BINDING_SECRET_KEY, scope: input.scope.tenant_slug },
+        JSON.stringify(request),
+        options
+      )
+    );
+  }
+
+  private runCommand(
+    input: ResolveSecretInput,
+    request?: string,
+    options: ShellSecretResolverOptions = this.options
+  ): string | null {
+    const cmd = options.command
       .replace(/\{\{key\}\}/gu, input.key)
       .replace(/\{\{scope\}\}/gu, input.scope ?? '');
-    const shell = this.options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
+    const shell = options.shell ?? getRegisteredEnvText('SHELL') ?? '/bin/sh';
     try {
       const stdout = execFileSync(shell, ['-c', cmd], {
         encoding: 'utf8',
-        timeout: this.options.timeoutMs ?? 5_000,
-        stdio: ['ignore', 'pipe', 'pipe'],
+        timeout: options.timeoutMs ?? 5_000,
+        stdio: [request === undefined ? 'ignore' : 'pipe', 'pipe', 'pipe'],
+        ...(request === undefined ? {} : { input: request }),
         maxBuffer: 128 * 1024,
       });
       const trimmed = stdout.replace(/\r?\n$/u, '');
