@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const g = globalThis as unknown as Record<string, unknown>;
+type Api = { create: ReturnType<typeof vi.fn>; availability: ReturnType<typeof vi.fn> };
+
 function installBuiltInAi(promptResponse: unknown, summarizerText?: string) {
   const session = {
     prompt: vi.fn(async () => JSON.stringify(promptResponse)),
@@ -11,13 +14,13 @@ function installBuiltInAi(promptResponse: unknown, summarizerText?: string) {
     summarize: vi.fn(async () => summarizerText ?? ''),
     destroy: vi.fn(),
   };
-  (globalThis as any).__kyberionPiiScrub = (value: unknown) =>
+  g.__kyberionPiiScrub = (value: unknown) =>
     String(value ?? '').replaceAll('SECRET', '[REDACTED:SECRET]');
-  (globalThis as any).LanguageModel = {
+  g.LanguageModel = {
     availability: vi.fn(async () => 'available'),
     create: vi.fn(async () => session),
   };
-  (globalThis as any).Summarizer = summarizerText
+  g.Summarizer = summarizerText
     ? { availability: vi.fn(async () => 'available'), create: vi.fn(async () => summarizer) }
     : { availability: vi.fn(async () => 'unavailable') };
   return { session, summarizer };
@@ -26,17 +29,17 @@ function installBuiltInAi(promptResponse: unknown, summarizerText?: string) {
 async function loadAdapter() {
   vi.resetModules();
   await import('../tools/meet-copilot-extension/meeting-ai.js');
-  return (globalThis as any).KyberionMeetingAI;
+  return g.KyberionMeetingAI;
 }
 
 describe('Meeting Copilot Chrome Built-in AI adapter', () => {
   afterEach(() => {
-    delete (globalThis as any).KyberionMeetingAI;
-    delete (globalThis as any).__kyberionPiiScrub;
-    delete (globalThis as any).LanguageModel;
-    delete (globalThis as any).Summarizer;
-    delete (globalThis as any).Translator;
-    delete (globalThis as any).LanguageDetector;
+    delete g.KyberionMeetingAI;
+    delete g.__kyberionPiiScrub;
+    delete g.LanguageModel;
+    delete g.Summarizer;
+    delete g.Translator;
+    delete g.LanguageDetector;
   });
 
   it('summarizes captions through the Summarizer API and scrubs both directions', async () => {
@@ -136,7 +139,7 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
   });
 
   it('reports a capability matrix where missing APIs are unsupported', async () => {
-    (globalThis as any).LanguageModel = { availability: vi.fn(async () => 'available') };
+    g.LanguageModel = { availability: vi.fn(async () => 'available') };
     const adapter = await loadAdapter();
 
     const matrix = await adapter.availability();
@@ -150,8 +153,8 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
 
   it('clones one base session per call and destroys the base on dispose', async () => {
     const { session } = installBuiltInAi({ summary: 'ok' });
-    const clones: any[] = [];
-    (session as any).clone = vi.fn(async () => {
+    const clones: unknown[] = [];
+    (session as unknown as { clone: unknown }).clone = vi.fn(async () => {
       const clone = {
         prompt: vi.fn(async () => JSON.stringify({ summary: 'ok' })),
         destroy: vi.fn(),
@@ -164,8 +167,8 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
     await adapter.summarizeMeeting({ transcript: ['一'], previousSummary: 'x' });
     await adapter.summarizeMeeting({ transcript: ['二'], previousSummary: 'x' });
 
-    const createOptions = (globalThis as any).LanguageModel.create.mock.calls[0][0];
-    expect((globalThis as any).LanguageModel.create).toHaveBeenCalledTimes(1);
+    const createOptions = (g.LanguageModel as Api).create.mock.calls[0][0];
+    expect((g.LanguageModel as Api).create).toHaveBeenCalledTimes(1);
     expect(createOptions.initialPrompts[0].content).toContain('信頼できないデータ');
     expect(clones).toHaveLength(2);
     clones.forEach((clone) => expect(clone.destroy).toHaveBeenCalledTimes(1));
@@ -214,7 +217,7 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
 
   it('streams a Summarizer result and forwards the AbortSignal', async () => {
     const { summarizer } = installBuiltInAi({}, 'unused');
-    (summarizer as any).summarizeStreaming = vi.fn(() =>
+    (summarizer as unknown as { summarizeStreaming: unknown }).summarizeStreaming = vi.fn(() =>
       (async function* () {
         yield '要点 SECRET';
       })()
@@ -231,8 +234,11 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
 
     expect(onChunk).toHaveBeenCalledWith('要点 [REDACTED:SECRET]');
     expect(result.text).toBe('要点 [REDACTED:SECRET]');
-    expect((summarizer as any).summarizeStreaming.mock.calls[0][1].signal).toBe(controller.signal);
-    expect((globalThis as any).Summarizer.create.mock.calls[0][0].signal).toBe(controller.signal);
+    expect(
+      (summarizer as unknown as { summarizeStreaming: ReturnType<typeof vi.fn> }).summarizeStreaming
+        .mock.calls[0][1].signal
+    ).toBe(controller.signal);
+    expect((g.Summarizer as Api).create.mock.calls[0][0].signal).toBe(controller.signal);
 
     controller.abort();
     await expect(
@@ -243,7 +249,7 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
   it('translates non-ja captions and passes same-language text through', async () => {
     installBuiltInAi({});
     const translator = { translate: vi.fn(async () => '予算は SECRET'), destroy: vi.fn() };
-    (globalThis as any).Translator = {
+    g.Translator = {
       availability: vi.fn(async () => 'available'),
       create: vi.fn(async () => translator),
     };
@@ -251,7 +257,7 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
 
     const same = await adapter.translate('こんにちは', { sourceLanguage: 'ja' });
     expect(same.translated).toBe(false);
-    expect((globalThis as any).Translator.create).not.toHaveBeenCalled();
+    expect((g.Translator as Api).create).not.toHaveBeenCalled();
 
     const result = await adapter.translate('budget SECRET', { sourceLanguage: 'en' });
     expect(translator.translate.mock.calls[0][0]).toBe('budget [REDACTED:SECRET]');
@@ -267,7 +273,7 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
       .fn()
       .mockResolvedValueOnce([{ detectedLanguage: 'en', confidence: 0.8 }])
       .mockResolvedValueOnce([{ detectedLanguage: 'en', confidence: 0.2 }]);
-    (globalThis as any).LanguageDetector = {
+    g.LanguageDetector = {
       create: vi.fn(async () => ({ detect, destroy: vi.fn() })),
     };
     expect((await adapter.detectLanguage('hello')).language).toBe('en');
@@ -275,8 +281,8 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
   });
 
   it('fails closed when the shared PII scrubber is unavailable', async () => {
-    (globalThis as any).LanguageModel = { availability: vi.fn(async () => 'available') };
-    (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+    g.LanguageModel = { availability: vi.fn(async () => 'available') };
+    g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
     const adapter = await loadAdapter();
 
     await expect(adapter.summarizeMeeting({ transcript: ['発言'] })).rejects.toThrow(

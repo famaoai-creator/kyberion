@@ -1,17 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const g = globalThis as unknown as Record<string, unknown>;
+type Api = { create: ReturnType<typeof vi.fn>; availability: ReturnType<typeof vi.fn> };
+
 function installBuiltInAi(promptResponse: unknown) {
   const session = {
     prompt: vi.fn(async () => JSON.stringify(promptResponse)),
     destroy: vi.fn(),
   };
-  (globalThis as any).__kyberionPiiScrub = (value: unknown) =>
+  g.__kyberionPiiScrub = (value: unknown) =>
     String(value ?? '').replaceAll('SECRET', '[REDACTED:SECRET]');
-  (globalThis as any).LanguageModel = {
+  g.LanguageModel = {
     availability: vi.fn(async () => 'available'),
     create: vi.fn(async () => session),
   };
-  (globalThis as any).Summarizer = {
+  g.Summarizer = {
     availability: vi.fn(async () => 'unavailable'),
   };
   return session;
@@ -20,17 +23,17 @@ function installBuiltInAi(promptResponse: unknown) {
 async function loadAdapter() {
   vi.resetModules();
   await import('../tools/adf-replay-extension/built-in-ai.js');
-  return (globalThis as any).KyberionBuiltInAI;
+  return g.KyberionBuiltInAI;
 }
 
 describe('Browser Bridge Chrome Built-in AI adapter', () => {
   afterEach(() => {
-    delete (globalThis as any).KyberionBuiltInAI;
-    delete (globalThis as any).__kyberionPiiScrub;
-    delete (globalThis as any).LanguageModel;
-    delete (globalThis as any).Summarizer;
+    delete g.KyberionBuiltInAI;
+    delete g.__kyberionPiiScrub;
+    delete g.LanguageModel;
+    delete g.Summarizer;
     for (const name of ['Translator', 'LanguageDetector', 'Writer', 'Rewriter', 'Proofreader']) {
-      delete (globalThis as any)[name];
+      delete g[name];
     }
   });
 
@@ -76,8 +79,8 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
   });
 
   it('fails closed when the shared PII scrubber is unavailable', async () => {
-    (globalThis as any).LanguageModel = { availability: vi.fn(async () => 'available') };
-    (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+    g.LanguageModel = { availability: vi.fn(async () => 'available') };
+    g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
     const adapter = await loadAdapter();
 
     await expect(adapter.summarize('ページ本文')).rejects.toThrow('PII scrubber');
@@ -85,7 +88,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
 
   describe('modernised platform support', () => {
     function stubScrub() {
-      (globalThis as any).__kyberionPiiScrub = (value: unknown) =>
+      g.__kyberionPiiScrub = (value: unknown) =>
         String(value ?? '').replaceAll('SECRET', '[REDACTED:SECRET]');
     }
 
@@ -99,7 +102,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     }
 
     it('reports a capability matrix with missing APIs as unsupported', async () => {
-      (globalThis as any).LanguageModel = { availability: vi.fn(async () => 'downloadable') };
+      g.LanguageModel = { availability: vi.fn(async () => 'downloadable') };
       const adapter = await loadAdapter();
 
       const matrix = await adapter.availability();
@@ -115,7 +118,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     });
 
     it('turns an availability failure into an error state, not an exception', async () => {
-      (globalThis as any).Summarizer = {
+      g.Summarizer = {
         availability: vi.fn(async () => {
           throw new Error('boom');
         }),
@@ -130,26 +133,26 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
 
     it('uses one cloned session per call and destroys the base on dispose', async () => {
       stubScrub();
-      const clones: any[] = [];
-      const base: any = promptSession({
+      const clones: unknown[] = [];
+      const base = promptSession({
         clone: vi.fn(async () => {
           const clone = promptSession();
           clones.push(clone);
           return clone;
         }),
       });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => base),
       };
-      (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
       const adapter = await loadAdapter();
 
       await adapter.summarize('一つ目');
       await adapter.summarize('二つ目');
 
-      const createOptions = (globalThis as any).LanguageModel.create.mock.calls[0][0];
-      expect((globalThis as any).LanguageModel.create).toHaveBeenCalledTimes(1);
+      const createOptions = (g.LanguageModel as Api).create.mock.calls[0][0];
+      expect((g.LanguageModel as Api).create).toHaveBeenCalledTimes(1);
       expect(createOptions.initialPrompts[0].role).toBe('system');
       expect(createOptions.initialPrompts[0].content).toContain('信頼できないデータ');
       expect(clones).toHaveLength(2);
@@ -169,11 +172,11 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
         // 1 token per character
         measureContextUsage: vi.fn(async (text: string) => text.length),
       });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
-      (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
       const adapter = await loadAdapter();
 
       const result = await adapter.summarize('あ'.repeat(5000));
@@ -190,11 +193,11 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
         inputUsage: 0,
         measureInputUsage: vi.fn(async (text: string) => text.length),
       });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
-      (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
       const adapter = await loadAdapter();
 
       const result = await adapter.summarize('い'.repeat(3000));
@@ -206,11 +209,11 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     it('falls back to the character cap when no token API exists', async () => {
       stubScrub();
       const session = promptSession();
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
-      (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
       const adapter = await loadAdapter();
 
       const long = await adapter.summarize('う'.repeat(40_000));
@@ -232,7 +235,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
         summarize: vi.fn(),
         destroy: vi.fn(),
       };
-      (globalThis as any).Summarizer = {
+      g.Summarizer = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => summarizer),
       };
@@ -261,11 +264,11 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
           })()
         ),
       });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
-      (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
       const adapter = await loadAdapter();
       const onChunk = vi.fn();
 
@@ -280,18 +283,18 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     it('propagates the AbortSignal to prompt (not the shared base create), and rejects when already aborted', async () => {
       stubScrub();
       const session = promptSession();
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
-      (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
       const adapter = await loadAdapter();
       const controller = new AbortController();
 
       await adapter.summarize('本文', { signal: controller.signal });
 
       // The base session is shared: aborting one caller must not destroy it.
-      expect((globalThis as any).LanguageModel.create.mock.calls[0][0].signal).toBeUndefined();
+      expect((g.LanguageModel as Api).create.mock.calls[0][0].signal).toBeUndefined();
       expect(session.prompt.mock.calls[0][1].signal).toBe(controller.signal);
 
       controller.abort();
@@ -305,7 +308,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
         .mockResolvedValueOnce([{ detectedLanguage: 'fr', confidence: 0.9 }])
         .mockResolvedValueOnce([{ detectedLanguage: 'fr', confidence: 0.3 }]);
       const detector = { detect, destroy: vi.fn() };
-      (globalThis as any).LanguageDetector = {
+      g.LanguageDetector = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => detector),
       };
@@ -323,7 +326,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     it('passes same-language text through the translator unchanged', async () => {
       stubScrub();
       const create = vi.fn();
-      (globalThis as any).Translator = {
+      g.Translator = {
         availability: vi.fn(async () => 'available'),
         create,
       };
@@ -345,7 +348,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
         translate: vi.fn(async () => '予算は SECRET'),
         destroy: vi.fn(),
       };
-      (globalThis as any).Translator = {
+      g.Translator = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => translator),
       };
@@ -369,20 +372,20 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
         destroy: vi.fn(),
       };
       const translator = { translate: vi.fn(async () => '翻訳済み本文'), destroy: vi.fn() };
-      (globalThis as any).LanguageDetector = {
+      g.LanguageDetector = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => detector),
       };
-      (globalThis as any).Translator = {
+      g.Translator = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => translator),
       };
       const session = promptSession();
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
-      (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
       const adapter = await loadAdapter();
 
       const result = await adapter.summarize('Bonjour le monde');
@@ -402,7 +405,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
           JSON.stringify({ label: 'invoice', confidence: 1.7, reason: '請求 SECRET' })
         ),
       });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
@@ -436,7 +439,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
       const session = promptSession({
         prompt: vi.fn(async () => JSON.stringify({ label: 'other', confidence: 0.4, reason: 'x' })),
       });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
@@ -456,7 +459,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
       const session = promptSession({
         prompt: vi.fn(async () => JSON.stringify({ name: '山田 SECRET', tags: ['a SECRET'] })),
       });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
@@ -487,7 +490,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     it('rejects invalid extract schemas before any model call', async () => {
       stubScrub();
       const create = vi.fn();
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create,
       };
@@ -512,7 +515,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     it('rejects an extract result that misses required keys', async () => {
       stubScrub();
       const session = promptSession({ prompt: vi.fn(async () => JSON.stringify({ other: 1 })) });
-      (globalThis as any).LanguageModel = {
+      g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
         create: vi.fn(async () => session),
       };
@@ -554,9 +557,9 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
       };
       const rewriter = { rewrite: vi.fn(async () => '丁寧 SECRET'), destroy: vi.fn() };
       const writer = { write: vi.fn(async () => '下書き SECRET'), destroy: vi.fn() };
-      (globalThis as any).Proofreader = { create: vi.fn(async () => proofreader) };
-      (globalThis as any).Rewriter = { create: vi.fn(async () => rewriter) };
-      (globalThis as any).Writer = { create: vi.fn(async () => writer) };
+      g.Proofreader = { create: vi.fn(async () => proofreader) };
+      g.Rewriter = { create: vi.fn(async () => rewriter) };
+      g.Writer = { create: vi.fn(async () => writer) };
       const adapter = await loadAdapter();
 
       const proofread = await adapter.proofread('なおす SECRET');
@@ -569,10 +572,10 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
         tone: 'more-formal',
         length: 'bogus',
       });
-      expect((globalThis as any).Rewriter.create.mock.calls[0][0]).toMatchObject({
+      expect((g.Rewriter as Api).create.mock.calls[0][0]).toMatchObject({
         tone: 'more-formal',
       });
-      expect((globalThis as any).Rewriter.create.mock.calls[0][0].length).toBeUndefined();
+      expect((g.Rewriter as Api).create.mock.calls[0][0].length).toBeUndefined();
       expect(rewritten.text).toBe('丁寧 [REDACTED:SECRET]');
 
       const written = await adapter.runLocalTask({
@@ -590,18 +593,16 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
     it('describes a caller-supplied image only when image input is available', async () => {
       stubScrub();
       const session = promptSession({ prompt: vi.fn(async () => '画面に SECRET が見える') });
-      const availability = vi.fn(async (opts: any) =>
-        opts?.expectedInputs?.some((entry: any) => entry.type === 'image')
-          ? 'available'
-          : 'available'
+      const availability = vi.fn(async (opts?: { expectedInputs?: Array<{ type?: string }> }) =>
+        opts?.expectedInputs?.some((entry) => entry.type === 'image') ? 'available' : 'available'
       );
-      (globalThis as any).LanguageModel = { availability, create: vi.fn(async () => session) };
+      g.LanguageModel = { availability, create: vi.fn(async () => session) };
       const adapter = await loadAdapter();
       const blob = { size: 1 };
 
       const result = await adapter.describeImage({ blob, question: '何が見える? SECRET' });
 
-      const createOptions = (globalThis as any).LanguageModel.create.mock.calls[0][0];
+      const createOptions = (g.LanguageModel as Api).create.mock.calls[0][0];
       expect(createOptions.expectedInputs).toContainEqual({ type: 'image' });
       const message = session.prompt.mock.calls[0][0][0];
       expect(message.content[0].value).toContain('[REDACTED:SECRET]');
@@ -610,7 +611,7 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
       expect(result.executable).toBe(false);
       expect(session.destroy).toHaveBeenCalledTimes(1);
 
-      (globalThis as any).LanguageModel.availability = vi.fn(async () => 'downloadable');
+      (g.LanguageModel as Api).availability = vi.fn(async () => 'downloadable');
       await expect(adapter.describeImage({ blob })).rejects.toThrow('画像入力');
       await expect(adapter.describeImage({})).rejects.toThrow('画像');
     });
