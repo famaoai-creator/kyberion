@@ -1,3 +1,11 @@
+import type { Observation } from '@agent/core/perception/observation';
+import type { VisualFingerprint, VisualChange } from '@agent/core/perception/visual-change';
+import {
+  PERCEPTION_OPTIONS_HELP,
+  validatePerceptionOptions,
+  enhancementDeps,
+  renderObservations,
+} from './lib/perception-enhancements.js';
 /**
  * `pnpm kyberion watch <video> [--every <sec>] [--max-frames <n>] [--no-ocr]
  *   [--no-audio] [--ocr-provider <id>] [--frames <dir>] [--lang <bcp47>] [--json] [--out <file>]`
@@ -16,10 +24,13 @@ import { ScriptExitError } from './lib/harness.js';
 import { transcribeMediaFile } from './cli-listen.js';
 import {
   assertExtension,
+  assertPerceptionInput,
+  assertPerceptionOutput,
   createPerceptionWorkDir,
   defaultPerceptionDeps,
   emitOutput,
   explainMediaError,
+  extractSttWav,
   formatTimestamp,
   isInsideRepository,
   NoTranscriptError,
@@ -28,6 +39,7 @@ import {
   renderSegments,
   resolveRepositoryInput,
   VIDEO_EXTENSIONS,
+  LOCAL_MEDIA_INPUT_ARGS,
   type CommonArgs,
   type PerceptionDeps,
 } from './lib/perception.js';
@@ -47,6 +59,8 @@ Perceives a ${VIDEO_EXTENSIONS.join(' / ')} video: metadata, audio transcript, a
   --json            Print {file, metadata, transcript, frames, warnings} as JSON
   --out <file>      Write the Markdown (or JSON) to a file inside the repository instead of stdout
   --verbose         Keep runtime logs (they go to stdout; off by default so stdout is the content)
+
+${PERCEPTION_OPTIONS_HELP}
 
 Needs ffmpeg (macOS: brew install ffmpeg). The file must be inside the repository. Copy external files first, e.g.
   mkdir -p active/shared/tmp/<job> && cp ~/Downloads/<video> active/shared/tmp/<job>/`;
@@ -69,12 +83,20 @@ export interface VideoMetadata {
 }
 
 export interface WatchFrame {
+  change?: VisualChange;
+  ocr_provider?: string;
   time_sec: number;
   text?: string;
   path?: string;
 }
 
 export interface WatchResult {
+  source?: import('@agent/core/perception/observation').PerceptionSource;
+  observations?: Observation[];
+  analysis?: import('@agent/core/perception/audio-analysis').AudioAnalysisResult;
+  tracking?: import('@agent/core/perception/tracking').TrackingResult;
+  animation_cues?: unknown[];
+  index?: unknown;
   file: string;
   metadata: VideoMetadata;
   every_sec: number;
@@ -116,6 +138,7 @@ function parseWatchArgs(argv: string[]): WatchArgs {
       args.maxFrames = Math.floor(positiveNumber('--max-frames', argv[index + 1]));
       if (args.maxFrames < 1)
         throw new ScriptExitError(1, '--max-frames requires a positive number');
+      if (args.maxFrames > 300) throw new ScriptExitError(1, '--max-frames must be at most 300');
       index += 1;
     } else if (value === '--frames') {
       args.frames = argv[index + 1];
@@ -237,6 +260,11 @@ export function renderWatchResult(result: WatchResult, asJson: boolean): string 
     if (frame.path) lines.push('', `frame: ${frame.path}`);
     if (frame.text !== undefined) lines.push('', frame.text.trim() || '_(no text)_');
   }
+  if (result.analysis)
+    lines.push('', '## Audio analysis', '', JSON.stringify(result.analysis, null, 2));
+  if (result.tracking) lines.push('', '## Tracking', '', JSON.stringify(result.tracking));
+  if (result.index) lines.push('', '## Index', '', JSON.stringify(result.index));
+  if (result.observations) lines.push(...renderObservations(result.observations));
   if (result.warnings.length > 0) lines.push('', ...result.warnings.map((w) => `> [watch] ${w}`));
   return lines.join('\n');
 }
@@ -252,6 +280,10 @@ export async function runWatchCommand(
     print(WATCH_USAGE);
     return undefined;
   }
+  const options = args.enhancement ?? {};
+  validatePerceptionOptions('watch', options);
+  if (!args.audio && (options.diarize || options.events))
+    throw new ScriptExitError(1, '--no-audio cannot be combined with audio analysis');
   const absolute = resolveRepositoryInput('watch', args.file);
   assertExtension(
     'watch',
@@ -259,6 +291,7 @@ export async function runWatchCommand(
     VIDEO_EXTENSIONS,
     'Audio-only files: use `pnpm kyberion listen`.'
   );
+  assertPerceptionInput(absolute);
   const framesDir = args.frames ? pathResolver.rootResolve(args.frames) : undefined;
   if (framesDir && !isInsideRepository(framesDir)) {
     throw new ScriptExitError(
@@ -267,6 +300,7 @@ export async function runWatchCommand(
     );
   }
 
+  if (framesDir) assertPerceptionOutput(absolute, path.join(framesDir, 'frame.png'));
   let metadata: VideoMetadata;
   try {
     metadata = parseFfprobeMetadata(
@@ -277,6 +311,7 @@ export async function runWatchCommand(
         'json',
         '-show_format',
         '-show_streams',
+        ...LOCAL_MEDIA_INPUT_ARGS,
         absolute,
       ])
     );
@@ -284,6 +319,35 @@ export async function runWatchCommand(
     explainMediaError('watch', error);
   }
 
+  if (
+    ![metadata.width, metadata.height].every(
+      (value) =>
+        typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0
+    ) ||
+    metadata.width! * metadata.height! > 16_000_000
+  )
+    throw new ScriptExitError(
+      1,
+      '[watch] decoded video dimensions must be known and <=16 million pixels'
+    );
+  if (
+    (options.events || options.diarize) &&
+    (!Number.isFinite(metadata.duration_sec) ||
+      metadata.duration_sec <= 0 ||
+      metadata.duration_sec > 600)
+  )
+    throw new ScriptExitError(1, '[watch] audio analysis is limited to 600 seconds');
+  const enhanced = Boolean(
+    options.grounded ||
+    options.changes ||
+    options.track ||
+    options.diarize ||
+    options.events ||
+    options.index
+  );
+  const feature = enhanced ? await enhancementDeps(deps) : undefined;
+  const source = feature?.source?.(absolute) ?? feature?.perceptionSource(absolute);
+  const observations: Observation[] = [];
   const warnings: string[] = [];
   const duration = metadata.duration_sec > 0 ? metadata.duration_sec : 1;
   const every = args.every ?? Math.max(1, Math.ceil((duration / args.maxFrames) * 10) / 10);
@@ -294,7 +358,7 @@ export async function runWatchCommand(
     );
   }
 
-  const workDir = createPerceptionWorkDir('watch');
+  const workDir = createPerceptionWorkDir('watch', absolute);
   try {
     const sampleDir = path.join(workDir, 'frames');
     safeMkdir(sampleDir, { recursive: true });
@@ -304,6 +368,7 @@ export async function runWatchCommand(
         '-hide_banner',
         '-loglevel',
         'error',
+        ...LOCAL_MEDIA_INPUT_ARGS,
         '-i',
         absolute,
         '-vf',
@@ -323,6 +388,7 @@ export async function runWatchCommand(
 
     const frames: WatchFrame[] = [];
     let ocrFailure: string | undefined;
+    let priorFingerprint: VisualFingerprint | undefined;
     for (const [index, name] of frameFiles.entries()) {
       const source = path.join(sampleDir, name);
       const frame: WatchFrame = { time_sec: Math.round(index * every * 10) / 10 };
@@ -340,14 +406,50 @@ export async function runWatchCommand(
             ...(args.lang ? { language: args.lang } : {}),
           });
           frame.text = ocr.text;
+          frame.ocr_provider = ocr.provider;
         } catch (error) {
           ocrFailure = (error as Error).message;
           warnings.push(`local OCR unavailable, frames not read: ${ocrFailure}`);
         }
       }
+      if (options.changes && feature) {
+        const current = await feature.fingerprint(source);
+        if (priorFingerprint) frame.change = feature.compare(priorFingerprint, current);
+        if (!priorFingerprint || frame.change?.changed) priorFingerprint = current;
+      }
       frames.push(frame);
     }
-    const timeline = args.ocr ? dropDuplicateFrames(frames) : frames;
+    const timeline = options.changes
+      ? frames.filter((frame, index) => index === 0 || frame.change?.changed)
+      : args.ocr
+        ? dropDuplicateFrames(frames)
+        : frames;
+    if (source && feature) {
+      for (const frame of timeline) {
+        if (frame.text !== undefined)
+          observations.push(
+            feature.observation(source, {
+              modality: 'video',
+              kind: 'text',
+              provider: frame.ocr_provider ?? 'unavailable',
+              finality: 'final',
+              text: frame.text,
+              time: { start_sec: frame.time_sec, end_sec: frame.time_sec, basis: 'sampled' },
+            })
+          );
+        if (frame.change)
+          observations.push(
+            feature.observation(source, {
+              modality: 'video',
+              kind: 'visual_change',
+              provider: 'local-pixel-delta',
+              finality: 'final',
+              time: { start_sec: frame.time_sec, end_sec: frame.time_sec, basis: 'sampled' },
+              attributes: { ...frame.change },
+            })
+          );
+      }
+    }
     if (timeline.length < frames.length) {
       warnings.push(
         `${frames.length - timeline.length} near-duplicate frame(s) omitted from the timeline`
@@ -355,7 +457,7 @@ export async function runWatchCommand(
     }
 
     let transcript: WatchResult['transcript'];
-    if (!args.audio) {
+    if (!args.audio || options.noTranscript) {
       // explicitly skipped
     } else if (!metadata.has_audio) {
       warnings.push('video has no audio stream; no transcript');
@@ -364,6 +466,7 @@ export async function runWatchCommand(
         const heard = await transcribeMediaFile(deps, 'watch', absolute, workDir, {
           ...(args.lang ? { language: args.lang } : {}),
           timestamps: true,
+          ...(options.diarize || options.events ? { maxSeconds: 601 } : {}),
         });
         transcript = {
           backend: heard.backend,
@@ -378,7 +481,104 @@ export async function runWatchCommand(
       }
     }
 
+    let analysis: WatchResult['analysis'];
+    if (options.diarize || options.events) {
+      if (!metadata.has_audio)
+        throw new ScriptExitError(1, '[watch] requested audio analysis but video has no audio');
+      const wav = path.join(workDir, 'analysis-16k-mono.wav');
+      await extractSttWav(deps, absolute, wav, 601);
+      const audio = await import('@agent/core/perception/audio-analysis');
+      analysis = await (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
+        path: wav,
+        diarize: options.diarize,
+        events: options.events,
+        diarizationModel: options.diarizationModel,
+        audioModel: options.audioModel,
+        python: options.python,
+      });
+      warnings.push(...analysis.warnings);
+      if (options.diarize && transcript?.segments)
+        transcript.segments = (deps.enhancements?.alignSpeakers ?? audio.alignSpeakerSegments)(
+          transcript.segments,
+          analysis.speakers
+        );
+      if (source && feature) {
+        for (const speaker of analysis.speakers)
+          observations.push(
+            feature.observation(source, {
+              modality: 'audio',
+              kind: 'speaker',
+              provider: analysis.provider,
+              finality: 'tentative',
+              speaker_id: speaker.speaker_id,
+              time: { start_sec: speaker.start_sec, end_sec: speaker.end_sec, basis: 'aligned' },
+            })
+          );
+        for (const event of analysis.events)
+          observations.push(
+            feature.observation(source, {
+              modality: 'audio',
+              kind: 'sound_event',
+              provider: analysis.provider,
+              finality: 'final',
+              text: event.label,
+              confidence: event.confidence,
+              time: { start_sec: event.start_sec, end_sec: event.end_sec, basis: 'aligned' },
+            })
+          );
+      }
+    }
+    if (source && feature && transcript?.segments)
+      observations.push(
+        ...feature.transcriptObservations(source, transcript.backend, transcript.segments)
+      );
+    let tracking: WatchResult['tracking'];
+    let animation_cues: unknown[] | undefined;
+    if (options.track) {
+      const tracker = await import('@agent/core/perception/tracking');
+      tracking = await (deps.enhancements?.track ?? tracker.trackMedia)({
+        path: absolute,
+        faceModel: options.faceModel,
+        poseModel: options.poseModel,
+        gestureModel: options.gestureModel,
+        python: options.python,
+        maxFrames: args.maxFrames,
+        everyMs: Math.max(1, Math.round(every * 1000)),
+      });
+      if (source) observations.push(...tracker.trackingObservations(source, tracking));
+      if (options.avatarId)
+        animation_cues = tracking.frames.flatMap((frame) =>
+          (deps.enhancements?.cues ?? tracker.trackingFrameToAnimationCues)(
+            frame,
+            options.avatarId!
+          )
+        );
+    }
+    let index: unknown;
+    if (options.index && source) {
+      const indexMedia =
+        deps.enhancements?.index ??
+        (await import('@agent/core/perception/semantic-index')).indexMedia;
+      index = await indexMedia({
+        indexId: options.index,
+        scope: source.scope,
+        modelPath: options.embeddingModel!,
+        python: options.python,
+        entries: frameFiles.map((name, i) => ({
+          id: 'frame-' + i,
+          path: absolute,
+          image_path: path.join(sampleDir, name),
+          time_sec: Math.round(i * every * 10) / 10,
+          text: frames[i]?.text || undefined,
+        })),
+      });
+    }
     const result: WatchResult = {
+      ...(source ? { source, observations } : {}),
+      ...(analysis ? { analysis } : {}),
+      ...(tracking ? { tracking } : {}),
+      ...(animation_cues ? { animation_cues } : {}),
+      ...(index ? { index } : {}),
       file: path.relative(pathResolver.rootDir(), absolute),
       metadata,
       every_sec: every,
@@ -387,12 +587,14 @@ export async function runWatchCommand(
       warnings,
     };
     if (framesDir) warnings.push(`${frameFiles.length} frame(s) kept in ${args.frames}`);
+    if (source && feature) feature.assertSourceUnchanged(source);
     emitOutput(
       'watch',
       renderWatchResult(result, args.json),
       args.out,
       print,
-      `${timeline.length} frame(s)${transcript ? ', transcript' : ''}`
+      `${timeline.length} frame(s)${transcript ? ', transcript' : ''}`,
+      absolute
     );
     return result;
   } finally {

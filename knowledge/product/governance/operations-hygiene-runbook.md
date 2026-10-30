@@ -2489,3 +2489,7 @@ OBS WebSocket v5 authentication tests assert a fixed wire-protocol vector instea
 of recalculating its password-derived digest in the expected value. Keep the
 protocol-mandated runtime algorithm unchanged; password-storage KDF guidance does
 not change an external handshake. Gates: CodeQL and the OBS virtual-camera tests.
+
+### Changelog fragment authoring authority
+
+Changelog fragment authoring uses the existing assemble_changelog authority, which owns CHANGELOG.md and changelog.d/. Do not add persistent changelog writes to ecosystem_architect or software_developer: historical one-time grants remain revoked. Verify both the developer denial and the changelog-owned authoring path. Gates: changelog-fragments, tier-guard-stt-changelog, tier-guard-durable-intake-changelog, dot-team-templates and tier-guard-perception-changelog tests.

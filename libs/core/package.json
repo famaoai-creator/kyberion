@@ -8043,6 +8043,30 @@
     "./shortcut-bridge": {
       "types": "./dist/shortcut-bridge.d.ts",
       "default": "./dist/shortcut-bridge.js"
+    },
+    "./perception/observation": {
+      "types": "./dist/perception/observation.d.ts",
+      "default": "./dist/perception/observation.js"
+    },
+    "./perception/visual-change": {
+      "types": "./dist/perception/visual-change.d.ts",
+      "default": "./dist/perception/visual-change.js"
+    },
+    "./perception/audio-analysis": {
+      "types": "./dist/perception/audio-analysis.d.ts",
+      "default": "./dist/perception/audio-analysis.js"
+    },
+    "./perception/tracking": {
+      "types": "./dist/perception/tracking.d.ts",
+      "default": "./dist/perception/tracking.js"
+    },
+    "./perception/semantic-index": {
+      "types": "./dist/perception/semantic-index.d.ts",
+      "default": "./dist/perception/semantic-index.js"
+    },
+    "./perception/image-dimensions": {
+      "types": "./dist/perception/image-dimensions.d.ts",
+      "default": "./dist/perception/image-dimensions.js"
     }
   },
   "dependencies": {

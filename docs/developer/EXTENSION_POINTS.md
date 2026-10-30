@@ -3,7 +3,7 @@ title: Kyberion Extension Points
 category: Developer
 tags: [extension, semver, contract, plugin, actuator]
 importance: 10
-last_updated: 2026-10-29
+last_updated: 2026-10-30
 ---
 
 # Kyberion Extension Points
@@ -17,6 +17,20 @@ This is the contract between Kyberion core and:
 - Core maintainers who must not break stable surfaces without a major version bump.
 
 ## 1. Stability Tiers
+
+### Grounded perception — Beta
+
+The public subpaths `@agent/core/perception/observation`, `visual-change`,
+`audio-analysis`, `tracking` and `semantic-index` provide source/scope-grounded
+observations, local inference and scoped image/video retrieval. The existing
+`see`, `listen` and `watch` CLI commands expose additive, explicit options.
+Native helpers require provisioned local models; they never fabricate missing
+inference or silently select a cloud service. Model availability and accuracy
+are separate from contract validation. Capture/record consent and avatar
+rendering remain with their existing owners; resident tracking consumes an
+already-authorized frame stream and returns media-session-compatible cues.
+These core APIs do not register new ADF actuator operations. See
+[usage, model setup and measured limits](../../knowledge/product/orchestration/grounded-perception.ja.md).
 
 ### Live video filtering — Beta
 

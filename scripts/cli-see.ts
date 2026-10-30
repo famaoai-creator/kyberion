@@ -1,3 +1,10 @@
+import type { Observation } from '@agent/core/perception/observation';
+import {
+  PERCEPTION_OPTIONS_HELP,
+  validatePerceptionOptions,
+  enhancementDeps,
+  renderObservations,
+} from './lib/perception-enhancements.js';
 /**
  * `pnpm kyberion see <image> [--describe] [--lang <bcp47>] [--json] [--out <file>]`
  *
@@ -15,6 +22,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import { ScriptExitError } from './lib/harness.js';
 import {
   assertExtension,
+  assertPerceptionInput,
   defaultPerceptionDeps,
   emitOutput,
   IMAGE_EXTENSIONS,
@@ -37,6 +45,8 @@ Reads the text in a ${IMAGE_EXTENSIONS.join(' / ')} image with local OCR (no dat
   --out <file>   Write the Markdown (or JSON) to a file inside the repository instead of stdout
   --verbose      Keep runtime logs (they go to stdout; off by default so stdout is the content)
 
+${PERCEPTION_OPTIONS_HELP}
+
 The file must be inside the repository. Copy external files first, e.g.
   mkdir -p active/shared/tmp/<job> && cp ~/Downloads/<image> active/shared/tmp/<job>/`;
 
@@ -48,6 +58,13 @@ interface SeeArgs extends CommonArgs {
 }
 
 export interface SeeResult {
+  source?: import('@agent/core/perception/observation').PerceptionSource;
+  observations?: Observation[];
+  changes?: import('@agent/core/perception/visual-change').VisualChange;
+  tracking?: import('@agent/core/perception/tracking').TrackingResult;
+  animation_cues?: unknown[];
+  index?: unknown;
+  search?: import('@agent/core/perception/semantic-index').SemanticSearchHit[];
   file: string;
   bytes: number;
   width?: number;
@@ -86,6 +103,21 @@ function parseSeeArgs(argv: string[]): SeeArgs {
 
 export function renderSeeResult(result: SeeResult, asJson: boolean): string {
   if (asJson) return JSON.stringify(result, null, 2);
+  if (result.search)
+    return [
+      '# Semantic search',
+      '',
+      ...result.search.map(
+        (hit) =>
+          '- ' +
+          hit.path +
+          (hit.time_sec === undefined ? '' : ' @ ' + hit.time_sec + 's') +
+          ' (score ' +
+          hit.score.toFixed(4) +
+          ')'
+      ),
+      ...(result.search.length ? [] : ['_(no matches)_']),
+    ].join('\n');
   const dims = result.width && result.height ? `, ${result.width}×${result.height}` : '';
   const lines = [
     `# ${path.basename(result.file)}`,
@@ -99,6 +131,11 @@ export function renderSeeResult(result: SeeResult, asJson: boolean): string {
   }
   if (result.description) lines.push('', '## Description', '', result.description.text.trim());
   lines.push('', '## Text', '', result.ocr?.text.trim() || '_(no text recognized)_');
+  if (result.changes) lines.push('', '## Changes', '', JSON.stringify(result.changes));
+  if (result.tracking) lines.push('', '## Tracking', '', JSON.stringify(result.tracking));
+  if (result.index) lines.push('', '## Index', '', JSON.stringify(result.index));
+  if (result.search) lines.push('', '## Search', '', JSON.stringify(result.search, null, 2));
+  if (result.observations) lines.push(...renderObservations(result.observations));
   if (result.warnings.length > 0) lines.push('', ...result.warnings.map((w) => `> [see] ${w}`));
   return lines.join('\n');
 }
@@ -109,13 +146,37 @@ export async function runSeeCommand(
   deps: PerceptionDeps = defaultPerceptionDeps
 ): Promise<SeeResult | undefined> {
   const args = parseSeeArgs(argv);
-  if (args.help || !args.file) {
+  if (args.help || (!args.file && !args.enhancement?.search)) {
     if (!args.file && !args.help) throw new ScriptExitError(1, SEE_USAGE);
     print(SEE_USAGE);
     return undefined;
   }
-  const absolute = resolveRepositoryInput('see', args.file);
+  const options = args.enhancement ?? {};
+  validatePerceptionOptions('see', options);
+  if (options.search) {
+    if (args.file) throw new ScriptExitError(1, '--search does not take an input file');
+    const { resolveScopeContext } = await import('@agent/core/scope-context');
+    const current = resolveScopeContext();
+    const search =
+      deps.enhancements?.search ??
+      (await import('@agent/core/perception/semantic-index')).searchMedia;
+    const hits = await search({
+      indexId: options.index!,
+      scope: {
+        tier: current.tier,
+        ...(current.tenant_slug ? { tenant_slug: current.tenant_slug } : {}),
+      },
+      query: options.search,
+      modelPath: options.embeddingModel!,
+      python: options.python,
+    });
+    const result: SeeResult = { file: '', bytes: 0, search: hits, warnings: [] };
+    emitOutput('see', renderSeeResult(result, args.json), args.out, print, 'semantic search');
+    return result;
+  }
+  const absolute = resolveRepositoryInput('see', args.file!);
   assertExtension('see', absolute, IMAGE_EXTENSIONS);
+  assertPerceptionInput(absolute);
   let buffer: Buffer;
   try {
     buffer = safeReadFile(absolute, { encoding: null }) as Buffer;
@@ -129,6 +190,17 @@ export async function runSeeCommand(
     ...sniffImageDimensions(buffer),
     warnings: [],
   };
+  const enhanced = Boolean(options.grounded || options.compare || options.track || options.index);
+  const feature = enhanced ? await enhancementDeps(deps) : undefined;
+  const source = feature?.source?.(absolute) ?? feature?.perceptionSource(absolute);
+  const previousSource =
+    options.compare && feature
+      ? feature.perceptionSource(resolveRepositoryInput('see', options.compare))
+      : undefined;
+  if (source) {
+    result.source = source;
+    result.observations = [];
+  }
   if (args.ocr)
     try {
       const ocr = await deps.ocr({
@@ -144,6 +216,16 @@ export async function runSeeCommand(
         },
         ...(args.lang ? { language: args.lang } : {}),
       });
+      if (source && feature)
+        result.observations!.push(
+          ...feature.ocrObservations(
+            source,
+            ocr,
+            result.width && result.height
+              ? { width: result.width, height: result.height }
+              : undefined
+          )
+        );
       result.ocr = {
         text: ocr.text,
         provider: ocr.provider,
@@ -158,6 +240,16 @@ export async function runSeeCommand(
       const description = await deps.describe({ path: relative, kind: 'detailed' });
       if (description.status === 'succeeded') {
         result.description = { text: description.description, provider: description.provider };
+        if (source && feature)
+          result.observations!.push(
+            feature.observation(source, {
+              modality: 'image',
+              kind: 'description',
+              provider: description.provider,
+              finality: 'final',
+              text: description.description,
+            })
+          );
         result.warnings.push(`description provided by ${description.provider}`);
       } else {
         result.warnings.push(
@@ -168,18 +260,65 @@ export async function runSeeCommand(
       result.warnings.push(`image description unavailable: ${(error as Error).message}`);
     }
   }
-  if (!result.ocr && !result.description) {
+  if (options.compare && source && feature) {
+    result.changes = await feature.compareImages(
+      resolveRepositoryInput('see', options.compare),
+      absolute
+    );
+    result.observations!.push(
+      feature.observation(source, {
+        modality: 'image',
+        kind: 'visual_change',
+        provider: 'local-pixel-delta',
+        finality: 'final',
+        attributes: { ...result.changes, previous_source: previousSource },
+      })
+    );
+  }
+  if (options.track) {
+    const tracking = await import('@agent/core/perception/tracking');
+    result.tracking = await (deps.enhancements?.track ?? tracking.trackMedia)({
+      path: absolute,
+      faceModel: options.faceModel,
+      poseModel: options.poseModel,
+      gestureModel: options.gestureModel,
+      python: options.python,
+      maxFrames: 1,
+    });
+    if (source)
+      result.observations!.push(...tracking.trackingObservations(source, result.tracking));
+    if (options.avatarId)
+      result.animation_cues = result.tracking.frames.flatMap((frame) =>
+        (deps.enhancements?.cues ?? tracking.trackingFrameToAnimationCues)(frame, options.avatarId!)
+      );
+  }
+  if (options.index && source) {
+    const index =
+      deps.enhancements?.index ??
+      (await import('@agent/core/perception/semantic-index')).indexMedia;
+    result.index = await index({
+      indexId: options.index,
+      scope: source.scope,
+      modelPath: options.embeddingModel!,
+      python: options.python,
+      entries: [{ id: 'image', path: absolute, image_path: absolute, text: result.ocr?.text }],
+    });
+  }
+  if (!result.ocr && !result.description && !result.tracking && !result.changes && !result.index) {
     throw new ScriptExitError(
       1,
       `[see] nothing could be read from ${args.file}: ${result.warnings.join('; ')}`
     );
   }
+  if (source && feature) feature.assertSourceUnchanged(source);
+  if (previousSource && feature) feature.assertSourceUnchanged(previousSource);
   emitOutput(
     'see',
     renderSeeResult(result, args.json),
     args.out,
     print,
-    `${result.ocr?.text.length ?? 0} chars`
+    `${result.ocr?.text.length ?? 0} chars`,
+    absolute
   );
   return result;
 }
