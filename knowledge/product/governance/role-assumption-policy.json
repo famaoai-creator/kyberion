@@ -169,7 +169,8 @@
         "decision_ledger",
         "ecosystem_architect",
         "mission_controller",
-        "sovereign_concierge"
+        "sovereign_concierge",
+        "engine_runtime_preferences_operator"
       ],
       "rationale": "Presence Studio routes assume ecosystem_architect directly (avatar, front-desk, hearing, hearing-mission, training, work-inventory routes, server.ts) and sovereign_concierge (server.ts ensureOwnerMember), mission_controller in hearing-mission-routes.ts. the same broad roles: reachable per docs/developer/role-assumption-reachability.json (e.g. mission_controller via libs/core agent-identity appendGoverned and approval-gate, ecosystem_architect via libs/core deployment-adapter / storage-janitor, sovereign_concierge via libs/core authn-providers / browser-onboarding / tool-runtime-policy, and the GovernedArtifactRole union of surface-coordination-store). The surface also has unresolved sites (child processes that inherit SYSTEM_ROLE with a computed entry point, computed dynamic imports), so the analysis treats every role as reachable and nothing here is removable. RN-01: the Presence Studio vitest suite and a hermetic smoke under SYSTEM_ROLE=presence_studio observed ecosystem_architect, mission_controller and sovereign_concierge. chronos_token_registry_reader is deliberately absent: presence-studio/security.ts passes `registrations: null` (TR-01), recorded as reviewed-infeasible in the report."
     },
