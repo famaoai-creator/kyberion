@@ -6,17 +6,14 @@ import { pathResolver } from '../../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../../secure-io.js';
 import { decodeEntities } from '../../text-escaping.js';
 import type {
-  PdfAcroForm,
-  PdfAnnotation,
   PdfDesignProtocol,
-  PdfFormField,
   PdfLayoutElement,
-  PdfOutlineItem,
   PdfPage,
   PdfImageElement,
 } from '../../contracts/pdf-protocol.js';
 import { clamp } from '../../foundation/text.js';
 import { decodeFilterChain, parseDecodeParms, parseFilterNames } from './filters.js';
+import * as pdfStructure from './structure.js';
 
 /**
  * High-Fidelity Native PDF Parser v4.1 [PDF 2.0 COMPLIANT]
@@ -659,62 +656,15 @@ export class NativePdfParser {
     return pages.length > 0 ? pages : this.resilientStreamScan();
   }
 
+  extractOutlines() {
+    return pdfStructure.extractOutlines(this as unknown as pdfStructure.PdfStructureHost);
+  }
+
+  extractAcroForm() {
+    return pdfStructure.extractAcroForm(this as unknown as pdfStructure.PdfStructureHost);
+  }
+
   /** Catalog `/Outlines` tree → protocol bookmarks (PdfCraft-style thin distill). */
-  extractOutlines(): PdfOutlineItem[] | undefined {
-    const rootMatch = this.str.match(/\/Root\s+(\d+)\s+0\s+R/);
-    if (!rootMatch) return undefined;
-    const rootObj = this.getFullObject(parseInt(rootMatch[1], 10));
-    if (!rootObj) return undefined;
-    const outlinesRef = rootObj.match(/\/Outlines\s+(\d+)\s+0\s+R/);
-    if (!outlinesRef) return undefined;
-    const outlinesObj = this.getFullObject(parseInt(outlinesRef[1], 10));
-    if (!outlinesObj) return undefined;
-    const first = outlinesObj.match(/\/First\s+(\d+)\s+0\s+R/);
-    if (!first) return undefined;
-
-    const pagesRefMatch = rootObj.match(/\/Pages\s+(\d+)\s+0\s+R/);
-    let leafPageIds = pagesRefMatch ? this.resolveKids(parseInt(pagesRefMatch[1], 10)) : [];
-    if (leafPageIds.length === 0) leafPageIds = this.scanLeafPageIdsDirect();
-    const pageIdToIndex = new Map<number, number>();
-    leafPageIds.forEach((id, i) => pageIdToIndex.set(id, i));
-
-    const items = this.walkOutlineSiblings(parseInt(first[1], 10), pageIdToIndex, 0);
-    return items.length > 0 ? items : undefined;
-  }
-
-  /** Catalog `/AcroForm` field list (names / values / types). */
-  extractAcroForm(): PdfAcroForm | undefined {
-    const rootMatch = this.str.match(/\/Root\s+(\d+)\s+0\s+R/);
-    if (!rootMatch) return undefined;
-    const rootObj = this.getFullObject(parseInt(rootMatch[1], 10));
-    if (!rootObj) return undefined;
-    const acroRef = rootObj.match(/\/AcroForm\s+(\d+)\s+0\s+R/);
-    const acroObj = acroRef
-      ? this.getFullObject(parseInt(acroRef[1], 10))
-      : /\/AcroForm\s*<</.test(rootObj)
-        ? rootObj.match(/\/AcroForm\s*(<<[\s\S]*?>>)/)?.[1]
-        : undefined;
-    if (!acroObj) return undefined;
-
-    const fields: PdfFormField[] = [];
-    const fieldsBlock = typeof acroObj === 'string' ? acroObj : '';
-    const arrayMatch = fieldsBlock.match(/\/Fields\s*\[([^\]]*)\]/);
-    if (arrayMatch) {
-      const refs = arrayMatch[1].match(/(\d+)\s+0\s+R/g) || [];
-      for (const ref of refs) {
-        fields.push(...this.collectAcroFields(parseInt(ref, 10), ''));
-      }
-    }
-    if (fields.length === 0) return undefined;
-
-    const needAppearances = /\/NeedAppearances\s+true\b/.test(fieldsBlock);
-    const defaultDA = this.readPdfInfoString(fieldsBlock, 'DA');
-    return {
-      fields,
-      needAppearances: needAppearances || undefined,
-      defaultDA,
-    };
-  }
 
   private scanLeafPageIdsDirect(): number[] {
     const ids: number[] = [];
@@ -741,7 +691,10 @@ export class NativePdfParser {
     const { width, height } = this.extractPageGeometry(obj);
     const fontResources = this.extractFontResources(obj);
     const imageResources = this.extractImageResources(obj);
-    const formResources = this.extractFormResources(obj);
+    const formResources = pdfStructure.extractFormResources(
+      this as unknown as pdfStructure.PdfStructureHost,
+      obj
+    );
     const extGStateResources = this.extractExtGStateResources(obj);
     const refs = this.extractContentRefs(obj);
     const elements: any[] = [];
@@ -758,10 +711,22 @@ export class NativePdfParser {
       const streamText = this.parseTextOperators(decoded).join(' ').trim();
       if (streamText) textParts.push(streamText);
       // Form XObject `Do` — scrape nested text (depth-bounded)
-      textParts.push(...this.extractFormXObjectText(decoded, formResources, 0));
+      textParts.push(
+        ...pdfStructure.extractFormXObjectText(
+          this as unknown as pdfStructure.PdfStructureHost,
+          decoded,
+          formResources,
+          0
+        )
+      );
     }
 
-    const annotations = this.extractPageAnnotations(obj, height, pageIdToIndex);
+    const annotations = pdfStructure.extractPageAnnotations(
+      this as unknown as pdfStructure.PdfStructureHost,
+      obj,
+      height,
+      pageIdToIndex
+    );
     const mergedText = textParts.join(' ').replace(/\s+/g, ' ').trim();
     return {
       pageNumber,
@@ -772,306 +737,6 @@ export class NativePdfParser {
       images: images.length > 0 ? images : undefined,
       annotations: annotations.length > 0 ? annotations : undefined,
     };
-  }
-
-  private walkOutlineSiblings(
-    firstId: number,
-    pageIdToIndex: Map<number, number>,
-    depth: number
-  ): PdfOutlineItem[] {
-    if (depth > 32) return [];
-    const items: PdfOutlineItem[] = [];
-    let id: number | undefined = firstId;
-    const seen = new Set<number>();
-    while (id !== undefined && !seen.has(id)) {
-      seen.add(id);
-      const obj = this.getFullObject(id);
-      if (!obj) break;
-      const title = this.readPdfInfoString(obj, 'Title') ?? '';
-      const dest = this.resolveOutlineDest(obj, pageIdToIndex);
-      const childFirst = obj.match(/\/First\s+(\d+)\s+0\s+R/);
-      const children = childFirst
-        ? this.walkOutlineSiblings(parseInt(childFirst[1], 10), pageIdToIndex, depth + 1)
-        : undefined;
-      const countMatch = obj.match(/\/Count\s+(-?\d+)/);
-      const closed = countMatch ? parseInt(countMatch[1], 10) < 0 : undefined;
-      if (title || dest || children?.length) {
-        items.push({
-          title,
-          pageIndex: dest?.pageIndex ?? 0,
-          top: dest?.top,
-          zoom: dest?.zoom,
-          children: children?.length ? children : undefined,
-          closed: closed || undefined,
-        });
-      }
-      const next = obj.match(/\/Next\s+(\d+)\s+0\s+R/);
-      id = next ? parseInt(next[1], 10) : undefined;
-    }
-    return items;
-  }
-
-  private resolveOutlineDest(
-    obj: string,
-    pageIdToIndex: Map<number, number>
-  ): { pageIndex: number; top?: number; zoom?: number } | undefined {
-    // Inline: /Dest [pageId 0 R /XYZ …]
-    let destBlock = obj.match(/\/Dest\s*\[([^\]]*)\]/)?.[1];
-    if (!destBlock) {
-      const destRef = obj.match(/\/Dest\s+(\d+)\s+0\s+R/);
-      if (destRef) {
-        const destObj = this.getFullObject(parseInt(destRef[1], 10)) || '';
-        destBlock = destObj.match(/\[([^\]]*)\]/)?.[1] ?? destObj;
-      }
-    }
-    // /A << /S /GoTo /D [page …] >>
-    if (!destBlock) {
-      const action = obj.match(/\/A\s*<<([\s\S]*?)>>/);
-      if (action) {
-        destBlock = action[1].match(/\/D\s*\[([^\]]*)\]/)?.[1];
-      }
-    }
-    if (!destBlock) return undefined;
-    const pageRef = destBlock.match(/(\d+)\s+0\s+R/);
-    if (!pageRef) return undefined;
-    const pageId = parseInt(pageRef[1], 10);
-    const pageIndex = pageIdToIndex.get(pageId) ?? 0;
-    const xyz = destBlock.match(/\/XYZ\s+(\S+)\s+(\S+)\s+(\S+)/);
-    const top =
-      xyz && xyz[2] !== 'null' && Number.isFinite(Number(xyz[2])) ? Number(xyz[2]) : undefined;
-    const zoom =
-      xyz && xyz[3] !== 'null' && Number.isFinite(Number(xyz[3])) ? Number(xyz[3]) : undefined;
-    return { pageIndex, top, zoom };
-  }
-
-  private collectAcroFields(id: number, parentName: string): PdfFormField[] {
-    const obj = this.getFullObject(id);
-    if (!obj) return [];
-    const partial = this.readPdfInfoString(obj, 'T') ?? '';
-    const name = parentName ? (partial ? `${parentName}.${partial}` : parentName) : partial;
-    const kids = obj.match(/\/Kids\s*\[([^\]]*)\]/);
-    if (kids && !/\/FT\s*\//.test(obj)) {
-      const out: PdfFormField[] = [];
-      for (const ref of kids[1].match(/(\d+)\s+0\s+R/g) || []) {
-        out.push(...this.collectAcroFields(parseInt(ref, 10), name));
-      }
-      return out;
-    }
-    const field = this.parseAcroFieldDict(obj, id, name);
-    return field ? [field] : [];
-  }
-
-  private parseAcroFieldDict(obj: string, id: number, name: string): PdfFormField | null {
-    if (!name && !/\/FT\s*\//.test(obj)) return null;
-
-    const ft = obj.match(/\/FT\s*\/([A-Za-z]+)/)?.[1] ?? 'Tx';
-    let type: PdfFormField['type'] = 'text';
-    if (ft === 'Btn') {
-      const flags = parseInt(obj.match(/\/Ff\s+(\d+)/)?.[1] ?? '0', 10);
-      type = flags & 65536 ? 'button' : flags & 32768 ? 'radio' : 'checkbox';
-    } else if (ft === 'Ch') {
-      const flags = parseInt(obj.match(/\/Ff\s+(\d+)/)?.[1] ?? '0', 10);
-      type = flags & 131072 ? 'listbox' : 'dropdown';
-    } else if (ft === 'Sig') type = 'signature';
-
-    const value =
-      this.readPdfInfoString(obj, 'V') ??
-      (obj.match(/\/V\s*\/([A-Za-z0-9_.+-]+)/)?.[1]
-        ? `/${obj.match(/\/V\s*\/([A-Za-z0-9_.+-]+)/)![1]}`
-        : undefined);
-    const defaultValue = this.readPdfInfoString(obj, 'DV');
-    const tooltip = this.readPdfInfoString(obj, 'TU');
-    const rectMatch = obj.match(
-      /\/Rect\s*\[\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\]/
-    );
-    const rect: [number, number, number, number] = rectMatch
-      ? [
-          parseFloat(rectMatch[1]),
-          parseFloat(rectMatch[2]),
-          parseFloat(rectMatch[3]) - parseFloat(rectMatch[1]),
-          parseFloat(rectMatch[4]) - parseFloat(rectMatch[2]),
-        ]
-      : [0, 0, 0, 0];
-
-    const options: string[] = [];
-    const optBlock = obj.match(/\/Opt\s*\[([\s\S]*?)\]/);
-    if (optBlock) {
-      const lit = optBlock[1].matchAll(/\((?:\\.|[^\\)])*\)|<[^>]+>/g);
-      for (const m of lit) {
-        const raw = m[0];
-        if (raw.startsWith('(')) options.push(this.decodeInfoLiteralString(raw.slice(1, -1)));
-        else options.push(this.decodeHexString(raw.slice(1, -1)));
-      }
-    }
-
-    const checked =
-      type === 'checkbox' || type === 'radio'
-        ? value !== undefined && value !== '/Off' && value !== 'Off'
-        : undefined;
-
-    return {
-      name: name || `field_${id}`,
-      type,
-      rect,
-      value,
-      defaultValue,
-      tooltip,
-      options: options.length ? options : undefined,
-      checked,
-      flags: parseInt(obj.match(/\/Ff\s+(\d+)/)?.[1] ?? '', 10) || undefined,
-      defaultAppearance: this.readPdfInfoString(obj, 'DA'),
-    };
-  }
-
-  private extractPageAnnotations(
-    pageObj: string,
-    pageHeight: number,
-    pageIdToIndex: Map<number, number>
-  ): PdfAnnotation[] {
-    const annots: PdfAnnotation[] = [];
-    const arrayMatch = pageObj.match(/\/Annots\s*\[([^\]]*)\]/);
-    const singleRef = pageObj.match(/\/Annots\s+(\d+)\s+0\s+R/);
-    const refIds: number[] = [];
-    if (arrayMatch) {
-      for (const m of arrayMatch[1].matchAll(/(\d+)\s+0\s+R/g)) {
-        refIds.push(parseInt(m[1], 10));
-      }
-    } else if (singleRef) {
-      const arrObj = this.getFullObject(parseInt(singleRef[1], 10)) || '';
-      for (const m of arrObj.matchAll(/(\d+)\s+0\s+R/g)) {
-        refIds.push(parseInt(m[1], 10));
-      }
-      // Some writers store the array as the object body itself: `[ … ]`
-      if (refIds.length === 0) {
-        for (const m of (arrObj.match(/\[([^\]]*)\]/)?.[1] || '').matchAll(/(\d+)\s+0\s+R/g)) {
-          refIds.push(parseInt(m[1], 10));
-        }
-      }
-    }
-
-    for (const aid of refIds) {
-      const ann = this.parseAnnotation(aid, pageHeight, pageIdToIndex);
-      if (ann) annots.push(ann);
-    }
-    return annots;
-  }
-
-  private parseAnnotation(
-    id: number,
-    pageHeight: number,
-    pageIdToIndex: Map<number, number>
-  ): PdfAnnotation | null {
-    const obj = this.getFullObject(id);
-    if (!obj) return null;
-    const subtype = obj.match(/\/Subtype\s*\/([A-Za-z]+)/)?.[1];
-    if (!subtype) return null;
-    const rectMatch = obj.match(
-      /\/Rect\s*\[\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\]/
-    );
-    if (!rectMatch) return null;
-    const llx = parseFloat(rectMatch[1]);
-    const lly = parseFloat(rectMatch[2]);
-    const urx = parseFloat(rectMatch[3]);
-    const ury = parseFloat(rectMatch[4]);
-    const rect: [number, number, number, number] = [
-      llx,
-      Math.max(0, pageHeight - ury),
-      Math.max(0, urx - llx),
-      Math.max(0, ury - lly),
-    ];
-    const borderWidth = parseFloat(
-      obj.match(/\/Border\s*\[\s*\d+(?:\.\d+)?\s+\d+(?:\.\d+)?\s+(\d+(?:\.\d+)?)/)?.[1] ?? ''
-    );
-    const colorMatch = obj.match(
-      /\/C\s*\[\s*(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s*\]/
-    );
-    const color: [number, number, number] | undefined = colorMatch
-      ? [parseFloat(colorMatch[1]), parseFloat(colorMatch[2]), parseFloat(colorMatch[3])]
-      : undefined;
-    const opacity = parseFloat(obj.match(/\/CA\s+(\d+(?:\.\d+)?)/)?.[1] ?? '');
-    const base = {
-      rect,
-      color,
-      borderWidth: Number.isFinite(borderWidth) ? borderWidth : undefined,
-      opacity: Number.isFinite(opacity) ? opacity : undefined,
-    };
-
-    if (subtype === 'Link') {
-      // `/S /URI` is a name token — only accept `/URI (…)` / `/URI <…>` string values.
-      let uri: string | undefined;
-      const uriLit = obj.match(/\/URI\s*\(((?:\\.|[^\\)])*)\)/);
-      if (uriLit) uri = this.decodeInfoLiteralString(uriLit[1]);
-      else {
-        const uriHex = obj.match(/\/URI\s*<([^>]*)>/);
-        if (uriHex) uri = this.decodeHexString(uriHex[1]);
-      }
-      let pageTarget: number | undefined;
-      const dest = obj.match(/\/Dest\s*\[(\d+)\s+0\s+R/);
-      if (dest) pageTarget = pageIdToIndex.get(parseInt(dest[1], 10));
-      return { type: 'Link', ...base, uri, pageTarget };
-    }
-    if (subtype === 'Text') {
-      return {
-        type: 'Text',
-        ...base,
-        content: this.readPdfInfoString(obj, 'Contents') ?? '',
-        title: this.readPdfInfoString(obj, 'T'),
-      };
-    }
-    if (subtype === 'Square' || subtype === 'Circle') {
-      return { type: subtype, ...base, title: this.readPdfInfoString(obj, 'T') };
-    }
-    if (subtype === 'Highlight') {
-      return { type: 'Highlight', ...base };
-    }
-    return null;
-  }
-
-  private extractFormResources(obj: string): Map<string, number> {
-    const resources = new Map<string, number>();
-    let xObjectSection = obj.match(/\/XObject\s*<<([\s\S]*?)>>/);
-    if (!xObjectSection) {
-      const resRef = obj.match(/\/Resources\s+(\d+)\s+0\s+R/);
-      if (resRef) {
-        const resObj = this.getFullObject(parseInt(resRef[1], 10));
-        if (resObj) xObjectSection = resObj.match(/\/XObject\s*<<([\s\S]*?)>>/);
-      }
-    }
-    if (!xObjectSection) return resources;
-    const refRegex = /\/([A-Za-z0-9_.-]+)\s+(\d+)\s+0\s+R/g;
-    let match: RegExpExecArray | null;
-    while ((match = refRegex.exec(xObjectSection[1])) !== null) {
-      const objectId = parseInt(match[2], 10);
-      const formObj = this.getFullObject(objectId);
-      if (formObj && /\/Subtype\s*\/Form\b/.test(formObj)) {
-        resources.set(match[1], objectId);
-      }
-    }
-    return resources;
-  }
-
-  private extractFormXObjectText(
-    content: string,
-    formResources: Map<string, number>,
-    depth: number
-  ): string[] {
-    if (depth > 4) return [];
-    const parts: string[] = [];
-    const doRegex = /\/([A-Za-z0-9_.-]+)\s+Do\b/g;
-    let match: RegExpExecArray | null;
-    while ((match = doRegex.exec(content)) !== null) {
-      const objectId = formResources.get(match[1]);
-      if (!objectId) continue;
-      const decoded = this.decodeStream(objectId);
-      if (!decoded) continue;
-      const text = this.parseTextOperators(decoded).join(' ').trim();
-      if (text) parts.push(text);
-      const nested = this.extractFormResources(this.getFullObject(objectId) || '');
-      if (nested.size > 0) {
-        parts.push(...this.extractFormXObjectText(decoded, nested, depth + 1));
-      }
-    }
-    return parts;
   }
 
   private extractPageGeometry(obj: string): { width: number; height: number } {
