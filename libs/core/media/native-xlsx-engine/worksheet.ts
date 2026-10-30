@@ -8,6 +8,7 @@ import type {
   XlsxColumn,
 } from '../../contracts/xlsx-protocol.js';
 import { escapeXml as escXml } from '../../text-escaping.js';
+import { computeSheetDimension, escapeXlsxAttr, escapeXlsxText } from '../xlsx-xstring.js';
 
 function cellXml(cell: XlsxCell, sstMap?: Map<string, number>): string {
   // If raw XML preserved, use it
@@ -41,7 +42,7 @@ function cellXml(cell: XlsxCell, sstMap?: Map<string, number>): string {
     inner += `<f>${escXml(cell.formula)}</f>`;
     if (cell.value !== undefined) inner += `<v>${escXml(String(cell.value))}</v>`;
   } else if (effectiveType === 'inlineStr') {
-    inner += `<is><t xml:space="preserve">${escXml(String(cell.value ?? ''))}</t></is>`;
+    inner += `<is><t xml:space="preserve">${escapeXlsxText(String(cell.value ?? ''))}</t></is>`;
   } else if (cell.richText && cell.richText.length > 0) {
     inner += '<is>';
     for (const run of cell.richText) {
@@ -51,17 +52,22 @@ function cellXml(cell: XlsxCell, sstMap?: Map<string, number>): string {
         if (run.font.bold) inner += '<b/>';
         if (run.font.italic) inner += '<i/>';
         if (run.font.size) inner += `<sz val="${run.font.size}"/>`;
-        if (run.font.name) inner += `<name val="${escXml(run.font.name)}"/>`;
+        if (run.font.name) inner += `<name val="${escapeXlsxAttr(run.font.name)}"/>`;
         inner += '</rPr>';
       }
-      inner += `<t xml:space="preserve">${escXml(run.text)}</t>`;
+      inner += `<t xml:space="preserve">${escapeXlsxText(run.text)}</t>`;
       inner += '</r>';
     }
     inner += '</is>';
   } else if (cell.type === 's' && sstIndex !== undefined) {
     inner += `<v>${sstIndex}</v>`;
   } else if (cell.value !== undefined) {
-    inner += `<v>${escXml(String(cell.value))}</v>`;
+    const text = String(cell.value);
+    // Numeric / boolean cached values stay plain; strings use ST_Xstring.
+    inner +=
+      effectiveType === 'str' || typeof cell.value === 'string'
+        ? `<v>${escapeXlsxText(text)}</v>`
+        : `<v>${escXml(text)}</v>`;
   }
 
   // Self-close if no inner content (preserves original format for empty styled cells)
@@ -110,7 +116,12 @@ function colXml(col: XlsxColumn): string {
 export function generateWorksheet(
   sheet: XlsxWorksheet,
   drawingRId?: string,
-  sstMap?: Map<string, number>
+  sstMap?: Map<string, number>,
+  tableRIds?: string[],
+  options?: {
+    hyperlinkRIds?: Map<string, string>;
+    legacyDrawingRId?: string;
+  }
 ): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="x14ac xr xr2 xr3" xmlns:x14ac="http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac" xmlns:xr="http://schemas.microsoft.com/office/spreadsheetml/2014/revision" xmlns:xr2="http://schemas.microsoft.com/office/spreadsheetml/2015/revision2" xmlns:xr3="http://schemas.microsoft.com/office/spreadsheetml/2016/revision3">`;
@@ -120,9 +131,10 @@ export function generateWorksheet(
     xml += sheet.sheetPrXml;
   }
 
-  // Dimension
-  if (sheet.dimension) {
-    xml += `<dimension ref="${sheet.dimension}"/>`;
+  // Dimension — recompute from cells when missing (GridCraft used_range)
+  const dimension = sheet.dimension || computeSheetDimension(sheet.rows);
+  if (dimension) {
+    xml += `<dimension ref="${dimension}"/>`;
   }
 
   // Sheet views
@@ -184,6 +196,25 @@ export function generateWorksheet(
     xml += '</mergeCells>';
   }
 
+  // Hyperlinks (GridCraft sheet_write)
+  if (sheet.hyperlinks && sheet.hyperlinks.length > 0) {
+    xml += '<hyperlinks>';
+    for (const link of sheet.hyperlinks) {
+      xml += `<hyperlink ref="${escapeXlsxAttr(link.ref)}"`;
+      const rId = options?.hyperlinkRIds?.get(link.ref);
+      if (rId) {
+        xml += ` r:id="${rId}"`;
+      } else if (link.location) {
+        xml += ` location="${escapeXlsxAttr(link.location)}"`;
+      } else if (!link.external) {
+        xml += ` location="${escapeXlsxAttr(link.target)}"`;
+      }
+      if (link.tooltip) xml += ` tooltip="${escapeXlsxAttr(link.tooltip)}"`;
+      xml += '/>';
+    }
+    xml += '</hyperlinks>';
+  }
+
   // Conditional formatting
   for (const cf of sheet.conditionalFormats) {
     xml += `<conditionalFormatting sqref="${cf.sqref}">`;
@@ -214,8 +245,8 @@ export function generateWorksheet(
         if (dv.operator) xml += ` operator="${dv.operator}"`;
         if (dv.showDropDown) xml += ' showDropDown="1"';
         if (dv.showErrorMessage) xml += ' showErrorMessage="1"';
-        if (dv.errorTitle) xml += ` errorTitle="${escXml(dv.errorTitle)}"`;
-        if (dv.error) xml += ` error="${escXml(dv.error)}"`;
+        if (dv.errorTitle) xml += ` errorTitle="${escapeXlsxAttr(dv.errorTitle)}"`;
+        if (dv.error) xml += ` error="${escapeXlsxAttr(dv.error)}"`;
         xml += '>';
         if (dv.formula1) xml += `<formula1>${escXml(dv.formula1)}</formula1>`;
         if (dv.formula2) xml += `<formula2>${escXml(dv.formula2)}</formula2>`;
@@ -255,6 +286,22 @@ export function generateWorksheet(
   // Drawing reference
   if (drawingRId) {
     xml += `<drawing r:id="${drawingRId}"/>`;
+  }
+
+  // Legacy VML drawing for cell comments / notes
+  const legacyRId = options?.legacyDrawingRId || sheet.legacyDrawingRId;
+  if (legacyRId) {
+    xml += `<legacyDrawing r:id="${legacyRId}"/>`;
+  }
+
+  // Table parts must be listed on the worksheet for Excel to bind xl/tables/*
+  // (GridCraft sheet_write `tableParts`).
+  if (tableRIds && tableRIds.length > 0) {
+    xml += `<tableParts count="${tableRIds.length}">`;
+    for (const rId of tableRIds) {
+      xml += `<tablePart r:id="${rId}"/>`;
+    }
+    xml += '</tableParts>';
   }
 
   // Extensions

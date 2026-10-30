@@ -20,6 +20,7 @@ import type {
   XlsxCellStyle,
 } from '../contracts/xlsx-protocol.js';
 import { formatXlsxNumber } from './xlsx-number-format.js';
+import { scrapeDiagramText, scrapeOmmlText } from './docx-xml.js';
 import type { PptxDesignProtocol, PptxSlide, PptxElement } from '../contracts/pptx-protocol.js';
 
 // ─── Public API ──────────────────────────────────────────────
@@ -119,18 +120,51 @@ export function docxToMarkdown(protocol: DocxDesignProtocol): string {
     renderDocxBlock(block, lines, protocol);
   }
 
+  // SmartArt / diagram text from passthrough diagram data parts
+  const diagramBullets = collectDiagramMarkdown(protocol);
+  if (diagramBullets.length > 0) {
+    lines.push('', '## SmartArt', '');
+    for (const bullet of diagramBullets) lines.push(`- ${bullet}`);
+  }
+
   return lines.join('\n').trim();
 }
 
 export function xlsxToMarkdown(protocol: XlsxDesignProtocol): string {
   const lines: string[] = [];
+  const date1904 = !!protocol.workbookProperties?.date1904;
 
   for (const sheet of protocol.sheets) {
     if (sheet.state === 'hidden' || sheet.state === 'veryHidden') continue;
     if (protocol.sheets.length > 1) {
       lines.push(`## ${sheet.name}`, '');
     }
-    renderXlsxSheet(sheet, protocol.sharedStrings, lines, protocol.styles?.cellXfs ?? []);
+    renderXlsxSheet(sheet, protocol.sharedStrings, lines, protocol.styles?.cellXfs ?? [], date1904);
+
+    const drawingTexts = (sheet.drawing?.elements ?? [])
+      .map((el) => el.text?.trim())
+      .filter((t): t is string => !!t);
+    if (drawingTexts.length > 0) {
+      lines.push('', '### Drawing text', '');
+      for (const t of drawingTexts) lines.push(`- ${t}`);
+    }
+
+    if (sheet.hyperlinks?.length) {
+      lines.push('', '### Links', '');
+      for (const link of sheet.hyperlinks) {
+        const label = link.tooltip || link.ref;
+        lines.push(`- [${label}](${link.target})`);
+      }
+    }
+
+    if (sheet.comments?.length) {
+      lines.push('', '### Comments', '');
+      for (const c of sheet.comments) {
+        const who = c.author ? ` (${c.author})` : '';
+        lines.push(`- ${c.ref}${who}: ${c.text}`);
+      }
+    }
+
     lines.push('');
   }
 
@@ -292,6 +326,14 @@ function renderDocxBlock(block: DocxBlockContent, lines: string[], protocol: Doc
         renderDocxBlock(child, lines, protocol);
       }
       break;
+    case 'rawXml': {
+      // Display OMML (`m:oMathPara`) — scrape visible math text.
+      if (/oMath/i.test(block.xml)) {
+        const math = scrapeOmmlText(block.xml);
+        if (math) lines.push(`$${math}$`, '');
+      }
+      break;
+    }
   }
 }
 
@@ -330,9 +372,22 @@ function extractDocxParagraphText(para: DocxParagraph, protocol?: DocxDesignProt
     } else if (item.type === 'hyperlink') {
       const linkText = item.hyperlink.runs.map((r) => extractDocxRunText(r, protocol)).join('');
       if (linkText) parts.push(linkText);
+    } else if (item.type === 'rawXml' && /oMath/i.test(item.xml)) {
+      const math = scrapeOmmlText(item.xml);
+      if (math) parts.push(`$${math}$`);
     }
   }
   return parts.join('');
+}
+
+/** Pull SmartArt node labels from passthrough `word/diagrams/data*.xml`. */
+function collectDiagramMarkdown(protocol: DocxDesignProtocol): string[] {
+  const out: string[] = [];
+  for (const part of protocol.passthroughParts || []) {
+    if (!/^word\/diagrams\/data/i.test(part.path)) continue;
+    out.push(...scrapeDiagramText(part.content));
+  }
+  return out;
 }
 
 /**
@@ -361,6 +416,24 @@ function extractDocxRunText(run: DocxRun, protocol?: DocxDesignProtocol): string
         break;
       case 'tab':
         parts.push('\t');
+        break;
+      case 'cr':
+        parts.push('\n');
+        break;
+      case 'softHyphen':
+        parts.push('\u00ad');
+        break;
+      case 'noBreakHyphen':
+        parts.push('\u2011');
+        break;
+      case 'sym':
+        // Surface as a Unicode char when the code point is valid.
+        try {
+          const cp = Number.parseInt(c.char, 16);
+          if (Number.isFinite(cp) && cp >= 0x20) parts.push(String.fromCodePoint(cp));
+        } catch {
+          /* ignore bad sym */
+        }
         break;
       case 'break':
         // <w:br/> without a type is an ordinary line break (textWrapping is
@@ -455,7 +528,8 @@ function renderXlsxSheet(
   sheet: XlsxWorksheet,
   sharedStrings: string[],
   lines: string[],
-  cellXfs: XlsxCellStyle[] = []
+  cellXfs: XlsxCellStyle[] = [],
+  date1904 = false
 ) {
   if (!sheet.rows.length) {
     lines.push('(Empty sheet)');
@@ -484,7 +558,7 @@ function renderXlsxSheet(
     const cells: string[] = new Array(colCount).fill('');
     for (const cell of row.cells) {
       const colIdx = cellRefToColIndex(cell.ref);
-      cells[colIdx] = resolveXlsxCellValue(cell, sharedStrings, cellXfs);
+      cells[colIdx] = resolveXlsxCellValue(cell, sharedStrings, cellXfs, date1904);
     }
     tableRows.push(cells);
   }
@@ -503,7 +577,8 @@ function renderXlsxSheet(
 function resolveXlsxCellValue(
   cell: XlsxCell,
   sharedStrings: string[],
-  cellXfs: XlsxCellStyle[] = []
+  cellXfs: XlsxCellStyle[] = [],
+  date1904 = false
 ): string {
   if (cell.type === 's' && typeof cell.value === 'number') {
     return sharedStrings[cell.value] ?? '';
@@ -518,7 +593,7 @@ function resolveXlsxCellValue(
   if (isNumeric && cell.value !== '' && cell.value != null && Number.isFinite(numeric)) {
     const formatCode =
       cell.styleIndex !== undefined ? cellXfs[cell.styleIndex]?.numFmt?.formatCode : undefined;
-    return formatXlsxNumber(numeric, formatCode);
+    return formatXlsxNumber(numeric, formatCode, date1904);
   }
   if (cell.value != null) return String(cell.value);
   return '';
