@@ -502,6 +502,7 @@
 - [パイプライン結晶化ループ設計メモ](./product/orchestration/pipeline-crystallization-memo.md) (public | Kyberion)
 - [プロジェクト依存ミッション連鎖の実走メモ (PRJ-KYBERION-PRODUCTION-READINESS, 2026-10-07)](./product/orchestration/mission-dependency-chain-demo-20261007.md) (public | Unknown)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
+- [リアルタイム会話のstreaming設定と解除](./product/orchestration/realtime-voice-streaming-preferences.ja.md) (public | Unknown)
 - [リアルタイム映像フィルタと会話アバターの運用](./product/orchestration/realtime-av-operations.ja.md) (public | Unknown)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
 - [位置・時刻・変化を持つ知覚の利用と検証](./product/orchestration/grounded-perception.ja.md) (public | Unknown)
