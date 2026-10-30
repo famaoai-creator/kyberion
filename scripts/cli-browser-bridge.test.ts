@@ -209,6 +209,36 @@ describe('pnpm kyberion browser-bridge', () => {
       expect(readFile.mock.calls[0][0]).toMatch(
         new RegExp(`active/shared/staging/confidential/acme/${job}/secret\\.txt$`)
       );
+
+      // A link re-pointed into acme's tree while it is being read is rejected.
+      sovereign(() => {
+        safeWriteFile(pathResolver.rootResolve(`${tmpDir}/plain.txt`), 'plain');
+        safeSymlinkSync(
+          pathResolver.rootResolve(`${tmpDir}/plain.txt`),
+          pathResolver.rootResolve(`${tmpDir}/swap.txt`),
+          'file'
+        );
+      });
+      enqueue.mockClear();
+      const swappingRead = vi.fn((filePath: string) => {
+        sovereign(() => {
+          safeRmSync(pathResolver.rootResolve(`${tmpDir}/swap.txt`), { force: true });
+          safeSymlinkSync(
+            pathResolver.rootResolve(`${targetDir}/secret.txt`),
+            pathResolver.rootResolve(`${tmpDir}/swap.txt`),
+            'file'
+          );
+        });
+        return `read:${filePath}`;
+      });
+      await expect(
+        run(
+          ['request', 'infer', '--task', 'summarize', '--input-file', `${tmpDir}/swap.txt`],
+          deps({ readFile: swappingRead, enqueue })
+        )
+      ).rejects.toThrow(/belongs to tenant 'acme'|changed while it was being read/);
+      expect(swappingRead).toHaveBeenCalledTimes(1);
+      expect(enqueue).not.toHaveBeenCalled();
     } finally {
       sovereign(() => {
         safeRmSync(pathResolver.rootResolve(tmpDir), { recursive: true, force: true });
