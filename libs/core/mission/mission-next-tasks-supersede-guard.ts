@@ -59,6 +59,12 @@ function followRewrites(dependency: string, rewrites: MissionTaskDependencyRewri
 export interface SupersedeGuardOptions {
   /** supersede-task's own write: it may introduce a `superseded` task. */
   allowSupersede?: boolean;
+  /**
+   * A writer that rebuilds the board from canonical state (the Work Graph
+   * projection, reconcile-work) may carry a `superseded` task whose supersede
+   * the mission proves (an approved supersede-task). Others are dropped.
+   */
+  isSupersedeProven?: (task: object) => boolean;
 }
 
 /**
@@ -70,7 +76,8 @@ export interface SupersedeGuardOptions {
  *  - an on-disk superseded task, or the replacement a supersede named, that
  *    the incoming list lacks is kept;
  *  - a `superseded` status the incoming copy introduces is dropped (the
- *    on-disk status is kept) unless `allowSupersede`.
+ *    on-disk status is kept) unless `allowSupersede`, or `isSupersedeProven`
+ *    holds for that task.
  */
 export function guardSupersedeState<T extends object, U extends object = T>(
   missionId: string,
@@ -81,7 +88,12 @@ export function guardSupersedeState<T extends object, U extends object = T>(
   const existingById = new Map(onDisk.map((task) => [taskId(task), task]));
   const merged: Array<T | U> = incoming.map((task): T | U => {
     const existing = existingById.get(taskId(task));
-    if (isSuperseded(task) && !isSuperseded(existing) && !options.allowSupersede) {
+    if (
+      isSuperseded(task) &&
+      !isSuperseded(existing) &&
+      !options.allowSupersede &&
+      !options.isSupersedeProven?.(task)
+    ) {
       logger.warn(
         `task ${taskId(task)} not written as superseded — only supersede-task can supersede a task | the status on disk is kept; supersede it with pnpm mission supersede-task ${missionId} ${taskId(task)} --by <new_task_id> --reason <text> --request-approval | mission=${missionId}`
       );

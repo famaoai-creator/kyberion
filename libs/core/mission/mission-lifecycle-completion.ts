@@ -3,10 +3,7 @@
  * task reconciliation, and goal/repair task materialization.
  */
 
-import {
-  guardSupersedeState,
-  type SupersedeGuardOptions,
-} from './mission-next-tasks-supersede-guard.js';
+import { guardSupersedeState } from './mission-next-tasks-supersede-guard.js';
 import * as path from 'node:path';
 import { createActuatorTrace } from '../actuator/actuator-trace.js';
 import * as customerResolver from '../customer-resolver.js';
@@ -38,7 +35,7 @@ import {
   receiptToArtifactReviewDecision,
 } from '../workforce/artifact-review.js';
 import { loadState } from './mission-state.js';
-import { isSupersedeProvenForGate } from './mission-task-supersede-proof.js';
+import { isSupersedeProven, isSupersedeProvenForGate } from './mission-task-supersede-proof.js';
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
 import type { IntentReconciliationInput } from '../intent/intent-reconciliation.js';
@@ -419,6 +416,17 @@ export type MissionNextTasksUpdate = (
   onDisk: Array<Record<string, unknown>>
 ) => Array<Record<string, unknown>> | undefined;
 
+export interface MissionNextTasksWriteOptions {
+  /** supersede-task's own write: it may introduce a `superseded` task. */
+  allowSupersede?: boolean;
+  /**
+   * A board rebuilt from canonical state may carry a `superseded` task the
+   * mission proves (an approved supersede-task record); an unproven one is
+   * still dropped.
+   */
+  acceptProvenSupersede?: boolean;
+}
+
 /**
  * The one writer of a mission's NEXT_TASKS.json. The board on disk is read
  * under the writer lease, right before the write, and keeps every supersede a
@@ -430,7 +438,7 @@ export type MissionNextTasksUpdate = (
 export function writeMissionNextTasks(
   missionDir: string,
   tasks: Array<Record<string, unknown>> | MissionNextTasksUpdate,
-  options: SupersedeGuardOptions = {}
+  options: MissionNextTasksWriteOptions = {}
 ): boolean {
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
   const missionId = path.basename(safeMissionDir(missionDir, true));
@@ -447,7 +455,14 @@ export function writeMissionNextTasks(
       if (!incoming) return undefined;
       return provisionMissionEntry(
         validateMissionNextTaskObjects(
-          guardSupersedeState(missionId, incoming, onDisk, options),
+          guardSupersedeState(missionId, incoming, onDisk, {
+            allowSupersede: options.allowSupersede,
+            ...(options.acceptProvenSupersede
+              ? {
+                  isSupersedeProven: (task: object) => isSupersedeProven(missionId, task),
+                }
+              : {}),
+          }),
           nextTasksPath
         )
       );
