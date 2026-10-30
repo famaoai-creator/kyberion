@@ -177,20 +177,51 @@ describe('board writers keep a worker write made since their read', () => {
     expect(task1.ticket_dispatch).not.toHaveProperty('resumed_at');
   });
 
-  it('record-evidence auto-complete decides on the board read under the lease', () => {
+  /** Is the board's writer lease held right now? */
+  function boardLeaseHeld(): boolean {
+    const leasePath = `${missionPath}/coordination/writer-lease.json`;
+    if (!safeExistsSync(leasePath)) return false;
+    const lease = JSON.parse(String(safeReadFile(leasePath, { encoding: 'utf8' })));
+    return Number(lease.expires_at_ms) > Date.now();
+  }
+
+  it('record-evidence auto-complete checks outside the lease and keeps a write made meanwhile', () => {
     safeMkdir(`${missionPath}/evidence`, { recursive: true });
     safeWriteFile(`${missionPath}/evidence/task-1.md`, '# task-1\n');
-    const leasePath = `${missionPath}/coordination/writer-lease.json`;
-    let leaseHeld = false;
+    const leaseHeldAtCheck: boolean[] = [];
     const result = tryAutoCompleteTaskFromEvidence(missionPath, 'task-1', {
       isHeld: () => {
-        const lease = JSON.parse(String(safeReadFile(leasePath, { encoding: 'utf8' })));
-        leaseHeld = Number(lease.expires_at_ms) > Date.now();
+        leaseHeldAtCheck.push(boardLeaseHeld());
+        // A worker's write between the checks and the write (it takes the lease itself).
+        if (leaseHeldAtCheck.length === 1) workerCompletesTask2();
         return false;
       },
     });
     expect(result.completed).toBe(true);
-    expect(leaseHeld).toBe(true);
+    expect(leaseHeldAtCheck).toEqual([false, false]);
     expect(statusOf('task-1')).toBe('completed');
+    expect(statusOf('task-2')).toBe('completed');
+  });
+
+  it('record-evidence auto-complete checks under the lease once the board keeps changing', () => {
+    safeMkdir(`${missionPath}/evidence`, { recursive: true });
+    safeWriteFile(`${missionPath}/evidence/task-1.md`, '# task-1\n');
+    const leaseHeldAtCheck: boolean[] = [];
+    const result = tryAutoCompleteTaskFromEvidence(missionPath, 'task-1', {
+      isHeld: () => {
+        leaseHeldAtCheck.push(boardLeaseHeld());
+        if (!boardLeaseHeld()) {
+          // Every snapshot is outdated by the time it would be written.
+          const tasks = readMissionNextTasks(missionPath);
+          tasks[1] = { ...tasks[1], touched: leaseHeldAtCheck.length };
+          safeWriteFile(`${missionPath}/NEXT_TASKS.json`, JSON.stringify(tasks, null, 2));
+        }
+        return false;
+      },
+    });
+    expect(result.completed).toBe(true);
+    expect(leaseHeldAtCheck).toEqual([false, false, false, true]);
+    expect(statusOf('task-1')).toBe('completed');
+    expect(readMissionNextTasks(missionPath)[1].touched).toBe(3);
   });
 });
