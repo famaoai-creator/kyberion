@@ -123,66 +123,98 @@ export function missionTaskSupersedeProof(
     if (String(entry.status || '').toLowerCase() !== 'superseded') {
       return { verified: false, reason: 'task_not_superseded' };
     }
-    const record =
-      entry.superseded && typeof entry.superseded === 'object'
-        ? (entry.superseded as Record<string, unknown>)
-        : undefined;
-    const approvalId =
-      typeof record?.approval_request_id === 'string' ? record.approval_request_id : '';
-    const byTaskId = typeof record?.by_task_id === 'string' ? record.by_task_id : '';
-    const reasonSha256 = typeof record?.reason_sha256 === 'string' ? record.reason_sha256 : '';
-    if (!approvalId || !byTaskId || !reasonSha256) {
-      return { verified: false, reason: 'supersede_record_incomplete' };
-    }
-    if (options.byTaskId !== undefined && options.byTaskId !== byTaskId) {
-      return { verified: false, reason: 'replacement_mismatch' };
-    }
-    if (options.approvalRequestId !== undefined && options.approvalRequestId !== approvalId) {
-      return { verified: false, reason: 'approval_mismatch' };
-    }
-    const approval = loadApprovalRequest(MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL, approvalId);
-    if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
-      return { verified: false, reason: 'approval_not_approved' };
-    }
-    if (approval.source?.missionId?.toUpperCase() !== upper) {
-      return { verified: false, reason: 'approval_other_mission' };
-    }
-    if (
-      approval.accountability?.effectBinding !== missionTaskSupersedeEffectBinding(upper, taskId)
-    ) {
-      return { verified: false, reason: 'approval_other_effect' };
-    }
-    const payloadHash = computeApprovalPayloadHash(
-      missionTaskSupersedePayloadFromHash({ missionId: upper, taskId, byTaskId, reasonSha256 })
-    );
-    if (approval.accountability?.payloadHash !== payloadHash) {
-      return { verified: false, reason: 'approval_other_payload' };
-    }
-    // N4: each human decision re-checked as apply re-checks it
-    // (validateHumanFinalDecision, phase recheck): a human, authenticated
-    // decider on a human-proof surface, bound to this payload and effect.
-    if (approval.accountability?.finalDecision !== 'human_only') {
-      return { verified: false, reason: 'approval_not_human_only' };
-    }
-    const human = approval.workflow?.approvals?.some(
-      (decision) =>
-        decision.status === 'approved' &&
-        decision.decidedByType === 'human' &&
-        decision.authenticated === true &&
-        !(decision.authMethod && NON_HUMAN_PROOF_AUTH_METHODS.has(decision.authMethod)) &&
-        decision.payloadHash === approval.accountability?.payloadHash &&
-        decision.effectBinding === approval.accountability?.effectBinding
-    );
-    if (!human) return { verified: false, reason: 'approval_not_human' };
-    // N4: apply ran under this approval (its receipt or its ledger entry).
-    if (!applyEvidenceExists(missionPath, taskId, approvalId)) {
-      return { verified: false, reason: 'apply_evidence_missing' };
-    }
-    return { verified: true, by_task_id: byTaskId, approval_request_id: approvalId };
+    return verifySupersedeRecord(upper, missionPath, taskId, entry.superseded, options);
   } catch (error) {
     const code = /\[([A-Z0-9_]+)\]/u.exec(error instanceof Error ? error.message : String(error));
     return { verified: false, reason: `proof_unreadable:${code?.[1] ?? 'error'}` };
   }
+}
+
+/**
+ * {@link missionTaskSupersedeProof} for a supersede record the caller holds
+ * rather than the one on the board: a board rebuilt from canonical WorkItems
+ * (the Work Graph projection, reconcile-work) carries a record the board on
+ * disk may not have yet. The record must still match an approved, applied
+ * supersede-task of this mission (the approval and its receipt or ledger
+ * entry live outside the board).
+ */
+export function missionTaskSupersedeRecordProof(
+  missionId: string,
+  taskId: string,
+  record: unknown
+): MissionTaskSupersedeProof {
+  try {
+    const upper = missionId.trim().toUpperCase();
+    const missionPath = findMissionPath(upper);
+    if (!missionPath) return { verified: false, reason: 'mission_not_found' };
+    return verifySupersedeRecord(upper, missionPath, taskId, record, {});
+  } catch (error) {
+    const code = /\[([A-Z0-9_]+)\]/u.exec(error instanceof Error ? error.message : String(error));
+    return { verified: false, reason: `proof_unreadable:${code?.[1] ?? 'error'}` };
+  }
+}
+
+function verifySupersedeRecord(
+  upper: string,
+  missionPath: string,
+  taskId: string,
+  supersededRecord: unknown,
+  options: { byTaskId?: string; approvalRequestId?: string }
+): MissionTaskSupersedeProof {
+  const record =
+    supersededRecord && typeof supersededRecord === 'object'
+      ? (supersededRecord as Record<string, unknown>)
+      : undefined;
+  const approvalId =
+    typeof record?.approval_request_id === 'string' ? record.approval_request_id : '';
+  const byTaskId = typeof record?.by_task_id === 'string' ? record.by_task_id : '';
+  const reasonSha256 = typeof record?.reason_sha256 === 'string' ? record.reason_sha256 : '';
+  if (!approvalId || !byTaskId || !reasonSha256) {
+    return { verified: false, reason: 'supersede_record_incomplete' };
+  }
+  if (options.byTaskId !== undefined && options.byTaskId !== byTaskId) {
+    return { verified: false, reason: 'replacement_mismatch' };
+  }
+  if (options.approvalRequestId !== undefined && options.approvalRequestId !== approvalId) {
+    return { verified: false, reason: 'approval_mismatch' };
+  }
+  const approval = loadApprovalRequest(MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL, approvalId);
+  if (!approval || approval.kind !== 'mission_gate' || approval.status !== 'approved') {
+    return { verified: false, reason: 'approval_not_approved' };
+  }
+  if (approval.source?.missionId?.toUpperCase() !== upper) {
+    return { verified: false, reason: 'approval_other_mission' };
+  }
+  if (approval.accountability?.effectBinding !== missionTaskSupersedeEffectBinding(upper, taskId)) {
+    return { verified: false, reason: 'approval_other_effect' };
+  }
+  const payloadHash = computeApprovalPayloadHash(
+    missionTaskSupersedePayloadFromHash({ missionId: upper, taskId, byTaskId, reasonSha256 })
+  );
+  if (approval.accountability?.payloadHash !== payloadHash) {
+    return { verified: false, reason: 'approval_other_payload' };
+  }
+  // N4: each human decision re-checked as apply re-checks it
+  // (validateHumanFinalDecision, phase recheck): a human, authenticated
+  // decider on a human-proof surface, bound to this payload and effect.
+  if (approval.accountability?.finalDecision !== 'human_only') {
+    return { verified: false, reason: 'approval_not_human_only' };
+  }
+  const human = approval.workflow?.approvals?.some(
+    (decision) =>
+      decision.status === 'approved' &&
+      decision.decidedByType === 'human' &&
+      decision.authenticated === true &&
+      !(decision.authMethod && NON_HUMAN_PROOF_AUTH_METHODS.has(decision.authMethod)) &&
+      decision.payloadHash === approval.accountability?.payloadHash &&
+      decision.effectBinding === approval.accountability?.effectBinding
+  );
+  if (!human) return { verified: false, reason: 'approval_not_human' };
+  // N4: apply ran under this approval (its receipt or its ledger entry).
+  if (!applyEvidenceExists(missionPath, taskId, approvalId)) {
+    return { verified: false, reason: 'apply_evidence_missing' };
+  }
+  return { verified: true, by_task_id: byTaskId, approval_request_id: approvalId };
 }
 
 /** {@link missionTaskSupersedeProof} as a boolean (fails closed). */
@@ -195,6 +227,21 @@ export function isTaskVerifiablySuperseded(
 }
 
 const warnedUnprovenMissions = new Set<string>();
+
+/**
+ * Does the mission prove the task's own supersede record (an approved,
+ * applied supersede-task)? Quiet: a board writer asks this for a superseded
+ * task it carries, and the gate readers below log an unproven one themselves.
+ */
+export function isSupersedeProven(
+  missionId: string,
+  task: { task_id?: unknown; superseded?: unknown }
+): boolean {
+  return (
+    missionTaskSupersedeRecordProof(missionId, String(task.task_id ?? ''), task.superseded)
+      .verified === true
+  );
+}
 
 /**
  * For readers that grant authority on a superseded task (the finish gate,
