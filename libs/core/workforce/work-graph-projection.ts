@@ -355,6 +355,7 @@ export function projectWorkGraphToNextTasks(
     .map(toProjectedTask)
     .sort((a, b) => a.task_id.localeCompare(b.task_id));
   const existingTasks = readExistingTasks(nextTasksPath);
+  let existingTaskCount = existingTasks.length;
   let drift = driftFor(existingTasks, projectedTasks);
   let applied = false;
   if (input.apply && graph.valid && !hasBlockingProjectionDrift(existingTasks, drift)) {
@@ -371,6 +372,7 @@ export function projectWorkGraphToNextTasks(
             const current = onDisk as unknown as NextTask[];
             // The reported drift is the one the apply was decided on.
             drift = driftFor(current, projectedTasks);
+            existingTaskCount = current.length;
             if (hasBlockingProjectionDrift(current, drift)) return undefined;
             return mergedTasks(current, projectedTasks) as unknown as Array<
               Record<string, unknown>
@@ -391,7 +393,7 @@ export function projectWorkGraphToNextTasks(
     graph_valid: graph.valid,
     graph_diagnostics: graph.diagnostics,
     projected_tasks: projectedTasks,
-    existing_task_count: existingTasks.length,
+    existing_task_count: existingTaskCount,
     drift,
   };
 }
