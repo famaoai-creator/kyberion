@@ -27,7 +27,7 @@ const baseOptions = {
   dryRun: false,
 };
 
-const noopPresence = async () => ({});
+const noopPresence = async (): Promise<void> => {};
 
 describe('runAituberLiveSession', () => {
   it('processes fixture messages through reply + presence path', async () => {
