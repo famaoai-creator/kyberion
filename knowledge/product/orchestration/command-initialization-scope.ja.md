@@ -78,3 +78,10 @@ provider 障害は同じ identity のまま設定が直る場合があるため�
 検証: credential-binding / provider-registry / Gemini / service-secret-resolver、
 reasoning-bootstrap、pipeline-bootstrap-needs、voice_cli_bootstrap、
 supervisor-reasoning-readiness、error-classifier の各テスト。
+
+## テストfixtureの資格情報境界
+
+tenant scopeで推論処理を呼ぶE2Eテストは、stubを注入していてもbindingを明示する。
+外部通信を行わないfixtureでは、テスト用tenantに一致する空の資格情報bindingで
+実行を囲む。テストを通すために本番bootstrapのbinding検査を緩めない。
+会議follow-upとreminder sweepの回帰検証はmeeting-to-value-e2e.test.tsで行う。
