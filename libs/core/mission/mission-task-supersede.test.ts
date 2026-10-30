@@ -639,6 +639,57 @@ describe('mission_controller supersede-task', () => {
     for (const taskId of ['task-late', 'task-late-item']) {
       expect(getWorkItem(itemId(taskId))?.dependencies).toEqual(['task-replacement']);
     }
+    // The durable record names the late dependents too, once.
+    const readReceipt = () =>
+      JSON.parse(
+        String(
+          safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+            encoding: 'utf8',
+          })
+        )
+      ) as Record<string, unknown>;
+    expect(readReceipt()).toMatchObject({
+      rewritten_dependent_task_ids: ['task-after'],
+      late_rewritten_dependent_task_ids: ['task-late', 'task-late-item'],
+    });
+    const lateLedgerEntries = () =>
+      String(
+        safeReadFile(nodePath.join(missionPath, 'execution-ledger.jsonl'), { encoding: 'utf8' })
+      )
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .filter((entry) => entry.event_type === 'task_supersede_dependents_rewired');
+    expect(lateLedgerEntries()).toHaveLength(1);
+    expect(lateLedgerEntries()[0].payload).toMatchObject({
+      late_rewritten_dependent_task_ids: ['task-late', 'task-late-item'],
+    });
+    const { auditChain } = await import('../governance/audit-chain.js');
+    const lateAudits = () =>
+      auditChain
+        .loadAll()
+        .filter(
+          (entry) =>
+            entry.action === 'mission.task_supersede_dependents_rewired' &&
+            entry.metadata?.approval_request_id === approvalRequestId
+        );
+    expect(lateAudits()).toHaveLength(1);
+    expect(isTaskVerifiablySuperseded(missionId, 'task-held', { approvalRequestId })).toBe(true);
+
+    // A re-run with the same approval records nothing again.
+    await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(readReceipt().late_rewritten_dependent_task_ids).toEqual([
+      'task-late',
+      'task-late-item',
+    ]);
+    expect(lateLedgerEntries()).toHaveLength(1);
+    expect(lateAudits()).toHaveLength(1);
   });
 
   it('never points a late dependent the replacement waits on at the replacement', async () => {
