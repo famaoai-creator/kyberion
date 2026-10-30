@@ -926,6 +926,7 @@ describe('peer auto-reply', () => {
       tier: 'confidential',
       tenant_slug: TENANT,
       purpose: 'peer-conversation:auto-reply',
+      attachment_count: 0,
       training_use: 'no_training',
     });
     // The egress gate reads the tenant's own egress overlay under the
@@ -964,6 +965,7 @@ describe('peer auto-reply', () => {
       tier: 'confidential',
       tenant_slug: TENANT,
       purpose: 'peer-conversation:auto-reply',
+      attachment_count: 0,
       training_use: 'no_training',
     });
     expect(observedExecution).toEqual({ role: 'peer_responder_reader', tenant: TENANT });
