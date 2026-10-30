@@ -80,6 +80,7 @@ import type {
 } from './mission-orchestration-worker-contracts.js';
 import { loadState, saveState } from './mission-state.js';
 import {
+  isSupersedeProven,
   ledgerHasTaskSupersede,
   missionTaskSupersedeReceiptPath,
   MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
@@ -351,6 +352,13 @@ function planSupersede(
     if (oldStatus === MISSION_TASK_SUPERSEDED_STATUS) {
       throw new Error(`Task ${taskId} is already superseded`);
     }
+    // The board is written last: a supersede it shows, and the mission
+    // proves, took effect, whatever the WorkItem says now (a worker can write
+    // WorkItems). An unproven board record (a hand edit) does not block one.
+    const boardEntry = nextTasks.find((task) => String(task.task_id || '').trim() === taskId);
+    if (boardEntry && isTaskSuperseded(boardEntry) && isSupersedeProven(missionId, boardEntry)) {
+      throw new Error(`Task ${taskId} is already superseded`);
+    }
   }
   if (oldStatus === 'in_progress') {
     throw new Error(`Task ${taskId} is in progress; wait until its attempt ends`);
@@ -582,14 +590,48 @@ function rewriteDependencies(
   return { dependencies: rewritten, changed: true };
 }
 
+/**
+ * The rewrite markers after a dependency was rewritten now. The first rewrite
+ * of a task for this supersede keeps the supersede's time; a dependency that
+ * came back since and is rewritten again gets a marker of this run's time
+ * (`runAt`), so it is recorded again.
+ */
 function withRewrite(
   existing: unknown,
-  rewrite: MissionTaskDependencyRewrite
+  rewrite: MissionTaskDependencyRewrite,
+  runAt: string
 ): MissionTaskDependencyRewrite[] {
   const previous = Array.isArray(existing) ? (existing as MissionTaskDependencyRewrite[]) : [];
-  return previous.some((entry) => entry.from === rewrite.from && entry.to === rewrite.to)
-    ? previous
-    : [...previous, rewrite];
+  const samePair = previous.filter(
+    (entry) => entry.from === rewrite.from && entry.to === rewrite.to
+  );
+  if (samePair.length === 0) return [...previous, rewrite];
+  if (samePair.some((entry) => entry.at === runAt)) return previous;
+  return [...previous, { ...rewrite, at: runAt }];
+}
+
+/** A late rewrite's record key: the task and the time of its marker. */
+function rewriteKey(taskId: string, at: string): string {
+  return `${taskId}@${at}`;
+}
+
+/** The keys a ledger or audit record holds (older records name task ids only, at the supersede's time). */
+function recordedRewriteKeys(
+  record: Record<string, unknown> | undefined,
+  supersedeAt: string
+): string[] {
+  if (!record) return [];
+  if (Array.isArray(record.late_rewrites)) {
+    return record.late_rewrites
+      .filter(
+        (entry): entry is { task_id: unknown; at: unknown } =>
+          Boolean(entry) && typeof entry === 'object'
+      )
+      .map((entry) => rewriteKey(String(entry.task_id), String(entry.at)));
+  }
+  return Array.isArray(record.late_rewritten_dependent_task_ids)
+    ? record.late_rewritten_dependent_task_ids.map((id) => rewriteKey(String(id), supersedeAt))
+    : [];
 }
 
 /**
@@ -655,6 +697,8 @@ export async function supersedeMissionTask(
     };
     const at = record.at;
     const rewrite: MissionTaskDependencyRewrite = { from: input.taskId, to: input.byTaskId, at };
+    // This run's time, for a dependency rewritten again (see withRewrite).
+    const runAt = nowIso();
     const dependents = new Set(plan.dependents);
     let changed = false;
 
@@ -662,9 +706,35 @@ export async function supersedeMissionTask(
     //    the evidence a re-run resumes from, and the proof requires it.
     const receiptPath = missionTaskSupersedeReceiptPath(plan.missionPath, input.taskId);
     const receiptRelative = pathResolver.toRepoRelative(receiptPath);
-    const existingReceipt = safeExistsSync(receiptPath)
+    const foundReceipt = safeExistsSync(receiptPath)
       ? readJson<Record<string, unknown>>(receiptPath)
       : undefined;
+    // A receipt under another approval was left by a run that stopped before
+    // it superseded the task (planSupersede refuses a task already superseded):
+    // it is kept beside this run's receipt, which replaces it, so the record,
+    // audit stamp and dependents it names are this approval's own.
+    // Only the receipt a resumed run is derived from is this run's own; any
+    // other (another approval's, or one that does not match this approval's
+    // replacement and reason) is set aside.
+    const staleReceipt = foundReceipt && !plan.resumed ? foundReceipt : undefined;
+    const existingReceipt = staleReceipt ? undefined : foundReceipt;
+    if (staleReceipt) {
+      // Named by its approval, or by its content when it names none.
+      const staleApproval =
+        supersededRecordOf(staleReceipt.superseded)?.approval_request_id ||
+        `unknown-${sha256Text(JSON.stringify(staleReceipt)).slice(0, 16)}`;
+      writeDispatchArtifact(
+        receiptPath.replace(
+          /\.json$/u,
+          `.abandoned-${staleApproval.replace(/[^a-zA-Z0-9._-]/gu, '-')}.json`
+        ),
+        staleReceipt,
+        { missionId: input.missionId, missionPath: plan.missionPath }
+      );
+      logger.warn(
+        `supersede-task: ${input.taskId} had a receipt from an abandoned run under approval ${staleApproval} — this run writes its own (the old one is kept beside it) | none | mission=${input.missionId}`
+      );
+    }
     const receiptBody = (auditRecordedAt?: string) => ({
       kind: 'mission-task-supersede-receipt',
       version: '1.0.0',
@@ -676,6 +746,9 @@ export async function supersedeMissionTask(
         : plan.dependents,
       ...(Array.isArray(existingReceipt?.late_rewritten_dependent_task_ids)
         ? { late_rewritten_dependent_task_ids: existingReceipt.late_rewritten_dependent_task_ids }
+        : {}),
+      ...(Array.isArray(existingReceipt?.late_rewrites)
+        ? { late_rewrites: existingReceipt.late_rewrites }
         : {}),
       ...(auditRecordedAt ? { audit_recorded_at: auditRecordedAt } : {}),
     });
@@ -735,7 +808,11 @@ export async function supersedeMissionTask(
           ...(metadataDependencies?.changed
             ? { dependencies: metadataDependencies.dependencies }
             : {}),
-          dependencies_rewritten_from: withRewrite(metadata.dependencies_rewritten_from, rewrite),
+          dependencies_rewritten_from: withRewrite(
+            metadata.dependencies_rewritten_from,
+            rewrite,
+            runAt
+          ),
         },
       });
       workItemIdsUpdated.push(current.item_id);
@@ -778,7 +855,7 @@ export async function supersedeMissionTask(
           by_task_id: input.byTaskId,
           reason_sha256: reasonSha256,
           approval_request_id: approvalId,
-          rewritten_dependent_task_ids: plan.dependents,
+          rewritten_dependent_task_ids: receiptBody().rewritten_dependent_task_ids,
           receipt_path: receiptRelative,
         },
       });
@@ -801,7 +878,7 @@ export async function supersedeMissionTask(
           by_task_id: input.byTaskId,
           reason_sha256: reasonSha256,
           approval_request_id: approvalId,
-          rewritten_dependent_task_ids: plan.dependents,
+          rewritten_dependent_task_ids: receiptBody().rewritten_dependent_task_ids,
         },
       });
       changed = true;
@@ -865,7 +942,11 @@ export async function supersedeMissionTask(
           return {
             ...task,
             dependencies: next.dependencies,
-            dependencies_rewritten_from: withRewrite(task.dependencies_rewritten_from, rewrite),
+            dependencies_rewritten_from: withRewrite(
+              task.dependencies_rewritten_from,
+              rewrite,
+              runAt
+            ),
           };
         });
         return boardChanged ? nextTasks : undefined;
@@ -902,51 +983,58 @@ export async function supersedeMissionTask(
     }
 
     // The receipt, audit entry and ledger entry above name the plan's
-    // dependents only. Every task this supersede rewired carries its
-    // durable marker (dependencies_rewritten_from, on the board or its
-    // WorkItem), so the late ones are found again after a crash, and each
-    // record is completed on its own (none is a stamp for another).
-    const isOwnRewrite = (entry: unknown): boolean =>
-      Boolean(entry) &&
-      typeof entry === 'object' &&
-      (entry as MissionTaskDependencyRewrite).from === input.taskId &&
-      (entry as MissionTaskDependencyRewrite).to === input.byTaskId;
-    const rewiredIds = new Set<string>();
-    for (const task of readMissionNextTasks(plan.missionPath)) {
-      const markers = task.dependencies_rewritten_from;
-      if (Array.isArray(markers) && markers.some(isOwnRewrite)) {
-        rewiredIds.add(String(task.task_id || '').trim());
-      }
-    }
-    for (const [id, item] of canonicalItems) {
-      const current = getWorkItem(item.item_id) ?? item;
-      const markers = current.metadata?.dependencies_rewritten_from;
-      if (Array.isArray(markers) && markers.some(isOwnRewrite)) rewiredIds.add(id);
-    }
+    // dependents only. Every rewrite this supersede made carries its durable
+    // marker (dependencies_rewritten_from, on the board or its WorkItem), so
+    // the late ones (a dependent added during a run, or one whose dependency
+    // came back and was rewritten again) are found again after a crash, and
+    // each record is completed on its own (none is a stamp for another). A
+    // late rewrite is keyed by its task and its marker's time.
+    const lateRewrites = new Map<string, { task_id: string; at: string }>();
     const currentReceipt = readJson<Record<string, unknown>>(receiptPath);
     const plannedIds = new Set(
       Array.isArray(currentReceipt.rewritten_dependent_task_ids)
         ? currentReceipt.rewritten_dependent_task_ids.map(String)
         : plan.dependents
     );
-    const late = [...rewiredIds].filter((id) => id && !plannedIds.has(id)).sort();
-    if (late.length > 0) {
-      const ledgerRecorded = new Set(
-        readMissionExecutionLedger(input.missionId, plan.missionPath)
-          .filter(
-            (entry) =>
-              entry.event_type === 'task_supersede_dependents_rewired' &&
-              entry.task_id === input.taskId &&
-              (entry.payload as { approval_request_id?: unknown } | undefined)
-                ?.approval_request_id === approvalId
-          )
-          .flatMap((entry) => {
-            const ids = (entry.payload as { late_rewritten_dependent_task_ids?: unknown })
-              .late_rewritten_dependent_task_ids;
-            return Array.isArray(ids) ? ids.map(String) : [];
-          })
+    const collectMarkers = (taskId: string, markers: unknown): void => {
+      if (!taskId || !Array.isArray(markers)) return;
+      for (const marker of markers as MissionTaskDependencyRewrite[]) {
+        if (!marker || marker.from !== input.taskId || marker.to !== input.byTaskId) continue;
+        const markerAt = String(marker.at);
+        // The plan's own rewrite of a planned dependent is already recorded.
+        if (plannedIds.has(taskId) && markerAt === at) continue;
+        lateRewrites.set(rewriteKey(taskId, markerAt), { task_id: taskId, at: markerAt });
+      }
+    };
+    for (const task of readMissionNextTasks(plan.missionPath)) {
+      collectMarkers(String(task.task_id || '').trim(), task.dependencies_rewritten_from);
+    }
+    for (const [id, item] of canonicalItems) {
+      const current = getWorkItem(item.item_id) ?? item;
+      collectMarkers(id, current.metadata?.dependencies_rewritten_from);
+    }
+    const late = [...new Set([...lateRewrites.values()].map((entry) => entry.task_id))].sort();
+    if (lateRewrites.size > 0) {
+      const missingFrom = (recorded: Set<string>) =>
+        [...lateRewrites.entries()]
+          .filter(([key]) => !recorded.has(key))
+          .map(([, entry]) => entry)
+          .sort((a, b) => a.task_id.localeCompare(b.task_id) || a.at.localeCompare(b.at));
+      const ledgerMissing = missingFrom(
+        new Set(
+          readMissionExecutionLedger(input.missionId, plan.missionPath)
+            .filter(
+              (entry) =>
+                entry.event_type === 'task_supersede_dependents_rewired' &&
+                entry.task_id === input.taskId &&
+                (entry.payload as { approval_request_id?: unknown } | undefined)
+                  ?.approval_request_id === approvalId
+            )
+            .flatMap((entry) =>
+              recordedRewriteKeys(entry.payload as Record<string, unknown> | undefined, at)
+            )
+        )
       );
-      const ledgerMissing = late.filter((id) => !ledgerRecorded.has(id));
       if (ledgerMissing.length > 0) {
         appendMissionExecutionLedgerEntry({
           mission_id: input.missionId,
@@ -960,28 +1048,27 @@ export async function supersedeMissionTask(
           payload: {
             by_task_id: input.byTaskId,
             approval_request_id: approvalId,
-            late_rewritten_dependent_task_ids: ledgerMissing,
+            late_rewritten_dependent_task_ids: [
+              ...new Set(ledgerMissing.map((entry) => entry.task_id)),
+            ],
+            late_rewrites: ledgerMissing,
           },
         });
         changed = true;
       }
-      const auditRecorded = new Set(
-        auditChain
-          .loadAll()
-          .filter(
-            (entry) =>
-              entry.action === 'mission.task_supersede_dependents_rewired' &&
-              entry.metadata?.approval_request_id === approvalId &&
-              entry.metadata?.task_id === input.taskId
-          )
-          .flatMap((entry) =>
-            (Array.isArray(entry.metadata?.late_rewritten_dependent_task_ids)
-              ? (entry.metadata.late_rewritten_dependent_task_ids as unknown[])
-              : []
-            ).map(String)
-          )
+      const auditMissing = missingFrom(
+        new Set(
+          auditChain
+            .loadAll()
+            .filter(
+              (entry) =>
+                entry.action === 'mission.task_supersede_dependents_rewired' &&
+                entry.metadata?.approval_request_id === approvalId &&
+                entry.metadata?.task_id === input.taskId
+            )
+            .flatMap((entry) => recordedRewriteKeys(entry.metadata, at))
+        )
       );
-      const auditMissing = late.filter((id) => !auditRecorded.has(id));
       if (auditMissing.length > 0) {
         auditChain.record({
           agentId: executor,
@@ -993,21 +1080,32 @@ export async function supersedeMissionTask(
             task_id: input.taskId,
             by_task_id: input.byTaskId,
             approval_request_id: approvalId,
-            late_rewritten_dependent_task_ids: auditMissing,
+            late_rewritten_dependent_task_ids: [
+              ...new Set(auditMissing.map((entry) => entry.task_id)),
+            ],
+            late_rewrites: auditMissing,
             receipt_path: receiptRelative,
           },
         });
         changed = true;
       }
-      const receiptRecorded = Array.isArray(currentReceipt.late_rewritten_dependent_task_ids)
-        ? currentReceipt.late_rewritten_dependent_task_ids.map(String)
-        : [];
-      if (late.some((id) => !receiptRecorded.includes(id))) {
+      const receiptMissing = missingFrom(new Set(recordedRewriteKeys(currentReceipt, at)));
+      if (receiptMissing.length > 0) {
+        const receiptRecorded = Array.isArray(currentReceipt.late_rewrites)
+          ? (currentReceipt.late_rewrites as Array<{ task_id: string; at: string }>)
+          : (Array.isArray(currentReceipt.late_rewritten_dependent_task_ids)
+              ? currentReceipt.late_rewritten_dependent_task_ids.map(String)
+              : []
+            ).map((taskId) => ({ task_id: taskId, at }));
+        const allLate = [...receiptRecorded, ...receiptMissing];
         writeDispatchArtifact(
           receiptPath,
           {
             ...currentReceipt,
-            late_rewritten_dependent_task_ids: [...new Set([...receiptRecorded, ...late])].sort(),
+            late_rewritten_dependent_task_ids: [
+              ...new Set(allLate.map((entry) => entry.task_id)),
+            ].sort(),
+            late_rewrites: allLate,
           },
           { missionId: input.missionId, missionPath: plan.missionPath }
         );
@@ -1055,7 +1153,10 @@ export async function supersedeMissionTask(
     return {
       status: changed ? ('applied' as const) : ('already_superseded' as const),
       ...base,
-      rewritten_dependent_task_ids: [...new Set([...plan.dependents, ...lateDependents])].sort(),
+      // Every dependent this supersede rewired, a resumed run included.
+      rewritten_dependent_task_ids: [
+        ...new Set([...plannedIds, ...plan.dependents, ...lateDependents, ...late]),
+      ].sort(),
       work_item_ids_updated: workItemIdsUpdated,
       approval_request_id: approvalId,
       receipt_path: receiptRelative,
