@@ -491,6 +491,7 @@
 - [Work Coordination Platform Implementation Plan](./product/orchestration/work-coordination-platform-plan.md) (public | Unknown)
 - [meet-copilot live verification runbook](./product/orchestration/meet-copilot-live-verification.md) (public | Unknown)
 - [takt Clean-Room Notes](./product/orchestration/takt-clean-room-notes.md) (public | Unknown)
+- [エンジン実行設定の保存と安全な解決](./product/orchestration/engine-runtime-preferences.ja.md) (public | Unknown)
 - [エンタープライズ品質管理フロー (Quality Management Flow)](./product/orchestration/quality-management-flow.md) (public | Ecosystem Architect)
 - [コンテキスト抽出・要約ルール (Context Extraction Rules)](./product/orchestration/context-extraction-rules.md) (public | Ecosystem Architect)
 - [スキル間データ受け渡し仕様 (Data Handover Specs)](./product/orchestration/data-handover-specs.md) (public | Ecosystem Architect)
@@ -746,6 +747,7 @@
 - [決定台帳(decision ledger)のスキーマ](./product/schemas/README-decision-ledger.md) (public | Unknown)
 
 ## 📁 product/voice
+- [Haas-ja-v1.0 (third-intelligence) ASR evaluation](./product/voice/haas-asr-evaluation.md) (public | Unknown)
 - [Realtime voice conversation operations](./product/voice/realtime-voice-conversation-operations.md) (public | Unknown)
 - [音声ペルソナ定義 (Voice Persona Definitions)](./product/voice/persona_definitions.md) (public | Ecosystem Architect)
 
