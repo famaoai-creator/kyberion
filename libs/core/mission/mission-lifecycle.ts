@@ -177,36 +177,48 @@ export function evaluateMissionFinishExitGate(
   reason?: string;
   pendingTasks: string[];
 } {
-  const nextTasks = readMissionNextTasks(missionDir);
   // A superseded task (supersede-task, human-approved) is closed; its
   // replacement still has to complete.
   const closedStatuses = MISSION_TASK_CLOSED_STATUSES;
-  const statusByTaskId = new Map(
-    nextTasks.map((task) => [
-      String(task.task_id || ''),
-      String(task.status || 'planned').toLowerCase(),
-    ])
-  );
-  let autoResolvedTaskState = false;
-  for (const task of nextTasks) {
+  const isRepairTask = (task: Record<string, unknown>): boolean => {
     const taskId = String(task.task_id || '');
-    if (!taskId.startsWith('repair-') && !taskId.startsWith('goal-gap-')) continue;
-    // A superseded repair task is never auto-resolved (that would erase the
-    // record); an unproven one still counts as pending below.
-    if (isTaskSuperseded(task)) continue;
-    const staleCircularGoalRepair =
-      taskId === 'repair-goal-satisfaction' &&
-      Boolean(state) &&
-      hasLifecycleClosureEvidence(state || {}) &&
-      isLifecycleClosureGap(String(task.description || ''));
-    if (isTaskDeliverableSatisfied(missionDir, task, statusByTaskId) || staleCircularGoalRepair) {
-      task.status = 'completed';
-      statusByTaskId.set(taskId, 'completed');
-      autoResolvedTaskState = true;
-    }
-  }
-  if (autoResolvedTaskState) {
-    writeMissionNextTasks(missionDir, nextTasks);
+    return taskId.startsWith('repair-') || taskId.startsWith('goal-gap-');
+  };
+  let nextTasks = readMissionNextTasks(missionDir);
+  if (nextTasks.some(isRepairTask)) {
+    // Resolved on the board read under its writer lease, so a worker's status
+    // write since the read above is kept.
+    writeMissionNextTasks(missionDir, (onDisk) => {
+      nextTasks = onDisk;
+      const statusByTaskId = new Map(
+        onDisk.map((task) => [
+          String(task.task_id || ''),
+          String(task.status || 'planned').toLowerCase(),
+        ])
+      );
+      let autoResolvedTaskState = false;
+      for (const task of onDisk) {
+        if (!isRepairTask(task)) continue;
+        // A superseded repair task is never auto-resolved (that would erase the
+        // record); an unproven one still counts as pending below.
+        if (isTaskSuperseded(task)) continue;
+        const taskId = String(task.task_id || '');
+        const staleCircularGoalRepair =
+          taskId === 'repair-goal-satisfaction' &&
+          Boolean(state) &&
+          hasLifecycleClosureEvidence(state || {}) &&
+          isLifecycleClosureGap(String(task.description || ''));
+        if (
+          isTaskDeliverableSatisfied(missionDir, task, statusByTaskId) ||
+          staleCircularGoalRepair
+        ) {
+          task.status = 'completed';
+          statusByTaskId.set(taskId, 'completed');
+          autoResolvedTaskState = true;
+        }
+      }
+      return autoResolvedTaskState ? onDisk : undefined;
+    });
   }
   const pendingTasks = nextTasks
     .filter((task) => {
@@ -345,22 +357,24 @@ function reopenArtifactReviewTasks(input: {
   reason: string;
 }): string[] {
   const taskIds = new Set(input.taskIds);
-  const tasks = readMissionNextTasks(input.missionDir);
+  if (taskIds.size === 0) return [];
   const reopened: string[] = [];
   const invalidatedAt = nowIso();
-  for (const task of tasks) {
-    const taskId = String(task.task_id || '');
-    if (!taskIds.has(taskId)) continue;
-    task.status = 'planned';
-    delete task.artifact_review_receipt;
-    delete task.reconciliation;
-    task.last_review_invalidation = {
-      invalidated_at: invalidatedAt,
-      reason: input.reason,
-    };
-    reopened.push(taskId);
-  }
-  if (reopened.length > 0) writeMissionNextTasks(input.missionDir, tasks);
+  writeMissionNextTasks(input.missionDir, (tasks) => {
+    for (const task of tasks) {
+      const taskId = String(task.task_id || '');
+      if (!taskIds.has(taskId)) continue;
+      task.status = 'planned';
+      delete task.artifact_review_receipt;
+      delete task.reconciliation;
+      task.last_review_invalidation = {
+        invalidated_at: invalidatedAt,
+        reason: input.reason,
+      };
+      reopened.push(taskId);
+    }
+    return reopened.length > 0 ? tasks : undefined;
+  });
   return reopened;
 }
 

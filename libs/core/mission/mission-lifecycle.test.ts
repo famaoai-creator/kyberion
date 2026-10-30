@@ -529,6 +529,33 @@ describe('mission lifecycle finish gate', () => {
     expect(writeMissionNextTasks(missionPath, () => undefined)).toBe(false);
   });
 
+  it('keeps a superseded task frozen against an update that edits the board in place', () => {
+    const superseded = {
+      by_task_id: 'T2',
+      at: '2026-10-29T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    };
+    writeMissionNextTasks(
+      missionPath,
+      [
+        { task_id: 'T1', status: 'superseded', superseded },
+        { task_id: 'T2', status: 'planned' },
+      ],
+      { allowSupersede: true }
+    );
+    // A review receipt stamped onto the task it was given, which was
+    // superseded since the review started.
+    writeMissionNextTasks(missionPath, (onDisk) => {
+      onDisk[0].artifact_review_receipt = 'evidence/reviews/T1-r1.json';
+      onDisk[0].status = 'planned';
+      return onDisk;
+    });
+    const t1 = readMissionNextTasks(missionPath).find((task) => task.task_id === 'T1');
+    expect(t1).toEqual({ task_id: 'T1', status: 'superseded', superseded });
+  });
+
   it('resolves circular lifecycle closure criteria from verify and distill history', () => {
     const reconciliation = reconcileLifecycleClosureCriteria(
       {

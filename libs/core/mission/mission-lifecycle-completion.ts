@@ -441,7 +441,9 @@ export function writeMissionNextTasks(
     missionPathHint: missionDir,
     build: () => {
       const onDisk = readMissionNextTasks(missionDir);
-      const incoming = typeof tasks === 'function' ? tasks(onDisk) : tasks;
+      // The update gets its own copy: one that edits it in place must not
+      // change the board the supersede guard compares against.
+      const incoming = typeof tasks === 'function' ? tasks(structuredClone(onDisk)) : tasks;
       if (!incoming) return undefined;
       return provisionMissionEntry(
         validateMissionNextTaskObjects(
@@ -688,24 +690,52 @@ export function isTaskDeliverableSatisfied(
  * No-ops (returns `completed: false`) when the task is unknown, already
  * completed, or its deliverable/dependencies aren't actually satisfied yet —
  * recording evidence for a task never rubber-stamps a task whose deliverable
- * doesn't exist.
+ * doesn't exist. The board is read, completed and written under its writer
+ * lease, so a worker's status write since the caller's read is kept; the
+ * options' callbacks run under that lease and must not write the board.
  */
 export function tryAutoCompleteTaskFromEvidence(
   missionDir: string,
   taskId: string,
-  options: {
-    /**
-     * CD-09: a task waiting for a customer decision (unresolved
-     * requires_customer hold) is never auto-completed, nor cascaded.
-     */
-    isHeld?: (taskId: string) => boolean;
-    /** A caller may require task-specific provenance before adopting a dependent's output. */
-    canCascade?: (taskId: string) => boolean;
-    /** Only supplied after the canonical claim fence hashes this exact source target. Never cascaded. */
-    verifiedSourceTarget?: string;
-  } = {}
-): { completed: boolean; reason: string; cascaded: string[] } {
-  const nextTasks = readMissionNextTasks(missionDir);
+  options: AutoCompleteOptions = {}
+): AutoCompleteResult {
+  let result: AutoCompleteResult = {
+    completed: false,
+    reason: 'task not found in NEXT_TASKS.json',
+    cascaded: [],
+  };
+  writeMissionNextTasks(missionDir, (nextTasks) => {
+    result = autoCompleteOnBoard(missionDir, nextTasks, taskId, options);
+    return result.completed ? nextTasks : undefined;
+  });
+  return result;
+}
+
+interface AutoCompleteOptions {
+  /**
+   * CD-09: a task waiting for a customer decision (unresolved
+   * requires_customer hold) is never auto-completed, nor cascaded.
+   */
+  isHeld?: (taskId: string) => boolean;
+  /** A caller may require task-specific provenance before adopting a dependent's output. */
+  canCascade?: (taskId: string) => boolean;
+  /** Only supplied after the canonical claim fence hashes this exact source target. Never cascaded. */
+  verifiedSourceTarget?: string;
+}
+
+interface AutoCompleteResult {
+  completed: boolean;
+  reason: string;
+  cascaded: string[];
+}
+
+/** Completes the task (and its satisfied dependents) on `nextTasks` in place. */
+function autoCompleteOnBoard(
+  missionDir: string,
+  nextTasks: Array<Record<string, unknown>>,
+  taskId: string,
+  options: AutoCompleteOptions
+): AutoCompleteResult {
   const statusByTaskId = new Map(
     nextTasks.map((task) => [
       String(task.task_id || ''),
@@ -792,7 +822,6 @@ export function tryAutoCompleteTaskFromEvidence(
       }
     }
   }
-  writeMissionNextTasks(missionDir, nextTasks);
   return {
     completed: true,
     reason: 'deliverable present and dependencies satisfied',
@@ -814,7 +843,6 @@ export function upsertGoalGapTasks(input: {
   gaps: string[];
   goal: { summary: string; success_condition: string };
 }): string[] {
-  const tasks = readMissionNextTasks(input.missionDir);
   const created: string[] = [];
   const upserted: Record<string, unknown>[] = [];
   input.gaps.slice(0, 3).forEach((gap, index) => {
@@ -853,19 +881,23 @@ export function upsertGoalGapTasks(input: {
     });
     created.push(taskId, reviewTaskId);
   });
-  // m3: a goal-gap task superseded by supersede-task is never reset to planned.
-  const supersededIds = new Set(
-    tasks.filter((task) => isTaskSuperseded(task)).map((task) => String(task.task_id || ''))
-  );
-  // Nor is a review of a superseded gap task filed.
-  const kept = upserted.filter(
-    (task) =>
-      !supersededIds.has(String(task.task_id || '')) &&
-      !supersededIds.has(String(task.review_target || ''))
-  );
-  const createdIds = new Set(kept.map((task) => String(task.task_id || '')));
-  const filtered = tasks.filter((task) => !createdIds.has(String(task.task_id || '')));
-  writeMissionNextTasks(input.missionDir, [...filtered, ...kept]);
+  let createdIds = new Set<string>();
+  // Merged into the board read under its writer lease.
+  writeMissionNextTasks(input.missionDir, (tasks) => {
+    // m3: a goal-gap task superseded by supersede-task is never reset to planned.
+    const supersededIds = new Set(
+      tasks.filter((task) => isTaskSuperseded(task)).map((task) => String(task.task_id || ''))
+    );
+    // Nor is a review of a superseded gap task filed.
+    const kept = upserted.filter(
+      (task) =>
+        !supersededIds.has(String(task.task_id || '')) &&
+        !supersededIds.has(String(task.review_target || ''))
+    );
+    createdIds = new Set(kept.map((task) => String(task.task_id || '')));
+    const filtered = tasks.filter((task) => !createdIds.has(String(task.task_id || '')));
+    return [...filtered, ...kept];
+  });
   return created.filter((taskId) => createdIds.has(taskId));
 }
 
@@ -875,13 +907,7 @@ export function upsertMissionGateRepairTask(input: {
   reason: string;
   pendingTasks: string[];
 }): string[] {
-  const tasks = readMissionNextTasks(input.missionDir);
   const repairTaskId = `repair-${input.gateId}`;
-  // m3: a repair task superseded by supersede-task (human-approved) stays so;
-  // its replacement carries the repair.
-  if (tasks.some((task) => String(task.task_id || '') === repairTaskId && isTaskSuperseded(task))) {
-    return [];
-  }
   const repairTask = {
     task_id: repairTaskId,
     status: 'planned',
@@ -901,8 +927,18 @@ export function upsertMissionGateRepairTask(input: {
     expected_output_format: 'files',
     estimated_scope: 'M',
   };
-  const filtered = tasks.filter((task) => String(task.task_id || '') !== repairTaskId);
-  filtered.unshift(repairTask as Record<string, unknown>);
-  writeMissionNextTasks(input.missionDir, filtered);
-  return [repairTaskId];
+  // Upserted into the board read under its writer lease.
+  const written = writeMissionNextTasks(input.missionDir, (tasks) => {
+    // m3: a repair task superseded by supersede-task (human-approved) stays so;
+    // its replacement carries the repair.
+    if (
+      tasks.some((task) => String(task.task_id || '') === repairTaskId && isTaskSuperseded(task))
+    ) {
+      return undefined;
+    }
+    const filtered = tasks.filter((task) => String(task.task_id || '') !== repairTaskId);
+    filtered.unshift(repairTask as Record<string, unknown>);
+    return filtered;
+  });
+  return written ? [repairTaskId] : [];
 }
