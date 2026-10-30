@@ -80,6 +80,7 @@ import type {
 } from './mission-orchestration-worker-contracts.js';
 import { loadState, saveState } from './mission-state.js';
 import {
+  isSupersedeProven,
   ledgerHasTaskSupersede,
   missionTaskSupersedeReceiptPath,
   MISSION_TASK_SUPERSEDE_APPROVAL_CHANNEL,
@@ -351,10 +352,11 @@ function planSupersede(
     if (oldStatus === MISSION_TASK_SUPERSEDED_STATUS) {
       throw new Error(`Task ${taskId} is already superseded`);
     }
-    // The board is written last: a supersede it shows took effect, whatever
-    // the WorkItem says now (a worker can write WorkItems).
+    // The board is written last: a supersede it shows, and the mission
+    // proves, took effect, whatever the WorkItem says now (a worker can write
+    // WorkItems). An unproven board record (a hand edit) does not block one.
     const boardEntry = nextTasks.find((task) => String(task.task_id || '').trim() === taskId);
-    if (boardEntry && isTaskSuperseded(boardEntry) && supersededRecordOf(boardEntry.superseded)) {
+    if (boardEntry && isTaskSuperseded(boardEntry) && isSupersedeProven(missionId, boardEntry)) {
       throw new Error(`Task ${taskId} is already superseded`);
     }
   }
