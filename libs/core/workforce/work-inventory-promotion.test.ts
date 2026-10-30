@@ -327,6 +327,8 @@ describe('planWorkInventoryPromotion', () => {
         'active/shared/tmp/sales-run.json',
         '--name',
         'weekly-sales-report',
+        '--run',
+        '<run-id>',
         '--tenant',
         '<tenant-slug>',
       ],

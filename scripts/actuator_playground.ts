@@ -65,10 +65,19 @@ Try a single op:
 Record a session of successful live runs and emit a PipelineAdf draft:
   --record <name>            append this run's step to session <name> (live runs only)
   --record <name> --reset    clear session <name> before this run
+  --record <name> --drop-last
+                             remove the last recorded step (with --actuator/--op,
+                             drop it and record this run in its place)
+  --sessions                 list recorded sessions
+  --show <name>              print a session's recorded steps
   --emit-adf <name>          write active/shared/tmp/actuator-playground/<name>.adf.json
       [--name <slug>]        pipeline_id/name override (default: session name)
       [--out <path>]         output path override (repo-relative)
-  Next step: pnpm pipeline:promote --input <adf>.json --source-is-public
+      [--request-trust]      open a project-trust approval request for the draft
+  Next steps (printed by --emit-adf): project-trust approve → pnpm pipeline run
+  → pnpm pipeline:promote --input <adf>.json --run <run-id> --source-is-public
+  A charter that delegates 'pipeline_trust_grant' skips the approval round-trip:
+  pnpm pipeline --input <adf>.json --delegated-trust [person|tenant:<slug>]
 
 Other flags: --json (machine output) --quiet --help
 No flags:    interactive wizard
@@ -78,7 +87,7 @@ Examples:
   pnpm playground -- --actuator file-actuator --op read --describe --json
   pnpm playground -- --actuator file-actuator --op read --params '{"path":"package.json"}' --check
   pnpm playground -- --record login-flow --actuator browser-actuator --op goto --params '{"url":"https://example.com"}'
-  pnpm playground -- --emit-adf login-flow`;
+  pnpm playground -- --emit-adf login-flow --request-trust`;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -315,7 +324,7 @@ export interface PlaygroundRecordedStep {
   recorded_at: string;
 }
 
-interface PlaygroundSessionFile {
+export interface PlaygroundSessionFile {
   session: string;
   created_at: string;
   steps: PlaygroundRecordedStep[];
@@ -378,6 +387,39 @@ export function recordPlaygroundStep(
   });
   writePlaygroundJson(filePath, file);
   return file;
+}
+
+/** Read a recorded session for inspection (`--show`). */
+export function readPlaygroundSession(session: string, scratchDir?: string): PlaygroundSessionFile {
+  return loadPlaygroundSession(session, scratchDir).file;
+}
+
+/** List every recorded session on the scratch floor (`--sessions`). */
+export function listPlaygroundSessions(scratchDir?: string): PlaygroundSessionFile[] {
+  const sessionsDir = path.join(playgroundScratchDir(scratchDir), 'sessions');
+  if (!safeExistsSync(sessionsDir)) return [];
+  return safeReaddir(sessionsDir)
+    .filter((entry) => entry.endsWith('.json'))
+    .sort()
+    .map((entry) => readJsonIfPresent<PlaygroundSessionFile>(path.join(sessionsDir, entry)))
+    .filter((file): file is PlaygroundSessionFile => Boolean(file?.session));
+}
+
+/**
+ * Remove the most recent step from a session (`--drop-last`). A step that ran
+ * successfully but did the wrong thing should not force a full --reset.
+ */
+export function dropLastPlaygroundStep(
+  session: string,
+  scratchDir?: string
+): { removed: PlaygroundRecordedStep; remaining: number } {
+  const { filePath, file } = loadPlaygroundSession(session, scratchDir);
+  const removed = file.steps.pop();
+  if (!removed) {
+    throw new Error(`Playground session '${session}' has no recorded steps to drop.`);
+  }
+  writePlaygroundJson(filePath, file);
+  return { removed, remaining: file.steps.length };
 }
 
 function sanitizeRecordedParams(value: unknown, placeholders: Map<string, string>): unknown {
@@ -489,6 +531,59 @@ export function emitPlaygroundSessionAdf(args: {
   return { output_path: outPath, steps: file.steps.length, redacted_keys, unverified_ops, adf };
 }
 
+/**
+ * The verified-evidence chain a scratch ADF must complete before
+ * `pipeline:promote` accepts it: the draft is project-local content, so it
+ * needs a human-approved project-trust decision to run, and catalog promotion
+ * needs the engine run id of that exact file. `--emit-adf` prints this card
+ * instead of a bare promote command.
+ */
+export function buildPlaygroundEmitNextSteps(args: {
+  adfRepoPath: string;
+  redactedKeys: string[];
+  /** Approved-or-pending trust request id bound to the current draft content. */
+  trustRequestId?: string | null;
+  /** True when the id came from `--request-trust` (still needs a human decision). */
+  trustRequested?: boolean;
+  storageChannel?: string;
+  /** Scope whose charter already delegates the trust grant (`person` / `tenant:<slug>`). */
+  delegatedScope?: string;
+}): string[] {
+  const contextArg =
+    args.redactedKeys.length > 0
+      ? ` --context '${JSON.stringify(
+          Object.fromEntries(args.redactedKeys.map((key) => [key, '<value>']))
+        )}'`
+      : '';
+  const promote = `pnpm pipeline:promote --input ${args.adfRepoPath} --run <run-id> --source-is-public`;
+  if (args.delegatedScope) {
+    return [
+      `pnpm pipeline --input ${args.adfRepoPath} --delegated-trust ${args.delegatedScope}${contextArg}`,
+      promote,
+    ];
+  }
+  if (args.trustRequestId && args.trustRequested) {
+    const channel = args.storageChannel || 'project-trust';
+    return [
+      `a human approves the request: pnpm kyberion approve ${args.trustRequestId} ${channel}`,
+      `pnpm pipeline --input ${args.adfRepoPath} --project-trust-approval ${args.trustRequestId}${contextArg}`,
+      promote,
+    ];
+  }
+  if (args.trustRequestId) {
+    return [
+      `pnpm pipeline --input ${args.adfRepoPath} --project-trust-approval ${args.trustRequestId}${contextArg}`,
+      promote,
+    ];
+  }
+  return [
+    `pnpm kyberion project-trust request ${args.adfRepoPath}`,
+    'a human approves the request: pnpm kyberion approve <request-id> project-trust',
+    `pnpm pipeline --input ${args.adfRepoPath} --project-trust-approval <request-id>${contextArg}`,
+    promote,
+  ];
+}
+
 export function evaluatePlaygroundDryRun(args: {
   actuatorId: string;
   operation: string;
@@ -586,6 +681,23 @@ interface PlaygroundRunOptions {
   executeActuator?: PlaygroundExecuteActuator;
   /** Test seam: redirect the scratch dir used for session files and ADF drafts. */
   scratchDir?: string;
+  /** Test seam: look up an existing valid project-trust approval for the draft. */
+  findTrustApproval?: (adfRepoPath: string) => string | null | Promise<string | null>;
+  /** Test seam: open a project-trust approval request for the draft. */
+  requestTrustApproval?: (
+    adfRepoPath: string
+  ) => { id: string; storageChannel: string } | Promise<{ id: string; storageChannel: string }>;
+  /**
+   * Test seam: ask an accountability charter whether it delegates the
+   * pipeline_trust_grant decision for this draft (returns the scope string
+   * to print, e.g. 'person' / 'tenant:<slug>', or null).
+   */
+  evaluateTrustDelegation?: (
+    adfRepoPath: string
+  ) =>
+    | { delegatedScope: string; charterId: string }
+    | null
+    | Promise<{ delegatedScope: string; charterId: string } | null>;
 }
 
 function defaultExecuteActuator(args: {
@@ -596,6 +708,65 @@ function defaultExecuteActuator(args: {
   return safeExec('node', [args.execPath, '--input', args.inputPath, ...args.extraArgs], {
     cwd: pathResolver.rootDir(),
   });
+}
+
+/** Repo-relative POSIX path for printed commands. */
+function playgroundRepoRelative(absolutePath: string): string {
+  return path.relative(pathResolver.rootDir(), absolutePath).split(path.sep).join('/');
+}
+
+async function defaultFindTrustApproval(adfRepoPath: string): Promise<string | null> {
+  try {
+    const { findValidProjectTrustApproval } = await import('@agent/core/project/project-trust');
+    return findValidProjectTrustApproval(adfRepoPath);
+  } catch {
+    // The approvals store may not exist yet — treat as "no approval on file".
+    return null;
+  }
+}
+
+async function defaultRequestTrustApproval(
+  adfRepoPath: string
+): Promise<{ id: string; storageChannel: string }> {
+  const { createProjectTrustApprovalRequest } = await import('@agent/core/project/project-trust');
+  const record = createProjectTrustApprovalRequest({
+    inputPath: adfRepoPath,
+    requestedBy: 'actuator-playground',
+  });
+  return { id: record.id, storageChannel: record.storageChannel };
+}
+
+/**
+ * Probe every active charter scope (the person's own plus each tenant) and
+ * return the first whose envelope delegates `pipeline_trust_grant` for this
+ * draft — so the run card can skip the human round-trip when a charter
+ * already covers it.
+ */
+async function defaultEvaluateTrustDelegation(
+  adfRepoPath: string
+): Promise<{ delegatedScope: string; charterId: string } | null> {
+  try {
+    const { evaluateProjectTrustDelegation } = await import('@agent/core/project/project-trust');
+    const { listActiveCharters } =
+      await import('@agent/core/governance/accountability-charter-registry');
+    for (const charter of listActiveCharters(new Date())) {
+      const scope = charter.scope;
+      const result = evaluateProjectTrustDelegation({
+        inputPath: adfRepoPath,
+        scope,
+        agentId: 'actuator-playground',
+      });
+      if (result.delegated === true) {
+        return {
+          delegatedScope: scope.kind === 'organization' ? `tenant:${scope.tenant_slug}` : 'person',
+          charterId: result.charterId,
+        };
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function runPlayground(
@@ -640,6 +811,53 @@ export async function runPlayground(
         out: cliParams.out,
         scratchDir: options.scratchDir,
       });
+      const adfRepoPath = playgroundRepoRelative(emitted.output_path);
+      // Verified-evidence chain: a scratch draft is project-local content and
+      // needs project-trust to run; catalog promotion needs the engine run id.
+      // Reuse a still-valid approval when one is already on file, or open the
+      // request now with --request-trust so the operator only has to approve.
+      let trustRequestId: string | null = null;
+      let trustRequested = false;
+      let storageChannel: string | undefined;
+      let trustWarning: string | undefined;
+      if (cliParams['request-trust'] !== undefined) {
+        const requestTrust = options.requestTrustApproval ?? defaultRequestTrustApproval;
+        try {
+          const record = await requestTrust(adfRepoPath);
+          trustRequestId = record.id;
+          storageChannel = record.storageChannel;
+          trustRequested = true;
+        } catch (err) {
+          trustWarning = `project-trust request failed — request it manually: ${
+            err instanceof Error ? err.message : String(err)
+          }`;
+        }
+      } else {
+        const findApproval = options.findTrustApproval ?? defaultFindTrustApproval;
+        trustRequestId = await findApproval(adfRepoPath);
+      }
+      // No approval on file and no explicit request: a charter that already
+      // delegates pipeline_trust_grant lets the draft run without the human
+      // round-trip — the card then shows the --delegated-trust form.
+      let delegatedScope: string | undefined;
+      let delegatedCharterId: string | undefined;
+      if (!trustRequestId && !trustRequested) {
+        const evaluateDelegation =
+          options.evaluateTrustDelegation ?? defaultEvaluateTrustDelegation;
+        const delegated = await evaluateDelegation(adfRepoPath);
+        if (delegated) {
+          delegatedScope = delegated.delegatedScope;
+          delegatedCharterId = delegated.charterId;
+        }
+      }
+      const nextSteps = buildPlaygroundEmitNextSteps({
+        adfRepoPath,
+        redactedKeys: emitted.redacted_keys,
+        trustRequestId,
+        trustRequested,
+        ...(storageChannel ? { storageChannel } : {}),
+        ...(delegatedScope ? { delegatedScope } : {}),
+      });
       const result = {
         ok: true,
         mode: 'emit-adf',
@@ -648,6 +866,11 @@ export async function runPlayground(
         redacted_keys: emitted.redacted_keys,
         unverified_ops: emitted.unverified_ops,
         output_path: emitted.output_path,
+        ...(trustRequestId ? { trust_request_id: trustRequestId } : {}),
+        ...(delegatedScope ? { delegated_scope: delegatedScope } : {}),
+        ...(delegatedCharterId ? { delegated_charter_id: delegatedCharterId } : {}),
+        ...(trustWarning ? { trust_warning: trustWarning } : {}),
+        next_steps: nextSteps,
       };
       if (options.json) return result;
       emit(`Wrote ADF draft (${emitted.steps} step(s)): ${emitted.output_path}`);
@@ -659,9 +882,17 @@ export async function runPlayground(
           `⚠️  Ops not in the actuator op registry — verify they dispatch as ADF steps: ${emitted.unverified_ops.join(', ')}`
         );
       }
-      emit(
-        `Review the draft, then: pnpm pipeline:promote --input ${emitted.output_path} --source-is-public`
-      );
+      if (trustRequested && trustRequestId) {
+        emit(`Opened project-trust request ${trustRequestId}.`);
+      }
+      if (delegatedScope && delegatedCharterId) {
+        emit(`Charter ${delegatedCharterId} delegates 'pipeline_trust_grant' for this draft.`);
+      }
+      if (trustWarning) {
+        emit(`⚠️  ${trustWarning}`);
+      }
+      emit('Review the draft, then:');
+      nextSteps.forEach((step, index) => emit(`  ${index + 1}. ${step}`));
       return result;
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -674,6 +905,58 @@ export async function runPlayground(
     rl.close();
     throw new ScriptExitError(1, '--reset requires --record <name>.');
   }
+  if (cliParams['drop-last'] !== undefined && cliParams.record === undefined) {
+    rl.close();
+    throw new ScriptExitError(1, '--drop-last requires --record <name>.');
+  }
+  if (cliParams['request-trust'] !== undefined) {
+    rl.close();
+    throw new ScriptExitError(1, '--request-trust requires --emit-adf <name>.');
+  }
+
+  // --sessions / --show inspect recorded sessions without touching actuators.
+  if (cliParams.sessions !== undefined) {
+    rl.close();
+    const sessions = listPlaygroundSessions(options.scratchDir).map((file) => ({
+      session: file.session,
+      created_at: file.created_at,
+      steps: file.steps.length,
+    }));
+    const result = { ok: true, mode: 'sessions', sessions };
+    if (options.json) return result;
+    if (sessions.length === 0) {
+      emit('No recorded playground sessions.');
+    } else {
+      sessions.forEach((entry) =>
+        emit(`  ${entry.session} — ${entry.steps} step(s), created ${entry.created_at}`)
+      );
+    }
+    return result;
+  }
+  if (cliParams.show !== undefined) {
+    rl.close();
+    const session = cliParams.show;
+    if (session === 'true') {
+      throw new ScriptExitError(1, '--show requires a session name.');
+    }
+    const file = readPlaygroundSession(session, options.scratchDir);
+    if (file.steps.length === 0) {
+      throw new ScriptExitError(
+        1,
+        `Playground session '${session}' has no recorded steps (check --sessions).`
+      );
+    }
+    const result = { ok: true, mode: 'show', session, steps: file.steps };
+    if (options.json) return result;
+    emit(`Session '${session}' (${file.steps.length} step(s)):`);
+    file.steps.forEach((step, index) => {
+      emit(
+        `  ${index + 1}. ${step.domain}:${step.op} [${step.kind}] ${JSON.stringify(step.params)}`
+      );
+    });
+    return result;
+  }
+
   if (cliParams.record !== undefined) {
     if (cliParams.record === 'true') {
       rl.close();
@@ -683,6 +966,24 @@ export async function runPlayground(
       resolvePlaygroundSessionPath(cliParams.record, options.scratchDir);
       if (cliParams.reset !== undefined) {
         resetPlaygroundSession(cliParams.record, options.scratchDir);
+      }
+      // Standalone drop: no actuator means "remove the last step and stop".
+      // With --actuator/--op the run below records the replacement step.
+      if (cliParams['drop-last'] !== undefined && cliParams.actuator === undefined) {
+        rl.close();
+        const { removed, remaining } = dropLastPlaygroundStep(cliParams.record, options.scratchDir);
+        const result = {
+          ok: true,
+          mode: 'drop-last',
+          session: cliParams.record,
+          removed,
+          remaining,
+        };
+        if (options.json) return result;
+        emit(
+          `Dropped last step (${removed.domain}:${removed.op}) from session '${cliParams.record}' — ${remaining} step(s) remain.`
+        );
+        return result;
       }
     } catch (err) {
       rl.close();
@@ -1103,6 +1404,15 @@ export async function runPlayground(
     log(chalk.white(stdout.trim()));
     let recorded: Record<string, unknown> | undefined;
     if (cliParams.record !== undefined && options.dryRun !== true) {
+      // --drop-last with a run replaces the previous step only on success —
+      // a failing replacement never loses the recorded original.
+      if (cliParams['drop-last'] !== undefined) {
+        try {
+          dropLastPlaygroundStep(cliParams.record, options.scratchDir);
+        } catch {
+          // Empty session: nothing to replace — record normally.
+        }
+      }
       const sessionFile = recordPlaygroundStep(
         cliParams.record,
         {

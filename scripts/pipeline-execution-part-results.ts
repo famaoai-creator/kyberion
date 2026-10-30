@@ -929,6 +929,10 @@ export async function main(args?: string[], print: Print = () => undefined) {
       type: 'string',
       describe: 'Approved project-trust request id for this exact pipeline resource',
     })
+    .option('delegated-trust', {
+      describe:
+        "Let an accountability charter that delegates 'pipeline_trust_grant' stand in for the project-trust approval: person (default) or tenant:<slug>",
+    })
     .parseSync();
 
   let resumeState: PipelineRunJournalState | undefined;
@@ -976,7 +980,31 @@ export async function main(args?: string[], print: Print = () => undefined) {
   // pre-trust unless their exact human approval request is supplied.
   const inputIsBuiltin = isBuiltinPipelineResource(pathResolver.toRepoRelative(String(argv.input)));
   const trustResolved = inputIsBuiltin && !projectTrustApprovalId;
-  const effectiveTrustResolved = trustResolved || Boolean(projectTrustApprovalId);
+  // --delegated-trust: an accountability charter that delegates
+  // 'pipeline_trust_grant' resolves the same trust decision without the human
+  // round-trip. A denial only warns — the approval/builtin paths still apply.
+  let delegatedTrustAllowed = false;
+  if (argv['delegated-trust'] !== undefined && argv['delegated-trust'] !== false) {
+    const { evaluateProjectTrustDelegation, parseDelegatedTrustScope } =
+      await import('@agent/core/project/project-trust');
+    const delegation = evaluateProjectTrustDelegation({
+      inputPath: String(argv.input),
+      scope: parseDelegatedTrustScope(argv['delegated-trust']),
+      agentId: 'pipeline-cli',
+    });
+    if (delegation.delegated === true) {
+      delegatedTrustAllowed = true;
+      logger.info(
+        `   [PIPELINE] project trust delegated under charter ${delegation.charterId} (${delegation.message})`
+      );
+    } else {
+      logger.warn(
+        `   [PIPELINE] charter delegation declined: ${delegation.reason} — project-trust resolution continues`
+      );
+    }
+  }
+  const effectiveTrustResolved =
+    trustResolved || Boolean(projectTrustApprovalId) || delegatedTrustAllowed;
 
   if (argv['dry-run']) {
     try {
@@ -1364,13 +1392,15 @@ export async function main(args?: string[], print: Print = () => undefined) {
         const { PROMOTION_CANDIDATE_MIN_RUNS, recordAdhocPipelineRun } =
           await import('@agent/core/promotion-candidates');
         const successCount = recordAdhocPipelineRun(inputRelative);
+        // --run binds the promotion to this exact verified run; a scratch
+        // source also needs --tenant <slug> or --source-is-public.
         if (successCount >= PROMOTION_CANDIDATE_MIN_RUNS) {
           logger.warn(
-            `   [PIPELINE] This ad-hoc ADF has now succeeded ${successCount}x — promote it: pnpm pipeline:promote --input ${inputRelative} --tenant <slug>`
+            `   [PIPELINE] This ad-hoc ADF has now succeeded ${successCount}x — promote it: pnpm pipeline:promote --input ${inputRelative} --run ${runId} --tenant <slug>`
           );
         } else {
           logger.info(
-            `   [PIPELINE] Reusable? Promote this run into the tenant catalog: pnpm pipeline:promote --input ${inputRelative} --tenant <slug>`
+            `   [PIPELINE] Reusable? Promote this run into the tenant catalog: pnpm pipeline:promote --input ${inputRelative} --run ${runId} --tenant <slug>`
           );
         }
       }

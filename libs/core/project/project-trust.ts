@@ -24,6 +24,13 @@ import {
   type ApprovalRequesterInput,
   type ApprovalRequesterRef,
 } from '../governance/approval-requester.js';
+import type { CharterScope } from '../governance/accountability-charter.js';
+import { runCharterGate } from '../governance/approval-gate-charter.js';
+import {
+  charterInputForPipelineTrust,
+  PIPELINE_TRUST_GRANT_DECISION_TYPE,
+} from '../governance/charter-call-site.js';
+import type { CharterPathOptions } from '../governance/accountability-charter-registry.js';
 import { readTextFile } from '../foundation/text.js';
 import { safeExistsSync, safeLstat } from '../secure-io.js';
 import { isBuiltinPipelineResource } from '../trust-requiring-resources.js';
@@ -298,4 +305,94 @@ export function findValidProjectTrustApproval(inputPath: string): string | null 
     }
   }
   return null;
+}
+
+// --- Charter delegation -----------------------------------------------------
+// An accountability charter that names `pipeline_trust_grant` in
+// `envelope.delegated_decisions` can stand in for the human approval. The
+// envelope delegates the *type* of decision (the human already bounded it by
+// accepting the charter); the content binding lives in the correlation id —
+// a fresh content hash means a fresh delegated decision, never a reused one.
+
+export { PIPELINE_TRUST_GRANT_DECISION_TYPE };
+
+/** `--delegated-trust` scope spelling: `person` (default) or `tenant:<slug>`. */
+export function parseDelegatedTrustScope(value: unknown): CharterScope {
+  const raw =
+    value === true || value === '' || value === undefined ? 'person' : String(value).trim();
+  if (raw === 'person') return { kind: 'person' };
+  const tenant = raw.startsWith('tenant:') ? raw.slice('tenant:'.length).trim() : '';
+  if (tenant) return { kind: 'organization', tenant_slug: tenant };
+  throw new Error(
+    `[DELEGATED_TRUST_SCOPE] --delegated-trust takes 'person' or 'tenant:<slug>' (got '${raw}')`
+  );
+}
+
+export type ProjectTrustDelegation =
+  { delegated: true; charterId: string; message: string } | { delegated: false; reason: string };
+
+/**
+ * Ask the accountability charter whether it delegates the trust grant for
+ * this exact pipeline resource. Reads the file once — the content hash goes
+ * into the correlation id so an edited file is a new delegated decision and
+ * re-runs of unchanged content do not double-charge the ledger.
+ */
+export function evaluateProjectTrustDelegation(args: {
+  inputPath: string;
+  scope: CharterScope;
+  /** Agent identity acting on the operator's behalf (e.g. 'pipeline-cli'). */
+  agentId?: string;
+  now?: Date;
+  pathOptions?: CharterPathOptions;
+}): ProjectTrustDelegation {
+  const resolved = normalizeRelativePath(args.inputPath);
+  if (isBuiltinPipelineResource(resolved.relative)) {
+    return { delegated: false, reason: 'repository-owned pipeline needs no trust decision' };
+  }
+  const hash = contentHash(resolved.absolute);
+  let outcome: ReturnType<typeof runCharterGate>;
+  try {
+    const charter = charterInputForPipelineTrust(
+      { scope: args.scope, agentId: args.agentId },
+      args.pathOptions ?? {},
+      args.now ?? new Date()
+    );
+    if (!charter) {
+      return {
+        delegated: false,
+        reason: `no active charter for this scope, or '${PIPELINE_TRUST_GRANT_DECISION_TYPE}' is not in the charter decision vocabulary`,
+      };
+    }
+    outcome = runCharterGate({
+      charter,
+      agentId: args.agentId ?? 'pipeline-cli',
+      operationId: `project-trust:${resolved.relative}`,
+      correlationId: `project-trust:${resolved.relative}:${hash.slice(0, 16)}`,
+      now: args.now,
+    });
+  } catch (error) {
+    // Scope-denied or unreadable charter state means "no delegation here" —
+    // fail closed: the caller falls back to the human approval path.
+    return {
+      delegated: false,
+      reason: `charter evaluation unavailable: ${error instanceof Error ? error.message : String(error)}`,
+    };
+  }
+  if (outcome.kind === 'allow') {
+    return {
+      delegated: true,
+      charterId: outcome.acceptedCharter!.charter_id,
+      message: outcome.message,
+    };
+  }
+  if (outcome.kind === 'stop') {
+    return { delegated: false, reason: outcome.message };
+  }
+  return {
+    delegated: false,
+    reason:
+      outcome.kind === 'require_approval'
+        ? outcome.reason
+        : 'no accountability charter covers this decision',
+  };
 }

@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-26
+last_updated: 2026-10-31
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -54,6 +54,38 @@ pnpm playground --actuator <id> --op <op> --params '{...}'           # 本実行
 - 知覚の本番経路は sense 動詞です（`perception-playbook.md`、
   `action-playbook.md`）: `pnpm kyberion read|see|listen|watch`。
 
+複数ステップを記録して ADF draft 化（scratch → ADF）:
+
+```bash
+pnpm playground -- --record <name> --actuator <id> --op <op> --params '{...}'  # 成功した live 実行ごとに追記
+pnpm playground -- --record <name> --drop-last ...                            # 直前ステップを取り消し（単独なら削除のみ）
+pnpm playground -- --sessions / --show <name>                               # 記録済みセッションの確認
+pnpm playground -- --emit-adf <name> --request-trust                        # draft 出力＋trust 承認リクエスト発行
+pnpm kyberion approve <request-id> project-trust                            # 人間が承認
+pnpm pipeline --input active/shared/tmp/actuator-playground/<name>.adf.json --project-trust-approval <request-id>
+pnpm pipeline:promote --input active/shared/tmp/actuator-playground/<name>.adf.json --run <run-id> --source-is-public
+```
+
+scratch の draft は project-local コンテンツなので、実行には人間の
+project-trust 承認が必要で、昇格には同じファイルの成功したエンジン実行の
+`--run <run-id>` が必要です。`--emit-adf` はこの run カード（次の一手順）を
+表示します。`{{placeholder}}` がある draft では `--context '{...}'` ヒントも
+出ます。
+
+charter 委任（人間承認の代替）: `envelope.delegated_decisions` に
+`pipeline_trust_grant` を名付けた accountability charter は承認を肩代わり
+できます。`--emit-adf` が有効な charter scope（person＋各 tenant）を探し、
+該当があれば委任形を表示します:
+
+```bash
+pnpm pipeline --input <adf>.json --delegated-trust person          # person charter
+pnpm pipeline --input <adf>.json --delegated-trust tenant:<slug>   # tenant charter
+```
+
+委任の判断はファイル内容に結合（correlation id が content hash を保持 →
+編集すれば新しい判断）、charter ledger に記録されます。deny/`stop` は
+通常の承認経路にフォールバックします。
+
 ## 3. 提携する（cowork / peer）
 
 2系統を混同しないでください。
@@ -93,10 +125,10 @@ accept の断絶（仕様）:
 
 昇格は2系統で入力が違います。
 
-| 入力                                                         | コマンド                                                                                                   | 出力                                                               |
-| ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| 成功済み **ADF 実行**一回分                                  | `pnpm pipeline:promote --input <adf>.json [--name <slug>] [--trace <id>] [--dry-run] [--no-llm] [--force]` | `pipelines/<slug>.json` + `promotion` 由来記録 + README カタログ行 |
-| Browser **recording**（`active/shared/runtime/recordings/`） | `promote-procedure` パイプライン                                                                           | `ProcedureCatalog` 登録（Pattern A→B）                             |
+| 入力                                                         | コマンド                                                                                                                  | 出力                                                               |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| 成功済み **ADF 実行**一回分                                  | `pnpm pipeline:promote --input <adf>.json --run <run-id> [--name <slug>] [--trace <id>] [--dry-run] [--no-llm] [--force]` | `pipelines/<slug>.json` + `promotion` 由来記録 + README カタログ行 |
+| Browser **recording**（`active/shared/runtime/recordings/`） | `promote-procedure` パイプライン                                                                                          | `ProcedureCatalog` 登録（Pattern A→B）                             |
 
 ADF ライフサイクル: `draft → preflight → auto-repair → commit → execute`
 （`validateAndRepairAdf`。permission/auth/config/env は fail-closed）。
@@ -127,6 +159,11 @@ Trust: `pipelines/` と templates 以外は `[TRUST_REQUIRED]` で失敗しま�
   scope を明記。
 - accept 後の停滞 — accept 時に `next_steps` を表示し、cowork レビューの
   完了ログにも次行動を記載。
+- `--emit-adf` が `pipeline:promote --source-is-public` をそのまま案内 —
+  昇格にエンジン実行の `--run <run-id>` が必須化されて失敗する案内だった。
+  project-trust → 実行 → `promote --run` の run カード表示＋`--request-trust`
+  で承認リクエストを同時発行する形に修正（2026-10-31）。誤記録ステップは
+  `--record <name> --drop-last`、確認は `--sessions` / `--show`。
 - MCP 面（`kyberion.capability.*`、`actuator.invoke`）が manifest のみ参照で
   pipeline 駆動 actuator の細粒度 op が届かなかった — 2026-10-26 に
   discovery マージ + one-step pipeline envelope 包みで解消。

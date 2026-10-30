@@ -135,7 +135,7 @@ modify signed limits, or clear a stop. The defaults remain 5%, two and five.
 
 Business decision types are extended through `charter-decision-vocabulary.json`
 and the organization decision-rights matrix; the owner explicitly names the new
-type in a replacement charter. Purpose and processor identifiers are declared
+type in a replacement charter. `pipeline_trust_grant` is the decision type for the project-trust grant: a charter that names it in `envelope.delegated_decisions` lets `pnpm pipeline --input <adf> --delegated-trust <person|tenant:<slug>>` run a project-local pipeline without a human project-trust round-trip, and the delegated decision binds the exact file content. Purpose and processor identifiers are declared
 in the accepted scope. New effect classes or risk metrics need a typed evaluator
 and schema support, because an unknown effect or missing decision fact must not
 be interpreted as permission. `approval:evaluate_decision_rights` forwards

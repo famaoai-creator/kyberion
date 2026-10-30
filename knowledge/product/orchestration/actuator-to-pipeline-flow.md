@@ -4,7 +4,7 @@ category: Orchestration
 tags: [actuator, playground, collaboration, adf, pipeline-promote, procedure, trust]
 importance: 8
 author: Kyberion
-last_updated: 2026-10-26
+last_updated: 2026-10-31
 role_affinity: [ecosystem_architect, mission_controller, operator, researcher]
 phase_affinity: [alignment, execution, review]
 ---
@@ -68,8 +68,10 @@ Recording a multi-step session (scratch → ADF draft):
 ```bash
 pnpm playground -- --record <name> --actuator <id> --op <op> --params '{...}'  # each successful live run appends a step
 pnpm playground -- --record <name> --reset ...                                # clear the session first
-pnpm playground -- --emit-adf <name> [--name <slug>] [--out <path>]           # write a PipelineAdf draft
-pnpm pipeline:promote --input active/shared/tmp/actuator-playground/<name>.adf.json --source-is-public
+pnpm playground -- --record <name> --drop-last ...                            # replace the last step (alone: just drop it)
+pnpm playground -- --sessions                                               # list recorded sessions
+pnpm playground -- --show <name>                                            # inspect a session's steps
+pnpm playground -- --emit-adf <name> [--name <slug>] [--out <path>] [--request-trust]
 ```
 
 Session files and drafts live under `active/shared/tmp/actuator-playground/`.
@@ -79,6 +81,40 @@ are present; string params under sensitive-looking keys (password/secret/
 token/…) are redacted into `{{placeholders}}` declared in `parameters`.
 The draft is a starting point — review steps, selectors, and params before
 promoting (§4).
+
+`--emit-adf` prints the verified-evidence run card. A scratch draft is
+project-local content: it needs a human-approved project-trust decision to
+run at all, and `pipeline:promote` only accepts a draft whose exact bytes
+have a successful engine run. `--request-trust` opens the approval request
+in the same command; a still-valid approval for unchanged content is reused
+automatically:
+
+```bash
+pnpm playground -- --emit-adf <name> --request-trust
+pnpm kyberion approve <request-id> project-trust                            # human decides
+pnpm pipeline --input active/shared/tmp/actuator-playground/<name>.adf.json \
+  --project-trust-approval <request-id>                                     # prints Run ID
+pnpm pipeline:promote --input active/shared/tmp/actuator-playground/<name>.adf.json \
+  --run <run-id> --source-is-public
+```
+
+When the draft declares `{{placeholders}}`, the run card appends the matching
+`--context '{...}'` hint to the `pnpm pipeline` line.
+
+Charter delegation (alternative to the human round-trip): an accountability
+charter that names `pipeline_trust_grant` in `envelope.delegated_decisions`
+stands in for the approval. `--emit-adf` probes every active charter scope
+(person + each tenant) and prints the delegated form when one covers the
+draft:
+
+```bash
+pnpm pipeline --input <adf>.json --delegated-trust person          # person charter
+pnpm pipeline --input <adf>.json --delegated-trust tenant:<slug>   # tenant charter
+```
+
+The delegated decision binds the exact file content (the correlation id
+carries the content hash — an edited draft is a new decision) and is recorded
+in the charter ledger; a deny/`stop` falls back to the normal approval path.
 
 ## 3. Collaborate (cowork / peer)
 
@@ -118,10 +154,14 @@ proposal stubs — the schedule ships disabled, opt-in).
 
 Two promotions, different inputs:
 
-| Input                                                       | Command                                                                                                    | Output                                                                |
-| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| Successful one-off **ADF run**                              | `pnpm pipeline:promote --input <adf>.json [--name <slug>] [--trace <id>] [--dry-run] [--no-llm] [--force]` | `pipelines/<slug>.json` + `promotion` provenance + README catalog row |
-| Browser **recording** (`active/shared/runtime/recordings/`) | `promote-procedure` pipeline                                                                               | `ProcedureCatalog` entry (Pattern A→B)                                |
+| Input                                                       | Command                                                                                                                   | Output                                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Successful one-off **ADF run**                              | `pnpm pipeline:promote --input <adf>.json --run <run-id> [--name <slug>] [--trace <id>] [--dry-run] [--no-llm] [--force]` | `pipelines/<slug>.json` + `promotion` provenance + README catalog row |
+| Browser **recording** (`active/shared/runtime/recordings/`) | `promote-procedure` pipeline                                                                                              | `ProcedureCatalog` entry (Pattern A→B)                                |
+
+`--run <run-id>` is the verified-evidence gate: the journal must prove this
+exact ADF (sha-bound) ran to success in the target scope. Use `--draft` only
+to stage an inert, non-executable proposal.
 
 ADF lifecycle underneath: `draft → preflight → auto-repair → commit →
 execute` (`validateAndRepairAdf`; permission/auth/config/env fails closed).
@@ -201,3 +241,13 @@ through the normal compile path.
   allowlisted step ops died on `[MCP_ACTUATOR_OP_UNKNOWN]` — fixed 2026-10-26
   by merging `actuator-op-discovery.json` into list/search/declaration and
   wrapping discovery-only ops into the one-step pipeline envelope.
+- `--emit-adf` pointed straight at `pipeline:promote --source-is-public`,
+  which fails `[PIPELINE_PROMOTION_UNVERIFIED]` now that promotion requires
+  the engine run id — fixed 2026-10-31 by printing the full run card
+  (project-trust → `pnpm pipeline` run → `promote --run`), reusing a valid
+  approval, and adding `--request-trust` to open the request in the same
+  command.
+- A recorded-but-wrong step forced a full `--reset` — fixed by
+  `--record <name> --drop-last` (standalone drop, or success-gated
+  replacement when combined with a run) plus `--sessions` / `--show` to
+  inspect what was recorded.
