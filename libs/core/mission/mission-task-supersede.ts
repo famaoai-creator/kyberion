@@ -940,12 +940,11 @@ export async function supersedeMissionTask(
               (entry.payload as { approval_request_id?: unknown } | undefined)
                 ?.approval_request_id === approvalId
           )
-          .flatMap((entry) =>
-            (
-              (entry.payload as { late_rewritten_dependent_task_ids?: unknown[] })
-                .late_rewritten_dependent_task_ids ?? []
-            ).map(String)
-          )
+          .flatMap((entry) => {
+            const ids = (entry.payload as { late_rewritten_dependent_task_ids?: unknown })
+              .late_rewritten_dependent_task_ids;
+            return Array.isArray(ids) ? ids.map(String) : [];
+          })
       );
       const ledgerMissing = late.filter((id) => !ledgerRecorded.has(id));
       if (ledgerMissing.length > 0) {
