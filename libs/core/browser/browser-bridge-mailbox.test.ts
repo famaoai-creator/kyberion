@@ -198,7 +198,7 @@ describe('enqueueBrowserBridgeRequest', () => {
 });
 
 describe('review regressions: enqueue', () => {
-  it('requires non-empty allowed_origins for a confidential observe_tab', () => {
+  it('requires non-empty allowed_origins for a tenant-scoped observe_tab on every tier', () => {
     const confidential = { tier: 'confidential' as const, tenant_slug: 'acme' };
     let message = '';
     try {
@@ -206,7 +206,7 @@ describe('review regressions: enqueue', () => {
     } catch (err) {
       message = String((err as Error).message);
     }
-    expect(message).toMatch(/confidential \(tenant\) observe_tab request requires non-empty/);
+    expect(message).toMatch(/tenant-scoped \(scope.tenant_slug\) observe_tab request requires/);
     expect(
       code(() =>
         observe({
@@ -217,6 +217,28 @@ describe('review regressions: enqueue', () => {
     ).toBe('invalid_input');
     // Personal scope keeps the optional allowlist.
     expect(observe({ payload: { purpose: 'Read it', mode: 'text' } }).status).toBe('pending');
+    // ...but a tenant partition is tenant-scoped on every tier (personal/<tenant>, public/<tenant>).
+    for (const tier of ['personal', 'public'] as const) {
+      expect(
+        code(() =>
+          observe({
+            scope: { tier, tenant_slug: 'acme' },
+            payload: { purpose: 'Read it', mode: 'text' },
+          })
+        )
+      ).toBe('invalid_input');
+      expect(observe({ scope: { tier, tenant_slug: 'acme' } }).scope).toEqual({
+        tier,
+        tenant_slug: 'acme',
+      });
+    }
+    const personalTenant = observe({ scope: { tier: 'personal', tenant_slug: 'acme' } });
+    expect(
+      validateBrowserBridgeRequest({
+        ...personalTenant,
+        payload: { purpose: 'Read it', mode: 'text' },
+      }).valid
+    ).toBe(false);
     // A stored confidential record without origins fails the schema too (fail closed).
     const stored = observe({ scope: confidential });
     const stripped = {
