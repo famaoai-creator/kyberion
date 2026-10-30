@@ -1,16 +1,12 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { loadMissionNextTaskObjectsAtPath } from '../mission/mission-next-task-reader.js';
+import { writeMissionNextTasks } from '../mission/mission-lifecycle-completion.js';
 import { pathResolver } from '../path-resolver.js';
 import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
 
 export interface WorkGraphProjectionOptions {
   missionId: string;
@@ -252,6 +248,25 @@ function driftFor(existing: NextTask[], projected: NextTask[]): WorkGraphProject
   return drift;
 }
 
+// A WorkItem archived by supersede-task projects as `superseded`; the board
+// writer keeps that status only when the mission proves the supersede.
+const PROJECTION_WRITE_OPTIONS = { acceptProvenSupersede: true } as const;
+
+/** Drift the additive projection must not overwrite. */
+function hasBlockingProjectionDrift(
+  existingTasks: NextTask[],
+  drift: ReturnType<typeof driftFor>
+): boolean {
+  const managedTaskIds = new Set(
+    existingTasks.filter(isManagedProcessTask).map((task) => task.task_id)
+  );
+  return drift.some(
+    (entry) =>
+      entry.kind === 'stale_projection_entry' ||
+      (entry.kind === 'different_from_projection' && !managedTaskIds.has(entry.task_id))
+  );
+}
+
 function mergedTasks(existing: NextTask[], projected: NextTask[]): NextTask[] {
   const projectedById = new Map(projected.map((task) => [task.task_id, task]));
   const merged = existing.map((task) => {
@@ -340,29 +355,34 @@ export function projectWorkGraphToNextTasks(
     .map(toProjectedTask)
     .sort((a, b) => a.task_id.localeCompare(b.task_id));
   const existingTasks = readExistingTasks(nextTasksPath);
-  const drift = driftFor(existingTasks, projectedTasks);
+  let existingTaskCount = existingTasks.length;
+  let drift = driftFor(existingTasks, projectedTasks);
   let applied = false;
-  const managedTaskIds = new Set(
-    existingTasks.filter(isManagedProcessTask).map((task) => task.task_id)
-  );
-  const hasBlockingProjectionDrift = drift.some(
-    (entry) =>
-      entry.kind === 'stale_projection_entry' ||
-      (entry.kind === 'different_from_projection' && !managedTaskIds.has(entry.task_id))
-  );
-  if (input.apply && graph.valid && !hasBlockingProjectionDrift) {
-    withExecutionContext(
+  if (input.apply && graph.valid && !hasBlockingProjectionDrift(existingTasks, drift)) {
+    applied = withExecutionContext(
       'mission_controller',
       () => {
         safeMkdir(safeMissionPath, { recursive: true });
-        safeWriteFile(
-          nextTasksPath,
-          JSON.stringify(mergedTasks(existingTasks, projectedTasks), null, 2)
+        // Merged into the board read under its writer lease (with the supersede
+        // guard), so a worker's write since the read above is kept; drift that
+        // appeared meanwhile still blocks the apply.
+        return writeMissionNextTasks(
+          safeMissionPath,
+          (onDisk) => {
+            const current = onDisk as unknown as NextTask[];
+            // The reported drift is the one the apply was decided on.
+            drift = driftFor(current, projectedTasks);
+            existingTaskCount = current.length;
+            if (hasBlockingProjectionDrift(current, drift)) return undefined;
+            return mergedTasks(current, projectedTasks) as unknown as Array<
+              Record<string, unknown>
+            >;
+          },
+          PROJECTION_WRITE_OPTIONS
         );
       },
       'worker'
     );
-    applied = true;
   }
   return {
     mission_id: missionId,
@@ -373,7 +393,7 @@ export function projectWorkGraphToNextTasks(
     graph_valid: graph.valid,
     graph_diagnostics: graph.diagnostics,
     projected_tasks: projectedTasks,
-    existing_task_count: existingTasks.length,
+    existing_task_count: existingTaskCount,
     drift,
   };
 }

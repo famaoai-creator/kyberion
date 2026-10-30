@@ -102,6 +102,8 @@ export interface RealtimeVoiceConversationCliOptions {
   sourceId: string;
   deliveryMode: DeliveryMode;
   personalVoiceMode: PersonalVoiceMode;
+  /** Presence avatar agent id used for surface frames; defaults to the surface agent. */
+  avatarAgentId?: string;
   /** Low-latency selects the governed fast reasoning tier and shorter turn/TTS boundaries. */
   latencyProfile?: LatencyProfile;
   /** Optional exact provider model override; the active provider must support it. */
@@ -528,6 +530,7 @@ export async function runRealtimeVoiceConversationInteractive(
       reasoningModel: options.reasoningModel,
       reasoningModelTier: reasoningModelTierForOptions(options),
       reasoningEffort: reasoningEffortForOptions(options),
+      ...(options.avatarAgentId ? { avatarAgentId: options.avatarAgentId } : {}),
     });
 
     print(`User: ${result.user_text}`);
@@ -751,7 +754,7 @@ export async function runRealtimeVoiceConversationLoop(
     ? (state: string) => {
         void dispatchPresenceFrame({
           surfaceId: options.surfaceId,
-          agentId: 'presence-surface-agent',
+          agentId: options.avatarAgentId || 'presence-surface-agent',
           status: state === 'calibrating' ? 'listening' : state,
           expression: state === 'listening' || state === 'thinking' ? state : 'neutral',
         }).catch(() => {
@@ -990,7 +993,7 @@ export async function runRealtimeVoiceConversationLoop(
         });
         if (avatarFollow) {
           void reflectPresenceAgentReply({
-            agentId: 'presence-surface-agent',
+            agentId: options.avatarAgentId || 'presence-surface-agent',
             surfaceId: options.surfaceId,
             text: turn.assistant_text,
             speaker: session.assistant_name,
@@ -1078,6 +1081,7 @@ async function runOneShotConversation(
     reasoningModelTier: reasoningModelTierForOptions(options),
     reasoningEffort: reasoningEffortForOptions(options),
     ...(options.ttsEngine ? { ttsEngineId: options.ttsEngine } : {}),
+    ...(options.avatarAgentId ? { avatarAgentId: options.avatarAgentId } : {}),
   });
   print(JSON.stringify(result, null, 2));
 }
@@ -1180,6 +1184,9 @@ export function parseRealtimeVoiceConversationCli(
         : configured?.system_prompt,
     surfaceId: String(argv['surface-id'] || 'presence-studio'),
     sourceId: String(argv['source-id'] || 'local-mic'),
+    ...(argv['avatar-agent-id']
+      ? { avatarAgentId: String(argv['avatar-agent-id']) }
+      : {}),
     deliveryMode:
       (argv['delivery-mode'] as DeliveryMode) ??
       configured?.delivery_mode ??
@@ -1286,6 +1293,11 @@ export async function main(
     .option('profile-id', { type: 'string', alias: 'voice-profile-id' })
     .option('language', { type: 'string' })
     .option('assistant-name', { type: 'string' })
+    .option('avatar-agent-id', {
+      type: 'string',
+      describe:
+        'Presence avatar agent id shown on the surface (defaults to presence-surface-agent)',
+    })
     .option('system-prompt', { type: 'string' })
     .option('surface-id', { type: 'string', default: 'presence-studio' })
     .option('source-id', { type: 'string', default: 'local-mic' })

@@ -15,6 +15,34 @@ vi.mock('../customer-resolver.js', async (importOriginal) => {
     await import('../governance/__tests__/sod-overlay-state.js');
   return { ...actual, customerRoot: customerRootWithSodOverlay(actual.customerRoot) };
 });
+// A worker's board write landing inside reconcile-work's WorkItem update.
+const workItemHook = vi.hoisted(() => ({ afterUpdate: undefined as undefined | (() => void) }));
+vi.mock('../workforce/work-coordination.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../workforce/work-coordination.js')>();
+  return {
+    ...actual,
+    updateWorkItem: (...args: Parameters<typeof actual.updateWorkItem>) => {
+      const result = actual.updateWorkItem(...args);
+      workItemHook.afterUpdate?.();
+      return result;
+    },
+  };
+});
+// reconcile-work's board write failing once (a run stopping after its WorkItem updates).
+const boardFault = vi.hoisted(() => ({ failNextReconcileWrite: false }));
+vi.mock('./mission-lifecycle-completion.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./mission-lifecycle-completion.js')>();
+  return {
+    ...actual,
+    writeMissionNextTasks: (...args: Parameters<typeof actual.writeMissionNextTasks>) => {
+      if (boardFault.failNextReconcileWrite && args[2]?.acceptProvenSupersede) {
+        boardFault.failNextReconcileWrite = false;
+        throw new Error('[TEST_FAULT] board write failed');
+      }
+      return actual.writeMissionNextTasks(...args);
+    },
+  };
+});
 import {
   clearSeparationOfDuties,
   setSeparationOfDuties,
@@ -58,6 +86,7 @@ import {
   reconcileMissionExistingWork,
   type MissionWorkReconciliationManifest,
 } from './mission-work-reconciliation.js';
+import { readMissionNextTasks, writeMissionNextTasks } from './mission-lifecycle-completion.js';
 
 const missionId = 'MSN-WORK-RECONCILIATION-TEST';
 const missionPath = pathResolver.missionDir(missionId, 'public');
@@ -757,6 +786,131 @@ describe('mission existing work reconciliation', () => {
         (entry) => entry.target_path === receiptTargetPath && entry.phase === 'verified'
       )
     ).toHaveLength(1);
+  });
+
+  it('a re-run repairs the board of a run that stopped after its WorkItem updates', async () => {
+    const workItem = importExternalWorkItem({
+      source: 'local',
+      sourceRef: `mission:${missionId}:implementation`,
+      title: 'Existing implementation',
+      description: 'Implementation completed outside dispatch.',
+      status: 'ready',
+      projectId: missionId,
+      metadata: { mission_id: missionId, task_id: 'implementation' },
+    });
+    prepareMission([
+      {
+        task_id: 'implementation',
+        status: 'planned',
+        description: 'Implement the reconciliation command.',
+        acceptance_criteria: ['The reconciliation command updates only verified tasks.'],
+        dependencies: [],
+        ticket_dispatch: { work_item_id: workItem.item_id },
+      },
+      {
+        task_id: 'repair-finish-exit',
+        status: 'planned',
+        description: 'Repair the finish exit gate.',
+        acceptance_criteria: ['All pending tasks are resolved.'],
+        dependencies: ['implementation'],
+      },
+    ]);
+    writeManifest(buildManifest());
+    const approvalRequestId = approveCurrentManifest();
+    boardFault.failNextReconcileWrite = true;
+    await expect(
+      reconcileMissionExistingWork({ missionId, manifestPath, approvalRequestId })
+    ).rejects.toThrow('[TEST_FAULT] board write failed');
+    expect(getWorkItem(workItem.item_id)?.status).toBe('done');
+    expect(readMissionNextTasks(missionPath).map((task) => task.status)).toEqual([
+      'planned',
+      'planned',
+    ]);
+    const ledgerPath = nodePath.join(missionPath, 'execution-ledger.jsonl');
+    const ledgerAfterFailure = String(safeReadFile(ledgerPath, { encoding: 'utf8' }));
+
+    const rerun = await reconcileMissionExistingWork({
+      missionId,
+      manifestPath,
+      approvalRequestId,
+    });
+
+    expect(rerun.status).toBe('applied');
+    expect(rerun.reconciled_task_ids).toEqual([]);
+    expect(rerun.board_repaired_task_ids).toEqual(['implementation', 'repair-finish-exit']);
+    const board = readMissionNextTasks(missionPath);
+    expect(board.map((task) => task.status)).toEqual(['completed', 'completed']);
+    expect(board[0].reconciliation).toMatchObject({
+      manifest_sha256: rerun.manifest_sha256,
+      adopted_by: buildManifest().adopted_by,
+    });
+    expect(rerun.receipt_path && safeExistsSync(pathResolver.rootResolve(rerun.receipt_path))).toBe(
+      true
+    );
+    // The failed run's ledger entries are not recorded twice.
+    expect(String(safeReadFile(ledgerPath, { encoding: 'utf8' }))).toBe(ledgerAfterFailure);
+    const history = JSON.parse(
+      String(safeReadFile(nodePath.join(missionPath, 'mission-state.json'), { encoding: 'utf8' }))
+    ).history as Array<{ event: string; note: string }>;
+    expect(history.at(-1)).toMatchObject({
+      event: 'RECONCILE_EXISTING_WORK',
+      note: expect.stringContaining('board repaired for implementation, repair-finish-exit'),
+    });
+
+    // A third run finds nothing left to repair.
+    const third = await reconcileMissionExistingWork({
+      missionId,
+      manifestPath,
+      approvalRequestId,
+    });
+    expect(third.board_repaired_task_ids).toEqual([]);
+    expect(third.already_reconciled_task_ids).toEqual(['implementation']);
+  });
+
+  it('keeps a worker status write made while the work is reconciled', async () => {
+    const workItem = importExternalWorkItem({
+      source: 'local',
+      sourceRef: `mission:${missionId}:implementation`,
+      title: 'Existing implementation',
+      description: 'Implementation completed outside dispatch.',
+      status: 'ready',
+      projectId: missionId,
+      metadata: { mission_id: missionId, task_id: 'implementation' },
+    });
+    prepareMission([
+      {
+        task_id: 'implementation',
+        status: 'planned',
+        description: 'Implement the reconciliation command.',
+        acceptance_criteria: ['The reconciliation command updates only verified tasks.'],
+        dependencies: [],
+        ticket_dispatch: { work_item_id: workItem.item_id },
+      },
+      {
+        task_id: 'worker-task',
+        status: 'in_progress',
+        description: 'Work a worker is finishing.',
+        acceptance_criteria: ['Done.'],
+        dependencies: [],
+      },
+    ]);
+    writeManifest(buildManifest());
+    const approvalRequestId = approveCurrentManifest();
+    workItemHook.afterUpdate = () =>
+      writeMissionNextTasks(missionPath, (onDisk) =>
+        onDisk.map((task) =>
+          task.task_id === 'worker-task' ? { ...task, status: 'completed' } : task
+        )
+      );
+    try {
+      await reconcileMissionExistingWork({ missionId, manifestPath, approvalRequestId });
+    } finally {
+      workItemHook.afterUpdate = undefined;
+    }
+    const statusById = Object.fromEntries(
+      readMissionNextTasks(missionPath).map((task) => [task.task_id, task.status])
+    );
+    expect(statusById).toEqual({ implementation: 'completed', 'worker-task': 'completed' });
   });
 
   it('rejects an artifact hash mismatch', async () => {

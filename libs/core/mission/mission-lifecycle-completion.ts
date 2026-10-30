@@ -3,10 +3,7 @@
  * task reconciliation, and goal/repair task materialization.
  */
 
-import {
-  guardSupersedeState,
-  type SupersedeGuardOptions,
-} from './mission-next-tasks-supersede-guard.js';
+import { guardSupersedeState } from './mission-next-tasks-supersede-guard.js';
 import * as path from 'node:path';
 import { createActuatorTrace } from '../actuator/actuator-trace.js';
 import * as customerResolver from '../customer-resolver.js';
@@ -38,7 +35,7 @@ import {
   receiptToArtifactReviewDecision,
 } from '../workforce/artifact-review.js';
 import { loadState } from './mission-state.js';
-import { isSupersedeProvenForGate } from './mission-task-supersede-proof.js';
+import { isSupersedeProven, isSupersedeProvenForGate } from './mission-task-supersede-proof.js';
 import { nowIso } from '../foundation/time.js';
 import { readTextFile } from '../foundation/text.js';
 import type { IntentReconciliationInput } from '../intent/intent-reconciliation.js';
@@ -419,6 +416,17 @@ export type MissionNextTasksUpdate = (
   onDisk: Array<Record<string, unknown>>
 ) => Array<Record<string, unknown>> | undefined;
 
+export interface MissionNextTasksWriteOptions {
+  /** supersede-task's own write: it may introduce a `superseded` task. */
+  allowSupersede?: boolean;
+  /**
+   * A board rebuilt from canonical state may carry a `superseded` task the
+   * mission proves (an approved supersede-task record); an unproven one is
+   * still dropped.
+   */
+  acceptProvenSupersede?: boolean;
+}
+
 /**
  * The one writer of a mission's NEXT_TASKS.json. The board on disk is read
  * under the writer lease, right before the write, and keeps every supersede a
@@ -430,7 +438,7 @@ export type MissionNextTasksUpdate = (
 export function writeMissionNextTasks(
   missionDir: string,
   tasks: Array<Record<string, unknown>> | MissionNextTasksUpdate,
-  options: SupersedeGuardOptions = {}
+  options: MissionNextTasksWriteOptions = {}
 ): boolean {
   const nextTasksPath = safeMissionPath(missionDir, 'NEXT_TASKS.json', true);
   const missionId = path.basename(safeMissionDir(missionDir, true));
@@ -447,7 +455,14 @@ export function writeMissionNextTasks(
       if (!incoming) return undefined;
       return provisionMissionEntry(
         validateMissionNextTaskObjects(
-          guardSupersedeState(missionId, incoming, onDisk, options),
+          guardSupersedeState(missionId, incoming, onDisk, {
+            allowSupersede: options.allowSupersede,
+            ...(options.acceptProvenSupersede
+              ? {
+                  isSupersedeProven: (task: object) => isSupersedeProven(missionId, task),
+                }
+              : {}),
+          }),
           nextTasksPath
         )
       );
@@ -690,15 +705,36 @@ export function isTaskDeliverableSatisfied(
  * No-ops (returns `completed: false`) when the task is unknown, already
  * completed, or its deliverable/dependencies aren't actually satisfied yet —
  * recording evidence for a task never rubber-stamps a task whose deliverable
- * doesn't exist. The board is read, completed and written under its writer
- * lease, so a worker's status write since the caller's read is kept; the
- * options' callbacks run under that lease and must not write the board.
+ * doesn't exist. The checks (deliverables, review receipts, the options'
+ * callbacks) run on a snapshot of the board, outside its writer lease, so a
+ * long cascade cannot hold the lease past its timeout; the completions are
+ * then written under the lease only if the board still equals that snapshot.
+ * A board changed in between (a worker's status write) is re-checked; after
+ * {@link AUTO_COMPLETE_SNAPSHOT_ATTEMPTS} changed snapshots the checks run
+ * under the lease, as before. The callbacks must not write the board.
  */
 export function tryAutoCompleteTaskFromEvidence(
   missionDir: string,
   taskId: string,
   options: AutoCompleteOptions = {}
 ): AutoCompleteResult {
+  for (let attempt = 0; attempt < AUTO_COMPLETE_SNAPSHOT_ATTEMPTS; attempt += 1) {
+    const snapshot = readMissionNextTasks(missionDir);
+    const snapshotJson = JSON.stringify(snapshot);
+    const planned = autoCompleteOnBoard(missionDir, snapshot, taskId, options);
+    if (!planned.completed) return planned;
+    const completedIds = new Set([taskId, ...planned.cascaded]);
+    let unchanged = false;
+    writeMissionNextTasks(missionDir, (onDisk) => {
+      if (JSON.stringify(onDisk) !== snapshotJson) return undefined;
+      unchanged = true;
+      for (const task of onDisk) {
+        if (completedIds.has(String(task.task_id || ''))) task.status = 'completed';
+      }
+      return onDisk;
+    });
+    if (unchanged) return planned;
+  }
   let result: AutoCompleteResult = {
     completed: false,
     reason: 'task not found in NEXT_TASKS.json',
@@ -710,6 +746,9 @@ export function tryAutoCompleteTaskFromEvidence(
   });
   return result;
 }
+
+/** Snapshots auto-complete checks outside the board lease before it checks under it. */
+const AUTO_COMPLETE_SNAPSHOT_ATTEMPTS = 3;
 
 interface AutoCompleteOptions {
   /**
