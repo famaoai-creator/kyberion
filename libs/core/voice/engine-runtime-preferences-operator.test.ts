@@ -1,9 +1,11 @@
 import { beforeEach, describe, it, expect, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 const state = vi.hoisted(() => ({
   root: '/repo/knowledge/personal',
   value: { version: '1.0.0', python_bin: '/python' } as Record<string, unknown>,
   events: [] as string[],
   failure: undefined as Error | undefined,
+  lockKeys: [] as string[],
 }));
 vi.mock('../path-resolver.js', () => ({ pathResolver: { rootDir: () => '/repo' } }));
 vi.mock('../profile-root.js', () => ({
@@ -20,6 +22,7 @@ vi.mock('../foundation/credential-binding.js', () => ({
 }));
 vi.mock('../foundation/lock-utils.js', () => ({
   withLockSync: (_key: string, fn: () => unknown) => {
+    state.lockKeys.push(_key);
     state.events.push('lock');
     return fn();
   },
@@ -57,6 +60,7 @@ beforeEach(() => {
   state.value = { version: '1.0.0', python_bin: '/python' };
   state.events = [];
   state.failure = undefined;
+  state.lockKeys = [];
 });
 describe('operator profile facade', () => {
   it('validates scope before profile/lock and returns only a safe descriptor', () => {
@@ -108,5 +112,17 @@ describe('operator profile facade', () => {
       update(principal, { expected_revision: revision, patch: { python_bin: 'relative' } })
     ).toThrow('preference_rejected');
     expect(state.events).not.toContain('save');
+  });
+  it('uses the canonical core profile transaction key for API compare and update', () => {
+    const first = get(principal);
+    update(principal, { patch: { python_bin: '/next' }, expected_revision: first.revision });
+    expect(state.lockKeys).toEqual(
+      Array(2).fill(
+        'engine-runtime-operator:' +
+          createHash('sha256')
+            .update('knowledge/personal/onboarding/engine-runtime.json')
+            .digest('hex')
+      )
+    );
   });
 });
