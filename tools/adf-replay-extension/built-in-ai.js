@@ -190,12 +190,22 @@
   // ---- Prompt session: one shared base per side-panel lifetime ---------------
 
   let basePromise = null;
+  // Bases already handed out whole (no clone()): never handed out twice.
+  const claimedBases = new WeakSet();
+  // Every caller waiting on a pending base creation sees its download progress.
+  const baseProgressListeners = new Set();
 
-  // The base session is shared across calls, so it is created without a
-  // caller's AbortSignal: aborting a create() signal after resolution destroys
-  // the created session, which would tear down every later clone source.
-  async function createBaseSession(onProgress) {
-    if (!usable(await promptAvailability())) return null;
+  function notifyBaseProgress(loaded) {
+    for (const listener of [...baseProgressListeners]) {
+      try {
+        listener(loaded);
+      } catch (_) {
+        // a caller's progress callback must not break the others
+      }
+    }
+  }
+
+  function createSession(onProgress) {
     return global.LanguageModel.create({
       expectedInputs: PROMPT_INPUTS,
       expectedOutputs: PROMPT_OUTPUTS,
@@ -204,31 +214,78 @@
     });
   }
 
+  // The base session is shared across calls, so it is created without a
+  // caller's AbortSignal: aborting a create() signal after resolution destroys
+  // the created session, which would tear down every later clone source.
+  async function createBaseSession() {
+    if (!usable(await promptAvailability())) return null;
+    return createSession(notifyBaseProgress);
+  }
+
+  function ensureBase() {
+    if (!basePromise) {
+      const pending = createBaseSession().catch((error) => {
+        if (basePromise === pending) basePromise = null;
+        throw error;
+      });
+      basePromise = pending;
+    }
+    return basePromise;
+  }
+
+  async function awaitBase(pending, onProgress) {
+    const listener = typeof onProgress === 'function' ? (loaded) => onProgress(loaded) : null;
+    if (listener) baseProgressListeners.add(listener);
+    try {
+      return await pending;
+    } finally {
+      if (listener) baseProgressListeners.delete(listener);
+    }
+  }
+
   /**
    * Hands out a per-call session. The base session (carrying the untrusted-data
-   * system prompt) is created once and cloned per call; when the browser has no
-   * clone(), the base itself is handed out once and recreated next time.
+   * system prompt) is created once and cloned per call. When the browser has no
+   * clone(), the base is handed out to exactly one caller (and recreated next
+   * time); concurrent callers get their own fresh session. A clone() failure
+   * discards the base and retries once on a fresh one.
    * Returns null when the Prompt API is unavailable.
    */
   async function acquirePromptSession({ onProgress, signal } = {}) {
     throwIfAborted(signal);
-    if (!basePromise) {
-      basePromise = createBaseSession(onProgress).catch((error) => {
-        basePromise = null;
-        throw error;
-      });
+    for (let attempt = 0; ; attempt += 1) {
+      const pending = ensureBase();
+      const base = await awaitBase(pending, onProgress);
+      if (!base) {
+        if (basePromise === pending) basePromise = null;
+        return null;
+      }
+      if (typeof base.clone !== 'function') {
+        if (basePromise === pending) basePromise = null;
+        if (!claimedBases.has(base)) {
+          claimedBases.add(base);
+          return { session: base, release: () => base.destroy?.() };
+        }
+        throwIfAborted(signal);
+        const session = await createSession(onProgress);
+        return { session, release: () => session.destroy?.() };
+      }
+      try {
+        const session = await base.clone(withSignal({}, signal));
+        return { session, release: () => session.destroy?.() };
+      } catch (error) {
+        if (signal?.aborted || attempt >= 1) throw error;
+        // A broken base would fail every later call: drop it and retry once.
+        if (basePromise === pending) {
+          basePromise = null;
+          try {
+            base.destroy?.();
+          } catch (_) {
+            // already unusable
+          }
+        }
+      }
     }
-    const base = await basePromise;
-    if (!base) {
-      basePromise = null;
-      return null;
-    }
-    if (typeof base.clone === 'function') {
-      const session = await base.clone(withSignal({}, signal));
-      return { session, release: () => session.destroy?.() };
-    }
-    basePromise = null;
-    return { session: base, release: () => base.destroy?.() };
   }
 
   async function withPromptSession(options, fn) {
@@ -1130,7 +1187,16 @@
       }
       case 'translate': {
         const result = await translate(input, { ...options, signal });
-        return done(result.provider, result.text, result.truncated);
+        return done(
+          result.provider,
+          {
+            text: result.text,
+            translated: result.translated === true,
+            source_language: result.source_language,
+            target_language: result.target_language,
+          },
+          result.truncated
+        );
       }
       case 'detect_language': {
         const result = await detectLanguage(input, { onProgress, signal });

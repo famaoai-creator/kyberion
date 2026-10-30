@@ -27,6 +27,7 @@ Kyberion から拡張への連絡は、拡張が Native Messaging host に問い
 - 要対応の件数を拡張アイコンのバッジに出します。新しいページ観測の依頼と承認待ちは Chrome の通知でも知らせます。
 - **ページ観測**（`observe_tab`）: 依頼元・目的・対象サイト・残り時間を確認し、「許可して応答」で、Live タブで接続中の現在タブを PII 除去して返します。対象サイトが指定されている依頼は、そのサイトのタブでしか応答できません。押さなければ何も返しません。
 - **ローカル推論**（`local_infer`）: Chrome 内蔵 AI でこの端末内で処理し、結果だけを返します。既定ではクリックが必要です。「ローカル推論依頼を自動応答」をオンにすると、このブラウザを閉じるまでローカル推論だけ自動で応答します（ページ観測には適用しません）。内蔵 AI が使えない場合は、理由を添えて失敗として返します。
+  - 結果の `output` は文字列かオブジェクトです。`summarize` / `rewrite` / `write` は文字列、`translate` は `{ text, translated, source_language, target_language }`、`detect_language` は `{ language, confidence }`、`proofread` は `{ text, corrections }`、`classify` / `extract` はタスクごとの値です。上限（約 48 KB）を超える出力は切り詰めて `truncated: true` を付け、それでも送れない場合は失敗として返します。
 - **お知らせ**（`notify`）: 情報・進捗は「確認」で既読にします。承認待ちは表示だけです。拡張では承認できず、表示されたコマンド（`pnpm kyberion approvals --approve <id>`）をコピーしてターミナルで実行します。
 - 期限を過ぎた依頼は手元で消え、応答しません。
 

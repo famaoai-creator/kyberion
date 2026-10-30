@@ -1538,7 +1538,20 @@ async function runLocalInfer(item, { auto }) {
       announce(
         auto ? 'ローカル推論依頼に自動で応答しました。' : 'ローカル推論の結果を応答しました。'
       );
+      return;
     }
+    // The result could not be sent (rejected or too large): answer `failed`
+    // so the requester is not left waiting until the request expires.
+    if (controller.signal.aborted) return;
+    const failed = await invokeInbox('bridge:respond-request', {
+      requestId: item.request_id,
+      status: 'failed',
+      error: `ローカル推論の結果を送信できませんでした: ${lastError || '不明なエラー'}`.slice(
+        0,
+        1000
+      ),
+    });
+    if (failed?.responded) announce('ローカル推論の結果を送信できず、失敗として応答しました。');
   } finally {
     clearTimeout(timer);
     localInferInFlight.delete(item.request_id);

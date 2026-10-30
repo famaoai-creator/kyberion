@@ -164,6 +164,119 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
       expect(base.destroy).toHaveBeenCalledTimes(1);
     });
 
+    it('gives concurrent callers their own session when clone() is absent', async () => {
+      stubScrub();
+      const sessions: Array<ReturnType<typeof promptSession>> = [];
+      g.LanguageModel = {
+        availability: vi.fn(async () => 'available'),
+        create: vi.fn(async () => {
+          const session = promptSession();
+          sessions.push(session);
+          return session;
+        }),
+      };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      const adapter = await loadAdapter();
+
+      await Promise.all([adapter.summarize('一つ目'), adapter.summarize('二つ目')]);
+
+      expect(sessions).toHaveLength(2);
+      sessions.forEach((session) => {
+        expect(session.prompt).toHaveBeenCalledTimes(1);
+        expect(session.destroy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    it('drops a base whose clone() rejects and retries once on a fresh base', async () => {
+      stubScrub();
+      const broken = promptSession({ clone: vi.fn(async () => Promise.reject(new Error('gone'))) });
+      const clone = promptSession();
+      const healthy = promptSession({ clone: vi.fn(async () => clone) });
+      g.LanguageModel = {
+        availability: vi.fn(async () => 'available'),
+        create: vi.fn().mockResolvedValueOnce(broken).mockResolvedValueOnce(healthy),
+      };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      const adapter = await loadAdapter();
+
+      const result = await adapter.summarize('本文');
+
+      expect(result.text).toBe('ok');
+      expect(broken.destroy).toHaveBeenCalledTimes(1);
+      expect(clone.prompt).toHaveBeenCalledTimes(1);
+      expect(clone.destroy).toHaveBeenCalledTimes(1);
+      // The healthy base stays for the next call.
+      await adapter.summarize('次');
+      expect((g.LanguageModel as Api).create).toHaveBeenCalledTimes(2);
+    });
+
+    it('reports base download progress to every caller waiting on it', async () => {
+      stubScrub();
+      let fireProgress: (loaded: number) => void = () => undefined;
+      let resolveBase: (value: unknown) => void = () => undefined;
+      const base = promptSession({ clone: vi.fn(async () => promptSession()) });
+      g.LanguageModel = {
+        availability: vi.fn(async () => 'available'),
+        create: vi.fn((options: any) => {
+          options.monitor({
+            addEventListener: (_type: string, listener: (event: any) => void) => {
+              fireProgress = (loaded) => listener({ loaded });
+            },
+          });
+          return new Promise((resolve) => {
+            resolveBase = resolve;
+          });
+        }),
+      };
+      g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
+      const adapter = await loadAdapter();
+      const first = vi.fn();
+      const second = vi.fn();
+
+      const pending = Promise.all([
+        adapter.prepare({ onProgress: first, preferred: 'prompt' }),
+        adapter.prepare({ onProgress: second, preferred: 'prompt' }),
+      ]);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      fireProgress(0.5);
+      resolveBase(base);
+      await pending;
+
+      expect(first).toHaveBeenCalledWith(0.5);
+      expect(second).toHaveBeenCalledWith(0.5);
+    });
+
+    it('returns the translation flag and languages for a translate local task', async () => {
+      stubScrub();
+      g.Translator = {
+        availability: vi.fn(async () => 'available'),
+        create: vi.fn(async () => ({
+          translate: vi.fn(async () => '予算 SECRET'),
+          destroy: vi.fn(),
+        })),
+      };
+      const adapter = await loadAdapter();
+
+      const result = await adapter.runLocalTask({
+        task: 'translate',
+        input: 'budget SECRET',
+        options: { sourceLanguage: 'en', targetLanguage: 'ja' },
+      });
+
+      expect(result).toEqual({
+        provider: 'chrome-translator',
+        task: 'translate',
+        output: {
+          text: '予算 [REDACTED:SECRET]',
+          translated: true,
+          source_language: 'en',
+          target_language: 'ja',
+        },
+        truncated: false,
+        executable: false,
+      });
+    });
+
     it('trims by tokens via the new measurement API and reports truncated', async () => {
       stubScrub();
       const session = promptSession({
