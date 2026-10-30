@@ -1,6 +1,7 @@
 import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import * as nodePath from 'node:path';
 import { withExecutionContext } from '../authority.js';
+import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
@@ -197,24 +198,37 @@ export function recoverMissionRequestedTasks(
 
     if (resumeStamps.size > 0) {
       // Applied to the board read under its writer lease, so a worker's status
-      // write since the read above is kept. A task whose dispatch moved to
-      // another WorkItem meanwhile keeps that dispatch.
+      // write since the read above is kept. A task no longer requested, or
+      // whose dispatch moved to another WorkItem meanwhile, is left as it is.
+      const unstamped = new Set(resumeStamps.keys());
       writeMissionNextTasks(nodePath.dirname(nextTasksPath(upperMissionId)), (onDisk) => {
-        let stamped = false;
+        unstamped.clear();
+        resumeStamps.forEach((_, taskId) => unstamped.add(taskId));
         const next = onDisk.map((task) => {
-          const stamp = resumeStamps.get(String(task.task_id || '').trim());
+          const taskId = String(task.task_id || '').trim();
+          const stamp = resumeStamps.get(taskId);
           const dispatch =
             task.ticket_dispatch && typeof task.ticket_dispatch === 'object'
               ? (task.ticket_dispatch as Record<string, unknown>)
               : {};
-          if (!stamp || String(dispatch.work_item_id || '').trim() !== stamp.work_item_id) {
+          if (
+            !stamp ||
+            String(task.status || 'planned') !== 'requested' ||
+            String(dispatch.work_item_id || '').trim() !== stamp.work_item_id
+          ) {
             return task;
           }
-          stamped = true;
+          unstamped.delete(taskId);
           return { ...task, ticket_dispatch: stamp };
         });
-        return stamped ? next : undefined;
+        return unstamped.size < resumeStamps.size ? next : undefined;
       });
+      for (const taskId of unstamped) {
+        const stamp = resumeStamps.get(taskId);
+        logger.warn(
+          `[mission-task-recovery] resume claim not recorded on task ${taskId} — the task changed while it was claimed | the claim on ${String(stamp?.work_item_id)} lapses at ${String(stamp?.lease_expires_at)}; resume again if the task is still requested | mission=${upperMissionId} lease=${String(stamp?.lease_id)}`
+        );
+      }
     }
 
     return summary;

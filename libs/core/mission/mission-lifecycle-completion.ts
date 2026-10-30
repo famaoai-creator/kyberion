@@ -441,7 +441,9 @@ export function writeMissionNextTasks(
     missionPathHint: missionDir,
     build: () => {
       const onDisk = readMissionNextTasks(missionDir);
-      const incoming = typeof tasks === 'function' ? tasks(onDisk) : tasks;
+      // The update gets its own copy: one that edits it in place must not
+      // change the board the supersede guard compares against.
+      const incoming = typeof tasks === 'function' ? tasks(structuredClone(onDisk)) : tasks;
       if (!incoming) return undefined;
       return provisionMissionEntry(
         validateMissionNextTaskObjects(
