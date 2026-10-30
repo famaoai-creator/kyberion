@@ -1,6 +1,10 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { safeExistsSync } from '../secure-io.js';
+import {
+  engineRuntimePreferencesReadiness,
+  type EngineRuntimePreferences,
+} from '../voice/engine-runtime-preferences.js';
 import { findInstalledManagedBinary, getToolRuntimeRecord } from './tool-runtime-registry.js';
 
 /**
@@ -8,9 +12,10 @@ import { findInstalledManagedBinary, getToolRuntimeRecord } from './tool-runtime
  *
  * Override order mirrors the blackhole-audio-bus reference pattern
  * (`opts.ffmpeg_bin ?? 'ffmpeg'`): explicit KYBERION_*_BIN env override
- * first, an installed `managed_binary` in the tool's managed env second,
- * governed registry command third, hardcoded literal last so every
- * call site stays behavior-preserving when neither is configured.
+ * first, the operator-owned engine-runtime preferences second, an
+ * installed `managed_binary` in the tool's managed env third, governed
+ * registry command fourth, hardcoded literal last so every call site
+ * stays behavior-preserving when neither is configured.
  */
 
 function firstConfiguredEnv(...names: string[]): string | null {
@@ -19,6 +24,12 @@ function firstConfiguredEnv(...names: string[]): string | null {
     if (value) return value;
   }
   return null;
+}
+
+function enginePreferenceBin(key: keyof EngineRuntimePreferences): string | null {
+  const readiness = engineRuntimePreferencesReadiness();
+  const value = readiness.status === 'ready' ? readiness.preferences[key] : undefined;
+  return typeof value === 'string' && value.trim() ? value.trim() : null;
 }
 
 function registryCommand(toolId: string): string | null {
@@ -43,10 +54,12 @@ function managedBinary(toolId: string): string | null {
 export function resolveExternalToolBin(
   toolId: string,
   envNames: string[],
-  literalFallback: string
+  literalFallback: string,
+  preferenceKey?: keyof EngineRuntimePreferences
 ): string {
   return (
     firstConfiguredEnv(...envNames) ??
+    (preferenceKey ? enginePreferenceBin(preferenceKey) : null) ??
     managedBinary(toolId) ??
     registryCommand(toolId) ??
     literalFallback
@@ -54,11 +67,11 @@ export function resolveExternalToolBin(
 }
 
 export function resolveFfmpegBin(): string {
-  return resolveExternalToolBin('ffmpeg', ['KYBERION_FFMPEG_BIN'], 'ffmpeg');
+  return resolveExternalToolBin('ffmpeg', ['KYBERION_FFMPEG_BIN'], 'ffmpeg', 'ffmpeg_bin');
 }
 
 export function resolveFfprobeBin(): string {
-  return resolveExternalToolBin('ffprobe', ['KYBERION_FFPROBE_BIN'], 'ffprobe');
+  return resolveExternalToolBin('ffprobe', ['KYBERION_FFPROBE_BIN'], 'ffprobe', 'ffprobe_bin');
 }
 
 export function resolveAdbBin(): string {
@@ -96,7 +109,11 @@ export function resolveXcodebuildBin(): string {
 }
 
 export function resolvePython3Bin(): string {
-  return firstConfiguredEnv('KYBERION_PYTHON_BIN', 'KYBERION_PYTHON') ?? 'python3';
+  return (
+    firstConfiguredEnv('KYBERION_PYTHON_BIN', 'KYBERION_PYTHON') ??
+    enginePreferenceBin('python_bin') ??
+    'python3'
+  );
 }
 
 /** Pane-runtime multiplexer CLI (Herdr). Env override wins over registry. */

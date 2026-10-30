@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "engine-runtime-preferences.schema.json",
+  "title": "Engine runtime preferences",
+  "description": "Operator-owned defaults for local engine binaries and commands shared by perception and voice paths.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version"],
+  "properties": {
+    "version": {
+      "const": "1.0.0"
+    },
+    "ffmpeg_bin": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 500,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      },
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\)"
+    },
+    "ffprobe_bin": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 500,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      },
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\)"
+    },
+    "python_bin": {
+      "type": "string",
+      "minLength": 2,
+      "maxLength": 500,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      },
+      "pattern": "^(?:/|[A-Za-z]:[\\\\/]|\\\\\\\\)"
+    },
+    "audio_record_command": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      }
+    },
+    "audio_playback_backend": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      }
+    },
+    "fluid_audio_stt_command": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 400,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      }
+    },
+    "streaming_stt_bridge": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      }
+    },
+    "streaming_tts_bridge": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      }
+    },
+    "agent_runtime_backend": {
+      "enum": ["pipe", "pane"]
+    },
+    "agent_pane_runtime_provider": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200,
+      "not": {
+        "pattern": "[\\u0000\\r\\n]"
+      }
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

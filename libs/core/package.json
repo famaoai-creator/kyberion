@@ -5264,6 +5264,10 @@
       "types": "./dist/voice/realtime-voice-preferences.d.ts",
       "default": "./dist/voice/realtime-voice-preferences.js"
     },
+    "./engine-runtime-preferences": {
+      "types": "./dist/voice/engine-runtime-preferences.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences.js"
+    },
     "./reasoning": {
       "types": "./dist/reasoning/index.d.ts",
       "default": "./dist/reasoning/index.js"
@@ -7503,6 +7507,10 @@
     "./voice/realtime-voice-preferences": {
       "types": "./dist/voice/realtime-voice-preferences.d.ts",
       "default": "./dist/voice/realtime-voice-preferences.js"
+    },
+    "./voice/engine-runtime-preferences": {
+      "types": "./dist/voice/engine-runtime-preferences.d.ts",
+      "default": "./dist/voice/engine-runtime-preferences.js"
     },
     "./voice/speech-languages": {
       "types": "./dist/voice/speech-languages.d.ts",

@@ -1,4 +1,15 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('../voice/engine-runtime-preferences.js').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('../voice/engine-runtime-preferences.js', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+}));
 import {
   resolveAdbBin,
   resolveExternalToolBin,
@@ -77,5 +88,37 @@ describe('tool binary resolvers', () => {
 
   it('falls back to the literal only when the registry record is unavailable', () => {
     expect(resolveExternalToolBin('unknown-tool', [], 'unknown-tool')).toBe('unknown-tool');
+  });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
+});
+
+describe('engine binary defaults', () => {
+  it('trims saved paths and falls back only for optional absence', () => {
+    preferencesReadiness.mockReturnValue({
+      status: 'ready',
+      preferences: { version: '1.0.0', ffmpeg_bin: '  /opt/tools/ffmpeg  ' },
+    });
+    expect(resolveExternalToolBin('unknown-tool', [], 'fallback', 'ffmpeg_bin')).toBe(
+      '/opt/tools/ffmpeg'
+    );
+    preferencesReadiness.mockReturnValue({
+      status: 'unavailable',
+      reason: 'personal_profile_not_authorized',
+    });
+    expect(resolveExternalToolBin('unknown-tool', [], 'fallback', 'ffmpeg_bin')).toBe('fallback');
+  });
+  it('propagates profile failures but never reads below an explicit environment override', () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    vi.stubEnv('KYBERION_FFMPEG_BIN', '/explicit/ffmpeg');
+    expect(resolveFfmpegBin()).toBe('/explicit/ffmpeg');
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+    vi.stubEnv('KYBERION_FFMPEG_BIN', '');
+    expect(() => resolveFfmpegBin()).toThrow('profile denied');
   });
 });

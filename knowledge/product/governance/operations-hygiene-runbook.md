@@ -2510,3 +2510,11 @@ same-identity configuration repairs are not stranded. Procedure:
 [command initialization scope](../orchestration/command-initialization-scope.ja.md).
 Gates: credential-binding, reasoning-bootstrap, pipeline-bootstrap-needs,
 voice_cli_bootstrap, supervisor-reasoning-readiness and error-classifier tests.
+
+### Operator engine preference reads and registrations
+
+Engine defaults are context, never authority. Admit the current profile read before any filesystem probe; only an explicitly typed, generic denial of the exact default personal profile may be optional-unavailable. Preserve all other scope, resource, policy and configuration failures. Re-read admitted values and keep invocation snapshots immutable. Resolve higher-priority explicit inputs before consulting lower-priority saved settings.
+
+Saved provider IDs remain subject to capability eligibility and governed pins/rules. Own command-backed registrations by configuration/context plus registration identity, so change/reset releases only the installer's own records. Gates: engine-runtime-preferences, tier-guard-engine-runtime, engine_runtime_config, consumer regressions and seam-provider-selection tests. Procedure: [engine-runtime preferences](../orchestration/engine-runtime-preferences.ja.md).
+
+Unit tests that mock all filesystem paths as existing must isolate shared binary resolvers at their consumer boundary. When a resolver gains profile-backed configuration, generic fake file contents must not create a fictitious profile or force real filesystem probes. Keep configuration validation strict and verify default command protocol through explicit resolver fixtures. Regression examples: video-render-backend.test.ts and video-composition-actuator/src/index.test.ts.

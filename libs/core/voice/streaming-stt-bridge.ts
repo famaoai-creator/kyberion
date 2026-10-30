@@ -13,6 +13,7 @@
  * stub bindings).
  */
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { engineRuntimePreferencesReadiness } from './engine-runtime-preferences.js';
 import { nowIso } from '../foundation/time.js';
 
 import type { AudioChunk, TranscriptChunk } from '../meeting/meeting-session-types.js';
@@ -150,8 +151,15 @@ export function resetStreamingSttBridges(): void {
   for (const dispose of [...streamingSttDisposers.values()]) dispose();
 }
 
+function enginePreference(key: 'streaming_stt_bridge'): string | undefined {
+  const readiness = engineRuntimePreferencesReadiness();
+  return readiness.status === 'ready' ? readiness.preferences[key]?.trim() || undefined : undefined;
+}
+
 export function getStreamingSttBridge(
-  id: string = getRegisteredEnvText('KYBERION_STREAMING_STT_BRIDGE') ?? 'stub'
+  id: string = getRegisteredEnvText('KYBERION_STREAMING_STT_BRIDGE') ??
+    enginePreference('streaming_stt_bridge') ??
+    'stub'
 ): StreamingSpeechToTextBridge {
   if (id === 'stub') return new StubStreamingSpeechToTextBridge();
   const factory = streamingSttSeam.getOptional(id);
@@ -230,11 +238,13 @@ export function selectStreamingSttBridge(
     return { bridge_id: explicit, bridge: getStreamingSttBridge(explicit), source: 'explicit' };
   }
   const purpose = options.purpose?.trim() || undefined;
+  const savedDefault = purpose ? undefined : enginePreference('streaming_stt_bridge');
   const requires = options.requires ?? {};
   const language = primaryLanguageSubtag(requires.language);
   const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
   const stubUnusable = unmetStreamingSttRequirements('stub', requires).length > 0;
   const shouldSelect =
+    Boolean(savedDefault) ||
     Boolean(purpose) ||
     Boolean(matchSeamSelectionRule(STREAMING_STT_SEAM, { context })) ||
     (stubUnusable && Boolean(getSeamSelectionPolicy(STREAMING_STT_SEAM)?.fallback_purpose));
@@ -245,6 +255,7 @@ export function selectStreamingSttBridge(
   const decision = resolveSeamProviderDecision({
     seam: STREAMING_STT_SEAM,
     candidates,
+    ...(savedDefault ? { defaultProvider: savedDefault } : {}),
     ...(purpose ? { purpose } : {}),
     ...(Object.keys(context).length > 0 ? { context } : {}),
     decisionKey: purpose || 'default',
