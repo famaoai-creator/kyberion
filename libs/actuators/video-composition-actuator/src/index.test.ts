@@ -167,6 +167,14 @@ const mocks = vi.hoisted(() => ({
   })),
 }));
 
+// These tests assert the default CLI protocol, not profile/tool discovery.
+// Their broad filesystem fixtures must not manufacture an engine profile.
+vi.mock('@agent/core/tool/tool-binary-resolvers', () => ({
+  resolveFfmpegBin: () => 'ffmpeg',
+  resolveFfprobeBin: () => 'ffprobe',
+  resolvePython3Bin: () => 'python3',
+}));
+
 vi.mock('@agent/core/foundation', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/foundation')>()),
   compileSchema: mocks.compileSchemaFromPath,
