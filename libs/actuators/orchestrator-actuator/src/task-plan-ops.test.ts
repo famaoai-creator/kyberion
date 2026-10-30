@@ -1,4 +1,20 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Whether the mission proves a supersede (an approved supersede-task record);
+// the proof itself is covered in core (mission-task-supersede.test.ts).
+const proof = vi.hoisted(() => ({ proven: true }));
+vi.mock('@agent/core/mission/mission-lifecycle-completion', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('@agent/core/mission/mission-lifecycle-completion')>();
+  return {
+    ...actual,
+    isTaskProvenSuperseded: (
+      missionDir: string,
+      task: Record<string, unknown> | null | undefined,
+      reader: string
+    ) => proof.proven && actual.isTaskSuperseded(task),
+  };
+});
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { saveTaskPlan } from '@agent/core/sdlc-artifact-store';
@@ -26,6 +42,7 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
   beforeEach(() => {
     process.env.MISSION_ROLE = 'mission_controller';
     process.env.KYBERION_PERSONA = 'worker';
+    proof.proven = true;
   });
 
   afterEach(() => {
@@ -36,19 +53,21 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
     else process.env.KYBERION_PERSONA = savedEnv.persona;
   });
 
-  it('writes the plan through the board writer, keeping a supersede on disk and rewiring to its replacement', () => {
+  const superseded = {
+    by_task_id: 'T-IMPL-2',
+    at: '2026-10-30T00:00:00.000Z',
+    actor_id: 'operator',
+    reason_sha256: 'a'.repeat(64),
+    approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+  };
+
+  /** T-IMPL-1 superseded by T-IMPL-2 on disk, and a plan that still names T-IMPL-1. */
+  function boardWithSupersedeAndPlan(): void {
     safeMkdir(missionDir, { recursive: true });
     safeWriteFile(
       `${missionDir}/mission-state.json`,
       JSON.stringify({ mission_id: missionId, tier: 'public', status: 'active', history: [] })
     );
-    const superseded = {
-      by_task_id: 'T-IMPL-2',
-      at: '2026-10-30T00:00:00.000Z',
-      actor_id: 'operator',
-      reason_sha256: 'a'.repeat(64),
-      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
-    };
     writeMissionNextTasks(
       missionDir,
       [
@@ -90,11 +109,18 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
         ],
       },
     });
+  }
 
-    expect(taskPlanToNextTasks({ mission_id: missionId }).task_count).toBe(3);
-    const board = JSON.parse(
+  function readBoard(): Array<Record<string, unknown>> {
+    return JSON.parse(
       String(safeReadFile(`${missionDir}/NEXT_TASKS.json`, { encoding: 'utf8' }))
     ) as Array<Record<string, unknown>>;
+  }
+
+  it('writes the plan through the board writer, keeping a supersede on disk and rewiring to its replacement', () => {
+    boardWithSupersedeAndPlan();
+    expect(taskPlanToNextTasks({ mission_id: missionId }).task_count).toBe(3);
+    const board = readBoard();
     expect(board.find((task) => task.task_id === 'T-IMPL-1')).toMatchObject({
       status: 'superseded',
       superseded,
@@ -106,6 +132,24 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
       dependencies: ['T-IMPL-2'],
       review_target: 'T-IMPL-2',
       deliverable: 'deliverables/REVIEW-T-IMPL-2.md',
+    });
+  });
+
+  it('does not follow a supersede the mission does not prove', () => {
+    proof.proven = false;
+    boardWithSupersedeAndPlan();
+
+    expect(taskPlanToNextTasks({ mission_id: missionId }).task_count).toBe(3);
+    const board = readBoard();
+    // The supersede on disk is kept (the writer's guard), but nothing is
+    // pointed at its unproven replacement: the plan's own id stays.
+    expect(board.find((task) => task.task_id === 'T-IMPL-1')).toMatchObject({
+      status: 'superseded',
+    });
+    expect(board.find((task) => task.task_id === 'T-IMPL-2')?.dependencies).toEqual(['T-IMPL-1']);
+    expect(board.find((task) => task.task_id === 'T-REVIEW-1')).toMatchObject({
+      dependencies: ['T-IMPL-1'],
+      deliverable: 'deliverables/REVIEW-T-IMPL-1.md',
     });
   });
 });

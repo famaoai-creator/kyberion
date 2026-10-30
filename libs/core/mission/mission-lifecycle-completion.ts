@@ -705,15 +705,36 @@ export function isTaskDeliverableSatisfied(
  * No-ops (returns `completed: false`) when the task is unknown, already
  * completed, or its deliverable/dependencies aren't actually satisfied yet —
  * recording evidence for a task never rubber-stamps a task whose deliverable
- * doesn't exist. The board is read, completed and written under its writer
- * lease, so a worker's status write since the caller's read is kept; the
- * options' callbacks run under that lease and must not write the board.
+ * doesn't exist. The checks (deliverables, review receipts, the options'
+ * callbacks) run on a snapshot of the board, outside its writer lease, so a
+ * long cascade cannot hold the lease past its timeout; the completions are
+ * then written under the lease only if the board still equals that snapshot.
+ * A board changed in between (a worker's status write) is re-checked; after
+ * {@link AUTO_COMPLETE_SNAPSHOT_ATTEMPTS} changed snapshots the checks run
+ * under the lease, as before. The callbacks must not write the board.
  */
 export function tryAutoCompleteTaskFromEvidence(
   missionDir: string,
   taskId: string,
   options: AutoCompleteOptions = {}
 ): AutoCompleteResult {
+  for (let attempt = 0; attempt < AUTO_COMPLETE_SNAPSHOT_ATTEMPTS; attempt += 1) {
+    const snapshot = readMissionNextTasks(missionDir);
+    const snapshotJson = JSON.stringify(snapshot);
+    const planned = autoCompleteOnBoard(missionDir, snapshot, taskId, options);
+    if (!planned.completed) return planned;
+    const completedIds = new Set([taskId, ...planned.cascaded]);
+    let unchanged = false;
+    writeMissionNextTasks(missionDir, (onDisk) => {
+      if (JSON.stringify(onDisk) !== snapshotJson) return undefined;
+      unchanged = true;
+      for (const task of onDisk) {
+        if (completedIds.has(String(task.task_id || ''))) task.status = 'completed';
+      }
+      return onDisk;
+    });
+    if (unchanged) return planned;
+  }
   let result: AutoCompleteResult = {
     completed: false,
     reason: 'task not found in NEXT_TASKS.json',
@@ -725,6 +746,9 @@ export function tryAutoCompleteTaskFromEvidence(
   });
   return result;
 }
+
+/** Snapshots auto-complete checks outside the board lease before it checks under it. */
+const AUTO_COMPLETE_SNAPSHOT_ATTEMPTS = 3;
 
 interface AutoCompleteOptions {
   /**
