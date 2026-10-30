@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import { credentialBindingReadiness } from '../foundation/credential-binding.js';
-import { withLockSync } from '../foundation/lock-utils.js';
+import { withEngineRuntimePreferencesTransaction } from './engine-runtime-preferences-transaction.js';
 import { pathResolver } from '../path-resolver.js';
 import { resolveActiveProfileRoot } from '../profile-root.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
@@ -80,9 +80,7 @@ function run<T>(
   action: (profile: { kind: 'personal' | 'customer'; id: string }) => T
 ): T {
   const selected = target(principal);
-  const key =
-    'engine-runtime-operator:' + createHash('sha256').update(selected.relative).digest('hex');
-  return withLockSync(key, () =>
+  return withEngineRuntimePreferencesTransaction(selected.relative, () =>
     withEngineRuntimePreferencesAccess(selected.relative, () =>
       withExecutionContext(ENGINE_RUNTIME_OPERATOR_ROLE, () => action(selected.profile))
     )
