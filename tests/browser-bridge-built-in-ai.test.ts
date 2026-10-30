@@ -217,9 +217,9 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
       const base = promptSession({ clone: vi.fn(async () => promptSession()) });
       g.LanguageModel = {
         availability: vi.fn(async () => 'available'),
-        create: vi.fn((options: any) => {
+        create: vi.fn((options: { monitor: (m: unknown) => void }) => {
           options.monitor({
-            addEventListener: (_type: string, listener: (event: any) => void) => {
+            addEventListener: (_type: string, listener: (event: { loaded: number }) => void) => {
               fireProgress = (loaded) => listener({ loaded });
             },
           });

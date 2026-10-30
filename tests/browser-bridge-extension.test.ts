@@ -1426,8 +1426,9 @@ describe('Browser Bridge mailbox hardening', () => {
     harness.hooks.tabMessage = pageSourceHook();
     await harness.send({ type: 'bridge:connect-active-tab' });
     await harness.send({ type: 'bridge:poll-inbox' });
-    harness.chrome.scripting.executeScript.mockImplementation(async (details: any) =>
-      details?.func?.name === 'probeWebMcpTools' ? new Promise(() => undefined) : []
+    harness.chrome.scripting.executeScript.mockImplementation(
+      async (details: { func?: { name?: string } }) =>
+        details?.func?.name === 'probeWebMcpTools' ? new Promise(() => undefined) : []
     );
 
     const respond = harness.send({
@@ -1588,7 +1589,7 @@ describe('Browser Bridge mailbox hardening', () => {
     const harness = await createHarness();
     mailboxHost(harness, [mailboxRequest('local_infer', { task: 'extract', input: 'x' })]);
     await harness.send({ type: 'bridge:poll-inbox' });
-    let deep: any = { mail: 'user@example.com' };
+    let deep: Record<string, unknown> = { mail: 'user@example.com' };
     for (let level = 0; level < 9; level++) deep = { next: deep };
 
     await harness.send({
@@ -1615,7 +1616,7 @@ describe('Browser Bridge mailbox hardening', () => {
     const source = pageSourceHook();
     for (const origin of ['https://evil.example', undefined]) {
       harness.hooks.tabMessage = (message) => {
-        const response: any = source(message);
+        const response = source(message) as Record<string, unknown> | undefined;
         return response ? { ...response, origin } : undefined;
       };
       const response = await harness.send({
