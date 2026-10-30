@@ -1,7 +1,11 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { getStreamingTtsBridge, resetStreamingTtsBridges } from '../voice/streaming-tts-bridge.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
-import { ShellStreamingTextToSpeechBridge } from './shell-streaming-tts-bridge.js';
+import {
+  installShellStreamingTtsBridgeFromEnv,
+  ShellStreamingTextToSpeechBridge,
+} from './shell-streaming-tts-bridge.js';
 
 // A framed-protocol worker: per stdin line, emits `framesPerLine` payload
 // frames (deterministic byte fill) then a zero-length end-of-request frame.
@@ -63,6 +67,24 @@ function ephemeral(worker: string) {
 }
 
 describe('shell streaming TTS bridge — ephemeral mode', () => {
+  it('terminates a live ephemeral worker when the bridge is disposed during startup', async () => {
+    const b = ephemeral(
+      'process.stdout.write(Buffer.from(String(process.pid))); setInterval(() => {}, 1000);'
+    );
+    const iterator = b.synthesizeStream(linesOf('probe'), 'fixture')[Symbol.asyncIterator]();
+    try {
+      const first = await iterator.next();
+      expect(first.done).toBe(false);
+      const pid = Number(Buffer.from(first.value!.payload).toString('utf8'));
+      expect(pid).toBeGreaterThan(0);
+      b.dispose();
+      await vi.waitFor(() => expect(() => process.kill(pid, 0)).toThrow());
+    } finally {
+      b.dispose();
+      await iterator.return?.();
+    }
+  });
+
   it('drains queued PCM after the worker closes while the consumer is paused', async () => {
     let release!: () => void;
     const gate = new Promise<void>((resolve) => {
@@ -240,5 +262,38 @@ describe('shell streaming TTS bridge — persistent framed mode', () => {
       persistent: true,
     });
     await expect(collect(bad.synthesizeStream(linesOf('x'), 'profile-a'))).rejects.toThrow();
+  });
+});
+
+describe('shell streaming TTS invocation installation', () => {
+  afterEach(() => {
+    resetStreamingTtsBridges();
+    vi.unstubAllEnvs();
+  });
+
+  it.each([24000, 48000])(
+    'advertises the explicitly configured %s Hz rate and releases registration',
+    (rate) => {
+      const installed = installShellStreamingTtsBridgeFromEnv({
+        KYBERION_TTS_COMMAND: process.execPath,
+        KYBERION_TTS_SAMPLE_RATE_HZ: String(rate),
+      });
+      expect(installed.installed).toBe(true);
+      expect(getStreamingTtsBridge('shell').format.sample_rate_hz).toBe(rate);
+      installed.dispose?.();
+      expect(() => getStreamingTtsBridge('shell')).toThrow('unknown bridge');
+    }
+  );
+
+  it('keeps the existing ambient environment entry point', () => {
+    vi.stubEnv('KYBERION_TTS_COMMAND', process.execPath);
+    vi.stubEnv('KYBERION_TTS_SAMPLE_RATE_HZ', '24000');
+    expect(installShellStreamingTtsBridgeFromEnv().installed).toBe(true);
+    expect(getStreamingTtsBridge('shell').format.sample_rate_hz).toBe(24000);
+  });
+
+  it('does not borrow a global command when an isolated environment is empty', () => {
+    vi.stubEnv('KYBERION_TTS_COMMAND', 'ambient-command');
+    expect(installShellStreamingTtsBridgeFromEnv({}).installed).toBe(false);
   });
 });

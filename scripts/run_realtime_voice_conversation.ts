@@ -80,6 +80,16 @@ import type { StreamingTextToSpeechBridge } from '@agent/core/voice/streaming-tt
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { parseSafeJsonInput } from './lib/json-input.js';
 import {
+  cleanupRealtimeVoiceResources,
+  smokeTestStreamingTts,
+  transcribeRealtimeBatchFallback,
+} from './lib/realtime-voice-streaming-runtime.js';
+import {
+  resolveRealtimeVoiceStreamingConfig,
+  realtimeVoiceStreamingEnvironment,
+  type RealtimeVoiceStreamingConfig,
+} from './lib/realtime-voice-streaming-config.js';
+import {
   MediaEventBuffer,
   validateMediaSessionDescriptor,
   type MediaEvent,
@@ -163,6 +173,8 @@ export interface RealtimeVoiceConversationCliOptions {
   sttPurpose?: string;
   /** Use streaming STT (KYBERION_STT_COMMAND) during the utterance when available. */
   streamingStt: boolean;
+  /** Invocation-owned settings consumed only by the interactive VAD loop. */
+  streamingConfig?: RealtimeVoiceStreamingConfig;
   /** Keep one warm voice-actuator process instead of spawning per segment. */
   warmActuator: boolean;
   /**
@@ -612,11 +624,7 @@ export async function runRealtimeVoiceConversationLoop(
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
   const sttBridge = resolveRealtimeSttBridge(options);
-  if (sttBridge.name === 'stub') {
-    throw new Error(
-      'Realtime interactive voice requires a real STT backend. Set KYBERION_STT_COMMAND or register a SpeechToTextBridge before using --interactive.'
-    );
-  }
+  const streamingConfig = options.streamingConfig ?? resolveRealtimeVoiceStreamingConfig(null);
   const micProbe = probeMicCapture({
     ...(options.micDevice ? { device: options.micDevice } : {}),
   });
@@ -640,7 +648,7 @@ export async function runRealtimeVoiceConversationLoop(
           'Start it with: pnpm surfaces --action start --surface voice-hub'
       );
     }
-  } else if (playbackEnabled) {
+  } else if (playbackEnabled && !streamingConfig.ttsCommand) {
     const playbackProbe = probeAudioPlayback();
     if (!playbackProbe.available) {
       throw new Error(
@@ -679,221 +687,231 @@ export async function runRealtimeVoiceConversationLoop(
     ? mediaEventBuffer.subscribe(options.onMediaEvent)
     : undefined;
 
-  // VAD backend (Phase 3): silero when configured, energy otherwise.
-  installSileroVadBackend();
-  installTenVadBackend();
-  const resolvedVad = resolveVadBackend(options.vadBackend, {
-    ...(options.vadPurpose ? { purpose: options.vadPurpose } : {}),
-  });
-  if (resolvedVad.degradedFrom) {
-    print(
-      `⚠️  VAD backend '${resolvedVad.degradedFrom}' unavailable (${resolvedVad.degradedReason}); using 'energy'.`
-    );
-  }
-  const vadBackend = resolvedVad.backend;
-  if (resolvedVad.decision) {
-    print(`🎚️  VAD backend: ${vadBackend.backend_id} (${resolvedVad.decision.rationale})`);
-  }
-
-  // Streaming STT (Phase 1): transcription overlaps the utterance when configured.
-  let streamingStt: StreamingSpeechToTextBridge | undefined;
-  if (options.streamingStt) {
-    const installed = installShellStreamingSttBridgeFromEnv();
-    if (!installed.installed) installManagedMlxWhisperStreamingSttBridgeIfAvailable();
-    // Real transcription only: the stub is never streamed into the loop.
-    try {
-      const selection = selectStreamingSttBridge({
-        ...(options.sttPurpose ? { purpose: options.sttPurpose } : {}),
-        requires: { allowSynthetic: false, ...(language ? { language } : {}) },
-      });
-      if (selection.bridge_id !== 'stub') {
-        streamingStt = selection.bridge;
-        print(
-          selection.bridge_id === 'shell'
-            ? '🔁 streaming STT: KYBERION_STT_COMMAND (partials during speech)'
-            : selection.bridge_id === 'managed_mlx_whisper'
-              ? '🔁 streaming STT: managed mlx_whisper (resident per utterance)'
-              : `🔁 streaming STT: ${selection.bridge_id} (${selection.source})`
-        );
-      }
-    } catch (error: unknown) {
-      print(
-        `⚠️  streaming STT unavailable (${error instanceof Error ? error.message : String(error)}); using batch STT.`
-      );
-    }
-  }
-
-  // Warm actuator (Phase 1): one resident synthesis process per session.
-  const warmClient =
-    options.warmActuator && options.deliveryMode !== 'none'
-      ? createVoiceActuatorServeClient()
-      : null;
-
+  const streamingEnv = realtimeVoiceStreamingEnvironment(streamingConfig);
+  const bridgeDisposers: Array<() => void> = [];
   let streamingTts: StreamingTextToSpeechBridge | undefined;
-  const streamPlaybackCommand = getRegisteredEnvText('KYBERION_TTS_PLAY_COMMAND')
-    ?.split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  // Avatar follow delegates playback to voice-hub, which is what lets the
-  // talking avatar track turns — the direct-PCM streaming path bypasses it,
-  // so artifact playback wins when both are configured.
-  const avatarFollow = Boolean(options.avatarFollow) && playbackEnabled;
-  if (options.avatarFollow && !playbackEnabled) {
-    print(
-      `⚠️ --avatar-follow has no effect without playback (delivery-mode ${options.deliveryMode}).`
-    );
-  }
-  if (avatarFollow && getRegisteredEnvText('KYBERION_TTS_COMMAND')) {
-    print(
-      '⚠️ --avatar-follow + streaming TTS: audio plays locally; ' +
-        'voice-hub speech state is marked externally for the avatar.'
-    );
-  }
-  const voiceHubUrl = avatarFollow ? resolveSurfaceUrl('voice-hub') : '';
-  const reflectLoopState = avatarFollow
-    ? (state: string) => {
-        void dispatchPresenceFrame({
-          surfaceId: options.surfaceId,
-          agentId: options.avatarAgentId || 'presence-surface-agent',
-          status: state === 'calibrating' ? 'listening' : state,
-          expression: state === 'listening' || state === 'thinking' ? state : 'neutral',
-        }).catch(() => {
-          /* presence surface is best effort */
-        });
-        // Streaming playback bypasses voice-hub audio — mark the speech state
-        // explicitly so surfaces polling /api/speech/state still track turns.
-        void fetch(`${voiceHubUrl}/api/speech/state`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ status: state === 'speaking' ? 'speaking' : 'idle' }),
-        }).catch(() => {
-          /* voice-hub is best effort */
-        });
-      }
-    : undefined;
-  if (playbackEnabled) {
-    const installed = installShellStreamingTtsBridgeFromEnv();
-    if (installed.installed) {
-      const probe = probePcmAudioStreaming();
-      if (!probe.available) {
-        throw new Error(
-          `KYBERION_TTS_COMMAND is configured but direct PCM playback is unavailable: ${probe.reason}`
-        );
-      }
-      streamingTts = getStreamingTtsBridge('shell');
-      // A misconfigured command fails every turn *silently* (empty PCM
-      // stream → playback "completes" instantly). Smoke it once at startup:
-      // feed one line and require some PCM bytes back within 15s.
-      // Persistent workers pay the model load on the first call — a 1.7B
-      // clone needs ~10s cold, so give the smoke room beyond the 15s default.
-      const persistent = ['1', 'true', 'yes', 'on'].includes(
-        (getRegisteredEnvText('KYBERION_TTS_PERSISTENT') ?? '').trim().toLowerCase()
-      );
-      const smoke = await smokeTestStreamingTts(
-        streamingTts,
-        session.profile_id,
-        persistent ? 60_000 : 15_000
-      );
-      if (!smoke.ok) {
-        streamingTts.dispose?.();
-        throw new Error(
-          `KYBERION_TTS_COMMAND produced no PCM audio: ${smoke.reason}. ` +
-            'Unset it to fall back to governed artifact synthesis.'
-        );
-      }
-      print('🔊 streaming TTS: KYBERION_TTS_COMMAND → direct PCM playback');
-    }
-  }
-
-  const firstPhraseCache =
-    options.firstPhraseCache && options.deliveryMode !== 'none'
-      ? createRealtimeFirstPhraseCache()
-      : undefined;
-  const synthesizeSegment =
-    options.deliveryMode === 'none'
-      ? async () => ''
-      : async (
-          segment: string,
-          segmentIndex: number,
-          turn: number,
-          signal?: AbortSignal
-        ): Promise<string> => {
-          const synthesis = await synthesizeRealtimeVoice(
-            {
-              sessionId: session.session_id,
-              profileId: session.profile_id,
-              language,
-              text: segment,
-              deliveryMode: 'artifact',
-              personalVoiceMode: options.personalVoiceMode,
-              requestTag: `t${turn + 1}s${segmentIndex}`,
-              ...(options.ttsEngine ? { engineId: options.ttsEngine } : {}),
-            },
-            warmClient
-              ? (payload, requestSignal) => warmClient.request(payload, requestSignal)
-              : undefined,
-            signal,
-            segmentIndex === 0 ? firstPhraseCache : undefined
-          );
-          if (!synthesis.artifactPath) {
-            throw new Error(
-              `voice actuator returned no artifact for segment ${segmentIndex} of turn ${turn + 1}`
-            );
-          }
-          return synthesis.artifactPath;
-        };
-
-  const bargeInMode = resolveRealtimeVoiceBargeInMode({
-    mode:
-      options.bargeInMode ??
-      (options.bargeIn ? 'legacy' : defaultBargeInMode(options, Boolean(streamingStt))),
-  });
-  print(
-    `\n=== Realtime voice loop — session ${session.session_id} ` +
-      `(mic=${describeMicDevice(options.micDevice)}, vad=${vadBackend.backend_id}, ` +
-      `barge-in=${bargeInMode}, stt=${streamingStt ? 'streaming' : 'batch'}) ===`
-  );
-  if (bargeInMode === 'two_stage' && !streamingStt) {
-    print(
-      // i18n-exempt: JA voice demo script output
-      '   注意: two_stage の「言葉確認」は streaming STT の partial が必要です。batch STT ではエコーと実際の発話を区別できず、スピーカー環境では自分の再生音が割り込みとして返答を止めることがあります。--streaming-stt またはヘッドセットを使ってください。'
-    );
-  }
-  if (bargeInMode !== 'off') {
-    // i18n-exempt: JA voice demo script output
-    print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
-  }
-
-  // Warm the STT backend while the VAD calibrates — the first real
-  // transcription otherwise pays the backend's model-load cost in-band
-  // (observed ~99s on the first batch call vs ~6s steady-state). A silent
-  // clip exits via the no-speech path without loading the model, so the
-  // warmup uses a short synthesized utterance and falls back to silence
-  // when TTS is unavailable. Best-effort: never blocks the loop.
-  const sttWarmupPath = pathResolver.sharedTmp(`realtime-voice-warmup-${options.sessionId}.wav`);
-  void (async () => {
-    try {
-      // Warmup text comes from the lexicon's agent backchannels for the
-      // session language — no hardcoded per-language literals.
-      const warmupText =
-        loadVoiceTurnTakingLexicon().languages[language]?.agent_backchannels?.[0] ?? 'hello';
-      const clip = await synthesizeSegment(warmupText, -2, 0).catch(() => '');
-      const warmupPath =
-        clip ||
-        (() => {
-          safeWriteFile(sttWarmupPath, pcmToWav(Buffer.alloc(16000 * 2 * 0.25), 16000));
-          return sttWarmupPath;
-        })();
-      await sttBridge.transcribe({
-        audioPath: warmupPath,
-        ...(options.language ? { language: options.language } : {}),
-      });
-    } catch {
-      /* warmup is best-effort */
-    }
-  })();
-
+  let warmClient: ReturnType<typeof createVoiceActuatorServeClient> | null = null;
   try {
+    // VAD backend (Phase 3): silero when configured, energy otherwise.
+    installSileroVadBackend();
+    installTenVadBackend();
+    const resolvedVad = resolveVadBackend(options.vadBackend, {
+      ...(options.vadPurpose ? { purpose: options.vadPurpose } : {}),
+    });
+    if (resolvedVad.degradedFrom) {
+      print(
+        `⚠️  VAD backend '${resolvedVad.degradedFrom}' unavailable (${resolvedVad.degradedReason}); using 'energy'.`
+      );
+    }
+    const vadBackend = resolvedVad.backend;
+    if (resolvedVad.decision) {
+      print(`🎚️  VAD backend: ${vadBackend.backend_id} (${resolvedVad.decision.rationale})`);
+    }
+
+    // Streaming STT (Phase 1): transcription overlaps the utterance when configured.
+    let streamingStt: StreamingSpeechToTextBridge | undefined;
+    if (options.streamingStt) {
+      const shell = installShellStreamingSttBridgeFromEnv(streamingEnv);
+      const installed = shell.installed
+        ? shell
+        : installManagedMlxWhisperStreamingSttBridgeIfAvailable(streamingEnv);
+      if (installed.dispose) bridgeDisposers.push(installed.dispose);
+      // Real transcription only: the stub is never streamed into the loop.
+      try {
+        const selection = selectStreamingSttBridge({
+          ...(options.sttPurpose ? { purpose: options.sttPurpose } : {}),
+          requires: { allowSynthetic: false, ...(language ? { language } : {}) },
+        });
+        if (selection.bridge_id !== 'stub') {
+          streamingStt = selection.bridge;
+          print(
+            selection.bridge_id === 'shell'
+              ? '🔁 streaming STT: KYBERION_STT_COMMAND (partials during speech)'
+              : selection.bridge_id === 'managed_mlx_whisper'
+                ? '🔁 streaming STT: managed mlx_whisper (resident per utterance)'
+                : `🔁 streaming STT: ${selection.bridge_id} (${selection.source})`
+          );
+        }
+      } catch (error: unknown) {
+        if (sttBridge.name === 'stub') throw error;
+        print(
+          `⚠️  streaming STT unavailable (${error instanceof Error ? error.message : String(error)}); using batch STT.`
+        );
+      }
+    }
+
+    if (!streamingStt && sttBridge.name === 'stub')
+      throw new Error('Realtime interactive voice requires a real streaming or batch STT backend');
+
+    // Warm actuator (Phase 1): one resident synthesis process per session.
+    warmClient =
+      options.warmActuator && options.deliveryMode !== 'none'
+        ? createVoiceActuatorServeClient()
+        : null;
+
+    const streamPlaybackCommand = streamingConfig.playbackCommand;
+    // Avatar follow delegates playback to voice-hub, which is what lets the
+    // talking avatar track turns — the direct-PCM streaming path bypasses it,
+    // so artifact playback wins when both are configured.
+    const avatarFollow = Boolean(options.avatarFollow) && playbackEnabled;
+    if (options.avatarFollow && !playbackEnabled) {
+      print(
+        `⚠️ --avatar-follow has no effect without playback (delivery-mode ${options.deliveryMode}).`
+      );
+    }
+    if (avatarFollow && streamingConfig.ttsCommand) {
+      print(
+        '⚠️ --avatar-follow + streaming TTS: audio plays locally; ' +
+          'voice-hub speech state is marked externally for the avatar.'
+      );
+    }
+    const voiceHubUrl = avatarFollow ? resolveSurfaceUrl('voice-hub') : '';
+    const reflectLoopState = avatarFollow
+      ? (state: string) => {
+          void dispatchPresenceFrame({
+            surfaceId: options.surfaceId,
+            agentId: options.avatarAgentId || 'presence-surface-agent',
+            status: state === 'calibrating' ? 'listening' : state,
+            expression: state === 'listening' || state === 'thinking' ? state : 'neutral',
+          }).catch(() => {
+            /* presence surface is best effort */
+          });
+          // Streaming playback bypasses voice-hub audio — mark the speech state
+          // explicitly so surfaces polling /api/speech/state still track turns.
+          void fetch(`${voiceHubUrl}/api/speech/state`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ status: state === 'speaking' ? 'speaking' : 'idle' }),
+          }).catch(() => {
+            /* voice-hub is best effort */
+          });
+        }
+      : undefined;
+    if (playbackEnabled) {
+      const installed = installShellStreamingTtsBridgeFromEnv(streamingEnv);
+      if (installed.dispose) bridgeDisposers.push(installed.dispose);
+      if (installed.installed) {
+        const probe = probePcmAudioStreaming(streamPlaybackCommand);
+        if (!probe.available) {
+          throw new Error(
+            `KYBERION_TTS_COMMAND is configured but direct PCM playback is unavailable: ${probe.reason}`
+          );
+        }
+        streamingTts = getStreamingTtsBridge('shell');
+        // A misconfigured command fails every turn *silently* (empty PCM
+        // stream → playback "completes" instantly). Smoke it once at startup:
+        // feed one line and require some PCM bytes back within 15s.
+        // Persistent workers pay the model load on the first call — a 1.7B
+        // clone needs ~10s cold, so give the smoke room beyond the 15s default.
+        const persistent = ['1', 'true', 'yes', 'on'].includes(
+          (getRegisteredEnvText('KYBERION_TTS_PERSISTENT', { env: streamingEnv }) ?? '')
+            .trim()
+            .toLowerCase()
+        );
+        const smoke = await smokeTestStreamingTts(
+          streamingTts,
+          session.profile_id,
+          persistent ? 60_000 : 15_000
+        );
+        if (!smoke.ok) {
+          throw new Error(
+            `KYBERION_TTS_COMMAND produced no PCM audio: ${smoke.reason}. ` +
+              'Unset it to fall back to governed artifact synthesis.'
+          );
+        }
+        print('🔊 streaming TTS: KYBERION_TTS_COMMAND → direct PCM playback');
+      }
+    }
+
+    const firstPhraseCache =
+      options.firstPhraseCache && options.deliveryMode !== 'none'
+        ? createRealtimeFirstPhraseCache()
+        : undefined;
+    const synthesizeSegment =
+      options.deliveryMode === 'none'
+        ? async () => ''
+        : async (
+            segment: string,
+            segmentIndex: number,
+            turn: number,
+            signal?: AbortSignal
+          ): Promise<string> => {
+            const synthesis = await synthesizeRealtimeVoice(
+              {
+                sessionId: session.session_id,
+                profileId: session.profile_id,
+                language,
+                text: segment,
+                deliveryMode: 'artifact',
+                personalVoiceMode: options.personalVoiceMode,
+                requestTag: `t${turn + 1}s${segmentIndex}`,
+                ...(options.ttsEngine ? { engineId: options.ttsEngine } : {}),
+              },
+              warmClient
+                ? (payload, requestSignal) => warmClient.request(payload, requestSignal)
+                : undefined,
+              signal,
+              segmentIndex === 0 ? firstPhraseCache : undefined
+            );
+            if (!synthesis.artifactPath) {
+              throw new Error(
+                `voice actuator returned no artifact for segment ${segmentIndex} of turn ${turn + 1}`
+              );
+            }
+            return synthesis.artifactPath;
+          };
+
+    const bargeInMode = resolveRealtimeVoiceBargeInMode({
+      mode:
+        options.bargeInMode ??
+        (options.bargeIn ? 'legacy' : defaultBargeInMode(options, Boolean(streamingStt))),
+    });
+    print(
+      `\n=== Realtime voice loop — session ${session.session_id} ` +
+        `(mic=${describeMicDevice(options.micDevice)}, vad=${vadBackend.backend_id}, ` +
+        `barge-in=${bargeInMode}, stt=${streamingStt ? 'streaming' : 'batch'}) ===`
+    );
+    if (bargeInMode === 'two_stage' && !streamingStt) {
+      print(
+        // i18n-exempt: JA voice demo script output
+        '   注意: two_stage の「言葉確認」は streaming STT の partial が必要です。batch STT ではエコーと実際の発話を区別できず、スピーカー環境では自分の再生音が割り込みとして返答を止めることがあります。--streaming-stt またはヘッドセットを使ってください。'
+      );
+    }
+    if (bargeInMode !== 'off') {
+      // i18n-exempt: JA voice demo script output
+      print('   barge-in はスピーカーのエコーで誤動作することがあります。ヘッドセット推奨です。');
+    }
+
+    // Warm the STT backend while the VAD calibrates — the first real
+    // transcription otherwise pays the backend's model-load cost in-band
+    // (observed ~99s on the first batch call vs ~6s steady-state). A silent
+    // clip exits via the no-speech path without loading the model, so the
+    // warmup uses a short synthesized utterance and falls back to silence
+    // when TTS is unavailable. Best-effort: never blocks the loop.
+    const sttWarmupPath = pathResolver.sharedTmp(`realtime-voice-warmup-${options.sessionId}.wav`);
+    void (async () => {
+      if (sttBridge.name === 'stub') return;
+      try {
+        // Warmup text comes from the lexicon's agent backchannels for the
+        // session language — no hardcoded per-language literals.
+        const warmupText =
+          loadVoiceTurnTakingLexicon().languages[language]?.agent_backchannels?.[0] ?? 'hello';
+        const clip = await synthesizeSegment(warmupText, -2, 0).catch(() => '');
+        const warmupPath =
+          clip ||
+          (() => {
+            safeWriteFile(sttWarmupPath, pcmToWav(Buffer.alloc(16000 * 2 * 0.25), 16000));
+            return sttWarmupPath;
+          })();
+        await sttBridge.transcribe({
+          audioPath: warmupPath,
+          ...(options.language ? { language: options.language } : {}),
+        });
+      } catch {
+        /* warmup is best-effort */
+      }
+    })();
+
     const handle = await startRealtimeVoiceLoop({
       // Same id as the media-event buffer — otherwise every published event
       // is rejected with a session_id mismatch.
@@ -950,7 +968,7 @@ export async function runRealtimeVoiceConversationLoop(
         : {}),
       ...(streamingStt ? { streamingStt } : {}),
       language,
-      transcribe: async (audioPath) => (await sttBridge.transcribe({ audioPath, language })).text,
+      transcribe: (audioPath) => transcribeRealtimeBatchFallback(sttBridge, audioPath, language),
       reply: (userText) =>
         generateRealtimeAssistantReply(session.session_id, userText, reasoningOptionsFor(options)),
       streamReply: (userText, _turn, onSegment, signal) =>
@@ -969,7 +987,7 @@ export async function runRealtimeVoiceConversationLoop(
             voiceProfileId: session.profile_id,
             playAudioStream: (audio: AsyncIterable<AudioChunk>, _index: number) =>
               playPcmAudioStream(audio, {
-                ...(streamPlaybackCommand ? { command: streamPlaybackCommand } : {}),
+                ...(streamPlaybackCommand ? { command: [...streamPlaybackCommand] } : {}),
               }),
           }
         : {}),
@@ -1022,40 +1040,14 @@ export async function runRealtimeVoiceConversationLoop(
       throw new Error(report.error);
     }
   } finally {
-    unsubscribeMediaEvents?.();
-    streamingTts?.dispose?.();
-    await warmClient?.dispose();
-  }
-}
-
-/**
- * Prove the configured streaming-TTS bridge actually emits PCM: push a short
- * utterance and require at least one audio chunk back. Without this a broken
- * KYBERION_TTS_COMMAND turns every reply into instant silence.
- */
-async function smokeTestStreamingTts(
-  bridge: StreamingTextToSpeechBridge,
-  voiceProfileId: string,
-  timeoutMs = 15_000
-): Promise<{ ok: boolean; reason?: string }> {
-  async function* text(): AsyncGenerator<string> {
-    // i18n-exempt: JA voice demo script output
-    yield 'テスト。';
-  }
-  try {
-    const iterator = bridge.synthesizeStream(text(), voiceProfileId)[Symbol.asyncIterator]();
-    const timedOut = Symbol('timeout');
-    const first = await Promise.race([
-      iterator.next(),
-      new Promise<typeof timedOut>((resolve) => setTimeout(() => resolve(timedOut), timeoutMs)),
+    await cleanupRealtimeVoiceResources([
+      { resource: 'media events', cleanup: () => unsubscribeMediaEvents?.() },
+      { resource: 'TTS bridge', cleanup: () => streamingTts?.dispose?.() },
+      ...bridgeDisposers
+        .reverse()
+        .map((cleanup) => ({ resource: 'streaming registration', cleanup })),
+      { resource: 'warm actuator', cleanup: () => warmClient?.dispose() },
     ]);
-    void iterator.return?.();
-    if (first === timedOut) return { ok: false, reason: `no PCM within ${timeoutMs}ms` };
-    if (first.done) return { ok: false, reason: 'stream closed without audio chunks' };
-    if (!first.value.payload.length) return { ok: false, reason: 'empty first audio chunk' };
-    return { ok: true };
-  } catch (error) {
-    return { ok: false, reason: error instanceof Error ? error.message : String(error) };
   }
 }
 
@@ -1172,6 +1164,7 @@ export function parseRealtimeVoiceConversationCli(
   return {
     sessionId,
     audio,
+    streamingConfig: resolveRealtimeVoiceStreamingConfig(configured),
     profileId:
       argv['profile-id'] || argv['voice-profile-id']
         ? String(argv['profile-id'] ?? argv['voice-profile-id'])
