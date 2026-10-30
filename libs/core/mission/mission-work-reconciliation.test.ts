@@ -849,6 +849,13 @@ describe('mission existing work reconciliation', () => {
     );
     // The failed run's ledger entries are not recorded twice.
     expect(String(safeReadFile(ledgerPath, { encoding: 'utf8' }))).toBe(ledgerAfterFailure);
+    const history = JSON.parse(
+      String(safeReadFile(nodePath.join(missionPath, 'mission-state.json'), { encoding: 'utf8' }))
+    ).history as Array<{ event: string; note: string }>;
+    expect(history.at(-1)).toMatchObject({
+      event: 'RECONCILE_EXISTING_WORK',
+      note: expect.stringContaining('board repaired for implementation, repair-finish-exit'),
+    });
 
     // A third run finds nothing left to repair.
     const third = await reconcileMissionExistingWork({
