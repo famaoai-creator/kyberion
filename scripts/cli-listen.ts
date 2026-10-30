@@ -1,3 +1,10 @@
+import type { Observation } from '@agent/core/perception/observation';
+import {
+  PERCEPTION_OPTIONS_HELP,
+  validatePerceptionOptions,
+  enhancementDeps,
+  renderObservations,
+} from './lib/perception-enhancements.js';
 /**
  * `pnpm kyberion listen <audio> [--lang <bcp47>] [--timestamps] [--json] [--out <file>]`
  *
@@ -15,6 +22,8 @@ import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge'
 import { ScriptExitError } from './lib/harness.js';
 import {
   assertExtension,
+  assertPerceptionInput,
+  assertAudioAnalysisDuration,
   AUDIO_EXTENSIONS,
   createPerceptionWorkDir,
   defaultPerceptionDeps,
@@ -41,6 +50,8 @@ Transcribes a ${AUDIO_EXTENSIONS.join(' / ')} recording with the installed local
   --out <file>    Write the Markdown (or JSON) to a file inside the repository instead of stdout
   --verbose       Keep runtime logs (they go to stdout; off by default so stdout is the content)
 
+${PERCEPTION_OPTIONS_HELP}
+
 Videos: use \`pnpm kyberion watch <video>\`. No backend yet? Run \`pnpm kyberion voice setup\`.
 The file must be inside the repository. Copy external files first, e.g.
   mkdir -p active/shared/tmp/<job> && cp ~/Downloads/<audio> active/shared/tmp/<job>/`;
@@ -50,11 +61,14 @@ interface ListenArgs extends CommonArgs {
 }
 
 export interface ListenResult {
+  source?: import('@agent/core/perception/observation').PerceptionSource;
   file: string;
   backend: string;
   language?: string;
   text: string;
-  segments?: TranscriptSegment[];
+  segments?: (TranscriptSegment & { speaker_id?: string })[];
+  analysis?: import('@agent/core/perception/audio-analysis').AudioAnalysisResult;
+  observations?: Observation[];
   warnings: string[];
 }
 
@@ -95,6 +109,9 @@ export function renderListenResult(
     '',
     body,
   ];
+  if (result.analysis)
+    lines.push('', '## Audio analysis', '', JSON.stringify(result.analysis, null, 2));
+  if (result.observations) lines.push(...renderObservations(result.observations));
   if (result.warnings.length > 0) lines.push('', ...result.warnings.map((w) => `> [listen] ${w}`));
   return lines.join('\n');
 }
@@ -108,11 +125,12 @@ export async function transcribeMediaFile(
   command: string,
   absolute: string,
   workDir: string,
-  options: { language?: string; timestamps: boolean }
+  options: { language?: string; timestamps: boolean; maxSeconds?: number }
 ): Promise<ListenResult> {
   const wav = path.join(workDir, 'audio-16k-mono.wav');
   try {
-    await extractSttWav(deps, absolute, wav);
+    await extractSttWav(deps, absolute, wav, options.maxSeconds);
+    if (options.maxSeconds !== undefined) await assertAudioAnalysisDuration(deps, wav);
   } catch (error) {
     explainMediaError(command, error);
   }
@@ -145,6 +163,8 @@ export async function runListenCommand(
     print(LISTEN_USAGE);
     return undefined;
   }
+  const options = args.enhancement ?? {};
+  validatePerceptionOptions('listen', options);
   const absolute = resolveRepositoryInput('listen', args.file);
   const ext = path.extname(absolute).toLowerCase();
   if (ext !== '.webm' && (VIDEO_EXTENSIONS as readonly string[]).includes(ext)) {
@@ -154,18 +174,100 @@ export async function runListenCommand(
     );
   }
   assertExtension('listen', absolute, AUDIO_EXTENSIONS);
-  const workDir = createPerceptionWorkDir('listen');
+  assertPerceptionInput(absolute);
+  const workDir = createPerceptionWorkDir('listen', absolute);
   try {
-    const result = await transcribeMediaFile(deps, 'listen', absolute, workDir, {
-      ...(args.lang ? { language: args.lang } : {}),
-      timestamps: args.timestamps,
-    });
+    const feature =
+      options.grounded || options.diarize || options.events
+        ? await enhancementDeps(deps)
+        : undefined;
+    const source = feature?.source?.(absolute) ?? feature?.perceptionSource(absolute);
+    if (options.diarize || options.events) await assertAudioAnalysisDuration(deps, absolute);
+    const result: ListenResult = options.noTranscript
+      ? {
+          file: path.relative(pathResolver.rootDir(), absolute),
+          backend: 'analysis-only',
+          text: '',
+          warnings: [],
+        }
+      : await transcribeMediaFile(deps, 'listen', absolute, workDir, {
+          ...(args.lang ? { language: args.lang } : {}),
+          timestamps: args.timestamps || Boolean(options.diarize),
+          ...(options.diarize || options.events ? { maxSeconds: 601 } : {}),
+        });
+    if (source && feature) {
+      result.source = source;
+      result.observations = [];
+      if (options.diarize || options.events) {
+        const wav = path.join(workDir, 'analysis-16k-mono.wav');
+        await extractSttWav(deps, absolute, wav, 601);
+        const audio = await import('@agent/core/perception/audio-analysis');
+        result.analysis = await (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
+          path: wav,
+          diarize: options.diarize,
+          events: options.events,
+          diarizationModel: options.diarizationModel,
+          audioModel: options.audioModel,
+          python: options.python,
+        });
+        result.warnings.push(...result.analysis.warnings);
+        if (options.diarize && result.segments)
+          result.segments = (deps.enhancements?.alignSpeakers ?? audio.alignSpeakerSegments)(
+            result.segments,
+            result.analysis.speakers
+          );
+        else if (options.diarize && !options.noTranscript)
+          result.warnings.push(
+            'transcript has no segment timestamps; speaker labels are available separately, not aligned to text'
+          );
+        for (const speaker of result.analysis.speakers)
+          result.observations.push(
+            feature.observation(source, {
+              modality: 'audio',
+              kind: 'speaker',
+              provider: result.analysis.provider,
+              finality: 'tentative',
+              speaker_id: speaker.speaker_id,
+              time: { start_sec: speaker.start_sec, end_sec: speaker.end_sec, basis: 'aligned' },
+              ...(speaker.confidence === undefined ? {} : { confidence: speaker.confidence }),
+            })
+          );
+        for (const event of result.analysis.events)
+          result.observations.push(
+            feature.observation(source, {
+              modality: 'audio',
+              kind: 'sound_event',
+              provider: result.analysis.provider,
+              finality: 'final',
+              text: event.label,
+              confidence: event.confidence,
+              time: { start_sec: event.start_sec, end_sec: event.end_sec, basis: 'aligned' },
+            })
+          );
+      }
+      if (result.segments)
+        result.observations.push(
+          ...feature.transcriptObservations(source, result.backend, result.segments)
+        );
+      else if (result.text)
+        result.observations.push(
+          feature.observation(source, {
+            modality: 'audio',
+            kind: 'speech',
+            provider: result.backend,
+            finality: 'final',
+            text: result.text,
+          })
+        );
+    }
+    if (source && feature) feature.assertSourceUnchanged(source);
     emitOutput(
       'listen',
       renderListenResult(result, { json: args.json, timestamps: args.timestamps }),
       args.out,
       print,
-      `${result.backend}, ${result.text.length} chars`
+      `${result.backend}, ${result.text.length} chars`,
+      absolute
     );
     return result;
   } catch (error) {

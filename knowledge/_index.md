@@ -503,6 +503,7 @@
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
 - [リアルタイム映像フィルタと会話アバターの運用](./product/orchestration/realtime-av-operations.ja.md) (public | Unknown)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
+- [位置・時刻・変化を持つ知覚の利用と検証](./product/orchestration/grounded-perception.ja.md) (public | Unknown)
 - [作業完了から再利用候補への自動接続](./product/orchestration/workflow-reuse-playbook.md) (public | Unknown)
 - [依頼を再利用可能な知識・スキル・pipeline に育てる](./product/orchestration/reusable-learning-playbook.ja.md) (public | Unknown)
 - [動画素材からの字幕付き短縮編集](./product/orchestration/video-recut-production-playbook.md) (public | Unknown)

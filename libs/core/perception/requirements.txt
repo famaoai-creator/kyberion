@@ -1,0 +1,8 @@
+# Optional isolated local inference runtime; inference does not install packages/models.
+mediapipe==1.2.0
+opencv-python-headless==5.0.0.93
+torch==2.15.0
+transformers==5.22.1
+Pillow==13.0.0
+sentencepiece==0.2.2
+# Optional diarization: install pyannote.audio>=4,<5 after provisioning Community-1.
