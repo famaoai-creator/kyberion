@@ -1059,6 +1059,20 @@ export async function reconcileMissionExistingWork(input: {
       work_item_ids_updated: [] as string[],
       ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
     };
+    // The finish repair task an earlier run of this manifest completed, but
+    // whose board entry it never wrote (found before a dry run returns, so
+    // the dry run reports it too).
+    for (const task of tasks) {
+      if (
+        task.task_id === 'repair-finish-exit' &&
+        !boardRepairedTaskIds.includes(task.task_id) &&
+        String(task.status || '').toLowerCase() === 'completed' &&
+        task.reconciliation?.manifest_sha256 === manifestHash &&
+        !boardCarriesReconciliation(task.task_id)
+      ) {
+        boardRepairedTaskIds.push(task.task_id);
+      }
+    }
     if (input.dryRun) return { status: 'dry_run_ready', ...resultBase };
 
     const adoptedAt = nowIso();
@@ -1108,17 +1122,8 @@ export async function reconcileMissionExistingWork(input: {
     );
     for (const task of tasks) {
       if (task.task_id !== 'repair-finish-exit') continue;
-      if (TERMINAL_TASK_STATUSES.has(String(task.status || '').toLowerCase())) {
-        // Completed by an earlier run of this manifest that stopped before its board write.
-        if (
-          String(task.status || '').toLowerCase() === 'completed' &&
-          task.reconciliation?.manifest_sha256 === manifestHash &&
-          !boardCarriesReconciliation(task.task_id)
-        ) {
-          boardRepairedTaskIds.push(task.task_id);
-        }
-        continue;
-      }
+      // A repair task an earlier run completed is board-repaired above.
+      if (TERMINAL_TASK_STATUSES.has(String(task.status || '').toLowerCase())) continue;
       const dependencies = (task.dependencies || []).filter(
         (dependency) => dependency !== task.task_id
       );

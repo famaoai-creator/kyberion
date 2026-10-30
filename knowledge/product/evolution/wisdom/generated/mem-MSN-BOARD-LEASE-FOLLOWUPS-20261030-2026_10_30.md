@@ -1,0 +1,42 @@
+---
+record_id: mem-MSN-BOARD-LEASE-FOLLOWUPS-20261030-2026_10_30
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-BOARD-LEASE-FOLLOWUPS-20261030-2026_10_30
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-30T09:42:39.743Z
+source_branch: fix/board-lease-followups-20261030
+source_commit: 4b817b073fe71287378eae2204d9b2c6022c8603
+---
+
+# Recover follow-up records from durable markers, not from the state the effect changes
+
+When an effect's own result hides what it did (a rewired dependency no longer points at the old task), find its records again from a durable marker written in the same update, and make each record idempotent on its own.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- - Do not detect what still needs recording from the condition the effect removes. A dependent rewired from the old task no longer depends on it, so a re-run after a crash finds nothing to record. Instead, write a durable marker in the same update as the effect (dependencies_rewritten_from on the board and the WorkItem) and rebuild the set from the markers on every run.
+- Never let one record act as the done stamp for another. If the receipt is written first and gates the audit and ledger appends, a crash between them leaves the receipt claiming entries that do not exist. Make each record check its own store (ledger entries, audit entries, the receipt field) for the ids it already holds, and append only the missing ones; any crash order then converges.
+- A re-run test after a fully successful run proves nothing about dedupe: the code path that dedupes is never reached. Inject a fault after the effect and between the records, then re-run (twice) and assert each id is recorded exactly once.
+- A test for an existing guard (e.g. re-validation on a repair path) passes on the current code by design; prove it is meaningful with a mutation check that removes the guard.
+
+## Recommended References
+
+- active/missions/public/MSN-BOARD-LEASE-FOLLOWUPS-20261030/evidence/distillation.md
+
+## Evidence
+
+- active/missions/public/MSN-BOARD-LEASE-FOLLOWUPS-20261030/evidence/distillation.md
+
+## Artifacts
