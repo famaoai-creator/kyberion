@@ -807,6 +807,18 @@ export async function supersedeMissionTask(
     // is left as it is: pointing it at the replacement would make it wait on
     // itself. It stays pending on the superseded task for the operator.
     const leftLateDependents = new Set<string>();
+    let replacementWaitsOn = new Set<string>();
+    const canonicalItems = new Map(
+      [...missionWorkItemsByTaskId(plan.state)].map(
+        ([id, item]) => [id, getWorkItem(item.item_id) ?? item] as const
+      )
+    );
+    const itemDependencies = (item: WorkItem | undefined): string[] => [
+      ...(item?.dependencies || []).map(String),
+      ...(Array.isArray(item?.metadata?.dependencies)
+        ? (item.metadata.dependencies as unknown[]).map(String)
+        : []),
+    ];
     const nextTasksChanged = writeMissionNextTasks(
       plan.missionPath,
       (onDisk) => {
@@ -814,9 +826,11 @@ export async function supersedeMissionTask(
         const boardById = new Map(
           onDisk.map((task) => [String(task.task_id || '').trim(), task] as const)
         );
-        const replacementWaitsOn = dependencyClosure(input.byTaskId, (id) =>
-          taskDependencies(boardById.get(id))
-        );
+        // Over the board and the WorkItems together: a cycle may span both.
+        replacementWaitsOn = dependencyClosure(input.byTaskId, (id) => [
+          ...taskDependencies(boardById.get(id)),
+          ...itemDependencies(canonicalItems.get(id)),
+        ]);
         const nextTasks = onDisk.map((task) => {
           const id = String(task.task_id || '').trim();
           if (id === input.taskId) {
@@ -828,14 +842,14 @@ export async function supersedeMissionTask(
           if (isClosedTask({ ...task, task_id: id })) return task;
           const next = rewriteDependencies(taskDependencies(task), input.taskId, input.byTaskId);
           if (!next.changed) return task;
+          if (replacementWaitsOn.has(id)) {
+            leftLateDependents.add(id);
+            return task;
+          }
           if (!dependents.has(id)) {
             // A review of the old task cannot be pointed at another task; it
             // stays pending, as the plan would have refused it.
             if (String(task.review_target || '') === input.taskId) return task;
-            if (replacementWaitsOn.has(id)) {
-              leftLateDependents.add(id);
-              return task;
-            }
             lateDependents.add(id);
           }
           boardChanged = true;
@@ -852,26 +866,14 @@ export async function supersedeMissionTask(
     if (nextTasksChanged) changed = true;
     // A canonical dependent added since the plan (its board entry may not
     // exist yet) is rewritten the same way.
-    const canonicalItems = new Map(
-      [...missionWorkItemsByTaskId(plan.state)].map(
-        ([id, item]) => [id, getWorkItem(item.item_id) ?? item] as const
-      )
-    );
-    const itemDependencies = (item: WorkItem | undefined): string[] => [
-      ...(item?.dependencies || []).map(String),
-      ...(Array.isArray(item?.metadata?.dependencies)
-        ? (item.metadata.dependencies as unknown[]).map(String)
-        : []),
-    ];
-    const replacementItemWaitsOn = dependencyClosure(input.byTaskId, (id) =>
-      itemDependencies(canonicalItems.get(id))
-    );
-    for (const [id, current] of canonicalItems) {
+    // Re-read: the board step's WorkItem reads may be older than the board write.
+    for (const [id, item] of canonicalItems) {
       if (id === input.taskId || dependents.has(id)) continue;
+      const current = getWorkItem(item.item_id) ?? item;
       if (isClosedTask({ task_id: id, status: itemTaskStatus(current) })) continue;
       if (String(current.metadata?.review_target || '') === input.taskId) continue;
       if (!itemDependencies(current).includes(input.taskId)) continue;
-      if (replacementItemWaitsOn.has(id) || leftLateDependents.has(id)) {
+      if (replacementWaitsOn.has(id) || leftLateDependents.has(id)) {
         leftLateDependents.add(id);
         continue;
       }
