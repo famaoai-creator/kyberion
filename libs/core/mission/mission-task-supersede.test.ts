@@ -12,6 +12,10 @@ const ledgerFault = vi.hoisted(() => ({
   failAuditStamp: false,
   failReceipt: false,
   failArchive: false,
+  // Fail the next ledger append of this event type (once).
+  failEventType: undefined as string | undefined,
+  // Fail the receipt write that records late dependents (once).
+  failLateReceipt: false,
   // Runs once before the next ledger append: another board writer between the
   // supersede's plan (its board read) and its NEXT_TASKS write.
   beforeAppend: undefined as (() => void) | undefined,
@@ -41,6 +45,14 @@ vi.mock('./mission-dispatch-lifecycle.js', async (importOriginal) => {
         ledgerFault.failReceipt = false;
         throw new Error('[TEST_FAULT] receipt write failed');
       }
+      if (
+        ledgerFault.failLateReceipt &&
+        payload &&
+        'late_rewritten_dependent_task_ids' in payload
+      ) {
+        ledgerFault.failLateReceipt = false;
+        throw new Error('[TEST_FAULT] late receipt write failed');
+      }
       if (ledgerFault.failAuditStamp && payload && 'audit_recorded_at' in payload) {
         ledgerFault.failAuditStamp = false;
         throw new Error('[TEST_FAULT] audit stamp failed');
@@ -58,6 +70,10 @@ vi.mock('./mission-team-binding.js', async (importOriginal) => {
     ) => {
       if (ledgerFault.failNext) {
         ledgerFault.failNext = false;
+        throw new Error('[TEST_FAULT] ledger append failed');
+      }
+      if (ledgerFault.failEventType && args[0].event_type === ledgerFault.failEventType) {
+        ledgerFault.failEventType = undefined;
         throw new Error('[TEST_FAULT] ledger append failed');
       }
       const beforeAppend = ledgerFault.beforeAppend;
@@ -257,6 +273,35 @@ afterEach(() => {
 useSeparationOfDutiesOverlay(
   pathResolver.sharedTmp(`sod-overlay-mission-task-supersede-${process.pid}.json`)
 );
+
+/** Two tasks come to wait on task-held while the supersede runs (board + WorkItem, WorkItem only). */
+function addLateDependentsDuringRun(): void {
+  ledgerFault.beforeAppend = () => {
+    writeMissionNextTasks(missionPath, (onDisk) => [
+      ...onDisk,
+      {
+        task_id: 'task-late',
+        status: 'planned',
+        description: 'Added late',
+        dependencies: ['task-held'],
+      },
+    ]);
+    for (const taskId of ['task-late', 'task-late-item']) {
+      createWorkItem({
+        itemId: itemId(taskId),
+        title: taskId,
+        description: taskId,
+        status: 'ready',
+        projectId: missionId,
+        source: 'local',
+        sourceRef: `mission:${missionId}:${taskId}`,
+        dependencies: ['task-held'],
+        context: { mission_id: missionId, project_id: missionId, task_id: taskId },
+        metadata: { task_id: taskId, mission_id: missionId },
+      });
+    }
+  };
+}
 
 describe('mission_controller supersede-task', () => {
   it('requires the mission controller role', async () => {
@@ -590,33 +635,9 @@ describe('mission_controller supersede-task', () => {
   it('rewires a dependent added after its plan was read, on the board and in WorkItems', async () => {
     prepareMission();
     const approvalRequestId = approve();
-    ledgerFault.beforeAppend = () => {
-      // A planner adds two tasks that wait on the held task while the supersede
-      // runs: one on the board and in WorkItems, one only in WorkItems so far.
-      writeMissionNextTasks(missionPath, (onDisk) => [
-        ...onDisk,
-        {
-          task_id: 'task-late',
-          status: 'planned',
-          description: 'Added late',
-          dependencies: ['task-held'],
-        },
-      ]);
-      for (const taskId of ['task-late', 'task-late-item']) {
-        createWorkItem({
-          itemId: itemId(taskId),
-          title: taskId,
-          description: taskId,
-          status: 'ready',
-          projectId: missionId,
-          source: 'local',
-          sourceRef: `mission:${missionId}:${taskId}`,
-          dependencies: ['task-held'],
-          context: { mission_id: missionId, project_id: missionId, task_id: taskId },
-          metadata: { task_id: taskId, mission_id: missionId },
-        });
-      }
-    };
+    // A planner adds two tasks that wait on the held task while the supersede
+    // runs: one on the board and in WorkItems, one only in WorkItems so far.
+    addLateDependentsDuringRun();
     const result = await supersedeMissionTask({
       missionId,
       taskId: 'task-held',
@@ -639,6 +660,141 @@ describe('mission_controller supersede-task', () => {
     for (const taskId of ['task-late', 'task-late-item']) {
       expect(getWorkItem(itemId(taskId))?.dependencies).toEqual(['task-replacement']);
     }
+    // The durable record names the late dependents too, once.
+    const readReceipt = () =>
+      JSON.parse(
+        String(
+          safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+            encoding: 'utf8',
+          })
+        )
+      ) as Record<string, unknown>;
+    expect(readReceipt()).toMatchObject({
+      rewritten_dependent_task_ids: ['task-after'],
+      late_rewritten_dependent_task_ids: ['task-late', 'task-late-item'],
+    });
+    const lateLedgerEntries = () =>
+      String(
+        safeReadFile(nodePath.join(missionPath, 'execution-ledger.jsonl'), { encoding: 'utf8' })
+      )
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line) as Record<string, unknown>)
+        .filter((entry) => entry.event_type === 'task_supersede_dependents_rewired');
+    expect(lateLedgerEntries()).toHaveLength(1);
+    expect(lateLedgerEntries()[0].payload).toMatchObject({
+      late_rewritten_dependent_task_ids: ['task-late', 'task-late-item'],
+    });
+    const { auditChain } = await import('../governance/audit-chain.js');
+    const lateAudits = () =>
+      auditChain
+        .loadAll()
+        .filter(
+          (entry) =>
+            entry.action === 'mission.task_supersede_dependents_rewired' &&
+            entry.metadata?.approval_request_id === approvalRequestId
+        );
+    expect(lateAudits()).toHaveLength(1);
+    expect(isTaskVerifiablySuperseded(missionId, 'task-held', { approvalRequestId })).toBe(true);
+
+    // A re-run with the same approval records nothing again.
+    await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(readReceipt().late_rewritten_dependent_task_ids).toEqual([
+      'task-late',
+      'task-late-item',
+    ]);
+    expect(lateLedgerEntries()).toHaveLength(1);
+    expect(lateAudits()).toHaveLength(1);
+  });
+
+  /** The late-dependent records: receipt field, ledger entries and audit entries. */
+  async function lateRecords(approvalRequestId: string) {
+    const receipt = JSON.parse(
+      String(
+        safeReadFile(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'), {
+          encoding: 'utf8',
+        })
+      )
+    ) as Record<string, unknown>;
+    const ledger = String(
+      safeReadFile(nodePath.join(missionPath, 'execution-ledger.jsonl'), { encoding: 'utf8' })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as Record<string, unknown>)
+      .filter((entry) => entry.event_type === 'task_supersede_dependents_rewired');
+    const { auditChain } = await import('../governance/audit-chain.js');
+    const audits = auditChain
+      .loadAll()
+      .filter(
+        (entry) =>
+          entry.action === 'mission.task_supersede_dependents_rewired' &&
+          entry.metadata?.approval_request_id === approvalRequestId
+      );
+    return {
+      receipt: receipt.late_rewritten_dependent_task_ids,
+      ledger: ledger.flatMap(
+        (entry) =>
+          (entry.payload as { late_rewritten_dependent_task_ids: string[] })
+            .late_rewritten_dependent_task_ids
+      ),
+      audit: audits.flatMap(
+        (entry) => entry.metadata?.late_rewritten_dependent_task_ids as string[]
+      ),
+    };
+  }
+
+  it('records late dependents after a crash right after they were rewired', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    addLateDependentsDuringRun();
+    ledgerFault.failEventType = 'task_supersede_dependents_rewired';
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
+    // Rewired, but nothing records it yet; the re-run finds them by their markers.
+    expect(boardTask('task-late')?.dependencies).toEqual(['task-replacement']);
+    await supersedeMissionTask(input);
+    expect(await lateRecords(approvalRequestId)).toEqual({
+      receipt: ['task-late', 'task-late-item'],
+      ledger: ['task-late', 'task-late-item'],
+      audit: ['task-late', 'task-late-item'],
+    });
+  });
+
+  it('completes the late-dependent records without duplicates after a crash between them', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    const input = {
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    };
+    addLateDependentsDuringRun();
+    // Ledger and audit entries written, the receipt not.
+    ledgerFault.failLateReceipt = true;
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/TEST_FAULT/u);
+    expect((await lateRecords(approvalRequestId)).receipt).toBeUndefined();
+    await supersedeMissionTask(input);
+    await supersedeMissionTask(input);
+    expect(await lateRecords(approvalRequestId)).toEqual({
+      receipt: ['task-late', 'task-late-item'],
+      ledger: ['task-late', 'task-late-item'],
+      audit: ['task-late', 'task-late-item'],
+    });
   });
 
   it('never points a late dependent the replacement waits on at the replacement', async () => {
