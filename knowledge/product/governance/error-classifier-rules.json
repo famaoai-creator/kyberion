@@ -4,6 +4,22 @@
   "description": "Error classification rules for classifyError(). Rules are evaluated in order; first match wins. Add new entries here rather than editing error-classifier.ts. Pattern strings are applied as case-insensitive RegExp. Code strings are matched as exact equality against the Node.js error code.",
   "rules": [
     {
+      "id": "credential.scope-denied",
+      "category": "governance_block",
+      "label": "Credential execution scope is inconsistent",
+      "remediation": "Inspect the command's resolved tenant, mission and task scope and repair the conflicting context before retrying. Do not clear tenant scope to borrow operator credentials.",
+      "patterns": ["\\[CREDENTIAL_SCOPE_DENIED\\]|\\[CREDENTIAL_OWNER_DENIED\\]"],
+      "repairAction": "Reconcile the authenticated execution envelope and its tenant/task credential binding; retry only after the scope conflict has been repaired."
+    },
+    {
+      "id": "credential.binding-required",
+      "category": "governance_block",
+      "label": "Trusted tenant credential binding required",
+      "remediation": "Run credential-dependent tenant work through the governed WorkItem dispatch path with a matching bindTask resolver. Local diagnostics and maintenance should initialize only the capabilities they need.",
+      "patterns": ["\\[CREDENTIAL_BINDING_REQUIRED\\]"],
+      "repairAction": "Inspect the resolved scope and tenant resolver's bindTask configuration, then dispatch the claimed WorkItem with its trusted credential binding. Approval or an API-key environment variable does not replace that binding."
+    },
+    {
       "id": "service.endpoint-missing",
       "category": "resource_unavailable",
       "label": "Service endpoint not configured",

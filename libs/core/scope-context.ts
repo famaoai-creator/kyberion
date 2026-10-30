@@ -334,6 +334,7 @@ export function writeScopeEnv(
   ].join('\n');
   const filePath = scopeEnvPath(env);
   safeWriteFile(filePath, lines, { encoding: 'utf8', mkdir: true, mode: 0o600 });
+  resetCurrentScope();
   return filePath;
 }
 
@@ -344,6 +345,7 @@ export function clearScopeEnv(env: NodeJS.ProcessEnv = process.env): void {
   // would resurrect a scope the operator intentionally cleared.
   const stackPath = scopeStackPath(env);
   if (safeExistsSync(stackPath)) safeUnlinkSync(stackPath);
+  resetCurrentScope();
 }
 
 /** Maximum stashed scopes; push beyond this is an operator error, not growth. */
@@ -424,7 +426,8 @@ export function currentScope(
   input: ScopeContextInput = {},
   env: NodeJS.ProcessEnv = process.env
 ): ScopeContext {
-  if (Object.keys(input).length === 0 && env === process.env && cachedCurrentScope) {
+  const cacheable = !isScopeEnvOnly() && Object.keys(input).length === 0 && env === process.env;
+  if (cacheable && cachedCurrentScope) {
     return cachedCurrentScope;
   }
   const resolved = resolveScopeContext(input, env);
@@ -432,7 +435,7 @@ export function currentScope(
     { ...resolved, tier: resolved.tier || 'public' },
     { requireTenant: false, allowShared: true }
   );
-  if (Object.keys(input).length === 0 && env === process.env) cachedCurrentScope = scope;
+  if (cacheable) cachedCurrentScope = scope;
   return scope;
 }
 

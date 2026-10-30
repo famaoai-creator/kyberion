@@ -234,7 +234,7 @@ export async function pruneStimuli(): Promise<void> {
 }
 
 function printUsage(print: Print): void {
-  print('Usage: pnpm presence-controller <resolve|perceive|prune> [args]');
+  print('Usage: pnpm kyberion presence stimuli <resolve|perceive|prune> [args]');
 }
 
 export async function main(args: string[] = [], print: Print = () => undefined): Promise<void> {
