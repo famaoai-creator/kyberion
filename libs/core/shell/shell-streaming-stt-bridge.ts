@@ -213,8 +213,8 @@ function terminateProcess(proc: ChildProcessWithoutNullStreams): void {
   timer.unref();
 }
 
-export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): void {
-  registerStreamingSttBridge(
+export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): () => void {
+  return registerStreamingSttBridge(
     opts.bridge_id,
     () => new ShellStreamingSpeechToTextBridge(opts),
     opts.capabilities
@@ -225,15 +225,19 @@ export function installShellStreamingSttBridge(opts: ShellStreamingSttOptions): 
  * Convenience: installs from `KYBERION_STT_COMMAND` (and optional
  * `KYBERION_STT_ARGS`, comma-separated) under the bridge id `shell`.
  */
-export function installShellStreamingSttBridgeFromEnv(): { installed: boolean; reason?: string } {
-  const command = getRegisteredEnvText('KYBERION_STT_COMMAND');
+export function installShellStreamingSttBridgeFromEnv(env: NodeJS.ProcessEnv = process.env): {
+  installed: boolean;
+  reason?: string;
+  dispose?: () => void;
+} {
+  const command = getRegisteredEnvText('KYBERION_STT_COMMAND', { env });
   if (!command) return { installed: false, reason: 'KYBERION_STT_COMMAND not set' };
-  const args = (getRegisteredEnvText('KYBERION_STT_ARGS') ?? '')
+  const args = (getRegisteredEnvText('KYBERION_STT_ARGS', { env }) ?? '')
     .split(',')
     .map((a) => a.trim())
     .filter(Boolean);
-  installShellStreamingSttBridge({ bridge_id: 'shell', command, args });
-  return { installed: true };
+  const dispose = installShellStreamingSttBridge({ bridge_id: 'shell', command, args });
+  return { installed: true, dispose };
 }
 
 /**
@@ -242,7 +246,7 @@ export function installShellStreamingSttBridgeFromEnv(): { installed: boolean; r
  */
 export function installManagedMlxWhisperStreamingSttBridgeIfAvailable(
   env: NodeJS.ProcessEnv = process.env
-): { installed: boolean; reason?: string; bridge_id?: string } {
+): { installed: boolean; reason?: string; bridge_id?: string; dispose?: () => void } {
   if (getRegisteredEnvText('KYBERION_STT_COMMAND', { env })?.trim()) {
     return { installed: false, reason: 'KYBERION_STT_COMMAND already configured' };
   }
@@ -252,12 +256,12 @@ export function installManagedMlxWhisperStreamingSttBridgeIfAvailable(
     return { installed: false, reason: 'managed mlx_whisper stream runtime is unavailable' };
   }
   const bridgeId = 'managed_mlx_whisper';
-  installShellStreamingSttBridge({
+  const dispose = installShellStreamingSttBridge({
     bridge_id: bridgeId,
     command,
     args: [script],
     capabilities: { local_only: true, languages: [...WHISPER_LANGUAGES] },
   });
   logger.success('[stt-bridge] installed managed mlx_whisper streaming bridge');
-  return { installed: true, bridge_id: bridgeId };
+  return { installed: true, bridge_id: bridgeId, dispose };
 }

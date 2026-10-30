@@ -261,10 +261,14 @@ export function playPcmAudioStream(
   };
 }
 
-export function probePcmAudioStreaming(): { available: boolean; reason?: string } {
-  const probe = spawnSync('which', ['ffplay'], { stdio: 'ignore' });
+export function probePcmAudioStreaming(command?: readonly string[]): {
+  available: boolean;
+  reason?: string;
+} {
+  const executable = command?.[0] || 'ffplay';
+  const probe = spawnSync('which', [executable], { stdio: 'ignore' });
   return probe.error || probe.status !== 0
-    ? { available: false, reason: 'ffplay is not available on PATH' }
+    ? { available: false, reason: `${executable} is not available on PATH` }
     : { available: true };
 }
 
