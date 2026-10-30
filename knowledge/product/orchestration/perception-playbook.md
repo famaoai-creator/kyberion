@@ -103,3 +103,7 @@ Warnings are printed as `> [<command>] …` lines after the content — act on t
 - **URLs, the live screen, authoring (the inverse of `read`) and the memory axis** —
   which of those have a verb and which do not is tracked in
   [capability-verb-inventory.md](./capability-verb-inventory.md).
+
+## Grounded perception extensions
+
+Position/time observations, visual changes, diarization, sound events, local tracking and scoped semantic search: [usage and limits](./grounded-perception.ja.md).
