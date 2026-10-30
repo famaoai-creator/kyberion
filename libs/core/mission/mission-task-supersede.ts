@@ -250,6 +250,19 @@ function supersededRecordOf(value: unknown): MissionTaskSupersededRecord | undef
     : undefined;
 }
 
+/** The task and every task it waits on, directly or not. */
+function dependencyClosure(taskId: string, dependenciesOf: (id: string) => string[]): Set<string> {
+  const closure = new Set<string>();
+  const stack = [taskId];
+  while (stack.length > 0) {
+    const next = stack.pop()!;
+    if (closure.has(next)) continue;
+    closure.add(next);
+    stack.push(...dependenciesOf(next));
+  }
+  return closure;
+}
+
 /** A completed or superseded task: never rewritten, never a reason to refuse. */
 function isClosedTask(view: TaskView): boolean {
   const status = String(view.status || 'planned').toLowerCase();
@@ -790,10 +803,20 @@ export async function supersedeMissionTask(
     //    copy: a worker result written since the plan was read is kept, and a
     //    dependent added since then is rewritten too (a late dependent).
     const lateDependents = new Set<string>();
+    // A late dependent the replacement waits on (or the replacement itself)
+    // is left as it is: pointing it at the replacement would make it wait on
+    // itself. It stays pending on the superseded task for the operator.
+    const leftLateDependents = new Set<string>();
     const nextTasksChanged = writeMissionNextTasks(
       plan.missionPath,
       (onDisk) => {
         let boardChanged = false;
+        const boardById = new Map(
+          onDisk.map((task) => [String(task.task_id || '').trim(), task] as const)
+        );
+        const replacementWaitsOn = dependencyClosure(input.byTaskId, (id) =>
+          taskDependencies(boardById.get(id))
+        );
         const nextTasks = onDisk.map((task) => {
           const id = String(task.task_id || '').trim();
           if (id === input.taskId) {
@@ -809,6 +832,10 @@ export async function supersedeMissionTask(
             // A review of the old task cannot be pointed at another task; it
             // stays pending, as the plan would have refused it.
             if (String(task.review_target || '') === input.taskId) return task;
+            if (replacementWaitsOn.has(id)) {
+              leftLateDependents.add(id);
+              return task;
+            }
             lateDependents.add(id);
           }
           boardChanged = true;
@@ -825,23 +852,37 @@ export async function supersedeMissionTask(
     if (nextTasksChanged) changed = true;
     // A canonical dependent added since the plan (its board entry may not
     // exist yet) is rewritten the same way.
-    for (const [id, item] of missionWorkItemsByTaskId(plan.state)) {
+    const canonicalItems = new Map(
+      [...missionWorkItemsByTaskId(plan.state)].map(
+        ([id, item]) => [id, getWorkItem(item.item_id) ?? item] as const
+      )
+    );
+    const itemDependencies = (item: WorkItem | undefined): string[] => [
+      ...(item?.dependencies || []).map(String),
+      ...(Array.isArray(item?.metadata?.dependencies)
+        ? (item.metadata.dependencies as unknown[]).map(String)
+        : []),
+    ];
+    const replacementItemWaitsOn = dependencyClosure(input.byTaskId, (id) =>
+      itemDependencies(canonicalItems.get(id))
+    );
+    for (const [id, current] of canonicalItems) {
       if (id === input.taskId || dependents.has(id)) continue;
-      const current = getWorkItem(item.item_id) ?? item;
       if (isClosedTask({ task_id: id, status: itemTaskStatus(current) })) continue;
       if (String(current.metadata?.review_target || '') === input.taskId) continue;
-      const metadataDependencies = Array.isArray(current.metadata?.dependencies)
-        ? (current.metadata.dependencies as unknown[]).map(String)
-        : [];
-      if (
-        !(current.dependencies || []).map(String).includes(input.taskId) &&
-        !metadataDependencies.includes(input.taskId)
-      ) {
+      if (!itemDependencies(current).includes(input.taskId)) continue;
+      if (replacementItemWaitsOn.has(id) || leftLateDependents.has(id)) {
+        leftLateDependents.add(id);
         continue;
       }
       rewriteWorkItemDependencies(current);
       lateDependents.add(id);
       changed = true;
+    }
+    if (leftLateDependents.size > 0) {
+      logger.warn(
+        `supersede-task: ${[...leftLateDependents].sort().join(', ')} came to depend on ${input.taskId} during this run, but ${input.byTaskId} waits on them — they still wait on ${input.taskId} | remove that dependency, then re-run supersede-task with the same approval | mission=${input.missionId}`
+      );
     }
     if (lateDependents.size > 0) {
       logger.info(
