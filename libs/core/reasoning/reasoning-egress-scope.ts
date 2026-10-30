@@ -50,6 +50,8 @@ export interface ReasoningPayloadScope {
   purpose?: string;
   /** Deterministic categories supplied by the caller; absent facts become `unknown`. */
   categories?: Array<'routine_business' | 'personal_data' | 'sensitive_business' | 'unknown'>;
+  /** Number of attached inputs; required for explicitly scoped processors. */
+  attachment_count?: number;
   /** Maximum provider data-use posture. Defaults to local_only. */
   training_use?: ReasoningTrainingUse;
   external_egress?: 'allow' | 'deny';
@@ -219,7 +221,8 @@ function assertCharterProcessorScope(
     purpose: scope.purpose ?? '',
     processor_id: provider ?? '',
     categories,
-    attachment_count: 0,
+    // Missing attachment facts must not silently become an attachment-free request.
+    attachment_count: scope.attachment_count ?? -1,
   });
   if (violations.length) throw new ReasoningEgressDeniedError(violations.join('; '));
 }

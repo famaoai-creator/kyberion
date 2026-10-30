@@ -16,7 +16,7 @@ it('uses only supported stable Chrome with its sandbox and bounded startup', () 
     channel: 'chrome',
     headless: true,
     chromiumSandbox: true,
-    timeout: 20_000,
+    timeout: 45_000,
   });
   expect(Object.isFrozen(selectionBrowserLaunchOptions)).toBe(true);
 });

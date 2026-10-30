@@ -509,8 +509,48 @@ describe('no_training honours tenant provider attestations', () => {
         tier: 'public',
         tenant_slug: 'approved-tenant',
         purpose: 'vendor_quote_analysis',
+        attachment_count: 0,
         categories: ['sensitive_business'],
         training_use: 'training_eligible',
+      },
+      () =>
+        expect(() =>
+          assertReasoningEgressAllowedAtEndpoint('claude-cli', 'https://api.anthropic.com')
+        ).not.toThrow()
+    );
+  });
+
+  it.each([undefined, -1, 0.5, NaN, Infinity])(
+    'rejects incomplete or invalid processor attachment facts (%s)',
+    (attachment_count) => {
+      installProcessorCharter();
+      withReasoningPayloadScope(
+        {
+          tier: 'public',
+          tenant_slug: 'approved-tenant',
+          purpose: 'vendor_quote_analysis',
+          categories: ['sensitive_business'],
+          training_use: 'training_eligible',
+          ...(attachment_count === undefined ? {} : { attachment_count }),
+        },
+        () =>
+          expect(() =>
+            assertReasoningEgressAllowedAtEndpoint('claude-cli', 'https://api.anthropic.com')
+          ).toThrow(/information_flow facts are incomplete or invalid/)
+      );
+    }
+  );
+
+  it('passes the actual image attachment count into processor evaluation', () => {
+    installProcessorCharter();
+    withReasoningPayloadScope(
+      {
+        tier: 'public',
+        tenant_slug: 'approved-tenant',
+        purpose: 'vendor_quote_analysis',
+        categories: ['sensitive_business'],
+        training_use: 'training_eligible',
+        attachment_count: 2,
       },
       () =>
         expect(() =>
@@ -526,6 +566,7 @@ describe('no_training honours tenant provider attestations', () => {
         tier: 'public',
         tenant_slug: 'approved-tenant',
         purpose: 'vendor_quote_analysis',
+        attachment_count: 0,
         categories: ['sensitive_business'],
         training_use: 'training_eligible',
       },
@@ -543,6 +584,7 @@ describe('no_training honours tenant provider attestations', () => {
         tier: 'public',
         tenant_slug: 'approved-tenant',
         purpose: 'vendor_quote_analysis',
+        attachment_count: 0,
         categories: ['sensitive_business'],
         training_use: 'training_eligible',
       },
@@ -568,6 +610,7 @@ describe('no_training honours tenant provider attestations', () => {
         tier: 'public',
         tenant_slug: 'approved-tenant',
         purpose: 'vendor_quote_analysis',
+        attachment_count: 0,
         categories: ['sensitive_business'],
         training_use: 'training_eligible',
       },

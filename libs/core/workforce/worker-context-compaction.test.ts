@@ -238,6 +238,7 @@ describe('worker-context-compaction (OH-01)', () => {
           tier: 'confidential',
           tenant_slug: 'tenant-a',
           purpose: 'test summary scope',
+          attachment_count: 0,
         },
         summarize: async () => {
           observed = getReasoningPayloadScope();
@@ -251,6 +252,7 @@ describe('worker-context-compaction (OH-01)', () => {
       tier: 'confidential',
       tenant_slug: 'tenant-a',
       purpose: 'test summary scope',
+      attachment_count: 0,
     });
     expect(getReasoningPayloadScope()).toBeUndefined();
   });
