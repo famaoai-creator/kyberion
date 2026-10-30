@@ -1,3 +1,9 @@
+import { delegateSubagentTask, getWorkItemTaskId } from './mission-subagent-task.js';
+export {
+  delegateSubagentTask,
+  getWorkItemTaskId,
+  workItemExpectsFiles,
+} from './mission-subagent-task.js';
 import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
 /**
@@ -9,7 +15,7 @@ import * as nodePath from 'node:path';
 import type { A2AMessage } from '../mesh/a2a-bridge.js';
 import { extractFencedBlock } from '../foundation/text.js';
 import { getA2ARoute } from '../mesh/a2a-route-port.js';
-import type { AgentExecutionPort, AgentExecutionReceipt } from '../agent/agent-execution-port.js';
+import type { AgentExecutionPort } from '../agent/agent-execution-port.js';
 import type { AgentContextMode } from '../context-boundary.js';
 import {
   buildArtifactReviewReceipt,
@@ -18,15 +24,14 @@ import {
   type ArtifactReviewFinding,
   type ArtifactReviewReceipt,
 } from '../workforce/artifact-review.js';
-import { getReasoningBackend } from '../reasoning/reasoning-backend.js';
+import { classifyReasoningFailure } from '../reasoning/reasoning-failure-taxonomy.js';
 import {
-  delegateCoordinatedCliSubagentTask,
   delegateCoordinatedAgentTask,
   type CoordinatedAgentExecutionReceipt,
 } from '../coordinated-agent-execution-port.js';
 import { loadAgentProfileIndex } from './mission-team-index.js';
 import * as pathResolver from '../path-resolver.js';
-import { getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
+import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { nowIso } from '../foundation/time.js';
 import { isAgentRuntimeApprovalPendingError } from '../agent/agent-prompt-approval-port.js';
@@ -59,13 +64,9 @@ import { routeTaskWithJudgment } from '../task/task-routing-judgment.js';
 import { ensureJudgmentBackendsRegistered } from '../reasoning/judgment-provider-bootstrap.js';
 import { type TaskResultBlock } from '../surface/channel-surface-types.js';
 import { type OperatorInteractionPacket } from '../contracts/operator-interaction-packet.js';
-import { HarnessSubagentDispatcher } from '../agent/agent-dispatch.js';
 import { buildWorkingPrinciplesLines, canonicalizeTeamRole } from '../working-principles.js';
 import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
-import {
-  assertProviderCanProjectProfile,
-  resolveCliProviderDescriptorOrNull,
-} from '../provider/provider-permission-profiles.js';
+import { assertProviderCanProjectProfile } from '../provider/provider-permission-profiles.js';
 import type { MissionState } from './mission-types.js';
 import type { ContextSecurityScope } from '../context-security-scope.js';
 import { checkProviderEgress } from '../provider/provider-egress-gate.js';
@@ -905,15 +906,6 @@ export async function runWithWorkItemResponseDeadline<T>(
   }
 }
 
-export function getWorkItemTaskId(item: WorkItem): string | undefined {
-  const metadata = (item.metadata || {}) as Record<string, unknown>;
-  const taskId = metadata.task_id;
-  if (typeof taskId === 'string' && taskId.trim()) return taskId.trim();
-  const sourceRef = String(item.source_ref || '').trim();
-  const match = sourceRef.match(/^mission:[^:]+:(.+)$/u);
-  return match?.[1] || undefined;
-}
-
 export async function runIndependentReviewerReview(input: {
   missionPath: string;
   missionId: string;
@@ -1075,165 +1067,6 @@ export async function runIndependentReviewerReview(input: {
  *  - Transient CLI hiccups returned empty responses that went straight to
  *    blocked; retry once before giving up.
  */
-export function workItemExpectsFiles(item: WorkItem): boolean {
-  const metadata = (item.metadata || {}) as Record<string, unknown>;
-  return Boolean(
-    metadata.deliverable ||
-    metadata.target_path ||
-    String(metadata.expected_output_format || '') === 'files'
-  );
-}
-
-export async function delegateSubagentTask(input: {
-  item: WorkItem;
-  assigneePeerId?: string;
-  prompt: string;
-  routingOptions: Record<string, unknown>;
-  adapters: WorkItemDispatchAdapters;
-  notes: string[];
-  signal: AbortSignal;
-  securityScope: ContextSecurityScope;
-  contextMode: AgentContextMode;
-  purpose?: 'implementation' | 'review';
-  /**
-   * KD-05 tier the delegation must run under — resolved by the caller from
-   * the team role × purpose ceiling (resolveDelegationCapabilityProfile).
-   * Falls back to the purpose-only floor for legacy callers.
-   */
-  capabilityProfile?: string;
-}): Promise<WorkItemExecutionOutcome> {
-  const delegationContext = input.purpose === 'review' ? 'workitem-review' : 'workitem';
-  const capabilityProfile =
-    input.capabilityProfile ?? (input.purpose === 'review' ? 'explorer' : 'implementer');
-  const delegationIdentity = input.assigneePeerId || input.item.assignee_peer_id;
-  const delegationContextRef = delegationIdentity
-    ? `${delegationContext}:${input.item.item_id}:agent=${delegationIdentity}`
-    : `${delegationContext}:${input.item.item_id}`;
-  const missionId = String(
-    input.item.metadata?.mission_id || input.item.project_id || input.item.item_id
-  ).trim();
-  const backend = getReasoningBackend();
-  // The ambient CLI backend must be able to project this tier too —
-  // unknown/non-CLI adapters are skipped (they execute no tools).
-  if (resolveCliProviderDescriptorOrNull(backend.name)) {
-    assertProviderCanProjectProfile(backend.name, capabilityProfile);
-  }
-  const nativeDispatcher = new HarnessSubagentDispatcher();
-  const nativeAdopter = backend.getNativeSubagentAdopter?.() ?? null;
-
-  const executeText = async (): Promise<AgentExecutionReceipt> => {
-    const startedAt = nowIso();
-    try {
-      let nativeSubagent: Record<string, unknown> | undefined;
-      const run = async () => {
-        if (input.adapters.nativeSubagentTask) {
-          const result = await input.adapters.nativeSubagentTask(
-            input.prompt,
-            delegationContextRef,
-            {
-              ...input.routingOptions,
-              context_mode: input.contextMode,
-              signal: input.signal,
-            }
-          );
-          nativeSubagent = result.nativeSubagent;
-          return result.text;
-        }
-        if (input.adapters.delegateTask) {
-          return input.adapters.delegateTask(input.prompt, delegationContextRef, {
-            context_mode: input.contextMode,
-            signal: input.signal,
-          });
-        }
-        return nativeDispatcher.dispatch(input.prompt, delegationContextRef, backend, {
-          ...input.routingOptions,
-          context_mode: input.contextMode,
-          profile: capabilityProfile,
-          role: input.purpose === 'review' ? 'reviewer' : 'implementer',
-          signal: input.signal,
-        });
-      };
-      let output = await run();
-      if (!output || !output.trim()) {
-        input.notes.push('empty subagent response; retrying once');
-        output = await run();
-      }
-      return {
-        execution_kind: 'agent_delegation',
-        task_id: getWorkItemTaskId(input.item) || input.item.item_id,
-        agent_id: delegationIdentity || `task-agent-${input.item.item_id}`,
-        provider: backend.name,
-        ...(input.routingOptions.model ? { model_id: String(input.routingOptions.model) } : {}),
-        ...(nativeAdopter?.getInfo?.()
-          ? { native_subagent: nativeAdopter.getInfo() || undefined }
-          : nativeSubagent
-            ? { native_subagent: nativeSubagent }
-            : {}),
-        status: 'succeeded',
-        started_at: startedAt,
-        completed_at: nowIso(),
-        output_ref: `${input.item.item_id}:result`,
-        output,
-      };
-    } catch (error) {
-      if (isAgentRuntimeApprovalPendingError(error)) throw error;
-      return {
-        execution_kind: 'agent_delegation',
-        task_id: getWorkItemTaskId(input.item) || input.item.item_id,
-        agent_id: delegationIdentity || `task-agent-${input.item.item_id}`,
-        provider: backend.name,
-        ...(input.routingOptions.model ? { model_id: String(input.routingOptions.model) } : {}),
-        status: 'failed',
-        started_at: startedAt,
-        completed_at: nowIso(),
-        error: error instanceof Error ? error.message : String(error),
-      };
-    }
-  };
-
-  const wantsFiles = workItemExpectsFiles(input.item);
-  const previousTools = getRegisteredEnvText('KYBERION_CLAUDE_AGENT_TOOLS');
-  if (wantsFiles && previousTools === undefined) {
-    setRegisteredEnv('KYBERION_CLAUDE_AGENT_TOOLS', '1');
-    input.notes.push('agentic tools auto-enabled (work item expects file output)');
-  }
-  try {
-    const receipt: CoordinatedAgentExecutionReceipt = await delegateCoordinatedCliSubagentTask(
-      {
-        work_item_id: input.item.item_id,
-        task_id: getWorkItemTaskId(input.item) || input.item.item_id,
-        ...(missionId ? { mission_id: missionId } : {}),
-        ...(delegationIdentity ? { agent_id: delegationIdentity } : {}),
-        security_scope: input.securityScope,
-        context_mode: input.contextMode,
-        // Transport success still awaits task_result validation and final reflection.
-        success_status: 'review',
-        instruction: input.prompt,
-        context_refs: [delegationContextRef, JSON.stringify(input.routingOptions)],
-        idempotency_key: `${delegationContext}:${input.item.item_id}:${input.item.version}`,
-      },
-      executeText,
-      delegationIdentity || `workitem:${input.item.item_id}`
-    );
-    if (receipt.status !== 'succeeded') {
-      throw new Error(receipt.error || `work item delegation ${receipt.status}`);
-    }
-    return {
-      responseText: receipt.output || '',
-      attemptId: receipt.attempt_id,
-      runtimeId: receipt.runtime_id,
-      outputRef: receipt.output_ref,
-      executorAgentId: receipt.agent_id,
-      provider: receipt.provider,
-      ...(receipt.model_id ? { modelId: receipt.model_id } : {}),
-      ...(receipt.native_subagent ? { nativeSubagent: receipt.native_subagent } : {}),
-    };
-  } finally {
-    if (wantsFiles && previousTools === undefined) {
-      setRegisteredEnv('KYBERION_CLAUDE_AGENT_TOOLS', previousTools);
-    }
-  }
-}
 export async function routeToAgentOrSubagent(input: {
   missionId: string;
   item: WorkItem;
@@ -1602,22 +1435,21 @@ export async function routeToAgentOrSubagent(input: {
         `[EXECUTION_SURFACE_FAILED] ${surfaceDecision.surface} dispatch failed: ${error?.message || error}`
       );
     }
+    if (!classifyReasoningFailure(error).allowFailover) throw error;
     notes.push(`agent dispatch failed: ${error?.message || error}; falling back to subagent`);
-    const backend = getReasoningBackend();
-    const nativeDispatcher = new HarnessSubagentDispatcher();
-    const responseText = input.adapters.delegateTask
-      ? await input.adapters.delegateTask(prompt, `workitem:${input.item.item_id}`, {
-          context_mode: input.contextMode,
-          signal: input.signal,
-        })
-      : await nativeDispatcher.dispatch(prompt, `workitem:${input.item.item_id}`, backend, {
-          model: input.taskModelHint.model_id,
-          effort: input.taskModelHint.effort,
-          profile: 'implementer',
-          context_mode: input.contextMode,
-          role: 'implementer',
-          signal: input.signal,
-        });
-    return { executionMode: 'subagent', executionSurfaceUsed: 'cli_subagent', responseText, notes };
+    const execution = await delegateSubagentTask({
+      item: input.item,
+      assigneePeerId: input.assigneePeerId,
+      prompt,
+      routingOptions,
+      adapters: input.adapters,
+      notes,
+      signal: input.signal,
+      securityScope: runtimeSecurityScope,
+      contextMode: input.contextMode,
+      purpose: surfacePurpose,
+      capabilityProfile,
+    });
+    return { ...execution, executionMode: 'subagent', executionSurfaceUsed: 'cli_subagent', notes };
   }
 }

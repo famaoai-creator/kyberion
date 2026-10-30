@@ -1,3 +1,9 @@
+// Non-sensitive readiness is exposed through the public credential facade.
+export {
+  credentialBindingReadiness,
+  isCredentialBindingRequired,
+  type CredentialBindingReadiness,
+} from '../foundation/credential-binding.js';
 import * as secureIo from '../secure-io.js';
 import { operatorProbeSecretAccess } from '../service/operator-service-connection-admission.js';
 import { logger } from '../core.js';
