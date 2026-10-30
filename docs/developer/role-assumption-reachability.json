@@ -3476,6 +3476,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/cli-browser-bridge.ts#<module>",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/config_mission.ts#cmdApply (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller"],
       "unresolved": []
