@@ -50,7 +50,7 @@ secret serviceは、このtenantへの明示的な割り当てを確認したう
 ```
 
 `providerEnvironments` はCLIを使わなければ省略できる。
-`HOME` は既存のprivate tenant scratch/cache floor内に事前に作成し、当該tenantの
+`HOME` は既存のprivate tenantの一時領域またはキャッシュ領域内に事前に作成し、当該tenantの
 認証を設定する。operator HOMEのコピー、別tenantのHOME、リンク、特殊ファイル、
 HOME外を指す認証設定パスは拒否される。CLIの子プロセス環境はこの設定から構築される。
 レスポンスは128 KiBまで、secret/envの各mapは64項目まで、各値は16,384文字まで。

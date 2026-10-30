@@ -2477,3 +2477,8 @@ promotion of a generative provider even when invocation tests pass.
 Gates: image-description provider authorization/fallback regressions,
 dirty-tile source-tier/output-directory regressions, and Apple Speech
 locale/asset/explicit-provider selection tests.
+
+OBS WebSocket v5 authentication tests assert a fixed wire-protocol vector instead
+of recalculating its password-derived digest in the expected value. Keep the
+protocol-mandated runtime algorithm unchanged; password-storage KDF guidance does
+not change an external handshake. Gates: CodeQL and the OBS virtual-camera tests.
