@@ -12,7 +12,8 @@ import {
   readRequirementsDraft,
   readRequirementsDraftAtPath,
 } from '@agent/core/requirements-draft-store';
-import { assertSafeRepositoryPath, safeWriteFile } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { writeMissionNextTasks } from '@agent/core/mission';
 
 function resolveTaskPlanInputPath(ref: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
@@ -112,8 +113,12 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
   });
   // NEXT_TASKS.json belongs to the existing mission wherever it lives; an
   // unknown mission fails closed (OwnerScopeError) instead of landing in public.
-  const nextTasksPath = `${resolveMissionDir(input.mission_id)}/NEXT_TASKS.json`;
-  safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
+  const missionDir = resolveMissionDir(input.mission_id);
+  const nextTasksPath = `${missionDir}/NEXT_TASKS.json`;
+  // Through the one board writer: the new plan replaces the board, but a task
+  // superseded on disk keeps its supersede record (M2) and the board is
+  // validated before it is written.
+  writeMissionNextTasks(missionDir, nextTasks as unknown as Array<Record<string, unknown>>);
   return {
     mission_id: input.mission_id,
     next_tasks_path: nextTasksPath,

@@ -57,6 +57,7 @@ import { loadState, saveState } from './mission-state.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { readCanonicalWorkGraphTasks } from '../workforce/work-graph-projection.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 
 // `superseded` (supersede-task) is terminal: a replaced task is never adoptable.
 const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed', 'superseded']);
@@ -1180,9 +1181,20 @@ export async function reconcileMissionExistingWork(input: {
     }
 
     if (reconciledTaskIds.length > 0 || resultBase.auto_completed_repair_task_ids.length > 0) {
-      writeDispatchArtifact(nodePath.join(missionPath, 'NEXT_TASKS.json'), tasks, {
-        missionId,
-        missionPath,
+      // Written under the board's writer lease: the adopted and repair tasks
+      // carry this reconciliation, every other task keeps the board's current
+      // entry, so a worker's status write since the read above is kept.
+      const changedIds = new Set([
+        ...reconciledTaskIds,
+        ...resultBase.auto_completed_repair_task_ids,
+      ]);
+      writeMissionNextTasks(missionPath, (onDisk) => {
+        const onDiskById = new Map(onDisk.map((task) => [String(task.task_id || ''), task]));
+        return tasks.map((task) => {
+          const taskId = String(task.task_id || '');
+          if (changedIds.has(taskId)) return task as unknown as Record<string, unknown>;
+          return onDiskById.get(taskId) ?? (task as unknown as Record<string, unknown>);
+        });
       });
     }
     const receipt: MissionWorkReconciliationResult & { adopted_at: string; reason: string } = {
