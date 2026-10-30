@@ -33,8 +33,12 @@ import {
   resolveCliOperatorIdentity,
 } from '@agent/core/governance/cli-operator-principal';
 import { pathResolver } from '@agent/core/path-resolver';
+import { classifyPromotionSourceScope, isUnknownTierSource } from '@agent/core/scratch-promotion';
 import { safeReadFile } from '@agent/core/secure-io';
-import type { StorageDataTier } from '@agent/core/storage-layout';
+import {
+  partitionedRuntimeStateKnowledgePath,
+  type StorageDataTier,
+} from '@agent/core/storage-layout';
 import { ScriptExitError } from './lib/harness.js';
 
 export const BROWSER_BRIDGE_USAGE = `Usage: pnpm kyberion browser-bridge <request|status|wait> [options]
@@ -148,6 +152,61 @@ function fail(message: string): never {
   throw new ScriptExitError(1, `${message}\n\n${BROWSER_BRIDGE_USAGE}`);
 }
 
+const TIER_RANK: Record<StorageDataTier, number> = { public: 0, confidential: 1, personal: 2 };
+
+/**
+ * Refuse an `--input-file` whose location carries a higher tier than the
+ * requested scope, or another tenant's data. Classification reuses the
+ * governed helpers: tiered trees (`knowledge/`, `active/{missions,projects,
+ * organizations}/`), the storage floors, and the partitioned runtime state
+ * roots (mapped onto their `knowledge/<tier>/<tenant>/` rules). An
+ * unpartitioned (legacy) floor path has an unknown tier, so it may not be sent
+ * as public. Anything else keeps the requested scope.
+ */
+export function assertInputFileScope(
+  filePath: string,
+  scope: { tier: StorageDataTier; tenant_slug?: string }
+): void {
+  // Classify the logical repo-relative location (rootResolve may relocate
+  // runtime roots, e.g. per test pool); an absolute path is made repo-relative.
+  const relative = (
+    path.isAbsolute(filePath)
+      ? path.relative(pathResolver.rootResolve('.'), path.resolve(filePath))
+      : path.normalize(filePath)
+  )
+    .split(path.sep)
+    .join('/');
+  if (relative.startsWith('../') || relative === '..' || path.isAbsolute(relative)) return;
+  const source = classifyPromotionSourceScope(
+    partitionedRuntimeStateKnowledgePath(relative) ?? relative
+  );
+  if (!source) {
+    if (scope.tier === 'public' && isUnknownTierSource(relative)) {
+      fail(
+        `--input-file ${filePath} is in an unpartitioned storage location (tier unknown); ` +
+          'it cannot be sent with --tier public. Use the tier/tenant partition that owns it.'
+      );
+    }
+    return;
+  }
+  const requestedTenant = scope.tenant_slug?.trim().toLowerCase() || undefined;
+  const requested = `${scope.tier}${requestedTenant ? `/${requestedTenant}` : ''}`;
+  const carried = `${source.tier}${source.tenant ? `/${source.tenant}` : ''}`;
+  if (TIER_RANK[source.tier] > TIER_RANK[scope.tier]) {
+    fail(
+      `--input-file ${filePath} holds ${carried} data (${source.location}); ` +
+        `it cannot be sent in the lower ${requested} scope. Pass --tier ${source.tier}` +
+        `${source.tenant ? ` --tenant ${source.tenant}` : ''}.`
+    );
+  }
+  if (source.tenant && source.tenant !== requestedTenant) {
+    fail(
+      `--input-file ${filePath} belongs to tenant '${source.tenant}' (${source.location}); ` +
+        `it cannot be sent in the ${requested} scope. Pass --tenant ${source.tenant}.`
+    );
+  }
+}
+
 function text(options: Record<string, string | boolean>, flag: string): string | undefined {
   const value = options[flag];
   return typeof value === 'string' ? value : undefined;
@@ -197,6 +256,7 @@ function buildRequest(
     const inline = text(options, '--input');
     const file = text(options, '--input-file');
     if (Boolean(inline) === Boolean(file)) fail('give exactly one of --input or --input-file');
+    if (file) assertInputFileScope(file, common.scope);
     let taskOptions: Record<string, unknown> | undefined;
     const rawOptions = text(options, '--options-json');
     if (rawOptions) {

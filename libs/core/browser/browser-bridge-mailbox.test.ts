@@ -1,7 +1,8 @@
 import * as path from 'node:path';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { withLockSync } from '../foundation/lock-utils.js';
 import type { ApprovalRequestRecord } from '../governance/approval-store.js';
 import {
   BROWSER_BRIDGE_MAILBOX_ROOT,
@@ -15,9 +16,16 @@ import {
   loadBrowserBridgeRequest,
   respondBrowserBridgeRequest,
   toBrowserBridgeRequestView,
+  validateBrowserBridgeRequest,
   type BrowserBridgeRequest,
   type EnqueueBrowserBridgeRequestInput,
 } from './browser-bridge-mailbox.js';
+
+// Pass-through spy: lets the poll test prove terminal records skip the lock.
+vi.mock('../foundation/lock-utils.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../foundation/lock-utils.js')>();
+  return { ...actual, withLockSync: vi.fn(actual.withLockSync) };
+});
 
 const ROOT = pathResolver.rootResolve(BROWSER_BRIDGE_MAILBOX_ROOT);
 const T0 = new Date('2026-10-31T00:00:00.000Z');
@@ -189,6 +197,80 @@ describe('enqueueBrowserBridgeRequest', () => {
   });
 });
 
+describe('review regressions: enqueue', () => {
+  it('requires non-empty allowed_origins for a confidential observe_tab', () => {
+    const confidential = { tier: 'confidential' as const, tenant_slug: 'acme' };
+    let message = '';
+    try {
+      observe({ scope: confidential, payload: { purpose: 'Read it', mode: 'text' } });
+    } catch (err) {
+      message = String((err as Error).message);
+    }
+    expect(message).toMatch(/confidential \(tenant\) observe_tab request requires non-empty/);
+    expect(
+      code(() =>
+        observe({
+          scope: confidential,
+          payload: { purpose: 'Read it', mode: 'text', allowed_origins: [] },
+        })
+      )
+    ).toBe('invalid_input');
+    // Personal scope keeps the optional allowlist.
+    expect(observe({ payload: { purpose: 'Read it', mode: 'text' } }).status).toBe('pending');
+    // A stored confidential record without origins fails the schema too (fail closed).
+    const stored = observe({ scope: confidential });
+    const stripped = {
+      ...stored,
+      payload: { purpose: 'Read it', mode: 'text' },
+    };
+    expect(validateBrowserBridgeRequest(stripped).valid).toBe(false);
+    safeWriteFile(
+      path.join(ROOT, 'confidential', 'acme', `${stored.request_id}.json`),
+      JSON.stringify(stripped)
+    );
+    expect(loadBrowserBridgeRequest(stored.request_id, { now: T0 })).toBeNull();
+  });
+
+  it('accepts valid input that redaction would push over maxLength, clamped after redaction', () => {
+    // 6-char email -> 16-char token: 118 + 10 = 128 > 120 before the fix.
+    const title = `${'t'.repeat(112)} a@b.co`;
+    expect(title.length).toBe(119);
+    const body = `${'b'.repeat(993)} a@b.co`;
+    const notify = enqueueBrowserBridgeRequest(
+      {
+        request_kind: 'notify',
+        payload: { level: 'info', title, body },
+        requested_by: { actor_id: 'agent:test' },
+        scope: { tier: 'personal' },
+      },
+      { now: T0 }
+    );
+    const payload = notify.payload as { title: string; body: string };
+    expect(payload.title.length).toBe(120);
+    expect(payload.body.length).toBe(1000);
+    expect(payload.title).not.toContain('a@b.co');
+    const purpose = `${'p'.repeat(293)} a@b.co`;
+    expect(
+      (observe({ payload: { purpose, mode: 'text' } }).payload as { purpose: string }).purpose
+    ).toHaveLength(300);
+    const input = `${'i'.repeat(29_993)} a@b.co`;
+    const infer = enqueueBrowserBridgeRequest(
+      {
+        request_kind: 'local_infer',
+        payload: { task: 'summarize', input },
+        requested_by: { actor_id: 'agent:test' },
+        scope: { tier: 'personal' },
+      },
+      { now: T0 }
+    );
+    expect((infer.payload as { input: string }).input).toHaveLength(30_000);
+    // Raw input over the limit is still rejected (lengths are checked before redaction).
+    expect(
+      code(() => observe({ payload: { purpose: 'x'.repeat(301), mode: 'text' } as never }))
+    ).toBe('invalid_input');
+  });
+});
+
 describe('listDeliverableBrowserBridgeRequests', () => {
   it('marks pending requests delivered and sweeps expired ones', () => {
     const fresh = observe();
@@ -207,6 +289,31 @@ describe('listDeliverableBrowserBridgeRequests', () => {
     const view = toBrowserBridgeRequestView(listed[0]);
     expect(view).not.toHaveProperty('response');
     expect(view).not.toHaveProperty('delivered_at');
+  });
+});
+
+describe('review regressions: poll cost', () => {
+  it('skips terminal records without taking their lock, and still sweeps expiry', () => {
+    const done = observe();
+    respondBrowserBridgeRequest(done.request_id, { status: 'declined' }, { now: at(1000) });
+    const stale = observe({ ttl_ms: 60_000 });
+    const live = observe();
+    const lock = vi.mocked(withLockSync);
+    lock.mockClear();
+    const listed = listDeliverableBrowserBridgeRequests({ now: at(2 * 60_000) });
+    expect(listed.map((r) => r.request_id)).toEqual([live.request_id]);
+    const lockedIds = lock.mock.calls.map(([id]) => id);
+    expect(lockedIds).not.toContain(`browser-bridge-mailbox-${done.request_id}`);
+    expect(lockedIds).toContain(`browser-bridge-mailbox-${stale.request_id}`);
+    expect(loadBrowserBridgeRequest(stale.request_id, { now: at(2 * 60_000) })?.status).toBe(
+      'expired'
+    );
+    // Once expired, the swept record is skipped cheaply on the next poll too.
+    lock.mockClear();
+    listDeliverableBrowserBridgeRequests({ now: at(3 * 60_000) });
+    expect(lock.mock.calls.map(([id]) => id)).toEqual([
+      `browser-bridge-mailbox-${live.request_id}`,
+    ]);
   });
 });
 
@@ -288,6 +395,32 @@ describe('respondBrowserBridgeRequest', () => {
       truncated: false,
       executable: false,
     });
+  });
+
+  it('redacts object keys in a local_infer output, suffixing collisions deterministically', () => {
+    const request = localInfer();
+    const done = respondBrowserBridgeRequest(
+      request.request_id,
+      {
+        status: 'completed',
+        result: {
+          provider: 'chrome-prompt',
+          task: 'summarize',
+          output: {
+            'alice@example.com': 'owner',
+            'bob@example.com': { 'carol@example.com': 'nested' },
+            plain: 'dave@example.com',
+          },
+          executable: false,
+        },
+      },
+      { now: at(1000) }
+    );
+    const output = (done.response?.result as { output: Record<string, unknown> }).output;
+    expect(Object.keys(output)).toEqual(['[redacted-email]', '[redacted-email] (2)', 'plain']);
+    expect(output['[redacted-email] (2)']).toEqual({ '[redacted-email]': 'nested' });
+    expect(output.plain).toBe('[redacted-email]');
+    expect(JSON.stringify(done.response)).not.toMatch(/@example\.com/);
   });
 
   it('caps the response size at 64 KiB', () => {
