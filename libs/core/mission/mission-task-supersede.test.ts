@@ -97,6 +97,7 @@ import {
   writeMissionNextTasks,
 } from './mission-lifecycle.js';
 import { loadState } from './mission-state.js';
+import { projectWorkGraphToNextTasks } from '../workforce/work-graph-projection.js';
 import {
   createMissionTaskSupersedeApprovalRequest,
   isTaskVerifiablySuperseded,
@@ -289,6 +290,46 @@ describe('mission_controller supersede-task', () => {
     expect(dry.rewritten_dependent_task_ids).toEqual(['task-after']);
     expect(boardTask('task-held')?.status).toBe('blocked');
     expect(boardTask('task-after')?.dependencies).toEqual(['task-held']);
+  });
+
+  it('a board rebuilt from WorkItems after it was deleted keeps the proven supersede', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    const record = boardTask('task-held')?.superseded;
+    safeRmSync(nodePath.join(missionPath, 'NEXT_TASKS.json'));
+
+    const result = projectWorkGraphToNextTasks({
+      missionId,
+      projectId: missionId,
+      missionPath,
+      apply: true,
+    });
+    expect(result.applied).toBe(true);
+    expect(boardTask('task-held')).toMatchObject({ status: 'superseded', superseded: record });
+    expect(evaluateMissionFinishExitGate(missionPath).pendingTasks).not.toContain('task-held');
+
+    // A record the approval does not cover (another replacement) is not carried.
+    safeRmSync(nodePath.join(missionPath, 'NEXT_TASKS.json'));
+    writeMissionNextTasks(
+      missionPath,
+      () => [
+        {
+          task_id: 'task-held',
+          status: 'superseded',
+          superseded: { ...(record as Record<string, unknown>), by_task_id: 'task-done' },
+        },
+      ],
+      { acceptProvenSupersede: true }
+    );
+    expect(boardTask('task-held')?.status).toBe('planned');
+    expect(boardTask('task-held')).not.toHaveProperty('superseded');
   });
 
   it('applies with an authenticated human approval: closes the task, moves dependents, keeps the reason in the receipt only', async () => {
@@ -544,6 +585,91 @@ describe('mission_controller supersede-task', () => {
     expect(boardTask('task-held')?.status).toBe('superseded');
     expect(boardTask('task-after')?.dependencies).toEqual(['task-replacement']);
     expect(boardTask('task-replacement')).toMatchObject({ status: 'in_progress', rework_count: 1 });
+  });
+
+  it('rewires a dependent added after its plan was read, on the board and in WorkItems', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    ledgerFault.beforeAppend = () => {
+      // A planner adds two tasks that wait on the held task while the supersede
+      // runs: one on the board and in WorkItems, one only in WorkItems so far.
+      writeMissionNextTasks(missionPath, (onDisk) => [
+        ...onDisk,
+        {
+          task_id: 'task-late',
+          status: 'planned',
+          description: 'Added late',
+          dependencies: ['task-held'],
+        },
+      ]);
+      for (const taskId of ['task-late', 'task-late-item']) {
+        createWorkItem({
+          itemId: itemId(taskId),
+          title: taskId,
+          description: taskId,
+          status: 'ready',
+          projectId: missionId,
+          source: 'local',
+          sourceRef: `mission:${missionId}:${taskId}`,
+          dependencies: ['task-held'],
+          context: { mission_id: missionId, project_id: missionId, task_id: taskId },
+          metadata: { task_id: taskId, mission_id: missionId },
+        });
+      }
+    };
+    const result = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(result.status).toBe('applied');
+    expect(result.rewritten_dependent_task_ids).toEqual([
+      'task-after',
+      'task-late',
+      'task-late-item',
+    ]);
+    expect(boardTask('task-late')).toMatchObject({
+      dependencies: ['task-replacement'],
+      dependencies_rewritten_from: [
+        expect.objectContaining({ from: 'task-held', to: 'task-replacement' }),
+      ],
+    });
+    for (const taskId of ['task-late', 'task-late-item']) {
+      expect(getWorkItem(itemId(taskId))?.dependencies).toEqual(['task-replacement']);
+    }
+  });
+
+  it('never points a late dependent the replacement waits on at the replacement', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    ledgerFault.beforeAppend = () => {
+      // The replacement itself comes to wait on the task it replaces.
+      writeMissionNextTasks(missionPath, (onDisk) =>
+        onDisk.map((task) =>
+          task.task_id === 'task-replacement' ? { ...task, dependencies: ['task-held'] } : task
+        )
+      );
+      const item = getWorkItem(itemId('task-replacement'))!;
+      updateWorkItem({
+        itemId: item.item_id,
+        expectedVersion: item.version,
+        dependencies: ['task-held'],
+      });
+    };
+    const result = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(result.status).toBe('applied');
+    expect(result.rewritten_dependent_task_ids).toEqual(['task-after']);
+    expect(boardTask('task-replacement')?.dependencies).toEqual(['task-held']);
+    expect(getWorkItem(itemId('task-replacement'))?.dependencies).toEqual(['task-held']);
+    expect(boardTask('task-after')?.dependencies).toEqual(['task-replacement']);
   });
 
   it('leaves a dependent that completed after its plan was read unrewired (m2)', async () => {

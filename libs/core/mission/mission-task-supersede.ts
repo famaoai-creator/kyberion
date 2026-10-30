@@ -250,6 +250,19 @@ function supersededRecordOf(value: unknown): MissionTaskSupersededRecord | undef
     : undefined;
 }
 
+/** The task and every task it waits on, directly or not. */
+function dependencyClosure(taskId: string, dependenciesOf: (id: string) => string[]): Set<string> {
+  const closure = new Set<string>();
+  const stack = [taskId];
+  while (stack.length > 0) {
+    const next = stack.pop()!;
+    if (closure.has(next)) continue;
+    closure.add(next);
+    stack.push(...dependenciesOf(next));
+  }
+  return closure;
+}
+
 /** A completed or superseded task: never rewritten, never a reason to refuse. */
 function isClosedTask(view: TaskView): boolean {
   const status = String(view.status || 'planned').toLowerCase();
@@ -688,9 +701,7 @@ export async function supersedeMissionTask(
         workItemIdsUpdated.push(current.item_id);
       }
     }
-    for (const dependentId of plan.dependents) {
-      const item = plan.items.get(dependentId);
-      if (!item) continue;
+    const rewriteWorkItemDependencies = (item: WorkItem): void => {
       const current = getWorkItem(item.item_id) ?? item;
       const metadata = current.metadata || {};
       const canonical = rewriteDependencies(
@@ -705,7 +716,7 @@ export async function supersedeMissionTask(
             input.byTaskId
           )
         : null;
-      if (!canonical.changed && !metadataDependencies?.changed) continue;
+      if (!canonical.changed && !metadataDependencies?.changed) return;
       updateWorkItem({
         itemId: current.item_id,
         expectedVersion: current.version,
@@ -719,6 +730,10 @@ export async function supersedeMissionTask(
         },
       });
       workItemIdsUpdated.push(current.item_id);
+    };
+    for (const dependentId of plan.dependents) {
+      const item = plan.items.get(dependentId);
+      if (item) rewriteWorkItemDependencies(item);
     }
     if (workItemIdsUpdated.length > 0) changed = true;
 
@@ -785,11 +800,37 @@ export async function supersedeMissionTask(
 
     // 4. NEXT_TASKS last: the finish gate and the supersede proof read it.
     //    Applied to the board read under its writer lease, not to the plan's
-    //    copy: a worker result written since the plan was read is kept.
+    //    copy: a worker result written since the plan was read is kept, and a
+    //    dependent added since then is rewritten too (a late dependent).
+    const lateDependents = new Set<string>();
+    // A late dependent the replacement waits on (or the replacement itself)
+    // is left as it is: pointing it at the replacement would make it wait on
+    // itself. It stays pending on the superseded task for the operator.
+    const leftLateDependents = new Set<string>();
+    let replacementWaitsOn = new Set<string>();
+    const canonicalItems = new Map(
+      [...missionWorkItemsByTaskId(plan.state)].map(
+        ([id, item]) => [id, getWorkItem(item.item_id) ?? item] as const
+      )
+    );
+    const itemDependencies = (item: WorkItem | undefined): string[] => [
+      ...(item?.dependencies || []).map(String),
+      ...(Array.isArray(item?.metadata?.dependencies)
+        ? (item.metadata.dependencies as unknown[]).map(String)
+        : []),
+    ];
     const nextTasksChanged = writeMissionNextTasks(
       plan.missionPath,
       (onDisk) => {
         let boardChanged = false;
+        const boardById = new Map(
+          onDisk.map((task) => [String(task.task_id || '').trim(), task] as const)
+        );
+        // Over the board and the WorkItems together: a cycle may span both.
+        replacementWaitsOn = dependencyClosure(input.byTaskId, (id) => [
+          ...taskDependencies(boardById.get(id)),
+          ...itemDependencies(canonicalItems.get(id)),
+        ]);
         const nextTasks = onDisk.map((task) => {
           const id = String(task.task_id || '').trim();
           if (id === input.taskId) {
@@ -797,11 +838,20 @@ export async function supersedeMissionTask(
             boardChanged = true;
             return { ...task, status: MISSION_TASK_SUPERSEDED_STATUS, superseded: record };
           }
-          if (!dependents.has(id)) return task;
           // A dependent closed since the plan keeps its history (m2).
           if (isClosedTask({ ...task, task_id: id })) return task;
           const next = rewriteDependencies(taskDependencies(task), input.taskId, input.byTaskId);
           if (!next.changed) return task;
+          if (replacementWaitsOn.has(id)) {
+            leftLateDependents.add(id);
+            return task;
+          }
+          if (!dependents.has(id)) {
+            // A review of the old task cannot be pointed at another task; it
+            // stays pending, as the plan would have refused it.
+            if (String(task.review_target || '') === input.taskId) return task;
+            lateDependents.add(id);
+          }
           boardChanged = true;
           return {
             ...task,
@@ -814,6 +864,33 @@ export async function supersedeMissionTask(
       { allowSupersede: true }
     );
     if (nextTasksChanged) changed = true;
+    // A canonical dependent added since the plan (its board entry may not
+    // exist yet) is rewritten the same way.
+    // Re-read: the board step's WorkItem reads may be older than the board write.
+    for (const [id, item] of canonicalItems) {
+      if (id === input.taskId || dependents.has(id)) continue;
+      const current = getWorkItem(item.item_id) ?? item;
+      if (isClosedTask({ task_id: id, status: itemTaskStatus(current) })) continue;
+      if (String(current.metadata?.review_target || '') === input.taskId) continue;
+      if (!itemDependencies(current).includes(input.taskId)) continue;
+      if (replacementWaitsOn.has(id) || leftLateDependents.has(id)) {
+        leftLateDependents.add(id);
+        continue;
+      }
+      rewriteWorkItemDependencies(current);
+      lateDependents.add(id);
+      changed = true;
+    }
+    if (leftLateDependents.size > 0) {
+      logger.warn(
+        `supersede-task: ${[...leftLateDependents].sort().join(', ')} came to depend on ${input.taskId} during this run, but ${input.byTaskId} waits on them — they still wait on ${input.taskId} | remove that dependency, then re-run supersede-task with the same approval | mission=${input.missionId}`
+      );
+    }
+    if (lateDependents.size > 0) {
+      logger.info(
+        `supersede-task: ${[...lateDependents].sort().join(', ')} came to depend on ${input.taskId} during this run and now depend on ${input.byTaskId}.`
+      );
+    }
 
     // 5. History (once per approval) and the commit, like record-evidence but
     //    only in the mission's own repository (never the enclosing checkout).
@@ -855,7 +932,7 @@ export async function supersedeMissionTask(
     return {
       status: changed ? ('applied' as const) : ('already_superseded' as const),
       ...base,
-      rewritten_dependent_task_ids: plan.dependents,
+      rewritten_dependent_task_ids: [...new Set([...plan.dependents, ...lateDependents])].sort(),
       work_item_ids_updated: workItemIdsUpdated,
       approval_request_id: approvalId,
       receipt_path: receiptRelative,

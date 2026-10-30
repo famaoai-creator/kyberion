@@ -5027,6 +5027,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_YOUTUBE_API_KEY",
+      "category": "secret",
+      "type": "string",
+      "required": false,
+      "description": "YouTube Data API v3 key used by scripts/aituber_live_session.ts to poll liveChatMessages (read-only). Resolved via env or the secret resolver; never accepted from argv or repo files.",
+      "documented": true,
+      "subsystem": "aituber"
+    },
+    {
       "name": "KYBERION_YTDLP_BIN",
       "category": "path",
       "type": "path",

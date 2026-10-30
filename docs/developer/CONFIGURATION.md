@@ -12,7 +12,7 @@
 
 Copy [`env.example`](./env.example) to `.env` at the repo root for local overrides (the example is generated here because root dotfiles are write-protected by the policy engine).
 
-## secret (41)
+## secret (42)
 
 | Variable                                  | Type   | Required | Description                                                                                                                                                                                                                                                                 |
 | ----------------------------------------- | ------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -57,6 +57,7 @@ Copy [`env.example`](./env.example) to `.env` at the repo root for local overrid
 | `KYBERION_TYPESAFE_API_KEY`               | string | no       | TypeSafe API key for the typesafe-jev judgment backend. The provider is declared external-api, so personal-tier state never reaches it and confidential-tier state requires tenant approval through the provider egress policy.                                             |
 | `KYBERION_VLLM_KEY`                       | string | no       | API key for the vLLM OpenAI-compatible backend, when authentication is enabled.                                                                                                                                                                                             |
 | `KYBERION_WEB_PUSH_PRIVATE_KEY`           | string | no       | VAPID private key for Web Push to the concierge PWA. Generate a pair with `pnpm tsx scripts/generate_web_push_keys.ts`; keep it in the deployment secret store. Without the key pair nothing is pushed and subscribing is refused.                                          |
+| `KYBERION_YOUTUBE_API_KEY`                | string | no       | YouTube Data API v3 key used by scripts/aituber_live_session.ts to poll liveChatMessages (read-only). Resolved via env or the secret resolver; never accepted from argv or repo files.                                                                                      |
 
 ## path (126)
 
