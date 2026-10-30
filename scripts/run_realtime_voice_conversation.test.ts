@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RealtimeVoiceConversationPreferences } from '@agent/core/voice/realtime-voice-preferences';
 import { readFileSync } from 'node:fs';
 import {
   registerSpeechToTextBridge,
@@ -13,18 +14,91 @@ import {
   runRealtimeVoiceConversationInteractive,
 } from './run_realtime_voice_conversation.js';
 
+const preferenceState = vi.hoisted(() => ({
+  current: null as RealtimeVoiceConversationPreferences | null,
+}));
+vi.mock('@agent/core/voice/realtime-voice-preferences', async (original) => ({
+  ...(await original<typeof import('@agent/core/voice/realtime-voice-preferences')>()),
+  loadRealtimeVoiceConversationPreferences: () => preferenceState.current,
+}));
+
 describe('run_realtime_voice_conversation cli', () => {
   const previousSudo = process.env.KYBERION_SUDO;
 
   beforeEach(() => {
+    preferenceState.current = null;
+    for (const key of [
+      'KYBERION_STT_COMMAND',
+      'KYBERION_STT_ARGS',
+      'KYBERION_TTS_COMMAND',
+      'KYBERION_TTS_ARGS',
+      'KYBERION_TTS_PLAY_COMMAND',
+      'KYBERION_TTS_SAMPLE_RATE_HZ',
+      'KYBERION_TTS_SAMPLE_RATE',
+    ])
+      vi.stubEnv(key, undefined);
     // These tests inject recorder/turn dependencies and never open a real mic.
     process.env.KYBERION_SUDO = 'true';
   });
 
   afterEach(() => {
+    vi.unstubAllEnvs();
     resetSpeechToTextBridge();
     if (previousSudo === undefined) delete process.env.KYBERION_SUDO;
     else process.env.KYBERION_SUDO = previousSudo;
+  });
+
+  function streamingPreferences(command: string): RealtimeVoiceConversationPreferences {
+    return {
+      version: '1.0.0',
+      voice_profile_id: 'fixture',
+      language: 'ja',
+      assistant_name: 'Agent',
+      latency_profile: 'low_latency',
+      personal_voice_mode: 'allow_fallback',
+      delivery_mode: 'none',
+      streaming_stt_command: command,
+      streaming_tts_command: 'stream-tts',
+      streaming_tts_sample_rate: 24000,
+    };
+  }
+
+  it('re-parses saved streaming settings and their reset without mutating process.env', () => {
+    const args = { 'session-id': 'stream-pure', interactive: true, mission: 'MSN-STREAM-PURE' };
+    preferenceState.current = streamingPreferences('first-stream');
+    const first = parseRealtimeVoiceConversationCli(args);
+    preferenceState.current = streamingPreferences('second-stream');
+    const second = parseRealtimeVoiceConversationCli(args);
+    preferenceState.current = null;
+    const reset = parseRealtimeVoiceConversationCli(args);
+    expect(first.streamingConfig?.sttCommand).toBe('first-stream');
+    expect(second.streamingConfig?.sttCommand).toBe('second-stream');
+    expect(reset.streamingConfig?.sttCommand).toBeUndefined();
+    expect(process.env.KYBERION_STT_COMMAND).toBeUndefined();
+    expect(process.env.KYBERION_TTS_SAMPLE_RATE_HZ).toBeUndefined();
+    expect(process.env.KYBERION_TTS_SAMPLE_RATE).toBeUndefined();
+  });
+
+  it('does not seed saved commands into a failed parse or the batch/fixed command environment', () => {
+    preferenceState.current = streamingPreferences('ndjson-stream-only');
+    expect(() =>
+      parseRealtimeVoiceConversationCli({
+        'session-id': 'invalid',
+        interactive: true,
+        mission: 'MSN-INVALID',
+        'record-seconds': -1,
+      })
+    ).toThrow('--record-seconds');
+    parseRealtimeVoiceConversationCli({ 'session-id': 'batch', audio: 'package.json' });
+    parseRealtimeVoiceConversationCli({
+      'session-id': 'fixed',
+      interactive: true,
+      recorder: 'fixed',
+      mission: 'MSN-FIXED',
+    });
+    expect(process.env.KYBERION_STT_COMMAND).toBeUndefined();
+    expect(process.env.KYBERION_STT_ARGS).toBeUndefined();
+    expect(process.env.KYBERION_TTS_COMMAND).toBeUndefined();
   });
 
   it('parses interactive mode and default record settings', () => {

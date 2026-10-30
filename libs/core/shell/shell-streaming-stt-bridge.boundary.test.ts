@@ -1,7 +1,13 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  getStreamingSttBridge,
+  listStreamingSttBridges,
+  resetStreamingSttBridges,
+} from '../voice/streaming-stt-bridge.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import {
+  installShellStreamingSttBridgeFromEnv,
   parseShellStreamingSttTranscript,
   ShellStreamingSpeechToTextBridge,
 } from './shell-streaming-stt-bridge.js';
@@ -154,5 +160,32 @@ describe('shell streaming STT transcript boundary', () => {
     const chunk = parseShellStreamingSttTranscript('{}');
     expect(chunk).toMatchObject({ is_final: true, text: '' });
     expect(chunk?.utterance_id).toBeTruthy();
+  });
+});
+
+describe('shell streaming STT invocation installation', () => {
+  afterEach(() => {
+    resetStreamingSttBridges();
+    vi.unstubAllEnvs();
+  });
+
+  it('uses explicit command arguments and releases only its registration', async () => {
+    const script = 'process.stdout.write(JSON.stringify({text:process.argv[1]})+"\\n")';
+    const installed = installShellStreamingSttBridgeFromEnv({
+      KYBERION_STT_COMMAND: process.execPath,
+      KYBERION_STT_ARGS: '-e,' + script + ',explicit-stream',
+    });
+    expect(installed.installed).toBe(true);
+    expect(await transcripts(getStreamingSttBridge('shell').transcribeStream(noAudio()))).toEqual([
+      'explicit-stream',
+    ]);
+    installed.dispose?.();
+    expect(listStreamingSttBridges()).not.toContain('shell');
+  });
+
+  it('does not borrow a global command when an isolated environment is empty', () => {
+    vi.stubEnv('KYBERION_STT_COMMAND', 'ambient-batch-command');
+    expect(installShellStreamingSttBridgeFromEnv({}).installed).toBe(false);
+    expect(process.env.KYBERION_STT_COMMAND).toBe('ambient-batch-command');
   });
 });

@@ -72,6 +72,7 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
   readonly capabilities: StreamingTtsCapabilities;
   private channel: PersistentFramedTtsChannel | null = null;
   private disposed = false;
+  private readonly ephemeralProcesses = new Set<ChildProcessWithoutNullStreams>();
   constructor(private readonly opts: ShellStreamingTtsOptions) {
     this.bridge_id = opts.bridge_id;
     this.format = opts.format ?? DEFAULT_FORMAT;
@@ -82,8 +83,8 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
     text: AsyncIterable<string>,
     voice_profile_id: string
   ): AsyncIterable<AudioChunk> {
+    if (this.disposed) throw new Error('TTS bridge is disposed');
     if (this.opts.persistent) {
-      if (this.disposed) throw new Error('persistent TTS channel is disposed');
       this.channel ??= new PersistentFramedTtsChannel(this.opts, this.format);
       yield* this.channel.request(text, voice_profile_id);
       return;
@@ -96,6 +97,8 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
     this.disposed = true;
     this.channel?.dispose();
     this.channel = null;
+    for (const proc of this.ephemeralProcesses) terminateProcess(proc);
+    this.ephemeralProcesses.clear();
   }
 
   private async *synthesizeStreamEphemeral(
@@ -110,6 +113,7 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
         KYBERION_VOICE_PROFILE_ID: voice_profile_id,
       }),
     });
+    this.ephemeralProcesses.add(proc);
     let stderrTail = '';
     proc.stderr.on('data', (buf) => {
       stderrTail += buf.toString('utf8');
@@ -179,6 +183,7 @@ export class ShellStreamingTextToSpeechBridge implements StreamingTextToSpeechBr
       }
     } finally {
       drained = true;
+      this.ephemeralProcesses.delete(proc);
       terminateProcess(proc);
     }
   }
@@ -555,14 +560,21 @@ function terminateProcess(proc: ChildProcessWithoutNullStreams): void {
   timer.unref();
 }
 
-export function installShellStreamingTtsBridge(opts: ShellStreamingTtsOptions): void {
-  registerStreamingTtsBridge(opts.bridge_id, () => new ShellStreamingTextToSpeechBridge(opts));
+export function installShellStreamingTtsBridge(opts: ShellStreamingTtsOptions): () => void {
+  return registerStreamingTtsBridge(
+    opts.bridge_id,
+    () => new ShellStreamingTextToSpeechBridge(opts)
+  );
 }
 
-export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; reason?: string } {
-  const command = getRegisteredEnvText('KYBERION_TTS_COMMAND');
+export function installShellStreamingTtsBridgeFromEnv(sourceEnv: NodeJS.ProcessEnv = process.env): {
+  installed: boolean;
+  reason?: string;
+  dispose?: () => void;
+} {
+  const command = getRegisteredEnvText('KYBERION_TTS_COMMAND', { env: sourceEnv });
   if (!command) return { installed: false, reason: 'KYBERION_TTS_COMMAND not set' };
-  const args = (getRegisteredEnvText('KYBERION_TTS_ARGS') ?? '')
+  const args = (getRegisteredEnvText('KYBERION_TTS_ARGS', { env: sourceEnv }) ?? '')
     .split(',')
     .map((a) => a.trim())
     .filter(Boolean);
@@ -570,7 +582,7 @@ export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; r
   // Declaring the real rate keeps the ffplay sink from mis-pitching it —
   // chunks carry this format through. Non-governed rates (e.g. piper 22050)
   // must be resampled inside the TTS command wrapper instead.
-  const rateRaw = getRegisteredEnvText('KYBERION_TTS_SAMPLE_RATE_HZ')?.trim();
+  const rateRaw = getRegisteredEnvText('KYBERION_TTS_SAMPLE_RATE_HZ', { env: sourceEnv })?.trim();
   const parsedRate = rateRaw ? Number.parseInt(rateRaw, 10) : NaN;
   const format = [16000, 24000, 48000].includes(parsedRate)
     ? { ...DEFAULT_FORMAT, sample_rate_hz: parsedRate as AudioFormat['sample_rate_hz'] }
@@ -579,7 +591,7 @@ export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; r
   // qwen3_tts_stream_bridge.py --stream-framed — so one worker serves every
   // turn without a per-call model reload.
   const persistent = ['1', 'true', 'yes', 'on'].includes(
-    (getRegisteredEnvText('KYBERION_TTS_PERSISTENT') ?? '').trim().toLowerCase()
+    (getRegisteredEnvText('KYBERION_TTS_PERSISTENT', { env: sourceEnv }) ?? '').trim().toLowerCase()
   );
   // Wrapper-tunable envs: the child process runs under a sanitised env, so
   // overrides must be forwarded explicitly through the spawn options.
@@ -595,10 +607,10 @@ export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; r
     'KYBERION_PIPER_RATE',
     'KYBERION_PIPER_OUT_RATE',
   ]) {
-    const value = getRegisteredEnvText(name);
+    const value = getRegisteredEnvText(name, { env: sourceEnv });
     if (value) env[name] = value;
   }
-  installShellStreamingTtsBridge({
+  const dispose = installShellStreamingTtsBridge({
     bridge_id: 'shell',
     command,
     args,
@@ -606,5 +618,5 @@ export function installShellStreamingTtsBridgeFromEnv(): { installed: boolean; r
     persistent,
     ...(Object.keys(env).length ? { env } : {}),
   });
-  return { installed: true };
+  return { installed: true, dispose };
 }
