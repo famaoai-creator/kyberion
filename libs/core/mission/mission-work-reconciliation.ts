@@ -1008,8 +1008,9 @@ export async function reconcileMissionExistingWork(input: {
         throw new Error(`Task ${manifestTask.task_id} not found in canonical WorkItems`);
       const status = String(plannedTask.status || 'planned').toLowerCase();
       const previousManifestHash = String(plannedTask.reconciliation?.manifest_sha256 || '');
+      // Only a task completed by that run (never superseded, never in review).
       const boardRepair =
-        TERMINAL_TASK_STATUSES.has(status) &&
+        status === 'completed' &&
         previousManifestHash === manifestHash &&
         !boardCarriesReconciliation(manifestTask.task_id);
       if (TERMINAL_TASK_STATUSES.has(status) && !boardRepair) {
@@ -1110,6 +1111,7 @@ export async function reconcileMissionExistingWork(input: {
       if (TERMINAL_TASK_STATUSES.has(String(task.status || '').toLowerCase())) {
         // Completed by an earlier run of this manifest that stopped before its board write.
         if (
+          String(task.status || '').toLowerCase() === 'completed' &&
           task.reconciliation?.manifest_sha256 === manifestHash &&
           !boardCarriesReconciliation(task.task_id)
         ) {
@@ -1183,8 +1185,7 @@ export async function reconcileMissionExistingWork(input: {
       };
     }
 
-    // Once per task and manifest: a re-run repairing an earlier partial run
-    // records only what that run did not.
+    // A re-run repairing an earlier partial run records only what that run did not.
     const ledger = readMissionExecutionLedger(missionId, missionPath);
     const ledgerHas = (eventType: string, taskId: string): boolean =>
       ledger.some(
@@ -1201,7 +1202,12 @@ export async function reconcileMissionExistingWork(input: {
       ) {
         continue;
       }
-      if (ledgerHas('existing_work_reconciled', manifestTask.task_id)) continue;
+      if (
+        boardRepairedTaskIds.includes(manifestTask.task_id) &&
+        ledgerHas('existing_work_reconciled', manifestTask.task_id)
+      ) {
+        continue;
+      }
       appendMissionExecutionLedgerEntry({
         mission_id: missionId,
         mission_path_hint: missionPath,
@@ -1223,7 +1229,12 @@ export async function reconcileMissionExistingWork(input: {
       ...resultBase.auto_completed_repair_task_ids,
       ...boardRepairedTaskIds.filter((taskId) => taskId === 'repair-finish-exit'),
     ]) {
-      if (ledgerHas('existing_work_reconciliation_repair_completed', repairTaskId)) continue;
+      if (
+        boardRepairedTaskIds.includes(repairTaskId) &&
+        ledgerHas('existing_work_reconciliation_repair_completed', repairTaskId)
+      ) {
+        continue;
+      }
       appendMissionExecutionLedgerEntry({
         mission_id: missionId,
         mission_path_hint: missionPath,
@@ -1318,7 +1329,7 @@ export async function reconcileMissionExistingWork(input: {
     currentState.history.push({
       ts: adoptedAt,
       event: 'RECONCILE_EXISTING_WORK',
-      note: `Adopted ${reconciledTaskIds.length} task(s) from ${manifest.source.commit}: ${manifest.reason}`,
+      note: `Adopted ${reconciledTaskIds.length} task(s) from ${manifest.source.commit}${boardRepairedTaskIds.length > 0 ? ` (board repaired for ${boardRepairedTaskIds.join(', ')})` : ''}: ${manifest.reason}`,
     });
     await saveState(missionId, currentState, { alreadyLocked: true });
 
@@ -1332,6 +1343,7 @@ export async function reconcileMissionExistingWork(input: {
         manifest_sha256: manifestHash,
         source_commit: manifest.source.commit,
         task_ids: reconciledTaskIds,
+        board_repaired_task_ids: boardRepairedTaskIds,
         ...(input.approvalRequestId ? { approval_request_id: input.approvalRequestId } : {}),
         receipt_path: receiptRelative,
       },

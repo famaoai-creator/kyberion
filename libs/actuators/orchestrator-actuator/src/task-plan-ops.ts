@@ -131,7 +131,11 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
     const unproven: string[] = [];
     for (const task of onDisk) {
       const by = (task.superseded as { by_task_id?: unknown } | undefined)?.by_task_id;
-      if (task.status === 'superseded' && typeof by === 'string' && by) {
+      if (
+        String(task.status || '').toLowerCase() === 'superseded' &&
+        typeof by === 'string' &&
+        by
+      ) {
         if (isTaskProvenSuperseded(missionDir, task, 'task_plan_to_next_tasks')) {
           replacedBy.set(String(task.task_id || ''), by);
         } else {
@@ -182,7 +186,10 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
       onDisk.filter((task) => {
         const taskId = String(task.task_id || '');
         if (plannedIds.has(taskId)) return false;
-        return task.status === 'superseded' || [...replacedBy.values()].includes(taskId);
+        return (
+          String(task.status || '').toLowerCase() === 'superseded' ||
+          [...replacedBy.values()].includes(taskId)
+        );
       }).length;
     return planned;
   });

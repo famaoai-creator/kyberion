@@ -641,6 +641,37 @@ describe('mission_controller supersede-task', () => {
     }
   });
 
+  it('never points a late dependent the replacement waits on at the replacement', async () => {
+    prepareMission();
+    const approvalRequestId = approve();
+    ledgerFault.beforeAppend = () => {
+      // The replacement itself comes to wait on the task it replaces.
+      writeMissionNextTasks(missionPath, (onDisk) =>
+        onDisk.map((task) =>
+          task.task_id === 'task-replacement' ? { ...task, dependencies: ['task-held'] } : task
+        )
+      );
+      const item = getWorkItem(itemId('task-replacement'))!;
+      updateWorkItem({
+        itemId: item.item_id,
+        expectedVersion: item.version,
+        dependencies: ['task-held'],
+      });
+    };
+    const result = await supersedeMissionTask({
+      missionId,
+      taskId: 'task-held',
+      byTaskId: 'task-replacement',
+      reason,
+      approvalRequestId,
+    });
+    expect(result.status).toBe('applied');
+    expect(result.rewritten_dependent_task_ids).toEqual(['task-after']);
+    expect(boardTask('task-replacement')?.dependencies).toEqual(['task-held']);
+    expect(getWorkItem(itemId('task-replacement'))?.dependencies).toEqual(['task-held']);
+    expect(boardTask('task-after')?.dependencies).toEqual(['task-replacement']);
+  });
+
   it('leaves a dependent that completed after its plan was read unrewired (m2)', async () => {
     prepareMission();
     const approvalRequestId = approve();
