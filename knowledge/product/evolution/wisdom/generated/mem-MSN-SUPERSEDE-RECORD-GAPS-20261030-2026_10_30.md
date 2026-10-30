@@ -1,0 +1,43 @@
+---
+record_id: mem-MSN-SUPERSEDE-RECORD-GAPS-20261030-2026_10_30
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-SUPERSEDE-RECORD-GAPS-20261030-2026_10_30
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-30T10:48:38.149Z
+source_branch: fix/supersede-record-gaps-20261030
+source_commit: 97fb04141d1b6cc8ebd59a8b370457a1ac7ced58
+---
+
+# Trust only proven state when deciding an approved effect already happened
+
+Decide 'already done' and 'resumable' from the evidence the approval proof accepts, not from record shapes or worker-writable status; key repeat records by an event time so a second occurrence is recorded.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- - When a later approval meets leftovers of an earlier one, decide whether the earlier effect took effect from proven state (the approval proof: approved request plus receipt or ledger evidence), not from the shape of a record. A shape check lets a crafted entry block every later approval; a worker-writable status (a WorkItem) can hide an effect that did take effect.
+- Reuse a receipt only when the resume check accepts it (kind, approval, replacement, reason). Matching the approval id alone lets a crafted receipt with an audit stamp suppress the run's own audit entry. Anything else is set aside (kept beside, content-named if it names no approval), and the run writes its own.
+- Payloads written on a resumed run must name what the first run did (the receipt's planned list), not what the resumed run's plan sees: a dependent already rewired no longer looks like a dependent.
+- To record a repeat occurrence (a dependency rewritten again), give each occurrence a marker with its own time and key records by (item, time); older id-only records map to the first occurrence's time. Check which stores can actually repeat: a guarded writer may make the repeat impossible there (the board guard re-applies recorded rewrites).
+- A new refusal inside a shared precondition function also refuses at approval-request time; test it there.
+
+## Recommended References
+
+- active/missions/public/MSN-SUPERSEDE-RECORD-GAPS-20261030/evidence/distillation.md
+
+## Evidence
+
+- active/missions/public/MSN-SUPERSEDE-RECORD-GAPS-20261030/evidence/distillation.md
+
+## Artifacts
