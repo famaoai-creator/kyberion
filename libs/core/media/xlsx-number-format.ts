@@ -12,7 +12,9 @@
  */
 
 /** Excel serial date epoch (1900 system, including the 1900-02-29 bug). */
-const EXCEL_EPOCH_UTC = Date.UTC(1899, 11, 30);
+const EXCEL_EPOCH_1900_UTC = Date.UTC(1899, 11, 30);
+/** Excel 1904 date system epoch (Mac Excel legacy). */
+const EXCEL_EPOCH_1904_UTC = Date.UTC(1904, 0, 1);
 
 /** General format: integers as-is, fractions to 10 significant digits. */
 export function formatGeneralNumber(value: number): string {
@@ -105,8 +107,9 @@ function pad(value: number, width: number): string {
   return String(value).padStart(width, '0');
 }
 
-function formatDate(serial: number, pattern: string): string {
-  const millis = EXCEL_EPOCH_UTC + Math.round(serial * 86_400_000);
+function formatDate(serial: number, pattern: string, date1904 = false): string {
+  const epoch = date1904 ? EXCEL_EPOCH_1904_UTC : EXCEL_EPOCH_1900_UTC;
+  const millis = epoch + Math.round(serial * 86_400_000);
   const date = new Date(millis);
   const hasAmPm = /AM\/PM|A\/P/i.test(pattern);
   let out = '';
@@ -190,8 +193,13 @@ function formatNumberPattern(value: number, pattern: string): string {
 /**
  * Format a numeric cell value with its number-format code. Returns the
  * General rendering when the code is empty, "General" or not understood.
+ * Pass `date1904` when the workbook uses the 1904 date system.
  */
-export function formatXlsxNumber(value: number, formatCode: string | undefined): string {
+export function formatXlsxNumber(
+  value: number,
+  formatCode: string | undefined,
+  date1904 = false
+): string {
   if (!Number.isFinite(value)) return String(value);
   const code = String(formatCode ?? '').trim();
   if (!code || /^General$/i.test(code) || code === '@') return formatGeneralNumber(value);
@@ -222,7 +230,7 @@ export function formatXlsxNumber(value: number, formatCode: string | undefined):
             : `\u0001${literals.push(token.literal ?? '') - 1}\u0002`
         )
         .join('');
-      return formatDate(value, composed).replace(
+      return formatDate(value, composed, date1904).replace(
         /\u0001(\d+)\u0002/g,
         (_marker, index: string) => literals[Number(index)] ?? ''
       );

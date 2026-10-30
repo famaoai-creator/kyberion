@@ -258,6 +258,50 @@ trailer<< /Size 8 /Root 1 0 R /Info 6 0 R >>
     expect(design.metadata?.title).toBe('Flate XMP Title');
   });
 
+  it('reads classic xref tables via startxref (PdfCraft-aligned discovery)', async () => {
+    ensureDir(OUT);
+    const out = pathResolver.sharedTmp('tests/native-pdf/classic-xref.pdf');
+    // Manually laid-out classic xref; offsets computed for the object bodies below.
+    const objects = `1 0 obj<< /Type /Catalog /Pages 2 0 R >>endobj
+2 0 obj<< /Type /Pages /Kids [3 0 R] /Count 1 >>endobj
+3 0 obj<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>endobj
+4 0 obj<< /Length 48 >>stream
+BT /F1 12 Tf 72 720 Td (Classic Xref) Tj ET
+endstream
+endobj
+5 0 obj<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>endobj
+6 0 obj<< /Title (Classic Title) >>endobj
+`;
+    const header = '%PDF-1.4\n';
+    // Build with placeholder xref then patch offsets.
+    const bodyStart = header.length;
+    const parts: Array<{ id: number; text: string; offset: number }> = [];
+    let cursor = bodyStart;
+    for (const chunk of objects.split(/(?=\d+ 0 obj)/).filter(Boolean)) {
+      const id = Number.parseInt(chunk, 10);
+      parts.push({ id, text: chunk, offset: cursor });
+      cursor += Buffer.byteLength(chunk, 'binary');
+    }
+    const xrefAt = cursor;
+    let xref = 'xref\n0 7\n0000000000 65535 f \n';
+    for (let id = 1; id <= 6; id += 1) {
+      const p = parts.find((x) => x.id === id)!;
+      xref += `${String(p.offset).padStart(10, '0')} 00000 n \n`;
+    }
+    xref += `trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>\nstartxref\n${xrefAt}\n%%EOF\n`;
+    fs.writeFileSync(
+      out,
+      Buffer.concat([
+        Buffer.from(header, 'binary'),
+        ...parts.map((p) => Buffer.from(p.text, 'binary')),
+        Buffer.from(xref, 'binary'),
+      ])
+    );
+    const design = await distillPdfDesign(out);
+    expect(design.metadata?.title).toBe('Classic Title');
+    expect(design.content?.text).toContain('Classic Xref');
+  });
+
   it('prefers Info /Title when XMP only carries a placeholder', async () => {
     ensureDir(OUT);
     const out = pathResolver.sharedTmp('tests/native-pdf/xmp-placeholder-vs-info.pdf');
@@ -1136,6 +1180,58 @@ trailer<< /Size 7 /Root 1 0 R /Info 6 0 R >>
     expect(t).toContain('/Contents <');
     expect(t).toContain('/AcroForm');
     expect(t).toContain('/SigFlags 3');
+  });
+
+  // ── Distill: outlines / annots / AcroForm (PdfCraft-aligned) ─
+
+  it('should distill outlines, link annotations, and AcroForm fields', async () => {
+    ensureDir(OUT);
+    const distillOut = path.join(path.dirname(OUT), 'distill-structure.pdf');
+    await generateNativePdf(
+      {
+        version: '1.0.0',
+        generatedAt: new Date().toISOString(),
+        source: { format: 'markdown', body: 'Chapter body' },
+        content: {
+          pages: [
+            {
+              pageNumber: 1,
+              width: 595,
+              height: 842,
+              text: 'Chapter body',
+              annotations: [
+                {
+                  type: 'Link',
+                  rect: [50, 100, 200, 20],
+                  uri: 'https://kyberion.ai/docs',
+                  borderWidth: 1,
+                },
+              ],
+            },
+          ],
+        },
+        outlines: [{ title: 'Chapter 1', pageIndex: 0 }],
+        acroForm: {
+          fields: [
+            {
+              name: 'FullName',
+              type: 'text',
+              rect: [50, 700, 200, 20],
+              value: 'Ada',
+              pageIndex: 0,
+            },
+          ],
+        },
+      } as any,
+      distillOut,
+      { compress: false }
+    );
+
+    const design = await distillPdfDesign(distillOut);
+    expect(design.outlines?.some((o) => o.title.includes('Chapter'))).toBe(true);
+    const links = design.content?.pages?.[0]?.annotations?.filter((a) => a.type === 'Link');
+    expect(links?.some((a) => 'uri' in a && String(a.uri).includes('kyberion.ai'))).toBe(true);
+    expect(design.acroForm?.fields?.some((f) => f.name.includes('FullName'))).toBe(true);
   });
 
   // ── P3-8: Document Parts ─────────────────────────────────
