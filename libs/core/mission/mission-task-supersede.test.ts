@@ -1227,7 +1227,7 @@ describe('mission_controller supersede-task', () => {
         )
       )
     );
-    await expect(supersedeMissionTask(input)).rejects.toThrow(/already superseded|expired/u);
+    await expect(supersedeMissionTask(input)).rejects.toThrow(/approval has expired/u);
     expect(
       safeExistsSync(nodePath.join(missionPath, 'evidence/task-supersede/task-held.json'))
     ).toBe(false);
