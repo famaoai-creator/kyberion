@@ -35,6 +35,7 @@ import { isRecord } from '../foundation/text.js';
 import { resolveSecretIdentity } from '../secret/secret-identity.js';
 import { getSecretForIdentity } from '../secret/secret-guard.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { isCredentialBindingRequired } from '../foundation/credential-binding.js';
 import { createLogger } from '../logger.js';
 
 const logger = createLogger('reasoning-provider-registry');
@@ -881,7 +882,17 @@ export function resolveReasoningProviderEnvironment(
       continue;
     }
     const identity = resolveSecretIdentity(reference.service_id, reference.secret_key);
-    const value = getSecretForIdentity(identity, `reasoning.${descriptor.mode}`)?.trim();
+    let value: string | undefined;
+    try {
+      value = getSecretForIdentity(identity, `reasoning.${descriptor.mode}`)?.trim();
+    } catch (error) {
+      // A tenant-bound execution without a trusted credential binding cannot
+      // resolve secrets; discovery must treat the credential as unavailable
+      // rather than fail the whole backend selection. The actual consumer of
+      // the secret still fails closed on its own getSecret call.
+      if (!isCredentialBindingRequired(error)) throw error;
+      continue;
+    }
     if (!value) continue;
     resolved ??= { ...env };
     for (const name of reference.env_keys) resolved[name] = value;

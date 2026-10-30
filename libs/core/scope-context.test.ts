@@ -18,6 +18,64 @@ import {
 } from './scope-context.js';
 
 describe('scope-context', () => {
+  it('invalidates the process scope after governed write and clear operations', () => {
+    const file = pathResolver.sharedTmp('scope-cache-write-clear-test.env');
+    for (const name of [
+      'KYBERION_TIER',
+      'KYBERION_TENANT',
+      'KYBERION_ORGANIZATION_ID',
+      'KYBERION_PROJECT_ID',
+      'MISSION_ID',
+      'KYBERION_TASK_ID',
+    ])
+      vi.stubEnv(name, '');
+    vi.stubEnv('KYBERION_SCOPE_ENV_PATH', file);
+    resetCurrentScope();
+    try {
+      writeScopeEnv({ tier: 'confidential', tenant_slug: 'alpha' });
+      expect(currentScope().tenant_slug).toBe('alpha');
+      writeScopeEnv({ tier: 'public' });
+      expect(currentScope().tenant_slug).toBeUndefined();
+      writeScopeEnv({ tier: 'confidential', tenant_slug: 'beta' });
+      expect(currentScope().tenant_slug).toBe('beta');
+      clearScopeEnv();
+      expect(currentScope().tenant_slug).toBeUndefined();
+    } finally {
+      safeRmSync(file, { force: true });
+      vi.unstubAllEnvs();
+      resetCurrentScope();
+    }
+  });
+
+  it('does not share the process scope cache with transported scope contexts', () => {
+    const file = pathResolver.sharedTmp('scope-cache-transport-test.env');
+    for (const name of [
+      'KYBERION_TIER',
+      'KYBERION_TENANT',
+      'KYBERION_ORGANIZATION_ID',
+      'KYBERION_PROJECT_ID',
+      'MISSION_ID',
+      'KYBERION_TASK_ID',
+    ])
+      vi.stubEnv(name, '');
+    vi.stubEnv('KYBERION_SCOPE_ENV_PATH', file);
+    resetCurrentScope();
+    try {
+      writeScopeEnv({ tier: 'confidential', tenant_slug: 'alpha' });
+      expect(currentScope().tenant_slug).toBe('alpha');
+      expect(withScopeEnvOnly(() => currentScope())).toEqual({ tier: 'public' });
+      expect(withScopeEnvOnly(() => currentScope(), { work_shape: 'task_session' })).toEqual({
+        tier: 'public',
+        work_shape: 'task_session',
+      });
+      expect(currentScope().tenant_slug).toBe('alpha');
+    } finally {
+      safeRmSync(file, { force: true });
+      vi.unstubAllEnvs();
+      resetCurrentScope();
+    }
+  });
+
   it('keeps transported runtime scope independent of a destination persisted scope', () => {
     const dir = pathResolver.sharedTmp(`scope-host-${process.pid}`);
     const file = `${dir}/scope.env`;

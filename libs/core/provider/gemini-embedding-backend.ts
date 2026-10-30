@@ -2,6 +2,7 @@ import { secureFetch } from '../network.js';
 import { isRecord } from '../foundation/text.js';
 import { resolveGeminiApiKey } from './gemini-api-backend.js';
 import type { EmbeddingBackend } from '../embedding-backend.js';
+import { isCredentialBindingRequired } from '../foundation/credential-binding.js';
 
 /**
  * KM-02 Task 3: a real embedding path that works off-macOS (MLX is
@@ -20,7 +21,14 @@ export function resolveGeminiEmbeddingKey(): string | undefined {
 }
 
 export function isGeminiEmbeddingAvailable(): boolean {
-  return Boolean(resolveGeminiEmbeddingKey());
+  try {
+    return Boolean(resolveGeminiEmbeddingKey());
+  } catch (error) {
+    // A tenant-bound execution without a trusted credential binding cannot
+    // resolve the API key — for an availability probe that means unavailable.
+    if (!isCredentialBindingRequired(error)) throw error;
+    return false;
+  }
 }
 
 interface GeminiEmbeddingOptions {

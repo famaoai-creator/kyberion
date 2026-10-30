@@ -169,6 +169,26 @@ describe('Kyberion CLI helpers', () => {
     expect(recordOutput).toContain('Usage: pnpm kyberion record');
   });
 
+  it.each(['capture', 'record'])('shows %s help without a tenant task binding', async (command) => {
+    vi.stubEnv('KYBERION_TENANT', 'scope-probe');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    const output = await captureMainOutput([command, '--help']);
+    expect(output).toContain('pnpm kyberion');
+  });
+
+  it.each([
+    ['intent', '-h'],
+    ['intent', '--help', 'hello'],
+    ['task', '--help'],
+  ])('terminates command help before a legacy model handler: %s', async (...args) => {
+    vi.stubEnv('KYBERION_TENANT', 'scope-probe');
+    vi.stubEnv('KYBERION_TIER', 'confidential');
+    legacyIntentAsk.mockClear();
+    const output = await captureMainOutput([...args, '--locale', 'en']);
+    expect(output).toContain('Kyberion commands');
+    expect(legacyIntentAsk).not.toHaveBeenCalled();
+  });
+
   it('forwards --dry-run from pnpm kyberion run to the actuator process', () => {
     expect(
       buildKyberionRunNodeArgs('dist/libs/actuators/secret-actuator/src/index.js', [
@@ -204,6 +224,10 @@ describe('Kyberion CLI helpers', () => {
     expect(shouldBootstrapRuntime(['see', 'shot.png'])).toBe(false);
     expect(shouldBootstrapRuntime(['listen', 'memo.m4a'])).toBe(false);
     expect(shouldBootstrapRuntime(['watch', 'demo.mp4'])).toBe(false);
+    expect(shouldBootstrapRuntime(['capture', 'image'])).toBe(false);
+    expect(shouldBootstrapRuntime(['record', 'video'])).toBe(false);
+    expect(shouldBootstrapRuntime(['task', '--help'])).toBe(false);
+    expect(shouldBootstrapRuntime(['intent', '-h'])).toBe(false);
     // speak uses the voice actuator's engine registry, not the python voice bridge.
     expect(shouldBootstrapRuntime(['speak', 'hello'])).toBe(false);
     expect(shouldBootstrapRuntime(['draw', 'a lake', '--out', 'a.png'])).toBe(false);

@@ -301,7 +301,14 @@ export async function runSeeCommand(
       scope: source.scope,
       modelPath: options.embeddingModel!,
       python: options.python,
-      entries: [{ id: 'image', path: absolute, image_path: absolute, text: result.ocr?.text }],
+      entries: [
+        {
+          id: 'image',
+          path: absolute,
+          image_path: absolute,
+          ...(result.ocr?.text?.trim() ? { text: result.ocr.text } : {}),
+        },
+      ],
     });
   }
   if (!result.ocr && !result.description && !result.tracking && !result.changes && !result.index) {
@@ -312,13 +319,7 @@ export async function runSeeCommand(
   }
   if (source && feature) feature.assertSourceUnchanged(source);
   if (previousSource && feature) feature.assertSourceUnchanged(previousSource);
-  emitOutput(
-    'see',
-    renderSeeResult(result, args.json),
-    args.out,
-    print,
-    `${result.ocr?.text.length ?? 0} chars`,
-    absolute
-  );
+  const rendered = renderSeeResult(result, args.json);
+  emitOutput('see', rendered, args.out, print, `${rendered.length} chars`, absolute);
   return result;
 }

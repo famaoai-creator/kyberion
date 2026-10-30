@@ -27,6 +27,7 @@ import {
   safeRmSync,
   setWorkCoordinationNamespace,
 } from '@agent/core';
+import { withTaskCredentialBinding } from '@agent/core/secret/secret-resolver';
 import { createMission } from '../scripts/refactor/mission-creation.js';
 import { loadState, saveState } from '../scripts/refactor/mission-state.js';
 import { runSteps } from '../scripts/run_pipeline.ts';
@@ -44,6 +45,12 @@ const CUSTOMER_ROOT = path.join(ROOT, 'customer', CUSTOMER_SLUG);
 const TRANSCRIPT_PATH = pathResolver.rootResolve('tests/fixtures/meeting-transcript-sample.md');
 const PIPELINE_PATH = pathResolver.rootResolve('pipelines/meeting-followup.json');
 const REPORT_PATH = pathResolver.rootResolve('active/shared/tmp/meeting-to-value-e2e-report.json');
+
+// The fixture injects deterministic reasoning and carries no real credentials.
+// Match tenant execution admission explicitly instead of relying on an unbound host.
+function withFixtureCredentials<T>(run: () => T): T {
+  return withTaskCredentialBinding({ tenantSlug: CUSTOMER_SLUG, secrets: {} }, run);
+}
 
 function readPipeline(): {
   context?: Record<string, unknown>;
@@ -260,22 +267,24 @@ describe('meeting-to-value e2e', () => {
       safeReadFile(path.join(MISSION_DIR, 'TASK_BOARD.md'), { encoding: 'utf8' }) as string
     ).toContain('ai-meeting-facilitator-followup');
 
-    const result = await runSteps(
-      pipeline.steps ?? [],
-      {
-        ...(pipeline.context ?? {}),
-        mission_id: MISSION_ID,
-        work_item_id: WORK_ITEM_ID,
-        mission_evidence_dir: path.relative(ROOT, path.join(MISSION_DIR, 'evidence')),
-        transcript_path: TRANSCRIPT_PATH,
-        attendees: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Operator' }],
-        operator_label: 'Operator',
-        language: 'ja',
-      },
-      {
-        pipelinePath: PIPELINE_PATH,
-        quiet: true,
-      }
+    const result = await withFixtureCredentials(() =>
+      runSteps(
+        pipeline.steps ?? [],
+        {
+          ...(pipeline.context ?? {}),
+          mission_id: MISSION_ID,
+          work_item_id: WORK_ITEM_ID,
+          mission_evidence_dir: path.relative(ROOT, path.join(MISSION_DIR, 'evidence')),
+          transcript_path: TRANSCRIPT_PATH,
+          attendees: [{ name: 'Alice' }, { name: 'Bob' }, { name: 'Operator' }],
+          operator_label: 'Operator',
+          language: 'ja',
+        },
+        {
+          pipelinePath: PIPELINE_PATH,
+          quiet: true,
+        }
+      )
     );
 
     expect(result.status).toBe('succeeded');
@@ -289,13 +298,15 @@ describe('meeting-to-value e2e', () => {
     expect(actionItems).toHaveLength(3);
     expect(listOthersPending(MISSION_ID)).toHaveLength(2);
 
-    const reminderReport = await runActionItemReminderSweep({
-      mission_ids: [MISSION_ID],
-      tone: 'friendly',
-      language: 'ja',
-      max_items_per_mission: 20,
-      report_path: REPORT_PATH,
-    });
+    const reminderReport = await withFixtureCredentials(() =>
+      runActionItemReminderSweep({
+        mission_ids: [MISSION_ID],
+        tone: 'friendly',
+        language: 'ja',
+        max_items_per_mission: 20,
+        report_path: REPORT_PATH,
+      })
+    );
     expect(reminderReport.reminders_sent).toBe(2);
     expect(reminderReport.outbox_messages_sent).toBe(2);
 

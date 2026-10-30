@@ -1239,6 +1239,9 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'see',
   'listen',
   'watch',
+  // Native capture/record resolve their own consent and device bridges.
+  'capture',
+  'record',
   // permissions status/warmup only talk to the macOS TCC probe helper.
   'permissions',
   // grants list/check/grant/revoke read and write grant records and approvals only.
@@ -1261,6 +1264,8 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
 export function shouldBootstrapRuntime(args: string[]): boolean {
   const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const command = normalizedArgs[0] || 'help';
+  // Command-level help is discovery, including model-backed command nouns.
+  if (normalizedArgs.slice(0, 2).some((arg) => arg === '--help' || arg === '-h')) return false;
   if (command === 'list') return normalizedArgs.includes('--check');
   if (command === 'task' && normalizedArgs[1] === 'scenario') return false;
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
@@ -1307,7 +1312,11 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
     installReasoningBackends();
   }
 
-  const handler = CLI_COMMAND_HANDLERS[command];
+  // Legacy model/effect handlers do not all parse help themselves. Terminate
+  // command-level help through the shared renderer before entering those paths.
+  const commandHelp = normalizedArgs[1] === '--help' || normalizedArgs[1] === '-h';
+  const helpOnly = commandHelp && !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
+  const handler = CLI_COMMAND_HANDLERS[helpOnly ? 'help' : command];
   if (handler) {
     await handler({
       command,

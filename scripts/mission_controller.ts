@@ -1384,7 +1384,7 @@ async function approveScopeChange(
 }
 
 /**
- * Journal-only actions that never delegate to a reasoning backend.
+ * Deterministic lifecycle, journal, and view actions that never invoke a model.
  * Skipping the reasoning bootstrap (~3s of CLI availability probes per
  * spawn) keeps high-frequency per-task `record-task`/`record-evidence`
  * spawns cheap. Unknown actions fail safe toward installing: delegation
@@ -1392,6 +1392,10 @@ async function approveScopeChange(
  */
 const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
   'help',
+  // These persist/activate agreed intent; execution and delegation occur later.
+  'create',
+  'start',
+  'kickoff',
   'record-task',
   'record-evidence',
   // Registers an already performed review; it does not run model inference.
@@ -1416,8 +1420,18 @@ const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
 ]);
 
 /** Whether this action may skip the reasoning-backend bootstrap. Exported for tests. */
+export function missionReasoningInitialization(
+  action: string | undefined
+): 'none' | 'host' | 'execution' {
+  if (action && REASONING_FREE_ACTIONS.has(action)) return 'none';
+  // Dispatch prepares factories/resolver only. Credentials are bound after claim;
+  // task-local providers must be constructed inside that binding, never here.
+  if (action === 'dispatch-workitems' || action === 'dispatch-tickets') return 'host';
+  return 'execution';
+}
+
 export function shouldSkipReasoningBootstrap(action: string | undefined): boolean {
-  return !!action && REASONING_FREE_ACTIONS.has(action);
+  return missionReasoningInitialization(action) === 'none';
 }
 
 function triageCommands(): Promise<typeof MissionTriageCommands> {
@@ -1466,9 +1480,11 @@ async function mainImpl(
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.
   // Journal-only actions never delegate; skip their probe cost.
-  if (!shouldSkipReasoningBootstrap(earlyPositionalArgs[0] ?? 'help')) {
-    const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
-    installReasoningBackends();
+  const initialization = missionReasoningInitialization(earlyPositionalArgs[0] ?? 'help');
+  if (initialization !== 'none') {
+    const bootstrap = await import('@agent/core/reasoning/reasoning-bootstrap');
+    if (initialization === 'host') bootstrap.prepareReasoningExecutionHost();
+    else bootstrap.installReasoningBackends();
     // Import side effects: the canonical A2A route (without it every
     // agent_runtime dispatch fails with "has no A2A/runtime route") and pane
     // prompt escalation into approval requests. Journal-only verbs never

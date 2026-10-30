@@ -1,5 +1,6 @@
 import type { ReasoningBackend, ReasoningCallOptions } from './reasoning-backend-contracts.js';
 import { loadModelRegistry } from './reasoning-model-routing.js';
+import { currentScopeEnvelope } from '../scope-envelope.js';
 import {
   loadReasoningRouteUserConfig,
   reasoningRoleInheritsDefault,
@@ -56,6 +57,7 @@ export function assertFixedReasoningBinding(
     );
   }
   const route = resolveReasoningRoute({
+    scope: currentScopeEnvelope()?.identity,
     role,
     requestedProfile: options?.route_profile,
     requestedModel: options?.model,
@@ -81,7 +83,8 @@ export function assertFixedReasoningBinding(
 /** Pin per-call model overrides as well as backend construction and the failover chain. */
 export function bindFixedReasoningBackend(
   backend: ReasoningBackend,
-  route: ResolvedReasoningRoute
+  route: ResolvedReasoningRoute,
+  options?: { nativeAdoption: 'disabled' }
 ): ReasoningBackend {
   if (route.selection?.requested.mode !== 'fixed') return backend;
   const fixedModel = route.selection.modelPinned
@@ -89,6 +92,10 @@ export function bindFixedReasoningBackend(
     : undefined;
   const wrapped = new Proxy(backend, {
     get(target, property, receiver) {
+      // Task-local chains use the constrained text path; native transports do
+      // not carry fixed model/route constraints and must not be advertised.
+      if (property === 'getNativeSubagentAdopter' && options?.nativeAdoption === 'disabled')
+        return undefined;
       const value: unknown = Reflect.get(target, property, receiver);
       if (typeof value !== 'function') return value;
       if (property === 'getNativeSubagentAdopter') {

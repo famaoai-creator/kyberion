@@ -35,7 +35,41 @@ import {
 describe('mission-intent-delta hooks', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(loadState).mockReturnValue(null);
   });
+
+  it.each([false, true])(
+    'records lifecycle intake without an extractor (canonical state: %s)',
+    async (hasCanonicalState) => {
+      if (hasCanonicalState)
+        vi.mocked(loadState).mockReturnValue({
+          intent: { goal_summary: 'Agreed handoff goal', source_text: 'Original user wording' },
+        } as unknown as MissionState);
+      vi.mocked(getIntentExtractor).mockImplementation(() => {
+        throw new Error('Lifecycle intake must not acquire a model backend');
+      });
+
+      await emitMissionLifecycleIntentSnapshot({
+        missionId: 'MSN-DETERMINISTIC-INTAKE',
+        stage: 'intake',
+        source: 'user_prompt',
+        extraction: 'canonical_only',
+        text: 'Agreed handoff goal',
+        traceRef: 'intake-correlation',
+      });
+
+      expect(getIntentExtractor).not.toHaveBeenCalled();
+      expect(emitIntentSnapshot).toHaveBeenCalledWith(
+        expect.objectContaining({
+          missionId: 'MSN-DETERMINISTIC-INTAKE',
+          stage: 'intake',
+          source: 'user_prompt',
+          traceRef: 'intake-correlation',
+          intent: expect.objectContaining({ goal: 'Agreed handoff goal' }),
+        })
+      );
+    }
+  );
 
   it('emits lifecycle snapshot using extractor output when text is available', async () => {
     vi.mocked(getIntentExtractor).mockReturnValue({

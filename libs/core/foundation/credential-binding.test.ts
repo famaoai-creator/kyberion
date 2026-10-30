@@ -2,6 +2,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runInExecutionScope } from './execution-scope.js';
 import {
   credentialExecutionIdentity,
+  credentialBindingReadiness,
+  isCredentialBindingRequired,
   withTaskCredentialBinding,
   resolveTaskCredential,
 } from './credential-binding.js';
@@ -47,6 +49,75 @@ afterEach(() => {
 });
 
 describe('task-local credential binding', () => {
+  it('reports unbound operator and tenant readiness without resolving secret values', () => {
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_TASK_ID', '');
+    withExecutionContext(
+      'infrastructure_sentinel',
+      () => {
+        expect(credentialBindingReadiness()).toEqual({
+          status: 'operator',
+          identity: { tenantSlug: undefined, missionId: undefined, taskId: undefined },
+        });
+      },
+      undefined,
+      ''
+    );
+    tenant('alpha', () => {
+      expect(credentialBindingReadiness()).toEqual({
+        status: 'binding_required',
+        identity: { tenantSlug: 'alpha', missionId: undefined, taskId: undefined },
+      });
+      withTaskCredentialBinding(
+        { tenantSlug: 'alpha', secrets: { TEST_BOUND_KEY: 'private-value' } },
+        () => {
+          expect(credentialBindingReadiness()).toEqual({
+            status: 'bound',
+            identity: { tenantSlug: 'alpha', missionId: undefined, taskId: undefined },
+          });
+        }
+      );
+    });
+  });
+
+  it('never downgrades malformed or contradictory readiness into missing credentials', () => {
+    vi.stubEnv('KYBERION_TENANT', 'INVALID/TENANT');
+    expect(() => credentialBindingReadiness()).toThrow('[CREDENTIAL_SCOPE_DENIED]');
+    tenant('alpha', () =>
+      runInResourceAccessScope(
+        { tenantSlug: 'beta', readExact: [], writeExact: [], mkdirExact: [] },
+        () => expect(() => credentialBindingReadiness()).toThrow('[CREDENTIAL_SCOPE_DENIED]')
+      )
+    );
+  });
+
+  it('revalidates an existing binding when the execution scope changes', () => {
+    tenant('alpha', () =>
+      withTaskCredentialBinding({ tenantSlug: 'alpha', secrets: {} }, () =>
+        tenant('beta', () =>
+          expect(() => credentialBindingReadiness()).toThrow('[CREDENTIAL_SCOPE_DENIED]')
+        )
+      )
+    );
+  });
+
+  it('classifies only a missing binding as optional discovery absence', () => {
+    expect(
+      isCredentialBindingRequired(
+        new Error('[CREDENTIAL_BINDING_REQUIRED] trusted binding missing')
+      )
+    ).toBe(true);
+    expect(
+      isCredentialBindingRequired(new Error('[CREDENTIAL_SCOPE_DENIED] contradictory tenant'))
+    ).toBe(false);
+    expect(isCredentialBindingRequired(new Error('keychain unavailable'))).toBe(false);
+    expect(
+      isCredentialBindingRequired(
+        new Error('[CREDENTIAL_SCOPE_DENIED] [CREDENTIAL_BINDING_REQUIRED]')
+      )
+    ).toBe(false);
+    expect(isCredentialBindingRequired('[CREDENTIAL_BINDING_REQUIRED]')).toBe(false);
+  });
   it('honors a trusted explicit public tenant clear without reopening a parent credential binding', () => {
     vi.stubEnv('KYBERION_TENANT', 'alpha');
     vi.stubEnv('MISSION_ID', '');

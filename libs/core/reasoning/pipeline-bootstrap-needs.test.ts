@@ -3,7 +3,7 @@ import { pipelineBootstrapNeeds } from './pipeline-bootstrap-needs.js';
 import { readJson } from '../foundation/json.js';
 
 describe('pipelineBootstrapNeeds', () => {
-  it.each(['baseline-check', 'vital-check'])(
+  it.each(['baseline-check', 'vital-check', 'storage-janitor'])(
     'keeps the canonical %s diagnostic provider-free',
     (id) => {
       const pipeline = readJson<{ steps: Parameters<typeof pipelineBootstrapNeeds>[0] }>(
@@ -42,6 +42,17 @@ describe('pipelineBootstrapNeeds', () => {
     ]);
     expect(needs.required).toBe(false);
     expect(needs.reasons).toEqual([]);
+  });
+
+  it('still initializes reasoning in a maintenance error fallback', () => {
+    expect(
+      pipelineBootstrapNeeds([
+        {
+          op: 'core:run_janitor',
+          on_error: { fallback: [{ op: 'reasoning:query' }] },
+        },
+      ])
+    ).toEqual({ required: true, reasons: ['reasoning:query'] });
   });
 
   it('requires the bootstrap for an unclassified op', () => {
