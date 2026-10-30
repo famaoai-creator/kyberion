@@ -192,6 +192,7 @@
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
 - [時間コンテキストとカレンダーワークフローモデル](./product/architecture/temporal-context-model.ja.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
+- [音声・リアルタイム映像の技術再評価 2026-10](./product/architecture/realtime-av-technology-review-2026-10.md) (public | Unknown)
 
 ## 📁 product/architecture/decisions
 - [Constrain Mesh Hub v1 to a Same-Tenant Single-Writer Control Plane](./product/architecture/decisions/2026-06-24-mesh-hub-v1-boundaries.md) (public | Ecosystem Architect)
@@ -493,12 +494,14 @@
 - [エンタープライズ品質管理フロー (Quality Management Flow)](./product/orchestration/quality-management-flow.md) (public | Ecosystem Architect)
 - [コンテキスト抽出・要約ルール (Context Extraction Rules)](./product/orchestration/context-extraction-rules.md) (public | Ecosystem Architect)
 - [スキル間データ受け渡し仕様 (Data Handover Specs)](./product/orchestration/data-handover-specs.md) (public | Ecosystem Architect)
+- [テナント資格情報のタスク束縛](./product/orchestration/tenant-task-credential-binding.ja.md) (public | Unknown)
 - [トークン・エコノミー ＆ 高密度コンテキスト・プロトコル (MSC Protocol)](./product/orchestration/token-economy-protocol.md) (public | Ecosystem Architect)
 - [ドキュメントファイル読み取りプレイブック（PDF / PPTX / XLSX / DOCX → テキスト・表・OCR）](./product/orchestration/document-file-reading-playbook.ja.md) (public | Ecosystem Architect)
 - [ハイブリッド型AIネイティブ開発フロー (Hybrid AI-Native Flow)](./product/orchestration/hybrid-development-flow.md) (public | Ecosystem Architect)
 - [パイプライン結晶化ループ設計メモ](./product/orchestration/pipeline-crystallization-memo.md) (public | Kyberion)
 - [プロジェクト依存ミッション連鎖の実走メモ (PRJ-KYBERION-PRODUCTION-READINESS, 2026-10-07)](./product/orchestration/mission-dependency-chain-demo-20261007.md) (public | Unknown)
 - [ミッション実行規程 (Mission Execution Protocol v2.0)](./product/orchestration/mission-execution-protocol.md) (public | Kyberion Sovereign Entity)
+- [リアルタイム映像フィルタと会話アバターの運用](./product/orchestration/realtime-av-operations.ja.md) (public | Unknown)
 - [企業内ネットワーク環境セットアップガイド](./product/orchestration/corporate-env-guide.md) (public | Ecosystem Architect)
 - [作業完了から再利用候補への自動接続](./product/orchestration/workflow-reuse-playbook.md) (public | Unknown)
 - [依頼を再利用可能な知識・スキル・pipeline に育てる](./product/orchestration/reusable-learning-playbook.ja.md) (public | Unknown)

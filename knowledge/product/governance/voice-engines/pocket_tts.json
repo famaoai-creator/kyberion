@@ -23,7 +23,7 @@
         "artifact_formats": ["wav"]
       },
       "fallback_engine_id": "local_say",
-      "notes": "CPU streaming TTS and consent-gated voice cloning. Current upstream language packs do not include Japanese.",
+      "notes": "CPU TTS and consent-gated voice cloning. The Kyberion bridge emits complete WAV artifacts. A configured registry override may opt into model_id english_18m_2026-10, english_7m_2026-10 or english_2m_2026-10 with a compatible upstream runtime. These English Small models are not the default. Only the 1.9M configuration has a short local WAV-generation measurement; streaming latency and listening quality remain unverified. Current upstream language packs do not include Japanese.",
       "language_notes": "Bridge rejects Japanese; upstream packs for fr/de/pt/it/es exist but the bridge does not select a language pack, so only en is declared."
     }
   ]

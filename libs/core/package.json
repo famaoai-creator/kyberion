@@ -7148,6 +7148,18 @@
       "types": "./dist/video/video-device-lease.d.ts",
       "default": "./dist/video/video-device-lease.js"
     },
+    "./video/video-filter": {
+      "types": "./dist/video/video-filter.d.ts",
+      "default": "./dist/video/video-filter.js"
+    },
+    "./video/video-filter-bootstrap": {
+      "types": "./dist/video/video-filter-bootstrap.d.ts",
+      "default": "./dist/video/video-filter-bootstrap.js"
+    },
+    "./video/obs-video-filter-provider": {
+      "types": "./dist/video/obs-video-filter-provider.d.ts",
+      "default": "./dist/video/obs-video-filter-provider.js"
+    },
     "./video/video-frame-archive": {
       "types": "./dist/video/video-frame-archive.d.ts",
       "default": "./dist/video/video-frame-archive.js"

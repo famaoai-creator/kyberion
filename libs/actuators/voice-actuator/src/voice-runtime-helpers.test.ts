@@ -284,6 +284,25 @@ describe('voice runtime helpers', () => {
     );
   });
 
+  it('forwards an opt-in packaged Pocket small model to the Python bridge', async () => {
+    const { runPythonTtsBridge } = await import('./voice-runtime-helpers.js');
+    await runPythonTtsBridge(
+      'libs/actuators/voice-actuator/scripts/pocket_tts_bridge.py',
+      'A compact English voice.',
+      '/tmp/pocket-small.wav',
+      'en',
+      undefined,
+      'pocket_tts',
+      'alba',
+      'english_7m_2026-10'
+    );
+    expect(mocks.safeExecResult).toHaveBeenLastCalledWith(
+      expect.any(String),
+      ['-X', 'utf8', expect.stringContaining('pocket_tts_bridge.py')],
+      expect.objectContaining({ input: expect.stringContaining('"model_id":"english_7m_2026-10"') })
+    );
+  });
+
   it('accepts a successful local STT response', async () => {
     const { parseVoiceSttBridgeResponse } = await import('./voice-runtime-helpers.js');
     expect(
