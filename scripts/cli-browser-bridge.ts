@@ -304,11 +304,20 @@ function buildRequest(
         fail('--options-json must be a JSON object');
       }
     }
+    let input = inline;
+    if (input === undefined) {
+      input = deps.readFile(canonicalFile as string);
+      // A path swapped for a symlink between the check and the read resolves
+      // elsewhere afterwards; re-check so that content is never enqueued.
+      if (assertInputFileScope(file as string, common.scope) !== canonicalFile) {
+        fail('--input-file changed while it was being read; retry');
+      }
+    }
     return {
       request_kind: 'local_infer',
       payload: {
         task,
-        input: inline ?? deps.readFile(canonicalFile as string),
+        input,
         ...(taskOptions ? { options: taskOptions } : {}),
       },
       ...common,
