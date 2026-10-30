@@ -5,6 +5,8 @@ import { getServiceEndpointRecord, type CredentialSuffixMap } from './service-en
 export function resolveServiceSecret(serviceId: string, suffixes: string[]): string | null {
   const upper = serviceId.toUpperCase();
   for (const suffix of suffixes) {
+    // This resolver also serves actual requests and cached binding getters.
+    // Discovery must handle optional absence at its boundary, never here.
     const secret = secretGuard.getSecret(`${upper}_${suffix}`, serviceId, 'service.resolve');
     if (secret) return secret;
   }

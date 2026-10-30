@@ -27,6 +27,12 @@ vi.mock('./mission-state.js', async (importOriginal) => ({
   checkPrerequisites: vi.fn(),
 }));
 
+vi.mock('../intent/intent-extractor.js', () => ({
+  getIntentExtractor: vi.fn(() => {
+    throw new Error('Mission lifecycle must not acquire an intent model');
+  }),
+}));
+
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const TENANT = 'ledger-acme';
 const suffix = randomUUID().slice(0, 8).toUpperCase();
@@ -405,6 +411,46 @@ describe('mission ledger scope (D9)', () => {
       ledger.tenantLedgerPath('confidential', TENANT)
     );
     expect(fs.readFileSync(ledger.GLOBAL_LEDGER_PATH, 'utf8')).not.toContain(id);
+  }, 60_000);
+
+  it('preserves handoff user provenance and blocks a changed canonical goal without a model', async () => {
+    const { createMission } = await import('./mission-creation.js');
+    const { writeIntentGoalHandoff } = await import('../intent/intent-handoff.js');
+    const { getIntentExtractor } = await import('../intent/intent-extractor.js');
+    const { emitMissionLifecycleIntentSnapshot } = await import('./mission-intent-delta.js');
+    const { evaluateIntentDriftGate, listSnapshots } =
+      await import('../intent/intent-snapshot-store.js');
+    const id = `MSN-LEDGER-INTENT-${suffix}`;
+    const agreedGoal = 'Generate the monthly employee payroll spreadsheet and validate tax totals';
+    const handoff = writeIntentGoalHandoff(id, {
+      source_text: agreedGoal,
+      goal: { summary: agreedGoal },
+      correlation_id: 'handoff-origin-regression',
+    });
+    vi.mocked(getIntentExtractor).mockClear();
+
+    await createMission({ id, tier: 'public', rootDir: tmpRoot, intentGoal: handoff });
+
+    expect(getIntentExtractor).not.toHaveBeenCalled();
+    expect(listSnapshots(id)[0]).toMatchObject({
+      source: 'user_prompt',
+      kind: 'origin',
+      trace_ref: 'handoff-origin-regression',
+      intent: { goal: agreedGoal },
+    });
+    await emitMissionLifecycleIntentSnapshot({
+      missionId: id,
+      stage: 'execution',
+      source: 'mission_state',
+      extraction: 'canonical_only',
+      text: 'Routine progress update',
+    });
+    const result = evaluateIntentDriftGate(id, undefined, {
+      goal: 'Paint a forest landscape in watercolor for the exhibition',
+    });
+    expect(result.passed).toBe(false);
+    expect(result.verdict).toBe('blocking');
+    expect(getIntentExtractor).not.toHaveBeenCalled();
   }, 60_000);
 
   it('routes an archived tenant mission to its tenant; an unknown id stays a system record', async () => {
