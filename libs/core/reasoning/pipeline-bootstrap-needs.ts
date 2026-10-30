@@ -41,6 +41,8 @@ const STRUCTURAL_OPS: ReadonlySet<string> = new Set([
  */
 const INERT_OPS: ReadonlySet<string> = new Set([
   'working-memory:run-gc',
+  // Governed local retention cleanup never needs a model or provider secret.
+  'core:run_janitor',
   'system:write_artifact',
   'system:log',
   'system:baseline_check',

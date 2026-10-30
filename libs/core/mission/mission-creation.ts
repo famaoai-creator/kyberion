@@ -509,7 +509,10 @@ export async function createMission(args: {
       intentHandoff?.source_text ||
       resolvedVision ||
       `Mission ${upperId} (${missionType})`,
+    // Record agreed intent without a model while retaining user provenance
+    // so the drift gate still protects handoff-origin missions.
     source: intentHandoff ? 'user_prompt' : 'mission_state',
+    extraction: 'canonical_only',
     traceRef: intentHandoff?.correlation_id,
   });
 
@@ -783,6 +786,7 @@ export async function startMission(args: {
         visionRef ||
         `Start mission ${upperId} (${missionType})`,
       source: 'mission_state',
+      extraction: 'canonical_only',
       traceRef: state?.correlation_id,
     });
 

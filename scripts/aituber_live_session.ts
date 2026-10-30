@@ -260,9 +260,9 @@ export async function runAituberLiveSession(
   return { turns, processed };
 }
 
-async function main(argv: string[], print: (v: unknown) => void): Promise<void> {
-  installReasoningBackends();
+export async function main(argv: string[], print: (v: unknown) => void): Promise<void> {
   const parsed = await createStandardYargs(['node', 'aituber_live_session', ...argv])
+    .exitProcess(false)
     .option('session-id', { type: 'string', demandOption: true })
     .option('live-chat-id', { type: 'string' })
     .option('fixture', { type: 'string' })
@@ -286,6 +286,10 @@ async function main(argv: string[], print: (v: unknown) => void): Promise<void> 
     })
     .option('dry-run', { type: 'boolean', default: false })
     .parse();
+  if (parsed.help || parsed.h) return;
+  // A dry-run rehearsal never reaches a reasoning or TTS backend, so the
+  // credential-bound bootstrap is skipped.
+  if (!parsed['dry-run']) installReasoningBackends();
   const result = await runAituberLiveSession(
     {
       sessionId: String(parsed['session-id']),

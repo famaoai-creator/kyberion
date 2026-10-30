@@ -31,6 +31,7 @@ import {
   resolveMissionTicketDispatchOptionsFromArgv,
   resolveMissionWorkItemDispatchOptionsFromArgv,
   shouldSkipReasoningBootstrap,
+  missionReasoningInitialization,
   validateMissionStartCreateInput,
 } from './mission_controller.js';
 import { buildOrganizationDiscoveryReport } from './refactor/mission-organization-commands.js';
@@ -200,20 +201,26 @@ describe('mission_controller argument parsing', () => {
     }
   });
 
-  it('skips the reasoning bootstrap only for journal-only actions', () => {
+  it('skips bootstrap for deterministic lifecycle and journal actions', () => {
     // record-task/record-evidence never delegate: skipping their ~3s CLI
-    // probe cost keeps per-task worker spawns cheap. Everything else —
-    // including unknown actions — fails safe toward installing so delegation
-    // can never silently fall back to the stub.
+    // probe cost keeps per-task worker spawns cheap. Model-running and unknown
+    // actions still initialize, so delegation never silently uses the stub.
     expect(shouldSkipReasoningBootstrap('record-task')).toBe(true);
     expect(shouldSkipReasoningBootstrap('record-evidence')).toBe(true);
     expect(shouldSkipReasoningBootstrap('review-task')).toBe(true);
     expect(shouldSkipReasoningBootstrap('help')).toBe(true);
     expect(shouldSkipReasoningBootstrap('list')).toBe(true);
-    // kickoff shares the start path and must bootstrap reasoning like start —
-    // pin the invariant so a future REASONING_FREE_ACTIONS edit can't regress it.
-    expect(shouldSkipReasoningBootstrap('kickoff')).toBe(false);
+    // Creation/activation record existing agreed intent; model execution and
+    // delegation must remain behind the later model-requiring verbs.
+    for (const lifecycle of ['create', 'start', 'kickoff'])
+      expect(shouldSkipReasoningBootstrap(lifecycle)).toBe(true);
+    for (const modelVerb of ['verify', 'distill', 'finish'])
+      expect(shouldSkipReasoningBootstrap(modelVerb)).toBe(false);
     expect(shouldSkipReasoningBootstrap('dispatch-workitems')).toBe(false);
+    for (const dispatch of ['dispatch-workitems', 'dispatch-tickets'])
+      expect(missionReasoningInitialization(dispatch)).toBe('host');
+    expect(missionReasoningInitialization('create')).toBe('none');
+    expect(missionReasoningInitialization('finish')).toBe('execution');
     for (const readOnly of [
       'status',
       'outbox',
@@ -490,6 +497,41 @@ describe('mission_controller argument parsing', () => {
       process.argv = originalArgv;
       startSpy.mockRestore();
       routerSpy.mockRestore();
+    }
+  });
+
+  it('prepares tenant dispatch before claim without constructing a credential-dependent backend', async () => {
+    const bootstrap = await import('@agent/core/reasoning/reasoning-bootstrap');
+    const { credentialBindingReadiness } = await import('@agent/core/secret/secret-guard');
+    const install = vi.spyOn(bootstrap, 'installReasoningBackends').mockImplementation(() => {
+      throw new Error('Dispatch host must not construct a backend before bindTask');
+    });
+    const prepare = vi.spyOn(bootstrap, 'prepareReasoningExecutionHost');
+    const monitor = vi
+      .spyOn(killSwitch.killSwitch, 'startMonitor')
+      .mockImplementation(() => undefined);
+    const router = vi
+      .spyOn(missionControllerRouter, 'runMissionControllerAction')
+      .mockImplementation(async () => {
+        expect(credentialBindingReadiness().status).toBe('binding_required');
+        return undefined as any;
+      });
+    vi.stubEnv('KYBERION_TENANT', 'alpha');
+    vi.stubEnv('MISSION_ID', '');
+    vi.stubEnv('KYBERION_TASK_ID', '');
+    vi.stubEnv('MISSION_ROLE', 'mission_controller');
+    vi.stubEnv('KYBERION_SECRET_RESOLVER_COMMAND', '');
+    try {
+      await main(['dispatch-workitems', 'MSN-SCOPE-HOST'], () => undefined);
+      expect(prepare).toHaveBeenCalledOnce();
+      expect(install).not.toHaveBeenCalled();
+      expect(router).toHaveBeenCalledOnce();
+    } finally {
+      install.mockRestore();
+      prepare.mockRestore();
+      monitor.mockRestore();
+      router.mockRestore();
+      vi.unstubAllEnvs();
     }
   });
 
