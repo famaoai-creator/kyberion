@@ -1183,15 +1183,18 @@ export async function reconcileMissionExistingWork(input: {
     if (reconciledTaskIds.length > 0 || resultBase.auto_completed_repair_task_ids.length > 0) {
       // Written under the board's writer lease: the adopted and repair tasks
       // carry this reconciliation; every other task keeps the board's current
-      // entry (a worker's status write since the read above is kept) unless
-      // its WorkItem already closed it. A canonical task superseded by
+      // entry (a worker's status write since the read above is kept), with the
+      // WorkItem's status when the WorkItem already closed it. A canonical task superseded by
       // supersede-task stays so when the mission proves the supersede.
       const changedIds = new Set([
         ...reconciledTaskIds,
         ...resultBase.auto_completed_repair_task_ids,
       ]);
-      const isTerminal = (task: { status?: unknown }): boolean =>
-        TERMINAL_TASK_STATUSES.has(String(task.status || '').toLowerCase());
+      // `reviewed` is left out: a WorkItem still in review projects to it.
+      const isClosed = (task: { status?: unknown }): boolean =>
+        ['done', 'completed', 'accepted'].includes(String(task.status || '').toLowerCase());
+      const isSupersededEntry = (task: { status?: unknown }): boolean =>
+        String(task.status || '').toLowerCase() === 'superseded';
       writeMissionNextTasks(
         missionPath,
         (onDisk) => {
@@ -1201,7 +1204,11 @@ export async function reconcileMissionExistingWork(input: {
             const canonical = task as unknown as Record<string, unknown>;
             const current = onDiskById.get(taskId);
             if (changedIds.has(taskId) || !current) return canonical;
-            return isTerminal(canonical) && !isTerminal(current) ? canonical : current;
+            // Only the WorkItem's closing status is taken; the board entry
+            // keeps its own fields (deliverable, evidence, dispatch history).
+            return isClosed(canonical) && !isClosed(current) && !isSupersededEntry(current)
+              ? { ...current, status: canonical.status }
+              : current;
           });
         },
         { acceptProvenSupersede: true }

@@ -459,8 +459,7 @@ export function writeMissionNextTasks(
             allowSupersede: options.allowSupersede,
             ...(options.acceptProvenSupersede
               ? {
-                  isSupersedeProven: (task: object) =>
-                    isSupersedeProven(missionId, String((task as { task_id?: unknown }).task_id)),
+                  isSupersedeProven: (task: object) => isSupersedeProven(missionId, task),
                 }
               : {}),
           }),

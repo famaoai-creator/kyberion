@@ -71,6 +71,14 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
             test_criteria: ['core tests pass'],
           },
           {
+            task_id: 'T-IMPL-2',
+            title: 'Implement core again',
+            summary: 'the replacement, planned after the original',
+            priority: 'must',
+            estimate: 'S',
+            depends_on: ['T-IMPL-1'],
+          },
+          {
             task_id: 'T-REVIEW-1',
             title: 'Review',
             summary: 'PR review',
@@ -83,7 +91,6 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
       },
     });
 
-    // The plan's two tasks plus the replacement T-IMPL-2 the writer keeps.
     expect(taskPlanToNextTasks({ mission_id: missionId }).task_count).toBe(3);
     const board = JSON.parse(
       String(safeReadFile(`${missionDir}/NEXT_TASKS.json`, { encoding: 'utf8' }))
@@ -92,6 +99,8 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
       status: 'superseded',
       superseded,
     });
+    // The replacement does not wait for itself.
+    expect(board.find((task) => task.task_id === 'T-IMPL-2')?.dependencies).toEqual([]);
     // The review of the superseded task now reviews (and waits for) its replacement.
     expect(board.find((task) => task.task_id === 'T-REVIEW-1')).toMatchObject({
       dependencies: ['T-IMPL-2'],

@@ -22,8 +22,8 @@ vi.mock('./mission-task-supersede-proof.js', async (importOriginal) => {
     ...actual,
     isSupersedeProvenForGate: (missionId: string, taskId: string, reader: string) =>
       taskId.endsWith('-proven') || actual.isSupersedeProvenForGate(missionId, taskId, reader),
-    isSupersedeProven: (missionId: string, taskId: string) =>
-      taskId.endsWith('-proven') || actual.isSupersedeProven(missionId, taskId),
+    isSupersedeProven: (missionId: string, task: { task_id?: unknown; superseded?: unknown }) =>
+      String(task.task_id).endsWith('-proven') || actual.isSupersedeProven(missionId, task),
   };
 });
 
