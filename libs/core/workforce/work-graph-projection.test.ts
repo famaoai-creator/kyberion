@@ -1,4 +1,17 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+// The supersede proof (approval store) is exercised in mission-task-supersede.test.ts;
+// here a task named `*-proven` stands for a superseded task the mission proves.
+vi.mock('../mission/mission-task-supersede-proof.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../mission/mission-task-supersede-proof.js')>();
+  return {
+    ...actual,
+    isSupersedeProvenForGate: (missionId: string, taskId: string, reader: string) =>
+      taskId.endsWith('-proven') || actual.isSupersedeProvenForGate(missionId, taskId, reader),
+    isSupersedeProven: (missionId: string, task: { task_id?: unknown; superseded?: unknown }) =>
+      String(task.task_id).endsWith('-proven') || actual.isSupersedeProven(missionId, task),
+  };
+});
 import * as fs from 'node:fs';
 import * as nodePath from 'node:path';
 import {
@@ -13,6 +26,7 @@ import {
   readCanonicalWorkGraphTasks,
 } from './work-graph-projection.js';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../index.js';
+import { writeMissionNextTasks } from '../mission/mission-lifecycle-completion.js';
 
 const missionPath = pathResolver.sharedTmp('work-graph-projection-test');
 const alternateRoot = pathResolver.sharedTmp('work-graph-projection-root-test');
@@ -149,6 +163,102 @@ describe('work graph projection', () => {
         origin: 'canonical_work_graph',
       }),
     ]);
+  });
+
+  it('applies through the leased board writer, refusing drift found under the lease', () => {
+    createWorkItem({
+      itemId: 'projection-writer-item',
+      title: 'Projected work',
+      description: 'Work projected from canonical state.',
+      projectId: 'PRJ-PROJECTION',
+      status: 'ready',
+      context: { project_id: 'PRJ-PROJECTION', task_id: 'projected-task' },
+    });
+    const superseded = {
+      by_task_id: 'projected-task',
+      at: '2026-10-30T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    };
+    writeMissionNextTasks(
+      missionPath,
+      [{ task_id: 'replaced-task', status: 'superseded', superseded }],
+      { allowSupersede: true }
+    );
+    // A superseded entry the projection does not know is stale drift, so the
+    // apply is refused; it is checked again on the board read under the lease.
+    const result = projectWorkGraphToNextTasks({
+      missionId: 'MSN-PROJECTION',
+      projectId: 'PRJ-PROJECTION',
+      missionPath,
+      apply: true,
+    });
+    expect(result.applied).toBe(false);
+    safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), '[]\n');
+    const applied = projectWorkGraphToNextTasks({
+      missionId: 'MSN-PROJECTION',
+      projectId: 'PRJ-PROJECTION',
+      missionPath,
+      apply: true,
+    });
+    expect(applied.applied).toBe(true);
+    const records = String(
+      safeReadFile(nodePath.join(missionPath, 'coordination', 'provisioned-entries.jsonl'), {
+        encoding: 'utf8',
+      })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { target_path: string; phase: string });
+    expect(
+      records.filter(
+        (record) => record.target_path === 'NEXT_TASKS.json' && record.phase === 'verified'
+      ).length
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('rebuilds a board keeping a proven supersede and dropping an unproven one', () => {
+    const supersededItem = (taskId: string) =>
+      createWorkItem({
+        itemId: `item-${taskId}`,
+        title: 'Replaced task',
+        description: 'Replaced task.',
+        projectId: 'PRJ-PROJECTION',
+        status: 'archived',
+        context: { project_id: 'PRJ-PROJECTION', task_id: taskId },
+        metadata: {
+          superseded_by: 'task-new',
+          superseded: { by_task_id: 'task-new', at: '2026-10-30T00:00:00.000Z' },
+        },
+      });
+    supersededItem('task-old-proven');
+    supersededItem('task-old-unproven');
+    createWorkItem({
+      itemId: 'item-task-new',
+      title: 'Replacement',
+      description: 'Replacement task.',
+      projectId: 'PRJ-PROJECTION',
+      status: 'ready',
+      context: { project_id: 'PRJ-PROJECTION', task_id: 'task-new' },
+    });
+    const result = projectWorkGraphToNextTasks({
+      missionId: 'MSN-PROJECTION',
+      projectId: 'PRJ-PROJECTION',
+      missionPath,
+      apply: true,
+    });
+    expect(result.applied).toBe(true);
+    const board = JSON.parse(
+      String(safeReadFile(result.next_tasks_path, { encoding: 'utf8' }))
+    ) as Array<Record<string, unknown>>;
+    const byId = new Map(board.map((task) => [task.task_id, task]));
+    expect(byId.get('task-old-proven')).toMatchObject({
+      status: 'superseded',
+      superseded: { by_task_id: 'task-new' },
+    });
+    expect(byId.get('task-old-unproven')?.status).toBe('planned');
+    expect(byId.get('task-old-unproven')).not.toHaveProperty('superseded');
   });
 
   it('projects canonical WorkItems and reports drift without applying by default', () => {

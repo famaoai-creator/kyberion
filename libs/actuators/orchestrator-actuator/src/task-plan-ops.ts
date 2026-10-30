@@ -12,7 +12,9 @@ import {
   readRequirementsDraft,
   readRequirementsDraftAtPath,
 } from '@agent/core/requirements-draft-store';
-import { assertSafeRepositoryPath, safeWriteFile } from '@agent/core/secure-io';
+import { assertSafeRepositoryPath } from '@agent/core/secure-io';
+import { logger } from '@agent/core/core';
+import { writeMissionNextTasks } from '@agent/core/mission/mission-lifecycle-completion';
 
 function resolveTaskPlanInputPath(ref: string): string {
   return assertSafeRepositoryPath(pathResolver.rootResolve(ref), { allowMissingLeaf: true });
@@ -112,11 +114,66 @@ export function taskPlanToNextTasks(input: { mission_id: string }) {
   });
   // NEXT_TASKS.json belongs to the existing mission wherever it lives; an
   // unknown mission fails closed (OwnerScopeError) instead of landing in public.
-  const nextTasksPath = `${resolveMissionDir(input.mission_id)}/NEXT_TASKS.json`;
-  safeWriteFile(nextTasksPath, JSON.stringify(nextTasks, null, 2));
+  const missionDir = resolveMissionDir(input.mission_id);
+  const nextTasksPath = `${missionDir}/NEXT_TASKS.json`;
+  // Through the one board writer, against the board read under its lease: the
+  // new plan replaces the board, but a task superseded on disk keeps its
+  // record (M2), and a plan task that depends on (or reviews) a superseded id
+  // is pointed at its replacement, which a superseded task never satisfies.
+  let boardTaskCount = nextTasks.length;
+  writeMissionNextTasks(missionDir, (onDisk) => {
+    const replacedBy = new Map<string, string>();
+    for (const task of onDisk) {
+      const by = (task.superseded as { by_task_id?: unknown } | undefined)?.by_task_id;
+      if (task.status === 'superseded' && typeof by === 'string' && by) {
+        replacedBy.set(String(task.task_id || ''), by);
+      }
+    }
+    const resolve = (taskId: string): string => {
+      const seen = new Set([taskId]);
+      let current = taskId;
+      while (replacedBy.has(current) && !seen.has(replacedBy.get(current)!)) {
+        current = replacedBy.get(current)!;
+        seen.add(current);
+      }
+      return current;
+    };
+    const reused = nextTasks.filter((task) => replacedBy.has(task.task_id)).map((t) => t.task_id);
+    if (reused.length > 0) {
+      logger.warn(
+        `[task_plan_to_next_tasks] plan tasks ${reused.join(', ')} were superseded — their superseded entries are kept, not the plan's | regenerate the plan without them, or supersede them again | mission=${input.mission_id}`
+      );
+    }
+    const planned = nextTasks.map((task) => {
+      // A task never depends on, or reviews, itself (the plan's own
+      // replacement of a superseded id resolves to it).
+      const resolved = task.review_target ? resolve(task.review_target) : undefined;
+      const reviewTarget = resolved === task.task_id ? task.review_target : resolved;
+      return {
+        ...task,
+        dependencies: [
+          ...new Set(task.dependencies.map(resolve).filter((id) => id !== task.task_id)),
+        ],
+        ...(reviewTarget
+          ? { review_target: reviewTarget, deliverable: `deliverables/REVIEW-${reviewTarget}.md` }
+          : {}),
+      };
+    });
+    // The board as written: the plan plus each superseded task (and its
+    // replacement) on disk that the plan lacks, which the writer keeps.
+    const plannedIds = new Set(planned.map((task) => task.task_id));
+    boardTaskCount =
+      planned.length +
+      onDisk.filter((task) => {
+        const taskId = String(task.task_id || '');
+        if (plannedIds.has(taskId)) return false;
+        return task.status === 'superseded' || [...replacedBy.values()].includes(taskId);
+      }).length;
+    return planned;
+  });
   return {
     mission_id: input.mission_id,
     next_tasks_path: nextTasksPath,
-    task_count: nextTasks.length,
+    task_count: boardTaskCount,
   };
 }

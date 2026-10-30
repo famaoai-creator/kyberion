@@ -57,6 +57,7 @@ import { loadState, saveState } from './mission-state.js';
 import { loadMissionNextTaskObjectsAtPath } from './mission-next-task-reader.js';
 import { readCanonicalWorkGraphTasks } from '../workforce/work-graph-projection.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 
 // `superseded` (supersede-task) is terminal: a replaced task is never adoptable.
 const TERMINAL_TASK_STATUSES = new Set(['done', 'completed', 'accepted', 'reviewed', 'superseded']);
@@ -1180,10 +1181,38 @@ export async function reconcileMissionExistingWork(input: {
     }
 
     if (reconciledTaskIds.length > 0 || resultBase.auto_completed_repair_task_ids.length > 0) {
-      writeDispatchArtifact(nodePath.join(missionPath, 'NEXT_TASKS.json'), tasks, {
-        missionId,
+      // Written under the board's writer lease: the adopted and repair tasks
+      // carry this reconciliation; every other task keeps the board's current
+      // entry (a worker's status write since the read above is kept), with the
+      // WorkItem's status when the WorkItem already closed it. A canonical task superseded by
+      // supersede-task stays so when the mission proves the supersede.
+      const changedIds = new Set([
+        ...reconciledTaskIds,
+        ...resultBase.auto_completed_repair_task_ids,
+      ]);
+      // `reviewed` is left out: a WorkItem still in review projects to it.
+      const isClosed = (task: { status?: unknown }): boolean =>
+        ['done', 'completed', 'accepted'].includes(String(task.status || '').toLowerCase());
+      const isSupersededEntry = (task: { status?: unknown }): boolean =>
+        String(task.status || '').toLowerCase() === 'superseded';
+      writeMissionNextTasks(
         missionPath,
-      });
+        (onDisk) => {
+          const onDiskById = new Map(onDisk.map((task) => [String(task.task_id || ''), task]));
+          return tasks.map((task) => {
+            const taskId = String(task.task_id || '');
+            const canonical = task as unknown as Record<string, unknown>;
+            const current = onDiskById.get(taskId);
+            if (changedIds.has(taskId) || !current) return canonical;
+            // Only the WorkItem's closing status is taken; the board entry
+            // keeps its own fields (deliverable, evidence, dispatch history).
+            return isClosed(canonical) && !isClosed(current) && !isSupersededEntry(current)
+              ? { ...current, status: canonical.status }
+              : current;
+          });
+        },
+        { acceptProvenSupersede: true }
+      );
     }
     const receipt: MissionWorkReconciliationResult & { adopted_at: string; reason: string } = {
       status: 'applied',
