@@ -35,6 +35,8 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
     delete (globalThis as any).__kyberionPiiScrub;
     delete (globalThis as any).LanguageModel;
     delete (globalThis as any).Summarizer;
+    delete (globalThis as any).Translator;
+    delete (globalThis as any).LanguageDetector;
   });
 
   it('summarizes captions through the Summarizer API and scrubs both directions', async () => {
@@ -131,6 +133,145 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
     expect(normalized.truncated).toBe(true);
     expect(normalized.line_count).toBeLessThan(long.length);
     expect(normalized.text.endsWith(long[long.length - 1])).toBe(true);
+  });
+
+  it('reports a capability matrix where missing APIs are unsupported', async () => {
+    (globalThis as any).LanguageModel = { availability: vi.fn(async () => 'available') };
+    const adapter = await loadAdapter();
+
+    const matrix = await adapter.availability();
+
+    expect(matrix.prompt).toBe('available');
+    expect(matrix.summarizer).toBe('unsupported');
+    expect(matrix.translator).toBe('unsupported');
+    expect(matrix.languageDetector).toBe('unsupported');
+    expect(matrix.multimodal.image).toBe('available');
+  });
+
+  it('clones one base session per call and destroys the base on dispose', async () => {
+    const { session } = installBuiltInAi({ summary: 'ok' });
+    const clones: any[] = [];
+    (session as any).clone = vi.fn(async () => {
+      const clone = {
+        prompt: vi.fn(async () => JSON.stringify({ summary: 'ok' })),
+        destroy: vi.fn(),
+      };
+      clones.push(clone);
+      return clone;
+    });
+    const adapter = await loadAdapter();
+
+    await adapter.summarizeMeeting({ transcript: ['一'], previousSummary: 'x' });
+    await adapter.summarizeMeeting({ transcript: ['二'], previousSummary: 'x' });
+
+    const createOptions = (globalThis as any).LanguageModel.create.mock.calls[0][0];
+    expect((globalThis as any).LanguageModel.create).toHaveBeenCalledTimes(1);
+    expect(createOptions.initialPrompts[0].content).toContain('信頼できないデータ');
+    expect(clones).toHaveLength(2);
+    clones.forEach((clone) => expect(clone.destroy).toHaveBeenCalledTimes(1));
+    adapter.dispose();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(session.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the oldest speech by token quota and reports truncated', async () => {
+    const { session } = installBuiltInAi({ summary: 'ok' });
+    Object.assign(session, {
+      contextWindow: 500,
+      contextUsage: 0,
+      measureContextUsage: vi.fn(async (text: string) => text.length),
+    });
+    const adapter = await loadAdapter();
+    const lines = Array.from({ length: 50 }, (_, i) =>
+      `発言${String(i).padStart(2, '0')}`.padEnd(40, 'あ')
+    );
+
+    const result = await adapter.summarizeMeeting({ transcript: lines, previousSummary: '前回' });
+
+    expect(result.truncated).toBe(true);
+    const prompt: string = session.prompt.mock.calls[0][0];
+    expect(prompt).toContain('発言49');
+    expect(prompt).not.toContain('発言00');
+  });
+
+  it('falls back to the legacy quota names', async () => {
+    const { session } = installBuiltInAi({ summary: 'ok' });
+    Object.assign(session, {
+      inputQuota: 300,
+      inputUsage: 0,
+      measureInputUsage: vi.fn(async (text: string) => text.length),
+    });
+    const adapter = await loadAdapter();
+
+    const result = await adapter.summarizeMeeting({
+      transcript: Array.from({ length: 30 }, (_, i) => `行${i}`.padEnd(40, 'い')),
+      previousSummary: '前回',
+    });
+
+    expect(session.measureInputUsage).toHaveBeenCalled();
+    expect(result.truncated).toBe(true);
+  });
+
+  it('streams a Summarizer result and forwards the AbortSignal', async () => {
+    const { summarizer } = installBuiltInAi({}, 'unused');
+    (summarizer as any).summarizeStreaming = vi.fn(() =>
+      (async function* () {
+        yield '要点 SECRET';
+      })()
+    );
+    const adapter = await loadAdapter();
+    const controller = new AbortController();
+    const onChunk = vi.fn();
+
+    const result = await adapter.summarizeMeeting({
+      transcript: ['発言'],
+      onChunk,
+      signal: controller.signal,
+    });
+
+    expect(onChunk).toHaveBeenCalledWith('要点 [REDACTED:SECRET]');
+    expect(result.text).toBe('要点 [REDACTED:SECRET]');
+    expect((summarizer as any).summarizeStreaming.mock.calls[0][1].signal).toBe(controller.signal);
+    expect((globalThis as any).Summarizer.create.mock.calls[0][0].signal).toBe(controller.signal);
+
+    controller.abort();
+    await expect(
+      adapter.summarizeMeeting({ transcript: ['発言'], signal: controller.signal })
+    ).rejects.toBeDefined();
+  });
+
+  it('translates non-ja captions and passes same-language text through', async () => {
+    installBuiltInAi({});
+    const translator = { translate: vi.fn(async () => '予算は SECRET'), destroy: vi.fn() };
+    (globalThis as any).Translator = {
+      availability: vi.fn(async () => 'available'),
+      create: vi.fn(async () => translator),
+    };
+    const adapter = await loadAdapter();
+
+    const same = await adapter.translate('こんにちは', { sourceLanguage: 'ja' });
+    expect(same.translated).toBe(false);
+    expect((globalThis as any).Translator.create).not.toHaveBeenCalled();
+
+    const result = await adapter.translate('budget SECRET', { sourceLanguage: 'en' });
+    expect(translator.translate.mock.calls[0][0]).toBe('budget [REDACTED:SECRET]');
+    expect(result).toMatchObject({ translated: true, text: '予算は [REDACTED:SECRET]' });
+  });
+
+  it('detects language with a confidence threshold and errors clearly when absent', async () => {
+    installBuiltInAi({});
+    const adapter = await loadAdapter();
+    await expect(adapter.detectLanguage('hello')).rejects.toThrow('LanguageDetector API');
+
+    const detect = vi
+      .fn()
+      .mockResolvedValueOnce([{ detectedLanguage: 'en', confidence: 0.8 }])
+      .mockResolvedValueOnce([{ detectedLanguage: 'en', confidence: 0.2 }]);
+    (globalThis as any).LanguageDetector = {
+      create: vi.fn(async () => ({ detect, destroy: vi.fn() })),
+    };
+    expect((await adapter.detectLanguage('hello')).language).toBe('en');
+    expect((await adapter.detectLanguage('???')).language).toBe('und');
   });
 
   it('fails closed when the shared PII scrubber is unavailable', async () => {
