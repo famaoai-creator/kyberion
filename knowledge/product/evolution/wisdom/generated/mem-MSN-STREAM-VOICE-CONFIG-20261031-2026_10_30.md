@@ -1,0 +1,43 @@
+---
+record_id: mem-MSN-STREAM-VOICE-CONFIG-20261031-2026_10_30
+kind: knowledge_hint
+tier: public
+knowledge_domain: product
+owner_nhi: ''
+candidate_id: mem-MSN-STREAM-VOICE-CONFIG-20261031-2026_10_30
+supersedes: ''
+superseded_by: ''
+project_id: ''
+task_session_id: ''
+specialist_id: ''
+locale: ''
+created_at: 2026-10-30T16:44:16.908Z
+source_branch: fix/streaming-voice-config-20261031
+source_commit: 206a39baacf0d99d9c33892f06510323bb8cedcc
+---
+
+# Keep streaming voice configuration and cleanup invocation-local
+
+Resolve streaming settings per execution, preserve protocol boundaries and release all owned resources without hiding the primary failure.
+
+## Hint Scope
+
+mission
+
+## Trigger Phrases
+
+- Resolve saved streaming preferences into typed invocation settings rather than mutating process.env. Pass streaming commands only to PCM streaming adapters: batch STT uses a different file-based protocol. Preserve explicit empty environment arguments when overriding saved defaults, use the canonical PCM sample-rate key, and probe the player actually selected. Admit streaming-only VAD after selecting a real bridge, and reject synthetic batch fallback when streaming fails. Own registration disposers, native processes and warm clients per loop; attempt every cleanup action while preserving the original operation error, including synchronous iterator-return failures. Validate configuration through the same schema and semantic checks for save and dry-run. Test source-identical code in an isolated checkout when a live daemon makes strict file-leak checks ambiguous; do not weaken the guard.
+
+## Recommended References
+
+- active/missions/public/MSN-STREAM-VOICE-CONFIG-20261031/evidence/implementation-report.md
+- active/missions/public/MSN-STREAM-VOICE-CONFIG-20261031/evidence/test-report.md
+- active/missions/public/MSN-STREAM-VOICE-CONFIG-20261031/evidence/REVIEW-execution-implement.md
+
+## Evidence
+
+- active/missions/public/MSN-STREAM-VOICE-CONFIG-20261031/evidence/implementation-report.md
+- active/missions/public/MSN-STREAM-VOICE-CONFIG-20261031/evidence/test-report.md
+- active/missions/public/MSN-STREAM-VOICE-CONFIG-20261031/evidence/REVIEW-execution-implement.md
+
+## Artifacts
