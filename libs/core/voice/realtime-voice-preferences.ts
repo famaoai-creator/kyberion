@@ -35,8 +35,23 @@ export interface RealtimeVoiceConversationPreferences {
   reasoning_effort?: RealtimeVoiceReasoningEffort;
   personal_voice_mode: RealtimeVoicePersonalVoiceMode;
   delivery_mode: RealtimeVoiceDeliveryMode;
+  /**
+   * Defaults for interactive streaming only. Resolve these per invocation;
+   * explicit environment values win. Never seed process.env or batch STT
+   * settings from these preferences.
+   */
+  streaming_stt_command?: string;
+  streaming_stt_args?: string;
+  streaming_tts_command?: string;
+  streaming_tts_args?: string;
+  streaming_tts_play_command?: string;
+  streaming_tts_sample_rate?: 16000 | 24000 | 48000;
   updated_at?: string;
 }
+
+export type RealtimeVoiceConversationPreferencesPatch = Partial<
+  Omit<RealtimeVoiceConversationPreferences, 'version' | 'updated_at'>
+>;
 
 const PREFERENCES_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/realtime-voice-conversation-preferences.schema.json'
@@ -79,11 +94,41 @@ function defaultPreferences(): RealtimeVoiceConversationPreferences {
   };
 }
 
+function hasCommandControlCharacters(value: string): boolean {
+  return value.includes('\u0000') || value.includes('\r') || value.includes('\n');
+}
+
 function validatePreferences(value: RealtimeVoiceConversationPreferences): void {
   assertKnownVoiceProfile(value.voice_profile_id);
   if (!value.language.trim()) throw new Error('Realtime voice language must not be empty');
   if (!value.assistant_name.trim())
     throw new Error('Realtime voice assistant name must not be empty');
+  for (const key of [
+    'streaming_stt_command',
+    'streaming_tts_command',
+    'streaming_tts_play_command',
+  ] as const) {
+    const command = value[key];
+    if (command === undefined) continue;
+    if (typeof command !== 'string' || !command.trim() || hasCommandControlCharacters(command)) {
+      throw new Error(key + ' must be a non-empty command without NUL or line breaks');
+    }
+    if (key !== 'streaming_tts_play_command' && /\s/u.test(command.trim())) {
+      throw new Error(
+        key +
+          ' must name one executable without embedded whitespace; configure arguments separately'
+      );
+    }
+    if (key === 'streaming_tts_play_command' && !command.split(',')[0]?.trim()) {
+      throw new Error(key + ' requires an executable before comma-separated arguments');
+    }
+  }
+  for (const key of ['streaming_stt_args', 'streaming_tts_args'] as const) {
+    const args = value[key];
+    if (args !== undefined && (typeof args !== 'string' || hasCommandControlCharacters(args))) {
+      throw new Error(key + ' must be a string without NUL or line breaks');
+    }
+  }
   if (value.reasoning_model !== undefined && !value.reasoning_model.trim()) {
     throw new Error('Realtime voice reasoning model must not be empty');
   }
@@ -108,19 +153,31 @@ export function getRealtimeVoiceConversationPreferences(): RealtimeVoiceConversa
   return loadRealtimeVoiceConversationPreferences() || defaultPreferences();
 }
 
-export function saveRealtimeVoiceConversationPreferences(
-  patch: Partial<Omit<RealtimeVoiceConversationPreferences, 'version' | 'updated_at'>>
+/** Validate a proposed update exactly as save does, without writing profile state. */
+export function previewRealtimeVoiceConversationPreferences(
+  patch: RealtimeVoiceConversationPreferencesPatch
 ): RealtimeVoiceConversationPreferences {
-  const current = getRealtimeVoiceConversationPreferences();
   const next: RealtimeVoiceConversationPreferences = {
-    ...current,
+    ...getRealtimeVoiceConversationPreferences(),
     ...patch,
     version: '1.0.0',
     updated_at: nowIso(),
   };
+  // An explicit undefined removes an optional setting; it must not remain as
+  // an own property in the returned object or become a stale runtime default.
+  for (const key of Object.keys(patch) as Array<keyof typeof patch>) {
+    if (patch[key] === undefined) delete (next as unknown as Record<string, unknown>)[key];
+  }
   validatePreferences(next);
   const filePath = preferencesPath();
-  const validated = preferencesCatalogAtPath(filePath).validate(next, filePath);
+  return preferencesCatalogAtPath(filePath).validate(next, filePath);
+}
+
+export function saveRealtimeVoiceConversationPreferences(
+  patch: RealtimeVoiceConversationPreferencesPatch
+): RealtimeVoiceConversationPreferences {
+  const validated = previewRealtimeVoiceConversationPreferences(patch);
+  const filePath = preferencesPath();
   safeMkdir(path.dirname(filePath), { recursive: true });
   safeWriteFile(filePath, JSON.stringify(validated, null, 2) + '\n');
   return validated;
