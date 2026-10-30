@@ -216,6 +216,8 @@ const VITEST_LIVE_SUBTREES = [
   'shared/runtime/hearing/',
   // Standing grants (governance/grant-store.ts), tier/tenant partitioned.
   'shared/runtime/grants/',
+  // Browser bridge pull mailbox (browser/browser-bridge-mailbox.ts), tier/tenant partitioned.
+  'shared/runtime/browser-bridge-mailbox/',
   // Customer decision invite links (customer-decision/invite.ts), tier/tenant partitioned.
   'shared/runtime/customer-decision-invites/',
   // Tier/tenant-partitioned resource-usage ledgers (metrics.ts
