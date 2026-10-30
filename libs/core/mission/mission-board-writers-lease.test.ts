@@ -120,7 +120,11 @@ describe('board writers keep a worker write made since their read', () => {
     expect(task1?.ticket_dispatch).toMatchObject({ work_item_id: expect.any(String) });
   });
 
-  it('requested-task recovery stamps its resume onto the board read under the lease', async () => {
+  /** task-1 dispatched, claimed, its claim expired and its task requested again. */
+  async function requestedTaskWithExpiredClaim(): Promise<{
+    workItemId: string;
+    expiredNow: string;
+  }> {
     await dispatchMissionTickets(makeMissionState(), { targets: ['workitem'] });
     const tasks = readMissionNextTasks(missionPath);
     const dispatch = tasks[0].ticket_dispatch as Record<string, unknown>;
@@ -143,15 +147,34 @@ describe('board writers keep a worker write made since their read', () => {
         2
       )
     );
+    return {
+      workItemId: String(dispatch.work_item_id),
+      expiredNow: new Date(Date.parse(first.lease.expires_at) + 1_000).toISOString(),
+    };
+  }
 
+  it('requested-task recovery stamps its resume onto the board read under the lease', async () => {
+    const { workItemId, expiredNow } = await requestedTaskWithExpiredClaim();
     hooks.onWorkItemCall = workerCompletesTask2;
-    const expiredNow = new Date(Date.parse(first.lease.expires_at) + 1_000).toISOString();
     expect(recoverMissionRequestedTasks(missionId, { now: expiredNow }).reissued_count).toBe(1);
     expect(statusOf('task-2')).toBe('completed');
     expect(readMissionNextTasks(missionPath)[0].ticket_dispatch).toMatchObject({
-      work_item_id: dispatch.work_item_id,
+      work_item_id: workItemId,
       attempt_count: 2,
     });
+  });
+
+  it('requested-task recovery leaves a task completed while it was claimed as it is', async () => {
+    const { expiredNow } = await requestedTaskWithExpiredClaim();
+    hooks.onWorkItemCall = () =>
+      writeMissionNextTasks(missionPath, (onDisk) =>
+        onDisk.map((task) => (task.task_id === 'task-1' ? { ...task, status: 'completed' } : task))
+      );
+    recoverMissionRequestedTasks(missionId, { now: expiredNow });
+    const task1 = readMissionNextTasks(missionPath)[0];
+    expect(task1.status).toBe('completed');
+    expect(task1.ticket_dispatch).toMatchObject({ attempt_count: 1 });
+    expect(task1.ticket_dispatch).not.toHaveProperty('resumed_at');
   });
 
   it('record-evidence auto-complete decides on the board read under the lease', () => {
