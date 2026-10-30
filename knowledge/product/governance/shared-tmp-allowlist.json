@@ -522,12 +522,6 @@
       "note": "per-target host image hand-off request marker (target + prompt + requested_at), consumed by the rerun that collects the host's image; an expired marker just means the image is requested again"
     },
     {
-      "file": "scripts/lib/perception.ts",
-      "count": 1,
-      "classification": "legit-tmp",
-      "note": "per-run scratch dir for `kyberion see|listen|watch` (normalized wav, sampled frames, bridge transcript); removed in finally"
-    },
-    {
       "file": "scripts/refactor/ephemeral-actuator-call.ts",
       "count": 1,
       "classification": "legit-tmp",

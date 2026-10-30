@@ -1,3 +1,11 @@
+import { isRecord } from '@agent/core/foundation/text';
+import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { resolveScopeContext } from '@agent/core/scope-context';
+import { resolveStorageFloor, classifyStorageFloorPath } from '@agent/core/storage-layout';
+import { resolvePerceptionScope } from '@agent/core/perception/observation';
+import { inferImagePayloadTier } from '@agent/core/media/image-description-bridge';
+import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
+import { parsePerceptionOption } from './perception-enhancements.js';
 /**
  * Shared plumbing for the perception CLI commands (`pnpm kyberion see |
  * listen | watch`). Same contract as `pnpm kyberion read`: inputs must be
@@ -13,7 +21,13 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import {
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+  assertSafeRepositoryPath,
+  safeReadFileRange,
+} from '@agent/core/secure-io';
 import type { OcrRequest, OcrResult } from '@agent/core/ocr-types';
 import type { describeImage } from '@agent/core/media/image-description-bridge';
 import type {
@@ -23,11 +37,19 @@ import type {
 } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './harness.js';
 
+export const LOCAL_MEDIA_INPUT_ARGS = [
+  '-protocol_whitelist',
+  'file,pipe',
+  '-format_whitelist',
+  'wav,mp3,flac,ogg,aac,mov,matroska,webm,aiff,caf,avi',
+] as const;
+
 export type MediaTool = 'ffmpeg' | 'ffprobe';
 type ImageDescriptionRequest = Parameters<typeof describeImage>[0];
 type ImageDescriptionResult = Awaited<ReturnType<typeof describeImage>>;
 
 export interface PerceptionDeps {
+  enhancements?: import('./perception-enhancements.js').PerceptionEnhancementDeps;
   ocr(request: OcrRequest): Promise<OcrResult>;
   describe(request: ImageDescriptionRequest): Promise<ImageDescriptionResult>;
   /** Registered STT bridges (stub included when nothing real is installed). */
@@ -81,7 +103,7 @@ export function resolveRepositoryInput(command: string, file: string): string {
         `  mkdir -p active/shared/tmp/<job> && cp "${file}" active/shared/tmp/<job>/`
     );
   }
-  return absolute;
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
 }
 
 export function assertExtension(
@@ -125,8 +147,14 @@ export const AUDIO_EXTENSIONS = [
 export const VIDEO_EXTENSIONS = ['.mp4', '.mov', '.m4v', '.webm', '.mkv', '.avi'] as const;
 
 /** A uniquely named scratch directory under the shared tmp floor. */
-export function createPerceptionWorkDir(command: string): string {
-  const dir = pathResolver.sharedTmp(`perception-${command}-${randomUUID()}`);
+export function createPerceptionWorkDir(command: string, sourceFile?: string): string {
+  const scope = sourceFile ? resolvePerceptionScope(sourceFile) : resolveScopeContext();
+  const dir = resolveStorageFloor(
+    'scratch',
+    { kind: 'tier', tier: scope.tier, tenant: scope.tenant_slug },
+    'perception',
+    command + '-' + randomUUID()
+  );
   safeMkdir(dir, { recursive: true });
   return dir;
 }
@@ -135,34 +163,7 @@ export function removeWorkDir(dir: string | undefined): void {
   if (dir) safeRmSync(dir, { recursive: true, force: true });
 }
 
-/** Cheap header sniff for common raster formats; undefined when unknown. */
-export function sniffImageDimensions(
-  buffer: Buffer
-): { width: number; height: number } | undefined {
-  if (buffer.length >= 24 && buffer.readUInt32BE(0) === 0x89504e47) {
-    return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
-  }
-  if (buffer.length >= 10 && buffer.toString('ascii', 0, 3) === 'GIF') {
-    return { width: buffer.readUInt16LE(6), height: buffer.readUInt16LE(8) };
-  }
-  if (buffer.length >= 26 && buffer.toString('ascii', 0, 2) === 'BM') {
-    return { width: buffer.readInt32LE(18), height: Math.abs(buffer.readInt32LE(22)) };
-  }
-  if (buffer.length >= 4 && buffer[0] === 0xff && buffer[1] === 0xd8) {
-    let offset = 2;
-    while (offset + 9 < buffer.length) {
-      if (buffer[offset] !== 0xff) return undefined;
-      const marker = buffer[offset + 1]!;
-      const length = buffer.readUInt16BE(offset + 2);
-      // SOF0..SOF15 except DHT(C4), JPG(C8), DAC(CC)
-      if (marker >= 0xc0 && marker <= 0xcf && ![0xc4, 0xc8, 0xcc].includes(marker)) {
-        return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
-      }
-      offset += 2 + length;
-    }
-  }
-  return undefined;
-}
+export { sniffImageDimensions } from '@agent/core/perception/image-dimensions';
 
 /** `mm:ss` (or `h:mm:ss` from one hour). */
 export function formatTimestamp(seconds: number): string {
@@ -193,13 +194,15 @@ export class NoTranscriptError extends Error {}
 export async function extractSttWav(
   deps: PerceptionDeps,
   input: string,
-  output: string
+  output: string,
+  maxSeconds?: number
 ): Promise<void> {
   await deps.runMedia('ffmpeg', [
     '-y',
     '-hide_banner',
     '-loglevel',
     'error',
+    ...LOCAL_MEDIA_INPUT_ARGS,
     '-i',
     input,
     '-vn',
@@ -209,6 +212,7 @@ export async function extractSttWav(
     '16000',
     '-c:a',
     'pcm_s16le',
+    ...(maxSeconds === undefined ? [] : ['-t', String(maxSeconds)]),
     output,
   ]);
 }
@@ -281,6 +285,7 @@ export function explainMediaError(command: string, error: unknown): never {
 
 /** Shared option parsing: every perception command takes --json / --out / --lang / --verbose / --help. */
 export interface CommonArgs {
+  enhancement?: import('./perception-enhancements.js').PerceptionOptions;
   file?: string;
   json: boolean;
   out?: string;
@@ -309,7 +314,7 @@ export function parseCommonOption(
   } else if (value === '--lang') {
     args.lang = takeValue('a BCP-47 language tag');
     return { consumed: 1 };
-  } else return undefined;
+  } else return parsePerceptionOption(args, argv, index);
   return { consumed: 0 };
 }
 
@@ -318,7 +323,8 @@ export function emitOutput(
   rendered: string,
   out: string | undefined,
   print: (text: string) => void,
-  summary: string
+  summary: string,
+  sourceFile?: string
 ): void {
   if (!out) {
     print(rendered);
@@ -328,6 +334,55 @@ export function emitOutput(
   if (!isInsideRepository(target)) {
     throw new ScriptExitError(1, `[${command}] --out ${out} must be inside the repository`);
   }
+  assertPerceptionOutput(sourceFile, target);
   safeWriteFile(target, `${rendered}\n`);
   print(`[${command}] wrote ${out} (${summary})`);
+}
+
+export function assertPerceptionOutput(sourceFile: string | undefined, target: string): void {
+  const scope = sourceFile ? resolvePerceptionScope(sourceFile) : resolveScopeContext();
+  const tier = inferImagePayloadTier(target);
+  if (KNOWLEDGE_TIER_RANK[tier] < KNOWLEDGE_TIER_RANK[scope.tier])
+    throw new ScriptExitError(1, '[PERCEPTION_SCOPE] derived output would lower source tier');
+  const floor = classifyStorageFloorPath(target);
+  if (floor?.partition.kind === 'tier' && floor.partition.tenant !== scope.tenant_slug)
+    throw new ScriptExitError(1, '[PERCEPTION_SCOPE] output partition tenant differs');
+  if (tier === 'public' && scope.tenant_slug && floor?.partition.kind !== 'tier')
+    throw new ScriptExitError(1, '[PERCEPTION_SCOPE] tenant output requires an owned partition');
+  // For private outputs resolve the existing parent to authenticate tenant scope.
+  if (tier !== 'public') {
+    const destination = resolvePerceptionScope(path.dirname(target));
+    if (destination.tenant_slug !== scope.tenant_slug)
+      throw new ScriptExitError(1, '[PERCEPTION_SCOPE] output tenant differs');
+  }
+}
+
+export async function assertAudioAnalysisDuration(
+  deps: PerceptionDeps,
+  input: string
+): Promise<void> {
+  const output = await deps.runMedia('ffprobe', [
+    '-v',
+    'error',
+    ...LOCAL_MEDIA_INPUT_ARGS,
+    '-show_entries',
+    'format=duration',
+    '-of',
+    'json',
+    input,
+  ]);
+  const info = parseSafeJsonInput(output, 'audio analysis duration');
+  const raw = isRecord(info) && isRecord(info.format) ? info.format.duration : undefined;
+  const duration = typeof raw === 'string' || typeof raw === 'number' ? Number(raw) : NaN;
+  if (!Number.isFinite(duration) || duration <= 0 || duration > 600)
+    throw new ScriptExitError(
+      1,
+      '[perception] audio analysis requires a known positive duration <=600 seconds'
+    );
+}
+
+/** Authorize content before any native media loader receives the path. */
+export function assertPerceptionInput(file: string): void {
+  resolvePerceptionScope(file);
+  safeReadFileRange(file, 0, 1);
 }

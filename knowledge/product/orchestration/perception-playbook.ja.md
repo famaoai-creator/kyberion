@@ -76,3 +76,7 @@ pnpm kyberion read   active/shared/tmp/<job>/page.html
 - **音楽・音声以外の音** — 解析エンジンはない（音楽生成のみ）。
 - **行為側**（会話する・手を動かす・移動する） — [action-playbook.ja.md](./action-playbook.ja.md) を参照。
 - **URL・いまの画面・作る側（`read` の逆）・記憶の軸** — どれに動詞があり、どれにないかは [capability-verb-inventory.ja.md](./capability-verb-inventory.ja.md) で管理する。
+
+## Grounded perception extensions
+
+Position/time observations, visual changes, diarization, sound events, local tracking and scoped semantic search: [usage and limits](./grounded-perception.ja.md).
