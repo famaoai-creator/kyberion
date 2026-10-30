@@ -24,6 +24,7 @@ import { ScriptExitError } from './lib/harness.js';
 import { transcribeMediaFile } from './cli-listen.js';
 import {
   assertExtension,
+  assertPerceptionInput,
   assertPerceptionOutput,
   createPerceptionWorkDir,
   defaultPerceptionDeps,
@@ -38,6 +39,7 @@ import {
   renderSegments,
   resolveRepositoryInput,
   VIDEO_EXTENSIONS,
+  LOCAL_MEDIA_INPUT_ARGS,
   type CommonArgs,
   type PerceptionDeps,
 } from './lib/perception.js';
@@ -289,6 +291,7 @@ export async function runWatchCommand(
     VIDEO_EXTENSIONS,
     'Audio-only files: use `pnpm kyberion listen`.'
   );
+  assertPerceptionInput(absolute);
   const framesDir = args.frames ? pathResolver.rootResolve(args.frames) : undefined;
   if (framesDir && !isInsideRepository(framesDir)) {
     throw new ScriptExitError(
@@ -308,6 +311,7 @@ export async function runWatchCommand(
         'json',
         '-show_format',
         '-show_streams',
+        ...LOCAL_MEDIA_INPUT_ARGS,
         absolute,
       ])
     );
@@ -315,6 +319,24 @@ export async function runWatchCommand(
     explainMediaError('watch', error);
   }
 
+  if (
+    ![metadata.width, metadata.height].every(
+      (value) =>
+        typeof value === 'number' && Number.isFinite(value) && Number.isInteger(value) && value > 0
+    ) ||
+    metadata.width! * metadata.height! > 16_000_000
+  )
+    throw new ScriptExitError(
+      1,
+      '[watch] decoded video dimensions must be known and <=16 million pixels'
+    );
+  if (
+    (options.events || options.diarize) &&
+    (!Number.isFinite(metadata.duration_sec) ||
+      metadata.duration_sec <= 0 ||
+      metadata.duration_sec > 600)
+  )
+    throw new ScriptExitError(1, '[watch] audio analysis is limited to 600 seconds');
   const enhanced = Boolean(
     options.grounded ||
     options.changes ||
@@ -346,6 +368,7 @@ export async function runWatchCommand(
         '-hide_banner',
         '-loglevel',
         'error',
+        ...LOCAL_MEDIA_INPUT_ARGS,
         '-i',
         absolute,
         '-vf',
@@ -443,6 +466,7 @@ export async function runWatchCommand(
         const heard = await transcribeMediaFile(deps, 'watch', absolute, workDir, {
           ...(args.lang ? { language: args.lang } : {}),
           timestamps: true,
+          ...(options.diarize || options.events ? { maxSeconds: 601 } : {}),
         });
         transcript = {
           backend: heard.backend,
@@ -462,7 +486,7 @@ export async function runWatchCommand(
       if (!metadata.has_audio)
         throw new ScriptExitError(1, '[watch] requested audio analysis but video has no audio');
       const wav = path.join(workDir, 'analysis-16k-mono.wav');
-      await extractSttWav(deps, absolute, wav);
+      await extractSttWav(deps, absolute, wav, 601);
       const audio = await import('@agent/core/perception/audio-analysis');
       analysis = await (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
         path: wav,
