@@ -812,6 +812,7 @@ export const FRONT_DESK_TEMPLATE_FILE_REDIRECTS: Readonly<Record<string, string>
   '/progress.html': '/progress',
   '/help.html': '/help',
   '/first-job.html': '/first-job',
+  '/live-avatar.html': '/live-avatar',
 });
 
 /** Canonical route for a raw template file request, keeping the query string; null otherwise. */
@@ -869,6 +870,9 @@ export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: 
 
   app.get('/work', (req, res) => {
     sendFrontDeskPage(req, res, staticDir, 'index.html');
+  });
+  app.get('/live-avatar', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'live-avatar.html');
   });
 }
 

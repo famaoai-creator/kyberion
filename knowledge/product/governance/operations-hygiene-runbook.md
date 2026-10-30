@@ -2339,6 +2339,35 @@ override an active tenant resource/envelope constraint. Gate:
 `chronos-token-registry-reader.test.ts`, including ambient-tenant admission and
 unrelated-connection denial. Deterministic pipeline logging/transforms must not
 bootstrap provider credentials; unknown or reasoning operations still must.
+The `system:baseline_check` readiness operation also runs without provider
+installation: its own checks must report unavailable credentials instead of
+failing before health observation starts. Never clear a tenant or bind operator
+credentials to make baseline pass. Gate: `pipeline-bootstrap-needs.test.ts` and
+the real `pipelines/baseline-check.json` invocation. The file/profile probes and
+scoped mission listing used by `vital-check` likewise retain their existing I/O
+authorization without installing providers. Pin both canonical diagnostic
+contracts in that regression so catalog changes cannot silently add a credential
+dependency to startup checks.
+Configured shell task credentials use the version-1 protocol in
+[tenant-task-credential-binding](../orchestration/tenant-task-credential-binding.ja.md).
+Require the current canonical claim, running attempt, matching envelope and an
+isolated tenant HOME; missing/malformed responses never borrow operator auth.
+Gate: `shell-task-credential-binding.test.ts`.
+Live video filter effects use the provider-neutral contract and dedicated
+`video:filter_apply` reviewed schema interface. Keep native names, packed color
+encodings and credentials inside the provider adapter; never reuse camera-output
+authority for filter mutation. Validate cross-field settings before preparation
+so ignored crop geometry or custom colors cannot pass readback as success.
+Nested CLI command paths must resolve by the longest registered prefix, never a
+fixed noun/verb depth. Verify the canonical command through the real dispatcher,
+including payload forwarding and dry-run, rather than only testing its leaf
+handler or manifest entry. Gate: `scripts/kyberion.test.ts`.
+Live video filter effects validate and freeze their exact settings before approval,
+read settings back after commit, and never start camera output implicitly. An
+avatar projection must stop mouth animation on disconnect and dispose its stream
+on exit. Gates: `video_filter.test.ts`, `video-filter.test.ts`, `video-filter-schema.test.ts`,
+`operation-protection.test.ts`, `obs-virtual-camera-output.test.ts` and
+`live-avatar.test.ts`; see [realtime AV operations](../orchestration/realtime-av-operations.ja.md).
 Approval presentation uses `redactActiveSecretsForHostLog`, not the scoped
 credential-value reader: an unbound tenant can request approval without reading
 operator secrets, and known values remain masked. Gate:
@@ -2455,3 +2484,8 @@ promotion of a generative provider even when invocation tests pass.
 Gates: image-description provider authorization/fallback regressions,
 dirty-tile source-tier/output-directory regressions, and Apple Speech
 locale/asset/explicit-provider selection tests.
+
+OBS WebSocket v5 authentication tests assert a fixed wire-protocol vector instead
+of recalculating its password-derived digest in the expected value. Keep the
+protocol-mandated runtime algorithm unchanged; password-storage KDF guidance does
+not change an external handshake. Gates: CodeQL and the OBS virtual-camera tests.

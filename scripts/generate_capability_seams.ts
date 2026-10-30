@@ -39,6 +39,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/camera-output-bridge.ts',
     consumers: ['libs/actuators/voice-actuator/src/voice-media-output-helpers.ts'],
   },
+  'video-filter-provider': {
+    declaration: 'libs/core/video/video-filter.ts',
+    consumers: ['scripts/video_filter.ts'],
+  },
   'cli-provider-bundle': {
     declaration: 'libs/core/cli-provider-bundle.ts',
     consumers: [
