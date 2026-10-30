@@ -96,6 +96,8 @@ export interface SeamProviderDecision {
 export interface ResolveSeamProviderOptions {
   seam: string;
   candidates: SeamProviderCandidate[];
+  /** Soft default only: eligibility, mission pins, rules and explicit purposes still win. */
+  defaultProvider?: string;
   purpose?: string;
   /** Request facts operator rules may match on, e.g. { language: 'ja' }. */
   context?: Record<string, string>;
@@ -218,6 +220,20 @@ function decide(
   const excluded = options.candidates
     .filter((c) => !c.eligible)
     .map((c) => ({ id: c.id, unmet: c.unmet ?? [] }));
+  const configuredDefault = purpose ? undefined : options.defaultProvider?.trim();
+  const configuredCandidate = configuredDefault
+    ? options.candidates.find((candidate) => candidate.id === configuredDefault)
+    : undefined;
+  const defaultNote =
+    configuredDefault && !configuredCandidate
+      ? "configured default '" + configuredDefault + "' is not registered"
+      : configuredCandidate && !configuredCandidate.eligible
+        ? "configured default '" +
+          configuredDefault +
+          "' cannot run this task (" +
+          (configuredCandidate.unmet?.join(', ') || 'ineligible') +
+          ')'
+        : undefined;
   const base = {
     seam,
     ...(purpose ? { purpose } : {}),
@@ -239,7 +255,10 @@ function decide(
   if (!policy) return unresolved(`no selection policy for seam '${seam}'`);
   if (eligible.length === 0) {
     const reasons = excluded.map((e) => `${e.id}: ${e.unmet.join(', ') || 'ineligible'}`);
-    return unresolved(`no provider can run this task (${reasons.join('; ')})`);
+    return unresolved(
+      `no provider can run this task (${reasons.join('; ')})` +
+        (defaultNote ? '; ' + defaultNote : '')
+    );
   }
   const purposeSpec = purpose ? policy.purposes[purpose] : undefined;
   if (purpose && !purposeSpec) {
@@ -250,15 +269,20 @@ function decide(
 
   const withOverlay = !options.ignoreOperatorOverlay;
   const profiles = effectiveSeamProviderProfiles(policy, withOverlay);
-  const defaultEligible = eligible.includes(policy.default_provider);
+  const defaultProvider =
+    configuredDefault && configuredCandidate?.eligible
+      ? configuredDefault
+      : policy.default_provider;
+  const defaultLabel =
+    defaultProvider === configuredDefault ? 'configured default' : 'seam default';
+  const defaultEligible = eligible.includes(defaultProvider);
   // Without a purpose the default leads; if it cannot run the task the
   // policy's fallback purpose ranks what can.
   const rankingPurposeName =
     purpose ?? (!defaultEligible ? policy.fallback_purpose : undefined) ?? undefined;
   const rankingPurpose = rankingPurposeName ? policy.purposes[rankingPurposeName] : undefined;
   const tieBreak = (a: string, b: string) =>
-    Number(b === policy.default_provider) - Number(a === policy.default_provider) ||
-    a.localeCompare(b);
+    Number(b === defaultProvider) - Number(a === defaultProvider) || a.localeCompare(b);
   const scores = rankingPurpose
     ? eligible
         .map((id) => scoreCandidate(profiles, rankingPurpose, id))
@@ -287,7 +311,7 @@ function decide(
       rationale: `mission pin '${decisionKey}' (pinned ${pin.pinnedAt} by ${pin.by})`,
     };
   }
-  const notes: string[] = [];
+  const notes: string[] = defaultNote ? [defaultNote] : [];
   if (pin && !pinMatchesPurpose) {
     notes.push(
       pin.purpose !== undefined && pin.purpose !== purpose
@@ -324,10 +348,10 @@ function decide(
     if (defaultEligible) {
       return {
         ...withScores,
-        provider_id: policy.default_provider,
-        ranked: leading([policy.default_provider]),
+        provider_id: defaultProvider,
+        ranked: leading([defaultProvider]),
         strategy: 'default',
-        rationale: `no purpose given; seam default '${policy.default_provider}'${suffix}`,
+        rationale: `no purpose given; ${defaultLabel} '${defaultProvider}'${suffix}`,
       };
     }
     if (!rankingPurpose) {

@@ -491,6 +491,7 @@
 - [Work Coordination Platform Implementation Plan](./product/orchestration/work-coordination-platform-plan.md) (public | Unknown)
 - [meet-copilot live verification runbook](./product/orchestration/meet-copilot-live-verification.md) (public | Unknown)
 - [takt Clean-Room Notes](./product/orchestration/takt-clean-room-notes.md) (public | Unknown)
+- [エンジン実行設定の保存と安全な解決](./product/orchestration/engine-runtime-preferences.ja.md) (public | Unknown)
 - [エンタープライズ品質管理フロー (Quality Management Flow)](./product/orchestration/quality-management-flow.md) (public | Ecosystem Architect)
 - [コマンド初期化とスコープ・資格情報の契約](./product/orchestration/command-initialization-scope.ja.md) (public | Unknown)
 - [コンテキスト抽出・要約ルール (Context Extraction Rules)](./product/orchestration/context-extraction-rules.md) (public | Ecosystem Architect)

@@ -1,6 +1,17 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('./engine-runtime-preferences.js').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('./engine-runtime-preferences.js', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+}));
+
 const record = vi.fn();
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: (...args: unknown[]) => record(...args) },
@@ -40,6 +51,50 @@ describe('streaming-tts-bridge selection', () => {
     vi.unstubAllEnvs();
     resetStreamingTtsBridges();
     safeRmSync(dir, { recursive: true, force: true });
+  });
+
+  it('keeps saved bridge IDs behind hard eligibility and explicit purposes', () => {
+    installShellStreamingTtsBridge({
+      bridge_id: 'shell',
+      command: 'piper',
+      capabilities: { local_only: true, languages: ['ja'] },
+    });
+    for (const saved of ['stub', 'gemini', 'removed']) {
+      preferencesReadiness.mockReturnValue({
+        status: 'ready',
+        preferences: { version: '1.0.0', streaming_tts_bridge: saved },
+      });
+      const selected = selectStreamingTtsBridge({
+        requires: { allowSynthetic: false, localOnly: true, language: 'ja' },
+      });
+      expect(selected.bridge.bridge_id).toBe('shell');
+      if (saved === 'removed') expect(selected.decision.rationale).toContain('not registered');
+    }
+    preferencesReadiness.mockReturnValue({
+      status: 'ready',
+      preferences: { version: '1.0.0', streaming_tts_bridge: 'gemini' },
+    });
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('gemini');
+    expect(
+      resolveStreamingTtsBridge({ purpose: 'privacy', requires: { allowSynthetic: false } })
+        .bridge_id
+    ).toBe('shell');
+  });
+  it('does not read profiles below explicit selection and propagates genuine profile errors', () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    expect(resolveStreamingTtsBridge({ bridgeId: 'stub' }).bridge_id).toBe('stub');
+    vi.stubEnv('KYBERION_STREAMING_TTS_BRIDGE', 'gemini');
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('gemini');
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+    vi.stubEnv('KYBERION_STREAMING_TTS_BRIDGE', '');
+    expect(() => resolveStreamingTtsBridge()).toThrow('profile denied');
+    preferencesReadiness.mockReturnValue({
+      status: 'unavailable',
+      reason: 'personal_profile_not_authorized',
+    });
+    expect(resolveStreamingTtsBridge().bridge_id).toBe('stub');
   });
 
   it('declares capabilities on built-in and shell bridges', () => {
@@ -133,4 +188,9 @@ describe('streaming-tts-bridge selection', () => {
     // Rules exist but none matches: no selection runs at all.
     expect(record).not.toHaveBeenCalled();
   });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
 });

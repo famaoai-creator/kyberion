@@ -15,6 +15,7 @@
 
 import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import { engineRuntimePreferencesReadiness } from './engine-runtime-preferences.js';
 import { executeServicePreset } from '../service/service-engine.js';
 import { coreSeamCatalog, createSeam } from '../seam.js';
 import {
@@ -188,8 +189,15 @@ export function resetStreamingTtsBridges(): void {
   registerBuiltinStreamingTtsBridges();
 }
 
+function enginePreference(key: 'streaming_tts_bridge'): string | undefined {
+  const readiness = engineRuntimePreferencesReadiness();
+  return readiness.status === 'ready' ? readiness.preferences[key]?.trim() || undefined : undefined;
+}
+
 export function getStreamingTtsBridge(
-  id: string = getRegisteredEnvText('KYBERION_STREAMING_TTS_BRIDGE') ?? 'stub'
+  id: string = getRegisteredEnvText('KYBERION_STREAMING_TTS_BRIDGE') ??
+    enginePreference('streaming_tts_bridge') ??
+    'stub'
 ): StreamingTextToSpeechBridge {
   const factory = streamingTtsSeam.getOptional(id);
   if (!factory) throw new Error(`[streaming-tts] unknown bridge id '${id}'`);
@@ -274,6 +282,16 @@ export class StreamingTtsSelectionError extends Error {
 export function selectStreamingTtsBridge(
   options: SelectStreamingTtsBridgeOptions = {}
 ): StreamingTtsSelection {
+  const savedDefault = options.purpose?.trim()
+    ? undefined
+    : enginePreference('streaming_tts_bridge');
+  return selectStreamingTtsBridgeWithDefault(options, savedDefault);
+}
+
+function selectStreamingTtsBridgeWithDefault(
+  options: SelectStreamingTtsBridgeOptions,
+  savedDefault?: string
+): StreamingTtsSelection {
   const purpose = String(options.purpose || '').trim() || undefined;
   if (purpose) {
     const known = listSeamSelectionPurposes(STREAMING_TTS_SEAM);
@@ -292,6 +310,7 @@ export function selectStreamingTtsBridge(
   const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
   const decision = resolveSeamProviderDecision({
     seam: STREAMING_TTS_SEAM,
+    ...(savedDefault ? { defaultProvider: savedDefault } : {}),
     candidates: bridges.map((bridge) => {
       const unmet = unmetStreamingTtsRequirements(bridge, requires);
       return { id: bridge.bridge_id, eligible: unmet.length === 0, unmet };
@@ -327,6 +346,9 @@ export function resolveStreamingTtsBridge(
   const explicit =
     options.bridgeId?.trim() || getRegisteredEnvText('KYBERION_STREAMING_TTS_BRIDGE')?.trim();
   if (explicit) return getStreamingTtsBridge(explicit);
+  const savedDefault = options.purpose?.trim()
+    ? undefined
+    : enginePreference('streaming_tts_bridge');
   const defaultBridge = new StubStreamingTextToSpeechBridge();
   const defaultUnmet = unmetStreamingTtsRequirements(defaultBridge, options.requires ?? {});
   const language = String(options.requires?.language ?? '')
@@ -335,9 +357,10 @@ export function resolveStreamingTtsBridge(
     .split(/[-_]/u)[0];
   const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
   const shouldSelect =
+    Boolean(savedDefault) ||
     Boolean(String(options.purpose || '').trim()) ||
     Boolean(matchSeamSelectionRule(STREAMING_TTS_SEAM, { context })) ||
     defaultUnmet.length > 0;
   if (!shouldSelect) return defaultBridge;
-  return selectStreamingTtsBridge(options).bridge;
+  return selectStreamingTtsBridgeWithDefault(options, savedDefault).bridge;
 }

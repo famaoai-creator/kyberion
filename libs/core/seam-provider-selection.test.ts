@@ -70,6 +70,61 @@ describe('seam provider selection', () => {
     expect(listSeamSelectionPurposes(SEAM)).toEqual(['authenticated', 'evidence', 'throughput']);
   });
 
+  it('uses a configured default only after eligibility, pins, rules and explicit purposes', () => {
+    expect(
+      resolveSeamProviderDecision({ seam: SEAM, candidates: BOTH, defaultProvider: 'lightpanda' })
+        .provider_id
+    ).toBe('lightpanda');
+    expect(
+      resolveSeamProviderDecision({
+        seam: SEAM,
+        candidates: BOTH,
+        defaultProvider: 'lightpanda',
+        purpose: 'evidence',
+      }).provider_id
+    ).toBe('playwright-chromium');
+    overlay.rules = [rule({ prefer: ['playwright-chromium'] })];
+    expect(
+      resolveSeamProviderDecision({ seam: SEAM, candidates: BOTH, defaultProvider: 'lightpanda' })
+        .strategy
+    ).toBe('rule');
+    overlay.rules = [];
+    vi.stubEnv('MISSION_ID', 'MSN-CONFIG');
+    resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      defaultProvider: 'playwright-chromium',
+      decisionKey: 'saved',
+    });
+    expect(
+      resolveSeamProviderDecision({
+        seam: SEAM,
+        candidates: BOTH,
+        defaultProvider: 'lightpanda',
+        decisionKey: 'saved',
+      })
+    ).toMatchObject({ provider_id: 'playwright-chromium', strategy: 'pinned' });
+  });
+  it('diagnoses unknown and ineligible configured defaults without bypassing capability requirements', () => {
+    const unknown = resolveSeamProviderDecision({
+      seam: SEAM,
+      candidates: BOTH,
+      defaultProvider: 'removed',
+    });
+    expect(unknown.provider_id).toBe('playwright-chromium');
+    expect(unknown.rationale).toContain("configured default 'removed' is not registered");
+    const blocked = resolveSeamProviderDecision({
+      seam: SEAM,
+      defaultProvider: 'lightpanda',
+      candidates: [
+        { id: 'lightpanda', eligible: false, unmet: ['local_only'] },
+        { id: 'playwright-chromium', eligible: true },
+      ],
+    });
+    expect(blocked.provider_id).toBe('playwright-chromium');
+    expect(blocked.rationale).toContain('local_only');
+  });
+
   it('keeps the seam default when no purpose is given', () => {
     const decision = resolveSeamProviderDecision({ seam: SEAM, candidates: BOTH });
     expect(decision).toMatchObject({

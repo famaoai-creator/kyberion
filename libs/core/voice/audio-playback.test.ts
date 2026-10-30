@@ -1,6 +1,17 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+
+const { preferencesReadiness } = vi.hoisted(() => ({
+  preferencesReadiness: vi.fn(
+    (): ReturnType<
+      typeof import('./engine-runtime-preferences.js').engineRuntimePreferencesReadiness
+    > => ({ status: 'missing' })
+  ),
+}));
+vi.mock('./engine-runtime-preferences.js', () => ({
+  engineRuntimePreferencesReadiness: preferencesReadiness,
+}));
 
 const { spawnMock } = vi.hoisted(() => ({ spawnMock: vi.fn() }));
 
@@ -12,7 +23,11 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...actual, spawn: spawnMock };
 });
 
-import { playAudioFile, probeAudioPlayback } from './audio-playback.js';
+import {
+  playAudioFile,
+  probeAudioPlayback,
+  registerAudioPlaybackAdapter,
+} from './audio-playback.js';
 
 interface FakeChild extends EventEmitter {
   stdout: null;
@@ -200,5 +215,54 @@ describe('audio playback', () => {
         Object.defineProperty(process, 'platform', { configurable: true, value: originalPlatform });
       }
     });
+  });
+});
+
+beforeEach(() => {
+  preferencesReadiness.mockReset();
+  preferencesReadiness.mockReturnValue({ status: 'missing' });
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe('playback preference boundaries', () => {
+  it('uses ordinary adapter defaults when personal settings are unavailable', () => {
+    const dispose = registerAudioPlaybackAdapter({
+      backend_id: 'test-default',
+      platforms: [process.platform],
+      availabilityTarget: 'fixture',
+      priority: 10000,
+      command: () => ['true'],
+      probe: () => true,
+    });
+    try {
+      vi.stubEnv('KYBERION_AUDIO_PLAYBACK_BACKEND', '');
+      preferencesReadiness.mockReturnValue({
+        status: 'unavailable',
+        reason: 'personal_profile_not_authorized',
+      });
+      expect(probeAudioPlayback()).toMatchObject({ available: true, backend: 'test-default' });
+    } finally {
+      dispose();
+    }
+  });
+  it('does not read personal preferences for a custom command or explicit backend', () => {
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('profile denied');
+    });
+    expect(probeAudioPlayback({ command: ['true'] }).available).toBe(true);
+    expect(probeAudioPlayback({ backend: 'does-not-exist' }).available).toBe(false);
+    vi.stubEnv('KYBERION_AUDIO_PLAYBACK_BACKEND', 'does-not-exist');
+    expect(probeAudioPlayback().available).toBe(false);
+    expect(preferencesReadiness).not.toHaveBeenCalled();
+  });
+  it('propagates genuine lower priority profile failures', () => {
+    vi.stubEnv('KYBERION_AUDIO_PLAYBACK_BACKEND', '');
+    preferencesReadiness.mockImplementation(() => {
+      throw new Error('scope mismatch');
+    });
+    expect(() => probeAudioPlayback()).toThrow('scope mismatch');
   });
 });
