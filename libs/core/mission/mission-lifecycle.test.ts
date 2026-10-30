@@ -22,6 +22,8 @@ vi.mock('./mission-task-supersede-proof.js', async (importOriginal) => {
     ...actual,
     isSupersedeProvenForGate: (missionId: string, taskId: string, reader: string) =>
       taskId.endsWith('-proven') || actual.isSupersedeProvenForGate(missionId, taskId, reader),
+    isSupersedeProven: (missionId: string, taskId: string) =>
+      taskId.endsWith('-proven') || actual.isSupersedeProven(missionId, taskId),
   };
 });
 
@@ -527,6 +529,36 @@ describe('mission lifecycle finish gate', () => {
     ]);
     // No change: nothing is written.
     expect(writeMissionNextTasks(missionPath, () => undefined)).toBe(false);
+  });
+
+  it('lets a board rebuilt from canonical state carry only a proven supersede', () => {
+    const superseded = {
+      by_task_id: 'T-new',
+      at: '2026-10-30T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    };
+    writeMissionNextTasks(missionPath, [{ task_id: 'T-new', status: 'planned' }]);
+    const rebuilt = [
+      { task_id: 'T-old-proven', status: 'superseded', superseded },
+      { task_id: 'T-old', status: 'superseded', superseded },
+      { task_id: 'T-new', status: 'planned' },
+    ];
+    // Without the option no writer but supersede-task introduces a supersede.
+    writeMissionNextTasks(missionPath, rebuilt);
+    expect(readMissionNextTasks(missionPath).map((task) => task.status)).toEqual([
+      'planned',
+      'planned',
+      'planned',
+    ]);
+    writeMissionNextTasks(missionPath, () => rebuilt, { acceptProvenSupersede: true });
+    const board = readMissionNextTasks(missionPath);
+    expect(board.find((task) => task.task_id === 'T-old-proven')).toMatchObject({
+      status: 'superseded',
+      superseded,
+    });
+    expect(board.find((task) => task.task_id === 'T-old')?.status).toBe('planned');
   });
 
   it('keeps a superseded task frozen against an update that edits the board in place', () => {

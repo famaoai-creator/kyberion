@@ -248,6 +248,10 @@ function driftFor(existing: NextTask[], projected: NextTask[]): WorkGraphProject
   return drift;
 }
 
+// A WorkItem archived by supersede-task projects as `superseded`; the board
+// writer keeps that status only when the mission proves the supersede.
+const PROJECTION_WRITE_OPTIONS = { acceptProvenSupersede: true } as const;
+
 /** Drift the additive projection must not overwrite. */
 function hasBlockingProjectionDrift(
   existingTasks: NextTask[],
@@ -351,7 +355,7 @@ export function projectWorkGraphToNextTasks(
     .map(toProjectedTask)
     .sort((a, b) => a.task_id.localeCompare(b.task_id));
   const existingTasks = readExistingTasks(nextTasksPath);
-  const drift = driftFor(existingTasks, projectedTasks);
+  let drift = driftFor(existingTasks, projectedTasks);
   let applied = false;
   if (input.apply && graph.valid && !hasBlockingProjectionDrift(existingTasks, drift)) {
     applied = withExecutionContext(
@@ -361,13 +365,19 @@ export function projectWorkGraphToNextTasks(
         // Merged into the board read under its writer lease (with the supersede
         // guard), so a worker's write since the read above is kept; drift that
         // appeared meanwhile still blocks the apply.
-        return writeMissionNextTasks(safeMissionPath, (onDisk) => {
-          const current = onDisk as unknown as NextTask[];
-          if (hasBlockingProjectionDrift(current, driftFor(current, projectedTasks))) {
-            return undefined;
-          }
-          return mergedTasks(current, projectedTasks) as unknown as Array<Record<string, unknown>>;
-        });
+        return writeMissionNextTasks(
+          safeMissionPath,
+          (onDisk) => {
+            const current = onDisk as unknown as NextTask[];
+            // The reported drift is the one the apply was decided on.
+            drift = driftFor(current, projectedTasks);
+            if (hasBlockingProjectionDrift(current, drift)) return undefined;
+            return mergedTasks(current, projectedTasks) as unknown as Array<
+              Record<string, unknown>
+            >;
+          },
+          PROJECTION_WRITE_OPTIONS
+        );
       },
       'worker'
     );

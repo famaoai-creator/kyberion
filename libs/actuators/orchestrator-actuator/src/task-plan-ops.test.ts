@@ -36,7 +36,7 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
     else process.env.KYBERION_PERSONA = savedEnv.persona;
   });
 
-  it('writes the plan through the board writer, keeping a supersede on disk', () => {
+  it('writes the plan through the board writer, keeping a supersede on disk and rewiring to its replacement', () => {
     safeMkdir(missionDir, { recursive: true });
     safeWriteFile(
       `${missionDir}/mission-state.json`,
@@ -83,7 +83,8 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
       },
     });
 
-    expect(taskPlanToNextTasks({ mission_id: missionId }).task_count).toBe(2);
+    // The plan's two tasks plus the replacement T-IMPL-2 the writer keeps.
+    expect(taskPlanToNextTasks({ mission_id: missionId }).task_count).toBe(3);
     const board = JSON.parse(
       String(safeReadFile(`${missionDir}/NEXT_TASKS.json`, { encoding: 'utf8' }))
     ) as Array<Record<string, unknown>>;
@@ -91,6 +92,11 @@ describe('orchestrator task plan to NEXT_TASKS', () => {
       status: 'superseded',
       superseded,
     });
-    expect(board.some((task) => task.task_id === 'T-REVIEW-1')).toBe(true);
+    // The review of the superseded task now reviews (and waits for) its replacement.
+    expect(board.find((task) => task.task_id === 'T-REVIEW-1')).toMatchObject({
+      dependencies: ['T-IMPL-2'],
+      review_target: 'T-IMPL-2',
+      deliverable: 'deliverables/REVIEW-T-IMPL-2.md',
+    });
   });
 });

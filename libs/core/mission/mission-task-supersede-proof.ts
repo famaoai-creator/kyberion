@@ -197,6 +197,15 @@ export function isTaskVerifiablySuperseded(
 const warnedUnprovenMissions = new Set<string>();
 
 /**
+ * Does the mission prove the supersede (an approved supersede-task record)?
+ * Quiet: a board writer asks this for every superseded task it carries, and
+ * the gate readers below log an unproven one themselves.
+ */
+export function isSupersedeProven(missionId: string, taskId: string): boolean {
+  return missionTaskSupersedeProof(missionId, taskId).verified === true;
+}
+
+/**
  * For readers that grant authority on a superseded task (the finish gate,
  * record-evidence auto-complete, the continuous owner's "all done"): is this
  * `superseded` status proven? An unproven one counts as pending, with one
