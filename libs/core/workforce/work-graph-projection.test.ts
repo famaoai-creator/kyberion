@@ -13,6 +13,7 @@ import {
   readCanonicalWorkGraphTasks,
 } from './work-graph-projection.js';
 import { pathResolver, safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../index.js';
+import { writeMissionNextTasks } from '../mission/mission-lifecycle-completion.js';
 
 const missionPath = pathResolver.sharedTmp('work-graph-projection-test');
 const alternateRoot = pathResolver.sharedTmp('work-graph-projection-root-test');
@@ -149,6 +150,59 @@ describe('work graph projection', () => {
         origin: 'canonical_work_graph',
       }),
     ]);
+  });
+
+  it('applies through the leased board writer, keeping a supersede on disk', () => {
+    createWorkItem({
+      itemId: 'projection-writer-item',
+      title: 'Projected work',
+      description: 'Work projected from canonical state.',
+      projectId: 'PRJ-PROJECTION',
+      status: 'ready',
+      context: { project_id: 'PRJ-PROJECTION', task_id: 'projected-task' },
+    });
+    const superseded = {
+      by_task_id: 'projected-task',
+      at: '2026-10-30T00:00:00.000Z',
+      actor_id: 'operator',
+      reason_sha256: 'a'.repeat(64),
+      approval_request_id: '0b9d6f2e-3c4a-4d5e-8f60-718293a4b5c6',
+    };
+    writeMissionNextTasks(
+      missionPath,
+      [{ task_id: 'replaced-task', status: 'superseded', superseded }],
+      { allowSupersede: true }
+    );
+    // A superseded entry the projection does not know is stale drift, so the
+    // apply is refused; it is checked again on the board read under the lease.
+    const result = projectWorkGraphToNextTasks({
+      missionId: 'MSN-PROJECTION',
+      projectId: 'PRJ-PROJECTION',
+      missionPath,
+      apply: true,
+    });
+    expect(result.applied).toBe(false);
+    safeWriteFile(nodePath.join(missionPath, 'NEXT_TASKS.json'), '[]\n');
+    const applied = projectWorkGraphToNextTasks({
+      missionId: 'MSN-PROJECTION',
+      projectId: 'PRJ-PROJECTION',
+      missionPath,
+      apply: true,
+    });
+    expect(applied.applied).toBe(true);
+    const records = String(
+      safeReadFile(nodePath.join(missionPath, 'coordination', 'provisioned-entries.jsonl'), {
+        encoding: 'utf8',
+      })
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { target_path: string; phase: string });
+    expect(
+      records.filter(
+        (record) => record.target_path === 'NEXT_TASKS.json' && record.phase === 'verified'
+      ).length
+    ).toBeGreaterThanOrEqual(2);
   });
 
   it('projects canonical WorkItems and reports drift without applying by default', () => {

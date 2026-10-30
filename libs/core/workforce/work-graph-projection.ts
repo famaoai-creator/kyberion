@@ -1,16 +1,12 @@
 import * as nodePath from 'node:path';
 import { withExecutionContext } from '../authority.js';
 import { loadMissionNextTaskObjectsAtPath } from '../mission/mission-next-task-reader.js';
+import { writeMissionNextTasks } from '../mission/mission-lifecycle-completion.js';
 import { pathResolver } from '../path-resolver.js';
 import { resolveMissionDir, tryResolveOwnerScope } from '../owner-scope.js';
 import { listWorkItems, type WorkItem, type WorkItemStatus } from './work-coordination.js';
 import { buildWorkGraph, type WorkGraph } from './work-graph.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeMkdir,
-  safeWriteFile,
-} from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
 
 export interface WorkGraphProjectionOptions {
   missionId: string;
@@ -252,6 +248,21 @@ function driftFor(existing: NextTask[], projected: NextTask[]): WorkGraphProject
   return drift;
 }
 
+/** Drift the additive projection must not overwrite. */
+function hasBlockingProjectionDrift(
+  existingTasks: NextTask[],
+  drift: ReturnType<typeof driftFor>
+): boolean {
+  const managedTaskIds = new Set(
+    existingTasks.filter(isManagedProcessTask).map((task) => task.task_id)
+  );
+  return drift.some(
+    (entry) =>
+      entry.kind === 'stale_projection_entry' ||
+      (entry.kind === 'different_from_projection' && !managedTaskIds.has(entry.task_id))
+  );
+}
+
 function mergedTasks(existing: NextTask[], projected: NextTask[]): NextTask[] {
   const projectedById = new Map(projected.map((task) => [task.task_id, task]));
   const merged = existing.map((task) => {
@@ -342,27 +353,24 @@ export function projectWorkGraphToNextTasks(
   const existingTasks = readExistingTasks(nextTasksPath);
   const drift = driftFor(existingTasks, projectedTasks);
   let applied = false;
-  const managedTaskIds = new Set(
-    existingTasks.filter(isManagedProcessTask).map((task) => task.task_id)
-  );
-  const hasBlockingProjectionDrift = drift.some(
-    (entry) =>
-      entry.kind === 'stale_projection_entry' ||
-      (entry.kind === 'different_from_projection' && !managedTaskIds.has(entry.task_id))
-  );
-  if (input.apply && graph.valid && !hasBlockingProjectionDrift) {
-    withExecutionContext(
+  if (input.apply && graph.valid && !hasBlockingProjectionDrift(existingTasks, drift)) {
+    applied = withExecutionContext(
       'mission_controller',
       () => {
         safeMkdir(safeMissionPath, { recursive: true });
-        safeWriteFile(
-          nextTasksPath,
-          JSON.stringify(mergedTasks(existingTasks, projectedTasks), null, 2)
-        );
+        // Merged into the board read under its writer lease (with the supersede
+        // guard), so a worker's write since the read above is kept; drift that
+        // appeared meanwhile still blocks the apply.
+        return writeMissionNextTasks(safeMissionPath, (onDisk) => {
+          const current = onDisk as unknown as NextTask[];
+          if (hasBlockingProjectionDrift(current, driftFor(current, projectedTasks))) {
+            return undefined;
+          }
+          return mergedTasks(current, projectedTasks) as unknown as Array<Record<string, unknown>>;
+        });
       },
       'worker'
     );
-    applied = true;
   }
   return {
     mission_id: missionId,
