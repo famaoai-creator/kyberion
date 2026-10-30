@@ -5,7 +5,7 @@ scope: tools/adf-replay-extension
 authority: proposed
 status: draft
 owner: ecosystem_architect
-reviewed_at: 2026-06-23
+reviewed_at: 2026-10-31
 tags: [chrome-extension, browser-actuator, pipeline, approval, ux]
 ---
 
@@ -30,15 +30,15 @@ tags: [chrome-extension, browser-actuator, pipeline, approval, ux]
 
 ポップアップは短時間で閉じるため、通常操作は Side Panel に移す。ポップアップは Side Panel を開く入口だけにする。
 
-| 状態 | 利用者に見せるもの | 実行可能な操作 |
-| --- | --- | --- |
-| 接続前 | 「このタブを接続」ボタン、対象 origin、権限説明 | 接続、読み取り専用の観察 |
-| 観察中 | URL、タブ名、抽出範囲、ページから受け取った外部命令を信用しない注意 | snapshot、要素選択、記録開始 |
-| 記録中 | 録画中表示、操作数、秘密入力を除外したこと、停止ボタン | 記録停止、一時停止、直前操作の破棄 |
-| レビュー | 人間が読める操作文、対象、変数候補、リスク、差分 | 操作編集、削除、変数化、下書き提出 |
-| 承認待ち | 実行対象、影響、承認者、期限 | 承認要求の送信、取り消し |
-| 実行中 | 現在の手順、対象 tab、停止、証跡の要約 | 停止、緊急切断 |
-| 完了/失敗 | 成功条件、検証結果、redaction 済み receipt、次の選択肢 | パイプラインへ保存、再レビュー |
+| 状態      | 利用者に見せるもの                                                  | 実行可能な操作                     |
+| --------- | ------------------------------------------------------------------- | ---------------------------------- |
+| 接続前    | 「このタブを接続」ボタン、対象 origin、権限説明                     | 接続、読み取り専用の観察           |
+| 観察中    | URL、タブ名、抽出範囲、ページから受け取った外部命令を信用しない注意 | snapshot、要素選択、記録開始       |
+| 記録中    | 録画中表示、操作数、秘密入力を除外したこと、停止ボタン              | 記録停止、一時停止、直前操作の破棄 |
+| レビュー  | 人間が読める操作文、対象、変数候補、リスク、差分                    | 操作編集、削除、変数化、下書き提出 |
+| 承認待ち  | 実行対象、影響、承認者、期限                                        | 承認要求の送信、取り消し           |
+| 実行中    | 現在の手順、対象 tab、停止、証跡の要約                              | 停止、緊急切断                     |
+| 完了/失敗 | 成功条件、検証結果、redaction 済み receipt、次の選択肢              | パイプラインへ保存、再レビュー     |
 
 操作ラベルは `click_ref` や CSS selector を前面に出さない。例として `「請求書を作成」を選択`、`会社名を入力（値は保存しない）` のように、目的と影響を日本語で表示する。詳細ビューでのみ ref、locator 候補、検証結果を確認できる。
 
@@ -58,19 +58,39 @@ pipeline / mission evidence / governed knowledge
 
 ### 4.1 所有権
 
-| 責務 | 所有者 |
-| --- | --- |
-| Chrome tab の DOM 観察・操作 | 拡張 content script |
-| 表示、ローカル一時状態、停止 | Side Panel / service worker |
-| ADF / recording の schema 検証と compiler | Kyberion Browser Bridge service |
-| capability、origin scope、期限の検証 | Kyberion Browser Bridge service |
-| リスク分類と承認状態 | Kyberion approval policy |
-| secret binding、redaction、永続化 | Kyberion secret/secure-io 境界 |
-| trace、receipt、mission evidence | browser-actuator / mission lifecycle |
+| 責務                                      | 所有者                               |
+| ----------------------------------------- | ------------------------------------ |
+| Chrome tab の DOM 観察・操作              | 拡張 content script                  |
+| 表示、ローカル一時状態、停止              | Side Panel / service worker          |
+| ADF / recording の schema 検証と compiler | Kyberion Browser Bridge service      |
+| capability、origin scope、期限の検証      | Kyberion Browser Bridge service      |
+| リスク分類と承認状態                      | Kyberion approval policy             |
+| secret binding、redaction、永続化         | Kyberion secret/secure-io 境界       |
+| trace、receipt、mission evidence          | browser-actuator / mission lifecycle |
 
 ### 4.2 接続方式
 
 V1 は Native Messaging のみを採用する。ローカル loopback HTTP、任意 WebSocket、外部 SaaS への直接通信は採用しない。Native host 名は `com.kyberion.browser_bridge` とし、Chrome extension ID を allowlist する。
+
+### 4.3 Kyberion から拡張への依頼（pull mailbox）
+
+Kyberion から拡張への方向も Native Messaging だけで行う。拡張が native host に問い合わせ（`poll_requests`）、host が統制された runtime store（`libs/core/browser/browser-bridge-mailbox.ts`）を読む **pull 型の受信箱** とする。拡張は待ち受けポートを開かない。
+
+| 項目           | 規則                                                                                                                                                                                                                                                                                                                                                                         |
+| -------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 問い合わせ間隔 | `chrome.alarms` で 1 分ごと（Chrome の最小間隔）。Side Panel が `sidepanel` ポートで接続している間だけ 5 秒ごと。                                                                                                                                                                                                                                                            |
+| 保持           | 受信した依頼は `chrome.storage.session` に置き、ブラウザ終了で破棄する。期限（`expires_at`）を過ぎた依頼は手元で消し、応答しない。                                                                                                                                                                                                                                           |
+| 通知           | 拡張アイコンのバッジに要対応件数（ページ観測・ローカル推論・承認待ち通知）。新しいページ観測の依頼と承認待ちだけ Chrome 通知を出す（同じ依頼で 2 回出さない）。                                                                                                                                                                                                              |
+| `observe_tab`  | 受信タブで「許可して応答」を押したときだけ応答する。対象は Live タブで接続中の現在タブ（http(s)）だけで、`allowed_origins` があればその origin に限る。観測は既存の PII 除去済み抽出（AI 要約用本文 / ページ構造解析）から作り、`browser-observation.v1`（`procedure_id: browser-bridge-observe`、`recording_id: <request_id>`、`lease_id: LEASE-<request_id>`）として返す。 |
+| `local_infer`  | Side Panel で Chrome 内蔵 AI（`KyberionBuiltInAI.runLocalTask`）を実行し、結果（`executable: false`）を返す。既定はクリックが必要。セッション単位の「ローカル推論依頼を自動応答」（既定オフ、`local_infer` だけ）で自動応答できる。内蔵 AI が使えない場合は `failed` で理由を返す。                                                                                          |
+| `notify`       | 情報・進捗は「確認」で既読応答する。承認待ちは表示だけで、承認コマンド（`pnpm kyberion approvals --approve <id>`）のコピーを出す。拡張に承認ボタンは置かない。                                                                                                                                                                                                               |
+| 応答サイズ     | 1 応答 64 KiB 以内。観測本文は上限内に収まるよう切り詰める。                                                                                                                                                                                                                                                                                                                 |
+
+ページからの送信（B3）は Side Panel の送信タブまたは右クリックの「Kyberion に送る」から行う。右クリックは送信フォームに下書きを入れるだけで、自動では送らない。送信方法（intent / knowledge）、保存先の区分（personal が既定、confidential はテナント slug 必須、public は明示確認必須）を選び、PII 除去済みの本文を `send_page` で渡す。
+
+WebMCP（B5）は読み取りだけを行う。ページの MAIN world で `navigator.modelContextTesting?.listTools()` / `navigator.modelContext` を読み、ツール名・説明・入力スキーマの最上位キーだけ（50 件まで）を取り出し、拡張側で PII 除去してから Live タブに表示し、`observe_tab` の応答に `webmcp_tools` として添える。ツールは呼び出さない。
+
+### 4.4 Execution lease
 
 起動時に service は短命の `execution_lease` を発行する。lease には `mission_id`、`pipeline_id`、`tab_id`、許可 origin、許可 operation、承認済み step hash、発行時刻、有効期限を含める。拡張は lease 範囲外の tab、origin、step を拒否する。ページ遷移、tab 切替、期限切れ、拡張再起動時は lease を失効させる。
 
@@ -78,7 +98,7 @@ V1 は Native Messaging のみを採用する。ローカル loopback HTTP、任
 
 ### 5.1 Manifest V3
 
-- 必須権限は `activeTab`、`scripting`、`storage`、`sidePanel` に限定する。
+- 必須権限は `activeTab`、`scripting`、`storage`、`sidePanel`、`nativeMessaging` と、受信箱のための `alarms`（定期問い合わせ）、`contextMenus`（「Kyberion に送る」）、`notifications`（承認待ち・観測依頼の通知）に限定する。host permission は増やさない。
 - `tabs` は URL 表示が必要な場合だけ利用し、恒常的な閲覧履歴収集に使わない。
 - `host_permissions: ["<all_urls>"]` は削除する。複数 origin の継続利用は `optional_host_permissions` を明示 consent で取得する。
 - `externally_connectable`、remote code、eval、任意 URL からの script 読み込みを禁止する。
@@ -88,12 +108,12 @@ V1 は Native Messaging のみを採用する。ローカル loopback HTTP、任
 
 記録の一次成果物は ADF ではなく `browser-recording.v1` とする。値を含むイベントは以下のように扱う。
 
-| 入力種別 | 記録内容 |
-| --- | --- |
-| password、OTP、token、cookie、WebAuthn | 操作自体を記録しない。秘密入力が省略されたことだけを表示する。 |
-| email、電話、住所、自由入力 | デフォルトでは値を記録しない。`{{input.name}}` の候補と入力項目の意味だけを記録する。 |
-| select、checkbox、radio | 選択肢の表示名と value を別途リスク判定し、初期値は表示名だけを記録する。 |
-| ファイル upload / download | パス・内容を記録しない。ファイル選択または download の intent と承認要否だけを記録する。 |
+| 入力種別                               | 記録内容                                                                                 |
+| -------------------------------------- | ---------------------------------------------------------------------------------------- |
+| password、OTP、token、cookie、WebAuthn | 操作自体を記録しない。秘密入力が省略されたことだけを表示する。                           |
+| email、電話、住所、自由入力            | デフォルトでは値を記録しない。`{{input.name}}` の候補と入力項目の意味だけを記録する。    |
+| select、checkbox、radio                | 選択肢の表示名と value を別途リスク判定し、初期値は表示名だけを記録する。                |
+| ファイル upload / download             | パス・内容を記録しない。ファイル選択または download の intent と承認要否だけを記録する。 |
 
 拡張側の一時状態（接続・記録・下書き・実行進捗）は `chrome.storage.session` に保持し、ブラウザ終了で破棄する（実装は `background.js` の `STATE_KEY`）。`storage.local` への永続保存は行わない。canonical record、証跡、変数定義、receipt は Kyberion 側で tier を指定して保存する。
 
@@ -105,12 +125,12 @@ DOM、ページ本文、ARIA label、ページ内の指示、URL parameter は u
 
 V1 の実行可能操作は browser-actuator v3 の `snapshot + ref` 方針に合わせる。raw CSS selector は recording の内部候補としてのみ保持し、executor の公開契約には出さない。
 
-| 区分 | V1 操作 | ルール |
-| --- | --- | --- |
-| 観察 | `snapshot`、`screenshot`、`extract_text_ref`、`list_tabs` | 読み取り専用。内容は redaction 前に pipeline/LLM へ送らない。 |
-| 低リスク実行 | `open_tab`、`select_tab`、`click_ref`、`fill_ref`、`select_ref`、`press_ref`、`wait_for_ref` | lease と ref 解決の成功が必須。`fill_ref` は secret ref または明示入力だけを受ける。 |
-| 高リスク実行 | `submit_form`、`upload_file`、`download_file`、`delete`、`purchase`、`credential_submit`、`settings_change` | step ごとの明示承認と実行直前の再確認が必須。V1 では generic click に偽装しない。 |
-| 非対応 | `evaluate`、任意 JavaScript、raw selector click/fill、passkey credential export | 拡張 execution lease では拒否する。Playwright 専用か専用の将来契約へ分離する。 |
+| 区分         | V1 操作                                                                                                     | ルール                                                                               |
+| ------------ | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| 観察         | `snapshot`、`screenshot`、`extract_text_ref`、`list_tabs`                                                   | 読み取り専用。内容は redaction 前に pipeline/LLM へ送らない。                        |
+| 低リスク実行 | `open_tab`、`select_tab`、`click_ref`、`fill_ref`、`select_ref`、`press_ref`、`wait_for_ref`                | lease と ref 解決の成功が必須。`fill_ref` は secret ref または明示入力だけを受ける。 |
+| 高リスク実行 | `submit_form`、`upload_file`、`download_file`、`delete`、`purchase`、`credential_submit`、`settings_change` | step ごとの明示承認と実行直前の再確認が必須。V1 では generic click に偽装しない。    |
+| 非対応       | `evaluate`、任意 JavaScript、raw selector click/fill、passkey credential export                             | 拡張 execution lease では拒否する。Playwright 専用か専用の将来契約へ分離する。       |
 
 各 ref は role、accessible name、可視性、親コンテキスト、snapshot hash を持つ。実行直前に再 snapshot し、対象が変わった、複数候補に増えた、または confidence が閾値未満の場合は停止して利用者に再選択を求める。
 
@@ -153,33 +173,41 @@ pipeline 上の接続点は、`browser` actuator パイプラインの step `op:
 
 ## 8. UI 構成
 
-Side Panel は以下の 4 タブに固定する。
+Side Panel は以下の 7 タブで構成する（WAI-ARIA の tabs パターン。矢印キー・Home/End で移動）。
 
-1. **Live**: 接続状態、tab、現在の操作、停止、lease 期限。
-2. **Record**: 記録開始/停止、除外された秘密入力、操作タイムライン、直前の操作を破棄。
-3. **Review**: 人間向け要約、変数化、対象確認、risk badge、生成候補。
-4. **Run**: 承認状態、実行 plan、step progress、失敗時の再選択、receipt。
+1. **Intent**: やりたいことを入力し、登録済み手順と照合（Pattern B 実行 / Pattern A 記録）。
+2. **Live**: 接続状態、tab、Chrome 内蔵 AI の要約、ページ構造解析、このページが公開している AI ツール（WebMCP、読み取りのみ）。
+3. **受信**: Kyberion からの依頼（ページ観測・ローカル推論・お知らせ）と承認待ちの一覧。依頼元・種類・目的・対象 origin・残り時間を表示し、「許可して応答」「拒否」を選ぶ。新着は live region で読み上げる。
+4. **送信**: ページ本文または選択範囲を intent / knowledge として Kyberion に送る。送る前に PII 除去済みの本文を確認できる。
+5. **Record**: 記録開始/停止、除外された秘密入力、操作タイムライン、直前の操作を破棄。
+6. **Review**: 人間向け要約、変数化、対象確認、risk badge、生成候補。
+7. **Run**: 承認状態、実行 plan、step progress、失敗時の再選択、receipt。
 
 初回導線は「このタブで観察する」だけにし、記録・実行は別の明示操作にする。実行ボタンは、対象 origin、操作件数、承認が必要な件数、期限を一行で確認できる場合だけ有効化する。
 
-アクセシビリティは keyboard 操作、フォーカス移動、状態変化の live region、色だけに依存しない risk 表現、200% zoom を受入条件とする。
+アクセシビリティは keyboard 操作、フォーカス移動、状態変化の live region、色だけに依存しない risk 表現、200% zoom を受入条件とする。受信タブの依頼種別・お知らせの区分・承認待ちのリスクは文字で表示する。
+
+### 8.1 Chrome 内蔵 AI
+
+Prompt API（`LanguageModel`）、Summarizer、Translator、LanguageDetector と、利用できる場合だけ Writer / Rewriter / Proofreader を機能検出で使う（`built-in-ai.js`）。ページ由来の文字列はモデルに渡す前と、モデル出力の後の両方で PII 除去する。出力は常に `executable: false` で、操作・承認の判断には使わない。文書系 API は service worker では使えないため、要約・ローカル推論は Side Panel で実行する。
 
 ## 9. プロトタイプからの移行
 
-| 現在の実装 | 問題 | 移行先 |
-| --- | --- | --- |
-| Popup で JSON を貼り付けて Replay | 意味・影響・承認が見えず、誤実行しやすい | Side Panel の Review / Run と Bridge 経由の compiled plan |
-| `<all_urls>` | 常時の過大な site access | `activeTab` と optional host permission |
-| `chrome.storage.local.lastAdf` | 秘密値を含む ADF が残り得る | redaction 済み短期 draft のみ、canonical 保存は Kyberion |
-| CSS selector / `nth-of-type` | UI 変更で壊れ、レビュー不能 | snapshot + ref、内部 locator は再解決のみ |
-| `fill_ref` が DOM に直接値を書き込む | PII/secret の混入と React 等の互換性リスク | secret ref / 明示入力、native setter と実行前確認 |
-| click を即時 dispatch | destructive action の保護がない | risk classifier、step approval、execution lease |
-| 任意 ADF の `goto` / click 実行 | schema、capability、origin 制限なし | Bridge service の preflight 後に限定 execution |
-| in-memory state のみ | service worker 停止で進行状態と停止理由が不明瞭 | resumable session summary、lease 再検証、明示的な aborted state |
+| 現在の実装                           | 問題                                            | 移行先                                                          |
+| ------------------------------------ | ----------------------------------------------- | --------------------------------------------------------------- |
+| Popup で JSON を貼り付けて Replay    | 意味・影響・承認が見えず、誤実行しやすい        | Side Panel の Review / Run と Bridge 経由の compiled plan       |
+| `<all_urls>`                         | 常時の過大な site access                        | `activeTab` と optional host permission                         |
+| `chrome.storage.local.lastAdf`       | 秘密値を含む ADF が残り得る                     | redaction 済み短期 draft のみ、canonical 保存は Kyberion        |
+| CSS selector / `nth-of-type`         | UI 変更で壊れ、レビュー不能                     | snapshot + ref、内部 locator は再解決のみ                       |
+| `fill_ref` が DOM に直接値を書き込む | PII/secret の混入と React 等の互換性リスク      | secret ref / 明示入力、native setter と実行前確認               |
+| click を即時 dispatch                | destructive action の保護がない                 | risk classifier、step approval、execution lease                 |
+| 任意 ADF の `goto` / click 実行      | schema、capability、origin 制限なし             | Bridge service の preflight 後に限定 execution                  |
+| in-memory state のみ                 | service worker 停止で進行状態と停止理由が不明瞭 | resumable session summary、lease 再検証、明示的な aborted state |
 
 ## 10. 実装フェーズと受入条件
 
 > **実装状況（2026-06-23 時点）**
+>
 > - Phase 0–1: ✅ 完了（3 schema + op registry + preflight、最小権限 manifest、record-only、値・秘密・contenteditable 本文・raw selector を非記録）
 > - Phase 2: ✅ 完了（Native Messaging host `scripts/browser_bridge_host.ts` + `native-host/`、recording→pipeline candidate compile）
 > - Phase 3: ✅ 完了（高リスク op を approval-gate に接続、execution lease 発行、再 snapshot + ambiguity 停止の executor、receipt 生成/検証）
@@ -228,17 +256,17 @@ Side Panel は以下の 4 タブに固定する。
 
 ## 11. レビュー記録と反映
 
-| 観点 | 発見 | 仕様への反映 |
-| --- | --- | --- |
-| 契約整合性 | プロトタイプの `click_ref` / `fill_ref` は browser-pipeline schema の op ではなく、selector-first で v3 方針とずれる | recording.v1 を中間契約にし、snapshot + ref と compiler/preflight を必須化 |
-| セキュリティ | `<all_urls>`、任意 ADF、承認なし click/fill により任意サイトで高リスク操作を実行できる | activeTab、optional permission、origin/tab-bound lease、allowlisted op、step approval を採用 |
-| 秘密・プライバシー | `change` event が自由入力値を ADF と storage に保存する | 値を記録しないデータ分類と secret ref を導入。保存期限も定義 |
-| 信頼境界 | ページ DOM をそのまま操作対象・説明文として使うと prompt injection に影響される | ページを untrusted data とし、policy/lease をページから変更不可にした |
-| 信頼性 | `nth-of-type` selector と固定 1 秒 wait は SPA で壊れやすい。service worker 停止も扱わない | accessibility ref、再 snapshot、ambiguity stop、lease 再検証、resumable summary に変更 |
-| UX | JSON 貼り付けと技術用語中心で、記録・レビュー・承認が混在する | Side Panel の 4 タブ、目的中心の操作文、状態遷移、停止と破棄を分離 |
-| パイプライン化 | 記録した ADF をそのまま再生し、Kyberion の ADF lifecycle と mission evidence を通らない | `browser:extension_session` と compiler/preflight/receipt を定義し、draft からのみ昇格 |
-| Chrome 制約 | 特権ページや incognito を通常 tab と同じように扱えない | V1 の対象外を明示し、UI で実行不可理由を返す |
-| 運用・監査 | 実行者、承認者、対象、証跡の関連が残らない | lease と receipt に mission/pipeline/approval/policy/version を結び付ける |
+| 観点               | 発見                                                                                                                 | 仕様への反映                                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| 契約整合性         | プロトタイプの `click_ref` / `fill_ref` は browser-pipeline schema の op ではなく、selector-first で v3 方針とずれる | recording.v1 を中間契約にし、snapshot + ref と compiler/preflight を必須化                   |
+| セキュリティ       | `<all_urls>`、任意 ADF、承認なし click/fill により任意サイトで高リスク操作を実行できる                               | activeTab、optional permission、origin/tab-bound lease、allowlisted op、step approval を採用 |
+| 秘密・プライバシー | `change` event が自由入力値を ADF と storage に保存する                                                              | 値を記録しないデータ分類と secret ref を導入。保存期限も定義                                 |
+| 信頼境界           | ページ DOM をそのまま操作対象・説明文として使うと prompt injection に影響される                                      | ページを untrusted data とし、policy/lease をページから変更不可にした                        |
+| 信頼性             | `nth-of-type` selector と固定 1 秒 wait は SPA で壊れやすい。service worker 停止も扱わない                           | accessibility ref、再 snapshot、ambiguity stop、lease 再検証、resumable summary に変更       |
+| UX                 | JSON 貼り付けと技術用語中心で、記録・レビュー・承認が混在する                                                        | Side Panel の 4 タブ、目的中心の操作文、状態遷移、停止と破棄を分離                           |
+| パイプライン化     | 記録した ADF をそのまま再生し、Kyberion の ADF lifecycle と mission evidence を通らない                              | `browser:extension_session` と compiler/preflight/receipt を定義し、draft からのみ昇格       |
+| Chrome 制約        | 特権ページや incognito を通常 tab と同じように扱えない                                                               | V1 の対象外を明示し、UI で実行不可理由を返す                                                 |
+| 運用・監査         | 実行者、承認者、対象、証跡の関連が残らない                                                                           | lease と receipt に mission/pipeline/approval/policy/version を結び付ける                    |
 
 ## 12. 実装開始前の確認事項
 

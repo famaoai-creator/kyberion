@@ -1,0 +1,8 @@
+---
+category: Added
+---
+
+- **Chrome Browser Bridge receives requests from Kyberion** — the extension checks a pull mailbox over Native Messaging every minute, and every 5 seconds while the side panel is open. A new 受信 (Inbox) tab lists page-observation requests, on-device inference requests and notices, with an action-badge count and Chrome notifications for new observation requests and pending approvals. The extension answers a page-observation request only when you click 「許可して応答」. It reads only the connected active tab, only the allowed origins, and only through the PII-scrubbed extraction path. On-device inference runs Chrome Built-in AI in the side panel. Automatic answers can be turned on per session for inference requests only, and are off by default. Pending approvals show the `pnpm kyberion approvals --approve <id>` command; the extension has no approve button.
+- **Send a page or selection to Kyberion** — a new 送信 (Send) tab and a 「Kyberion に送る」 context-menu entry send scrubbed page text as an intent (matched to registered procedures, then continued with Pattern B) or as knowledge. The default tier is personal; confidential needs a tenant slug and public needs explicit confirmation. The context menu only fills in the form and never sends on its own.
+- **WebMCP tool discovery (read-only)** — the Live tab lists the AI tools a page exposes through WebMCP: names, descriptions and input keys only, scrubbed and capped at 50. These are also attached to page-observation responses. Tools are never invoked.
+- The extension adds the `alarms`, `contextMenus` and `notifications` permissions; it requests no new host permissions. Side-panel tabs now follow the WAI-ARIA tabs pattern (roles, arrow keys, Home/End).
