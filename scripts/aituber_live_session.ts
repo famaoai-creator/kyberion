@@ -163,7 +163,8 @@ export async function runAituberLiveSession(
 
   const resolveApiKey =
     deps.apiKeyResolver ??
-    (() => getRegisteredEnvText('KYBERION_YOUTUBE_API_KEY') || getSecret('KYBERION_YOUTUBE_API_KEY'));
+    (() =>
+      getRegisteredEnvText('KYBERION_YOUTUBE_API_KEY') || getSecret('KYBERION_YOUTUBE_API_KEY'));
   const apiKey = options.fixturePath ? '' : resolveApiKey() || '';
   if (!options.fixturePath && !apiKey) {
     throw new Error(
@@ -299,8 +300,9 @@ async function main(argv: string[], print: (v: unknown) => void): Promise<void> 
       pollIntervalMs: Number(parsed['poll-interval-ms']),
       maxTurns: Number(parsed['max-turns']),
       deliveryMode: parsed['delivery-mode'] as AituberLiveSessionOptions['deliveryMode'],
-      personalVoiceMode:
-        parsed['personal-voice-mode'] as AituberLiveSessionOptions['personalVoiceMode'],
+      personalVoiceMode: parsed[
+        'personal-voice-mode'
+      ] as AituberLiveSessionOptions['personalVoiceMode'],
       dryRun: Boolean(parsed['dry-run']),
     },
     {},
@@ -315,6 +317,9 @@ const aituberLiveSessionScript = defineScript({
   run: ({ argv, print }) => main(argv, print),
 });
 
-if (isDirectScript(import.meta.url, 'aituber_live_session.ts')) {
+if (
+  isDirectScript(import.meta.url, 'aituber_live_session.ts') ||
+  isDirectScript(import.meta.url, 'aituber_live_session.js')
+) {
   void aituberLiveSessionScript();
 }
