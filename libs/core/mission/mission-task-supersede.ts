@@ -351,6 +351,12 @@ function planSupersede(
     if (oldStatus === MISSION_TASK_SUPERSEDED_STATUS) {
       throw new Error(`Task ${taskId} is already superseded`);
     }
+    // The board is written last: a supersede it shows took effect, whatever
+    // the WorkItem says now (a worker can write WorkItems).
+    const boardEntry = nextTasks.find((task) => String(task.task_id || '').trim() === taskId);
+    if (boardEntry && isTaskSuperseded(boardEntry) && supersededRecordOf(boardEntry.superseded)) {
+      throw new Error(`Task ${taskId} is already superseded`);
+    }
   }
   if (oldStatus === 'in_progress') {
     throw new Error(`Task ${taskId} is in progress; wait until its attempt ends`);
@@ -705,15 +711,16 @@ export async function supersedeMissionTask(
     // it superseded the task (planSupersede refuses a task already superseded):
     // it is kept beside this run's receipt, which replaces it, so the record,
     // audit stamp and dependents it names are this approval's own.
-    const staleReceipt =
-      foundReceipt &&
-      supersededRecordOf(foundReceipt.superseded)?.approval_request_id !== approvalId
-        ? foundReceipt
-        : undefined;
+    // Only the receipt a resumed run is derived from is this run's own; any
+    // other (another approval's, or one that does not match this approval's
+    // replacement and reason) is set aside.
+    const staleReceipt = foundReceipt && !plan.resumed ? foundReceipt : undefined;
     const existingReceipt = staleReceipt ? undefined : foundReceipt;
     if (staleReceipt) {
+      // Named by its approval, or by its content when it names none.
       const staleApproval =
-        supersededRecordOf(staleReceipt.superseded)?.approval_request_id || 'unknown';
+        supersededRecordOf(staleReceipt.superseded)?.approval_request_id ||
+        `unknown-${sha256Text(JSON.stringify(staleReceipt)).slice(0, 16)}`;
       writeDispatchArtifact(
         receiptPath.replace(
           /\.json$/u,
@@ -737,6 +744,9 @@ export async function supersedeMissionTask(
         : plan.dependents,
       ...(Array.isArray(existingReceipt?.late_rewritten_dependent_task_ids)
         ? { late_rewritten_dependent_task_ids: existingReceipt.late_rewritten_dependent_task_ids }
+        : {}),
+      ...(Array.isArray(existingReceipt?.late_rewrites)
+        ? { late_rewrites: existingReceipt.late_rewrites }
         : {}),
       ...(auditRecordedAt ? { audit_recorded_at: auditRecordedAt } : {}),
     });
@@ -843,7 +853,7 @@ export async function supersedeMissionTask(
           by_task_id: input.byTaskId,
           reason_sha256: reasonSha256,
           approval_request_id: approvalId,
-          rewritten_dependent_task_ids: plan.dependents,
+          rewritten_dependent_task_ids: receiptBody().rewritten_dependent_task_ids,
           receipt_path: receiptRelative,
         },
       });
@@ -866,7 +876,7 @@ export async function supersedeMissionTask(
           by_task_id: input.byTaskId,
           reason_sha256: reasonSha256,
           approval_request_id: approvalId,
-          rewritten_dependent_task_ids: plan.dependents,
+          rewritten_dependent_task_ids: receiptBody().rewritten_dependent_task_ids,
         },
       });
       changed = true;
