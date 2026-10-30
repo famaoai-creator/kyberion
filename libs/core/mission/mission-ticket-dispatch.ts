@@ -255,7 +255,8 @@ export async function dispatchMissionTickets(
   const existingRecords = new Map<string, MissionTicketDispatchRecord>(
     (existingManifest?.records || []).map((record) => [record.task_id, record])
   );
-  const allTasks = readPlannedTasks(missionPath);
+  // Stamped onto the board at write time, under its writer lease.
+  const dispatchStamps = new Map<string, Record<string, unknown>>();
 
   const demandedRoles = Array.from(
     new Set(
@@ -577,25 +578,18 @@ export async function dispatchMissionTickets(
     };
     records.push(record);
 
-    const taskIndex = allTasks.findIndex((entry) => entry.task_id === task.task_id);
-    if (taskIndex >= 0) {
-      const nextTask = {
-        ...allTasks[taskIndex],
-        ticket_dispatch: {
-          registered_at: nowIso(),
-          manifest_path: manifestPath(missionPath),
-          work_item_id: workItemId,
-          targets,
-          ticket_targets: ticketTargets,
-          live_targets: liveTargets,
-          live_results: liveResults,
-          task_model_hint: taskModelHint,
-          status,
-          attempt_count: 1,
-        },
-      };
-      allTasks[taskIndex] = nextTask;
-    }
+    dispatchStamps.set(task.task_id, {
+      registered_at: nowIso(),
+      manifest_path: manifestPath(missionPath),
+      work_item_id: workItemId,
+      targets,
+      ticket_targets: ticketTargets,
+      live_targets: liveTargets,
+      live_results: liveResults,
+      task_model_hint: taskModelHint,
+      status,
+      attempt_count: 1,
+    });
 
     appendDispatchEvent(ticketEventPath(missionPath), {
       event_type: 'ticket_dispatched',
@@ -649,9 +643,19 @@ export async function dispatchMissionTickets(
   manifest.manifest_path = manifestFilePath;
   manifest.event_path = ticketEventPath(missionPath);
   writeDispatchArtifact(manifestFilePath, manifest, { missionId, missionPath });
-  // Through the one board writer: the board was read before the ticket calls,
-  // so a supersede that landed meanwhile is kept (M2).
-  writeMissionNextTasks(missionPath, allTasks);
+  // The stamps go onto the board read under its writer lease, after the
+  // ticket calls: a supersede (M2) or a worker's status write made meanwhile
+  // is kept.
+  writeMissionNextTasks(missionPath, (tasks) => {
+    let stamped = false;
+    const next = tasks.map((entry) => {
+      const stamp = dispatchStamps.get(String(entry.task_id || ''));
+      if (!stamp) return entry;
+      stamped = true;
+      return { ...entry, ticket_dispatch: stamp };
+    });
+    return stamped ? next : undefined;
+  });
 
   ledger.record('MISSION_TICKETS_REGISTERED', {
     mission_id: missionId,
