@@ -19,9 +19,10 @@
  * tenants) to the one operator's allowlisted Chrome extension. There is no
  * per-viewer filtering on that path — do not expose the poll surface to a
  * second principal or a shared browser profile. Because the operator's
- * currently open tab may belong to any tenant, a `confidential` (tenant)
- * `observe_tab` must name non-empty `allowed_origins`; the response is then
- * rejected unless the observed origin is one of them.
+ * currently open tab may belong to any tenant, a tenant-scoped `observe_tab`
+ * (any tier with `scope.tenant_slug` — a `<tier>/<tenant>` partition, as in
+ * the storage layout) must name non-empty `allowed_origins`; the response is
+ * then rejected unless the observed origin is one of them.
  *
  * Invariants:
  *   - A request never carries an executable instruction. `observe_tab` asks for
@@ -77,8 +78,8 @@ const MAX_APPROVAL_SUMMARIES = 20;
 
 const REQUEST_ID_PATTERN = /^BBR-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
 const SCHEMA_PATH = pathResolver.knowledge('product/schemas/browser-bridge-request.schema.json');
-const CONFIDENTIAL_OBSERVE_ORIGINS_ERROR =
-  'a confidential (tenant) observe_tab request requires non-empty payload.allowed_origins';
+const TENANT_OBSERVE_ORIGINS_ERROR =
+  'a tenant-scoped (scope.tenant_slug) observe_tab request requires non-empty payload.allowed_origins';
 /** Schema maxLength of the free-text payload fields redaction may lengthen. */
 const PAYLOAD_TEXT_LIMITS = { purpose: 300, input: 30000, title: 120, body: 1000 } as const;
 
@@ -260,8 +261,8 @@ export function validateBrowserBridgeRequest(input: unknown): {
     if (origins.some((origin) => canonicalHttpOrigin(origin) !== origin)) {
       errors.push('payload.allowed_origins must be canonical http(s) origins');
     }
-    if (value.scope.tier === 'confidential' && origins.length === 0) {
-      errors.push(CONFIDENTIAL_OBSERVE_ORIGINS_ERROR);
+    if (value.scope.tenant_slug && origins.length === 0) {
+      errors.push(TENANT_OBSERVE_ORIGINS_ERROR);
     }
   }
   if (value.request_kind === 'notify') {
@@ -524,10 +525,10 @@ export function enqueueBrowserBridgeRequest(
   }
   if (
     input.request_kind === 'observe_tab' &&
-    scope.tier === 'confidential' &&
+    scope.tenant_slug &&
     !((input.payload as BrowserBridgeObservePayload).allowed_origins?.length ?? 0)
   ) {
-    throw new BrowserBridgeMailboxError('invalid_input', CONFIDENTIAL_OBSERVE_ORIGINS_ERROR);
+    throw new BrowserBridgeMailboxError('invalid_input', TENANT_OBSERVE_ORIGINS_ERROR);
   }
   const raw: BrowserBridgeRequest = {
     kind: BROWSER_BRIDGE_REQUEST_KIND,
