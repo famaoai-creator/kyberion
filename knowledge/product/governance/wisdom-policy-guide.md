@@ -39,7 +39,7 @@ If `adapter` is omitted, the runtime falls back to `shell-json`.
 
 1. Add a new profile under `llm.profiles` in [`wisdom-policy.json`](wisdom-policy.json).
 2. Set `command`, `args`, `timeout_ms`, and `adapter` for that runner.
-3. If the adapter is new, register a structured runner in `scripts/refactor/mission-llm.ts`.
+3. If the adapter is new, register a structured runner in `libs/core/mission/mission-llm.ts`.
 4. Add or update tests that prove the new adapter can execute a structured schema.
 5. Run build and the reasoning tests before relying on the new profile in distillation.
 

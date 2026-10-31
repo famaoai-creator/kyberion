@@ -1,4 +1,10 @@
+import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
+import {
+  resolveStorageFloor,
+  storageFloorRelativePath,
+  SYSTEM_PARTITION,
+} from '../storage-layout.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { resolveActiveProfileRoot } from '../profile-root.js';
@@ -95,4 +101,42 @@ export function resolveToolRuntimeCacheRoot(
   policy: ToolRuntimePolicy = getToolRuntimePolicy()
 ): string {
   return pathResolver.rootResolve(policy.managed_roots.cache_root);
+}
+
+/**
+ * Directory under the managed root holding one subdirectory per tool runtime
+ * (`<tool_runtime_root>/tool-runtimes/<runtime-dir>/`). Registry records spell
+ * it in `managed_env_subpath`; code that builds the path itself uses this.
+ */
+export const TOOL_RUNTIMES_DIRNAME = 'tool-runtimes';
+
+/**
+ * Repo-relative download-cache root for managed tool runtimes:
+ * `active/shared/cache/system/tool-runtimes`. It holds re-generable package and
+ * model downloads (uv / pip / XDG caches, `HF_HOME`) keyed by runtime dir. Never
+ * an install target.
+ */
+export const TOOL_RUNTIME_DOWNLOAD_CACHE_ROOT = storageFloorRelativePath(
+  'cache',
+  SYSTEM_PARTITION,
+  TOOL_RUNTIMES_DIRNAME
+);
+
+/**
+ * Canonical install root for every managed tool runtime (venvs, binaries,
+ * `state.json` with install/pin provenance): `<tool_runtime_root>/tool-runtimes`,
+ * i.e. `active/shared/runtime/tool-runtimes` under the governed policy. It stays
+ * on the durable runtime floor because installs are approval-gated and their
+ * files keep upstream mtimes, which the cache floor's per-file mtime TTL would
+ * tear apart (see storage-retention-catalog.json).
+ */
+export function resolveToolRuntimesRoot(
+  policy: ToolRuntimePolicy = getToolRuntimePolicy()
+): string {
+  return path.join(resolveToolRuntimeRoot(policy), TOOL_RUNTIMES_DIRNAME);
+}
+
+/** Absolute download-cache directory for one runtime (uv / pip / XDG / HF caches). */
+export function resolveToolRuntimeDownloadCacheDir(runtimeDir: string): string {
+  return resolveStorageFloor('cache', SYSTEM_PARTITION, TOOL_RUNTIMES_DIRNAME, runtimeDir);
 }

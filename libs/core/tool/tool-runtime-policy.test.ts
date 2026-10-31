@@ -1,9 +1,13 @@
+import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   getToolRuntimePolicy,
   _resetToolRuntimePolicyCacheForTests,
   resolveToolRuntimeCacheRoot,
+  resolveToolRuntimeDownloadCacheDir,
   resolveToolRuntimeRoot,
+  resolveToolRuntimesRoot,
+  TOOL_RUNTIME_DOWNLOAD_CACHE_ROOT,
   writeToolRuntimePolicyAtPath,
 } from './tool-runtime-policy.js';
 import { pathResolver } from '../path-resolver.js';
@@ -115,5 +119,35 @@ describe('tool runtime policy', () => {
         })
       ).toThrow(/Invalid catalog tool-runtime-policy/);
     });
+  });
+});
+
+describe('tool runtime root resolution', () => {
+  it('defines the canonical install root on the runtime floor and the download cache on the cache floor', () => {
+    _resetToolRuntimePolicyCacheForTests();
+    expect(resolveToolRuntimesRoot()).toBe(
+      pathResolver.rootResolve('active/shared/runtime/tool-runtimes')
+    );
+    expect(TOOL_RUNTIME_DOWNLOAD_CACHE_ROOT).toBe('active/shared/cache/system/tool-runtimes');
+    expect(resolveToolRuntimeDownloadCacheDir('mlx-audio')).toBe(
+      pathResolver.rootResolve('active/shared/cache/system/tool-runtimes/mlx-audio')
+    );
+  });
+
+  it('derives the install root from the policy, not a hardcoded path', () => {
+    const policy = {
+      ...getToolRuntimePolicy(),
+      managed_roots: {
+        tool_runtime_root: 'active/shared/tmp/alt-runtime-root',
+        cache_root: 'active/shared/tmp/tool-runtime-cache',
+      },
+    };
+    expect(resolveToolRuntimesRoot(policy)).toBe(
+      path.join(pathResolver.rootResolve('active/shared/tmp/alt-runtime-root'), 'tool-runtimes')
+    );
+  });
+
+  it('rejects download-cache directories that escape the partition', () => {
+    expect(() => resolveToolRuntimeDownloadCacheDir('../outside')).toThrow();
   });
 });

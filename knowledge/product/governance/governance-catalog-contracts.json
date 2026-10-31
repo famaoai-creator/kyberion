@@ -77,15 +77,6 @@
     "knowledge-weights.json": ["defaults", "description", "tenant_overrides", "version"],
     "maintenance-schedule.json": ["default_tasks", "policy_path", "schedule", "scope"],
     "marketing-risk-policy.json": ["allowed_channels", "cta_domain_allowlist", "levels", "version"],
-    "mesh-hub-policy.json": [
-      "data_tier",
-      "placement",
-      "recipient_acceptance",
-      "routing",
-      "tenant_scope",
-      "topic_delivery",
-      "version"
-    ],
     "mission-management-config.json": [
       "directories",
       "mep_version",

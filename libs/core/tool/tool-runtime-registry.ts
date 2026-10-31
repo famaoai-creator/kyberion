@@ -20,6 +20,7 @@ import {
 import {
   getToolRuntimePolicy,
   resolveToolRuntimeRoot,
+  TOOL_RUNTIMES_DIRNAME,
   type ToolRuntimeEcosystem,
   type ToolRuntimeMode,
   type ToolRuntimeModePreference,
@@ -212,10 +213,14 @@ function backendIsAvailable(
   return result.status === 0 && Boolean(result.stdout.trim());
 }
 
+function managedEnvSubPath(tool: ToolRuntimeRecord): string {
+  return tool.managed_env_subpath || `${TOOL_RUNTIMES_DIRNAME}/${tool.tool_id}`;
+}
+
+/** Canonical managed env path: the install target and the home of state.json. */
 function resolveManagedEnvPath(tool: ToolRuntimeRecord): string {
   const root = resolveToolRuntimeRoot(getToolRuntimePolicy());
-  const subPath = tool.managed_env_subpath || `tool-runtimes/${tool.tool_id}`;
-  return assertManagedRuntimePath(root, path.join(root, subPath));
+  return assertManagedRuntimePath(root, path.join(root, managedEnvSubPath(tool)));
 }
 
 function assertManagedRuntimePath(root: string, candidate: string): string {
@@ -261,8 +266,7 @@ function getRegistry(): ToolRuntimeRegistry {
 
 function statePathForTool(tool: ToolRuntimeRecord): string {
   const root = resolveToolRuntimeRoot(getToolRuntimePolicy());
-  const subPath = tool.managed_env_subpath || `tool-runtimes/${tool.tool_id}`;
-  return assertManagedRuntimePath(root, path.join(root, subPath, 'state.json'));
+  return assertManagedRuntimePath(root, path.join(root, managedEnvSubPath(tool), 'state.json'));
 }
 
 export function _resetToolRuntimeRegistryCacheForTests(): void {

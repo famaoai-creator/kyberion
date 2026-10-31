@@ -1,7 +1,7 @@
 import { appendJsonLine } from '../foundation/json.js';
 import { nowIso } from '../foundation/time.js';
 /**
- * scripts/refactor/mission-governance.ts
+ * libs/core/mission/mission-governance.ts
  * Governance, trust, and observability helpers for mission orchestration.
  */
 

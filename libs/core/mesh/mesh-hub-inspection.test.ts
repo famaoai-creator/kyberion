@@ -2,7 +2,7 @@ import * as path from 'node:path';
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { appendGovernedArtifactJsonl, pathResolver, safeRmSync } from '../index.js';
+import { pathResolver, safeRmSync } from '../index.js';
 import {
   advertiseMeshCapabilities,
   recordMeshHeartbeat,
@@ -10,8 +10,7 @@ import {
 } from './mesh-peer-directory.js';
 import { clearMeshMessageBrokerNamespace, createMeshMessageBroker } from './mesh-message-broker.js';
 import { formatMeshHubInspectionReport, inspectMeshHub } from './mesh-hub-inspection.js';
-import { clearMeshTopicRegistryNamespace } from './mesh-topic-registry.js';
-import type { MeshRequest, MeshTopicSubscription } from './mesh-hub-contract.js';
+import type { MeshRequest } from './mesh-hub-contract.js';
 
 const ROOT = pathResolver.rootDir();
 const TEST_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub-inspection-tests';
@@ -59,7 +58,6 @@ describe('mesh-hub-inspection', () => {
     );
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     clearMeshMessageBrokerNamespace();
-    clearMeshTopicRegistryNamespace();
     broker = null;
   });
 
@@ -67,11 +65,10 @@ describe('mesh-hub-inspection', () => {
     broker?.close();
     broker = null;
     clearMeshMessageBrokerNamespace();
-    clearMeshTopicRegistryNamespace();
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
   });
 
-  it('reports healthy peers, expired peers, dead letters, routes, and topics', async () => {
+  it('reports healthy peers, expired peers, dead letters, and routes', async () => {
     registerMeshPeer({
       peer_id: 'peer-a1',
       tenant_id: 'tenant-acme',
@@ -117,27 +114,6 @@ describe('mesh-hub-inspection', () => {
       roles: ['notifier'],
       request_kinds: ['notification.publish'],
     });
-    // The subscription writer was retired with mesh-router (2026-10-01); the
-    // store is seeded directly so the read side stays covered.
-    const subscription: MeshTopicSubscription = {
-      kind: 'mesh-topic-subscription',
-      subscription_id: 'sub-a1',
-      tenant_id: 'tenant-acme',
-      topic: 'release.review',
-      peer_id: 'peer-a1',
-      filters: {
-        request_kinds: ['notification.publish'],
-        payload_classifications: ['public'],
-      },
-      expires_at: '2026-06-24T01:03:00.000Z',
-      policy_version: '1.0.0',
-    };
-    appendGovernedArtifactJsonl(
-      'infrastructure_sentinel',
-      `${TEST_RUNTIME_ROOT}/tenants/tenant-acme/subscriptions.jsonl`,
-      subscription
-    );
-
     broker = createMeshMessageBroker({ namespace: '' });
     const accepted = await broker.acceptMeshRequest(buildRequest('meshreq-inspect'), {
       now: '2026-06-24T00:03:00.000Z',
@@ -169,9 +145,7 @@ describe('mesh-hub-inspection', () => {
         (deadLetter) => deadLetter.delivery_id === accepted.delivery.delivery_id
       )
     ).toBe(true);
-    expect(
-      report.topics.some((topic) => topic.topic === 'release.review' && topic.fan_out_count === 1)
-    ).toBe(true);
+    expect(report).not.toHaveProperty('topics');
 
     const rendered = formatMeshHubInspectionReport(report);
     expect(rendered.join('\n')).toContain('peer-a1');

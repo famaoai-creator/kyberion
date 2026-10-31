@@ -22,7 +22,7 @@ import { createStandardYargs } from '@agent/core/cli-utils';
 import { getRegisteredEnvText, isRecord, readJsonLines } from '@agent/core/foundation';
 import { withImplicitTraceSubcommand } from './lib/intent-trace-argv.js';
 import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
-import { listMissionsInSearchDirs, loadState } from './refactor/mission-state.js';
+import { listMissionsInSearchDirs, loadState } from '@agent/core/mission/mission-state';
 
 type JsonRecord = Record<string, unknown> & { [key: string]: unknown };
 

@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-seal.ts
+ * libs/core/mission/mission-seal.ts
  * Cryptographic sealing (AES+RSA) of mission archives.
  */
 

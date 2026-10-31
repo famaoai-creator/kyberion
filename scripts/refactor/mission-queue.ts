@@ -12,7 +12,10 @@ import {
 } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/lock-utils';
 import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
-import { assertValidMissionIdList, normalizeMissionIdList } from './mission-state.js';
+import {
+  assertValidMissionIdList,
+  normalizeMissionIdList,
+} from '@agent/core/mission/mission-state';
 
 /** A start that fails this many times is parked as `failed` instead of blocking the queue. */
 export const MAX_DISPATCH_ATTEMPTS = 3;

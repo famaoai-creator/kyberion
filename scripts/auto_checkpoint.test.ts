@@ -1,8 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as autonomousOpsGate from '@agent/core/governance/autonomous-ops-gate';
 import * as decisionRouting from '@agent/core/governance/approval-decision-routing';
-import * as missionState from './refactor/mission-state.js';
-import * as maintenance from './refactor/mission-maintenance.js';
+import * as missionState from '@agent/core/mission/mission-state';
+import * as maintenance from '@agent/core/mission/mission-maintenance';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
 
 describe('auto_checkpoint', () => {

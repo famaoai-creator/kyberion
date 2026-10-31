@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-lifecycle.ts
+ * libs/core/mission/mission-lifecycle.ts
  * Delegation, verification, import, and finalization helpers for missions.
  */
 

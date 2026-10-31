@@ -136,4 +136,4 @@ const { overlay, base } = customerResolver.overlayCandidates('policy/approval-po
   - [x] baseline check consumer (`scripts/run_baseline_check.ts`)
 - [x] onboarding apply consumer (`scripts/onboarding_apply.ts`)
 - [x] slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)
-  - [x] mission prerequisites / creation consumer (`scripts/refactor/mission-state.ts`, `scripts/refactor/mission-creation.ts`, `scripts/refactor/mission-llm.ts`)
+  - [x] mission prerequisites / creation consumer (`libs/core/mission/mission-state.ts`, `libs/core/mission/mission-creation.ts`, `libs/core/mission/mission-llm.ts`)

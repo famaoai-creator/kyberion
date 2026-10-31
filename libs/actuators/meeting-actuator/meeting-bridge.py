@@ -115,6 +115,8 @@ def _resolve_default_python_bin():
         os.environ.get("KYBERION_PYTHON_BIN"),
         os.environ.get("KYBERION_PYTHON"),
     ]
+    # Canonical managed install root: active/shared/runtime/tool-runtimes
+    # (libs/core/tool/tool-runtime-policy.ts resolveToolRuntimesRoot).
     managed_candidates = [
         ROOT / "active/shared/runtime/tool-runtimes/mlx-audio/bin/python",
         ROOT / "active/shared/runtime/tool-runtimes/mlx-audio/bin/python3",

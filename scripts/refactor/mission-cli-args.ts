@@ -5,12 +5,16 @@
 
 import { assertSafeRepositoryPath, safeExistsSync } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
-import { BOOLEAN_FLAGS, VALUE_FLAGS, type MissionRelationships } from './mission-types.js';
+import {
+  BOOLEAN_FLAGS,
+  VALUE_FLAGS,
+  type MissionRelationships,
+} from '@agent/core/mission/mission-types';
 import {
   assertValidMissionIdList,
   normalizeMissionIdList,
   normalizeRelationships,
-} from './mission-state.js';
+} from '@agent/core/mission/mission-state';
 import { currentProcessArgv } from '../lib/harness.js';
 import { parseSafeJsonObjectInput, readSafeJsonFile } from '../lib/json-input.js';
 

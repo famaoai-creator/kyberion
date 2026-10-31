@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   safeExistsSync: vi.fn(),
   safeReaddir: vi.fn(),
   listToolRuntimeInventory: vi.fn(),
+  locateManagedToolPythonBin: vi.fn(),
+  getToolRuntimeStatePath: vi.fn(),
   createCoreAudioDeviceInventoryBridge: vi.fn(),
   checkSpeakConsent: vi.fn(),
   createStandardYargs: vi.fn(),
@@ -30,6 +32,8 @@ vi.mock('@agent/core/environment-capability-probes', () => ({
 
 vi.mock('@agent/core/tool/tool-runtime-registry', () => ({
   listToolRuntimeInventory: mocks.listToolRuntimeInventory,
+  locateManagedToolPythonBin: mocks.locateManagedToolPythonBin,
+  getToolRuntimeStatePath: mocks.getToolRuntimeStatePath,
 }));
 
 vi.mock('@agent/core/coreaudio-device-inventory', async (importOriginal) => {
@@ -130,13 +134,19 @@ describe('meeting_preflight', () => {
     mocks.safeExistsSync.mockImplementation(
       (candidate: string) =>
         candidate.includes('/active/shared/runtime/voice-profiles') ||
-        candidate.includes('/active/shared/runtime/tool-runtimes/mlx-audio/bin/python') ||
-        candidate.includes('/active/shared/runtime/tool-runtimes/mlx-audio/bin/python3') ||
         candidate.includes('/active/shared/runtime/voice-profiles/alpha/metadata.json') ||
         candidate.includes('/libs/core/coreaudio-output-bridge.swift') ||
         candidate.includes('/libs/core/coreaudio-device-inventory.swift')
     );
     mocks.safeReaddir.mockReturnValue(['alpha', 'README.md']);
+    mocks.locateManagedToolPythonBin.mockImplementation((toolId: string) =>
+      toolId === 'mlx_audio'
+        ? `${process.cwd()}/active/shared/runtime/tool-runtimes/mlx-audio/bin/python`
+        : null
+    );
+    mocks.getToolRuntimeStatePath.mockReturnValue(
+      `${process.cwd()}/active/shared/runtime/tool-runtimes/mlx-audio/state.json`
+    );
     mocks.listToolRuntimeInventory.mockReturnValue({
       version: 'test',
       platform: 'darwin',
@@ -256,6 +266,7 @@ describe('meeting_preflight', () => {
       candidate.includes('/does-not-exist/')
     );
     mocks.safeReaddir.mockReturnValue([]);
+    mocks.locateManagedToolPythonBin.mockReturnValue(null);
     mocks.checkSpeakConsent.mockReturnValue({ allowed: false, reason: 'voice consent missing' });
     const yargsStub = {
       option: vi.fn(() => yargsStub),

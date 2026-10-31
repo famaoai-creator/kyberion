@@ -68,7 +68,7 @@
 `active/` には既に揮発的な仕組みがある:
 
 - `active/missions/<TIER>/<MISSION_ID>/` … `mission-state.json`（`is_ephemeral` フラグ持ち）, `TASK_BOARD.md`, `execution-ledger.jsonl`, `LATEST_TASK.json`（Flight Recorder）, `evidence/`
-- `active/missions/ephemeral/<MISSION_ID>/` … `--ephemeral` モード（micro-repo なし、`git='ephemeral'`）※ `scripts/refactor/mission-creation.ts`
+- `active/missions/ephemeral/<MISSION_ID>/` … `--ephemeral` モード（micro-repo なし、`git='ephemeral'`）※ `libs/core/mission/mission-creation.ts`
 - `active/projects/<TIER>/<project>/` … `mission-ledger.json`
 - `active/shared/` … `coordination/` `tmp/` `runtime/`(locks) `logs/` `observability/` `registry/` `last_response.json`
 - Review フェーズで `active/shared/tmp/` を purge、ミッションを `active/archive/missions/` へ退避（`scripts/mission_controller.ts finish`）
@@ -222,7 +222,7 @@
   - `active/` 配下の現行揮発アーティファクト一覧を `pipelines/` の調査パイプラインで列挙（読み取りのみ）。
   - **§1.0 の生存コア資産の現状確認**: `MissionWorkingMemory`（永続化の有無）, `memory-promotion-queue/workflow`, `promoted-memory`, `memory-candidate.schema.json`, `pipelines/fragments/memory-distillation.json` の現契約を読み、再利用点を確定。
   - **`product/` 配下に生存する仕様の確認**: `corporate-memory-loop.md` / `memory-snapshot-protocol.md` / `pipeline-templates/daily-routine.yml` / `work-coordination-examples/personal-todo.json` / `mission-journal-policy.schema.json` を参照仕様として読む（git 回収不要）。真に GONE な `sovereign-memory` のみ git から回収。
-  - `scripts/refactor/mission-creation.ts` の `--ephemeral` 経路と `mission_controller finish` の purge 範囲を確認し、本計画のライフサイクルと突き合わせる。
+  - `libs/core/mission/mission-creation.ts` の `--ephemeral` 経路と `mission_controller finish` の purge 範囲を確認し、本計画のライフサイクルと突き合わせる。
 - **変更ファイル**: なし（調査レポートを `active/shared/tmp/` に出力）。
 - **受入条件**: 揮発面の物理位置・命名・既存 purge 範囲・**再利用する生存資産と復元する削除資産**が表に確定し、衝突がないこと。
 
@@ -246,7 +246,7 @@
   2. **`MissionWorkingMemory` を拡張**: 現状インメモリの entries を、本文 Markdown ＋ sidecar へ secure-io 経由で**原子的に**永続化（`updated_at` 自動更新）。既存の `mission|task|agent` scope と本計画の scope を整合。
   3. テンプレート `templates/` に `NOW.md` / `MEMORY.md` の雛形を追加（`## Action Items` / `## Decisions` / `## Open Questions` セクション固定）。
   4. ミッション作成（`mission-creation.ts`）時に `MEMORY.md`＋sidecar を初期化（`scope:mission, cadence:resident, lifetime:mission`）。
-- **変更ファイル**: actuator 実装＋テスト, `libs/core/mission/mission-working-memory.ts`, `CAPABILITIES_GUIDE.md`, `templates/`, `scripts/refactor/mission-creation.ts`。
+- **変更ファイル**: actuator 実装＋テスト, `libs/core/mission/mission-working-memory.ts`, `CAPABILITIES_GUIDE.md`, `templates/`, `libs/core/mission/mission-creation.ts`。
 - **受入条件**: 各 scope で作業面を作成/追記/読み出しでき、再起動後も永続面から復元できる。sidecar の `scope/cadence/tier/lifetime` が schema 検証を通る。tier 違反書き込みが拒否される。
 
 ### Phase 2b — personal / 時限面（日次・今日のTODO・週次）★今回の追加要望
@@ -346,7 +346,7 @@ Phase 0 (監査・生存資産確認)
 - 不変条件: [`AGENTS.md`](../AGENTS.md)（File I/O / temp / tier / mission 所有）
 - secure-io: `libs/core/secure-io.ts`
 - パス許可リスト: `knowledge/product/governance/security-policy.json`(v1.2.0)
-- ミッション生成/ephemeral: `scripts/refactor/mission-creation.ts`
+- ミッション生成/ephemeral: `libs/core/mission/mission-creation.ts`
 - ミッション制御/finish purge: `scripts/mission_controller.ts`
 - フェーズ: `knowledge/product/governance/phases/recovery.md`, `.../review.md`
 - 索引: `knowledge/_index.md`, `knowledge/_integrity-manifest.json`

@@ -3,7 +3,7 @@ title: Dependency Placement Policy
 category: Governance
 tags: [dependency, runtime, pnpm, uv, venv, policy]
 importance: 9
-last_updated: 2026-10-05
+last_updated: 2026-10-31
 ---
 
 # Dependency Placement Policy
@@ -19,6 +19,7 @@ Kyberion separates dependency placement by lifecycle, ownership, and persistence
 | Managed service runtimes         | service-runtime registry       | `active/shared/runtime/service-runtimes/<service-id>/`                                                                   | service-runtime policy + registry  |
 | Runtime state / receipts         | runtime layer                  | `active/shared/runtime/**/state.json` and readiness receipts                                                             | runtime layer / `env:bootstrap`    |
 | Shared caches                    | runtime policy                 | `active/shared/tmp/*-cache/`                                                                                             | runtime layer                      |
+| Tool-runtime download caches     | tool-runtime registry          | `active/shared/cache/system/tool-runtimes/<runtime-dir>/` (uv / pip / XDG caches, `HF_HOME`)                             | tool-runtime policy helpers        |
 | Large downloaded models / assets | owning tool or service runtime | `active/shared/runtime/tool-runtimes/<tool-id>/models/` or `active/shared/runtime/service-runtimes/<service-id>/models/` | governed bootstrap / runtime layer |
 | Temporary working files          | pipeline / mission             | `active/shared/tmp/` or mission evidence dirs                                                                            | pipeline / mission controller      |
 | Secrets / credentials            | connection tiers               | `knowledge/personal/`, customer overlays, or secret guard                                                                | service binding flow               |
@@ -41,7 +42,8 @@ These may exist temporarily for backward compatibility, but they are migration d
    - Product-tier docs and presets must not require `npm install -g`.
 
 2. Python and mixed-language runtime dependencies belong to managed runtime roots.
-   - Tool-scoped environments go under `active/shared/runtime/tool-runtimes/<tool-id>/`.
+   - Tool-scoped environments go under `active/shared/runtime/tool-runtimes/<tool-id>/`. This is the one canonical install root, resolved in code only by `resolveToolRuntimesRoot()` / the tool-runtime registry (`libs/core/tool/tool-runtime-policy.ts`, `tool-runtime-registry.ts`); never build the path by hand.
+   - `active/shared/cache/system/tool-runtimes/` is the tool-runtime download cache (`resolveToolRuntimeDownloadCacheDir()`), never an install target and never searched for runtimes.
    - Service-scoped environments go under `active/shared/runtime/service-runtimes/<service-id>/`.
    - The package manager (`uv`, `pip`, `brew`, etc.) is an implementation detail of the runtime layer, not a product-tier operator choice.
 
@@ -55,7 +57,7 @@ These may exist temporarily for backward compatibility, but they are migration d
    - Do not embed step-by-step package-manager commands inside reusable product-tier presets unless the artifact is explicitly marked as legacy migration guidance.
 
 5. Large runtime data must be separated by mutability.
-   - Re-downloadable caches belong under `active/shared/tmp/*-cache/`.
+   - Re-downloadable caches belong under `active/shared/tmp/*-cache/`; tool-runtime package and model downloads (`UV_CACHE_DIR`, `PIP_CACHE_DIR`, `XDG_CACHE_HOME`, `HF_HOME`) belong under `active/shared/cache/system/tool-runtimes/<runtime-dir>/`.
    - Long-lived model weights, checkpoints, and other pinned assets belong under the owning managed runtime root, typically `.../models/`.
    - Environment variables such as `HF_HOME`, `TRANSFORMERS_CACHE`, `TORCH_HOME`, and similar per-tool caches should be redirected into these governed roots rather than user-home defaults when a surface formalizes them.
    - Product-tier docs should describe the category and owner, not tell operators to pick arbitrary directories.

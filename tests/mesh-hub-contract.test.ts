@@ -79,7 +79,6 @@ describe('Mesh Hub contract', () => {
     expect(safeExistsSync('knowledge/product/schemas/mesh-topic-subscription.schema.json')).toBe(
       true
     );
-    expect(safeExistsSync('knowledge/product/governance/mesh-hub-policy.json')).toBe(true);
   });
 
   it('validates representative peer, presence, capability, request, delivery, and subscription contracts', () => {
@@ -283,47 +282,5 @@ describe('Mesh Hub contract', () => {
         },
       })
     ).toBe(false);
-  });
-
-  it('keeps the mesh hub policy closed and aligned with the allowlist', () => {
-    const policy = loadJson('knowledge/product/governance/mesh-hub-policy.json');
-    expect(Object.keys(policy).sort()).toEqual([
-      '$schema',
-      'data_tier',
-      // The loader (mesh-router.ts) is retired; the policy is kept as a contract.
-      'documentation_note',
-      'documentation_only',
-      'placement',
-      'recipient_acceptance',
-      'routing',
-      'tenant_scope',
-      'topic_delivery',
-      'version',
-    ]);
-    expect(policy.tenant_scope).toEqual({
-      same_tenant_only: true,
-      runtime_presence_required: true,
-      catalog_is_bootstrap_only: true,
-      catalog_cannot_override_runtime_revocation: true,
-    });
-    expect(policy.routing.selectors).toEqual(['peer', 'role', 'capability', 'topic']);
-    expect(policy.routing.request_kinds).toEqual([
-      'review.request',
-      'workitem.claim',
-      'workitem.handoff',
-      'workitem.status_update',
-      'capability.query',
-      'notification.publish',
-    ]);
-    expect(policy.routing.automatic_peer_selection).toBe('deny');
-    expect(policy.data_tier.personal).toBe('deny');
-    expect(policy.data_tier.confidential.delivery_scope).toBe('same_tenant_only');
-    expect(policy.topic_delivery.publisher_authorization).toBe('explicit');
-    expect(policy.topic_delivery.subscriber_authorization).toBe('explicit_subscription');
-    expect(policy.topic_delivery.max_fan_out).toBeGreaterThan(0);
-    expect(policy.recipient_acceptance['review.request']).toBe('required');
-    expect(policy.recipient_acceptance['workitem.handoff']).toBe('required');
-    expect(policy.recipient_acceptance.side_effects).toBe('required');
-    expect(policy.recipient_acceptance.mission_lifecycle).toBe('deny');
   });
 });

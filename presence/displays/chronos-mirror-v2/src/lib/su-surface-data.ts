@@ -37,7 +37,7 @@ import {
   safeLstat,
   safeReaddir,
 } from '@agent/core/secure-io';
-import { type MissionState } from '../../../../../scripts/refactor/mission-types.js';
+import { type MissionState } from '@agent/core/mission/mission-types';
 import { recordField, stringField } from './json-record';
 
 export interface MissionHistoryEntry {

@@ -308,7 +308,7 @@ The main files are:
 - `libs/core/organization/organization-profile.ts`
 - `libs/core/mission/mission-team-index.ts`
 - `libs/core/mission/mission-team-plan-composer.ts`
-- `scripts/refactor/mission-runtime.ts`
+- `libs/core/mission/mission-runtime.ts`
 - `scripts/mission_controller.ts`
 - `scripts/compose_mission_team.ts`
 

@@ -16,12 +16,12 @@ import {
   getOptionValue,
   parseCsvOption,
 } from './mission-cli-args.js';
-import { normalizeRelationships } from './mission-state.js';
+import { normalizeRelationships } from '@agent/core/mission/mission-state';
 import {
   resolveProjectLedgerJsonPath,
   resolveProjectLedgerPath,
-} from './mission-project-ledger.js';
-import type { MissionRelationships } from './mission-types.js';
+} from '@agent/core/mission/mission-project-ledger';
+import type { MissionRelationships } from '@agent/core/mission/mission-types';
 import { currentProcessArgv } from '../lib/harness.js';
 import {
   OwnerScopeError,

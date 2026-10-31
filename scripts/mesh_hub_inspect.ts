@@ -4,12 +4,41 @@ import {
   inspectMeshHub,
 } from '@agent/core/mesh/mesh-hub-inspection';
 import { getRegisteredEnvText } from '@agent/core/foundation';
-import { defineScript, isDirectScript } from './lib/harness.js';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
-type MeshHubInspectionSection =
-  'all' | 'peers' | 'routes' | 'deliveries' | 'dead-letters' | 'topics';
+const MESH_HUB_INSPECTION_SECTIONS = [
+  'all',
+  'peers',
+  'routes',
+  'deliveries',
+  'dead-letters',
+] as const;
+
+type MeshHubInspectionSection = (typeof MESH_HUB_INSPECTION_SECTIONS)[number];
+
+/**
+ * The positional section arrives through `argv._`, which yargs `choices` never
+ * checks, so validate it here instead of silently rendering the full report.
+ */
+export function resolveMeshHubSection(requested: unknown): MeshHubInspectionSection {
+  const section = String(requested ?? 'all').trim() || 'all';
+  if (section === 'topics') {
+    throw new ScriptExitError(
+      2,
+      'mesh-hub inspect: the topics view was retired with the mesh topic registry. ' +
+        `Use one of: ${MESH_HUB_INSPECTION_SECTIONS.join(', ')}.`
+    );
+  }
+  if (!(MESH_HUB_INSPECTION_SECTIONS as readonly string[]).includes(section)) {
+    throw new ScriptExitError(
+      2,
+      `mesh-hub inspect: unknown section '${section}'. Use one of: ${MESH_HUB_INSPECTION_SECTIONS.join(', ')}.`
+    );
+  }
+  return section as MeshHubInspectionSection;
+}
 
 function printJson(data: unknown, print: Print): void {
   print(JSON.stringify(data, null, 2));
@@ -45,14 +74,6 @@ function renderSection(
             `- ${deadLetter.dead_letter_id} | ${deadLetter.delivery_id} | ${deadLetter.failure_class} | ${deadLetter.redacted_reason}`
         ),
       ];
-    case 'topics':
-      return [
-        `Topics (${report.topic_count})`,
-        ...report.topics.map(
-          (topic) =>
-            `- ${topic.tenant_id}:${topic.topic} | subscribers=${topic.subscribers} | fan_out=${topic.fan_out_count} | request_kinds=${topic.request_kinds.join(', ')}`
-        ),
-      ];
     case 'all':
     default:
       return formatMeshHubInspectionReport(report);
@@ -65,7 +86,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     .usage('$0 [section]')
     .positional('section', {
       type: 'string',
-      choices: ['all', 'peers', 'routes', 'deliveries', 'dead-letters', 'topics'],
+      choices: [...MESH_HUB_INSPECTION_SECTIONS],
       default: 'all',
       describe: 'Which read-only mesh hub view to render',
     })
@@ -79,8 +100,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     .option('namespace', { type: 'string', describe: 'Optional mesh hub runtime namespace' })
     .parseSync();
 
-  const requestedSection = argv._[0] || argv.section || 'all';
-  const section = String(requestedSection) as MeshHubInspectionSection;
+  const section = resolveMeshHubSection(argv._[0] || argv.section || 'all');
   const report = await inspectMeshHub({
     tenantId: String(argv['tenant-id']).trim(),
     namespace:
