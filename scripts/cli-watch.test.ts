@@ -1,9 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   pathResolver,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReaddir,
   safeRmSync,
@@ -15,7 +16,15 @@ import {
   runWatchCommand,
   WATCH_USAGE,
 } from './cli-watch.js';
-import { createFakeDeps, fakeBridge } from './lib/perception.test-support.js';
+import { createFakeDeps, fakeBridge, guardedReadBridge } from './lib/perception.test-support.js';
+
+// Tier-guard denials emit best-effort audit events; keep them off the real
+// audit chain so the suite stays hermetic. Partial mock: the @agent/core
+// barrel loads audit-forwarder, which registers a publisher at import time.
+vi.mock('@agent/core/governance/audit-chain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/governance/audit-chain')>();
+  return { ...actual, auditChain: { ...actual.auditChain, record: vi.fn() } };
+});
 
 const PROBE_WITH_AUDIO = JSON.stringify({
   format: { duration: '30.0' },
@@ -37,7 +46,9 @@ describe('pnpm kyberion watch', () => {
     workDir = pathResolver.sharedTmp(`cli-watch-${randomUUID()}`);
     safeMkdir(workDir, { recursive: true });
     videoPath = path.join(workDir, 'demo.mp4');
-    safeWriteFile(videoPath, Buffer.from('fake-video'));
+    // R04: the fixture must carry a real container signature (ISO-BMFF ftyp),
+    // not 'fake-video' — watch now sniffs input bytes before spawning ffmpeg.
+    safeWriteFile(videoPath, Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom')]));
   });
 
   afterAll(() => {
@@ -147,5 +158,118 @@ describe('pnpm kyberion watch', () => {
       { time_sec: 2, text: 'A' },
     ];
     expect(dropDuplicateFrames(frames)).toHaveLength(3);
+  });
+});
+
+const ENV_KEYS = [
+  'KYBERION_TENANT',
+  'KYBERION_TIER',
+  'KYBERION_PERSONA',
+  'MISSION_ROLE',
+  'SYSTEM_ROLE',
+  'MISSION_ID',
+  'KYBERION_SCOPE_ENV_PATH',
+  'KYBERION_TENANT_SCOPE_REQUIRED',
+  'KYBERION_ENTITY_GOVERNANCE',
+] as const;
+
+const TENANT = 'acme-corp';
+
+describe('pnpm kyberion watch under a persisted confidential tenant scope', () => {
+  const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+    // The interactive-CLI identity: persisted tier + tenant, no claim, no
+    // role, persona resolves to 'unknown'.
+    process.env.KYBERION_TIER = 'confidential';
+    process.env.KYBERION_TENANT = TENANT;
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  it('lists and OCRs scratch frames, transcribes audio, and keeps --frames on a protected floor', async () => {
+    const staged = path.join(
+      pathResolver.rootDir(),
+      `active/shared/staging/confidential/${TENANT}/watch-${randomUUID()}`
+    );
+    safeMkdir(staged, { recursive: true });
+    const video = path.join(staged, 'demo.mp4');
+    safeWriteFile(video, Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom')]));
+    const keptDir = path.join(
+      pathResolver.rootDir(),
+      `active/shared/tmp/confidential/${TENANT}/watch-kept-${randomUUID()}`
+    );
+    // assertPerceptionOutput authenticates the tenant through the existing
+    // destination dir on protected tiers — create it first.
+    safeMkdir(keptDir, { recursive: true });
+    try {
+      // Before-state: the grant-less interactive identity cannot even read
+      // the input it staged — the residual ROLE_VIOLATION class.
+      expect(() => safeLstat(video)).toThrow(/ROLE_VIOLATION/);
+      const texts = ['Alpha title', 'Bravo agenda', 'Charlie summary'];
+      const deps = createFakeDeps({
+        ffprobe: PROBE_WITH_AUDIO,
+        frameCount: 3,
+        guardedReads: true, // reproduces ocrImage's lstat+read of each frame
+        ocrText: (p) => texts[Number(/frame-(\d{4})/.exec(p)![1]) - 1]!,
+        bridges: [guardedReadBridge('guarded-stt')],
+      });
+      const result = await runWatchCommand(
+        [video, '--every', '10', '--frames', keptDir],
+        () => {},
+        deps
+      );
+      // Frame listing + per-frame OCR + transcript ran under the media role;
+      // the kept-frame destination write stayed under the caller's identity.
+      expect(result?.transcript?.text).toBe('hello world');
+      expect(result?.frames).toHaveLength(3);
+      expect(result?.frames.map((f) => f.path)).toEqual([
+        path.relative(pathResolver.rootDir(), path.join(keptDir, 'frame-0001.png')),
+        path.relative(pathResolver.rootDir(), path.join(keptDir, 'frame-0002.png')),
+        path.relative(pathResolver.rootDir(), path.join(keptDir, 'frame-0003.png')),
+      ]);
+      expect(deps.ocrPaths).toHaveLength(3);
+    } finally {
+      safeRmSync(staged, { recursive: true, force: true });
+      safeRmSync(keptDir, { recursive: true, force: true });
+    }
+  });
+
+  it('still refuses an input on another tenant partition before any role runs', async () => {
+    const staged = path.join(
+      pathResolver.rootDir(),
+      `active/shared/staging/confidential/other-co/watch-${randomUUID()}`
+    );
+    const video = path.join(staged, 'demo.mp4');
+    // The bound acme-corp identity may not even write the foreign partition —
+    // stage the fixture unscoped, then rebind for the command itself.
+    delete process.env.KYBERION_TENANT;
+    try {
+      safeMkdir(staged, { recursive: true });
+      safeWriteFile(video, Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom')]));
+    } finally {
+      process.env.KYBERION_TENANT = TENANT;
+    }
+    try {
+      await expect(
+        runWatchCommand([video], () => {}, createFakeDeps({ guardedReads: true }))
+      ).rejects.toThrow(/PERCEPTION_SCOPE/);
+    } finally {
+      delete process.env.KYBERION_TENANT;
+      try {
+        safeRmSync(staged, { recursive: true, force: true });
+      } finally {
+        process.env.KYBERION_TENANT = TENANT;
+      }
+    }
   });
 });

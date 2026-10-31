@@ -215,7 +215,17 @@ describe('Kyberion CLI helpers', () => {
   it('skips runtime bootstrap for read-only CLI commands (LC-13)', () => {
     expect(shouldBootstrapRuntime(['--help'])).toBe(false);
     expect(shouldBootstrapRuntime(['list'])).toBe(false);
-    expect(shouldBootstrapRuntime(['list', '--check'])).toBe(true);
+    // R03a: --check probes host binaries/devices only — no backend install,
+    // so a persisted tenant scope can no longer kill the readiness view.
+    expect(shouldBootstrapRuntime(['list', '--check'])).toBe(false);
+    // R03a: pure readiness/status subcommands never install the runtime.
+    expect(shouldBootstrapRuntime(['calendar', 'status'])).toBe(false);
+    expect(shouldBootstrapRuntime(['calendar'])).toBe(false);
+    expect(shouldBootstrapRuntime(['email', 'status'])).toBe(false);
+    expect(shouldBootstrapRuntime(['email', 'latest-draft'])).toBe(false);
+    // Real connection verbs keep the bootstrap and its binding requirement.
+    expect(shouldBootstrapRuntime(['calendar', 'list-calendars'])).toBe(true);
+    expect(shouldBootstrapRuntime(['email', 'deliver'])).toBe(true);
     // Document reading must stay fast and keep stdout clean.
     expect(shouldBootstrapRuntime(['read', 'deck.pptx'])).toBe(false);
     // Authoring resolves design catalogs from disk; no reasoning backend either.
@@ -294,7 +304,12 @@ describe('Kyberion CLI helpers', () => {
     const output = await captureMainOutput(['help', '--locale', 'en']);
     expect(output).toContain('Kyberion commands');
     expect(output).toContain('Start here');
-    expect(output).toMatch(/^ {2}email status +Show email connection and workflow status$/mu);
+    // R06: readiness views carry the [readiness] badge; live-ops prerequisites
+    // render on a separate "Live ops need:" line under the entry.
+    expect(output).toMatch(
+      /^ {2}email status +Show email connection and workflow status {2}\[readiness\]$/mu
+    );
+    expect(output).toMatch(/^ {2,}Live ops need: trusted task binding \(see `kyberion task`\)$/mu);
     expect(output).not.toContain('── Actuator Management');
   });
 

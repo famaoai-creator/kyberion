@@ -117,7 +117,10 @@ export async function showHome(
   print(ui('recorder:recorder_home_doctor', { count: doctor.totalMissing }));
   print(
     ui('recorder:recorder_home_counts', {
-      approvals: governance.pending_approvals,
+      // Same snapshot and bucket as statusDetail/pendingApprovals (R13):
+      // the visible pending total — `pnpm kyberion approvals` denominator —
+      // never the sliced actionable list or a second, wider ledger read.
+      approvals: home.counts.pendingApprovals,
       questions: home.counts.clarificationQuestions,
       inbox: home.counts.unreadInbox,
     })
