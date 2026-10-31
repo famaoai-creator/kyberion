@@ -139,6 +139,9 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
       '../libs/core/secret/task-credential-dispatch.js',
       '../libs/core/workforce/work-coordination-ledger.js',
       '../libs/core/workforce/work-coordination.js',
+      // Sentinel-leak guard walks active/shared/tmp through the governed
+      // secure-io surface instead of a raw node:fs import.
+      '../libs/core/secure-io.js',
     ],
   ],
   [

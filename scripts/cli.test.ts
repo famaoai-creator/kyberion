@@ -304,7 +304,12 @@ describe('Kyberion CLI helpers', () => {
     const output = await captureMainOutput(['help', '--locale', 'en']);
     expect(output).toContain('Kyberion commands');
     expect(output).toContain('Start here');
-    expect(output).toMatch(/^ {2}email status +Show email connection and workflow status$/mu);
+    // R06: readiness views carry the [readiness] badge; live-ops prerequisites
+    // render on a separate "Live ops need:" line under the entry.
+    expect(output).toMatch(
+      /^ {2}email status +Show email connection and workflow status {2}\[readiness\]$/mu
+    );
+    expect(output).toMatch(/^ {2,}Live ops need: trusted task binding \(see `kyberion task`\)$/mu);
     expect(output).not.toContain('── Actuator Management');
   });
 
