@@ -547,9 +547,6 @@
     "libs/core/mesh/mesh-peer-directory.ts": {
       "runtime_path_literal_budget": 1
     },
-    "libs/core/mesh/mesh-topic-registry.ts": {
-      "runtime_path_literal_budget": 1
-    },
     "libs/core/mesh/peer-conversation.ts": {
       "json_state_write_budget": 1,
       "runtime_path_literal_budget": 1

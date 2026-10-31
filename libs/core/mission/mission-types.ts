@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-types.ts
+ * libs/core/mission/mission-types.ts
  * Core type definitions for the Mission Controller.
  */
 

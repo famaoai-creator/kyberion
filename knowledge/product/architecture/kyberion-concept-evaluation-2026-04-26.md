@@ -327,7 +327,7 @@ interface ArtifactRecord {
 
 実装状況:
 
-- `scripts/refactor/mission-intent-delta.ts` と `scripts/refactor/mission-intent-delta.test.ts` で lifecycle snapshot / drift summary が固定済み。
+- `libs/core/mission/mission-intent-delta.ts` と `libs/core/mission/mission-intent-delta.test.ts` で lifecycle snapshot / drift summary が固定済み。
 
 ### P2-2. Memory Promotion Queue を作る
 

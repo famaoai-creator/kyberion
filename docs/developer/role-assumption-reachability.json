@@ -1061,18 +1061,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/mesh/mesh-topic-registry.ts#clearMeshTopicRegistryNamespace",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
       "site": "libs/core/mesh/peer-auto-reply.ts#appendJobRow (via libs/core/workforce/artifact-store.ts#withRole)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []

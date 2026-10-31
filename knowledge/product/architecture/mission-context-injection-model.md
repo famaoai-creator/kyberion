@@ -165,18 +165,18 @@ The scoped injection flow should be owned by these modules or boundaries:
 - `libs/core/knowledge/distill-knowledge-injector.ts`
   - resolve distilled knowledge hints that are relevant to the scoped pack
   - keep the knowledge source as a derived input, not the primary execution store
-- `scripts/refactor/mission-workitem-dispatch.ts`
+- `libs/core/mission/mission-workitem-dispatch.ts`
   - request a scoped context pack before dispatch
   - deliver the pack to the selected agent or subagent
   - record what was sent, to whom, when, and why
   - write response artifacts, ticket reflections, and work-item metadata
-- `scripts/refactor/mission-ticket-dispatch.ts`
+- `libs/core/mission/mission-ticket-dispatch.ts`
   - register ticket payloads and source metadata for planned work
   - preserve the source of truth for assignment intent before execution
-- `scripts/refactor/mission-distill.ts`
+- `libs/core/mission/mission-distill.ts`
   - convert execution evidence and reflections into distillable knowledge
   - update knowledge only after execution evidence exists
-- `scripts/refactor/project-state-sync.ts`
+- `libs/core/project/project-state-sync.ts`
   - reflect mission outcomes back into the project operational state
 - `scripts/mission_controller.ts`
   - orchestrate mission lifecycle transitions without embedding full knowledge into every agent prompt

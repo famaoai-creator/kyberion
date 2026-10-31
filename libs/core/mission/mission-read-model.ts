@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-read-model.ts
+ * libs/core/mission/mission-read-model.ts
  * Query/read models for mission listings and status views.
  */
 

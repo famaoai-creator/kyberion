@@ -142,6 +142,7 @@ import {
   rotateLogs,
   scanRuntime,
   scanEventStores,
+  scanStorageFloors,
   sweepSupervisorEventFiles,
   sweepStatusRules,
   scanDataVault,
@@ -818,6 +819,35 @@ describe('storage-janitor', () => {
       expect(result.deleted).not.toContain(oldDated);
       expect(fs.existsSync(legacy)).toBe(true);
       expect(fs.existsSync(oldDated)).toBe(true);
+    });
+  });
+
+  describe('scanStorageFloors', () => {
+    it('keeps tool-runtime download caches while sweeping the rest of the system cache partition', () => {
+      // The governed catalog itself, so the real registrations are under test.
+      writeFile(
+        catalogFilePath(),
+        fs.readFileSync(path.join(REPO_ROOT, RETENTION_CATALOG_REPO_PATH), 'utf8')
+      );
+      const root = testRootDir();
+      const oldMs = 400 * RETENTION_DAY_MS;
+      const modelBlob = path.join(
+        root,
+        'active/shared/cache/system/tool-runtimes/mlx-audio/huggingface/hub/blobs/abc'
+      );
+      const otherCache = path.join(root, 'active/shared/cache/system/media-sidecars/old.json');
+      writeFile(modelBlob);
+      writeFile(otherCache);
+      setMtime(modelBlob, oldMs);
+      setMtime(otherCache, oldMs);
+
+      const result = scanStorageFloors({ dryRun: true });
+
+      expect(result.expired).toContain(otherCache);
+      expect(result.expired).not.toContain(modelBlob);
+      // Dry run touches nothing.
+      expect(fs.existsSync(otherCache)).toBe(true);
+      expect(fs.existsSync(modelBlob)).toBe(true);
     });
   });
 
