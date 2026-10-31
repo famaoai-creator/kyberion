@@ -88,6 +88,92 @@ export const defaultPerceptionDeps: PerceptionDeps = {
   },
 };
 
+/**
+ * R04 — media signature sniffing. An extension alone does not prove media:
+ * check the leading bytes for a known container magic before ffmpeg is ever
+ * spawned, so an 8-byte 'fake-wav' reports input_invalid instead of dumping
+ * raw ffmpeg stderr. Signatures cover the accepted AUDIO_EXTENSIONS +
+ * VIDEO_EXTENSIONS families (RIFF/WAVE, ID3/MPEG-sync, ISO-BMFF ftyp, Ogg,
+ * FLAC, CAF/AIFF, EBML/Matroska).
+ */
+const MEDIA_MAGICS: ReadonlyArray<{ offset: number; bytes: number[]; label: string }> = [
+  { offset: 0, bytes: [0x52, 0x49, 0x46, 0x46], label: 'RIFF' }, // .wav/.avi (WAVE checked below)
+  { offset: 0, bytes: [0x49, 0x44, 0x33], label: 'ID3' }, // .mp3 w/ tags
+  { offset: 0, bytes: [0xff, 0xfb], label: 'MPEG frame' }, // .mp3/.aac raw
+  { offset: 0, bytes: [0xff, 0xf3], label: 'MPEG frame' },
+  { offset: 0, bytes: [0xff, 0xf2], label: 'MPEG frame' },
+  { offset: 0, bytes: [0x4f, 0x67, 0x67, 0x53], label: 'Ogg' }, // .ogg/.opus
+  { offset: 0, bytes: [0x66, 0x4c, 0x61, 0x43], label: 'fLaC' }, // .flac
+  { offset: 0, bytes: [0x1a, 0x45, 0xdf, 0xa3], label: 'EBML' }, // .webm/.mkv
+  { offset: 0, bytes: [0x46, 0x4f, 0x52, 0x4d], label: 'FORM' }, // .aiff/.aifc
+  { offset: 0, bytes: [0x63, 0x61, 0x66, 0x66], label: 'caff' }, // .caf
+];
+
+export function sniffMediaSignature(absolute: string): boolean {
+  let header: Buffer;
+  try {
+    header = safeReadFileRange(absolute, 0, 16) as Buffer;
+  } catch {
+    return false;
+  }
+  for (const magic of MEDIA_MAGICS) {
+    if (magic.bytes.every((byte, index) => header[magic.offset + index] === byte)) return true;
+  }
+  // ISO-BMFF: size(4) + 'ftyp' box at offset 4 — .m4a/.mp4/.mov/.m4v
+  return header.length >= 8 && header.toString('latin1', 4, 8) === 'ftyp';
+}
+
+/**
+ * R04 — perception error classes. Keep these names stable: they are the
+ * outcome categories the CLI reliability matrix classifies against.
+ */
+export type PerceptionErrorClass =
+  | 'input_invalid'
+  | 'backend_missing'
+  | 'assets_missing'
+  | 'permission_denied'
+  | 'backend_runtime_error';
+
+export interface ClassifiedPerceptionError {
+  cls: PerceptionErrorClass;
+  message: string;
+}
+
+/** Strip absolute repository paths from text meant for public stdout/stderr. */
+function scrubPaths(text: string): string {
+  const root = pathResolver.rootDir();
+  return text.split(root).join('<repo>');
+}
+
+const PERMISSION_PATTERN = /ROLE_VIOLATION|EACCES|permission denied|PERCEPTION_SCOPE/i;
+const ASSETS_PATTERN =
+  /model(s)? (not|not found|missing|unavailable)|assets? (not|missing|unavailable)|ja_JP|no such file|ENOENT.*model|weights? not found/i;
+const BACKEND_MISSING_PATTERN =
+  /not installed|not in PATH|ENOENT.*(ffmpeg|ffprobe|whisper|python)|command not found|spawn .*ENOENT|no transcript backend|no speech-to-text backend/i;
+
+export function classifyPerceptionError(message: string): PerceptionErrorClass {
+  if (PERMISSION_PATTERN.test(message)) return 'permission_denied';
+  if (ASSETS_PATTERN.test(message)) return 'assets_missing';
+  if (BACKEND_MISSING_PATTERN.test(message)) return 'backend_missing';
+  return 'backend_runtime_error';
+}
+
+/** Human-usable next step per error class — never 'voice setup' for denials. */
+export function perceptionErrorNext(cls: PerceptionErrorClass): string {
+  switch (cls) {
+    case 'input_invalid':
+      return 'supply a real audio/video file (check its content, not just the extension)';
+    case 'backend_missing':
+      return VOICE_SETUP_HINT;
+    case 'assets_missing':
+      return 'install the backend model/language assets for the chosen STT backend (e.g. Apple Speech assets via System Settings, or a whisper model directory), then retry';
+    case 'permission_denied':
+      return 'the STT backend could not read the tenant-scoped intermediate under the current role — run `pnpm kyberion listen` from an operator shell (no inherited worker MISSION_ROLE) or dispatch through a claimed WorkItem whose scope owns the tier';
+    case 'backend_runtime_error':
+      return 'retry; if it persists, check `pnpm kyberion doctor` and the backend binary version';
+  }
+}
+
 export function isInsideRepository(absolute: string): boolean {
   const relative = path.relative(pathResolver.rootDir(), absolute);
   return Boolean(relative) && !relative.startsWith('..') && !path.isAbsolute(relative);
@@ -258,29 +344,46 @@ export async function transcribeWav(
         outputPath: path.join(workDir, `transcript-${index}.txt`),
       });
       if (raw.synthetic) {
-        errors.push(`${bridge.name}: returned a synthetic (sidecar) transcript — ignored`);
+        // A sidecar is not a real backend — counts as backend_missing.
+        errors.push(
+          `${bridge.name}: backend_missing — returned a synthetic (sidecar) transcript — ignored`
+        );
         continue;
       }
       return { result: normalizeSpeechToTextResult(bridge, raw), errors };
     } catch (error) {
-      errors.push(`${bridge.name}: ${error instanceof Error ? error.message : String(error)}`);
+      const raw = error instanceof Error ? error.message : String(error);
+      // R04: classify each backend failure; raw stderr paths are scrubbed from
+      // the message. permission_denied short-circuits — trying the remaining
+      // backends under the same denied role can only repeat the violation.
+      const cls = classifyPerceptionError(raw);
+      errors.push(`${bridge.name}: ${cls} — ${scrubPaths(raw)}`);
+      if (cls === 'permission_denied') break;
     }
   }
+  const classified = errors
+    .map((entry) => entry.match(/^([^:]+): (\w+) — /)?.[2] ?? 'backend_runtime_error')
+    .filter((value, index, all) => all.indexOf(value) === index);
+  const primary = classified[0] as PerceptionErrorClass;
   throw new NoTranscriptError(
-    `every speech-to-text backend failed (${errors.join('; ')}). ${VOICE_SETUP_HINT}`
+    `every speech-to-text backend failed (${primary}: ${errors.join('; ')}). ${perceptionErrorNext(primary)}`
   );
 }
 
-/** Turn a missing-ffmpeg failure into the install instruction. */
+/** R04: classify media errors — never dump raw ffmpeg stderr or scoped paths. */
 export function explainMediaError(command: string, error: unknown): never {
   const message = error instanceof Error ? error.message : String(error);
-  if (/not found|ENOENT/i.test(message) && /ffmpeg|ffprobe/i.test(message)) {
+  const cls = classifyPerceptionError(message);
+  if (cls === 'backend_missing' && /ffmpeg|ffprobe/i.test(message)) {
     throw new ScriptExitError(
       1,
-      `[${command}] ffmpeg/ffprobe is not installed. Install it (macOS: \`brew install ffmpeg\`) and retry.`
+      `[${command}] backend_missing: ffmpeg/ffprobe is not installed. Install it (macOS: \`brew install ffmpeg\`) and retry.`
     );
   }
-  throw new ScriptExitError(1, `[${command}] media processing failed: ${message}`);
+  throw new ScriptExitError(
+    1,
+    `[${command}] ${cls}: media processing failed — ${scrubPaths(message)} | next: ${perceptionErrorNext(cls)}`
+  );
 }
 
 /** Shared option parsing: every perception command takes --json / --out / --lang / --verbose / --help. */

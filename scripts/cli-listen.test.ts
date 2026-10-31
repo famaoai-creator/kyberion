@@ -22,7 +22,9 @@ describe('pnpm kyberion listen', () => {
     workDir = pathResolver.sharedTmp(`cli-listen-${randomUUID()}`);
     safeMkdir(workDir, { recursive: true });
     audioPath = path.join(workDir, 'memo.m4a');
-    safeWriteFile(audioPath, Buffer.from('fake-audio'));
+    // R04: the fixture must carry a real container signature (ISO-BMFF ftyp),
+    // not 'fake-audio' — listen now sniffs input bytes before spawning ffmpeg.
+    safeWriteFile(audioPath, Buffer.concat([Buffer.from([0, 0, 0, 20]), Buffer.from('ftypM4A ')]));
   });
 
   afterAll(() => {

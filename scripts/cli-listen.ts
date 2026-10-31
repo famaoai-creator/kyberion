@@ -35,6 +35,7 @@ import {
   removeWorkDir,
   renderSegments,
   resolveRepositoryInput,
+  sniffMediaSignature,
   transcribeWav,
   VIDEO_EXTENSIONS,
   type CommonArgs,
@@ -128,6 +129,14 @@ export async function transcribeMediaFile(
   options: { language?: string; timestamps: boolean; maxSeconds?: number }
 ): Promise<ListenResult> {
   const wav = path.join(workDir, 'audio-16k-mono.wav');
+  // R04: prove the input is real media by signature before ffmpeg — a renamed
+  // text file must report input_invalid, not raw ffmpeg stderr.
+  if (!sniffMediaSignature(absolute)) {
+    throw new ScriptExitError(
+      1,
+      `[${command}] input_invalid: ${path.basename(absolute)} is not recognizable media (bad or missing container signature) | next: supply a real audio/video file`
+    );
+  }
   try {
     await extractSttWav(deps, absolute, wav, options.maxSeconds);
     if (options.maxSeconds !== undefined) await assertAudioAnalysisDuration(deps, wav);
