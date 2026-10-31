@@ -21,6 +21,8 @@ set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../../.." && pwd)"
 
+# Canonical managed install root: active/shared/runtime/tool-runtimes
+# (libs/core/tool/tool-runtime-policy.ts resolveToolRuntimesRoot).
 PIPER_BIN="${KYBERION_PIPER_BIN:-$ROOT/active/shared/runtime/tool-runtimes/piper-plus/piper-plus/bin/piper-plus}"
 PIPER_MODEL="${KYBERION_PIPER_MODEL:-$ROOT/active/shared/cache/system/piper-plus/models/tsukuyomi/tsukuyomi-chan-6lang-fp16.onnx}"
 IN_RATE="${KYBERION_PIPER_RATE:-22050}"
