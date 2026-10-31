@@ -51,17 +51,23 @@ Page inspection → CLI (`submit_inspection`) also stays on Native Messaging; th
 is no loopback HTTP listener. `pnpm kyberion browser inspect --mode extension
 [--tier personal|confidential|public] [--tenant <slug>] [--origin <origin>]` opens
 a short-lived ticket at
-`active/shared/staging/<tier>/<tenant|shared>/browser-inspection/<ticket_id>.json`
-(storing only a digest of the code), prints a 6-character pairing code, and polls
-the ticket. The operator types the code into the Live tab. The host validates,
-bounds (headings 30, inputs/buttons/links 40, 64 KiB total) and re-redacts the
-inspection — input values are never accepted, URLs lose their query string and
-fragment — and writes it only into the waiting, unexpired ticket whose code
-matches (never "the newest ticket", so nothing crosses tiers or tenants). An
-`--origin` pin is enforced. Every outcome is audited as
-`browser_bridge_submit_inspection`; a confidential hand-off fails closed
-(`audit_unavailable`) when the audit record cannot be written. The CLI reads its
-ticket and deletes it. Implementation: `scripts/lib/browser-inspection-handoff.ts`.
+`active/shared/staging/<tier>/<tenant|shared>/browser-inspection/<ticket_id>.json`,
+prints a 6-character pairing code, and polls the ticket. The ticket stores a
+random per-ticket salt and sha256(salt:code), never the code. The code keeps
+concurrent CLIs from receiving each other's inspection; it is not an
+authentication secret (only the allowlisted extension reaches the host). The
+operator types the code into the Live tab. The host validates, bounds (headings
+30, inputs/buttons/links 40, 64 KiB total) and re-redacts the inspection — input
+values are never accepted, URLs lose their query string and fragment — and
+writes it only into the waiting, unexpired ticket whose code matches (never "the
+newest ticket", so nothing crosses tiers or tenants). An `--origin` pin is
+enforced. Every outcome is audited as `browser_bridge_submit_inspection`; the
+delivery audit is written before the ticket shows the inspection, and a
+confidential hand-off is skipped (`audit_unavailable`) when that record cannot
+be written (other tiers warn and deliver). The CLI reads its ticket and deletes
+it; the host deletes expired waiting tickets and submitted tickets more than 2
+minutes past their deadline (a crashed CLI). Implementation:
+`scripts/lib/browser-inspection-handoff.ts`.
 
 `dispatch_procedure` is the Pattern B (resolve-and-execute) entry point: it loads
 the reviewed recording referenced by the catalog entry's `adapter.recording_ref`

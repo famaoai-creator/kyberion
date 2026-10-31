@@ -23,7 +23,7 @@
  * concierge role, like the browser-bridge mailbox and send_page.
  */
 import { Buffer } from 'node:buffer';
-import { createHash, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { redactObservationText } from '@agent/core/browser/browser-extension-bridge';
@@ -104,7 +104,12 @@ export interface InspectionHandoffTicket {
   created_at: string;
   expires_at: string;
   scope: InspectionHandoffScope;
-  /** sha256 of the pairing code the CLI printed; the code itself is never stored. */
+  /**
+   * Random per-ticket salt and sha256(salt:code) of the pairing code the CLI
+   * printed; the code itself is never stored. The code keeps concurrent CLIs
+   * from receiving each other's inspection — it is not an authentication secret.
+   */
+  pairing_salt: string;
   pairing_code_sha256: string;
   /** Optional `--origin` pin: the host refuses inspections of any other origin. */
   allowed_origin?: string;
@@ -439,11 +444,16 @@ export function normalizePairingCode(value: unknown): string | null {
   return code;
 }
 
-function pairingDigest(code: string): string {
-  return createHash('sha256').update(`browser-inspection-pairing:${code}`).digest('hex');
+/** sha256(per-ticket random salt : code). */
+function pairingDigest(salt: string, code: string): string {
+  return createHash('sha256').update(`${salt}:${code}`).digest('hex');
 }
 
-function digestMatches(expected: string | undefined, actual: string): boolean {
+/** Does `code` match this ticket's salted digest? Constant-time comparison. */
+function ticketMatchesCode(ticket: InspectionHandoffTicket, code: string): boolean {
+  const { pairing_salt: salt, pairing_code_sha256: expected } = ticket;
+  if (typeof salt !== 'string' || !/^[0-9a-f]{32}$/u.test(salt)) return false;
+  const actual = pairingDigest(salt, code);
   if (typeof expected !== 'string' || expected.length !== actual.length) return false;
   return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(actual, 'utf8'));
 }
@@ -486,6 +496,7 @@ export function openInspectionTicket(
   }
   const now = options.now ?? new Date();
   const pairingCode = generatePairingCode();
+  const pairingSalt = randomBytes(16).toString('hex');
   const ticket: InspectionHandoffTicket = {
     kind: INSPECTION_HANDOFF_KIND,
     ticket_id: `BIH-${randomUUID()}`,
@@ -495,7 +506,8 @@ export function openInspectionTicket(
     scope: scope.tenant_slug
       ? { tier: scope.tier, tenant_slug: scope.tenant_slug }
       : { tier: scope.tier },
-    pairing_code_sha256: pairingDigest(pairingCode),
+    pairing_salt: pairingSalt,
+    pairing_code_sha256: pairingDigest(pairingSalt, pairingCode),
     ...(allowedOrigin ? { allowed_origin: allowedOrigin } : {}),
   };
   asConcierge(() => {
@@ -594,6 +606,16 @@ export interface InspectionSubmitResult {
   inspection: InspectionHandoffPayload;
 }
 
+/** How long a submitted ticket may outlive its deadline before the host deletes it (CLI crash). */
+export const INSPECTION_SUBMITTED_GRACE_MS = 2 * 60_000;
+
+/** Expired waiting tickets, and submitted ones past the grace, hold nothing a live CLI needs. */
+function isSweepable(ticket: InspectionHandoffTicket, nowMs: number): boolean {
+  const expires = Date.parse(ticket.expires_at);
+  if (ticket.status === 'waiting') return expires <= nowMs;
+  return expires + INSPECTION_SUBMITTED_GRACE_MS <= nowMs;
+}
+
 const SUBMIT_AUDIT = {
   action: 'browser_bridge_submit_inspection',
   operation: 'browser:bridge:submit_inspection',
@@ -617,9 +639,11 @@ function deny(
  * Deliver a sanitized inspection to the one waiting, unexpired ticket whose
  * pairing code the operator typed into the side panel. There is no "newest
  * ticket" fallback: the code alone selects the tier/tenant partition, so data
- * never lands in a scope the operator did not pair with. Expired tickets met
- * on the way are swept. Every outcome is audited; confidential deliveries are
- * rolled back when their audit record cannot be written.
+ * never lands in a scope the operator did not pair with. Expired waiting
+ * tickets, and submitted ones more than INSPECTION_SUBMITTED_GRACE_MS past
+ * their deadline (a crashed CLI), are swept on the way. Every outcome is
+ * audited; the delivery audit is written before the ticket shows the
+ * inspection, and a confidential delivery is skipped when it cannot be.
  */
 export function submitInspectionToWaitingTicket(
   raw: unknown,
@@ -649,7 +673,6 @@ export function submitInspectionToWaitingTicket(
       if (err instanceof InspectionHandoffError) deny(err.code, err.message, {});
       throw err;
     }
-    const digest = pairingDigest(code!);
     let waitingCount = 0;
     const matches: Array<{ scope: InspectionHandoffScope; ticket: InspectionHandoffTicket }> = [];
     for (const scope of ticketPartitions()) {
@@ -660,13 +683,7 @@ export function submitInspectionToWaitingTicket(
           try {
             withLockSync(lockId(id), () => {
               const current = readTicket(scope, id);
-              if (
-                current &&
-                current.status === 'waiting' &&
-                Date.parse(current.expires_at) <= Date.now()
-              ) {
-                removeTicket(scope, id);
-              }
+              if (current && isSweepable(current, clock().getTime())) removeTicket(scope, id);
             });
           } catch {
             /* a locked stale ticket is swept next time */
@@ -675,7 +692,7 @@ export function submitInspectionToWaitingTicket(
         }
         if (ticket.status !== 'waiting') continue;
         waitingCount += 1;
-        if (digestMatches(ticket.pairing_code_sha256, digest)) matches.push({ scope, ticket });
+        if (ticketMatchesCode(ticket, code!)) matches.push({ scope, ticket });
       }
     }
     if (matches.length === 0) {
@@ -706,20 +723,15 @@ export function submitInspectionToWaitingTicket(
         !current ||
         current.status !== 'waiting' ||
         Date.parse(current.expires_at) <= now.getTime() ||
-        !digestMatches(current.pairing_code_sha256, digest)
+        !ticketMatchesCode(current, code!)
       ) {
         return 'gone' as const;
       }
       if (current.allowed_origin && current.allowed_origin !== inspection.origin) {
         return 'origin_mismatch' as const;
       }
-      const updated: InspectionHandoffTicket = {
-        ...current,
-        status: 'submitted',
-        submitted_at: now.toISOString(),
-        inspection,
-      };
-      writeTicket(updated);
+      // Audit first: the CLI polls without this lock, so the ticket must not
+      // show the inspection before its audit record exists.
       const audited = recordAudit({
         ...SUBMIT_AUDIT,
         result: 'completed',
@@ -737,10 +749,14 @@ export function submitInspectionToWaitingTicket(
           truncated: inspection.truncated,
         },
       });
-      if (!audited && requiresAudit(scope)) {
-        writeTicket(current);
-        return 'audit_unavailable' as const;
-      }
+      if (!audited && requiresAudit(scope)) return 'audit_unavailable' as const;
+      const updated: InspectionHandoffTicket = {
+        ...current,
+        status: 'submitted',
+        submitted_at: now.toISOString(),
+        inspection,
+      };
+      writeTicket(updated);
       return 'delivered' as const;
     });
     const meta = {
