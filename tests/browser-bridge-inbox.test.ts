@@ -210,3 +210,47 @@ describe('Browser Bridge side panel inbox wiring', () => {
     expect(source).toContain("chrome.runtime.connect({ name: 'sidepanel' })");
   });
 });
+
+describe('Browser Bridge inspection hand-off payload', () => {
+  const inspection = {
+    url: 'https://user:pw@example.com/form?token=abc#x',
+    title: 'Form for jane@example.com',
+    headings: [{ level: 'H2', text: 'Contact' }],
+    inputs: [{ tag: 'INPUT', type: 'Email', name: 'mail', value: 'secret@example.com' }],
+    buttons: [{ text: 'Send', disabled: true }, { text: '' }],
+    links: [
+      { text: 'Docs', href: 'https://example.com/docs?ref=1' },
+      { text: 'Bad', href: 'javascript:alert(1)' },
+    ],
+    textExcerpt: 'Write to jane@example.com',
+  };
+
+  it('scrubs, bounds and strips values and query strings', () => {
+    const built = model.buildSubmitInspectionPayload(inspection, scrub);
+    expect(built.ok).toBe(true);
+    expect(built.payload.type).toBe('submit_inspection');
+    const sent = built.payload.inspection;
+    expect(sent.url).toBe('https://example.com/form');
+    expect(sent.origin).toBe('https://example.com');
+    expect(sent.title).toBe('Form for [REDACTED:EMAIL_ADDRESS]');
+    expect(sent.headings).toEqual([{ level: 'h2', text: 'Contact' }]);
+    expect(sent.inputs).toEqual([{ tag: 'input', type: 'email', name: 'mail' }]);
+    expect(sent.buttons).toEqual([{ text: 'Send', disabled: true }]);
+    expect(sent.links).toEqual([{ text: 'Docs', href: 'https://example.com/docs' }]);
+    expect(sent.textExcerpt).toBe('Write to [REDACTED:EMAIL_ADDRESS]');
+
+    const many = model.buildSubmitInspectionPayload(
+      { ...inspection, links: Array.from({ length: 100 }, () => inspection.links[0]) },
+      scrub
+    );
+    expect(many.payload.inspection.links).toHaveLength(40);
+  });
+
+  it('refuses without a scrubber or with a non-http page', () => {
+    expect(model.buildSubmitInspectionPayload(inspection, undefined).ok).toBe(false);
+    expect(
+      model.buildSubmitInspectionPayload({ ...inspection, url: 'file:///etc/passwd' }, scrub).ok
+    ).toBe(false);
+    expect(model.buildSubmitInspectionPayload(null, scrub).ok).toBe(false);
+  });
+});
