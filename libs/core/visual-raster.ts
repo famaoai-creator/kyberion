@@ -513,6 +513,75 @@ export async function rasterizeHtml(input: RasterizeHtmlInput): Promise<RasterRe
   return { available: true, images, backend: 'playwright' };
 }
 
+export interface RasterizePdfPagesInput {
+  /** Absolute path to the .pdf to rasterize. */
+  pdfPath: string;
+  /** Existing output directory for the page-*.png files. */
+  outDir: string;
+  /** Raster resolution. 200dpi is the OCR floor; 150dpi is enough for review. */
+  dpi?: number;
+  /** Cap on rendered pages. */
+  maxPages?: number;
+}
+
+export interface RasterizePdfPagesResult {
+  available: boolean;
+  /** Absolute paths to the rendered page images, in page order. */
+  images: string[];
+  unavailable_reason?: string;
+}
+
+/**
+ * Rasterize a PDF straight to PNGs via Poppler's pdftoppm — no LibreOffice
+ * pass, because the source is already a PDF. Used by the document reader to
+ * recover pages whose text layer cannot be mapped to Unicode (subset CID
+ * fonts without /ToUnicode) so OCR can read them as pixels. Absence of
+ * pdftoppm is a reported degradation, never an exception.
+ */
+export function rasterizePdfPages(input: RasterizePdfPagesInput): RasterizePdfPagesResult {
+  if (!commandExists('pdftoppm')) {
+    return {
+      available: false,
+      images: [],
+      unavailable_reason: `missing pdftoppm. Install ${rasterInstallHint(['pdftoppm'])} to rasterize PDFs.`,
+    };
+  }
+  const pdfPath = assertSafeRepositoryPath(input.pdfPath);
+  if (!safeExistsSync(pdfPath)) {
+    return { available: false, images: [], unavailable_reason: `PDF not found: ${pdfPath}` };
+  }
+  const outDir = assertSafeRepositoryPath(input.outDir, { allowMissingLeaf: true });
+  safeMkdir(outDir, { recursive: true });
+  const pagePrefix = path.join(outDir, 'page');
+  const args = ['-png', '-r', String(input.dpi ?? 200)];
+  if (input.maxPages) args.push('-f', '1', '-l', String(input.maxPages));
+  args.push(pdfPath, pagePrefix);
+  try {
+    safeExec('pdftoppm', args, { timeoutMs: 180_000, cwd: pathResolver.rootDir() });
+  } catch (error: any) {
+    return {
+      available: false,
+      images: [],
+      unavailable_reason: `pdftoppm could not rasterize ${path.basename(pdfPath)}: ${error?.message || error}`,
+    };
+  }
+  const images = safeReaddir(outDir)
+    .filter((name: string) => name.startsWith('page') && name.endsWith('.png'))
+    .sort((a: string, b: string) => {
+      const pageNumber = (name: string) => Number(name.match(/page-(\d+)\.png$/u)?.[1] || 0);
+      return pageNumber(a) - pageNumber(b);
+    })
+    .map((name: string) => path.join(outDir, name));
+  if (images.length === 0) {
+    return {
+      available: false,
+      images: [],
+      unavailable_reason: `pdftoppm produced no page images for ${path.basename(pdfPath)}`,
+    };
+  }
+  return { available: true, images };
+}
+
 /** Vector image formats OCR engines cannot read directly. */
 export const VECTOR_IMAGE_EXTENSIONS: ReadonlySet<string> = new Set(['.emf', '.wmf']);
 
