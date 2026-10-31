@@ -14,16 +14,16 @@ This document is the **input** to Phase B-3 hardening work.
 
 ## 1. Summary
 
-| Concern | Status | Severity |
-|---|---|---|
-| Concurrent state modification | 🟡 partial | high |
-| Duplicate RESUME entries | 🔴 not handled | medium |
-| Stale lock detection | ✅ done (PID-based via `lock-utils.ts`) | — |
-| Heartbeat / liveness | 🔴 not present | medium |
-| Periodic auto-checkpoint | 🔴 not present | medium |
-| Process-crash recovery | 🟡 partial (state survives, in-flight changes may not) | high |
-| 24h+ e2e test | 🔴 not present | high |
-| Trace integration in checkpoint | ✅ done (this PR, F7) | — |
+| Concern                         | Status                                                 | Severity |
+| ------------------------------- | ------------------------------------------------------ | -------- |
+| Concurrent state modification   | 🟡 partial                                             | high     |
+| Duplicate RESUME entries        | 🔴 not handled                                         | medium   |
+| Stale lock detection            | ✅ done (PID-based via `lock-utils.ts`)                | —        |
+| Heartbeat / liveness            | 🔴 not present                                         | medium   |
+| Periodic auto-checkpoint        | 🔴 not present                                         | medium   |
+| Process-crash recovery          | 🟡 partial (state survives, in-flight changes may not) | high     |
+| 24h+ e2e test                   | 🔴 not present                                         | high     |
+| Trace integration in checkpoint | ✅ done (this PR, F7)                                  | —        |
 
 Overall: the foundation is sound (file-based locks with stale detection, atomic state writes, mission-scoped git repos). The gaps are at the **edges**: read-modify-write sequences that escape the lock, missing liveness signals, and untested long-running scenarios.
 
@@ -31,7 +31,7 @@ Overall: the foundation is sound (file-based locks with stale detection, atomic 
 
 ### F1. resumeMission has a TOCTOU race — **fixed in this PR**
 
-`scripts/refactor/mission-maintenance.ts::resumeMission` previously did:
+`libs/core/mission/mission-maintenance.ts::resumeMission` previously did:
 
 ```typescript
 const state = loadState(targetId);          // read
@@ -76,7 +76,7 @@ If a process crashes:
 - ✅ Stale locks are detected and cleared by next run.
 - ✅ The mission's git repo retains all completed checkpoints.
 - ❌ In-flight, uncommitted changes are lost (expected — git contract).
-- ❌ The `LATEST_TASK.json` flight recorder hints at the last *intended* task but the user must manually verify physical state.
+- ❌ The `LATEST_TASK.json` flight recorder hints at the last _intended_ task but the user must manually verify physical state.
 
 **Recommendation (follow-up)**: when resuming, automatically run `git status` in the mission repo and surface dirty files to the user.
 
@@ -89,7 +89,7 @@ There is no automated test that:
 3. Simulates a process restart (suspend + spawn fresh process to resume)
 4. Verifies state integrity, history monotonicity, and checkpoint count
 
-**Recommendation (this PR)**: skeleton e2e test added under `scripts/refactor/mission-lifecycle-24h.test.ts` covering:
+**Recommendation (this PR)**: skeleton e2e test added under `scripts/refactor/mission-lifecycle-24h.test.ts` (since removed; lifecycle coverage now lives in `libs/core/mission/mission-lifecycle*.test.ts`) covering:
 
 - start → multiple checkpoints → suspend (process exit simulation) → fresh resume → finish
 - concurrent checkpoint attempts under contention
@@ -115,7 +115,7 @@ The trace is persisted via `persistTrace()` to `active/shared/logs/traces/` (or 
 
 - [x] **F1 fix**: `resumeMission` re-loads state inside the lock; uses `alreadyLocked` for the save.
 - [x] **F2 fix**: 60s RESUME idempotency window. Duplicate resumes within the window are no-ops with a clear log.
-- [x] **F6 partial**: idempotency unit test (`scripts/refactor/mission-maintenance.test.ts`) covering 9 scenarios. Full process-restart e2e test is Phase B-5.
+- [x] **F6 partial**: idempotency unit test (`libs/core/mission/mission-maintenance.test.ts`) covering 9 scenarios. Full process-restart e2e test is Phase B-5.
 - [x] **F7 done**: `recordCheckpointForMission` emits a Trace with spans for git.stage, git.commit, state.save, project_ledger.sync, intent_delta.emit. Persisted via `persistTrace()`.
 
 ## 4. What This PR Does NOT Change
@@ -126,13 +126,13 @@ The trace is persisted via `persistTrace()` to `active/shared/logs/traces/` (or 
 
 ## 5. Acceptance Criteria for Phase B-3 Closure
 
-| # | Criterion | Status |
-|---|---|---|
-| AC1 | `resumeMission` is idempotent across multiple invocations | ✅ |
-| AC2 | Concurrent `checkpoint` and `resume` cannot lose data | ✅ (after F1/F2) |
-| AC3 | Mission has a heartbeat that orchestrator can read | ❌ deferred |
+| #   | Criterion                                                       | Status           |
+| --- | --------------------------------------------------------------- | ---------------- |
+| AC1 | `resumeMission` is idempotent across multiple invocations       | ✅               |
+| AC2 | Concurrent `checkpoint` and `resume` cannot lose data           | ✅ (after F1/F2) |
+| AC3 | Mission has a heartbeat that orchestrator can read              | ❌ deferred      |
 | AC4 | A 24h e2e test passes (time-compressed, with simulated crashes) | 🟡 skeleton only |
-| AC5 | `mission_controller status` surfaces dirty files on resume | ❌ deferred |
-| AC6 | Checkpoint events are emitted as Trace spans | ✅ |
+| AC5 | `mission_controller status` surfaces dirty files on resume      | ❌ deferred      |
+| AC6 | Checkpoint events are emitted as Trace spans                    | ✅               |
 
 Phase B-3 closes when AC1–AC6 are all green. This PR closes AC1, AC2, AC6, and the skeleton portion of AC4.

@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import { sha256, type MarketingCompletionEvidence } from '@agent/core/marketing-workload';
-import { validateMarketingMissionCompletionGate } from './mission-governance.js';
+import { validateMarketingMissionCompletionGate } from '@agent/core/mission/mission-governance';
 
 const roots: string[] = [];
 

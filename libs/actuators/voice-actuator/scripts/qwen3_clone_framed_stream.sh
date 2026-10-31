@@ -19,6 +19,8 @@ set -eu
 HERE="$(cd "$(dirname "$0")" && pwd)"
 ROOT="$(cd "$HERE/../../../.." && pwd)"
 
+# Canonical managed install root: active/shared/runtime/tool-runtimes
+# (libs/core/tool/tool-runtime-policy.ts resolveToolRuntimesRoot).
 PY="${KYBERION_QWEN3_PYTHON:-$ROOT/active/shared/runtime/tool-runtimes/mlx-audio/bin/python3}"
 BRIDGE="$HERE/qwen3_tts_stream_bridge.py"
 MODEL_ID="${KYBERION_QWEN3_MODEL_ID:-mlx-community/Qwen3-TTS-12Hz-1.7B-Base-8bit}"

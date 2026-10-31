@@ -1,7 +1,7 @@
 import { t } from '../t.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 /**
- * scripts/refactor/mission-maintenance.ts
+ * libs/core/mission/mission-maintenance.ts
  * Maintenance and recovery operations for missions.
  */
 

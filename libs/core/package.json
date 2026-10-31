@@ -3208,10 +3208,6 @@
       "types": "./dist/mesh/mesh-peer-directory.d.ts",
       "default": "./dist/mesh/mesh-peer-directory.js"
     },
-    "./mesh/mesh-topic-registry": {
-      "types": "./dist/mesh/mesh-topic-registry.d.ts",
-      "default": "./dist/mesh/mesh-topic-registry.js"
-    },
     "./mesh/peer-auto-reply": {
       "types": "./dist/mesh/peer-auto-reply.d.ts",
       "default": "./dist/mesh/peer-auto-reply.js"

@@ -8,7 +8,6 @@ import {
   listMeshDeliveries,
   type MeshDeadLetterRecord,
 } from './mesh-message-broker.js';
-import { listMeshTopicSubscriptions } from './mesh-topic-registry.js';
 import { type MeshDeliveryRecord, type MeshTargetSelector } from './mesh-hub-contract.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { normalizeIso, nowIso } from '../foundation/time.js';
@@ -37,27 +36,15 @@ export interface MeshHubDeliveryInspection {
   failure_class?: MeshDeliveryRecord['failure_class'];
 }
 
-export interface MeshHubTopicInspection {
-  topic: string;
-  tenant_id: string;
-  subscribers: number;
-  fan_out_count: number;
-  request_kinds: string[];
-  payload_classifications: string[];
-  policy_version: string;
-}
-
 export interface MeshHubInspectionReport {
   generated_at: string;
   peer_count: number;
   route_count: number;
   delivery_count: number;
   dead_letter_count: number;
-  topic_count: number;
   peers: MeshHubPeerInspection[];
   routes: MeshHubDeliveryInspection[];
   dead_letters: MeshDeadLetterRecord[];
-  topics: MeshHubTopicInspection[];
 }
 
 export interface MeshHubInspectionOptions {
@@ -113,6 +100,14 @@ function buildPeerInspection(
   };
 }
 
+/**
+ * Read-only operator view over the live mesh-hub stores: the peer directory
+ * (written by `peer_conversation_server`), and broker deliveries / dead
+ * letters (written through the mesh-hub peer-messaging adapter and the
+ * delivery driver). Topic subscriptions are no longer reported: their writer
+ * and router were retired on 2026-10-01 and the read side followed on
+ * 2026-10-31 (`retired/libs-core/mesh/mesh-topic-registry.ts`).
+ */
 export async function inspectMeshHub(
   options: MeshHubInspectionOptions = {}
 ): Promise<MeshHubInspectionReport> {
@@ -126,7 +121,6 @@ export async function inspectMeshHub(
   const presences = listMeshPeerPresenceRecords(tenantId);
   const deliveryRecords = await listMeshDeliveries(namespace, tenantId);
   const deadLetters = await listMeshDeadLetters({ tenant_id: tenantId }, { namespace });
-  const subscriptions = listMeshTopicSubscriptions({}, { namespace, now, tenantId });
   const presenceByPeer = new Map(presences.map((record) => [record.peer_id, record] as const));
   const peerInspections = directories.map((peer) =>
     buildPeerInspection(now, peer, presenceByPeer.get(peer.peer_id) || null)
@@ -145,46 +139,15 @@ export async function inspectMeshHub(
     ...(delivery.failure_class ? { failure_class: delivery.failure_class } : {}),
   }));
 
-  const topicIndex = new Map<string, MeshHubTopicInspection>();
-  for (const subscription of subscriptions) {
-    const key = `${subscription.tenant_id}::${subscription.topic}`;
-    const current = topicIndex.get(key) || {
-      topic: subscription.topic,
-      tenant_id: subscription.tenant_id,
-      subscribers: 0,
-      fan_out_count: 0,
-      request_kinds: [],
-      payload_classifications: [],
-      policy_version: subscription.policy_version,
-    };
-    current.subscribers += 1;
-    current.fan_out_count = current.subscribers;
-    current.request_kinds = Array.from(
-      new Set([...current.request_kinds, ...subscription.filters.request_kinds])
-    );
-    current.payload_classifications = Array.from(
-      new Set([...current.payload_classifications, ...subscription.filters.payload_classifications])
-    );
-    current.policy_version = subscription.policy_version;
-    topicIndex.set(key, current);
-  }
-
-  const topics = Array.from(topicIndex.values()).sort(
-    (left, right) =>
-      left.tenant_id.localeCompare(right.tenant_id) || left.topic.localeCompare(right.topic)
-  );
-
   return {
     generated_at: nowIso(),
     peer_count: peerInspections.length,
     route_count: deliveries.length,
     delivery_count: deliveries.length,
     dead_letter_count: deadLetters.length,
-    topic_count: topics.length,
     peers: peerInspections,
     routes: deliveries,
     dead_letters: deadLetters,
-    topics,
   };
 }
 
@@ -192,7 +155,7 @@ export function formatMeshHubInspectionReport(report: MeshHubInspectionReport): 
   const lines: string[] = [];
   lines.push(`Mesh Hub inspection ${report.generated_at}`);
   lines.push(
-    `Peers: ${report.peer_count}  Deliveries: ${report.delivery_count}  Dead letters: ${report.dead_letter_count}  Topics: ${report.topic_count}`
+    `Peers: ${report.peer_count}  Deliveries: ${report.delivery_count}  Dead letters: ${report.dead_letter_count}`
   );
   lines.push('');
   lines.push('Peers');
@@ -213,13 +176,6 @@ export function formatMeshHubInspectionReport(report: MeshHubInspectionReport): 
   for (const deadLetter of report.dead_letters) {
     lines.push(
       `- ${deadLetter.dead_letter_id} | ${deadLetter.delivery_id} | ${deadLetter.failure_class} | ${deadLetter.redacted_reason}`
-    );
-  }
-  lines.push('');
-  lines.push('Topics');
-  for (const topic of report.topics) {
-    lines.push(
-      `- ${topic.tenant_id}:${topic.topic} | subscribers=${topic.subscribers} | fan_out=${topic.fan_out_count} | request_kinds=${topic.request_kinds.join(', ')}`
     );
   }
   return lines;

@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 import * as path from 'node:path';
 import { installCoreEnvironmentProbes } from '@agent/core/environment-capability-probes';
-import { listToolRuntimeInventory } from '@agent/core/tool/tool-runtime-registry';
+import {
+  getToolRuntimeStatePath,
+  listToolRuntimeInventory,
+  locateManagedToolPythonBin,
+} from '@agent/core/tool/tool-runtime-registry';
 import { loadEnvironmentManifest, probeManifest } from '@agent/core/environment-capability';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
@@ -307,17 +311,18 @@ function probeAudioPermission(
 }
 
 function probeMlxAudioRuntime(platform: NodeJS.Platform): MeetingPreflightItem {
-  const runtimeRoot = pathResolver.shared('runtime/tool-runtimes/mlx-audio');
-  const pythonBin = path.join(runtimeRoot, 'bin', 'python');
-  const python3Bin = path.join(runtimeRoot, 'bin', 'python3');
-  if (safeExistsSync(pythonBin) || safeExistsSync(python3Bin)) {
+  // The registry owns the managed root (canonical install root, with a read
+  // fallback for runtimes that exist only at the legacy cache-floor root).
+  const installedPython = locateManagedToolPythonBin('mlx_audio');
+  if (installedPython) {
     return item(
       'mlx.audio.runtime',
       'pass',
-      `mlx-audio runtime is present at ${path.relative(pathResolver.rootDir(), safeExistsSync(pythonBin) ? pythonBin : python3Bin)}`,
+      `mlx-audio runtime is present at ${path.relative(pathResolver.rootDir(), installedPython)}`,
       'none'
     );
   }
+  const pythonBin = path.join(path.dirname(getToolRuntimeStatePath('mlx_audio')), 'bin', 'python');
 
   const inventory = listToolRuntimeInventory('trial', platform);
   const mlxAudio = inventory.items.find((entry) => entry.tool.tool_id === 'mlx_audio');

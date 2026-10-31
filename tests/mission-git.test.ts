@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { deriveMissionBranchName } from '../scripts/refactor/mission-git.js';
+import { deriveMissionBranchName } from '@agent/core/mission/mission-git';
 
 describe('deriveMissionBranchName', () => {
   it('derives a non-main mission branch name', () => {
-    expect(deriveMissionBranchName('PDF-TO-PPTX-CONVERSION')).toBe('mission/pdf-to-pptx-conversion');
+    expect(deriveMissionBranchName('PDF-TO-PPTX-CONVERSION')).toBe(
+      'mission/pdf-to-pptx-conversion'
+    );
   });
 });

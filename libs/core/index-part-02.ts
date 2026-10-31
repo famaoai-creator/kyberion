@@ -239,13 +239,6 @@ export type {
 } from './mesh/mesh-peer-directory.js';
 
 export {
-  clearMeshTopicRegistryNamespace,
-  listMeshTopicSubscriptions,
-} from './mesh/mesh-topic-registry.js';
-
-export type { MeshTopicSubscriptionFilter } from './mesh/mesh-topic-registry.js';
-
-export {
   clearMeshHubPeerMessagingAdapterNamespace,
   createMeshHubPeerMessagingAdapter,
   decideMeshHubRecipientProposal,
@@ -270,7 +263,6 @@ export type {
   MeshHubInspectionOptions,
   MeshHubInspectionReport,
   MeshHubPeerInspection,
-  MeshHubTopicInspection,
 } from './mesh/mesh-hub-inspection.js';
 
 export {
