@@ -1198,11 +1198,19 @@ export class MetricsCollector {
       }
     }
 
+    let invalidEntries = 0;
     for (const entry of entries) {
-      const componentName = entry.component || entry.skill || entry.capability;
-      if (!componentName) continue;
-      if (!bySkill[componentName]) {
-        bySkill[componentName] = {
+      const identity = executionHistoryIdentity(entry);
+      const duration = executionHistoryDurationMs(entry);
+      if (!identity || duration === null) {
+        invalidEntries += 1;
+        continue;
+      }
+      const durationMs = duration ?? 0;
+      if (!bySkill[identity.key]) {
+        bySkill[identity.key] = {
+          label: identity.label,
+          kind: identity.kind,
           count: 0,
           errors: 0,
           totalMs: 0,
@@ -1213,16 +1221,17 @@ export class MetricsCollector {
           sloPasses: 0,
         };
       }
-      const s = bySkill[componentName];
+      const s = bySkill[identity.key];
       s.count++;
       if (entry.status === 'error') s.errors++;
-      s.totalMs += entry.duration_ms || 0;
-      s.minMs = Math.min(s.minMs, entry.duration_ms || 0);
-      s.maxMs = Math.max(s.maxMs, entry.duration_ms || 0);
+      s.totalMs += durationMs;
+      s.minMs = Math.min(s.minMs, durationMs);
+      s.maxMs = Math.max(s.maxMs, durationMs);
 
       const target =
-        (sloTargets.critical_path && sloTargets.critical_path[componentName]) || sloTargets.default;
-      const isLatencyOk = (entry.duration_ms || 0) <= target.latency_ms;
+        (sloTargets.critical_path && sloTargets.critical_path[identity.label]) ||
+        sloTargets.default;
+      const isLatencyOk = durationMs <= target.latency_ms;
       if (isLatencyOk && entry.status !== 'error') s.sloPasses++;
 
       if (entry.cacheStats) {
@@ -1231,7 +1240,8 @@ export class MetricsCollector {
       }
     }
 
-    const skills = Object.entries(bySkill).map(([name, s]) => {
+    const skills = Object.entries(bySkill).map(([_key, s]) => {
+      const name = s.label as string;
       const avgMs = s.count > 0 ? Math.round(s.totalMs / s.count) : 0;
       const totalCache = s.cacheHits + s.cacheMisses;
       const cacheHitRatio = totalCache > 0 ? Math.round((s.cacheHits / totalCache) * 100) : 0;
@@ -1255,6 +1265,7 @@ export class MetricsCollector {
       return {
         component: name,
         skill: name,
+        kind: s.kind,
         executions: s.count,
         errors: s.errors,
         errorRate: s.count > 0 ? Math.round((s.errors / s.count) * 1000) / 10 : 0,
@@ -1272,6 +1283,8 @@ export class MetricsCollector {
 
     return {
       totalEntries: entries.length,
+      /** Rows skipped because they name no component/skill/capability or carry an invalid duration. */
+      invalidEntries,
       uniqueSkills: skills.length,
       dateRange:
         entries.length > 0
@@ -1281,33 +1294,66 @@ export class MetricsCollector {
     };
   }
 
-  /** Latency regressions per skill; `read` as in reportFromHistory. */
+  /**
+   * Latency regressions per execution identity; `read` as in
+   * reportFromHistory. Rows are normalized through the same
+   * executionHistoryIdentity/executionHistoryDurationMs helper as the count
+   * report (component → skill → capability, kind-scoped keys), grouped in
+   * chronological order, and compared only when the cohort has at least
+   * REGRESSION_MIN_SAMPLES timed runs and a non-zero finite average.
+   * Rows with no identity or no usable duration are reported through
+   * `onInvalidRows` — never merged into an 'undefined' cohort.
+   */
   detectRegressions(
     thresholdMultiplier = 1.5,
     read?: ExecutionMetricsReadScope,
-    options: { onWithheld?: (partitions: number) => void } = {}
+    options: {
+      onWithheld?: (partitions: number) => void;
+      /** Called with the number of rows skipped as invalid (if any). */
+      onInvalidRows?: (rows: number) => void;
+    } = {}
   ) {
     const entries = chronological(this.loadHistory({ read, onWithheld: options.onWithheld }));
-    const bySkill: Record<string, any[]> = {};
+    const multiplier =
+      Number.isFinite(thresholdMultiplier) && thresholdMultiplier > 0 ? thresholdMultiplier : 1.5;
+    const bySkill: Record<
+      string,
+      { label: string; kind: string; runs: Array<{ entry: any; durationMs: number }> }
+    > = {};
+    let invalidRows = 0;
     for (const entry of entries) {
-      if (!bySkill[entry.skill]) bySkill[entry.skill] = [];
-      bySkill[entry.skill].push(entry);
+      const identity = executionHistoryIdentity(entry);
+      const durationMs = executionHistoryDurationMs(entry);
+      // Regression needs a timed run: identity-less rows and rows without a
+      // valid duration are invalid rows, counted — never a 'undefined' group.
+      if (!identity || durationMs === null || durationMs === undefined) {
+        invalidRows += 1;
+        continue;
+      }
+      const group =
+        bySkill[identity.key] ??
+        (bySkill[identity.key] = { label: identity.label, kind: identity.kind, runs: [] });
+      group.runs.push({ entry, durationMs });
     }
+    if (invalidRows > 0) options.onInvalidRows?.(invalidRows);
 
     const regressions: any[] = [];
-    for (const [name, runs] of Object.entries(bySkill)) {
-      if (runs.length < 5) continue;
+    for (const { label, kind, runs } of Object.values(bySkill)) {
+      if (runs.length < REGRESSION_MIN_SAMPLES) continue;
       const lastRun = runs[runs.length - 1];
       const history = runs.slice(0, -1);
-      const avgMs = history.reduce((sum, r) => sum + (r.duration_ms || 0), 0) / history.length;
+      const avgMs = history.reduce((sum, run) => sum + run.durationMs, 0) / history.length;
+      // A zero average cannot anchor a meaningful multiplier.
+      if (!(avgMs > 0)) continue;
 
-      if (lastRun.duration_ms > avgMs * thresholdMultiplier) {
+      if (lastRun.durationMs > avgMs * multiplier) {
         regressions.push({
-          skill: name,
-          lastDuration: lastRun.duration_ms,
+          skill: label,
+          kind,
+          lastDuration: lastRun.durationMs,
           historicalAvg: Math.round(avgMs),
-          increaseRate: Math.round((lastRun.duration_ms / avgMs) * 10) / 10,
-          timestamp: lastRun.timestamp,
+          increaseRate: Math.round((lastRun.durationMs / avgMs) * 10) / 10,
+          timestamp: lastRun.entry.timestamp,
         });
       }
     }
@@ -1360,6 +1406,59 @@ function chronological<T extends { timestamp?: unknown }>(rows: T[]): T[] {
     at(left) < at(right) ? -1 : at(left) > at(right) ? 1 : 0
   );
 }
+
+/**
+ * The identity/duration normalization shared by reportFromHistory and
+ * detectRegressions (R10). Identity precedence is explicit —
+ * component → skill → capability: the first non-empty field names the row.
+ * The aggregation key carries the identity kind so a component 'x' and a
+ * legacy skill 'x' never merge into one cohort; the label stays the bare
+ * name for display. Tenant partitioning is already applied by the read
+ * scope, so the key does not re-encode it — aggregate reads intentionally
+ * merge the same work across visible partitions. A row that names no
+ * identity, or carries a present-but-invalid duration, is an invalid row:
+ * counted, never grouped under a synthetic 'undefined' cohort.
+ */
+export interface ExecutionHistoryIdentity {
+  /** Aggregation key — '<kind>:<id>'; never the bare display name. */
+  key: string;
+  /** Display label — the raw component/skill/capability name. */
+  label: string;
+  kind: 'component' | 'skill' | 'capability';
+}
+
+export function executionHistoryIdentity(row: {
+  component?: unknown;
+  skill?: unknown;
+  capability?: unknown;
+}): ExecutionHistoryIdentity | null {
+  const pick = (value: unknown): string | undefined =>
+    typeof value === 'string' && value.trim() ? value.trim() : undefined;
+  const component = pick(row.component);
+  if (component) return { key: `component:${component}`, label: component, kind: 'component' };
+  const skill = pick(row.skill);
+  if (skill) return { key: `skill:${skill}`, label: skill, kind: 'skill' };
+  const capability = pick(row.capability);
+  if (capability) return { key: `capability:${capability}`, label: capability, kind: 'capability' };
+  return null;
+}
+
+/**
+ * `undefined` = the row carries no duration (usable in the count report,
+ * unusable for latency regression); `null` = present but not a finite
+ * non-negative number — the row is invalid.
+ */
+export function executionHistoryDurationMs(row: {
+  duration_ms?: unknown;
+}): number | null | undefined {
+  const raw = row.duration_ms;
+  if (raw === undefined || raw === null) return undefined;
+  const value = Number(raw);
+  return Number.isFinite(value) && value >= 0 ? value : null;
+}
+
+/** Minimum timed runs before a cohort can anchor a regression comparison. */
+const REGRESSION_MIN_SAMPLES = 5;
 
 /**
  * The scope an execution-metrics row is partitioned by. A tenant-less
