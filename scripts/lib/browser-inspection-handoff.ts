@@ -756,7 +756,23 @@ export function submitInspectionToWaitingTicket(
         submitted_at: now.toISOString(),
         inspection,
       };
-      writeTicket(updated);
+      try {
+        writeTicket(updated);
+      } catch (err) {
+        // The completed audit is already recorded: correct it so the log does
+        // not claim a delivery that never reached the CLI (best effort).
+        recordAudit({
+          ...SUBMIT_AUDIT,
+          result: 'failed',
+          reason: 'Delivery was audited but writing the ticket failed; the CLI did not receive it',
+          metadata: {
+            ticket_id: current.ticket_id,
+            ...scopeMetadata(scope),
+            origin: inspection.origin,
+          },
+        });
+        throw err;
+      }
       return 'delivered' as const;
     });
     const meta = {
