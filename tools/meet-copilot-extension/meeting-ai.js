@@ -18,6 +18,14 @@
   const MAX_INPUT_CHARS = 30_000;
   const PROMPT_INPUTS = [{ type: 'text', languages: ['en', 'ja'] }];
   const PROMPT_OUTPUTS = [{ type: 'text', languages: ['ja'] }];
+  // availability() must be asked with the same languages create() uses: Chrome
+  // warns when a Summarizer/Writer/Rewriter call omits the output language.
+  const TEXT_LANGUAGES = { expectedInputLanguages: ['en', 'ja'], outputLanguage: 'ja' };
+  const EXPERIMENTAL_LANGUAGES = {
+    Writer: TEXT_LANGUAGES,
+    Rewriter: TEXT_LANGUAGES,
+    Proofreader: { expectedInputLanguages: ['en', 'ja'] },
+  };
   const LANGUAGE_CONFIDENCE_THRESHOLD = 0.5;
   // Share of the remaining context window the transcript may use.
   const CONTEXT_INPUT_SHARE = 0.8;
@@ -120,7 +128,7 @@
   }
 
   function summarizerAvailability() {
-    return safeAvailability(global.Summarizer);
+    return safeAvailability(global.Summarizer, TEXT_LANGUAGES);
   }
 
   function translatorAvailability(sourceLanguage = 'en', targetLanguage = 'ja') {
@@ -133,7 +141,7 @@
     const api = global[name];
     if (!api) return 'unsupported';
     if (typeof api.availability !== 'function') return 'available';
-    return safeAvailability(api);
+    return safeAvailability(api, EXPERIMENTAL_LANGUAGES[name]);
   }
 
   async function multimodalAvailability(type) {
