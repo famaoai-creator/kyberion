@@ -15,9 +15,12 @@ import { defineGenerator, isDirectScript } from './lib/harness.js';
 import {
   CLI_COMMAND_GROUPS,
   loadCliManifest,
+  type CliCommand,
   type CliCommandGroup,
   type CliManifest,
+  type CliScriptCommand,
 } from './check_cli_manifest.js';
+import { formatPrerequisiteLines } from './lib/cli-help.js';
 
 const OUTPUT_PATH = pathResolver.rootResolve('docs/CLI_REFERENCE.md');
 
@@ -35,6 +38,21 @@ function describe(key: string | undefined): string {
   return (resolved?.entry.en ?? key).replace(/\\/gu, '\\\\').replace(/\|/gu, '\\|');
 }
 
+/**
+ * R06: manifest-documented effect + prerequisites, appended to the summary so
+ * the reference stays in sync with --help. Documentation only — the manifest
+ * grants nothing; execution eligibility stays a runtime authority decision.
+ */
+function notes(command: CliCommand | CliScriptCommand): string {
+  const parts: string[] = [];
+  if (command.effect) {
+    const badge = resolveVocabularyEntry(`cli:cli_manifest_help_effect_${command.effect}`);
+    parts.push(`**${badge?.entry.en ?? `[${command.effect}]`}**`);
+  }
+  parts.push(...formatPrerequisiteLines(command.prerequisites, 'en'));
+  return parts.length > 0 ? ` — ${parts.join(' · ')}` : '';
+}
+
 /** `x default` is invoked as plain `x`; the home command is the bare `kyberion`. */
 function invocation(command: string): string {
   const shown = command.replace(/ default$/u, '');
@@ -47,7 +65,7 @@ export function buildCliReferenceRows(manifest: CliManifest): CliReferenceRow[] 
   for (const command of manifest.commands) {
     const row: CliReferenceRow = {
       command: invocation(command.command),
-      summary: describe(command.description),
+      summary: describe(command.description) + notes(command),
       audience: command.audience,
       group: command.group ?? 'operate',
     };
@@ -63,7 +81,7 @@ export function buildCliReferenceRows(manifest: CliManifest): CliReferenceRow[] 
     const row: CliReferenceRow = {
       command: invocation(script.command),
       script: script.script,
-      summary: describe(script.description),
+      summary: describe(script.description) + notes(script),
       audience: script.audience,
       group: script.group ?? 'operate',
     };

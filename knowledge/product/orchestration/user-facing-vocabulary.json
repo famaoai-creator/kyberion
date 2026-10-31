@@ -10625,6 +10625,66 @@
         "ja": "スコープ: {usage}",
         "qps-ploc": "⟦Şƈőṗėş: {usage} ŀőřė⟧"
       },
+      "cli_manifest_help_effect_readiness": {
+        "en": "[readiness]",
+        "ja": "[準備状況]",
+        "qps-ploc": "⟦[řėȧḓïñėşş] ŀőř⟧"
+      },
+      "cli_manifest_help_effect_connection": {
+        "en": "[connection check]",
+        "ja": "[接続確認]",
+        "qps-ploc": "⟦[ƈőññėƈŧïőñ ƈħėƈķ] ŀőřėɱ⟧"
+      },
+      "cli_manifest_help_effect_state_change": {
+        "en": "[state change]",
+        "ja": "[状態変更]",
+        "qps-ploc": "⟦[şŧȧŧė ƈħȧñɠė] ŀőřė⟧"
+      },
+      "cli_manifest_help_needs": {
+        "en": "Needs: {items}",
+        "ja": "必要: {items}",
+        "qps-ploc": "⟦Ñėėḓş: {items} ŀőřė⟧"
+      },
+      "cli_manifest_help_needs_live": {
+        "en": "Live ops need: {items}",
+        "ja": "実操作に必要: {items}",
+        "qps-ploc": "⟦Ŀïṽė őṗş ñėėḓ: {items} ŀőřėɱ ï⟧"
+      },
+      "cli_manifest_help_prereq_via": {
+        "en": " (see `kyberion {command}`)",
+        "ja": "（`kyberion {command}` 参照）",
+        "qps-ploc": "⟦ (şėė `ķẏƀėřïőñ {command}`) ŀőřėɱ ïṗ⟧"
+      },
+      "cli_manifest_help_legend": {
+        "en": "Badges: [readiness] only displays readiness, [connection check] opens a service connection, [state change] mutates state. 'Needs' lines document prerequisites; they grant no authority.",
+        "ja": "バッジ: [準備状況]=準備表示のみ、[接続確認]=サービスへ接続、[状態変更]=状態を変更。「必要」行は前提条件の説明であり、権限を与えるものではありません。",
+        "qps-ploc": "⟦Ƀȧḓɠėş: [řėȧḓïñėşş] őñŀẏ ḓïşṗŀȧẏş řėȧḓïñėşş, [ƈőññėƈŧïőñ ƈħėƈķ] őṗėñş ȧ şėřṽïƈė ƈőññėƈŧïőñ, [şŧȧŧė ƈħȧñɠė] ɱůŧȧŧėş şŧȧŧė. 'Ñėėḓş' ŀïñėş ḓőƈůɱėñŧ ṗřėřėɋůïşïŧėş; ŧħėẏ ɠřȧñŧ ñő ȧůŧħőřïŧẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "cli_prereq_local_backend": {
+        "en": "local backend",
+        "ja": "ローカルバックエンド",
+        "qps-ploc": "⟦ŀőƈȧŀ ƀȧƈķėñḓ ŀőřė⟧"
+      },
+      "cli_prereq_trusted_claim": {
+        "en": "trusted task binding",
+        "ja": "信頼済みタスクバインディング",
+        "qps-ploc": "⟦ŧřůşŧėḓ ŧȧşķ ƀïñḓïñɠ ŀőřėɱ ⟧"
+      },
+      "cli_prereq_task_credentials": {
+        "en": "task credentials",
+        "ja": "タスク資格情報",
+        "qps-ploc": "⟦ŧȧşķ ƈřėḓėñŧïȧŀş ŀőřėɱ⟧"
+      },
+      "cli_prereq_service_setup": {
+        "en": "service setup",
+        "ja": "サービスセットアップ",
+        "qps-ploc": "⟦şėřṽïƈė şėŧůṗ ŀőřė⟧"
+      },
+      "cli_prereq_os_consent": {
+        "en": "OS consent",
+        "ja": "OS 許可",
+        "qps-ploc": "⟦ŐŞ ƈőñşėñŧ ŀőř⟧"
+      },
       "cli_scope_help_usage": {
         "en": "Usage: {usage}",
         "ja": "使い方: {usage}",
