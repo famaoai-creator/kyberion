@@ -169,6 +169,97 @@ function toRepoRelative(filePath: string): string {
   return path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
 }
 
+/* ------------------------------------------------------------------ *
+ * Compiler-input fingerprints (build-readiness / generation receipts)   *
+ *                                                                      *
+ * The input set is the same one the staleness scan judges: every source *
+ * file an owned target feeds the compiler — tracked or untracked, git   *
+ * status is irrelevant — plus the config/lockfile files that select the *
+ * program and toolchain. Fingerprints are keyed on repo-relative path   *
+ * and content hash, so same content with only mtime changed is the same *
+ * input set.                                                          *
+ * ------------------------------------------------------------------ */
+
+export interface BuildInputFingerprint {
+  /** sha256 over `path + content-hash` for every compiler input. */
+  hash: string;
+  /** Number of compiler-input files covered. */
+  fileCount: number;
+}
+
+/**
+ * Non-source compiler inputs: the tsconfig files that select each program,
+ * the root manifest, and the lockfile. Missing entries are skipped.
+ */
+export const BUILD_CONFIG_INPUTS: readonly string[] = [
+  'package.json',
+  'pnpm-lock.yaml',
+  'tsconfig.json',
+  'tsconfig.packages.json',
+  'tsconfig.bootstrap.json',
+  'tsconfig.base.json',
+  'tsconfig.actuators.json',
+  ...PACKAGE_BUILD_OUTPUTS.map(({ id }) => `${id}/tsconfig.json`),
+];
+
+/**
+ * sha256 over the compiler input set for the given stale targets (default:
+ * every owned target). Paths are deduplicated across targets and sorted, so
+ * the fingerprint is stable regardless of target order or overlap.
+ */
+export function fingerprintBuildInputs(
+  options: { targets?: StaleTargetSpec[] } = {}
+): BuildInputFingerprint {
+  const files = new Set<string>();
+  for (const spec of options.targets ?? defaultStaleDistTargets()) {
+    const sourceRoot = pathResolver.rootResolve(spec.sourceRoot);
+    if (!safeExistsSync(sourceRoot)) continue;
+    const excluded = (spec.excludeSourceDirs ?? []).map((rel) =>
+      path.join(sourceRoot, ...rel.split('/'))
+    );
+    const excludeTests = spec.excludeTests ?? false;
+    const scan = scanSources(
+      sourceRoot,
+      (filePath) =>
+        isSourceFile(filePath, excludeTests) &&
+        !excluded.some((dir) => filePath.startsWith(dir + path.sep)) &&
+        !(spec.excludeSourceFiles ?? []).some((file) => filePath === path.join(sourceRoot, file))
+    );
+    for (const filePath of scan.files) files.add(filePath);
+  }
+  const sorted = [...files].sort();
+  const hash = createHash('sha256');
+  for (const filePath of sorted) {
+    hash.update(toRepoRelative(filePath));
+    hash.update('\0');
+    hash.update(hashFile(filePath) ?? '<unreadable>');
+    hash.update('\0');
+  }
+  return { hash: hash.digest('hex'), fileCount: sorted.length };
+}
+
+/**
+ * sha256 over the config/lockfile inputs that select the compiler program
+ * and toolchain identity. Skips files that do not exist.
+ */
+export function fingerprintBuildConfigInputs(files: readonly string[] = BUILD_CONFIG_INPUTS): {
+  hash: string;
+  files: string[];
+} {
+  const hash = createHash('sha256');
+  const present: string[] = [];
+  for (const relative of files) {
+    const absolute = pathResolver.rootResolve(relative);
+    if (!safeExistsSync(absolute)) continue;
+    hash.update(relative);
+    hash.update('\0');
+    hash.update(hashFile(absolute) ?? '<unreadable>');
+    hash.update('\0');
+    present.push(relative);
+  }
+  return { hash: hash.digest('hex'), files: present };
+}
+
 function evaluateTarget(
   spec: StaleTargetSpec,
   buildInfoCache: Map<string, Map<string, string> | null> = new Map()

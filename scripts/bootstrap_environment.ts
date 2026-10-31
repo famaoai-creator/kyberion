@@ -36,6 +36,11 @@ import { resetLocalSttDiscoveryCache } from '@agent/core/local-stt-discovery';
 import '@agent/core/environment-capability-probes';
 import '@agent/core/blackhole-audio-bus';
 import '@agent/core/pulse-audio-bus';
+import { installBaselineBuildReadinessInspector } from './baseline_build_readiness.js';
+
+// The repo-build capability probes the same compiler-outputs inspection the
+// L2 baseline layer uses — install it before any manifest is probed.
+installBaselineBuildReadinessInspector();
 
 async function processManifest(
   manifestId: string,
