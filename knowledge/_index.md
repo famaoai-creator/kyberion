@@ -137,6 +137,7 @@
 - [Operator Surface Strategy (CLI + Governed Operator Web)](./product/architecture/operator-surface-strategy.md) (public | Unknown)
 - [Organization Profile Model](./product/architecture/organization-profile-model.md) (public | Ecosystem Architect)
 - [Organization Work Loop](./product/architecture/organization-work-loop.md) (public | Ecosystem Architect)
+- [PDF CID Font Unicode Fallback (ROS→UCS2 CMap Resolution)](./product/architecture/pdf-cid-font-unicode-fallback.md) (public | Devin)
 - [Pane Agent Prompt Handling](./product/architecture/agent-prompt-handling.md) (public | Unknown)
 - [Personal Voice Narrated Video Delivery Plan](./product/architecture/personal-voice-narrated-video-delivery-plan.md) (public | Ecosystem Architect)
 - [Plugin Permissions, Lifecycle and Views](./product/architecture/plugin-permissions-and-views.md) (public | Unknown)
@@ -814,6 +815,7 @@
 - [エージェント倫理規程 (Agentic Ethos v1.0)](./public/ethics/agent_ethos.md) (public | Ecosystem Architect)
 
 ## 📁 public/external-wisdom
+- [A2B攻撃(App-to-Backend Attack)早期検知のための Observability 調査レポート](./public/external-wisdom/a2b-attack-observability-report-2026-10.md) (public | Devin)
 - [Harness Landscape Scan 2026-05](./public/external-wisdom/harness-landscape-scan-2026-05.md) (public | Sovereign Concierge)
 - [Hermes Agent Absorption Plan 2026-06](./public/external-wisdom/hermes-agent-absorption-plan-2026-06.md) (public | Codex)
 - [Intelligence: Insights from the Agent Internet (2026-03)](./public/external-wisdom/agent-internet-insights-2026-03.md) (public | Unknown)
