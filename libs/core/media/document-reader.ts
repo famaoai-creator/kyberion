@@ -34,7 +34,11 @@ import {
 } from '../secure-io.js';
 import { ocrImage } from '../ocr-bridge.js';
 import type { OcrDataPolicy, OcrDataTier, OcrRoutingMode } from '../ocr-types.js';
-import { rasterizeVectorImage, VECTOR_IMAGE_EXTENSIONS } from '../visual-raster.js';
+import {
+  rasterizePdfPages,
+  rasterizeVectorImage,
+  VECTOR_IMAGE_EXTENSIONS,
+} from '../visual-raster.js';
 import { extractPptxSlides, type ExtractedSlide } from './native-pptx-engine/engine.js';
 import { distillPdfDesign, selectPdfOcrImages } from './pdf-utils.js';
 import { distillDocxDesign } from './docx-utils.js';
@@ -45,7 +49,7 @@ import {
   pdfToMarkdown,
   xlsxToMarkdown,
 } from './protocol-to-markdown.js';
-import type { PdfDesignProtocol } from '../contracts/pdf-protocol.js';
+import type { PdfDesignProtocol, PdfPage } from '../contracts/pdf-protocol.js';
 import { extractHtmlTitle, htmlToMarkdown } from '../html-to-markdown.js';
 import { extractOoxmlCoreTitle, OOXML_PLACEHOLDER_TITLES } from './ooxml-core-props.js';
 
@@ -451,6 +455,90 @@ async function pdfParsePageTexts(raw: Buffer): Promise<string[] | null> {
 }
 
 /**
+ * Ratio of decoded text that is raw-byte garbage: C0/C1 control characters
+ * plus the Latin-1 supplement band. Subset CID fonts without a /ToUnicode
+ * map (common in Quartz/LibreOffice-produced CJK PDFs) decode as raw bytes,
+ * leaving control characters and Latin-1 soup where the real script should
+ * be. Real prose never carries control characters — the NICT A2B notice
+ * produced ~59% garbage this way.
+ */
+export function unmappableTextRatio(text: string): { control: number; combined: number } {
+  let nonSpace = 0;
+  let control = 0;
+  let latin1 = 0;
+  for (const ch of text) {
+    if (/\s/.test(ch)) continue;
+    nonSpace += 1;
+    const cp = ch.codePointAt(0) ?? 0;
+    if (cp < 0x20 || (cp >= 0x7f && cp <= 0x9f)) control += 1;
+    else if (cp >= 0xa0 && cp <= 0xff) latin1 += 1;
+  }
+  if (nonSpace === 0) return { control: 0, combined: 0 };
+  return { control: control / nonSpace, combined: (control + latin1) / nonSpace };
+}
+
+/** Control bytes alone are decisive at 2%; controls+Latin-1 at 30% (legit accented prose stays far below). */
+export function isUnmappableTextLayer(text: string): boolean {
+  const ratio = unmappableTextRatio(text);
+  return ratio.control > 0.02 || ratio.combined > 0.3;
+}
+
+/**
+ * Recover pages whose text layer cannot be mapped to Unicode: rasterize the
+ * PDF with pdftoppm and OCR the rendered pages. Replaces `page.text` and
+ * drops the garbled positioned elements so table reconstruction and prose
+ * extraction read the OCR output instead of raw-byte mojibake.
+ */
+async function ocrUnmappablePdfPages(
+  pdfPath: string,
+  pages: PdfPage[],
+  workDir: string,
+  options: ReadDocumentOptions
+): Promise<{ recovered: number; failed: number; unavailable_reason?: string }> {
+  const rasterDir = path.join(workDir, 'page-raster');
+  const raster = rasterizePdfPages({ pdfPath, outDir: rasterDir, dpi: 200 });
+  if (!raster.available) {
+    return { recovered: 0, failed: 0, unavailable_reason: raster.unavailable_reason };
+  }
+  const imageByPage = new Map<number, string>();
+  for (const imagePath of raster.images) {
+    const pageNumber = Number(imagePath.match(/page-(\d+)\.png$/u)?.[1] || 0);
+    if (pageNumber > 0) imageByPage.set(pageNumber, imagePath);
+  }
+  let recovered = 0;
+  let failed = 0;
+  for (const page of pages) {
+    const imagePath = imageByPage.get(page.pageNumber);
+    if (!imagePath) {
+      failed += 1;
+      continue;
+    }
+    try {
+      const result = await ocrImage({
+        path: imagePath,
+        language: options.ocrLanguage || 'jpn+eng',
+        mode:
+          options.ocrMode ||
+          (options.trainingUse && options.trainingUse !== 'local_only' ? 'balanced' : 'local_only'),
+        ...(options.tier ? { tier: options.tier } : {}),
+        ...(options.tenantSlug ? { tenant_slug: options.tenantSlug } : {}),
+        training_use: options.trainingUse || 'local_only',
+      });
+      if (!result.text.trim()) {
+        failed += 1;
+        continue;
+      }
+      page.text = result.text.trim();
+      page.elements = [];
+      recovered += 1;
+    } catch {
+      failed += 1;
+    }
+  }
+  return { recovered, failed };
+}
+
+/**
  * OCR each page's placed images (≥3% of the page) into `page.imageOcr`.
  * Shared with media:pdf_extract so both surfaces OCR PDFs the same way.
  */
@@ -516,6 +604,23 @@ async function readPdf(
           if (cleaner[index]) page.text = cleaner[index];
         });
       }
+      // Judge what the renderer would emit: page.text plus positioned
+      // element text — a clean pdf-parse text can replace page.text while the
+      // elements still carry raw-byte mojibake into table reconstruction.
+      const unmappablePages = pages.filter((page) =>
+        isUnmappableTextLayer(
+          `${page.text}\n${(page.elements ?? []).map((element) => element.text ?? '').join(' ')}`
+        )
+      );
+      let ocrRecovered = 0;
+      let ocrFailed = 0;
+      let rasterUnavailable: string | undefined;
+      if (options.ocr && unmappablePages.length > 0) {
+        const recovery = await ocrUnmappablePdfPages(pdfPath, unmappablePages, workDir, options);
+        ocrRecovered = recovery.recovered;
+        ocrFailed = recovery.failed;
+        rasterUnavailable = recovery.unavailable_reason;
+      }
       if (options.ocr) await ocrPdfDesignImages(design, options);
       if (exporter) {
         for (const page of pages) {
@@ -538,6 +643,21 @@ async function readPdf(
       const warnings: string[] = [];
       const skipped = pages.reduce((sum, page) => sum + (page.imageOcrSkipped?.length ?? 0), 0);
       if (skipped) warnings.push(`${skipped} page image(s) could not be OCR’d`);
+      if (ocrRecovered > 0) {
+        warnings.push(
+          `${ocrRecovered} page(s) had an unmappable text layer (embedded fonts lack a Unicode cmap) — recovered via page OCR (unverified)`
+        );
+      }
+      if (rasterUnavailable) {
+        warnings.push(`unmappable text layer could not be OCR’d: ${rasterUnavailable}`);
+      } else if (ocrFailed > 0) {
+        warnings.push(`${ocrFailed} page(s) with an unmappable text layer could not be OCR’d`);
+      }
+      if (!options.ocr && unmappablePages.length > 0) {
+        warnings.push(
+          `${unmappablePages.length} page(s) have an unmappable text layer (embedded fonts lack a Unicode cmap) — pass ocr to recover them via page OCR`
+        );
+      }
       if (!options.ocr && pages.some((page) => selectPdfOcrImages(page).length > 0)) {
         warnings.push('page images were not OCR’d — pass ocr to read text inside them');
       }
