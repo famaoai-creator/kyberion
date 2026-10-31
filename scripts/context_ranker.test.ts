@@ -3,11 +3,7 @@ import * as path from 'node:path';
 import { readTextFile } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core';
 import { ScriptExitError } from './lib/harness.js';
-import {
-  normalizeRankingWeights,
-  parseRankArgs,
-  type RankingWeights,
-} from './context_ranker.js';
+import { normalizeRankingWeights, parseRankArgs, type RankingWeights } from './context_ranker.js';
 
 const defaults: RankingWeights = {
   title: 10,
@@ -57,9 +53,7 @@ describe('context ranker configuration boundary', () => {
   });
 
   it('accepts positional and --intent only when they agree', () => {
-    expect(
-      parseRankArgs(['--intent', 'same query', 'same query']).intent
-    ).toBe('same query');
+    expect(parseRankArgs(['--intent', 'same query', 'same query']).intent).toBe('same query');
     expect(() => parseRankArgs(['--intent', 'alpha', 'beta'])).toThrow(/conflicting queries/);
     expect(() => parseRankArgs(['--intent', 'alpha', 'beta'])).toThrow(ScriptExitError);
   });
