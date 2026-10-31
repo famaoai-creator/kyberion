@@ -17,7 +17,7 @@ declares a **tier** directly instead of a literal file path:
 ```
 
 - `tier` (required): `personal` | `confidential` | `public`. Drives mission tier
-  auto-elevation directly — `calculateRequiredTier` (`scripts/refactor/mission-state.ts`) reads
+  auto-elevation directly — `calculateRequiredTier` (`libs/core/mission/mission-state.ts`) reads
   this field, it does not sniff a path. If any entry's tier outweighs the requested tier, the
   mission's own execution tier is raised to match (see "ミッション・ティアの継承" in
   [knowledge-protocol.md](../governance/knowledge-protocol.md)).

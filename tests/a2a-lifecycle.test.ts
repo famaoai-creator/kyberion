@@ -20,7 +20,7 @@ const LEDGER_BEFORE = fs.existsSync(LEDGER_PATH) ? fs.readFileSync(LEDGER_PATH, 
 // KP-07 (knowledge-store hygiene): mission_controller's checkPrerequisites()
 // gates mission creation on a full "sovereign profile" (my-identity.json +
 // my-vision.md + agent-identity.json) resolved via resolveActiveProfileRoot()
-// (scripts/refactor/mission-state.ts). That resolver honors KYBERION_CUSTOMER
+// (libs/core/mission/mission-state.ts). That resolver honors KYBERION_CUSTOMER
 // as a profile-root override (libs/core/customer-resolver.ts: customerRoot()),
 // so this suite points the gate at an isolated `customer/{slug}/` overlay
 // instead of writing fixture identity content into the real
