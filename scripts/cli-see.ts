@@ -159,21 +159,30 @@ export async function runSeeCommand(
     if (args.file) throw new ScriptExitError(1, '--search does not take an input file');
     const { resolveScopeContext } = await import('@agent/core/scope-context');
     const current = resolveScopeContext();
-    // The index lives on the cache floor — outside the media role's grants —
-    // so this path runs under the caller's own authority, not the wrap below.
+    // The index lives on the cache floor's perception subtree, which the
+    // media role now grants tenant-parameterised — the guarded index reads
+    // run under the same wrap as every other media read (see
+    // withPerceptionMediaRole).
     const search =
       deps.enhancements?.search ??
       (await import('@agent/core/perception/semantic-index')).searchMedia;
-    const hits = await search({
-      indexId: options.index!,
-      scope: {
+    const hits = await withPerceptionMediaRole(
+      {
         tier: current.tier,
         ...(current.tenant_slug ? { tenant_slug: current.tenant_slug } : {}),
       },
-      query: options.search,
-      modelPath: options.embeddingModel!,
-      python: options.python,
-    });
+      () =>
+        search({
+          indexId: options.index!,
+          scope: {
+            tier: current.tier,
+            ...(current.tenant_slug ? { tenant_slug: current.tenant_slug } : {}),
+          },
+          query: options.search!,
+          modelPath: options.embeddingModel!,
+          python: options.python,
+        })
+    );
     const result: SeeResult = { file: '', bytes: 0, search: hits, warnings: [] };
     emitOutput('see', renderSeeResult(result, args.json), args.out, print, 'semantic search');
     return result;
@@ -313,27 +322,29 @@ export async function runSeeCommand(
         (deps.enhancements?.cues ?? tracking.trackingFrameToAnimationCues)(frame, options.avatarId!)
       );
   }
-  // --index / --search stay outside the media role: the semantic index lives
-  // on the cache floor, which perception_media_worker deliberately does not
-  // grant — those paths still need the caller's own authority.
+  // --index / --search run under the same media role: the semantic index
+  // lives on the cache floor's perception subtree, which
+  // perception_media_worker grants bound to the scope's own tenant.
   if (options.index && source) {
     const index =
       deps.enhancements?.index ??
       (await import('@agent/core/perception/semantic-index')).indexMedia;
-    result.index = await index({
-      indexId: options.index,
-      scope: source.scope,
-      modelPath: options.embeddingModel!,
-      python: options.python,
-      entries: [
-        {
-          id: 'image',
-          path: absolute,
-          image_path: absolute,
-          ...(result.ocr?.text?.trim() ? { text: result.ocr.text } : {}),
-        },
-      ],
-    });
+    result.index = await withPerceptionMediaRole(inputScope, () =>
+      index({
+        indexId: options.index!,
+        scope: source.scope,
+        modelPath: options.embeddingModel!,
+        python: options.python,
+        entries: [
+          {
+            id: 'image',
+            path: absolute,
+            image_path: absolute,
+            ...(result.ocr?.text?.trim() ? { text: result.ocr.text } : {}),
+          },
+        ],
+      })
+    );
   }
   if (!result.ocr && !result.description && !result.tracking && !result.changes && !result.index) {
     throw new ScriptExitError(
