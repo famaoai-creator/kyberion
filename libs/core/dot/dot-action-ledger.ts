@@ -478,6 +478,155 @@ export function latestDotActions(deps: DotActionLedgerDeps = {}): DotActionRecor
   return [...latest.values()];
 }
 
+/** Observation integrity for `dot status` — never weaker than the data behind it. */
+export type DotActionLedgerIntegrity = 'complete' | 'partial' | 'integrity_error';
+
+export interface DotActionObservation {
+  /**
+   * complete        — every index row for this dot parsed and its scoped
+   *                   evidence hydrated.
+   * partial         — the index parsed, but some of this dot's rows live in a
+   *                   scope this process may not hydrate (another tenant or
+   *                   personal owner). Counts remain trustworthy for the
+   *                   visible rows only.
+   * integrity_error — malformed index lines/rows, an invalid private index
+   *                   shape, or missing/changed scoped evidence. Also used
+   *                   when the shared index itself could not be read — then
+   *                   `anomalies` is null because even the totals are unknown.
+   */
+  integrity: DotActionLedgerIntegrity;
+  /** Hydrated records for `dotId` (private evidence read in scope). */
+  actions: DotActionRecord[];
+  /**
+   * Well-formed index rows whose scoped evidence is missing or changed.
+   * Metadata only — they carry no private prose and are never executable.
+   */
+  index_only: DotActionRecord[];
+  /**
+   * Anomaly counts within the caller's visible scope. Refused-row contents
+   * and ids of invisible scopes are never returned — `not_visible` is a count
+   * only. Null when the shared index itself was unreadable (the count is
+   * unknown, never zero-filled).
+   */
+  anomalies: { malformed_rows: number; missing_evidence: number; not_visible: number } | null;
+  /** Reviewed repair entry points; observation never rewrites the ledger. */
+  repair: string[];
+}
+
+const DOT_ACTION_OBSERVATION_REPAIR = {
+  malformed:
+    'the shared action index has malformed rows; have an authorized operator review the owning scope — pnpm kyberion dot migrate-state <dot_id> --legacy-tier <tier> --apply adopts legacy records only after review',
+  missing:
+    'scoped action evidence is missing or changed; restore it inside the owning scope or have the owner confirm a decline — the shared index must never be executed',
+  invisible:
+    "some of this dot's rows live outside this process scope; inspect them under the owning tenant/owner identity — status never widens permissions to read them",
+} as const;
+
+/** Why a hydrate was refused — decides anomaly kind without exposing row content. */
+function hydrateRefusalKind(error: unknown): 'malformed' | 'missing_evidence' | 'not_visible' {
+  const message = error instanceof Error ? error.message : String(error);
+  if (
+    message.includes('invalid private content identity') ||
+    message.includes('invalid private index scope')
+  )
+    return 'malformed';
+  if (message.includes('missing or changed')) return 'missing_evidence';
+  // DOT_PERSONAL_OWNER, secure-io denials and anything unrecognized: the row
+  // claims a scope this process cannot verify — treat as not visible rather
+  // than as absent.
+  return 'not_visible';
+}
+
+/**
+ * Read-only observation of one dot's action ledger for `dot status`.
+ *
+ * Execution callers keep the strict `currentDotActions` hydrate: it refuses
+ * the whole set on a single bad row, which is correct for dispatch but made a
+ * status view die on unrelated corruption. This observer separates the two:
+ * visible-scope rows are still summarized at index level, anomalies are
+ * counted (never silently skipped into 'healthy'), and rows in an invisible
+ * scope contribute a count only — their contents and ids never leave this
+ * function. The ledger is never written here; `repair` points at the
+ * reviewed migration / owner-confirmation paths.
+ */
+export function observeDotActions(
+  dotId: string,
+  deps: DotActionLedgerDeps = {}
+): DotActionObservation {
+  const file = ledgerFile(deps);
+  let malformed = 0;
+  let rows: DotActionRecord[];
+  try {
+    rows = readJsonLines<DotActionRecord>(file, {
+      onMalformed: () => {
+        malformed += 1;
+      },
+    });
+  } catch {
+    return {
+      integrity: 'integrity_error',
+      actions: [],
+      index_only: [],
+      anomalies: null,
+      repair: [
+        "the shared action index could not be read, so even row counts are unknown — check this process's scope, then re-run status under an identity that may read it",
+      ],
+    };
+  }
+  const latest = new Map<string, DotActionRecord>();
+  const indexOnly = new Map<string, DotActionRecord>();
+  let missingEvidence = 0;
+  let notVisible = 0;
+  for (const row of rows) {
+    if (!row || typeof row.action_ref !== 'string' || typeof row.dot_id !== 'string') {
+      malformed += 1;
+      continue;
+    }
+    if (row.dot_id !== dotId) continue;
+    const index =
+      !row.scope || (row.scope.tier !== 'public' && !row.private_content_hash)
+        ? actionIndex(row)
+        : row;
+    try {
+      latest.set(row.action_ref, hydratePrivateAction(index, deps));
+      indexOnly.delete(row.action_ref);
+    } catch (error) {
+      const kind = hydrateRefusalKind(error);
+      if (kind === 'malformed') {
+        malformed += 1;
+        indexOnly.delete(row.action_ref);
+      } else if (kind === 'missing_evidence') {
+        missingEvidence += 1;
+        if (!latest.has(row.action_ref)) indexOnly.set(row.action_ref, index);
+      } else {
+        notVisible += 1;
+        indexOnly.delete(row.action_ref);
+      }
+    }
+  }
+  const integrity: DotActionLedgerIntegrity =
+    malformed > 0 || missingEvidence > 0
+      ? 'integrity_error'
+      : notVisible > 0
+        ? 'partial'
+        : 'complete';
+  const repair: string[] = [];
+  if (malformed > 0) repair.push(DOT_ACTION_OBSERVATION_REPAIR.malformed);
+  if (missingEvidence > 0) repair.push(DOT_ACTION_OBSERVATION_REPAIR.missing);
+  if (notVisible > 0) repair.push(DOT_ACTION_OBSERVATION_REPAIR.invisible);
+  return {
+    integrity,
+    actions: [...latest.values()],
+    index_only: [...indexOnly.values()],
+    anomalies: {
+      malformed_rows: malformed,
+      missing_evidence: missingEvidence,
+      not_visible: notVisible,
+    },
+    repair,
+  };
+}
+
 /** Identity of a proposal for dedupe: includes pipeline, target and intent so opposing proposals never collapse. */
 export function dotProposalHash(dotId: string, proposal: DotProposal): string {
   return createHash('sha256')
