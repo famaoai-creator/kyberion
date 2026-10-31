@@ -18,6 +18,7 @@
 import { matchesCron } from './pipeline/cron-utils.js';
 import type { InstalledUnit, InstalledUnitsReport } from './daemon/installed-units.js';
 import { DAEMON_TICK_IN_PROGRESS_MAX_MS } from './daemon-heartbeat.js';
+import { TRIGGER_STORE_ROTATE_COMMAND } from './trigger-runner.js';
 
 export type { InstalledUnit, InstalledUnitsReport };
 
@@ -535,7 +536,10 @@ function triggerStoreFindings(input: OpsHealthInput): OpsHealthFinding[] {
       id: 'trigger-store-near-cap',
       severity: ratio >= 1 ? 'error' : 'warn',
       reason: `trigger delivery store is ${(ratio * 100).toFixed(0)}% of its ${(store.cap_bytes / 1_048_576).toFixed(0)}MB hard cap — past the cap, appends are refused ([TRIGGER_STORE_FULL]) and triggers fail closed`,
-      next: 'pnpm daemon:watchdog -- --json  # confirm delivery health, then run `pnpm pipeline --input pipelines/storage-janitor.json` to compact',
+      next:
+        ratio >= 1
+          ? `${TRIGGER_STORE_ROTATE_COMMAND}  # dry-run first; then --request-approval, and --apply --approval-request-id <id> once a human approved`
+          : 'pnpm daemon:watchdog -- --json  # find the key prefix minting stable keys; the journal rotates itself once older receipts leave the 7-day window',
       evidence: [`path=${store.path}`, `size_bytes=${store.size_bytes}`],
     },
   ];

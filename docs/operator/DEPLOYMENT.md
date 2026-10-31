@@ -139,6 +139,27 @@ into `~/Library/LaunchAgents/`. They exist only as a reference for an existing
 single-instance deployment; run `pnpm kyberion scheduler reconcile --apply` from that
 checkout to migrate it to scoped units.
 
+Rerunning reconcile from a shell with a different `PATH` plans nothing: the `PATH`
+baked into a unit is left out of the drift comparison.
+
+The trigger delivery journal (`active/shared/runtime/trigger-deliveries.jsonl`) rotates
+itself, but it never drops a stable key younger than its 7-day dedupe window. If those
+keys alone fill it, appends stop at the 5 MB hard cap (`[TRIGGER_STORE_FULL]`, ops-health
+`trigger-store-near-cap` at error) and every trigger fails closed. The escape hatch is
+approval-gated and dry-run by default:
+
+```bash
+pnpm kyberion scheduler trigger-store rotate                     # plan: what is kept / dropped
+pnpm kyberion scheduler trigger-store rotate --request-approval  # opens a human approval
+pnpm kyberion approvals --approve <id>
+pnpm kyberion scheduler trigger-store rotate --apply --approval-request-id <id>
+```
+
+It archives the full journal to a `trigger-deliveries-<stamp>.jsonl` segment, keeps
+in-flight claims, the newest 2000 stable keys (`--keep-stable <n>`) and cron receipts of
+the last 10 minutes, uses the approval once and records `trigger.store_rotate` on the
+audit chain. A dropped stable key may deliver once more.
+
 The watchdog reads daemon heartbeats from `active/shared/runtime/heartbeats/` and records
 an ops alert to `active/shared/observability/ops-alerts.jsonl` when a configured daemon is
 missing, stale, or malformed. If `KYBERION_OPS_ALERT_WEBHOOK_URL` is set, the same alert is
@@ -461,7 +482,9 @@ What `--scope all` archives: `active/`, `vault/`, `knowledge/personal/` and
 `knowledge/confidential/`, minus re-creatable data — the
 `active/shared/{tmp,staging,cache}` floors, every
 `storage-retention-catalog.json` entry marked `"backup": "exclude"` (fully
-regenerable data such as indexes, probe caches and test-run fixtures; a
+regenerable data such as indexes, probe caches and test-run fixtures, plus the
+re-fetchable `active/shared/data-vault` cache and the soft-delete grace floor
+`active/archive/.trash`; a
 `cache`/`tmp` class alone never excludes, because staging stores like distill
 candidates or queued events hold pending state), the backup output directory and earlier archives in it, and the managed tool-runtime
 installs (only each runtime's `state.json` provenance is kept; reinstall the
