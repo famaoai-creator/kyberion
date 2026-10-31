@@ -265,6 +265,81 @@ jobs:
         with:
           job: actuator/boundary/security tests
 
+  # R15 integration lane: the built-CLI process smoke (R14) plus the P0
+  # confidential organization lifecycle (R01) — expectation classification in
+  # tests/fixtures/cli-reliability/probes.json distinguishes bug /
+  # expected-denial / expected-attention / env-blocked, so a refused probe is
+  # not a regression and a green mock never stands in for a denied path.
+  cli-reliability:
+    name: cli-reliability (smoke + lifecycle)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: build-artifacts
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v5
+      - name: Setup Kyberion
+        uses: ./.github/actions/setup-kyberion
+        with:
+          node-version: '24'
+      - name: Download compiler outputs
+        id: workspace
+        uses: actions/download-artifact@v6
+        with:
+          name: build-outputs
+
+      # Fast lane surfaces (manifest/schema + type/lint/format) stay in
+      # pr-gates/static-checks; this lane owns the process-level contracts.
+      - name: CLI help contract (no bootstrap, exit 0)
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
+        run: node scripts/kyberion_cli_entry.mjs --help > /dev/null
+
+      - name: Built-CLI smoke (26 probes, hermetic)
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
+        shell: bash
+        run: pnpm exec vitest run tests/cli-reliability.smoke.test.ts 2>&1 | tee "$RUNNER_TEMP/cli-smoke.log"
+
+      - name: Confidential organization lifecycle (P0)
+        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
+        shell: bash
+        run: pnpm exec vitest run tests/confidential-organization-lifecycle.test.ts 2>&1 | tee "$RUNNER_TEMP/confidential-lifecycle.log"
+
+      # Provenance: SHA / lockfile / build-generation receipt / fixture
+      # schemaVersion, plus the redacted logs (fixture env carries no
+      # secrets; the secret guard masks registered values in harness output).
+      - name: Attach lane provenance
+        if: always()
+        shell: bash
+        run: |
+          {
+            echo "sha: ${GITHUB_SHA}"
+            echo "lockfile_sha256: $(sha256sum pnpm-lock.yaml | cut -d' ' -f1)"
+            echo "build_generation: $(cat dist/.build-generation.json 2>/dev/null || echo none)"
+            echo "fixture_schema: $(node -e "console.log(JSON.parse(require('fs').readFileSync('tests/fixtures/cli-reliability/probes.json','utf8')).schemaVersion)")"
+            git status --porcelain
+          } > "$RUNNER_TEMP/cli-reliability-provenance.txt"
+          # First-run results stay attached even on retry: classify every
+          # failure as bug/expected-denial/env-blocked/flaky in triage.
+          cp "$RUNNER_TEMP/cli-smoke.log" "$RUNNER_TEMP/cli-smoke-first-run.log" 2>/dev/null || true
+          cp "$RUNNER_TEMP/confidential-lifecycle.log" "$RUNNER_TEMP/confidential-lifecycle-first-run.log" 2>/dev/null || true
+      - name: Upload cli-reliability evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: cli-reliability-evidence
+          path: |
+            ${{ runner.temp }}/cli-reliability-provenance.txt
+            ${{ runner.temp }}/cli-smoke-first-run.log
+            ${{ runner.temp }}/confidential-lifecycle-first-run.log
+          retention-days: 14
+
+      - name: Triage failure
+        if: failure()
+        uses: ./.github/actions/ci-failure-triage
+        with:
+          job: cli-reliability
+
   vital:
     name: vital-check
     runs-on: ubuntu-latest
