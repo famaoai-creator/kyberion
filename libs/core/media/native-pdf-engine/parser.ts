@@ -12,11 +12,14 @@ import type {
   PdfImageElement,
 } from '../../contracts/pdf-protocol.js';
 import { clamp } from '../../foundation/text.js';
+import { decodeFilterChain, parseDecodeParms, parseFilterNames } from './filters.js';
+import * as pdfStructure from './structure.js';
 
 /**
- * High-Fidelity Native PDF Parser v4.0 [PDF 2.0 COMPLIANT]
- * Supports both legacy xref tables and PDF 2.0 Cross-Reference Streams.
- * Handles UTF-16BE hex strings, FlateDecode, and XMP metadata.
+ * High-Fidelity Native PDF Parser v4.1 [PDF 2.0 COMPLIANT]
+ * Supports classic xref tables (+ /Prev, hybrid /XRefStm), PDF 2.0 Cross-Reference
+ * Streams (including /Index), object streams, filter chains, and XMP metadata.
+ * Xref / stream-bound behaviour informed by PdfCraft `pdfcraft-cos` (MIT OR Apache-2.0).
  */
 export class NativePdfParser {
   private buffer: Buffer;
@@ -40,83 +43,250 @@ export class NativePdfParser {
   // ── Object Discovery ──────────────────────────────────────
 
   private discoverObjects() {
-    // First try Cross-Reference Stream (PDF 2.0)
-    if (!this.parseXRefStream()) {
-      // Fallback: scan for all "N 0 obj" markers
-      this.scanObjectMarkers();
+    // Prefer startxref → classic table / xref stream (+ /Prev), then any leftover /XRef,
+    // then a full object-marker scan for damaged files (PdfCraft-style repair fallback).
+    if (!this.parseFromStartxref()) {
+      this.parseXRefStream();
     }
+    this.scanObjectMarkers();
+  }
+
+  /** Locate the last `startxref` value near EOF (ISO 32000-2 §7.5.5). */
+  private findStartxrefOffset(): number | null {
+    const tailStart = Math.max(0, this.buffer.length - 4096);
+    const tail = this.str.substring(tailStart);
+    const matches = [...tail.matchAll(/startxref\s+(\d+)/g)];
+    if (matches.length === 0) return null;
+    return Number.parseInt(matches[matches.length - 1][1], 10);
+  }
+
+  /**
+   * Walk the xref chain from `startxref`: classic tables, xref streams, `/Prev`,
+   * and hybrid `/XRefStm` supplements.
+   */
+  private parseFromStartxref(): boolean {
+    const start = this.findStartxrefOffset();
+    if (start === null || start < 0 || start >= this.buffer.length) return false;
+
+    const visited = new Set<number>();
+    let offset: number | null = start;
+    let loaded = false;
+
+    while (offset !== null && !visited.has(offset)) {
+      visited.add(offset);
+      const head = this.str.substring(offset, Math.min(offset + 20, this.str.length));
+      if (/^\s*xref\b/.test(head)) {
+        const trailer = this.parseClassicXrefTable(offset);
+        loaded = true;
+        if (trailer) {
+          // Hybrid: /XRefStm supplements and replaces table entries for this revision.
+          const xrefStm = trailer.match(/\/XRefStm\s+(\d+)/)?.[1];
+          if (xrefStm) this.parseXRefStreamAt(Number.parseInt(xrefStm, 10), true);
+          const prev = trailer.match(/\/Prev\s+(\d+)/)?.[1];
+          offset = prev ? Number.parseInt(prev, 10) : null;
+          continue;
+        }
+        break;
+      }
+      if (this.parseXRefStreamAt(offset, false)) {
+        loaded = true;
+        // Stream dict may carry /Prev in the same object header
+        const headerEnd = this.str.indexOf('stream', offset);
+        const header =
+          headerEnd === -1
+            ? this.str.substring(offset, offset + 800)
+            : this.str.substring(offset, headerEnd);
+        const prev = header.match(/\/Prev\s+(\d+)/)?.[1];
+        offset = prev ? Number.parseInt(prev, 10) : null;
+        continue;
+      }
+      break;
+    }
+
+    return loaded && (this.xref.size > 0 || this.compressedXref.size > 0);
+  }
+
+  /** Classic `xref` subsection table ending at `trailer << ... >>`. */
+  private parseClassicXrefTable(offset: number): string | null {
+    const xrefIdx = this.str.indexOf('xref', offset);
+    if (xrefIdx === -1 || xrefIdx > offset + 16) return null;
+
+    let pos = xrefIdx + 4;
+    while (pos < this.str.length && /\s/.test(this.str[pos])) pos += 1;
+
+    // Subsections: `start count` then `offset gen n|f` lines (20 bytes typical).
+    while (pos < this.str.length) {
+      while (pos < this.str.length && /\s/.test(this.str[pos])) pos += 1;
+      if (this.str.startsWith('trailer', pos)) break;
+
+      const sub = this.str.substring(pos).match(/^(\d+)\s+(\d+)/);
+      if (!sub) break;
+      const startId = Number.parseInt(sub[1], 10);
+      const count = Number.parseInt(sub[2], 10);
+      pos += sub[0].length;
+      while (pos < this.str.length && (this.str[pos] === ' ' || this.str[pos] === '\r')) pos += 1;
+      if (this.str[pos] === '\n') pos += 1;
+
+      for (let i = 0; i < count; i += 1) {
+        const line = this.str.substring(pos, pos + 22);
+        const entry = line.match(/^(\d{10})\s+(\d{5})\s+([nf])/);
+        if (entry) {
+          const objNum = startId + i;
+          const objOffset = Number.parseInt(entry[1], 10);
+          if (entry[3] === 'n' && objNum > 0 && !this.xref.has(objNum)) {
+            this.xref.set(objNum, objOffset);
+          }
+          // Advance past the 20-byte entry (+ optional CR/LF)
+          pos += 20;
+          if (this.str[pos] === '\r') pos += 1;
+          if (this.str[pos] === '\n') pos += 1;
+        } else {
+          // Tolerant: skip to next newline
+          const nl = this.str.indexOf('\n', pos);
+          if (nl === -1) return null;
+          pos = nl + 1;
+        }
+      }
+    }
+
+    const trailerIdx = this.str.indexOf('trailer', pos);
+    if (trailerIdx === -1) return null;
+    const dictStart = this.str.indexOf('<<', trailerIdx);
+    const dictEnd = this.str.indexOf('>>', dictStart);
+    if (dictStart === -1 || dictEnd === -1) return null;
+    return this.str.substring(dictStart, dictEnd + 2);
+  }
+
+  /**
+   * Parse a Cross-Reference Stream at a byte offset (object header or `/Type /XRef`).
+   * Honours `/Index [start count …]` (ISO 32000-2 §7.5.8.2).
+   * @param overwrite when true (hybrid `/XRefStm`), replace existing entries; otherwise
+   *   only fill gaps so a newer `/Prev` section keeps priority.
+   */
+  private parseXRefStreamAt(hintOffset: number, overwrite = false): boolean {
+    // Accept either an object that starts at hintOffset or a /Type /XRef nearby.
+    let objStart = hintOffset;
+    const local = this.str.substring(hintOffset, Math.min(hintOffset + 64, this.str.length));
+    if (!/\d+\s+\d+\s+obj/.test(local)) {
+      const xrefTypeIdx = this.str.indexOf('/Type /XRef', hintOffset);
+      const alt = this.str.indexOf('/Type/XRef', hintOffset);
+      const typeIdx =
+        xrefTypeIdx === -1 ? alt : alt === -1 ? xrefTypeIdx : Math.min(xrefTypeIdx, alt);
+      if (typeIdx === -1) return false;
+      const marker = this.str.lastIndexOf(' 0 obj', typeIdx);
+      if (marker === -1) return false;
+      // Walk back to object number start
+      let s = marker;
+      while (s > 0 && /[\d\s]/.test(this.str[s - 1])) s -= 1;
+      objStart = s;
+    }
+
+    const streamKeyword = this.str.indexOf('stream', objStart);
+    if (streamKeyword === -1) return false;
+    const headerRegion = this.str.substring(objStart, streamKeyword);
+    if (!/\/Type\s*\/XRef\b/.test(headerRegion)) return false;
+
+    const wMatch = headerRegion.match(/\/W\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s*\]/);
+    if (!wMatch) return false;
+    const w = [parseInt(wMatch[1]), parseInt(wMatch[2]), parseInt(wMatch[3])];
+    const entrySize = w[0] + w[1] + w[2];
+    if (entrySize <= 0) return false;
+
+    const sizeMatch = headerRegion.match(/\/Size\s+(\d+)/);
+    if (!sizeMatch) return false;
+    const size = parseInt(sizeMatch[1], 10);
+
+    // `/Index [start count …]`; default `[0 Size]`
+    const indexRanges: Array<{ start: number; count: number }> = [];
+    const indexMatch = headerRegion.match(/\/Index\s*\[([^\]]*)\]/);
+    if (indexMatch) {
+      const nums = [...indexMatch[1].matchAll(/(\d+)/g)].map((m) => parseInt(m[1], 10));
+      for (let i = 0; i + 1 < nums.length; i += 2) {
+        indexRanges.push({ start: nums[i], count: nums[i + 1] });
+      }
+    }
+    if (indexRanges.length === 0) indexRanges.push({ start: 0, count: size });
+
+    const sliced = this.sliceStreamPayload(headerRegion, streamKeyword);
+    if (!sliced) return false;
+
+    const filters = parseFilterNames(headerRegion);
+    const parms = parseDecodeParms(headerRegion);
+    const data = filters.length > 0 ? decodeFilterChain(sliced, filters, parms) : sliced;
+    if (!data) return false;
+
+    let row = 0;
+    for (const range of indexRanges) {
+      for (let i = 0; i < range.count; i += 1) {
+        const objNum = range.start + i;
+        const offset = row * entrySize;
+        if (offset + entrySize > data.length)
+          return this.xref.size > 0 || this.compressedXref.size > 0;
+        const type = w[0] === 0 ? 1 : this.readField(data, offset, w[0]);
+        const field2 = this.readField(data, offset + w[0], w[1]);
+        const field3 = this.readField(data, offset + w[0] + w[1], w[2]);
+        if (type === 1 && objNum > 0 && (overwrite || !this.xref.has(objNum))) {
+          this.xref.set(objNum, field2);
+          if (overwrite) this.compressedXref.delete(objNum);
+        } else if (type === 2 && objNum > 0 && (overwrite || !this.compressedXref.has(objNum))) {
+          this.compressedXref.set(objNum, { objectStreamId: field2, objectIndex: field3 });
+          if (overwrite) this.xref.delete(objNum);
+        }
+        row += 1;
+      }
+    }
+
+    return this.xref.size > 0 || this.compressedXref.size > 0;
   }
 
   /**
    * Parse PDF 2.0 Cross-Reference Stream (ISO 32000-2 §7.5.8)
-   * Returns true if a valid XRef stream was found.
+   * Returns true if a valid XRef stream was found (first match scan).
    */
   private parseXRefStream(): boolean {
     const xrefTypeIdx = this.str.indexOf('/Type /XRef');
-    if (xrefTypeIdx === -1) return false;
+    const alt = this.str.indexOf('/Type/XRef');
+    const typeIdx =
+      xrefTypeIdx === -1 ? alt : alt === -1 ? xrefTypeIdx : Math.min(xrefTypeIdx, alt);
+    if (typeIdx === -1) return false;
+    return this.parseXRefStreamAt(typeIdx);
+  }
 
-    // Find the enclosing object
-    const objStart = this.str.lastIndexOf(' 0 obj', xrefTypeIdx);
-    if (objStart === -1) return false;
-
-    // Extract /W array
-    const headerRegion = this.str.substring(objStart, this.str.indexOf('stream', objStart));
-    const wMatch = headerRegion.match(/\/W\s*\[\s*(\d+)\s+(\d+)\s+(\d+)\s*\]/);
-    if (!wMatch) return false;
-
-    const w = [parseInt(wMatch[1]), parseInt(wMatch[2]), parseInt(wMatch[3])];
-    const entrySize = w[0] + w[1] + w[2];
-
-    // Extract /Size
-    const sizeMatch = headerRegion.match(/\/Size\s+(\d+)/);
-    if (!sizeMatch) return false;
-    const totalEntries = parseInt(sizeMatch[1]);
-
-    // Extract and decompress the stream data
-    const streamStart = this.str.indexOf('stream', objStart);
-    const streamEnd = this.str.indexOf('endstream', streamStart);
-    if (streamStart === -1 || streamEnd === -1) return false;
-
-    let dataStart = streamStart + 6;
-    while (this.buffer[dataStart] === 10 || this.buffer[dataStart] === 13) dataStart++;
-
-    const rawData = this.buffer.subarray(dataStart, streamEnd);
-    let data: Buffer;
-
-    if (headerRegion.includes('/FlateDecode')) {
-      try {
-        data = zlib.inflateSync(rawData);
-      } catch {
-        try {
-          data = zlib.unzipSync(rawData);
-        } catch {
-          return false;
-        }
-      }
-    } else {
-      data = rawData;
+  /**
+   * Slice stream bytes after the `stream` keyword: skip the mandatory EOL,
+   * prefer `/Length` when present, else stop at `endstream` (trim trailing EOL).
+   */
+  private sliceStreamPayload(header: string, streamKeywordOffset: number): Buffer | null {
+    let dataStart = streamKeywordOffset + 6; // after "stream"
+    // ISO 32000: optional spaces/tabs then a single EOL (CR, LF, or CRLF)
+    while (
+      dataStart < this.buffer.length &&
+      (this.buffer[dataStart] === 0x20 || this.buffer[dataStart] === 0x09)
+    ) {
+      dataStart += 1;
+    }
+    if (this.buffer[dataStart] === 0x0d) {
+      dataStart += 1;
+      if (this.buffer[dataStart] === 0x0a) dataStart += 1;
+    } else if (this.buffer[dataStart] === 0x0a) {
+      dataStart += 1;
     }
 
-    // Parse entries according to /W array
-    for (let i = 0; i < totalEntries && i * entrySize < data.length; i++) {
-      const offset = i * entrySize;
-      const type = this.readField(data, offset, w[0]);
-      const field2 = this.readField(data, offset + w[0], w[1]);
-      const field3 = this.readField(data, offset + w[0] + w[1], w[2]);
-
-      if (type === 1 && i > 0) {
-        // Type 1: in-use object at byte offset `field2`
-        this.xref.set(i, field2);
-      } else if (type === 2 && i > 0) {
-        // Type 2: object stored inside an object stream
-        this.compressedXref.set(i, { objectStreamId: field2, objectIndex: field3 });
+    const lengthMatch = header.match(/\/Length\s+(\d+)\b/);
+    if (lengthMatch) {
+      const length = Number.parseInt(lengthMatch[1], 10);
+      if (length >= 0 && dataStart + length <= this.buffer.length) {
+        return this.buffer.subarray(dataStart, dataStart + length);
       }
     }
 
-    // Also register objects not in xref (fallback scan for safety)
-    this.scanObjectMarkers();
-
-    return this.xref.size > 0;
+    const end = this.str.indexOf('endstream', dataStart);
+    if (end === -1) return null;
+    let dataEnd = end;
+    // Writers often put EOL before endstream; drop one trailing CR/LF pair.
+    if (dataEnd > dataStart && this.buffer[dataEnd - 1] === 0x0a) dataEnd -= 1;
+    if (dataEnd > dataStart && this.buffer[dataEnd - 1] === 0x0d) dataEnd -= 1;
+    return this.buffer.subarray(dataStart, dataEnd);
   }
 
   /** Read a multi-byte big-endian unsigned integer field from buffer */
@@ -189,30 +359,22 @@ export class NativePdfParser {
     if (offset === undefined) return parsed;
 
     const start = this.str.indexOf('stream', offset);
-    const end = this.str.indexOf('endstream', start);
-    if (start === -1 || end === -1) return parsed;
+    if (start === -1) return parsed;
 
     const objectHeader = this.str.substring(offset, start);
     const firstMatch = objectHeader.match(/\/First\s+(\d+)/);
     const countMatch = objectHeader.match(/\/N\s+(\d+)/);
     if (!firstMatch || !countMatch) return parsed;
 
-    let streamStart = start + 6;
-    while (this.buffer[streamStart] === 10 || this.buffer[streamStart] === 13) streamStart++;
-    const rawData = this.buffer.subarray(streamStart, end);
+    const rawData = this.sliceStreamPayload(objectHeader, start);
+    if (!rawData) return parsed;
 
-    let decoded = rawData;
-    if (objectHeader.includes('/FlateDecode')) {
-      try {
-        decoded = zlib.inflateSync(rawData);
-      } catch {
-        try {
-          decoded = zlib.unzipSync(rawData);
-        } catch {
-          return parsed;
-        }
-      }
-    }
+    const filters = parseFilterNames(objectHeader);
+    const decoded =
+      filters.length > 0
+        ? decodeFilterChain(rawData, filters, parseDecodeParms(objectHeader))
+        : rawData;
+    if (!decoded) return parsed;
 
     const decodedText = decoded.toString('latin1');
     const first = parseInt(firstMatch[1]);
@@ -413,35 +575,10 @@ export class NativePdfParser {
   private decodeMetadataStream(objectId: number): string | null {
     const raw = this.readRawStream(objectId);
     if (!raw) return null;
-    let data = raw.data;
-    const lengthMatch = raw.header.match(/\/Length\s+(\d+)\b/);
-    if (lengthMatch) {
-      const length = parseInt(lengthMatch[1], 10);
-      if (Number.isFinite(length) && length >= 0 && length <= data.length) {
-        data = data.subarray(0, length);
-      }
-    } else {
-      // endstream search may include the EOL before the keyword.
-      while (
-        data.length > 0 &&
-        (data[data.length - 1] === 0x0a || data[data.length - 1] === 0x0d)
-      ) {
-        data = data.subarray(0, data.length - 1);
-      }
-    }
-
-    let decoded = data;
-    if (/\/FlateDecode\b/.test(raw.header)) {
-      try {
-        decoded = zlib.inflateSync(data);
-      } catch {
-        try {
-          decoded = zlib.unzipSync(data);
-        } catch {
-          return null;
-        }
-      }
-    }
+    const filters = parseFilterNames(raw.header);
+    if (filters.length === 0) return raw.data.toString('utf8');
+    const decoded = decodeFilterChain(raw.data, filters, parseDecodeParms(raw.header));
+    if (!decoded) return null;
     return decoded.toString('utf8');
   }
 
@@ -501,15 +638,33 @@ export class NativePdfParser {
       leafPageIds = this.scanLeafPageIdsDirect();
     }
 
+    const pageIdToIndex = new Map<number, number>();
+    leafPageIds.forEach((id, index) => pageIdToIndex.set(id, index));
+
     leafPageIds.forEach((id, index) => {
-      const page = this.extractPageContent(id, index + 1);
-      if (page.text.trim() || page.elements?.length || page.images?.length) {
+      const page = this.extractPageContent(id, index + 1, pageIdToIndex);
+      if (
+        page.text.trim() ||
+        page.elements?.length ||
+        page.images?.length ||
+        page.annotations?.length
+      ) {
         pages.push(page);
       }
     });
 
     return pages.length > 0 ? pages : this.resilientStreamScan();
   }
+
+  extractOutlines() {
+    return pdfStructure.extractOutlines(this as unknown as pdfStructure.PdfStructureHost);
+  }
+
+  extractAcroForm() {
+    return pdfStructure.extractAcroForm(this as unknown as pdfStructure.PdfStructureHost);
+  }
+
+  /** Catalog `/Outlines` tree → protocol bookmarks (PdfCraft-style thin distill). */
 
   private scanLeafPageIdsDirect(): number[] {
     const ids: number[] = [];
@@ -527,11 +682,19 @@ export class NativePdfParser {
     return ids.sort((a, b) => a - b);
   }
 
-  private extractPageContent(id: number, pageNumber: number): PdfPage {
+  private extractPageContent(
+    id: number,
+    pageNumber: number,
+    pageIdToIndex: Map<number, number> = new Map()
+  ): PdfPage {
     const obj = this.getFullObject(id) || '';
     const { width, height } = this.extractPageGeometry(obj);
     const fontResources = this.extractFontResources(obj);
     const imageResources = this.extractImageResources(obj);
+    const formResources = pdfStructure.extractFormResources(
+      this as unknown as pdfStructure.PdfStructureHost,
+      obj
+    );
     const extGStateResources = this.extractExtGStateResources(obj);
     const refs = this.extractContentRefs(obj);
     const elements: any[] = [];
@@ -547,8 +710,23 @@ export class NativePdfParser {
       images.push(...this.extractPlacedImages(decoded, height, imageResources));
       const streamText = this.parseTextOperators(decoded).join(' ').trim();
       if (streamText) textParts.push(streamText);
+      // Form XObject `Do` — scrape nested text (depth-bounded)
+      textParts.push(
+        ...pdfStructure.extractFormXObjectText(
+          this as unknown as pdfStructure.PdfStructureHost,
+          decoded,
+          formResources,
+          0
+        )
+      );
     }
 
+    const annotations = pdfStructure.extractPageAnnotations(
+      this as unknown as pdfStructure.PdfStructureHost,
+      obj,
+      height,
+      pageIdToIndex
+    );
     const mergedText = textParts.join(' ').replace(/\s+/g, ' ').trim();
     return {
       pageNumber,
@@ -557,6 +735,7 @@ export class NativePdfParser {
       text: mergedText,
       elements,
       images: images.length > 0 ? images : undefined,
+      annotations: annotations.length > 0 ? annotations : undefined,
     };
   }
 
@@ -840,32 +1019,25 @@ export class NativePdfParser {
   // ── Text Extraction ───────────────────────────────────────
 
   private decodeStream(id: number): string | null {
-    const offset = this.xref.get(id);
-    if (offset === undefined) return null;
+    const raw = this.readRawStream(id);
+    if (!raw) return null;
 
-    const start = this.str.indexOf('stream', offset);
-    const end = this.str.indexOf('endstream', start);
-    if (start === -1 || end === -1) return null;
+    const filters = parseFilterNames(raw.header);
+    if (filters.length === 0) return raw.data.toString('latin1');
 
-    let streamStart = start + 6;
-    while (this.buffer[streamStart] === 10 || this.buffer[streamStart] === 13) streamStart++;
-
-    const data = this.buffer.subarray(streamStart, end);
-    const header = this.str.substring(offset, start);
-
-    let decoded = data;
-    if (header.includes('/FlateDecode')) {
-      try {
-        decoded = zlib.inflateSync(data);
-      } catch (_) {
-        try {
-          decoded = zlib.unzipSync(data);
-        } catch (__) {
-          return null;
-        }
-      }
+    // Image-only codecs: leave as opaque binary — text extractors skip these.
+    if (filters.some((f) => f === 'DCTDecode' || f === 'JPXDecode' || f === 'JBIG2Decode')) {
+      return null;
     }
 
+    const parms = parseDecodeParms(raw.header);
+    // For image streams with Predictor, Columns often equals /Width when omitted.
+    if (parms.predictor > 1 && parms.columns === 1) {
+      const width = Number.parseInt(raw.header.match(/\/Width\s+(\d+)/)?.[1] || '', 10);
+      if (Number.isFinite(width) && width > 0) parms.columns = width;
+    }
+    const decoded = decodeFilterChain(raw.data, filters, parms);
+    if (!decoded) return null;
     return decoded.toString('latin1');
   }
 
@@ -874,16 +1046,12 @@ export class NativePdfParser {
     if (offset === undefined) return null;
 
     const start = this.str.indexOf('stream', offset);
-    const end = this.str.indexOf('endstream', start);
-    if (start === -1 || end === -1) return null;
+    if (start === -1) return null;
+    const header = this.str.substring(offset, start);
+    const data = this.sliceStreamPayload(header, start);
+    if (!data) return null;
 
-    let streamStart = start + 6;
-    while (this.buffer[streamStart] === 10 || this.buffer[streamStart] === 13) streamStart += 1;
-
-    return {
-      header: this.str.substring(offset, start),
-      data: this.buffer.subarray(streamStart, end),
-    };
+    return { header, data };
   }
 
   private extractTextFromStream(id: number): string {
@@ -946,13 +1114,23 @@ export class NativePdfParser {
       fullObject.match(/\/SMask\s+(\d+)\s+0\s+R/)?.[1] || '',
       10
     );
+    const filters = parseFilterNames(raw.header);
     let extension = '';
     let data = raw.data;
-    if (/\/DCTDecode\b/.test(raw.header)) {
+    if (filters.includes('DCTDecode') || /\/DCTDecode\b/.test(raw.header)) {
+      // Unwrap ASCII* wrappers around JPEG when present.
+      if (filters.length > 1 && filters[filters.length - 1] === 'DCTDecode') {
+        const unwrapped = decodeFilterChain(raw.data, filters.slice(0, -1));
+        if (unwrapped) data = unwrapped;
+      }
       extension = '.jpg';
-    } else if (/\/JPXDecode\b/.test(raw.header)) {
+    } else if (filters.includes('JPXDecode') || /\/JPXDecode\b/.test(raw.header)) {
+      if (filters.length > 1 && filters[filters.length - 1] === 'JPXDecode') {
+        const unwrapped = decodeFilterChain(raw.data, filters.slice(0, -1));
+        if (unwrapped) data = unwrapped;
+      }
       extension = '.jp2';
-    } else if (/\/FlateDecode\b/.test(raw.header)) {
+    } else if (filters.includes('FlateDecode') || /\/FlateDecode\b/.test(raw.header)) {
       const alphaMask = Number.isFinite(softMaskObjectId)
         ? this.extractSoftMaskAlpha(softMaskObjectId)
         : null;
@@ -1027,12 +1205,17 @@ export class NativePdfParser {
       return null;
     }
 
-    let rawPixels: Buffer;
-    try {
-      rawPixels = zlib.inflateSync(compressedData);
-    } catch {
-      return null;
-    }
+    const filters = parseFilterNames(header);
+    const parms = parseDecodeParms(header);
+    if (parms.predictor > 1 && parms.columns === 1) parms.columns = width;
+    if (parms.predictor > 1 && parms.colors === 1 && channels > 1) parms.colors = channels;
+    const chain = filters.length > 0 ? filters : ['FlateDecode'];
+    // Drop trailing image-only names; Flate(+ASCII*) is what we need for pixels.
+    const pixelFilters = chain.filter(
+      (f) => f !== 'DCTDecode' && f !== 'JPXDecode' && f !== 'JBIG2Decode'
+    );
+    const rawPixels = decodeFilterChain(compressedData, pixelFilters, parms);
+    if (!rawPixels) return null;
 
     const rowStride = width * channels;
     if (rawPixels.length < rowStride * height) return null;
@@ -1622,23 +1805,14 @@ export class NativePdfParser {
     return pages;
   }
 
-  private decodeRawStream(start: number, end: number): string | null {
-    let streamStart = start + 6;
-    while (this.buffer[streamStart] === 10 || this.buffer[streamStart] === 13) streamStart++;
-    const data = this.buffer.subarray(streamStart, end);
+  private decodeRawStream(start: number, _end: number): string | null {
     const header = this.str.substring(Math.max(0, start - 200), start);
-    let decoded = data;
-    if (header.includes('/FlateDecode')) {
-      try {
-        decoded = zlib.inflateSync(data);
-      } catch (_) {
-        try {
-          decoded = zlib.unzipSync(data);
-        } catch (__) {
-          return null;
-        }
-      }
-    }
+    const data = this.sliceStreamPayload(header, start);
+    if (!data) return null;
+    const filters = parseFilterNames(header);
+    if (filters.length === 0) return data.toString('latin1');
+    const decoded = decodeFilterChain(data, filters, parseDecodeParms(header));
+    if (!decoded) return null;
     return decoded.toString('latin1');
   }
 
@@ -1655,6 +1829,8 @@ export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDes
   const parser = new NativePdfParser(sourcePath);
   const metadata = parser.extractMetadata();
   const pages = parser.extractPages();
+  const outlines = parser.extractOutlines();
+  const acroForm = parser.extractAcroForm();
   const fullText = pages.map((p) => p.text).join('\n\n');
   const elements = pages.flatMap((page) => [
     ...(page.elements || []),
@@ -1683,6 +1859,8 @@ export async function distillNativePdfDesign(sourcePath: string): Promise<PdfDes
     source: { format: 'markdown' as any, body: fullText, title: metadata.title },
     content: { text: fullText, pages },
     metadata: { ...metadata, pageCount: pages.length },
+    outlines,
+    acroForm,
     aesthetic: { layout, elements, fonts },
   };
 }

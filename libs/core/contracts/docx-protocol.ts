@@ -136,6 +136,12 @@ export type DocxRunContent =
   | { type: 'text'; text: string }
   | { type: 'break'; breakType?: 'page' | 'column' | 'textWrapping' }
   | { type: 'tab' }
+  /** Carriage return inside a run (`w:cr`) — WordCraft maps this to a line break. */
+  | { type: 'cr' }
+  /** Soft hyphen (`w:softHyphen` / U+00AD). */
+  | { type: 'softHyphen' }
+  /** Non-breaking hyphen (`w:noBreakHyphen` / U+2011). */
+  | { type: 'noBreakHyphen' }
   | { type: 'drawing'; drawing: DocxDrawing }
   | { type: 'fieldChar'; fldCharType: 'begin' | 'separate' | 'end' }
   | { type: 'instrText'; text: string }

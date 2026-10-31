@@ -5,7 +5,8 @@
 export function generateContentTypes(
   sheetCount: number,
   drawingCount: number,
-  tableCount: number
+  tableCount: number,
+  commentCount = 0
 ): string {
   let xml = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
@@ -30,6 +31,9 @@ export function generateContentTypes(
   }
   for (let i = 1; i <= tableCount; i++) {
     xml += `\n  <Override PartName="/xl/tables/table${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml"/>`;
+  }
+  for (let i = 1; i <= commentCount; i++) {
+    xml += `\n  <Override PartName="/xl/comments${i}.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml"/>`;
   }
 
   xml += `\n</Types>`;

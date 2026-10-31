@@ -18,6 +18,8 @@ import { generateWorkbook } from './workbook.js';
 import { generateWorksheet } from './worksheet.js';
 import { generateDrawing, collectDrawingImageRels } from './drawing.js';
 import { generateTable } from './table.js';
+import { generateCommentsXml, generateVmlDrawing } from './comments.js';
+import { escapeXlsxAttr } from '../xlsx-xstring.js';
 
 // Re-use PPTX engine's theme generator (DrawingML theme is identical)
 import { generateTheme } from '../native-pptx-engine/theme.js';
@@ -36,11 +38,13 @@ export async function generateNativeXlsx(
   const zip = new AdmZip();
   const sheetCount = protocol.sheets.length;
 
-  // Count drawings and tables across all sheets
+  // Count drawings, tables, and comment parts across all sheets
   let totalDrawings = 0;
   let totalTables = 0;
+  let totalComments = 0;
   const sheetDrawingIndex: number[] = []; // per-sheet: drawing index (1-based) or 0
   const sheetTableIndices: number[][] = []; // per-sheet: array of table indices (1-based)
+  const sheetCommentIndex: number[] = []; // per-sheet: comments index (1-based) or 0
 
   for (const sheet of protocol.sheets) {
     if (sheet.drawing && sheet.drawing.elements.length > 0) {
@@ -56,12 +60,19 @@ export async function generateNativeXlsx(
       tableIds.push(totalTables);
     }
     sheetTableIndices.push(tableIds);
+
+    if (sheet.comments && sheet.comments.length > 0) {
+      totalComments++;
+      sheetCommentIndex.push(totalComments);
+    } else {
+      sheetCommentIndex.push(0);
+    }
   }
 
   // 1. Core package files
   zip.addFile(
     '[Content_Types].xml',
-    Buffer.from(generateContentTypes(sheetCount, totalDrawings, totalTables), 'utf8')
+    Buffer.from(generateContentTypes(sheetCount, totalDrawings, totalTables, totalComments), 'utf8')
   );
   zip.addFile('_rels/.rels', Buffer.from(generateGlobalRels(), 'utf8'));
   // Preserve a title from raw core.xml when present; otherwise omit dc:title
@@ -122,42 +133,97 @@ ${titleXml}<dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || 
   });
   zip.addFile('xl/sharedStrings.xml', Buffer.from(generateSharedStrings(protocol), 'utf8'));
 
-  // 6. Worksheets, Drawings, Tables
+  // 6. Worksheets, Drawings, Tables, Comments
   protocol.sheets.forEach((sheet, sheetIdx) => {
     const sheetNum = sheetIdx + 1;
     const drawingIdx = sheetDrawingIndex[sheetIdx];
     const tableIds = sheetTableIndices[sheetIdx];
+    const commentIdx = sheetCommentIndex[sheetIdx];
 
     // Build sheet relationships
-    const sheetExtras: Array<{ id: string; type: string; target: string }> = [];
+    const sheetExtras: Array<{
+      id: string;
+      type: string;
+      target: string;
+      targetMode?: string;
+    }> = [];
     let rIdCounter = 1;
 
+    let drawingRId: string | undefined;
     if (drawingIdx > 0) {
+      drawingRId = `rId${rIdCounter}`;
       sheetExtras.push({
-        id: `rId${rIdCounter++}`,
+        id: drawingRId,
         type: 'drawing',
         target: `../drawings/drawing${drawingIdx}.xml`,
       });
+      rIdCounter += 1;
     }
 
+    const tableRIds: string[] = [];
     for (const tableId of tableIds) {
+      const id = `rId${rIdCounter++}`;
+      tableRIds.push(id);
       sheetExtras.push({
-        id: `rId${rIdCounter++}`,
+        id,
         type: 'table',
         target: `../tables/table${tableId}.xml`,
       });
     }
 
-    // Worksheet XML
-    const drawingRId = drawingIdx > 0 ? 'rId1' : undefined;
+    let legacyDrawingRId: string | undefined;
+    if (commentIdx > 0) {
+      const commentsRId = `rId${rIdCounter++}`;
+      sheetExtras.push({
+        id: commentsRId,
+        type: 'comments',
+        target: `../comments${commentIdx}.xml`,
+      });
+      legacyDrawingRId = `rId${rIdCounter++}`;
+      sheetExtras.push({
+        id: legacyDrawingRId,
+        type: 'vmlDrawing',
+        target: `../drawings/vmlDrawing${commentIdx}.vml`,
+      });
+    }
+
+    const hyperlinkRIds = new Map<string, string>();
+    for (const link of sheet.hyperlinks || []) {
+      if (!link.external && !/^https?:\/\//i.test(link.target) && !link.target.includes('://')) {
+        continue;
+      }
+      // Strip #fragment for the relationship target
+      const href = (link.target.split('#')[0] || link.target).trim();
+      if (!href) continue;
+      const id = `rId${rIdCounter++}`;
+      hyperlinkRIds.set(link.ref, id);
+      sheetExtras.push({
+        id,
+        type: 'hyperlink',
+        target: escapeXlsxAttr(href),
+        targetMode: 'External',
+      });
+    }
+
     zip.addFile(
       `xl/worksheets/sheet${sheetNum}.xml`,
-      Buffer.from(generateWorksheet(sheet, drawingRId, sstMap), 'utf8')
+      Buffer.from(
+        generateWorksheet(sheet, drawingRId, sstMap, tableRIds, {
+          hyperlinkRIds,
+          legacyDrawingRId,
+        }),
+        'utf8'
+      )
     );
 
     // Sheet rels: prefer rawParts version (preserves VML/comment/printerSettings refs)
+    // unless we are synthesizing comments/hyperlinks ourselves.
     const sheetRelsPath = `xl/worksheets/_rels/sheet${sheetNum}.xml.rels`;
-    if (protocol.rawParts?.[sheetRelsPath]) {
+    const synthesizeRels =
+      hyperlinkRIds.size > 0 ||
+      commentIdx > 0 ||
+      (!protocol.rawParts?.[sheetRelsPath] && sheetExtras.length > 0);
+    if (protocol.rawParts?.[sheetRelsPath] && !synthesizeRels) {
       zip.addFile(sheetRelsPath, Buffer.from(protocol.rawParts[sheetRelsPath], 'base64'));
     } else if (sheetExtras.length > 0) {
       zip.addFile(sheetRelsPath, Buffer.from(generateSheetRels(sheetExtras), 'utf8'));
@@ -211,6 +277,18 @@ ${titleXml}<dcterms:created xsi:type="dcterms:W3CDTF">${protocol.generatedAt || 
       const globalTableId = tableIds[tableLocalIdx];
       zip.addFile(`xl/tables/table${globalTableId}.xml`, Buffer.from(generateTable(table), 'utf8'));
     });
+
+    // Comments + VML note shapes
+    if (commentIdx > 0 && sheet.comments) {
+      zip.addFile(
+        `xl/comments${commentIdx}.xml`,
+        Buffer.from(generateCommentsXml(sheet.comments), 'utf8')
+      );
+      zip.addFile(
+        `xl/drawings/vmlDrawing${commentIdx}.vml`,
+        Buffer.from(generateVmlDrawing(sheet.comments, commentIdx), 'utf8')
+      );
+    }
   });
 
   // 7. Inject rawParts (VML drawings, comments, printerSettings, calcChain, etc.)
