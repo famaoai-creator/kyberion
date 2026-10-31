@@ -20,8 +20,8 @@ import {
   readDocument,
   type ReadDocumentResult,
 } from '@agent/core/media/document-reader';
-import { safeWriteFile } from '@agent/core/secure-io';
-import { ScriptExitError } from './lib/harness.js';
+import { safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
+import { ScriptExitError, type ScriptErrorDetails } from './lib/harness.js';
 
 export const READ_USAGE = `Usage: pnpm kyberion read <file> [--ocr] [--tier <tier>] [--training-use <policy>] [--tenant <slug>] [--json] [--out <file>] [--images <dir>]
 
@@ -56,8 +56,33 @@ interface ReadArgs {
   help: boolean;
 }
 
+// §3.2 error contract: every refusal the operator can hit is classified so
+// the JSON error envelope carries code/category/next_action.
+const INVALID_USAGE_DETAILS: ScriptErrorDetails = {
+  code: 'INVALID_USAGE',
+  category: 'invalid_input',
+  retryable: false,
+};
+const INVALID_INPUT_DETAILS: ScriptErrorDetails = {
+  code: 'INVALID_INPUT',
+  category: 'invalid_input',
+  retryable: false,
+};
+const OUTSIDE_SCOPE_DETAILS: ScriptErrorDetails = {
+  code: 'OUTSIDE_ALLOWED_SCOPE',
+  category: 'permission_denied',
+  retryable: false,
+};
+const NOT_FOUND_DETAILS: ScriptErrorDetails = {
+  code: 'NOT_FOUND',
+  category: 'not_found',
+  retryable: false,
+};
+
 function parseReadArgs(argv: string[]): ReadArgs {
   const args: ReadArgs = { ocr: false, json: false, help: false };
+  const invalid = (message: string): ScriptExitError =>
+    new ScriptExitError(1, message, false, undefined, INVALID_USAGE_DETAILS);
   for (let index = 0; index < argv.length; index += 1) {
     const value = argv[index];
     if (value === undefined) continue;
@@ -69,22 +94,22 @@ function parseReadArgs(argv: string[]): ReadArgs {
     else if (value === '--out') {
       args.out = argv[index + 1];
       index += 1;
-      if (!args.out) throw new ScriptExitError(1, '--out requires a file path');
+      if (!args.out) throw invalid('--out requires a file path');
     } else if (value === '--images') {
       args.images = argv[index + 1];
       index += 1;
-      if (!args.images) throw new ScriptExitError(1, '--images requires a directory');
+      if (!args.images) throw invalid('--images requires a directory');
     } else if (value === '--tier') {
       const tier = argv[index + 1];
       index += 1;
       if (tier !== 'public' && tier !== 'confidential' && tier !== 'personal') {
-        throw new ScriptExitError(1, '--tier must be public, confidential, or personal');
+        throw invalid('--tier must be public, confidential, or personal');
       }
       args.tier = tier;
     } else if (value === '--tenant') {
       args.tenant = argv[index + 1];
       index += 1;
-      if (!args.tenant) throw new ScriptExitError(1, '--tenant requires a slug');
+      if (!args.tenant) throw invalid('--tenant requires a slug');
     } else if (value === '--training-use') {
       const policy = argv[index + 1];
       index += 1;
@@ -93,15 +118,12 @@ function parseReadArgs(argv: string[]): ReadArgs {
         policy !== 'zero_retention' &&
         policy !== 'training_eligible'
       ) {
-        throw new ScriptExitError(
-          1,
-          '--training-use must be local_only, zero_retention, or training_eligible'
-        );
+        throw invalid('--training-use must be local_only, zero_retention, or training_eligible');
       }
       args.trainingUse = policy;
-    } else if (value.startsWith('--')) throw new ScriptExitError(1, `Unknown option: ${value}`);
+    } else if (value.startsWith('--')) throw invalid(`Unknown option: ${value}`);
     else if (!args.file) args.file = value;
-    else throw new ScriptExitError(1, `Unexpected argument: ${value}`);
+    else throw invalid(`Unexpected argument: ${value}`);
   }
   return args;
 }
@@ -134,15 +156,43 @@ export async function runReadCommand(
       1,
       `[read] ${args.file} is a URL — read only reads local files. Fetch remote content through the ` +
         'egress-governed network:fetch op (see knowledge/product/orchestration/document-file-reading-playbook.md), ' +
-        'save it under active/shared/tmp/<job>/, then read that file.'
+        'save it under active/shared/tmp/<job>/, then read that file.',
+      false,
+      undefined,
+      {
+        ...INVALID_INPUT_DETAILS,
+        next_action:
+          'fetch remote content through the egress-governed network:fetch op, save it under active/shared/tmp/<job>/, then read that file',
+      }
     );
   }
   const absolute = pathResolver.rootResolve(args.file);
   if (!isInsideRepository(absolute)) {
+    // The scope guard runs on path arithmetic alone: an outside path is never
+    // stat'ed, so `read` cannot serve as an existence oracle and the refusal
+    // is identical whether the file exists or not.
     throw new ScriptExitError(
       1,
       `[read] ${args.file} is outside the repository. Copy it in first:\n` +
-        `  mkdir -p active/shared/tmp/<job> && cp "${args.file}" active/shared/tmp/<job>/`
+        `  mkdir -p active/shared/tmp/<job> && cp "${args.file}" active/shared/tmp/<job>/`,
+      false,
+      undefined,
+      {
+        ...OUTSIDE_SCOPE_DETAILS,
+        next_action:
+          'copy the file into active/shared/tmp/<job>/ inside the repository, then read it',
+      }
+    );
+  }
+  // Only an authorized in-repository path is probed: a missing leaf inside the
+  // allowed scope is NOT_FOUND, which outside paths never reach.
+  if (!safeExistsSync(absolute)) {
+    throw new ScriptExitError(
+      1,
+      `[read] ${args.file} does not exist inside the repository — check the path, then retry.`,
+      false,
+      undefined,
+      NOT_FOUND_DETAILS
     );
   }
   const format = inferDocumentFormat(absolute);
@@ -151,13 +201,31 @@ export async function runReadCommand(
       1,
       `[read] unsupported file type "${path.extname(absolute) || '(none)'}". ` +
         `Readable: ${Object.keys(READABLE_DOCUMENT_EXTENSIONS).join(', ')}. ` +
-        'Source code and other text can be opened with the editor; binary formats need a dedicated verb (see / listen / watch).'
+        'Source code and other text can be opened with the editor; binary formats need a dedicated verb (see / listen / watch).',
+      false,
+      undefined,
+      {
+        ...INVALID_INPUT_DETAILS,
+        code: 'UNSUPPORTED_TYPE',
+      }
     );
   }
   if (args.images && !isInsideRepository(pathResolver.rootResolve(args.images))) {
     throw new ScriptExitError(
       1,
-      `[read] --images ${args.images} must be a directory inside the repository`
+      `[read] --images ${args.images} must be a directory inside the repository`,
+      false,
+      undefined,
+      OUTSIDE_SCOPE_DETAILS
+    );
+  }
+  if (args.out && !isInsideRepository(pathResolver.rootResolve(args.out))) {
+    throw new ScriptExitError(
+      1,
+      `[read] --out ${args.out} must be a file inside the repository`,
+      false,
+      undefined,
+      OUTSIDE_SCOPE_DETAILS
     );
   }
   const result = await readDocument(absolute, format, {
@@ -168,17 +236,36 @@ export async function runReadCommand(
     ...(args.images ? { imagesDir: args.images } : {}),
   });
   const rendered = renderReadResult(result, args.json);
+  const notices: string[] = [];
   if (args.images) {
-    print(`[read] ${result.images.length} image(s) written to ${args.images}`);
+    notices.push(`[read] ${result.images.length} image(s) written to ${args.images}`);
     for (const image of result.images) {
-      print(`[read]   ${image.location}: ${path.relative(pathResolver.rootDir(), image.path)}`);
+      notices.push(
+        `[read]   ${image.location}: ${path.relative(pathResolver.rootDir(), image.path)}`
+      );
     }
   }
   if (args.out) {
     safeWriteFile(pathResolver.rootResolve(args.out), `${rendered}\n`);
-    print(`[read] wrote ${args.out} (${result.format}, ${result.markdown.length} chars)`);
+    notices.push(`[read] wrote ${args.out} (${result.format}, ${result.markdown.length} chars)`);
+  }
+  if (args.json) {
+    // JSON mode carries exactly one document on stdout: status notices move
+    // inside the payload instead of polluting the machine-readable stream.
+    print(
+      JSON.stringify(
+        {
+          ...result,
+          ...(notices.length > 0 ? { notices } : {}),
+          ...(args.out ? { written_to: args.out } : {}),
+        },
+        null,
+        2
+      )
+    );
   } else {
-    print(rendered);
+    for (const notice of notices) print(notice);
+    if (!args.out) print(rendered);
   }
   return result;
 }
