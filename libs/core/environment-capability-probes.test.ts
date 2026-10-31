@@ -8,8 +8,14 @@ import {
   parseEnginesNodeFloor,
   playwrightBrowsersDir,
   probeExplicitReasoningBackend,
+  probeRepoBuild,
   requiredPlaywrightChromiumDirs,
 } from './environment-capability-probes.js';
+import {
+  registerBuildReadinessInspector,
+  resetBuildReadinessInspector,
+  type BuildReadinessInspection,
+} from './build-readiness.js';
 import { probeManifest, type EnvironmentManifest } from './environment-capability.js';
 import * as pathResolver from './path-resolver.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -273,6 +279,81 @@ describe('probeExplicitReasoningBackend (LC-04d: explicit selection is probed sp
     );
     expect(result.available).toBe(false);
     expect(result.reason).toContain('reasoning-backend-policy.json');
+  });
+});
+
+describe('repo-build.receipt probe', () => {
+  const installInspector = (inspection: Partial<BuildReadinessInspection>) =>
+    registerBuildReadinessInspector(async () => ({
+      deferred: false,
+      entrypointPresent: true,
+      importViolations: [],
+      staleFindings: [],
+      scanFailures: [],
+      ...inspection,
+    }));
+
+  afterEach(() => {
+    resetBuildReadinessInspector();
+  });
+
+  it('reports fresh compiler outputs as available', async () => {
+    installInspector({});
+    expect(await probeRepoBuild()).toEqual({ available: true });
+  });
+
+  it('names the stale target and the rebuild fix', async () => {
+    installInspector({
+      staleFindings: [
+        {
+          target: 'libs/core',
+          code: 'source_changed_since_build',
+          sourceFile: 'libs/core/new.ts',
+        },
+      ],
+    });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build stale');
+    expect(result.reason).toContain('libs/core');
+    expect(result.reason).toContain('pnpm build');
+  });
+
+  it('distinguishes missing outputs from stale ones', async () => {
+    installInspector({ entrypointPresent: false });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build missing');
+  });
+
+  it('defers as building — an observation, never a repair', async () => {
+    installInspector({ deferred: true, entrypointPresent: false });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build building');
+  });
+
+  it('reports inputs that moved during the scan as changed_during_scan', async () => {
+    installInspector({ inputFingerprintBefore: 'a', inputFingerprintAfter: 'b' });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('changed_during_scan');
+  });
+
+  it('stops on unknown instead of degrading to green', async () => {
+    installInspector({
+      scanFailures: [{ target: 'libs/core', code: 'scan_failed', detail: 'permission denied' }],
+    });
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('repo-build unknown');
+  });
+
+  it('stays unknown when no inspector is installed', async () => {
+    const result = await probeRepoBuild();
+    expect(result.available).toBe(false);
+    expect(result.reason).toContain('unknown');
+    expect(result.reason).toContain('inspector');
   });
 });
 

@@ -792,6 +792,14 @@
       "types": "./dist/build-coordination.d.ts",
       "default": "./dist/build-coordination.js"
     },
+    "./build-generation": {
+      "types": "./dist/build-generation.d.ts",
+      "default": "./dist/build-generation.js"
+    },
+    "./build-readiness": {
+      "types": "./dist/build-readiness.d.ts",
+      "default": "./dist/build-readiness.js"
+    },
     "./business-calendar": {
       "types": "./dist/business-calendar.d.ts",
       "default": "./dist/business-calendar.js"
