@@ -1,3 +1,7 @@
+// Side-effect imports: the shared PII scrubber (globalThis.__kyberionPiiScrub)
+// and the pure inbox/send helpers (globalThis.KyberionBridgeInbox).
+import './pii-rules.generated.js';
+import './bridge-inbox.js';
 import { BROWSER_OPERATION_POLICY } from './operation-policy.js';
 
 const SAFE_OPERATIONS = new Set(BROWSER_OPERATION_POLICY.safe);
@@ -24,7 +28,7 @@ function withStateLock(fn) {
 }
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  withStateLock(() => handleMessage(message, sender))
+  routeMessage(message, sender)
     .then((result) => sendResponse({ ok: true, ...result }))
     .catch((error) =>
       sendResponse({ ok: false, error: error instanceof Error ? error.message : String(error) })
@@ -35,6 +39,52 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) =>
   withStateLock(() => handleTabUpdate(tabId, changeInfo, tab)).catch(() => undefined)
 );
+
+// Mailbox (受信) messages serialize on their own lock so a slow native poll
+// never blocks recording events; send-page and the WebMCP probe only read the
+// recording state and run unlocked (send-page takes the state lock itself to
+// store an intent resolution).
+function routeMessage(message, sender) {
+  const type = message?.type;
+  if (INBOX_MESSAGE_TYPES.has(type) || SIDE_PANEL_ONLY_MESSAGE_TYPES.has(type)) {
+    // Mailbox answers, page sends and WebMCP probes are Side Panel actions: a
+    // content script (or any other extension page) must never drive them.
+    if (!isSidePanelSender(sender)) {
+      return Promise.reject(new Error('この操作は Side Panel からのみ実行できます。'));
+    }
+  }
+  // Answering observe_tab reads the page, which the page can stall (an open
+  // alert(), a busy main thread): that part runs outside the inbox lock.
+  if (type === 'bridge:respond-request') return routeRespondRequest(message);
+  if (INBOX_MESSAGE_TYPES.has(type)) return withInboxLock(() => handleInboxMessage(message));
+  if (type === 'bridge:send-page') return sendPage(message.form || {});
+  if (type === 'bridge:get-send-draft') return getSendDraft();
+  if (type === 'bridge:probe-webmcp') return probeConnectedTabWebMcp();
+  return withStateLock(() => handleMessage(message, sender));
+}
+
+const SIDE_PANEL_ONLY_MESSAGE_TYPES = new Set([
+  'bridge:send-page',
+  'bridge:get-send-draft',
+  'bridge:probe-webmcp',
+]);
+
+// The Side Panel is an extension page: it has no `sender.tab` and its URL is
+// this extension's sidepanel.html.
+function isSidePanelSender(sender) {
+  if (!sender || sender.tab) return false;
+  const url = typeof sender.url === 'string' ? sender.url : '';
+  let expected = '';
+  try {
+    expected = chrome.runtime.getURL('sidepanel.html');
+  } catch {
+    return false;
+  }
+  return (
+    Boolean(expected) &&
+    (url === expected || url.startsWith(`${expected}?`) || url.startsWith(`${expected}#`))
+  );
+}
 
 async function handleTabUpdate(tabId, changeInfo, tab) {
   if (changeInfo.status === 'loading') {
@@ -1715,3 +1765,998 @@ async function handleMfaChallenge(lease, recording, session) {
   await broadcastState();
   return { state, lease: response.lease };
 }
+
+// ---------------------------------------------------------------------------
+// Kyberion → extension pull mailbox (受信) — B1 observe / B2 local infer / B4 notify
+// ---------------------------------------------------------------------------
+//
+// Native Messaging stays the only transport: the extension polls the native
+// host (`poll_requests`) and answers with `respond_request`. The poller runs
+// every minute via chrome.alarms, and every 5 s only while a Side Panel holds
+// a `sidepanel` port. Nothing here answers a request on its own: observe_tab
+// needs an explicit click in the Side Panel, local_infer runs in the Side Panel
+// (Built-in AI document APIs are unavailable in a service worker), and
+// approval_pending notifications are display-only.
+
+const Inbox = globalThis.KyberionBridgeInbox;
+const INBOX_KEY = 'browserBridgeInbox';
+const SEND_DRAFT_KEY = 'browserBridgeSendDraft';
+const MAILBOX_ALARM = 'kyberion-bridge-mailbox';
+const FAST_POLL_MS = 5_000;
+const SEND_MENU_ID = 'kyberion-send-page';
+const OBSERVE_PROCEDURE_ID = 'browser-bridge-observe';
+// Leave headroom under the host's 64 KiB respond_request cap.
+const RESPONSE_BUDGET_BYTES = 60_000;
+const LOCAL_INFER_OUTPUT_BUDGET_BYTES = 48_000;
+// WebMCP discovery is page-controlled: bound the in-page wait and the
+// isolated-side wait so a hostile page can never hold the inbox lock.
+const WEBMCP_PAGE_TIMEOUT_MS = 1_500;
+const WEBMCP_PROBE_TIMEOUT_MS = 3_000;
+// Overall bound on all page interaction for one observe_tab answer.
+const OBSERVE_TIMEOUT_MS = 10_000;
+const NOTIFICATION_PREFIX = 'kyberion-bbr-';
+// 1x1 PNG: chrome.notifications 'basic' requires an iconUrl and the extension
+// ships no icon assets.
+const NOTIFICATION_ICON =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+const INBOX_MESSAGE_TYPES = new Set([
+  'bridge:get-inbox',
+  'bridge:poll-inbox',
+  'bridge:respond-request',
+  'bridge:decline-request',
+  'bridge:dismiss-request',
+  'bridge:set-local-infer-auto',
+]);
+const REMOVE_ON_HOST_CODES = new Set(['expired', 'terminal', 'not_found']);
+
+let inboxLock = Promise.resolve();
+function withInboxLock(fn) {
+  const next = inboxLock.then(fn, fn);
+  inboxLock = next.then(
+    () => undefined,
+    () => undefined
+  );
+  return next;
+}
+
+const sidePanelPorts = new Set();
+let fastPollTimer = null;
+
+function scrubber() {
+  const scrub = globalThis.__kyberionPiiScrub;
+  if (typeof scrub !== 'function') {
+    throw new Error('PII scrubber が読み込まれていないため、Kyberion への送信を停止しました。');
+  }
+  return scrub;
+}
+
+function scrubLine(value, max) {
+  return String(scrubber()(String(value ?? '')))
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+function scrubDeep(value, depth = 0) {
+  if (typeof value === 'string') return scrubber()(value);
+  if (value === null || typeof value !== 'object') return value;
+  // Past the depth limit nothing unscrubbed may survive: drop the subtree.
+  if (depth > 6) return null;
+  if (Array.isArray(value)) return value.slice(0, 200).map((entry) => scrubDeep(entry, depth + 1));
+  return Object.fromEntries(
+    Object.entries(value)
+      .slice(0, 64)
+      .map(([key, entry]) => [scrubber()(key).slice(0, 120), scrubDeep(entry, depth + 1)])
+  );
+}
+
+function byteLength(value) {
+  return new TextEncoder().encode(typeof value === 'string' ? value : JSON.stringify(value)).length;
+}
+
+function trimToBytes(text, maxBytes) {
+  let out = String(text);
+  while (out && byteLength(out) > maxBytes) out = out.slice(0, Math.floor(out.length * 0.85));
+  return out;
+}
+
+function errorText(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function emptyInbox() {
+  return {
+    requests: [],
+    approvals: [],
+    requestsSignature: '',
+    approvalsSignature: '',
+    approvalsUnavailable: false,
+    lastPolledAt: null,
+    lastError: null,
+    notified: [],
+    dismissed: [],
+    localInferAuto: false,
+  };
+}
+
+async function loadInbox() {
+  const stored = await chrome.storage.session.get(INBOX_KEY);
+  return { ...emptyInbox(), ...(stored[INBOX_KEY] || {}) };
+}
+
+async function saveInbox(inbox) {
+  await chrome.storage.session.set({ [INBOX_KEY]: inbox });
+}
+
+function publicInbox(inbox) {
+  return {
+    requests: inbox.requests,
+    approvals: inbox.approvals,
+    approvalsSignature: inbox.approvalsSignature,
+    approvalsUnavailable: Boolean(inbox.approvalsUnavailable),
+    lastPolledAt: inbox.lastPolledAt,
+    lastError: inbox.lastError,
+    localInferAuto: inbox.localInferAuto === true,
+  };
+}
+
+async function updateBadge(inbox) {
+  const count = Inbox.badgeCount(inbox.requests);
+  try {
+    await chrome.action.setBadgeText({ text: count > 0 ? String(count) : '' });
+    if (count > 0) await chrome.action.setBadgeBackgroundColor({ color: '#174b3b' });
+  } catch (_) {
+    // badge is best-effort
+  }
+}
+
+function postToSidePanels(message) {
+  for (const port of sidePanelPorts) {
+    try {
+      port.postMessage(message);
+    } catch (_) {
+      sidePanelPorts.delete(port);
+    }
+  }
+}
+
+function notifyInboxChanged(inbox, newIds = [], approvalsChanged = false) {
+  postToSidePanels({
+    type: 'bridge:inbox-changed',
+    inbox: publicInbox(inbox),
+    newIds,
+    approvalsChanged,
+  });
+}
+
+function clearToast(requestId) {
+  try {
+    Promise.resolve(chrome.notifications.clear(`${NOTIFICATION_PREFIX}${requestId}`)).catch(
+      () => undefined
+    );
+  } catch (_) {
+    // best-effort
+  }
+}
+
+function raiseToast(item) {
+  let title;
+  let message;
+  if (item.request_kind === 'observe_tab') {
+    title = 'Kyberion: ページ観測の依頼';
+    message = `${scrubLine(item.payload?.purpose, 200)} — サイドパネルの「受信」で許可または拒否してください。`;
+  } else if (item.request_kind === 'notify' && item.payload?.level === 'approval_pending') {
+    title = 'Kyberion: 承認待ち';
+    message = `${scrubLine(item.payload?.title, 120)} — 承認はターミナルで行います（サイドパネルの「受信」にコマンドがあります）。`;
+  } else {
+    return;
+  }
+  try {
+    Promise.resolve(
+      chrome.notifications.create(`${NOTIFICATION_PREFIX}${item.request_id}`, {
+        type: 'basic',
+        iconUrl: NOTIFICATION_ICON,
+        title,
+        message,
+        priority: 1,
+      })
+    ).catch(() => undefined);
+  } catch (_) {
+    // notifications are best-effort
+  }
+}
+
+async function purgeExpired(inbox, now = Date.now()) {
+  const expired = inbox.requests.filter((item) => Inbox.isExpired(item, now));
+  if (expired.length === 0) return false;
+  // Expired items are dropped locally and never answered.
+  inbox.requests = inbox.requests.filter((item) => !Inbox.isExpired(item, now));
+  inbox.requestsSignature = Inbox.stableSignature(inbox.requests);
+  expired.forEach((item) => clearToast(item.request_id));
+  return true;
+}
+
+async function pollMailbox() {
+  const inbox = await loadInbox();
+  const now = Date.now();
+  let response;
+  try {
+    response = await callNativeHost({ type: 'poll_requests' }, 15_000);
+  } catch (error) {
+    response = { ok: false, error: errorText(error) };
+  }
+  inbox.lastPolledAt = new Date(now).toISOString();
+
+  if (!response?.ok) {
+    const lastError = String(response?.error || '受信箱を確認できませんでした。').slice(0, 500);
+    const errorChanged = lastError !== inbox.lastError;
+    inbox.lastError = lastError;
+    const purged = await purgeExpired(inbox, now);
+    await saveInbox(inbox);
+    await updateBadge(inbox);
+    if (errorChanged || purged) notifyInboxChanged(inbox);
+    return { inbox: publicInbox(inbox) };
+  }
+
+  const dismissed = new Set(inbox.dismissed);
+  const requests = (Array.isArray(response.requests) ? response.requests : [])
+    .filter(
+      (item) =>
+        Inbox.isValidRequestId(item?.request_id) &&
+        ['observe_tab', 'local_infer', 'notify'].includes(item.request_kind) &&
+        !Inbox.isExpired(item, now) &&
+        !dismissed.has(item.request_id)
+    )
+    .slice(0, 50);
+  const approvals = (Array.isArray(response.approvals) ? response.approvals : []).slice(0, 20);
+  const requestsSignature = Inbox.stableSignature(requests);
+  const approvalsSignature = Inbox.stableSignature(approvals);
+  const requestsChanged = requestsSignature !== inbox.requestsSignature;
+  const approvalsChanged = approvalsSignature !== inbox.approvalsSignature;
+  const errorChanged = inbox.lastError !== null;
+
+  const notified = new Set(inbox.notified);
+  const fresh = requests.filter((item) => !notified.has(item.request_id));
+  fresh.forEach((item) => {
+    raiseToast(item);
+    notified.add(item.request_id);
+  });
+  const liveIds = new Set(requests.map((item) => item.request_id));
+  inbox.requests
+    .filter((item) => !liveIds.has(item.request_id))
+    .forEach((item) => clearToast(item.request_id));
+
+  inbox.requests = requests;
+  inbox.approvals = approvals;
+  inbox.requestsSignature = requestsSignature;
+  inbox.approvalsSignature = approvalsSignature;
+  inbox.approvalsUnavailable = response.approvals_unavailable === true;
+  inbox.lastError = null;
+  inbox.notified = [...notified].slice(-200);
+  inbox.dismissed = [...dismissed].filter((id) => notified.has(id)).slice(-200);
+  await saveInbox(inbox);
+  await updateBadge(inbox);
+  if (requestsChanged || approvalsChanged || errorChanged) {
+    notifyInboxChanged(
+      inbox,
+      fresh.map((item) => item.request_id),
+      approvalsChanged
+    );
+  }
+  return { inbox: publicInbox(inbox) };
+}
+
+function schedulePoll() {
+  return withInboxLock(pollMailbox).catch(() => undefined);
+}
+
+function startFastPoll() {
+  if (fastPollTimer) return;
+  fastPollTimer = setInterval(() => {
+    if (sidePanelPorts.size === 0) {
+      stopFastPoll();
+      return;
+    }
+    void schedulePoll();
+  }, FAST_POLL_MS);
+}
+
+function stopFastPoll() {
+  if (!fastPollTimer) return;
+  clearInterval(fastPollTimer);
+  fastPollTimer = null;
+}
+
+async function handleInboxMessage(message) {
+  switch (message.type) {
+    case 'bridge:get-inbox': {
+      const inbox = await loadInbox();
+      if (await purgeExpired(inbox)) {
+        await saveInbox(inbox);
+        await updateBadge(inbox);
+      }
+      return { inbox: publicInbox(inbox) };
+    }
+    case 'bridge:poll-inbox':
+      return pollMailbox();
+    case 'bridge:respond-request':
+      return respondRequest(message);
+    case 'bridge:decline-request':
+      return declineRequest(message.requestId, message.reason);
+    case 'bridge:dismiss-request':
+      return dismissRequest(message.requestId);
+    case 'bridge:set-local-infer-auto': {
+      const inbox = await loadInbox();
+      inbox.localInferAuto = message.enabled === true;
+      await saveInbox(inbox);
+      notifyInboxChanged(inbox);
+      return { inbox: publicInbox(inbox) };
+    }
+    default:
+      throw new Error('Unsupported Browser Bridge message.');
+  }
+}
+
+async function takeInboxItem(requestId) {
+  if (!Inbox.isValidRequestId(requestId)) throw new Error('依頼 ID が不正です。');
+  const inbox = await loadInbox();
+  const item = inbox.requests.find((candidate) => candidate.request_id === requestId);
+  if (!item) {
+    throw new Error('この依頼は受信箱にありません（応答済みか期限切れです）。');
+  }
+  if (Inbox.isExpired(item)) {
+    await removeInboxItem(requestId);
+    throw new Error('この依頼は期限切れです。応答は送りません。');
+  }
+  return item;
+}
+
+async function removeInboxItem(requestId) {
+  const inbox = await loadInbox();
+  inbox.requests = inbox.requests.filter((item) => item.request_id !== requestId);
+  inbox.requestsSignature = Inbox.stableSignature(inbox.requests);
+  await saveInbox(inbox);
+  await updateBadge(inbox);
+  clearToast(requestId);
+  notifyInboxChanged(inbox);
+  return inbox;
+}
+
+async function dismissRequest(requestId) {
+  const item = await takeInboxItem(requestId);
+  if (item.request_kind !== 'notify') {
+    throw new Error('観測・推論の依頼は「拒否」で応答してください。');
+  }
+  // Local only: the request is never answered, it just stops being shown.
+  const inbox = await loadInbox();
+  inbox.dismissed = [...new Set([...inbox.dismissed, requestId])].slice(-200);
+  await saveInbox(inbox);
+  return { inbox: publicInbox(await removeInboxItem(requestId)) };
+}
+
+// respond-request in three steps for observe_tab: check the item under a short
+// inbox lock, collect the observation with no lock held (bounded by one overall
+// timeout), then re-take the lock to re-check the item and send the answer.
+async function routeRespondRequest(message) {
+  const item = await withInboxLock(() => takeInboxItem(message.requestId));
+  if (item.request_kind !== 'observe_tab') {
+    return withInboxLock(() => respondRequest(message));
+  }
+  // Reading the page needs a per-request click in the Side Panel.
+  if (message.userAction !== true) {
+    throw new Error('ページ観測の依頼には、受信タブでの明示的な許可が必要です。');
+  }
+  const wire = await withTimeout(
+    buildObserveResponse(item),
+    OBSERVE_TIMEOUT_MS,
+    'ページの応答がないため観測を中止しました（ダイアログが開いているか、ページが応答していません）。ページを確認してから、もう一度許可してください。'
+  );
+  return withInboxLock(() => respondRequest(message, wire));
+}
+
+function withTimeout(promise, timeoutMs, errorMessage) {
+  let timer;
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(errorMessage)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+async function respondRequest(message, observeWire) {
+  // Re-checked here (under the inbox lock): the item may have been answered,
+  // declined or expired while an observation was being collected.
+  const item = await takeInboxItem(message.requestId);
+  let wire;
+  if (item.request_kind === 'observe_tab') {
+    if (message.userAction !== true || !observeWire) {
+      throw new Error('ページ観測の依頼には、受信タブでの明示的な許可が必要です。');
+    }
+    const allowed = Array.isArray(item.payload?.allowed_origins)
+      ? item.payload.allowed_origins
+      : [];
+    if (allowed.length > 0 && !allowed.includes(observeWire.origin)) {
+      throw new Error('観測中に依頼の対象サイトが変わったため、応答を中止しました。');
+    }
+    wire = observeWire;
+  } else if (item.request_kind === 'local_infer') {
+    return respondLocalInfer(item, message);
+  } else if (item.request_kind === 'notify') {
+    if (item.payload?.level === 'approval_pending') {
+      throw new Error(
+        '承認待ちの通知には応答しません。承認は表示されたコマンドで、ターミナルから行ってください。'
+      );
+    }
+    wire = { status: 'completed' };
+  } else {
+    throw new Error('未対応の依頼です。');
+  }
+  return sendRequestResponse(item, wire);
+}
+
+async function declineRequest(requestId, reason) {
+  const item = await takeInboxItem(requestId);
+  return sendRequestResponse(item, {
+    status: 'declined',
+    error: String(reason || 'ユーザーが拒否しました。'),
+  });
+}
+
+async function sendRequestResponse(item, wire) {
+  const payload = {
+    type: 'respond_request',
+    request_id: item.request_id,
+    status: wire.status,
+    ...(wire.result !== undefined ? { result: wire.result } : {}),
+    ...(wire.error ? { error: scrubLine(wire.error, 1000) } : {}),
+    ...(wire.origin ? { origin: wire.origin } : {}),
+  };
+  if (byteLength(payload) > 64 * 1024) {
+    throw new ResponseTooLargeError('応答が 64 KiB を超えるため送信できません。');
+  }
+  const response = await callNativeHost(payload, 30_000);
+  if (!response?.ok) {
+    if (REMOVE_ON_HOST_CODES.has(response?.code)) await removeInboxItem(item.request_id);
+    throw new Error(response?.error || '応答を Kyberion に送信できませんでした。');
+  }
+  const inbox = await removeInboxItem(item.request_id);
+  return {
+    inbox: publicInbox(inbox),
+    responded: { request_id: item.request_id, status: response.status || wire.status },
+  };
+}
+
+// A completed local_infer answer that cannot be sent (too large even after
+// bounding) is answered as `failed` instead, so the requester is never left
+// waiting on a request the panel silently gave up on.
+async function respondLocalInfer(item, message) {
+  try {
+    return await sendRequestResponse(item, buildLocalInferResponse(item, message));
+  } catch (error) {
+    if (!error?.responseTooLarge) throw error;
+    return sendRequestResponse(item, {
+      status: 'failed',
+      error: `ローカル推論の結果が大きすぎるため送信できませんでした: ${errorText(error)}`,
+    });
+  }
+}
+
+class ResponseTooLargeError extends Error {
+  constructor(message) {
+    super(message);
+    this.responseTooLarge = true;
+  }
+}
+
+// Trim an object output (already scrubbed, plain JSON) until its serialized
+// size fits: shorten the longest string first, then halve the longest array.
+function boundObjectOutput(output, maxBytes) {
+  if (byteLength(output) <= maxBytes) return { output, truncated: false };
+  const bounded = structuredClone(output);
+  for (let guard = 0; guard < 400 && byteLength(bounded) > maxBytes; guard += 1) {
+    let longestString = null;
+    let longestArray = null;
+    const visit = (node) => {
+      if (Array.isArray(node)) {
+        if (!longestArray || node.length > longestArray.length) longestArray = node;
+        node.forEach((entry, index) => {
+          if (typeof entry === 'string') {
+            if (!longestString || entry.length > longestString.length)
+              longestString = { parent: node, key: index, length: entry.length };
+          } else if (entry && typeof entry === 'object') visit(entry);
+        });
+        return;
+      }
+      for (const [key, entry] of Object.entries(node)) {
+        if (typeof entry === 'string') {
+          if (!longestString || entry.length > longestString.length)
+            longestString = { parent: node, key, length: entry.length };
+        } else if (entry && typeof entry === 'object') visit(entry);
+      }
+    };
+    visit(bounded);
+    if (longestString && longestString.length > 256) {
+      const { parent, key } = longestString;
+      parent[key] = parent[key].slice(0, Math.floor(parent[key].length * 0.7));
+    } else if (longestArray && longestArray.length > 1) {
+      longestArray.length = Math.floor(longestArray.length / 2);
+    } else if (longestString && longestString.length > 0) {
+      const { parent, key } = longestString;
+      parent[key] = parent[key].slice(0, Math.floor(parent[key].length / 2));
+    } else {
+      break;
+    }
+  }
+  if (byteLength(bounded) > maxBytes) {
+    throw new ResponseTooLargeError('出力を上限内に収められません。');
+  }
+  return { output: bounded, truncated: true };
+}
+
+function buildLocalInferResponse(item, message) {
+  const task = item.payload?.task;
+  if (message.status === 'failed') {
+    return {
+      status: 'failed',
+      error: String(message.error || 'Chrome 内蔵 AI でローカル推論を実行できませんでした。'),
+    };
+  }
+  const result = message.result;
+  if (!result || result.executable !== false) {
+    throw new Error('ローカル推論の結果は executable:false である必要があります。');
+  }
+  if (result.task !== task) throw new Error('ローカル推論の結果のタスクが依頼と一致しません。');
+  const provider = scrubLine(result.provider, 80);
+  if (!provider) throw new Error('ローカル推論の結果に provider がありません。');
+  let output = scrubDeep(result.output);
+  let truncated = result.truncated === true;
+  if (typeof output === 'string' && byteLength(output) > LOCAL_INFER_OUTPUT_BUDGET_BYTES) {
+    output = trimToBytes(output, LOCAL_INFER_OUTPUT_BUDGET_BYTES);
+    truncated = true;
+  }
+  if (typeof output !== 'string' && (output === null || typeof output !== 'object')) {
+    throw new Error('ローカル推論の出力が不正です。');
+  }
+  if (typeof output !== 'string') {
+    const bounded = boundObjectOutput(output, LOCAL_INFER_OUTPUT_BUDGET_BYTES);
+    output = bounded.output;
+    truncated = truncated || bounded.truncated;
+  }
+  return { status: 'completed', result: { provider, task, output, truncated, executable: false } };
+}
+
+// observe_tab: only the active tab that the user connected in the Live tab,
+// only http(s), only an allowed origin; content comes from the same scrubbed
+// extraction paths the AI summary and page inspection already use.
+async function buildObserveResponse(item) {
+  const tab = await activeTab();
+  const origin = assertSupportedTab(tab);
+  const state = await loadState();
+  if (state.connected?.tabId !== tab.id || state.connected?.origin !== origin) {
+    throw new Error(
+      '観測できるのは Live タブで接続中の現在タブだけです。対象のタブを開いて接続してから許可してください。'
+    );
+  }
+  const allowed = Array.isArray(item.payload?.allowed_origins) ? item.payload.allowed_origins : [];
+  if (allowed.length > 0 && !allowed.includes(origin)) {
+    throw new Error(
+      `この依頼の対象は ${allowed.join(', ')} です（現在のタブ: ${origin}）。対象サイトのタブを接続するか、拒否してください。`
+    );
+  }
+  await ensureContentScript(tab.id);
+  const extracted =
+    item.payload?.mode === 'structure'
+      ? await observeStructureFields(tab.id)
+      : await observeTextFields(tab.id);
+  // The tab may have navigated between the origin check above and the
+  // extraction: bind the content to the origin of the document it came from.
+  if (extracted.origin !== origin || (allowed.length > 0 && !allowed.includes(extracted.origin))) {
+    throw new Error(
+      '観測中にページの接続先が変わったため、応答を中止しました。対象のタブを開き直してから許可してください。'
+    );
+  }
+  const { fields } = extracted;
+  const webmcp = await probeTabWebMcp(tab.id);
+  const observation = {
+    schema_version: 'browser-observation.v1',
+    observation_id: `OBS-${crypto.randomUUID()}`,
+    procedure_id: OBSERVE_PROCEDURE_ID,
+    recording_id: item.request_id,
+    lease_id: `LEASE-${item.request_id}`,
+    origin,
+    captured_at: new Date().toISOString(),
+    source: 'chrome-extension',
+    fields,
+  };
+  const result = {
+    observation,
+    ...(webmcp.tools.length > 0 ? { webmcp_tools: webmcp.tools } : {}),
+  };
+  fitObservationToBudget(result, RESPONSE_BUDGET_BYTES);
+  return { status: 'completed', origin, result };
+}
+
+async function observeTextFields(tabId) {
+  const source = await chrome.tabs.sendMessage(tabId, { type: 'bridge:get-ai-page-source' });
+  if (!source?.ok) throw new Error(source?.error || 'ページ内容を取得できませんでした。');
+  const fields = [
+    { name: 'title', text: scrubLine(source.title, 500) },
+    { name: 'path', text: scrubLine(source.url, 500) },
+    { name: 'page_text', text: String(scrubber()(String(source.text || ''))).slice(0, 20_000) },
+  ];
+  if (source.truncated) fields.push({ name: 'note', text: '本文は上限で切り詰めています。' });
+  return { fields, origin: originOf(String(source.origin || '')) };
+}
+
+function linkTarget(href) {
+  try {
+    const url = new URL(String(href || ''));
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return '';
+    // Never forward query strings or fragments (tokens, identifiers, searches).
+    return `${url.origin}${url.pathname}`;
+  } catch {
+    return '';
+  }
+}
+
+async function observeStructureFields(tabId) {
+  const result = await chrome.tabs.sendMessage(tabId, { type: 'bridge:inspect-page' });
+  if (!result?.ok || !result.inspection) {
+    throw new Error(result?.error || 'ページ構造を取得できませんでした。');
+  }
+  const inspection = result.inspection;
+  const lines = (entries, format) =>
+    (Array.isArray(entries) ? entries : [])
+      .map((entry) => scrubLine(format(entry), 500))
+      .filter(Boolean)
+      .join('\n')
+      .slice(0, 20_000);
+  const fields = [
+    { name: 'title', text: scrubLine(inspection.title, 500) },
+    { name: 'headings', text: lines(inspection.headings, (h) => `${h.level}: ${h.text}`) },
+    {
+      name: 'inputs',
+      text: lines(inspection.inputs, (input) =>
+        [
+          `${input.tag}${input.type ? `[${input.type}]` : ''}`,
+          input.label || input.placeholder || input.name || input.id || '',
+          input.required ? '(必須)' : '',
+        ]
+          .filter(Boolean)
+          .join(' ')
+      ),
+    },
+    { name: 'buttons', text: lines(inspection.buttons, (button) => button.text) },
+    {
+      name: 'links',
+      text: lines(inspection.links, (link) => {
+        const target = linkTarget(link.href);
+        return target ? `${link.text} → ${target}` : link.text;
+      }),
+    },
+    { name: 'excerpt', text: scrubLine(inspection.textExcerpt, 1000) },
+  ];
+  return {
+    fields: fields.filter((field) => field.name === 'title' || field.text),
+    origin: originOf(String(inspection.origin || '')),
+  };
+}
+
+function fitObservationToBudget(result, budget) {
+  const fields = result.observation.fields;
+  let guard = 0;
+  while (byteLength(result) > budget && guard < 200) {
+    guard += 1;
+    const longest = fields.reduce((a, b) => (b.text.length > a.text.length ? b : a), fields[0]);
+    if (!longest || longest.text.length === 0) break;
+    longest.text = longest.text.slice(0, Math.floor(longest.text.length * 0.8));
+  }
+  if (byteLength(result) > budget) throw new Error('観測結果が大きすぎるため送信できません。');
+}
+
+// ---------------------------------------------------------------------------
+// B5 WebMCP discovery (read-only)
+// ---------------------------------------------------------------------------
+
+// Runs in the page's MAIN world (serialized by chrome.scripting, so it must be
+// self-contained). Reads the tool list only — names, descriptions and the
+// top-level keys of each input schema. Never calls a tool, never registers one,
+// and never throws on pages without the API. Everything here is page-controlled
+// (the API object, the returned list, every property), so listTools() is raced
+// against a timeout, the walk stops at `max`, and only own data properties are
+// read (a getter is never invoked).
+async function probeWebMcpTools(limit, timeoutMs) {
+  const max = Math.max(0, Math.min(Number(limit) || 50, 50));
+  const waitMs = Math.max(0, Math.min(Number(timeoutMs) || 1500, 5000));
+  const tools = [];
+  let truncated = false;
+  let supported = false;
+  const own = (object, key) => {
+    try {
+      const descriptor = Object.getOwnPropertyDescriptor(object, key);
+      return descriptor && 'value' in descriptor ? descriptor.value : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const text = (value, size) => (typeof value === 'string' ? value.slice(0, size) : '');
+  const keysOf = (schema) => {
+    let parsed = schema;
+    if (typeof parsed === 'string') {
+      if (parsed.length > 50_000) return [];
+      try {
+        parsed = JSON.parse(parsed);
+      } catch {
+        return [];
+      }
+    }
+    if (!parsed || typeof parsed !== 'object') return [];
+    const properties = own(parsed, 'properties');
+    if (!properties || typeof properties !== 'object') return [];
+    const keys = [];
+    for (const key in properties) {
+      if (keys.length >= 32) break;
+      if (typeof key === 'string' && Object.prototype.hasOwnProperty.call(properties, key)) {
+        keys.push(key.slice(0, 80));
+      }
+    }
+    return keys;
+  };
+  const collect = (list) => {
+    if (!Array.isArray(list)) return;
+    let length = 0;
+    try {
+      length = Math.max(0, Math.min(Number(list.length) || 0, 10_000));
+    } catch {
+      return;
+    }
+    // Bound the walk itself: skipped (invalid) entries count too.
+    const scanLimit = Math.min(length, max * 4);
+    for (let index = 0; index < scanLimit; index += 1) {
+      if (tools.length >= max) {
+        truncated = true;
+        break;
+      }
+      try {
+        const tool = own(list, index);
+        if (!tool || typeof tool !== 'object') continue;
+        const name = text(own(tool, 'name'), 120);
+        if (!name) continue;
+        tools.push({
+          name,
+          description: text(own(tool, 'description'), 500),
+          input_keys: keysOf(own(tool, 'inputSchema') ?? own(tool, 'input_schema')),
+        });
+      } catch {
+        // a hostile entry: skip it
+      }
+    }
+    if (length > scanLimit) truncated = true;
+  };
+  const withTimeout = (promise) =>
+    Promise.race([
+      Promise.resolve(promise),
+      new Promise((resolve) => setTimeout(() => resolve(undefined), waitMs)),
+    ]);
+  try {
+    const testing = navigator.modelContextTesting;
+    if (testing) supported = true;
+    const listTools = testing ? testing.listTools : undefined;
+    if (typeof listTools === 'function') {
+      collect(await withTimeout(listTools.call(testing)));
+    }
+  } catch {
+    // API absent, rejected, or timed out
+  }
+  if (tools.length === 0) {
+    try {
+      const context = navigator.modelContext;
+      if (context) {
+        supported = true;
+        collect(context.tools);
+      }
+    } catch {
+      // API absent
+    }
+  }
+  return { supported, tools, truncated };
+}
+
+async function probeTabWebMcp(tabId) {
+  let timer;
+  try {
+    const probe = chrome.scripting.executeScript({
+      target: { tabId },
+      world: 'MAIN',
+      func: probeWebMcpTools,
+      args: [Inbox.MAX_WEBMCP_TOOLS, WEBMCP_PAGE_TIMEOUT_MS],
+    });
+    // The page can wedge the MAIN-world call (e.g. a hostile setTimeout), so
+    // the isolated side never waits longer than this either.
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(
+        () => reject(new Error('WebMCP の確認がタイムアウトしました。')),
+        WEBMCP_PROBE_TIMEOUT_MS
+      );
+    });
+    const results = await Promise.race([probe, timeout]);
+    const raw = results?.[0]?.result;
+    // Scrub on the isolated side: page-provided strings are untrusted.
+    const sanitized = Inbox.sanitizeWebMcpTools(raw?.tools, scrubber());
+    return {
+      supported: raw?.supported === true,
+      tools: sanitized.tools,
+      truncated: raw?.truncated === true || sanitized.truncated,
+    };
+  } catch (error) {
+    return { supported: false, tools: [], truncated: false, error: errorText(error) };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function probeConnectedTabWebMcp() {
+  const state = await loadState();
+  const tabId = state.connected?.tabId;
+  if (tabId === undefined || tabId === null) {
+    throw new Error('先に Live タブから現在のページを接続してください。');
+  }
+  return { webmcp: await probeTabWebMcp(tabId) };
+}
+
+// ---------------------------------------------------------------------------
+// Page → Kyberion (送信) — B3
+// ---------------------------------------------------------------------------
+
+async function sendPage(form) {
+  const scrub = scrubber();
+  const built = Inbox.buildSendPagePayload({
+    ...form,
+    title: scrubLine(form.title, 300),
+    text: String(scrub(String(form.text || ''))).slice(0, Inbox.SEND_MAX_TEXT + 1),
+    note: String(scrub(String(form.note || ''))),
+  });
+  if (!built.ok) throw new Error(built.errors.join(' '));
+  const response = await callNativeHost(built.payload, 180_000);
+  if (!response?.ok) throw new Error(response?.error || 'Kyberion への送信に失敗しました。');
+  if (response.mode === 'intent' && response.resolution) {
+    // Store the resolution exactly like resolve_intent so the Intent tab's
+    // Pattern B / Pattern A buttons work on it.
+    await withStateLock(async () => {
+      const state = await loadState();
+      state.intentResolution = {
+        intent: built.payload.note || built.payload.title,
+        outcome: response.resolution.outcome,
+        best: response.resolution.best || null,
+        candidates: response.resolution.candidates || [],
+        recommendedPattern: response.resolution.recommendedPattern,
+        resolvedAt: new Date().toISOString(),
+      };
+      state.notice = formatResolutionNotice(response.resolution);
+      await saveState(state);
+      await broadcastState();
+    });
+  }
+  await chrome.storage.session.set({ [SEND_DRAFT_KEY]: null });
+  return {
+    state: await loadState(),
+    sendResult: {
+      mode: response.mode,
+      intent: built.payload.note || built.payload.title,
+      ...(response.resolution ? { resolution: response.resolution } : {}),
+      ...(response.staged_ref ? { staged_ref: response.staged_ref } : {}),
+      ...(response.ingest ? { ingest: response.ingest } : {}),
+      ...(response.page ? { page: response.page } : {}),
+    },
+  };
+}
+
+async function getSendDraft() {
+  const stored = await chrome.storage.session.get(SEND_DRAFT_KEY);
+  return { draft: stored[SEND_DRAFT_KEY] || null };
+}
+
+// Context menu: pre-fill the Side Panel's 送信 form. Never sends by itself.
+async function prepareSendDraft(info, tab) {
+  const origin = originOf(tab?.url || '');
+  const preparedAt = new Date().toISOString();
+  let draft;
+  if (!origin) {
+    draft = {
+      error: 'このページは送信できません（http(s) の通常タブのみ）。',
+      prepared_at: preparedAt,
+    };
+  } else if (typeof info?.selectionText === 'string' && info.selectionText.trim()) {
+    const text = String(scrubber()(info.selectionText)).trim();
+    draft = {
+      url_origin: origin,
+      title: scrubLine(tab?.title, 300),
+      text: text.slice(0, Inbox.SEND_MAX_TEXT),
+      truncated: text.length > Inbox.SEND_MAX_TEXT,
+      selection_only: true,
+      prepared_at: preparedAt,
+    };
+  } else {
+    try {
+      await ensureContentScript(tab.id);
+      const source = await chrome.tabs.sendMessage(tab.id, { type: 'bridge:get-ai-page-source' });
+      if (!source?.ok) throw new Error(source?.error || 'ページ内容を取得できませんでした。');
+      draft = {
+        url_origin: origin,
+        title: scrubLine(source.title, 300),
+        text: String(scrubber()(String(source.text || ''))).slice(0, Inbox.SEND_MAX_TEXT),
+        truncated: Boolean(source.truncated),
+        selection_only: false,
+        prepared_at: preparedAt,
+      };
+    } catch (error) {
+      draft = {
+        url_origin: origin,
+        title: scrubLine(tab?.title, 300),
+        text: '',
+        selection_only: false,
+        error: errorText(error),
+        prepared_at: preparedAt,
+      };
+    }
+  }
+  await chrome.storage.session.set({ [SEND_DRAFT_KEY]: draft });
+  chrome.runtime.sendMessage({ type: 'bridge:send-draft-ready', draft }).catch(() => undefined);
+  return draft;
+}
+
+function registerContextMenu() {
+  chrome.contextMenus.removeAll(() => {
+    chrome.contextMenus.create(
+      { id: SEND_MENU_ID, title: 'Kyberion に送る', contexts: ['page', 'selection'] },
+      () => void chrome.runtime.lastError
+    );
+  });
+}
+
+chrome.runtime.onInstalled.addListener(() => registerContextMenu());
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info?.menuItemId !== SEND_MENU_ID) return;
+  // Open first, while the click's user gesture is still valid.
+  if (tab?.windowId !== undefined) {
+    Promise.resolve(chrome.sidePanel.open({ windowId: tab.windowId })).catch(() => undefined);
+  }
+  prepareSendDraft(info, tab).catch(() => undefined);
+});
+
+chrome.notifications.onClicked.addListener((notificationId) => {
+  if (!String(notificationId).startsWith(NOTIFICATION_PREFIX)) return;
+  Promise.resolve(chrome.windows.getLastFocused())
+    .then((window) =>
+      window?.id !== undefined ? chrome.sidePanel.open({ windowId: window.id }) : undefined
+    )
+    .catch(() => undefined);
+});
+
+// Poller wiring: the alarm (1 min, Chrome's minimum period) always runs; the
+// 5 s fast poll runs only while a Side Panel holds a `sidepanel` port.
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm?.name === MAILBOX_ALARM) void schedulePoll();
+});
+Promise.resolve(chrome.alarms.get(MAILBOX_ALARM))
+  .then((existing) =>
+    existing ? undefined : chrome.alarms.create(MAILBOX_ALARM, { periodInMinutes: 1 })
+  )
+  .catch(() => undefined);
+
+chrome.runtime.onConnect.addListener((port) => {
+  if (port?.name !== 'sidepanel') return;
+  if (!isSidePanelSender(port.sender)) {
+    port.disconnect?.();
+    return;
+  }
+  sidePanelPorts.add(port);
+  port.onDisconnect.addListener(() => {
+    sidePanelPorts.delete(port);
+    if (sidePanelPorts.size === 0) stopFastPoll();
+  });
+  // Keep-alive pings from the panel need no reply.
+  port.onMessage.addListener(() => undefined);
+  startFastPoll();
+  void schedulePoll();
+});

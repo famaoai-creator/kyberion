@@ -3316,6 +3316,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/browser_bridge_host.ts#handlePollRequests",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/browser_bridge_host.ts#handlePromoteProcedure",
       "roles": ["sovereign_concierge"],
       "unresolved": []
@@ -3327,6 +3332,11 @@
     },
     {
       "site": "scripts/browser_bridge_host.ts#handleResolveIntent",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/browser_bridge_host.ts#handleRespondRequest",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3351,7 +3361,22 @@
       "unresolved": []
     },
     {
+      "site": "scripts/browser_bridge_host.ts#ingestStagedPage",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/browser_bridge_host.ts#loadBrowserProcedure",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/browser_bridge_host.ts#recordBridgeAudit",
+      "roles": ["sovereign_concierge"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/browser_bridge_host.ts#stageSendPage",
       "roles": ["sovereign_concierge"],
       "unresolved": []
     },
@@ -3448,6 +3473,11 @@
     {
       "site": "scripts/clean.ts#main",
       "roles": ["mission_controller"],
+      "unresolved": []
+    },
+    {
+      "site": "scripts/cli-browser-bridge.ts#<module>",
+      "roles": ["sovereign_concierge"],
       "unresolved": []
     },
     {
