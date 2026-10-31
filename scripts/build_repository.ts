@@ -4,6 +4,13 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { createLogger } from '../libs/core/logger.js';
 import { withCompilerOutputs } from '../libs/core/build-coordination.js';
+import {
+  BUILD_RECEIPT_SCHEMA_VERSION,
+  publishBuildGenerationReceipt,
+  type BuildGenerationReceipt,
+} from '../libs/core/build-generation.js';
+import { readJsonIfPresent } from '../libs/core/foundation/json.js';
+import { nowIso } from '../libs/core/foundation/time.js';
 import { PfcController, type RecoveryAttempt } from '../libs/core/pfc/PfcController.js';
 import { pathResolver } from '../libs/core/path-resolver.js';
 import { assertGovernedExec, buildSafeExecEnv, safeSpawn } from '../libs/core/secure-io.js';
@@ -177,12 +184,64 @@ export async function runBuildStage(
   });
 }
 
+export interface BuildInputSnapshot {
+  /** sha256 over the compiler input set (source contents + membership). */
+  sourceHash: string;
+  /** sha256 over tsconfig / manifest / lockfile inputs. */
+  configHash: string;
+  /** Number of compiler-input files covered. */
+  fileCount: number;
+  takenAt: string;
+}
+
 export interface BuildDependencies {
   run(stage: BuildStage): Promise<void>;
   clean(): void;
   readiness(): Promise<boolean>;
   record(attempt: RecoveryAttempt): void;
   lock<T>(build: () => Promise<T>): Promise<T>;
+  /**
+   * Snapshot the compiler input set (untracked compiler inputs count — git
+   * status is irrelevant). Taken before and after the stage run: a mismatch
+   * means sources moved under the build and the output is a mixed
+   * generation that must not be called fresh.
+   */
+  snapshotInputs?(): Promise<BuildInputSnapshot>;
+  /** Atomically publish a completed-generation receipt (dist/.build-generation.json). */
+  publishReceipt?(receipt: BuildGenerationReceipt): void;
+}
+
+async function trySnapshotInputs(deps: BuildDependencies): Promise<BuildInputSnapshot | null> {
+  if (!deps.snapshotInputs) return null;
+  try {
+    return await deps.snapshotInputs();
+  } catch (error) {
+    logger.warn(
+      `compiler input snapshot failed — build generation will stay unverifiable | next: none, the build still runs | evidence: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return null;
+  }
+}
+
+/** Tool versions safe to persist in a receipt — no env dumps, no secrets. */
+function buildToolVersions(): BuildGenerationReceipt['toolVersions'] {
+  const versions: BuildGenerationReceipt['toolVersions'] = { node: process.version };
+  try {
+    const manifest = readJsonIfPresent<{ version?: string }>(
+      pathResolver.rootResolve('node_modules/typescript/package.json')
+    );
+    if (typeof manifest?.version === 'string' && manifest.version) {
+      versions.typescript = manifest.version;
+    }
+  } catch {
+    /* TypeScript identity unknown — leave it unset rather than guess. */
+  }
+  const userAgent = process.env.npm_config_user_agent;
+  const pnpmMatch = userAgent ? /pnpm\/([\d.]+)/.exec(userAgent) : null;
+  if (pnpmMatch?.[1]) versions.pnpm = pnpmMatch[1];
+  return versions;
 }
 
 export async function buildRepository(
@@ -204,10 +263,25 @@ export async function buildRepository(
         pathResolver.rootResolve('active/shared/runtime/state/pfc-state.json')
       ).recordRecoveryAttempt('L2', attempt),
     lock: withCompilerOutputs,
+    snapshotInputs: async () => {
+      const { fingerprintBuildInputs, fingerprintBuildConfigInputs } =
+        await import('./check_stale_dist.js');
+      const inputs = fingerprintBuildInputs();
+      const config = fingerprintBuildConfigInputs();
+      return {
+        sourceHash: inputs.hash,
+        configHash: config.hash,
+        fileCount: inputs.fileCount,
+        takenAt: nowIso(),
+      };
+    },
+    publishReceipt: (receipt) => publishBuildGenerationReceipt(receipt),
     ...dependencies,
   };
   await deps.lock(async () => {
     const id = randomUUID();
+    const startedAt = nowIso();
+    const before = await trySnapshotInputs(deps);
     try {
       if (mode === 'all') deps.clean();
       for (const stage of mode === 'packages'
@@ -225,6 +299,17 @@ export async function buildRepository(
       });
       throw error;
     }
+    const after = await trySnapshotInputs(deps);
+    // Concurrent-update detection: the compiler-outputs lock protects dist
+    // writes, not source writes — a source that moved under us makes this a
+    // mixed generation. A→B→A is unprovable from fingerprints alone, so
+    // 'stable_observed' honestly means "before/after fingerprints matched".
+    const inputStability =
+      !before || !after
+        ? 'unverifiable'
+        : before.sourceHash === after.sourceHash && before.configHash === after.configHash
+          ? 'stable_observed'
+          : 'changed_observed';
     let restored = false;
     let reason: string | undefined;
     try {
@@ -232,7 +317,48 @@ export async function buildRepository(
     } catch {
       reason = 'Compiler readiness scan failed after build';
     }
-    deps.record({ id, passed: true, restored, ...(reason ? { reason } : {}) });
+    if (inputStability === 'changed_observed') {
+      const detail = 'compiler inputs changed during the build — outputs may mix generations';
+      logger.warn(
+        `${detail} | next: re-run the build once source writes settle | evidence: before=${before?.sourceHash.slice(0, 12)} after=${after?.sourceHash.slice(0, 12)}`
+      );
+      reason = reason ? `${reason}; ${detail}` : detail;
+    } else if (inputStability === 'unverifiable') {
+      logger.warn(
+        'compiler input stability could not be verified — no build-generation receipt will be published for this run'
+      );
+    }
+    // A completed-generation receipt is published only when the existing
+    // readiness checks pass AND the input generation held stable; failed,
+    // aborted or mixed builds never overwrite the last good receipt.
+    if (restored && inputStability === 'stable_observed' && before && deps.publishReceipt) {
+      try {
+        deps.publishReceipt({
+          schemaVersion: BUILD_RECEIPT_SCHEMA_VERSION,
+          generationId: id,
+          mode,
+          startedAt,
+          finishedAt: nowIso(),
+          result: 'completed',
+          inputFingerprint: before.sourceHash,
+          configFingerprint: before.configHash,
+          toolVersions: buildToolVersions(),
+          inputStability: 'stable_observed',
+        });
+      } catch (error) {
+        logger.warn(
+          `build-generation receipt publish failed — the build result is unaffected | evidence: ${
+            error instanceof Error ? error.message : String(error)
+          }`
+        );
+      }
+    }
+    deps.record({
+      id,
+      passed: true,
+      restored: restored && inputStability !== 'changed_observed',
+      ...(reason ? { reason } : {}),
+    });
     // These failures do not indicate a compiler recovery failure.
     if (mode === 'all') for (const stage of postBuild) await deps.run(stage);
   });

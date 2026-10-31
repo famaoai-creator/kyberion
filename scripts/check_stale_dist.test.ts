@@ -6,6 +6,8 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   findStaleDistTargets,
+  fingerprintBuildConfigInputs,
+  fingerprintBuildInputs,
   formatStaleDistWarning,
   listRootEmittedPackageTargets,
   type StaleTargetSpec,
@@ -573,5 +575,86 @@ describe('check_stale_dist', () => {
     const warning = formatStaleDistWarning(scan);
     expect(warning).toContain('pnpm run build');
     expect(warning).toContain('fixture');
+  });
+});
+
+describe('fingerprintBuildInputs', () => {
+  afterEach(() => {
+    if (safeExistsSync(FIXTURE_DIR)) {
+      safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
+    }
+  });
+
+  function spec(overrides: Partial<StaleTargetSpec> = {}): StaleTargetSpec {
+    return {
+      id: 'fixture',
+      sourceRoot: `${FIXTURE_ROOT}/src`,
+      distRoot: `${FIXTURE_ROOT}/dist`,
+      ...overrides,
+    };
+  }
+
+  it('is stable when the same input set is scanned twice', () => {
+    write('src/a.ts', 'export const a = 1;\n');
+    write('src/sub/b.ts', 'export const b = 2;\n');
+    const first = fingerprintBuildInputs({ targets: [spec()] });
+    const second = fingerprintBuildInputs({ targets: [spec()] });
+    expect(first.hash).toBe(second.hash);
+    expect(first.fileCount).toBe(2);
+  });
+
+  it('counts an untracked compiler input as a generation change — git status is irrelevant', () => {
+    write('src/a.ts', 'export const a = 1;\n');
+    const before = fingerprintBuildInputs({ targets: [spec()] });
+    // An untracked .ts that lands inside a compiler input root IS an input.
+    write('src/agent-added-untracked.ts', 'export const injected = 1;\n');
+    const after = fingerprintBuildInputs({ targets: [spec()] });
+    expect(after.hash).not.toBe(before.hash);
+    expect(after.fileCount).toBe(before.fileCount + 1);
+  });
+
+  it('does not change for same-content touch or non-source files', () => {
+    write('src/a.ts', 'export const a = 1;\n');
+    write('src/README.md', '# not a compiler input\n');
+    const before = fingerprintBuildInputs({ targets: [spec()] });
+    setMtime('src/a.ts', T_NEW);
+    write('dist/a.js'); // outputs are not inputs
+    const after = fingerprintBuildInputs({ targets: [spec()] });
+    expect(after.hash).toBe(before.hash);
+  });
+
+  it('changes when input content or membership changes', () => {
+    write('src/a.ts', 'export const a = 1;\n');
+    const before = fingerprintBuildInputs({ targets: [spec()] });
+    write('src/a.ts', 'export const a = 2;\n');
+    expect(fingerprintBuildInputs({ targets: [spec()] }).hash).not.toBe(before.hash);
+  });
+
+  it('honors source exclusions and test exclusion like the staleness scan', () => {
+    write('src/a.ts', 'export const a = 1;\n');
+    write('src/a.test.ts', 'export const t = 1;\n');
+    write('src/skip/b.ts', 'export const b = 1;\n');
+    const fp = fingerprintBuildInputs({
+      targets: [spec({ excludeTests: true, excludeSourceDirs: ['skip'] })],
+    });
+    expect(fp.fileCount).toBe(1);
+  });
+});
+
+describe('fingerprintBuildConfigInputs', () => {
+  afterEach(() => {
+    if (safeExistsSync(FIXTURE_DIR)) {
+      safeRmSync(FIXTURE_DIR, { recursive: true, force: true });
+    }
+  });
+
+  it('hashes only existing config files and reacts to content changes', () => {
+    const cfg = `${FIXTURE_ROOT}/cfg/tsconfig.json`;
+    write('cfg/tsconfig.json', '{"compilerOptions":{}}\n');
+    const before = fingerprintBuildConfigInputs([cfg, `${FIXTURE_ROOT}/cfg/absent.json`]);
+    expect(before.files).toEqual([cfg]);
+
+    write('cfg/tsconfig.json', '{"compilerOptions":{"strict":true}}\n');
+    expect(fingerprintBuildConfigInputs([cfg]).hash).not.toBe(before.hash);
   });
 });

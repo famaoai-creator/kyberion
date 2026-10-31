@@ -234,6 +234,13 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/voice/vad-registry.ts',
     consumers: ['libs/core/ten-vad-bridge.ts', 'libs/core/silero-vad-bridge.ts'],
   },
+  'build.readiness-inspector': {
+    declaration: 'libs/core/build-readiness.ts',
+    consumers: [
+      'libs/core/environment-capability-probes.ts',
+      'scripts/baseline_build_readiness.ts',
+    ],
+  },
 };
 
 const OUTPUT_PATH = pathResolver.rootResolve('docs/developer/CAPABILITY_SEAMS.md');

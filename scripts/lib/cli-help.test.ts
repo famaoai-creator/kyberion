@@ -4,9 +4,11 @@ import { safeReadFile } from '@agent/core/secure-io';
 import { t, type VocabularyKey } from '@agent/core/t';
 import { loadCliManifest } from '../check_cli_manifest.js';
 import {
+  describeRegisteredCommand,
   editDistance,
   formatCliManifestHelp,
   formatUnknownCommand,
+  formatPrerequisiteLines,
   suggestCommands,
 } from './cli-help.js';
 
@@ -81,6 +83,62 @@ describe('CU-03 registry help renderer', () => {
   it('lists a same-target script alias once (under the governed command)', () => {
     const help = formatCliManifestHelp(manifest, { locale: 'en' });
     expect(help.match(/^ {2}doctor /gmu)).toHaveLength(1);
+  });
+
+  it('R06: distinguishes readiness / connection / state-change and shows prerequisites', () => {
+    const lines = formatCliManifestHelp(manifest, { locale: 'en' }).split('\n');
+    // `calendar status` is a binding-free readiness view; the binding gate
+    // applies to live ops on the surface, rendered under the Live-ops heading.
+    const status = lines.findIndex((line) => line.startsWith('  calendar status '));
+    expect(lines[status]).toContain('[readiness]');
+    expect(lines.slice(status, status + 3).join('\n')).toContain(
+      'Live ops need: trusted task binding (see `kyberion task`)'
+    );
+    // `calendar agenda` opens a live connection and documents both gates.
+    const agenda = lines.findIndex((line) => line.startsWith('  calendar agenda '));
+    expect(lines[agenda]).toContain('[connection check]');
+    expect(lines.slice(agenda, agenda + 3).join('\n')).toContain(
+      'Needs: trusted task binding (see `kyberion task`), task credentials (see `kyberion service setup`)'
+    );
+    // `calendar create-event` mutates state.
+    const create = lines.findIndex((line) => line.startsWith('  calendar create-event '));
+    expect(lines[create]).toContain('[state change]');
+    // `list --check` stays a readiness view under R03.
+    const list = lines.findIndex((line) => /^ {2}list {2,}/u.test(line));
+    expect(lines[list]).toContain('[readiness]');
+    // `listen` needs the local STT backend; the pointer is a real command.
+    const listen = lines.findIndex((line) => /^ {2}listen {2,}/u.test(line));
+    expect(lines.slice(listen, listen + 3).join('\n')).toContain(
+      'Needs: local backend (see `kyberion voice setup`)'
+    );
+  });
+
+  it('R06: prints the legend clarifying that badges grant no authority', () => {
+    const help = formatCliManifestHelp(manifest, { locale: 'en' });
+    expect(help).toContain('grant no authority');
+  });
+
+  it('R06: guarded per-command help carries prerequisites too', () => {
+    const listen = manifest.commands.find((command) => command.command === 'listen');
+    expect(describeRegisteredCommand(listen!, 'en').join('\n')).toContain(
+      'Needs: local backend (see `kyberion voice setup`)'
+    );
+  });
+
+  it('R06: splits always vs live_ops prerequisites into separate lines', () => {
+    expect(
+      formatPrerequisiteLines(
+        [
+          { kind: 'trusted_claim', via: 'task', when: 'live_ops' },
+          { kind: 'local_backend', via: 'voice setup' },
+        ],
+        'en'
+      )
+    ).toEqual([
+      'Needs: local backend (see `kyberion voice setup`)',
+      'Live ops need: trusted task binding (see `kyberion task`)',
+    ]);
+    expect(formatPrerequisiteLines(undefined, 'en')).toEqual([]);
   });
 });
 

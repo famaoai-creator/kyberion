@@ -12,6 +12,7 @@ import {
   type CliCommand,
   type CliCommandGroup,
   type CliManifest,
+  type CliPrerequisite,
   type CliScriptCommand,
 } from '../check_cli_manifest.js';
 import { formatScopeUsage } from './cli-scopes.js';
@@ -29,6 +30,10 @@ interface HelpRow {
   caution?: string;
   /** CU-09: `--scope a|b` / `<a|b>` for commands that route scopes. */
   scopes?: string;
+  /** R06: readiness / connection check / state change badge. */
+  effect?: string;
+  /** R06: rendered prerequisite lines (documentation only). */
+  needs?: string[];
 }
 
 const LABEL_WIDTH = 30;
@@ -47,6 +52,49 @@ function groupOf(command: CliCommand | CliScriptCommand): CliCommandGroup {
   return command.audience === 'dev' ? 'dev' : 'operate';
 }
 
+/** R06: one rendered prerequisite: `<kind>` with an optional real `kyberion <via>` pointer. */
+function formatPrerequisite(prerequisite: CliPrerequisite, locale?: SupportedLocale): string {
+  const kind = t(`cli:cli_prereq_${prerequisite.kind}` as VocabularyKey, undefined, locale);
+  if (!prerequisite.via) return kind;
+  return kind + t('cli:cli_manifest_help_prereq_via', { command: prerequisite.via }, locale);
+}
+
+/**
+ * R06: rendered prerequisite lines. `when:"live_ops"` prerequisites gate the
+ * surface's live/credentialed work while the command itself stays a readiness
+ * view, so they render under the Live-ops heading. Documentation only — this
+ * resolves no credentials and grants no authority.
+ */
+export function formatPrerequisiteLines(
+  prerequisites: readonly CliPrerequisite[] | undefined,
+  locale?: SupportedLocale
+): string[] {
+  if (!prerequisites?.length) return [];
+  const always = prerequisites
+    .filter((prerequisite) => (prerequisite.when ?? 'always') === 'always')
+    .map((prerequisite) => formatPrerequisite(prerequisite, locale));
+  const liveOps = prerequisites
+    .filter((prerequisite) => prerequisite.when === 'live_ops')
+    .map((prerequisite) => formatPrerequisite(prerequisite, locale));
+  const lines: string[] = [];
+  if (always.length > 0) {
+    lines.push(t('cli:cli_manifest_help_needs', { items: always.join(', ') }, locale));
+  }
+  if (liveOps.length > 0) {
+    lines.push(t('cli:cli_manifest_help_needs_live', { items: liveOps.join(', ') }, locale));
+  }
+  return lines;
+}
+
+/** R06: the [readiness] / [connection check] / [state change] badge. */
+function formatEffectBadge(
+  effect: string | undefined,
+  locale?: SupportedLocale
+): string | undefined {
+  if (!effect) return undefined;
+  return t(`cli:cli_manifest_help_effect_${effect}` as VocabularyKey, undefined, locale);
+}
+
 function helpRows(manifest: CliManifest, locale?: SupportedLocale): HelpRow[] {
   const entries: Array<CliCommand | CliScriptCommand> = [
     ...manifest.commands,
@@ -63,18 +111,25 @@ function helpRows(manifest: CliManifest, locale?: SupportedLocale): HelpRow[] {
       summary: render(command.description, locale) ?? `${command.noun} ${command.verb}`,
       caution: render(command.caution, locale),
       scopes: 'entry' in command ? formatScopeUsage(command) : undefined,
+      effect: formatEffectBadge(command.effect, locale),
+      needs: formatPrerequisiteLines(command.prerequisites, locale),
     }))
     .sort((left, right) => (left.label < right.label ? -1 : left.label > right.label ? 1 : 0));
 }
 
-/** Summary (+ caution) lines for one registry entry, used by guarded `--help`. */
+/** Summary (+ caution, badge, prerequisites) lines for one registry entry, used by guarded `--help`. */
 export function describeRegisteredCommand(
   command: CliCommand | CliScriptCommand,
   locale?: SupportedLocale
 ): string[] {
   const summary = render(command.description, locale) ?? `${command.noun} ${command.verb}`;
+  const badge = formatEffectBadge(command.effect, locale);
   const caution = render(command.caution, locale);
-  return caution ? [summary, caution] : [summary];
+  return [
+    badge ? `${summary}  ${badge}` : summary,
+    ...(caution ? [caution] : []),
+    ...formatPrerequisiteLines(command.prerequisites, locale),
+  ];
 }
 
 export function formatCliManifestHelp(
@@ -93,17 +148,25 @@ export function formatCliManifestHelp(
     if (groupRows.length === 0) continue;
     lines.push('', t(`cli:cli_manifest_help_group_${group}` as VocabularyKey, undefined, locale));
     for (const row of groupRows) {
-      lines.push(`  ${row.label.padEnd(LABEL_WIDTH)} ${row.summary}`);
+      lines.push(
+        `  ${row.label.padEnd(LABEL_WIDTH)} ${row.summary}${row.effect ? `  ${row.effect}` : ''}`
+      );
       if (row.caution) lines.push(`  ${''.padEnd(LABEL_WIDTH)} ${row.caution}`);
       if (row.scopes) {
         lines.push(
           `  ${''.padEnd(LABEL_WIDTH)} ${t('cli:cli_manifest_help_scopes', { usage: `${row.label} ${row.scopes}` }, locale)}`
         );
       }
+      for (const need of row.needs ?? []) {
+        lines.push(`  ${''.padEnd(LABEL_WIDTH)} ${need}`);
+      }
     }
   }
   lines.push('', t('cli:cli_manifest_help_footer', undefined, locale));
   lines.push(t('cli:cli_manifest_help_footer_detail', undefined, locale));
+  if (rows.some((row) => row.effect || (row.needs ?? []).length > 0)) {
+    lines.push(t('cli:cli_manifest_help_legend', undefined, locale));
+  }
   const hidden = rows.filter((row) => row.group === 'dev').length;
   if (!options.all && hidden > 0) {
     lines.push(t('cli:cli_manifest_help_footer_all', { count: hidden }, locale));

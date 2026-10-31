@@ -1,4 +1,5 @@
 import type { Observation } from '@agent/core/perception/observation';
+import { resolvePerceptionScope } from '@agent/core/perception/observation';
 import {
   PERCEPTION_OPTIONS_HELP,
   validatePerceptionOptions,
@@ -29,6 +30,7 @@ import {
   parseCommonOption,
   resolveRepositoryInput,
   sniffImageDimensions,
+  withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
 } from './lib/perception.js';
@@ -157,6 +159,8 @@ export async function runSeeCommand(
     if (args.file) throw new ScriptExitError(1, '--search does not take an input file');
     const { resolveScopeContext } = await import('@agent/core/scope-context');
     const current = resolveScopeContext();
+    // The index lives on the cache floor — outside the media role's grants —
+    // so this path runs under the caller's own authority, not the wrap below.
     const search =
       deps.enhancements?.search ??
       (await import('@agent/core/perception/semantic-index')).searchMedia;
@@ -176,13 +180,18 @@ export async function runSeeCommand(
   }
   const absolute = resolveRepositoryInput('see', args.file!);
   assertExtension('see', absolute, IMAGE_EXTENSIONS);
-  assertPerceptionInput(absolute);
-  let buffer: Buffer;
-  try {
-    buffer = safeReadFile(absolute, { encoding: null }) as Buffer;
-  } catch (error) {
-    throw new ScriptExitError(1, `[see] cannot read ${args.file}: ${(error as Error).message}`);
-  }
+  // The input read and every guarded read of the perception intermediates
+  // below run under the tenant-bound media role on protected tiers (see
+  // withPerceptionMediaRole).
+  const inputScope = resolvePerceptionScope(absolute);
+  const buffer = await withPerceptionMediaRole(inputScope, () => {
+    assertPerceptionInput(absolute);
+    try {
+      return safeReadFile(absolute, { encoding: null }) as Buffer;
+    } catch (error) {
+      throw new ScriptExitError(1, `[see] cannot read ${args.file}: ${(error as Error).message}`);
+    }
+  });
   const relative = path.relative(pathResolver.rootDir(), absolute);
   const result: SeeResult = {
     file: relative,
@@ -192,10 +201,17 @@ export async function runSeeCommand(
   };
   const enhanced = Boolean(options.grounded || options.compare || options.track || options.index);
   const feature = enhanced ? await enhancementDeps(deps) : undefined;
-  const source = feature?.source?.(absolute) ?? feature?.perceptionSource(absolute);
+  const source = feature
+    ? await withPerceptionMediaRole(
+        inputScope,
+        () => feature.source?.(absolute) ?? feature.perceptionSource(absolute)
+      )
+    : undefined;
   const previousSource =
     options.compare && feature
-      ? feature.perceptionSource(resolveRepositoryInput('see', options.compare))
+      ? await withPerceptionMediaRole(inputScope, () =>
+          feature.perceptionSource(resolveRepositoryInput('see', options.compare!))
+        )
       : undefined;
   if (source) {
     result.source = source;
@@ -203,19 +219,21 @@ export async function runSeeCommand(
   }
   if (args.ocr)
     try {
-      const ocr = await deps.ocr({
-        path: relative,
-        mode: args.provider ? 'privacy_first' : 'local_only',
-        ...(args.provider ? { providerPreference: [args.provider] } : {}),
-        timeout_ms: args.timeoutMs,
-        onProgress: (event) => {
-          if (deps === defaultPerceptionDeps)
-            process.stderr.write(
-              `[see] OCR ${event.stage}${event.provider ? ` (${event.provider})` : ''}\n`
-            );
-        },
-        ...(args.lang ? { language: args.lang } : {}),
-      });
+      const ocr = await withPerceptionMediaRole(inputScope, () =>
+        deps.ocr({
+          path: relative,
+          mode: args.provider ? 'privacy_first' : 'local_only',
+          ...(args.provider ? { providerPreference: [args.provider] } : {}),
+          timeout_ms: args.timeoutMs,
+          onProgress: (event) => {
+            if (deps === defaultPerceptionDeps)
+              process.stderr.write(
+                `[see] OCR ${event.stage}${event.provider ? ` (${event.provider})` : ''}\n`
+              );
+          },
+          ...(args.lang ? { language: args.lang } : {}),
+        })
+      );
       if (source && feature)
         result.observations!.push(
           ...feature.ocrObservations(
@@ -237,7 +255,9 @@ export async function runSeeCommand(
     }
   if (args.describe) {
     try {
-      const description = await deps.describe({ path: relative, kind: 'detailed' });
+      const description = await withPerceptionMediaRole(inputScope, () =>
+        deps.describe({ path: relative, kind: 'detailed' })
+      );
       if (description.status === 'succeeded') {
         result.description = { text: description.description, provider: description.provider };
         if (source && feature)
@@ -261,9 +281,8 @@ export async function runSeeCommand(
     }
   }
   if (options.compare && source && feature) {
-    result.changes = await feature.compareImages(
-      resolveRepositoryInput('see', options.compare),
-      absolute
+    result.changes = await withPerceptionMediaRole(inputScope, () =>
+      feature.compareImages(resolveRepositoryInput('see', options.compare!), absolute)
     );
     result.observations!.push(
       feature.observation(source, {
@@ -277,14 +296,16 @@ export async function runSeeCommand(
   }
   if (options.track) {
     const tracking = await import('@agent/core/perception/tracking');
-    result.tracking = await (deps.enhancements?.track ?? tracking.trackMedia)({
-      path: absolute,
-      faceModel: options.faceModel,
-      poseModel: options.poseModel,
-      gestureModel: options.gestureModel,
-      python: options.python,
-      maxFrames: 1,
-    });
+    result.tracking = await withPerceptionMediaRole(inputScope, () =>
+      (deps.enhancements?.track ?? tracking.trackMedia)({
+        path: absolute,
+        faceModel: options.faceModel,
+        poseModel: options.poseModel,
+        gestureModel: options.gestureModel,
+        python: options.python,
+        maxFrames: 1,
+      })
+    );
     if (source)
       result.observations!.push(...tracking.trackingObservations(source, result.tracking));
     if (options.avatarId)
@@ -292,6 +313,9 @@ export async function runSeeCommand(
         (deps.enhancements?.cues ?? tracking.trackingFrameToAnimationCues)(frame, options.avatarId!)
       );
   }
+  // --index / --search stay outside the media role: the semantic index lives
+  // on the cache floor, which perception_media_worker deliberately does not
+  // grant — those paths still need the caller's own authority.
   if (options.index && source) {
     const index =
       deps.enhancements?.index ??
@@ -317,8 +341,10 @@ export async function runSeeCommand(
       `[see] nothing could be read from ${args.file}: ${result.warnings.join('; ')}`
     );
   }
-  if (source && feature) feature.assertSourceUnchanged(source);
-  if (previousSource && feature) feature.assertSourceUnchanged(previousSource);
+  if (source && feature)
+    await withPerceptionMediaRole(inputScope, () => feature.assertSourceUnchanged(source));
+  if (previousSource && feature)
+    await withPerceptionMediaRole(inputScope, () => feature.assertSourceUnchanged(previousSource));
   const rendered = renderSeeResult(result, args.json);
   emitOutput('see', rendered, args.out, print, `${rendered.length} chars`, absolute);
   return result;

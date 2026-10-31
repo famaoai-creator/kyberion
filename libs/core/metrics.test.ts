@@ -546,6 +546,133 @@ describe('metrics core', () => {
     expect(report.skills[0].sloCompliance).toBe(50);
   });
 
+  it('R10: detects regressions for component-only history under its own name', () => {
+    // Producers persist `component`; grouping by `skill` used to merge every
+    // row into an 'undefined' cohort (the observed `undefined:` doctor line).
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-r10-identity');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+    const historyPath = path.join(metricsDir, 'history.jsonl');
+    const entries = [0, 1, 2, 3].map((index) => ({
+      component: 'code-actuator',
+      duration_ms: 100,
+      status: 'success',
+      timestamp: `2026-03-15T00:0${index}:00.000Z`,
+    }));
+    entries.push({
+      component: 'code-actuator',
+      duration_ms: 900,
+      status: 'success',
+      timestamp: '2026-03-15T00:04:00.000Z',
+    });
+    fs.writeFileSync(historyPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+
+    const mc = new MetricsCollector({ metricsDir, metricsFile: 'history.jsonl', persist: false });
+    const invalid: number[] = [];
+    const regressions = mc.detectRegressions(1.5, undefined, {
+      onInvalidRows: (rows) => invalid.push(rows),
+    });
+    expect(regressions).toHaveLength(1);
+    expect(regressions[0].skill).toBe('code-actuator');
+    expect(regressions[0].kind).toBe('component');
+    expect(regressions[0].lastDuration).toBe(900);
+    expect(invalid).toEqual([]);
+
+    const report = mc.reportFromHistory();
+    expect(report.invalidEntries).toBe(0);
+    expect(report.skills[0].kind).toBe('component');
+  });
+
+  it('R10: counts identity-less and bad-duration rows instead of grouping them', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-r10-invalid');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+    const historyPath = path.join(metricsDir, 'history.jsonl');
+    const timed = (index: number, duration = 100) => ({
+      component: 'worker',
+      duration_ms: duration,
+      status: 'success',
+      timestamp: `2026-03-15T00:0${index}:00.000Z`,
+    });
+    const entries = [
+      timed(0),
+      timed(1),
+      timed(2),
+      timed(3),
+      timed(4, 400),
+      { type: 'intervention', context: 'ctx', timestamp: '2026-03-15T00:05:00.000Z' },
+      { component: 'worker', duration_ms: -5, timestamp: '2026-03-15T00:06:00.000Z' },
+      { component: 'worker', duration_ms: 'not-a-number', timestamp: '2026-03-15T00:07:00.000Z' },
+      { skill: '', duration_ms: 10, timestamp: '2026-03-15T00:08:00.000Z' },
+    ];
+    fs.writeFileSync(historyPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+
+    const mc = new MetricsCollector({ metricsDir, metricsFile: 'history.jsonl', persist: false });
+    const invalid: number[] = [];
+    const regressions = mc.detectRegressions(1.5, undefined, {
+      onInvalidRows: (rows) => invalid.push(rows),
+    });
+    // Five timed runs of 'worker' remain (last = 400ms vs avg 100ms).
+    expect(regressions).toMatchObject([{ skill: 'worker', lastDuration: 400 }]);
+    expect(regressions.every((row) => row.skill !== 'undefined')).toBe(true);
+    expect(invalid).toEqual([4]);
+
+    const report = mc.reportFromHistory();
+    expect(report.invalidEntries).toBe(4);
+    expect(report.skills.map((row) => row.skill)).toEqual(['worker']);
+  });
+
+  it('R10: keeps a same-named component and skill in separate cohorts and needs 5 runs', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-r10-kinds');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+    const historyPath = path.join(metricsDir, 'history.jsonl');
+    const rows: Record<string, unknown>[] = [];
+    for (let index = 0; index < 5; index += 1) {
+      rows.push({
+        component: 'dup',
+        duration_ms: index === 4 ? 900 : 100,
+        status: 'success',
+        timestamp: `2026-03-15T00:0${index}:00.000Z`,
+      });
+      rows.push({
+        skill: 'dup',
+        duration_ms: 10,
+        status: 'success',
+        timestamp: `2026-03-15T00:0${index}:30.000Z`,
+      });
+    }
+    fs.writeFileSync(historyPath, `${rows.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+
+    const mc = new MetricsCollector({ metricsDir, metricsFile: 'history.jsonl', persist: false });
+    // Each cohort sees only its own history: the component cohort regresses,
+    // the skill cohort never mixes into its average.
+    expect(mc.detectRegressions(1.5)).toMatchObject([
+      { skill: 'dup', kind: 'component', lastDuration: 900, historicalAvg: 100 },
+    ]);
+    const report = mc.reportFromHistory();
+    expect(report.uniqueSkills).toBe(2);
+    expect(report.skills.map((row) => row.kind).sort()).toEqual(['component', 'skill']);
+  });
+
+  it('R10: skips cohorts whose average cannot anchor a ratio', () => {
+    const metricsDir = path.join(process.cwd(), 'active/shared/tmp/metrics-test-r10-zeroavg');
+    fs.rmSync(metricsDir, { recursive: true, force: true });
+    fs.mkdirSync(metricsDir, { recursive: true });
+    const historyPath = path.join(metricsDir, 'history.jsonl');
+    const entries = [0, 1, 2, 3, 4].map((index) => ({
+      component: 'free-op',
+      duration_ms: 0,
+      status: 'success',
+      timestamp: `2026-03-15T00:0${index}:00.000Z`,
+    }));
+    entries[4].duration_ms = 500;
+    fs.writeFileSync(historyPath, `${entries.map((entry) => JSON.stringify(entry)).join('\n')}\n`);
+
+    const mc = new MetricsCollector({ metricsDir, metricsFile: 'history.jsonl', persist: false });
+    expect(mc.detectRegressions(1.5)).toEqual([]);
+  });
+
   it('loads SLO targets through the governed catalog boundary', () => {
     const source = fs.readFileSync(path.join(process.cwd(), 'libs/core/metrics.ts'), 'utf8');
     expect(source).toContain('sloTargetsCatalog(safeCandidate).load()');

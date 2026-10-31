@@ -5,6 +5,7 @@ import {
   loadEnvironmentManifest,
   probeManifest,
 } from '@agent/core/environment-capability';
+import { installBaselineBuildReadinessInspector } from './baseline_build_readiness.js';
 import { readJanitorLastRunMs, readJanitorLastSubmissionMs } from '@agent/core/storage-janitor';
 import { inspectMeshHub } from '@agent/core/mesh/mesh-hub-inspection';
 import { getGovernanceControlSummary } from '@agent/core/governance/governance-status';
@@ -55,6 +56,10 @@ import {
   runAppPreflight,
   type AppPreflightReport,
 } from './app_preflight.js';
+
+// The repo-build probe must judge on the same input-set/emit basis as
+// `pnpm run check` — install the canonical compiler-outputs inspector.
+installBaselineBuildReadinessInspector();
 
 const DEFAULT_MANIFESTS = ['kyberion-runtime-baseline', 'reasoning-backend'];
 const MISSION_MANIFESTS = [

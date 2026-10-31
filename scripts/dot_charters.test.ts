@@ -57,10 +57,34 @@ vi.mock('@agent/core/dot/dot-inbox', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/dot/dot-inbox')>()),
   appendDotInboxEntry: mocks.appendInbox,
 }));
+vi.mock('@agent/core/dot/dot-action-ledger', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/dot/dot-action-ledger')>();
+  return {
+    ...actual,
+    observeDotActions: (dotId: string, deps?: Parameters<typeof actual.observeDotActions>[1]) =>
+      actual.observeDotActions(dotId, { ...deps, rootDir: mocks.rootDir }),
+  };
+});
+vi.mock('@agent/core/dot/dot-dispatch', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/dot/dot-dispatch')>();
+  return {
+    ...actual,
+    dotDelegationCapacity: (
+      charter: Parameters<typeof actual.dotDelegationCapacity>[0],
+      deps?: Parameters<typeof actual.dotDelegationCapacity>[1]
+    ) => actual.dotDelegationCapacity(charter, { ...deps, rootDir: mocks.rootDir }),
+  };
+});
 vi.mock('./daemon_watchdog.js', () => ({ DEFAULT_DAEMONS: [] }));
 
 import { runDotCharters } from './dot_charters.js';
 import { DOT_STATUS_SECTIONS } from '@agent/core/dot/dot-extension-registry';
+import {
+  appendActionRecord,
+  DOT_ACTION_LEDGER_PATH,
+  type DotActionRecord,
+} from '@agent/core/dot/dot-action-ledger';
+import { appendJsonLine } from '@agent/core/foundation/json';
 
 const TEST_ROOT = mocks.rootDir;
 const CHARTER: DotCharter = {
@@ -114,6 +138,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllEnvs();
   process.exitCode = undefined;
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
@@ -354,6 +379,89 @@ describe('dot execution diagnostic CLI presentation', () => {
     expect(mocks.release).not.toHaveBeenCalled();
     expect(mocks.install).not.toHaveBeenCalled();
     expect(mocks.appendInbox).not.toHaveBeenCalled();
+  });
+});
+
+describe('dot status action-ledger integrity (R07)', () => {
+  const action = (overrides: Partial<DotActionRecord> = {}): DotActionRecord => ({
+    scope: { tier: 'public' },
+    action_ref: 'ref-ok',
+    dot_id: CHARTER.dot_id,
+    actor_id: `dot:${CHARTER.dot_id}`,
+    action_id: 'repair',
+    title: 'visible-title',
+    objective: 'visible-objective',
+    work_shape: 'pipeline',
+    status: 'admitted',
+    proposal_hash: 'hash',
+    at: '2026-10-26T00:00:00Z',
+    ...overrides,
+  });
+
+  it('reports permitted sections beside one corrupt row instead of dying', async () => {
+    writeCharter(CHARTER, 'status-integrity');
+    appendActionRecord(action(), { rootDir: TEST_ROOT });
+    appendJsonLine(`${TEST_ROOT}/${DOT_ACTION_LEDGER_PATH}`, {
+      dot_id: CHARTER.dot_id,
+      action_ref: 'ref-corrupt',
+      private_content_hash: 'not-a-hex-digest',
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
+      actor_id: `dot:${CHARTER.dot_id}`,
+      action_id: 'repair',
+      work_shape: 'pipeline',
+      status: 'admitted',
+      proposal_hash: 'hash',
+      at: '2026-10-26T00:01:00Z',
+    });
+    const report = await runDotCharters(['status', CHARTER.dot_id, '--json', '--quiet']);
+    expect(report).toMatchObject({
+      ok: false,
+      integrity: 'integrity_error',
+      dots: [
+        {
+          dot_id: CHARTER.dot_id,
+          action_integrity: 'integrity_error',
+          action_anomalies: { malformed_rows: 1 },
+          actions: { admitted: 1 },
+        },
+      ],
+    });
+    expect(process.exitCode).toBe(1);
+    const dot = (report?.dots as Array<Record<string, unknown>>)[0];
+    // Capacity derives from the strict hydrate — degraded, never a crash.
+    expect(dot.delegation_capacity).toMatchObject({ status: 'unavailable' });
+    // The corrupt row contributes no content and no fabricated success.
+    expect(JSON.stringify(report)).not.toContain('ref-corrupt');
+  });
+
+  it('marks rows in an invisible scope partial and keeps them out of the payload', async () => {
+    writeCharter(CHARTER, 'status-partial');
+    appendActionRecord(action(), { rootDir: TEST_ROOT });
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-a');
+    appendActionRecord(
+      action({
+        scope: { tier: 'personal', owner_nhi: 'owner-a' },
+        action_ref: 'ref-personal',
+        title: 'personal-secret',
+      }),
+      { rootDir: TEST_ROOT }
+    );
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-b');
+    const report = await runDotCharters(['status', CHARTER.dot_id, '--json', '--quiet']);
+    expect(report).toMatchObject({
+      ok: true,
+      integrity: 'partial',
+      dots: [
+        {
+          action_integrity: 'partial',
+          action_anomalies: { not_visible: 1 },
+          actions: { admitted: 1 },
+        },
+      ],
+    });
+    expect(process.exitCode).not.toBe(1);
+    expect(JSON.stringify(report)).not.toContain('personal-secret');
+    expect(JSON.stringify(report)).not.toContain('ref-personal');
   });
 });
 

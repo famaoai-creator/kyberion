@@ -18,6 +18,7 @@ import {
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolvePerceptionScope } from '@agent/core/perception/observation';
 import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './lib/harness.js';
 import {
@@ -35,8 +36,10 @@ import {
   removeWorkDir,
   renderSegments,
   resolveRepositoryInput,
+  sniffMediaSignature,
   transcribeWav,
   VIDEO_EXTENSIONS,
+  withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
 } from './lib/perception.js';
@@ -128,6 +131,18 @@ export async function transcribeMediaFile(
   options: { language?: string; timestamps: boolean; maxSeconds?: number }
 ): Promise<ListenResult> {
   const wav = path.join(workDir, 'audio-16k-mono.wav');
+  // R04: prove the input is real media by signature before ffmpeg — a renamed
+  // text file must report input_invalid, not raw ffmpeg stderr. The sniff is a
+  // guarded read of the input the user pointed at: on a protected tier the
+  // interactive identity performs it under the tenant-bound media role.
+  const inputScope = resolvePerceptionScope(absolute);
+  const isMedia = await withPerceptionMediaRole(inputScope, () => sniffMediaSignature(absolute));
+  if (!isMedia) {
+    throw new ScriptExitError(
+      1,
+      `[${command}] input_invalid: ${path.basename(absolute)} is not recognizable media (bad or missing container signature) | next: supply a real audio/video file`
+    );
+  }
   try {
     await extractSttWav(deps, absolute, wav, options.maxSeconds);
     if (options.maxSeconds !== undefined) await assertAudioAnalysisDuration(deps, wav);
@@ -174,14 +189,22 @@ export async function runListenCommand(
     );
   }
   assertExtension('listen', absolute, AUDIO_EXTENSIONS);
-  assertPerceptionInput(absolute);
+  // The input read and every guarded read of the scratch below run under the
+  // tenant-bound media role on protected tiers (see withPerceptionMediaRole).
+  const inputScope = resolvePerceptionScope(absolute);
+  await withPerceptionMediaRole(inputScope, () => assertPerceptionInput(absolute));
   const workDir = createPerceptionWorkDir('listen', absolute);
   try {
     const feature =
       options.grounded || options.diarize || options.events
         ? await enhancementDeps(deps)
         : undefined;
-    const source = feature?.source?.(absolute) ?? feature?.perceptionSource(absolute);
+    const source = feature
+      ? await withPerceptionMediaRole(
+          inputScope,
+          () => feature.source?.(absolute) ?? feature.perceptionSource(absolute)
+        )
+      : undefined;
     if (options.diarize || options.events) await assertAudioAnalysisDuration(deps, absolute);
     const result: ListenResult = options.noTranscript
       ? {
@@ -202,14 +225,16 @@ export async function runListenCommand(
         const wav = path.join(workDir, 'analysis-16k-mono.wav');
         await extractSttWav(deps, absolute, wav, 601);
         const audio = await import('@agent/core/perception/audio-analysis');
-        result.analysis = await (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
-          path: wav,
-          diarize: options.diarize,
-          events: options.events,
-          diarizationModel: options.diarizationModel,
-          audioModel: options.audioModel,
-          python: options.python,
-        });
+        result.analysis = await withPerceptionMediaRole(inputScope, () =>
+          (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
+            path: wav,
+            diarize: options.diarize,
+            events: options.events,
+            diarizationModel: options.diarizationModel,
+            audioModel: options.audioModel,
+            python: options.python,
+          })
+        );
         result.warnings.push(...result.analysis.warnings);
         if (options.diarize && result.segments)
           result.segments = (deps.enhancements?.alignSpeakers ?? audio.alignSpeakerSegments)(
@@ -260,7 +285,8 @@ export async function runListenCommand(
           })
         );
     }
-    if (source && feature) feature.assertSourceUnchanged(source);
+    if (source && feature)
+      await withPerceptionMediaRole(inputScope, () => feature.assertSourceUnchanged(source));
     emitOutput(
       'listen',
       renderListenResult(result, { json: args.json, timestamps: args.timestamps }),

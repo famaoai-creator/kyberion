@@ -61,15 +61,20 @@ import { resolveIdentityContext } from '@agent/core/authority';
 import { validateReadPermission } from '@agent/core/tier-guard';
 import { pathResolver } from '@agent/core/path-resolver';
 import { migrateLegacyDotState } from '@agent/core/dot/dot-state-paths';
-import { migrateLegacyDotActions } from '@agent/core/dot/dot-action-ledger';
+import { migrateLegacyDotActions, observeDotActions } from '@agent/core/dot/dot-action-ledger';
 import { dotTokensUsedToday, readScopedDotWakeLedger } from '@agent/core/dot/dot-runtime';
 import { appendDotInboxEntry } from '@agent/core/dot/dot-inbox';
-import { currentDotActions, dotDelegationCapacity } from '@agent/core/dot/dot-dispatch';
+import { dotDelegationCapacity } from '@agent/core/dot/dot-dispatch';
 import { dotFeedbackPromptLines, latestDotSignals } from '@agent/core/dot/dot-feedback';
 import { runDotWakeWithGoalDriver } from '@agent/core/dot/dot-wake-orchestration';
 import { installReasoningBackends } from '@agent/core/reasoning/reasoning-bootstrap';
 import { DEFAULT_DAEMONS } from './daemon_watchdog.js';
-import { defineScript, isDirectScript, stripSharedScriptFlags } from './lib/harness.js';
+import {
+  defineScript,
+  isDirectScript,
+  ScriptExitError,
+  stripSharedScriptFlags,
+} from './lib/harness.js';
 
 const STATUSES: DotCharterStatus[] = ['draft', 'active', 'paused', 'retired'];
 const SUBCOMMANDS = [
@@ -336,10 +341,26 @@ function reportStatus(argv: string[]) {
     .map((entry) => {
       const wakes = asCharter(entry.charter, () => readScopedDotWakeLedger(entry.charter));
       const last = wakes[wakes.length - 1];
-      const actions = currentDotActions(entry.charter.dot_id);
+      // Observation path (R07): malformed or out-of-scope rows flag integrity
+      // instead of aborting the status. Execution still uses the strict
+      // hydrate — this read never rewrites the ledger.
+      const observation = observeDotActions(entry.charter.dot_id);
+      const actions = [...observation.actions, ...observation.index_only];
       const actionCounts: Record<string, number> = {};
       for (const action of actions) {
         actionCounts[action.status] = (actionCounts[action.status] ?? 0) + 1;
+      }
+      let delegationCapacity: Record<string, unknown>;
+      try {
+        delegationCapacity = asCharter(entry.charter, () => dotDelegationCapacity(entry.charter));
+      } catch {
+        // Capacity derives from the same strict hydrate; when observation
+        // reports degraded integrity, report it unavailable rather than dying.
+        delegationCapacity = {
+          status: 'unavailable',
+          reason:
+            'the action ledger could not be fully read; resolve action_integrity findings before trusting capacity',
+        };
       }
       return {
         dot_id: entry.charter.dot_id,
@@ -356,8 +377,11 @@ function reportStatus(argv: string[]) {
               ...(last.summary ? { summary: last.summary } : {}),
             }
           : null,
+        action_integrity: observation.integrity,
+        action_anomalies: observation.anomalies,
+        ...(observation.repair.length ? { action_repair: observation.repair } : {}),
         actions: actionCounts,
-        delegation_capacity: asCharter(entry.charter, () => dotDelegationCapacity(entry.charter)),
+        delegation_capacity: delegationCapacity,
         waiting_for_capacity: actions
           .filter((action) => action.status === 'waiting_capacity')
           .map((action) => ({
@@ -380,7 +404,12 @@ function reportStatus(argv: string[]) {
   if (dotId && dots.length === 0) {
     throw new Error(`[DOT_NOT_FOUND] no charter for dot_id '${dotId}' under dots/`);
   }
-  return { ok: true, dots };
+  const integrity = dots.some((dot) => dot.action_integrity === 'integrity_error')
+    ? 'integrity_error'
+    : dots.some((dot) => dot.action_integrity === 'partial')
+      ? 'partial'
+      : 'complete';
+  return { ok: integrity !== 'integrity_error', integrity, dots };
 }
 
 const VIEW_LIMIT = 20;
@@ -667,6 +696,22 @@ function printReport(report: Record<string, unknown>, print: (line: string) => v
             .join(' ')}`
         );
       }
+      if (dot.action_integrity && dot.action_integrity !== 'complete') {
+        const anomalies = dot.action_anomalies as {
+          malformed_rows: number;
+          missing_evidence: number;
+          not_visible: number;
+        } | null;
+        print(
+          `    action ledger: ${dot.action_integrity}` +
+            (anomalies
+              ? ` (malformed=${anomalies.malformed_rows} missing_evidence=${anomalies.missing_evidence} not_visible=${anomalies.not_visible})`
+              : ' (counts unknown — shared index unreadable)')
+        );
+        for (const hint of (dot.action_repair ?? []) as string[]) {
+          print(`      next: ${hint}`);
+        }
+      }
       for (const waiting of (dot.waiting_on_operator ?? []) as Array<Record<string, unknown>>) {
         print(`    waiting on you: ${waiting.title} (${waiting.request_id ?? 'no request'})`);
       }
@@ -780,9 +825,14 @@ export const runDotCharters = defineScript({
     const report = await main(context.argv);
     if (context.json) {
       context.print(report);
-      return report;
+    } else {
+      printReport(report, context.print);
     }
-    printReport(report, context.print);
+    // R05 convention: a typed report may still exit non-zero — ledger
+    // integrity findings are attention, never a silent 'healthy'.
+    if (report.integrity === 'integrity_error') {
+      throw new ScriptExitError(1, '', true, report);
+    }
     return report;
   },
 });

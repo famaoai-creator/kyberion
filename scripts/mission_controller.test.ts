@@ -214,13 +214,19 @@ describe('mission_controller argument parsing', () => {
     // delegation must remain behind the later model-requiring verbs.
     for (const lifecycle of ['create', 'start', 'kickoff'])
       expect(shouldSkipReasoningBootstrap(lifecycle)).toBe(true);
-    for (const modelVerb of ['verify', 'distill', 'finish'])
-      expect(shouldSkipReasoningBootstrap(modelVerb)).toBe(false);
+    // R03c: lifecycle verbs are deterministic journal/state transitions.
+    // distill's only model stage shells out through the egress-gated profile
+    // path (never the in-process backend chain), so none of them consume
+    // tenant task credentials — and installing reasoning backends under a
+    // persisted tenant scope without a claim would fail closed before the
+    // verb even ran.
+    for (const lifecycle of ['verify', 'distill', 'finish', 'review-worker-output'])
+      expect(shouldSkipReasoningBootstrap(lifecycle)).toBe(true);
     expect(shouldSkipReasoningBootstrap('dispatch-workitems')).toBe(false);
     for (const dispatch of ['dispatch-workitems', 'dispatch-tickets'])
       expect(missionReasoningInitialization(dispatch)).toBe('host');
     expect(missionReasoningInitialization('create')).toBe('none');
-    expect(missionReasoningInitialization('finish')).toBe('execution');
+    expect(missionReasoningInitialization('finish')).toBe('none');
     for (const readOnly of [
       'status',
       'outbox',

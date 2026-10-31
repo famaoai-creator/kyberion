@@ -1,9 +1,24 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
+import {
+  pathResolver,
+  safeLstat,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '@agent/core';
 import { renderSeeResult, runSeeCommand, SEE_USAGE } from './cli-see.js';
 import { createFakeDeps } from './lib/perception.test-support.js';
+
+// Tier-guard denials emit best-effort audit events; keep them off the real
+// audit chain so the suite stays hermetic. Partial mock: the @agent/core
+// barrel loads audit-forwarder, which registers a publisher at import time.
+vi.mock('@agent/core/governance/audit-chain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/governance/audit-chain')>();
+  return { ...actual, auditChain: { ...actual.auditChain, record: vi.fn() } };
+});
 
 function pngHeader(width: number, height: number): Buffer {
   const buffer = Buffer.alloc(33);
@@ -104,5 +119,97 @@ describe('pnpm kyberion see', () => {
         false
       )
     ).toContain('_(no text recognized)_');
+  });
+});
+
+const ENV_KEYS = [
+  'KYBERION_TENANT',
+  'KYBERION_TIER',
+  'KYBERION_PERSONA',
+  'MISSION_ROLE',
+  'SYSTEM_ROLE',
+  'MISSION_ID',
+  'KYBERION_SCOPE_ENV_PATH',
+  'KYBERION_TENANT_SCOPE_REQUIRED',
+  'KYBERION_ENTITY_GOVERNANCE',
+] as const;
+
+const TENANT = 'acme-corp';
+
+describe('pnpm kyberion see under a persisted confidential tenant scope', () => {
+  const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
+
+  beforeEach(() => {
+    for (const key of ENV_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+    // The interactive-CLI identity: persisted tier + tenant, no claim, no
+    // role, persona resolves to 'unknown'.
+    process.env.KYBERION_TIER = 'confidential';
+    process.env.KYBERION_TENANT = TENANT;
+  });
+
+  afterEach(() => {
+    for (const key of ENV_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  it('OCRs and describes an image staged on a protected floor with guarded readers', async () => {
+    const dir = path.join(
+      pathResolver.rootDir(),
+      `active/shared/staging/confidential/${TENANT}/see-${randomUUID()}`
+    );
+    safeMkdir(dir, { recursive: true });
+    const image = path.join(dir, 'card.png');
+    safeWriteFile(image, pngHeader(640, 480));
+    try {
+      // Before-state: the grant-less interactive identity cannot even read
+      // the input it staged — the residual ROLE_VIOLATION class.
+      expect(() => safeLstat(image)).toThrow(/ROLE_VIOLATION/);
+      // guardedReads reproduces ocrImage/describeImage's lstat+read of the
+      // image inside the provider call.
+      const result = await runSeeCommand(
+        [image, '--describe'],
+        () => {},
+        createFakeDeps({ guardedReads: true })
+      );
+      expect(result?.ocr?.text).toBe('Hello OCR');
+      expect(result?.description?.provider).toBe('fake_describer');
+      expect(result?.description?.text).toBe('A test card.');
+    } finally {
+      safeRmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('still refuses an input on another tenant partition before any role runs', async () => {
+    const dir = path.join(
+      pathResolver.rootDir(),
+      `active/shared/staging/confidential/other-co/see-${randomUUID()}`
+    );
+    const image = path.join(dir, 'card.png');
+    // The bound acme-corp identity may not even write the foreign partition —
+    // stage the fixture unscoped, then rebind for the command itself.
+    delete process.env.KYBERION_TENANT;
+    try {
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(image, pngHeader(640, 480));
+    } finally {
+      process.env.KYBERION_TENANT = TENANT;
+    }
+    try {
+      await expect(
+        runSeeCommand([image], () => {}, createFakeDeps({ guardedReads: true }))
+      ).rejects.toThrow(/PERCEPTION_SCOPE/);
+    } finally {
+      delete process.env.KYBERION_TENANT;
+      try {
+        safeRmSync(dir, { recursive: true, force: true });
+      } finally {
+        process.env.KYBERION_TENANT = TENANT;
+      }
+    }
   });
 });

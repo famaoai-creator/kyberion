@@ -23,12 +23,30 @@ export interface ScriptContext extends ScriptFlags {
 
 export type ScriptFlag = 'json' | 'dry-run' | 'check' | 'quiet';
 
+/**
+ * Machine-facing error classification (reliability plan §3.2). Every field is
+ * additive: a ScriptExitError without details renders exactly the stderr
+ * payload it did before, and uncategorized exceptions classify as
+ * `internal_error` rather than inheriting a made-up code.
+ */
+export interface ScriptErrorDetails {
+  /** Upper-snake failure code, e.g. `NOT_FOUND`, `OUTSIDE_ALLOWED_SCOPE`. */
+  code?: string;
+  /** Outcome category from the §3.2 vocabulary (not_found, permission_denied, invalid_input, …). */
+  category?: string;
+  /** Whether retrying the unchanged request can succeed. Omit when unknown. */
+  retryable?: boolean;
+  /** Machine-facing remediation pointer; the human text keeps the `| next:` convention. */
+  next_action?: string;
+}
+
 export class ScriptExitError extends Error {
   constructor(
     public readonly code: number,
     message = '',
     public readonly silent = message.length === 0,
-    public readonly returnValue?: unknown
+    public readonly returnValue?: unknown,
+    public readonly details?: ScriptErrorDetails
   ) {
     super(message);
     this.name = 'ScriptExitError';
@@ -158,6 +176,20 @@ export function renderScriptError(
   return report;
 }
 
+/**
+ * Secrets registered with the secret guard are masked from every harness
+ * error channel — including DEBUG stacks — without loading the secret
+ * subsystem into the happy path. Falls back to identity when the guard is
+ * unavailable so an error report can never fail on its own redaction.
+ */
+let cachedErrorRedactor: Promise<(text: string) => string> | undefined;
+function loadErrorTextRedactor(): Promise<(text: string) => string> {
+  cachedErrorRedactor ??= import('./secret/secret-guard.js')
+    .then((mod) => (text: string) => mod.redactActiveSecretsForHostLog(text, '[REDACTED_SECRET]'))
+    .catch(() => (text: string) => text);
+  return cachedErrorRedactor;
+}
+
 export function defineScript<T>(options: {
   name: string;
   flags?: readonly ScriptFlag[];
@@ -190,15 +222,33 @@ export function defineScript<T>(options: {
             error instanceof ScriptExitError
               ? { message: error.message }
               : renderScriptError(error);
+          const details = error instanceof ScriptExitError ? error.details : undefined;
+          // Machine-facing fields (§3.2) are additive: classified errors carry
+          // their code/category, every uncategorized exception is reported as
+          // internal_error, and ScriptExitError without details keeps its
+          // historical {ok:false,error} payload byte-for-byte.
+          const errorCode =
+            details?.code ?? (error instanceof ScriptExitError ? undefined : 'INTERNAL_ERROR');
+          const errorCategory =
+            details?.category ?? (error instanceof ScriptExitError ? undefined : 'internal_error');
+          const redact = await loadErrorTextRedactor();
+          report.message = redact(report.message);
+          if (report.next) report.next = redact(report.next);
+          if (report.stack) report.stack = redact(report.stack);
+          const nextAction = report.next ?? details?.next_action;
           if (!flags.json) {
             console.error(`[${options.name}] ${report.message}`);
-            if (report.next) console.error(`  next: ${report.next}`);
+            if (nextAction) console.error(`  next: ${nextAction}`);
             if (report.stack) console.error(report.stack);
           } else {
             console.error(
               JSON.stringify({
                 ok: false,
                 error: report.message,
+                ...(errorCode ? { code: errorCode } : {}),
+                ...(errorCategory ? { category: errorCategory } : {}),
+                ...(details?.retryable !== undefined ? { retryable: details.retryable } : {}),
+                ...(nextAction ? { next_action: nextAction } : {}),
                 ...(report.next ? { next: report.next } : {}),
                 ...(report.stack ? { stack: report.stack } : {}),
               })

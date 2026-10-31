@@ -18,7 +18,8 @@ import {
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeCopyFileSync, safeMkdir, safeReaddir } from '@agent/core/secure-io';
+import { resolvePerceptionScope } from '@agent/core/perception/observation';
+import { safeMkdir, safeReaddir, safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import type { TranscriptSegment } from '@agent/core/voice/speech-to-text-bridge';
 import { ScriptExitError } from './lib/harness.js';
 import { transcribeMediaFile } from './cli-listen.js';
@@ -40,6 +41,7 @@ import {
   resolveRepositoryInput,
   VIDEO_EXTENSIONS,
   LOCAL_MEDIA_INPUT_ARGS,
+  withPerceptionMediaRole,
   type CommonArgs,
   type PerceptionDeps,
 } from './lib/perception.js';
@@ -291,7 +293,12 @@ export async function runWatchCommand(
     VIDEO_EXTENSIONS,
     'Audio-only files: use `pnpm kyberion listen`.'
   );
-  assertPerceptionInput(absolute);
+  // The input read and every guarded read of the perception scratch below
+  // (frame listing, frame OCR/fingerprints, audio analysis, source hashes)
+  // run under the tenant-bound media role on protected tiers (see
+  // withPerceptionMediaRole).
+  const inputScope = resolvePerceptionScope(absolute);
+  await withPerceptionMediaRole(inputScope, () => assertPerceptionInput(absolute));
   const framesDir = args.frames ? pathResolver.rootResolve(args.frames) : undefined;
   if (framesDir && !isInsideRepository(framesDir)) {
     throw new ScriptExitError(
@@ -346,7 +353,12 @@ export async function runWatchCommand(
     options.index
   );
   const feature = enhanced ? await enhancementDeps(deps) : undefined;
-  const source = feature?.source?.(absolute) ?? feature?.perceptionSource(absolute);
+  const source = feature
+    ? await withPerceptionMediaRole(
+        inputScope,
+        () => feature.source?.(absolute) ?? feature.perceptionSource(absolute)
+      )
+    : undefined;
   const observations: Observation[] = [];
   const warnings: string[] = [];
   const duration = metadata.duration_sec > 0 ? metadata.duration_sec : 1;
@@ -380,7 +392,7 @@ export async function runWatchCommand(
     } catch (error) {
       explainMediaError('watch', error);
     }
-    const frameFiles = safeReaddir(sampleDir)
+    const frameFiles = (await withPerceptionMediaRole(inputScope, () => safeReaddir(sampleDir)))
       .filter((name) => /^frame-\d{4}\.png$/.test(name))
       .sort();
     if (frameFiles.length === 0) warnings.push('ffmpeg produced no frames');
@@ -394,17 +406,25 @@ export async function runWatchCommand(
       const frame: WatchFrame = { time_sec: Math.round(index * every * 10) / 10 };
       if (framesDir) {
         const kept = path.join(framesDir, name);
-        safeCopyFileSync(source, kept);
+        // The scratch read needs the media role on protected tiers; the
+        // --frames destination write stays under the caller's own identity so
+        // it keeps working wherever the caller may already write.
+        const bytes = (await withPerceptionMediaRole(inputScope, () =>
+          safeReadFile(source, { encoding: null })
+        )) as Buffer;
+        safeWriteFile(kept, bytes);
         frame.path = path.relative(pathResolver.rootDir(), kept);
       }
       if (args.ocr && !ocrFailure) {
         try {
-          const ocr = await deps.ocr({
-            path: path.relative(pathResolver.rootDir(), source),
-            mode: args.ocrProvider ? 'privacy_first' : 'local_only',
-            ...(args.ocrProvider ? { providerPreference: [args.ocrProvider] } : {}),
-            ...(args.lang ? { language: args.lang } : {}),
-          });
+          const ocr = await withPerceptionMediaRole(inputScope, () =>
+            deps.ocr({
+              path: path.relative(pathResolver.rootDir(), source),
+              mode: args.ocrProvider ? 'privacy_first' : 'local_only',
+              ...(args.ocrProvider ? { providerPreference: [args.ocrProvider] } : {}),
+              ...(args.lang ? { language: args.lang } : {}),
+            })
+          );
           frame.text = ocr.text;
           frame.ocr_provider = ocr.provider;
         } catch (error) {
@@ -413,7 +433,9 @@ export async function runWatchCommand(
         }
       }
       if (options.changes && feature) {
-        const current = await feature.fingerprint(source);
+        const current = await withPerceptionMediaRole(inputScope, () =>
+          feature.fingerprint(source)
+        );
         if (priorFingerprint) frame.change = feature.compare(priorFingerprint, current);
         if (!priorFingerprint || frame.change?.changed) priorFingerprint = current;
       }
@@ -488,14 +510,16 @@ export async function runWatchCommand(
       const wav = path.join(workDir, 'analysis-16k-mono.wav');
       await extractSttWav(deps, absolute, wav, 601);
       const audio = await import('@agent/core/perception/audio-analysis');
-      analysis = await (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
-        path: wav,
-        diarize: options.diarize,
-        events: options.events,
-        diarizationModel: options.diarizationModel,
-        audioModel: options.audioModel,
-        python: options.python,
-      });
+      analysis = await withPerceptionMediaRole(inputScope, () =>
+        (deps.enhancements?.analyzeAudio ?? audio.analyzeAudio)({
+          path: wav,
+          diarize: options.diarize,
+          events: options.events,
+          diarizationModel: options.diarizationModel,
+          audioModel: options.audioModel,
+          python: options.python,
+        })
+      );
       warnings.push(...analysis.warnings);
       if (options.diarize && transcript?.segments)
         transcript.segments = (deps.enhancements?.alignSpeakers ?? audio.alignSpeakerSegments)(
@@ -536,15 +560,17 @@ export async function runWatchCommand(
     let animation_cues: unknown[] | undefined;
     if (options.track) {
       const tracker = await import('@agent/core/perception/tracking');
-      tracking = await (deps.enhancements?.track ?? tracker.trackMedia)({
-        path: absolute,
-        faceModel: options.faceModel,
-        poseModel: options.poseModel,
-        gestureModel: options.gestureModel,
-        python: options.python,
-        maxFrames: args.maxFrames,
-        everyMs: Math.max(1, Math.round(every * 1000)),
-      });
+      tracking = await withPerceptionMediaRole(inputScope, () =>
+        (deps.enhancements?.track ?? tracker.trackMedia)({
+          path: absolute,
+          faceModel: options.faceModel,
+          poseModel: options.poseModel,
+          gestureModel: options.gestureModel,
+          python: options.python,
+          maxFrames: args.maxFrames,
+          everyMs: Math.max(1, Math.round(every * 1000)),
+        })
+      );
       if (source) observations.push(...tracker.trackingObservations(source, tracking));
       if (options.avatarId)
         animation_cues = tracking.frames.flatMap((frame) =>
@@ -554,6 +580,9 @@ export async function runWatchCommand(
           )
         );
     }
+    // --index stays outside the media role: the semantic index lives on the
+    // cache floor, which perception_media_worker deliberately does not grant —
+    // it still needs the caller's own authority.
     let index: unknown;
     if (options.index && source) {
       const indexMedia =
@@ -587,7 +616,8 @@ export async function runWatchCommand(
       warnings,
     };
     if (framesDir) warnings.push(`${frameFiles.length} frame(s) kept in ${args.frames}`);
-    if (source && feature) feature.assertSourceUnchanged(source);
+    if (source && feature)
+      await withPerceptionMediaRole(inputScope, () => feature.assertSourceUnchanged(source));
     emitOutput(
       'watch',
       renderWatchResult(result, args.json),

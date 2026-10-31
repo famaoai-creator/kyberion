@@ -642,6 +642,20 @@
         "active/shared/artifacts/confidential/${KYBERION_TENANT}/artifacts-index.jsonl"
       ]
     },
+    "perception_media_worker": {
+      "allow_read": [
+        "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+        "active/shared/tmp/personal/${KYBERION_TENANT}/",
+        "active/shared/staging/confidential/${KYBERION_TENANT}/",
+        "active/shared/staging/personal/${KYBERION_TENANT}/"
+      ],
+      "allow_write": [
+        "active/shared/tmp/confidential/${KYBERION_TENANT}/",
+        "active/shared/tmp/personal/${KYBERION_TENANT}/",
+        "active/shared/staging/confidential/${KYBERION_TENANT}/",
+        "active/shared/staging/personal/${KYBERION_TENANT}/"
+      ]
+    },
     "metrics_cap_reader": {
       "allow_read": [
         "active/shared/runtime/execution-metrics/",

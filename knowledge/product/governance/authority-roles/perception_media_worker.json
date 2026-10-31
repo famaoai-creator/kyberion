@@ -1,0 +1,9 @@
+{
+  "role": "perception_media_worker",
+  "description": "Shared core exact-tenant media-perception scratch worker. The perception CLI commands (see/listen/watch) normalize media into a scratch dir on the persisted scope's own tier partition — the write side is admitted by the tmp default_allow, but reads on protected tiers need an authorized identity. This role gives the STT/OCR bridge stage of that command the same effective identity the claimed-WorkItem path already has: read+write on active/shared/tmp/{confidential,personal}/${KYBERION_TENANT}/ and active/shared/staging/{confidential,personal}/${KYBERION_TENANT}/, bound to the scope's own tenant. It never reads knowledge/, other tenants, other partitions, or system floors.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal", "confidential"]
+}

@@ -165,7 +165,9 @@ describe('Workflow operations contract', () => {
     const tee = '2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"';
     for (const [file, jobs] of [
       ['.github/workflows/ci.yml', 2],
-      ['.github/workflows/pr-validation.yml', 4],
+      // R15: gates / static / test-core / test-extra / cli-reliability each end
+      // with the shared failure-triage action.
+      ['.github/workflows/pr-validation.yml', 5],
       ['.github/workflows/cross-os.yml', 1],
     ] as const) {
       const workflow = read(file);
