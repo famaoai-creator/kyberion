@@ -225,6 +225,14 @@
       "allowed_actuators": [],
       "tier_access": ["confidential"]
     },
+    "dot_result_writer": {
+      "description": "Internal DOT result facade only: confidential tenant result append and minimal state projection under a mandatory active exact operation capability. Never a charter execution role.",
+      "default_persona": "worker",
+      "write_scopes": ["active/shared/runtime/dot/confidential/${KYBERION_TENANT}/"],
+      "scope_classes": ["operations_runtime"],
+      "allowed_actuators": [],
+      "tier_access": ["confidential"]
+    },
     "dot_lifecycle_writer": {
       "description": "Writes dot charters (dots/) and the lifecycle audit ledger during governed status transitions (kyberion dot activate/pause/retire). Deliberately separate from any role a dot may bind at runtime, so an active dot can never rewrite the contract it runs under.",
       "default_persona": "worker",

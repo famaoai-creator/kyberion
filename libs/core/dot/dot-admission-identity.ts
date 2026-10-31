@@ -7,6 +7,11 @@ import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js'
 import type { DotCharter } from './dot-charter.js';
 import type { DotProposal } from './dot-proposals.js';
 import type { DotActionRecord } from './dot-action-ledger.js';
+import {
+  validateServerDotJudgmentProposal,
+  dotJudgmentCharterHash,
+} from './dot-judgment-binding.js';
+import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 
 export function dotAdmissionMissionId(actionRef: string): string {
   return `MSN-DOT-${createHash('sha256').update(actionRef).digest('hex').slice(0, 24).toUpperCase()}`;
@@ -30,12 +35,30 @@ export function dotRecordAdmissionMatches(
     ? row.admission.scope_hash === dotAdmissionScopeHash(charter)
     : !charter.work_binding;
 }
+/** Synthetic metadata may never enroll a shadow/diagnostic or differently bounded charter. */
+export function assertDotJudgmentProposalCharter(charter: DotCharter, proposal: DotProposal): void {
+  const judgment = validateServerDotJudgmentProposal(proposal);
+  if (!judgment) return;
+  const mode = charter.runtime.semantic_judgment;
+  if (
+    charter.status !== 'active' ||
+    charter.runtime.execution_mode !== undefined ||
+    (mode !== undefined &&
+      (mode.mode !== 'off' || Object.keys(mode).some((field) => field !== 'mode'))) ||
+    !(charter.authority.allowed_work_shapes ?? []).includes('pipeline') ||
+    !(charter.authority.allowed_pipelines ?? []).includes(proposal.pipeline_ref!) ||
+    judgmentCanonicalHash(judgment.scope) !== judgmentCanonicalHash(charter.scope) ||
+    judgment.charter_hash !== dotJudgmentCharterHash(charter)
+  )
+    throw new Error('Judgment proposal requires its original active, bounded, non-shadow charter');
+}
 export function genericDotActionIdentity(
   charter: DotCharter,
   proposal: DotProposal,
   ordinal: number,
   operationKey?: string
 ): Pick<DotActionRecord, 'action_ref' | 'admission'> {
+  assertDotJudgmentProposalCharter(charter, proposal);
   if (operationKey !== undefined && (!operationKey.trim() || operationKey.length > 2000))
     throw new Error('invalid dot operation key');
   const scope_hash = dotAdmissionScopeHash(charter);
@@ -85,6 +108,10 @@ export function admissionForDotRecord(
   row: DotActionRecord
 ): NonNullable<DotActionRecord['admission']> {
   if (row.admission) return row.admission;
+  if (row.semantic_judgment !== undefined)
+    throw new Error(
+      'Judged work requires its original immutable admission; legacy reconstruction is forbidden'
+    );
   if (charter.work_binding)
     throw new Error(
       '[DOT_WORK_BINDING] Legacy unbound work cannot inherit a new operation responsibility.'

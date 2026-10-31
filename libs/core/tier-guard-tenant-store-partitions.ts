@@ -10,6 +10,117 @@
  * tenant scope check runs before this in tier-guard.validateWritePermission.
  */
 import { tenantStoreLedgerPartitionOf } from './storage-layout.js';
+import { isRecord } from './foundation/primitives.js';
+import { isValidTenantSlug } from './entity-scope.js';
+
+interface TenantScopePolicy {
+  tenant_scope?: {
+    slug_pattern?: unknown;
+    protected_prefixes?: string[];
+    shared_prefixes?: string[];
+    system_registry_reads?: unknown[];
+    require_tenant_binding?: unknown;
+    broker_requirements?: {
+      require_approved_by?: unknown;
+      require_approved_at?: unknown;
+      require_expires_at?: unknown;
+    };
+  };
+}
+
+/** Pure policy normalization; the caller resolves the current environment flag. */
+export function tenantScopeConfig(policy: TenantScopePolicy, requireTenantBinding: boolean) {
+  const cfg = policy?.tenant_scope || {};
+  const slugPatternRaw =
+    typeof cfg.slug_pattern === 'string' ? cfg.slug_pattern : '^[a-z][a-z0-9-]{1,30}$';
+  let slugPattern = /^[a-z][a-z0-9-]{1,30}$/;
+  try {
+    slugPattern = new RegExp(slugPatternRaw);
+  } catch (_) {
+    /* fallback */
+  }
+  return {
+    protectedPrefixes: Array.isArray(cfg.protected_prefixes)
+      ? cfg.protected_prefixes
+      : ['knowledge/confidential/'],
+    sharedPrefixes: Array.isArray(cfg.shared_prefixes)
+      ? cfg.shared_prefixes
+      : ['knowledge/confidential/heuristics/', 'knowledge/confidential/relationships/'],
+    systemRegistryReads: Array.isArray(cfg.system_registry_reads)
+      ? cfg.system_registry_reads.filter(
+          (entry: unknown): entry is { path: string; roles: string[] } =>
+            Boolean(entry) &&
+            typeof (entry as { path?: unknown }).path === 'string' &&
+            Array.isArray((entry as { roles?: unknown }).roles) &&
+            (entry as { roles: unknown[] }).roles.every((role) => typeof role === 'string')
+        )
+      : [
+          {
+            path: 'knowledge/confidential/tenants/index.json',
+            roles: ['check_tenant_registry_consistency'],
+          },
+        ],
+    // Unpartitioned legacy roots still follow the existing tier/persona rules.
+    requireTenantBinding: cfg.require_tenant_binding === true || requireTenantBinding,
+    slugPattern,
+    brokerRequirements: {
+      requireApprovedBy: cfg?.broker_requirements?.require_approved_by !== false,
+      requireApprovedAt: cfg?.broker_requirements?.require_approved_at !== false,
+      requireExpiresAt: cfg?.broker_requirements?.require_expires_at !== false,
+    },
+  };
+}
+
+export function normalizeRegisteredTenantProfile(value: unknown): {
+  tenant_slug: string;
+  status: string;
+} | null {
+  if (!isRecord(value)) return null;
+  if (typeof value.tenant_slug !== 'string' || typeof value.status !== 'string') return null;
+  return { tenant_slug: value.tenant_slug, status: value.status };
+}
+
+export interface TenantGroupProfile {
+  tenant_group_id: string;
+  status?: string;
+  member_tenants?: string[];
+  shared_prefixes?: string[];
+}
+
+export function extractTenantGroupFromSharedPath(relativePath: string): string | null {
+  const match = relativePath.match(
+    /^knowledge\/confidential\/shared\/([a-z][a-z0-9-]{1,30})(?:\/|$)/
+  );
+  return match?.[1] ?? null;
+}
+
+export function isValidTenantGroupProfile(
+  groupId: string,
+  profile: unknown
+): profile is TenantGroupProfile {
+  if (!isRecord(profile)) return false;
+  const memberTenants = profile.member_tenants;
+  const sharedPrefixes = profile.shared_prefixes;
+  return (
+    profile.tenant_group_id === groupId &&
+    typeof profile.tenant_group_id === 'string' &&
+    (profile.status === 'active' ||
+      profile.status === 'suspended' ||
+      profile.status === 'archived') &&
+    Array.isArray(memberTenants) &&
+    memberTenants.length > 0 &&
+    memberTenants.every((tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)) &&
+    Array.isArray(sharedPrefixes) &&
+    sharedPrefixes.length > 0 &&
+    sharedPrefixes.every(
+      (prefix) =>
+        typeof prefix === 'string' &&
+        new RegExp(`^knowledge/confidential/shared/${groupId.replace(/[^\w-]/gu, '')}/`).test(
+          prefix
+        )
+    )
+  );
+}
 
 interface PartitionWritePolicy {
   authority_role_permissions?: Record<string, { allow_write?: unknown[] } | undefined>;
@@ -33,7 +144,7 @@ export function tenantStorePartitionWriteDecision(
   relativePath: string,
   identity: PartitionWriteIdentity,
   deps: {
-    operation: 'write' | 'mkdir';
+    operation: 'write' | 'append' | 'mkdir';
     sudoAllows: (sudoScope: string[] | undefined) => boolean;
     matches: (pattern: string) => boolean;
   }

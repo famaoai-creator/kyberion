@@ -12,6 +12,7 @@
       "customer_decision_invite_store",
       "customer_decision_milestone_store",
       "deliverable_inbox_writer",
+      "dot_result_writer",
       "infrastructure_sentinel",
       "knowledge_steward",
       "memory_provenance_reader",

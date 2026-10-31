@@ -41,6 +41,7 @@
 
 import * as path from 'node:path';
 import { appendJsonLine, readJsonIfPresent, readJsonLines, writeJson } from '../foundation/json.js';
+import { projectDotResultRecords, dotResultScopeSchema } from './dot-result-records.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import {
   routeAutonomousDecision,
@@ -473,9 +474,12 @@ function regressedSince(c: DotCharter, since: number, deps: DotAutonomyDeps): nu
 }
 
 function executorIncidentsSince(c: DotCharter, since: number, deps: DotAutonomyDeps): number {
-  return readJsonLines<DotWorkResultRow>(abs(deps, dotStatePath(c, DOT_WORK_RESULTS_FILE)), {
-    onMalformed: 'skip',
-  }).filter(
+  return (
+    projectDotResultRecords(
+      readJsonLines<unknown>(abs(deps, dotStatePath(c, DOT_WORK_RESULTS_FILE))),
+      c.scope.tier === 'confidential' ? dotResultScopeSchema.parse(c.scope) : undefined
+    ) as DotWorkResultRow[]
+  ).filter(
     (row) =>
       row?.dot_id === c.dot_id &&
       // Only failures are incidents: `blocked` / escalated rows are by-design
