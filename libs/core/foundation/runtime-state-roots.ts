@@ -18,6 +18,8 @@ export const PARTITIONED_RUNTIME_STATE_ROOTS = {
   grants: 'active/shared/runtime/grants',
   /** CD-06 customer decision invite links (hashes only; customer-decision/invite.ts). */
   customer_decision_invites: 'active/shared/runtime/customer-decision-invites',
+  /** Kyberion -> Chrome extension pull mailbox (browser/browser-bridge-mailbox.ts). */
+  browser_bridge_mailbox: 'active/shared/runtime/browser-bridge-mailbox',
 } as const;
 
 /**

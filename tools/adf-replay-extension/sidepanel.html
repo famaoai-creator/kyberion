@@ -16,15 +16,103 @@
     </header>
 
     <nav class="tabs" aria-label="Browser Bridge sections">
-      <button class="tab" data-tab="intent" type="button">Intent</button>
-      <button class="tab is-active" data-tab="live" type="button">Live</button>
-      <button class="tab" data-tab="record" type="button">Record</button>
-      <button class="tab" data-tab="review" type="button">Review</button>
-      <button class="tab" data-tab="run" type="button">Run</button>
+      <div class="tab-list" role="tablist" aria-label="Browser Bridge sections">
+        <button
+          class="tab"
+          id="tab-intent"
+          data-tab="intent"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-intent"
+          tabindex="-1"
+        >
+          Intent
+        </button>
+        <button
+          class="tab is-active"
+          id="tab-live"
+          data-tab="live"
+          type="button"
+          role="tab"
+          aria-selected="true"
+          aria-controls="panel-live"
+          tabindex="0"
+        >
+          Live
+        </button>
+        <button
+          class="tab"
+          id="tab-inbox"
+          data-tab="inbox"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-inbox"
+          tabindex="-1"
+        >
+          受信 <span id="inbox-tab-count" class="tab-count"></span>
+        </button>
+        <button
+          class="tab"
+          id="tab-send"
+          data-tab="send"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-send"
+          tabindex="-1"
+        >
+          送信
+        </button>
+        <button
+          class="tab"
+          id="tab-record"
+          data-tab="record"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-record"
+          tabindex="-1"
+        >
+          Record
+        </button>
+        <button
+          class="tab"
+          id="tab-review"
+          data-tab="review"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-review"
+          tabindex="-1"
+        >
+          Review
+        </button>
+        <button
+          class="tab"
+          id="tab-run"
+          data-tab="run"
+          type="button"
+          role="tab"
+          aria-selected="false"
+          aria-controls="panel-run"
+          tabindex="-1"
+        >
+          Run
+        </button>
+      </div>
     </nav>
 
     <main>
-      <section class="panel" data-panel="intent">
+      <section
+        class="panel"
+        id="panel-intent"
+        data-panel="intent"
+        role="tabpanel"
+        aria-labelledby="tab-intent"
+        tabindex="0"
+      >
         <p class="section-kicker">INTENT-DRIVEN AUTOMATION</p>
         <h2>何をしたいか入力してください</h2>
         <p>自然言語でやりたいことを入力すると、登録済みの手順と照合します。</p>
@@ -92,7 +180,14 @@
         </div>
       </section>
 
-      <section class="panel is-active" data-panel="live">
+      <section
+        class="panel is-active"
+        id="panel-live"
+        data-panel="live"
+        role="tabpanel"
+        aria-labelledby="tab-live"
+        tabindex="0"
+      >
         <p class="section-kicker">CURRENT TAB</p>
         <div class="connection-card">
           <span id="connection-status" class="status-pill">未接続</span>
@@ -129,15 +224,20 @@
         <div class="execution-inputs">
           <p class="section-kicker">PAGE DISCOVERY & INSPECTION</p>
           <p>
-            現在のページDOM（入力欄・ボタン・見出し・リンク）を解析し、Kyberion CLIやエージェント連携用に取得・送信します。
+            現在のページDOM（入力欄・ボタン・見出し・リンク）を解析し、Kyberion
+            CLIやエージェント連携用に取得・送信します。
           </p>
-          <div class="intent-input-row" style="margin-bottom: 8px;">
-            <label for="inspect-port-input" style="font-size: 12px; color: var(--text-muted, #666); margin-right: 6px;">Port:</label>
+          <div class="intent-input-row" style="margin-bottom: 8px">
+            <label
+              for="inspect-port-input"
+              style="font-size: 12px; color: var(--text-muted, #666); margin-right: 6px"
+              >Port:</label
+            >
             <input
               id="inspect-port-input"
               type="number"
               class="intent-input"
-              style="width: 80px; padding: 4px 8px; font-size: 12px;"
+              style="width: 80px; padding: 4px 8px; font-size: 12px"
               value="8788"
               min="1024"
               max="65535"
@@ -154,11 +254,140 @@
           <p id="inspect-page-status" class="ai-status" aria-live="polite"></p>
           <pre id="inspect-page-result" class="draft-preview" hidden></pre>
         </div>
-
+        <div class="execution-inputs">
+          <p class="section-kicker">WEBMCP TOOLS (READ-ONLY)</p>
+          <h3 class="subsection-title">このページが公開している AI ツール</h3>
+          <p>
+            ページが WebMCP
+            で公開しているツールの名前・説明・入力項目名だけを表示します。ツールは呼び出しません。
+          </p>
+          <div class="button-row">
+            <button id="webmcp-probe-button" class="secondary" type="button">
+              AI ツールを確認
+            </button>
+          </div>
+          <p id="webmcp-status" class="ai-status" aria-live="polite"></p>
+          <ul
+            id="webmcp-tools"
+            class="action-list"
+            aria-label="このページが公開している AI ツール"
+          ></ul>
+        </div>
       </section>
 
+      <section
+        class="panel"
+        id="panel-inbox"
+        data-panel="inbox"
+        role="tabpanel"
+        aria-labelledby="tab-inbox"
+        tabindex="0"
+      >
+        <p class="section-kicker">FROM KYBERION</p>
+        <h2>Kyberion からの依頼</h2>
+        <p>
+          ページを読む依頼は、ここで「許可して応答」を押したときだけ応答します。承認は表示されたコマンドでターミナルから行います（ここでは承認できません）。
+        </p>
+        <p id="inbox-status" class="ai-status">受信箱を確認しています…</p>
+        <p id="inbox-live" class="visually-hidden" role="status" aria-live="polite"></p>
+        <div class="button-row">
+          <button id="inbox-refresh-button" class="secondary" type="button">今すぐ確認</button>
+        </div>
+        <label class="toggle-row">
+          <input id="local-infer-auto-toggle" type="checkbox" />
+          <span
+            >ローカル推論依頼を自動応答（このブラウザを閉じるまで。ページ観測には適用しません）</span
+          >
+        </label>
+        <h3 class="subsection-title" id="inbox-requests-heading">依頼</h3>
+        <ol id="inbox-requests" class="action-list" aria-labelledby="inbox-requests-heading"></ol>
+        <p id="inbox-empty" class="intent-empty">現在、依頼はありません。</p>
+        <h3 class="subsection-title" id="inbox-approvals-heading">承認待ち（表示のみ）</h3>
+        <ol id="inbox-approvals" class="action-list" aria-labelledby="inbox-approvals-heading"></ol>
+        <p id="inbox-approvals-empty" class="intent-empty">承認待ちはありません。</p>
+      </section>
 
-      <section class="panel" data-panel="record">
+      <section
+        class="panel"
+        id="panel-send"
+        data-panel="send"
+        role="tabpanel"
+        aria-labelledby="tab-send"
+        tabindex="0"
+      >
+        <p class="section-kicker">TO KYBERION</p>
+        <h2>このページを Kyberion に送る</h2>
+        <p>
+          PII を除去した本文だけを送ります。右クリックの「Kyberion
+          に送る」でも、ここに下書きが入ります（自動では送りません）。
+        </p>
+        <div class="button-row">
+          <button id="send-load-page-button" class="secondary" type="button">
+            接続中のページを取り込む
+          </button>
+        </div>
+        <fieldset class="send-fieldset">
+          <legend>送信方法</legend>
+          <label class="toggle-row">
+            <input type="radio" name="send-mode" value="intent" checked />
+            <span>やりたいこととして送る（intent）</span>
+          </label>
+          <label class="toggle-row">
+            <input type="radio" name="send-mode" value="knowledge" />
+            <span>ナレッジとして保存する（knowledge）</span>
+          </label>
+        </fieldset>
+        <fieldset class="send-fieldset">
+          <legend>保存先の区分</legend>
+          <label class="toggle-row">
+            <input type="radio" name="send-tier" value="personal" checked />
+            <span>personal（個人・既定）</span>
+          </label>
+          <label class="toggle-row">
+            <input type="radio" name="send-tier" value="confidential" />
+            <span>confidential（テナント）</span>
+          </label>
+          <label class="toggle-row">
+            <input type="radio" name="send-tier" value="public" />
+            <span>public（公開）</span>
+          </label>
+          <label class="execution-input" id="send-tenant-row" hidden>
+            <span>テナント slug（必須）</span>
+            <input id="send-tenant-input" type="text" autocomplete="off" spellcheck="false" />
+          </label>
+          <label class="toggle-row" id="send-public-confirm-row" hidden>
+            <input id="send-public-confirm" type="checkbox" />
+            <span>公開してよい内容であることを確認しました</span>
+          </label>
+        </fieldset>
+        <label class="execution-input">
+          <span id="send-note-label">やりたいこと・メモ（1,000 文字まで）</span>
+          <textarea id="send-note-input" rows="2" maxlength="1000" autocomplete="off"></textarea>
+        </label>
+        <p id="send-source" class="ai-status">まだ本文がありません。</p>
+        <pre
+          id="send-preview"
+          class="draft-preview"
+          aria-label="送信する本文のプレビュー（PII 除去済み）"
+          tabindex="0"
+        ></pre>
+        <div class="button-row">
+          <button id="send-submit-button" class="primary" type="button" disabled>
+            Kyberion に送信
+          </button>
+          <button id="send-clear-button" class="secondary" type="button">下書きを消す</button>
+        </div>
+        <div id="send-result" class="intent-result" role="status" aria-live="polite" hidden></div>
+      </section>
+
+      <section
+        class="panel"
+        id="panel-record"
+        data-panel="record"
+        role="tabpanel"
+        aria-labelledby="tab-record"
+        tabindex="0"
+      >
         <p class="section-kicker">CAPTURE INTENT, NOT DATA</p>
         <h2>操作を記録</h2>
         <p>
@@ -196,7 +425,14 @@
         </button>
       </section>
 
-      <section class="panel" data-panel="review">
+      <section
+        class="panel"
+        id="panel-review"
+        data-panel="review"
+        role="tabpanel"
+        aria-labelledby="tab-review"
+        tabindex="0"
+      >
         <p class="section-kicker">HUMAN REVIEW REQUIRED</p>
         <h2>下書きをレビュー</h2>
         <p id="review-summary">記録を停止すると、ここに redaction 済みの下書きが表示されます。</p>
@@ -212,7 +448,14 @@
         <pre id="draft-preview" class="draft-preview" aria-label="Browser recording draft"></pre>
       </section>
 
-      <section class="panel" data-panel="run">
+      <section
+        class="panel"
+        id="panel-run"
+        data-panel="run"
+        role="tabpanel"
+        aria-labelledby="tab-run"
+        tabindex="0"
+      >
         <p class="section-kicker">GOVERNED EXECUTION</p>
         <h2>次に何が起きるか</h2>
         <p id="handoff-status">
@@ -289,6 +532,7 @@
     <footer id="notice" class="notice" aria-live="polite"></footer>
     <script src="pii-rules.generated.js"></script>
     <script src="built-in-ai.js"></script>
+    <script src="bridge-inbox.js"></script>
     <script src="sidepanel.js"></script>
   </body>
 </html>

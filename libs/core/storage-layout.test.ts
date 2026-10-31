@@ -221,6 +221,8 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/grants/confidential/',
       'active/shared/runtime/customer-decision-invites/personal/',
       'active/shared/runtime/customer-decision-invites/confidential/',
+      'active/shared/runtime/browser-bridge-mailbox/personal/',
+      'active/shared/runtime/browser-bridge-mailbox/confidential/',
     ]);
     for (const prefix of protectedRuntimeStatePrefixes())
       expect(policy.tenant_scope.protected_prefixes).toContain(prefix);

@@ -459,6 +459,8 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   // durable receipts: review-required, never auto-offboarded (see hearing-/discussion-request-storage-boundary tests)
   discussion_create_requests: 'not_offboarded',
   grants: 'tenant_runtime_state',
+  // Short-lived extension requests/responses (≤60 min lifetime): purge with the tenant.
+  browser_bridge_mailbox: 'tenant_runtime_state',
 } as const satisfies Record<TenantRuntimePartitionKey, OffboardTargetKind | 'not_offboarded'>;
 
 /**

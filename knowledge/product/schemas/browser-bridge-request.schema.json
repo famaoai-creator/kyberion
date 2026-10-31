@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "kyberion://schemas/browser-bridge-request.v1",
+  "title": "Kyberion Browser Bridge Request v1",
+  "description": "One Kyberion -> Chrome extension request in the pull mailbox (libs/core/browser/browser-bridge-mailbox.ts). The extension pulls requests through the native host (poll_requests) and answers with respond_request. Requests never carry an executable instruction: observe_tab asks the user for consent to read the active tab, local_infer runs an on-device model whose result stays non-executable, notify is display-only and never carries page data. Stored one file per request under active/shared/runtime/browser-bridge-mailbox/<tier>/<tenant|shared>/.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "kind",
+    "request_id",
+    "request_kind",
+    "created_at",
+    "expires_at",
+    "requested_by",
+    "scope",
+    "payload",
+    "status"
+  ],
+  "properties": {
+    "kind": { "const": "browser-bridge-request.v1" },
+    "request_id": {
+      "type": "string",
+      "pattern": "^BBR-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$"
+    },
+    "request_kind": { "enum": ["observe_tab", "local_infer", "notify"] },
+    "created_at": { "type": "string", "format": "date-time" },
+    "expires_at": { "type": "string", "format": "date-time" },
+    "requested_by": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["actor_id"],
+      "properties": {
+        "actor_id": { "type": "string", "minLength": 1, "maxLength": 200 },
+        "mission_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$" }
+      }
+    },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tier"],
+      "properties": {
+        "tier": { "enum": ["personal", "confidential", "public"] },
+        "tenant_slug": { "type": "string", "pattern": "^[a-z][a-z0-9-]{1,30}$" }
+      },
+      "if": { "properties": { "tier": { "const": "confidential" } } },
+      "then": { "required": ["tenant_slug"] }
+    },
+    "payload": { "type": "object" },
+    "status": {
+      "enum": ["pending", "delivered", "completed", "declined", "failed", "expired"]
+    },
+    "delivered_at": { "type": "string", "format": "date-time" },
+    "response": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "responded_at"],
+      "properties": {
+        "status": { "enum": ["completed", "declined", "failed", "expired"] },
+        "result": { "type": "object" },
+        "error": { "type": "string", "maxLength": 1000 },
+        "responded_at": { "type": "string", "format": "date-time" },
+        "origin": { "type": "string", "maxLength": 2048 }
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "request_kind": { "const": "observe_tab" } } },
+      "then": { "properties": { "payload": { "$ref": "#/definitions/observe_tab_payload" } } }
+    },
+    {
+      "description": "A tenant-scoped observe_tab (any tier with scope.tenant_slug, i.e. a <tier>/<tenant> partition) must bind the observation to named origins: the native host is a single-operator channel and the operator's open tab may belong to any tenant.",
+      "if": {
+        "type": "object",
+        "required": ["request_kind", "scope"],
+        "properties": {
+          "request_kind": { "const": "observe_tab" },
+          "scope": {
+            "type": "object",
+            "required": ["tenant_slug"]
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "payload": {
+            "type": "object",
+            "required": ["allowed_origins"],
+            "properties": { "allowed_origins": { "type": "array", "minItems": 1 } }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "request_kind": { "const": "local_infer" } } },
+      "then": { "properties": { "payload": { "$ref": "#/definitions/local_infer_payload" } } }
+    },
+    {
+      "if": { "properties": { "request_kind": { "const": "notify" } } },
+      "then": { "properties": { "payload": { "$ref": "#/definitions/notify_payload" } } }
+    }
+  ],
+  "definitions": {
+    "observe_tab_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["purpose", "mode"],
+      "properties": {
+        "purpose": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "allowed_origins": {
+          "type": "array",
+          "maxItems": 20,
+          "uniqueItems": true,
+          "items": { "type": "string", "pattern": "^https?://[^/\\s]+$", "maxLength": 300 }
+        },
+        "mode": { "enum": ["text", "structure"] }
+      }
+    },
+    "local_infer_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["task", "input"],
+      "properties": {
+        "task": {
+          "enum": [
+            "summarize",
+            "classify",
+            "extract",
+            "translate",
+            "detect_language",
+            "proofread",
+            "rewrite",
+            "write"
+          ]
+        },
+        "input": { "type": "string", "minLength": 1, "maxLength": 30000 },
+        "options": { "type": "object" }
+      }
+    },
+    "notify_payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["level", "title", "body"],
+      "properties": {
+        "level": { "enum": ["info", "progress", "approval_pending"] },
+        "title": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "body": { "type": "string", "maxLength": 1000 },
+        "approval_request_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,159}$"
+        },
+        "mission_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,159}$" },
+        "progress": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["done", "total"],
+          "properties": {
+            "done": { "type": "integer", "minimum": 0 },
+            "total": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

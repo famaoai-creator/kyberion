@@ -62,12 +62,26 @@ h2 {
 }
 
 .tabs {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 1px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--line);
   background: #e3ded3;
+}
+.tab-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(56px, 1fr));
+  gap: 1px;
+}
+.tab-count:not(:empty) {
+  display: inline-block;
+  min-width: 18px;
+  margin-left: 2px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--forest);
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  line-height: 18px;
 }
 .tab {
   min-height: 38px;
@@ -429,4 +443,72 @@ footer.notice-busy::after {
   100% {
     opacity: 0.3;
   }
+}
+
+/* --- Inbox / Send / WebMCP ---------------------------------------------- */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.subsection-title {
+  margin: 18px 0 6px;
+  font-size: 15px;
+}
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 8px 0;
+  font-size: 13px;
+}
+.toggle-row input {
+  margin-top: 3px;
+}
+.send-fieldset {
+  margin: 12px 0;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--panel);
+}
+.send-fieldset legend {
+  padding: 0 4px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.inbox-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.inbox-card.is-actionable {
+  border-left-color: var(--orange);
+}
+.inbox-tag {
+  align-self: flex-start;
+  padding: 1px 6px;
+  border: 1px solid var(--forest);
+  border-radius: 4px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+}
+.inbox-tag.is-approval {
+  border-style: dashed;
+  border-color: var(--orange);
+}
+.inbox-command {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 4px;
+  background: #edf0e6;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 11px;
+  word-break: break-all;
+}
+.inbox-card .review-controls {
+  flex-wrap: wrap;
 }

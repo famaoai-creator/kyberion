@@ -1,5 +1,6 @@
 /** Domain barrel — public surface for libs/core/browser */
 export * from './browser-automation-runtime-bridge.js';
+export * from './browser-bridge-mailbox.js';
 export * from './browser-conversation-session.js';
 export * from './browser-extension-bridge.js';
 export * from './browser-judgment.js';

@@ -1246,6 +1246,8 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
   'permissions',
   // grants list/check/grant/revoke read and write grant records and approvals only.
   'grants',
+  // browser-bridge request/status/wait read and write the extension mailbox only.
+  'browser-bridge',
   'memory',
   // speak routes through the voice actuator's engine registry, not the
   // bootstrapped python voice bridge / reasoning backends.
