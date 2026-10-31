@@ -647,13 +647,17 @@
         "active/shared/tmp/confidential/${KYBERION_TENANT}/",
         "active/shared/tmp/personal/${KYBERION_TENANT}/",
         "active/shared/staging/confidential/${KYBERION_TENANT}/",
-        "active/shared/staging/personal/${KYBERION_TENANT}/"
+        "active/shared/staging/personal/${KYBERION_TENANT}/",
+        "active/shared/cache/confidential/${KYBERION_TENANT}/perception/",
+        "active/shared/cache/personal/${KYBERION_TENANT}/perception/"
       ],
       "allow_write": [
         "active/shared/tmp/confidential/${KYBERION_TENANT}/",
         "active/shared/tmp/personal/${KYBERION_TENANT}/",
         "active/shared/staging/confidential/${KYBERION_TENANT}/",
-        "active/shared/staging/personal/${KYBERION_TENANT}/"
+        "active/shared/staging/personal/${KYBERION_TENANT}/",
+        "active/shared/cache/confidential/${KYBERION_TENANT}/perception/",
+        "active/shared/cache/personal/${KYBERION_TENANT}/perception/"
       ]
     },
     "metrics_cap_reader": {
@@ -754,6 +758,7 @@
         "active/shared/runtime/approvals.json"
       ]
     },
+    "build_repository": { "allow_write": ["dist/.build-generation.json"] },
     "customer_create": { "allow_write": ["customer/"] },
     "onboarding": { "allow_write": ["customer/"] },
     "assemble_changelog": { "allow_write": ["CHANGELOG.md", "changelog.d/"] },
