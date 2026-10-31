@@ -744,6 +744,10 @@
       "types": "./dist/browser/browser-recording-compiler.d.ts",
       "default": "./dist/browser/browser-recording-compiler.js"
     },
+    "./browser/browser-bridge-mailbox": {
+      "types": "./dist/browser/browser-bridge-mailbox.d.ts",
+      "default": "./dist/browser/browser-bridge-mailbox.js"
+    },
     "./browser/browser-automation-runtime-bridge": {
       "types": "./dist/browser/browser-automation-runtime-bridge.d.ts",
       "default": "./dist/browser/browser-automation-runtime-bridge.js"

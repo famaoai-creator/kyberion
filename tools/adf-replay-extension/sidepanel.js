@@ -118,10 +118,56 @@ const elements = {
   intentInputs: document.querySelector('#intent-inputs'),
   intentInputsFields: document.querySelector('#intent-inputs-fields'),
   intentRunButton: document.querySelector('#intent-run-button'),
+  // Live tab: WebMCP discovery
+  webmcpProbeButton: document.querySelector('#webmcp-probe-button'),
+  webmcpStatus: document.querySelector('#webmcp-status'),
+  webmcpTools: document.querySelector('#webmcp-tools'),
+  // Inbox tab
+  inboxTabCount: document.querySelector('#inbox-tab-count'),
+  inboxStatus: document.querySelector('#inbox-status'),
+  inboxLive: document.querySelector('#inbox-live'),
+  inboxRefreshButton: document.querySelector('#inbox-refresh-button'),
+  localInferAutoToggle: document.querySelector('#local-infer-auto-toggle'),
+  inboxRequests: document.querySelector('#inbox-requests'),
+  inboxEmpty: document.querySelector('#inbox-empty'),
+  inboxApprovals: document.querySelector('#inbox-approvals'),
+  inboxApprovalsEmpty: document.querySelector('#inbox-approvals-empty'),
+  // Send tab
+  sendLoadPageButton: document.querySelector('#send-load-page-button'),
+  sendTenantRow: document.querySelector('#send-tenant-row'),
+  sendTenantInput: document.querySelector('#send-tenant-input'),
+  sendPublicConfirmRow: document.querySelector('#send-public-confirm-row'),
+  sendPublicConfirm: document.querySelector('#send-public-confirm'),
+  sendNoteLabel: document.querySelector('#send-note-label'),
+  sendNoteInput: document.querySelector('#send-note-input'),
+  sendSource: document.querySelector('#send-source'),
+  sendPreview: document.querySelector('#send-preview'),
+  sendSubmitButton: document.querySelector('#send-submit-button'),
+  sendClearButton: document.querySelector('#send-clear-button'),
+  sendResult: document.querySelector('#send-result'),
 };
 
-document.querySelectorAll('.tab').forEach((tab) => {
+const tabButtons = [...document.querySelectorAll('.tab')];
+tabButtons.forEach((tab, index) => {
   tab.addEventListener('click', () => selectTab(tab.dataset.tab));
+  // WAI-ARIA tabs pattern: arrows move between tabs, Home/End jump to the ends.
+  tab.addEventListener('keydown', (event) => {
+    const last = tabButtons.length - 1;
+    const next =
+      event.key === 'ArrowRight'
+        ? (index + 1) % tabButtons.length
+        : event.key === 'ArrowLeft'
+          ? (index + last) % tabButtons.length
+          : event.key === 'Home'
+            ? 0
+            : event.key === 'End'
+              ? last
+              : null;
+    if (next === null) return;
+    event.preventDefault();
+    selectTab(tabButtons[next].dataset.tab);
+    tabButtons[next].focus();
+  });
 });
 
 // Intent tab wiring
@@ -409,6 +455,7 @@ bindAction(elements.inspectSendCliButton, sendInspectionToCli, {
 
 chrome.runtime.onMessage.addListener((message) => {
   if (message?.type === 'bridge:state-changed') render(message.state);
+  if (message?.type === 'bridge:send-draft-ready') receiveSendDraft(message.draft, true);
 });
 
 // Busy/label handling comes from bindAction — resolution may call the LLM
@@ -832,6 +879,7 @@ function render(nextState) {
   elements.aiScenarioUseIntentButton.disabled = !lastScenarioCandidate?.goal;
   elements.aiPageSummaryButton.disabled = !connected;
   elements.inspectPageButton.disabled = !connected;
+  if (elements.webmcpProbeButton) elements.webmcpProbeButton.disabled = !connected;
   elements.aiRepairButton.disabled = !state.current.repairPending?.target;
   elements.aiObservationSummaryButton.disabled = !(
     state.current.execution?.observation?.preview || []
@@ -1173,9 +1221,12 @@ function reviewMessage(status, hasPending, hasApproved) {
 }
 
 function selectTab(tabName) {
-  document
-    .querySelectorAll('.tab')
-    .forEach((tab) => tab.classList.toggle('is-active', tab.dataset.tab === tabName));
+  document.querySelectorAll('.tab').forEach((tab) => {
+    const selected = tab.dataset.tab === tabName;
+    tab.classList.toggle('is-active', selected);
+    tab.setAttribute('aria-selected', selected ? 'true' : 'false');
+    tab.tabIndex = selected ? 0 : -1;
+  });
   document
     .querySelectorAll('.panel')
     .forEach((panel) => panel.classList.toggle('is-active', panel.dataset.panel === tabName));
@@ -1187,3 +1238,571 @@ function showNotice(message, kind = 'info') {
   elements.notice.textContent = message;
   elements.notice.className = `notice notice-${kind}${message ? '' : ' is-empty'}`;
 }
+
+// ---------------------------------------------------------------------------
+// 受信 (Inbox): requests from Kyberion, pulled by the service worker
+// ---------------------------------------------------------------------------
+//
+// Nothing here answers an observe_tab request without a click on 「許可して応答」.
+// local_infer runs Chrome Built-in AI in this panel (the document APIs are not
+// available in the service worker) and may be answered automatically only when
+// the per-session toggle is on. Approval notices are display-only: they show
+// the CLI command; there is no approve control.
+
+const InboxModel = globalThis.KyberionBridgeInbox;
+let inboxState = null;
+let renderedRequestsSignature = null;
+let renderedApprovalsSignature = null;
+const localInferInFlight = new Set();
+// Auto-answer each local_infer request at most once (a host rejection must not loop).
+const localInferAutoAttempted = new Set();
+let mailboxPort = null;
+let sendDraft = null;
+
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function announce(message) {
+  // Re-set so screen readers announce repeated messages too.
+  elements.inboxLive.textContent = '';
+  setTimeout(() => {
+    elements.inboxLive.textContent = message;
+  }, 50);
+}
+
+async function invokeInbox(type, payload = {}) {
+  const response = await invoke(type, payload);
+  if (response?.inbox) renderInbox(response.inbox);
+  return response;
+}
+
+function connectMailboxPort() {
+  try {
+    mailboxPort = chrome.runtime.connect({ name: 'sidepanel' });
+  } catch (_) {
+    mailboxPort = null;
+    setTimeout(connectMailboxPort, 2_000);
+    return;
+  }
+  mailboxPort.onMessage.addListener((message) => {
+    if (message?.type === 'bridge:inbox-changed') {
+      renderInbox(message.inbox, message.newIds || []);
+    }
+  });
+  // The service worker may be restarted by Chrome; reconnect so fast polling
+  // resumes while this panel stays open.
+  mailboxPort.onDisconnect.addListener(() => {
+    mailboxPort = null;
+    setTimeout(connectMailboxPort, 1_000);
+  });
+}
+
+function renderInbox(inbox, newIds = []) {
+  if (!inbox) return;
+  inboxState = inbox;
+  const requests = (inbox.requests || []).filter((item) => !InboxModel.isExpired(item));
+  const count = InboxModel.badgeCount(requests);
+  elements.inboxTabCount.textContent = count > 0 ? String(count) : '';
+  if (count > 0) elements.inboxTabCount.setAttribute('aria-label', `要対応 ${count} 件`);
+  else elements.inboxTabCount.removeAttribute('aria-label');
+  elements.localInferAutoToggle.checked = inbox.localInferAuto === true;
+  elements.inboxStatus.textContent = inbox.lastError
+    ? `受信箱を確認できません: ${inbox.lastError}`
+    : inbox.lastPolledAt
+      ? `最終確認: ${new Date(inbox.lastPolledAt).toLocaleTimeString('ja-JP')}`
+      : '受信箱を確認しています…';
+
+  const requestsSignature = InboxModel.stableSignature(
+    requests.map((item) => [item.request_id, item.status])
+  );
+  if (requestsSignature !== renderedRequestsSignature) {
+    renderedRequestsSignature = requestsSignature;
+    elements.inboxRequests.replaceChildren(...requests.map(inboxRequestCard));
+    elements.inboxEmpty.hidden = requests.length > 0;
+  }
+  // Approvals ride along on every poll; rebuild only when they changed.
+  const approvalsSignature =
+    inbox.approvalsSignature || InboxModel.stableSignature(inbox.approvals);
+  if (approvalsSignature !== renderedApprovalsSignature) {
+    renderedApprovalsSignature = approvalsSignature;
+    const approvals = inbox.approvals || [];
+    elements.inboxApprovals.replaceChildren(...approvals.map(approvalCard));
+    elements.inboxApprovalsEmpty.hidden = approvals.length > 0;
+    elements.inboxApprovalsEmpty.textContent = inbox.approvalsUnavailable
+      ? '承認待ちの一覧を取得できませんでした。'
+      : '承認待ちはありません。';
+    if (inbox.approvalsUnavailable) elements.inboxApprovalsEmpty.hidden = false;
+  }
+
+  const fresh = requests.filter((item) => newIds.includes(item.request_id));
+  if (fresh.length > 0) {
+    const titles = fresh
+      .map((item) => {
+        const view = InboxModel.describeRequest(item);
+        return `${view.kindLabel}${view.levelLabel ? `（${view.levelLabel}）` : ''}「${view.title}」`;
+      })
+      .join('、');
+    announce(`Kyberion から新しい依頼が ${fresh.length} 件届きました: ${titles}`);
+  }
+
+  requests
+    .filter(
+      (item) =>
+        InboxModel.shouldAutoRespond(item, inbox.localInferAuto === true) &&
+        !localInferAutoAttempted.has(item.request_id)
+    )
+    .forEach((item) => {
+      localInferAutoAttempted.add(item.request_id);
+      void runLocalInfer(item, { auto: true });
+    });
+}
+
+function controlButton(label, contextTitle, handler, options) {
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'decision-button';
+  button.textContent = label;
+  button.setAttribute('aria-label', `${label}: ${contextTitle}`);
+  bindAction(button, handler, options);
+  return button;
+}
+
+function inboxRequestCard(item) {
+  const view = InboxModel.describeRequest(item);
+  const li = document.createElement('li');
+  li.className = `inbox-card${view.actionable ? ' is-actionable' : ''}`;
+  li.dataset.requestId = view.request_id;
+  const tag = document.createElement('span');
+  tag.className = `inbox-tag${view.level === 'approval_pending' ? ' is-approval' : ''}`;
+  // Kind and level are spelled out — never conveyed by colour alone.
+  tag.textContent = view.levelLabel ? `${view.kindLabel} / ${view.levelLabel}` : view.kindLabel;
+  const title = document.createElement('strong');
+  title.textContent = view.title;
+  const meta = document.createElement('small');
+  meta.textContent = `依頼元: ${view.requester} ・ 区分: ${view.scope}`;
+  li.append(tag, title, meta);
+  view.lines.forEach((line) => {
+    const detail = document.createElement('small');
+    detail.textContent = line;
+    li.append(detail);
+  });
+  const countdown = document.createElement('small');
+  countdown.dataset.expiresAt = view.expiresAt || '';
+  countdown.textContent = `期限: ${view.remaining}`;
+  li.append(countdown);
+  if (view.command) {
+    const hint = document.createElement('small');
+    hint.textContent = '承認はターミナルで次のコマンドを実行します（ここでは承認できません）:';
+    const code = document.createElement('code');
+    code.className = 'inbox-command';
+    code.textContent = view.command;
+    li.append(hint, code);
+  }
+  const controls = document.createElement('div');
+  controls.className = 'review-controls';
+  view.controls.forEach((control) => {
+    if (control === 'respond') {
+      controls.append(
+        controlButton('許可して応答', view.title, () => respondToItem(item), {
+          busyLabel: '応答中…',
+          busyNotice:
+            item.request_kind === 'local_infer'
+              ? 'Chrome 内蔵 AI でローカル推論を実行しています…'
+              : '現在のページを観測して応答しています…',
+        })
+      );
+    } else if (control === 'decline') {
+      controls.append(
+        controlButton('拒否', view.title, () => declineItem(item), { busyLabel: '送信中…' })
+      );
+    } else if (control === 'acknowledge') {
+      controls.append(
+        controlButton('確認', view.title, () =>
+          invokeInbox('bridge:respond-request', { requestId: item.request_id })
+        )
+      );
+    } else if (control === 'copy_command') {
+      controls.append(
+        controlButton('コマンドをコピー', view.title, () => copyCommand(view.command))
+      );
+    } else if (control === 'dismiss') {
+      controls.append(
+        controlButton('表示を閉じる', view.title, () =>
+          invokeInbox('bridge:dismiss-request', { requestId: item.request_id })
+        )
+      );
+    }
+  });
+  li.append(controls);
+  return li;
+}
+
+function approvalCard(approval) {
+  const view = InboxModel.describeApproval(approval);
+  const li = document.createElement('li');
+  li.className = 'inbox-card';
+  const tag = document.createElement('span');
+  tag.className = 'inbox-tag is-approval';
+  tag.textContent = `承認待ち / ${view.riskLabel}`;
+  const title = document.createElement('strong');
+  title.textContent = view.title || view.request_id;
+  li.append(tag, title);
+  if (view.command) {
+    const code = document.createElement('code');
+    code.className = 'inbox-command';
+    code.textContent = view.command;
+    const controls = document.createElement('div');
+    controls.className = 'review-controls';
+    controls.append(
+      controlButton('コマンドをコピー', view.title || view.request_id, () =>
+        copyCommand(view.command)
+      )
+    );
+    li.append(code, controls);
+  }
+  return li;
+}
+
+async function copyCommand(command) {
+  if (!command) return;
+  try {
+    await navigator.clipboard.writeText(command);
+    showNotice('承認コマンドをコピーしました。ターミナルで実行してください。', 'success');
+  } catch {
+    showNotice('コピーできませんでした。表示されたコマンドを選択してコピーしてください。', 'error');
+  }
+}
+
+async function respondToItem(item) {
+  if (item.request_kind === 'observe_tab') {
+    // Site access must be requested inside the click's user gesture.
+    if (!(await ensureHostPermission())) {
+      throw new Error('現在のサイトへのアクセスが許可されませんでした。観測には許可が必要です。');
+    }
+    const response = await invokeInbox('bridge:respond-request', {
+      requestId: item.request_id,
+      userAction: true,
+    });
+    if (response?.responded) announce('現在のページを観測して応答しました。');
+    return;
+  }
+  if (item.request_kind === 'local_infer') {
+    await runLocalInfer(item, { auto: false });
+    return;
+  }
+  await invokeInbox('bridge:respond-request', { requestId: item.request_id });
+}
+
+async function declineItem(item) {
+  const response = await invokeInbox('bridge:decline-request', { requestId: item.request_id });
+  if (response?.responded) announce('依頼を拒否しました。');
+}
+
+async function runLocalInfer(item, { auto }) {
+  if (localInferInFlight.has(item.request_id) || InboxModel.isExpired(item)) return;
+  localInferInFlight.add(item.request_id);
+  const controller = new AbortController();
+  const timer = setTimeout(
+    () => controller.abort(),
+    Math.max(0, Date.parse(item.expires_at) - Date.now())
+  );
+  try {
+    let result;
+    try {
+      result = await aiAdapter().runLocalTask({
+        task: item.payload?.task,
+        input: item.payload?.input,
+        options: { ...(item.payload?.options || {}) },
+        signal: controller.signal,
+      });
+    } catch (error) {
+      // Expired while running: never answered.
+      if (controller.signal.aborted) return;
+      await invokeInbox('bridge:respond-request', {
+        requestId: item.request_id,
+        status: 'failed',
+        error: `Chrome 内蔵 AI でローカル推論を実行できませんでした: ${errorMessage(error)}`.slice(
+          0,
+          1000
+        ),
+      });
+      announce('ローカル推論を実行できなかったため、失敗として応答しました。');
+      return;
+    }
+    const response = await invokeInbox('bridge:respond-request', {
+      requestId: item.request_id,
+      result,
+    });
+    if (response?.responded) {
+      announce(
+        auto ? 'ローカル推論依頼に自動で応答しました。' : 'ローカル推論の結果を応答しました。'
+      );
+      return;
+    }
+    // The result could not be sent (rejected or too large): answer `failed`
+    // so the requester is not left waiting until the request expires.
+    if (controller.signal.aborted) return;
+    const failed = await invokeInbox('bridge:respond-request', {
+      requestId: item.request_id,
+      status: 'failed',
+      error: `ローカル推論の結果を送信できませんでした: ${lastError || '不明なエラー'}`.slice(
+        0,
+        1000
+      ),
+    });
+    if (failed?.responded) announce('ローカル推論の結果を送信できず、失敗として応答しました。');
+  } finally {
+    clearTimeout(timer);
+    localInferInFlight.delete(item.request_id);
+  }
+}
+
+elements.localInferAutoToggle.addEventListener('change', () => {
+  void invokeInbox('bridge:set-local-infer-auto', {
+    enabled: elements.localInferAutoToggle.checked,
+  });
+});
+bindAction(elements.inboxRefreshButton, () => invokeInbox('bridge:poll-inbox'), {
+  busyLabel: '確認中…',
+  busyNotice: '受信箱を確認しています…',
+});
+
+// Countdown: update text in place (no rebuild, not a live region) and drop
+// items as soon as they expire.
+setInterval(() => {
+  let expired = false;
+  elements.inboxRequests.querySelectorAll('[data-expires-at]').forEach((node) => {
+    const label = InboxModel.remainingLabel(node.dataset.expiresAt);
+    node.textContent = `期限: ${label}`;
+    if (label === '期限切れ') expired = true;
+  });
+  if (expired && inboxState) renderInbox(inboxState);
+}, 1_000);
+
+// ---------------------------------------------------------------------------
+// 送信 (Send): page / selection → Kyberion (intent or knowledge)
+// ---------------------------------------------------------------------------
+
+function selectedRadio(name) {
+  return document.querySelector(`input[name="${name}"]:checked`)?.value;
+}
+
+function syncSendForm() {
+  const tier = selectedRadio('send-tier') || 'personal';
+  elements.sendTenantRow.hidden = tier !== 'confidential';
+  elements.sendPublicConfirmRow.hidden = tier !== 'public';
+  if (tier !== 'public') elements.sendPublicConfirm.checked = false;
+  elements.sendNoteLabel.textContent =
+    selectedRadio('send-mode') === 'knowledge'
+      ? 'メモ（任意・1,000 文字まで）'
+      : 'やりたいこと（intent として登録済みの手順と照合します・1,000 文字まで）';
+  elements.sendSubmitButton.disabled = !sendDraft?.text;
+}
+
+document
+  .querySelectorAll('input[name="send-tier"], input[name="send-mode"]')
+  .forEach((input) => input.addEventListener('change', syncSendForm));
+
+function receiveSendDraft(draft, focus) {
+  if (!draft) return;
+  if (draft.error && !draft.text) {
+    sendDraft = null;
+    elements.sendPreview.textContent = '';
+    elements.sendSource.textContent = draft.error;
+  } else {
+    // Already scrubbed by the extension; scrub again before display.
+    const scrub = globalThis.__kyberionPiiScrub;
+    const text = typeof scrub === 'function' ? scrub(String(draft.text || '')) : '';
+    sendDraft = { ...draft, text };
+    elements.sendPreview.textContent = text;
+    elements.sendSource.textContent = [
+      draft.selection_only ? '選択範囲' : 'ページ本文',
+      draft.title || '（タイトルなし）',
+      draft.url_origin,
+      `${text.length.toLocaleString('ja-JP')} 文字${draft.truncated ? '（上限で切り詰め）' : ''}`,
+    ].join(' ・ ');
+  }
+  elements.sendResult.hidden = true;
+  syncSendForm();
+  if (focus) {
+    selectTab('send');
+    announce('送信フォームに下書きを入れました。内容を確認して送信してください。');
+  }
+}
+
+bindAction(
+  elements.sendLoadPageButton,
+  async () => {
+    const origin = state.current?.connected?.origin;
+    if (!origin) throw new Error('先に Live タブから現在のページを接続してください。');
+    const source = await getRedactedAiPageSource();
+    receiveSendDraft(
+      {
+        url_origin: origin,
+        title: source.title,
+        text: source.text,
+        truncated: source.truncated,
+        selection_only: false,
+      },
+      false
+    );
+  },
+  { busyLabel: '取り込み中…', busyNotice: 'ページ本文を PII 除去して取り込んでいます…' }
+);
+
+elements.sendClearButton.addEventListener('click', () => {
+  sendDraft = null;
+  elements.sendPreview.textContent = '';
+  elements.sendSource.textContent = 'まだ本文がありません。';
+  elements.sendResult.hidden = true;
+  chrome.storage.session.set({ browserBridgeSendDraft: null }).catch(() => undefined);
+  syncSendForm();
+});
+
+bindAction(
+  elements.sendSubmitButton,
+  async () => {
+    const form = {
+      mode: selectedRadio('send-mode'),
+      tier: selectedRadio('send-tier'),
+      tenantSlug: elements.sendTenantInput.value,
+      confirmPublic: elements.sendPublicConfirm.checked,
+      title: sendDraft?.title || '',
+      urlOrigin: sendDraft?.url_origin,
+      text: sendDraft?.text || '',
+      selectionOnly: sendDraft?.selection_only === true,
+      note: elements.sendNoteInput.value,
+    };
+    const checked = InboxModel.buildSendPagePayload(form);
+    if (!checked.ok) throw new Error(checked.errors.join(' '));
+    const response = await invoke('bridge:send-page', { form });
+    if (response?.sendResult) renderSendResult(response.sendResult);
+  },
+  { busyLabel: '送信中…', busyNotice: 'Kyberion に送信しています…' }
+);
+
+function renderSendResult(result) {
+  const box = elements.sendResult;
+  box.replaceChildren();
+  box.hidden = false;
+  const heading = document.createElement('p');
+  heading.className = 'intent-outcome';
+  if (result.mode === 'intent') {
+    heading.textContent = '送信しました（intent として照合）';
+    box.append(heading);
+    if (result.resolution) {
+      // Reuse the Intent tab's resolution view and its Pattern B / A buttons.
+      elements.intentInput.value = String(result.intent || '').slice(0, 1_000);
+      renderIntentResolution(result.intent, result.resolution);
+      const detail = document.createElement('p');
+      detail.textContent =
+        result.resolution.outcome === 'matched'
+          ? '登録済みの手順が見つかりました。Intent タブから Pattern B で実行できます。'
+          : result.resolution.outcome === 'ambiguous'
+            ? '候補が複数あります。Intent タブで選んでください。'
+            : '一致する手順はありません。Intent タブから新しく記録できます。';
+      const open = document.createElement('button');
+      open.type = 'button';
+      open.className = 'secondary';
+      open.textContent = 'Intent タブで続ける';
+      open.addEventListener('click', () => selectTab('intent'));
+      box.append(detail, open);
+    }
+    return;
+  }
+  const ingest = result.ingest || {};
+  const labels = {
+    committed: 'ナレッジに登録しました',
+    staged: '取り込み待ちの場所に置きました',
+    not_committed: '置きましたが、ナレッジにはまだ登録されていません',
+    failed: 'ナレッジへの登録に失敗しました',
+  };
+  heading.textContent = labels[ingest.status] || `状態: ${ingest.status || '不明'}`;
+  box.append(heading);
+  const lines = [
+    result.staged_ref ? `置き場所: ${result.staged_ref}` : '',
+    ingest.detail ? String(ingest.detail) : '',
+    ingest.error ? `理由: ${ingest.error}` : '',
+  ].filter(Boolean);
+  lines.forEach((line) => {
+    const p = document.createElement('p');
+    p.textContent = line;
+    box.append(p);
+  });
+  if (ingest.next) {
+    const hint = document.createElement('p');
+    hint.textContent = '次に実行するコマンド:';
+    const code = document.createElement('code');
+    code.className = 'inbox-command';
+    code.textContent = String(ingest.next);
+    box.append(hint, code);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Live tab: WebMCP tools the page exposes (read-only discovery)
+// ---------------------------------------------------------------------------
+
+bindAction(
+  elements.webmcpProbeButton,
+  async () => {
+    const response = await invoke('bridge:probe-webmcp');
+    const result = response?.webmcp;
+    if (!result) return;
+    const tools = result.tools || [];
+    elements.webmcpTools.replaceChildren(
+      ...tools.map((tool) => {
+        const li = document.createElement('li');
+        const name = document.createElement('strong');
+        name.textContent = tool.name;
+        li.append(name);
+        if (tool.description) {
+          const description = document.createElement('small');
+          description.textContent = tool.description;
+          li.append(description);
+        }
+        const keys = document.createElement('small');
+        keys.textContent = `入力項目: ${(tool.input_keys || []).join(', ') || 'なし'}`;
+        li.append(keys);
+        return li;
+      })
+    );
+    elements.webmcpStatus.textContent = result.error
+      ? `確認できませんでした: ${result.error}`
+      : !result.supported
+        ? 'このページは WebMCP の AI ツールを公開していません（またはこの Chrome が未対応です）。'
+        : tools.length === 0
+          ? 'WebMCP は利用できますが、公開されているツールはありません。'
+          : `${tools.length} 件のツールを公開しています（Kyberion はツールを呼び出しません）。${result.truncated ? '先頭 50 件のみ表示しています。' : ''}`;
+  },
+  { busyLabel: '確認中…', busyNotice: 'ページが公開している AI ツールを確認しています…' }
+);
+
+// ---------------------------------------------------------------------------
+// Startup
+// ---------------------------------------------------------------------------
+
+syncSendForm();
+connectMailboxPort();
+setInterval(() => {
+  try {
+    mailboxPort?.postMessage({ type: 'keepalive' });
+  } catch (_) {
+    // reconnect happens on disconnect
+  }
+}, 20_000);
+chrome.runtime
+  .sendMessage({ type: 'bridge:get-inbox' })
+  .then((response) => response?.ok && renderInbox(response.inbox))
+  .catch(() => undefined);
+chrome.runtime
+  .sendMessage({ type: 'bridge:get-send-draft' })
+  .then((response) => {
+    const draft = response?.ok ? response.draft : null;
+    if (!draft) return;
+    // A draft prepared just now came from the context menu that opened us.
+    const fresh = Date.now() - Date.parse(draft.prepared_at || '') < 15_000;
+    receiveSendDraft(draft, fresh);
+  })
+  .catch(() => undefined);

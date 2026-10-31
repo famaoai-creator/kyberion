@@ -3,7 +3,16 @@
   "name": "Kyberion Browser Bridge",
   "version": "0.1.0",
   "description": "Record and review governed Kyberion browser workflows in the active tab.",
-  "permissions": ["activeTab", "scripting", "storage", "sidePanel", "nativeMessaging"],
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage",
+    "sidePanel",
+    "nativeMessaging",
+    "alarms",
+    "contextMenus",
+    "notifications"
+  ],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "action": {
     "default_title": "Open Kyberion Browser Bridge"

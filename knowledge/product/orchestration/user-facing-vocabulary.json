@@ -9170,6 +9170,26 @@
         "ja": "音声を文字起こし",
         "qps-ploc": "⟦Ŧřȧñşƈřïƀė ȧůḓïő ŀőřėɱ⟧"
       },
+      "cli_cmd_operator_cli_browser_bridge": {
+        "en": "Send requests to the Chrome extension (pull mailbox)",
+        "ja": "Chrome 拡張への依頼(受信箱)を扱う",
+        "qps-ploc": "⟦Şėñḓ řėɋůėşŧş ŧő ŧħė Ƈħřőɱė ėẋŧėñşïőñ (ṗůŀŀ ɱȧïŀƀőẋ) ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "cli_cmd_operator_cli_browser_bridge_request": {
+        "en": "Queue an observe, on-device inference or notify request for the Chrome extension",
+        "ja": "Chrome 拡張にページ観察・端末内推論・通知の依頼を出す",
+        "qps-ploc": "⟦Ɋůėůė ȧñ őƀşėřṽė, őñ-ḓėṽïƈė ïñƒėřėñƈė őř ñőŧïƒẏ řėɋůėşŧ ƒőř ŧħė Ƈħřőɱė ėẋŧėñşïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ⟧"
+      },
+      "cli_cmd_operator_cli_browser_bridge_status": {
+        "en": "Show a Chrome extension request and its response",
+        "ja": "Chrome 拡張への依頼と応答を表示",
+        "qps-ploc": "⟦Şħőẇ ȧ Ƈħřőɱė ėẋŧėñşïőñ řėɋůėşŧ ȧñḓ ïŧş řėşṗőñşė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_operator_cli_browser_bridge_wait": {
+        "en": "Wait for the Chrome extension to answer a request",
+        "ja": "Chrome 拡張の応答を待つ",
+        "qps-ploc": "⟦Ẇȧïŧ ƒőř ŧħė Ƈħřőɱė ėẋŧėñşïőñ ŧő ȧñşẇėř ȧ řėɋůėşŧ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
       "cli_cmd_operator_cli_grants": {
         "en": "Manage standing grants (consents decided ahead of time)",
         "ja": "常設の許可(事前に決める同意)を管理",

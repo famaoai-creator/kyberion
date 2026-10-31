@@ -2,6 +2,9 @@ import { readFileSync } from 'node:fs';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+const g = globalThis as unknown as Record<string, unknown>;
+type Api = { create: ReturnType<typeof vi.fn>; availability: ReturnType<typeof vi.fn> };
+
 function installBuiltInAi(promptResponse: unknown, summarizerText?: string) {
   const session = {
     prompt: vi.fn(async () => JSON.stringify(promptResponse)),
@@ -11,13 +14,13 @@ function installBuiltInAi(promptResponse: unknown, summarizerText?: string) {
     summarize: vi.fn(async () => summarizerText ?? ''),
     destroy: vi.fn(),
   };
-  (globalThis as any).__kyberionPiiScrub = (value: unknown) =>
+  g.__kyberionPiiScrub = (value: unknown) =>
     String(value ?? '').replaceAll('SECRET', '[REDACTED:SECRET]');
-  (globalThis as any).LanguageModel = {
+  g.LanguageModel = {
     availability: vi.fn(async () => 'available'),
     create: vi.fn(async () => session),
   };
-  (globalThis as any).Summarizer = summarizerText
+  g.Summarizer = summarizerText
     ? { availability: vi.fn(async () => 'available'), create: vi.fn(async () => summarizer) }
     : { availability: vi.fn(async () => 'unavailable') };
   return { session, summarizer };
@@ -26,15 +29,17 @@ function installBuiltInAi(promptResponse: unknown, summarizerText?: string) {
 async function loadAdapter() {
   vi.resetModules();
   await import('../tools/meet-copilot-extension/meeting-ai.js');
-  return (globalThis as any).KyberionMeetingAI;
+  return g.KyberionMeetingAI;
 }
 
 describe('Meeting Copilot Chrome Built-in AI adapter', () => {
   afterEach(() => {
-    delete (globalThis as any).KyberionMeetingAI;
-    delete (globalThis as any).__kyberionPiiScrub;
-    delete (globalThis as any).LanguageModel;
-    delete (globalThis as any).Summarizer;
+    delete g.KyberionMeetingAI;
+    delete g.__kyberionPiiScrub;
+    delete g.LanguageModel;
+    delete g.Summarizer;
+    delete g.Translator;
+    delete g.LanguageDetector;
   });
 
   it('summarizes captions through the Summarizer API and scrubs both directions', async () => {
@@ -133,9 +138,201 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
     expect(normalized.text.endsWith(long[long.length - 1])).toBe(true);
   });
 
+  it('reports a capability matrix where missing APIs are unsupported', async () => {
+    g.LanguageModel = { availability: vi.fn(async () => 'available') };
+    const adapter = await loadAdapter();
+
+    const matrix = await adapter.availability();
+
+    expect(matrix.prompt).toBe('available');
+    expect(matrix.summarizer).toBe('unsupported');
+    expect(matrix.translator).toBe('unsupported');
+    expect(matrix.languageDetector).toBe('unsupported');
+    expect(matrix.multimodal.image).toBe('available');
+  });
+
+  it('clones one base session per call and destroys the base on dispose', async () => {
+    const { session } = installBuiltInAi({ summary: 'ok' });
+    const clones: unknown[] = [];
+    (session as unknown as { clone: unknown }).clone = vi.fn(async () => {
+      const clone = {
+        prompt: vi.fn(async () => JSON.stringify({ summary: 'ok' })),
+        destroy: vi.fn(),
+      };
+      clones.push(clone);
+      return clone;
+    });
+    const adapter = await loadAdapter();
+
+    await adapter.summarizeMeeting({ transcript: ['一'], previousSummary: 'x' });
+    await adapter.summarizeMeeting({ transcript: ['二'], previousSummary: 'x' });
+
+    const createOptions = (g.LanguageModel as Api).create.mock.calls[0][0];
+    expect((g.LanguageModel as Api).create).toHaveBeenCalledTimes(1);
+    expect(createOptions.initialPrompts[0].content).toContain('信頼できないデータ');
+    expect(clones).toHaveLength(2);
+    clones.forEach((clone) => expect(clone.destroy).toHaveBeenCalledTimes(1));
+    adapter.dispose();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(session.destroy).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives concurrent callers their own session when clone() is absent', async () => {
+    installBuiltInAi({ summary: 'ok' });
+    const sessions: Array<{ prompt: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> }> =
+      [];
+    (g.LanguageModel as Api).create.mockImplementation(async () => {
+      const session = {
+        prompt: vi.fn(async () => JSON.stringify({ summary: 'ok' })),
+        destroy: vi.fn(),
+      };
+      sessions.push(session);
+      return session;
+    });
+    const adapter = await loadAdapter();
+
+    await Promise.all([
+      adapter.summarizeMeeting({ transcript: ['一'], previousSummary: 'x' }),
+      adapter.summarizeMeeting({ transcript: ['二'], previousSummary: 'x' }),
+    ]);
+
+    expect(sessions).toHaveLength(2);
+    sessions.forEach((session) => {
+      expect(session.prompt).toHaveBeenCalledTimes(1);
+      expect(session.destroy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('drops a base whose clone() rejects and retries once on a fresh base', async () => {
+    installBuiltInAi({ summary: 'ok' });
+    const clone = {
+      prompt: vi.fn(async () => JSON.stringify({ summary: 'ok' })),
+      destroy: vi.fn(),
+    };
+    const broken = {
+      clone: vi.fn(async () => Promise.reject(new Error('gone'))),
+      destroy: vi.fn(),
+    };
+    const healthy = { clone: vi.fn(async () => clone), destroy: vi.fn() };
+    (g.LanguageModel as Api).create
+      .mockImplementationOnce(async () => broken)
+      .mockImplementationOnce(async () => healthy);
+    const adapter = await loadAdapter();
+
+    await adapter.summarizeMeeting({ transcript: ['一'], previousSummary: 'x' });
+
+    expect(broken.destroy).toHaveBeenCalledTimes(1);
+    expect(clone.prompt).toHaveBeenCalledTimes(1);
+    expect(clone.destroy).toHaveBeenCalledTimes(1);
+    expect(healthy.destroy).not.toHaveBeenCalled();
+  });
+
+  it('drops the oldest speech by token quota and reports truncated', async () => {
+    const { session } = installBuiltInAi({ summary: 'ok' });
+    Object.assign(session, {
+      contextWindow: 500,
+      contextUsage: 0,
+      measureContextUsage: vi.fn(async (text: string) => text.length),
+    });
+    const adapter = await loadAdapter();
+    const lines = Array.from({ length: 50 }, (_, i) =>
+      `発言${String(i).padStart(2, '0')}`.padEnd(40, 'あ')
+    );
+
+    const result = await adapter.summarizeMeeting({ transcript: lines, previousSummary: '前回' });
+
+    expect(result.truncated).toBe(true);
+    const prompt: string = session.prompt.mock.calls[0][0];
+    expect(prompt).toContain('発言49');
+    expect(prompt).not.toContain('発言00');
+  });
+
+  it('falls back to the legacy quota names', async () => {
+    const { session } = installBuiltInAi({ summary: 'ok' });
+    Object.assign(session, {
+      inputQuota: 300,
+      inputUsage: 0,
+      measureInputUsage: vi.fn(async (text: string) => text.length),
+    });
+    const adapter = await loadAdapter();
+
+    const result = await adapter.summarizeMeeting({
+      transcript: Array.from({ length: 30 }, (_, i) => `行${i}`.padEnd(40, 'い')),
+      previousSummary: '前回',
+    });
+
+    expect(session.measureInputUsage).toHaveBeenCalled();
+    expect(result.truncated).toBe(true);
+  });
+
+  it('streams a Summarizer result and forwards the AbortSignal', async () => {
+    const { summarizer } = installBuiltInAi({}, 'unused');
+    (summarizer as unknown as { summarizeStreaming: unknown }).summarizeStreaming = vi.fn(() =>
+      (async function* () {
+        yield '要点 SECRET';
+      })()
+    );
+    const adapter = await loadAdapter();
+    const controller = new AbortController();
+    const onChunk = vi.fn();
+
+    const result = await adapter.summarizeMeeting({
+      transcript: ['発言'],
+      onChunk,
+      signal: controller.signal,
+    });
+
+    expect(onChunk).toHaveBeenCalledWith('要点 [REDACTED:SECRET]');
+    expect(result.text).toBe('要点 [REDACTED:SECRET]');
+    expect(
+      (summarizer as unknown as { summarizeStreaming: ReturnType<typeof vi.fn> }).summarizeStreaming
+        .mock.calls[0][1].signal
+    ).toBe(controller.signal);
+    expect((g.Summarizer as Api).create.mock.calls[0][0].signal).toBe(controller.signal);
+
+    controller.abort();
+    await expect(
+      adapter.summarizeMeeting({ transcript: ['発言'], signal: controller.signal })
+    ).rejects.toBeDefined();
+  });
+
+  it('translates non-ja captions and passes same-language text through', async () => {
+    installBuiltInAi({});
+    const translator = { translate: vi.fn(async () => '予算は SECRET'), destroy: vi.fn() };
+    g.Translator = {
+      availability: vi.fn(async () => 'available'),
+      create: vi.fn(async () => translator),
+    };
+    const adapter = await loadAdapter();
+
+    const same = await adapter.translate('こんにちは', { sourceLanguage: 'ja' });
+    expect(same.translated).toBe(false);
+    expect((g.Translator as Api).create).not.toHaveBeenCalled();
+
+    const result = await adapter.translate('budget SECRET', { sourceLanguage: 'en' });
+    expect(translator.translate.mock.calls[0][0]).toBe('budget [REDACTED:SECRET]');
+    expect(result).toMatchObject({ translated: true, text: '予算は [REDACTED:SECRET]' });
+  });
+
+  it('detects language with a confidence threshold and errors clearly when absent', async () => {
+    installBuiltInAi({});
+    const adapter = await loadAdapter();
+    await expect(adapter.detectLanguage('hello')).rejects.toThrow('LanguageDetector API');
+
+    const detect = vi
+      .fn()
+      .mockResolvedValueOnce([{ detectedLanguage: 'en', confidence: 0.8 }])
+      .mockResolvedValueOnce([{ detectedLanguage: 'en', confidence: 0.2 }]);
+    g.LanguageDetector = {
+      create: vi.fn(async () => ({ detect, destroy: vi.fn() })),
+    };
+    expect((await adapter.detectLanguage('hello')).language).toBe('en');
+    expect((await adapter.detectLanguage('???')).language).toBe('und');
+  });
+
   it('fails closed when the shared PII scrubber is unavailable', async () => {
-    (globalThis as any).LanguageModel = { availability: vi.fn(async () => 'available') };
-    (globalThis as any).Summarizer = { availability: vi.fn(async () => 'unavailable') };
+    g.LanguageModel = { availability: vi.fn(async () => 'available') };
+    g.Summarizer = { availability: vi.fn(async () => 'unavailable') };
     const adapter = await loadAdapter();
 
     await expect(adapter.summarizeMeeting({ transcript: ['発言'] })).rejects.toThrow(
