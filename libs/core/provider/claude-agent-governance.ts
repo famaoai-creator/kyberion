@@ -26,8 +26,18 @@ import {
  *    plus mission & knowledge context.
  */
 
-const READ_ONLY_TOOLS = new Set(['Read', 'Grep', 'Glob', 'NotebookRead']);
+const READ_ONLY_TOOLS = new Set([
+  'Read',
+  'Grep',
+  'Glob',
+  'LS',
+  'NotebookRead',
+  'WebFetch',
+  'WebSearch',
+]);
 const FILE_WRITE_TOOLS = new Set(['Write', 'Edit', 'MultiEdit', 'NotebookEdit']);
+/** State tools for shells the sub-agent itself spawned — no new execution surface. */
+const SHELL_STATE_TOOLS = new Set(['BashOutput', 'KillShell']);
 /** Tools that start a provider-native sub-agent (CN-05). */
 const NATIVE_SUBAGENT_TOOLS = new Set(CLAUDE_NATIVE_SUBAGENT_TOOL_NAMES);
 const GOVERNED_MCP_TOOL_PREFIX = 'mcp__kyberion__';
@@ -46,12 +56,17 @@ export const GOVERNED_AGENT_ALLOWED_TOOLS: string[] = [
   'Read',
   'Grep',
   'Glob',
+  'LS',
   'NotebookRead',
   'Write',
   'Edit',
   'MultiEdit',
   'NotebookEdit',
   'Bash',
+  'BashOutput',
+  'KillShell',
+  'WebFetch',
+  'WebSearch',
 ];
 
 function allow(input: Record<string, unknown>): PermissionResult {
@@ -135,6 +150,13 @@ export function createKyberionCanUseTool(options: KyberionCanUseToolOptions = {}
         tool_input: input,
       }).hookSpecificOutput;
       if (decision.permissionDecision === 'deny') return deny(decision.permissionDecisionReason);
+      if (!auditAgentTool(toolName, input)) {
+        return deny('Kyberion governance audit was unavailable; tool call denied.');
+      }
+      return allow(input);
+    }
+
+    if (SHELL_STATE_TOOLS.has(toolName)) {
       if (!auditAgentTool(toolName, input)) {
         return deny('Kyberion governance audit was unavailable; tool call denied.');
       }

@@ -1,7 +1,7 @@
 ---
 name: implementer
 description: Produces the main code and configuration changes.
-tools: Read, Grep, Glob, NotebookRead, Write, Edit, MultiEdit, NotebookEdit, Bash
+tools: Read, Grep, Glob, LS, NotebookRead, Write, Edit, MultiEdit, NotebookEdit, Bash, BashOutput, KillShell, WebFetch, WebSearch
 ---
 
 <!--

@@ -9,6 +9,7 @@ import {
 } from '@agent/core';
 import { withExecutionContext } from '@agent/core/governance';
 import {
+  AGY_KNOWN_TOOLS,
   AGY_PROFILE_TOOLS,
   agyAgentName,
   buildAgyAgentDefinitionSource,
@@ -37,6 +38,7 @@ import {
   buildGeneratedDevinFiles,
   buildGeneratedFiles,
   condenseProcedure,
+  isCodexProjectionGeneratable,
   main,
   readSubagentDefinitionsTextFile,
   resolveProfile,
@@ -84,8 +86,11 @@ describe('generate_subagent_definitions', () => {
 
   it('maps team roles to KD-05 profiles deterministically', () => {
     expect(resolveProfile('implementer')).toBe('implementer');
+    expect(resolveProfile('tester')).toBe('implementer');
     expect(resolveProfile('reviewer')).toBe('explorer');
     expect(resolveProfile('devils_advocate')).toBe('explorer');
+    expect(resolveProfile('researcher')).toBe('explorer');
+    expect(resolveProfile('planner')).toBe('planner');
     // Unlisted roles fall back to the safe (read-only) default rather than
     // silently inheriting write/exec access.
     expect(resolveProfile('some_future_role')).toBe('explorer');
@@ -157,13 +162,52 @@ describe('generate_subagent_definitions', () => {
   it('keeps AGY tool vocabulary provider-specific and least-privileged', () => {
     expect(AGY_PROFILE_TOOLS.implementer).toEqual([
       'view_file',
+      'view_code_item',
       'grep_search',
+      'find_by_name',
+      'list_dir',
+      'read_terminal',
+      'write_to_file',
       'replace_file_content',
+      'multi_replace_file_content',
       'run_command',
     ]);
-    expect(AGY_PROFILE_TOOLS.explorer).toEqual(['view_file', 'grep_search']);
+    expect(AGY_PROFILE_TOOLS.explorer).toEqual([
+      'view_file',
+      'view_code_item',
+      'grep_search',
+      'find_by_name',
+      'list_dir',
+      'search_web',
+      'read_url_content',
+    ]);
     expect(AGY_PROFILE_TOOLS.planner).toEqual([]);
     expect(agyAgentName('devils_advocate')).toBe('kyberion-devils-advocate');
+  });
+
+  it('only projects AGY tool names that are verified against the CLI vocabulary', () => {
+    // Vendor docs warn an unmapped tool name can hang a subagent; every
+    // projected name must be in the binary-verified AGY_KNOWN_TOOLS set.
+    const known = new Set(AGY_KNOWN_TOOLS);
+    for (const [profile, tools] of Object.entries(AGY_PROFILE_TOOLS)) {
+      for (const tool of tools) {
+        expect(known.has(tool), `${profile} tool "${tool}" is not a verified AGY tool name`).toBe(
+          true
+        );
+      }
+    }
+    // The create-file capability the implementer tier relies on.
+    expect(known.has('write_to_file')).toBe(true);
+  });
+
+  it('skips the Codex projection for tiers Codex cannot express', () => {
+    // planner x codex is a refused permission cell: a codex custom-agent
+    // file could only offer sandbox read-only, which still executes shell —
+    // an under-restricted approximation of the no-exec tier contract.
+    expect(isCodexProjectionGeneratable('implementer')).toBe(true);
+    expect(isCodexProjectionGeneratable('tester')).toBe(true);
+    expect(isCodexProjectionGeneratable('reviewer')).toBe(true);
+    expect(isCodexProjectionGeneratable('planner')).toBe(false);
   });
 
   it('projects the same governed body into Devin custom-subagent frontmatter', () => {
@@ -295,7 +339,7 @@ describe('generate_subagent_definitions', () => {
   });
 
   it('explorer-mapped role definitions carry no write/execute tools', () => {
-    for (const role of ['reviewer', 'devils_advocate']) {
+    for (const role of ['reviewer', 'devils_advocate', 'researcher']) {
       expect(resolveProfile(role)).toBe('explorer');
       const source = buildAgentDefinitionSource(role);
       const toolsLine = source.split('\n').find((line) => line.startsWith('tools:'));
@@ -354,8 +398,14 @@ describe('generate_subagent_definitions', () => {
           safeReadFile(cursorAgentPath(role), { encoding: 'utf8' }) || ''
         );
         expect(cursorOnDisk).toBe(cursorBuilt.get(role));
-        const codexOnDisk = String(safeReadFile(codexAgentPath(role), { encoding: 'utf8' }) || '');
-        expect(codexOnDisk).toBe(codexBuilt.get(role));
+        if (isCodexProjectionGeneratable(role)) {
+          const codexOnDisk = String(
+            safeReadFile(codexAgentPath(role), { encoding: 'utf8' }) || ''
+          );
+          expect(codexOnDisk).toBe(codexBuilt.get(role));
+        } else {
+          expect(codexBuilt.has(role)).toBe(false);
+        }
       }
 
       process.exitCode = undefined;
