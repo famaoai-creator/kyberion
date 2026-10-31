@@ -15,6 +15,7 @@
 import { createHash } from 'node:crypto';
 import type { FrontDeskExecutionBinding } from '../surface/front-desk-execution-contract.js';
 import type { ContinuousWorkPlan } from '../organization/continuous-work-plan.js';
+import type { DotJudgmentBinding } from './dot-judgment-binding.js';
 import { loadDotExecutionPolicy } from './dot-execution-policy.js';
 import { DOT_PROPOSE_TOOL_NAME, DOT_PROPOSALS_FENCE } from './dot-extensions.js';
 
@@ -31,6 +32,8 @@ import {
 } from '../governance/mandate-shadow.js';
 
 export interface DotProposal {
+  /** Server-authored synthetic reference; the model parser always rejects this reserved field. */
+  semantic_judgment?: DotJudgmentBinding;
   /** Proposed internal admission facts; never tool authority. */
   mission_admission?: MissionAdmissionRequest;
   /** Trusted configuration binding; model normalization deliberately discards it. */
@@ -203,6 +206,8 @@ export function normalizeDotProposal(value: unknown): DotProposal {
     throw new Error('proposal must be an object');
   }
   const raw = value as Record<string, unknown>;
+  if (Object.hasOwn(raw, 'semantic_judgment'))
+    throw new Error('semantic_judgment is reserved for server-authored synthetic references');
   const missionAdmission = parseMissionAdmissionRequest(raw.mission_admission);
   if (missionAdmission && (raw.work_shape !== 'mission' || raw.handoff_to))
     throw new Error('mission_admission requires direct mission work');

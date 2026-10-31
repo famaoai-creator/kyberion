@@ -20,6 +20,7 @@ import {
 } from './scoped-learning-approval-verifier.js';
 import { inspectScopedLearningPublication } from './scoped-learning-publication.js';
 import type { ScopedLearningPublicationIdentity } from './scoped-learning-contract.js';
+import { approvedLearningPayloadDigest } from './scoped-learning-domain.js';
 import {
   withScopedLearningCandidateReview,
   type MemoryCandidate,
@@ -115,31 +116,56 @@ export function recordScopedLearningPublicationConsumption(
   candidate: MemoryCandidate,
   publication: ScopedLearningPublicationIdentity
 ): void {
-  const proof = verifyScopedLearningApprovalRef(
-    { ...candidate, status: 'approved' },
-    candidate.learning_approval!.approval_ref
-  );
-  const observed = inspectScopedLearningPublication({ ...candidate, status: 'approved' });
-  if (JSON.stringify(observed) !== JSON.stringify(publication))
-    throw new Error('[LEARNING_PUBLICATION_INVALID] Consumption differs from verified files');
-  withExecutionContext(ROLE, () => {
-    const [channel, id] = proof.approval_ref.split(':');
-    const record = loadApprovalRequest(channel!, id!)!;
-    const effectRef = 'scoped-learning:' + proof.payload_digest + ':' + publication.markdown_sha256;
-    if (record.consumption) {
+  withScopedLearningCandidateReview(
+    {
+      candidateId: candidate.candidate_id,
+      scope: candidate.scope!,
+      expectedCandidate: candidate,
+      expectedPayloadDigest: approvedLearningPayloadDigest(candidate),
+    },
+    (current) => {
+      if (current.status !== 'approved' && current.status !== 'promoted')
+        throw new Error('[LEARNING_APPROVAL_REQUIRED] Current candidate is not approved');
+      if (!current.learning_approval)
+        throw new Error('[LEARNING_APPROVAL_REQUIRED] Current approval receipt is missing');
+      const proof = verifyScopedLearningApprovalRef(
+        current,
+        current.learning_approval.approval_ref
+      );
+      const observed = inspectScopedLearningPublication(current);
       if (
-        record.consumption.consumer !== 'scoped_learning_publication' ||
-        record.consumption.effectRef !== effectRef
+        JSON.stringify(observed) !== JSON.stringify(publication) ||
+        (current.status === 'promoted' &&
+          JSON.stringify(current.learning_publication) !== JSON.stringify(observed))
       )
-        throw new Error('[LEARNING_APPROVAL_CONFLICT] Approval consumed by another publication');
-      return;
+        throw new Error('[LEARNING_PUBLICATION_INVALID] Consumption differs from verified files');
+      withExecutionContext(ROLE, () => {
+        const [channel, id] = proof.approval_ref.split(':');
+        const record = loadApprovalRequest(channel!, id!)!;
+        const effectRef =
+          'scoped-learning:' + proof.payload_digest + ':' + publication.markdown_sha256;
+        if (record.consumption) {
+          if (
+            record.consumption.consumer !== 'scoped_learning_publication' ||
+            record.consumption.effectRef !== effectRef
+          )
+            throw new Error(
+              '[LEARNING_APPROVAL_CONFLICT] Approval consumed by another publication'
+            );
+          return;
+        }
+        if (current.status !== 'approved')
+          throw new Error(
+            '[LEARNING_APPROVAL_REQUIRED] Promoted history requires prior consumption'
+          );
+        markApprovalConsumed(ROLE, {
+          channel: channel!,
+          requestId: id!,
+          consumer: 'scoped_learning_publication',
+          consumedBy: 'memory-promotion',
+          effectRef,
+        });
+      });
     }
-    markApprovalConsumed(ROLE, {
-      channel: channel!,
-      requestId: id!,
-      consumer: 'scoped_learning_publication',
-      consumedBy: 'memory-promotion',
-      effectRef,
-    });
-  });
+  );
 }

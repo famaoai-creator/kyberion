@@ -8,6 +8,7 @@
 import * as path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readJsonLines } from '../foundation/json.js';
+import * as foundationJson from '../foundation/json.js';
 import type { AutonomousOpsGateResult } from '../governance/autonomous-ops-gate.js';
 import { AUTONOMY_APPROVAL_CHANNEL } from '../governance/approval-decision-card.js';
 import {
@@ -18,7 +19,6 @@ import {
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeMkdir, safeRmSync } from '../secure-io.js';
-import * as secureIo from '../secure-io.js';
 import {
   claimWorkItem,
   clearWorkCoordinationNamespace,
@@ -778,13 +778,21 @@ describe('dot executor end to end', () => {
         appendDotInboxEntry(input, { rootDir: TEST_ROOT });
         if (fail && failure === 'after inbox') throw new Error('receipt response lost');
       };
-      const originalWrite = secureIo.safeWriteFile;
+      const originalWrite = foundationJson.writeJsonLines;
+      let faultHits = 0;
       const write = vi
-        .spyOn(secureIo, 'safeWriteFile')
-        .mockImplementation((file, content, options) => {
-          if (fail && failure === 'report marker' && file.endsWith(DOT_WORK_RESULTS_FILE))
+        .spyOn(foundationJson, 'writeJsonLines')
+        .mockImplementation((file, records) => {
+          if (
+            fail &&
+            failure === 'report marker' &&
+            path.resolve(file) ===
+              path.resolve(TEST_ROOT, dotStatePath(CHARTER, DOT_WORK_RESULTS_FILE))
+          ) {
+            faultHits += 1;
             throw new Error('report marker unavailable');
-          return originalWrite(file, content, options);
+          }
+          return originalWrite(file, records);
         });
       const deps = {
         rootDir: TEST_ROOT,
@@ -800,6 +808,7 @@ describe('dot executor end to end', () => {
       const loaded = [{ path: 'dots/exec-it.json', charter: CHARTER }];
       try {
         expect(await runDotExecutorSweep(loaded, p, deps)).toMatchObject([{ status: 'done' }]);
+        expect(faultHits).toBe(failure === 'report marker' ? 1 : 0);
         expect(readDotWorkResults(CHARTER, deps)[0].report_enqueued_at).toBeUndefined();
         fail = false;
         vi.setSystemTime(Date.now() + 91_000);

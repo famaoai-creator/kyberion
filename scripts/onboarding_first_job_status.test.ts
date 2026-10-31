@@ -493,6 +493,37 @@ describe('request-bound first-job status with real governed stores', { timeout: 
     put(dotStatePath(charter, DOT_WORK_RESULTS_FILE), '{invalid\n');
     expect((await read()).status).toBe('uncertain');
   });
+  it('treats valid confidential markers in public first-job history and orphan/unknown markers as uncertainty, never absence', async () => {
+    const fixture = await pending();
+    decide(fixture);
+    await api.tickFirstJob(tenant);
+    expect((await read()).status).toBe('artifact_verified');
+    const charter = charters.findDotCharter(fixture.configured.dot_id)!.charter;
+    expect(charter.scope.tier).toBe('public');
+    const { dotStatePath, DOT_WORK_RESULTS_FILE } = await import('@agent/core/dot/dot-state-paths');
+    const { createDotReportMarker } = await import('@agent/core/dot/dot-result-records');
+    const original = {
+      ...results.readDotWorkResults(charter).at(-1)!,
+      report_to_dot_id: 'operator',
+    };
+    const marker = createDotReportMarker({
+      row: original,
+      scope: { tier: 'confidential', tenant_slug: tenant },
+      reportTo: 'operator',
+      enqueuedAt: original.completed_at,
+    });
+    const file = dotStatePath(charter, DOT_WORK_RESULTS_FILE);
+    // Public first-job charters are intentionally unchanged; confidential markers cannot
+    // be imported as public evidence, even when their standalone schema/hash is valid.
+    for (const rows of [
+      [original, marker],
+      [marker],
+      [original, { ...marker, kind: 'unknown-marker' }],
+    ]) {
+      put(file, rows.map((row) => JSON.stringify(row)).join('\n') + '\n');
+      expect((await read()).status).toBe('uncertain');
+    }
+  });
   it('returns exactly the same unavailable projection for malformed, missing, scoped and denied reads', async () => {
     configure();
     const expected = status.firstJobStatusUnavailable();
