@@ -21,4 +21,19 @@ describe('withImplicitTraceSubcommand', () => {
     expect(withImplicitTraceSubcommand(['corr-1'], 'intent')).toEqual(['corr-1']);
     expect(withImplicitTraceSubcommand([], 'intent:trace')).toEqual([]);
   });
+
+  it('routes a natural-language positional to `trace` untouched — the id guard rejects it', () => {
+    // The argv layer only adds the implicit verb; it must not decompose a
+    // multi-word question into unrelated-mission exploration. intent.ts
+    // rejects whitespace-bearing ids as invalid_input before scanning.
+    expect(withImplicitTraceSubcommand(['why did this fail'], 'intent:trace')).toEqual([
+      'trace',
+      'why did this fail',
+    ]);
+    expect(withImplicitTraceSubcommand(['trace', 'corr-1', 'extra'], 'intent:trace')).toEqual([
+      'trace',
+      'corr-1',
+      'extra',
+    ]);
+  });
 });
