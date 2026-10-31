@@ -195,6 +195,7 @@
       "path": "active/shared/data-vault",
       "artifact_class": "cache",
       "action": "delete",
+      "backup": "exclude",
       "note": "Self-expiring: each JSON entry carries its own expiresAt, honored per-file by the janitor. No directory-level TTL."
     },
     {
@@ -641,7 +642,7 @@
       "path": "active/shared/runtime/trigger-deliveries.jsonl",
       "artifact_class": "log",
       "action": "rotate",
-      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys used to embed daemon+status+minute — every tick minted a NEW key, so latest-per-key compaction never shrank the file (4.9MB). daemon_watchdog now keys recovery per unhealthy episode (stale: last heartbeat timestamp plus a 15-minute retry bucket, at most 4 attempts; missing/malformed: 15-minute bucket — daemonRecoveryKey). trigger-runner also rotates inline past its 4MB cap (it cannot wait for the janitor, which runs from chronos): the full journal is copied to a <stem>-YYYYMMDD-HHmmss.jsonl segment and the live file keeps every finished receipt younger than 7 days (stable keys never re-deliver inside the window) and every pending claim whose lease expired less than 7 days ago; only above half the cap are the oldest cron (minute-scoped) receipts trimmed first. When stable keys alone exceed 3/4 of the cap it skips rotation and appends run to the 5MB hard cap (ops-health trigger-store-near-cap); reads are a bounded 8MB tail. Segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
+      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys used to embed daemon+status+minute — every tick minted a NEW key, so latest-per-key compaction never shrank the file (4.9MB). daemon_watchdog now keys recovery per unhealthy episode (stale: last heartbeat timestamp plus a 15-minute retry bucket, at most 4 attempts; missing/malformed: 15-minute bucket — daemonRecoveryKey). trigger-runner also rotates inline past its 4MB cap (it cannot wait for the janitor, which runs from chronos): the full journal is copied to a <stem>-YYYYMMDD-HHmmss.jsonl segment and the live file keeps every finished receipt younger than 7 days (stable keys never re-deliver inside the window) and every pending claim whose lease expired less than 7 days ago; only above half the cap are the oldest cron (minute-scoped) receipts trimmed first. When stable keys alone exceed 3/4 of the cap it skips rotation and appends run to the 5MB hard cap (ops-health trigger-store-near-cap; operator escape hatch: pnpm kyberion scheduler trigger-store rotate, approval-gated); reads are a bounded 8MB tail. Segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
       "ttl_days": 30
     },
     {
@@ -1006,6 +1007,7 @@
       "path": "active/archive/.trash",
       "artifact_class": "tmp",
       "action": "delete",
+      "backup": "exclude",
       "note": "Soft-delete grace floor (AL-04): expired files from soft_delete_days entries land here preserving their original repo-relative path. The janitor trash sweep purges each file after its governing entry's soft_delete_days (30d default when no entry covers it). Code-driven — no directory-level ttl_days."
     },
     {

@@ -441,6 +441,23 @@ describe('evaluateOpsHealth', () => {
     ]);
   });
 
+  it('names the approval-gated rotate command once the trigger store is at its hard cap', () => {
+    const at = (size: number) =>
+      evaluateOpsHealth(
+        healthy({
+          triggerStore: {
+            path: 'runtime/trigger-deliveries.jsonl',
+            size_bytes: size,
+            cap_bytes: 5 * 1024 * 1024,
+          },
+        }),
+        NOW
+      ).findings.find((f) => f.id === 'trigger-store-near-cap')!;
+    expect(at(5 * 1024 * 1024).severity).toBe('error');
+    expect(at(5 * 1024 * 1024).next).toContain('pnpm kyberion scheduler trigger-store rotate');
+    expect(at(4.5 * 1024 * 1024).next).not.toContain('trigger-store rotate');
+  });
+
   it('backup hints point at the keychain introduce command, not an env var', () => {
     const findings = evaluateOpsHealth(
       healthy({ backup: { status: 'missing', latestName: null, latestAgeHours: null } }),
