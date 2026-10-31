@@ -468,12 +468,17 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     'Read',
     'Grep',
     'Glob',
+    'LS',
     'NotebookRead',
     'Write',
     'Edit',
     'MultiEdit',
     'NotebookEdit',
     'Bash',
+    'BashOutput',
+    'KillShell',
+    'WebFetch',
+    'WebSearch',
   ];
 
   function makeFakeRuntime(runTaskImpl?: (params: any) => Promise<any>) {
@@ -518,7 +523,15 @@ describe('HarnessSubagentDispatcher (CT-02)', () => {
     const explorerProfile = getSubagentCapabilityProfile('explorer');
     expect(call.systemPrompt).toContain(explorerProfile.systemPromptPrefix);
     expect(call.systemPrompt).toContain('mission ctx');
-    expect(call.allowedTools).toEqual(['Read', 'Grep', 'Glob', 'NotebookRead']);
+    expect(call.allowedTools).toEqual([
+      'Read',
+      'Grep',
+      'Glob',
+      'LS',
+      'NotebookRead',
+      'WebFetch',
+      'WebSearch',
+    ]);
     expect(call.allowedTools).not.toContain('Write');
     expect(call.allowedTools).not.toContain('Edit');
     expect(call.allowedTools).not.toContain('Bash');
