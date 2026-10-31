@@ -117,6 +117,27 @@ describe('Browser Bridge Chrome Built-in AI adapter', () => {
       expect(matrix.multimodal).toEqual({ image: 'downloadable', audio: 'downloadable' });
     });
 
+    it('asks availability() with the same languages create() uses', async () => {
+      const languages = { expectedInputLanguages: ['en', 'ja'], outputLanguage: 'ja' };
+      const apis = Object.fromEntries(
+        ['Summarizer', 'Writer', 'Rewriter', 'Proofreader'].map((name) => [
+          name,
+          { availability: vi.fn(async () => 'available') },
+        ])
+      );
+      Object.assign(g, apis);
+      const adapter = await loadAdapter();
+
+      await adapter.availability();
+
+      expect(apis.Summarizer.availability).toHaveBeenCalledWith(languages);
+      expect(apis.Writer.availability).toHaveBeenCalledWith(languages);
+      expect(apis.Rewriter.availability).toHaveBeenCalledWith(languages);
+      expect(apis.Proofreader.availability).toHaveBeenCalledWith({
+        expectedInputLanguages: ['en', 'ja'],
+      });
+    });
+
     it('turns an availability failure into an error state, not an exception', async () => {
       g.Summarizer = {
         availability: vi.fn(async () => {

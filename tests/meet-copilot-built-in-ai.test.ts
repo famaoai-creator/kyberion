@@ -151,6 +151,19 @@ describe('Meeting Copilot Chrome Built-in AI adapter', () => {
     expect(matrix.multimodal.image).toBe('available');
   });
 
+  it('asks Summarizer.availability() with the output language', async () => {
+    const availability = vi.fn(async () => 'available');
+    g.Summarizer = { availability };
+    const adapter = await loadAdapter();
+
+    await adapter.availability();
+
+    expect(availability).toHaveBeenCalledWith({
+      expectedInputLanguages: ['en', 'ja'],
+      outputLanguage: 'ja',
+    });
+  });
+
   it('clones one base session per call and destroys the base on dispose', async () => {
     const { session } = installBuiltInAi({ summary: 'ok' });
     const clones: unknown[] = [];
