@@ -92,7 +92,7 @@ export function withPrPublicationStoreAccess<T>(
 
 export function prPublicationResourceAllowed(
   target: string,
-  operation: 'read' | 'write' | 'mkdir' | 'metadata'
+  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
 ): boolean {
   if (!runtime.getStore()) return false;
   const scope = resources.getStore();
@@ -104,7 +104,7 @@ export function prPublicationResourceAllowed(
     (target === 'knowledge/product' || target.startsWith('knowledge/product/'))
   )
     return true;
-  if (operation === 'write') return scope.write.includes(target);
+  if (operation === 'write' || operation === 'append') return scope.write.includes(target);
   if (operation === 'read') return scope.read.includes(target) || scope.write.includes(target);
   return [...scope.read, ...scope.write].some(
     (file) => file === target || target === '' || file.startsWith(target + '/')

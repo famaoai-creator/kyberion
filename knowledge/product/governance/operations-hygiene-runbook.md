@@ -286,6 +286,16 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
    new name. A name there means a store was created through a dynamic path the gate cannot see; add
    its catalog entry by hand.
 
+### Immutable scoped evidence attempts
+
+- Use `writeScopedArtifactAttempt` / `readScopedArtifactAttempt` in `libs/core/workforce/artifact-store.ts` for immutable, repeatable evidence. Keep the full evaluation binding in the parent key and keep the effect identity stable across evaluation revisions. Use the existing owner scope, artifact class and index; never introduce a parallel ledger or put tenant evidence in the system partition.
+- A create collision adopts only a fully validated existing winner. Validate its scope, parent/effect identity, original content hash and lifetime; a different valid verdict is not a reason to overwrite it. Historical validation must accept well-formed expired evidence so the facade can allocate the next bounded attempt. Domain adoption separately rechecks current policy, source versions and time.
+- A payload written before its index row is an orphan. Retry the governed attempt writer to validate the immutable payload and repair only its registration. Read-only access must not repair it. Do not rewrite the bytes, extend expiry, remove a conflicting index row, or skip a corrupt occupied slot.
+- An indexed latest attempt with missing payload is unknown history, not proof of expiry or non-execution. Stop allocation and recover the original evidence through the owning workflow. Clock regression, exhaustion of 128 attempts and conflicting registration also fail closed. Domain reuse must select the latest attempt; an old reference cannot become current after a clock rollback.
+- Persist confidential trace data through the same scoped facade with class `log`, using only IDs, hashes and references. Do not invent a tenant log directory or rely on an audit ID whose append failure was swallowed. Keep external trace export disabled for offline fixtures.
+- Validate all attempt-directory ancestors with the repository path boundary, then check metadata only on the owned directory leaf. Never stat tenantless structural tier parents to establish an owner's directory safety, or broaden tenant grants to make those reads pass. The boundary rejects ancestor symlinks and file ancestors; leaf/index/payload metadata checks retain their normal authorization. Test attempt creation and these path failures with the unchanged security policy, an isolated registered tenant and owner, as well as the hermetic corruption suite.
+- Enforcing regressions: the whole `libs/core/workforce/artifact-store.test.ts` covers create collisions, expiry, registration-only recovery, missing payload, corruption, scope, symlinks and clock boundaries. Receipt and routing consumers must also test fresh-source validation and zero effects on unavailable evidence.
+
 ### Hearing writer consistency
 
 - Every hearing writer uses `updateHearingRecord` with the same namespace/session inter-process lock. Never lock only the final save of an older snapshot. Async preparation runs outside the lock; reload and compare the relevant revision before writing.
@@ -406,6 +416,15 @@ it (for example `mission_controller`) print them, and check every pipeline op th
 gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
+
+When a store module also exports pure admission/security checks, partially mock the module
+with typed `importOriginal` and replace only the I/O reader. A full-module mock can hide
+new validator exports and fail otherwise unrelated consumer suites. After adding an export,
+search every `vi.mock` of that module and run its consumer suites as well as the new tests.
+For the Dot action ledger, keep `assertDotActionJudgmentBinding` real in
+`continuous-work-owner-state.test.ts` and `mission-admission.test.ts`; these suites are the
+regression gate for owner and mission admission compatibility. Never stub the validator
+to an unconditional success to repair a missing-export failure.
 
 **Repository security scans under coverage.** A green PR shard does not prove the
 unsharded main core run passes with V8 coverage. When a repository-wide AST contract
@@ -2522,3 +2541,43 @@ Unit tests that mock all filesystem paths as existing must isolate shared binary
 Local settings surfaces must pin the direct loopback peer and local Host on reads as well as writes, and require explicit same-origin mutation before assuming a settings role. HTTP viewer authority and file authority remain separate: use a non-callback facade with an exact profile capability, preserve outer ceilings, deny role-only access, and grant directory creation only as a distinct operation. Use no-store typed JSON failures and revision-bound partial changes with explicit unset; disable saving until a valid snapshot loads. Gates: engine settings route, exact-profile capability, and surface client regressions.
 
 Engine preference mutations must use the shared profile transaction: CLI save/reset and the surface revision check, fresh merge, validation and publication share one lock. Nested synchronous core saves reuse only the active same-profile lease; async descendants never retain ownership. Keep permission-only admission before lock I/O and reset repair independent of corrupt JSON. Direct file editors and older nonparticipating runtimes remain outside this concurrency guarantee. Regression: engine-runtime-preferences-transaction, engine-runtime-preferences and engine-runtime-preferences-operator tests.
+
+### Confidential DOT result persistence
+
+Record confidential executor outcomes through the exact DOT result facade, never by widening a worker persona or redirecting tenant prose to a public/shared file. Validate the original action, creation history, current attempt/lease and full ownership scope under existing source-reader permissions before granting the result-file capability. Recheck the claim after waiting for the existing file lock and reading the journal. The internal executor mints a one-shot origin permit after its port returns; this trusted-module boundary is not cryptographic host authentication or pipeline-effect authority.
+
+If persistence fails after a port effect, retain the claim and unknown effect ownership: absence of a durable result does not prove absence of effects. Do not release or automatically replay it. Historical negative recovery supports only a real expired lease, its `lease_expired` released attempt, matching claim/start/expiry/release events and unchanged held ownership. Append only `blocked`/`escalated` unknown evidence before the existing version-guarded archive/report; never claim completion, stopped execution or no effects. Revalidate the same historical fingerprint after the result-file lock and journal read. New claims/attempts, operator release/supersession, settled ownership, missing history and `lease_lost` stay unavailable. Pipeline continuation remains unavailable pending its separate validator. A charter pause after execution must not discard its captured active outcome while scope/ownership still agree.
+
+The existing generic archive may finalize `attempt.status` as `completed`; that lifecycle label is not effect success: retain `failure_reason: lease_expired`, blocked executor metadata and held ownership, whereas a successful effect requires the separate done WorkItem, completed settlement and durable done result.
+
+Report processing appends a typed marker referencing the immutable result digest and existing report identity; it never overwrites or duplicates an outcome/token row. All journal consumers project and validate markers before counting. Capability-unavailable suppression records an explicit no-wake processing marker, not transport acknowledgement. Concurrent receipts adopt the first valid marker. Minimal state reads contain only bounded audit IDs/status/times; withheld private verification is unknown, never evidence for first-job completion or pipeline continuation. Generic private-body and referenced-artifact reads keep their existing permission checks, and caller caches never establish confidential terminal evidence.
+
+Enforcing gates: `dot-result-records`, `dot-result-origin`, `dot-result-store`, `dot-result-store.integration`, `tier-guard-dot-result-writer`, `resource-access-scope`, `dot-result-store-capability-boundary`, executor/report recovery and the strict active-state leak guard. Verify the ordinary charter-role append/body-read denial as well as the actual scoped producer success. Never count pending or skipped end-to-end scenarios as completed verification.
+
+### Scoped learning consumption after interrupted publication
+
+Publication files and a detached approved candidate do not establish current consent. Before consuming a learning approval, re-read exactly one canonical candidate under the existing publication → queue lock order and compare its scoped identity and expected payload digest. Verify its current approval reference and the complete publication identity while retaining both locks through approval consumption. Never coerce a rejected, queued or missing candidate into an approved snapshot. The review callback must not invoke queue mutators or nest the same synchronous lock.
+
+An approved partial publication may recover with the same exact consumption; a promoted historical retry may only verify an already matching consumption, including after consent expiry, and must never mint a new consumption. Rejection leaves any partial files unverified and the settled approval record unchanged. Regression gates: `scoped-learning-publication`, `scoped-learning-workflow` and `judgment-learning.integration`, including rejection between file publication and consumption, unchanged file/approval bytes, exact retry and historical expiry.
+
+Deliberate corruption fixtures must locate and write the single governed tenant approval record inside their isolated test store; a second system copy and its ambiguity refusal do not prove the intended missing-consumption boundary.
+
+### Scoped pinned knowledge path checks
+
+Pinned knowledge must keep its lexical knowledge-root containment and validate every existing ancestor with the shared repository-path boundary. Do not request tenant metadata authority on structural prefixes such as `knowledge/confidential/`: those paths do not identify a tenant. Keep normal secure metadata and body authorization at the owned leaf, including regular-file, descriptor identity, hardlink and size checks. Hash and deliver the same admitted text bytes; the pin itself is not publication or scope authority.
+
+Missing paths, non-directory ancestors, substituted ancestor/leaf links, path escapes and guarded-read failures omit the hint without widening the worker role. Verify the focused `mission-context-pack-knowledge` path tests and actual scoped learning delivery integration; discovery-mocked unit fixtures do not establish publication authenticity or production role access.
+
+### Ordinary confidential DOT result compatibility
+
+Select ordinary result-body read and append authority independently under the existing charter role and exact server-derived ledger path. A denied permission decision may select the scoped append/minimal-state facade; an exception, malformed journal, changed source proof or actual I/O refusal must not trigger a fallback. Recheck every operation through secure I/O. A legitimate ordinary body reader retains protected continuation/recovery evidence; a minimal facade result with withheld proof remains unknown. Confidential caches never replace a fresh authoritative read.
+
+Mint strict internal outcome permits only when the selected operation needs the capability lane. Ordinary authorized execution, pipeline-continuation and reaper producers must not be rejected by an unnecessary unsupported-phase permit. If permissions change after selection, the actual append still refuses; do not mint a replacement permit or retry through another lane after that refusal.
+
+Preserve immutable result originals when adding modern report markers. For historical rows without an attempt identity, never invent one: only an ordinarily authorized full reader and writer may update one unique unmarked original line's report metadata. Validate the complete mixed journal before and after, reject marker-bound or ambiguous targets, and preserve every unrelated raw line, marker, blank line and line ending. The capability lane never gains overwrite access. Enforce this with `dot-result-ordinary-compat.integration`, ordinary executor diagnostics, scoped result-store tests and the capability import/permission boundary gates.
+
+### Confidential DOT journal append boundaries
+
+Under the common result-file lock, capture the retained file's actual UTF-8 byte length, terminal LF state and file identity during the existing read-state phase. Carry only this private metadata to the append capability; it must not read protected bodies. Supply a separating LF for a nonempty unterminated last record and reject an append whose exact serialized UTF-8 bytes, including delimiters, would exceed the same 16 MiB read ceiling. Recheck absence or the original device/inode/size/mtime plus regular-file and single-link constraints immediately before guarded append. Never raise the limit, overwrite, rotate or release an uncertain claim to make an append succeed.
+
+On overflow or concurrent file change, preserve the retained bytes and leave outcome ownership unknown or the report pending as appropriate. Test both outcome and marker appends with valid no-LF originals, exact-capacity success, one-byte UTF-8 overflow, changed file fingerprints, actual held-effect failure and report retry without effect replay. Enforcing gates are `dot-result-store`, `dot-result-store.integration` and the result-capability boundary tests; capacity padding fixtures belong only to their isolated stores.

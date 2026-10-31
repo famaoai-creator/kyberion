@@ -18,6 +18,7 @@ import * as path from 'node:path';
 
 import { safeMkdir, safeRmSync } from '../secure-io.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { createDotReportMarker } from './dot-result-records.js';
 import type {
   AutonomousOpsGateInput,
   AutonomousOpsGateResult,
@@ -551,6 +552,37 @@ describe('dot autonomy shadow ledger and metrics', () => {
       outcome_success_rate: 0.5,
       since_level_change: { executor_incidents: 1, regressed_outcomes: 1 },
     });
+  });
+  it('projects confidential report markers before counting incidents and refuses orphan marker history', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'marker-tenant' };
+    const c = { ...CHARTER, scope };
+    const file = path.join(TEST_ROOT, dotStatePath(c, DOT_WORK_RESULTS_FILE));
+    safeMkdir(path.dirname(file), { recursive: true });
+    const row = {
+      dot_id: c.dot_id,
+      work_item_id: 'marker-work',
+      action_ref: 'marker-action',
+      attempt_id: 'marker-attempt',
+      mode: 'pipeline' as const,
+      status: 'failed' as const,
+      summary: 'synthetic failure',
+      started_at: T0.toISOString(),
+      completed_at: T0.toISOString(),
+      report_to_dot_id: 'operator',
+    };
+    const marker = createDotReportMarker({
+      row,
+      scope,
+      reportTo: 'operator',
+      enqueuedAt: T0.toISOString(),
+    });
+    appendJsonLine(file, row);
+    appendJsonLine(file, marker);
+    expect(
+      dotAutonomyMetrics(c, { rootDir: TEST_ROOT, now: () => T0 }).executor_incidents_30d
+    ).toBe(1);
+    appendJsonLine(file, { ...marker, result_digest: 'f'.repeat(64) });
+    expect(() => dotAutonomyMetrics(c, { rootDir: TEST_ROOT, now: () => T0 })).toThrow();
   });
 });
 

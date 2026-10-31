@@ -437,10 +437,24 @@
       ]
     },
     {
+      "site": "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
+      "roles": [],
+      "unresolved": [
+        "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport"
+      ]
+    },
+    {
       "site": "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
       "roles": [],
       "unresolved": [
         "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#markReportEnqueued"
+      ]
+    },
+    {
+      "site": "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
+      "roles": [],
+      "unresolved": [
+        "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission"
       ]
     },
     {
@@ -497,6 +511,11 @@
     {
       "site": "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatusUnlocked",
       "roles": ["dot_lifecycle_writer"],
+      "unresolved": []
+    },
+    {
+      "site": "libs/core/dot/dot-result-store.ts#privileged",
+      "roles": ["dot_result_writer"],
       "unresolved": []
     },
     {
@@ -1599,18 +1618,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/organization/organization-standup.ts#persistOrganizationCadenceReport (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
       "site": "libs/core/organization/publication-role-migration.ts#applyPublicationRoleMigration (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["infrastructure_sentinel"],
       "unresolved": []
@@ -1976,18 +1983,6 @@
       "unresolved": []
     },
     {
-      "site": "libs/core/surface/scoped-workspace-ingest.ts#<module> (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
       "site": "libs/core/surface/surface-approval-ui.ts#applySurfaceApprovalDecision (via libs/core/governance/approval-apply-claim.ts#withApprovalRecordLock)",
       "roles": ["mission_controller", "slack_bridge", "surface_runtime"],
       "unresolved": []
@@ -2316,6 +2311,18 @@
       "unresolved": []
     },
     {
+      "site": "libs/core/workforce/artifact-store.ts#writeScopedArtifact (via libs/core/workforce/artifact-store.ts#withRole)",
+      "roles": [
+        "chronos_gateway",
+        "infrastructure_sentinel",
+        "mission_controller",
+        "slack_bridge",
+        "sovereign_concierge",
+        "surface_runtime"
+      ],
+      "unresolved": []
+    },
+    {
       "site": "libs/core/workforce/background-review-patch.ts#applyBackgroundReviewMemoryConsolidationPatchLocked",
       "roles": ["ecosystem_architect"],
       "unresolved": []
@@ -2348,30 +2355,6 @@
     {
       "site": "libs/core/workforce/task-source-edit.ts#createTaskSourceEditTool",
       "roles": ["ecosystem_architect"],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/workforce/task-source-edit.ts#createTaskSourceEditTool (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
-      "site": "libs/core/workforce/task-tool-runtime.ts#createRuntimeForTask (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
       "unresolved": []
     },
     {
@@ -3499,18 +3482,6 @@
       "unresolved": []
     },
     {
-      "site": "scripts/continuous_operations_report.ts#runContinuousOperationsReport (via libs/core/workforce/artifact-store.ts#withRole)",
-      "roles": [
-        "chronos_gateway",
-        "infrastructure_sentinel",
-        "mission_controller",
-        "slack_bridge",
-        "sovereign_concierge",
-        "surface_runtime"
-      ],
-      "unresolved": []
-    },
-    {
       "site": "scripts/continuous_work_owner.ts#createContinuousOwnerPorts",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -4295,8 +4266,14 @@
     "libs/core/dot/dot-executor-reports.ts#appendWorkResult": [
       "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#appendWorkResult"
     ],
+    "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport": [
+      "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport"
+    ],
     "libs/core/dot/dot-executor-reports.ts#markReportEnqueued": [
       "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#markReportEnqueued"
+    ],
+    "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission": [
+      "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission"
     ],
     "libs/core/dot/dot-executor-reports.ts#scopedWorkResults": [
       "role argument `c.authority.authority_role` could not be resolved at libs/core/dot/dot-executor-reports.ts#scopedWorkResults"
@@ -4907,6 +4884,21 @@
             "libs/core/dot/dot-lifecycle.ts#transitionDotCharterStatus"
           ]
         },
+        "dot_result_writer": {
+          "example_path": [
+            "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/chronos-mirror-v2/src/app/api/agents/route.ts#GET",
@@ -5136,7 +5128,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -5357,6 +5351,33 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -5771,7 +5792,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -6238,6 +6261,25 @@
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
           ]
         },
+        "dot_result_writer": {
+          "example_path": [
+            "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
+          ]
+        },
         "ecosystem_architect": {
           "example_path": [
             "presence/displays/concierge/src/app/api/hygiene/[id]/route.ts#POST",
@@ -6486,7 +6528,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -6546,6 +6590,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "deliverable_inbox_writer",
+        "dot_result_writer",
         "infrastructure_sentinel",
         "knowledge_steward",
         "memory_provenance_reader",
@@ -6656,6 +6701,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "deliverable_inbox_writer",
+        "dot_result_writer",
         "infrastructure_sentinel",
         "knowledge_steward",
         "memory_provenance_reader",
@@ -6836,6 +6882,28 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessage",
+            "satellites/discord-bridge/src/index.ts#handleDiscordMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -7174,7 +7242,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -7310,6 +7380,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "deliverable_inbox_writer",
+        "dot_result_writer",
         "knowledge_steward",
         "memory_provenance_reader",
         "metrics_cap_reader",
@@ -7582,6 +7653,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "deliverable_inbox_writer",
+        "dot_result_writer",
         "knowledge_steward",
         "organization_operator",
         "peer_catalog_reader",
@@ -7768,6 +7840,30 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "satellites/imessage-bridge/src/index.ts#<module>",
+            "satellites/imessage-bridge/src/index.ts#main",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessage",
+            "satellites/imessage-bridge/src/index.ts#processIncomingIMessageInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -8161,7 +8257,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -8368,6 +8466,22 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "scripts/mcp_server.ts#<module>",
+            "libs/shared-network/src/mcp-server-engine.ts#startMcpServerStdio",
+            "libs/shared-network/src/mcp-server-engine.ts#createKyberionMcpServer",
+            "libs/shared-network/src/mcp-server-engine.ts#startPipelineJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -8718,7 +8832,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -9002,6 +9118,33 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "presence/bridge/nexus-daemon.ts#<module>",
+            "presence/bridge/nexus-daemon.ts#nexusLoop",
+            "presence/bridge/nexus-daemon.ts#scanAndDispatch",
+            "presence/bridge/nexus-daemon.ts#dispatchFeedback",
+            "libs/actuators/service-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#handleSingleAction",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#reconcileServices",
+            "libs/actuators/service-actuator/src/service-actuator-helpers.ts#startService",
+            "libs/actuators/system-actuator/src/index.ts#<module> [child process]",
+            "libs/actuators/system-actuator/src/system-action-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-helpers.ts#<module>",
+            "libs/actuators/system-actuator/src/system-pipeline-core-helpers.ts#<module>",
+            "scripts/run_baseline_check.ts#runBaselineCheck",
+            "scripts/run_baseline_check.ts#maybeSubmitJanitorMaintenanceJob",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -9480,7 +9623,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -9750,6 +9895,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "deliverable_inbox_writer",
+        "dot_result_writer",
         "knowledge_steward",
         "metrics_cap_reader",
         "organization_operator",
@@ -9971,6 +10117,25 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -10297,7 +10462,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -10533,6 +10700,33 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "scripts/mission_controller.ts#handoffMission [child process]",
+            "scripts/mission_controller.ts#syncProjectLedgerIfLinked",
+            "libs/core/mission/mission-system.ts#buildMissionSystem",
+            "libs/core/mission/mission-maintenance.ts#resumeMission",
+            "libs/core/mission/mission-orchestration-events.ts#startMissionOrchestrationWorker",
+            "scripts/run_mission_orchestration_event_worker.ts#<module> [child process]",
+            "libs/core/mission/mission-orchestration-worker.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-results.ts#<module>",
+            "libs/core/mission/mission-orchestration-worker-part-context.ts#runMissionController",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -10955,7 +11149,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -11152,6 +11348,22 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "presence/displays/presence-studio/server.ts#<module>",
+            "presence/displays/presence-studio/presence-studio-runtime-data.ts#<module>",
+            "libs/core/in-room-minutes-recorder.ts#startInRoomMinutesSession",
+            "libs/core/in-room-minutes-recorder.ts#defaultRunMinutesPipeline",
+            "scripts/run_pipeline.ts#<module> [child process]",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -11441,7 +11653,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -11657,6 +11871,29 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "satellites/slack-bridge/src/index.ts#<module>",
+            "satellites/slack-bridge/src/index.ts#start",
+            "satellites/slack-bridge/src/team-channel.ts#issueSlackThreadMission",
+            "libs/core/surface/surface-mission-proposals.ts#issueSlackMissionFromProposal",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -12014,7 +12251,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -12138,6 +12377,7 @@
         "customer_decision_invite_store",
         "customer_decision_milestone_store",
         "deliverable_inbox_writer",
+        "dot_result_writer",
         "knowledge_steward",
         "memory_provenance_reader",
         "metrics_cap_reader",
@@ -12296,6 +12536,18 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "scripts/run_pipeline.ts#<module>",
+            "scripts/pipeline-execution-part-results.ts#main",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -12588,7 +12840,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -12791,6 +13045,28 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdate",
+            "satellites/telegram-bridge/src/index.ts#handleTelegramUpdateInner",
+            "libs/core/surface/surface-mission-proposals.ts#resolveMissionProposalReply",
+            "libs/core/surface/surface-mission-proposals.ts#issueMissionFromProposal",
+            "scripts/mission_controller.ts#main [child process]",
+            "scripts/mission_controller.ts#mainImpl",
+            "libs/core/mesh/a2a-bridge.ts#A2ABridgeImpl.route",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#askAgentRuntimeViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -13129,7 +13405,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -13386,6 +13664,24 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "presence/displays/terminal-hud/src/index.ts#<module>",
+            "presence/displays/terminal-hud/src/snapshot.ts#<module>",
+            "presence/displays/terminal-hud/src/store/coordination.ts#loadCoordination",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#listAgentRuntimesViaDaemon",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -13720,7 +14016,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",
@@ -13928,6 +14226,25 @@
             "libs/core/mission/mission-system.ts#buildMissionSystem",
             "libs/core/mission/mission-creation.ts#startMission",
             "libs/core/mission/mission-bolt-review.ts#notifyBoltReviewRejected"
+          ]
+        },
+        "dot_result_writer": {
+          "example_path": [
+            "libs/core/agent/agent-runtime-supervisor.ts#startAgentRuntimeSupervisorForRequest",
+            "scripts/run_agent_runtime_supervisor.ts#<module> [child process]",
+            "scripts/run_agent_runtime_supervisor.ts#main",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.startMonitor",
+            "libs/core/governance/kill-switch.ts#KillSwitchImpl.respond",
+            "libs/core/agent/agent-runtime-supervisor-client.ts#ensureAgentRuntimeSupervisorDaemon",
+            "scripts/agent_runtime_supervisor_daemon.ts#<module> [child process]",
+            "scripts/task_pipeline_executor.ts#<module>",
+            "scripts/task_pipeline_executor.ts#installTaskPipelineExecutor",
+            "scripts/pipeline-execution-part-results.ts#resumeLibraryPipelineRun",
+            "libs/core/dot/dot-executor.ts#executeDotWorkItem",
+            "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+            "libs/core/dot/dot-result-store.ts#appendConfidentialDotWorkResult",
+            "libs/core/dot/dot-result-store.ts#raw",
+            "libs/core/dot/dot-result-store.ts#privileged"
           ]
         },
         "ecosystem_architect": {
@@ -14256,7 +14573,9 @@
         "libs/core/delegated-task-observability.ts#spawnDelegatedTaskWorkerProcess",
         "libs/core/dot/dot-executor-release.ts#applyApprovedDotReleases",
         "libs/core/dot/dot-executor-reports.ts#appendWorkResult",
+        "libs/core/dot/dot-executor-reports.ts#markOrdinaryConfidentialReport",
         "libs/core/dot/dot-executor-reports.ts#markReportEnqueued",
+        "libs/core/dot/dot-executor-reports.ts#ordinaryResultPermission",
         "libs/core/dot/dot-executor-reports.ts#scopedWorkResults",
         "libs/core/dot/dot-executor.ts#runDotExecutorSweep",
         "libs/core/dot/dot-key-results.ts#runAsDotCharter",

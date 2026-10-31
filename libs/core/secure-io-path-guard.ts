@@ -344,7 +344,7 @@ export function assertCanonicalWritable(
   resolved: string,
   displayPath: string,
   mode: CanonicalMode = 'follow',
-  operation: 'write' | 'mkdir' = 'write',
+  operation: 'write' | 'append' | 'mkdir' = 'write',
   content?: WriteContent
 ): string {
   const canonical = canonicalGuardPath(resolved, mode);
@@ -394,7 +394,7 @@ export function guardWritePath(
     resolved,
     filePath,
     mode,
-    operation === 'mkdir' ? 'mkdir' : 'write'
+    operation === 'mkdir' ? 'mkdir' : operation === 'append' ? 'append' : 'write'
   );
   return { resolved, canonical };
 }
@@ -413,7 +413,7 @@ export function guardLiteralWritePath(
   const resolved = pathResolver.resolve(filePath);
   const guard = validateWritePermission(
     resolved,
-    operation === 'mkdir' ? 'mkdir' : 'write',
+    operation === 'mkdir' ? 'mkdir' : operation === 'append' ? 'append' : 'write',
     content
   );
   if (!guard.allowed) throw new Error(guard.reason);
@@ -988,7 +988,7 @@ function assertAuthorizedAt(
   const guard =
     operation === 'read'
       ? validateReadPermission(actual, readOperation)
-      : validateWritePermission(actual);
+      : validateWritePermission(actual, operation);
   if (!guard.allowed) {
     throw new Error(
       `[SECURITY] ${operation === 'read' ? 'Read' : 'Write'} denied: ${displayPath} resolves to a location outside the caller's ${operation} scope${denialCode(guard.reason)}`
@@ -1086,7 +1086,7 @@ export function safeRealpath(filePath: string): string {
  * target) gets no exemption. Writes that replace the entry (safeWriteFile,
  * the copy destination: temp + rename) never touch the old inode.
  */
-export type HardLinkOperation = 'read' | 'write';
+export type HardLinkOperation = 'read' | 'write' | 'append';
 
 // `var`: reachable during the secure-io bootstrap cycle (no TDZ).
 // eslint-disable-next-line no-var
