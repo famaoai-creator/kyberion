@@ -316,9 +316,15 @@ describe('script harness', () => {
     await main(['--json']);
 
     const parsed = JSON.parse(String(err.mock.calls[0]?.[0])) as Record<string, unknown>;
+    // R05: uncategorized exceptions are machine-classified as INTERNAL_ERROR /
+    // internal_error; `next_action` mirrors the human `next` hint. Stacks stay
+    // out of the report unless DEBUG is set.
     expect(parsed).toEqual({
       ok: false,
       error: 'gone',
+      code: 'INTERNAL_ERROR',
+      category: 'internal_error',
+      next_action: 'confirm the target service is running and reachable',
       next: 'confirm the target service is running and reachable',
     });
     expect(parsed.stack).toBeUndefined();

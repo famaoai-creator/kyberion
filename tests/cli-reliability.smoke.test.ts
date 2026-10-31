@@ -183,20 +183,37 @@ function specFor(probe: ProbeEntry): SmokeFixtureSpec {
   };
 }
 
+/**
+ * Remove one case root inside the owning test's timeout budget. A full root
+ * is ~15k content-copied files (~150 MB, plus dist for mirrorDist cases), so
+ * deferring every removal to a single afterAll hook blows the default 30 s
+ * hook timeout on runners without copy-on-write clones (Linux). The afterAll
+ * below only sweeps roots orphaned by a timed-out or crashed test.
+ */
+function removeCaseRoot(root: string): void {
+  fs.rmSync(root, { recursive: true, force: true });
+}
+
 async function runProbe(probe: ProbeEntry) {
   const contract = probe.smoke_contract;
   const root = seedCaseRoot(probe.id, specFor(probe));
-  const result = await runCliCase(root, contract?.launcher ?? 'direct', probe.argv, {
-    timeoutMs: contract?.timeout_ms ?? 120_000,
-    env: contract?.fixture?.env,
-  });
-  return { root, result };
+  try {
+    const result = await runCliCase(root, contract?.launcher ?? 'direct', probe.argv, {
+      timeoutMs: contract?.timeout_ms ?? 120_000,
+      env: contract?.fixture?.env,
+    });
+    return { root, result };
+  } finally {
+    removeCaseRoot(root);
+  }
 }
 
-// Clean the whole smoke tree — fixtures are regenerable scratch, never kept state.
+// Sweep whatever per-case cleanup could not reach (timed-out tests skip their
+// finally only when the runner aborts mid-removal) — fixtures are regenerable
+// scratch, never kept state. Bounded well above the default hook budget.
 afterAll(() => {
   fs.rmSync(SMOKE_ROOT, { recursive: true, force: true });
-});
+}, 300_000);
 
 describe('cli-reliability smoke — fixture-free negatives and help', () => {
   const ids = ['P20-unknown-command', 'P21-read-outside-missing'];
@@ -230,7 +247,7 @@ describe('cli-reliability smoke — fixture-free negatives and help', () => {
       const root = seedCaseRoot('S01-help');
       const result = await runCliCase(root, 'direct', ['kyberion', '--help'], {
         timeoutMs: 60_000,
-      });
+      }).finally(() => removeCaseRoot(root));
       expect(result.timedOut).toBe(false);
       expect(result.exit).toBe(0);
       expect(result.stdout.trim().length).toBeGreaterThan(0);
@@ -248,7 +265,7 @@ describe('cli-reliability smoke — fixture-free negatives and help', () => {
         'direct',
         ['kyberion', 'read', '/nonexistent/file.pdf', '--json'],
         { timeoutMs: 60_000 }
-      );
+      ).finally(() => removeCaseRoot(root));
       expect(result.timedOut).toBe(false);
       expect(result.exit).toBe(1);
       expect(result.stdout.trim()).toBe('');
@@ -270,7 +287,7 @@ describe('cli-reliability smoke — fixture-free negatives and help', () => {
         'script-entry',
         ['dist/scripts/context_ranker.js', '--bogus', '--json'],
         { timeoutMs: 60_000 }
-      );
+      ).finally(() => removeCaseRoot(root));
       expect(result.timedOut).toBe(false);
       expect(result.exit).toBe(1);
       expect(result.stdout.trim()).toBe('');
@@ -293,7 +310,7 @@ describe('cli-reliability smoke — fixture-free negatives and help', () => {
         {
           timeoutMs: 90_000,
         }
-      );
+      ).finally(() => removeCaseRoot(root));
       expect(result.timedOut).toBe(false);
       expect(result.exit).not.toBe(0);
       expect(`${result.stdout}\n${result.stderr}`).toContain('definitely-not-a-command');
