@@ -37,8 +37,10 @@
  * read to active/shared/cache/system/role-assumption/reachability.json (the
  * re-generable system cache floor); `--check` is
  * accepted for compatibility and changes nothing. Unresolved ("any role")
- * sites are ratcheted per system role against the committed counts in
- * role-assumption-unresolved-baseline.json (counts only, low churn);
+ * sites and child-process entries inheriting SYSTEM_ROLE are ratcheted per
+ * system role against the committed counts in
+ * role-assumption-unresolved-baseline.json (counts only, low churn); a count
+ * below its baseline prints a warning to lower it.
  * `--print-unresolved-baseline` prints that file for the current report.
  */
 import * as path from 'node:path';
@@ -83,6 +85,14 @@ export interface UnresolvedSiteBaselineFile {
   description?: string;
   /** System role -> number of reachable unresolved sites allowed. */
   unresolved_sites: Record<string, number>;
+  /** System role -> number of child-process entries inheriting SYSTEM_ROLE allowed. */
+  child_process_entries?: Record<string, number>;
+}
+
+/** Ratcheted counts read from the baseline file. */
+export interface ReachabilityBaseline {
+  unresolved_sites: Record<string, number>;
+  child_process_entries: Record<string, number>;
 }
 
 export interface ReachableRole {
@@ -394,7 +404,8 @@ export interface RoleAssumptionViolation {
     | 'analysed-role-not-in-policy'
     | 'launched-role-not-analysed'
     | 'narrowed-role-unresolved'
-    | 'unresolved-sites-increased';
+    | 'unresolved-sites-increased'
+    | 'child-process-entries-increased';
   system_role: string;
   message: string;
 }
@@ -412,13 +423,16 @@ const POLICY_HINT = `grant it in ${POLICY_PATH} (system_roles.<role>.may_assume,
  *  - every narrowed system role stays fully resolved (no any-role site, no
  *    child process inheriting SYSTEM_ROLE);
  *  - with a baseline, no system role gains unresolved ("any role") sites
- *    beyond its committed count (a role missing from the baseline allows 0).
+ *    beyond its committed count (a role missing from the baseline allows 0);
+ *  - with a child-process baseline, no system role gains child-process
+ *    entries that inherit SYSTEM_ROLE beyond its committed count.
  */
 export function checkReachabilityInvariants(
   report: RoleAssumptionReachabilityReport,
   policy: RoleAssumptionPolicyFile,
   packageScripts: Record<string, string> = {},
-  unresolvedBaseline?: Record<string, number>
+  unresolvedBaseline?: Record<string, number>,
+  childProcessBaseline?: Record<string, number>
 ): RoleAssumptionViolation[] {
   const violations: RoleAssumptionViolation[] = [];
   const analysed = Object.keys(report.system_roles).sort();
@@ -494,7 +508,72 @@ export function checkReachabilityInvariants(
       });
     }
   }
+  if (childProcessBaseline) {
+    for (const [systemRole, count] of Object.entries(countChildProcessEntries(report))) {
+      const allowed = childProcessBaseline[systemRole] ?? 0;
+      if (count <= allowed) continue;
+      violations.push({
+        rule: 'child-process-entries-increased',
+        system_role: systemRole,
+        message: `${systemRole} spawns ${count} child process entr(ies) that inherit SYSTEM_ROLE, above its baseline of ${allowed} in ${UNRESOLVED_BASELINE_PATH} (child_process_entries) | next: spawn the child without SYSTEM_ROLE or under its own system role; only if it is reviewed and intended, raise the count (--print-unresolved-baseline > ${UNRESOLVED_BASELINE_PATH})`,
+      });
+    }
+  }
   return violations;
+}
+
+/** Child-process entries inheriting SYSTEM_ROLE per analysed system role, sorted by role. */
+export function countChildProcessEntries(
+  report: RoleAssumptionReachabilityReport
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.keys(report.system_roles)
+      .sort()
+      .map((role) => [role, report.system_roles[role]!.child_process_entries.length])
+  );
+}
+
+export interface BaselineSlack {
+  system_role: string;
+  kind: 'unresolved_sites' | 'child_process_entries';
+  current: number;
+  baseline: number;
+}
+
+/**
+ * Roles whose current count is below the committed baseline. Not a failure —
+ * but a ratchet that is never lowered lets a later regression back in
+ * silently, so the gate warns until the baseline is regenerated.
+ */
+export function findBaselineSlack(
+  report: RoleAssumptionReachabilityReport,
+  baseline: ReachabilityBaseline
+): BaselineSlack[] {
+  const slack: BaselineSlack[] = [];
+  const kinds = [
+    ['unresolved_sites', countUnresolvedSites(report)],
+    ['child_process_entries', countChildProcessEntries(report)],
+  ] as const;
+  for (const [kind, counts] of kinds) {
+    for (const [systemRole, current] of Object.entries(counts)) {
+      const allowed = baseline[kind][systemRole];
+      if (allowed !== undefined && current < allowed) {
+        slack.push({ system_role: systemRole, kind, current, baseline: allowed });
+      }
+    }
+  }
+  return slack;
+}
+
+export function formatBaselineSlack(slack: readonly BaselineSlack[]): string {
+  return [
+    `[role-assumption-reachability] WARN — ${slack.length} baseline count(s) are above the current analysis; lower them so a regression cannot return silently:`,
+    ...slack.map(
+      (item) =>
+        `  - ${item.system_role} ${item.kind}: current ${item.current} < baseline ${item.baseline}`
+    ),
+    `  next: node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --print-unresolved-baseline > ${UNRESOLVED_BASELINE_PATH}`,
+  ].join('\n');
 }
 
 /** Unresolved-site count per analysed system role, sorted by role. */
@@ -524,8 +603,9 @@ export function renderUnresolvedBaseline(report: RoleAssumptionReachabilityRepor
   const file: UnresolvedSiteBaselineFile = {
     $schema: '../schemas/role-assumption-unresolved-baseline.schema.json',
     description:
-      'Per-system-role ratchet of reachable unresolved ("any role") role-assumption sites, checked by the role-assumption-reachability gate (scripts/analyze_role_assumptions.ts). A role fails when its count rises above this number; lower it when sites are resolved. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --print-unresolved-baseline > knowledge/product/governance/role-assumption-unresolved-baseline.json`.',
+      'Per-system-role ratchets checked by the role-assumption-reachability gate (scripts/analyze_role_assumptions.ts): reachable unresolved ("any role") role-assumption sites (unresolved_sites) and child-process entries that inherit SYSTEM_ROLE (child_process_entries). A role fails when its count rises above its number, and the gate warns when the count falls below it — lower it then. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --print-unresolved-baseline > knowledge/product/governance/role-assumption-unresolved-baseline.json`.',
     unresolved_sites: countUnresolvedSites(report),
+    child_process_entries: countChildProcessEntries(report),
   };
   return `${JSON.stringify(file, null, 2)}\n`;
 }
@@ -542,6 +622,8 @@ export function formatViolations(violations: readonly RoleAssumptionViolation[])
 export function evaluateReachabilityGate(root: string = pathResolver.rootDir()): {
   report: RoleAssumptionReachabilityReport;
   baseline: Record<string, number>;
+  childProcessBaseline: Record<string, number>;
+  slack: BaselineSlack[];
   violations: RoleAssumptionViolation[];
 } {
   const report = buildReachabilityReport(root);
@@ -554,16 +636,30 @@ export function evaluateReachabilityGate(root: string = pathResolver.rootDir()):
     'package.json'
   );
   const baselinePath = path.join(root, UNRESOLVED_BASELINE_PATH);
-  const baseline = safeExistsSync(baselinePath)
+  const file: UnresolvedSiteBaselineFile = safeExistsSync(baselinePath)
     ? readSafeJsonFile<UnresolvedSiteBaselineFile>(
         baselinePath,
         'role assumption unresolved baseline'
-      ).unresolved_sites
-    : {};
+      )
+    : { unresolved_sites: {} };
+  const baseline = file.unresolved_sites ?? {};
+  // A baseline file without child_process_entries leaves that ratchet off.
+  const childProcessBaseline = file.child_process_entries;
   return {
     report,
     baseline,
-    violations: checkReachabilityInvariants(report, policy, packageJson.scripts ?? {}, baseline),
+    childProcessBaseline: childProcessBaseline ?? {},
+    slack: findBaselineSlack(report, {
+      unresolved_sites: baseline,
+      child_process_entries: childProcessBaseline ?? {},
+    }),
+    violations: checkReachabilityInvariants(
+      report,
+      policy,
+      packageJson.scripts ?? {},
+      baseline,
+      childProcessBaseline
+    ),
   };
 }
 
@@ -600,6 +696,9 @@ export const main = defineScript({
       context.print(renderUnresolvedBaseline(report).trimEnd());
       return { status: 'ok', violations: [] };
     }
+    if (evaluated.slack.length > 0 && !context.json) {
+      context.print(formatBaselineSlack(evaluated.slack));
+    }
     if (violations.length > 0) {
       throw new ScriptExitError(1, formatViolations(violations), false, { violations });
     }
@@ -607,7 +706,14 @@ export const main = defineScript({
     const unresolved = countUnresolvedSites(report);
     context.print(
       context.json
-        ? { status: 'ok', system_roles: systemRoles, unresolved_sites: unresolved, violations: [] }
+        ? {
+            status: 'ok',
+            system_roles: systemRoles,
+            unresolved_sites: unresolved,
+            child_process_entries: countChildProcessEntries(report),
+            baseline_slack: evaluated.slack,
+            violations: [],
+          }
         : `[role-assumption-reachability] OK — ${systemRoles} system role(s); every reachable role is granted; unresolved sites per role (current/baseline): ${formatUnresolvedCounts(unresolved, evaluated.baseline)}`
     );
     return { status: 'ok', violations: [] };
