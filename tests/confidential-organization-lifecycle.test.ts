@@ -19,6 +19,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 
+import { safeExistsSync, safeReaddir, safeReadFile, safeStat } from '../libs/core/secure-io.js';
 import { runInExecutionScope } from '../libs/core/foundation/execution-scope.js';
 import {
   credentialBindingReadiness,
@@ -219,16 +220,14 @@ describe('R01b — verify -> distill -> finish -> same-scope reuse (boundary map
     // Guard: the fixture itself must not leak its sentinel into the repo's
     // shared/public tmp. (The artifact-path assertion lives in R02.)
     const publicTmp = path.resolve('active/shared/tmp/public');
-    const fs = require('node:fs') as typeof import('node:fs');
-    if (fs.existsSync(publicTmp)) {
+    if (safeExistsSync(publicTmp)) {
       const walk = (dir: string): string[] =>
-        fs
-          .readdirSync(dir, { withFileTypes: true })
-          .flatMap((e) =>
-            e.isDirectory() ? walk(path.join(dir, e.name)) : [path.join(dir, e.name)]
-          );
+        safeReaddir(dir).flatMap((name) => {
+          const entry = path.join(dir, name);
+          return safeStat(entry).isDirectory() ? walk(entry) : [entry];
+        });
       for (const file of walk(publicTmp)) {
-        expect(fs.readFileSync(file, 'utf8')).not.toContain(SENTINEL_CONFIDENTIAL_BODY);
+        expect(safeReadFile(file, { encoding: 'utf8' })).not.toContain(SENTINEL_CONFIDENTIAL_BODY);
       }
     }
     expect(SENTINEL_CONFIDENTIAL_BODY).toMatch(/confidential-sentinel/);

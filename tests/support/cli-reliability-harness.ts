@@ -303,6 +303,15 @@ export async function runCliCase(
       resolve({ exit: null, signal: null, timedOut });
     });
   });
+  // The leader exiting does not end the detached group: nested pnpm / module
+  // grandchildren can outlive it, hold inherited pipe fds open, and keep
+  // writing into the fixture root while the next case (or the suite teardown)
+  // is running. Reap the group unconditionally — a vanished group is ESRCH.
+  try {
+    if (child.pid) process.kill(-child.pid, 'SIGKILL');
+  } catch {
+    /* group already gone */
+  }
   return {
     ...outcome,
     stdout,

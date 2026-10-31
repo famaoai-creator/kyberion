@@ -173,6 +173,7 @@
     "scripts/write_core_dist_scope.mjs",
     "tests/a2a-lifecycle.test.ts",
     "tests/browser-bridge-a11y.test.ts",
+    "tests/cli-reliability.smoke.test.ts",
     "tests/customer-dialogue-e2e.test.ts",
     "tests/impact-analysis.test.ts",
     "tests/knowledge-store-purity.test.ts",
@@ -181,6 +182,7 @@
     "tests/mission-orchestration-dashboard-contract.test.ts",
     "tests/runtime-surface-state.test.ts",
     "tests/sdlc-cycle-contract.test.ts",
+    "tests/support/cli-reliability-harness.ts",
     "tests/surface-auth.test.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts",
@@ -273,6 +275,7 @@
     "scripts/write_core_dist_scope.test.ts",
     "tests/knowledge-taxonomy-contract.test.ts",
     "tests/managed-process.test.ts",
+    "tests/support/cli-reliability-harness.ts",
     "tests/utils/assertion-extensions.ts",
     "tests/utils/test-utilities.test.ts"
   ]
