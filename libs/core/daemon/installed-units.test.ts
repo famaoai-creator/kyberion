@@ -7,6 +7,7 @@ import {
   inspectInstalledUnits,
   parseKyberionUnitLabel,
   parsePlistXml,
+  unitDriftSha256,
   type InstalledUnitsExec,
 } from './installed-units.js';
 import { DAEMON_SPECS, daemonInstanceFromCanonicalRoot, scopeDaemonServiceSpec } from './specs.js';
@@ -259,5 +260,42 @@ describe('installed-units helpers', () => {
     expect(deriveUnitRepoRoot({ programArguments: ['/n', '/r/k/dist/scripts/x.js'] })).toBe('/r/k');
     expect(deriveUnitRepoRoot({ environment: { KYBERION_ROOT: '/r/env/' } })).toBe('/r/env');
     expect(deriveUnitRepoRoot({})).toBeNull();
+  });
+});
+
+describe('unit drift hash', () => {
+  const spec = scopeDaemonServiceSpec(
+    DAEMON_SPECS.chronos!,
+    daemonInstanceFromCanonicalRoot(MINE, 'linux')
+  );
+  const ctx = (userPath: string[], nodePath = '/usr/bin/node'): DaemonRenderContext => ({
+    nodePath,
+    repoRoot: MINE,
+    homeDir: '/home/op',
+    uid: '1000',
+    stagingDir: '/tmp/x',
+    userPath,
+  });
+
+  it('ignores the PATH baked from the installing shell (launchd and systemd)', () => {
+    const launchd = (extraPath: string[]) =>
+      buildLaunchdPlist(
+        { nodePath: '/opt/homebrew/opt/node/bin/node', repoRoot: MINE, logDir: '/l', extraPath },
+        { label: 'com.kyberion.chronos', daemonScript: 'd.js', logBaseName: 'k' }
+      );
+    expect(launchd(['/a/bin'])).not.toBe(launchd(['/b/bin', '/c dir/bin']));
+    expect(unitDriftSha256(launchd(['/a/bin']))).toBe(
+      unitDriftSha256(launchd(['/b/bin', '/c dir/bin']))
+    );
+    const systemd = (userPath: string[]) => buildSystemdServiceUnit(spec, ctx(userPath));
+    expect(unitDriftSha256(systemd(['/a/bin']))).toBe(
+      unitDriftSha256(systemd(['/b/bin', '/c dir/bin']))
+    );
+  });
+
+  it('still detects every other content change', () => {
+    expect(unitDriftSha256(buildSystemdServiceUnit(spec, ctx([])))).not.toBe(
+      unitDriftSha256(buildSystemdServiceUnit(spec, ctx([], '/opt/node/bin/node')))
+    );
   });
 });

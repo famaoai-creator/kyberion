@@ -158,6 +158,7 @@
       "artifact_class": "tmp",
       "ttl_days": 1,
       "action": "delete",
+      "backup": "exclude",
       "note": "Approval requests and events written by test runs (approval-store.ts approvalStoreRoots under vitest). Isolated from the live approval store so fixtures never count as operator decisions."
     },
     {
@@ -165,6 +166,7 @@
       "artifact_class": "tmp",
       "ttl_days": 1,
       "action": "delete",
+      "backup": "exclude",
       "note": "Delivery outboxes, audit logs, ops alerts, inboxes and peer mailboxes written by test runs (path-resolver vitestLivePath under vitest). Kept out of the live operational tree so fixtures are never delivered or counted as evidence."
     },
     {
@@ -172,6 +174,7 @@
       "artifact_class": "tmp",
       "ttl_days": 1,
       "action": "delete",
+      "backup": "exclude",
       "note": "Per-process operations-halt flags written by test runs (operations-halt.ts under vitest). Isolated so a test that engages a halt never stops the live system."
     },
     {
@@ -231,6 +234,7 @@
       "artifact_class": "cache",
       "ttl_days": 30,
       "action": "delete",
+      "backup": "exclude",
       "note": "History search index (history-search-index.ts) — regenerable from source logs."
     },
     {
@@ -238,6 +242,7 @@
       "artifact_class": "cache",
       "ttl_days": 14,
       "action": "delete",
+      "backup": "exclude",
       "note": "Baseline-check / provider-capability probe cache — regenerated on the next session start."
     },
     {
@@ -266,6 +271,7 @@
       "artifact_class": "cache",
       "ttl_days": 14,
       "action": "delete",
+      "backup": "exclude",
       "note": "Daemon heartbeat files (daemon-heartbeat.ts). Live daemons refresh mtime continuously, so a 14d TTL only ever removes entries of long-dead daemons."
     },
     {
@@ -635,7 +641,7 @@
       "path": "active/shared/runtime/trigger-deliveries.jsonl",
       "artifact_class": "log",
       "action": "rotate",
-      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys used to embed daemon+status+minute — every tick minted a NEW key, so latest-per-key compaction never shrank the file (4.9MB). daemon_watchdog now keys one recovery per unhealthy episode (stale: last heartbeat timestamp; missing/malformed: 15-minute bucket — daemonRecoveryKey). An episode outliving the retained history can re-deliver at most once more, which only re-raises the same operator-gated recovery. trigger-runner also rotates inline past its 4MB cap (it cannot wait for the janitor, which runs from chronos): the full journal is copied to a <stem>-YYYYMMDD-HHmmss.jsonl segment and the live file keeps in-flight claims plus finished receipts from the last 7 days, newest first, within half the cap; reads are a bounded 8MB tail. Segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
+      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys used to embed daemon+status+minute — every tick minted a NEW key, so latest-per-key compaction never shrank the file (4.9MB). daemon_watchdog now keys recovery per unhealthy episode (stale: last heartbeat timestamp plus a 15-minute retry bucket, at most 4 attempts; missing/malformed: 15-minute bucket — daemonRecoveryKey). trigger-runner also rotates inline past its 4MB cap (it cannot wait for the janitor, which runs from chronos): the full journal is copied to a <stem>-YYYYMMDD-HHmmss.jsonl segment and the live file keeps every finished receipt younger than 7 days (stable keys never re-deliver inside the window) and every pending claim whose lease expired less than 7 days ago; only above half the cap are the oldest cron (minute-scoped) receipts trimmed first. When stable keys alone exceed 3/4 of the cap it skips rotation and appends run to the 5MB hard cap (ops-health trigger-store-near-cap); reads are a bounded 8MB tail. Segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
       "ttl_days": 30
     },
     {
@@ -685,6 +691,7 @@
       "path": "active/shared/runtime/intent-flow-cache.json",
       "artifact_class": "cache",
       "action": "delete",
+      "backup": "exclude",
       "note": "Intent flow cache (libs/core/intent/intent-flow-cache.ts), one file rewritten in place; entries self-expire by the policy's cache_ttl_hours, so the file carries no TTL of its own."
     },
     {
@@ -703,6 +710,7 @@
       "path": "active/shared/runtime/provider-cache.json",
       "artifact_class": "cache",
       "action": "delete",
+      "backup": "exclude",
       "note": "Provider discovery disk cache (libs/core/provider/provider-discovery.ts), one file rewritten on every refresh — bounded by construction, regenerable."
     },
     {
@@ -847,6 +855,7 @@
       "artifact_class": "cache",
       "ttl_days": 30,
       "action": "delete",
+      "backup": "exclude",
       "note": "G02: pipeline ADF rendered from execution plan-set bundles (orchestrator-actuator orchestrator-helpers.ts / orchestrator-execution-brief-helpers.ts). Regenerable from the bundle; consumed in the same run."
     },
     {
@@ -972,6 +981,7 @@
       "path": "active/shared/runtime/voice-first-phrase-cache",
       "artifact_class": "cache",
       "action": "delete",
+      "backup": "exclude",
       "note": "Synthesized first-phrase audio cache (libs/core/voice/voice-first-phrase-cache.ts); self-evicting LRU (maxEntries, default 64), regenerable."
     },
     {
@@ -1212,6 +1222,7 @@
       "artifact_class": "cache",
       "ttl_days": 14,
       "action": "delete",
+      "backup": "exclude",
       "note": "terminal_session_cli.ts daemon state — Unix socket, pidfile, and startup log for the persistent terminal-actuator bridge. Files are recreated on daemon start; leftovers from a dead daemon are stale and safe to delete (same lifecycle as heartbeats)."
     }
   ]

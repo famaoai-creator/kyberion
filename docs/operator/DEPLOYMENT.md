@@ -460,8 +460,10 @@ and destination appear to share a device.
 What `--scope all` archives: `active/`, `vault/`, `knowledge/personal/` and
 `knowledge/confidential/`, minus re-creatable data — the
 `active/shared/{tmp,staging,cache}` floors, every
-`storage-retention-catalog.json` entry classed `cache` or `tmp`, the backup
-output directory and earlier archives in it, and the managed tool-runtime
+`storage-retention-catalog.json` entry marked `"backup": "exclude"` (fully
+regenerable data such as indexes, probe caches and test-run fixtures; a
+`cache`/`tmp` class alone never excludes, because staging stores like distill
+candidates or queued events hold pending state), the backup output directory and earlier archives in it, and the managed tool-runtime
 installs (only each runtime's `state.json` provenance is kept; reinstall the
 rest with `pnpm tool:setup`). Sockets, FIFOs, devices and symlinks are skipped,
 mission `.git` directories ride as git bundles, and the manifest records

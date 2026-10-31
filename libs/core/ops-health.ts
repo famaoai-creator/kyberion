@@ -17,6 +17,7 @@
  */
 import { matchesCron } from './pipeline/cron-utils.js';
 import type { InstalledUnit, InstalledUnitsReport } from './daemon/installed-units.js';
+import { DAEMON_TICK_IN_PROGRESS_MAX_MS } from './daemon-heartbeat.js';
 
 export type { InstalledUnit, InstalledUnitsReport };
 
@@ -48,7 +49,7 @@ export const BACKUP_ARCHIVE_MAX_AGE_HOURS = 36;
 export const BACKUP_DRILL_MAX_AGE_MS = 35 * 24 * 60 * 60 * 1000;
 /** Janitor marker freshness — 2x the daily maintenance TTL (AL-01). */
 export const JANITOR_MARKER_MAX_AGE_MS = 48 * 60 * 60 * 1000;
-/** Warn when the trigger delivery store reaches this share of its read cap. */
+/** Warn when the trigger delivery store reaches this share of its hard append cap. */
 export const TRIGGER_STORE_WARN_RATIO = 0.8;
 /** Schedule id of the daily encrypted backup (pipelines/backup-daily.json). */
 export const BACKUP_DAILY_SCHEDULE_ID = 'backup-daily';
@@ -76,6 +77,9 @@ export interface ChronosHeartbeatObservation {
   last_tick_ok_at?: string | null;
   last_tick_error?: string | null;
   last_tick_error_at?: string | null;
+  /** `tick_in_progress` while a long tick refreshes the heartbeat. */
+  phase?: string | null;
+  tick_started_at?: string | null;
 }
 
 export interface OpsHealthBackupSummary {
@@ -286,7 +290,7 @@ function scheduleFindings(
   return findings;
 }
 
-function heartbeatFindings(input: OpsHealthInput): OpsHealthFinding[] {
+function heartbeatFindings(input: OpsHealthInput, nowMs: number): OpsHealthFinding[] {
   const heartbeat = input.heartbeat;
   if (!heartbeat) return [];
   const findings: OpsHealthFinding[] = [];
@@ -301,6 +305,17 @@ function heartbeatFindings(input: OpsHealthInput): OpsHealthFinding[] {
         `started_at=${heartbeat.started_at ?? 'unknown'}`,
         ...(heartbeat.last_tick_error ? [`last_tick_error=${heartbeat.last_tick_error}`] : []),
       ],
+    });
+  }
+  const tickStartedMs =
+    heartbeat.phase === 'tick_in_progress' ? parseMs(heartbeat.tick_started_at) : null;
+  if (tickStartedMs !== null && nowMs - tickStartedMs > DAEMON_TICK_IN_PROGRESS_MAX_MS) {
+    findings.push({
+      id: 'scheduler-tick-overrunning',
+      severity: 'error',
+      reason: `chronos's current tick has been running since ${heartbeat.tick_started_at} (${hours(nowMs - tickStartedMs)}, limit ${hours(DAEMON_TICK_IN_PROGRESS_MAX_MS)}) — a scheduled run is hung; the other schedules wait behind it`,
+      next: 'pnpm kyberion scheduler status  # find the hung run, then `pnpm kyberion scheduler restart --apply`',
+      evidence: [`tick_started_at=${heartbeat.tick_started_at}`],
     });
   }
   const errorAtMs = parseMs(heartbeat.last_tick_error_at);
@@ -334,7 +349,7 @@ function backupFindings(input: OpsHealthInput, nowMs: number): OpsHealthFinding[
       id: 'backup-archive-missing',
       severity: 'error',
       reason: 'no backup archive exists',
-      next: `${backupCommand}  # needs KYBERION_BACKUP_PASSPHRASE`,
+      next: `${backupCommand}  # passphrase: ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND}`,
       ...(backup.backupDir ? { evidence: [`dir=${backup.backupDir}`] } : {}),
     });
   } else if (
@@ -346,7 +361,7 @@ function backupFindings(input: OpsHealthInput, nowMs: number): OpsHealthFinding[
       id: 'backup-archive-stale',
       severity: 'warn',
       reason: `latest backup archive is ${backup.latestAgeHours.toFixed(1)}h old (limit ${BACKUP_ARCHIVE_MAX_AGE_HOURS}h)`,
-      next: `${backupCommand}  # needs KYBERION_BACKUP_PASSPHRASE`,
+      next: `${backupCommand}  # passphrase: ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND}`,
       evidence: [`latest=${backup.latestName ?? 'unknown'}`],
     });
   }
@@ -359,7 +374,7 @@ function backupFindings(input: OpsHealthInput, nowMs: number): OpsHealthFinding[
       id: 'backup-daily-failed',
       severity: 'error',
       reason: `the ${BACKUP_DAILY_SCHEDULE_ID} schedule failed its last run (${backupDaily.lastRun ?? 'unknown'})`,
-      next: `${backupCommand}  # reproduce; usually KYBERION_BACKUP_PASSPHRASE is missing in the daemon env`,
+      next: `${backupCommand}  # reproduce; if the passphrase is unreachable from the daemon: ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND}`,
       evidence: [`consecutiveFailures=${backupDaily.consecutiveFailures ?? 0}`],
     });
   }
@@ -519,7 +534,7 @@ function triggerStoreFindings(input: OpsHealthInput): OpsHealthFinding[] {
     {
       id: 'trigger-store-near-cap',
       severity: ratio >= 1 ? 'error' : 'warn',
-      reason: `trigger delivery store is ${(ratio * 100).toFixed(0)}% of its ${(store.cap_bytes / 1_048_576).toFixed(0)}MB read cap — past the cap, reads fail and idempotency is lost`,
+      reason: `trigger delivery store is ${(ratio * 100).toFixed(0)}% of its ${(store.cap_bytes / 1_048_576).toFixed(0)}MB hard cap — past the cap, appends are refused ([TRIGGER_STORE_FULL]) and triggers fail closed`,
       next: 'pnpm daemon:watchdog -- --json  # confirm delivery health, then run `pnpm pipeline --input pipelines/storage-janitor.json` to compact',
       evidence: [`path=${store.path}`, `size_bytes=${store.size_bytes}`],
     },
@@ -536,7 +551,7 @@ export function evaluateOpsHealth(
   return {
     findings: [
       ...scheduleFindings(input, nowMs, options),
-      ...heartbeatFindings(input),
+      ...heartbeatFindings(input, nowMs),
       ...backupFindings(input, nowMs),
       ...janitorFindings(input, nowMs),
       ...unitFindings(input),
@@ -547,7 +562,7 @@ export function evaluateOpsHealth(
 
 /** Findings that make the scheduler layer (L10) fail. */
 export function isSchedulerOpsFinding(finding: OpsHealthFinding): boolean {
-  return /^(schedule-overdue|schedule-failing|schedule-registry-empty|scheduler-crash-loop|scheduler-tick-failing):?/.test(
+  return /^(schedule-overdue|schedule-failing|schedule-registry-empty|scheduler-crash-loop|scheduler-tick-failing|scheduler-tick-overrunning):?/.test(
     finding.id
   );
 }

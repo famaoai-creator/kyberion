@@ -175,6 +175,17 @@ describe('evaluateOpsHealth', () => {
       expected: 'scheduler-tick-failing',
     },
     {
+      name: 'tick in progress longer than the overrun limit',
+      input: healthy({
+        heartbeat: {
+          ...healthy().heartbeat!,
+          phase: 'tick_in_progress',
+          tick_started_at: iso(-9 * HOUR),
+        },
+      }),
+      expected: 'scheduler-tick-overrunning',
+    },
+    {
       name: 'backup archive older than 36h',
       input: healthy({ backup: { status: 'stale', latestName: 'old.tar.gz', latestAgeHours: 50 } }),
       expected: 'backup-archive-stale',
@@ -303,7 +314,7 @@ describe('evaluateOpsHealth', () => {
       expected: 'unit-double-owner:generation-schedule',
     },
     {
-      name: 'trigger delivery store above 80% of its read cap',
+      name: 'trigger delivery store above 80% of its hard cap',
       input: healthy({
         triggerStore: {
           path: 'runtime/trigger-deliveries.jsonl',
@@ -401,6 +412,43 @@ describe('evaluateOpsHealth', () => {
     expect(formatOpsHealthFinding(report.findings[0]!)).toMatch(
       /^ERROR scheduler-crash-loop: .* \| next: pnpm kyberion scheduler status/
     );
+  });
+
+  it('a long tick still in progress within the limit raises no finding', () => {
+    expect(
+      ids(
+        healthy({
+          heartbeat: {
+            ...healthy().heartbeat!,
+            phase: 'tick_in_progress',
+            tick_started_at: iso(-3 * HOUR),
+          },
+        })
+      )
+    ).toEqual([]);
+    const overrun = evaluateOpsHealth(
+      healthy({
+        heartbeat: {
+          ...healthy().heartbeat!,
+          phase: 'tick_in_progress',
+          tick_started_at: iso(-9 * HOUR),
+        },
+      }),
+      NOW
+    ).findings;
+    expect(overrun.filter(isSchedulerOpsFinding).map((f) => f.id)).toEqual([
+      'scheduler-tick-overrunning',
+    ]);
+  });
+
+  it('backup hints point at the keychain introduce command, not an env var', () => {
+    const findings = evaluateOpsHealth(
+      healthy({ backup: { status: 'missing', latestName: null, latestAgeHours: null } }),
+      NOW
+    ).findings;
+    const missing = findings.find((f) => f.id === 'backup-archive-missing')!;
+    expect(missing.next).toContain('pnpm kyberion secret introduce kyberion-backup PASSPHRASE');
+    expect(missing.next).not.toContain('KYBERION_BACKUP_PASSPHRASE');
   });
 
   it('latestMissedCronOccurrence stops at lastRun', () => {

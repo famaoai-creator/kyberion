@@ -82,6 +82,11 @@
           "minimum": 0,
           "description": "Scratch promotion grace (active/shared/tmp only): an unpromoted job directory holding authored code (*.ts, *.mts, *.js, *.mjs, *.py, *.sh) or an ADF JSON (top-level steps array) keeps its files this many days beyond ttl_days; while the grace runs the janitor warns with the exact pnpm scratch:promote command and lists the directory in active/shared/runtime/system/scratch-promotion-candidates.json. A TOOL.json or .scratch-promoted.json in the job directory counts as promoted. Default 2 when omitted."
         },
+        "backup": {
+          "type": "string",
+          "enum": ["exclude"],
+          "description": "Backup opt-out (scripts/lib/backup-file-selection.ts). exclude = `--scope all|mission|tenant` backups leave this directory out because it is fully regenerable (rebuildable index, provider/probe cache, test-run fixtures, daemon sockets). Omit for everything else: a cache/tmp class alone never excludes, since staging stores (distill or promotion candidates, queued events, mailboxes) hold pending state a restore needs. The tmp/staging/cache floor roots are always excluded."
+        },
         "note": {
           "type": "string",
           "description": "Human rationale: why this TTL/action, and any special expiry mechanism."

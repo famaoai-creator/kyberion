@@ -136,6 +136,39 @@ describe('scheduler reconcile', () => {
     expect(formatReconcileReport(second)).toContain('Nothing to change.');
   });
 
+  it('stays a no-op when reconcile runs from a shell with a different PATH', async () => {
+    const host = fakeHost();
+    await reconcileResidentServices({ apply: true }, host.deps);
+    const baseContext = host.deps.renderContext!;
+    const withPath =
+      (userPath: string[]): ReconcileDeps['renderContext'] =>
+      (manager, env) => ({ ...baseContext(manager, env), userPath });
+    host.calls.length = 0;
+    for (const userPath of [
+      ['/Users/op/.local/bin', '/opt/homebrew/bin', '/Users/op/.nvm/versions/node/v22/bin'],
+      [],
+    ]) {
+      const again = await reconcileResidentServices(
+        { apply: true },
+        { ...host.deps, renderContext: withPath(userPath) }
+      );
+      expect(again.plan.pendingChanges).toBe(0);
+    }
+    expect(host.calls).toEqual([]);
+    // A real content change (another node binary) is still drift.
+    const moved = await reconcileResidentServices(
+      { apply: false },
+      {
+        ...host.deps,
+        renderContext: (manager, env) => ({
+          ...baseContext(manager, env),
+          nodePath: '/usr/local/bin/node',
+        }),
+      }
+    );
+    expect(moved.plan.pendingChanges).toBeGreaterThan(0);
+  });
+
   it("migrates this checkout's legacy unit and leaves a foreign checkout's untouched", async () => {
     const legacyChronos = `${AGENTS}/com.kyberion.chronos.plist`;
     const foreignSupervisor = `${AGENTS}/com.kyberion.agent-runtime-supervisor.plist`;

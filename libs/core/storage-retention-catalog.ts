@@ -170,6 +170,12 @@ export interface RetentionCatalogEntry {
    * DEFAULT_CODE_GRACE_DAYS (scratch-promotion.ts) when omitted.
    */
   code_grace_days?: number;
+  /**
+   * Backup opt-out: `exclude` leaves this fully regenerable directory out of
+   * `--scope all|mission|tenant` backups (scripts/lib/backup-file-selection.ts).
+   * The cache/tmp class alone never excludes — staging stores hold pending state.
+   */
+  backup?: 'exclude';
   note?: string;
   /** WI-16: per-file status-aware expiry rules nested under this directory. */
   status_rules?: RetentionStatusRule[];
@@ -365,6 +371,9 @@ function validateEntry(raw: unknown, index: number): string | null {
     ) {
       return `entries[${index}] (${String(entry.path)}): "soft_delete_days" must be a positive number`;
     }
+  }
+  if (entry.backup !== undefined && entry.backup !== 'exclude') {
+    return `entries[${index}] (${String(entry.path)}): "backup" must be "exclude" when set`;
   }
   if (entry.code_grace_days !== undefined) {
     if (

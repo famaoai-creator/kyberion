@@ -42,6 +42,7 @@ import {
 import {
   inspectInstalledUnitDetails,
   type InspectInstalledUnitsOptions,
+  unitDriftSha256,
   type InstalledUnitDetailsReport,
   type InstalledUnitsExec,
 } from '@agent/core/daemon/installed-units';
@@ -51,7 +52,6 @@ import {
   planResidentServices,
   readResidentServicesState,
   residentServicesStatePath,
-  sha256Text,
   writeResidentServicesState,
   type DesiredResidentUnit,
   type ResidentServicesPlan,
@@ -183,7 +183,7 @@ export function inspectResidentServices(
       id: service.id,
       label: spec.label,
       legacyLabel: base.label,
-      unitSha256: sha256Text(unit.content),
+      unitSha256: unitDriftSha256(unit.content),
       nodePath: ctx.nodePath,
     };
   }

@@ -553,9 +553,8 @@ function reportAwaitScanError(runId: string, reason: string | undefined): void {
 // ---------------------------------------------------------------------------
 // Heartbeat: liveness that a crash loop cannot fake. Every write carries the
 // process start time, rolling restart counters (ops-health crash-loop
-// finding) and the last tick outcome. The healthy `running` heartbeat is
-// refreshed only AFTER a tick completes, so a tick that throws every minute
-// no longer keeps the heartbeat fresh.
+// finding) and the last tick outcome. `last_tick_ok_at` moves only AFTER a
+// tick completes; a long tick refreshes the heartbeat as `tick_in_progress`.
 // ---------------------------------------------------------------------------
 
 const chronosLiveness: Record<string, unknown> = {};
@@ -567,7 +566,33 @@ function writeChronosHeartbeat(
   recordDaemonHeartbeat('chronos-daemon', { status, details: { ...chronosLiveness, ...details } });
 }
 
-/** Run one leader tick and record its outcome in the heartbeat. */
+/**
+ * How often a running tick refreshes the heartbeat. A scheduled run can last
+ * hours (a backup archive is allowed up to 6h), and a heartbeat written only
+ * after the tick would go stale mid-run: baseline L10 would raise a false
+ * alarm and the watchdog could kickstart chronos in the middle of the run.
+ */
+export const TICK_HEARTBEAT_REFRESH_MS = 60_000;
+
+function lastTickFailed(liveness: Record<string, unknown>): boolean {
+  const errorAt =
+    typeof liveness.last_tick_error_at === 'string' ? Date.parse(liveness.last_tick_error_at) : NaN;
+  if (!Number.isFinite(errorAt)) return false;
+  const okAt =
+    typeof liveness.last_tick_ok_at === 'string' ? Date.parse(liveness.last_tick_ok_at) : NaN;
+  return !Number.isFinite(okAt) || errorAt > okAt;
+}
+
+/**
+ * Run one leader tick and record its outcome in the heartbeat. While the tick
+ * runs, the heartbeat is refreshed every `refreshMs` with phase
+ * `tick_in_progress` and the tick start (readDaemonHeartbeat flags a tick in
+ * progress past DAEMON_TICK_IN_PROGRESS_MAX_MS); `last_tick_ok_at` still moves
+ * only when a tick completes. A tick shorter than `refreshMs` writes nothing
+ * until it settles, so a tick that throws every minute cannot keep the
+ * heartbeat fresh. The lease attempt is a single try, so a standby process
+ * settles long before the first refresh.
+ */
 export async function runTickWithHeartbeat(
   run: () => Promise<boolean>,
   write: (
@@ -575,8 +600,25 @@ export async function runTickWithHeartbeat(
     details: Record<string, unknown>
   ) => void = writeChronosHeartbeat,
   liveness: Record<string, unknown> = chronosLiveness,
-  now: () => Date = () => new Date()
+  now: () => Date = () => new Date(),
+  refreshMs: number = TICK_HEARTBEAT_REFRESH_MS
 ): Promise<void> {
+  const tickStartedAt = now().toISOString();
+  const refresh = setInterval(() => {
+    try {
+      write(lastTickFailed(liveness) ? 'error' : 'running', {
+        phase: 'tick_in_progress',
+        tick_started_at: tickStartedAt,
+      });
+    } catch (error) {
+      logger.warn(
+        `[CHRONOS] in-progress heartbeat write failed — ${
+          error instanceof Error ? error.message : String(error)
+        } | next: the tick continues; check active/shared/runtime/heartbeats is writable`
+      );
+    }
+  }, refreshMs);
+  refresh.unref?.();
   try {
     const led = await run();
     if (!led) return;
@@ -588,6 +630,8 @@ export async function runTickWithHeartbeat(
     liveness.last_tick_error_at = now().toISOString();
     write('error', { phase: 'tick' });
     throw error;
+  } finally {
+    clearInterval(refresh);
   }
 }
 

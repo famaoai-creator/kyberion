@@ -139,8 +139,10 @@ export function chronosLaunchAgentTargetPath(homeDir: string = os.homedir()): st
 
 /**
  * The render context every install/reconcile uses for this host — one place,
- * so `scheduler install` and `scheduler reconcile` render byte-identical units
- * (reconcile compares unit hashes to decide on a reinstall).
+ * so `scheduler install` and `scheduler reconcile` render identical units.
+ * `userPath` comes from the calling shell's PATH, so reconcile compares the
+ * PATH-masked drift hash (installed-units unitDriftSha256) and a shell with a
+ * different PATH never triggers a reinstall on its own.
  */
 export function buildDaemonRenderContext(
   manager: Pick<DaemonManager, 'platform'>,

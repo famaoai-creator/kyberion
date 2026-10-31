@@ -65,6 +65,8 @@ export function toChronosHeartbeatObservation(
     last_tick_ok_at: text('last_tick_ok_at'),
     last_tick_error: text('last_tick_error'),
     last_tick_error_at: text('last_tick_error_at'),
+    phase: text('phase'),
+    tick_started_at: text('tick_started_at'),
   };
 }
 
@@ -167,9 +169,12 @@ export interface BackupPassphraseProbeDeps {
 }
 
 /**
- * Passphrase availability with a session cache: only a reachable result is
- * cached (6h) so `pnpm kyberion secret introduce ...` is seen on the next run,
- * while hourly baselines skip the keychain read once it is known good.
+ * Passphrase availability with a session cache: only a reachable result from
+ * the OS keychain / secret resolver (`source: 'secret'`) is cached (6h), so
+ * `pnpm kyberion secret introduce ...` is seen on the next run while hourly
+ * baselines skip the keychain read once it is known good. An `env` result is
+ * never cached: it reflects the shell that ran the probe, not the daemon env
+ * backup-daily runs in.
  */
 export function probeBackupPassphraseCached(
   deps: BackupPassphraseProbeDeps = {}
@@ -184,9 +189,9 @@ export function probeBackupPassphraseCached(
       return null;
     }
   })();
-  if (cached?.available) return cached;
+  if (cached?.available && cached.source === 'secret') return cached;
   const result = (deps.probe ?? (() => describeBackupPassphraseAvailability()))();
-  if (result.available && result.source) {
+  if (result.available && result.source === 'secret') {
     try {
       (
         deps.storeCached ??
