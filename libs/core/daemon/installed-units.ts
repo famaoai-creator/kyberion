@@ -118,13 +118,38 @@ function decodeXml(text: string): string {
     .replace(/&amp;/g, '&');
 }
 
+/**
+ * Single-pass tokenizer: tags and text runs, dropping the XML declaration,
+ * processing instructions, comments and DOCTYPE. Uses indexOf only, so it is
+ * linear in the input and never leaves a partial `<!--` behind.
+ */
+function tokenizePlistXml(xml: string): string[] {
+  const tokens: string[] = [];
+  let pos = 0;
+  while (pos < xml.length) {
+    const lt = xml.indexOf('<', pos);
+    if (lt === -1) {
+      tokens.push(xml.slice(pos));
+      break;
+    }
+    if (lt > pos) tokens.push(xml.slice(pos, lt));
+    if (xml.startsWith('<!--', lt)) {
+      const end = xml.indexOf('-->', lt + 4);
+      pos = end === -1 ? xml.length : end + 3;
+      continue;
+    }
+    const gt = xml.indexOf('>', lt + 1);
+    if (gt === -1) break;
+    const tag = xml.slice(lt, gt + 1);
+    if (!tag.startsWith('<?') && !tag.startsWith('<!')) tokens.push(tag);
+    pos = gt + 1;
+  }
+  return tokens;
+}
+
 export function parsePlistXml(xml: string): Record<string, PlistValue> | null {
-  const tokens = xml
-    .replace(/<\?xml[^>]*\?>/g, '')
-    .replace(/<!DOCTYPE[^>]*>/g, '')
-    .replace(/<!--[\s\S]*?-->/g, '')
-    .match(/<[^>]+>|[^<]+/g);
-  if (!tokens) return null;
+  const tokens = tokenizePlistXml(xml);
+  if (tokens.length === 0) return null;
   let index = 0;
   const next = (): string | undefined => {
     while (index < tokens.length && !tokens[index]!.startsWith('<') && !tokens[index]!.trim())
