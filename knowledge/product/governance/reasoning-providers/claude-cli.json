@@ -73,7 +73,9 @@
               "Read",
               "Glob",
               "Grep",
+              "LS",
               "WebFetch",
+              "WebSearch",
               "--disallowedTools",
               "Write",
               "Edit",
@@ -81,7 +83,7 @@
               "Bash",
               "KillShell"
             ],
-            "notes": "Read-only: only Read/Glob/Grep/WebFetch allowed, Write/Edit/NotebookEdit/Bash/KillShell explicitly denied."
+            "notes": "Read-only: only Read/Glob/Grep/LS/WebFetch/WebSearch allowed, Write/Edit/NotebookEdit/Bash/KillShell explicitly denied."
           },
           "planner": {
             "args": ["--permission-mode", "plan"],
