@@ -580,27 +580,29 @@ export async function runWatchCommand(
           )
         );
     }
-    // --index stays outside the media role: the semantic index lives on the
-    // cache floor, which perception_media_worker deliberately does not grant —
-    // it still needs the caller's own authority.
+    // --index runs under the same media role: the semantic index lives on
+    // the cache floor's perception subtree, which perception_media_worker
+    // grants bound to the scope's own tenant.
     let index: unknown;
     if (options.index && source) {
       const indexMedia =
         deps.enhancements?.index ??
         (await import('@agent/core/perception/semantic-index')).indexMedia;
-      index = await indexMedia({
-        indexId: options.index,
-        scope: source.scope,
-        modelPath: options.embeddingModel!,
-        python: options.python,
-        entries: frameFiles.map((name, i) => ({
-          id: 'frame-' + i,
-          path: absolute,
-          image_path: path.join(sampleDir, name),
-          time_sec: Math.round(i * every * 10) / 10,
-          text: frames[i]?.text || undefined,
-        })),
-      });
+      index = await withPerceptionMediaRole(inputScope, () =>
+        indexMedia({
+          indexId: options.index!,
+          scope: source.scope,
+          modelPath: options.embeddingModel!,
+          python: options.python,
+          entries: frameFiles.map((name, i) => ({
+            id: 'frame-' + i,
+            path: absolute,
+            image_path: path.join(sampleDir, name),
+            time_sec: Math.round(i * every * 10) / 10,
+            text: frames[i]?.text || undefined,
+          })),
+        })
+      );
     }
     const result: WatchResult = {
       ...(source ? { source, observations } : {}),
