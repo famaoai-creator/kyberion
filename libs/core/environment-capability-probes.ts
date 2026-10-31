@@ -9,7 +9,9 @@
  *
  *   reasoning-backend.any-real   — at least one non-stub backend usable
  *   audit-chain.integrity        — audit-chain hashes verify
- *   repo-build.receipt           — libs/core/dist/ is fresh enough
+ *   repo-build.receipt           — compiler outputs match their compiler
+ *                                  inputs (same basis as check:stale-dist /
+ *                                  the L2 baseline layer)
  *   node-version.floor           — running Node satisfies package.json engines
  *   playwright.chromium-browser  — a Playwright browser cache is present
  *   public-ingress.any-ready     — a live public-ingress provider is ready
@@ -23,17 +25,9 @@ import * as os from 'node:os';
 import { createRequire } from 'node:module';
 import * as path from 'node:path';
 import { t } from './t.js';
-import { logger } from './core.js';
 import * as pathResolver from './path-resolver.js';
 import { parseSafeJsonObjectValue, readJson, readJsonLines } from './foundation/json.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeReaddir,
-  safeStat,
-  safeExec,
-} from './secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeExec } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { isMacOS, isWindows } from './platform.js';
 import { normalizePersistedAuditEntry } from './governance/audit-chain.js';
@@ -41,6 +35,7 @@ import { normalizePersistedAuditEntry } from './governance/audit-chain.js';
 function kyberionEnv(name: string): string | undefined {
   return getRegisteredEnvText(name);
 }
+import { inspectBuildReadiness } from './build-readiness.js';
 import {
   hasEnvironmentCapabilityProbe,
   registerEnvironmentCapabilityProbe,
@@ -205,28 +200,41 @@ export function isRegularAuditChainPath(filePath: string): boolean {
   }
 }
 
-async function probeRepoBuild(): Promise<{ available: boolean; reason?: string }> {
-  const distDir = pathResolver.rootResolve('libs/core/dist');
-  if (!safeExistsSync(distDir)) {
-    return {
-      available: false,
-      reason: 'libs/core/dist missing — run `pnpm build`',
-    };
-  }
-  try {
-    const distMtime = newestOutputMtimeUnder(distDir);
-    const newestTs = newestTsMtimeUnder(pathResolver.rootResolve('libs/core'));
-    if (newestTs === null) return { available: true };
-    if (distMtime !== null && newestTs > distMtime + 5_000) {
+/**
+ * `repo-build.receipt` — judged on the same basis as `pnpm run check`'s L2
+ * layer and `check:stale-dist` (compiler input set including untracked
+ * files, emit checks, generation identity) through the build-readiness
+ * inspector the scripts layer installs. This probe only observes: it never
+ * runs a build or a clean, and `building`/`changed_during_scan`/`unknown`
+ * are reported as unsatisfied — unknown never degrades to green.
+ */
+export async function probeRepoBuild(): Promise<{ available: boolean; reason?: string }> {
+  const result = await inspectBuildReadiness();
+  const generation =
+    result.generation.provenance === 'receipt' && result.generation.receiptId
+      ? ` (generation: receipt ${result.generation.receiptId.slice(0, 12)})`
+      : result.generation.provenance === 'stamp' && result.generation.head
+        ? ` (generation: HEAD ${result.generation.head.slice(0, 12)})`
+        : result.generation.provenance === 'legacy_receipt'
+          ? ' (generation: legacy receipt — unverified)'
+          : '';
+  switch (result.state) {
+    case 'fresh':
+      return { available: true };
+    case 'missing':
+      return { available: false, reason: `repo-build missing — ${result.detail}${generation}` };
+    case 'stale':
+      return { available: false, reason: `repo-build stale — ${result.detail}${generation}` };
+    case 'building':
+      return { available: false, reason: `repo-build building — ${result.detail}` };
+    case 'changed_during_scan':
       return {
         available: false,
-        reason: `libs/core has TypeScript newer than the dist build by ${((newestTs - distMtime) / 1000).toFixed(0)}s — run \`pnpm build\``,
+        reason: `repo-build changed_during_scan — ${result.detail}`,
       };
-    }
-    return { available: true };
-  } catch (err: any) {
-    logger.warn(`[env-probes] repo-build.receipt probe error: ${err?.message ?? err}`);
-    return { available: true };
+    case 'unknown':
+    default:
+      return { available: false, reason: `repo-build unknown — ${result.detail}${generation}` };
   }
 }
 
@@ -389,69 +397,6 @@ async function probePublicIngress(): Promise<{ available: boolean; reason?: stri
 /* ------------------------------------------------------------------ *
  * Helpers                                                             *
  * ------------------------------------------------------------------ */
-
-function newestTsMtimeUnder(dir: string): number | null {
-  try {
-    if (!safeExistsSync(dir)) return null;
-    let newest = 0;
-    walk(dir);
-    return newest === 0 ? null : newest;
-
-    function walk(current: string): void {
-      const entries = listDir(current);
-      for (const name of entries) {
-        if (name === 'dist' || name === 'node_modules' || name === '.git') continue;
-        const full = path.join(current, name);
-        const stat = safeStat(full);
-        if (stat.isDirectory()) {
-          walk(full);
-        } else if (isBuildRelevantTsFile(full)) {
-          if (stat.mtimeMs > newest) newest = stat.mtimeMs;
-        }
-      }
-    }
-  } catch {
-    return null;
-  }
-}
-
-function newestOutputMtimeUnder(dir: string): number | null {
-  try {
-    if (!safeExistsSync(dir)) return null;
-    let newest = 0;
-    walk(dir);
-    return newest === 0 ? null : newest;
-
-    function walk(current: string): void {
-      const entries = listDir(current);
-      for (const name of entries) {
-        if (name === 'node_modules' || name === '.git') continue;
-        const full = path.join(current, name);
-        const stat = safeStat(full);
-        if (stat.isDirectory()) {
-          walk(full);
-        } else if (/\.(js|cjs|mjs|d\.ts|map)$/.test(full)) {
-          if (stat.mtimeMs > newest) newest = stat.mtimeMs;
-        }
-      }
-    }
-  } catch {
-    return null;
-  }
-}
-
-function isBuildRelevantTsFile(full: string): boolean {
-  if (!full.endsWith('.ts') || full.endsWith('.d.ts')) return false;
-  return !/(\.test|\.spec)\.ts$/.test(full);
-}
-
-function listDir(dir: string): string[] {
-  try {
-    return safeReaddir(dir);
-  } catch {
-    return [];
-  }
-}
 
 function binaryAvailable(command: string, args: readonly string[]): boolean {
   try {
