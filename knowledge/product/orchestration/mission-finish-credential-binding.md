@@ -45,6 +45,17 @@ binding は決して生成されない — フラグでも env でも代替で�
    approval-mediated フローは finish の binding を代替しない(人間承認は別レイヤ)。
    2 番の resolver 整備が先。
 
+## 更新 (2026-10-31, R03/R05)
+
+- `mission verify` / `distill` / `finish` と `list --check`、`calendar status`、
+  `email status` は readiness 観測として reasoning bootstrap なしで動く
+  (scripts/cli.ts `PURE_READINESS_SUBCOMMANDS` + `shouldBootstrapRuntime`)。
+  binding エラーが出るのは lifecycle 変更や live 接続を伴う実行で、これは
+  fail-closed の設計どおり。
+- まず `pnpm kyberion list --check` / `calendar status` /
+  `email status` (binding 不要の readiness) で状態を確認してから、
+  実作業は claim 済み WorkItem 経由で委任する。
+
 ## 関連コード
 
 - `libs/core/foundation/credential-binding.ts` — `getSecret` の拒否条件と `withTaskCredentialBinding`
