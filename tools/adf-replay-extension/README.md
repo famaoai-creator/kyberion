@@ -42,9 +42,10 @@ Kyberion から拡張への連絡は、拡張が Native Messaging host に問い
 
 ## ページ構造を Kyberion CLI へ渡す
 
-1. ターミナルで `pnpm kyberion browser inspect --mode extension` を実行します（保存先の区分は `--tier personal|confidential|public`、confidential は `--tenant <slug>` が必要。既定は personal、待ち時間は `--timeout` ミリ秒で最大 10 分）。
-2. Live タブで対象ページを接続し、「ページ構造を解析」→「Kyberion CLIへ送信」。
-3. 送信は native host（`submit_inspection`）経由です。ポートの設定はありません。待機中の CLI がなければ送信は拒否されます。入力欄の値は送らず、URL のクエリと fragment は落とします。
+1. ターミナルで `pnpm kyberion browser inspect --mode extension` を実行します（保存先の区分は `--tier personal|confidential|public`、confidential は `--tenant <slug>` が必要。既定は personal、待ち時間は `--timeout` ミリ秒で最大 10 分。`--origin https://example.com` を付けるとその origin 以外は受け付けません）。CLI に 6 文字の **ペアリングコード** が表示されます。
+2. Live タブで対象ページを接続し、「ページ構造を解析」を押します。
+3. 表示された入力欄にペアリングコードを入れて「Kyberion CLIへ送信」を押します。
+4. 送信は native host（`submit_inspection`）経由です。ポートの設定はありません。コードが一致する待機中の CLI にだけ届き、コードがない・一致しない場合は送信が拒否されます。入力欄の値は送らず、URL のクエリと fragment は落とします。
 
 ## 既存の導入を更新する
 

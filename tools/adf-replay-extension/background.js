@@ -58,7 +58,7 @@ function routeMessage(message, sender) {
   if (type === 'bridge:respond-request') return routeRespondRequest(message);
   if (INBOX_MESSAGE_TYPES.has(type)) return withInboxLock(() => handleInboxMessage(message));
   if (type === 'bridge:send-page') return sendPage(message.form || {});
-  if (type === 'bridge:submit-inspection') return submitInspection();
+  if (type === 'bridge:submit-inspection') return submitInspection(message.pairingCode);
   if (type === 'bridge:get-send-draft') return getSendDraft();
   if (type === 'bridge:probe-webmcp') return probeConnectedTabWebMcp();
   return withStateLock(() => handleMessage(message, sender));
@@ -2655,20 +2655,36 @@ async function sendPage(form) {
 // Page inspection → waiting `pnpm kyberion browser inspect --mode extension`.
 // Native Messaging only (spec §4.2): the connected tab is re-inspected here so
 // the Side Panel cannot supply its own data, scrubbed, then handed to the host.
-async function submitInspection() {
-  const { inspection } = await inspectCurrentPage();
-  const built = Inbox.buildSubmitInspectionPayload(inspection, scrubber());
-  if (!built.ok) throw new Error(built.errors.join(' '));
+const SUBMIT_INSPECTION_ERRORS = {
+  no_waiting_cli:
+    '待機中の Kyberion CLI がありません。先に pnpm kyberion browser inspect --mode extension を実行してください。',
+  pairing_code_required: 'CLI が表示したペアリングコードを入力してください。',
+  pairing_mismatch:
+    'ペアリングコードが待機中の CLI と一致しません。CLI に表示されたコードを確認してください。',
+  ambiguous_waiting_cli: '同じコードの CLI が複数待機しています。どちらかを再起動してください。',
+  origin_mismatch:
+    'CLI はこのページの origin を受け付けません（--origin の指定を確認してください）。',
+  audit_unavailable: '監査記録を書けなかったため、confidential の受け渡しを止めました。',
+};
+
+async function submitInspection(pairingCode) {
   const state = await loadState();
-  if (state.connected?.origin && built.payload.inspection.origin !== state.connected.origin) {
+  const connectedOrigin = state.connected?.origin;
+  if (!connectedOrigin) {
+    throw new Error('先に Live タブから現在のページを接続してください。');
+  }
+  const { inspection } = await inspectCurrentPage();
+  const built = Inbox.buildSubmitInspectionPayload(inspection, scrubber(), pairingCode);
+  if (!built.ok) throw new Error(built.errors.join(' '));
+  if (built.payload.inspection.origin !== connectedOrigin) {
     throw new Error('解析したページが接続中のタブの origin と一致しません。');
   }
   const response = await callNativeHost(built.payload);
   if (!response?.ok) {
     throw new Error(
-      response?.code === 'no_waiting_cli'
-        ? '待機中の Kyberion CLI がありません。先に pnpm kyberion browser inspect --mode extension を実行してください。'
-        : response?.error || 'Kyberion CLI への送信に失敗しました。'
+      SUBMIT_INSPECTION_ERRORS[response?.code] ||
+        response?.error ||
+        'Kyberion CLI への送信に失敗しました。'
     );
   }
   return {
