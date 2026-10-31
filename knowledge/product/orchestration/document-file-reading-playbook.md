@@ -57,6 +57,15 @@ the ingest ceremony is the only sanctioned way into
   `tier: 'confidential'` or `tier: 'personal'` and retain the OCR result in that tier.
   Remote OCR requires an explicit `training_use` (`zero_retention` or
   `training_eligible`), a tenant slug, and normal tenant egress approval.
+- PDFs whose text layer cannot be mapped to Unicode (subset CID fonts without
+  `/ToUnicode` — typical of Quartz/macOS "Print → PDF" CJK documents) are first
+  decoded deterministically: the descendant font's CIDSystemInfo ordering
+  resolves a vendored Adobe ROS→UCS2 CMap (`libs/core/media/native-pdf-engine/cmaps/`;
+  Japan1, GB1 简体, CNS1 繁體, Korea1 한국어 ship today — drop another
+  `Adobe-<Ordering>-UCS2` file in to extend). Only when no map exists does
+  `read --ocr` recover the pages by rasterizing via `pdftoppm` and OCR-ing the
+  rendered pages; without `--ocr` a warning names the affected pages.
+  `media:pdf_extract` does not page-OCR.
 - Scanned PDFs (one full-page image per page): `media:pdf_to_pptx_design` with
   `hints.features.fullPageImageOcrOverlay: true`. This overlay does **not** fire for
   partial-page images; use `ocr: true` above for those.
