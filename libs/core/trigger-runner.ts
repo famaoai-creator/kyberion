@@ -488,6 +488,8 @@ function shouldAttemptCompaction(storePath: string, sizeBytes: number, now: Date
   const last = windowFullAttempts.get(storePath);
   if (!last) return true;
   return (
+    // Shrank since the last attempt (e.g. an operator rotation in another process).
+    sizeBytes < last.sizeBytes ||
     sizeBytes >= last.sizeBytes + TRIGGER_STORE_WINDOW_FULL_REGROWTH_BYTES ||
     now.getTime() - last.atMs >= TRIGGER_STORE_WINDOW_FULL_RETRY_MS
   );
@@ -662,6 +664,10 @@ export interface TriggerStoreRotationPlan {
   keep_stable: number;
   kept: { in_flight: number; stable: number; recent_cron: number };
   dropped_keys: number;
+  /** Stable keys younger than the 7-day dedupe window that the rotation drops (may re-deliver once). */
+  dropped_stable_in_window: number;
+  /** Up to 5 key prefixes (text before the first ':') of those keys, most frequent first. */
+  dropped_stable_in_window_prefixes: Array<{ prefix: string; count: number }>;
   kept_bytes: number;
 }
 
@@ -699,6 +705,18 @@ function selectRotationKeep(
     .slice(0, keepStable);
   const keep = new Set<TriggerRecord>([...inFlight, ...recentCron, ...stable]);
   const lines = all.filter((r) => keep.has(r)).map((r) => JSON.stringify(r));
+  const droppedInWindow = finished.filter(
+    (r) => !isMinuteScoped(r) && !keep.has(r) && recordTimeMs(r) >= cutoff
+  );
+  const prefixCounts = new Map<string, number>();
+  for (const record of droppedInWindow) {
+    const prefix = record.idempotencyKey.split(':')[0] || record.idempotencyKey;
+    prefixCounts.set(prefix, (prefixCounts.get(prefix) ?? 0) + 1);
+  }
+  const prefixes = [...prefixCounts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([prefix, count]) => ({ prefix, count }));
   return {
     plan: {
       store_path: path.relative(pathResolver.rootDir(), storePath).split(path.sep).join('/'),
@@ -708,6 +726,8 @@ function selectRotationKeep(
       keep_stable: keepStable,
       kept: { in_flight: inFlight.length, stable: stable.length, recent_cron: recentCron.length },
       dropped_keys: all.length - keep.size,
+      dropped_stable_in_window: droppedInWindow.length,
+      dropped_stable_in_window_prefixes: prefixes,
       kept_bytes: lines.reduce((sum, line) => sum + Buffer.byteLength(line, 'utf8') + 1, 0),
     },
     lines,
