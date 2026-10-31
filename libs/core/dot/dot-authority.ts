@@ -6,6 +6,8 @@ export function assertDotAccountabilityCharter(
   dot: DotCharter,
   deps: { rootDir?: string; now?: () => Date } = {}
 ): void {
+  if (dot.authority.authority_role === 'dot_result_writer')
+    throw new Error('dot_result_writer is an internal store role, never a DOT execution role');
   const ref = dot.authority.accountability_charter_ref;
   if (ref === undefined) return;
   if (!ref || !dot.scope.tenant_slug)

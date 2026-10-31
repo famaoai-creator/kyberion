@@ -42,7 +42,7 @@ export function currentMemoryProvenanceReadCapability(): Readonly<Binding> | und
 }
 export function memoryProvenanceReadAllowed(
   target: string,
-  operation: 'read' | 'metadata' | 'write' | 'mkdir'
+  operation: 'read' | 'metadata' | 'write' | 'append' | 'mkdir'
 ): boolean {
   const file = reads.getStore()?.file;
   return (

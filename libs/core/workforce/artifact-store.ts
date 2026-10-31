@@ -8,8 +8,10 @@ export {
   readGovernedArtifactJson,
 } from './artifact-store-reader.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
-import { isRecord, sanitizeIdSegment } from '../foundation/text.js';
+import { isRecord, sanitizeIdSegment, readTextFile } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
+import { createHash } from 'node:crypto';
+import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
@@ -587,6 +589,13 @@ export function scopedArtifactDir(
 }
 
 export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScopedArtifactResult {
+  return writeScopedArtifactInternal(input);
+}
+
+function writeScopedArtifactInternal(
+  input: WriteScopedArtifactInput,
+  writtenAt = nowIso()
+): WriteScopedArtifactResult {
   if (!RETENTION_ARTIFACT_CLASSES.includes(input.artifact_class)) {
     throw new Error(
       `writeScopedArtifact: invalid artifact_class ${JSON.stringify(input.artifact_class)} ` +
@@ -641,7 +650,7 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
     path: repoRelative,
     scope: { ...input.scope },
     scope_kind: kind,
-    written_at: nowIso(),
+    written_at: writtenAt,
   };
   const catalog = scopedArtifactIndexCatalog(indexPath);
   const validatedEntry = catalog.validate(entry, indexPath);
@@ -666,6 +675,521 @@ export function writeScopedArtifact(input: WriteScopedArtifactInput): WriteScope
     scope_kind: kind,
     ...(artifactId ? { artifact_id: artifactId } : {}),
   };
+}
+
+const MAX_SCOPED_ARTIFACT_ATTEMPTS = 128;
+const MAX_ATTEMPT_CONTENT_BYTES = 1024 * 1024;
+const ATTEMPT_FILE = /^attempt-(\d{6})\.json$/u;
+const ATTEMPT_SCOPE_KEYS = [
+  'system',
+  'tenant',
+  'organization',
+  'project',
+  'mission',
+  'task',
+  'session',
+] as const;
+
+export interface ScopedArtifactAttemptAddress {
+  scope: ScopedArtifactScope;
+  tier?: 'personal' | 'confidential' | 'public';
+  artifact_class: RetentionArtifactClass;
+  /** One server-owned safe segment, never a model-supplied path. */
+  namespace: string;
+  parent_key: string;
+  effect_key: string;
+}
+export interface ScopedArtifactAttemptMetadata extends ScopedArtifactAttemptAddress {
+  tier: 'personal' | 'confidential' | 'public';
+  schema_version: 1;
+  attempt: number;
+  created_at: string;
+  expires_at: string;
+}
+export interface ScopedArtifactAttemptEnvelope<T> extends ScopedArtifactAttemptMetadata {
+  content_hash: string;
+  content: T;
+}
+export interface ScopedArtifactAttemptResult<T> {
+  attempt: number;
+  envelope: ScopedArtifactAttemptEnvelope<T>;
+  artifact: WriteScopedArtifactResult;
+  adopted_existing: boolean;
+}
+export interface ReadScopedArtifactAttemptInput<T> extends ScopedArtifactAttemptAddress {
+  /** Omit to read the highest allocated ordinal; reading never repairs an orphan. */
+  attempt?: number;
+  /** Check historical integrity, including metadata, without rejecting only because it expired. */
+  validateContent(content: unknown, metadata: ScopedArtifactAttemptMetadata): T;
+}
+export interface WriteScopedArtifactAttemptInput<T> extends Omit<
+  ReadScopedArtifactAttemptInput<T>,
+  'attempt'
+> {
+  content: T;
+  created_at: string;
+  expires_at: string;
+  now(): number;
+}
+
+/** JSON.stringify must not invoke code or discard properties before integrity hashing. */
+function assertAttemptJson(value: unknown, ancestors = new Set<object>(), depth = 0): void {
+  if (depth > 32) throw new Error('artifact attempt JSON nesting exceeds its bound');
+  if (value === null || typeof value === 'string' || typeof value === 'boolean') return;
+  if (typeof value === 'number' && Number.isFinite(value)) return;
+  if (!value || typeof value !== 'object' || ancestors.has(value))
+    throw new Error('artifact attempt requires finite acyclic JSON');
+  const array = Array.isArray(value);
+  if (Object.getPrototypeOf(value) !== (array ? Array.prototype : Object.prototype))
+    throw new Error('artifact attempt requires plain JSON');
+  const keys = Reflect.ownKeys(value);
+  if (keys.length > 100_000 || (array && value.length > 100_000))
+    throw new Error('artifact attempt JSON collection exceeds its bound');
+  ancestors.add(value);
+  for (const key of keys) {
+    if (typeof key !== 'string' || ['__proto__', 'constructor', 'prototype'].includes(key))
+      throw new Error('artifact attempt has a dangerous JSON key');
+    const descriptor = Object.getOwnPropertyDescriptor(value, key);
+    if (!descriptor || !('value' in descriptor))
+      throw new Error('artifact attempt requires JSON data properties');
+    if (array && key === 'length') continue;
+    const index = Number(key);
+    if (
+      !descriptor.enumerable ||
+      (array &&
+        (!Number.isInteger(index) || index < 0 || index >= value.length || String(index) !== key))
+    )
+      throw new Error('artifact attempt contains a lossy JSON property');
+    assertAttemptJson(descriptor.value, ancestors, depth + 1);
+  }
+  if (array && keys.length !== value.length + 1)
+    throw new Error('artifact attempt requires dense JSON arrays');
+  ancestors.delete(value);
+}
+function attemptContentBytes(value: unknown): string {
+  assertAttemptJson(value);
+  const bytes = JSON.stringify(value);
+  if (Buffer.byteLength(bytes, 'utf8') > MAX_ATTEMPT_CONTENT_BYTES)
+    throw new Error('artifact attempt content exceeds its byte bound');
+  return bytes;
+}
+const attemptHash = (bytes: string): string =>
+  createHash('sha256').update(bytes, 'utf8').digest('hex');
+function attemptTime(value: unknown): number {
+  if (typeof value !== 'string') throw new Error('invalid artifact attempt timestamp');
+  const time = Date.parse(value);
+  if (!Number.isFinite(time) || new Date(time).toISOString() !== value)
+    throw new Error('artifact attempt requires canonical ISO timestamps');
+  return time;
+}
+
+function attemptContext(input: ScopedArtifactAttemptAddress) {
+  if (
+    !/^[a-z][a-z0-9-]{0,63}$/u.test(input.namespace) ||
+    !/^[a-f0-9]{64}$/u.test(input.parent_key) ||
+    !/^[a-f0-9]{64}$/u.test(input.effect_key)
+  )
+    throw new Error('invalid artifact attempt address');
+  if (!RETENTION_ARTIFACT_CLASSES.includes(input.artifact_class))
+    throw new Error('invalid artifact attempt class');
+  assertAttemptJson(input.scope);
+  if (
+    Object.keys(input.scope).some((key) => !(ATTEMPT_SCOPE_KEYS as readonly string[]).includes(key))
+  )
+    throw new Error('invalid artifact attempt scope');
+  const scope = Object.fromEntries(
+    ATTEMPT_SCOPE_KEYS.filter((key) => input.scope[key] !== undefined).map((key) => [
+      key,
+      input.scope[key],
+    ])
+  ) as ScopedArtifactScope;
+  const root = resolveScopeArtifactsRoot(scope, input.tier);
+  const base = kindArtifactDir(root.artifactsRoot, root.kind, scope, input.artifact_class);
+  const dir = path.join(base, input.namespace, input.parent_key);
+  const indexPath = path.join(root.artifactsRoot, SCOPED_ARTIFACT_INDEX_FILENAME);
+  // The boundary walks every ancestor, rejecting links and ENOTDIR. Metadata
+  // authorization applies only to the owned leaf, never tenantless tier parents.
+  assertSafeRepositoryPath(dir, { allowMissingLeaf: true });
+  try {
+    if (!safeLstat(dir).isDirectory())
+      throw new Error('artifact attempt directory must be regular');
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+  }
+  ensureRegularScopedArtifactIndex(indexPath);
+  return { root, scope, dir, indexPath, prefix: `${input.namespace}/${input.parent_key}/` };
+}
+function kindArtifactDir(
+  root: string,
+  kind: ScopedArtifactScopeKind,
+  scope: ScopedArtifactScope,
+  artifactClass: RetentionArtifactClass
+): string {
+  return kind === 'task'
+    ? path.join(root, artifactClass, scopedTaskArtifactDirName(scope.task as string))
+    : path.join(root, artifactClass);
+}
+type AttemptContext = ReturnType<typeof attemptContext>;
+function attemptArtifact(context: AttemptContext, ordinal: number): WriteScopedArtifactResult {
+  const absolute = assertSafeRepositoryPath(
+    path.join(context.dir, `attempt-${String(ordinal).padStart(6, '0')}.json`),
+    { allowMissingLeaf: true }
+  );
+  const relative = pathResolver.toRepoRelative(absolute).split(path.sep).join('/');
+  if (!isScopedArtifactPath(relative)) throw new Error('artifact attempt escaped its scoped root');
+  return {
+    absolute_path: absolute,
+    repo_relative_path: relative,
+    index_path: context.indexPath,
+    scope_kind: context.root.kind,
+  };
+}
+function ordinalFromName(name: string): number {
+  const match = ATTEMPT_FILE.exec(name);
+  const ordinal = match ? Number(match[1]) : 0;
+  if (ordinal < 1 || ordinal > MAX_SCOPED_ARTIFACT_ATTEMPTS)
+    throw new Error('invalid artifact attempt ordinal');
+  return ordinal;
+}
+function attemptIndexEntry(
+  context: AttemptContext,
+  envelope: ScopedArtifactAttemptMetadata
+): ScopedArtifactIndexEntry {
+  return scopedArtifactIndexCatalog(context.indexPath).validate(
+    {
+      name: context.prefix + `attempt-${String(envelope.attempt).padStart(6, '0')}.json`,
+      artifact_class: envelope.artifact_class,
+      path: attemptArtifact(context, envelope.attempt).repo_relative_path,
+      scope: context.scope,
+      scope_kind: context.root.kind,
+      written_at: envelope.created_at,
+    },
+    context.indexPath
+  );
+}
+function checkedAttemptContent<T>(
+  content: unknown,
+  metadata: ScopedArtifactAttemptMetadata,
+  validate: ReadScopedArtifactAttemptInput<T>['validateContent']
+): T {
+  const bytes = attemptContentBytes(content);
+  const detached = parseSafeJsonInput(bytes, 'artifact attempt content');
+  const result = validate(detached, structuredClone(metadata));
+  if (attemptContentBytes(detached) !== bytes || attemptContentBytes(result) !== bytes)
+    throw new Error('artifact attempt validator mutated or transformed content');
+  return parseSafeJsonInput(bytes, 'artifact attempt content') as T;
+}
+function loadAttempt<T>(
+  input: ReadScopedArtifactAttemptInput<T>,
+  context: AttemptContext,
+  ordinal: number
+): ScopedArtifactAttemptEnvelope<T> {
+  const artifact = attemptArtifact(context, ordinal);
+  if (!safeLstat(artifact.absolute_path).isFile())
+    throw new Error('artifact attempt must be a regular file');
+  const raw = readTextFile(artifact.absolute_path);
+  if (Buffer.byteLength(raw, 'utf8') > MAX_ATTEMPT_CONTENT_BYTES + 16_384)
+    throw new Error('artifact attempt envelope exceeds its byte bound');
+  const value = parseSafeJsonInput(raw, 'artifact attempt envelope');
+  if (
+    !isRecord(value) ||
+    Object.keys(value).sort().join(',') !==
+      [
+        'schema_version',
+        'scope',
+        'tier',
+        'artifact_class',
+        'namespace',
+        'parent_key',
+        'effect_key',
+        'attempt',
+        'created_at',
+        'expires_at',
+        'content_hash',
+        'content',
+      ]
+        .sort()
+        .join(',')
+  )
+    throw new Error('invalid artifact attempt envelope');
+  const metadata: ScopedArtifactAttemptMetadata = {
+    schema_version: 1,
+    scope: context.scope,
+    tier: context.root.tier,
+    artifact_class: input.artifact_class,
+    namespace: input.namespace,
+    parent_key: input.parent_key,
+    effect_key: input.effect_key,
+    attempt: ordinal,
+    created_at: value.created_at as string,
+    expires_at: value.expires_at as string,
+  };
+  for (const [key, expected] of Object.entries(metadata)) {
+    if (key === 'scope') {
+      const savedScope = value.scope;
+      assertAttemptJson(savedScope);
+      if (
+        !isRecord(savedScope) ||
+        Object.keys(savedScope).length !== Object.keys(context.scope).length ||
+        Object.entries(context.scope).some(([field, entry]) => savedScope[field] !== entry)
+      )
+        throw new Error('artifact attempt scope mismatch');
+    } else if (value[key] !== expected) throw new Error('artifact attempt identity mismatch');
+  }
+  if (attemptTime(metadata.expires_at) <= attemptTime(metadata.created_at))
+    throw new Error('invalid artifact attempt lifetime');
+  if (value.content_hash !== attemptHash(attemptContentBytes(value.content)))
+    throw new Error('artifact attempt content hash mismatch');
+  return {
+    ...metadata,
+    content_hash: value.content_hash as string,
+    content: checkedAttemptContent(value.content, metadata, input.validateContent),
+  };
+}
+function scanAttempts<T>(input: ReadScopedArtifactAttemptInput<T>, context: AttemptContext) {
+  const index = readScopedArtifactIndex(context.scope, context.root.tier);
+  let highWater = 0;
+  const scopedPrefix = pathResolver.toRepoRelative(context.dir).split(path.sep).join('/') + '/';
+  const matching = index.filter(
+    (entry) =>
+      (entry.artifact_class === input.artifact_class && entry.name.startsWith(context.prefix)) ||
+      entry.path.startsWith(scopedPrefix)
+  );
+  for (const entry of matching) {
+    const ordinal = ordinalFromName(entry.name.slice(context.prefix.length));
+    const expected = attemptArtifact(context, ordinal);
+    if (
+      entry.artifact_class !== input.artifact_class ||
+      entry.path !== expected.repo_relative_path ||
+      entry.scope_kind !== context.root.kind ||
+      Object.keys(entry.scope).length !== Object.keys(context.scope).length ||
+      Object.entries(context.scope).some(
+        ([key, value]) => (entry.scope as Record<string, unknown>)[key] !== value
+      )
+    )
+      throw new Error('artifact attempt index scope or path mismatch');
+    highWater = Math.max(highWater, ordinal);
+  }
+  const envelopes = new Map<number, ScopedArtifactAttemptEnvelope<T>>();
+  if (safeExistsSync(context.dir)) {
+    const files = safeReaddir(context.dir);
+    if (files.length > MAX_SCOPED_ARTIFACT_ATTEMPTS * 3)
+      throw new Error('artifact attempt directory exceeds its bound');
+    for (const file of files) {
+      // Secure atomic publication may leave temporary siblings; they are never attempt slots.
+      if (/^attempt-\d{6}\.json\.tmp\.[a-z0-9]+\.[a-z0-9]*$/u.test(file)) continue;
+      const ordinal = ordinalFromName(file);
+      envelopes.set(ordinal, loadAttempt(input, context, ordinal));
+      highWater = Math.max(highWater, ordinal);
+    }
+  }
+  return { index, highWater, envelopes };
+}
+function ensureAttemptRegistration<T>(
+  context: AttemptContext,
+  envelope: ScopedArtifactAttemptEnvelope<T>,
+  index: ScopedArtifactIndexEntry[],
+  repair: boolean
+): void {
+  const expected = attemptIndexEntry(context, envelope);
+  const samePath = index.filter((entry) => entry.path === expected.path);
+  if (samePath.some((entry) => !sameAttemptIndexEntry(entry, expected)))
+    throw new Error('artifact attempt has conflicting index registration');
+  if (samePath.length) return;
+  if (!repair) throw new Error('artifact attempt is not registered');
+  appendJsonLine(context.indexPath, expected);
+  const proof = readScopedArtifactIndex(context.scope, context.root.tier).filter(
+    (entry) => entry.path === expected.path
+  );
+  if (!proof.length || proof.some((entry) => !sameAttemptIndexEntry(entry, expected)))
+    throw new Error('artifact attempt registration could not be verified');
+}
+
+function sameAttemptIndexEntry(
+  left: ScopedArtifactIndexEntry,
+  right: ScopedArtifactIndexEntry
+): boolean {
+  return (
+    left.name === right.name &&
+    left.artifact_class === right.artifact_class &&
+    left.path === right.path &&
+    left.scope_kind === right.scope_kind &&
+    left.written_at === right.written_at &&
+    Object.keys(left.scope).length === Object.keys(right.scope).length &&
+    ATTEMPT_SCOPE_KEYS.every((key) => left.scope[key] === right.scope[key])
+  );
+}
+
+/** Read-only access by scoped identity and ordinal; no caller-provided path or role. */
+export function readScopedArtifactAttempt<T>(
+  input: ReadScopedArtifactAttemptInput<T>
+): ScopedArtifactAttemptResult<T> | null {
+  if (
+    Object.keys(input).some(
+      (key) =>
+        ![
+          'scope',
+          'tier',
+          'artifact_class',
+          'namespace',
+          'parent_key',
+          'effect_key',
+          'attempt',
+          'validateContent',
+        ].includes(key)
+    )
+  )
+    throw new Error('unsupported artifact attempt read option');
+  if (
+    input.attempt !== undefined &&
+    (!Number.isInteger(input.attempt) ||
+      input.attempt < 1 ||
+      input.attempt > MAX_SCOPED_ARTIFACT_ATTEMPTS)
+  )
+    throw new Error('invalid artifact attempt ordinal');
+  const context = attemptContext(input);
+  const scanned = scanAttempts(input, context);
+  if (scanned.highWater > 0 && !scanned.envelopes.has(scanned.highWater))
+    throw new Error(
+      'artifact attempt latest indexed payload is missing; history recovery is required'
+    );
+  const ordinal = input.attempt ?? scanned.highWater;
+  const envelope = scanned.envelopes.get(ordinal);
+  if (!envelope) return null;
+  ensureAttemptRegistration(context, envelope, scanned.index, false);
+  return {
+    attempt: ordinal,
+    envelope,
+    artifact: attemptArtifact(context, ordinal),
+    adopted_existing: true,
+  };
+}
+
+/**
+ * Create-only version allocation using existing artifact files/index, without a second store or
+ * lock. Concurrent creators converge at the atomic slot; valid winners are never overwritten.
+ * Registration-only orphan repair may append byte-identical rows; readers treat them as one ref.
+ */
+export function writeScopedArtifactAttempt<T>(
+  input: WriteScopedArtifactAttemptInput<T>
+): ScopedArtifactAttemptResult<T> {
+  if (
+    Object.keys(input).some(
+      (key) =>
+        ![
+          'scope',
+          'tier',
+          'artifact_class',
+          'namespace',
+          'parent_key',
+          'effect_key',
+          'content',
+          'created_at',
+          'expires_at',
+          'now',
+          'validateContent',
+        ].includes(key)
+    )
+  )
+    throw new Error('unsupported artifact attempt write option');
+  const context = attemptContext(input);
+  const now = (): number => {
+    const time = input.now();
+    if (!Number.isFinite(time) || !Number.isFinite(new Date(time).getTime()))
+      throw new Error('invalid artifact attempt clock');
+    return time;
+  };
+  for (let collision = 0; collision < MAX_SCOPED_ARTIFACT_ATTEMPTS; collision++) {
+    const scanned = scanAttempts(input, context);
+    if (scanned.highWater > 0 && !scanned.envelopes.has(scanned.highWater))
+      throw new Error(
+        'artifact attempt latest indexed payload is missing; history recovery is required'
+      );
+    for (const envelope of scanned.envelopes.values())
+      ensureAttemptRegistration(context, envelope, scanned.index, true);
+    const latest = scanned.envelopes.get(scanned.highWater);
+    const sampledNow = now();
+    if (latest && Date.parse(latest.created_at) > sampledNow)
+      throw new Error('artifact attempt clock regressed before the current attempt');
+    if (latest && sampledNow < Date.parse(latest.expires_at)) {
+      return {
+        attempt: latest.attempt,
+        envelope: latest,
+        artifact: attemptArtifact(context, latest.attempt),
+        adopted_existing: true,
+      };
+    }
+    if (scanned.highWater >= MAX_SCOPED_ARTIFACT_ATTEMPTS)
+      throw new Error('artifact attempt ordinal budget exhausted');
+    const ordinal = scanned.highWater + 1;
+    const metadata: ScopedArtifactAttemptMetadata = {
+      schema_version: 1,
+      scope: context.scope,
+      tier: context.root.tier,
+      artifact_class: input.artifact_class,
+      namespace: input.namespace,
+      parent_key: input.parent_key,
+      effect_key: input.effect_key,
+      attempt: ordinal,
+      created_at: input.created_at,
+      expires_at: input.expires_at,
+    };
+    const created = attemptTime(input.created_at),
+      expires = attemptTime(input.expires_at);
+    const candidateNow = now();
+    if (created > candidateNow || expires <= candidateNow || expires <= created)
+      throw new Error('artifact attempt candidate is not currently valid');
+    const content = checkedAttemptContent(input.content, metadata, input.validateContent);
+    const envelope: ScopedArtifactAttemptEnvelope<T> = {
+      ...metadata,
+      content_hash: attemptHash(attemptContentBytes(content)),
+      content,
+    };
+    const publicationNow = now();
+    if (created > publicationNow)
+      throw new Error('artifact attempt clock regressed before publication');
+    if (publicationNow >= expires)
+      throw new Error('artifact attempt candidate expired before publication');
+    try {
+      const artifact = writeScopedArtifactInternal(
+        {
+          scope: context.scope,
+          tier: context.root.tier,
+          artifact_class: input.artifact_class,
+          name: context.prefix + `attempt-${String(ordinal).padStart(6, '0')}.json`,
+          content: envelope,
+          format: 'json',
+          create_only: true,
+        },
+        metadata.created_at
+      );
+      if (artifact.repo_relative_path !== attemptArtifact(context, ordinal).repo_relative_path)
+        throw new Error('artifact attempt owner changed during publication');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error;
+      // Re-read the occupied slot, including its integrity and fresh expiration, on the next pass.
+      continue;
+    }
+    const readback = loadAttempt(input, context, ordinal);
+    ensureAttemptRegistration(
+      context,
+      readback,
+      readScopedArtifactIndex(context.scope, context.root.tier),
+      false
+    );
+    const adoptionNow = now();
+    if (Date.parse(readback.created_at) > adoptionNow)
+      throw new Error('artifact attempt clock regressed before adoption');
+    if (adoptionNow >= Date.parse(readback.expires_at))
+      throw new Error('artifact attempt expired before adoption');
+    return {
+      attempt: ordinal,
+      envelope: readback,
+      artifact: attemptArtifact(context, ordinal),
+      adopted_existing: false,
+    };
+  }
+  throw new Error('artifact attempt collision budget exhausted');
 }
 
 /**

@@ -13,6 +13,10 @@ import {
 import { loadApprovalRequest } from '../governance/approval-store.js';
 import { approvalUsabilityRefusal } from '../governance/approval-linked-usability.js';
 import { isOperationsHalted } from '../governance/operations-halt.js';
+import {
+  requireCurrentDotJudgmentApproval,
+  recordDeferredDotJudgmentApprovalFeedback,
+} from './dot-judgment-approval.js';
 const DECISION_RANK = { auto: 0, notify: 1, approve: 2 };
 export interface AdmissionRecoveryPorts {
   find: (ref: string) => WorkItem | undefined;
@@ -42,6 +46,11 @@ export function reconcileAdmittedDotAction(
       recoveryEvidenceHash(identity.proposal) !== identity.semantic_hash
     )
       return latest;
+    try {
+      requireCurrentDotJudgmentApproval(charter, latest, deps);
+    } catch {
+      return latest;
+    }
     const existing = ports.find(latest.action_ref);
     if (!existing) {
       const scope = ports.scope(identity.proposal);
@@ -69,6 +78,8 @@ export function reconcileAdmittedDotAction(
           return latest;
       } else if (!['none', 'fyi'].includes(resolveInterventionLevel(gate))) return latest;
     }
-    return ports.execute(latest);
+    const result = ports.execute(latest);
+    recordDeferredDotJudgmentApprovalFeedback(charter, latest, result, deps);
+    return result;
   });
 }

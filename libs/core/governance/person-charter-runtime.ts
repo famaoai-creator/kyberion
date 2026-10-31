@@ -50,11 +50,11 @@ export function withPersonCharterStoreAccess<T>(
 }
 export function personCharterResourceAccessAllowed(
   target: string,
-  operation: 'read' | 'write' | 'mkdir' | 'metadata'
+  operation: 'read' | 'write' | 'append' | 'mkdir' | 'metadata'
 ): boolean {
   const scope = resources.getStore();
   if (!bindings.getStore() || !scope) return false;
-  return operation === 'write'
+  return operation === 'write' || operation === 'append'
     ? scope.write.includes(target)
     : operation === 'mkdir'
       ? scope.mkdir.includes(target)

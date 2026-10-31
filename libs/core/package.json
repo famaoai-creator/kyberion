@@ -1496,6 +1496,10 @@
       "types": "./dist/dot/dot-proposals.d.ts",
       "default": "./dist/dot/dot-proposals.js"
     },
+    "./dot/dot-result-records": {
+      "types": "./dist/dot/dot-result-records.d.ts",
+      "default": "./dist/dot/dot-result-records.js"
+    },
     "./dot/dot-runtime": {
       "types": "./dist/dot/dot-runtime.d.ts",
       "default": "./dist/dot/dot-runtime.js"

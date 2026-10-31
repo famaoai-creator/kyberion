@@ -669,14 +669,14 @@ export function safeAppendFileSync(
   data: string | Buffer,
   options: any = 'utf8'
 ): void {
-  const { resolved, canonical } = guardWritePath(filePath);
+  const { resolved, canonical } = guardWritePath(filePath, 'follow', 'append');
   const opts = typeof options === 'string' ? { encoding: options } : options || {};
   if (opts.flag !== undefined && !['a', 'a+', 'ax', 'ax+'].includes(opts.flag)) {
     throw new Error(`[SECURITY] safeAppendFileSync only appends (flag '${String(opts.flag)}')`);
   }
   // Appends modify the existing inode: refuse a foreign hard link (on the fd).
   const flag = opts.flag ?? 'a';
-  const fd = openInPlace(resolved, filePath, flag, 'write', opts.mode, false, canonical);
+  const fd = openInPlace(resolved, filePath, flag, 'append', opts.mode, false, canonical);
   try {
     fs.appendFileSync(fd, data, { encoding: opts.encoding });
   } finally {

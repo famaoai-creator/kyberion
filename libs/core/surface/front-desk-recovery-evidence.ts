@@ -2,6 +2,7 @@ import { withLockSync } from '../foundation/lock-utils.js';
 import { stateFile, workResultLock } from '../dot/dot-executor-reports.js';
 /** Shared strict retained-output proof. Read-only and fail-closed, including missing ledgers. */
 import { readJsonLines } from '../foundation/json.js';
+import { projectDotResultRecords, dotResultScopeSchema } from '../dot/dot-result-records.js';
 import { assertSafeRepositoryPath, safeLstat } from '../secure-io.js';
 import { physicalScopedPath } from '../physical-namespace.js';
 import type { DotCharter } from '../dot/dot-charter.js';
@@ -47,7 +48,11 @@ export function assertFrontDeskRecoveryOutputsAbsent(
       binding.work_item_id + '.json'
     )
   );
-  for (const row of readJsonLines<DotWorkResultRow>(file)) {
+  const rows = projectDotResultRecords(
+    readJsonLines<unknown>(file),
+    charter.scope.tier === 'confidential' ? dotResultScopeSchema.parse(charter.scope) : undefined
+  ) as DotWorkResultRow[];
+  for (const row of rows) {
     if (
       !row ||
       typeof row !== 'object' ||
