@@ -140,7 +140,21 @@ export interface OperatorHomeSummary {
      * "actually moving" number (long-lived active states accumulate). */
     recentlyActiveMissions: number;
     blockedMissions: number;
+    /**
+     * Visible pending total: every pending approval this reader may see in
+     * scope — the same denominator `pnpm kyberion approvals` reports. Never
+     * a slice of the displayed list.
+     */
     pendingApprovals: number;
+    /** Actionable subset actually rendered (top `limit` of the visible total). */
+    pendingApprovalsShown: number;
+    /**
+     * Other approval kinds pending in the same visible store that the home
+     * summary cannot attribute to a scope (e.g. an unresolvable
+     * scoped-learning request). Emitted only for an unscoped operator view:
+     * under a scope filter the count could name hidden, out-of-scope work.
+     */
+    pendingApprovalsOther?: number;
     clarificationQuestions: number;
     unreadInbox: number;
     totalInbox: number;
@@ -667,9 +681,20 @@ export function collectOperatorHomeSummary(
   const blockedMissions = missionItems.filter(
     (item) => item.status === 'paused' || item.status === 'failed'
   );
-  const pendingApprovals = listApprovalRequests({ status: 'pending' })
-    .filter(approvalMatchesScope)
-    .slice(0, input.limit || 8);
+  // One snapshot per render (R13): the store is read once, then bucketed —
+  // 'visible pending total' (the same denominator `pnpm kyberion approvals`
+  // reports) vs the 'actionable' top-N actually displayed vs 'other kinds'
+  // the summary cannot attribute. Two different buckets never share a label,
+  // and the same bucket never shows two different counts on one screen.
+  const pendingApprovalSnapshot = listApprovalRequests({ status: 'pending' });
+  const visiblePendingApprovals = pendingApprovalSnapshot.filter(approvalMatchesScope);
+  const pendingApprovals = visiblePendingApprovals.slice(0, input.limit || 8);
+  // 'Other kinds': only nameable without leaking hidden work — an unscoped
+  // view excludes exactly the pending requests whose scope cannot be
+  // resolved (e.g. a scoped-learning approval without a live candidate).
+  const pendingApprovalsOther = isScoped
+    ? undefined
+    : pendingApprovalSnapshot.length - visiblePendingApprovals.length;
   const inboxEntries = listInboxEntries({ limit: isScoped ? 10000 : input.limit || 8 })
     .filter(inboxMatchesScope)
     .slice(0, input.limit || 8);
@@ -688,7 +713,7 @@ export function collectOperatorHomeSummary(
   const status =
     blockedMissions.length > 0
       ? 'blocked'
-      : pendingApprovals.length > 0 || unreadInbox > 0 || pendingQualityDecisions > 0
+      : visiblePendingApprovals.length > 0 || unreadInbox > 0 || pendingQualityDecisions > 0
         ? 'attention'
         : 'ready';
   const statusLabel = t(`operator_home:status.${status}`);
@@ -697,7 +722,7 @@ export function collectOperatorHomeSummary(
       ? t('operator_home:status_detail.blocked', { count: blockedMissions.length })
       : status === 'attention'
         ? t('operator_home:status_detail.attention', {
-            approvals: pendingApprovals.length,
+            approvals: visiblePendingApprovals.length,
             inbox: unreadInbox,
             quality: pendingQualityDecisions,
           })
@@ -712,12 +737,12 @@ export function collectOperatorHomeSummary(
           next_action_type: 'inspect_artifact',
           suggested_command: 'pnpm mission list --active',
         })
-      : pendingApprovals.length > 0
+      : visiblePendingApprovals.length > 0
         ? buildNextAction({
             title: t('operator_home:next_action.review_approvals'),
             next_action_key: 'operator_home:next_action.review_approvals',
             reason: t('operator_home:next_action_reason.approvals', {
-              count: pendingApprovals.length,
+              count: visiblePendingApprovals.length,
             }),
             next_action_type: 'run_command',
             suggested_command: 'pnpm kyberion approvals',
@@ -760,7 +785,11 @@ export function collectOperatorHomeSummary(
         return Number.isFinite(updated) && Date.now() - updated < 7 * 24 * 60 * 60 * 1000;
       }).length,
       blockedMissions: blockedMissions.length,
-      pendingApprovals: pendingApprovals.length,
+      pendingApprovals: visiblePendingApprovals.length,
+      pendingApprovalsShown: pendingApprovals.length,
+      ...(pendingApprovalsOther !== undefined && pendingApprovalsOther > 0
+        ? { pendingApprovalsOther }
+        : {}),
       clarificationQuestions,
       unreadInbox,
       totalInbox: inboxEntries.length,
