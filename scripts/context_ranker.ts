@@ -440,37 +440,130 @@ function loadWeights(scope?: ScopeContext): RankingWeights {
   }
 }
 
-export async function main(args: string[] = [], print: Print = () => undefined) {
-  const intentIdx = args.indexOf('--intent');
-  const roleIdx = args.indexOf('--role');
-  const phaseIdx = args.indexOf('--phase');
-  const scopeIdx = args.indexOf('--scope');
-  const tenantIdx = args.indexOf('--tenant');
-  const organizationIdx = args.indexOf('--organization');
-  const projectIdx = args.indexOf('--project');
-  const missionIdx = args.indexOf('--mission');
-  const taskIdx = args.indexOf('--task');
-  const limitIdx = args.indexOf('--limit');
-  const jsonFlag = args.includes('--json');
-  const explainFlag = args.includes('--explain');
+const RANK_USAGE =
+  'Usage: node dist/scripts/context_ranker.js ("query" | --intent "query") [--role "role"] [--phase "alignment"] [--scope "repository"] [--tenant slug] [--organization id] [--project id] [--mission id] [--task id] [--limit N] [--explain] [--json]';
 
-  const intent = intentIdx >= 0 ? args[intentIdx + 1] : '';
-  const role = roleIdx >= 0 ? args[roleIdx + 1] : '';
-  const phase = phaseIdx >= 0 ? args[phaseIdx + 1] : '';
-  const scope = scopeIdx >= 0 ? args[scopeIdx + 1] : 'repository';
-  const tenant = tenantIdx >= 0 ? args[tenantIdx + 1] : undefined;
-  const organization = organizationIdx >= 0 ? args[organizationIdx + 1] : undefined;
-  const project = projectIdx >= 0 ? args[projectIdx + 1] : undefined;
-  const mission = missionIdx >= 0 ? args[missionIdx + 1] : undefined;
-  const task = taskIdx >= 0 ? args[taskIdx + 1] : undefined;
-  const limit = limitIdx >= 0 ? parseInt(args[limitIdx + 1], 10) : 7;
+/** TOP-N stays a digest: above this a positional full-scan dump is a different verb. */
+const MAX_RANK_LIMIT = 100;
 
-  if (!intent) {
-    throw new ScriptExitError(
-      1,
-      'Usage: node dist/scripts/context_ranker.js --intent "query" [--role "role"] [--phase "alignment"] [--scope "repository"] [--tenant slug] [--organization id] [--project id] [--mission id] [--task id] [--limit N] [--explain] [--json]'
+const RANK_VALUE_FLAGS = new Set([
+  '--intent',
+  '--role',
+  '--phase',
+  '--scope',
+  '--tenant',
+  '--organization',
+  '--project',
+  '--mission',
+  '--task',
+  '--limit',
+]);
+const RANK_BOOLEAN_FLAGS = new Set(['--json', '--explain']);
+
+interface RankArgs {
+  intent: string;
+  role: string;
+  phase: string;
+  scope: string;
+  tenant?: string;
+  organization?: string;
+  project?: string;
+  mission?: string;
+  task?: string;
+  limit: number;
+  json: boolean;
+  explain: boolean;
+}
+
+/**
+ * R09 argument contract: a positional query is an alias for --intent, a
+ * conflicting pair is a usage error, and every flag needs a valid value.
+ * Scope flags only narrow which knowledge roots are scanned — per-file reads
+ * stay under tier-guard, so they can never widen permissions.
+ */
+export function parseRankArgs(args: string[]): RankArgs {
+  const usage = (message: string): ScriptExitError =>
+    new ScriptExitError(1, `${message}\n${RANK_USAGE}`, false, undefined, {
+      code: 'INVALID_USAGE',
+      category: 'invalid_input',
+      retryable: false,
+    });
+  const values = new Map<string, string>();
+  const booleans = new Set<string>();
+  const positional: string[] = [];
+  for (let index = 0; index < args.length; index += 1) {
+    const arg = args[index];
+    if (arg === undefined) continue;
+    if (RANK_VALUE_FLAGS.has(arg)) {
+      const value = args[index + 1];
+      if (value === undefined || value.startsWith('--')) {
+        throw usage(`${arg} requires a value`);
+      }
+      index += 1;
+      if (values.has(arg)) throw usage(`${arg} was given more than once`);
+      values.set(arg, value);
+    } else if (RANK_BOOLEAN_FLAGS.has(arg)) {
+      booleans.add(arg);
+    } else if (arg.startsWith('-') && arg !== '-') {
+      throw usage(`unknown option: ${arg}`);
+    } else {
+      positional.push(arg);
+    }
+  }
+
+  const positionalQuery = positional.join(' ').trim();
+  const flagIntent = (values.get('--intent') ?? '').trim();
+  if (positionalQuery && flagIntent && positionalQuery !== flagIntent) {
+    throw usage(
+      `conflicting queries: positional "${positionalQuery}" vs --intent "${flagIntent}" — pass only one`
     );
   }
+  const intent = flagIntent || positionalQuery;
+  if (!intent) {
+    throw usage('a query is required (positional or --intent)');
+  }
+
+  let limit = 7;
+  const rawLimit = values.get('--limit');
+  if (rawLimit !== undefined) {
+    const parsed = Number(rawLimit);
+    if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_RANK_LIMIT) {
+      throw usage(`--limit must be an integer between 1 and ${MAX_RANK_LIMIT}, got "${rawLimit}"`);
+    }
+    limit = parsed;
+  }
+
+  return {
+    intent,
+    role: values.get('--role') ?? '',
+    phase: values.get('--phase') ?? '',
+    scope: values.get('--scope') ?? 'repository',
+    tenant: values.get('--tenant'),
+    organization: values.get('--organization'),
+    project: values.get('--project'),
+    mission: values.get('--mission'),
+    task: values.get('--task'),
+    limit,
+    json: booleans.has('--json'),
+    explain: booleans.has('--explain'),
+  };
+}
+
+export async function main(args: string[] = [], print: Print = () => undefined) {
+  const {
+    intent,
+    role,
+    phase,
+    scope,
+    tenant,
+    organization,
+    project,
+    mission,
+    task,
+    limit,
+    json: jsonFlag,
+    explain: explainFlag,
+  } = parseRankArgs(args);
 
   logger.info(
     `🔍 [ContextRanker] Ranking knowledge for intent="${intent}", role="${role}", phase="${phase}", scope="${scope}", limit=${limit}`
@@ -574,7 +667,9 @@ export async function main(args: string[] = [], print: Print = () => undefined) 
 
 const script = defineScript({
   name: 'knowledge:context-ranker',
-  flags: [],
+  // Declaring --json lets the harness silence logger.info/warn lines so the
+  // stdout contract stays exactly one JSON document (R09).
+  flags: ['json'],
   run: ({ argv, print }) => main(argv, print),
 });
 if (
