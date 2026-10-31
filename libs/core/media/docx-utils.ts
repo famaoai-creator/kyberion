@@ -9,6 +9,7 @@ import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeWriteFile } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
+import { cleanDocxText, normalizeSymChar, scrapeOmmlText } from './docx-xml.js';
 import type {
   DocxDesignProtocol,
   DocxTheme,
@@ -360,8 +361,9 @@ function extractRunContent(runXml: string): DocxRunContent[] {
   // Remove rPr first
   const bodyXml = runXml.replace(/<w:rPr>[\s\S]*?<\/w:rPr>/gi, '');
 
-  // Extract text, breaks, tabs, drawings in order
-  const re = /<w:(t|br|tab|drawing|fldChar|instrText|sym)(\s[^>]*)?\/?>([\s\S]*?<\/w:\1>)?/gi;
+  // Text / breaks / tabs / hyphens / drawings (WordCraft runs.rs specials)
+  const re =
+    /<w:(t|br|cr|tab|softHyphen|noBreakHyphen|drawing|fldChar|instrText|sym)(\s[^>]*)?\/?>([\s\S]*?<\/w:\1>)?/gi;
   let m;
   while ((m = re.exec(bodyXml)) !== null) {
     const tagName = m[1].toLowerCase();
@@ -371,7 +373,7 @@ function extractRunContent(runXml: string): DocxRunContent[] {
     switch (tagName) {
       case 't': {
         const textMatch = fullMatch.match(/<w:t[^>]*>([\s\S]*?)<\/w:t>/i);
-        content.push({ type: 'text', text: textMatch ? textMatch[1] : '' });
+        content.push({ type: 'text', text: cleanDocxText(textMatch ? textMatch[1] : '') });
         break;
       }
       case 'br': {
@@ -379,8 +381,17 @@ function extractRunContent(runXml: string): DocxRunContent[] {
         content.push({ type: 'break', breakType: brType as any });
         break;
       }
+      case 'cr':
+        content.push({ type: 'cr' });
+        break;
       case 'tab':
         content.push({ type: 'tab' });
+        break;
+      case 'softhyphen':
+        content.push({ type: 'softHyphen' });
+        break;
+      case 'nobreakhyphen':
+        content.push({ type: 'noBreakHyphen' });
         break;
       case 'drawing': {
         const drawingContent = fullMatch.match(/<w:drawing>([\s\S]*?)<\/w:drawing>/i);
@@ -396,13 +407,14 @@ function extractRunContent(runXml: string): DocxRunContent[] {
       }
       case 'instrtext': {
         const instrMatch = fullMatch.match(/<w:instrText[^>]*>([\s\S]*?)<\/w:instrText>/i);
-        if (instrMatch) content.push({ type: 'instrText', text: instrMatch[1].trim() });
+        if (instrMatch)
+          content.push({ type: 'instrText', text: cleanDocxText(instrMatch[1]).trim() });
         break;
       }
       case 'sym': {
         const font = getAttrExact(fullMatch, 'w', 'font') || '';
-        const char = getAttrExact(fullMatch, 'w', 'char') || '';
-        content.push({ type: 'sym', font, char });
+        const char = normalizeSymChar(getAttrExact(fullMatch, 'w', 'char') || '');
+        if (font && char) content.push({ type: 'sym', font, char });
         break;
       }
     }
@@ -413,7 +425,7 @@ function extractRunContent(runXml: string): DocxRunContent[] {
     const plainText = bodyXml.match(/<w:t[^>]*>([^<]*)<\/w:t>/gi);
     if (plainText) {
       for (const pt of plainText) {
-        const text = pt.replace(/<\/?w:t[^>]*>/g, '');
+        const text = cleanDocxText(pt.replace(/<\/?w:t[^>]*>/g, ''));
         content.push({ type: 'text', text });
       }
     }
@@ -438,31 +450,47 @@ function extractParagraph(pXml: string): DocxParagraph {
   // Remove pPr to process remaining content
   const bodyXml = pXml.replace(/<w:pPr>[\s\S]*?<\/w:pPr>/i, '');
 
-  // Extract runs, hyperlinks, bookmarks
-  const re = /<w:(r|hyperlink|bookmarkStart|bookmarkEnd)(\s[^>]*)?\/?>([\s\S]*?<\/w:\1>)?/gi;
+  // Runs, hyperlinks, bookmarks, orphan breaks, and inline OMML (WordCraft story)
+  const re =
+    /<((?:w:(?:r|hyperlink|bookmarkStart|bookmarkEnd|br|cr)|m:oMath))(\s[^>]*)?\/?>([\s\S]*?<\/\1>)?/gi;
   let m;
   while ((m = re.exec(bodyXml)) !== null) {
     const tagName = m[1];
     const fullMatch = m[0];
 
     switch (tagName) {
-      case 'r':
+      case 'w:r':
         content.push({ type: 'run', run: extractRun(fullMatch) });
         break;
-      case 'hyperlink': {
+      case 'w:br': {
+        const brType = getAttrExact(fullMatch, 'w', 'type');
+        content.push({
+          type: 'run',
+          run: { content: [{ type: 'break', breakType: brType as any }] },
+        });
+        break;
+      }
+      case 'w:cr':
+        content.push({ type: 'run', run: { content: [{ type: 'cr' }] } });
+        break;
+      case 'm:oMath':
+        // Keep full OMML for round-trip; markdown scrapes m:t separately.
+        content.push({ type: 'rawXml', xml: fullMatch });
+        break;
+      case 'w:hyperlink': {
         const rId = getAttrExact(fullMatch, 'r', 'id');
         const anchor = getAttrExact(fullMatch, 'w', 'anchor');
         const hlRuns = getAllTagsNS(fullMatch, 'w', 'r').map((r) => extractRun(r));
         content.push({ type: 'hyperlink', hyperlink: { rId, anchor, runs: hlRuns } });
         break;
       }
-      case 'bookmarkStart': {
+      case 'w:bookmarkStart': {
         const id = parseInt(getAttrExact(fullMatch, 'w', 'id') || '0', 10);
         const name = getAttrExact(fullMatch, 'w', 'name') || '';
         content.push({ type: 'bookmarkStart', bookmark: { id, name } });
         break;
       }
-      case 'bookmarkEnd': {
+      case 'w:bookmarkEnd': {
         const id = parseInt(getAttrExact(fullMatch, 'w', 'id') || '0', 10);
         content.push({ type: 'bookmarkEnd', id });
         break;
@@ -604,19 +632,22 @@ function extractTable(tblXml: string): DocxTable {
 function extractBlockContent(xml: string): DocxBlockContent[] {
   const content: DocxBlockContent[] = [];
 
-  // Match top-level w:p and w:tbl elements
-  const re = /<w:(p|tbl)(\s[^>]*)?\/?>([\s\S]*?<\/w:\1>)?/gi;
+  // Top-level paragraphs, tables, and display OMML (`m:oMathPara`)
+  const re = /<((?:w:(?:p|tbl)|m:oMathPara))(\s[^>]*)?\/?>([\s\S]*?<\/\1>)?/gi;
   let m;
   while ((m = re.exec(xml)) !== null) {
     const tagName = m[1];
     const fullMatch = m[0];
 
     switch (tagName) {
-      case 'p':
+      case 'w:p':
         content.push({ type: 'paragraph', paragraph: extractParagraph(fullMatch) });
         break;
-      case 'tbl':
+      case 'w:tbl':
         content.push({ type: 'table', table: extractTable(fullMatch) });
+        break;
+      case 'm:oMathPara':
+        content.push({ type: 'rawXml', xml: fullMatch });
         break;
     }
   }
@@ -758,7 +789,20 @@ function extractNumbering(numberingXml: string): DocxDesignProtocol['numbering']
     const numId = parseInt(getAttrExact(numXml, 'w', 'numId') || '0', 10);
     const abstractNumIdRef = getValTag(numXml, 'abstractNumId');
     if (abstractNumIdRef) {
-      nums.push({ numId, abstractNumId: parseInt(abstractNumIdRef, 10) });
+      const overrides: DocxNum['overrides'] = [];
+      for (const ovXml of getAllTagsNS(numXml, 'w', 'lvlOverride')) {
+        const ilvl = parseInt(getAttrExact(ovXml, 'w', 'ilvl') || '0', 10);
+        const startOverride = getNumValTag(ovXml, 'startOverride');
+        overrides.push({
+          ilvl,
+          ...(startOverride !== undefined ? { startOverride } : {}),
+        });
+      }
+      nums.push({
+        numId,
+        abstractNumId: parseInt(abstractNumIdRef, 10),
+        ...(overrides.length > 0 ? { overrides } : {}),
+      });
     }
   }
 
@@ -826,6 +870,17 @@ const PASSTHROUGH_PART_PATHS = new Set([
   'word/comments.xml',
   'word/people.xml',
 ]);
+
+function isPassthroughPartPath(entryName: string): boolean {
+  if (PASSTHROUGH_PART_PATHS.has(entryName)) return true;
+  if (entryName.startsWith('customXml/')) return true;
+  // SmartArt / DrawingML diagram package parts (WordCraft keeps these opaque)
+  if (entryName.startsWith('word/diagrams/')) return true;
+  return false;
+}
+
+/** Re-export OMML text scrape for markdown / tests. */
+export { scrapeOmmlText };
 
 export interface DistillDocxOptions {
   /**
@@ -1035,7 +1090,7 @@ export async function distillDocxDesign(
   // intentionally not carried.
   const passthroughParts: DocxPassthroughPart[] = [];
   for (const entryName of Object.keys(zip.files)) {
-    if (!PASSTHROUGH_PART_PATHS.has(entryName) && !entryName.startsWith('customXml/')) continue;
+    if (!isPassthroughPartPath(entryName)) continue;
     const entry = zip.file(entryName);
     if (!entry || entry.dir) continue;
     passthroughParts.push({

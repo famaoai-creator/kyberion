@@ -4,6 +4,7 @@ import { safeReadFile } from '../secure-io.js';
 import { stripTags } from '../html-sanitize.js';
 import { decodeEntities } from '../text-escaping.js';
 import { nowIso } from '../foundation/time.js';
+import { decodeXstring, parseIsoDatetimeToSerial } from './xlsx-xstring.js';
 import {
   XlsxDesignProtocol,
   XlsxWorksheet,
@@ -18,6 +19,9 @@ import {
   XlsxCellStyle,
   XlsxAlignment,
   XlsxTextRun,
+  XlsxPhoneticString,
+  XlsxHyperlink,
+  XlsxComment,
   XlsxTheme,
   XlsxDefinedName,
   XlsxDrawing,
@@ -45,6 +49,25 @@ function getTagContent(xml: string, tag: string): string | undefined {
   const re = new RegExp(`<${tag}[^<>]*>([\\s\\S]*?)<\\/${tag}>`, 'i');
   const m = xml.match(re);
   return m ? m[1] : undefined;
+}
+
+/** Decode XML entities then SpreadsheetML `_xHHHH_` escapes (GridCraft `rich_text`). */
+function decodeSheetText(raw: string | undefined): string {
+  if (raw === undefined) return '';
+  return decodeXstring(decodeEntities(raw));
+}
+
+/** Concatenate `<t>` and rich `<r><t>` runs inside an `<si>` / `<is>` item. */
+function richTextFromItem(xml: string): string {
+  const rTags = getAllTags(xml, 'r');
+  if (rTags.length > 0) {
+    let plain = '';
+    for (const r of rTags) {
+      plain += decodeSheetText(getTagContent(r, 't') ?? getTagContent(r, 'x:t'));
+    }
+    return plain;
+  }
+  return decodeSheetText(getTagContent(xml, 't') ?? getTagContent(xml, 'x:t'));
 }
 
 function getTagFull(xml: string, tag: string): string | undefined {
@@ -150,27 +173,29 @@ async function extractThemeAsync(zip: JSZip): Promise<XlsxTheme> {
 
 // ─── Shared Strings Extraction ───────────────────────────────
 
-async function extractSharedStrings(
-  zip: JSZip
-): Promise<{ plain: string[]; rich: XlsxTextRun[][] }> {
+async function extractSharedStrings(zip: JSZip): Promise<{
+  plain: string[];
+  rich: XlsxTextRun[][];
+  phonetic: Array<XlsxPhoneticString | undefined>;
+}> {
   const plain: string[] = [];
   const rich: XlsxTextRun[][] = [];
+  const phonetic: Array<XlsxPhoneticString | undefined> = [];
 
   const sstFile = zip.file('xl/sharedStrings.xml');
-  if (!sstFile) return { plain, rich };
+  if (!sstFile) return { plain, rich, phonetic };
 
   const xml = await sstFile.async('string');
   const siTags = getAllTags(xml, 'si');
 
   for (const si of siTags) {
-    // Check for rich text runs
+    // Check for rich text runs (`<r><t>`; phonetic `<rPh>` stored separately — GridCraft)
     const rTags = getAllTags(si, 'r');
     if (rTags.length > 0) {
       const runs: XlsxTextRun[] = [];
       let plainText = '';
       for (const r of rTags) {
-        const tTag = getTagContent(r, 't');
-        const text = tTag || '';
+        const text = decodeSheetText(getTagContent(r, 't') ?? getTagContent(r, 'x:t'));
         plainText += text;
 
         const run: XlsxTextRun = { text };
@@ -183,13 +208,33 @@ async function extractSharedStrings(
       plain.push(plainText);
       rich.push(runs);
     } else {
-      const tTag = getTagContent(si, 't');
-      plain.push(tTag || '');
-      rich.push([{ text: tTag || '' }]);
+      const text = decodeSheetText(getTagContent(si, 't') ?? getTagContent(si, 'x:t'));
+      plain.push(text);
+      rich.push([{ text }]);
     }
+    phonetic.push(extractPhonetic(si));
   }
 
-  return { plain, rich };
+  return { plain, rich, phonetic };
+}
+
+function extractPhonetic(si: string): XlsxPhoneticString | undefined {
+  const rPhTags = getAllTags(si, 'rPh');
+  if (rPhTags.length === 0) return undefined;
+  const runs = rPhTags.map((tag) => ({
+    sb: parseInt(getAttr(tag, 'sb') || '0', 10),
+    eb: parseInt(getAttr(tag, 'eb') || '0', 10),
+    text: decodeSheetText(getTagContent(tag, 't') ?? getTagContent(tag, 'x:t')),
+  }));
+  const pr = getTagFull(si, 'phoneticPr') || getTagFull(si, 'x:phoneticPr');
+  const props = pr
+    ? {
+        fontId: getAttr(pr, 'fontId') ? parseInt(getAttr(pr, 'fontId')!, 10) : undefined,
+        type: getAttr(pr, 'type'),
+        alignment: getAttr(pr, 'alignment'),
+      }
+    : undefined;
+  return { runs, props };
 }
 
 // ─── Style Extraction ────────────────────────────────────────
@@ -413,6 +458,7 @@ async function extractStyles(zip: JSZip): Promise<XlsxDesignProtocol['styles']> 
   return styles;
 }
 
+/** Built-in formats (ECMA-376 §18.8.30 en-US) — aligned with GridCraft `numfmt::builtin`. */
 function getBuiltinNumFmt(id: number): string {
   const builtins: { [key: number]: string } = {
     0: 'General',
@@ -420,12 +466,16 @@ function getBuiltinNumFmt(id: number): string {
     2: '0.00',
     3: '#,##0',
     4: '#,##0.00',
+    5: '"$"#,##0_);\\("$"#,##0\\)',
+    6: '"$"#,##0_);[Red]\\("$"#,##0\\)',
+    7: '"$"#,##0.00_);\\("$"#,##0.00\\)',
+    8: '"$"#,##0.00_);[Red]\\("$"#,##0.00\\)',
     9: '0%',
     10: '0.00%',
     11: '0.00E+00',
     12: '# ?/?',
     13: '# ??/??',
-    14: 'mm-dd-yy',
+    14: 'm/d/yyyy',
     15: 'd-mmm-yy',
     16: 'd-mmm',
     17: 'mmm-yy',
@@ -433,11 +483,15 @@ function getBuiltinNumFmt(id: number): string {
     19: 'h:mm:ss AM/PM',
     20: 'h:mm',
     21: 'h:mm:ss',
-    22: 'm/d/yy h:mm',
+    22: 'm/d/yyyy h:mm',
     37: '#,##0 ;(#,##0)',
     38: '#,##0 ;[Red](#,##0)',
     39: '#,##0.00;(#,##0.00)',
     40: '#,##0.00;[Red](#,##0.00)',
+    41: '_(* #,##0_);_(* \\(#,##0\\);_(* "-"_);_(@_)',
+    42: '_("$"* #,##0_);_("$"* \\(#,##0\\);_("$"* "-"_);_(@_)',
+    43: '_(* #,##0.00_);_(* \\(#,##0.00\\);_(* "-"??_);_(@_)',
+    44: '_("$"* #,##0.00_);_("$"* \\(#,##0.00\\);_("$"* "-"??_);_(@_)',
     45: 'mm:ss',
     46: '[h]:mm:ss',
     47: 'mmss.0',
@@ -454,7 +508,8 @@ async function extractWorksheet(
   sheetPath: string,
   sheetName: string,
   sheetId: string,
-  sharedStrings: string[]
+  sharedStrings: string[],
+  date1904 = false
 ): Promise<XlsxWorksheet> {
   const ws: XlsxWorksheet = {
     id: sheetId,
@@ -512,7 +567,7 @@ async function extractWorksheet(
   const rowTags = getAllTags(xml, 'row');
   const rowSource = rowTags.length > 0 ? rowTags : getAllTags(xml, 'x:row');
   for (const rowXml of rowSource) {
-    const row = extractRow(rowXml, sharedStrings);
+    const row = extractRow(rowXml, sharedStrings, date1904);
     if (row) ws.rows.push(row);
   }
 
@@ -591,7 +646,109 @@ async function extractWorksheet(
     }
   }
 
+  const legacyDrawing = getTagFull(xml, 'legacyDrawing') || getTagFull(xml, 'x:legacyDrawing');
+  if (legacyDrawing) {
+    ws.legacyDrawingRId = getAttr(legacyDrawing, 'r:id');
+  }
+
+  ws.hyperlinks = await extractHyperlinks(zip, sheetPath, xml);
+  ws.comments = await extractComments(zip, sheetPath);
+
   return ws;
+}
+
+async function extractHyperlinks(
+  zip: JSZip,
+  sheetPath: string,
+  sheetXml: string
+): Promise<XlsxHyperlink[] | undefined> {
+  const block = getTagFull(sheetXml, 'hyperlinks') || getTagFull(sheetXml, 'x:hyperlinks');
+  if (!block) return undefined;
+  const tags = getAllTags(block, 'hyperlink');
+  const tagsNs = tags.length > 0 ? tags : getAllTags(block, 'x:hyperlink');
+  if (tagsNs.length === 0) return undefined;
+
+  const rels = await loadSheetRels(zip, sheetPath);
+  const links: XlsxHyperlink[] = [];
+  for (const h of tagsNs) {
+    const ref = getAttr(h, 'ref');
+    if (!ref) continue;
+    const rId = getAttr(h, 'r:id');
+    const location = getAttr(h, 'location');
+    const tooltip = getAttr(h, 'tooltip');
+    let target = '';
+    let external = false;
+    if (rId && rels.has(rId)) {
+      target = rels.get(rId)!;
+      external = true;
+    }
+    if (location) {
+      target = target ? `${target}#${location}` : location.replace(/^#/, '');
+    }
+    if (!target) continue;
+    links.push({ ref, target, tooltip, location, external });
+  }
+  return links.length > 0 ? links : undefined;
+}
+
+async function extractComments(zip: JSZip, sheetPath: string): Promise<XlsxComment[] | undefined> {
+  const sheetDir = path.dirname(sheetPath);
+  const relsPath = sheetDir + '/_rels/' + path.basename(sheetPath) + '.rels';
+  const relsFile = zip.file(relsPath);
+  if (!relsFile) return undefined;
+  const relsXml = await relsFile.async('string');
+  const commentRel = getAllTags(relsXml, 'Relationship').find((r) =>
+    (getAttr(r, 'Type') || '').includes('/comments')
+  );
+  if (!commentRel) return undefined;
+  const target = getAttr(commentRel, 'Target');
+  if (!target) return undefined;
+  const commentsPath = target.startsWith('/')
+    ? target.substring(1)
+    : resolveZipEntryPath(sheetDir, target);
+  const commentsFile = zip.file(commentsPath) || zip.file('xl/' + target.replaceAll('../', ''));
+  if (!commentsFile) return undefined;
+
+  const xml = await commentsFile.async('string');
+  const authors = getAllTags(xml, 'author').map((a) =>
+    decodeSheetText(a.replace(/<\/?author[^>]*>/gi, ''))
+  );
+  const comments: XlsxComment[] = [];
+  for (const c of getAllTags(xml, 'comment')) {
+    const ref = getAttr(c, 'ref');
+    if (!ref) continue;
+    const authorId = parseInt(getAttr(c, 'authorId') || '0', 10);
+    let text = '';
+    const textTag = getTagFull(c, 'text') || getTagFull(c, 'x:text');
+    if (textTag) {
+      const tParts = getAllTags(textTag, 't').map((t) =>
+        decodeSheetText(t.replace(/<\/?t[^>]*>/gi, ''))
+      );
+      text = tParts.join('');
+    }
+    const author = authors[authorId];
+    // Excel prefixes notes with "Author:\n"
+    if (author && text.startsWith(`${author}:`)) {
+      text = text.slice(author.length + 1).replace(/^\n/, '');
+    }
+    comments.push({ ref, author, text });
+  }
+  return comments.length > 0 ? comments : undefined;
+}
+
+async function loadSheetRels(zip: JSZip, sheetPath: string): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  const sheetDir = path.dirname(sheetPath);
+  const relsPath = sheetDir + '/_rels/' + path.basename(sheetPath) + '.rels';
+  const relsFile = zip.file(relsPath);
+  if (!relsFile) return map;
+  const relsXml = await relsFile.async('string');
+  for (const r of getAllTags(relsXml, 'Relationship')) {
+    const id = getAttr(r, 'Id');
+    const target = getAttr(r, 'Target');
+    if (id && target) map.set(id, target);
+  }
+  return map;
 }
 
 function extractColDef(xml: string, ws: XlsxWorksheet) {
@@ -608,7 +765,7 @@ function extractColDef(xml: string, ws: XlsxWorksheet) {
   ws.columns.push(col);
 }
 
-function extractRow(xml: string, sharedStrings: string[]): XlsxRow | null {
+function extractRow(xml: string, sharedStrings: string[], date1904 = false): XlsxRow | null {
   const rNum = getAttr(xml, 'r');
   if (!rNum) return null;
 
@@ -630,14 +787,14 @@ function extractRow(xml: string, sharedStrings: string[]): XlsxRow | null {
   const cellTags = getAllTags(xml, 'c');
   const cellSource = cellTags.length > 0 ? cellTags : getAllTags(xml, 'x:c');
   for (const cXml of cellSource) {
-    const cell = extractCell(cXml, sharedStrings);
+    const cell = extractCell(cXml, sharedStrings, date1904);
     if (cell) row.cells.push(cell);
   }
 
   return row;
 }
 
-function extractCell(xml: string, sharedStrings: string[]): XlsxCell | null {
+function extractCell(xml: string, sharedStrings: string[], date1904 = false): XlsxCell | null {
   const ref = getAttr(xml, 'r');
   if (!ref) return null;
 
@@ -657,24 +814,34 @@ function extractCell(xml: string, sharedStrings: string[]): XlsxCell | null {
       cell.value = idx >= 0 && idx < sharedStrings.length ? sharedStrings[idx] : vContent;
     } else if (t === 'b') {
       cell.value = vContent === '1';
+    } else if (t === 'd') {
+      // ISO datetime → Excel serial so number formats still apply (GridCraft sheet_read).
+      const serial = parseIsoDatetimeToSerial(decodeEntities(vContent), date1904);
+      if (serial !== null) {
+        cell.type = 'n';
+        cell.value = serial;
+      } else {
+        cell.value = decodeSheetText(vContent);
+      }
+    } else if (t === 'str' || t === 'e') {
+      cell.value = decodeSheetText(vContent);
     } else if (t === 'n' || !t) {
       const num = parseFloat(vContent);
-      cell.value = isNaN(num) ? vContent : num;
+      cell.value = isNaN(num) ? decodeSheetText(vContent) : num;
     } else {
-      cell.value = vContent;
+      cell.value = decodeSheetText(vContent);
     }
   }
 
   // Formula
   const fContent = getTagContent(xml, 'f') || getTagContent(xml, 'x:f');
-  if (fContent) cell.formula = fContent;
+  if (fContent) cell.formula = decodeSheetText(fContent);
 
-  // Inline string
+  // Inline string (plain `<t>` or rich `<r><t>` runs)
   if (t === 'inlineStr') {
     const isTag = getTagFull(xml, 'is') || getTagFull(xml, 'x:is');
     if (isTag) {
-      const tContent = getTagContent(isTag, 't') ?? getTagContent(isTag, 'x:t');
-      if (tContent !== undefined) cell.value = tContent;
+      cell.value = richTextFromItem(isTag);
     }
   }
 
@@ -944,14 +1111,25 @@ async function extractTables(zip: JSZip, sheetPath: string): Promise<XlsxTable[]
 async function extractWorkbook(zip: JSZip): Promise<{
   sheets: Array<{ name: string; sheetId: string; rId: string; state?: string }>;
   definedNames: XlsxDefinedName[];
-  properties?: any;
+  date1904: boolean;
 }> {
-  const result: any = { sheets: [], definedNames: [] };
+  const result: {
+    sheets: Array<{ name: string; sheetId: string; rId: string; state?: string }>;
+    definedNames: XlsxDefinedName[];
+    date1904: boolean;
+  } = { sheets: [], definedNames: [], date1904: false };
 
   const wbFile = zip.file('xl/workbook.xml');
   if (!wbFile) return result;
 
   const xml = await wbFile.async('string');
+
+  // workbookPr/@date1904 (GridCraft read.rs)
+  const wbPr = getTagFull(xml, 'workbookPr') || getTagFull(xml, 'x:workbookPr');
+  if (wbPr) {
+    const flag = getAttr(wbPr, 'date1904');
+    result.date1904 = flag === '1' || flag === 'true';
+  }
 
   // Sheets
   const sheetTags = getAllTags(xml, 'sheet');
@@ -1024,7 +1202,11 @@ export async function distillXlsxDesign(source: string | Buffer): Promise<XlsxDe
   const theme = await extractThemeAsync(zip);
 
   // 2. Shared strings
-  const { plain: sharedStrings, rich: sharedStringsRich } = await extractSharedStrings(zip);
+  const {
+    plain: sharedStrings,
+    rich: sharedStringsRich,
+    phonetic: sharedStringsPhonetic,
+  } = await extractSharedStrings(zip);
 
   // 3. Styles
   const styles = await extractStyles(zip);
@@ -1044,7 +1226,8 @@ export async function distillXlsxDesign(source: string | Buffer): Promise<XlsxDe
       sheetPath,
       sheet.name,
       `sheet${sheet.sheetId}`,
-      sharedStrings
+      sharedStrings,
+      wb.date1904
     );
     if (sheet.state) ws.state = sheet.state as any;
 
@@ -1085,7 +1268,9 @@ export async function distillXlsxDesign(source: string | Buffer): Promise<XlsxDe
     styles,
     sharedStrings,
     sharedStringsRich,
+    sharedStringsPhonetic: sharedStringsPhonetic.some((p) => p) ? sharedStringsPhonetic : undefined,
     definedNames: wb.definedNames,
+    workbookProperties: wb.date1904 ? { date1904: true } : undefined,
     sheets,
     rawParts: Object.keys(rawParts).length > 0 ? rawParts : undefined,
   };

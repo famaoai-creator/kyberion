@@ -185,8 +185,27 @@ export function encodePdfString(s: string, unicode: boolean): string {
   return `(${escapeLit(s)})`;
 }
 
+/**
+ * Escape a PDF literal string (ISO 32000-2 §7.3.4.2).
+ * Control characters use the named escapes or octal, matching PdfCraft `write_string`
+ * so titles / URIs with newlines or binary do not emit illegal literals.
+ */
 export function escapeLit(s: string): string {
-  return s.replace(/\\/g, '\\\\').replace(/\(/g, '\\(').replace(/\)/g, '\\)');
+  let out = '';
+  for (let i = 0; i < s.length; i += 1) {
+    const c = s.charCodeAt(i);
+    if (c === 0x5c) out += '\\\\';
+    else if (c === 0x28) out += '\\(';
+    else if (c === 0x29) out += '\\)';
+    else if (c === 0x0a) out += '\\n';
+    else if (c === 0x0d) out += '\\r';
+    else if (c === 0x09) out += '\\t';
+    else if (c === 0x08) out += '\\b';
+    else if (c === 0x0c) out += '\\f';
+    else if (c < 0x20 || c === 0x7f) out += '\\' + c.toString(8).padStart(3, '0');
+    else out += s[i];
+  }
+  return out;
 }
 
 // ─── XMP Metadata ────────────────────────────────────────────
@@ -244,6 +263,8 @@ export interface ImageInfo {
   bitsPerComponent: number;
   filter?: string;
   data: Buffer;
+  /** Optional DeviceGray soft-mask samples (already Flate-compressed), like PdfCraft create. */
+  softMask?: Buffer;
 }
 
 export type EmbeddedCjkFont = {

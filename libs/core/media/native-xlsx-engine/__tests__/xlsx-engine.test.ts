@@ -353,4 +353,86 @@ describe('Native XLSX Engine', () => {
       );
     });
   });
+
+  // ═══════════════════════════════════════════════════════════
+  // #3: Hyperlinks / comments / phonetic (GridCraft-aligned)
+  // ═══════════════════════════════════════════════════════════
+
+  describe('Hyperlinks, comments, and phonetic SST', () => {
+    it('round-trips hyperlinks, comments, and rPh', async () => {
+      const base = createTestProtocol();
+      const protocol: XlsxDesignProtocol = {
+        ...base,
+        sharedStrings: ['東京都', '大阪'],
+        sharedStringsPhonetic: [
+          {
+            runs: [
+              { sb: 0, eb: 2, text: 'トウキョウ' },
+              { sb: 2, eb: 3, text: 'ト' },
+            ],
+            props: { fontId: 1, type: 'noConversion', alignment: 'center' },
+          },
+          undefined,
+        ],
+        sheets: [
+          {
+            id: 'sheet1',
+            name: 'LinksComments',
+            columns: [],
+            rows: [
+              {
+                index: 1,
+                cells: [
+                  { ref: 'A1', type: 's', value: '東京都' },
+                  { ref: 'B1', type: 's', value: '大阪' },
+                ],
+              },
+            ],
+            mergeCells: [],
+            tables: [],
+            conditionalFormats: [],
+            dataValidations: [],
+            hyperlinks: [
+              {
+                ref: 'A1',
+                target: 'https://example.com/tokyo',
+                tooltip: 'Tokyo',
+                external: true,
+              },
+            ],
+            comments: [{ ref: 'B1', author: 'Alice', text: 'Note about Osaka' }],
+            drawing: {
+              elements: [
+                {
+                  type: 'shape',
+                  anchor: {
+                    type: 'twoCellAnchor',
+                    from: { col: 0, colOffset: 0, row: 0, rowOffset: 0 },
+                    to: { col: 2, colOffset: 0, row: 2, rowOffset: 0 },
+                  },
+                  text: 'Callout text',
+                },
+              ],
+            },
+          },
+        ],
+      };
+
+      const out = path.join(tmpDir, 'links-comments.xlsx');
+      await generateNativeXlsx(protocol, out);
+      const files = extractXlsx(out);
+      expect(files.get('xl/sharedStrings.xml')).toContain('<rPh sb="0" eb="2">');
+      expect(files.get('xl/sharedStrings.xml')).toContain('トウキョウ');
+      expect(files.get('xl/worksheets/sheet1.xml')).toContain('<hyperlinks>');
+      expect(files.get('xl/worksheets/sheet1.xml')).toContain('<legacyDrawing');
+      expect(files.get('xl/comments1.xml')).toContain('Note about Osaka');
+      expect(files.has('xl/drawings/vmlDrawing1.vml')).toBe(true);
+
+      const distilled = await distillXlsxDesign(out);
+      expect(distilled.sharedStringsPhonetic?.[0]?.runs?.[0]?.text).toBe('トウキョウ');
+      expect(distilled.sheets[0].hyperlinks?.[0]?.target).toContain('example.com/tokyo');
+      expect(distilled.sheets[0].comments?.[0]?.text).toContain('Note about Osaka');
+      expect(distilled.sheets[0].drawing?.elements?.[0]?.text).toBe('Callout text');
+    });
+  });
 });
