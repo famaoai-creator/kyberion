@@ -467,6 +467,32 @@ function retainTriggerDedupeWindow(
   return ordered.filter((record) => !drop.has(record)).map((record) => JSON.stringify(record));
 }
 
+/** After a window-full attempt, re-parse only once the journal grew this much... */
+export const TRIGGER_STORE_WINDOW_FULL_REGROWTH_BYTES = 256 * 1024;
+/** ...or this long passed (also the warning rate limit). */
+export const TRIGGER_STORE_WINDOW_FULL_RETRY_MS = 60 * 60 * 1000;
+/** Escape hatch named by the hard-cap diagnostics and the ops-health finding. */
+export const TRIGGER_STORE_ROTATE_COMMAND = 'pnpm kyberion scheduler trigger-store rotate';
+
+/** Per-journal memory of the last window-full compaction attempt (this process). */
+const windowFullAttempts = new Map<string, { sizeBytes: number; atMs: number }>();
+const windowFullWarnedAt = new Map<string, number>();
+
+/** Test seam: forget window-full attempts and warning timestamps. */
+export function resetTriggerStoreWindowFullState(): void {
+  windowFullAttempts.clear();
+  windowFullWarnedAt.clear();
+}
+
+function shouldAttemptCompaction(storePath: string, sizeBytes: number, now: Date): boolean {
+  const last = windowFullAttempts.get(storePath);
+  if (!last) return true;
+  return (
+    sizeBytes >= last.sizeBytes + TRIGGER_STORE_WINDOW_FULL_REGROWTH_BYTES ||
+    now.getTime() - last.atMs >= TRIGGER_STORE_WINDOW_FULL_RETRY_MS
+  );
+}
+
 /**
  * Rotate inline: the janitor that would rotate this journal runs from chronos,
  * so waiting for it is self-defeating when the journal is what stops chronos.
@@ -487,12 +513,20 @@ function compactRecords(storePath: string, maxStoreBytes: number, now: Date): vo
   if (retainedBytes > Math.floor((maxStoreBytes * 3) / 4)) {
     // Stable keys inside the dedupe window alone fill the budget: rotating now
     // would copy a segment on every append and free almost nothing. Appends
-    // continue up to the hard cap, which ops-health reports.
-    logger.warn(
-      `[TRIGGER_STORE_WINDOW_FULL] delivery journal not rotated — ${retainedBytes} bytes of receipts are inside the ${DEDUPE_RETENTION_MS / 86_400_000}-day dedupe window | next: find the key prefix minting stable keys at this rate (they should be per episode, not per tick); appends continue to the ${MAX_STORE_BYTES}-byte hard cap, then triggers fail closed | evidence: ${storePath}`
-    );
+    // continue up to the hard cap, which ops-health reports. The next attempt
+    // waits for real regrowth or an hour, and the warning is rate-limited, so
+    // a stuck journal is not re-parsed and re-logged on every append.
+    windowFullAttempts.set(storePath, { sizeBytes: storeSize(storePath), atMs: now.getTime() });
+    const warnedAt = windowFullWarnedAt.get(storePath);
+    if (warnedAt === undefined || now.getTime() - warnedAt >= TRIGGER_STORE_WINDOW_FULL_RETRY_MS) {
+      windowFullWarnedAt.set(storePath, now.getTime());
+      logger.warn(
+        `[TRIGGER_STORE_WINDOW_FULL] delivery journal not rotated — ${retainedBytes} bytes of receipts are inside the ${DEDUPE_RETENTION_MS / 86_400_000}-day dedupe window | next: find the key prefix minting stable keys at this rate (they should be per episode, not per tick); appends continue to the ${MAX_STORE_BYTES}-byte hard cap, then triggers fail closed — at the cap: ${TRIGGER_STORE_ROTATE_COMMAND} | evidence: ${storePath}`
+      );
+    }
     return;
   }
+  windowFullAttempts.delete(storePath);
   safeCopyFileSync(storePath, rotatedSegmentPath(storePath, now));
   safeWriteFile(storePath, retained.length > 0 ? `${retained.join('\n')}\n` : '');
 }
@@ -517,7 +551,7 @@ function appendRecord(
   const serialized = `${JSON.stringify(record)}\n`;
   const lineBytes = Buffer.byteLength(serialized, 'utf8');
   let size = storeSize(storePath);
-  if (size + lineBytes > maxStoreBytes) {
+  if (size + lineBytes > maxStoreBytes && shouldAttemptCompaction(storePath, size, now)) {
     try {
       compactRecords(storePath, maxStoreBytes, now);
     } catch (error) {
@@ -532,7 +566,7 @@ function appendRecord(
   }
   if (size + lineBytes > MAX_STORE_BYTES) {
     throw new Error(
-      `[TRIGGER_STORE_FULL] delivery journal is at its ${MAX_STORE_BYTES}-byte hard cap and could not be rotated: ${storePath}`
+      `[TRIGGER_STORE_FULL] delivery journal is at its ${MAX_STORE_BYTES}-byte hard cap and could not be rotated: ${storePath} | next: ${TRIGGER_STORE_ROTATE_COMMAND} (dry-run, then --request-approval and --apply)`
     );
   }
   safeAppendFileSync(storePath, serialized);
@@ -597,6 +631,142 @@ function receiptFrom(record: TriggerRecord, status: TriggerReceipt['status']): T
   };
 }
 
+/** Inter-process lock guarding one delivery journal (shared by runners and rotation). */
+function triggerStoreLockId(storePath: string): string {
+  return `trigger-store-${createHash('sha256')
+    .update(pathResolver.rootResolve(storePath))
+    .digest('hex')
+    .slice(0, 32)}`;
+}
+
+/** Default number of stable keys an operator rotation keeps. */
+export const TRIGGER_STORE_ROTATE_DEFAULT_KEEP_STABLE = 2000;
+/**
+ * Cron receipts this recent survive an operator rotation, so a schedule whose
+ * minute is still current cannot fire twice.
+ */
+const ROTATE_RECENT_CRON_MS = 10 * 60 * 1000;
+
+export interface TriggerStoreRotationOptions {
+  storePath?: string;
+  /** Newest stable (non-cron) keys to keep; default TRIGGER_STORE_ROTATE_DEFAULT_KEEP_STABLE. */
+  keepStable?: number;
+  now?: Date;
+}
+
+export interface TriggerStoreRotationPlan {
+  store_path: string;
+  size_bytes: number;
+  records: number;
+  keys: number;
+  keep_stable: number;
+  kept: { in_flight: number; stable: number; recent_cron: number };
+  dropped_keys: number;
+  kept_bytes: number;
+}
+
+export interface TriggerStoreRotationResult extends TriggerStoreRotationPlan {
+  segment_path: string;
+}
+
+function resolveStorePath(storePath?: string): string {
+  return assertSafeRepositoryPath(pathResolver.rootResolve(storePath || DEFAULT_STORE_PATH), {
+    allowMissingLeaf: true,
+  });
+}
+
+function selectRotationKeep(
+  storePath: string,
+  keepStable: number,
+  now: Date
+): { plan: TriggerStoreRotationPlan; lines: string[] } {
+  const records = safeExistsSync(storePath) ? readRecords(storePath) : [];
+  const latest = new Map<string, TriggerRecord>();
+  for (const record of records) {
+    latest.delete(record.idempotencyKey);
+    latest.set(record.idempotencyKey, record);
+  }
+  const cutoff = now.getTime() - DEDUPE_RETENTION_MS;
+  const all = [...latest.values()];
+  const inFlight = all.filter((r) => isInFlight(r) && !isAbandonedClaim(r, cutoff));
+  const finished = all.filter((r) => !isInFlight(r));
+  const recentCron = finished.filter(
+    (r) => isMinuteScoped(r) && recordTimeMs(r) >= now.getTime() - ROTATE_RECENT_CRON_MS
+  );
+  const stable = finished
+    .filter((r) => !isMinuteScoped(r))
+    .sort((a, b) => recordTimeMs(b) - recordTimeMs(a))
+    .slice(0, keepStable);
+  const keep = new Set<TriggerRecord>([...inFlight, ...recentCron, ...stable]);
+  const lines = all.filter((r) => keep.has(r)).map((r) => JSON.stringify(r));
+  return {
+    plan: {
+      store_path: path.relative(pathResolver.rootDir(), storePath).split(path.sep).join('/'),
+      size_bytes: storeSize(storePath),
+      records: records.length,
+      keys: all.length,
+      keep_stable: keepStable,
+      kept: { in_flight: inFlight.length, stable: stable.length, recent_cron: recentCron.length },
+      dropped_keys: all.length - keep.size,
+      kept_bytes: lines.reduce((sum, line) => sum + Buffer.byteLength(line, 'utf8') + 1, 0),
+    },
+    lines,
+  };
+}
+
+function normalizeKeepStable(value: number | undefined): number {
+  const keep = value ?? TRIGGER_STORE_ROTATE_DEFAULT_KEEP_STABLE;
+  if (!Number.isInteger(keep) || keep < 0) {
+    throw new Error(`[TRIGGER_STORE_ROTATE] keep-stable must be a non-negative integer: ${value}`);
+  }
+  return keep;
+}
+
+/** What an operator rotation would keep and drop. Read-only. */
+export function planTriggerStoreRotation(
+  options: TriggerStoreRotationOptions = {}
+): TriggerStoreRotationPlan {
+  return selectRotationKeep(
+    resolveStorePath(options.storePath),
+    normalizeKeepStable(options.keepStable),
+    options.now ?? new Date()
+  ).plan;
+}
+
+/**
+ * Operator escape hatch for a journal stuck at the hard cap: under the store
+ * lock, copy the full journal to a segment and rewrite it with the in-flight
+ * claims, the newest `keepStable` stable keys and cron receipts of the last
+ * 10 minutes. Dropped stable keys may re-deliver once. `wrap` runs around the
+ * write inside the lock (the CLI consumes its approval there) and the caller
+ * records the audit entry.
+ */
+export async function rotateTriggerStore(
+  options: TriggerStoreRotationOptions = {},
+  wrap: <T>(effect: () => T) => T = (effect) => effect()
+): Promise<TriggerStoreRotationResult> {
+  const storePath = resolveStorePath(options.storePath);
+  const keepStable = normalizeKeepStable(options.keepStable);
+  const now = options.now ?? new Date();
+  return withLock(triggerStoreLockId(storePath), async () =>
+    wrap(() => {
+      assertTriggerStoreFile(storePath);
+      if (!safeExistsSync(storePath)) {
+        throw new Error(`[TRIGGER_STORE_ROTATE] no delivery journal at ${storePath}`);
+      }
+      const { plan, lines } = selectRotationKeep(storePath, keepStable, now);
+      const segment = rotatedSegmentPath(storePath, now);
+      safeCopyFileSync(storePath, segment);
+      safeWriteFile(storePath, lines.length > 0 ? `${lines.join('\n')}\n` : '');
+      windowFullAttempts.delete(storePath);
+      return {
+        ...plan,
+        segment_path: path.relative(pathResolver.rootDir(), segment).split(path.sep).join('/'),
+      };
+    })
+  );
+}
+
 export class TriggerRunner {
   private readonly storePath: string;
   private readonly now: () => Date;
@@ -620,10 +790,7 @@ export class TriggerRunner {
       MAX_STORE_BYTES
     );
     this.authorityResolver = options.authorityResolver || resolveGovernedAuthority;
-    this.lockId = `trigger-store-${createHash('sha256')
-      .update(pathResolver.rootResolve(this.storePath))
-      .digest('hex')
-      .slice(0, 32)}`;
+    this.lockId = triggerStoreLockId(this.storePath);
   }
 
   records(): TriggerReceipt[] {

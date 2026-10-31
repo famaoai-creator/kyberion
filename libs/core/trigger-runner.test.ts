@@ -16,6 +16,9 @@ import {
   assertNoEscalation,
   normalizeTriggerRecord,
   releaseTriggerLeaderLease,
+  planTriggerStoreRotation,
+  resetTriggerStoreWindowFullState,
+  rotateTriggerStore,
   resolveCurrentTriggerAuthority,
   runWakeTrigger,
   withTriggerLeaderLease,
@@ -483,6 +486,150 @@ describe('QM-02 trigger runner', () => {
       const live = String(safeReadFile(store, { encoding: 'utf8' }));
       expect(live).toContain('continuous-owner:action-0"');
       expect(live).toContain('wake:append-anyway');
+    } finally {
+      for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+    }
+  });
+
+  describe('window-full backoff', () => {
+    const minute = 60_000;
+    const T0 = new Date('2026-11-01T00:00:00.000Z');
+    // Inside the window at T0, aged out five minutes later.
+    const nearExpiry = new Date(T0.getTime() - 7 * 24 * 60 * minute + 5 * minute).toISOString();
+
+    function windowFullStore(): { store: string; at: (offsetMin: number) => TriggerRunner } {
+      resetTriggerStoreWindowFullState();
+      const store = pathResolver.sharedTmp(`qm02-backoff-${randomUUID()}.jsonl`);
+      stores.push(store);
+      const lines = Array.from({ length: 300 }, (_, i) =>
+        journalLine(`continuous-owner:act-${i}`, nearExpiry, 'delivered', 'wake')
+      );
+      safeWriteFile(store, `${lines.join('\n')}\n`);
+      return {
+        store,
+        at: (offsetMin) =>
+          new TriggerRunner({
+            storePath: store,
+            maxStoreBytes: 64 * 1024,
+            authorityResolver: (snapshot) => snapshot,
+            now: () => new Date(T0.getTime() + offsetMin * minute),
+          }),
+      };
+    }
+
+    function captureWarnings(): { count: () => number; restore: () => void } {
+      const lines: string[] = [];
+      const spies = [process.stderr, process.stdout].map((stream) =>
+        vi.spyOn(stream, 'write').mockImplementation((chunk: unknown) => {
+          lines.push(String(chunk));
+          return true;
+        })
+      );
+      return {
+        count: () => lines.filter((line) => line.includes('[TRIGGER_STORE_WINDOW_FULL]')).length,
+        restore: () => spies.forEach((spy) => spy.mockRestore()),
+      };
+    }
+
+    const wake = (key: string) => ({
+      idempotencyKey: key,
+      source: 'wake' as const,
+      createdBy: authority,
+    });
+
+    it('skips the re-parse until an hour passed and warns once per hour', async () => {
+      const { store, at } = windowFullStore();
+      const warnings = captureWarnings();
+      try {
+        await at(0).run(wake('wake:a'), async () => 'd');
+        await at(1).run(wake('wake:b'), async () => 'd');
+        expect(warnings.count()).toBe(1);
+        // At +10 min the old receipts aged out, so a compaction would now rotate —
+        // but the journal has not regrown and the hour has not passed: skipped.
+        await at(10).run(wake('wake:c'), async () => 'd');
+        expect(rotatedSegments(store)).toHaveLength(0);
+        await at(61).run(wake('wake:d'), async () => 'd');
+        expect(rotatedSegments(store)).toHaveLength(1);
+        expect(String(safeReadFile(store, { encoding: 'utf8' }))).not.toContain('act-0"');
+        expect(warnings.count()).toBe(1);
+      } finally {
+        warnings.restore();
+        for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+      }
+    });
+
+    it('retries early once the journal regrew by 256KB', async () => {
+      const { store, at } = windowFullStore();
+      const warnings = captureWarnings();
+      try {
+        await at(0).run(wake('wake:a'), async () => 'd');
+        const old = new Date(T0.getTime() - 30 * 24 * 60 * minute).toISOString();
+        const filler = Array.from({ length: 900 }, (_, i) =>
+          journalLine(`continuous-owner:old-${i}`, old, 'delivered', 'wake')
+        ).join('\n');
+        safeWriteFile(store, `${String(safeReadFile(store, { encoding: 'utf8' }))}${filler}\n`);
+        await at(10).run(wake('wake:b'), async () => 'd');
+        expect(rotatedSegments(store)).toHaveLength(1);
+      } finally {
+        warnings.restore();
+        for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+      }
+    });
+  });
+
+  it('operator rotation keeps in-flight claims, the newest N stable keys and recent cron receipts', async () => {
+    const store = pathResolver.sharedTmp(`qm02-rotate-${randomUUID()}.jsonl`);
+    stores.push(store);
+    const now = new Date();
+    const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+    const pending = JSON.stringify({
+      idempotencyKey: 'wake:pending',
+      source: 'wake',
+      status: 'failed',
+      reason: 'delivery_pending',
+      deliveryId: 'wake:pending',
+      createdBy: authority,
+      requestedAuthority: authority,
+      recordedAt: ago(60_000),
+      claimId: 'c',
+      claimOwnerPid: process.pid,
+      claimExpiresAt: new Date(now.getTime() + 60_000).toISOString(),
+      attempt: 1,
+    });
+    const lines = [
+      pending,
+      ...Array.from({ length: 5 }, (_, i) =>
+        journalLine(`reflex:r:${i}`, ago((10 - i) * 60_000), 'delivered', 'wake')
+      ),
+      journalLine('cron:job:2026-11-01T00:00', ago(2 * 60_000)),
+      journalLine('cron:job:2026-10-31T00:00', ago(2 * 60 * 60_000)),
+    ];
+    safeWriteFile(store, `${lines.join('\n')}\n`);
+    try {
+      const plan = planTriggerStoreRotation({ storePath: store, keepStable: 2, now });
+      expect(plan.kept).toEqual({ in_flight: 1, stable: 2, recent_cron: 1 });
+      expect(plan.dropped_keys).toBe(4);
+      expect(safeStat(store).size).toBe(plan.size_bytes);
+
+      const wrapped = vi.fn(<T>(effect: () => T) => effect());
+      const result = await rotateTriggerStore({ storePath: store, keepStable: 2, now }, wrapped);
+      expect(wrapped).toHaveBeenCalledTimes(1);
+      const live = String(safeReadFile(store, { encoding: 'utf8' }));
+      expect(live).toContain('wake:pending');
+      expect(live).toContain('reflex:r:4');
+      expect(live).toContain('reflex:r:3');
+      expect(live).not.toContain('reflex:r:2');
+      expect(live).toContain('cron:job:2026-11-01T00:00');
+      expect(live).not.toContain('cron:job:2026-10-31T00:00');
+      expect(rotatedSegments(store).map((s) => path.basename(s))).toContain(
+        path.basename(result.segment_path)
+      );
+      expect(String(safeReadFile(rotatedSegments(store)[0], { encoding: 'utf8' }))).toContain(
+        'reflex:r:0'
+      );
+      await expect(rotateTriggerStore({ storePath: store, keepStable: -1, now })).rejects.toThrow(
+        /keep-stable/
+      );
     } finally {
       for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
     }

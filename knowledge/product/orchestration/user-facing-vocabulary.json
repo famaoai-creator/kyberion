@@ -10270,6 +10270,11 @@
         "ja": "このチェックアウトの常駐サービス（スケジューラ・ウォッチドッグ）を登録し、旧ユニットを移行",
         "qps-ploc": "⟦Řėɠïşŧėř ŧħïş ƈħėƈķőůŧ'ş řėşïḓėñŧ şėřṽïƈėş (şƈħėḓůŀėř, ẇȧŧƈħḓőɠ) ȧñḓ ɱïɠřȧŧė ŀėɠȧƈẏ ůñïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
       },
+      "cli_cmd_script_chronos_trigger_store_rotate": {
+        "en": "Rotate a trigger delivery journal stuck at its hard cap (dry-run; apply needs approval)",
+        "ja": "上限に達したトリガー配信ジャーナルをローテーション（既定はドライラン、適用には承認が必要）",
+        "qps-ploc": "⟦Řőŧȧŧė ȧ ŧřïɠɠėř ḓėŀïṽėřẏ ĵőůřñȧŀ şŧůƈķ ȧŧ ïŧş ħȧřḓ ƈȧṗ (ḓřẏ-řůñ; ȧṗṗŀẏ ñėėḓş ȧṗṗřőṽȧŀ) ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈő⟧"
+      },
       "cli_cmd_script_chronos_restart": {
         "en": "Restart this checkout's Chronos service via the host service manager",
         "ja": "ホストのサービスマネージャ経由でこのcheckoutのChronosサービスを再起動",

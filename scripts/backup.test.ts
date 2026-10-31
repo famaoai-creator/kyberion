@@ -1039,6 +1039,8 @@ describe('backup file selection', () => {
     { path: 'active/shared/coordination/orchestration/events', artifact_class: 'cache' },
     { path: 'presence/bridge/runtime', artifact_class: 'cache' },
     { path: 'active/shared/runtime/user-tenant-cache', artifact_class: 'cache', backup: 'exclude' },
+    { path: 'active/archive/.trash', artifact_class: 'tmp', backup: 'exclude' },
+    { path: 'active/shared/data-vault', artifact_class: 'cache', backup: 'exclude' },
   ];
   const toolRuntimesRoot = 'active/shared/runtime/tool-runtimes';
 
@@ -1060,6 +1062,8 @@ describe('backup file selection', () => {
         'active/shared/exports/backups',
         'active/shared/runtime/vitest-live',
         'active/shared/runtime/history-search',
+        'active/archive/.trash',
+        'active/shared/data-vault',
       ])
     );
     for (const pending of [
@@ -1079,6 +1083,24 @@ describe('backup file selection', () => {
     ]);
     expect(exclusions.archiveDirs).toEqual(['active/out']);
     expect(exclusions.provenanceOnlyRoots).toEqual([toolRuntimesRoot]);
+  });
+
+  it('the governed catalog opts .trash and data-vault out but keeps pending staging stores', () => {
+    const exclusions = resolveBackupExclusions({
+      rootDir: pathResolver.rootDir(),
+      entries: ['active'],
+      toolRuntimesRoot: null,
+    });
+    expect(exclusions.excludedRoots).toEqual(
+      expect.arrayContaining(['active/archive/.trash', 'active/shared/data-vault'])
+    );
+    for (const pending of [
+      'active/shared/runtime/distill-candidates',
+      'active/shared/runtime/feedback-loop/tenants',
+      'active/shared/coordination/orchestration/events',
+    ]) {
+      expect(exclusions.excludedRoots).not.toContain(pending);
+    }
   });
 
   it('reports repeated hard links as dropped paths, not as archived once', () => {
@@ -1120,6 +1142,8 @@ describe('backup file selection', () => {
       'active/shared/staging/inbound.pdf',
       'active/shared/exports/backups/kyberion-all-old.tar.gz.enc',
       'active/shared/runtime/vitest-live/run.json',
+      'active/archive/.trash/active/old/removed.json',
+      'active/shared/data-vault/entry.json',
       'active/out/kyberion-all-previous.tar.gz.enc',
       'active/out/kyberion-all.tar.gz.enc',
       `${toolRuntimesRoot}/whisper/bin/python`,
