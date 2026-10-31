@@ -299,3 +299,18 @@ describe('unit drift hash', () => {
     );
   });
 });
+
+describe('parsePlistXml tokenizer', () => {
+  it('drops declarations, comments and doctype without regex backtracking', () => {
+    const xml =
+      '<?xml version="1.0"?><!DOCTYPE plist PUBLIC "x" "y"><!-- <!-- nested --><plist version="1.0"><dict><key>Label</key><string>a&amp;b</string><!-- c --></dict></plist>';
+    expect(parsePlistXml(xml)).toEqual({ Label: 'a&b' });
+  });
+
+  it('handles many repeated declarations in linear time', () => {
+    const xml = '<?xml'.repeat(50_000);
+    const started = Date.now();
+    expect(parsePlistXml(xml)).toBeNull();
+    expect(Date.now() - started).toBeLessThan(1000);
+  });
+});
