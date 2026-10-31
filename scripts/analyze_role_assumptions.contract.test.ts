@@ -5,7 +5,10 @@ import {
   NARROWED_SYSTEM_ROLES,
   UNRESOLVED_BASELINE_PATH,
   checkReachabilityInvariants,
+  countChildProcessEntries,
   countUnresolvedSites,
+  findBaselineSlack,
+  formatBaselineSlack,
   formatUnresolvedCounts,
   formatViolations,
   type UnresolvedSiteBaselineFile,
@@ -188,6 +191,81 @@ describe('RN-03 role assumption invariants (role-assumption-reachability gate)',
         expect(Number.isInteger(count) && count >= 0).toBe(true);
       }
       for (const role of NARROWED_SYSTEM_ROLES) expect(baseline.unresolved_sites[role]).toBe(0);
+    });
+  });
+
+  describe('per-role child-process ratchet and baseline slack', () => {
+    const child = (site: string) => ({ site, targets: ['scripts/child.ts'] });
+    const report = reportOf({
+      surface_a: entry({
+        unresolved_sites: ['libs/core/a.ts#x'],
+        child_process_entries: [child('scripts/a.ts#spawn'), child('scripts/b.ts#spawn')],
+      }),
+    });
+
+    it('fails when a role gains child-process entries beyond its baseline', () => {
+      const violations = checkReachabilityInvariants(
+        report,
+        fixturePolicy,
+        {},
+        { surface_a: 1 },
+        { surface_a: 1 }
+      );
+      expect(violations.map((v) => [v.rule, v.system_role])).toEqual([
+        ['child-process-entries-increased', 'surface_a'],
+      ]);
+      expect(violations[0]!.message).toContain('2 child process entr(ies)');
+      expect(violations[0]!.message).toContain('--print-unresolved-baseline');
+    });
+
+    it('passes at or below the child-process baseline, and is off without one', () => {
+      expect(
+        checkReachabilityInvariants(report, fixturePolicy, {}, { surface_a: 1 }, { surface_a: 2 })
+      ).toEqual([]);
+      expect(checkReachabilityInvariants(report, fixturePolicy, {}, { surface_a: 1 })).toEqual([]);
+      expect(countChildProcessEntries(report)).toEqual({ surface_a: 2 });
+    });
+
+    it('warns (without failing) when a count is below its baseline', () => {
+      const baseline = {
+        unresolved_sites: { surface_a: 4 },
+        child_process_entries: { surface_a: 2 },
+      };
+      expect(
+        checkReachabilityInvariants(
+          report,
+          fixturePolicy,
+          {},
+          baseline.unresolved_sites,
+          baseline.child_process_entries
+        )
+      ).toEqual([]);
+      const slack = findBaselineSlack(report, baseline);
+      expect(slack).toEqual([
+        { system_role: 'surface_a', kind: 'unresolved_sites', current: 1, baseline: 4 },
+      ]);
+      const text = formatBaselineSlack(slack);
+      expect(text).toContain('WARN');
+      expect(text).toContain('surface_a unresolved_sites: current 1 < baseline 4');
+      expect(text).toContain(`--print-unresolved-baseline > ${UNRESOLVED_BASELINE_PATH}`);
+      expect(
+        findBaselineSlack(report, {
+          unresolved_sites: { surface_a: 1 },
+          child_process_entries: { surface_a: 5 },
+        }).map((item) => item.kind)
+      ).toEqual(['child_process_entries']);
+    });
+
+    it('the committed baseline ratchets child-process entries for every governed role', () => {
+      const baseline = readJson<UnresolvedSiteBaselineFile>(
+        pathResolver.rootResolve(UNRESOLVED_BASELINE_PATH)
+      );
+      expect(Object.keys(baseline.child_process_entries ?? {}).sort()).toEqual(
+        Object.keys(policy.system_roles ?? {}).sort()
+      );
+      for (const role of NARROWED_SYSTEM_ROLES) {
+        expect(baseline.child_process_entries?.[role]).toBe(0);
+      }
     });
   });
 
