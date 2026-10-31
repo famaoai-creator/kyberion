@@ -262,7 +262,10 @@ export function removeWorkDir(dir: string | undefined): void {
  * comes from `resolvePerceptionScope`, which pins it to the active scope's
  * own tenant, and a protected scope without a tenant throws
  * [ROLE_TENANT_SCOPE_REQUIRED] rather than assuming unbound. Public-tier
- * media is unprotected, so no assumption happens there.
+ * media is unprotected, so no assumption happens there. The grant also
+ * names the cache floor's own-tenant `perception/` subtree — the semantic
+ * index `see|watch --index` and `see --search` read and write — never the
+ * rest of the cache floor.
  */
 export async function withPerceptionMediaRole<T>(
   scope: PerceptionScope,

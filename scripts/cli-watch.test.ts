@@ -3,13 +3,20 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   pathResolver,
+  resetCurrentScope,
   safeExistsSync,
   safeLstat,
   safeMkdir,
   safeReaddir,
   safeRmSync,
   safeWriteFile,
+  validateReadPermission,
 } from '@agent/core';
+import {
+  indexMedia,
+  type SemanticEmbeddingProvider,
+  type SemanticIndexOptions,
+} from '@agent/core/perception/semantic-index';
 import {
   dropDuplicateFrames,
   parseFfprobeMetadata,
@@ -175,6 +182,12 @@ const ENV_KEYS = [
 
 const TENANT = 'acme-corp';
 
+/** Deterministic local embedder — the CLI only forwards it to the real index op. */
+const fakeEmbeddingProvider: SemanticEmbeddingProvider = {
+  identity: 'test-embedder-v1',
+  embed: async (inputs) => inputs.map(() => [1, 0]),
+};
+
 describe('pnpm kyberion watch under a persisted confidential tenant scope', () => {
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
@@ -187,6 +200,9 @@ describe('pnpm kyberion watch under a persisted confidential tenant scope', () =
     // role, persona resolves to 'unknown'.
     process.env.KYBERION_TIER = 'confidential';
     process.env.KYBERION_TENANT = TENANT;
+    // currentScope() is process-cached; drop any scope resolved under a
+    // different env so the semantic-index scope check sees this binding.
+    resetCurrentScope();
   });
 
   afterEach(() => {
@@ -270,6 +286,51 @@ describe('pnpm kyberion watch under a persisted confidential tenant scope', () =
       } finally {
         process.env.KYBERION_TENANT = TENANT;
       }
+    }
+  });
+
+  it('indexes sampled frames into the own-tenant cache index under the media role', async () => {
+    const staged = path.join(
+      pathResolver.rootDir(),
+      `active/shared/staging/confidential/${TENANT}/watch-${randomUUID()}`
+    );
+    safeMkdir(staged, { recursive: true });
+    const video = path.join(staged, 'demo.mp4');
+    safeWriteFile(video, Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom')]));
+    const indexId = `watch${randomUUID().replace(/-/gu, '').slice(0, 12)}`;
+    const indexPath = path.join(
+      pathResolver.rootDir(),
+      `active/shared/cache/confidential/${TENANT}/perception/semantic/${indexId}.json`
+    );
+    try {
+      // Before-state: the grant-less interactive identity cannot read the
+      // cache-floor index subtree — the residual this change fixes.
+      expect(validateReadPermission(indexPath).allowed).toBe(false);
+      const deps = createFakeDeps({
+        ffprobe: PROBE_SILENT,
+        frameCount: 2,
+        guardedReads: true,
+      });
+      deps.enhancements = {
+        index: (options: SemanticIndexOptions) =>
+          indexMedia(options, { provider: fakeEmbeddingProvider }),
+      };
+      const result = await runWatchCommand(
+        [video, '--index', indexId, '--embedding-model', 'unused-fake-model'],
+        () => {},
+        deps
+      );
+      expect(result?.index).toMatchObject({
+        index_id: indexId,
+        entries: 2,
+        provider: 'test-embedder-v1',
+      });
+      // The interactive identity outside the wrap still cannot read it.
+      expect(validateReadPermission(indexPath).allowed).toBe(false);
+      expect(() => safeLstat(indexPath)).toThrow();
+    } finally {
+      safeRmSync(staged, { recursive: true, force: true });
+      safeRmSync(indexPath, { force: true });
     }
   });
 });

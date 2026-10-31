@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
-import { validateReadPermission } from './tier-guard.js';
+import { validateReadPermission, validateWritePermission } from './tier-guard.js';
 import { safeLstat, safeMkdir, safeWriteFile } from './secure-io.js';
 import { withExecutionContextAsync } from './authority.js';
 import * as pathResolver from './path-resolver.js';
@@ -85,6 +85,16 @@ describe('tier-guard perception_media_worker authority role', () => {
               at('active/shared/tmp/personal/acme-corp/perception/listen-y/x.wav')
             ).allowed
           ).toBe(true);
+          // The semantic index subtree on the cache floor — the only cache
+          // domain the role grants — read and written by see|watch --index
+          // and see --search.
+          for (const tier of ['confidential', 'personal'] as const) {
+            const indexFile = `active/shared/cache/${tier}/acme-corp/perception/semantic/demo.json`;
+            expect(validateReadPermission(at(indexFile)).allowed, indexFile).toBe(true);
+            expect(validateWritePermission(at(indexFile)).allowed, indexFile).toBe(true);
+            const indexDir = `active/shared/cache/${tier}/acme-corp/perception/`;
+            expect(validateReadPermission(at(indexDir)).allowed, indexDir).toBe(true);
+          }
         },
         'worker',
         TENANT
@@ -108,6 +118,17 @@ describe('tier-guard perception_media_worker authority role', () => {
           'active/shared/tmp/personal/other-co/perception/listen-x/x.wav',
           // The untenanted `shared` segment is not a partition the role owns.
           'active/shared/tmp/confidential/shared/perception/listen-x/x.wav',
+          'active/shared/cache/confidential/shared/perception/semantic/x.json',
+          // The index grant names the cache floor's perception/ subtree only:
+          // another tenant's index stays denied, and on the personal tier —
+          // where the bound persona holds no cache grant at all — every cache
+          // domain outside perception/ stays denied too (the model store and
+          // any other cache domain included).
+          'active/shared/cache/confidential/other-co/perception/semantic/x.json',
+          'active/shared/cache/personal/other-co/perception/semantic/x.json',
+          'active/shared/cache/personal/acme-corp/perception-models/face.task',
+          'active/shared/cache/personal/acme-corp/build/output.bin',
+          'active/shared/cache/personal/acme-corp/semantic/x.json',
           // Tenant knowledge is outside the media-perception surface.
           'knowledge/confidential/acme-corp/notes.md',
           'knowledge/personal/tenants/acme-corp.json',

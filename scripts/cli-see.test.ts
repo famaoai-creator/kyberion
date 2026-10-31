@@ -3,12 +3,21 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   pathResolver,
+  resetCurrentScope,
   safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
   safeWriteFile,
+  validateReadPermission,
 } from '@agent/core';
+import {
+  indexMedia,
+  searchMedia,
+  type SemanticEmbeddingProvider,
+  type SemanticIndexOptions,
+  type SemanticSearchOptions,
+} from '@agent/core/perception/semantic-index';
 import { renderSeeResult, runSeeCommand, SEE_USAGE } from './cli-see.js';
 import { createFakeDeps } from './lib/perception.test-support.js';
 
@@ -136,6 +145,18 @@ const ENV_KEYS = [
 
 const TENANT = 'acme-corp';
 
+/** Deterministic local embedder — the CLIs only forward it to the real index ops. */
+const fakeEmbeddingProvider: SemanticEmbeddingProvider = {
+  identity: 'test-embedder-v1',
+  embed: async (inputs) => inputs.map(() => [1, 0]),
+};
+const realIndexOps = {
+  index: (options: SemanticIndexOptions) =>
+    indexMedia(options, { provider: fakeEmbeddingProvider }),
+  search: (options: SemanticSearchOptions) =>
+    searchMedia(options, { provider: fakeEmbeddingProvider }),
+};
+
 describe('pnpm kyberion see under a persisted confidential tenant scope', () => {
   const saved: Partial<Record<(typeof ENV_KEYS)[number], string | undefined>> = {};
 
@@ -148,6 +169,9 @@ describe('pnpm kyberion see under a persisted confidential tenant scope', () => 
     // role, persona resolves to 'unknown'.
     process.env.KYBERION_TIER = 'confidential';
     process.env.KYBERION_TENANT = TENANT;
+    // currentScope() is process-cached; drop any scope resolved under a
+    // different env so the semantic-index scope check sees this binding.
+    resetCurrentScope();
   });
 
   afterEach(() => {
@@ -210,6 +234,52 @@ describe('pnpm kyberion see under a persisted confidential tenant scope', () => 
       } finally {
         process.env.KYBERION_TENANT = TENANT;
       }
+    }
+  });
+
+  it('indexes a staged image and searches the own-tenant cache index under the media role', async () => {
+    const dir = path.join(
+      pathResolver.rootDir(),
+      `active/shared/staging/confidential/${TENANT}/see-${randomUUID()}`
+    );
+    safeMkdir(dir, { recursive: true });
+    const image = path.join(dir, 'card.png');
+    safeWriteFile(image, pngHeader(320, 200));
+    const indexId = `see${randomUUID().replace(/-/gu, '').slice(0, 12)}`;
+    const indexPath = path.join(
+      pathResolver.rootDir(),
+      `active/shared/cache/confidential/${TENANT}/perception/semantic/${indexId}.json`
+    );
+    try {
+      // Before-state: the grant-less interactive identity cannot read the
+      // cache-floor index subtree — the residual this change fixes.
+      expect(() => safeLstat(indexPath)).toThrow();
+      const deps = createFakeDeps({ guardedReads: true });
+      deps.enhancements = realIndexOps;
+      const indexed = await runSeeCommand(
+        [image, '--index', indexId, '--embedding-model', 'unused-fake-model'],
+        () => {},
+        deps
+      );
+      expect(indexed?.index).toMatchObject({
+        index_id: indexId,
+        entries: 1,
+        provider: 'test-embedder-v1',
+      });
+      // The index now exists, but the unwrapped interactive identity still
+      // may not even stat it — only the wrapped --search leg reads it.
+      expect(validateReadPermission(indexPath).allowed).toBe(false);
+      expect(() => safeLstat(indexPath)).toThrow();
+      const queried = await runSeeCommand(
+        ['--search', 'card', '--index', indexId, '--embedding-model', 'unused-fake-model'],
+        () => {},
+        deps
+      );
+      expect(queried?.search).toHaveLength(1);
+      expect(queried?.search?.[0]).toMatchObject({ id: 'image', path: image });
+    } finally {
+      safeRmSync(dir, { recursive: true, force: true });
+      safeRmSync(indexPath, { force: true });
     }
   });
 });
