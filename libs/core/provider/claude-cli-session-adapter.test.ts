@@ -198,7 +198,14 @@ describe('ClaudeCliSessionAdapter (CN-01)', () => {
 
       const definitions = JSON.parse(args[args.indexOf('--agents') + 1]);
       expect(Object.keys(definitions)).toEqual(['kyberion-explorer']);
-      expect(definitions['kyberion-explorer'].tools).toEqual(['Read', 'Grep', 'Glob']);
+      expect(definitions['kyberion-explorer'].tools).toEqual([
+        'Read',
+        'Grep',
+        'Glob',
+        'LS',
+        'WebFetch',
+        'WebSearch',
+      ]);
     });
 
     it('carries the implementer permission projection and the effort flag', () => {

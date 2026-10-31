@@ -62,6 +62,22 @@ describe('claude-agent-governance — canUseTool gate', () => {
   it('allows read-only tools', async () => {
     expect((await gate('Read', { file_path: 'x' }, opts)).behavior).toBe('allow');
     expect((await gate('Grep', { pattern: 'x' }, opts)).behavior).toBe('allow');
+    expect((await gate('LS', { path: 'x' }, opts)).behavior).toBe('allow');
+    expect((await gate('WebFetch', { url: 'https://x' }, opts)).behavior).toBe('allow');
+    expect((await gate('WebSearch', { query: 'x' }, opts)).behavior).toBe('allow');
+  });
+
+  it('allows shell-state tools after audit (no new execution surface)', async () => {
+    expect((await gate('BashOutput', { shell_id: 's1' }, opts)).behavior).toBe('allow');
+    expect((await gate('KillShell', { shell_id: 's1' }, opts)).behavior).toBe('allow');
+  });
+
+  it('denies shell-state tools when the audit record cannot be written', async () => {
+    vi.mocked(auditChain.record).mockImplementationOnce(() => {
+      throw new Error('audit unavailable');
+    });
+    const denied = await gate('BashOutput', { shell_id: 's1' }, opts);
+    expect(denied.behavior).toBe('deny');
   });
 
   it('allows governed kyberion.* MCP tools', async () => {
