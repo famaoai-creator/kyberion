@@ -51,7 +51,10 @@ export const PERCEPTION_OPTIONS_HELP =
   '  --avatar-id <id> Include animation cues from tracked faces (see/watch)\n' +
   '  --index <id> --embedding-model <local-dir> Index images/video frames\n' +
   '  --search <query> --index <id> --embedding-model <local-dir> Search an existing index (see, no file)\n' +
-  '  --python <executable> Local inference Python (default python3); models never auto-download';
+  '  --python <executable> Local inference Python (default python3); models never auto-download\n' +
+  '  Model assets must be paths inside the repository the command may read: provision them under\n' +
+  '  active/shared/cache/system/perception-models/ (the documented store) or on a public /\n' +
+  '  own-tenant tmp|staging partition; other floors deny the read on protected tiers.';
 
 export function parsePerceptionOption(
   args: CommonArgs,
