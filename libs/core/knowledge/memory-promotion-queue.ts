@@ -20,6 +20,7 @@ import {
 import { assessMissionMemoryCandidate } from '../mission/mission-assessment.js';
 import { normalizeMemoryFact } from './memory-notebook.js';
 import { assertMemoryScope, type MemoryScopeEnvelope } from './memory-scope.js';
+import { credentialBindingReadiness } from '../foundation/credential-binding.js';
 import { scopeContextKey } from '../scope-context.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
@@ -431,6 +432,26 @@ function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
   }
 }
 
+/**
+ * R02: fail closed when a credential-bound tenant execution drops the
+ * candidate's scope. Inside `withTaskCredentialBinding` every non-public
+ * candidate must carry the same tenant scope — otherwise the row lands on the
+ * shared legacy queue floor, where other tenants' viewers can see it
+ * (tenant omission / cross-tenant leak). Public (product-knowledge) candidates
+ * stay unscoped by design and are unaffected. Operator runs without a binding
+ * keep the legacy behaviour.
+ */
+function assertBoundTenantScopePresent(candidate: MemoryCandidate): void {
+  const readiness = credentialBindingReadiness();
+  const boundTenant = readiness.status === 'bound' ? readiness.identity.tenantSlug : undefined;
+  if (!boundTenant || candidate.sensitivity_tier === 'public') return;
+  if (candidate.scope?.tenant_slug !== boundTenant) {
+    throw new Error(
+      `[MEMORY_SCOPE_DENIED] A ${candidate.sensitivity_tier} memory candidate must carry tenant scope '${boundTenant}' during credential-bound execution`
+    );
+  }
+}
+
 function ensureQueueDir(queuePath: string): void {
   const dir = assertSafeRepositoryPath(path.dirname(queuePath), { allowMissingLeaf: true });
   if (!safeExistsSync(dir)) safeMkdir(dir, { recursive: true });
@@ -525,6 +546,7 @@ function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): st
     summary: normalizeMemoryFact(candidate.summary, Date.parse(candidate.queued_at) || Date.now()),
   };
   assertPublicTierReferencesSafe(normalizedCandidate);
+  assertBoundTenantScopePresent(normalizedCandidate);
   const validation = validateMemoryPromotionCandidate(normalizedCandidate);
   if (!validation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${validation.errors.join('; ')}`);
@@ -626,6 +648,7 @@ function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): st
       );
     assertScopedLearningReviewUnchanged(current, next);
     assertPublicTierReferencesSafe(next);
+    assertBoundTenantScopePresent(next);
     const updatedValidation = validateMemoryPromotionCandidate(next);
     if (!updatedValidation.valid) {
       throw new Error(
