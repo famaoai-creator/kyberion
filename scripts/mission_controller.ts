@@ -1404,6 +1404,22 @@ const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
   // skipping the ~3s backend bootstrap keeps the triage loop cheap.
   'triage',
   'scope-approve',
+  // R03c — owner lifecycle verbs: deterministic state transitions + governed
+  // audit/gate writes only. verify writes the verification record; finish runs
+  // deterministic gates (intent-drift evaluation, memory ratification via git)
+  // and the retrospective, which degrades to the stub backend by design;
+  // distill's LLM path shells out to egress-attested provider profiles
+  // (runAdaptiveStructuredLlmProfile → mission-llm.ts, gated by
+  // provider-egress-policy.json), never the in-process backend chain. None of
+  // them consume tenant task credentials, so installing reasoning backends —
+  // which fails closed under a persisted tenant scope without a claim — is
+  // neither needed nor wanted. Tenant credential work still requires the
+  // claimed WorkItem dispatch; nothing here relaxes that.
+  'verify',
+  'distill',
+  'finish',
+  // Thin alias of verify for operator review flows — same code path.
+  'review-worker-output',
   // Read-only views: they read mission/organization/outbox/memory state from disk and
   // never delegate. (`status` only reports the backend; it does not need it installed.)
   'list',
