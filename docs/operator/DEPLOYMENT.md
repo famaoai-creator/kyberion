@@ -158,7 +158,10 @@ pnpm kyberion scheduler trigger-store rotate --apply --approval-request-id <id>
 It archives the full journal to a `trigger-deliveries-<stamp>.jsonl` segment, keeps
 in-flight claims, the newest 2000 stable keys (`--keep-stable <n>`) and cron receipts of
 the last 10 minutes, uses the approval once and records `trigger.store_rotate` on the
-audit chain. A dropped stable key may deliver once more.
+audit chain. A dropped stable key may deliver once more: the dry run, the approval
+summary and the audit record name how many dropped keys are still inside the 7-day
+window and their most frequent key prefixes. `--store` accepts only a
+`trigger-deliveries*.jsonl` file directly under `active/shared/runtime/`.
 
 The watchdog reads daemon heartbeats from `active/shared/runtime/heartbeats/` and records
 an ops alert to `active/shared/observability/ops-alerts.jsonl` when a configured daemon is

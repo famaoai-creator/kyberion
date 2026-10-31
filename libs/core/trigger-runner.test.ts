@@ -558,6 +558,24 @@ describe('QM-02 trigger runner', () => {
       }
     });
 
+    it('retries early when the journal shrank (rotated by another process)', async () => {
+      const { store, at } = windowFullStore();
+      const warnings = captureWarnings();
+      try {
+        await at(0).run(wake('wake:a'), async () => 'd');
+        const lines = Array.from({ length: 220 }, (_, i) =>
+          journalLine(`continuous-owner:act-${i}`, nearExpiry, 'delivered', 'wake')
+        );
+        safeWriteFile(store, `${lines.join('\n')}\n`);
+        expect(safeStat(store).size).toBeGreaterThan(64 * 1024);
+        await at(10).run(wake('wake:b'), async () => 'd');
+        expect(rotatedSegments(store)).toHaveLength(1);
+      } finally {
+        warnings.restore();
+        for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+      }
+    });
+
     it('retries early once the journal regrew by 256KB', async () => {
       const { store, at } = windowFullStore();
       const warnings = captureWarnings();
