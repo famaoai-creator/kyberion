@@ -95,7 +95,8 @@ vi.mock('../dot/dot-charter.js', () => ({
   findDotCharter: () => ({ charter: mocks.dot }),
   dotGoalRefLabel: () => undefined,
 }));
-vi.mock('../dot/dot-action-ledger.js', () => ({
+vi.mock('../dot/dot-action-ledger.js', async (original) => ({
+  ...(await original<typeof import('../dot/dot-action-ledger.js')>()),
   readDotActionLedgerStrict: () => mocks.rows,
 }));
 vi.mock('../workforce/work-coordination.js', () => ({

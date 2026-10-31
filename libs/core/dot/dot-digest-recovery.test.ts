@@ -9,6 +9,7 @@ import type { DotCharter } from './dot-charter.js';
 import type { DotActionRecord } from './dot-action-ledger.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
+import { createDotReportMarker } from './dot-result-records.js';
 const root = 'active/shared/tmp/digest-recovery-' + randomUUID();
 const charter = {
   dot_id: 'digest',
@@ -195,6 +196,38 @@ describe('terminal evidence only', () => {
   it('never calls dispatch or item-only done completion', () => {
     expect(evidence([]).status).toBe('queued');
     expect(evidence([row]).status).toBe('done');
+  });
+  it('projects a confidential marker before choosing actual terminal evidence, and refuses orphan evidence', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'marker-tenant' };
+    const c = { ...charter, scope };
+    const scopedItem = { ...item, context: { tenant_slug: scope.tenant_slug } } as WorkItem;
+    const original = {
+      ...row,
+      mode: 'pipeline' as const,
+      summary: 'actual result',
+      started_at: '2026-10-04T09:00:00.000Z',
+      completed_at: '2026-10-04T09:00:00.000Z',
+      report_to_dot_id: 'operator',
+    };
+    const marker = createDotReportMarker({
+      row: original,
+      scope,
+      reportTo: 'operator',
+      enqueuedAt: original.completed_at,
+    });
+    expect(
+      evidence([original, marker] as unknown as DotWorkResultRow[], scopedItem, c).status
+    ).toBe('done');
+    expect(evidence([marker] as unknown as DotWorkResultRow[], scopedItem, c).status).toBe(
+      'queued'
+    );
+    expect(
+      evidence(
+        [original, { ...marker, kind: 'unknown-marker' }] as unknown as DotWorkResultRow[],
+        scopedItem,
+        c
+      ).status
+    ).toBe('queued');
   });
   it('reports blocked/failed receipts honestly', () => {
     expect(evidence([{ ...row, status: 'blocked' }]).status).toBe('blocked');

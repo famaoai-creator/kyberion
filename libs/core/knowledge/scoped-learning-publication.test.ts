@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { writeGovernedArtifactJson } from '../workforce/artifact-store.js';
+import {
+  locateApprovalRequest,
+  writeLocatedApprovalRequest,
+} from '../governance/approval-store-location.js';
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext, withExecutionContextAsync } from '../authority.js';
@@ -26,7 +29,10 @@ import {
   memoryPromotionQueuePath,
   type MemoryCandidate,
 } from './memory-promotion-queue.js';
-import { requestScopedLearningApproval } from './scoped-learning-approval.js';
+import {
+  requestScopedLearningApproval,
+  recordScopedLearningPublicationConsumption,
+} from './scoped-learning-approval.js';
 import {
   computeApprovalPresentedDigest,
   decideApprovalRequest,
@@ -36,7 +42,10 @@ import {
 } from '../governance/approval-store.js';
 import { promoteMemoryCandidateToKnowledge } from './memory-promotion-workflow.js';
 import { scopedLearningMarkdownPath, assertScopedLearningScope } from './scoped-learning-domain.js';
-import { verifyScopedLearningPublication } from './scoped-learning-publication.js';
+import {
+  inspectScopedLearningPublication,
+  verifyScopedLearningPublication,
+} from './scoped-learning-publication.js';
 import { savePromotedMemoryRecord, buildPromotedMemoryMarkdown } from '../promoted-memory.js';
 import {
   registerReasoningBackend,
@@ -311,6 +320,12 @@ describe('exact scoped learning publication', () => {
         },
       });
       const partial = savePromotedMemoryRecord(distilled);
+      const publication = inspectScopedLearningPublication(approved);
+      recordScopedLearningPublicationConsumption(approved, publication);
+      const [channel, id] = f.approvalRef.split(':');
+      const consumed = loadApprovalRequest(channel!, id!)!.consumption;
+      recordScopedLearningPublicationConsumption(approved, publication);
+      expect(loadApprovalRequest(channel!, id!)!.consumption).toEqual(consumed);
       const mdPath = pathResolver.rootResolve(partial.logicalPath);
       const jsonPath = mdPath.replace(/\.md$/, '.json');
       const original = safeReadFile(jsonPath, { encoding: 'utf8' });
@@ -321,6 +336,95 @@ describe('exact scoped learning publication', () => {
       });
       expect(safeReadFile(jsonPath, { encoding: 'utf8' })).toBe(original);
       expect(verifyScopedLearningPublication(promoted.candidate)).toBeDefined();
+      expect(loadApprovalRequest(channel!, id!)!.consumption).toEqual(consumed);
+    }));
+
+  it('refuses a detached approved snapshot after the actual partial candidate was rejected', () =>
+    withExecutionContext('ecosystem_architect', () => {
+      const f = fixture();
+      const approved = f.approve();
+      savePromotedMemoryRecord(
+        createDistillCandidateRecord({
+          candidate_id: approved.candidate_id,
+          source_type: 'task_session',
+          task_session_id: approved.source_ref.slice('task_session:'.length),
+          tier: 'confidential',
+          scope: f.scope,
+          title: f.curation.title,
+          summary: f.curation.summary,
+          status: 'proposed',
+          target_kind: 'sop_candidate',
+          evidence_refs: approved.evidence_refs,
+          metadata: {
+            knowledge_domain: 'organization',
+            procedure_steps: [f.curation.content],
+            approved_payload_digest: approved.learning_approval!.payload_digest,
+          },
+        })
+      );
+      const publication = inspectScopedLearningPublication(approved);
+      const paths = [publication.markdown_path, publication.record_path];
+      const bytes = paths.map((file) =>
+        safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' })
+      );
+      updateMemoryPromotionCandidateStatus({
+        candidateId: approved.candidate_id,
+        scope: f.scope,
+        status: 'rejected',
+      });
+      const queue = safeReadFile(memoryPromotionQueuePath(f.scope), { encoding: 'utf8' });
+      const [channel, id] = f.approvalRef.split(':');
+      const approval = loadApprovalRequest(channel!, id!);
+      expect(() => recordScopedLearningPublicationConsumption(approved, publication)).toThrow(
+        /APPROVAL_REQUIRED/
+      );
+      expect(loadApprovalRequest(channel!, id!)).toEqual(approval);
+      expect(loadApprovalRequest(channel!, id!)!.consumption).toBeUndefined();
+      expect(safeReadFile(memoryPromotionQueuePath(f.scope), { encoding: 'utf8' })).toBe(queue);
+      expect(
+        paths.map((file) => safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }))
+      ).toEqual(bytes);
+    }));
+
+  it('refuses queued, missing, foreign and stale consumption selectors without new consent use', async () =>
+    withExecutionContextAsync('ecosystem_architect', async () => {
+      registerReasoningBackend(stubReasoningBackend);
+      const f = fixture();
+      f.approve();
+      const published = await promoteMemoryCandidateToKnowledge({
+        candidateId: f.queued.candidate_id,
+        scope: f.scope,
+      });
+      const candidate = published.candidate;
+      const publication = candidate.learning_publication!;
+      const queuedFixture = fixture();
+      const queued = loadMemoryPromotionCandidate(
+        queuedFixture.queued.candidate_id,
+        queuedFixture.scope
+      )!;
+      expect(() =>
+        recordScopedLearningPublicationConsumption({ ...queued, status: 'approved' }, publication)
+      ).toThrow(/APPROVAL_REQUIRED/);
+      const [channel, id] = f.approvalRef.split(':');
+      const before = loadApprovalRequest(channel!, id!);
+      const invalid = [
+        { ...candidate, candidate_id: 'MEM-MISSING' },
+        { ...candidate, scope: { ...f.scope, project_id: 'other-project' } },
+        { ...candidate, curation: { ...candidate.curation!, content: 'Different unreviewed SOP' } },
+      ];
+      for (const detached of invalid)
+        expect(() => recordScopedLearningPublicationConsumption(detached, publication)).toThrow(
+          /CANDIDATE_CONFLICT|STALE_PAYLOAD/
+        );
+      expect(() =>
+        recordScopedLearningPublicationConsumption(candidate, {
+          ...publication,
+          markdown_sha256: '0'.repeat(64),
+        })
+      ).toThrow(/PUBLICATION_INVALID/);
+      expect(loadApprovalRequest(channel!, id!)).toEqual(before);
+      const [queuedChannel, queuedId] = queuedFixture.approvalRef.split(':');
+      expect(loadApprovalRequest(queuedChannel!, queuedId!)!.consumption).toBeUndefined();
     }));
 
   it.each(['markdown_only', 'conflicting_record', 'conflicting_markdown'] as const)(
@@ -436,16 +540,28 @@ describe('exact scoped learning publication', () => {
         )
       ).toBe(false);
       expect(verifyScopedLearningPublication(published.candidate)).toBeDefined();
+      recordScopedLearningPublicationConsumption(
+        published.candidate,
+        published.candidate.learning_publication!
+      );
       const [channel, id] = used.approvalRef.split(':');
       const record = loadApprovalRequest(channel!, id!)!;
+      expect(loadApprovalRequest(channel!, id!)!.consumption).toEqual(record.consumption);
       const withoutConsumption = { ...record };
       delete withoutConsumption.consumption;
-      writeGovernedArtifactJson(
-        'mission_controller',
-        approvalRequestLogicalPath(channel!, id!),
-        withoutConsumption
-      );
+      const located = locateApprovalRequest(channel!, id!);
+      expect(located?.partition).toMatchObject({ kind: 'tenant' });
+      if (!located) throw new Error('Missing fixture approval location');
+      writeLocatedApprovalRequest('mission_controller', located, withoutConsumption);
+      expect(loadApprovalRequest(channel!, id!)).toEqual(withoutConsumption);
       expect(verifyScopedLearningPublication(published.candidate)).toBeUndefined();
+      expect(() =>
+        recordScopedLearningPublicationConsumption(
+          published.candidate,
+          published.candidate.learning_publication!
+        )
+      ).toThrow();
+      expect(loadApprovalRequest(channel!, id!)!.consumption).toBeUndefined();
       expect(
         verifyScopedLearningPublication({
           ...unused.queued,
