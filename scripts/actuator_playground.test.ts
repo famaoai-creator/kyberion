@@ -7,12 +7,16 @@ import * as nodePath from 'node:path';
 import {
   actuatorAcceptsPipeline,
   buildPipelineWrappedPayload,
+  buildPlaygroundEmitNextSteps,
   buildPlaygroundPayload,
   buildSessionAdf,
+  dropLastPlaygroundStep,
   emitPlaygroundSessionAdf,
   evaluatePlaygroundDryRun,
+  listPlaygroundSessions,
   lookupDiscoveryOpKind,
   parsePlaygroundParams,
+  readPlaygroundSession,
   recordPlaygroundStep,
   resetPlaygroundSession,
   resolveActuatorDomain,
@@ -483,7 +487,7 @@ describe('actuator playground session recording → ADF emit', () => {
     expect(adf.session_id).toBe('secrets-flow');
   });
 
-  it('emits via the CLI boundary and prints the promote next step', async () => {
+  it('emits via the CLI boundary and prints the verified-evidence run card', async () => {
     resetPlaygroundSession('cli-flow', scratchDir);
     recordPlaygroundStep(
       'cli-flow',
@@ -500,6 +504,8 @@ describe('actuator playground session recording → ADF emit', () => {
     const result = await runPlayground(['--emit-adf', 'cli-flow', '--name', 'cli-flow-pipe'], {
       print: (value) => printed.push(value),
       scratchDir,
+      findTrustApproval: () => null,
+      evaluateTrustDelegation: () => null,
       resolveExecutable: () => {
         throw new Error('emit must not resolve executables');
       },
@@ -509,7 +515,232 @@ describe('actuator playground session recording → ADF emit', () => {
     expect(safeExistsSync(outPath)).toBe(true);
     const adf = JSON.parse(String(safeReadFile(outPath)));
     expect(adf.pipeline_id).toBe('cli-flow-pipe');
+    // The promote command requires the engine run id of this exact draft —
+    // the card walks project-trust → run → promote instead of the dead
+    // bare-promote hint the playground used to print.
+    const steps = result?.next_steps as string[];
+    expect(steps[0]).toContain('project-trust request');
+    expect(steps[2]).toContain('pnpm pipeline --input');
+    expect(steps[2]).toContain('--project-trust-approval');
+    expect(steps[3]).toContain('pipeline:promote');
+    expect(steps[3]).toContain('--run <run-id>');
     expect(String(printed.at(-1))).toContain('pipeline:promote');
+  });
+
+  it('shortens the run card when a valid approval already exists', async () => {
+    resetPlaygroundSession('approved-flow', scratchDir);
+    recordPlaygroundStep(
+      'approved-flow',
+      {
+        actuator_id: 'file-actuator',
+        domain: 'file',
+        op: 'read',
+        kind: 'capture',
+        params: { path: 'package.json' },
+      },
+      scratchDir
+    );
+    const result = await runPlayground(['--emit-adf', 'approved-flow'], {
+      json: true,
+      scratchDir,
+      findTrustApproval: () => 'req-123',
+      evaluateTrustDelegation: () => {
+        throw new Error('must not probe charters when an approval already exists');
+      },
+    });
+    const steps = result?.next_steps as string[];
+    expect(steps).toHaveLength(2);
+    expect(steps[0]).toContain('--project-trust-approval req-123');
+    expect(steps[1]).toContain('--run <run-id>');
+  });
+
+  it('opens a project-trust request with --request-trust and prints its id', async () => {
+    resetPlaygroundSession('trust-flow', scratchDir);
+    recordPlaygroundStep(
+      'trust-flow',
+      {
+        actuator_id: 'file-actuator',
+        domain: 'file',
+        op: 'read',
+        kind: 'capture',
+        params: { path: 'package.json' },
+      },
+      scratchDir
+    );
+    const requestTrustApproval = vi.fn(() => ({
+      id: 'req-999',
+      storageChannel: 'project-trust',
+    }));
+    const result = await runPlayground(['--emit-adf', 'trust-flow', '--request-trust'], {
+      json: true,
+      scratchDir,
+      requestTrustApproval,
+      findTrustApproval: () => {
+        throw new Error('must not probe approvals when --request-trust is given');
+      },
+    });
+    expect(requestTrustApproval).toHaveBeenCalledWith(
+      expect.stringContaining('trust-flow.adf.json')
+    );
+    expect(result).toMatchObject({ trust_request_id: 'req-999' });
+    const steps = result?.next_steps as string[];
+    expect(steps[0]).toContain('approve req-999 project-trust');
+    expect(steps[1]).toContain('--project-trust-approval req-999');
+  });
+
+  it('prints the delegated run when a charter covers the trust grant', async () => {
+    resetPlaygroundSession('delegated-flow', scratchDir);
+    recordPlaygroundStep(
+      'delegated-flow',
+      {
+        actuator_id: 'file-actuator',
+        domain: 'file',
+        op: 'read',
+        kind: 'capture',
+        params: { path: 'package.json' },
+      },
+      scratchDir
+    );
+    const result = await runPlayground(['--emit-adf', 'delegated-flow'], {
+      json: true,
+      scratchDir,
+      findTrustApproval: () => null,
+      evaluateTrustDelegation: () => ({ delegatedScope: 'tenant:acme', charterId: 'chr-7' }),
+    });
+    expect(result).toMatchObject({ delegated_scope: 'tenant:acme', delegated_charter_id: 'chr-7' });
+    const steps = result?.next_steps as string[];
+    expect(steps).toHaveLength(2);
+    expect(steps[0]).toContain('--delegated-trust tenant:acme');
+    expect(steps[1]).toContain('--run <run-id>');
+  });
+
+  it('fills redacted placeholders into the run context hint', () => {
+    const steps = buildPlaygroundEmitNextSteps({
+      adfRepoPath: 'active/shared/tmp/x.adf.json',
+      redactedKeys: ['api_key'],
+      trustRequestId: 'req-1',
+    });
+    expect(steps[0]).toContain(`--context '{"api_key":"<value>"}'`);
+    const delegated = buildPlaygroundEmitNextSteps({
+      adfRepoPath: 'active/shared/tmp/x.adf.json',
+      redactedKeys: [],
+      delegatedScope: 'person',
+    });
+    expect(delegated[0]).toContain('--delegated-trust person');
+  });
+
+  it('lists and shows recorded sessions', async () => {
+    resetPlaygroundSession('inspect-me', scratchDir);
+    recordPlaygroundStep(
+      'inspect-me',
+      {
+        actuator_id: 'file-actuator',
+        domain: 'file',
+        op: 'read',
+        kind: 'capture',
+        params: { path: 'package.json' },
+      },
+      scratchDir
+    );
+    const listed = await runPlayground(['--sessions'], { json: true, scratchDir });
+    expect(listed?.sessions).toEqual(
+      expect.arrayContaining([expect.objectContaining({ session: 'inspect-me', steps: 1 })])
+    );
+    const shown = await runPlayground(['--show', 'inspect-me'], { json: true, scratchDir });
+    expect(shown).toMatchObject({ mode: 'show', session: 'inspect-me' });
+    expect((shown?.steps as unknown[]).length).toBe(1);
+    await expect(runPlayground(['--show'], { json: true, scratchDir })).rejects.toThrow(
+      '--show requires a session name'
+    );
+    await expect(runPlayground(['--show', 'no-such'], { json: true, scratchDir })).rejects.toThrow(
+      'has no recorded steps'
+    );
+  });
+
+  it('drops the last recorded step standalone and as a run replacement', async () => {
+    resetPlaygroundSession('drop-flow', scratchDir);
+    for (const op of ['read', 'write']) {
+      recordPlaygroundStep(
+        'drop-flow',
+        {
+          actuator_id: 'file-actuator',
+          domain: 'file',
+          op,
+          kind: 'capture',
+          params: {},
+        },
+        scratchDir
+      );
+    }
+    const dropped = await runPlayground(['--record', 'drop-flow', '--drop-last'], {
+      json: true,
+      scratchDir,
+    });
+    expect(dropped).toMatchObject({ mode: 'drop-last', remaining: 1 });
+    expect((dropped?.removed as { op: string }).op).toBe('write');
+
+    // A --drop-last run records the replacement only on success.
+    const replaced = await runPlayground(
+      [
+        '--record',
+        'drop-flow',
+        '--drop-last',
+        '--actuator',
+        'file-actuator',
+        '--op',
+        'exists',
+        '--params',
+        '{"path":"package.json"}',
+      ],
+      {
+        json: true,
+        quiet: true,
+        scratchDir,
+        resolveExecutable: () => '/tmp/fake-file.js',
+        executeActuator: () => '{"status":"ok"}',
+      }
+    );
+    expect(replaced).toMatchObject({ recorded: { session: 'drop-flow', steps: 1 } });
+    const session = readPlaygroundSession('drop-flow', scratchDir);
+    expect(session.steps.map((step) => step.op)).toEqual(['exists']);
+  });
+
+  it('keeps the original step when a --drop-last replacement run fails', async () => {
+    resetPlaygroundSession('drop-fail', scratchDir);
+    recordPlaygroundStep(
+      'drop-fail',
+      {
+        actuator_id: 'file-actuator',
+        domain: 'file',
+        op: 'read',
+        kind: 'capture',
+        params: {},
+      },
+      scratchDir
+    );
+    await runPlayground(
+      [
+        '--record',
+        'drop-fail',
+        '--drop-last',
+        '--actuator',
+        'file-actuator',
+        '--op',
+        'write',
+        '--params',
+        '{"path":"active/shared/tmp/x.txt","content":"y"}',
+      ],
+      {
+        json: true,
+        quiet: true,
+        scratchDir,
+        resolveExecutable: () => '/tmp/fake-file.js',
+        executeActuator: () => {
+          throw new Error('run failed');
+        },
+      }
+    );
+    expect(readPlaygroundSession('drop-fail', scratchDir).steps.map((s) => s.op)).toEqual(['read']);
   });
 
   it('rejects malformed session flags early', async () => {
@@ -522,8 +753,20 @@ describe('actuator playground session recording → ADF emit', () => {
         scratchDir,
       })
     ).rejects.toThrow('--reset requires --record');
+    await expect(runPlayground(['--drop-last'], { json: true, scratchDir })).rejects.toThrow(
+      '--drop-last requires --record'
+    );
+    await expect(
+      runPlayground(['--request-trust', '--actuator', 'file-actuator', '--op', 'read'], {
+        json: true,
+        scratchDir,
+      })
+    ).rejects.toThrow('--request-trust requires --emit-adf');
     await expect(
       runPlayground(['--emit-adf', 'bad name!'], { json: true, scratchDir })
     ).rejects.toThrow('Invalid session name');
+    await expect(
+      runPlayground(['--record', 'empty-session', '--drop-last'], { json: true, scratchDir })
+    ).rejects.toThrow('has no recorded steps to drop');
   });
 });
