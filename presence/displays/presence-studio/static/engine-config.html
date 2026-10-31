@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="{{locale}}" data-density="comfortable">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>{{t:presence_studio:engine_config_title}} — Kyberion</title>
+    <script src="/front-desk-prefs.js"></script>
+    <link rel="stylesheet" href="/design-tokens.css" />
+    <link rel="stylesheet" href="/kyberion-ui.css" />
+    <link rel="stylesheet" href="/design-system.css" />
+    <link rel="stylesheet" href="/engine-config.css" />
+    <script type="module" src="/engine-config.js"></script>
+  </head>
+  <body>
+    <div class="kb-app-shell" data-density="comfortable">
+      <div class="kb-app-shell__nav" id="front-desk-rail">{{partial:rail}}</div>
+      <main class="kb-app-shell__main" data-engine-main>
+        <div class="engine-page" id="engine-config">
+          <header class="kb-page-header">
+            <div class="kb-page-header__titles">
+              <a href="/help">{{t:presence_studio:engine_config_back}}</a>
+              <h1 class="kb-page-header__title">
+                {{t:presence_studio:engine_config_title}}
+                <span class="kb-badge" data-role="presence-studio"
+                  >{{t:presence_studio:shell_role_badge}}</span
+                >
+              </h1>
+              <p>{{t:presence_studio:engine_config_description}}</p>
+            </div>
+            {{partial:shell-controls}}
+          </header>
+          <section class="kb-section" aria-labelledby="engine-profile-label">
+            <h2 class="kb-section__title" id="engine-profile-label">
+              {{t:presence_studio:engine_config_profile}}
+            </h2>
+            <p id="engine-profile">{{t:presence_studio:engine_config_profile_unknown}}</p>
+          </section>
+          <form id="engine-form">
+            <fieldset id="engine-fields" disabled>
+              <legend>{{t:presence_studio:engine_config_fields}}</legend>
+              <p id="engine-clear-help">{{t:presence_studio:engine_config_clear_help}}</p>
+              <div class="engine-fields">
+                <div class="engine-field">
+                  <label for="engine-ffmpeg_bin"
+                    >{{t:presence_studio:engine_config_ffmpeg_bin}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-ffmpeg_bin"
+                    name="ffmpeg_bin"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-binary-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-ffprobe_bin"
+                    >{{t:presence_studio:engine_config_ffprobe_bin}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-ffprobe_bin"
+                    name="ffprobe_bin"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-binary-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-python_bin"
+                    >{{t:presence_studio:engine_config_python_bin}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-python_bin"
+                    name="python_bin"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-binary-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-audio_record_command"
+                    >{{t:presence_studio:engine_config_audio_record_command}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-audio_record_command"
+                    name="audio_record_command"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-record-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-audio_playback_backend"
+                    >{{t:presence_studio:engine_config_audio_playback_backend}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-audio_playback_backend"
+                    name="audio_playback_backend"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-bridge-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-fluid_audio_stt_command"
+                    >{{t:presence_studio:engine_config_fluid_audio_stt_command}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-fluid_audio_stt_command"
+                    name="fluid_audio_stt_command"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-fluid-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-streaming_stt_bridge"
+                    >{{t:presence_studio:engine_config_streaming_stt_bridge}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-streaming_stt_bridge"
+                    name="streaming_stt_bridge"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-bridge-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-streaming_tts_bridge"
+                    >{{t:presence_studio:engine_config_streaming_tts_bridge}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-streaming_tts_bridge"
+                    name="streaming_tts_bridge"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-bridge-help"
+                  />
+                </div>
+                <div class="engine-field">
+                  <label for="engine-agent_runtime_backend"
+                    >{{t:presence_studio:engine_config_agent_runtime_backend}}</label
+                  ><select
+                    class="kb-input"
+                    id="engine-agent_runtime_backend"
+                    name="agent_runtime_backend"
+                  >
+                    <option value="">{{t:presence_studio:engine_config_mode_default}}</option>
+                    <option value="pipe">{{t:presence_studio:engine_config_mode_pipe}}</option>
+                    <option value="pane">{{t:presence_studio:engine_config_mode_pane}}</option>
+                  </select>
+                </div>
+                <div class="engine-field">
+                  <label for="engine-agent_pane_runtime_provider"
+                    >{{t:presence_studio:engine_config_agent_pane_runtime_provider}}</label
+                  ><input
+                    class="kb-input"
+                    type="text"
+                    id="engine-agent_pane_runtime_provider"
+                    name="agent_pane_runtime_provider"
+                    autocomplete="off"
+                    spellcheck="false"
+                    aria-describedby="engine-bridge-help"
+                  />
+                </div>
+              </div>
+              <div class="engine-guidance">
+                <p id="engine-binary-help">{{t:presence_studio:engine_config_binary_help}}</p>
+                <p id="engine-record-help">{{t:presence_studio:engine_config_record_help}}</p>
+                <p id="engine-fluid-help">{{t:presence_studio:engine_config_fluid_help}}</p>
+                <p id="engine-bridge-help">{{t:presence_studio:engine_config_bridge_help}}</p>
+              </div>
+            </fieldset>
+            <div class="engine-actions">
+              <button class="kb-btn kb-btn--primary" type="submit" id="engine-save" disabled>
+                {{t:presence_studio:engine_config_save}}</button
+              ><button class="kb-btn kb-btn--secondary" type="button" id="engine-reload" disabled>
+                {{t:presence_studio:engine_config_reload}}
+              </button>
+            </div>
+          </form>
+          <p id="engine-status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">
+            {{t:presence_studio:engine_config_loading}}
+          </p>
+          <div hidden>
+            <span data-message="loading">{{t:presence_studio:engine_config_loading}}</span
+            ><span data-message="ready">{{t:presence_studio:engine_config_ready}}</span
+            ><span data-message="saving">{{t:presence_studio:engine_config_saving}}</span
+            ><span data-message="saved">{{t:presence_studio:engine_config_saved}}</span
+            ><span data-message="unchanged">{{t:presence_studio:engine_config_unchanged}}</span
+            ><span data-message="load_failed">{{t:presence_studio:engine_config_load_failed}}</span
+            ><span data-message="save_failed">{{t:presence_studio:engine_config_save_failed}}</span
+            ><span data-message="denied">{{t:presence_studio:engine_config_denied}}</span
+            ><span data-message="conflict">{{t:presence_studio:engine_config_conflict}}</span
+            ><span data-message="invalid">{{t:presence_studio:engine_config_invalid}}</span
+            ><span data-message="profile_personal"
+              >{{t:presence_studio:engine_config_profile_personal}}</span
+            ><span data-message="profile_customer"
+              >{{t:presence_studio:engine_config_profile_customer}}</span
+            >
+          </div>
+        </div>
+      </main>
+    </div>
+    <script type="module" src="/front-desk-rail.js"></script>
+    <script type="module">
+      if (window.FrontDeskRail)
+        window.FrontDeskRail.mount(document.getElementById("front-desk-rail"), { current: null });
+    </script>
+  </body>
+</html>

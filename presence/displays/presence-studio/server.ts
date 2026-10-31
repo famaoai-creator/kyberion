@@ -96,6 +96,7 @@ import { registerHearingLedgerRoutes } from './hearing-ledger-routes.js';
 import { registerComponentHostRoutes } from './component-host-routes.js';
 import { registerTrainingRoutes } from './training-routes.js';
 import { registerVoiceSynthesizeRoute } from './voice-synthesize-route.js';
+import { registerEngineConfigRoute } from './engine-config-route.js';
 import { registerWorkInventoryRoutes } from './work-inventory-routes.js';
 import { registerAvatarRoutes } from './avatar-routes.js';
 import { PRESENCE_STUDIO_VOCABULARY_KEYS } from './front-desk-pages.js';
@@ -172,6 +173,8 @@ registerWorkInventoryRoutes(presenceStudioData.app);
 registerAvatarRoutes(presenceStudioData.app);
 // PA-09: return-audio TTS for the talking avatar — see voice-synthesize-route.ts.
 registerVoiceSynthesizeRoute(presenceStudioData.app);
+// Engine-runtime preferences (mirrors `kyberion voice engine-config`) — see engine-config-route.ts.
+registerEngineConfigRoute(presenceStudioData.app);
 
 presenceStudioData.app.get('/health', (_req, res) => {
   res.json({

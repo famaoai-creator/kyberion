@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { nowIso } from '../foundation/time.js';
 import { readJson, writeJson } from '../foundation/json.js';
 import { credentialBindingReadiness } from '../foundation/credential-binding.js';
+import { withEngineRuntimePreferencesTransaction } from './engine-runtime-preferences-transaction.js';
 import { inspectReadPermission } from '../tier-guard.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
@@ -208,35 +209,57 @@ export function previewEngineRuntimePreferences(
   return normalizeAndValidatePreferences(next, preferencesPath());
 }
 
-export function saveEngineRuntimePreferences(
-  patch: EngineRuntimePreferencesPatch
-): EngineRuntimePreferences {
-  const validated = previewEngineRuntimePreferences(patch);
-  const filePath = preferencesPath();
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  writeJson(filePath, validated);
-  resetEngineRuntimePreferencesCache();
-  return validated;
-}
-
-/** Restore empty defaults (env and built-in resolution win). */
-export function resetEngineRuntimePreferences(): EngineRuntimePreferences {
-  // Reset may repair malformed previous JSON, but never bypass current read
-  // authority. Authorize the path without consuming the invalid previous value.
+/** Permission-only admission precedes lock metadata and preserves reset repair. */
+function authorizeMutationTarget(repair: boolean): string {
   credentialBindingReadiness();
   const filePath = preferencesTarget(true);
   const permission = inspectReadPermission(filePath);
-  if (!permission.allowed)
+  if (!permission.allowed) {
+    if (
+      !repair &&
+      permission.denialKind === 'tier_restriction' &&
+      filePath === pathResolver.knowledge('personal/onboarding/engine-runtime.json')
+    )
+      throw new Error(
+        '[ENGINE_RUNTIME_PREFERENCES_UNAVAILABLE] Personal profile is not authorized in this execution; use an authorized operator context for configuration.'
+      );
     throw new Error(
       '[ENGINE_RUNTIME_PREFERENCES_READ_DENIED] ' +
         (permission.reason || 'Profile read is not authorized')
     );
-  assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
-  const validated = normalizeAndValidatePreferences(
-    { ...defaultPreferences(), updated_at: nowIso() },
-    filePath
-  );
-  safeMkdir(path.dirname(filePath), { recursive: true });
-  writeJson(filePath, validated);
-  return validated;
+  }
+  return filePath;
+}
+function mutatePreferences<T>(action: (filePath: string) => T, repair = false): T {
+  const filePath = authorizeMutationTarget(repair);
+  const relative = path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
+  return withEngineRuntimePreferencesTransaction(relative, () => {
+    assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+    return action(filePath);
+  });
+}
+export function saveEngineRuntimePreferences(
+  patch: EngineRuntimePreferencesPatch
+): EngineRuntimePreferences {
+  return mutatePreferences((filePath) => {
+    // Fresh read/merge/validation and publication share the API/CLI transaction.
+    const validated = previewEngineRuntimePreferences(patch);
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    writeJson(filePath, validated);
+    resetEngineRuntimePreferencesCache();
+    return validated;
+  });
+}
+
+/** Restore empty defaults, including repair of malformed previous JSON. */
+export function resetEngineRuntimePreferences(): EngineRuntimePreferences {
+  return mutatePreferences((filePath) => {
+    const validated = normalizeAndValidatePreferences(
+      { ...defaultPreferences(), updated_at: nowIso() },
+      filePath
+    );
+    safeMkdir(path.dirname(filePath), { recursive: true });
+    writeJson(filePath, validated);
+    return validated;
+  }, true);
 }
