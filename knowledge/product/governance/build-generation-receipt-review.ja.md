@@ -31,7 +31,7 @@ last_updated: 2026-10-31
 
 保存先 `dist/.build-generation.json`:
 
-- **利点**: receipt が記述する成果物と寿命が一致する。`pnpm clean`、dist の差し替え、別 worktree での再生成で receipt も消えるため、「dist だけが消えて receipt が残り続ける」 orphan 証跡にならない。`dist/.session-build-head` (agent-worktree 所有) と同じ floor・同じ寿命で、既存慣行に一致する。
+- **利点**: receipt が記述する成果物と寿命が一致する。`pnpm build` 先頭の clean ステージ (`scripts/clean.ts`)、dist の差し替え、別 worktree での再生成で receipt も消えるため、「dist だけが消えて receipt が残り続ける」 orphan 証跡にならない。`dist/.session-build-head` (agent-worktree 所有) と同じ floor・同じ寿命で、既存慣行に一致する。
 - **制約**: `dist/` は gitignore されるため receipt は repo 外証跡であり、CI artifact への採取 (pr-validation.yml の `build_generation` 行) は既に別経路で担保されている。
 - **代替案との比較**: `active/shared/runtime/` 配下に置く案は receipt が dist より長生きし、dist 差し替え後に旧世代の証跡を誤って名乗る余地がある。dist 同居は「receipt は dist の属性」のモデルとして正しい選択。
 

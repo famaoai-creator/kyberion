@@ -54,6 +54,7 @@ import '@agent/core/virtual/virtual-device-inventory-bridge';
 import '@agent/core/voice/voice-bridge';
 import '@agent/core/voice/vad-registry';
 import '@agent/core/environment-capability';
+import '@agent/core/build-readiness';
 import { defineScript, isDirectScript } from './lib/harness.js';
 
 export interface BindingInspectionSnapshot extends SeamBindingSnapshot {
