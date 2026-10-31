@@ -28,8 +28,8 @@ import {
   setWorkCoordinationNamespace,
 } from '@agent/core';
 import { withTaskCredentialBinding } from '@agent/core/secret/secret-resolver';
-import { createMission } from '../scripts/refactor/mission-creation.js';
-import { loadState, saveState } from '../scripts/refactor/mission-state.js';
+import { createMission } from '@agent/core/mission/mission-creation';
+import { loadState, saveState } from '@agent/core/mission/mission-state';
 import { runSteps } from '../scripts/run_pipeline.ts';
 import { runActionItemReminderSweep } from '../scripts/action_item_reminders.js';
 

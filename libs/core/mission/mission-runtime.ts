@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-runtime.ts
+ * libs/core/mission/mission-runtime.ts
  * Mission team and runtime control helpers.
  */
 

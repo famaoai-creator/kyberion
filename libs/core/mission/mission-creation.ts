@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-creation.ts
+ * libs/core/mission/mission-creation.ts
  * Mission creation and activation helpers.
  */
 

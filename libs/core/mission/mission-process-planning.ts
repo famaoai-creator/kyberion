@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-process-planning.ts
+ * libs/core/mission/mission-process-planning.ts
  *
  * Applies a mission's process template (workflow catalog phase specs) to the
  * mission directory: expands the per-phase default tasks into NEXT_TASKS.json,

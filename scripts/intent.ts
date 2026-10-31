@@ -29,12 +29,12 @@ import {
   getActiveMissionSearchDirs,
   listMissionsInSearchDirs,
   loadState,
-} from './refactor/mission-state.js';
+} from '@agent/core/mission/mission-state';
 import { readMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
 import { boundTenant, missionTierScanDirs } from '@agent/core/owner-scope';
 import { isMissionLookupRefusal, missionPathOrNull } from '@agent/core/mission-lookup';
 import { validateReadPermission } from '@agent/core/tier-guard';
-import type { MissionState } from './refactor/mission-types.js';
+import type { MissionState } from '@agent/core/mission/mission-types';
 
 type IntentTraceSource = 'mission' | 'snapshot' | 'delta' | 'memory' | 'trace' | 'audit';
 

@@ -30,7 +30,7 @@ Each persona directory holds:
 1. **Assignment**: `mission_controller start <ID> --persona <role_slug>` (default: `worker`,
    which has no directory here — no procedure gets injected for the default).
 2. **Mirroring**: `syncRoleProcedure(missionId, persona)`
-   (`scripts/refactor/mission-governance.ts`) runs once at mission activation. If
+   (`libs/core/mission/mission-governance.ts`) runs once at mission activation. If
    `knowledge/product/roles/{persona}/PROCEDURE.md` exists, it's copied into the mission
    directory as `ROLE_PROCEDURE.md`. If the persona has no matching directory, this is a
    silent no-op (logged as a warning) — check the mission log if a procedure you expected
@@ -43,4 +43,4 @@ Each persona directory holds:
 
 Renaming a persona directory or moving `PROCEDURE.md` breaks step 2 silently (falls through to
 "no procedure found, using default") rather than erroring — grep for the slug in
-`scripts/refactor/mission-governance.ts` before renaming.
+`libs/core/mission/mission-governance.ts` before renaming.

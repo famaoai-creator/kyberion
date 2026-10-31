@@ -7,7 +7,7 @@ export {
 import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
 import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
 /**
- * scripts/refactor/mission-workitem-dispatch.ts
+ * libs/core/mission/mission-workitem-dispatch.ts
  * Mission work item execution dispatch for registered tickets.
  */
 

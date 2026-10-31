@@ -122,4 +122,4 @@ is tracked as a follow-up — for now, paste the JSON into the
 - [`multi-tenant-operations.md`](../architecture/multi-tenant-operations.md)
 - [`libs/core/tier-guard.ts`](../../../libs/core/tier-guard.ts) — `checkTenantScope`
 - [`libs/core/governance/audit-forwarder.ts`](../../../libs/core/governance/audit-forwarder.ts) — `TenantFilteringAuditForwarder`
-- [`scripts/refactor/mission-types.ts`](../../../scripts/refactor/mission-types.ts) — `MissionState.cross_tenant_brokerage`
+- [`libs/core/mission/mission-types.ts`](../../../libs/core/mission/mission-types.ts) — `MissionState.cross_tenant_brokerage`
