@@ -249,7 +249,7 @@ export function createLocalMultimodalEmbeddingProvider(
   const configData = JSON.parse(configText) as { model_type?: string };
   if (!['clip', 'siglip', 'siglip2'].includes(configData.model_type ?? ''))
     throw new Error(
-      '[SEMANTIC_MODEL] Use a local CLIP or SigLIP model with built-in Transformers support'
+      '[SEMANTIC_MODEL] Use a local CLIP or SigLIP model with built-in Transformers support, provisioned under active/shared/cache/system/perception-models/ (or another repo path the scope may read — public or own-tenant tmp/staging)'
     );
   // Cryptographic identity covers all local config/tokenizer/weight assets in bounded reads.
   const assetNames = safeReaddir(model)
@@ -316,7 +316,7 @@ export function createLocalMultimodalEmbeddingProvider(
       );
       if (result.status !== 0 || result.error)
         throw new Error(
-          '[SEMANTIC_UNAVAILABLE] Install torch, transformers and Pillow in the selected Python runtime; supply an existing local model. ' +
+          '[SEMANTIC_UNAVAILABLE] Install torch, transformers and Pillow in the selected Python runtime; supply an existing local model (e.g. under active/shared/cache/system/perception-models/). ' +
             String(result.stderr || result.error?.message).slice(0, 2048)
         );
       let decoded: unknown;

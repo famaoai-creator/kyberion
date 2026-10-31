@@ -167,7 +167,7 @@ export function perceptionErrorNext(cls: PerceptionErrorClass): string {
     case 'backend_missing':
       return VOICE_SETUP_HINT;
     case 'assets_missing':
-      return 'install the backend model/language assets for the chosen STT backend (e.g. Apple Speech assets via System Settings, or a whisper model directory), then retry';
+      return 'install the backend model/language assets for the chosen STT backend (e.g. Apple Speech assets via System Settings, or a whisper model directory), then retry; --face-model/--diarization-model/--audio-model/--embedding-model paths must be readable repo paths — provision them under active/shared/cache/system/perception-models/ (the documented store) or a public / own-tenant tmp|staging partition';
     case 'permission_denied':
       return 'the STT backend could not read the tenant-scoped intermediate — interactive `pnpm kyberion listen` reads the scratch under the tenant-bound perception_media_worker role, so a denial means the persisted scope does not own that partition; confirm `pnpm scope` binds the right tenant, or dispatch through a claimed WorkItem whose scope owns the tier';
     case 'backend_runtime_error':
