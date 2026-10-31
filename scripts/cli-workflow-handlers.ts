@@ -46,6 +46,7 @@ import { main as taskListMain } from './task_list.js';
 import { main as taskRunMain } from './task_run.js';
 import { main as taskSmokeMain } from './task_smoke.js';
 import { ScriptExitError } from './lib/harness.js';
+import { credentialBindingReadiness } from '@agent/core/foundation/credential-binding';
 import { parseCliWorkflowOptions, parseOffboardArgs } from './cli-offboard-args.js';
 export { parseOffboardArgs, type ParsedOffboardCommand } from './cli-offboard-args.js';
 
@@ -112,6 +113,28 @@ function printCalendarResult(result: unknown, options: Record<string, string | b
   }
   printHeader();
   printText(JSON.stringify(result, null, 2));
+}
+
+/**
+ * R03a: additive readiness annotation — pure status output reports whether
+ * real connection work would need a trusted task binding, with the governed
+ * next step. Never resolves credentials; `bound`/`binding_required` are the
+ * two non-operator answers, kept distinct so "not connected" is not confused
+ * with "cannot diagnose".
+ */
+export function credentialBindingStatusField(): {
+  status: 'bound' | 'binding_required' | 'operator';
+  next?: string;
+} {
+  const readiness = credentialBindingReadiness();
+  return {
+    status: readiness.status,
+    ...(readiness.status === 'binding_required'
+      ? {
+          next: 'a tenant scope is active without a trusted task binding — live provider operations keep requiring dispatch through a claimed WorkItem (mission dispatch-workitems); `status`/`latest-draft` remain available as readiness views',
+        }
+      : {}),
+  };
 }
 
 function printEmailHelp(locale = resolveLocale()): void {
@@ -427,13 +450,28 @@ export async function handleEmailWorkflowCommand(
 
   if (subcommand === 'status') {
     printHeader();
-    printText(JSON.stringify({ accounts: listEmailAccountProviders() }, null, 2));
+    printText(
+      JSON.stringify(
+        {
+          accounts: listEmailAccountProviders(),
+          credential_binding: credentialBindingStatusField(),
+        },
+        null,
+        2
+      )
+    );
     return;
   }
 
   if (subcommand === 'latest-draft') {
     printHeader();
-    printText(JSON.stringify(readEmailDraftArtifact(), null, 2));
+    printText(
+      JSON.stringify(
+        { ...readEmailDraftArtifact(), credential_binding: credentialBindingStatusField() },
+        null,
+        2
+      )
+    );
     return;
   }
 
@@ -550,7 +588,7 @@ export async function handleCalendarWorkflowCommand(
   if (subcommand === 'status') {
     const provider = getCalendarProvider(options);
     const status = await readCalendarProviderAuthStatus(provider);
-    printCalendarResult(status, options);
+    printCalendarResult({ ...status, credential_binding: credentialBindingStatusField() }, options);
     return;
   }
 

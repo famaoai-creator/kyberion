@@ -1260,15 +1260,33 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
 
 /**
  * LC-13: metadata/status commands must not pay the provider, embedding, or
- * voice bootstrap cost. `list --check` is the explicit exception because it
- * asks for live runtime capability probes.
+ * voice bootstrap cost.
+ *
+ * R03a: readiness observations never need the reasoning bootstrap — it would
+ * die on CREDENTIAL_BINDING_REQUIRED under a persisted tenant scope before
+ * the probe even runs. `list` (including `--check`, whose capability probes
+ * only observe host binaries/devices, never installed reasoning backends)
+ * and the pure status subcommands of `calendar`/`email` skip it. Their real
+ * connection verbs (list-calendars, agenda, deliver, draft…) keep the
+ * bootstrap — and with it the deny-without-claim requirement — unchanged.
  */
+const PURE_READINESS_SUBCOMMANDS: Record<string, ReadonlySet<string>> = {
+  calendar: new Set(['status']),
+  email: new Set(['status', 'latest-draft']),
+};
+
 export function shouldBootstrapRuntime(args: string[]): boolean {
   const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const command = normalizedArgs[0] || 'help';
   // Command-level help is discovery, including model-backed command nouns.
   if (normalizedArgs.slice(0, 2).some((arg) => arg === '--help' || arg === '-h')) return false;
-  if (command === 'list') return normalizedArgs.includes('--check');
+  if (command === 'list') return false;
+  const readiness = PURE_READINESS_SUBCOMMANDS[command];
+  if (readiness) {
+    const subcommand = normalizedArgs[1];
+    if (subcommand === undefined || subcommand === 'help' || readiness.has(subcommand))
+      return false;
+  }
   if (command === 'task' && normalizedArgs[1] === 'scenario') return false;
   return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
 }
