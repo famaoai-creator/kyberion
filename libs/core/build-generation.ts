@@ -14,8 +14,9 @@
  *  - Only a *completed* generation observed against a *stable* input set may
  *    be published. Failed / aborted / concurrent-modified builds never
  *    overwrite the last good receipt.
- *  - Writes go through `safeWriteFile`, which publishes atomically
- *    (temp + rename), so readers never see a torn receipt.
+ *  - Writes go through the foundation `writeJson` helper (which publishes
+ *    atomically via safeWriteFile temp + rename), so readers never see a
+ *    torn receipt.
  *  - A receipt is evidence, not authority: a present receipt never makes a
  *    build fresh by itself — the input/emit scan re-judges every time.
  *  - No secrets, no environment dumps: tool versions and hashes only.
@@ -23,7 +24,8 @@
 
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { safeExistsSync, safeReadFile, safeWriteFile } from './secure-io.js';
+import { writeJson } from './foundation/json.js';
+import { safeExistsSync, safeReadFile } from './secure-io.js';
 import type { BuildGenerationIdentity } from './build-readiness.js';
 
 export const BUILD_RECEIPT_SCHEMA_VERSION = 1;
@@ -165,7 +167,7 @@ export function publishBuildGenerationReceipt(
       'refusing to publish a build-generation receipt that is not a completed, stable-input generation'
     );
   }
-  safeWriteFile(buildGenerationReceiptPath(distDir), JSON.stringify(receipt, null, 2) + '\n');
+  writeJson(buildGenerationReceiptPath(distDir), receipt);
 }
 
 /**
