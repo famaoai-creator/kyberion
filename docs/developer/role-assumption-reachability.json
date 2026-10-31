@@ -3764,6 +3764,11 @@
       "unresolved": []
     },
     {
+      "site": "scripts/lib/perception.ts#withPerceptionMediaRole",
+      "roles": ["perception_media_worker"],
+      "unresolved": []
+    },
+    {
       "site": "scripts/lib/video-production-evidence.ts#requestVideoProductionApproval (via libs/core/governance/approval-store-location.ts#asPartitionWriter)",
       "roles": ["mission_controller"],
       "unresolved": []
@@ -6563,6 +6568,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "perception_media_worker",
         "person_charter_store",
         "pipeline_journal_store",
         "pr_publication_store",
@@ -6671,6 +6677,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "perception_media_worker",
         "person_charter_store",
         "pipeline_journal_store",
         "pr_publication_store",
@@ -7323,6 +7330,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "perception_media_worker",
         "person_charter_store",
         "pipeline_journal_store",
         "pr_publication_store",
@@ -7540,13 +7548,9 @@
         },
         "tenant_ledger_store": {
           "example_path": [
-            "scripts/run_generation_schedule_daemon.ts#runTickAndReport",
-            "scripts/run_generation_schedule_daemon.ts#runTick",
-            "scripts/run_generation_schedule.ts#<module> [child process]",
-            "libs/core/governance.ts#<module>",
-            "libs/core/governance/approval-human-decision.ts#<module>",
-            "libs/core/agent-execution-context.ts#<module>",
-            "libs/core/reasoning/reasoning-provider-registry.ts#<module>",
+            "scripts/run_generation_schedule_daemon.ts#<module>",
+            "libs/core/script-harness.ts#defineScript",
+            "libs/core/script-harness.ts#loadErrorTextRedactor",
             "libs/core/secret/secret-guard.ts#<module>",
             "libs/core/ledger.ts#<module>",
             "libs/core/ledger.ts#record",
@@ -7595,6 +7599,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "perception_media_worker",
         "slack_bridge",
         "task_runtime_worker",
         "workspace_tenant_registry_index_reader"
@@ -9763,6 +9768,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "perception_media_worker",
         "slack_bridge",
         "sovereign_concierge",
         "task_runtime_worker",
@@ -12153,6 +12159,7 @@
         "peer_catalog_reader",
         "peer_responder_reader",
         "peer_task_artifact_writer",
+        "perception_media_worker",
         "person_charter_store",
         "pipeline_journal_store",
         "pr_publication_store",

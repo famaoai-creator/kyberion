@@ -225,7 +225,9 @@ describe('operator home scoped learning approvals', () => {
     state.approvals = state.candidates.map(approval);
     const limited = collectOperatorHomeSummary({ scope: viewer, limit: 1 });
     expect(limited.pendingApprovals.map((row) => row.id)).toEqual(['APPROVAL-MEM-VISIBLE-1']);
-    expect(limited.counts.pendingApprovals).toBe(1);
+    // The count is the visible pending total — never the sliced display list.
+    expect(limited.counts.pendingApprovals).toBe(2);
+    expect(limited.counts.pendingApprovalsShown).toBe(1);
     expect(limited.nextAction.next_action_key).toBe('operator_home:next_action.review_approvals');
     expect(limited.actionQueue?.map((row) => row.actionId)).toEqual([
       'approval:APPROVAL-MEM-VISIBLE-1',

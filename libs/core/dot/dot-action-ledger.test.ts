@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   appendActionRecord,
   currentDotActions,
+  observeDotActions,
   readDotActionLedger,
   latestDotActions,
   migrateLegacyDotActions,
@@ -111,5 +112,114 @@ describe('private Dot action evidence', () => {
     expect(() => appendActionRecord(readDotActionLedger({ rootDir })[0], { rootDir })).toThrow(
       'shared index'
     );
+  });
+});
+
+describe('observeDotActions (R07 status observation)', () => {
+  const scopedRecord = (overrides: Partial<DotActionRecord> = {}): DotActionRecord => ({
+    scope: { tier: 'confidential', tenant_slug: 'acme' },
+    action_ref: 'ref-normal',
+    dot_id: 'obs-dot',
+    actor_id: 'dot:obs-dot',
+    action_id: 'repair',
+    title: 'scoped-secret-title',
+    objective: 'scoped-secret-objective',
+    work_shape: 'pipeline',
+    status: 'admitted',
+    proposal_hash: 'hash',
+    at: '2026-10-26T00:00:00Z',
+    ...overrides,
+  });
+
+  it('keeps permitted sections visible beside malformed and missing-evidence rows', () => {
+    const normal = scopedRecord();
+    const missing = scopedRecord({
+      scope: { tier: 'confidential', tenant_slug: 'acme-missing' },
+      action_ref: 'ref-missing',
+    });
+    appendActionRecord(normal, { rootDir });
+    appendActionRecord(missing, { rootDir });
+    // Corrupt private index: a non-hex content identity is malformed evidence.
+    appendJsonLine(`${rootDir}/${DOT_ACTION_LEDGER_PATH}`, {
+      dot_id: 'obs-dot',
+      action_ref: 'ref-corrupt',
+      private_content_hash: 'not-a-hex-digest',
+      scope: { tier: 'confidential', tenant_slug: 'acme-missing' },
+      actor_id: 'dot:obs-dot',
+      action_id: 'repair',
+      work_shape: 'pipeline',
+      status: 'admitted',
+      proposal_hash: 'hash',
+      at: '2026-10-26T00:01:00Z',
+    });
+    // Drop the scoped evidence for `ref-missing`: the index row stays.
+    safeRmSync(`${rootDir}/${dotStatePath({ scope: missing.scope! }, 'action-ledger.jsonl')}`);
+
+    const observation = observeDotActions('obs-dot', { rootDir });
+    expect(observation.integrity).toBe('integrity_error');
+    expect(observation.actions.map((row) => row.action_ref)).toEqual(['ref-normal']);
+    expect(observation.actions[0].title).toBe('scoped-secret-title');
+    // The missing-evidence row is still reported at index level — metadata only.
+    expect(observation.index_only.map((row) => row.action_ref)).toEqual(['ref-missing']);
+    expect(observation.index_only[0].title).toBe('[scoped action]');
+    expect(observation.anomalies).toMatchObject({ malformed_rows: 1, missing_evidence: 1 });
+    // The strict execution hydrate still refuses the same ledger.
+    expect(() => currentDotActions('obs-dot', { rootDir })).toThrow(
+      'DOT_ACTION_CONTENT_UNAVAILABLE'
+    );
+    // Repair guidance points at a reviewed path — never a silent rewrite.
+    expect(observation.repair.join(' ')).toContain('migrate-state');
+  });
+
+  it('counts rows in an invisible scope without returning their contents or ids', () => {
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-a');
+    appendActionRecord(
+      scopedRecord({
+        scope: { tier: 'personal', owner_nhi: 'owner-a' },
+        action_ref: 'ref-personal',
+        title: 'personal-secret',
+      }),
+      { rootDir }
+    );
+    appendActionRecord(scopedRecord({ action_ref: 'ref-normal' }), { rootDir });
+    vi.stubEnv('KYBERION_NHI_ID', 'owner-b');
+    const observation = observeDotActions('obs-dot', { rootDir });
+    expect(observation.integrity).toBe('partial');
+    expect(observation.anomalies).toMatchObject({ not_visible: 1, malformed_rows: 0 });
+    expect(observation.actions.map((row) => row.action_ref)).toEqual(['ref-normal']);
+    expect(observation.index_only).toEqual([]);
+    expect(JSON.stringify(observation)).not.toContain('personal-secret');
+    expect(JSON.stringify(observation)).not.toContain('ref-personal');
+  });
+
+  it('flags unparseable index lines and reports unknown counts when the index is unreadable', () => {
+    safeMkdir(`${rootDir}/active/shared/runtime`, { recursive: true });
+    appendJsonLine(
+      `${rootDir}/${DOT_ACTION_LEDGER_PATH}`,
+      scopedRecord({ scope: { tier: 'public' } })
+    );
+    const parsed = observeDotActions('obs-dot', { rootDir });
+    expect(parsed.integrity).toBe('complete');
+    expect(parsed.anomalies).toMatchObject({
+      malformed_rows: 0,
+      missing_evidence: 0,
+      not_visible: 0,
+    });
+
+    appendJsonLine(`${rootDir}/${DOT_ACTION_LEDGER_PATH}`, { nope: true } as never);
+    const flagged = observeDotActions('obs-dot', { rootDir });
+    expect(flagged.integrity).toBe('integrity_error');
+    expect(flagged.anomalies?.malformed_rows).toBe(1);
+    expect(flagged.actions).toHaveLength(1);
+
+    // Whole index unreadable → counts themselves are unknown, never zero-filled.
+    safeMkdir(`${rootDir}-blocked/active/shared/runtime/dot-action-ledger.jsonl`, {
+      recursive: true,
+    });
+    const unreadable = observeDotActions('obs-dot', { rootDir: `${rootDir}-blocked` });
+    expect(unreadable.integrity).toBe('integrity_error');
+    expect(unreadable.anomalies).toBeNull();
+    expect(unreadable.actions).toEqual([]);
+    expect(unreadable.repair.join(' ')).toContain('counts are unknown');
   });
 });

@@ -556,3 +556,142 @@ describe('CU-08 / CU-09 command aliases and scopes', () => {
     );
   });
 });
+
+describe('R06 documented prerequisites', () => {
+  const base = (): CliManifest => ({
+    version: 1,
+    commands: [
+      {
+        id: 'operator-home.default',
+        command: '',
+        noun: 'home',
+        verb: 'default',
+        entry: 'operator-home',
+        audience: 'user',
+        description: 'cli_cmd_operator_home_default',
+        group: 'start',
+      },
+      {
+        id: 'operator-cli.task',
+        command: 'task',
+        noun: 'task',
+        verb: 'default',
+        entry: 'operator-cli',
+        audience: 'operator',
+        description: 'cli_cmd_operator_cli_task',
+        group: 'operate',
+      },
+      {
+        id: 'operator-cli.calendar.status',
+        command: 'calendar status',
+        noun: 'calendar',
+        verb: 'status',
+        entry: 'operator-cli',
+        audience: 'user',
+        description: 'cli_cmd_operator_cli_calendar_status',
+        group: 'inspect',
+        effect: 'readiness',
+        prerequisites: [{ kind: 'trusted_claim', via: 'task', when: 'live_ops' }],
+      },
+    ],
+    entrypoints: [
+      { id: 'operator-home', module: 'scripts/kyberion_home.ts', commands: [''] },
+      { id: 'operator-cli', module: 'scripts/cli.ts', commands: ['task', 'calendar status'] },
+    ],
+  });
+
+  it('accepts documented prerequisites whose via names a registered command', () => {
+    expect(
+      checkCliManifest(base(), { packageScripts: new Set() }).filter(
+        (f) => f.includes('prerequisite') || f.includes('effect')
+      )
+    ).toEqual([]);
+  });
+
+  it('rejects a via pointing at an unregistered (guessed) command', () => {
+    const manifest = base();
+    manifest.commands[2] = {
+      ...manifest.commands[2]!,
+      prerequisites: [{ kind: 'trusted_claim', via: 'claim' }],
+    };
+    expect(checkCliManifest(manifest, { packageScripts: new Set() })).toContain(
+      'command operator-cli.calendar.status prerequisite trusted_claim via must name a registered command: claim'
+    );
+    manifest.commands[2] = {
+      ...manifest.commands[2]!,
+      prerequisites: [{ kind: 'service_setup', via: 'repair' }],
+    };
+    expect(checkCliManifest(manifest, { packageScripts: new Set() })).toContain(
+      'command operator-cli.calendar.status prerequisite service_setup via must name a registered command: repair'
+    );
+  });
+
+  it('rejects unknown kinds, duplicate kinds, invalid when, and empty arrays', () => {
+    const manifest = base();
+    manifest.commands[2] = {
+      ...manifest.commands[2]!,
+      effect: 'teleport' as never,
+      prerequisites: [{ kind: 'magic' as never }],
+    };
+    const failures = checkCliManifest(manifest, { packageScripts: new Set() });
+    expect(failures).toContain('command operator-cli.calendar.status has invalid effect: teleport');
+    expect(failures).toContain(
+      'command operator-cli.calendar.status has invalid prerequisite kind: magic'
+    );
+
+    manifest.commands[2] = {
+      ...manifest.commands[2]!,
+      effect: 'readiness',
+      prerequisites: [
+        { kind: 'trusted_claim' },
+        { kind: 'trusted_claim', via: 'task' },
+        { kind: 'local_backend', when: 'sometimes' as never },
+      ],
+    };
+    const dupes = checkCliManifest(manifest, { packageScripts: new Set() });
+    expect(dupes).toContain(
+      'command operator-cli.calendar.status prerequisite kind must be unique: trusted_claim'
+    );
+    expect(dupes).toContain(
+      'command operator-cli.calendar.status prerequisite local_backend has invalid when: sometimes'
+    );
+
+    manifest.commands[2] = {
+      ...manifest.commands[2]!,
+      prerequisites: [],
+    };
+    expect(checkCliManifest(manifest, { packageScripts: new Set() })).toContain(
+      'command operator-cli.calendar.status prerequisites must be a non-empty array'
+    );
+  });
+
+  it('keeps the repository manifest annotation-consistent', () => {
+    const manifest = loadCliManifest();
+    const names = new Set([
+      ...manifest.commands.map((command) => command.command),
+      ...(manifest.script_commands ?? []).map((command) =>
+        command.command.endsWith(' default')
+          ? command.command.slice(0, -' default'.length)
+          : command.command
+      ),
+    ]);
+    for (const command of [...manifest.commands, ...(manifest.script_commands ?? [])]) {
+      for (const prerequisite of command.prerequisites ?? []) {
+        expect(
+          prerequisite.via === undefined || names.has(prerequisite.via),
+          `${command.id} -> ${prerequisite.via}`
+        ).toBe(true);
+      }
+    }
+    // the mandated annotations from R06 exist
+    const listen = manifest.commands.find((command) => command.command === 'listen');
+    expect(listen?.prerequisites).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'local_backend' })])
+    );
+    const status = manifest.commands.find((command) => command.command === 'calendar status');
+    expect(status?.effect).toBe('readiness');
+    expect(status?.prerequisites).toEqual(
+      expect.arrayContaining([expect.objectContaining({ kind: 'trusted_claim', when: 'live_ops' })])
+    );
+  });
+});
