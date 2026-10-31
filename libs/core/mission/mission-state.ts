@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-state.ts
+ * libs/core/mission/mission-state.ts
  * State management and prerequisite validation for missions.
  */
 import { KNOWLEDGE_TIER_RANK } from '../foundation/knowledge-tier.js';

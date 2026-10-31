@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-llm.ts
+ * libs/core/mission/mission-llm.ts
  * LLM resolution and invocation layer for mission distillation.
  */
 

@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-project-ledger.ts
+ * libs/core/mission/mission-project-ledger.ts
  * Project ledger synchronization utilities for missions.
  */
 

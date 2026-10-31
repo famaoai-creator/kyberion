@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-git.ts
+ * libs/core/mission/mission-git.ts
  * Git operation utilities for Mission micro-repositories.
  */
 

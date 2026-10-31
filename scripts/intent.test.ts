@@ -3,7 +3,7 @@ import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
 import { collectIntentTraceReport, main, renderIntentTraceReport } from './intent.js';
-import type { MissionState } from './refactor/mission-types.js';
+import type { MissionState } from '@agent/core/mission/mission-types';
 
 const FIXTURE_ROOT = pathResolver.sharedTmp('intent-trace-tests');
 

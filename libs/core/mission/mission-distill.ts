@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-distill.ts
+ * libs/core/mission/mission-distill.ts
  * Knowledge distillation (Wisdom extraction) for completed missions.
  */
 

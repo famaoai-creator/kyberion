@@ -13,11 +13,10 @@ import { auditChain } from '@agent/core/governance/audit-chain';
 import type { resolveIntentTrackGate } from '@agent/core/intent/intent-track-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
-import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
+import type { HumanDecidedBy, MissionRelationships } from '@agent/core/mission/mission-types';
 import { getOptionValue, parseCsvOption } from './mission-cli-args.js';
 import { parseMissionVisionRef } from '@agent/core/mission/mission-vision-ref';
 import { resolveDecidedByFromArgv } from '../lib/decided-by-args.js';
-import type { MissionRelationships } from './mission-types.js';
 
 const MISSION_TIERS = ['personal', 'confidential', 'public'] as const;
 const MEMORY_QUEUE_STATUSES = ['queued', 'approved', 'rejected', 'promoted'] as const;

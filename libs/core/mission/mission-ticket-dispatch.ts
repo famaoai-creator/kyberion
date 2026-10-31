@@ -1,5 +1,5 @@
 /**
- * scripts/refactor/mission-ticket-dispatch.ts
+ * libs/core/mission/mission-ticket-dispatch.ts
  * Mission follow-up ticket registration for work items and external issue payloads.
  */
 

@@ -30,7 +30,7 @@ import type { ArtifactReviewFinding } from '@agent/core/workforce/artifact-revie
 import type * as MissionTriageCommands from './refactor/mission-triage-commands.js';
 import type * as MissionMemoryCommands from './refactor/mission-memory-commands.js';
 import type * as MissionOrganizationCommands from './refactor/mission-organization-commands.js';
-import type * as MissionProcessPlanning from './refactor/mission-process-planning.js';
+import type * as MissionProcessPlanning from '@agent/core/mission/mission-process-planning';
 import type { HumanDecidedBy } from '@agent/core/mission/mission-types';
 
 type Print = (value: unknown) => void;
@@ -71,7 +71,7 @@ import {
   loadState,
   saveState,
   checkDependencies,
-} from './refactor/mission-state.js';
+} from '@agent/core/mission/mission-state';
 import {
   assertMissionIdArgument,
   runMissionControllerAction,
@@ -102,12 +102,12 @@ function writeFocusedMissionId(missionId: string): void {
 
 // ─── Project ledger helpers (bind ROOT_DIR) ───────────────────────────────────
 async function syncProjectLedger(id: string): Promise<unknown> {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.syncProjectLedger(id);
 }
 
 async function syncProjectLedgerIfLinked(id: string): Promise<unknown> {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.syncProjectLedgerIfLinked(id);
 }
 
@@ -151,17 +151,17 @@ async function reassignMissionProject(
 
 // ─── Mission seal / distill wrappers ─────────────────────────────────────────
 async function sealMission(id: string): Promise<unknown> {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.sealMission(id);
 }
 
 async function distillMission(id: string): Promise<void> {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.distillMission(id);
 }
 
 async function dispatchMissionTickets(id: string): Promise<void> {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   const result = await missionSystem.dispatchMissionTickets(
     id,
     resolveMissionTicketDispatchOptionsFromArgv()
@@ -217,7 +217,7 @@ async function createMission(
   missionType: string = 'development',
   visionRef?: string,
   persona: string = 'worker',
-  relationships: Partial<import('./refactor/mission-types.js').MissionRelationships> = {},
+  relationships: Partial<import('@agent/core/mission/mission-types').MissionRelationships> = {},
   tenantSlug?: string,
   organizationId?: string,
   options?: { ephemeral?: boolean; intentGoal?: string }
@@ -292,7 +292,7 @@ async function startMission(
   tenantId: string = 'default',
   missionType: string = 'development',
   visionRef?: string,
-  relationships: Partial<import('./refactor/mission-types.js').MissionRelationships> = {},
+  relationships: Partial<import('@agent/core/mission/mission-types').MissionRelationships> = {},
   tenantSlug?: string,
   organizationId?: string,
   options?: {
@@ -333,12 +333,12 @@ async function startMission(
 // earlier in this file (lines 97-104), delegating to mission-project-ledger.ts
 
 async function delegateMission(id: string, agentId: string, a2aMessageId: string) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.delegateMission(id, agentId, a2aMessageId);
 }
 
 async function importMission(id: string, remoteUrl: string) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.importMission(id, remoteUrl);
 }
 
@@ -353,9 +353,9 @@ async function verifyMission(id: string, result: 'verified' | 'rejected', note: 
 
 // distillMission, sealMission and all LLM/distillation helpers are defined
 // as thin wrappers at the top of this file, delegating to:
-//   - scripts/refactor/mission-distill.ts (distillMission, helpers)
-//   - scripts/refactor/mission-llm.ts (LLM resolution)
-//   - scripts/refactor/mission-seal.ts (sealMission)
+//   - libs/core/mission/mission-distill.ts (distillMission, helpers)
+//   - libs/core/mission/mission-llm.ts (LLM resolution)
+//   - libs/core/mission/mission-seal.ts (sealMission)
 
 async function finishMission(id: string, seal: boolean = false) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
@@ -476,12 +476,12 @@ async function pauseMission(id: string, note?: string, decidedBy?: HumanDecidedB
 }
 
 async function cancelMission(id: string, note?: string, decidedBy?: HumanDecidedBy) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.cancelMission(id, note, decidedBy);
 }
 
 async function repairLegacyMissionState(id: string, note?: string) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.repairLegacyMissionState(id, note);
 }
 
@@ -490,7 +490,7 @@ async function recordTask(
   description: string,
   details: Record<string, unknown> = {}
 ) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   return missionSystem.recordTask(missionId, description, details);
 }
 
@@ -505,7 +505,7 @@ async function recordEvidence(
   provider?: string,
   taskBinding?: import('@agent/core/mission/mission-task-evidence-binding').TaskEvidenceBinding
 ) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   const { TraceContext, persistTrace } = await import('@agent/core/trace');
   const result = await missionSystem.recordEvidence(
     missionId,
@@ -546,7 +546,7 @@ async function recordArtifactReview(
   specialistRoles?: string[],
   provider?: string
 ) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   const result = await missionSystem.recordArtifactReview(
     missionId,
     reviewTaskId,
@@ -623,7 +623,7 @@ async function reconcileExistingWork(
   dryRun = false,
   approvalRequestId?: string
 ) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   const result = await missionSystem.reconcileExistingWork(
     missionId,
     manifestPath,
@@ -635,7 +635,7 @@ async function reconcileExistingWork(
 }
 
 async function reenterMissionFromReview(missionId: string) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   const result = await missionSystem.reenterMissionFromReview(missionId);
   printOutput(JSON.stringify(result, null, 2));
   return result;
@@ -659,7 +659,7 @@ export function formatPurgeCandidateTable(
 }
 
 async function purgeMissions(dryRun: boolean = false): Promise<void> {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   // AL-01: purgeMissions now returns a structured PurgeMissionsResult; the
   // CLI router's context type is (dryRun?) => Awaitable<void> and never
   // consumed a return value, so drop it here to keep the thin-router contract.
@@ -694,7 +694,7 @@ async function archiveMissions(
  */
 async function listMissions(filterStatus?: string, jsonOutput = false) {
   const { renderStatus } = await import('@agent/core/ux-vocabulary');
-  const { listMissionSummaries } = await import('./refactor/mission-read-model.js');
+  const { listMissionSummaries } = await import('@agent/core/mission/mission-read-model');
   const missions = listMissionSummaries(filterStatus);
 
   if (jsonOutput) {
@@ -741,7 +741,7 @@ async function listMissions(filterStatus?: string, jsonOutput = false) {
 async function showMissionStatus(id: string, follow: boolean = false) {
   const { missionLifecycleService } = await import('@agent/core/mission/mission-lifecycle-service');
   const { renderStatus } = await import('@agent/core/ux-vocabulary');
-  const { buildMissionStatusView } = await import('./refactor/mission-read-model.js');
+  const { buildMissionStatusView } = await import('@agent/core/mission/mission-read-model');
   if (!id) {
     logger.error('Usage: mission_controller status <MISSION_ID>');
     return;
@@ -909,7 +909,7 @@ async function showMissionTeam(
   organizationId?: string,
   providerPreference?: { provider: string; modelId?: string }
 ) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   const { withOrganizationContext } = await import('./refactor/organization-context.js');
   return withOrganizationContext(organizationId, () =>
     missionSystem.showMissionTeam(id, refresh, providerPreference)
@@ -1128,7 +1128,7 @@ export async function handoffMission(
 }
 
 async function grantMissionAccess(missionId: string, serviceId: string, ttl: number = 30) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   assertCanGrantMissionAuthority();
   return missionSystem.grantMissionAccess(missionId, serviceId, ttl);
 }
@@ -1182,7 +1182,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
     advanceCurrentPhase,
     evaluateStoredMissionGate,
     markPhaseTasksCompleted,
-  } = await import('./refactor/mission-process-planning.js');
+  } = await import('@agent/core/mission/mission-process-planning');
   if (activeMissionControllerArgs.includes('--machine-only')) {
     const { runMachineOnlyMissionGate } = await import('./mission_machine_gate.js');
     await runMachineOnlyMissionGate(
@@ -1295,7 +1295,7 @@ async function gatePass(missionId: string, gateFile?: string, note?: string): Pr
 async function gateFail(missionId: string, gateFile?: string, note?: string): Promise<void> {
   const { recordMissionGateOverride } = await import('@agent/core/mission/mission-gate-engine');
   const { evaluateStoredMissionGate, markPhaseTasksForRework } =
-    await import('./refactor/mission-process-planning.js');
+    await import('@agent/core/mission/mission-process-planning');
   if (!missionId) {
     logger.error(
       'Usage: mission_controller gate-fail <MISSION_ID> [gate-file.json|GATE_ID] [--note "..."]'
@@ -1359,7 +1359,7 @@ async function gateFail(missionId: string, gateFile?: string, note?: string): Pr
 }
 
 async function grantMissionSudo(missionId: string, on: boolean = true, ttl: number = 15) {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   assertCanGrantMissionAuthority();
   return missionSystem.grantMissionSudo(missionId, on, ttl);
 }
@@ -1374,7 +1374,7 @@ async function approveScopeChange(
     approvalRequestId?: string;
   }
 ): Promise<void> {
-  const { missionSystem } = await import('./refactor/mission-system.js');
+  const { missionSystem } = await import('@agent/core/mission/mission-system');
   // The approval-mediated path validates the human approval inside
   // approveScopeChange; SUDO is only required for the direct path.
   if (!options?.approvalRequestId?.trim()) {
@@ -1463,7 +1463,7 @@ function organizationCommands(): Promise<typeof MissionOrganizationCommands> {
 }
 
 function processPlanning(): Promise<typeof MissionProcessPlanning> {
-  return import('./refactor/mission-process-planning.js');
+  return import('@agent/core/mission/mission-process-planning');
 }
 
 /**

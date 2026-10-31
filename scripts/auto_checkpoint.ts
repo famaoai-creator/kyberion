@@ -6,8 +6,8 @@ import {
   isAutonomyDecisionRoutingEnabled,
   routeAutonomousDecision,
 } from '@agent/core/governance/approval-decision-routing';
-import { createCheckpoint } from './refactor/mission-maintenance.js';
-import { listActiveMissions, loadState } from './refactor/mission-state.js';
+import { createCheckpoint } from '@agent/core/mission/mission-maintenance';
+import { listActiveMissions, loadState } from '@agent/core/mission/mission-state';
 import { defineScript, isDirectScript } from './lib/harness.js';
 function getGitHash(cwd: string): string {
   return safeExec('git', ['rev-parse', 'HEAD'], { cwd }).trim();
