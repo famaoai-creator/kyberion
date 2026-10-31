@@ -43,7 +43,7 @@ These may exist temporarily for backward compatibility, but they are migration d
 
 2. Python and mixed-language runtime dependencies belong to managed runtime roots.
    - Tool-scoped environments go under `active/shared/runtime/tool-runtimes/<tool-id>/`. This is the one canonical install root, resolved in code only by `resolveToolRuntimesRoot()` / the tool-runtime registry (`libs/core/tool/tool-runtime-policy.ts`, `tool-runtime-registry.ts`); never build the path by hand.
-   - `active/shared/cache/system/tool-runtimes/` is the tool-runtime download cache (`resolveToolRuntimeDownloadCacheDir()`), never an install target. A runtime installed only there by an older setup is still found as a read-only fallback; new installs always land in the canonical root.
+   - `active/shared/cache/system/tool-runtimes/` is the tool-runtime download cache (`resolveToolRuntimeDownloadCacheDir()`), never an install target and never searched for runtimes.
    - Service-scoped environments go under `active/shared/runtime/service-runtimes/<service-id>/`.
    - The package manager (`uv`, `pip`, `brew`, etc.) is an implementation detail of the runtime layer, not a product-tier operator choice.
 

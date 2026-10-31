@@ -4,13 +4,11 @@ import {
   getToolRuntimePolicy,
   _resetToolRuntimePolicyCacheForTests,
   resolveToolRuntimeCacheRoot,
-  resolveToolRuntimeDir,
   resolveToolRuntimeDownloadCacheDir,
   resolveToolRuntimeRoot,
   resolveToolRuntimesRoot,
   TOOL_RUNTIME_DOWNLOAD_CACHE_ROOT,
   writeToolRuntimePolicyAtPath,
-  type ToolRuntimePolicy,
 } from './tool-runtime-policy.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeRmSync, safeWriteFile } from '../secure-io.js';
@@ -125,25 +123,6 @@ describe('tool runtime policy', () => {
 });
 
 describe('tool runtime root resolution', () => {
-  const runtimeDir = `resolver-test-${process.pid}`;
-  const managedRoot = pathResolver.sharedTmp(`tool-runtime-roots-${process.pid}`);
-  const policy: ToolRuntimePolicy = {
-    version: '1.0.0',
-    managed_roots: {
-      tool_runtime_root: path.relative(pathResolver.rootDir(), managedRoot),
-      cache_root: 'active/shared/tmp/tool-runtime-cache',
-    },
-    mode_preference: { python: 'trial_first', node: 'installed_first', system: 'installed_first' },
-    approval: { install_requires_approval: true, pin_requires_approval: true },
-  };
-  const canonicalDir = path.join(managedRoot, 'tool-runtimes', runtimeDir);
-  const legacyDir = resolveToolRuntimeDownloadCacheDir(runtimeDir);
-
-  afterEach(() => {
-    safeRmSync(managedRoot, { recursive: true, force: true });
-    safeRmSync(legacyDir, { recursive: true, force: true });
-  });
-
   it('defines the canonical install root on the runtime floor and the download cache on the cache floor', () => {
     _resetToolRuntimePolicyCacheForTests();
     expect(resolveToolRuntimesRoot()).toBe(
@@ -155,27 +134,20 @@ describe('tool runtime root resolution', () => {
     );
   });
 
-  it('returns the canonical directory when the runtime exists nowhere (new installs)', () => {
-    expect(resolveToolRuntimeDir(runtimeDir, policy)).toBe(canonicalDir);
+  it('derives the install root from the policy, not a hardcoded path', () => {
+    const policy = {
+      ...getToolRuntimePolicy(),
+      managed_roots: {
+        tool_runtime_root: 'active/shared/tmp/alt-runtime-root',
+        cache_root: 'active/shared/tmp/tool-runtime-cache',
+      },
+    };
+    expect(resolveToolRuntimesRoot(policy)).toBe(
+      path.join(pathResolver.rootResolve('active/shared/tmp/alt-runtime-root'), 'tool-runtimes')
+    );
   });
 
-  it('ignores a legacy directory that only holds download caches', () => {
-    safeWriteFile(path.join(legacyDir, 'huggingface', 'marker'), 'x', { mkdir: true });
-    expect(resolveToolRuntimeDir(runtimeDir, policy)).toBe(canonicalDir);
-  });
-
-  it('falls back to the legacy root when the runtime is installed only there', () => {
-    safeWriteFile(path.join(legacyDir, 'bin', 'python'), '', { mkdir: true });
-    expect(resolveToolRuntimeDir(runtimeDir, policy)).toBe(legacyDir);
-  });
-
-  it('prefers the canonical root when the runtime is installed in both', () => {
-    safeWriteFile(path.join(legacyDir, 'bin', 'python'), '', { mkdir: true });
-    safeWriteFile(path.join(canonicalDir, 'state.json'), '{}', { mkdir: true });
-    expect(resolveToolRuntimeDir(runtimeDir, policy)).toBe(canonicalDir);
-  });
-
-  it('rejects runtime directories that escape the managed root', () => {
-    expect(() => resolveToolRuntimeDir('../outside', policy)).toThrow('[TOOL_RUNTIME_PATH_SCOPE]');
+  it('rejects download-cache directories that escape the partition', () => {
+    expect(() => resolveToolRuntimeDownloadCacheDir('../outside')).toThrow();
   });
 });

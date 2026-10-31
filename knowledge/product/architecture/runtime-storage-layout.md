@@ -85,10 +85,9 @@ Installs are state, not cache: they are approval-gated, `state.json` records
 the install/pin provenance, and installed files keep upstream mtimes that the
 cache partition's per-file TTL would tear apart. Downloads are re-generable but
 `review_required` in the retention catalog because multi-GB weights are fetched
-deliberately and keep their download mtime. A runtime that an older setup
-installed under the download-cache root is still read (`resolveToolRuntimeDir`,
-registry python/binary lookups) as a fallback; new installs always go to the
-runtime root. Never build either path by hand.
+deliberately and keep their download mtime. The download-cache root is never
+an install target and is never searched for interpreters or binaries; only the
+runtime root is. Never build either path by hand.
 
 ### Process start-up caches
 

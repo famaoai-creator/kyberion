@@ -2,7 +2,11 @@
 
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
-import { markToolRuntimeInstalled, probeToolRuntime } from '@agent/core/tool/tool-runtime-registry';
+import {
+  markToolRuntimeInstalled,
+  probeToolRuntime,
+  resolveManagedToolPythonBin,
+} from '@agent/core/tool/tool-runtime-registry';
 import { resolveToolRuntimeDownloadCacheDir } from '@agent/core/tool/tool-runtime-policy';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
@@ -63,22 +67,10 @@ function voiceRuntimeInstallEnv(): Record<string, string> {
   };
 }
 
-function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
-  if (isWindows()) {
-    return [
-      path.join(managedEnvPath, 'Scripts', 'python.exe'),
-      path.join(managedEnvPath, 'Scripts', 'python3.exe'),
-    ];
-  }
-  return [path.join(managedEnvPath, 'bin', 'python'), path.join(managedEnvPath, 'bin', 'python3')];
-}
-
+// Same resolver as meeting preflight and the speak CLI: the registry's
+// canonical managed env (`active/shared/runtime/tool-runtimes/<dir>`).
 function resolveManagedPythonBin(toolId: VoiceToolId): string | null {
-  const resolution = probeToolRuntime(toolId, 'installed');
-  for (const candidate of resolveManagedPythonCandidates(resolution.managed_env_path)) {
-    if (safeExistsSync(candidate)) return candidate;
-  }
-  return null;
+  return resolveManagedToolPythonBin(toolId);
 }
 
 function isManagedPythonCurrent(pythonBin: string | null): boolean {

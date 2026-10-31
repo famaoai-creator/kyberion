@@ -113,8 +113,8 @@ export const TOOL_RUNTIMES_DIRNAME = 'tool-runtimes';
 /**
  * Repo-relative download-cache root for managed tool runtimes:
  * `active/shared/cache/system/tool-runtimes`. It holds re-generable package and
- * model downloads (uv / pip / XDG caches, `HF_HOME`) keyed by runtime dir, and is
- * the legacy location older installs may have used. Never an install target.
+ * model downloads (uv / pip / XDG caches, `HF_HOME`) keyed by runtime dir. Never
+ * an install target.
  */
 export const TOOL_RUNTIME_DOWNLOAD_CACHE_ROOT = storageFloorRelativePath(
   'cache',
@@ -139,29 +139,4 @@ export function resolveToolRuntimesRoot(
 /** Absolute download-cache directory for one runtime (uv / pip / XDG / HF caches). */
 export function resolveToolRuntimeDownloadCacheDir(runtimeDir: string): string {
   return resolveStorageFloor('cache', SYSTEM_PARTITION, TOOL_RUNTIMES_DIRNAME, runtimeDir);
-}
-
-/** True when `dir` holds an installed runtime rather than only download caches. */
-export function hasToolRuntimeInstall(dir: string): boolean {
-  return ['bin', 'Scripts', 'state.json'].some((marker) => safeExistsSync(path.join(dir, marker)));
-}
-
-/**
- * Read-side resolution of a managed runtime directory. The canonical install
- * root wins; a runtime installed only under the legacy download-cache root is
- * still found (read fallback). With neither present the canonical path is
- * returned, so new installs always land in the canonical root.
- */
-export function resolveToolRuntimeDir(
-  runtimeDir: string,
-  policy: ToolRuntimePolicy = getToolRuntimePolicy()
-): string {
-  const segments = runtimeDir.split(/[\\/]+/u).filter(Boolean);
-  if (segments.length === 0 || segments.some((segment) => segment === '.' || segment === '..')) {
-    throw new Error(`[TOOL_RUNTIME_PATH_SCOPE] invalid runtime directory: ${runtimeDir}`);
-  }
-  const canonical = path.join(resolveToolRuntimesRoot(policy), ...segments);
-  if (hasToolRuntimeInstall(canonical)) return canonical;
-  const legacy = resolveToolRuntimeDownloadCacheDir(segments.join('/'));
-  return hasToolRuntimeInstall(legacy) ? legacy : canonical;
 }
