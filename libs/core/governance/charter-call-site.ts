@@ -16,7 +16,11 @@
 
 import { agentActor } from '../actor.js';
 import { buildNhiId, NHI_SLUG_PATTERN } from '../nhi-id.js';
-import { parseInformationFlowFacts, type CharterAction } from './accountability-charter.js';
+import {
+  parseInformationFlowFacts,
+  type CharterAction,
+  type CharterScope,
+} from './accountability-charter.js';
 import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { findActiveCharter, type CharterPathOptions } from './accountability-charter-registry.js';
 import {
@@ -109,6 +113,47 @@ export function charterInputForDecision(
     action,
     ...(amountUnknown ? { amountUnknown: true } : {}),
     ...(options.rootDir ? { pathOptions } : {}),
+  };
+}
+
+/** Decision type a charter can delegate to stand in for a project-trust approval. */
+export const PIPELINE_TRUST_GRANT_DECISION_TYPE = 'pipeline_trust_grant';
+
+/**
+ * Project-trust grant for a project-local pipeline → `internal_decision`.
+ * Unlike `charterInputForDecision` this scope is caller-chosen (`person` for a
+ * solo operator's scratch ADF, `organization` for tenant pipelines) because a
+ * trust grant is about what may execute, not about tenant business spend.
+ * The content binding lives in the correlation id the caller supplies —
+ * the envelope only delegates the *type* of decision.
+ */
+export function charterInputForPipelineTrust(
+  input: { scope: CharterScope; agentId?: string },
+  options: CharterPathOptions & { vocabulary?: CharterDecisionVocabulary } = {},
+  now: Date = new Date()
+): ApprovalGateCharterInput | undefined {
+  const entry = findCharterDecision(PIPELINE_TRUST_GRANT_DECISION_TYPE, options.vocabulary);
+  if (!entry) return undefined;
+  const charter = findActiveCharter(
+    input.scope,
+    now,
+    options.rootDir ? { rootDir: options.rootDir } : {}
+  );
+  if (!charter) return undefined;
+  const orgSlug = input.scope.kind === 'organization' ? input.scope.tenant_slug : 'system';
+  const action: CharterAction = {
+    actor: agentActor(buildNhiId(orgSlug, workerSlug(input.agentId)), charter.accountable.actor),
+    action_class: entry.action_class,
+    decision_type: entry.decision_type,
+    reversible: entry.reversible,
+    estimated_loss: 0,
+    ...(entry.reputational_class ? { reputational_class: entry.reputational_class } : {}),
+    blast_radius: { systems: entry.systems ?? 1 },
+  };
+  return {
+    scope: input.scope,
+    action,
+    ...(options.rootDir ? { pathOptions: { rootDir: options.rootDir } } : {}),
   };
 }
 

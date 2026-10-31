@@ -405,7 +405,7 @@ async function main(
   if (!inputPath) {
     fail(
       '[promote] missing --input — pipeline:promote needs the ADF to promote | ' +
-        'pnpm pipeline:promote --input <adf.json> [--name <slug>] [--tenant <slug> | --source-is-public] [--trace <traceId>] [--dry-run] [--no-llm] [--force] ' +
+        'pnpm pipeline:promote --input <adf.json> --run <run-id> [--name <slug>] [--tenant <slug> | --source-is-public] [--trace <traceId>] [--dry-run] [--no-llm] [--force] ' +
         '(ADF pipeline runs only; browser recordings use the promote-procedure pipeline) | evidence: argv'
     );
   }
