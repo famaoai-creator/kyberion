@@ -55,6 +55,10 @@ import {
  */
 
 import { randomUUID } from 'node:crypto';
+import * as path from 'node:path';
+import { pathResolver } from '../path-resolver.js';
+import { mintDotResultOutcomePermit } from './dot-result-origin.js';
+import { dotResultCanonicalJson, dotResultScopeSchema } from './dot-result-records.js';
 import {
   FRONT_DESK_RECEIPT_PIPELINE,
   prepareFrontDeskExecution,
@@ -93,6 +97,7 @@ import {
   actorOf,
   addressedTo,
   appendWorkResult,
+  ordinaryResultPermission,
   attemptsSinceRelease,
   bounded,
   dotItemTenantMismatch,
@@ -701,6 +706,9 @@ export async function executeDotWorkItem(
     );
   }
   const { lease } = claimed;
+  // Capture before the port runs: later pause/revision does not erase an already observed outcome.
+  const resultCharter: DotCharter =
+    c.scope.tier === 'confidential' ? JSON.parse(dotResultCanonicalJson(c)) : c;
   const accountingId = claimed.item.current_attempt_id ?? randomUUID();
   const clock = deps.clock ?? Date.now;
   const budgetMs = wallClockMs(c);
@@ -834,7 +842,22 @@ export async function executeDotWorkItem(
   };
   // Never release before durable evidence exists. If this throws, the expired
   // claim is conservatively quarantined by recovery, not replayed.
-  appendWorkResult(c, row, deps);
+  appendWorkResult(
+    resultCharter,
+    row,
+    deps,
+    resultCharter.scope.tier === 'confidential' &&
+      !ordinaryResultPermission(resultCharter, deps, 'append')
+      ? mintDotResultOutcomePermit({
+          rootDir: path.resolve(deps.rootDir ?? pathResolver.rootDir()),
+          charter: resultCharter,
+          scope: dotResultScopeSchema.parse(resultCharter.scope),
+          row,
+          phase: 'active_execution',
+          leaseId: lease.lease_id,
+        })
+      : undefined
+  );
   // Advisory model completions are never receipts of an executed effect.
   // Pipeline ports report concrete runner outcomes; retries use the same
   // attempt identity and the tenant learner deduplicates their receipts.
@@ -961,7 +984,21 @@ export function recordDotPipelineContinuation(
     summary: `Original pipeline ${outcome.runId} ${outcome.succeeded ? 'completed' : 'failed and remains held'} after approval`,
     report_to_dot_id: meta(item, 'dot_id') ?? charter.dot_id,
   };
-  appendWorkResult(charter, row, deps);
+  appendWorkResult(
+    charter,
+    row,
+    deps,
+    charter.scope.tier === 'confidential' && !ordinaryResultPermission(charter, deps, 'append')
+      ? mintDotResultOutcomePermit({
+          rootDir: path.resolve(deps.rootDir ?? pathResolver.rootDir()),
+          charter,
+          scope: dotResultScopeSchema.parse(charter.scope),
+          row,
+          phase: 'pipeline_continuation',
+          ...(item.lease_id ? { leaseId: item.lease_id } : {}),
+        })
+      : undefined
+  );
   recordAutonomyExecution(
     {
       action_id: meta(item, 'gate_action_id') ?? meta(item, 'action_id') ?? 'dot_delegate_work',
@@ -1064,7 +1101,22 @@ export function reapStrandedDotWorkItems(
     try {
       // Evidence first. If this write fails, the expired-attempt guard still
       // prevents automatic execution of this recovered item.
-      if (!terminal) appendWorkResult(executor, row, deps);
+      if (!terminal)
+        appendWorkResult(
+          executor,
+          row,
+          deps,
+          executor.scope.tier === 'confidential' &&
+            !ordinaryResultPermission(executor, deps, 'append')
+            ? mintDotResultOutcomePermit({
+                rootDir: path.resolve(deps.rootDir ?? pathResolver.rootDir()),
+                charter: executor,
+                scope: dotResultScopeSchema.parse(executor.scope),
+                row,
+                phase: 'negative_recovery',
+              })
+            : undefined
+        );
       persisted = true;
       (deps.update ?? updateWorkItem)({
         itemId: item.item_id,

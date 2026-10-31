@@ -11,6 +11,10 @@ import {
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
+  DOT_RESULT_STORE_ROLE,
+  isDotResultStoreCapability,
+} from './foundation/dot-result-store-capability.js';
+import {
   MEMORY_PROVENANCE_READER_ROLE,
   memoryProvenanceReadAllowed,
   isMemoryProvenanceStatePath,
@@ -60,7 +64,18 @@ import {
   storageFloorTierInPath,
 } from './storage-layout.js';
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
-import { tenantStorePartitionWriteDecision } from './tier-guard-tenant-store-partitions.js';
+import {
+  tenantStorePartitionWriteDecision,
+  tenantScopeConfig,
+  normalizeRegisteredTenantProfile,
+  isValidTenantGroupProfile,
+  extractTenantGroupFromSharedPath,
+  type TenantGroupProfile,
+} from './tier-guard-tenant-store-partitions.js';
+export {
+  normalizeRegisteredTenantProfile,
+  isValidTenantGroupProfile,
+} from './tier-guard-tenant-store-partitions.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
 import {
@@ -445,63 +460,6 @@ function hasAuthorityAccess(
   );
 }
 
-function tenantScopeConfig(policy: any): {
-  protectedPrefixes: string[];
-  sharedPrefixes: string[];
-  systemRegistryReads: Array<{ path: string; roles: string[] }>;
-  requireTenantBinding: boolean;
-  slugPattern: RegExp;
-  brokerRequirements: {
-    requireApprovedBy: boolean;
-    requireApprovedAt: boolean;
-    requireExpiresAt: boolean;
-  };
-} {
-  const cfg = policy?.tenant_scope || {};
-  const slugPatternRaw =
-    typeof cfg.slug_pattern === 'string' ? cfg.slug_pattern : '^[a-z][a-z0-9-]{1,30}$';
-  let slugPattern = /^[a-z][a-z0-9-]{1,30}$/;
-  try {
-    slugPattern = new RegExp(slugPatternRaw);
-  } catch (_) {
-    /* fallback */
-  }
-  return {
-    protectedPrefixes: Array.isArray(cfg.protected_prefixes)
-      ? cfg.protected_prefixes
-      : ['knowledge/confidential/'],
-    sharedPrefixes: Array.isArray(cfg.shared_prefixes)
-      ? cfg.shared_prefixes
-      : ['knowledge/confidential/heuristics/', 'knowledge/confidential/relationships/'],
-    systemRegistryReads: Array.isArray(cfg.system_registry_reads)
-      ? cfg.system_registry_reads.filter(
-          (entry: unknown): entry is { path: string; roles: string[] } =>
-            Boolean(entry) &&
-            typeof (entry as { path?: unknown }).path === 'string' &&
-            Array.isArray((entry as { roles?: unknown }).roles) &&
-            (entry as { roles: unknown[] }).roles.every((role) => typeof role === 'string')
-        )
-      : [
-          {
-            path: 'knowledge/confidential/tenants/index.json',
-            roles: ['check_tenant_registry_consistency'],
-          },
-        ],
-    // Tenant-qualified protected paths and shared groups require a
-    // server-resolved binding. Unpartitioned legacy roots remain governed by
-    // the existing tier/persona checks until their storage migration lands.
-    requireTenantBinding:
-      cfg.require_tenant_binding === true ||
-      getRegisteredEnvBool('KYBERION_TENANT_SCOPE_REQUIRED') === true,
-    slugPattern,
-    brokerRequirements: {
-      requireApprovedBy: cfg?.broker_requirements?.require_approved_by !== false,
-      requireApprovedAt: cfg?.broker_requirements?.require_approved_at !== false,
-      requireExpiresAt: cfg?.broker_requirements?.require_expires_at !== false,
-    },
-  };
-}
-
 function extractTenantFromProtectedPrefix(
   relativePath: string,
   protectedPrefixes: string[]
@@ -529,29 +487,6 @@ function isRegisteredActiveTenant(tenantSlug: string): boolean {
   }
 }
 
-export function normalizeRegisteredTenantProfile(value: unknown): {
-  tenant_slug: string;
-  status: string;
-} | null {
-  if (!isRecord(value)) return null;
-  if (typeof value.tenant_slug !== 'string' || typeof value.status !== 'string') return null;
-  return { tenant_slug: value.tenant_slug, status: value.status };
-}
-
-interface TenantGroupProfile {
-  tenant_group_id: string;
-  status?: string;
-  member_tenants?: string[];
-  shared_prefixes?: string[];
-}
-
-function extractTenantGroupFromSharedPath(relativePath: string): string | null {
-  const match = relativePath.match(
-    /^knowledge\/confidential\/shared\/([a-z][a-z0-9-]{1,30})(?:\/|$)/
-  );
-  return match?.[1] ?? null;
-}
-
 function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
   const file = pathResolver.knowledge(`confidential/tenant-groups/${groupId}.json`);
   try {
@@ -562,34 +497,6 @@ function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
   } catch (_) {
     return null;
   }
-}
-
-export function isValidTenantGroupProfile(
-  groupId: string,
-  profile: unknown
-): profile is TenantGroupProfile {
-  if (!isRecord(profile)) return false;
-  const memberTenants = profile.member_tenants;
-  const sharedPrefixes = profile.shared_prefixes;
-  return (
-    profile.tenant_group_id === groupId &&
-    typeof profile.tenant_group_id === 'string' &&
-    (profile.status === 'active' ||
-      profile.status === 'suspended' ||
-      profile.status === 'archived') &&
-    Array.isArray(memberTenants) &&
-    memberTenants.length > 0 &&
-    memberTenants.every((tenant) => typeof tenant === 'string' && isValidTenantSlug(tenant)) &&
-    Array.isArray(sharedPrefixes) &&
-    sharedPrefixes.length > 0 &&
-    sharedPrefixes.every(
-      (prefix) =>
-        typeof prefix === 'string' &&
-        new RegExp(`^knowledge/confidential/shared/${groupId.replace(/[^\w-]/gu, '')}/`).test(
-          prefix
-        )
-    )
-  );
 }
 
 function checkTenantGroupScope(
@@ -649,9 +556,20 @@ function isScopedStructuralMkdir(
   relativePath: string,
   protectedPrefix: string,
   tenantSlug: string | undefined,
-  access: { kind: 'read' | 'write' | 'mkdir'; role?: string }
+  access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string }
 ): boolean {
   if (access.kind !== 'mkdir') return false;
+  if (access.role === DOT_RESULT_STORE_ROLE)
+    return Boolean(
+      tenantSlug &&
+      isRegisteredActiveTenant(tenantSlug) &&
+      currentResourceAccessScope()?.tenantSlug === tenantSlug &&
+      isDotResultStoreCapability(currentResourceAccessScope(), {
+        rootDir: projectRoot(),
+        target: relativePath,
+        operation: 'mkdir',
+      })
+    );
   if (access.role === PR_PUBLICATION_STORE_ROLE) {
     const publication = currentPrPublicationScope();
     return (
@@ -736,10 +654,13 @@ function checkTenantScope(
       }
     | undefined,
   authorities: Authority[],
-  access: { kind: 'read' | 'write' | 'mkdir'; role?: string } = { kind: 'write' }
+  access: { kind: 'read' | 'write' | 'append' | 'mkdir'; role?: string } = { kind: 'write' }
 ): { allowed: boolean; reason?: string } | null {
   if (authorities.includes('SUDO')) return null;
-  const cfg = tenantScopeConfig(policy);
+  const cfg = tenantScopeConfig(
+    policy,
+    getRegisteredEnvBool('KYBERION_TENANT_SCOPE_REQUIRED') === true
+  );
   // Cross-tenant registry files (e.g. the tenant design-override index under
   // knowledge/confidential/tenants/) are not a tenant's data, but they list
   // every tenant. Only the named system reader roles may READ them, whatever
@@ -1025,6 +946,50 @@ function requestResourceDenial(
     getRegisteredEnvText('MISSION_ROLE');
   const normalizedRole = role?.trim().toLowerCase().replace(/\s+/gu, '_');
   if (
+    normalizedRole === DOT_RESULT_STORE_ROLE &&
+    !denyCandidatePaths(relativePath).every((target) =>
+      isDotResultStoreCapability(currentResourceAccessScope(), {
+        rootDir: projectRoot(),
+        target,
+        operation,
+      })
+    )
+  )
+    return {
+      allowed: false,
+      reason:
+        '[DOT_RESULT_CAPABILITY_REQUIRED] Active exact DOT result operation capability required',
+    };
+  // Old dedicated-store capability validators predate appendExact. An added append path
+  // cannot enlarge their original write or metadata ceiling, even under ambient grants.
+  const legacyStoreCapability = (valid: boolean): boolean => {
+    if (!valid) return false;
+    const scope = currentResourceAccessScope();
+    if (!scope) return false;
+    const candidates = denyCandidatePaths(relativePath);
+    if (operation === 'append')
+      return candidates.every((target) => scope.writeExact.includes(target));
+    if (operation === 'metadata') {
+      const original = [
+        ...(scope.metadataExact ?? []),
+        ...scope.readExact,
+        ...scope.writeExact,
+        ...scope.mkdirExact,
+      ];
+      return candidates.every(
+        (target) =>
+          original.some(
+            (allowed) => target === allowed || target === '' || allowed.startsWith(target + '/')
+          ) ||
+          (scope.allowProductKnowledgeRead === true &&
+            (target === 'knowledge' ||
+              target === 'knowledge/product' ||
+              target.startsWith('knowledge/product/')))
+      );
+    }
+    return true;
+  };
+  if (
     normalizedRole === MEMORY_PROVENANCE_READER_ROLE &&
     !memoryProvenanceReadAllowed(relativePath, operation)
   )
@@ -1033,7 +998,7 @@ function requestResourceDenial(
       reason: '[MEMORY_PROVENANCE_READ_SCOPE] Read-only exact lineage capability required',
     };
   if (
-    (operation === 'write' || operation === 'mkdir') &&
+    (operation === 'write' || operation === 'append' || operation === 'mkdir') &&
     isMemoryProvenanceStatePath(relativePath) &&
     !['mission_controller', 'knowledge_steward', 'chronos_gateway'].includes(normalizedRole || '')
   )
@@ -1064,7 +1029,7 @@ function requestResourceDenial(
     };
   if (
     normalizedRole === 'autonomy_learning_store' &&
-    !isAutonomyLearningCapability(currentResourceAccessScope())
+    !legacyStoreCapability(isAutonomyLearningCapability(currentResourceAccessScope()))
   ) {
     return {
       allowed: false,
@@ -1074,7 +1039,7 @@ function requestResourceDenial(
   }
   if (
     normalizedRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
-    !isDiscussionRequestCapability(currentResourceAccessScope())
+    !legacyStoreCapability(isDiscussionRequestCapability(currentResourceAccessScope()))
   )
     return {
       allowed: false,
@@ -1083,7 +1048,7 @@ function requestResourceDenial(
     };
   if (
     normalizedRole === PIPELINE_JOURNAL_STORE_ROLE &&
-    !isPipelineJournalCapability(currentResourceAccessScope())
+    !legacyStoreCapability(isPipelineJournalCapability(currentResourceAccessScope()))
   )
     return {
       allowed: false,
@@ -1092,7 +1057,7 @@ function requestResourceDenial(
     };
   if (
     normalizedRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
-    !isCustomerDecisionInviteCapability(currentResourceAccessScope())
+    !legacyStoreCapability(isCustomerDecisionInviteCapability(currentResourceAccessScope()))
   )
     return {
       allowed: false,
@@ -1101,7 +1066,7 @@ function requestResourceDenial(
     };
   if (
     normalizedRole === CUSTOMER_DECISION_CONSUMER_STORE_ROLE &&
-    !isCustomerDecisionConsumerCapability(currentResourceAccessScope())
+    !legacyStoreCapability(isCustomerDecisionConsumerCapability(currentResourceAccessScope()))
   )
     return {
       allowed: false,
@@ -1110,7 +1075,7 @@ function requestResourceDenial(
     };
   if (
     normalizedRole === CUSTOMER_DECISION_MILESTONE_STORE_ROLE &&
-    !isCustomerDecisionMilestoneCapability(currentResourceAccessScope())
+    !legacyStoreCapability(isCustomerDecisionMilestoneCapability(currentResourceAccessScope()))
   )
     return {
       allowed: false,
@@ -1131,7 +1096,10 @@ function requestResourceDenial(
   if (narrowDenial) return { allowed: false, reason: narrowDenial };
   if (
     normalizedRole === 'concierge_management_reader' &&
-    (!currentResourceAccessScope() || operation === 'write' || operation === 'mkdir')
+    (!currentResourceAccessScope() ||
+      operation === 'write' ||
+      operation === 'append' ||
+      operation === 'mkdir')
   ) {
     return {
       allowed: false,
@@ -1152,7 +1120,7 @@ function requestResourceDenial(
 
 export function validateWritePermission(
   filePath: string,
-  operation: 'write' | 'mkdir' = 'write',
+  operation: 'write' | 'append' | 'mkdir' = 'write',
   content?: WriteContent
 ): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
@@ -1221,6 +1189,12 @@ export function validateWritePermission(
     // never knowledge-tier writes.
     // The exact request ceiling was checked before all ambient/default policy grants.
     if (
+      (currentRole === DOT_RESULT_STORE_ROLE &&
+        isDotResultStoreCapability(currentResourceAccessScope(), {
+          rootDir: projectRoot(),
+          target: relativePath,
+          operation,
+        })) ||
       (currentRole === DISCUSSION_REQUEST_STORAGE_ROLE &&
         isDiscussionRequestCapability(currentResourceAccessScope())) ||
       (currentRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
@@ -1255,7 +1229,7 @@ function personaTierWriteDecision(
   policy: any,
   relativePath: string,
   identity: ReturnType<typeof resolvePolicyIdentityContext>,
-  operation: 'write' | 'mkdir'
+  operation: 'write' | 'append' | 'mkdir'
 ): { allowed: boolean; reason?: string } {
   const {
     persona: currentPersona,
@@ -1379,7 +1353,10 @@ export function inspectReadPermission(
       if (!runtimeStatePolicyDeclarationValid(loaded.policy, relativePath)) {
         return INVALID_RUNTIME_STATE_POLICY_DECLARATION_DENIAL;
       }
-      const cfg = tenantScopeConfig(loaded.policy);
+      const cfg = tenantScopeConfig(
+        loaded.policy,
+        getRegisteredEnvBool('KYBERION_TENANT_SCOPE_REQUIRED') === true
+      );
       const protectedMatch = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
       if (protectedMatch) {
         const identity = resolvePolicyIdentityContext();
@@ -1403,8 +1380,14 @@ export function inspectReadPermission(
         // libs/core for cap enforcement) holds an explicit read grant on the
         // ledger root itself; it never widens knowledge/ access.
         if (
-          ((identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
-            isDiscussionRequestCapability(currentResourceAccessScope())) ||
+          ((identity.role === DOT_RESULT_STORE_ROLE &&
+            isDotResultStoreCapability(currentResourceAccessScope(), {
+              rootDir: projectRoot(),
+              target: relativePath,
+              operation,
+            })) ||
+            (identity.role === DISCUSSION_REQUEST_STORAGE_ROLE &&
+              isDiscussionRequestCapability(currentResourceAccessScope())) ||
             (identity.role === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
               isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
             (identity.role === PR_PUBLICATION_STORE_ROLE &&

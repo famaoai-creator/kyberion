@@ -1,0 +1,9 @@
+{
+  "role": "dot_result_writer",
+  "description": "Internal DOT result facade only: confidential tenant result append and minimal state projection under a mandatory active exact operation capability. Never a charter execution role.",
+  "default_persona": "worker",
+  "write_scopes": ["active/shared/runtime/dot/confidential/${KYBERION_TENANT}/"],
+  "scope_classes": ["operations_runtime"],
+  "allowed_actuators": [],
+  "tier_access": ["confidential"]
+}

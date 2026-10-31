@@ -4,12 +4,24 @@
   "description": "OW-07 orphan ratchet exceptions (scripts/check_orphans.ts). Each entry is a reviewed, intentional exception with the reason it is kept (wave-3 triage, ORPHAN_DECISIONS_2026-10-01.md); placeholder 'backlog' reasons are rejected. New orphans fail the check, and an entry that stops being an orphan must be removed. Actuator ops advertised in actuator-op-discovery.json and named by a unit test, and ops the provider bridge resolves to a cli_native harness capability, are reachable by rule and never listed here. `documented_only` lists pipelines only Markdown docs mention (run by hand); a declared schedule, even one shipped `enabled: false` (opt-in via KYBERION_CHRONOS_SCHEDULES), counts as wired.",
   "libs_core_modules": [
     {
+      "id": "libs/core/dot/dot-judgment-pre-effect.ts",
+      "reason": "Intentional offline acceptance boundary for the semantic judgment plan, documented in docs/developer/semantic-judgment-continuation.ja.md. Actual-claim judgment-pre-effect and latency-loop integration tests call this observer before a fixed synthetic file operation. eligible_observed is not pipeline effect authority; production callers remain disabled pending qualified provider cancellation, shared budget accounting, and independent model-quality review. Wiring a dummy production caller would misrepresent that No-Go boundary."
+    },
+    {
       "id": "libs/core/governance/charter-payment-settlement.ts",
       "reason": "Provider integration extension point published as @agent/core/governance/charter-payment-settlement and documented in docs/developer/EXTENSION_POINTS.md and ai-use-charter-operations.md. External trusted payment adapters call executeCharterPayment/reconcileCharterPayment; no real payment provider is bundled. Integration tests exercise the actual charter gate and compensation ledger."
     },
     {
       "id": "libs/core/mesh/acp-mediator-entry.ts",
       "reason": "Public subpath @agent/core/acp-mediator, listed in docs/PACKAGING_CONTRACT.md (\"Agent runtime and orchestration\") and libs/core/package.json exports: a side-effect bootstrap that imports risky-op-registry so a package-name consumer gets the governed approval handler, then re-exports acp-mediator. Consumed by package name only; in-repo code imports mesh/acp-mediator directly."
+    },
+    {
+      "id": "libs/core/organization/judgment-latency-verification.ts",
+      "reason": "Fixed synthetic latency acceptance verifier used by judgment-latency-verification.test.ts and the actual WorkItem/claim/executor latency-loop integration. It compares independently held expected bytes and the seeded measurement contract, rather than trusting worker reports. It is intentionally not a production service benchmark or a public execution adapter; the offline-only scope and proof-authentication limits are documented in docs/developer/semantic-judgment-continuation.ja.md."
+    },
+    {
+      "id": "libs/core/organization/judgment-routing.ts",
+      "reason": "Offline semantic routing and value-question draft seam, exercised by judgment-routing.test.ts and the human-handoff integration. It offers fixed planning routes and a draft callback without an executor or external-send port. No production human ingress or durable question queue is qualified in this slice; retaining the tested seam without a dummy live caller preserves the explicit No-Go documented in docs/developer/semantic-judgment-continuation.ja.md."
     },
     {
       "id": "libs/core/plugin/skill-wrapper.ts",

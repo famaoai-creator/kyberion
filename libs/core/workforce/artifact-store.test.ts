@@ -13,6 +13,10 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import type {
+  ReadScopedArtifactAttemptInput,
+  WriteScopedArtifactAttemptInput,
+} from './artifact-store.js';
 
 vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>();
@@ -23,6 +27,104 @@ const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..
 
 let tmpRoot: string;
 let store: typeof import('./artifact-store.js');
+
+describe('artifact attempts with the unchanged tenant security policy', () => {
+  let policyRoot: string;
+  let policyStore: typeof import('./artifact-store.js');
+  beforeAll(async () => {
+    policyRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'kyb-attempt-policy-'));
+    fs.writeFileSync(path.join(policyRoot, 'package.json'), '{}');
+    seedPolicyFile(policyRoot);
+    const governance = path.join(policyRoot, 'knowledge/product/governance');
+    fs.copyFileSync(
+      path.join(REPO_ROOT, 'knowledge/product/governance/security-policy.json'),
+      path.join(governance, 'security-policy.json')
+    );
+    fs.mkdirSync(path.join(policyRoot, 'knowledge/personal/tenants'), { recursive: true });
+    fs.writeFileSync(
+      path.join(policyRoot, 'knowledge/personal/tenants/synthetic-latency.json'),
+      JSON.stringify({
+        tenant_slug: 'synthetic-latency',
+        display_name: 'Fixture',
+        status: 'active',
+        assigned_role: 'owner',
+      })
+    );
+    vi.stubEnv('KYBERION_ROOT', policyRoot);
+    vi.stubEnv('KYBERION_TENANT', 'synthetic-latency');
+    vi.stubEnv('KYBERION_PERSONA', 'sovereign');
+    vi.stubEnv('MISSION_ROLE', 'mission_controller');
+    vi.resetModules();
+    const { saveProjectRecord } = await import('../project/project-registry.js');
+    saveProjectRecord({
+      project_id: 'attempt-policy-project',
+      name: 'Fixture',
+      summary: 'Policy regression',
+      status: 'active',
+      tier: 'confidential',
+      tenant_slug: 'synthetic-latency',
+    });
+    policyStore = await import('./artifact-store.js');
+  });
+  afterAll(() => {
+    vi.unstubAllEnvs();
+    vi.resetModules();
+    fs.rmSync(policyRoot, { recursive: true, force: true });
+  });
+
+  it('writes and reads owned attempts without reading tenantless structural metadata', () => {
+    const input = {
+      scope: { tenant: 'synthetic-latency', project: 'attempt-policy-project' },
+      tier: 'confidential' as const,
+      artifact_class: 'evidence' as const,
+      namespace: 'policy-regression',
+      parent_key: 'a'.repeat(64),
+      effect_key: 'b'.repeat(64),
+      content: { value: 'fixture' },
+      created_at: '2026-10-31T00:00:00.000Z',
+      expires_at: '2026-10-31T00:05:00.000Z',
+      now: () => Date.parse('2026-10-31T00:01:00.000Z'),
+      validateContent: (value: unknown) => value,
+    };
+    const read = {
+      scope: input.scope,
+      tier: input.tier,
+      artifact_class: input.artifact_class,
+      namespace: input.namespace,
+      parent_key: input.parent_key,
+      effect_key: input.effect_key,
+      validateContent: input.validateContent,
+    };
+    const saved = policyStore.writeScopedArtifactAttempt(input);
+    expect(policyStore.readScopedArtifactAttempt(read)?.envelope.content).toEqual(input.content);
+    const namespace = path.dirname(path.dirname(saved.artifact.absolute_path));
+    const artifactClass = path.dirname(namespace);
+    const owner = path.dirname(path.dirname(artifactClass));
+    for (const target of [owner, artifactClass, path.dirname(saved.artifact.absolute_path)]) {
+      const moved = target + '-real';
+      fs.renameSync(target, moved);
+      fs.symlinkSync(moved, target, 'dir');
+      try {
+        expect(() => policyStore.writeScopedArtifactAttempt(input)).toThrow();
+      } finally {
+        fs.unlinkSync(target);
+        fs.renameSync(moved, target);
+      }
+    }
+    for (const target of [artifactClass, path.dirname(saved.artifact.absolute_path)]) {
+      const moved = target + '-real';
+      fs.renameSync(target, moved);
+      fs.writeFileSync(target, 'not a directory');
+      try {
+        expect(() => policyStore.writeScopedArtifactAttempt(input)).toThrow();
+      } finally {
+        fs.unlinkSync(target);
+        fs.renameSync(moved, target);
+      }
+    }
+    expect(policyStore.readScopedArtifactAttempt(read)?.envelope.content).toEqual(input.content);
+  });
+});
 
 /** secure-io's policy engine fails closed without policies — seed the real file. */
 function seedPolicyFile(root: string): void {
@@ -690,6 +792,432 @@ describe('writeScopedArtifact (AL-02)', () => {
 
     expect(() => store.readScopedArtifactIndex({ mission: 'M-AL02-E' })).toThrow(
       /must be a regular file/
+    );
+  });
+
+  describe('immutable scoped artifact attempts', () => {
+    const epoch = Date.parse('2026-10-31T00:00:00.000Z');
+    type Payload = { value: string; evaluated_at: string; expires_at: string };
+    function fixture() {
+      const clock = { time: epoch };
+      const created = new Date(epoch).toISOString(),
+        expires = new Date(epoch + 300_000).toISOString();
+      const input: WriteScopedArtifactAttemptInput<Payload> = {
+        scope: { tenant: `attempt-${randomUUID().slice(0, 16)}` },
+        tier: 'confidential',
+        artifact_class: 'evidence',
+        namespace: 'attempt-test',
+        parent_key: 'a'.repeat(64),
+        effect_key: 'b'.repeat(64),
+        created_at: created,
+        expires_at: expires,
+        content: { value: 'candidate-a', evaluated_at: created, expires_at: expires },
+        now: () => clock.time,
+        validateContent: (value, metadata) => {
+          if (!value || typeof value !== 'object' || Array.isArray(value))
+            throw new Error('Invalid payload');
+          const body = value as Record<string, unknown>;
+          if (
+            Object.keys(body).sort().join(',') !== 'evaluated_at,expires_at,value' ||
+            typeof body.value !== 'string' ||
+            body.evaluated_at !== metadata.created_at ||
+            body.expires_at !== metadata.expires_at
+          )
+            throw new Error('Payload metadata mismatch');
+          return value as Payload;
+        },
+      };
+      const read = (): ReadScopedArtifactAttemptInput<Payload> => ({
+        scope: input.scope,
+        tier: input.tier,
+        artifact_class: input.artifact_class,
+        namespace: input.namespace,
+        parent_key: input.parent_key,
+        effect_key: input.effect_key,
+        validateContent: input.validateContent,
+      });
+      const nextCandidate = (value = 'candidate-b'): void => {
+        input.created_at = new Date(clock.time).toISOString();
+        input.expires_at = new Date(clock.time + 300_000).toISOString();
+        input.content = { value, evaluated_at: input.created_at, expires_at: input.expires_at };
+      };
+      return { input, clock, read, nextCandidate };
+    }
+
+    it('creates a tenant-scoped first attempt and exposes only identity metadata in the index', () => {
+      const { input, read } = fixture();
+      expect(store.readScopedArtifactAttempt(read())).toBeNull();
+      const result = store.writeScopedArtifactAttempt(input);
+      expect(result).toMatchObject({
+        attempt: 1,
+        adopted_existing: false,
+        envelope: {
+          schema_version: 1,
+          parent_key: input.parent_key,
+          effect_key: input.effect_key,
+          scope: input.scope,
+          tier: 'confidential',
+          content: input.content,
+        },
+      });
+      expect(result.artifact.repo_relative_path).toContain(
+        `/confidential/${input.scope.tenant}/evidence/attempt-test/${input.parent_key}/attempt-000001.json`
+      );
+      expect(store.readScopedArtifactAttempt(read())?.envelope).toEqual(result.envelope);
+      const rows = readIndex(result.artifact.index_path);
+      expect(rows).toHaveLength(1);
+      expect(rows[0].written_at).toBe(input.created_at);
+      expect(JSON.stringify(rows)).not.toContain('candidate-a');
+      expect(JSON.stringify(rows)).not.toContain('evaluated_at');
+    });
+
+    it('reuses a valid winner without replacing bytes with a different valid candidate', () => {
+      const { input } = fixture();
+      const first = store.writeScopedArtifactAttempt(input);
+      const before = fs.readFileSync(first.artifact.absolute_path, 'utf8');
+      input.content.value = 'another valid verdict';
+      const duplicate = store.writeScopedArtifactAttempt(input);
+      expect(duplicate).toMatchObject({ attempt: 1, adopted_existing: true });
+      expect(duplicate.envelope.content.value).toBe('candidate-a');
+      expect(fs.readFileSync(first.artifact.absolute_path, 'utf8')).toBe(before);
+      expect(readIndex(first.artifact.index_path)).toHaveLength(1);
+    });
+
+    it('allocates a new attempt after expiry without extending or replacing the old receipt', () => {
+      const { input, clock, nextCandidate, read } = fixture();
+      const first = store.writeScopedArtifactAttempt(input);
+      const before = fs.readFileSync(first.artifact.absolute_path, 'utf8');
+      clock.time += 300_000;
+      expect(() => store.writeScopedArtifactAttempt(input)).toThrow(/not currently valid/);
+      nextCandidate();
+      const second = store.writeScopedArtifactAttempt(input);
+      expect(second).toMatchObject({ attempt: 2, adopted_existing: false });
+      expect(second.envelope.parent_key).toBe(first.envelope.parent_key);
+      expect(second.envelope.effect_key).toBe(first.envelope.effect_key);
+      expect(fs.readFileSync(first.artifact.absolute_path, 'utf8')).toBe(before);
+      expect(store.readScopedArtifactAttempt({ ...read(), attempt: 1 })?.envelope).toEqual(
+        first.envelope
+      );
+      expect(store.readScopedArtifactAttempt(read())?.attempt).toBe(2);
+    });
+
+    it('converges atomic create collisions on the concurrent winner', () => {
+      const { input } = fixture();
+      const link = vi.mocked(fs.linkSync).getMockImplementation()!;
+      let raced = false;
+      vi.mocked(fs.linkSync).mockImplementation((source, target) => {
+        if (!raced && String(target).endsWith('attempt-000001.json')) {
+          raced = true;
+          store.writeScopedArtifactAttempt({
+            ...input,
+            content: { ...input.content, value: 'concurrent-winner' },
+          });
+        }
+        return link(source, target);
+      });
+      try {
+        const result = store.writeScopedArtifactAttempt(input);
+        expect(result).toMatchObject({ attempt: 1, adopted_existing: true });
+        expect(result.envelope.content.value).toBe('concurrent-winner');
+        expect(readIndex(result.artifact.index_path)).toHaveLength(1);
+      } finally {
+        vi.mocked(fs.linkSync).mockImplementation(link);
+      }
+    });
+
+    it('repairs file-before-index interruption by registration only and keeps readonly reads readonly', () => {
+      const { input, read } = fixture();
+      const append = fs.appendFileSync;
+      const open = fs.openSync;
+      const files = new Map<number, string>();
+      const openSpy = vi.spyOn(fs, 'openSync').mockImplementation((file, flags, mode) => {
+        const fd = open(file, flags, mode);
+        files.set(fd, String(file));
+        return fd;
+      });
+      let fail = true;
+      const spy = vi.spyOn(fs, 'appendFileSync').mockImplementation((file, data, options) => {
+        if (
+          fail &&
+          (typeof file === 'number' ? files.get(file) : String(file))?.endsWith(
+            'artifacts-index.jsonl'
+          )
+        ) {
+          fail = false;
+          throw new Error('Interrupted index append');
+        }
+        return append(file, data, options);
+      });
+      try {
+        expect(() => store.writeScopedArtifactAttempt(input)).toThrow(/Interrupted/);
+      } finally {
+        spy.mockRestore();
+        openSpy.mockRestore();
+      }
+      const dir = store.scopedArtifactDir(input.scope, input.artifact_class, input.tier).dir;
+      const file = path.join(dir, input.namespace, input.parent_key, 'attempt-000001.json');
+      const before = fs.readFileSync(file, 'utf8');
+      expect(() => store.readScopedArtifactAttempt(read())).toThrow(/not registered/);
+      const repaired = store.writeScopedArtifactAttempt(input);
+      expect(repaired).toMatchObject({ attempt: 1, adopted_existing: true });
+      expect(fs.readFileSync(file, 'utf8')).toBe(before);
+      expect(store.readScopedArtifactAttempt(read())?.envelope).toEqual(repaired.envelope);
+      expect(readIndex(repaired.artifact.index_path)).toHaveLength(1);
+    });
+
+    it('accepts byte-identical duplicate registration rows as one artifact reference', () => {
+      const { input, read } = fixture();
+      const saved = store.writeScopedArtifactAttempt(input);
+      const bytes = fs.readFileSync(saved.artifact.index_path, 'utf8');
+      fs.appendFileSync(saved.artifact.index_path, bytes);
+      expect(store.readScopedArtifactAttempt(read())?.attempt).toBe(1);
+      expect(store.writeScopedArtifactAttempt(input).attempt).toBe(1);
+      expect(readIndex(saved.artifact.index_path)).toHaveLength(2);
+    });
+
+    it('accepts reordered equivalent index and scope keys without changing metadata identity', () => {
+      const { input, read } = fixture();
+      input.scope = { project: 'proj-x', tenant: 'acme' };
+      const saved = store.writeScopedArtifactAttempt(input);
+      const rows = readIndex(saved.artifact.index_path).map((row) =>
+        row.path !== saved.artifact.repo_relative_path
+          ? row
+          : Object.fromEntries(
+              Object.entries({
+                ...row,
+                scope: Object.fromEntries(Object.entries(row.scope as object).reverse()),
+              }).reverse()
+            )
+      );
+      fs.writeFileSync(
+        saved.artifact.index_path,
+        rows.map((row) => JSON.stringify(row)).join('\n') + '\n'
+      );
+      expect(store.readScopedArtifactAttempt(read())?.attempt).toBe(1);
+      expect(store.writeScopedArtifactAttempt(input).adopted_existing).toBe(true);
+    });
+
+    it.each(['json', 'hash', 'effect', 'scope', 'metadata'] as const)(
+      'fails closed on occupied corrupt or mismatched slots: %s',
+      (variant) => {
+        const { input, clock, nextCandidate } = fixture();
+        const saved = store.writeScopedArtifactAttempt(input);
+        const value = JSON.parse(fs.readFileSync(saved.artifact.absolute_path, 'utf8'));
+        if (variant === 'hash') value.content.value = 'tampered';
+        if (variant === 'effect') value.effect_key = 'c'.repeat(64);
+        if (variant === 'scope') value.scope = { tenant: 'another-tenant' };
+        if (variant === 'metadata') value.expires_at = new Date(epoch + 900_000).toISOString();
+        const corrupt = variant === 'json' ? '{broken' : JSON.stringify(value);
+        fs.writeFileSync(saved.artifact.absolute_path, corrupt);
+        clock.time += 400_000;
+        nextCandidate();
+        expect(() => store.writeScopedArtifactAttempt(input)).toThrow();
+        expect(fs.readFileSync(saved.artifact.absolute_path, 'utf8')).toBe(corrupt);
+        expect(
+          fs.existsSync(
+            path.join(path.dirname(saved.artifact.absolute_path), 'attempt-000002.json')
+          )
+        ).toBe(false);
+      }
+    );
+
+    it('requires history recovery when the latest indexed payload is missing and never reuses its ordinal', () => {
+      const { input, clock, nextCandidate, read } = fixture();
+      store.writeScopedArtifactAttempt(input);
+      clock.time += 300_000;
+      nextCandidate();
+      const second = store.writeScopedArtifactAttempt(input);
+      fs.unlinkSync(second.artifact.absolute_path);
+      expect(() => store.readScopedArtifactAttempt(read())).toThrow(/history recovery/);
+      expect(() => store.writeScopedArtifactAttempt(input)).toThrow(/history recovery/);
+      expect(fs.existsSync(second.artifact.absolute_path)).toBe(false);
+      expect(
+        fs.existsSync(path.join(path.dirname(second.artifact.absolute_path), 'attempt-000003.json'))
+      ).toBe(false);
+    });
+
+    it('reuses a valid final ordinal and refuses allocation beyond the fixed attempt cap', () => {
+      const { input, clock, nextCandidate } = fixture();
+      const first = store.writeScopedArtifactAttempt(input);
+      const file = path.join(path.dirname(first.artifact.absolute_path), 'attempt-000128.json');
+      fs.writeFileSync(file, JSON.stringify({ ...first.envelope, attempt: 128 }));
+      // Writer registers this valid orphan using the same immutable-envelope metadata.
+      expect(store.writeScopedArtifactAttempt(input).attempt).toBe(128);
+      clock.time += 300_000;
+      nextCandidate();
+      expect(() => store.writeScopedArtifactAttempt(input)).toThrow(/ordinal budget exhausted/);
+      expect(fs.existsSync(path.join(path.dirname(file), 'attempt-000129.json'))).toBe(false);
+    });
+
+    it('refuses malformed index rows without rewriting the index or saving another attempt', () => {
+      const { input } = fixture();
+      const saved = store.writeScopedArtifactAttempt(input);
+      fs.appendFileSync(saved.artifact.index_path, '{broken}\n');
+      const before = fs.readFileSync(saved.artifact.index_path, 'utf8');
+      expect(() => store.writeScopedArtifactAttempt(input)).toThrow();
+      expect(fs.readFileSync(saved.artifact.index_path, 'utf8')).toBe(before);
+    });
+
+    it.each(['scope', 'path', 'class', 'written_at'] as const)(
+      'refuses conflicting same-reference index metadata: %s',
+      (field) => {
+        const { input, read } = fixture();
+        const saved = store.writeScopedArtifactAttempt(input);
+        const row = readIndex(saved.artifact.index_path)[0];
+        if (field === 'scope') row.scope = { tenant: 'different-tenant' };
+        if (field === 'path')
+          row.path = saved.artifact.repo_relative_path.replace('attempt-000001', 'another-000001');
+        if (field === 'class') row.artifact_class = 'report';
+        if (field === 'written_at') row.written_at = new Date(epoch + 1).toISOString();
+        fs.writeFileSync(saved.artifact.index_path, JSON.stringify(row) + '\n');
+        expect(() => store.readScopedArtifactAttempt(read())).toThrow();
+        expect(() => store.writeScopedArtifactAttempt(input)).toThrow();
+      }
+    );
+
+    it.each(['../escape', '/absolute', 'with/slash', '', 'Lossy Name'])(
+      'rejects namespace paths: %s',
+      (namespace) => {
+        const { input } = fixture();
+        expect(() => store.writeScopedArtifactAttempt({ ...input, namespace })).toThrow(/address/);
+      }
+    );
+
+    it('rejects arbitrary path, role and publication options', () => {
+      const { input } = fixture();
+      for (const option of [
+        { path: 'elsewhere' },
+        { role: 'mission_controller' },
+        { publish: { kind: 'report' } },
+      ]) {
+        expect(() => store.writeScopedArtifactAttempt({ ...input, ...option })).toThrow(
+          /unsupported/
+        );
+      }
+    });
+
+    it('refuses symlinked namespace directories, slots and indexes', () => {
+      for (const location of ['directory', 'slot', 'index']) {
+        const { input } = fixture();
+        const saved = store.writeScopedArtifactAttempt(input);
+        const target =
+          location === 'directory'
+            ? path.dirname(saved.artifact.absolute_path)
+            : location === 'slot'
+              ? saved.artifact.absolute_path
+              : saved.artifact.index_path;
+        const moved = target + '-real';
+        fs.renameSync(target, moved);
+        fs.symlinkSync(moved, target);
+        expect(() => store.writeScopedArtifactAttempt(input)).toThrow();
+      }
+    });
+
+    it('rejects an intermediate task artifact-class symlink omitted by endpoint-only checks', () => {
+      const { input } = fixture();
+      input.scope = { mission: 'M-AL02-A', task: `task-${randomUUID().slice(0, 8)}` };
+      store.writeScopedArtifactAttempt(input);
+      const directory = path.join(tmpRoot, 'active/missions/M-AL02-A/artifacts/evidence');
+      const moved = directory + '-real';
+      fs.renameSync(directory, moved);
+      fs.symlinkSync(moved, directory);
+      try {
+        expect(() => store.writeScopedArtifactAttempt(input)).toThrow(
+          /symbolic link|directory must be regular/
+        );
+      } finally {
+        fs.unlinkSync(directory);
+        fs.renameSync(moved, directory);
+      }
+    });
+
+    it('does not adopt copied bytes from another scope even when identity keys match', () => {
+      const first = fixture(),
+        second = fixture();
+      const saved = store.writeScopedArtifactAttempt(first.input);
+      const dir = path.join(
+        store.scopedArtifactDir(second.input.scope, second.input.artifact_class, second.input.tier)
+          .dir,
+        second.input.namespace,
+        second.input.parent_key
+      );
+      fs.mkdirSync(dir, { recursive: true });
+      fs.copyFileSync(saved.artifact.absolute_path, path.join(dir, 'attempt-000001.json'));
+      expect(() => store.writeScopedArtifactAttempt(second.input)).toThrow(/scope mismatch/);
+    });
+
+    it('rejects callback mutation or transformation and non-JSON data before saving', () => {
+      const { input } = fixture();
+      expect(() =>
+        store.writeScopedArtifactAttempt({
+          ...input,
+          validateContent: (body) => {
+            (body as Payload).value = 'mutated';
+            return body as Payload;
+          },
+        })
+      ).toThrow(/mutated/);
+      expect(() =>
+        store.writeScopedArtifactAttempt({
+          ...input,
+          validateContent: (body) => ({ ...(body as Payload), value: 'transformed' }),
+        })
+      ).toThrow(/transformed/);
+      for (const content of [
+        { value: NaN },
+        { value: undefined },
+        Object.assign([1], { '4294967295': 1800 }),
+        new Date(),
+      ]) {
+        expect(() =>
+          store.writeScopedArtifactAttempt({ ...input, content: content as unknown as Payload })
+        ).toThrow();
+      }
+    });
+
+    it('checks fresh time after validation before writing or adopting an expired candidate', () => {
+      const { input, clock } = fixture();
+      const validate = input.validateContent;
+      input.validateContent = (body, metadata) => {
+        const value = validate(body, metadata);
+        clock.time += 300_000;
+        return value;
+      };
+      expect(() => store.writeScopedArtifactAttempt(input)).toThrow(/expired before publication/);
+    });
+
+    it('refuses a regressed clock instead of allocating a lower-time replacement', () => {
+      const { input, clock, nextCandidate } = fixture();
+      const saved = store.writeScopedArtifactAttempt(input);
+      clock.time--;
+      nextCandidate();
+      expect(() => store.writeScopedArtifactAttempt(input)).toThrow(/clock regressed/);
+      expect(
+        fs.existsSync(path.join(path.dirname(saved.artifact.absolute_path), 'attempt-000002.json'))
+      ).toBe(false);
+    });
+
+    it.each(['validation', 'readback'] as const)(
+      'does not publish or adopt when time regresses during %s',
+      (stage) => {
+        const { input, clock } = fixture();
+        const validate = input.validateContent;
+        let calls = 0;
+        input.validateContent = (body, metadata) => {
+          const value = validate(body, metadata);
+          if (++calls === (stage === 'validation' ? 1 : 2)) clock.time--;
+          return value;
+        };
+        expect(() => store.writeScopedArtifactAttempt(input)).toThrow(/clock regressed/);
+        const directory = path.join(
+          store.scopedArtifactDir(input.scope, input.artifact_class, input.tier).dir,
+          input.namespace,
+          input.parent_key
+        );
+        expect(fs.existsSync(path.join(directory, 'attempt-000001.json'))).toBe(
+          stage === 'readback'
+        );
+      }
     );
   });
 

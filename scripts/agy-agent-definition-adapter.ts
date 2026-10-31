@@ -12,12 +12,64 @@ export type AgyAgentProfile = 'implementer' | 'explorer' | 'planner';
 export const AGY_AGENT_NAME_PREFIX = 'kyberion-';
 
 /**
+ * AGY CLI tool names verified against the agy 1.4.11 binary and the vendor
+ * custom-subagent docs. This list is the validation boundary: vendor docs
+ * warn that an unmapped or misspelled tool name can hang a subagent, so
+ * {@link AGY_PROFILE_TOOLS} entries are checked against this set in tests
+ * rather than trusted to be right.
+ */
+export const AGY_KNOWN_TOOLS: readonly string[] = [
+  'view_file',
+  'view_code_item',
+  'view_file_outline',
+  'view_content_chunk',
+  'grep_search',
+  'search_in_file',
+  'find_by_name',
+  'list_dir',
+  'read_terminal',
+  'write_to_file',
+  'replace_file_content',
+  'multi_replace_file_content',
+  'run_command',
+  'command_status',
+  'search_web',
+  'read_url_content',
+  'invoke_subagent',
+  'define_subagent',
+  'notify_user',
+  'memory',
+  'trajectory_search',
+];
+
+/**
  * AGY CLI tool names, deliberately kept separate from Claude's tools: list.
  * These names are the public custom-subagent vocabulary documented by AGY.
+ * `write_to_file` is the create-file tool — without it an implementer-tier
+ * agent can edit but can never create files.
  */
 export const AGY_PROFILE_TOOLS: Readonly<Record<AgyAgentProfile, readonly string[]>> = {
-  implementer: ['view_file', 'grep_search', 'replace_file_content', 'run_command'],
-  explorer: ['view_file', 'grep_search'],
+  implementer: [
+    'view_file',
+    'view_code_item',
+    'grep_search',
+    'find_by_name',
+    'list_dir',
+    'read_terminal',
+    'write_to_file',
+    'replace_file_content',
+    'multi_replace_file_content',
+    'run_command',
+  ],
+  explorer: [
+    'view_file',
+    'view_code_item',
+    'grep_search',
+    'find_by_name',
+    'list_dir',
+    'search_web',
+    'read_url_content',
+  ],
   planner: [],
 };
 
