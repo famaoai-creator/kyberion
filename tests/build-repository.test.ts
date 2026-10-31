@@ -3,6 +3,12 @@ import { buildRepository, type BuildDependencies } from '../scripts/build_reposi
 
 function dependencies() {
   const stages: string[] = [];
+  const snapshot = () => ({
+    sourceHash: 'fixture-source-hash',
+    configHash: 'fixture-config-hash',
+    fileCount: 0,
+    takenAt: '2026-10-31T00:00:00.000Z',
+  });
   const deps: BuildDependencies = {
     run: vi.fn(async (stage) => {
       stages.push(stage.name);
@@ -13,6 +19,10 @@ function dependencies() {
     record: vi.fn(),
     readiness: async () => true,
     lock: async (build) => build(),
+    // Real snapshots would walk the live repo and a real publish would write
+    // dist/.build-generation.json — fixture deps keep tests hermetic.
+    snapshotInputs: vi.fn(async () => snapshot()),
+    publishReceipt: vi.fn(),
   };
   return { deps, stages };
 }
@@ -205,6 +215,9 @@ describe('compiler stage shutdown', () => {
       };
       const pending = buildRepository('repo', deps);
       const rejection = expect(pending).rejects.toThrow('cancelled (SIGTERM)');
+      // The input snapshot now precedes stage execution — signal only once
+      // the stage (and therefore its child + handlers) actually exists.
+      await vi.waitFor(() => expect(deps.run).toHaveBeenCalledTimes(1));
       handlers.get('SIGTERM')!();
       expect(runtime.signalGroup).toHaveBeenCalledWith(424242, 'SIGTERM');
       expect(locked).toBe(true);
