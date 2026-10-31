@@ -745,6 +745,7 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'peer_catalog_reader',
   'peer_responder_reader',
   'peer_task_artifact_writer',
+  'perception_media_worker',
   'scope_locale_reader',
   'tenant_approval_store',
   'tenant_ledger_store',
