@@ -47,6 +47,7 @@ import {
 } from '@agent/core/reasoning/reasoning-runtime-instructions';
 import { loadTeamRoleIndex } from '@agent/core/mission/mission-team-index';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveProviderPermissionArgs } from '@agent/core/provider/provider-permission-profiles';
 import { resolveCapabilityProfileForTeamRole } from '@agent/core/subagent-capability-profiles';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeLstat } from '@agent/core/secure-io';
@@ -107,12 +108,20 @@ export const DEFAULT_PROFILE: SubagentProfileName =
 export const SHARED_DIRECTORY_RULES_LINES: readonly string[] =
   SUBAGENT_SHARED_DIRECTORY_RULES_LINES;
 
-// The representative roles this ceremony generates definitions for today
-// (CT-01 acceptance criterion 1: implementer / an explorer-tier analysis
-// role / devils_advocate). Add a role here to bring it under drift check;
-// resolveCapabilityProfileForTeamRole (libs/core/subagent-capability-profiles.ts)
-// controls which tier it gets.
-export const GENERATED_ROLES: readonly string[] = ['implementer', 'reviewer', 'devils_advocate'];
+// The representative roles this ceremony generates definitions for today.
+// The set deliberately covers every KD-05 tier — implementer (implementer,
+// tester), explorer (reviewer, devils_advocate, researcher), planner
+// (planner) — so each tier's projection stays under drift check. Add a role
+// here to bring it under drift check; resolveCapabilityProfileForTeamRole
+// (libs/core/subagent-capability-profiles.ts) controls which tier it gets.
+export const GENERATED_ROLES: readonly string[] = [
+  'implementer',
+  'tester',
+  'reviewer',
+  'devils_advocate',
+  'researcher',
+  'planner',
+];
 
 export function readSubagentDefinitionsTextFile(filePath: string): string {
   if (!safeExistsSync(filePath) || !safeLstat(filePath).isFile()) {
@@ -324,10 +333,23 @@ export async function buildGeneratedCursorFiles(): Promise<Map<string, string>> 
   return built;
 }
 
+/**
+ * Codex has no no-exec mode its custom-agent file can express: the planner
+ * x codex permission cell is refused, so a planner-tier role gets no codex
+ * file at all — emitting `sandbox_mode = "read-only"` would present an
+ * under-restricted approximation (read-only still runs shell commands) as
+ * if it satisfied the tier contract.
+ */
+export function isCodexProjectionGeneratable(role: string): boolean {
+  const resolution = resolveProviderPermissionArgs(resolveProfile(role), 'codex');
+  return resolution.kind === 'ok';
+}
+
 /** Build the Codex CLI projection from the same canonical role output. */
 export async function buildGeneratedCodexFiles(): Promise<Map<string, string>> {
   const built = new Map<string, string>();
   for (const role of GENERATED_ROLES) {
+    if (!isCodexProjectionGeneratable(role)) continue;
     const source = buildAgentDefinitionSource(role, 'codex');
     const description = source.match(/^description:\s*(.*)$/m)?.[1]?.trim() || role;
     const raw = buildCodexAgentDefinitionSource({
@@ -348,7 +370,7 @@ export const main = defineGenerator({
     agyTargetPath(role),
     devinTargetPath(role),
     cursorTargetPath(role),
-    codexTargetPath(role),
+    ...(isCodexProjectionGeneratable(role) ? [codexTargetPath(role)] : []),
   ]),
   executionContext: 'generate_subagent_definitions',
   async render() {

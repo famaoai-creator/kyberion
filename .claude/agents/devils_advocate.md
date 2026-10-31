@@ -1,7 +1,7 @@
 ---
 name: devils_advocate
 description: Argues the opposite position to force divergence before convergence in decision-support missions.
-tools: Read, Grep, Glob, NotebookRead
+tools: Read, Grep, Glob, LS, NotebookRead, WebFetch, WebSearch
 ---
 
 <!--
