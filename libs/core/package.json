@@ -1596,6 +1596,10 @@
       "types": "./dist/format.d.ts",
       "default": "./dist/format.js"
     },
+    "./foundation/credential-binding": {
+      "types": "./dist/foundation/credential-binding.d.ts",
+      "default": "./dist/foundation/credential-binding.js"
+    },
     "./foundation": {
       "types": "./dist/foundation/index.d.ts",
       "default": "./dist/foundation/index.js"
