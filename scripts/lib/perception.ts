@@ -1,5 +1,6 @@
 import { isRecord } from '@agent/core/foundation/text';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
+import { withExecutionContextAsync } from '@agent/core/authority';
 import { resolveScopeContext } from '@agent/core/scope-context';
 import { resolveStorageFloor, classifyStorageFloorPath } from '@agent/core/storage-layout';
 import { resolvePerceptionScope } from '@agent/core/perception/observation';
@@ -168,7 +169,7 @@ export function perceptionErrorNext(cls: PerceptionErrorClass): string {
     case 'assets_missing':
       return 'install the backend model/language assets for the chosen STT backend (e.g. Apple Speech assets via System Settings, or a whisper model directory), then retry';
     case 'permission_denied':
-      return 'the STT backend could not read the tenant-scoped intermediate under the current role — run `pnpm kyberion listen` from an operator shell (no inherited worker MISSION_ROLE) or dispatch through a claimed WorkItem whose scope owns the tier';
+      return 'the STT backend could not read the tenant-scoped intermediate — interactive `pnpm kyberion listen` reads the scratch under the tenant-bound perception_media_worker role, so a denial means the persisted scope does not own that partition; confirm `pnpm scope` binds the right tenant, or dispatch through a claimed WorkItem whose scope owns the tier';
     case 'backend_runtime_error':
       return 'retry; if it persists, check `pnpm kyberion doctor` and the backend binary version';
   }
@@ -335,38 +336,55 @@ export async function transcribeWav(
   if (bridges.length === 0) {
     throw new NoTranscriptError(`no speech-to-text backend is installed. ${VOICE_SETUP_HINT}`);
   }
-  const errors: string[] = [];
-  for (const [index, bridge] of bridges.entries()) {
-    try {
-      const raw = await bridge.transcribe({
-        audioPath: wavPath,
-        ...(options.language ? { language: options.language } : {}),
-        outputPath: path.join(workDir, `transcript-${index}.txt`),
-      });
-      if (raw.synthetic) {
-        // A sidecar is not a real backend — counts as backend_missing.
-        errors.push(
-          `${bridge.name}: backend_missing — returned a synthetic (sidecar) transcript — ignored`
-        );
-        continue;
+  const attemptBridges = async (): Promise<TranscriptOutcome> => {
+    const errors: string[] = [];
+    for (const [index, bridge] of bridges.entries()) {
+      try {
+        const raw = await bridge.transcribe({
+          audioPath: wavPath,
+          ...(options.language ? { language: options.language } : {}),
+          outputPath: path.join(workDir, `transcript-${index}.txt`),
+        });
+        if (raw.synthetic) {
+          // A sidecar is not a real backend — counts as backend_missing.
+          errors.push(
+            `${bridge.name}: backend_missing — returned a synthetic (sidecar) transcript — ignored`
+          );
+          continue;
+        }
+        return { result: normalizeSpeechToTextResult(bridge, raw), errors };
+      } catch (error) {
+        const raw = error instanceof Error ? error.message : String(error);
+        // R04: classify each backend failure; raw stderr paths are scrubbed from
+        // the message. permission_denied short-circuits — trying the remaining
+        // backends under the same denied role can only repeat the violation.
+        const cls = classifyPerceptionError(raw);
+        errors.push(`${bridge.name}: ${cls} — ${scrubPaths(raw)}`);
+        if (cls === 'permission_denied') break;
       }
-      return { result: normalizeSpeechToTextResult(bridge, raw), errors };
-    } catch (error) {
-      const raw = error instanceof Error ? error.message : String(error);
-      // R04: classify each backend failure; raw stderr paths are scrubbed from
-      // the message. permission_denied short-circuits — trying the remaining
-      // backends under the same denied role can only repeat the violation.
-      const cls = classifyPerceptionError(raw);
-      errors.push(`${bridge.name}: ${cls} — ${scrubPaths(raw)}`);
-      if (cls === 'permission_denied') break;
     }
-  }
-  const classified = errors
-    .map((entry) => entry.match(/^([^:]+): (\w+) — /)?.[2] ?? 'backend_runtime_error')
-    .filter((value, index, all) => all.indexOf(value) === index);
-  const primary = classified[0] as PerceptionErrorClass;
-  throw new NoTranscriptError(
-    `every speech-to-text backend failed (${primary}: ${errors.join('; ')}). ${perceptionErrorNext(primary)}`
+    const classified = errors
+      .map((entry) => entry.match(/^([^:]+): (\w+) — /)?.[2] ?? 'backend_runtime_error')
+      .filter((value, index, all) => all.indexOf(value) === index);
+    const primary = classified[0] as PerceptionErrorClass;
+    throw new NoTranscriptError(
+      `every speech-to-text backend failed (${primary}: ${errors.join('; ')}). ${perceptionErrorNext(primary)}`
+    );
+  };
+  // The STT scratch sits on the persisted scope's own tier partition: writes
+  // are admitted by the tmp default_allow, but the bridge adapter's guarded
+  // reads (safeLstat/safeReadFile on the wav and transcript) need an
+  // authorized identity on protected tiers. Run the backend loop under the
+  // tenant-bound perception_media_worker role — the same effective identity
+  // the claimed-WorkItem worker path already has on that partition. Public
+  // scratch is unprotected, so no assumption happens there.
+  const scope = resolvePerceptionScope(wavPath);
+  if (scope.tier === 'public') return attemptBridges();
+  return withExecutionContextAsync(
+    'perception_media_worker',
+    attemptBridges,
+    'worker',
+    scope.tenant_slug
   );
 }
 

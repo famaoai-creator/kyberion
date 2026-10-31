@@ -6,10 +6,15 @@ last_updated: 2026-10-31
 
 # listen の confidential scratch — backend 読み取り権限の橋渡し (R04 residual)
 
-状態: **設計ノート。実装しない。** security boundary (security-policy.json /
-role-assumption-policy.json / 権限 grant) を変える必要があるため、本書は選択肢と
-必要な承認を固定し、実装は承認後の別 ticket に委ねる。R04 で landed した
-permission_denied 分類は正しい fail-closed であり、ここで扱うのは成功系の残課題。
+状態: **実装済み (承認済み選択肢 (i))。** `transcribeWav` の backend loop を
+`withExecutionContextAsync('perception_media_worker', fn, 'worker', tenant)` で包み、
+`authority-roles/perception_media_worker.json` + security-policy.json の
+tmp/staging `{confidential,personal}/${KYBERION_TENANT}/` grant +
+`shared_core_roles` 登録 + TENANT_BOUND_READER_ROLES 登録で、interactive CLI が
+自 scope partition の scratch を読める。R04 で landed した
+permission_denied 分類は正しい fail-closed であり、本書で扱ったのは成功系の残課題。
+
+以下は実装時点の設計記録として残す (原文の選択肢と承認パッケージは変えない)。
 
 ## 1. 確認済みのメカニズム
 
