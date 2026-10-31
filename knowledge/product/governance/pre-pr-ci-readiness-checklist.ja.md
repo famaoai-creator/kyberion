@@ -204,6 +204,19 @@ pnpm kyberion pr preflight --title "<conventional title>" --body-file <body-file
 `full` / `release` gate を実行する。追加で選ばれた gate と、一致したファイル・パターンを先頭に表示する。
 CI の `lint-and-validate`（`--scope full`）でしか落ちなかった op-registry / governance-rules / catalogs などの drift を
 ローカルで先に検出するための仕組みで、`--scope pr` / `--scope full` の意味は変わらない。
+
+`--scope` の選択範囲と CI での実行場所（PR では各 gate がちょうど 1 回だけ走る。`pr` + `full-only` = `full`）:
+
+| `--scope`   | 選ぶ gate              | CI で実行する場所                                               |
+| ----------- | ---------------------- | --------------------------------------------------------------- |
+| `pr`        | pr gate                | `pr-validation.yml` の pr-gates（pull_request / merge_group）   |
+| `full-only` | full gate（pr を除く） | `ci.yml` の lint-and-validate（pull_request / merge_group）     |
+| `full`      | pr + full gate         | `ci.yml` の lint-and-validate（main への push / 週次 schedule） |
+| `release`   | 全 gate                | `release.yml`                                                   |
+
+`ci.yml` の `CHECK_SCOPE` の切り替えは `ci-gate-parity` gate が検査する。`ci.yml` の `integration` shard は
+`--skip-gate-tests` で、pr gate（`registration-tests`）が vitest で実行する test file を除外する（重複実行の削減。
+ローカルの `pnpm test -- --suite integration` は従来どおり `tests/` 全体を実行する）。
 `paths` を持たない full gate（`chronos-dom-contrast` は UI build が必要、`audit-continuity` は runtime の監査ログ依存）は
 `--changed` では選ばれないので、必要なら `--scope full --only <id>` で実行する。
 `pr` scope の `registration-tests` gate は、`tests/` の登録・境界ラチェット（shared-tmp allowlist、mission lookup、
@@ -224,8 +237,9 @@ CI の `lint-and-validate`（`--scope full`）でしか落ちなかった op-reg
 `knowledge/_integrity-manifest.json` は gitignore 済みのローカル生成物（`pnpm build` が再生成）なので commit しない。
 
 `main` を取り込んだ（merge / rebase）あと、または freshness gate が drift を報告したときは `pnpm kyberion resolve generated` を実行する。
-**この 1 コマンドで、CI が drift を検査する生成物をすべて**（op-registry、pseudo-locale、vocabulary-types、pii-rules、CLI reference、capability seams、subagent 定義、provider hooks、env registry、role-assumption reachability、knowledge index）依存順に再生成して stage し、changelog fragment を検証する。個別の `generate:*` を手で順に実行しない。
-`--check` は書き込まずに drift したファイルを全件列挙して非 0 で終了する。`.husky/pre-push` が `--check --fast`（約 100 秒かかる role-assumption 解析だけを省略。CI gate では実行される）を実行し、失敗時は修正コマンドを表示する（1 回だけ飛ばすときは `KYBERION_SKIP_PRE_PUSH=1 git push`）。
+**この 1 コマンドで、CI が drift を検査する生成物をすべて**（op-registry、pseudo-locale、vocabulary-types、pii-rules、CLI reference、capability seams、subagent 定義、provider hooks、env registry、knowledge index）依存順に再生成して stage し、changelog fragment を検証する。個別の `generate:*` を手で順に実行しない。
+`--check` は書き込まずに drift したファイルを全件列挙して非 0 で終了する。`.husky/pre-push` が `--check --fast`（`slow` 指定の step を省略。現在は該当なし）を実行し、失敗時は修正コマンドを表示する（1 回だけ飛ばすときは `KYBERION_SKIP_PRE_PUSH=1 git push`）。
+role-assumption reachability のレポートはコミットしない。`role-assumption-reachability` pr gate がメモリ上で到達可能性を計算し、到達可能なロールが `role-assumption-policy.json` で許可されていない場合などの不変条件違反だけで失敗する（違反ごとに経路と次の手順を表示）。レポートを読みたいときは `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --write-report`（出力先 `active/shared/cache/system/role-assumption/reachability.json`）。
 生成物（`_index.md`、`CONFIGURATION.md`、`env.example`、reachability report）の衝突は手で直さない。
 conflict marker が残っていても、このコマンドが index の conflict stage から組み直して再生成する（merge driver は不要）。
 `env-registry.json` で同じ entry が両側で別々に変更された場合だけ手で直してから再実行する。

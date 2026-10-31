@@ -124,8 +124,8 @@ bridge 内 guard) を `withExecutionContextAsync(<role>, fn, 'worker', tenantSlu
   `active/shared/tmp/confidential/${KYBERION_TENANT}/` と
   `active/shared/staging/confidential/${KYBERION_TENANT}/` (必要なら personal 同型) の
   allow_read/allow_write + `role-assumption-policy.json shared_core_roles` への登録 +
-  `docs/developer/role-assumption-reachability.json` の再生成
-  (`scripts/analyze_role_assumptions.ts`、contract test が到達可能 role を要求)。
+  `role-assumption-reachability` gate の通過
+  (`scripts/analyze_role_assumptions.ts` がメモリ上で到達可能 role を計算し、未許可なら失敗)。
   可能なら dedicated store role と同じ `currentResourceAccessScope` exact
   capability 縛りにすると grant の濫用面が最小。
 - **触る境界**: security-policy.json / role-assumption-policy.json / authority-roles/
@@ -178,8 +178,8 @@ claimed-WorkItem 正常系と同じ effective identity を interactive CLI に�
    role 宣言 (`default_persona: worker`)。
 3. `role-assumption-policy.json` — `shared_core_roles` への追加と rationale;
    SYSTEM_ROLE surface から呼ぶ場合は当該 `may_assume` にも追加。
-4. `docs/developer/role-assumption-reachability.json` 再生成 +
-   `scripts/analyze_role_assumptions.contract.test.ts` の更新。
+4. `pnpm check -- --only role-assumption-reachability` で到達可能 role が
+   すべて許可されていることを確認 (レポートはコミットしない)。
 5. 実装側: `transcribeWav` (必要に応じ `extractSttWav` 出力の後続検証 read も)
    を `withExecutionContextAsync` で包み、tenant は `resolvePerceptionScope`
    の返り値から受け取る。`runExternalOperation` の approval / egress 判定は

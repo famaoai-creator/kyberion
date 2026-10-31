@@ -28,16 +28,22 @@
  * unresolved dynamic import or an unresolved child process that inherits
  * SYSTEM_ROLE is reported as an "any role" site.
  *
- * The report is checked in at docs/developer/role-assumption-reachability.json.
- * `--check` (the `role-assumption-reachability` CI gate) fails when it is
- * stale; scripts/analyze_role_assumptions.contract.test.ts fails when a
- * reachable role is missing from role-assumption-policy.json.
+ * The report is computed in memory and is not committed (it changed in about
+ * a fifth of all commits and was a constant merge-conflict source). Running
+ * the script (the `role-assumption-reachability` CI gate) checks the RN-03
+ * invariants against role-assumption-policy.json and package.json
+ * (checkReachabilityInvariants) and exits 1 with one diagnostic per
+ * violation. `--write-report` also writes the full report for a human to
+ * read to active/shared/cache/system/role-assumption/reachability.json (the
+ * re-generable system cache floor); `--check` is
+ * accepted for compatibility and changes nothing.
  */
 import * as path from 'node:path';
-import { format as prettierFormat, resolveConfig as resolvePrettierConfig } from 'prettier';
-import { parseSafeJsonInput } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
-import { defineGenerator, isDirectScript } from './lib/harness.js';
+import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { resolveStorageFloor, SYSTEM_PARTITION } from '@agent/core/storage-layout';
+import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { guardCliArgs, hasCliFlag, type CliGuardSpec } from './lib/cli-guard.js';
 import { readSafeJsonFile } from './lib/json-input.js';
 import {
   Analyzer,
@@ -56,7 +62,10 @@ import {
   type Workspace,
 } from './lib/role-assumption-workspace.js';
 
-export const REACHABILITY_REPORT_PATH = 'docs/developer/role-assumption-reachability.json';
+/** Where `--write-report` puts the report: re-generable, so the system cache floor; never committed. */
+export function reachabilityReportPath(): string {
+  return resolveStorageFloor('cache', SYSTEM_PARTITION, 'role-assumption', 'reachability.json');
+}
 const POLICY_PATH = 'knowledge/product/governance/role-assumption-policy.json';
 
 export interface ReachableRole {
@@ -104,7 +113,7 @@ export interface RoleAssumptionReachabilityReport {
 // Report
 // ---------------------------------------------------------------------------
 
-interface PolicyFile {
+export interface RoleAssumptionPolicyFile {
   shared_core_roles: { roles: string[] };
   system_roles: Record<string, { may_assume: string[] }>;
 }
@@ -181,7 +190,7 @@ export function buildReachabilityReport(
   const resolveModule = createResolver(ws);
   const program = createProgram(ws, [...allRoots].sort(), resolveModule);
   const analyzer = new Analyzer(ws, program, packageJson.scripts ?? {}, resolveModule);
-  const policy = readSafeJsonFile<PolicyFile>(
+  const policy = readSafeJsonFile<RoleAssumptionPolicyFile>(
     path.join(root, POLICY_PATH),
     'role assumption policy'
   );
@@ -336,7 +345,7 @@ export function buildReachabilityReport(
     version: 1,
     generated_by: 'scripts/analyze_role_assumptions.ts',
     description:
-      'RN-02 call-level reachability of in-process role assumptions per SYSTEM_ROLE. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts`; see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.',
+      'RN-02 call-level reachability of in-process role assumptions per SYSTEM_ROLE. Computed in memory by `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --write-report` (not committed); see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.',
     assumption_sites: [...siteMap.values()].sort((a, b) => compareCodeUnits(a.site, b.site)),
     unresolved_sites: Object.fromEntries(
       [...unresolvedSites.entries()]
@@ -351,53 +360,173 @@ export function renderReachabilityReport(report: RoleAssumptionReachabilityRepor
   return `${JSON.stringify(report, null, 2)}\n`;
 }
 
-/** Compare reports by content so formatter (prettier) layout never reads as staleness. */
-/** Fields that only illustrate a path and depend on graph traversal order. */
-const ORDER_SENSITIVE_FIELDS = new Set(['example_path']);
+/**
+ * System roles whose grants RN-03 narrowed on the report's evidence. Their
+ * narrowing is only sound while the analysis can prove unreachability, so a
+ * new any-role site or an inheriting child process must force a re-review.
+ */
+export const NARROWED_SYSTEM_ROLES: readonly string[] = [
+  'oauth_callback_surface',
+  'surface_runtime',
+];
 
-function stripOrderSensitive(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(stripOrderSensitive);
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([key]) => !ORDER_SENSITIVE_FIELDS.has(key))
-      .map(([key, entry]) => [key, stripOrderSensitive(entry)])
-  );
+export interface RoleAssumptionViolation {
+  rule:
+    | 'reachable-role-not-granted'
+    | 'policy-role-not-analysed'
+    | 'analysed-role-not-in-policy'
+    | 'launched-role-not-analysed'
+    | 'narrowed-role-unresolved';
+  system_role: string;
+  message: string;
 }
+
+const POLICY_HINT = `grant it in ${POLICY_PATH} (system_roles.<role>.may_assume, with a rationale) or remove the assumption`;
 
 /**
- * The staleness comparison (`--check`): by content, not layout, and without
- * the illustrative example paths, so an unrelated refactor that only changes
- * which path the BFS finds first does not fail the gate. Roles, sites,
- * unresolved sites and child-process entries are compared.
+ * The RN-03 invariants the `role-assumption-reachability` gate enforces on an
+ * in-memory report:
+ *  - every reachable role is granted to its system role (the role itself,
+ *    shared_core_roles, or system_roles.<role>.may_assume), so code that adds
+ *    an assumption fails CI instead of [ROLE_ASSUMPTION_DENIED] in production;
+ *  - the analysis covers exactly the system roles the policy governs;
+ *  - every SYSTEM_ROLE a package script launches is analysed;
+ *  - every narrowed system role stays fully resolved (no any-role site, no
+ *    child process inheriting SYSTEM_ROLE).
  */
-export function normalizeReachabilityReport(content: string): string {
-  try {
-    return JSON.stringify(
-      stripOrderSensitive(parseSafeJsonInput(content, 'role assumption reachability report'))
-    );
-  } catch {
-    return content;
+export function checkReachabilityInvariants(
+  report: RoleAssumptionReachabilityReport,
+  policy: RoleAssumptionPolicyFile,
+  packageScripts: Record<string, string> = {}
+): RoleAssumptionViolation[] {
+  const violations: RoleAssumptionViolation[] = [];
+  const analysed = Object.keys(report.system_roles).sort();
+  const governed = Object.keys(policy.system_roles ?? {}).sort();
+  for (const systemRole of analysed) {
+    const entry = report.system_roles[systemRole]!;
+    const allowed = new Set([
+      systemRole,
+      ...(policy.shared_core_roles?.roles ?? []),
+      ...(policy.system_roles?.[systemRole]?.may_assume ?? []),
+    ]);
+    for (const [role, reach] of Object.entries(entry.reachable_roles)) {
+      if (allowed.has(role)) continue;
+      violations.push({
+        rule: 'reachable-role-not-granted',
+        system_role: systemRole,
+        message: `${systemRole} can assume ${role} but the policy does not grant it — via ${reach.example_path.join(' -> ')} | next: ${POLICY_HINT}`,
+      });
+    }
+    if (!governed.includes(systemRole)) {
+      violations.push({
+        rule: 'analysed-role-not-in-policy',
+        system_role: systemRole,
+        message: `${systemRole} has entry points (${entry.entries.join(', ')}) but no system_roles entry in ${POLICY_PATH} | next: add it with the roles it may assume`,
+      });
+    }
   }
+  for (const systemRole of governed) {
+    if (analysed.includes(systemRole)) continue;
+    violations.push({
+      rule: 'policy-role-not-analysed',
+      system_role: systemRole,
+      message: `${systemRole} is governed by ${POLICY_PATH} but the analysis found no entry point for it | next: remove the stale policy entry or register its surface/launcher`,
+    });
+  }
+  const launched = new Set(
+    Object.values(packageScripts).flatMap((command) =>
+      [...command.matchAll(/\bSYSTEM_ROLE=([a-z0-9_]+)/g)].map((match) => match[1]!)
+    )
+  );
+  for (const systemRole of [...launched].sort()) {
+    if (report.system_roles[systemRole]) continue;
+    violations.push({
+      rule: 'launched-role-not-analysed',
+      system_role: systemRole,
+      message: `a package.json script launches SYSTEM_ROLE=${systemRole} but the analysis has no entry point for it | next: add it to ${POLICY_PATH} and make its entry discoverable (scripts/lib/role-assumption-workspace.ts)`,
+    });
+  }
+  for (const systemRole of NARROWED_SYSTEM_ROLES) {
+    const entry = report.system_roles[systemRole];
+    if (!entry) continue;
+    const reasons = [
+      ...entry.unresolved_sites.map((site) => `any-role site ${site}`),
+      ...entry.child_process_entries.map(
+        (child) => `child process ${child.site} inherits SYSTEM_ROLE`
+      ),
+    ];
+    if (reasons.length === 0) continue;
+    violations.push({
+      rule: 'narrowed-role-unresolved',
+      system_role: systemRole,
+      message: `${systemRole} had its grants narrowed (RN-03) but is no longer fully resolved: ${reasons.join('; ')} | next: resolve the site or re-review the narrowed grants`,
+    });
+  }
+  return violations;
 }
 
-export const main = defineGenerator({
-  id: 'role-assumption-reachability',
-  outputs: [REACHABILITY_REPORT_PATH],
-  normalize: normalizeReachabilityReport,
-  async render() {
-    // Emit the committed (prettier) layout so a regeneration after a merge
-    // (`pnpm kyberion resolve generated`) does not rewrite every line.
-    const config = (await resolvePrettierConfig(REACHABILITY_REPORT_PATH)) ?? {};
-    return [
-      {
-        path: REACHABILITY_REPORT_PATH,
-        content: await prettierFormat(renderReachabilityReport(buildReachabilityReport()), {
-          ...config,
-          parser: 'json',
-        }),
-      },
-    ];
+export function formatViolations(violations: readonly RoleAssumptionViolation[]): string {
+  return [
+    `${violations.length} RN-03 invariant violation(s):`,
+    ...violations.map((violation) => `  - [${violation.rule}] ${violation.message}`),
+    `evidence: rerun with --write-report for the full report (active/shared/cache/system/role-assumption/reachability.json); see knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2`,
+  ].join('\n');
+}
+
+/** Build the report for `root` and check it against that checkout's policy and package.json. */
+export function evaluateReachabilityGate(root: string = pathResolver.rootDir()): {
+  report: RoleAssumptionReachabilityReport;
+  violations: RoleAssumptionViolation[];
+} {
+  const report = buildReachabilityReport(root);
+  const policy = readSafeJsonFile<RoleAssumptionPolicyFile>(
+    path.join(root, POLICY_PATH),
+    'role assumption policy'
+  );
+  const packageJson = readSafeJsonFile<{ scripts?: Record<string, string> }>(
+    path.join(root, 'package.json'),
+    'package.json'
+  );
+  return {
+    report,
+    violations: checkReachabilityInvariants(report, policy, packageJson.scripts ?? {}),
+  };
+}
+
+/** `--help` / typos exit before the ~100s analysis starts. */
+export const ROLE_ASSUMPTION_REACHABILITY_CLI: CliGuardSpec = {
+  command: 'node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts',
+  options: [
+    { flag: '--write-report' },
+    { flag: '--check' },
+    { flag: '--json' },
+    { flag: '--quiet' },
+  ],
+};
+
+export const main = defineScript({
+  name: 'role-assumption-reachability',
+  flags: ['json', 'quiet', 'check'],
+  async run(context) {
+    if (guardCliArgs(context.argv, ROLE_ASSUMPTION_REACHABILITY_CLI, context.print))
+      return undefined;
+    const { report, violations } = evaluateReachabilityGate();
+    if (hasCliFlag(context.argv, '--write-report')) {
+      const output = reachabilityReportPath();
+      safeMkdir(path.dirname(output), { recursive: true });
+      safeWriteFile(output, renderReachabilityReport(report));
+      context.print(`[role-assumption-reachability] report written to ${output}`);
+    }
+    if (violations.length > 0) {
+      throw new ScriptExitError(1, formatViolations(violations), false, { violations });
+    }
+    const systemRoles = Object.keys(report.system_roles).length;
+    context.print(
+      context.json
+        ? { status: 'ok', system_roles: systemRoles, violations: [] }
+        : `[role-assumption-reachability] OK — ${systemRoles} system role(s); every reachable role is granted`
+    );
+    return { status: 'ok', violations: [] };
   },
 });
 

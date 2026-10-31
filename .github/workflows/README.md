@@ -60,11 +60,27 @@ The `ci-workflow-contract` gate (`scripts/check_ci_workflow_contract.ts`, scope 
   builds every workspace package).
 
 **One owner per suite on pull requests.** `pr-validation.yml` owns the PR run of the core suite
-(6 shards), the actuator suite, governance boundary tests, lint, typecheck and format. On
+(6 shards), the actuator suite, the pr-scope gates (`pnpm run check -- --scope pr`, including the
+governance boundary tests in the `registration-tests` gate), lint, typecheck and format. On
 `pull_request` events `ci.yml` skips its `core`/`actuators` matrix entries and its lint/format/
 typecheck steps, and `cross-os.yml` skips the Linux core shards and boundary tests; all of them
 still run on `main` pushes and on the weekly schedule. Before adding a test step to a workflow,
 check which workflow already owns that suite for pull requests.
+
+**Check scopes per event.** Gates in `knowledge/product/governance/ci-gates.json` declare `pr`,
+`full` or `release`; `--scope` selects:
+
+| `--scope`   | Selects                | Run by                                                        |
+| ----------- | ---------------------- | ------------------------------------------------------------- |
+| `pr`        | pr gates               | `pr-validation.yml` pr-gates (pull_request, merge_group)      |
+| `full-only` | full gates, no pr gate | `ci.yml` lint-and-validate on pull_request and merge_group    |
+| `full`      | pr + full gates        | `ci.yml` lint-and-validate on push to `main` and the schedule |
+| `release`   | every gate             | `release.yml`                                                 |
+
+`pr` + `full-only` = `full`, so a PR runs each gate exactly once. `ci-gate-parity` enforces the
+`CHECK_SCOPE` selector in `ci.yml`. Likewise `ci.yml`'s `integration` shards pass
+`--skip-gate-tests`, which excludes the test files a pr-scope gate already runs through vitest
+(`registration-tests`); a local `pnpm test -- --suite integration` still runs all of `tests/`.
 
 **Suite sharding.** `ci.yml` shards `scripts` (3-ways) and `integration` (2-ways) through vitest
 `--shard=N/M` passed as `pnpm test -- --suite <s> --shard=N/M` — the dispatcher forwards Vitest

@@ -283,15 +283,10 @@
       "id": "role-assumption-reachability",
       "scope": "pr",
       "executable": "node",
-      "args": [
-        "--import",
-        "./scripts/ts-loader.mjs",
-        "scripts/analyze_role_assumptions.ts",
-        "--check"
-      ],
+      "args": ["--import", "./scripts/ts-loader.mjs", "scripts/analyze_role_assumptions.ts"],
       "timeout_ms": 240000,
       "owner": "security",
-      "rationale": "Keeps the call-level role assumption reachability report (docs/developer/role-assumption-reachability.json) current; role-assumption-policy.json must grant every reachable role (RN-02/RN-03). Budget: it type-checks scripts/, libs/core/ and libs/actuators/ as one TypeScript program (about 32s CPU, 40-50s wall alone on a loaded 4-vCPU host, 2-3x that while `pnpm check` runs 6 gates at once), so the 120s default timed out on busy runs."
+      "rationale": "Computes the call-level role assumption reachability report in memory (RN-02; not committed) and fails only on RN-03 invariant violations: role-assumption-policy.json must grant every reachable role, govern exactly the analysed system roles and every SYSTEM_ROLE a package script launches, and narrowed system roles must stay fully resolved. `--write-report` writes the report to active/shared/cache/system/role-assumption/ for review. Budget: it type-checks scripts/, libs/core/ and libs/actuators/ as one TypeScript program (about 32s CPU, 40-50s wall alone on a loaded 4-vCPU host, 2-3x that while `pnpm check` runs 6 gates at once), so the 120s default timed out on busy runs."
     },
     {
       "id": "reasoning-provider-registry",

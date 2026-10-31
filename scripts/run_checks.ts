@@ -37,6 +37,15 @@ const gateManifestCatalog = defineCatalog<GateManifest>({
 });
 
 const VALID_SCOPES = new Set<Gate['scope']>(['pr', 'full', 'release']);
+
+/**
+ * Selection scopes for `--scope`. A gate declares pr, full or release;
+ * `full-only` selects the full gates without the pr gates, so a CI job that
+ * runs alongside pr-validation.yml (`--scope pr`) covers `full` without
+ * running every pr gate twice: pr ∪ full-only = full.
+ */
+export type CheckScope = Gate['scope'] | 'full-only';
+const CHECK_SCOPES = new Set<CheckScope>([...VALID_SCOPES, 'full-only']);
 export const DEFAULT_GATE_TIMEOUT_MS = 120_000;
 export const DEFAULT_CONCURRENT_GATES = 6;
 
@@ -76,6 +85,10 @@ async function withPackageManagerGateLock<T>(operation: () => Promise<T>): Promi
 
 function isValidScope(value: string | undefined): value is Gate['scope'] {
   return value !== undefined && VALID_SCOPES.has(value as Gate['scope']);
+}
+
+function isCheckScope(value: string | undefined): value is CheckScope {
+  return value !== undefined && CHECK_SCOPES.has(value as CheckScope);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -157,11 +170,12 @@ export function loadGateManifest(): GateManifest {
   return manifest;
 }
 
-export function selectGates(manifest: GateManifest, scope: Gate['scope'], only?: string): Gate[] {
+export function selectGates(manifest: GateManifest, scope: CheckScope, only?: string): Gate[] {
   validateGateManifest(manifest);
-  if (!isValidScope(scope)) throw new Error(`unknown check scope: ${String(scope)}`);
+  if (!isCheckScope(scope)) throw new Error(`unknown check scope: ${String(scope)}`);
   const scoped = manifest.gates.filter((gate) => {
     if (scope === 'release') return true;
+    if (scope === 'full-only') return gate.scope === 'full';
     return gate.scope === scope || (scope === 'full' && gate.scope === 'pr');
   });
   if (only) {
@@ -309,7 +323,7 @@ export async function main(
     else print(`[check] ERROR ${message}`);
     return 1;
   };
-  if (!isValidScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
+  if (!isCheckScope(scopeValue)) return error(`unknown check scope: ${String(scopeValue)}`);
   if (scopeIndex >= 0 && !scopeValue) return error('--scope requires a value');
   if (onlyIndex >= 0 && !only) return error('--only requires a gate id');
   if (args.filter((arg) => arg === '--jobs').length > 1)
