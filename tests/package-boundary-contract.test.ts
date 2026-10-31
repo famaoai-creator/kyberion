@@ -123,6 +123,32 @@ const ALLOWED_TEST_SOURCE_IMPORTS = new Map<string, string[]>([
       '../libs/core/secure-io.js',
     ],
   ],
+  // R01 confidential-organization lifecycle drives the real scope/secret/
+  // coordination boundaries end to end; several collaborators have no
+  // @agent/core package export (execution-scope, task-credential-dispatch,
+  // work-coordination-ledger, scope-context-validation), so the suite keeps
+  // source-module imports.
+  [
+    'tests/confidential-organization-lifecycle.test.ts',
+    [
+      '../libs/core/foundation/credential-binding.js',
+      '../libs/core/foundation/execution-scope.js',
+      '../libs/core/reasoning/reasoning-bootstrap.js',
+      '../libs/core/scope-envelope.js',
+      '../libs/core/secret/secret-resolver.js',
+      '../libs/core/secret/task-credential-dispatch.js',
+      '../libs/core/workforce/work-coordination-ledger.js',
+      '../libs/core/workforce/work-coordination.js',
+    ],
+  ],
+  [
+    'tests/fixtures/cli-reliability/scoped-organization.ts',
+    [
+      '../../../libs/core/scope-context-validation.js',
+      '../../../libs/core/scope-envelope.js',
+      '../../../libs/core/secret/secret-resolver.js',
+    ],
+  ],
 ]);
 const ALLOWED_SCRIPT_CANONICAL_ROOT_CWD = new Set<string>([]);
 const ALLOWED_PLUGIN_SATELLITE_CANONICAL_ROOT_CWD = new Set<string>([]);

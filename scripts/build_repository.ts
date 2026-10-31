@@ -9,14 +9,11 @@ import {
   publishBuildGenerationReceipt,
   type BuildGenerationReceipt,
 } from '../libs/core/build-generation.js';
+import { readJsonIfPresent } from '../libs/core/foundation/json.js';
+import { nowIso } from '../libs/core/foundation/time.js';
 import { PfcController, type RecoveryAttempt } from '../libs/core/pfc/PfcController.js';
 import { pathResolver } from '../libs/core/path-resolver.js';
-import {
-  assertGovernedExec,
-  buildSafeExecEnv,
-  safeReadFile,
-  safeSpawn,
-} from '../libs/core/secure-io.js';
+import { assertGovernedExec, buildSafeExecEnv, safeSpawn } from '../libs/core/secure-io.js';
 import { defineScript, isDirectScript } from '../libs/core/script-harness.js';
 import { runClean } from './clean.js';
 
@@ -232,12 +229,10 @@ async function trySnapshotInputs(deps: BuildDependencies): Promise<BuildInputSna
 function buildToolVersions(): BuildGenerationReceipt['toolVersions'] {
   const versions: BuildGenerationReceipt['toolVersions'] = { node: process.version };
   try {
-    const manifest = JSON.parse(
-      safeReadFile(pathResolver.rootResolve('node_modules/typescript/package.json'), {
-        encoding: 'utf8',
-      }) as string
-    ) as { version?: string };
-    if (typeof manifest.version === 'string' && manifest.version) {
+    const manifest = readJsonIfPresent<{ version?: string }>(
+      pathResolver.rootResolve('node_modules/typescript/package.json')
+    );
+    if (typeof manifest?.version === 'string' && manifest.version) {
       versions.typescript = manifest.version;
     }
   } catch {
@@ -277,7 +272,7 @@ export async function buildRepository(
         sourceHash: inputs.hash,
         configHash: config.hash,
         fileCount: inputs.fileCount,
-        takenAt: new Date().toISOString(),
+        takenAt: nowIso(),
       };
     },
     publishReceipt: (receipt) => publishBuildGenerationReceipt(receipt),
@@ -285,7 +280,7 @@ export async function buildRepository(
   };
   await deps.lock(async () => {
     const id = randomUUID();
-    const startedAt = new Date().toISOString();
+    const startedAt = nowIso();
     const before = await trySnapshotInputs(deps);
     try {
       if (mode === 'all') deps.clean();
@@ -343,7 +338,7 @@ export async function buildRepository(
           generationId: id,
           mode,
           startedAt,
-          finishedAt: new Date().toISOString(),
+          finishedAt: nowIso(),
           result: 'completed',
           inputFingerprint: before.sourceHash,
           configFingerprint: before.configHash,
