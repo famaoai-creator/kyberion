@@ -4,6 +4,7 @@ import {
   parseContinuousObservations,
   parseContinuousOperationsConfig,
 } from './continuous-operations-policy.js';
+import { storageFloorRelativePath } from '../storage-layout.js';
 
 const now = new Date('2026-10-18T00:00:00.000Z');
 const config = () => ({
@@ -49,6 +50,73 @@ const run = (value = 5) =>
   );
 
 describe('continuous operations policy', () => {
+  it('accepts only same-scope continuous-operations cache snapshots, including the default snapshot kind', () => {
+    const input = config();
+    const scope = { ...input.scope, project_id: 'project-a' };
+    const cached = storageFloorRelativePath(
+      'cache',
+      { kind: 'tier', tier: 'confidential', tenant: 'acme' },
+      'continuous-operations',
+      'organizations',
+      'ops',
+      'projects',
+      'project-a',
+      'fixture',
+      'metrics.json'
+    );
+    for (const kind of [undefined, 'snapshot']) {
+      const source = { ...input.sources[0], path: cached, ...(kind ? { kind } : {}) };
+      expect(
+        parseContinuousOperationsConfig({ ...input, scope, sources: [source] }).sources[0]
+      ).toMatchObject({ path: cached });
+    }
+    expect(() =>
+      parseContinuousOperationsConfig({
+        ...input,
+        scope,
+        sources: [
+          {
+            ...input.sources[0],
+            kind: 'pipeline',
+            path: cached,
+            pipeline_ref: 'pipelines/collect.json',
+          },
+        ],
+      })
+    ).toThrow(/source outside configured scope/);
+    for (const sourcePath of [
+      cached.replace('/acme/', '/other/'),
+      cached.replace('/confidential/', '/public/'),
+      cached.replace('/organizations/ops/', '/organizations/other/'),
+      cached.replace('/projects/project-a/', '/projects/project-b/'),
+      cached.replace('/continuous-operations/', '/other-domain/'),
+      cached.replace('active/shared/cache/', 'active/shared/tmp/'),
+      cached.replace('confidential/acme/', 'system/'),
+      cached.replace('/fixture/', '/../fixture/'),
+    ])
+      expect(() =>
+        parseContinuousOperationsConfig({
+          ...input,
+          scope,
+          sources: [{ ...input.sources[0], path: sourcePath }],
+        })
+      ).toThrow();
+    expect(() =>
+      parseContinuousOperationsConfig({
+        ...input,
+        sources: [{ ...input.sources[0], path: cached }],
+      })
+    ).toThrow();
+    expect(parseContinuousOperationsConfig(input).sources[0]).toMatchObject({
+      path: input.sources[0].path,
+    });
+    expect(
+      parseContinuousOperationsConfig({
+        ...input,
+        sources: [{ ...input.sources[0], path: 'knowledge/confidential/acme/metrics.json' }],
+      }).sources[0]
+    ).toMatchObject({ path: 'knowledge/confidential/acme/metrics.json' });
+  });
   it('parses governed collector variants and bounded schedules', () => {
     const input = config();
     expect(

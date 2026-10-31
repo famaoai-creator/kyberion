@@ -222,6 +222,8 @@ export interface DotCharter {
     reasoning_backend?: string;
     /** Operator-authored data posture; provider attestation and egress gates still apply. */
     reasoning_training_use?: 'local_only' | 'no_training' | 'zero_retention';
+    /** Off when absent. Shadow requires injected fixture ports; no production budget/provider adapter. */
+    semantic_judgment?: { mode: 'off' | 'shadow' };
     max_idle_wake_ms?: number;
     /** Hours of missed cron runs coalesced into one catch-up wake (1-24, default 6). */
     cron_catch_up_hours?: number;
@@ -312,6 +314,10 @@ export function validateDotCharter(value: unknown, sourcePath = '<inline>'): Dot
   }
   isFrontDeskDiagnosticDot(candidate as DotCharter);
   const bound = candidate as DotCharter;
+  if (bound.authority.authority_role === 'dot_result_writer')
+    throw new Error(
+      `Invalid dot charter at ${sourcePath}: dot_result_writer is an internal store role`
+    );
   if (
     bound.work_binding &&
     (!bound.scope.organization_id || bound.scope.project_id || bound.operations_cadence)

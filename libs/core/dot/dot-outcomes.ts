@@ -20,6 +20,7 @@
 
 import * as path from 'node:path';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { projectDotResultRecords, dotResultScopeSchema } from './dot-result-records.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
@@ -167,9 +168,15 @@ export function scheduleDotOutcomeChecks(
   for (const row of readRows<DotOutcomeRow>(c, file(deps, c, DOT_OUTCOMES_FILE))) {
     known.add(row.action_ref);
   }
-  const results = deps.readResults
+  const rawResults = deps.readResults
     ? deps.readResults(c)
-    : readRows<DotWorkResultRow>(c, file(deps, c, DOT_WORK_RESULTS_FILE));
+    : readJsonLines<unknown>(file(deps, c, DOT_WORK_RESULTS_FILE));
+  const results = (
+    projectDotResultRecords(
+      rawResults,
+      c.scope.tier === 'confidential' ? dotResultScopeSchema.parse(c.scope) : undefined
+    ) as DotWorkResultRow[]
+  ).filter((row) => row && row.dot_id === c.dot_id);
   const effectOf = deps.expectedEffectOf ?? defaultExpectedEffect(deps);
   const scheduled: DotOutcomePendingRow[] = [];
   for (const result of results) {

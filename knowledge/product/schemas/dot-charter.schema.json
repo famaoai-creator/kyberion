@@ -359,6 +359,7 @@
       "properties": {
         "authority_role": {
           "type": "string",
+          "not": { "const": "dot_result_writer" },
           "description": "Must be a role declared in security-policy.json authority_role_permissions."
         },
         "accountability_charter_ref": {
@@ -505,6 +506,15 @@
           "type": "string",
           "enum": ["local_only", "no_training", "zero_retention"],
           "description": "Operator-reviewed reasoning data-use ceiling. Private charters default to local_only. no_training still requires provider attestation, processor authorization and tenant egress policy; this setting grants no authority itself."
+        },
+        "semantic_judgment": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": { "enum": ["off", "shadow"] }
+          },
+          "description": "Absent means off. Advisory shadow grants no execution or effect approval. No production shared-budget/provider adapter is supplied; without explicit injected fixture ports it performs no inference."
         },
         "max_idle_wake_ms": {
           "type": "integer",

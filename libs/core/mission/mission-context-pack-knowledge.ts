@@ -25,7 +25,7 @@ import { judgmentAssistReady } from '../reasoning/judgment-provider-bootstrap.js
 import { loadProjectRecord } from '../project/project-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import { readTextFile } from '../foundation/text.js';
-import { safeExistsSync, safeLstat } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import type { ScopeContext } from '../scope-context.js';
 import type { ProjectOperationalState } from '../project/project-operational-state-registry.js';
 import type { WorkItem } from '../workforce/work-coordination.js';
@@ -94,13 +94,9 @@ function resolveSafePinnedKnowledgePath(repoRelativePath: string, rootDir?: stri
   if (!relative || relative === '..' || relative.startsWith('../') || path.isAbsolute(relative)) {
     return null;
   }
-  let current = root;
-  for (const segment of relative.split('/')) {
-    current = path.join(current, segment);
-    if (!safeExistsSync(current)) break;
-    if (safeLstat(current).isSymbolicLink()) return null;
-  }
-  return absolute;
+  // Validate all ancestors without requesting metadata authority on tenantless
+  // structural tier prefixes. The owned leaf still uses normal secure I/O.
+  return assertSafeRepositoryPath(absolute, { allowMissingLeaf: true });
 }
 
 function loadPinnedKnowledgeHint(

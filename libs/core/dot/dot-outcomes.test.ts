@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { appendJsonLine } from '../foundation/json.js';
+import { createDotReportMarker, projectDotResultRecords } from './dot-result-records.js';
 import { safeMkdir, safeRmSync } from '../secure-io.js';
 import type { DotCharter } from './dot-charter.js';
 import {
@@ -93,6 +94,44 @@ const base = (now: Date, over: Partial<DotOutcomeDeps> = {}): DotOutcomeDeps => 
 afterEach(() => safeRmSync(TEST_ROOT, { recursive: true, force: true }));
 
 describe('dot outcomes', () => {
+  it('projects raw and injected confidential markers before scheduling exactly one outcome', () => {
+    const scope = { tier: 'confidential' as const, tenant_slug: 'marker-tenant' };
+    const c = { ...charter(), scope };
+    const row = result('marked', { attempt_id: 'marker-attempt', report_to_dot_id: 'operator' });
+    const marker = createDotReportMarker({
+      row,
+      scope,
+      reportTo: 'operator',
+      enqueuedAt: T0.toISOString(),
+    });
+    const raw = [row, marker] as unknown as DotWorkResultRow[];
+    seed(c, raw);
+    expect(scheduleDotOutcomeChecks(c, base(T0)).map((entry) => entry.action_ref)).toEqual([
+      'marked',
+    ]);
+    expect(scheduleDotOutcomeChecks(c, base(T0, { readResults: () => raw }))).toEqual([]);
+    expect(
+      scheduleDotOutcomeChecks(
+        c,
+        base(T0, { readResults: () => projectDotResultRecords(raw, scope) as DotWorkResultRow[] })
+      )
+    ).toEqual([]);
+    expect(() =>
+      scheduleDotOutcomeChecks(
+        c,
+        base(T0, { readResults: () => [marker] as unknown as DotWorkResultRow[] })
+      )
+    ).toThrow();
+    expect(() =>
+      scheduleDotOutcomeChecks(
+        c,
+        base(T0, {
+          readResults: () =>
+            [{ ...marker, kind: 'unknown-marker' }] as unknown as DotWorkResultRow[],
+        })
+      )
+    ).toThrow();
+  });
   it('verdict is direction-aware with tolerance', () => {
     expect(dotOutcomeVerdict('decrease', 10, 5, 0, 0.1)).toBe('improved');
     expect(dotOutcomeVerdict('decrease', 5, 10, 0, 0.1)).toBe('regressed');

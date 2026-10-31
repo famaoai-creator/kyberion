@@ -43,7 +43,10 @@ export function narrowStoreRoleDenial(input: {
   /** The guard's own raw read of a repo-relative file (undefined when absent). */
   readRepoFile: (repoRelative: string) => string | undefined;
 }): string | null {
-  const { role, relativePath, operation } = input;
+  const { role, relativePath } = input;
+  // Append must retain every pre-existing write/content restriction, never fall through
+  // a metadata/read branch merely because the resource ceiling distinguishes the verb.
+  const operation = input.operation === 'append' ? 'write' : input.operation;
   if (!role) return null;
   if (
     role === DELIVERABLE_INBOX_WRITER_ROLE &&

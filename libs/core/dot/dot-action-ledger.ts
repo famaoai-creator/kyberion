@@ -24,6 +24,12 @@ import type { DotWorkShape, DotDecisionLevel, DotProposal } from './dot-proposal
 import { parseMissionAdmissionRequest } from '../governance/mandate-shadow.js';
 import type { DotCharter } from './dot-charter.js';
 import { dotStatePath } from './dot-state-paths.js';
+import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
+import {
+  parseDotJudgmentBinding,
+  validateServerDotJudgmentProposal,
+  type DotJudgmentBinding,
+} from './dot-judgment-binding.js';
 export const DOT_ACTION_LEDGER_PATH = 'active/shared/runtime/dot-action-ledger.jsonl';
 export interface DotActionLedgerDeps {
   rootDir?: string;
@@ -38,6 +44,8 @@ export type DotActionStatus =
   'admitted' | 'dispatched' | 'parked' | 'waiting_capacity' | 'refused' | 'shadow' | 'declined';
 
 export interface DotActionRecord {
+  /** Server-authored immutable origin metadata; never exposed by the shared private index. */
+  semantic_judgment?: DotJudgmentBinding;
   scope?: DotCharter['scope'];
   /** Present only on a metadata-only shared index; never executable by itself. */
   private_content_hash?: string;
@@ -95,6 +103,59 @@ export interface DotActionRecord {
   at: string;
 }
 
+/** Executable evidence must be complete; absence on an inventory index is never legacy off. */
+export function assertDotActionJudgmentBinding(record: DotActionRecord): void {
+  if (record.private_content_hash !== undefined)
+    throw new Error(
+      '[DOT_ACTION_CONTENT_UNAVAILABLE] shared index cannot be used as executable evidence'
+    );
+  const descriptor = Object.getOwnPropertyDescriptor(record, 'semantic_judgment');
+  if ((descriptor && !('value' in descriptor)) || (!descriptor && 'semantic_judgment' in record))
+    throw new Error('Judgment action binding must be an own data value');
+  const binding = parseDotJudgmentBinding(descriptor?.value);
+  const admitted = record.admission?.proposal;
+  const admittedBinding = admitted ? validateServerDotJudgmentProposal(admitted) : undefined;
+  if (!binding && !admittedBinding) return;
+  judgmentCanonicalHash(record);
+  if (
+    !binding ||
+    !admitted ||
+    !admittedBinding ||
+    !record.admission ||
+    !isDotAdmissionIdentity(record.admission) ||
+    judgmentCanonicalHash(binding) !== judgmentCanonicalHash(admittedBinding) ||
+    judgmentCanonicalHash(record.scope) !== judgmentCanonicalHash(binding.scope) ||
+    recoveryEvidenceHash(admitted) !== record.admission.semantic_hash
+  )
+    throw new Error('Judgment action scope, admission or immutable binding differs');
+  for (const field of [
+    'action_id',
+    'title',
+    'objective',
+    'work_shape',
+    'rationale',
+    'priority',
+    'pipeline_ref',
+    'expected_effect',
+    'target',
+    'intent',
+    'mission_admission',
+    'handoff_to',
+    'continuous_work',
+    'front_desk_execution',
+  ] as const) {
+    const actual = record[field],
+      original = admitted[field];
+    if (actual === undefined && original === undefined) continue;
+    if (
+      actual === undefined ||
+      original === undefined ||
+      judgmentCanonicalHash(actual) !== judgmentCanonicalHash(original)
+    )
+      throw new Error(`Judgment action executable field differs: ${field}`);
+  }
+}
+
 export function isDotAdmissionIdentity(
   value: unknown
 ): value is NonNullable<DotActionRecord['admission']> {
@@ -115,9 +176,20 @@ export function isDotAdmissionIdentity(
 function ledgerFile(deps: DotActionLedgerDeps): string {
   return path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_ACTION_LEDGER_PATH);
 }
+function assertPrivateIndexHasNoJudgmentBody(record: DotActionRecord): void {
+  if (
+    record.private_content_hash !== undefined &&
+    ['semantic_judgment', 'admission'].some((field) => Object.hasOwn(record, field))
+  )
+    throw new Error('[DOT_ACTION_CONTENT_UNAVAILABLE] shared index contains private judgment body');
+}
 
 function hydratePrivateAction(record: DotActionRecord, deps: DotActionLedgerDeps): DotActionRecord {
-  if (record.private_content_hash === undefined) return record;
+  assertPrivateIndexHasNoJudgmentBody(record);
+  if (record.private_content_hash === undefined) {
+    assertDotActionJudgmentBinding(record);
+    return record;
+  }
   if (
     typeof record.private_content_hash !== 'string' ||
     !/^[a-f0-9]{64}$/.test(record.private_content_hash)
@@ -144,17 +216,19 @@ function hydratePrivateAction(record: DotActionRecord, deps: DotActionLedgerDeps
     throw new Error(
       '[DOT_ACTION_CONTENT_UNAVAILABLE] scoped action evidence missing or changed; do not execute the shared index'
     );
+  assertDotActionJudgmentBinding(full);
   return full;
 }
 
 export function readDotActionLedger(deps: DotActionLedgerDeps = {}): DotActionRecord[] {
   return readJsonLines<DotActionRecord>(ledgerFile(deps), { onMalformed: 'skip' })
     .filter((row) => typeof row?.action_ref === 'string' && typeof row.dot_id === 'string')
-    .map((row) =>
-      !row.scope || (row.scope.tier !== 'public' && !row.private_content_hash)
+    .map((row) => {
+      assertPrivateIndexHasNoJudgmentBody(row);
+      return !row.scope || (row.scope.tier !== 'public' && !row.private_content_hash)
         ? actionIndex(row)
-        : row
-    );
+        : row;
+    });
 }
 
 function actionIndex(record: DotActionRecord): DotActionRecord {
@@ -202,6 +276,7 @@ export function migrateLegacyDotActions(
           '[DOT_STATE_MIGRATION_SCOPE] inline action scope differs from reviewed charter'
         );
       const full = { ...row, scope: charter.scope };
+      assertDotActionJudgmentBinding(full);
       const scopedFile = path.join(
         deps.rootDir ?? pathResolver.rootDir(),
         dotStatePath(charter, 'action-ledger.jsonl')
@@ -231,6 +306,7 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
       if (!row || typeof row !== 'object' || Array.isArray(row))
         throw new Error('invalid_action_evidence');
       const value = row as Record<string, unknown>;
+      assertPrivateIndexHasNoJudgmentBody(row as DotActionRecord);
       if (
         value.private_content_hash !== undefined &&
         (typeof value.private_content_hash !== 'string' ||
@@ -330,6 +406,7 @@ export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotAc
           throw new Error('invalid_recovery_action_evidence');
       }
       const record = row as DotActionRecord;
+      if (record.private_content_hash === undefined) assertDotActionJudgmentBinding(record);
       const index =
         !record.scope || (record.scope.tier !== 'public' && !record.private_content_hash)
           ? actionIndex(record)
@@ -418,6 +495,7 @@ export function appendActionRecord(
   if (!record.scope)
     throw new Error('[DOT_ACTION_SCOPE_REQUIRED] action writers must bind a trusted charter scope');
   dotStatePath({ scope: record.scope }); // Validate every declared tier/owner/tenant before persistence.
+  assertDotActionJudgmentBinding(record);
   const write = () => {
     // A stale writer can never erase the terminal receipt or restore a parked row.
     const current = record.front_desk_execution
@@ -480,6 +558,7 @@ export function latestDotActions(deps: DotActionLedgerDeps = {}): DotActionRecor
 
 /** Identity of a proposal for dedupe: includes pipeline, target and intent so opposing proposals never collapse. */
 export function dotProposalHash(dotId: string, proposal: DotProposal): string {
+  const judgment = validateServerDotJudgmentProposal(proposal);
   return createHash('sha256')
     .update(
       JSON.stringify([
@@ -495,6 +574,7 @@ export function dotProposalHash(dotId: string, proposal: DotProposal): string {
         ...(proposal.pipeline_ref || proposal.target || proposal.intent
           ? [proposal.pipeline_ref ?? '', proposal.target ?? '', proposal.intent ?? '']
           : []),
+        ...(judgment ? ['semantic-judgment-v1', judgmentCanonicalHash(judgment)] : []),
       ])
     )
     .digest('hex')
