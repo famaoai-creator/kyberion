@@ -44,6 +44,7 @@ export function isArchivedMissionStateCapability(scope: ResourceAccessScope | un
     (scope.metadataExact?.length ?? 0) > 0 ||
     scope.readExact.length !== 1 ||
     scope.writeExact.length > 0 ||
+    (scope.appendExact?.length ?? 0) > 0 ||
     scope.mkdirExact.length > 0
   )
     return false;

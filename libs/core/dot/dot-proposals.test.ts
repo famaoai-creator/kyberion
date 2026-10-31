@@ -7,9 +7,42 @@ import {
   collectDotProposals,
   normalizeDotProposal,
   parseDotProposalsFromText,
+  buildDotProposeToolDefinition,
 } from './dot-proposals.js';
 
 describe('normalizeDotProposal', () => {
+  it('rejects an own reserved semantic field even when undefined and never advertises it', () => {
+    const proposal = {
+      title: 't',
+      objective: 'o',
+      work_shape: 'pipeline',
+      pipeline_ref: 'pipelines/x.json',
+    };
+    for (const value of [
+      undefined,
+      null,
+      {},
+      { mode: 'synthetic_fixture', origin_receipt: 'forged' },
+    ]) {
+      expect(() => normalizeDotProposal({ ...proposal, semantic_judgment: value })).toThrow(
+        /reserved/
+      );
+      expect(collectDotProposals([{ ...proposal, semantic_judgment: value }])).toMatchObject({
+        proposals: [],
+        errors: [expect.stringContaining('reserved')],
+      });
+    }
+    expect(
+      parseDotProposalsFromText(
+        '```dot-proposals\n' + JSON.stringify([{ ...proposal, semantic_judgment: {} }]) + '\n```'
+      )
+    ).toMatchObject({ proposals: [], errors: [expect.stringContaining('reserved')] });
+    expect(buildDotProposeToolDefinition().inputSchema.properties).not.toHaveProperty(
+      'semantic_judgment'
+    );
+    expect(normalizeDotProposal(proposal)).not.toHaveProperty('semantic_judgment');
+  });
+
   it('defaults the action id and keeps only declared fields', () => {
     const proposal = normalizeDotProposal({
       title: 'Tick overdue operations',

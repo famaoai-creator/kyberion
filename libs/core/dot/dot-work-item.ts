@@ -1,10 +1,14 @@
 import { dotGoalRefLabel, type DotCharter } from './dot-charter.js';
-import type { DotActionRecord } from './dot-action-ledger.js';
-import type { CreateWorkItemInput } from '../workforce/work-coordination-types.js';
+import { assertDotActionJudgmentBinding, type DotActionRecord } from './dot-action-ledger.js';
+import { parseDotJudgmentBinding } from './dot-judgment-binding.js';
+import type { CreateWorkItemInput, WorkItem } from '../workforce/work-coordination-types.js';
+import { buildWorkItemCreation } from '../workforce/work-coordination-identity.js';
+import { judgmentCanonicalHash } from '../organization/judgment-precedents.js';
 import {
   dotAdmissionItemId,
   dotAdmissionMissionId,
   dotRecordAdmissionMatches,
+  assertDotJudgmentProposalCharter,
 } from './dot-admission-identity.js';
 
 function workItemDescription(charter: DotCharter, record: DotActionRecord): string {
@@ -19,6 +23,46 @@ function workItemDescription(charter: DotCharter, record: DotActionRecord): stri
     .join('\n');
 }
 
+/** Real stores still verify original history; injected finders must prove this strict projection. */
+export function assertDotExistingWorkItem(
+  record: DotActionRecord,
+  existing: WorkItem | undefined,
+  input: ReturnType<typeof dotWorkItemInput>,
+  injected: boolean
+): void {
+  if (!existing) return;
+  const original = parseDotJudgmentBinding(record.semantic_judgment);
+  const persisted = parseDotJudgmentBinding(existing.metadata?.semantic_judgment);
+  if (
+    Boolean(original) !== Boolean(persisted) ||
+    (original && judgmentCanonicalHash(original) !== judgmentCanonicalHash(persisted))
+  )
+    throw new Error('Existing WorkItem judgment origin differs from the immutable admission');
+  if (existing.metadata?.action_ref && existing.metadata.action_ref !== record.action_ref)
+    throw new Error('dot work item identity conflict');
+  if (!injected || !original) return;
+  // No original store history is supplied by this injected port. Later identity edits are
+  // unsupported; lifecycle status/version/attempt updates are preserved without reopening work.
+  const expected = buildWorkItemCreation(input);
+  const fields = [
+    'item_id',
+    'title',
+    'description',
+    'priority',
+    'source',
+    'source_ref',
+    'project_id',
+    'context',
+    'metadata',
+    'labels',
+    'dependencies',
+  ] as const;
+  const projection = (value: WorkItem) =>
+    Object.fromEntries(fields.map((field) => [field, value[field]]));
+  if (judgmentCanonicalHash(projection(existing)) !== judgmentCanonicalHash(projection(expected)))
+    throw new Error('Existing injected WorkItem immutable creation envelope differs');
+}
+
 /** One immutable creation envelope, shared by initial admission and recovery. */
 export function dotWorkItemInput(
   charter: DotCharter,
@@ -26,12 +70,16 @@ export function dotWorkItemInput(
   rootDir?: string,
   existing?: { item_id: string; source_ref: string }
 ): CreateWorkItemInput & { itemId: string } {
+  assertDotActionJudgmentBinding(record);
+  const judgment = parseDotJudgmentBinding(record.semantic_judgment);
+  if (judgment) assertDotJudgmentProposalCharter(charter, record.admission!.proposal);
   if (!dotRecordAdmissionMatches(charter, record))
     throw new Error(
       '[DOT_WORK_BINDING] Operation responsibility differs from the admitted work; reconcile instead of relabeling.'
     );
   const legacy =
     existing &&
+    !judgment &&
     !record.front_desk_execution &&
     existing.item_id !== dotAdmissionItemId(record.action_ref);
   const actor = 'dot:' + charter.dot_id;
@@ -57,6 +105,7 @@ export function dotWorkItemInput(
       work_shape: 'routine_operation',
     },
     metadata: {
+      ...(judgment ? { semantic_judgment: judgment } : {}),
       ...(charter.work_binding ? { operation_id: charter.work_binding.operation_id } : {}),
       ...(record.mission_admission
         ? {
