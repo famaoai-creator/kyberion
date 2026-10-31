@@ -3,7 +3,7 @@ title: Runtime Storage Layout
 category: Architecture
 tags: [storage, artifacts, workspace, tmp, cache, staging, tier, multi-tenant, retention]
 importance: 8
-last_updated: 2026-10-26
+last_updated: 2026-10-31
 runtime_stages: [alignment, execution, review]
 ---
 
@@ -70,6 +70,25 @@ The floors (`tmp`, `staging`, `cache`, `artifacts`) share one partition rule
   `active/missions/confidential/<tenant>/<id>/artifacts/`).
 - A path directly under a floor root without a partition segment is
   **legacy**: it predates this layout and carries no governing tier.
+
+### Managed tool runtimes
+
+Managed tool runtimes split by purpose, and each half is resolved in one place
+(`libs/core/tool/tool-runtime-policy.ts`):
+
+| Data                                                           | Location                                          | Resolver                                               |
+| -------------------------------------------------------------- | ------------------------------------------------- | ------------------------------------------------------ |
+| Installs: venvs, managed binaries, `state.json`, provider CLIs | `active/shared/runtime/tool-runtimes/<dir>/`      | `resolveToolRuntimesRoot()`, the tool-runtime registry |
+| Downloads: uv / pip / XDG caches, `HF_HOME` model weights      | `active/shared/cache/system/tool-runtimes/<dir>/` | `resolveToolRuntimeDownloadCacheDir()`                 |
+
+Installs are state, not cache: they are approval-gated, `state.json` records
+the install/pin provenance, and installed files keep upstream mtimes that the
+cache partition's per-file TTL would tear apart. Downloads are re-generable but
+`review_required` in the retention catalog because multi-GB weights are fetched
+deliberately and keep their download mtime. A runtime that an older setup
+installed under the download-cache root is still read (`resolveToolRuntimeDir`,
+registry python/binary lookups) as a fallback; new installs always go to the
+runtime root. Never build either path by hand.
 
 ### Process start-up caches
 

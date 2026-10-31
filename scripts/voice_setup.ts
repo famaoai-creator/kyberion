@@ -3,6 +3,7 @@
 import * as path from 'node:path';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { markToolRuntimeInstalled, probeToolRuntime } from '@agent/core/tool/tool-runtime-registry';
+import { resolveToolRuntimeDownloadCacheDir } from '@agent/core/tool/tool-runtime-policy';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeMkdir } from '@agent/core/secure-io';
 import { getRegisteredEnvText } from '@agent/core/foundation';
@@ -45,7 +46,9 @@ function resolveManagedPythonPath(managedEnvPath: string): string {
 }
 
 function voiceRuntimeInstallEnv(): Record<string, string> {
-  const cacheRoot = pathResolver.rootResolve('active/shared/cache/system/tool-runtimes/mlx-audio');
+  // Download caches (re-generable) live on the cache floor; the venvs they feed
+  // install under the canonical runtime root via the registry.
+  const cacheRoot = resolveToolRuntimeDownloadCacheDir('mlx-audio');
   const uvCache = path.join(cacheRoot, 'uv');
   const xdgCache = path.join(cacheRoot, 'xdg');
   const huggingFaceCache = path.join(cacheRoot, 'huggingface');

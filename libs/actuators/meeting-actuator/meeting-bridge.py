@@ -115,11 +115,17 @@ def _resolve_default_python_bin():
         os.environ.get("KYBERION_PYTHON_BIN"),
         os.environ.get("KYBERION_PYTHON"),
     ]
+    # Mirrors libs/core/tool/tool-runtime-policy.ts: canonical install root
+    # first, then the legacy cache-floor root as a read-only fallback.
+    managed_roots = [
+        ROOT / "active/shared/runtime/tool-runtimes",
+        ROOT / "active/shared/cache/system/tool-runtimes",
+    ]
     managed_candidates = [
-        ROOT / "active/shared/runtime/tool-runtimes/mlx-audio/bin/python",
-        ROOT / "active/shared/runtime/tool-runtimes/mlx-audio/bin/python3",
-        ROOT / "active/shared/runtime/tool-runtimes/mlx-whisper/bin/python",
-        ROOT / "active/shared/runtime/tool-runtimes/mlx-whisper/bin/python3",
+        root / runtime / "bin" / name
+        for root in managed_roots
+        for runtime in ("mlx-audio", "mlx-whisper")
+        for name in ("python", "python3")
     ]
     legacy_candidates = [
         ROOT / ".venv/bin/python3",
