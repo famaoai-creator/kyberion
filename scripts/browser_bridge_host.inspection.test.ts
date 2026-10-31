@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from '@agent/core/authority';
@@ -264,6 +265,45 @@ describe('submit_inspection (native host)', () => {
     expect(stored).not.toHaveProperty('inspection');
   });
 
+  it('never lets a polling CLI see the inspection before its audit record exists', async () => {
+    for (const scope of [
+      { tier: 'confidential', tenant_slug: 'acme' },
+      { tier: 'personal' },
+    ] as const) {
+      const ticket = open(scope);
+      const seenDuringAudit: Array<Record<string, unknown>> = [];
+      const original = auditChain.record.bind(auditChain);
+      const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+      vi.spyOn(auditChain, 'record').mockImplementation((entry) => {
+        if (entry.action === 'browser_bridge_submit_inspection' && entry.result === 'completed') {
+          // A slow, then failing, audit write: the CLI polls in the meantime.
+          seenDuringAudit.push(storedTicket(ticket));
+          throw new Error('audit disk full');
+        }
+        return original(entry);
+      });
+      const reply = await submit(ticket);
+      vi.restoreAllMocks();
+      stderr.mockRestore();
+      expect(seenDuringAudit).toHaveLength(1);
+      expect(seenDuringAudit[0].status).toBe('waiting');
+      expect(seenDuringAudit[0]).not.toHaveProperty('inspection');
+      if (scope.tier === 'confidential') {
+        expect(reply.code).toBe('audit_unavailable');
+        // The CLI keeps polling until its deadline and never receives the data.
+        await expect(
+          awaitInspectionTicket(ticket, {
+            now: () => new Date(Date.parse(ticket.expires_at) + 1),
+          })
+        ).rejects.toMatchObject({ code: 'timeout' });
+      } else {
+        // Non-confidential: the failed audit only warns, then the ticket is written.
+        expect(reply.ok).toBe(true);
+        expect(storedTicket(ticket).status).toBe('submitted');
+      }
+    }
+  });
+
   it('refuses to open a confidential ticket the audit chain cannot record', () => {
     vi.spyOn(auditChain, 'record').mockImplementation(() => {
       throw new Error('audit disk full');
@@ -290,6 +330,39 @@ describe('submit_inspection (native host)', () => {
     const live = open({ tier: 'personal' });
     expect((await submit(live)).ok).toBe(true);
     expect(asConcierge(() => safeExistsSync(ticketFile(stale)))).toBe(false);
+  });
+
+  it('sweeps submitted tickets left behind by a crashed CLI once the grace has passed', async () => {
+    const now = Date.now();
+    const crashed = open({ tier: 'personal' }, 60_000, new Date(now - 10 * 60_000));
+    submitInspectionToWaitingTicket(inspection(), {
+      pairingCode: crashed.pairing_code,
+      clock: () => new Date(now - 10 * 60_000 + 1_000),
+    });
+    expect(storedTicket(crashed).status).toBe('submitted');
+    // Deliver the recent ticket at a time when the crashed one is still within its grace.
+    const recent = open({ tier: 'personal' }, 9 * 60_000 - 30_000, new Date(now - 10 * 60_000));
+    submitInspectionToWaitingTicket(inspection(), {
+      pairingCode: recent.pairing_code,
+      clock: () => new Date(now - 10 * 60_000 + 2_000),
+    });
+    const live = open({ tier: 'personal' });
+    expect((await submit(live)).ok).toBe(true);
+    expect(asConcierge(() => safeExistsSync(ticketFile(crashed)))).toBe(false);
+    // Expired 90 s ago: still inside the 2-minute grace, so a slow CLI can collect it.
+    expect(storedTicket(recent).status).toBe('submitted');
+  });
+
+  it('salts each ticket: the same code yields different digests', () => {
+    const a = open({ tier: 'personal' });
+    const b = open({ tier: 'personal' });
+    const storedA = storedTicket(a);
+    const storedB = storedTicket(b);
+    expect(storedA.pairing_salt).toMatch(/^[0-9a-f]{32}$/);
+    expect(storedA.pairing_salt).not.toBe(storedB.pairing_salt);
+    expect(storedA.pairing_code_sha256).not.toBe(
+      createHash('sha256').update(`browser-inspection-pairing:${a.pairing_code}`).digest('hex')
+    );
   });
 
   it('returns an inspection that lands at the CLI deadline instead of discarding it', async () => {
