@@ -417,6 +417,15 @@ gets clean JSON.
 
 ## §5 Tests: pollution and host dependencies
 
+When a store module also exports pure admission/security checks, partially mock the module
+with typed `importOriginal` and replace only the I/O reader. A full-module mock can hide
+new validator exports and fail otherwise unrelated consumer suites. After adding an export,
+search every `vi.mock` of that module and run its consumer suites as well as the new tests.
+For the Dot action ledger, keep `assertDotActionJudgmentBinding` real in
+`continuous-work-owner-state.test.ts` and `mission-admission.test.ts`; these suites are the
+regression gate for owner and mission admission compatibility. Never stub the validator
+to an unconditional success to repair a missing-export failure.
+
 **Repository security scans under coverage.** A green PR shard does not prove the
 unsharded main core run passes with V8 coverage. When a repository-wide AST contract
 times out, compare the exact failing command (`pnpm test -- --suite core --coverage`)
