@@ -61,6 +61,8 @@ def mlx_memory_limit_bytes() -> int:
 
 
 def load_local_model(model_id: str) -> tuple[Any, Any]:
+    # Model downloads live on the cache floor (re-generable), not in the
+    # runtime install root: tool-runtime-policy.ts resolveToolRuntimeDownloadCacheDir.
     managed_hf_home = (
         Path(__file__).resolve().parents[4]
         / "active/shared/cache/system/tool-runtimes/mlx-audio/huggingface"

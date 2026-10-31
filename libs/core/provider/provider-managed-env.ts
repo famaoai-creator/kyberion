@@ -1,7 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { pathResolver } from '../path-resolver.js';
-import { resolveToolRuntimeRoot } from '../tool/tool-runtime-policy.js';
+import { resolveToolRuntimesRoot } from '../tool/tool-runtime-policy.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { listCliReasoningProviderDescriptors } from '../reasoning/reasoning-provider-registry.js';
 
@@ -52,8 +51,7 @@ export function listManagedProviderCliDefinitions(): ManagedProviderCliDefinitio
 }
 
 export function resolveManagedProviderCliEnvPath(provider: string): string {
-  const root = resolveToolRuntimeRoot();
-  return assertSafeRepositoryPath(path.join(root, 'tool-runtimes', 'provider-cli', provider), {
+  return assertSafeRepositoryPath(path.join(resolveToolRuntimesRoot(), 'provider-cli', provider), {
     allowMissingLeaf: true,
   });
 }
@@ -88,5 +86,5 @@ export function resolveProviderCliCommand(provider: string): string {
 }
 
 export function providerCliManagedEnvRoot(): string {
-  return pathResolver.rootResolve('active/shared/runtime/tool-runtimes/provider-cli');
+  return path.join(resolveToolRuntimesRoot(), 'provider-cli');
 }
