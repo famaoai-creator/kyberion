@@ -10,15 +10,17 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { readJsonLines } from './foundation/json.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { clamp, isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
+  safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
   safeLstat,
+  safeReadFileTail,
   safeStat,
   safeWriteFile,
 } from './secure-io.js';
@@ -87,8 +89,27 @@ export interface TriggerRunnerOptions {
 
 const DEFAULT_STORE_PATH = 'active/shared/runtime/trigger-deliveries.jsonl';
 const DEFAULT_CLAIM_LEASE_MS = 15 * 60 * 1000;
-const DEFAULT_MAX_STORE_BYTES = 4 * 1024 * 1024;
-const MAX_STORE_BYTES = 5 * 1024 * 1024;
+/** Default rotation threshold of the delivery journal. */
+export const TRIGGER_STORE_DEFAULT_MAX_BYTES = 4 * 1024 * 1024;
+/** Hard cap: an append past this size fails with [TRIGGER_STORE_FULL]. */
+export const TRIGGER_STORE_HARD_CAP_BYTES = 5 * 1024 * 1024;
+const DEFAULT_MAX_STORE_BYTES = TRIGGER_STORE_DEFAULT_MAX_BYTES;
+const MAX_STORE_BYTES = TRIGGER_STORE_HARD_CAP_BYTES;
+/**
+ * Dedupe only ever needs the latest record per idempotency key, and recent
+ * keys sit at the end of the journal. Reads take a bounded tail of this size,
+ * so a journal that outgrew its cap (keys minted per minute never compact)
+ * can no longer fail the read and take the scheduler down with it.
+ */
+export const TRIGGER_STORE_READ_WINDOW_BYTES = 8 * 1024 * 1024;
+const STORE_READ_WINDOW_BYTES = TRIGGER_STORE_READ_WINDOW_BYTES;
+/**
+ * Finished receipts older than this are not needed for dedupe: cron and
+ * daemon-recovery keys are minute-scoped and never re-match, and in-flight
+ * claims are always kept. Stable keys (mission admission, continuous owner)
+ * normally re-fire within minutes of their first attempt.
+ */
+const DEDUPE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Trigger authority is derived from canonical role scope classes. */
 const TRIGGER_SCOPE_LEVELS: Readonly<Record<string, number>> = Object.freeze({
@@ -331,11 +352,21 @@ export function normalizeTriggerRecord(value: unknown): TriggerRecord | null {
 function readRecords(storePath: string): TriggerRecord[] {
   if (!safeExistsSync(storePath)) return [];
   assertTriggerStoreFile(storePath);
-  return readJsonLines<TriggerRecord | null>(storePath, {
-    onMalformed: 'skip',
-    readOptions: { maxSizeMB: 5 },
-    map: normalizeTriggerRecord,
-  }).filter((record): record is TriggerRecord => record !== null);
+  const { buffer, truncated } = safeReadFileTail(storePath, STORE_READ_WINDOW_BYTES);
+  const lines = buffer.toString('utf8').split(/\r?\n/u);
+  // A truncated window starts mid-record; the torn first line is not a record.
+  if (truncated) lines.shift();
+  const records: TriggerRecord[] = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    try {
+      const record = normalizeTriggerRecord(parseSafeJsonInput(line, 'trigger delivery record'));
+      if (record) records.push(record);
+    } catch {
+      /* a torn or malformed line must not hide the rest of the journal */
+    }
+  }
+  return records;
 }
 
 function assertTriggerStoreFile(storePath: string): void {
@@ -354,29 +385,133 @@ function isProcessAlive(pid: number | undefined): boolean {
   }
 }
 
-function compactRecords(storePath: string, records: TriggerRecord[]): void {
-  const latest = new Map<string, TriggerRecord>();
-  for (const record of records) latest.set(record.idempotencyKey, record);
-  const serialized = [...latest.values()].map((record) => JSON.stringify(record)).join('\n');
-  safeWriteFile(storePath, serialized ? `${serialized}\n` : '');
+/** Janitor-compatible segment name, so the catalog ttl_days segment sweep expires it. */
+function rotatedSegmentPath(storePath: string, now: Date): string {
+  const stamp = now.toISOString().replace(/[-:]/gu, '').replace('T', '-').slice(0, 15);
+  for (let i = 0; ; i++) {
+    const candidate = storePath.replace(/(\.jsonl)?$/u, `-${stamp}${i > 0 ? `-${i}` : ''}.jsonl`);
+    if (!safeExistsSync(candidate)) return candidate;
+  }
 }
 
-function appendRecord(storePath: string, record: TriggerRecord, maxStoreBytes: number): void {
+function isInFlight(record: TriggerRecord): boolean {
+  return record.reason === 'delivery_pending';
+}
+
+/**
+ * Retention compaction. Latest record per key alone never shrinks this
+ * journal (cron and daemon-recovery keys are minted per minute), so finished
+ * receipts older than the dedupe window are dropped, in-flight claims are
+ * always kept, and the rest is kept newest-first within `targetBytes`.
+ * Dropped history stays in the rotated segment.
+ */
+function retainTriggerDedupeWindow(
+  records: TriggerRecord[],
+  targetBytes: number,
+  now: Date
+): string[] {
+  const latest = new Map<string, TriggerRecord>();
+  for (const record of records) {
+    latest.delete(record.idempotencyKey);
+    latest.set(record.idempotencyKey, record);
+  }
+  const cutoff = now.getTime() - DEDUPE_RETENTION_MS;
+  const ordered = [...latest.values()].filter(
+    (record) => isInFlight(record) || Date.parse(record.recordedAt) >= cutoff
+  );
+  const keep = new Set<TriggerRecord>();
+  let bytes = 0;
+  const sizeOf = (record: TriggerRecord) => Buffer.byteLength(JSON.stringify(record), 'utf8') + 1;
+  for (const record of ordered) {
+    if (!isInFlight(record)) continue;
+    keep.add(record);
+    bytes += sizeOf(record);
+  }
+  for (let i = ordered.length - 1; i >= 0; i--) {
+    const record = ordered[i];
+    if (keep.has(record)) continue;
+    const size = sizeOf(record);
+    if (bytes + size > targetBytes) break;
+    keep.add(record);
+    bytes += size;
+  }
+  return ordered.filter((record) => keep.has(record)).map((record) => JSON.stringify(record));
+}
+
+/**
+ * Rotate inline: the janitor that would rotate this journal runs from chronos,
+ * so waiting for it is self-defeating when the journal is what stops chronos.
+ * The full journal is copied to a janitor-named segment first, then the live
+ * file is atomically replaced with the dedupe window, so a crash in between
+ * loses nothing.
+ */
+function compactRecords(storePath: string, maxStoreBytes: number, now: Date): void {
+  const retained = retainTriggerDedupeWindow(
+    readRecords(storePath),
+    Math.floor(maxStoreBytes / 2),
+    now
+  );
+  safeCopyFileSync(storePath, rotatedSegmentPath(storePath, now));
+  safeWriteFile(storePath, retained.length > 0 ? `${retained.join('\n')}\n` : '');
+}
+
+function storeSize(storePath: string): number {
+  if (!safeExistsSync(storePath)) return 0;
+  try {
+    return safeStat(storePath).size;
+  } catch {
+    return 0;
+  }
+}
+
+function appendRecord(
+  storePath: string,
+  record: TriggerRecord,
+  maxStoreBytes: number,
+  now: Date = new Date()
+): void {
   safeMkdir(path.dirname(pathResolver.rootResolve(storePath)));
   assertTriggerStoreFile(storePath);
   const serialized = `${JSON.stringify(record)}\n`;
-  let size = 0;
-  if (safeExistsSync(storePath)) {
+  const lineBytes = Buffer.byteLength(serialized, 'utf8');
+  let size = storeSize(storePath);
+  if (size + lineBytes > maxStoreBytes) {
     try {
-      size = safeStat(storePath).size;
-    } catch {
-      size = 0;
+      compactRecords(storePath, maxStoreBytes, now);
+    } catch (error) {
+      // Rotation is housekeeping; the receipt append below is the contract.
+      logger.warn(
+        `[TRIGGER_STORE_ROTATE_FAILED] delivery journal rotation failed — ${
+          error instanceof Error ? error.message : String(error)
+        } | next: the storage janitor rotates the journal on its next sweep (pnpm pipeline --input pipelines/storage-janitor.json) | evidence: ${storePath} (${size} bytes)`
+      );
     }
+    size = storeSize(storePath);
   }
-  if (size + Buffer.byteLength(serialized, 'utf8') > maxStoreBytes) {
-    compactRecords(storePath, readRecords(storePath));
+  if (size + lineBytes > MAX_STORE_BYTES) {
+    throw new Error(
+      `[TRIGGER_STORE_FULL] delivery journal is at its ${MAX_STORE_BYTES}-byte hard cap and could not be rotated: ${storePath}`
+    );
   }
   safeAppendFileSync(storePath, serialized);
+}
+
+/** Post-delivery receipts must not turn a completed side effect into a crash. */
+function appendOutcomeRecord(
+  storePath: string,
+  record: TriggerRecord,
+  maxStoreBytes: number,
+  now: Date
+): void {
+  try {
+    appendRecord(storePath, record, maxStoreBytes, now);
+  } catch (error) {
+    logger.warn(
+      `[TRIGGER_RECEIPT_APPEND_FAILED] ${record.status} receipt for ${record.idempotencyKey} not persisted — ${
+        error instanceof Error ? error.message : String(error)
+      } | next: rotate the delivery journal; the in-flight claim expires after its lease and may re-deliver | evidence: ${storePath}`
+    );
+  }
 }
 
 function recordTriggerAudit(record: TriggerRecord): void {
@@ -461,9 +596,27 @@ export class TriggerRunner {
     if (!idempotencyKey) throw new Error('Trigger idempotencyKey is required.');
     if (!request.source) throw new Error('Trigger source is required.');
     const claim = await withLock(this.lockId, async () => {
-      const existing = readRecords(this.storePath)
-        .reverse()
-        .find((record) => record.idempotencyKey === idempotencyKey);
+      let records: TriggerRecord[];
+      try {
+        records = readRecords(this.storePath);
+      } catch (error) {
+        // Fail closed for this one trigger (at-most-once), never for the caller:
+        // an unreadable journal must not crash the scheduler that hosts it.
+        const reason = `trigger_store_unreadable: ${error instanceof Error ? error.message : String(error)}`;
+        logger.warn(
+          `[TRIGGER_STORE_UNREADABLE] trigger ${idempotencyKey} not delivered — ${reason} | next: inspect or rotate the delivery journal (pnpm pipeline --input pipelines/storage-janitor.json); the next tick retries | evidence: ${this.storePath}`
+        );
+        return {
+          receipt: {
+            idempotencyKey,
+            source: request.source,
+            status: 'failed' as const,
+            reason,
+            recordedAt: this.now().toISOString(),
+          },
+        };
+      }
+      const existing = records.reverse().find((record) => record.idempotencyKey === idempotencyKey);
       if (existing) {
         const pendingUntil = existing.claimExpiresAt ? Date.parse(existing.claimExpiresAt) : 0;
         const pending = existing.reason === 'delivery_pending';
@@ -498,7 +651,7 @@ export class TriggerRunner {
           status: 'rejected',
           reason: error instanceof Error ? error.message : String(error),
         };
-        appendRecord(this.storePath, rejected, this.maxStoreBytes);
+        appendOutcomeRecord(this.storePath, rejected, this.maxStoreBytes, this.now());
         recordTriggerAudit(rejected);
         return { receipt: receiptFrom(rejected, 'rejected') };
       }
@@ -513,7 +666,16 @@ export class TriggerRunner {
         claimExpiresAt: new Date(this.now().getTime() + this.claimLeaseMs).toISOString(),
         attempt: ((existing?.attempt as number | undefined) || 0) + 1,
       };
-      appendRecord(this.storePath, claimed, this.maxStoreBytes);
+      try {
+        appendRecord(this.storePath, claimed, this.maxStoreBytes, this.now());
+      } catch (error) {
+        // No claim record means no idempotency guard: fail closed, do not deliver.
+        const reason = `trigger_store_unwritable: ${error instanceof Error ? error.message : String(error)}`;
+        logger.warn(
+          `[TRIGGER_STORE_UNWRITABLE] trigger ${idempotencyKey} not delivered — ${reason} | next: rotate the delivery journal (pnpm pipeline --input pipelines/storage-janitor.json); the next tick retries | evidence: ${this.storePath}`
+        );
+        return { receipt: receiptFrom({ ...claimed, reason }, 'failed') };
+      }
       return { claimed };
     });
 
@@ -544,7 +706,7 @@ export class TriggerRunner {
         recordedAt: this.now().toISOString(),
       };
       await withLock(this.lockId, async () => {
-        appendRecord(this.storePath, delivered, this.maxStoreBytes);
+        appendOutcomeRecord(this.storePath, delivered, this.maxStoreBytes, this.now());
       });
       recordTriggerAudit(delivered);
       return receiptFrom(delivered, 'delivered');
@@ -556,7 +718,7 @@ export class TriggerRunner {
         recordedAt: this.now().toISOString(),
       };
       await withLock(this.lockId, async () => {
-        appendRecord(this.storePath, failed, this.maxStoreBytes);
+        appendOutcomeRecord(this.storePath, failed, this.maxStoreBytes, this.now());
       });
       recordTriggerAudit(failed);
       return receiptFrom(failed, 'failed');

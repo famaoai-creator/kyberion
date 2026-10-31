@@ -1,7 +1,7 @@
 ---
 title: オンボーディング標準フロー — 環境 / Identity / Tenant / Activation / First Work
 tags: [governance, onboarding, identity, tenant, organization, activation, first-work]
-last_updated: 2026-10-22
+last_updated: 2026-11-01
 kind: governance
 scope: repository
 authority: standard
@@ -112,20 +112,21 @@ pnpm pipeline --input pipelines/baseline-check.json
 
 baseline の判定層は次のとおり。`needs_attention` のときは、どの層が落ちたかで対処が決まる。
 
-| 層  | 見ているもの                                                  |
-| --- | ------------------------------------------------------------- |
-| L0  | 必須 CLI                                                      |
-| L1  | SDK とコア依存                                                |
-| L2  | ディレクトリとビルド成果物                                    |
-| L3  | アクティブな profile の identity                              |
-| L4  | surface 定義と `active-surfaces.json`                         |
-| L5  | サービス接続の準備状況                                        |
-| L6  | cowork 連携                                                   |
-| L7  | 必須の `KYBERION_*` 環境変数                                  |
-| L8  | storage janitor の最終実行（48 時間以内）                     |
-| L9  | 所属先がなくなった NHI がないこと                             |
-| L10 | 有効なスケジュールがあるとき、chronos daemon が動いていること |
-| L11 | 監査台帳に最近の記録があること                                |
+| 層  | 見ているもの                                                                                  |
+| --- | --------------------------------------------------------------------------------------------- |
+| L0  | 必須 CLI                                                                                      |
+| L1  | SDK とコア依存                                                                                |
+| L2  | ディレクトリとビルド成果物                                                                    |
+| L3  | アクティブな profile の identity                                                              |
+| L4  | surface 定義と `active-surfaces.json`                                                         |
+| L5  | サービス接続の準備状況                                                                        |
+| L6  | cowork 連携                                                                                   |
+| L7  | 必須の `KYBERION_*` 環境変数                                                                  |
+| L8  | storage janitor の最終実行（48 時間以内）                                                     |
+| L9  | 所属先がなくなった NHI がないこと                                                             |
+| L10 | 有効なスケジュールがあるとき、chronos daemon が動き、各スケジュールが遅延・失敗していないこと |
+| L11 | 監査台帳に最近の記録があること                                                                |
+| L12 | 常駐運用（バックアップと復元演習、janitor、常駐ユニット、トリガー配送台帳）に問題がないこと   |
 
 ### Step 1: 導入とビルド（A）
 
@@ -164,6 +165,15 @@ pnpm kyberion setup report --persona first-time-user
   で適用する。登録状況は `pnpm kyberion secret status <service-id>` で確認する。GUI では
   concierge の `/settings` →「サービス連携」から同じ二段階の流れで登録できる。接続 JSON や
   `.env` に値を直接書かない。
+- **バックアップの passphrase**: 暗号化バックアップ（定期ジョブ `backup-daily` を含む）の鍵は
+  `pnpm kyberion secret introduce kyberion-backup PASSPHRASE` で OS の keychain に入れる。
+  launchd の agent はログイン中の GUI セッションで動くので、chronos daemon も login keychain を
+  読める。plist の `EnvironmentVariables` や `.env` には書かない（`scheduler reconcile` は
+  転送可能な変数しか引き継がないので消える）。`vault/` と `knowledge/personal/` はアーカイブに
+  入るため、keychain に無くリポジトリ内の保存先にしか無い鍵は `[BACKUP_PASSPHRASE_IN_BACKUP_SCOPE]`
+  で拒否される。別マシンでの復元に備えて、同じ値をパスワードマネージャーにもオフラインで控える。
+  一時的な上書きは `KYBERION_BACKUP_PASSPHRASE` 環境変数で行う。手順の詳細は
+  [DEPLOYMENT §9](../../../docs/operator/DEPLOYMENT.md#9-backup-and-disaster-recovery)。
 - **機能ごとの依存**: `pnpm deps:check --actuator <browser|voice|media-generation>`。
   lightpanda などの system tool は `pnpm tool:setup -- --list` で確認し、`--apply` で導入する。
 
@@ -235,13 +245,32 @@ Step 0 の baseline をもう一度実行する。初回は次の層が `needs_a
   ```
 
 - **L10（scheduler）**: 有効なスケジュールが一つもなければ通る。スケジュールを登録したら chronos
-  daemon を常駐させる。macOS では `pnpm kyberion scheduler install` で内容を確認し、`--apply` で
-  LaunchAgent に登録する。その場で動かすだけなら `pnpm scheduler`。daemon が生きているのに
+  daemon とデーモン監視を常駐させる。`pnpm kyberion scheduler reconcile` で計画を確認し、
+  `--apply` でこのチェックアウト専用のユニット（`com.kyberion.<id>.ws-<hash>`）を登録する
+  （必須/任意の区別は `resident-services.json`。旧固定名ユニットのうちこのチェックアウトを
+  動かすものは移行し、他チェックアウトのユニットには触れない。再実行しても変化しない）。
+  onboarding 自体は常駐サービスを登録しない。setup report の「Resident services [pending]」が
+  この手順の合図になる。その場で動かすだけなら `pnpm scheduler`。daemon が生きているのに
   heartbeat が古い（err ログに `EPERM` が並ぶ）ときは OS のファイルアクセス権を失っている
   ため、再登録ではなく `pnpm kyberion scheduler restart --apply` で再起動する（プラットフォーム
   抽象化済み: launchd `kickstart` / `systemctl --user restart`。[runbook](./operations-hygiene-runbook.md)）。
+
+  L10 はスケジュールごとにも判定する。予定時刻から 2 時間（interval は 1 周期）を過ぎても
+  実行されていない、直近が失敗している、自動停止された、chronos が 1 時間に 4 回以上再起動
+  している（crash loop）、直近の tick が失敗した、pipeline がスケジュールを宣言しているのに
+  registry が空、のいずれでも落ちる。heartbeat が新しいだけでは通らない。各指摘の `next` に
+  次に打つコマンドが出る。
+
 - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちる。Step 3 の identity 保存などの
   governed 操作を行えば記録される。
+- **L12（常駐運用）**: バックアップが 36 時間以上ない、`backup-daily` が失敗した、バックアップの
+  パスフレーズが env にも OS キーチェーンにもない、復元演習の記録がない・35 日より古い・失敗した、
+  janitor が 48 時間動いていない・失敗した、必須の常駐ユニットがない、ユニットが別チェックアウトを
+  指している、旧固定名ユニットが残っている、surface と OS ユニットが同じサービスを二重に動かして
+  いる、トリガー配送台帳が上限の 8 割を超えた、のいずれかで落ちる（`needs_attention` のみで、
+  `needs_recovery` にはならない）。ユニット関係は `pnpm kyberion scheduler reconcile --apply`、
+  パスフレーズは `pnpm kyberion secret introduce kyberion-backup PASSPHRASE` で解消する。
+  一覧と次のコマンドは `pnpm kyberion doctor` の「Resident ops」行でも確認できる。
 
 **ルート 1（個人のみ）はここで Step 9 の完了確認へ進む。**
 

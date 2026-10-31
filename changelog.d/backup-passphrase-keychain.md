@@ -1,0 +1,5 @@
+---
+category: Security
+---
+
+- **Backup passphrase from the keychain** — `pnpm backup create|restore|drill` now resolves the passphrase as `--passphrase-env <NAME>` → `KYBERION_BACKUP_PASSPHRASE` (override) → the secret identity `kyberion-backup` / `PASSPHRASE` from an external resolver or the OS keychain. Store it once with `pnpm kyberion secret introduce kyberion-backup PASSPHRASE` and keep an offline copy in your password manager; remove any plaintext `KYBERION_BACKUP_PASSPHRASE` from launchd plists (reconcile drops it anyway). A copy found only in an in-repo store (archived `vault/` / `knowledge/personal/`) is refused with `[BACKUP_PASSPHRASE_IN_BACKUP_SCOPE]`, the `kyberion-backup` connection document is excluded from every archive, and each run audits the source (`env` / `secret:<backend>`), never the value. An explicit `--passphrase-env` that is empty now fails instead of falling back. `describeBackupPassphraseAvailability()` exposes availability for health checks without the value.

@@ -13,6 +13,8 @@ import { collectDoctorReport } from './run_doctor.js';
 import { buildVitalReport } from './vital_check.js';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { formatSetupSummaryLine } from './setup-report-format.js';
+import { inspectResidentServices } from './reconcile_resident_services.js';
+import type { ResidentServicesPlan } from '@agent/core/daemon/resident-services';
 export {
   formatSetupHintLine,
   formatSetupSummaryLine,
@@ -46,7 +48,68 @@ type SetupReport = {
   vital: ReturnType<typeof buildVitalReport>;
   recommendedSurfaces: SurfaceRecommendation[];
   nextActions: NextAction[];
+  /** Resident OS services of this checkout (scheduler, watchdog) — informational. */
+  residentServices?: ResidentServicesSummary;
 };
+
+export type ResidentServicesSummary = {
+  status: 'current' | 'pending' | 'unavailable';
+  pendingChanges: number;
+  reason: string;
+  suggestedCommand?: string;
+  nextAction?: NextAction;
+};
+
+export const RESIDENT_SERVICES_RECONCILE_COMMAND = 'pnpm kyberion scheduler reconcile --apply';
+
+/**
+ * Onboarding never installs resident agents by itself; this step tells the
+ * operator whether the scheduler/watchdog units of THIS checkout are registered
+ * and suggests the one governed command that registers or migrates them.
+ */
+export function summarizeResidentServices(
+  plan: Pick<ResidentServicesPlan, 'items' | 'pendingChanges' | 'foreign' | 'note'> | null,
+  error?: string
+): ResidentServicesSummary {
+  if (!plan) {
+    return {
+      status: 'unavailable',
+      pendingChanges: 0,
+      reason: `resident services could not be inspected${error ? `: ${error}` : ''}`,
+    };
+  }
+  if (plan.pendingChanges === 0) {
+    return {
+      status: plan.note ? 'unavailable' : 'current',
+      pendingChanges: 0,
+      reason: plan.note ?? 'required resident services of this checkout are registered',
+    };
+  }
+  const pending = plan.items.filter((item) =>
+    ['install', 'migrate', 'reinstall'].includes(item.action)
+  );
+  const reason = `${pending.map((item) => `${item.id}: ${item.action}`).join(', ')}${plan.foreign.length ? `; ${plan.foreign.length} unit(s) of other checkouts are left untouched` : ''}`;
+  return {
+    status: 'pending',
+    pendingChanges: plan.pendingChanges,
+    reason,
+    suggestedCommand: RESIDENT_SERVICES_RECONCILE_COMMAND,
+    nextAction: buildNextAction({
+      title: 'Register resident services for this checkout',
+      reason: `The scheduler keeps schedules firing only while it runs as an OS service — ${reason}.`,
+      next_action_type: 'bootstrap_environment',
+      suggested_command: RESIDENT_SERVICES_RECONCILE_COMMAND,
+    }),
+  };
+}
+
+function collectResidentServices(): ResidentServicesSummary {
+  try {
+    return summarizeResidentServices(inspectResidentServices().plan);
+  } catch (error) {
+    return summarizeResidentServices(null, error instanceof Error ? error.message : String(error));
+  }
+}
 
 export type SetupReadinessInput = {
   surfaces: Pick<SetupReport['surfaces'], 'rows'>;
@@ -96,6 +159,7 @@ export async function runSetupReportWithPersona(options: {
   const readiness = { surfaces, surfaceHealth, reasoning, doctor, vital };
   const recommendedSurfaces = buildRecommendedSurfaces(readiness);
   const nextActions = buildFirstTimeUserNextActions(readiness);
+  const residentServices = collectResidentServices();
 
   return {
     surfaces,
@@ -106,6 +170,7 @@ export async function runSetupReportWithPersona(options: {
     vital,
     recommendedSurfaces,
     nextActions,
+    residentServices,
   };
 }
 
@@ -354,6 +419,7 @@ export function formatSetupReport(report: SetupReport, persona: SetupPersona): s
         lines.push(`  open: ${surface.openUrl}`);
       else if (surface.suggestedCommand) lines.push(`  when needed: ${surface.suggestedCommand}`);
     }
+    lines.push(...formatResidentServicesLines(report.residentServices));
     lines.push(
       '',
       'Optional service and messaging setup is informational; configure only what your request needs.',
@@ -385,6 +451,7 @@ export function formatSetupReport(report: SetupReport, persona: SetupPersona): s
       ['doctor gaps', report.doctor.totalMissing],
     ]),
   ];
+  lines.push(...formatResidentServicesLines(report.residentServices));
   if (report.doctor.summaries.length > 0) {
     lines.push('Doctor detail:');
     for (const summary of report.doctor.summaries) {
@@ -393,6 +460,15 @@ export function formatSetupReport(report: SetupReport, persona: SetupPersona): s
     }
   }
   return lines.join('\n');
+}
+
+export function formatResidentServicesLines(summary?: ResidentServicesSummary): string[] {
+  if (!summary) return [];
+  return [
+    `- Resident services [${summary.status}]`,
+    `  evidence: ${summary.reason}`,
+    ...(summary.suggestedCommand ? [`  when needed: ${summary.suggestedCommand}`] : []),
+  ];
 }
 
 async function main(

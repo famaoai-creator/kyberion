@@ -49,6 +49,7 @@ export class SovereignSentinel {
       'L9',
       'L10',
       'L11',
+      'L12',
     ];
 
     for (const layer of ORDER) {

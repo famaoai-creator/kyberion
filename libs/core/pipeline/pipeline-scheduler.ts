@@ -255,7 +255,10 @@ export function registerScheduledPipeline(
 export function reconcileScheduledPipelines(
   source: string,
   pipelines: ScheduledPipeline[],
-  options: PipelineSchedulerOptions = {}
+  options: PipelineSchedulerOptions & {
+    /** Compute the counts without saving the registry. */
+    dryRun?: boolean;
+  } = {}
 ): { added: number; updated: number; removed: number; unchanged: number } {
   if (!source.trim()) throw new Error('schedule reconciliation source is required');
 
@@ -317,7 +320,7 @@ export function reconcileScheduledPipelines(
     registry.schedules.filter((schedule) => schedule.managedBy === source).length -
     retainedManagedCount;
   const changed = added > 0 || updated > 0 || removed > 0;
-  if (changed) saveScheduleRegistry({ ...registry, schedules }, options);
+  if (changed && !options.dryRun) saveScheduleRegistry({ ...registry, schedules }, options);
 
   return { added, updated, removed, unchanged };
 }
