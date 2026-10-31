@@ -19,8 +19,6 @@ import {
 } from '../secure-io.js';
 import {
   getToolRuntimePolicy,
-  hasToolRuntimeInstall,
-  resolveToolRuntimeDownloadCacheDir,
   resolveToolRuntimeRoot,
   TOOL_RUNTIMES_DIRNAME,
   type ToolRuntimeEcosystem,
@@ -223,33 +221,6 @@ function managedEnvSubPath(tool: ToolRuntimeRecord): string {
 function resolveManagedEnvPath(tool: ToolRuntimeRecord): string {
   const root = resolveToolRuntimeRoot(getToolRuntimePolicy());
   return assertManagedRuntimePath(root, path.join(root, managedEnvSubPath(tool)));
-}
-
-/**
- * Legacy location of a runtime installed under the download-cache root
- * (`active/shared/cache/system/tool-runtimes/<dir>`), or null when the record's
- * subpath is not under `tool-runtimes/`.
- */
-function legacyManagedEnvPath(tool: ToolRuntimeRecord): string | null {
-  const subPath = managedEnvSubPath(tool).replaceAll('\\', '/');
-  const prefix = `${TOOL_RUNTIMES_DIRNAME}/`;
-  if (!subPath.startsWith(prefix)) return null;
-  try {
-    return resolveToolRuntimeDownloadCacheDir(subPath.slice(prefix.length));
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Read-side env path: canonical unless the runtime exists only at the legacy
- * root. Installs and state always use {@link resolveManagedEnvPath}.
- */
-function resolveInstalledManagedEnvPath(tool: ToolRuntimeRecord): string {
-  const canonical = resolveManagedEnvPath(tool);
-  if (hasToolRuntimeInstall(canonical)) return canonical;
-  const legacy = legacyManagedEnvPath(tool);
-  return legacy && hasToolRuntimeInstall(legacy) ? legacy : canonical;
 }
 
 function assertManagedRuntimePath(root: string, candidate: string): string {
@@ -522,8 +493,8 @@ export function probeToolRuntime(
   if (selectedAction === 'run_trial') selectedBackend = record.trial_backend;
   if (selectedAction === 'install') selectedBackend = installBackend;
   if (selectedAction !== 'install' && record.ecosystem === 'python' && selectedBackend) {
-    const python = resolveManagedPythonCandidates(resolveInstalledManagedEnvPath(record)).find(
-      (candidate) => safeExistsSync(candidate)
+    const python = resolveManagedPythonCandidates(resolveManagedEnvPath(record)).find((candidate) =>
+      safeExistsSync(candidate)
     );
     if (python && ['python', 'python3'].includes(selectedBackend.command)) {
       selectedBackend = { ...selectedBackend, kind: 'system', command: python };
@@ -623,16 +594,7 @@ export function resolveManagedBinaryPath(toolId: string): string | null {
 export function findInstalledManagedBinary(toolId: string): string | null {
   try {
     const binPath = resolveManagedBinaryPath(toolId);
-    if (!binPath) return null;
-    if (safeExistsSync(binPath)) return binPath;
-    const record = getToolRuntimeRecord(toolId);
-    const legacy = legacyManagedEnvPath(record);
-    if (!legacy || !record.managed_binary) return null;
-    const legacyBin = assertManagedRuntimePath(
-      legacy,
-      path.join(legacy, record.managed_binary.relative_path)
-    );
-    return safeExistsSync(legacyBin) ? legacyBin : null;
+    return binPath && safeExistsSync(binPath) ? binPath : null;
   } catch {
     return null;
   }
@@ -665,7 +627,7 @@ export function resolveToolRuntimeCommand(
 export function locateManagedToolPythonBin(toolId: string): string | null {
   const record = getToolRuntimeRecord(toolId);
   if (record.tool_id !== toolId) return null;
-  for (const candidate of resolveManagedPythonCandidates(resolveInstalledManagedEnvPath(record))) {
+  for (const candidate of resolveManagedPythonCandidates(resolveManagedEnvPath(record))) {
     if (safeExistsSync(candidate)) return candidate;
   }
   return null;
@@ -673,9 +635,7 @@ export function locateManagedToolPythonBin(toolId: string): string | null {
 
 export function resolveManagedToolPythonBin(toolId?: string): string | null {
   const resolution = probeToolRuntime(toolId, 'installed');
-  for (const candidate of resolveManagedPythonCandidates(
-    resolveInstalledManagedEnvPath(resolution.tool)
-  )) {
+  for (const candidate of resolveManagedPythonCandidates(resolution.managed_env_path)) {
     if (safeExistsSync(candidate)) return candidate;
   }
   return null;

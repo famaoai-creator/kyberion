@@ -114,7 +114,7 @@ How each stage maps to a step of the standard flow:
 
 ### Python runtime resolution
 
-- Python-based bridges resolve their interpreter in this order: `KYBERION_PYTHON_BIN` -> `KYBERION_PYTHON` -> managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`, falling back to a legacy install under `active/shared/cache/system/tool-runtimes/`) -> `.venv/bin/python3` -> `python3`.
+- Python-based bridges resolve their interpreter in this order: `KYBERION_PYTHON_BIN` -> `KYBERION_PYTHON` -> managed runtime (`active/shared/runtime/tool-runtimes/*/bin/python`) -> `.venv/bin/python3` -> `python3`.
 - `.venv/bin/python3` is a repo-local candidate kept for legacy compatibility and is not the new standard.
 - To use the AGY native subagent, install the official SDK into a managed runtime with `pnpm agy:sdk-setup --apply` (internally `uv venv` + `uv pip install`). Python 3.10+ is required; override the interpreter with `KYBERION_AGY_SDK_PYTHON`.
 - Kyberion's custom agent definitions for the AGY CLI are generated into `.agents/agents/` by `pnpm agents:generate`. To list them manually use `agy --add-dir "$PWD" agent`; to pick one use `agy --add-dir "$PWD" --agent kyberion-implementer ...`. `AgyCliBackend` passes the workspace to `--add-dir` automatically.

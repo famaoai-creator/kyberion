@@ -7,12 +7,6 @@
     "noEmit": true,
     "incremental": false
   },
-  "include": [
-    "mission-types.ts",
-    "mission-dispatch-io.ts",
-    "mission-controller-router.ts",
-    "mission-ticket-dispatch.ts",
-    "mission-workitem-dispatch.ts"
-  ],
+  "include": ["mission-controller-router.ts"],
   "exclude": ["node_modules", "dist", "**/*.test.ts"]
 }
