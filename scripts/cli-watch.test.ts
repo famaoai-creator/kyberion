@@ -37,7 +37,9 @@ describe('pnpm kyberion watch', () => {
     workDir = pathResolver.sharedTmp(`cli-watch-${randomUUID()}`);
     safeMkdir(workDir, { recursive: true });
     videoPath = path.join(workDir, 'demo.mp4');
-    safeWriteFile(videoPath, Buffer.from('fake-video'));
+    // R04: the fixture must carry a real container signature (ISO-BMFF ftyp),
+    // not 'fake-video' — watch now sniffs input bytes before spawning ffmpeg.
+    safeWriteFile(videoPath, Buffer.concat([Buffer.from([0, 0, 0, 24]), Buffer.from('ftypisom')]));
   });
 
   afterAll(() => {
