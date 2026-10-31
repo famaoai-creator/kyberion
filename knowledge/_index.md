@@ -402,6 +402,7 @@
 - [Browser Discovery & Inspection Playbook](./product/orchestration/browser-discovery-playbook.md) (public | Kyberion Engineering)
 - [Browser Site Learning Playbook (新規サイト→リプレイ可能ADF)](./product/orchestration/browser-site-learning-playbook.md) (public | Kyberion Engineering)
 - [Browser exploration to reviewed pipeline task session](./product/orchestration/browser-exploration-task-session.md) (public | Unknown)
+- [CLI Reliability Baseline — R00 接続表と証拠分類](./product/orchestration/cli-reliability-baseline.ja.md) (public | Unknown)
 - [Capability Bundle Progressive Disclosure](./product/orchestration/capability-bundle-progressive-disclosure.md) (public | Ecosystem Architect)
 - [Capability Verb Inventory (which capabilities have one verb, which do not)](./product/orchestration/capability-verb-inventory.md) (public | Ecosystem Architect)
 - [Code Documentation And Video Production Playbook](./product/orchestration/code-documentation-production-playbook.md) (public | Unknown)

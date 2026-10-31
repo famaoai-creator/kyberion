@@ -28,9 +28,44 @@ export interface CliCommand {
   scope_selector?: CliScopeSelector;
   /** CU-09: scopes/areas that delegate to an existing registered command. */
   scopes?: CliCommandScope[];
+  /** R06: what invoking the command does — shown as a badge by --help. */
+  effect?: CliCommandEffect;
+  /** R06: documented prerequisites for the command's real work; informational only. */
+  prerequisites?: CliPrerequisite[];
 }
 
 export type CliScopeSelector = 'flag' | 'positional';
+
+/** R06: what invoking a command does — drives the --help badge. */
+export type CliCommandEffect = 'readiness' | 'connection' | 'state_change';
+export const CLI_COMMAND_EFFECTS: readonly CliCommandEffect[] = [
+  'readiness',
+  'connection',
+  'state_change',
+];
+
+/** R06: documented prerequisite categories — documentation only, never an authority grant. */
+export type CliPrerequisiteKind =
+  'local_backend' | 'trusted_claim' | 'task_credentials' | 'service_setup' | 'os_consent';
+export const CLI_PREREQUISITE_KINDS: readonly CliPrerequisiteKind[] = [
+  'local_backend',
+  'trusted_claim',
+  'task_credentials',
+  'service_setup',
+  'os_consent',
+];
+
+/**
+ * R06: one documented prerequisite. `via` must name a real routable command —
+ * never a guessed 'claim'/'repair' command. `when` = 'live_ops' marks
+ * prerequisites that gate the surface's live/credentialed work while the
+ * command itself remains a readiness view (e.g. `calendar status`).
+ */
+export interface CliPrerequisite {
+  kind: CliPrerequisiteKind;
+  via?: string;
+  when?: 'always' | 'live_ops';
+}
 
 /** CU-09: one `doctor --scope <id>` / `setup <id>` route to an existing command. */
 export interface CliCommandScope {
@@ -69,6 +104,10 @@ export interface CliScriptCommand {
   native_help?: boolean;
   /** CU-05: a `<noun> default` entry may share a governed command name only when it is the same target. */
   same_target_as?: string;
+  /** R06: what invoking the command does — shown as a badge by --help. */
+  effect?: CliCommandEffect;
+  /** R06: documented prerequisites for the command's real work; informational only. */
+  prerequisites?: CliPrerequisite[];
 }
 
 /** CU-05: renamed package scripts kept as warning aliases (outside the SX-05 ratchet). */
@@ -348,6 +387,68 @@ function checkDeprecatedCommandAliases(manifest: CliManifest, failures: string[]
   }
 }
 
+/**
+ * R06: documented prerequisites — the manifest describes, never grants.
+ * - `kind` must come from the governed enum and be unique per command;
+ * - `when` must be `always` or `live_ops`;
+ * - `via` must route to a real registered command — never a guessed
+ *   'claim'/'repair' name.
+ */
+function checkPrerequisites(manifest: CliManifest, failures: string[]): void {
+  const names = routableCommandNames(manifest);
+  const entries: Array<
+    [label: string, command: { effect?: string; prerequisites?: CliPrerequisite[] }]
+  > = [
+    ...manifest.commands.map(
+      (command) => [`command ${command.id || '<missing>'}`, command] as [string, typeof command]
+    ),
+    ...(manifest.script_commands ?? []).map(
+      (command) =>
+        [`script command ${command.id || '<missing>'}`, command] as [string, typeof command]
+    ),
+  ];
+  for (const [label, command] of entries) {
+    if (
+      command.effect !== undefined &&
+      !CLI_COMMAND_EFFECTS.includes(command.effect as CliCommandEffect)
+    ) {
+      failures.push(`${label} has invalid effect: ${command.effect}`);
+    }
+    if (command.prerequisites === undefined) continue;
+    if (!Array.isArray(command.prerequisites) || command.prerequisites.length === 0) {
+      failures.push(`${label} prerequisites must be a non-empty array`);
+      continue;
+    }
+    const kinds = new Set<string>();
+    for (const prerequisite of command.prerequisites) {
+      if (!prerequisite || !CLI_PREREQUISITE_KINDS.includes(prerequisite.kind)) {
+        failures.push(
+          `${label} has invalid prerequisite kind: ${prerequisite?.kind ?? '<missing>'}`
+        );
+        continue;
+      }
+      if (kinds.has(prerequisite.kind)) {
+        failures.push(`${label} prerequisite kind must be unique: ${prerequisite.kind}`);
+      }
+      kinds.add(prerequisite.kind);
+      if (
+        prerequisite.when !== undefined &&
+        prerequisite.when !== 'always' &&
+        prerequisite.when !== 'live_ops'
+      ) {
+        failures.push(
+          `${label} prerequisite ${prerequisite.kind} has invalid when: ${prerequisite.when}`
+        );
+      }
+      if (prerequisite.via !== undefined && !names.has(prerequisite.via)) {
+        failures.push(
+          `${label} prerequisite ${prerequisite.kind} via must name a registered command: ${prerequisite.via}`
+        );
+      }
+    }
+  }
+}
+
 /** CU-09: each scope delegates to an existing registered command, never to another scope. */
 function checkCommandScopes(manifest: CliManifest, failures: string[]): void {
   const names = routableCommandNames(manifest);
@@ -585,6 +686,7 @@ export function checkCliManifest(
   );
   checkDeprecatedCommandAliases(manifest, failures);
   checkCommandScopes(manifest, failures);
+  checkPrerequisites(manifest, failures);
   return failures;
 }
 
