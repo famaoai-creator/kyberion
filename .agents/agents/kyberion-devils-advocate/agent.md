@@ -3,7 +3,12 @@ name: kyberion-devils-advocate
 description: 'Argues the opposite position to force divergence before convergence in decision-support missions.'
 tools:
   - view_file
+  - view_code_item
   - grep_search
+  - find_by_name
+  - list_dir
+  - search_web
+  - read_url_content
 subagent: true
 mainAgent: true
 model: inherit

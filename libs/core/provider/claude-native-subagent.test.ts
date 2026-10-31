@@ -22,7 +22,7 @@ describe('claude native subagent projection (CN-02)', () => {
 
     expect(permission.permissionMode).toBe('default');
     // KD-05 grants NotebookRead, the XP-02 allowlist does not — least agency wins.
-    expect(permission.agentTools).toEqual(['Read', 'Grep', 'Glob']);
+    expect(permission.agentTools).toEqual(['Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch']);
     expect(permission.disallowedTools).toEqual(
       expect.arrayContaining(['Write', 'Edit', 'Bash', 'NotebookEdit'])
     );
@@ -43,7 +43,7 @@ describe('claude native subagent projection (CN-02)', () => {
     const definition = definitions[claudeNativeAgentName('explorer')];
 
     expect(definition).toBeDefined();
-    expect(definition.tools).toEqual(['Read', 'Grep', 'Glob']);
+    expect(definition.tools).toEqual(['Read', 'Grep', 'Glob', 'LS', 'WebFetch', 'WebSearch']);
     expect(definition.prompt).toContain('You are a delegated explorer sub-agent.');
     expect(definition.prompt).toContain(SUBAGENT_SECURE_IO_CONSTRAINT);
     expect(definition.prompt).toContain('Working principles');
