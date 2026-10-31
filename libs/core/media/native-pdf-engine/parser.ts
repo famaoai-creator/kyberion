@@ -29,6 +29,7 @@ export class NativePdfParser {
   private objectStreamCache: Map<number, Map<number, string>> = new Map();
   private objectStreamIds: number[] = [];
   private fontUnicodeCache: Map<number, Map<string, string> | null> = new Map();
+  private rosUnicodeCache: Map<string, Map<string, string> | null> = new Map();
   private imagePathCache: Map<number, string | null> = new Map();
   /** Per-document image dir: object ids repeat across PDFs, so a shared dir would let one document's image overwrite (or be read as) another's. */
   private imageDirName: string;
@@ -708,7 +709,7 @@ export class NativePdfParser {
       const streamElements = this.extractPositionedText(decoded, height, fontResources);
       elements.push(...streamElements);
       images.push(...this.extractPlacedImages(decoded, height, imageResources));
-      const streamText = this.parseTextOperators(decoded).join(' ').trim();
+      const streamText = this.parseTextOperators(decoded, fontResources).join(' ').trim();
       if (streamText) textParts.push(streamText);
       // Form XObject `Do` — scrape nested text (depth-bounded)
       textParts.push(
@@ -1308,40 +1309,42 @@ export class NativePdfParser {
    *  - <hex> Tj      (PDF 2.0 UTF-16BE)
    *  - [(array)] TJ
    */
-  private parseTextOperators(content: string): string[] {
+  private parseTextOperators(
+    content: string,
+    fontResources: Map<string, number> = new Map()
+  ): string[] {
     const lines: string[] = [];
     const btBlocks = content.split('BT');
     for (let i = 1; i < btBlocks.length; i++) {
       const block = btBlocks[i].split('ET')[0];
 
-      // Literal string Tj: (text) Tj
-      const tjRegex = /\((.*?)\)\s*Tj/g;
-      let m;
-      while ((m = tjRegex.exec(block)) !== null) {
-        lines.push(m[1]);
-      }
-
-      // Hex string Tj: <FEFF...> Tj  (PDF 2.0 Unicode)
-      const hexTjRegex = /<([0-9A-Fa-f]+)>\s*Tj/g;
-      let hm;
-      while ((hm = hexTjRegex.exec(block)) !== null) {
-        lines.push(this.decodeHexString(hm[1]));
-      }
-
-      // Array TJ: [(text) -100 (more)] TJ
-      const TJRegex = /\[(.*?)\]\s*TJ/g;
-      let m2;
-      while ((m2 = TJRegex.exec(block)) !== null) {
-        const inner = m2[1];
-        // Extract both literal and hex strings from array
+      // Walk Tf / Tj / TJ ops in order so each show-string decodes under the
+      // font that was active when it ran (CID fonts need their own map).
+      const opRegex =
+        /\/([A-Za-z0-9_.-]+)\s+[\d.]+\s+Tf|\(([\s\S]*?)(?<!\\)\)\s*Tj|<([0-9A-Fa-f\s]+)>\s*Tj|\[([\s\S]*?)\]\s*TJ/g;
+      let fontObjectId: number | undefined;
+      let op: RegExpExecArray | null;
+      while ((op = opRegex.exec(block)) !== null) {
+        if (op[1] !== undefined) {
+          fontObjectId = fontResources.get(op[1]);
+          continue;
+        }
+        if (op[2] !== undefined) {
+          lines.push(this.decodeShowString(op[2], fontObjectId));
+          continue;
+        }
+        if (op[3] !== undefined) {
+          lines.push(this.decodeHexString(op[3], fontObjectId));
+          continue;
+        }
         const parts: string[] = [];
-        const arrayItemRegex = /\((.*?)\)|<([0-9A-Fa-f]+)>/g;
+        const arrayItemRegex = /\(([\s\S]*?)(?<!\\)\)|<([0-9A-Fa-f\s]+)>/g;
         let am;
-        while ((am = arrayItemRegex.exec(inner)) !== null) {
+        while ((am = arrayItemRegex.exec(op[4])) !== null) {
           if (am[1] !== undefined) {
-            parts.push(am[1]);
+            parts.push(this.decodeShowString(am[1], fontObjectId));
           } else if (am[2] !== undefined) {
-            parts.push(this.decodeHexString(am[2]));
+            parts.push(this.decodeHexString(am[2], fontObjectId));
           }
         }
         if (parts.length) lines.push(parts.join(''));
@@ -1499,8 +1502,11 @@ export class NativePdfParser {
   }
 
   private extractTextToken(token: string, fontObjectId?: number): string {
+    // A CID-keyed font without /ToUnicode maps both hex and literal strings —
+    // literal bytes are the same character codes, so route them through the
+    // font map too when one exists.
     const literal = token.match(/^\(([\s\S]*)\)\s*Tj$/);
-    if (literal) return this.decodeLiteralString(literal[1]);
+    if (literal) return this.decodeShowString(literal[1], fontObjectId);
 
     const hex = token.match(/^<([0-9A-Fa-f\s]+)>\s*Tj$/);
     if (hex) return this.decodeHexString(hex[1], fontObjectId);
@@ -1511,13 +1517,78 @@ export class NativePdfParser {
       const itemRegex = /\(([\s\S]*?)(?<!\\)\)|<([0-9A-Fa-f\s]+)>/g;
       let item: RegExpExecArray | null;
       while ((item = itemRegex.exec(array[1])) !== null) {
-        if (item[1] !== undefined) parts.push(this.decodeLiteralString(item[1]));
+        if (item[1] !== undefined) parts.push(this.decodeShowString(item[1], fontObjectId));
         if (item[2] !== undefined) parts.push(this.decodeHexString(item[2], fontObjectId));
       }
       return parts.join('');
     }
 
     return '';
+  }
+
+  /** Literal `(…)` strings: CID-decode via the font map when present, else cp1252. */
+  private decodeShowString(literalBody: string, fontObjectId?: number): string {
+    if (fontObjectId && this.getFontUnicodeMap(fontObjectId)?.size) {
+      return this.decodeHexString(this.literalStringToHex(literalBody), fontObjectId);
+    }
+    return this.decodeLiteralString(literalBody);
+  }
+
+  /** Escape-processing identical to decodeLiteralString but emitting raw bytes as hex. */
+  private literalStringToHex(input: string): string {
+    const bytes: number[] = [];
+    const pushByte = (value: number) => bytes.push(value & 0xff);
+    for (let i = 0; i < input.length; i++) {
+      const ch = input[i];
+      if (ch !== '\\') {
+        pushByte(ch.charCodeAt(0));
+        continue;
+      }
+      const next = input[i + 1];
+      if (next === undefined) {
+        pushByte(0x5c);
+        break;
+      }
+      if (/[0-7]/.test(next)) {
+        let octal = next;
+        let advance = 1;
+        for (
+          let j = i + 2;
+          j < input.length && advance < 3 && /[0-7]/.test(input[j]);
+          j++, advance++
+        ) {
+          octal += input[j];
+        }
+        pushByte(parseInt(octal, 8));
+        i += advance;
+        continue;
+      }
+      switch (next) {
+        case 'n':
+          pushByte(0x0a);
+          break;
+        case 'r':
+          pushByte(0x0d);
+          break;
+        case 't':
+          pushByte(0x09);
+          break;
+        case 'b':
+          pushByte(0x08);
+          break;
+        case 'f':
+          pushByte(0x0c);
+          break;
+        case '\n':
+        case '\r':
+          break;
+        default:
+          pushByte(next.charCodeAt(0));
+          break;
+      }
+      i += 1;
+    }
+    return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
   private decodeLiteralString(input: string): string {
@@ -1720,8 +1791,9 @@ export class NativePdfParser {
 
     const toUnicodeMatch = fontObject.match(/\/ToUnicode\s+(\d+)\s+0\s+R/);
     if (!toUnicodeMatch) {
-      this.fontUnicodeCache.set(fontObjectId, null);
-      return null;
+      const cidFallback = this.getCidFallbackUnicodeMap(fontObject);
+      this.fontUnicodeCache.set(fontObjectId, cidFallback);
+      return cidFallback;
     }
 
     const cmapStream = this.decodeStream(parseInt(toUnicodeMatch[1]));
@@ -1733,6 +1805,39 @@ export class NativePdfParser {
     const cmap = this.parseToUnicodeCMap(cmapStream);
     this.fontUnicodeCache.set(fontObjectId, cmap);
     return cmap;
+  }
+
+  /**
+   * CID-keyed fonts (Type0 + Identity-H, no /ToUnicode — typical of Quartz /
+   * "Print → PDF" CJK output) carry content-stream codes that are already ROS
+   * CIDs. Recover Unicode deterministically through the descendant font's
+   * CIDSystemInfo ordering and the vendored Adobe ROS→UCS2 CMaps
+   * (native-pdf-engine/cmaps/), instead of degrading to raw bytes.
+   */
+  private getCidFallbackUnicodeMap(fontObject: string): Map<string, string> | null {
+    const descendantRef = fontObject.match(/\/DescendantFonts\s*\[\s*(\d+)\s+0\s+R/);
+    if (!descendantRef) return null;
+    const descendant = this.getFullObject(parseInt(descendantRef[1], 10)) ?? '';
+    const ordering = descendant.match(/\/Ordering\s*\(([^)]+)\)/)?.[1];
+    const registry = descendant.match(/\/Registry\s*\(([^)]+)\)/)?.[1];
+    if (!ordering || !registry) return null;
+    const cmapName = `${registry}-${ordering}-UCS2`;
+    if (this.rosUnicodeCache.has(cmapName)) {
+      return this.rosUnicodeCache.get(cmapName) ?? null;
+    }
+    const cmapPath = pathResolver.rootResolve(
+      `libs/core/media/native-pdf-engine/cmaps/${cmapName}`
+    );
+    let map: Map<string, string> | null = null;
+    try {
+      const text = safeReadFile(cmapPath, { encoding: 'utf8' }) as string;
+      const parsed = this.parseToUnicodeCMap(text);
+      map = parsed.size > 0 ? parsed : null;
+    } catch {
+      map = null; // ROS not vendored — keep the raw-byte fallback.
+    }
+    this.rosUnicodeCache.set(cmapName, map);
+    return map;
   }
 
   private parseToUnicodeCMap(input: string): Map<string, string> {
@@ -1766,6 +1871,21 @@ export class NativePdfParser {
           );
           target++;
         }
+      }
+      // Array form: <start> <end> [<u1> <u2> …] — each source code maps to
+      // the listed value; used by Adobe's official UCS2 CMaps and legal in
+      // embedded /ToUnicode too.
+      const arrayRangeRegex = /<([0-9A-Fa-f]+)>\s*<([0-9A-Fa-f]+)>\s*\[([\s\S]*?)\]/g;
+      let arrayRange: RegExpExecArray | null;
+      while ((arrayRange = arrayRangeRegex.exec(body)) !== null) {
+        const start = parseInt(arrayRange[1], 16);
+        const targets = [...arrayRange[3].matchAll(/<([0-9A-Fa-f]+)>/g)].map((m) => m[1]);
+        targets.forEach((target, index) => {
+          cmap.set(
+            (start + index).toString(16).toUpperCase().padStart(arrayRange[1].length, '0'),
+            this.decodeUnicodeHex(target)
+          );
+        });
       }
     }
 
