@@ -4,6 +4,7 @@ import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import * as secureIo from '../secure-io.js';
 import * as tierGuard from '../tier-guard.js';
+import * as lockUtils from '../foundation/lock-utils.js';
 import { getFoundationIo } from '../foundation/io.js';
 import { resolveStorageFloor } from '../storage-layout.js';
 import * as profileResolver from '../profile-root.js';
@@ -108,6 +109,7 @@ describe('engine-runtime preferences', () => {
     const exists = vi.spyOn(secureIo, 'safeExistsSync');
     const boundary = vi.spyOn(secureIo, 'assertSafeRepositoryPath');
     const stat = vi.spyOn(secureIo, 'safeLstat');
+    const locks = vi.spyOn(lockUtils, 'withLockSync');
     expect(engineRuntimePreferencesReadiness()).toEqual({
       status: 'unavailable',
       reason: 'personal_profile_not_authorized',
@@ -130,6 +132,7 @@ describe('engine-runtime preferences', () => {
     const privatePath = path.join(profileRoot.value, 'onboarding', 'engine-runtime.json');
     expect(boundary.mock.calls.some(([file]) => file === privatePath)).toBe(false);
     expect(stat).not.toHaveBeenCalledWith(privatePath);
+    expect(locks).not.toHaveBeenCalled();
     denied.mockReturnValue({ allowed: false, reason: 'role denied' });
     expect(() => engineRuntimePreferencesReadiness()).toThrow(
       '[ENGINE_RUNTIME_PREFERENCES_READ_DENIED]'
@@ -305,5 +308,40 @@ describe('engine-runtime preferences', () => {
     expect(resolveAgentRuntimeLaunchMode({ env: { KYBERION_AGENT_RUNTIME_BACKEND: 'pipe' } })).toBe(
       'pipe'
     );
+  });
+  it('keeps core CLI save/reset fresh reads, merge and writes inside the shared transaction', () => {
+    let held = false;
+    const keys: string[] = [];
+    vi.spyOn(lockUtils, 'withLockSync').mockImplementation((key, action) => {
+      keys.push(key);
+      expect(held).toBe(false);
+      held = true;
+      try {
+        return action();
+      } finally {
+        held = false;
+      }
+    });
+    const io = getFoundationIo();
+    const load = io.loadJson.bind(io),
+      write = io.writeFile.bind(io);
+    const profile = path.join(profileRoot.value, 'onboarding', 'engine-runtime.json');
+    vi.spyOn(io, 'loadJson').mockImplementation((file, ...args) => {
+      if (file === profile) expect(held).toBe(true);
+      return load(file, ...args);
+    });
+    vi.spyOn(io, 'writeFile').mockImplementation((file, ...args) => {
+      if (file === profile) expect(held).toBe(true);
+      return write(file, ...args);
+    });
+    saveEngineRuntimePreferences({ python_bin: '/first/python' });
+    saveEngineRuntimePreferences({ ffmpeg_bin: '/next/ffmpeg' });
+    expect(load(profile)).toMatchObject({
+      python_bin: '/first/python',
+      ffmpeg_bin: '/next/ffmpeg',
+    });
+    resetEngineRuntimePreferences();
+    expect(keys).toHaveLength(3);
+    expect(new Set(keys).size).toBe(1);
   });
 });

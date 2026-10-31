@@ -95,6 +95,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   chronos_token_registry_reader: 'worker',
   scope_locale_reader: 'worker',
   memory_provenance_reader: 'worker',
+  engine_runtime_preferences_operator: 'worker',
   workspace_tenant_registry_reader: 'worker',
   workspace_tenant_registry_index_reader: 'worker',
   person_charter_store: 'worker',

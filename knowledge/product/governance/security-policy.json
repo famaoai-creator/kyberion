@@ -303,16 +303,9 @@
         "registry.json"
       ]
     },
-    "knowledge_steward": {
-      "allow_read": ["customer/"],
-      "allow_write": ["customer/"]
-    },
-    "run_baseline_check": {
-      "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
-    },
-    "ops_alerts": {
-      "allow_write": ["active/shared/observability/ops-alerts.jsonl"]
-    },
+    "knowledge_steward": { "allow_read": ["customer/"], "allow_write": ["customer/"] },
+    "run_baseline_check": { "allow_write": ["active/shared/observability/ops-alerts.jsonl"] },
+    "ops_alerts": { "allow_write": ["active/shared/observability/ops-alerts.jsonl"] },
     "ops_alert_store": {
       "allow_read": [
         "active/shared/observability/ops-alerts.jsonl",
@@ -325,10 +318,7 @@
         "active/shared/runtime/state/scheduler-ops-alert-days.json"
       ]
     },
-    "task_runtime_worker": {
-      "allow_read": [],
-      "allow_write": []
-    },
+    "task_runtime_worker": { "allow_read": [], "allow_write": [] },
     "operational_learning_writer": {
       "allow_write": [
         "active/organizations/personal/shared/${KYBERION_ORGANIZATION_ID}/state/learning/",
@@ -698,10 +688,7 @@
       ],
       "allow_write": []
     },
-    "generation_scheduler": {
-      "allow_read": ["knowledge/personal/tenants/"],
-      "allow_write": []
-    },
+    "generation_scheduler": { "allow_read": ["knowledge/personal/tenants/"], "allow_write": [] },
     "physical_namespace_migration": {
       "allow_read": [
         "active/shared/runtime/media-generation/schedules/",
@@ -753,18 +740,10 @@
         "active/shared/runtime/approvals.json"
       ]
     },
-    "customer_create": {
-      "allow_write": ["customer/"]
-    },
-    "onboarding": {
-      "allow_write": ["customer/"]
-    },
-    "assemble_changelog": {
-      "allow_write": ["CHANGELOG.md", "changelog.d/"]
-    },
-    "generate_changelog": {
-      "allow_write": ["CHANGELOG.md"]
-    },
+    "customer_create": { "allow_write": ["customer/"] },
+    "onboarding": { "allow_write": ["customer/"] },
+    "assemble_changelog": { "allow_write": ["CHANGELOG.md", "changelog.d/"] },
+    "generate_changelog": { "allow_write": ["CHANGELOG.md"] },
     "generate_design_tokens": {
       "allow_write": [
         "knowledge/public/design-patterns/media-templates/themes.json",
@@ -783,9 +762,7 @@
     "generate_provider_hook_configs": {
       "allow_write": [".gemini/", ".codex/hooks.json", ".claude/settings.json"]
     },
-    "ingest_commit": {
-      "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"]
-    },
+    "ingest_commit": { "allow_write": ["knowledge/confidential/", "knowledge/public/ingest/"] },
     "asset_promoter": {
       "allow_read": [
         "knowledge/personal/tenants/${KYBERION_TENANT}.json",
@@ -817,9 +794,7 @@
       ],
       "allow_write": ["knowledge/public/tools/", "active/shared/tmp/", "active/shared/staging/"]
     },
-    "reconcile_config_fallbacks": {
-      "allow_write": ["knowledge/public/", "active/shared/tmp/"]
-    },
+    "reconcile_config_fallbacks": { "allow_write": ["knowledge/public/", "active/shared/tmp/"] },
     "register_workflow": {
       "allow_write": [
         "knowledge/product/governance/mission-workflow-catalog.json",
@@ -1106,17 +1081,21 @@
     "customer_channel_binding_store": {
       "allow_read": ["customer/${KYBERION_TENANT}/connections/channel-bindings.json"],
       "allow_write": ["customer/${KYBERION_TENANT}/connections/"]
+    },
+    "engine_runtime_preferences_operator": {
+      "allow_read": [
+        "knowledge/product/schemas/engine-runtime-preferences.schema.json",
+        "knowledge/product/governance/security-policy.json",
+        "knowledge/product/governance/role-assumption-policy.json",
+        "knowledge/product/governance/env-registry.json",
+        "knowledge/product/governance/agent-policies.yaml"
+      ],
+      "allow_write": ["knowledge/personal/", "customer/"]
     }
   },
   "authority_permissions": {
-    "SUDO": {
-      "allow_read": ["/"],
-      "allow_write": ["/"]
-    },
-    "KNOWLEDGE_WRITE": {
-      "allow_read": ["knowledge/"],
-      "allow_write": ["knowledge/"]
-    },
+    "SUDO": { "allow_read": ["/"], "allow_write": ["/"] },
+    "KNOWLEDGE_WRITE": { "allow_read": ["knowledge/"], "allow_write": ["knowledge/"] },
     "GIT_WRITE": {
       "allow_read": [
         ".git/",
@@ -1144,9 +1123,7 @@
     "SECRET_READ": {
       "allow_read": ["vault/", "knowledge/personal/connections/", "active/shared/auth-grants.json"]
     },
-    "NETWORK_FETCH": {
-      "allow_read": ["knowledge/product/orchestration/"]
-    },
+    "NETWORK_FETCH": { "allow_read": ["knowledge/product/orchestration/"] },
     "SYSTEM_EXEC": {
       "allow_read": ["active/shared/tmp/", "active/shared/exports/"],
       "allow_write": ["active/shared/tmp/", "active/shared/exports/"]

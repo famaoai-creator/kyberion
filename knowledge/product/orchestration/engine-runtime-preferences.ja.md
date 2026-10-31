@@ -27,3 +27,11 @@ consumerのreadinessはready/missing/unavailableを区別する。現在の権�
 明示的に注入したenvはlive profileと分離する。保存したFluidAudio設定は次の登録時に再評価し、変更・解除・profile切替では自分の登録だけを更新する。同名pluginや後から置き換わった登録は削除しない。進行中の録音・再生・workerは途中で切り替えない。
 
 検証はengine-runtime-preferences、tier-guard-engine-runtime、engine_runtime_config、各consumerとseam-provider-selectionの回帰テストで行う。CLI追加時はscript登録、script数の登録ceremony、語彙typesとpseudo-localeの生成も同時に確認する。
+
+# Presence Studioから編集する
+
+ローカルのPresence Studioでエンジン設定画面を開く。画面は現在のprofileを表示し、読込が成功してから編集できる。変更した項目だけを保存し、保存済みの値を空欄にするとその項目を解除する。保存後はサーバーが正規化した値を表示する。環境変数による上書きは引き続き優先される。
+
+別CLIや別画面で設定が変わった場合は競合として保存を止め、再読込を案内する。通信失敗や権限不足でも成功表示へ切り替えない。設定の読書きは、サーバーが解決したローカル管理者・ローカルHost・変更元Originを検証した後、対象profileの設定ファイルに限定して実行する。remote tokenからの個人設定の参照・更新や、URL/bodyによるprofileの切替は許可しない。
+
+CLI の保存・リセットと設定画面の revision 確認・部分更新は、同じ profile 専用同期トランザクションで直列化します。別 profile は別ロックです。古い Kyberion 実行版や直接ファイル編集はこのロックに参加しないため、同時書込の保証対象外です。

@@ -209,7 +209,49 @@ export const FIRST_JOB_VOCABULARY_KEYS = [
   'front_desk:first_job_restart_detail',
 ] as const satisfies readonly VocabularyKey[];
 
+export const ENGINE_CONFIG_VOCABULARY_KEYS = [
+  'presence_studio:engine_config_title',
+  'presence_studio:engine_config_description',
+  'presence_studio:engine_config_back',
+  'presence_studio:engine_config_profile',
+  'presence_studio:engine_config_profile_unknown',
+  'presence_studio:engine_config_profile_personal',
+  'presence_studio:engine_config_profile_customer',
+  'presence_studio:engine_config_fields',
+  'presence_studio:engine_config_clear_help',
+  'presence_studio:engine_config_save',
+  'presence_studio:engine_config_reload',
+  'presence_studio:engine_config_loading',
+  'presence_studio:engine_config_ready',
+  'presence_studio:engine_config_saving',
+  'presence_studio:engine_config_saved',
+  'presence_studio:engine_config_unchanged',
+  'presence_studio:engine_config_load_failed',
+  'presence_studio:engine_config_save_failed',
+  'presence_studio:engine_config_denied',
+  'presence_studio:engine_config_conflict',
+  'presence_studio:engine_config_invalid',
+  'presence_studio:engine_config_ffmpeg_bin',
+  'presence_studio:engine_config_ffprobe_bin',
+  'presence_studio:engine_config_python_bin',
+  'presence_studio:engine_config_audio_record_command',
+  'presence_studio:engine_config_audio_playback_backend',
+  'presence_studio:engine_config_fluid_audio_stt_command',
+  'presence_studio:engine_config_streaming_stt_bridge',
+  'presence_studio:engine_config_streaming_tts_bridge',
+  'presence_studio:engine_config_agent_runtime_backend',
+  'presence_studio:engine_config_agent_pane_runtime_provider',
+  'presence_studio:engine_config_mode_default',
+  'presence_studio:engine_config_mode_pipe',
+  'presence_studio:engine_config_mode_pane',
+  'presence_studio:engine_config_binary_help',
+  'presence_studio:engine_config_record_help',
+  'presence_studio:engine_config_fluid_help',
+  'presence_studio:engine_config_bridge_help',
+] as const satisfies readonly VocabularyKey[];
+
 export const PRESENCE_STUDIO_VOCABULARY_KEYS = [
+  ...ENGINE_CONFIG_VOCABULARY_KEYS,
   ...FIRST_JOB_VOCABULARY_KEYS,
   'presence_studio:record_mission_placeholder',
   'presence_studio:record_start',
@@ -813,6 +855,7 @@ export const FRONT_DESK_TEMPLATE_FILE_REDIRECTS: Readonly<Record<string, string>
   '/help.html': '/help',
   '/first-job.html': '/first-job',
   '/live-avatar.html': '/live-avatar',
+  '/engine-config.html': '/engine-config',
 });
 
 /** Canonical route for a raw template file request, keeping the query string; null otherwise. */
@@ -870,6 +913,9 @@ export function registerFrontDeskHomeWorkPages(app: express.Express, staticDir: 
 
   app.get('/work', (req, res) => {
     sendFrontDeskPage(req, res, staticDir, 'index.html');
+  });
+  app.get('/engine-config', (req, res) => {
+    sendFrontDeskPage(req, res, staticDir, 'engine-config.html');
   });
   app.get('/live-avatar', (req, res) => {
     sendFrontDeskPage(req, res, staticDir, 'live-avatar.html');
