@@ -49,7 +49,7 @@ A piece of work with its own state, evidence, and lifecycle. Lives in `active/mi
 - Each mission has `mission-state.json` (the state machine), an evidence directory, and a history log.
 - Created by `pnpm mission create` or `mission_controller start`. Worked on by checkpoints. Closed by `finish`.
 
-Code: `scripts/mission_controller.ts`, `scripts/refactor/mission-*.ts`, `libs/core/mission-*.ts`.
+Code: `scripts/mission_controller.ts`, `scripts/refactor/mission-*.ts` (CLI argument/router glue), `libs/core/mission/mission-*.ts`.
 
 ### 2.2 Actuator
 
@@ -115,7 +115,7 @@ Concrete walkthrough: a user types `今週の進捗レポートを作って`. Tr
    → reads knowledge/product/governance/mission-classification-policy.json
 
 4. Mission seed → mission creation
-   → scripts/refactor/mission-creation.ts
+   → libs/core/mission/mission-creation.ts
    → creates active/missions/<id>/ with its own git repo
 
 5. Pipeline selected from mission seed
@@ -247,7 +247,7 @@ If you're going to read these files end-to-end, these are the ones:
 4. `libs/core/path-resolver.ts` — every file IO starts here.
 5. `libs/core/secure-io.ts` — the tier-enforcement boundary.
 6. `libs/core/pipeline/pipeline-engine.ts` — the executor.
-7. `scripts/mission_controller.ts` + `scripts/refactor/mission-maintenance.ts` — mission lifecycle.
+7. `scripts/mission_controller.ts` + `libs/core/mission/mission-maintenance.ts` — mission lifecycle.
 8. `libs/actuators/browser-actuator/src/index.ts` — a complete actuator reference.
 9. `docs/developer/EXTENSION_POINTS.md` — what is stable vs internal.
 10. `docs/QUICKSTART.md` — the current first-win ladder.

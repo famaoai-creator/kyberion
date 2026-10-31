@@ -12,17 +12,13 @@ import {
   loadToolRuntimeStateAtPath,
   markToolRuntimeInstalled,
   listToolRuntimeInventory,
-  locateManagedToolPythonBin,
   probeToolRuntime,
   resolveManagedBinaryArtifact,
   resolveManagedBinaryPath,
   resolveManagedToolPythonBin,
   _resetToolRuntimeRegistryCacheForTests,
 } from './tool-runtime-registry.js';
-import {
-  _resetToolRuntimePolicyCacheForTests,
-  resolveToolRuntimeDownloadCacheDir,
-} from './tool-runtime-policy.js';
+import { _resetToolRuntimePolicyCacheForTests } from './tool-runtime-policy.js';
 
 vi.mock('../secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('../secure-io.js')>('../secure-io.js');
@@ -546,46 +542,6 @@ describe('tool runtime registry', () => {
     expect(probeToolRuntime('mlx_audio', 'installed', 'darwin').selected_backend?.command).toBe(
       path.join(runtimeRoot, pythonName)
     );
-  });
-
-  it('reads a managed runtime installed only at the legacy cache-floor root', () => {
-    const toolId = `legacy_probe_${process.pid}`;
-    const runtimeDir = `legacy-probe-${process.pid}`;
-    const registry = JSON.parse(String(safeReadFile(registryPath, { encoding: 'utf8' }))) as {
-      tools: Array<Record<string, unknown>>;
-    };
-    registry.tools.push({
-      tool_id: toolId,
-      display_name: 'Legacy probe runtime',
-      ecosystem: 'python',
-      status: 'active',
-      platforms: ['any'],
-      supported_modes: ['trial', 'approved_install', 'installed', 'pinned'],
-      trial_backend: { kind: 'system', command: 'python3', args: [] },
-      managed_env_subpath: `tool-runtimes/${runtimeDir}`,
-    });
-    safeWriteFile(registryPath, JSON.stringify(registry), { encoding: 'utf8' });
-    _resetToolRuntimeRegistryCacheForTests();
-
-    const legacyDir = resolveToolRuntimeDownloadCacheDir(runtimeDir);
-    const binDir = process.platform === 'win32' ? 'Scripts' : 'bin';
-    const pythonName = process.platform === 'win32' ? 'python.exe' : 'python';
-    const legacyPython = path.join(legacyDir, binDir, pythonName);
-    const canonicalPython = path.join(managedRoot, 'tool-runtimes', runtimeDir, binDir, pythonName);
-    try {
-      expect(locateManagedToolPythonBin(toolId)).toBeNull();
-      safeWriteFile(legacyPython, '', { mkdir: true, encoding: 'utf8' });
-      expect(locateManagedToolPythonBin(toolId)).toBe(legacyPython);
-      expect(resolveManagedToolPythonBin(toolId)).toBe(legacyPython);
-      // Installs and state stay on the canonical root.
-      expect(probeToolRuntime(toolId, 'approved_install').managed_env_path).toBe(
-        path.join(managedRoot, 'tool-runtimes', runtimeDir)
-      );
-      safeWriteFile(canonicalPython, '', { mkdir: true, encoding: 'utf8' });
-      expect(locateManagedToolPythonBin(toolId)).toBe(canonicalPython);
-    } finally {
-      safeRmSync(legacyDir, { recursive: true, force: true });
-    }
   });
 
   function addManagedBinaryTool(relativePath = 'bin/panda'): void {

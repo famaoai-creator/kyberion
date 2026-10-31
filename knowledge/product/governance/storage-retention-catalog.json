@@ -97,7 +97,7 @@
       "path": "active/shared/cache/system/tool-runtimes",
       "artifact_class": "cache",
       "action": "review_required",
-      "note": "Managed tool-runtime download caches (uv / pip / XDG caches, HF_HOME model weights) keyed by runtime dir — TOOL_RUNTIME_DOWNLOAD_CACHE_ROOT / resolveToolRuntimeDownloadCacheDir in libs/core/tool/tool-runtime-policy.ts. Re-generable, but multi-GB weights are downloaded explicitly after a disk-space check and keep their download mtime, so the partition's per-file mtime TTL would tear live Hugging Face snapshot trees; eviction is the operator's call. Also the legacy install root, read only as a fallback (never an install target)."
+      "note": "Managed tool-runtime download caches (uv / pip / XDG caches, HF_HOME model weights) keyed by runtime dir — TOOL_RUNTIME_DOWNLOAD_CACHE_ROOT / resolveToolRuntimeDownloadCacheDir in libs/core/tool/tool-runtime-policy.ts. Re-generable, but multi-GB weights are downloaded explicitly after a disk-space check and keep their download mtime, so the partition's per-file mtime TTL would tear live Hugging Face snapshot trees; eviction is the operator's call. Never an install target; installs live under active/shared/runtime/tool-runtimes."
     },
     {
       "path": "active/shared/cache/public",

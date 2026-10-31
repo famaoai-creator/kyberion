@@ -178,7 +178,7 @@ The 3-tier system continues to govern **tier hygiene** (no leaks from confidenti
   - [x] Baseline check consumer (`scripts/run_baseline_check.ts`)
 - [x] Onboarding apply consumer (`scripts/onboarding_apply.ts`)
 - [x] Slack onboarding consumer (`libs/core/integrations/slack-onboarding.ts`)
-  - [x] Mission prerequisites / creation consumer (`scripts/refactor/mission-state.ts`, `scripts/refactor/mission-creation.ts`, `scripts/refactor/mission-llm.ts`)
+  - [x] Mission prerequisites / creation consumer (`libs/core/mission/mission-state.ts`, `libs/core/mission/mission-creation.ts`, `libs/core/mission/mission-llm.ts`)
 
 # Marketing Policy And Brand Overlay
 
