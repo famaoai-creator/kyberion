@@ -200,7 +200,7 @@ export async function trackMedia(
 ): Promise<TrackingResult> {
   if (!request.faceModel && !request.poseModel && !request.gestureModel)
     throw new Error(
-      '[TRACKING_MODEL_REQUIRED] Supply --face-model, --pose-model or --gesture-model pointing to a local MediaPipe .task bundle.'
+      '[TRACKING_MODEL_REQUIRED] Supply --face-model, --pose-model or --gesture-model pointing to a local MediaPipe .task bundle. Provision model assets under active/shared/cache/system/perception-models/ (or another repo path the scope may read — public or own-tenant tmp/staging).'
     );
   resolvePerceptionScope(request.path);
   const input = localFile(request.path);

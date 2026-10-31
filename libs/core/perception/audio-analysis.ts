@@ -246,7 +246,7 @@ export async function analyzeAudio(request: AudioAnalysisRequest): Promise<Audio
   if (request.diarize) {
     if (!request.diarizationModel)
       throw new Error(
-        '[AUDIO_MODEL_MISSING] --diarization-model requires a local Community-1 bundle; accept its model terms and provision assets before running'
+        '[AUDIO_MODEL_MISSING] --diarization-model requires a local Community-1 bundle; accept its model terms and provision assets under active/shared/cache/system/perception-models/ (or another repo path the scope may read — public or own-tenant tmp/staging) before running'
       );
     const bundle = localAsset(request.diarizationModel, true);
     const configPath = localAsset(path.join(bundle, 'config.yaml'), false);
@@ -260,7 +260,7 @@ export async function analyzeAudio(request: AudioAnalysisRequest): Promise<Audio
   }
   if (request.events && !request.audioModel)
     throw new Error(
-      '[AUDIO_MODEL_MISSING] --audio-model requires a local MediaPipe-compatible YAMNet TFLite asset'
+      '[AUDIO_MODEL_MISSING] --audio-model requires a local MediaPipe-compatible YAMNet TFLite asset under active/shared/cache/system/perception-models/ (or another repo path the scope may read — public or own-tenant tmp/staging)'
     );
   const audioModel = request.events ? localAsset(request.audioModel!, false) : undefined;
   if (audioModel && !/\.(tflite|task)$/iu.test(audioModel))
