@@ -7,10 +7,14 @@
  *   1. The CLI opens a short-lived *ticket* on the staging floor of the
  *      tier/tenant partition the operator chose
  *      (`active/shared/staging/<tier>/<tenant|shared>/browser-inspection/<ticket_id>.json`).
- *   2. The side panel's "Kyberion CLIへ送信" sends a `submit_inspection`
- *      native message. The native host (the only trust boundary reachable from
- *      the allowlisted extension) validates, bounds and re-redacts the payload
- *      and writes it into the newest waiting, unexpired ticket.
+ *      It prints a 6-character pairing code; only the code's digest is stored.
+ *   2. The operator types that code into the side panel and presses
+ *      "Kyberion CLIへ送信", which sends a `submit_inspection` native message.
+ *      The native host (the only trust boundary reachable from the allowlisted
+ *      extension) validates, bounds and re-redacts the payload and writes it
+ *      into the single waiting, unexpired ticket whose code matches — never
+ *      "the newest ticket", so data cannot cross into another tier/tenant.
+ *      An optional `--origin` pin on the ticket is enforced too.
  *   3. The CLI polls its own ticket, reads the inspection and deletes the file.
  *
  * A submission with no waiting CLI is refused, so nothing lands unless the
@@ -19,13 +23,14 @@
  * concierge role, like the browser-bridge mailbox and send_page.
  */
 import { Buffer } from 'node:buffer';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomInt, randomUUID, timingSafeEqual } from 'node:crypto';
 import * as path from 'node:path';
 import { withExecutionContext } from '@agent/core/authority';
 import { redactObservationText } from '@agent/core/browser/browser-extension-bridge';
 import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
 import { withLockSync } from '@agent/core/foundation/lock-utils';
 import { auditChain } from '@agent/core/governance/audit-chain';
+import { createLogger } from '@agent/core/logger';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   assertSafeRepositoryPath,
@@ -99,19 +104,37 @@ export interface InspectionHandoffTicket {
   created_at: string;
   expires_at: string;
   scope: InspectionHandoffScope;
+  /** sha256 of the pairing code the CLI printed; the code itself is never stored. */
+  pairing_code_sha256: string;
+  /** Optional `--origin` pin: the host refuses inspections of any other origin. */
+  allowed_origin?: string;
   submitted_at?: string;
   inspection?: InspectionHandoffPayload;
 }
 
+export type InspectionHandoffErrorCode =
+  | 'invalid_input'
+  | 'too_large'
+  | 'no_waiting_cli'
+  | 'pairing_code_required'
+  | 'pairing_mismatch'
+  | 'ambiguous_waiting_cli'
+  | 'origin_mismatch'
+  | 'audit_unavailable'
+  | 'timeout'
+  | 'not_found';
+
 export class InspectionHandoffError extends Error {
   constructor(
-    readonly code: 'invalid_input' | 'too_large' | 'no_waiting_cli' | 'timeout' | 'not_found',
+    readonly code: InspectionHandoffErrorCode,
     message: string
   ) {
     super(`[BROWSER_INSPECTION_${code.toUpperCase()}] ${message}`);
     this.name = 'InspectionHandoffError';
   }
 }
+
+const logger = createLogger('browser-inspection-handoff');
 
 const asConcierge = <T>(fn: () => T): T =>
   withExecutionContext('sovereign_concierge', fn, 'sovereign');
@@ -361,17 +384,24 @@ function ticketIdsIn(scope: InspectionHandoffScope): string[] {
   }
 }
 
-function recordAudit(entry: {
+export interface InspectionAuditEntry {
   action: string;
   operation: string;
   result: 'completed' | 'denied' | 'failed';
   reason: string;
   metadata: Record<string, unknown>;
-}): void {
+}
+
+/** Record an audit entry; returns false (and warns) when it could not be written. */
+function recordAudit(entry: InspectionAuditEntry): boolean {
   try {
     auditChain.record({ agentId: 'browser-inspect', ...entry });
-  } catch {
-    /* audit enrichment is best-effort */
+    return true;
+  } catch (err) {
+    logger.warn(
+      `browser inspection audit not recorded — ${err instanceof Error ? err.message.slice(0, 200) : 'audit chain unavailable'} | next: check the audit chain | evidence: ${entry.operation}`
+    );
+    return false;
   }
 }
 
@@ -379,20 +409,83 @@ function scopeMetadata(scope: InspectionHandoffScope): Record<string, unknown> {
   return { tier: scope.tier, ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}) };
 }
 
+/** Confidential hand-offs fail closed when their audit record cannot be written. */
+function requiresAudit(scope: InspectionHandoffScope): boolean {
+  return scope.tier === 'confidential';
+}
+
+// ---------------------------------------------------------------------------
+// Pairing code
+// ---------------------------------------------------------------------------
+
+/** No 0/O, 1/I/L: easy to read off a terminal and type into the side panel. */
+const PAIRING_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+export const PAIRING_CODE_LENGTH = 6;
+
+function generatePairingCode(): string {
+  let code = '';
+  for (let i = 0; i < PAIRING_CODE_LENGTH; i += 1) {
+    code += PAIRING_ALPHABET[randomInt(PAIRING_ALPHABET.length)];
+  }
+  return code;
+}
+
+/** Uppercase and drop spaces/hyphens; null when it is not a well-formed code. */
+export function normalizePairingCode(value: unknown): string | null {
+  if (typeof value !== 'string') return null;
+  const code = value.replace(/[\s-]+/gu, '').toUpperCase();
+  if (code.length !== PAIRING_CODE_LENGTH) return null;
+  for (const char of code) if (!PAIRING_ALPHABET.includes(char)) return null;
+  return code;
+}
+
+function pairingDigest(code: string): string {
+  return createHash('sha256').update(`browser-inspection-pairing:${code}`).digest('hex');
+}
+
+function digestMatches(expected: string | undefined, actual: string): boolean {
+  if (typeof expected !== 'string' || expected.length !== actual.length) return false;
+  return timingSafeEqual(Buffer.from(expected, 'utf8'), Buffer.from(actual, 'utf8'));
+}
+
 // ---------------------------------------------------------------------------
 // CLI side
 // ---------------------------------------------------------------------------
 
+export interface OpenedInspectionTicket extends InspectionHandoffTicket {
+  /** Shown to the operator only; the stored ticket keeps just its digest. */
+  pairing_code: string;
+}
+
 /** Open a waiting ticket in an already-normalized scope (see normalizeBrowserBridgeScope). */
 export function openInspectionTicket(
   scope: InspectionHandoffScope,
-  options: { ttlMs: number; now?: Date }
-): InspectionHandoffTicket {
+  options: { ttlMs: number; now?: Date; allowedOrigin?: string }
+): OpenedInspectionTicket {
   const ttl = options.ttlMs;
   if (!Number.isFinite(ttl) || ttl <= 0 || ttl > INSPECTION_HANDOFF_MAX_TTL_MS) {
     throw new InspectionHandoffError('invalid_input', 'timeout must be > 0 and at most 10 minutes');
   }
+  let allowedOrigin: string | undefined;
+  if (options.allowedOrigin !== undefined) {
+    try {
+      const url = new URL(options.allowedOrigin);
+      if (
+        (url.protocol !== 'http:' && url.protocol !== 'https:') ||
+        url.origin !== options.allowedOrigin.replace(/\/$/u, '')
+      ) {
+        throw new Error('not an origin');
+      }
+      allowedOrigin = url.origin;
+    } catch {
+      throw new InspectionHandoffError(
+        'invalid_input',
+        'origin must be a canonical http(s) origin such as https://example.com'
+      );
+    }
+  }
   const now = options.now ?? new Date();
+  const pairingCode = generatePairingCode();
   const ticket: InspectionHandoffTicket = {
     kind: INSPECTION_HANDOFF_KIND,
     ticket_id: `BIH-${randomUUID()}`,
@@ -402,10 +495,12 @@ export function openInspectionTicket(
     scope: scope.tenant_slug
       ? { tier: scope.tier, tenant_slug: scope.tenant_slug }
       : { tier: scope.tier },
+    pairing_code_sha256: pairingDigest(pairingCode),
+    ...(allowedOrigin ? { allowed_origin: allowedOrigin } : {}),
   };
   asConcierge(() => {
     writeTicket(ticket);
-    recordAudit({
+    const audited = recordAudit({
       action: 'browser_inspection_wait',
       operation: 'browser:inspect:extension:wait',
       result: 'completed',
@@ -414,10 +509,18 @@ export function openInspectionTicket(
         ticket_id: ticket.ticket_id,
         expires_at: ticket.expires_at,
         ...scopeMetadata(scope),
+        ...(allowedOrigin ? { allowed_origin: allowedOrigin } : {}),
       },
     });
+    if (!audited && requiresAudit(scope)) {
+      removeTicket(ticket.scope, ticket.ticket_id);
+      throw new InspectionHandoffError(
+        'audit_unavailable',
+        'the audit chain could not record a confidential hand-off; nothing is waiting'
+      );
+    }
   });
-  return ticket;
+  return { ...ticket, pairing_code: pairingCode };
 }
 
 /** Remove a ticket (consumed, timed out or abandoned). */
@@ -426,6 +529,22 @@ export function closeInspectionTicket(
 ): void {
   asConcierge(() =>
     withLockSync(lockId(ticket.ticket_id), () => removeTicket(ticket.scope, ticket.ticket_id))
+  );
+}
+
+/**
+ * Remove the ticket under its lock and return what it held, so a submission
+ * that lands right at the deadline is still delivered instead of discarded.
+ */
+function takeInspectionTicket(
+  ticket: Pick<InspectionHandoffTicket, 'scope' | 'ticket_id'>
+): InspectionHandoffTicket | null {
+  return asConcierge(() =>
+    withLockSync(lockId(ticket.ticket_id), () => {
+      const current = readTicket(ticket.scope, ticket.ticket_id);
+      removeTicket(ticket.scope, ticket.ticket_id);
+      return current;
+    })
   );
 }
 
@@ -451,6 +570,8 @@ export async function awaitInspectionTicket(
       if (current.status === 'submitted' && current.inspection) return current.inspection;
       const remaining = deadline - clock().getTime();
       if (remaining <= 0) {
+        const last = takeInspectionTicket(ticket);
+        if (last?.status === 'submitted' && last.inspection) return last.inspection;
         throw new InspectionHandoffError(
           'timeout',
           'no inspection arrived from the extension before the timeout'
@@ -473,77 +594,139 @@ export interface InspectionSubmitResult {
   inspection: InspectionHandoffPayload;
 }
 
+const SUBMIT_AUDIT = {
+  action: 'browser_bridge_submit_inspection',
+  operation: 'browser:bridge:submit_inspection',
+} as const;
+
+function deny(
+  code: InspectionHandoffErrorCode,
+  message: string,
+  metadata: Record<string, unknown>
+): never {
+  recordAudit({
+    ...SUBMIT_AUDIT,
+    result: 'denied',
+    reason: message.slice(0, 200),
+    metadata: { code, ...metadata },
+  });
+  throw new InspectionHandoffError(code, message);
+}
+
 /**
- * Deliver a sanitized inspection to the newest waiting, unexpired ticket.
- * Expired tickets met on the way are swept. Throws `no_waiting_cli` when no
- * CLI is waiting. Audits both outcomes.
+ * Deliver a sanitized inspection to the one waiting, unexpired ticket whose
+ * pairing code the operator typed into the side panel. There is no "newest
+ * ticket" fallback: the code alone selects the tier/tenant partition, so data
+ * never lands in a scope the operator did not pair with. Expired tickets met
+ * on the way are swept. Every outcome is audited; confidential deliveries are
+ * rolled back when their audit record cannot be written.
  */
 export function submitInspectionToWaitingTicket(
   raw: unknown,
-  options: { now?: Date } = {}
+  options: { pairingCode?: unknown; clock?: () => Date } = {}
 ): InspectionSubmitResult {
-  const now = options.now ?? new Date();
-  let inspection: InspectionHandoffPayload;
-  try {
-    inspection = sanitizeInspectionPayload(raw);
-  } catch (err) {
-    asConcierge(() =>
-      recordAudit({
-        action: 'browser_bridge_submit_inspection',
-        operation: 'browser:bridge:submit_inspection',
-        result: 'denied',
-        reason: err instanceof Error ? err.message.slice(0, 200) : 'invalid inspection',
-        metadata: {},
-      })
-    );
-    throw err;
-  }
+  const clock = options.clock ?? (() => new Date());
   return asConcierge(() => {
-    const waiting: Array<{ scope: InspectionHandoffScope; ticket: InspectionHandoffTicket }> = [];
+    if (
+      options.pairingCode === undefined ||
+      options.pairingCode === null ||
+      options.pairingCode === ''
+    ) {
+      deny(
+        'pairing_code_required',
+        'enter the pairing code that pnpm kyberion browser inspect --mode extension printed',
+        {}
+      );
+    }
+    const code = normalizePairingCode(options.pairingCode);
+    if (!code) {
+      deny('invalid_input', `pairing code must be ${PAIRING_CODE_LENGTH} letters/digits`, {});
+    }
+    let inspection: InspectionHandoffPayload;
+    try {
+      inspection = sanitizeInspectionPayload(raw);
+    } catch (err) {
+      if (err instanceof InspectionHandoffError) deny(err.code, err.message, {});
+      throw err;
+    }
+    const digest = pairingDigest(code!);
+    let waitingCount = 0;
+    const matches: Array<{ scope: InspectionHandoffScope; ticket: InspectionHandoffTicket }> = [];
     for (const scope of ticketPartitions()) {
       for (const id of ticketIdsIn(scope)) {
         const ticket = readTicket(scope, id);
         if (!ticket) continue;
-        if (Date.parse(ticket.expires_at) <= now.getTime()) {
+        if (Date.parse(ticket.expires_at) <= clock().getTime()) {
           try {
-            withLockSync(lockId(id), () => removeTicket(scope, id));
+            withLockSync(lockId(id), () => {
+              const current = readTicket(scope, id);
+              if (
+                current &&
+                current.status === 'waiting' &&
+                Date.parse(current.expires_at) <= Date.now()
+              ) {
+                removeTicket(scope, id);
+              }
+            });
           } catch {
             /* a locked stale ticket is swept next time */
           }
           continue;
         }
-        if (ticket.status === 'waiting') waiting.push({ scope, ticket });
+        if (ticket.status !== 'waiting') continue;
+        waitingCount += 1;
+        if (digestMatches(ticket.pairing_code_sha256, digest)) matches.push({ scope, ticket });
       }
     }
-    waiting.sort((a, b) => b.ticket.created_at.localeCompare(a.ticket.created_at));
-    for (const candidate of waiting) {
-      const delivered = withLockSync(lockId(candidate.ticket.ticket_id), () => {
-        const current = readTicket(candidate.scope, candidate.ticket.ticket_id);
-        if (
-          !current ||
-          current.status !== 'waiting' ||
-          Date.parse(current.expires_at) <= now.getTime()
-        ) {
-          return null;
-        }
-        const updated: InspectionHandoffTicket = {
-          ...current,
-          status: 'submitted',
-          submitted_at: now.toISOString(),
-          inspection,
-        };
-        writeTicket(updated);
-        return updated;
+    if (matches.length === 0) {
+      if (waitingCount === 0) {
+        deny(
+          'no_waiting_cli',
+          'no Kyberion CLI is waiting; run pnpm kyberion browser inspect --mode extension first',
+          { origin: inspection!.origin }
+        );
+      }
+      deny('pairing_mismatch', 'the pairing code does not match a waiting Kyberion CLI', {
+        origin: inspection!.origin,
       });
-      if (!delivered) continue;
-      recordAudit({
-        action: 'browser_bridge_submit_inspection',
-        operation: 'browser:bridge:submit_inspection',
+    }
+    if (matches.length > 1) {
+      // Two CLIs drew the same code: refuse rather than guess a scope.
+      deny(
+        'ambiguous_waiting_cli',
+        'more than one waiting Kyberion CLI matches this pairing code; restart one of them',
+        { origin: inspection!.origin }
+      );
+    }
+    const [{ scope, ticket }] = matches;
+    const outcome = withLockSync(lockId(ticket.ticket_id), () => {
+      const now = clock();
+      const current = readTicket(scope, ticket.ticket_id);
+      if (
+        !current ||
+        current.status !== 'waiting' ||
+        Date.parse(current.expires_at) <= now.getTime() ||
+        !digestMatches(current.pairing_code_sha256, digest)
+      ) {
+        return 'gone' as const;
+      }
+      if (current.allowed_origin && current.allowed_origin !== inspection.origin) {
+        return 'origin_mismatch' as const;
+      }
+      const updated: InspectionHandoffTicket = {
+        ...current,
+        status: 'submitted',
+        submitted_at: now.toISOString(),
+        inspection,
+      };
+      writeTicket(updated);
+      const audited = recordAudit({
+        ...SUBMIT_AUDIT,
         result: 'completed',
-        reason: `Extension inspection of ${inspection.origin} handed to the waiting CLI`,
+        reason: `Extension inspection of ${inspection.origin} handed to the paired CLI`,
         metadata: {
-          ticket_id: delivered.ticket_id,
-          ...scopeMetadata(candidate.scope),
+          ticket_id: current.ticket_id,
+          ...scopeMetadata(scope),
           origin: inspection.origin,
           counts: {
             headings: inspection.headings.length,
@@ -554,18 +737,33 @@ export function submitInspectionToWaitingTicket(
           truncated: inspection.truncated,
         },
       });
-      return { ticket_id: delivered.ticket_id, scope: candidate.scope, inspection };
-    }
-    recordAudit({
-      action: 'browser_bridge_submit_inspection',
-      operation: 'browser:bridge:submit_inspection',
-      result: 'denied',
-      reason: 'No CLI is waiting for an inspection',
-      metadata: { origin: inspection.origin },
+      if (!audited && requiresAudit(scope)) {
+        writeTicket(current);
+        return 'audit_unavailable' as const;
+      }
+      return 'delivered' as const;
     });
-    throw new InspectionHandoffError(
-      'no_waiting_cli',
-      'no Kyberion CLI is waiting; run pnpm kyberion browser inspect --mode extension first'
-    );
+    const meta = {
+      ticket_id: ticket.ticket_id,
+      ...scopeMetadata(scope),
+      origin: inspection.origin,
+    };
+    if (outcome === 'gone') {
+      deny('no_waiting_cli', 'the paired Kyberion CLI stopped waiting', meta);
+    }
+    if (outcome === 'origin_mismatch') {
+      deny(
+        'origin_mismatch',
+        `the waiting CLI only accepts ${ticket.allowed_origin}; this page is ${inspection.origin}`,
+        meta
+      );
+    }
+    if (outcome === 'audit_unavailable') {
+      throw new InspectionHandoffError(
+        'audit_unavailable',
+        'the audit chain could not record a confidential hand-off; nothing was delivered'
+      );
+    }
+    return { ticket_id: ticket.ticket_id, scope, inspection };
   });
 }

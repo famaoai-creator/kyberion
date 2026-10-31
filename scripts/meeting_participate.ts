@@ -335,7 +335,8 @@ async function main(args: string[] = []): Promise<void> {
     })
     .option('extension-ws-host', {
       type: 'string',
-      describe: 'chrome-extension driver: local WS host (default 127.0.0.1)',
+      describe:
+        'chrome-extension driver: loopback WS host (default 127.0.0.1; non-loopback hosts are refused)',
     })
     .option('extension-join-timeout-sec', {
       type: 'number',

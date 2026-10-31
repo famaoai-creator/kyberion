@@ -227,6 +227,20 @@
             現在のページDOM（入力欄・ボタン・見出し・リンク）を解析し、Native Bridge 経由で待機中の
             Kyberion CLI（pnpm kyberion browser inspect --mode extension）へ送信します。
           </p>
+          <div id="inspect-pairing-row" class="intent-input-row" hidden>
+            <label for="inspect-pairing-input">ペアリングコード（CLI に表示された 6 文字）</label>
+            <input
+              id="inspect-pairing-input"
+              class="intent-input"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              maxlength="9"
+              aria-describedby="inspect-page-status"
+            />
+          </div>
           <div class="button-row">
             <button id="inspect-page-button" class="secondary" type="button">
               ページ構造を解析

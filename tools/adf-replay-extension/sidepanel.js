@@ -100,6 +100,8 @@ const elements = {
   aiObservationSummary: document.querySelector('#ai-observation-summary'),
   inspectPageButton: document.querySelector('#inspect-page-button'),
   inspectSendCliButton: document.querySelector('#inspect-send-cli-button'),
+  inspectPairingRow: document.querySelector('#inspect-pairing-row'),
+  inspectPairingInput: document.querySelector('#inspect-pairing-input'),
   inspectPageStatus: document.querySelector('#inspect-page-status'),
   inspectPageResult: document.querySelector('#inspect-page-result'),
   intentResult: document.querySelector('#intent-result'),
@@ -788,6 +790,7 @@ async function inspectCurrentPageDOM() {
   lastInspectionData = response.inspection;
   elements.inspectPageResult.hidden = false;
   elements.inspectSendCliButton.hidden = false;
+  elements.inspectPairingRow.hidden = false;
   elements.inspectPageStatus.textContent = `解析完了: 入力欄 ${lastInspectionData.inputs.length} 件 / ボタン ${lastInspectionData.buttons.length} 件 / 見出し ${lastInspectionData.headings.length} 件 / リンク ${lastInspectionData.links.length} 件`;
   elements.inspectPageResult.textContent = JSON.stringify(lastInspectionData, null, 2);
 }
@@ -799,8 +802,15 @@ async function sendInspectionToCli() {
   if (!lastInspectionData) {
     throw new Error('解析結果がありません。先に「ページ構造を解析」を実行してください。');
   }
+  const pairingCode = InboxModel.normalizePairingCode(elements.inspectPairingInput.value);
+  if (!pairingCode) {
+    elements.inspectPageStatus.textContent =
+      'CLI が表示したペアリングコード（6 文字）を入力してください。';
+    elements.inspectPairingInput.focus();
+    return;
+  }
   elements.inspectPageStatus.textContent = 'Native Bridge 経由で Kyberion CLI へ送信中…';
-  const response = await invoke('bridge:submit-inspection');
+  const response = await invoke('bridge:submit-inspection', { pairingCode });
   if (!response?.submitResult) {
     elements.inspectPageStatus.textContent = `送信エラー: ${lastError || '送信に失敗しました。'}`;
     return;
@@ -813,6 +823,7 @@ async function sendInspectionToCli() {
   const scope = result.scope
     ? `${result.scope.tier}${result.scope.tenant_slug ? `/${result.scope.tenant_slug}` : ''}`
     : '';
+  elements.inspectPairingInput.value = '';
   elements.inspectPageStatus.textContent = `✓ 待機中の Kyberion CLI へ解析データを送信しました${scope ? `（保存先: ${scope}）` : ''}。`;
 }
 

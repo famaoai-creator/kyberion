@@ -20,6 +20,8 @@
   const SEND_MAX_TITLE = 300;
   const SEND_MAX_NOTE = 1_000;
   const TENANT_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+  const PAIRING_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789';
+  const PAIRING_CODE_LENGTH = 6;
   // Mirrors INSPECTION_LIMITS in scripts/lib/browser-inspection-handoff.ts.
   const INSPECT_LIMITS = {
     title: 300,
@@ -293,7 +295,16 @@
    * inspection: scrubbed, bounded, no input values, and URLs without query
    * strings or fragments. The host validates and redacts again.
    */
-  function buildSubmitInspectionPayload(inspection, scrub) {
+  function buildSubmitInspectionPayload(inspection, scrub, pairingCode) {
+    const code = normalizePairingCode(pairingCode);
+    if (!code) {
+      return {
+        ok: false,
+        errors: [
+          'CLI が表示したペアリングコード（6 文字）を入力してください（pnpm kyberion browser inspect --mode extension）。',
+        ],
+      };
+    }
     if (typeof scrub !== 'function') {
       return { ok: false, errors: ['PII scrubber が読み込まれていません。'] };
     }
@@ -311,6 +322,7 @@
     };
     const payload = {
       type: 'submit_inspection',
+      pairing_code: code,
       inspection: {
         url: pageUrl.toString(),
         origin: pageUrl.origin,
@@ -351,6 +363,15 @@
     return { ok: true, errors: [], payload };
   }
 
+  // Mirrors normalizePairingCode in scripts/lib/browser-inspection-handoff.ts.
+  function normalizePairingCode(value) {
+    if (typeof value !== 'string') return null;
+    const code = value.replace(/[\s-]+/g, '').toUpperCase();
+    if (code.length !== PAIRING_CODE_LENGTH) return null;
+    for (const char of code) if (!PAIRING_ALPHABET.includes(char)) return null;
+    return code;
+  }
+
   function stripQuery(value) {
     try {
       const url = new URL(String(value || ''));
@@ -382,5 +403,6 @@
     sanitizeWebMcpTools,
     buildSendPagePayload,
     buildSubmitInspectionPayload,
+    normalizePairingCode,
   };
 })(globalThis);

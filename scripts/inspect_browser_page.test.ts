@@ -200,13 +200,25 @@ describe('inspect_browser_page', () => {
       tenant_slug: scope.tenant_slug?.toLowerCase(),
     }));
     await main(
-      ['--mode', 'extension', '--tier', 'confidential', '--tenant', 'ACME', '--timeout', '5000'],
+      [
+        '--mode',
+        'extension',
+        '--tier',
+        'confidential',
+        '--tenant',
+        'ACME',
+        '--timeout',
+        '5000',
+        '--origin',
+        'https://example.com',
+      ],
       vi.fn(),
       { nodeVersion: 'v24.1.0', waitForExtensionInspection: waiter, normalizeScope }
     );
     expect(waiter).toHaveBeenCalledWith({
       scope: { tier: 'confidential', tenant_slug: 'acme' },
       timeoutMs: 5000,
+      origin: 'https://example.com',
     });
   });
 

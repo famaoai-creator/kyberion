@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { withExecutionContext } from '@agent/core/authority';
 import { auditChain } from '@agent/core/governance/audit-chain';
-import { safeExistsSync, safeReaddir, safeRmSync } from '@agent/core/secure-io';
+import { safeExistsSync, safeReadFile, safeReaddir, safeRmSync } from '@agent/core/secure-io';
 import { resolveStorageFloor } from '@agent/core/storage-layout';
 import {
   INSPECTION_HANDOFF_DOMAIN,
@@ -11,6 +11,8 @@ import {
   closeInspectionTicket,
   openInspectionTicket,
   sanitizeInspectionPayload,
+  submitInspectionToWaitingTicket,
+  type OpenedInspectionTicket,
   type InspectionHandoffScope,
   type InspectionHandoffTicket,
 } from './lib/browser-inspection-handoff.js';
@@ -31,7 +33,7 @@ interface Reply {
   ticket_id?: string;
   [key: string]: unknown;
 }
-const opened: InspectionHandoffTicket[] = [];
+const opened: OpenedInspectionTicket[] = [];
 
 beforeAll(async () => {
   ({ handle } = await import('./browser_bridge_host.js'));
@@ -125,35 +127,75 @@ describe('sanitizeInspectionPayload', () => {
   });
 });
 
+const submit = (ticketOrCode: { pairing_code: string } | string | undefined, overrides = {}) =>
+  handle({
+    type: 'submit_inspection',
+    inspection: inspection(overrides),
+    ...(ticketOrCode === undefined
+      ? {}
+      : {
+          pairing_code: typeof ticketOrCode === 'string' ? ticketOrCode : ticketOrCode.pairing_code,
+        }),
+  }) as Promise<Reply>;
+
+/** A well-formed code that differs from the ticket's. */
+function otherCode(code: string): string {
+  return (code[0] === 'A' ? 'B' : 'A') + code.slice(1);
+}
+
+function ticketFile(ticket: InspectionHandoffTicket): string {
+  return path.join(
+    resolveStorageFloor(
+      'staging',
+      { kind: 'tier', tier: ticket.scope.tier, tenant: ticket.scope.tenant_slug },
+      INSPECTION_HANDOFF_DOMAIN
+    ),
+    `${ticket.ticket_id}.json`
+  );
+}
+
+function storedTicket(ticket: InspectionHandoffTicket): Record<string, unknown> {
+  return asConcierge(() =>
+    JSON.parse(String(safeReadFile(ticketFile(ticket), { encoding: 'utf8' })))
+  );
+}
+
 describe('submit_inspection (native host)', () => {
   it('refuses and audits when no CLI is waiting', async () => {
     const audit = vi.spyOn(auditChain, 'record');
-    const reply = (await handle({ type: 'submit_inspection', inspection: inspection() })) as Reply;
+    const reply = await submit('ABCDEF');
     expect(reply).toMatchObject({ ok: false, code: 'no_waiting_cli' });
     expect(audit).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'browser_bridge_submit_inspection', result: 'denied' })
     );
   });
 
-  it('rejects an invalid payload without touching a waiting ticket', async () => {
+  it('requires the pairing code and never falls back to "the newest ticket"', async () => {
     const ticket = open({ tier: 'personal' });
-    const reply = (await handle({
-      type: 'submit_inspection',
-      inspection: inspection({ url: 'chrome://settings' }),
-    })) as Reply;
-    expect(reply).toMatchObject({ ok: false, code: 'invalid_input' });
-    await expect(
-      awaitInspectionTicket(
-        { ...ticket, expires_at: new Date(Date.now() + 60).toISOString() },
-        { pollMs: 50 }
-      )
-    ).rejects.toMatchObject({ code: 'timeout' });
+    expect(ticket.pairing_code).toMatch(/^[A-HJ-KM-NP-Z2-9]{6}$/);
+    expect((await submit(undefined)).code).toBe('pairing_code_required');
+    expect((await submit('12')).code).toBe('invalid_input');
+    expect((await submit(otherCode(ticket.pairing_code))).code).toBe('pairing_mismatch');
+    // The ticket on disk keeps only a digest of the code and is still waiting.
+    const raw = String(asConcierge(() => safeReadFile(ticketFile(ticket), { encoding: 'utf8' })));
+    expect(raw).not.toContain(`"${ticket.pairing_code}"`);
+    expect(storedTicket(ticket).status).toBe('waiting');
   });
 
-  it('hands a sanitized inspection to the waiting CLI ticket, audited with its scope', async () => {
+  it('rejects an invalid payload without touching the paired ticket', async () => {
+    const ticket = open({ tier: 'personal' });
+    const reply = await submit(ticket, { url: 'chrome://settings' });
+    expect(reply).toMatchObject({ ok: false, code: 'invalid_input' });
+    expect(storedTicket(ticket).status).toBe('waiting');
+  });
+
+  it('hands a sanitized inspection to the paired ticket, audited with its scope', async () => {
     const ticket = open({ tier: 'confidential', tenant_slug: 'acme' });
     const audit = vi.spyOn(auditChain, 'record');
-    const reply = (await handle({ type: 'submit_inspection', inspection: inspection() })) as Reply;
+    // Lower-case with a separator is normalized.
+    const typed =
+      `${ticket.pairing_code.slice(0, 3)}-${ticket.pairing_code.slice(3)}`.toLowerCase();
+    const reply = await submit(typed);
     expect(reply).toMatchObject({
       ok: true,
       ticket_id: ticket.ticket_id,
@@ -171,29 +213,112 @@ describe('submit_inspection (native host)', () => {
     const received = await awaitInspectionTicket(ticket, { pollMs: 50 });
     expect(received.url).toBe('https://example.com/login');
     expect(received.inputs[0]).not.toHaveProperty('value');
-    // The ticket is consumed: a second submission finds nobody waiting.
-    const again = (await handle({ type: 'submit_inspection', inspection: inspection() })) as Reply;
-    expect(again.code).toBe('no_waiting_cli');
+    // The ticket is consumed: the same code finds nobody waiting.
+    expect((await submit(ticket)).code).toBe('no_waiting_cli');
   });
 
-  it('prefers the newest waiting ticket and sweeps expired ones', async () => {
-    const stale = open({ tier: 'personal' }, 1_000, new Date(Date.now() - 10_000));
-    const older = open({ tier: 'personal' }, 60_000, new Date(Date.now() - 1_000));
-    const newer = open({ tier: 'personal' });
-    const reply = (await handle({ type: 'submit_inspection', inspection: inspection() })) as Reply;
-    expect(reply.ticket_id).toBe(newer.ticket_id);
-    const staleFile = path.join(
-      resolveStorageFloor('staging', { kind: 'tier', tier: 'personal' }, INSPECTION_HANDOFF_DOMAIN),
-      `${stale.ticket_id}.json`
+  it('keeps two waiting CLIs in different scopes apart: each code reaches only its own ticket', async () => {
+    const acme = open({ tier: 'confidential', tenant_slug: 'acme' });
+    const personal = open({ tier: 'personal' });
+    const first = await submit(acme, { title: 'for acme' });
+    expect(first).toMatchObject({ ok: true, ticket_id: acme.ticket_id });
+    expect(storedTicket(personal).status).toBe('waiting');
+    const second = await submit(personal, { title: 'for me' });
+    expect(second).toMatchObject({
+      ok: true,
+      ticket_id: personal.ticket_id,
+      scope: { tier: 'personal' },
+    });
+    expect((await awaitInspectionTicket(acme, { pollMs: 50 })).title).toBe('for acme');
+    expect((await awaitInspectionTicket(personal, { pollMs: 50 })).title).toBe('for me');
+  });
+
+  it('enforces an --origin pin on the ticket', async () => {
+    const ticket = openInspectionTicket(
+      { tier: 'personal' },
+      { ttlMs: 60_000, allowedOrigin: 'https://bank.example' }
     );
-    expect(asConcierge(() => safeExistsSync(staleFile))).toBe(false);
-    const olderFile = staleFile.replace(stale.ticket_id, older.ticket_id);
-    expect(asConcierge(() => safeExistsSync(olderFile))).toBe(true);
+    opened.push(ticket);
+    expect((await submit(ticket)).code).toBe('origin_mismatch');
+    expect(storedTicket(ticket).status).toBe('waiting');
+    expect(() =>
+      openInspectionTicket(
+        { tier: 'personal' },
+        { ttlMs: 60_000, allowedOrigin: 'https://x.test/path' }
+      )
+    ).toThrow(InspectionHandoffError);
+  });
+
+  it('fails closed for a confidential hand-off when the audit chain cannot record it', async () => {
+    const ticket = open({ tier: 'confidential', tenant_slug: 'acme' });
+    vi.spyOn(auditChain, 'record').mockImplementation(() => {
+      throw new Error('audit disk full');
+    });
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    const reply = await submit(ticket);
+    stderr.mockRestore();
+    vi.restoreAllMocks();
+    expect(reply.code).toBe('audit_unavailable');
+    const stored = storedTicket(ticket);
+    expect(stored.status).toBe('waiting');
+    expect(stored).not.toHaveProperty('inspection');
+  });
+
+  it('refuses to open a confidential ticket the audit chain cannot record', () => {
+    vi.spyOn(auditChain, 'record').mockImplementation(() => {
+      throw new Error('audit disk full');
+    });
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    expect(() =>
+      openInspectionTicket({ tier: 'confidential', tenant_slug: 'acme' }, { ttlMs: 60_000 })
+    ).toThrow(/AUDIT_UNAVAILABLE/);
+    stderr.mockRestore();
+  });
+
+  it('still delivers a personal hand-off when the audit write fails', async () => {
+    const ticket = open({ tier: 'personal' });
+    vi.spyOn(auditChain, 'record').mockImplementation(() => {
+      throw new Error('audit disk full');
+    });
+    const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
+    expect((await submit(ticket)).ok).toBe(true);
+    stderr.mockRestore();
+  });
+
+  it('sweeps expired tickets', async () => {
+    const stale = open({ tier: 'personal' }, 1_000, new Date(Date.now() - 10_000));
+    const live = open({ tier: 'personal' });
+    expect((await submit(live)).ok).toBe(true);
+    expect(asConcierge(() => safeExistsSync(ticketFile(stale)))).toBe(false);
+  });
+
+  it('returns an inspection that lands at the CLI deadline instead of discarding it', async () => {
+    const ticket = open({ tier: 'personal' });
+    let submitted = false;
+    const clock = () => {
+      if (!submitted) {
+        submitted = true;
+        // The host delivers between the CLI's last read and its deadline check.
+        submitInspectionToWaitingTicket(inspection(), { pairingCode: ticket.pairing_code });
+      }
+      return new Date(Date.parse(ticket.expires_at) + 1);
+    };
+    const received = await awaitInspectionTicket(ticket, { now: clock, pollMs: 50 });
+    expect(received.url).toBe('https://example.com/login');
+    expect(asConcierge(() => safeExistsSync(ticketFile(ticket)))).toBe(false);
+  });
+
+  it('times out and removes the ticket when nothing arrives', async () => {
+    const ticket = open({ tier: 'personal' });
+    await expect(
+      awaitInspectionTicket(ticket, { now: () => new Date(Date.parse(ticket.expires_at) + 1) })
+    ).rejects.toMatchObject({ code: 'timeout' });
+    expect(asConcierge(() => safeExistsSync(ticketFile(ticket)))).toBe(false);
   });
 });
 
 describe('inspect_browser_page --mode extension (end to end through the host)', () => {
-  it('receives the inspection the extension submits via the native host', async () => {
+  it('receives the inspection the extension submits with the printed pairing code', async () => {
     const { main } = await import('./inspect_browser_page.js');
     const dir = resolveStorageFloor(
       'staging',
@@ -205,15 +330,18 @@ describe('inspect_browser_page --mode extension (end to end through the host)', 
     const pending = main(['--mode', 'extension', '--timeout', '10000', '--json'], print, {
       nodeVersion: 'v24.1.0',
     });
-    // Once the CLI's ticket exists, submit as the extension would.
-    let reply: Reply = { ok: false };
+    // Read the pairing code the CLI printed, then submit as the extension would.
+    let code = '';
     await vi.waitFor(
-      async () => {
-        reply = (await handle({ type: 'submit_inspection', inspection: inspection() })) as Reply;
-        expect(reply.ok).toBe(true);
+      () => {
+        const printed = stderr.mock.calls.map((call) => String(call[0])).join('');
+        code = printed.match(/Pairing code: ([A-Z0-9]{6})/)?.[1] ?? '';
+        expect(code).not.toBe('');
       },
-      { timeout: 5_000, interval: 50 }
+      { timeout: 5_000, interval: 20 }
     );
+    const reply = await submit(code);
+    expect(reply.ok).toBe(true);
     const report = await pending;
     expect(report).toMatchObject({ mode: 'extension', url: 'https://example.com/login' });
     expect(print).toHaveBeenCalledWith(expect.stringContaining('"mode": "extension"'));

@@ -7,8 +7,8 @@
  *
  * Usage:
  *   pnpm kyberion browser inspect <url> [--mode browser|fetch] [--locale ja|en] [--headed] [--json]
- *   pnpm kyberion browser inspect --mode extension [--tier personal|confidential|public] [--tenant <slug>]
- *     (the extension hands the inspection over through the native host — no network listener)
+ *   pnpm kyberion browser inspect --mode extension [--tier personal|confidential|public] [--tenant <slug>] [--origin <origin>]
+ *     (prints a pairing code; the extension hands the inspection over through the native host — no network listener)
  */
 
 import { createStandardYargs } from '@agent/core/cli-utils';
@@ -452,6 +452,8 @@ export async function inspectWithCdp(
 export interface ExtensionInspectionWaitOptions {
   scope: InspectionHandoffScope;
   timeoutMs: number;
+  /** Optional origin pin enforced by the native host. */
+  origin?: string;
   print?: (msg: string) => void;
 }
 
@@ -482,17 +484,33 @@ export async function defaultWaitForExtensionInspection(
   options: ExtensionInspectionWaitOptions
 ): Promise<PageInspectionResult> {
   const { scope, timeoutMs, print = writeOperatorGuidance } = options;
-  const ticket = openInspectionTicket(scope, { ttlMs: timeoutMs });
+  const { origin } = options;
+  let ticket: ReturnType<typeof openInspectionTicket>;
+  try {
+    ticket = openInspectionTicket(scope, {
+      ttlMs: timeoutMs,
+      ...(origin ? { allowedOrigin: origin } : {}),
+    });
+  } catch (err) {
+    if (err instanceof InspectionHandoffError && err.code === 'invalid_input') {
+      throw new ScriptExitError(1, err.message);
+    }
+    throw err;
+  }
   const scopeLabel = `${scope.tier}${scope.tenant_slug ? `/${scope.tenant_slug}` : ''}`;
   print(
     `📡 [EXTENSION MODE] Waiting up to ${Math.round(timeoutMs / 1000)}s for the Chrome extension ` +
-      `(native host com.kyberion.browser_bridge, scope ${scopeLabel})\n` +
+      `(native host com.kyberion.browser_bridge, scope ${scopeLabel}` +
+      `${origin ? `, origin ${origin}` : ''})\n` +
+      `   Pairing code: ${ticket.pairing_code}\n` +
       `   1. Open Chrome with the target page\n` +
       `   2. Click Kyberion Browser Bridge icon -> Open Side Panel\n` +
       // i18n-exempt: Chrome Extension button label literal for operator guidance
       `   3. Go to "Live" tab -> Click "このタブを接続"\n` +
-      // i18n-exempt: Chrome Extension button labels literal for operator guidance
-      `   4. In "PAGE DISCOVERY & INSPECTION" -> Click "ページ構造を解析" -> Click "Kyberion CLIへ送信"`
+      // i18n-exempt: Chrome Extension button label literal for operator guidance
+      `   4. In "PAGE DISCOVERY & INSPECTION" -> Click "ページ構造を解析"\n` +
+      // i18n-exempt: Chrome Extension button label literal for operator guidance
+      `   5. Enter the pairing code ${ticket.pairing_code} -> Click "Kyberion CLIへ送信"`
   );
   try {
     return toExtensionReport(await awaitInspectionTicket(ticket));
@@ -508,6 +526,7 @@ export async function inspectWithExtension(
   options: {
     tier?: string;
     tenant?: string;
+    origin?: string;
     timeoutMs?: number;
   },
   deps: InspectBrowserPageDeps = {}
@@ -523,7 +542,7 @@ export async function inspectWithExtension(
     throw new ScriptExitError(1, err instanceof Error ? err.message : String(err));
   }
   const waiter = deps.waitForExtensionInspection ?? defaultWaitForExtensionInspection;
-  return waiter({ scope, timeoutMs });
+  return waiter({ scope, timeoutMs, ...(options.origin ? { origin: options.origin } : {}) });
 }
 
 export async function main(
@@ -567,6 +586,11 @@ export async function main(
     .option('tenant', {
       type: 'string',
       description: 'Extension mode: tenant slug (required for --tier confidential)',
+    })
+    .option('origin', {
+      type: 'string',
+      description:
+        'Extension mode: only accept an inspection of this origin (e.g. https://example.com)',
     })
     .option('wait', {
       type: 'number',
@@ -617,6 +641,7 @@ export async function main(
       {
         tier: String(argv.tier || 'personal'),
         tenant: argv.tenant ? String(argv.tenant) : undefined,
+        origin: argv.origin ? String(argv.origin) : undefined,
         timeoutMs: Number(argv.timeout || 60000),
       },
       deps

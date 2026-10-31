@@ -49,7 +49,7 @@ import { abortableAudioChunks } from '../meeting/meeting-session-types.js';
 export interface ChromeExtensionMeetingDriverOptions {
   /** Loopback port the driver listens on and the extension connects to. */
   wsPort?: number;
-  /** Loopback host. Default 127.0.0.1. */
+  /** Loopback host (127.0.0.0/8, ::1 or localhost; anything else is refused). Default 127.0.0.1. */
   wsHost?: string;
   /** Seconds to wait for the extension to connect + report the join. */
   joinTimeoutSec?: number;
@@ -63,6 +63,22 @@ export interface ChromeExtensionMeetingDriverOptions {
 
 const DEFAULT_PORT = 8779;
 const DEFAULT_HOST = '127.0.0.1';
+
+/**
+ * The extension control channel is loopback-only (Browser Bridge spec §4.2
+ * exception): binding any other interface would expose the join/mute/leave
+ * control socket to the network.
+ */
+export function isLoopbackWsHost(host: string): boolean {
+  const value = host.trim().toLowerCase();
+  if (value === 'localhost' || value === '::1' || value === '[::1]') return true;
+  const octets = value.split('.');
+  return (
+    octets.length === 4 &&
+    octets[0] === '127' &&
+    octets.every((octet) => /^\d{1,3}$/u.test(octet) && Number(octet) <= 255)
+  );
+}
 const logger = createLogger('meet-ext');
 const AI_PROVIDERS = new Set(['chrome-summarizer', 'chrome-prompt']);
 const AI_MODES = new Set(['full', 'rolling']);
@@ -160,6 +176,12 @@ export class ChromeExtensionMeetingJoinDriver implements MeetingJoinDriver {
   async join(target: MeetingTarget, bus: AudioBus): Promise<MeetingSession> {
     const port = this.options.wsPort ?? DEFAULT_PORT;
     const host = this.options.wsHost ?? DEFAULT_HOST;
+    if (!isLoopbackWsHost(host)) {
+      throw new Error(
+        `[MEET_EXTENSION_WS_HOST_NOT_LOOPBACK] chrome-extension driver host '${host}' is not a loopback address — ` +
+          'the control channel only binds 127.0.0.0/8, ::1 or localhost | next: drop --extension-ws-host or pass 127.0.0.1'
+      );
+    }
     const joinTimeoutMs = (this.options.joinTimeoutSec ?? 120) * 1000;
     const startMuted = this.options.startMuted !== false;
     const cameraOff = this.options.cameraOff !== false;

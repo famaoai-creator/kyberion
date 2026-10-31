@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StubAudioBus } from '../voice/audio-bus.js';
 import {
   ChromeExtensionMeetingJoinDriver,
+  isLoopbackWsHost,
   parseChromeExtensionEvent,
 } from './chrome-extension-meeting-driver.js';
 import { pathResolver } from '../path-resolver.js';
@@ -69,6 +70,30 @@ describe('ChromeExtensionMeetingJoinDriver on-device AI events', () => {
     expect(parseChromeExtensionEvent('{"event":"hello"}')).toMatchObject({ event: 'hello' });
     expect(parseChromeExtensionEvent('[]')).toBeUndefined();
     expect(parseChromeExtensionEvent('{"event":"hello","meta":{"__proto__":{}}}')).toBeUndefined();
+  });
+
+  it('accepts only loopback control hosts', () => {
+    for (const host of ['127.0.0.1', '127.1.2.3', 'localhost', '::1', '[::1]']) {
+      expect(isLoopbackWsHost(host), host).toBe(true);
+    }
+    for (const host of ['0.0.0.0', '192.168.1.10', '::', 'example.com', '127.0.0.256', '']) {
+      expect(isLoopbackWsHost(host), host).toBe(false);
+    }
+  });
+
+  it('refuses to bind the control channel on a non-loopback host', async () => {
+    const driver = new ChromeExtensionMeetingJoinDriver({
+      wsPort: WS_PORT,
+      wsHost: '0.0.0.0',
+      joinTimeoutSec: 1,
+      wsAuthToken: AUTH_TOKEN,
+    });
+    await expect(
+      driver.join(
+        { url: 'https://meet.google.com/abc-defg-hij', platform: 'meet' },
+        new StubAudioBus()
+      )
+    ).rejects.toThrow(/MEET_EXTENSION_WS_HOST_NOT_LOOPBACK/);
   });
 
   it('requires the pre-shared extension credential before opening the control session', async () => {

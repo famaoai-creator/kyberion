@@ -1767,11 +1767,12 @@ describe('Browser Bridge page inspection hand-off (Native Messaging only)', () =
           }
         : defaultNative(payload);
     await harness.send({ type: 'bridge:connect-active-tab' });
-    const sent = await harness.send({ type: 'bridge:submit-inspection' });
+    const sent = await harness.send({ type: 'bridge:submit-inspection', pairingCode: 'abc-234' });
 
     expect(sent.ok).toBe(true);
     expect(sent.submitResult).toMatchObject({ ticket_id: 'BIH-1', scope: { tier: 'personal' } });
     const call = harness.nativeCalls.find((entry) => entry.type === 'submit_inspection');
+    expect(call.pairing_code).toBe('ABC234');
     expect(call.inspection).toMatchObject({
       url: 'https://example.com/start',
       origin: 'https://example.com',
@@ -1789,7 +1790,7 @@ describe('Browser Bridge page inspection hand-off (Native Messaging only)', () =
         ? { ok: false, code: 'no_waiting_cli', error: 'none' }
         : defaultNative(payload);
     await harness.send({ type: 'bridge:connect-active-tab' });
-    const sent = await harness.send({ type: 'bridge:submit-inspection' });
+    const sent = await harness.send({ type: 'bridge:submit-inspection', pairingCode: 'abc-234' });
     expect(sent.ok).toBe(false);
     expect(sent.error).toContain('pnpm kyberion browser inspect --mode extension');
   });
@@ -1798,9 +1799,40 @@ describe('Browser Bridge page inspection hand-off (Native Messaging only)', () =
     const harness = await createHarness();
     harness.hooks.tabMessage = inspectHook();
     await harness.send({ type: 'bridge:connect-active-tab' });
-    const sent = await harness.send({ type: 'bridge:submit-inspection' }, { tab: harness.tab });
+    const sent = await harness.send(
+      { type: 'bridge:submit-inspection', pairingCode: 'ABC234' },
+      { tab: harness.tab }
+    );
     expect(sent.ok).toBe(false);
     expect(harness.nativeCalls.some((entry) => entry.type === 'submit_inspection')).toBe(false);
+  });
+
+  it('requires a pairing code and a connected tab before calling the host', async () => {
+    const harness = await createHarness();
+    harness.hooks.tabMessage = inspectHook();
+    const unconnected = await harness.send({
+      type: 'bridge:submit-inspection',
+      pairingCode: 'ABC234',
+    });
+    expect(unconnected.ok).toBe(false);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    const noCode = await harness.send({ type: 'bridge:submit-inspection' });
+    expect(noCode.ok).toBe(false);
+    expect(noCode.error).toContain('ペアリングコード');
+    expect(harness.nativeCalls.some((entry) => entry.type === 'submit_inspection')).toBe(false);
+  });
+
+  it('explains a pairing mismatch from the host', async () => {
+    const harness = await createHarness();
+    harness.hooks.tabMessage = inspectHook();
+    harness.hooks.native = (payload: { type: string }) =>
+      payload.type === 'submit_inspection'
+        ? { ok: false, code: 'pairing_mismatch', error: 'x' }
+        : defaultNative(payload);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    const sent = await harness.send({ type: 'bridge:submit-inspection', pairingCode: 'ABC234' });
+    expect(sent.ok).toBe(false);
+    expect(sent.error).toContain('一致しません');
   });
 
   it('has no loopback HTTP hand-off left in the side panel', () => {

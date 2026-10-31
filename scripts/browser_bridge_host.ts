@@ -1355,8 +1355,9 @@ async function handleSendPage(message: any): Promise<HostResponse> {
 /**
  * submit_inspection: the side panel hands a page inspection to a waiting
  * `pnpm kyberion browser inspect --mode extension`. The payload is validated,
- * bounded and re-redacted here, then written into the newest waiting ticket
- * on that CLI's tier/tenant staging partition (scripts/lib/browser-inspection-handoff.ts).
+ * bounded and re-redacted here, then written only into the waiting ticket whose
+ * pairing code (printed by the CLI, typed by the operator) matches — on that
+ * CLI's tier/tenant staging partition (scripts/lib/browser-inspection-handoff.ts).
  * Replaces the former loopback HTTP listener (spec §4.2: Native Messaging only).
  */
 /** Self-authored hand-off errors carry no paths or stack; safe for the wire. */
@@ -1366,7 +1367,9 @@ function describeInspectionError(err: InspectionHandoffError): string {
 
 function handleSubmitInspection(message: any): HostResponse {
   try {
-    const delivered = submitInspectionToWaitingTicket(message.inspection);
+    const delivered = submitInspectionToWaitingTicket(message.inspection, {
+      pairingCode: message.pairing_code,
+    });
     const { inspection } = delivered;
     return {
       ok: true,
