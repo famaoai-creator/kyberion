@@ -4,8 +4,9 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   buildReachabilityReport,
-  normalizeReachabilityReport,
+  evaluateReachabilityGate,
   type RoleAssumptionReachabilityReport,
+  type RoleAssumptionViolation,
 } from './analyze_role_assumptions.js';
 
 /**
@@ -643,28 +644,34 @@ describe('RN-02 role assumption reachability analysis', () => {
     ]);
   });
 
-  it('compares reports by content, not by layout', () => {
-    expect(normalizeReachabilityReport('{\n  "a": [1, 2]\n}\n')).toBe(
-      normalizeReachabilityReport('{"a":[\n1,\n2\n]}')
+  it('fails the gate when the analysed code reaches a role the policy does not grant (RN-03)', () => {
+    const policyFile = path.join(
+      FIXTURE_ROOT,
+      'knowledge/product/governance/role-assumption-policy.json'
     );
-  });
-
-  it('ignores example paths but not roles in the staleness comparison (S7)', () => {
-    const report = (path: string[], roles: string[]) =>
-      JSON.stringify({
-        system_roles: {
-          x: {
-            reachable_roles: Object.fromEntries(
-              roles.map((role) => [role, { example_path: path }])
-            ),
-          },
-        },
-      });
-    expect(normalizeReachabilityReport(report(['a#f', 'b#g'], ['r1']))).toBe(
-      normalizeReachabilityReport(report(['c#h'], ['r1']))
-    );
-    expect(normalizeReachabilityReport(report(['a#f'], ['r1']))).not.toBe(
-      normalizeReachabilityReport(report(['a#f'], ['r1', 'r2']))
-    );
+    const original = FILES['knowledge/product/governance/role-assumption-policy.json']!;
+    const notGranted = (violations: RoleAssumptionViolation[]) =>
+      violations
+        .filter((violation) => violation.rule === 'reachable-role-not-granted')
+        .filter((violation) => violation.system_role === 'literal_surface')
+        .map((violation) => violation.message);
+    // Granted as committed: literal_surface reaches role_literal and shared_writer.
+    expect(notGranted(evaluateReachabilityGate(FIXTURE_ROOT).violations)).toEqual([]);
+    // Revoke role_literal: the in-memory analysis must now report it.
+    const revoked = JSON.parse(original) as {
+      system_roles: Record<string, { may_assume: string[] }>;
+    };
+    revoked.system_roles.literal_surface!.may_assume = ['role_extra'];
+    safeWriteFile(policyFile, `${JSON.stringify(revoked)}\n`);
+    try {
+      const messages = notGranted(evaluateReachabilityGate(FIXTURE_ROOT).violations);
+      expect(messages).toEqual([
+        expect.stringMatching(
+          /^literal_surface can assume role_literal but the policy does not grant it — via apps\/literal\.ts/
+        ),
+      ]);
+    } finally {
+      safeWriteFile(policyFile, `${original}\n`);
+    }
   });
 });

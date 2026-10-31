@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { pathResolver, safeReadFile } from '@agent/core';
 import {
   buildVitestArgs,
   buildVitestEnv,
+  gateCoveredTestFiles,
   parseTestSuiteArgs,
   TEST_SUITES,
   runTestSuite,
@@ -51,6 +53,46 @@ describe('test suite dispatcher', () => {
       'scripts/',
       '--shard=1/3',
     ]);
+  });
+
+  it('excludes only pr-gate vitest files under --skip-gate-tests', () => {
+    expect(
+      parseTestSuiteArgs(['--suite', 'integration', '--skip-gate-tests', '--shard=1/2'])
+    ).toEqual({ suite: 'integration', vitestArgs: ['--shard=1/2'], skipGateTests: true });
+    expect(parseTestSuiteArgs(['--suite', 'integration'])).not.toHaveProperty('skipGateTests');
+    const vitest = ['node_modules/vitest/vitest.mjs', 'run'];
+    expect(
+      gateCoveredTestFiles({
+        gates: [
+          {
+            id: 'pr-tests',
+            scope: 'pr',
+            args: [...vitest, '--maxWorkers=2', 'tests/b.test.ts', 'tests/a.test.ts'],
+          },
+          // full gates do not run on pull requests' pr-gates job: never excluded.
+          { id: 'full-tests', scope: 'full', args: [...vitest, 'tests/full.test.ts'] },
+          { id: 'not-vitest', scope: 'pr', args: ['scripts/check.ts', 'tests/c.test.ts'] },
+        ],
+      })
+    ).toEqual(['tests/a.test.ts', 'tests/b.test.ts']);
+  });
+
+  it('skips the real registration-tests files in the CI integration suite', () => {
+    const manifest = JSON.parse(
+      String(
+        safeReadFile(pathResolver.rootResolve('knowledge/product/governance/ci-gates.json'), {
+          encoding: 'utf8',
+        })
+      )
+    );
+    const covered = gateCoveredTestFiles(manifest);
+    expect(covered).toContain('tests/foundation-io-boundary.test.ts');
+    expect(covered).toContain('tests/runtime-child-process-boundary.test.ts');
+    const ci = String(
+      safeReadFile(pathResolver.rootResolve('.github/workflows/ci.yml'), { encoding: 'utf8' })
+    );
+    expect(ci).toContain('pnpm test -- --suite integration --skip-gate-tests --shard=1/2');
+    expect(ci).toContain('pnpm test -- --suite integration --skip-gate-tests --shard=2/2');
   });
 
   it('rejects missing and unknown suite names', () => {

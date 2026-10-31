@@ -402,7 +402,7 @@ describe('RA-02 role assumption policy', () => {
   });
 
   it('grants only the broad roles the reachability report evidences (RN-03)', () => {
-    // docs/developer/role-assumption-reachability.json: unreachable and never traced.
+    // RN-02 analysis (scripts/analyze_role_assumptions.ts --write-report): unreachable and never traced.
     expect(isRoleAssumptionAllowed('oauth_callback_surface', 'sovereign_concierge')).toBe(true);
     expect(isRoleAssumptionAllowed('oauth_callback_surface', 'mission_controller')).toBe(false);
     expect(isRoleAssumptionAllowed('oauth_callback_surface', 'ecosystem_architect')).toBe(false);
