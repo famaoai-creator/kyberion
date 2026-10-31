@@ -13,7 +13,9 @@ import {
   assertReadableOfficeBytes,
   DELIMITED_TABLE_MAX_ROWS,
   inferDocumentFormat,
+  isUnmappableTextLayer,
   readDocument,
+  unmappableTextRatio,
 } from './document-reader.js';
 import { generateNativePdf } from './native-pdf-engine/engine.js';
 import { pathResolver } from '../path-resolver.js';
@@ -277,6 +279,19 @@ describe('document-reader', () => {
     expect(result.markdown).toContain('| Revenue | 41,593,000 |');
     expect(result.markdown).toContain('| Delta | ▲28,957 |');
     expect(result.markdown).toContain('| Raw | 0.3324257389 |');
+  });
+
+  it('flags raw-byte mojibake as an unmappable text layer but passes clean prose', () => {
+    // What a CID font without /ToUnicode decodes to: control bytes + Latin-1.
+    const mojibake = Array.from({ length: 40 }, (_, i) => String.fromCharCode((i * 37) % 256)).join(
+      ''
+    );
+    expect(isUnmappableTextLayer(mojibake)).toBe(true);
+    expect(unmappableTextRatio(mojibake).control).toBeGreaterThan(0.02);
+
+    expect(isUnmappableTextLayer('一般に公開されているAndroidアプリを解析し、')).toBe(false);
+    expect(isUnmappableTextLayer('Quarterly report — revenu prévu, naïve façade.')).toBe(false);
+    expect(isUnmappableTextLayer('')).toBe(false);
   });
 
   it('reads a pdf from a repository path without surfacing the author', async () => {
