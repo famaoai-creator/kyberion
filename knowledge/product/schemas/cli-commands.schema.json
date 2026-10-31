@@ -60,6 +60,13 @@
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/commandScope" }
+        },
+        "effect": { "$ref": "#/$defs/commandEffect" },
+        "prerequisites": {
+          "description": "R06: documented prerequisites for the command's real work. Informational only — execution eligibility stays a runtime authority decision; this entry grants nothing.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/prerequisite" }
         }
       }
     },
@@ -96,6 +103,34 @@
       "description": "Task grouping for kyberion --help; dev is hidden unless --all.",
       "type": "string",
       "enum": ["start", "inspect", "operate", "dev"]
+    },
+    "commandEffect": {
+      "description": "R06: what invoking the command does — readiness = displays readiness without opening the service, connection = opens a live service connection, state_change = mutates service or runtime state.",
+      "type": "string",
+      "enum": ["readiness", "connection", "state_change"]
+    },
+    "prerequisiteKind": {
+      "description": "R06: prerequisite categories shown by --help — documentation only, never an authority grant.",
+      "type": "string",
+      "enum": ["local_backend", "trusted_claim", "task_credentials", "service_setup", "os_consent"]
+    },
+    "prerequisite": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/prerequisiteKind" },
+        "via": {
+          "description": "A registered command that satisfies or diagnoses this prerequisite; must name a real routable command.",
+          "type": "string",
+          "minLength": 1
+        },
+        "when": {
+          "description": "always = required to run this command; live_ops = only for the live/credentialed work on this surface (the command itself stays a readiness view).",
+          "type": "string",
+          "enum": ["always", "live_ops"]
+        }
+      }
     },
     "deprecatedScriptAlias": {
       "type": "object",
@@ -156,6 +191,13 @@
         "native_help": {
           "description": "The target handles --help/-h itself before any side effect; otherwise the router answers --help from this registry.",
           "type": "boolean"
+        },
+        "effect": { "$ref": "#/$defs/commandEffect" },
+        "prerequisites": {
+          "description": "R06: documented prerequisites for the command's real work. Informational only — execution eligibility stays a runtime authority decision; this entry grants nothing.",
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/prerequisite" }
         },
         "same_target_as": {
           "description": "Governed command id this '<noun> default' entry shares a name with because it is the same target.",
