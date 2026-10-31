@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { afterAll, describe, expect, it, vi } from 'vitest';
 vi.mock('../customer-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../customer-resolver.js')>();
   const { customerRootWithSodOverlay } =
@@ -25,6 +26,7 @@ import { pathResolver } from '../path-resolver.js';
 import {
   assertProjectTrustApproval,
   createProjectTrustApprovalRequest,
+  parseDelegatedTrustScope,
   PROJECT_TRUST_APPROVAL_CHANNEL,
 } from './project-trust.js';
 
@@ -169,5 +171,94 @@ describe('project trust approvals', () => {
         safeRmSync(directoryPath, { recursive: true, force: true });
       });
     }
+  });
+});
+
+describe('parseDelegatedTrustScope', () => {
+  it('maps the flag spellings to charter scopes', () => {
+    expect(parseDelegatedTrustScope('person')).toEqual({ kind: 'person' });
+    expect(parseDelegatedTrustScope(true)).toEqual({ kind: 'person' });
+    expect(parseDelegatedTrustScope('')).toEqual({ kind: 'person' });
+    expect(parseDelegatedTrustScope('tenant:acme')).toEqual({
+      kind: 'organization',
+      tenant_slug: 'acme',
+    });
+  });
+
+  it('rejects unknown scope spellings', () => {
+    for (const bad of ['acme', 'org:acme', 'tenant:', 42]) {
+      expect(() => parseDelegatedTrustScope(bad)).toThrow('DELEGATED_TRUST_SCOPE');
+    }
+  });
+});
+
+describe('evaluateProjectTrustDelegation', () => {
+  const NOW = new Date('2026-10-31T09:00:00.000Z');
+  let root = '';
+
+  afterAll(() => {
+    if (root) safeRmSync(root, { recursive: true, force: true });
+  });
+
+  it('lets a charter delegating pipeline_trust_grant stand in for approval', async () => {
+    const { acceptCharter } = await import('../governance/accountability-charter-registry.js');
+    const { humanActor } = await import('../actor.js');
+    const { evaluateProjectTrustDelegation } = await import('./project-trust.js');
+    const { safeWriteFile } = await import('../secure-io.js');
+    root = pathResolver.sharedTmp(`pt-delegation-${randomUUID()}`);
+    acceptCharter(
+      {
+        draft: {
+          charter_id: 'chr-trust-1',
+          scope: { kind: 'organization', tenant_slug: 'acme' },
+          accountable: {
+            actor: 'user:owner',
+            authority_basis: { kind: 'officer', evidence_ref: 'registry-extract' },
+            expires_at: '2026-12-31T00:00:00.000Z',
+            deputies: [],
+          },
+          envelope: {
+            money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
+            data_tier: { read: [], write: [] },
+            external_effects: {},
+            irreversible: 'named_actions_only',
+            irreversible_named_actions: [],
+            delegated_decisions: { pipeline_trust_grant: 'allow' },
+          },
+          appetite: {
+            max_loss_per_incident: 0,
+            reputational_class_max: 'B',
+            blast_radius_max: { recipients: 0, systems: 1 },
+            tripwires: [],
+          },
+        },
+        statement: 'I am accountable.',
+        acceptedBy: humanActor('owner'),
+        validation: { holder_role: 'owner' },
+        now: NOW,
+      },
+      { rootDir: root }
+    );
+    const adfPath = pathResolver.sharedTmp(`pt-delegation-adf-${randomUUID()}.json`);
+    safeWriteFile(adfPath, JSON.stringify({ action: 'pipeline', steps: [] }));
+    const result = evaluateProjectTrustDelegation({
+      inputPath: adfPath,
+      scope: { kind: 'organization', tenant_slug: 'acme' },
+      agentId: 'pipeline-cli',
+      now: NOW,
+      pathOptions: { rootDir: root },
+    });
+    expect(result).toMatchObject({ delegated: true, charterId: 'chr-trust-1' });
+    // A scope whose charter does not name the decision type falls back closed.
+    expect(
+      evaluateProjectTrustDelegation({
+        inputPath: adfPath,
+        scope: { kind: 'organization', tenant_slug: 'other' },
+        agentId: 'pipeline-cli',
+        now: NOW,
+        pathOptions: { rootDir: root },
+      })
+    ).toMatchObject({ delegated: false });
+    safeRmSync(adfPath, { force: true });
   });
 });

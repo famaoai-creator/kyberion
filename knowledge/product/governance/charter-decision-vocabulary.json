@@ -5,7 +5,10 @@
   "decisions": [
     {
       "decision_type": "operational_spend",
-      "label": { "ja": "業務上の支出", "en": "Operational spend" },
+      "label": {
+        "ja": "業務上の支出",
+        "en": "Operational spend"
+      },
       "action_class": "payment",
       "reversible": false,
       "amount_semantics": "spend",
@@ -13,7 +16,10 @@
     },
     {
       "decision_type": "contract_signature",
-      "label": { "ja": "契約の締結", "en": "Contract signature" },
+      "label": {
+        "ja": "契約の締結",
+        "en": "Contract signature"
+      },
       "action_class": "sign_contract",
       "reversible": false,
       "amount_semantics": "spend",
@@ -21,7 +27,10 @@
     },
     {
       "decision_type": "headcount_expansion",
-      "label": { "ja": "採用(内定の提示)", "en": "Hiring (extending an offer)" },
+      "label": {
+        "ja": "採用(内定の提示)",
+        "en": "Hiring (extending an offer)"
+      },
       "action_class": "sign_contract",
       "reversible": false,
       "amount_semantics": "exposure",
@@ -31,7 +40,10 @@
     },
     {
       "decision_type": "quote_issuance",
-      "label": { "ja": "見積の提示", "en": "Issuing a quote" },
+      "label": {
+        "ja": "見積の提示",
+        "en": "Issuing a quote"
+      },
       "action_class": "sign_contract",
       "reversible": false,
       "amount_semantics": "exposure",
@@ -41,7 +53,10 @@
     },
     {
       "decision_type": "expense_reimbursement",
-      "label": { "ja": "経費の精算", "en": "Expense reimbursement" },
+      "label": {
+        "ja": "経費の精算",
+        "en": "Expense reimbursement"
+      },
       "action_class": "payment",
       "reversible": false,
       "amount_semantics": "spend",
@@ -49,7 +64,10 @@
     },
     {
       "decision_type": "vendor_invoice_payment",
-      "label": { "ja": "請求書の支払い", "en": "Paying a vendor invoice" },
+      "label": {
+        "ja": "請求書の支払い",
+        "en": "Paying a vendor invoice"
+      },
       "action_class": "payment",
       "reversible": false,
       "amount_semantics": "spend",
@@ -57,7 +75,10 @@
     },
     {
       "decision_type": "meeting_scheduling",
-      "label": { "ja": "社外との日程の確定", "en": "Confirming a meeting with an outside party" },
+      "label": {
+        "ja": "社外との日程の確定",
+        "en": "Confirming a meeting with an outside party"
+      },
       "action_class": "send_message_external",
       "reversible": false,
       "amount_semantics": "none",
@@ -67,7 +88,10 @@
     },
     {
       "decision_type": "external_reply",
-      "label": { "ja": "社外への返信", "en": "Replying to an outside party" },
+      "label": {
+        "ja": "社外への返信",
+        "en": "Replying to an outside party"
+      },
       "action_class": "send_message_external",
       "reversible": false,
       "amount_semantics": "none",
@@ -77,7 +101,10 @@
     },
     {
       "decision_type": "public_announcement",
-      "label": { "ja": "対外的な公開・発表", "en": "Public announcement" },
+      "label": {
+        "ja": "対外的な公開・発表",
+        "en": "Public announcement"
+      },
       "action_class": "publish_public",
       "reversible": false,
       "amount_semantics": "none",
@@ -86,7 +113,10 @@
     },
     {
       "decision_type": "access_grant",
-      "label": { "ja": "社内システムの権限付与", "en": "Granting system access" },
+      "label": {
+        "ja": "社内システムの権限付与",
+        "en": "Granting system access"
+      },
       "action_class": "credential_change",
       "reversible": true,
       "amount_semantics": "none",
@@ -96,7 +126,10 @@
     },
     {
       "decision_type": "internal_task_assignment",
-      "label": { "ja": "社内の作業の割り振り", "en": "Assigning internal work" },
+      "label": {
+        "ja": "社内の作業の割り振り",
+        "en": "Assigning internal work"
+      },
       "action_class": "internal_decision",
       "reversible": true,
       "amount_semantics": "none",
@@ -105,11 +138,27 @@
     },
     {
       "decision_type": "internal_document_approval",
-      "label": { "ja": "社内文書の承認", "en": "Approving an internal document" },
+      "label": {
+        "ja": "社内文書の承認",
+        "en": "Approving an internal document"
+      },
       "action_class": "internal_decision",
       "reversible": true,
       "amount_semantics": "none",
       "reputational_class": "A",
+      "requires_delegation": true
+    },
+    {
+      "decision_type": "pipeline_trust_grant",
+      "label": {
+        "ja": "プロジェクトローカル pipeline への実行信認付与",
+        "en": "Granting run trust to a project-local pipeline"
+      },
+      "action_class": "internal_decision",
+      "reversible": true,
+      "amount_semantics": "none",
+      "reputational_class": "B",
+      "systems": 1,
       "requires_delegation": true
     }
   ]

@@ -492,6 +492,10 @@ export function planWorkInventoryPromotion(
       source.input,
       '--name',
       name,
+      // Promotion requires the verified run id of this exact source — the
+      // operator fills it from the engine's `[PIPELINE] Run ID` line.
+      '--run',
+      '<run-id>',
       '--tenant',
       entry.scope.tenant_slug ?? '<tenant-slug>',
     ],
