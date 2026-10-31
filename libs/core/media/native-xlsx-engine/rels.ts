@@ -30,12 +30,13 @@ ${rels}</Relationships>`;
 }
 
 export function generateSheetRels(
-  extras: Array<{ id: string; type: string; target: string }>
+  extras: Array<{ id: string; type: string; target: string; targetMode?: string }>
 ): string {
   if (extras.length === 0) return '';
   let rels = '';
   for (const ex of extras) {
-    rels += `  <Relationship Id="${ex.id}" Type="${RT}/${ex.type}" Target="${ex.target}"/>\n`;
+    const mode = ex.targetMode ? ` TargetMode="${ex.targetMode}"` : '';
+    rels += `  <Relationship Id="${ex.id}" Type="${RT}/${ex.type}" Target="${ex.target}"${mode}/>\n`;
   }
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <Relationships xmlns="${NS}">

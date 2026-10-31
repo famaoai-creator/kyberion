@@ -2928,6 +2928,10 @@
       "types": "./dist/media/native-tts.d.ts",
       "default": "./dist/media/native-tts.js"
     },
+    "./media/native-xlsx-engine/comments": {
+      "types": "./dist/media/native-xlsx-engine/comments.d.ts",
+      "default": "./dist/media/native-xlsx-engine/comments.js"
+    },
     "./media/native-xlsx-engine/content-types": {
       "types": "./dist/media/native-xlsx-engine/content-types.d.ts",
       "default": "./dist/media/native-xlsx-engine/content-types.js"
