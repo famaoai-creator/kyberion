@@ -3,7 +3,8 @@
  * STT backend, or ffmpeg is touched — every provider call is recorded.
  */
 import * as path from 'node:path';
-import { safeWriteFile } from '@agent/core/secure-io';
+import { pathResolver } from '@agent/core/path-resolver';
+import { safeLstat, safeWriteFile } from '@agent/core/secure-io';
 import type { SpeechToTextBridge } from '@agent/core/voice/speech-to-text-bridge';
 import type { MediaTool, PerceptionDeps } from './perception.js';
 
@@ -14,6 +15,13 @@ export interface FakeDepsOptions {
   ffprobe?: string;
   frameCount?: number;
   missingFfmpeg?: boolean;
+  /**
+   * Reproduce the governed bridges' guarded reads: the real ocrImage /
+   * describeImage lstat and read the image before inference, so the fake does
+   * the same safeLstat — under a protected tier it throws ROLE_VIOLATION
+   * unless the caller ran it inside the tenant-bound media role.
+   */
+  guardedReads?: boolean;
 }
 
 export interface FakeDeps extends PerceptionDeps {
@@ -29,6 +37,7 @@ export function createFakeDeps(options: FakeDepsOptions = {}): FakeDeps {
     ocrPaths,
     async ocr(request) {
       ocrPaths.push(request.path);
+      if (options.guardedReads) safeLstat(pathResolver.rootResolve(request.path));
       if (options.ocrError) throw new Error(options.ocrError);
       return {
         status: 'succeeded',
@@ -39,7 +48,8 @@ export function createFakeDeps(options: FakeDepsOptions = {}): FakeDeps {
         providerDataEgress: request.mode === 'local_only' ? 'none' : 'external',
       };
     },
-    async describe() {
+    async describe(request) {
+      if (options.guardedReads) safeLstat(pathResolver.rootResolve(request.path));
       return {
         status: 'succeeded',
         provider: 'fake_describer',
@@ -67,6 +77,27 @@ export function createFakeDeps(options: FakeDepsOptions = {}): FakeDeps {
         safeWriteFile(output, Buffer.from('RIFF'));
       }
       return '';
+    },
+  };
+}
+
+/** A bridge that performs the same guarded read the real adapters do. */
+export function guardedReadBridge(name: string, alsoRead?: string): SpeechToTextBridge {
+  return {
+    name,
+    priority: 10,
+    capabilities: { timestamps: false, granularity: 'none', local_only: true },
+    async transcribe(input) {
+      // The whisperkit/shell adapters lstat the wav (and hash it) inside the
+      // bridge call — reproduce that guarded read exactly.
+      safeLstat(input.audioPath);
+      if (alsoRead) safeLstat(alsoRead);
+      return {
+        text: 'hello world',
+        backend: name,
+        language: input.language ?? 'en',
+        written_to: input.outputPath ?? path.join(path.dirname(input.audioPath), 'x.txt'),
+      };
     },
   };
 }
