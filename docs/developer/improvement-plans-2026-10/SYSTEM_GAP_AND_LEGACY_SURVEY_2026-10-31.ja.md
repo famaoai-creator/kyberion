@@ -71,3 +71,13 @@ main（fd0a5c2a4）を対象に、5 つの観点で読み取りのみの調査�
 ## 進行状況
 
 - 2026-10-31：13 に着手（MSN-LEGACY-CLEANUP-20261031）。低リスクの項目から順に整理する。
+- 2026-10-31：13 の第 1 弾を実施した。
+  - `scripts/refactor/` の shim 22 個を削除した。libs/core の小さな再エクスポートは、すべて参照元があるため残した。
+  - ツール実行環境のパス解決を `tool-runtime-policy.ts` に一本化した。インストール先は runtime 側で、cache 側はダウンロードキャッシュ専用とした。調査時に「二重配置」としたのは誤りで、実際には役割の異なる 2 つの場所だった。
+  - mesh-hub のトピック読み取り側と `mesh-hub-policy.json` を retired に移した。
+  - メッセージング層の対応表と推論バックエンドの方針を `agent-communication-layer-model.md` §9〜10 に追加した。
+- 残り：
+  - mesh の broker / delivery driver は本番の呼び出し元がない。配線するか、retired に移すかを決める。
+  - 推論バックエンドに `maturity` フィールドを追加する（スキーマ変更を伴う）。
+  - `@agent/core` の公開面を縮小する。
+  - tool-runtime-policy の未使用の `cache_root` を整理する。
