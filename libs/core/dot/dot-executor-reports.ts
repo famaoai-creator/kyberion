@@ -13,12 +13,34 @@ import type { DotDispatchDeps } from './dot-dispatch.js';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import {
+  appendJsonLine,
+  readJsonLines,
+  writeJsonLines,
+  parseSafeJsonInput,
+} from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { auditChain } from '../governance/audit-chain.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir, safeWriteFile } from '../secure-io.js';
+import { readTextFile } from '../foundation/text.js';
+import { validateReadPermission, validateWritePermission } from '../tier-guard.js';
+import {
+  projectDotResultRecords,
+  dotResultScopeSchema,
+  parseDotReportMarker,
+  executorReportKey,
+  createDotReportMarker,
+  dotResultDigest,
+} from './dot-result-records.js';
+import { mintDotReportMarkerPermit } from './dot-result-origin.js';
+import {
+  appendConfidentialDotWorkResult,
+  readConfidentialDotResultState,
+  appendConfidentialDotReportMarker,
+} from './dot-result-store.js';
+export { executorReportKey } from './dot-result-records.js';
 import {
   listWorkItems,
   type claimWorkItem,
@@ -43,6 +65,7 @@ import {
 } from './dot-state-paths.js';
 
 const logger = createLogger('dot-executor');
+const minimalResults = new WeakSet<object>();
 
 /** Max characters of a result summary. */
 export const DOT_WORK_RESULT_SUMMARY_MAX = 600;
@@ -168,9 +191,15 @@ export function readDotSignalSnapshot(
 
 /** This dot's recorded work results, oldest first. */
 export function readDotWorkResults(c: DotCharter, deps: DotExecutorDeps = {}): DotWorkResultRow[] {
-  return readJsonLines<DotWorkResultRow>(stateFile(deps, dotStatePath(c, DOT_WORK_RESULTS_FILE)), {
+  const records = readJsonLines<unknown>(stateFile(deps, dotStatePath(c, DOT_WORK_RESULTS_FILE)), {
     onMalformed: 'skip',
-  }).filter((row) => row?.dot_id === c.dot_id && typeof row.work_item_id === 'string');
+  });
+  return (
+    projectDotResultRecords(
+      records,
+      c.scope.tier === 'confidential' ? dotResultScopeSchema.parse(c.scope) : undefined
+    ) as DotWorkResultRow[]
+  ).filter((row) => row?.dot_id === c.dot_id && typeof row.work_item_id === 'string');
 }
 
 export function resultsCacheKey(c: DotCharter): string {
@@ -181,11 +210,39 @@ export function ownRows(c: DotCharter, rows: DotWorkResultRow[]): DotWorkResultR
   return rows.filter((row) => row?.dot_id === c.dot_id && typeof row.work_item_id === 'string');
 }
 
+/** Selection only: every ordinary operation still passes the actual secure I/O boundary. */
+export function ordinaryResultPermission(
+  c: DotCharter,
+  deps: DotExecutorDeps,
+  operation: 'read' | 'append' | 'write'
+): boolean {
+  return withExecutionContext(
+    c.authority.authority_role,
+    () => {
+      const file = stateFile(deps, dotStatePath(c, DOT_WORK_RESULTS_FILE));
+      return operation === 'read'
+        ? validateReadPermission(file, 'read').allowed
+        : validateWritePermission(file, operation).allowed;
+    },
+    undefined,
+    c.scope.tenant_slug,
+    c.scope.organization_id
+  );
+}
+
 export function appendWorkResult(
   c: DotCharter,
   row: DotWorkResultRow,
-  deps: DotExecutorDeps
+  deps: DotExecutorDeps,
+  permit?: unknown
 ): void {
+  if (c.scope.tier === 'confidential' && !ordinaryResultPermission(c, deps, 'append')) {
+    appendConfidentialDotWorkResult(c, row, permit, {
+      rootDir: deps.rootDir ?? pathResolver.rootDir(),
+    });
+    // Confidential authority is always read back from the exact file, never a caller's cache.
+    return;
+  }
   withExecutionContext(
     c.authority.authority_role,
     () => {
@@ -206,23 +263,6 @@ export function workResultLock(file: string): string {
   return `dot-results-${createHash('sha256').update(path.resolve(file)).digest('hex').slice(0, 24)}`;
 }
 
-export function executorReportKey(row: DotWorkResultRow, reportTo: string): string {
-  return `dot-executor:${createHash('sha256')
-    .update(
-      JSON.stringify([
-        row.dot_id,
-        reportTo,
-        row.work_item_id,
-        row.action_ref,
-        row.attempt_id,
-        row.started_at,
-        row.completed_at,
-        row.status,
-      ])
-    )
-    .digest('hex')}`;
-}
-
 /** Mark the existing result atomically, rather than duplicating its tokens/outcomes row. */
 export function markReportEnqueued(
   c: DotCharter,
@@ -231,6 +271,11 @@ export function markReportEnqueued(
   deps: DotExecutorDeps,
   suppressed?: DotWorkResultRow['report_suppressed']
 ): DotWorkResultRow {
+  if (c.scope.tier === 'confidential') {
+    if (!ordinaryResultPermission(c, deps, 'read'))
+      throw new Error('Confidential report body is not ordinarily readable');
+    return markOrdinaryConfidentialReport(c, row, reportTo, deps, suppressed);
+  }
   return withExecutionContext(
     c.authority.authority_role,
     () => {
@@ -255,7 +300,7 @@ export function markReportEnqueued(
         });
         if (!marked)
           throw new Error(`result missing while recording report receipt for ${row.work_item_id}`);
-        safeWriteFile(file, updated.map((entry) => `${JSON.stringify(entry)}\n`).join(''));
+        writeJsonLines(file, updated);
         if (deps.resultsCache?.has(resultsCacheKey(c))) {
           deps.resultsCache.set(resultsCacheKey(c), ownRows(c, updated));
         }
@@ -266,6 +311,191 @@ export function markReportEnqueued(
     c.scope.tenant_slug,
     c.scope.organization_id
   );
+}
+
+/** Preserve immutable modern originals and every unrelated raw line, including legacy mixed journals. */
+function markOrdinaryConfidentialReport(
+  c: DotCharter,
+  row: DotWorkResultRow,
+  reportTo: string,
+  deps: DotExecutorDeps,
+  suppressed?: DotWorkResultRow['report_suppressed']
+): DotWorkResultRow {
+  return withExecutionContext(
+    c.authority.authority_role,
+    () => {
+      const file = stateFile(deps, dotStatePath(c, DOT_WORK_RESULTS_FILE));
+      return withLockSync(workResultLock(file), () => {
+        const raw = readTextFile(file);
+        const lines = raw.match(/[^\r\n]*(?:\r\n|\n|\r|$)/g)!.filter((line) => line.length > 0);
+        const values = lines
+          .filter((line) => line.trim())
+          .map(
+            (line) =>
+              parseSafeJsonInput(line, 'DOT result journal line') as DotWorkResultRow & {
+                kind?: string;
+                result_digest?: string;
+              }
+          );
+        const scope = dotResultScopeSchema.parse(c.scope);
+        const projected = projectDotResultRecords(values, scope) as DotWorkResultRow[];
+        const key = executorReportKey(row, reportTo);
+        const matches = projected.filter(
+          (entry) =>
+            entry.dot_id === c.dot_id &&
+            executorReportKey(entry, entry.report_to_dot_id ?? reportTo) === key
+        );
+        if (matches.length !== 1) throw new Error('Report original missing or ambiguous');
+        const original = matches[0];
+        if (original.report_to_dot_id && original.report_to_dot_id !== reportTo)
+          throw new Error('Report recipient differs');
+        if (
+          (original.reason_code === 'capability_unavailable') !==
+          (suppressed === 'capability_unavailable')
+        )
+          throw new Error('Report suppression differs');
+        if (original.report_enqueued_at) {
+          if (original.report_suppressed !== suppressed)
+            throw new Error('Report suppression differs');
+          return original;
+        }
+        const at = nowOf(deps).toISOString();
+        if (original.attempt_id && original.report_to_dot_id) {
+          if (!validateWritePermission(file, 'append').allowed)
+            throw new Error('Ordinary report append denied');
+          const marker = createDotReportMarker({
+            row: original,
+            scope,
+            reportTo,
+            enqueuedAt: at,
+            ...(suppressed ? { suppressed } : {}),
+          });
+          projectDotResultRecords([...values, marker], scope);
+          appendJsonLine(file, marker, { leadingNewline: Boolean(raw && !/[\r\n]$/.test(raw)) });
+        } else {
+          // Historical rows have no attempt identity; never invent one or elevate a rewrite capability.
+          if (!validateWritePermission(file, 'write').allowed)
+            throw new Error('Ordinary legacy report write denied');
+          const originals = values.filter(
+            (entry) =>
+              !Object.hasOwn(entry, 'kind') &&
+              entry.dot_id === c.dot_id &&
+              executorReportKey(entry, entry.report_to_dot_id ?? reportTo) === key
+          );
+          if (originals.length !== 1)
+            throw new Error('Legacy report original missing or ambiguous');
+          const target = originals[0];
+          if (
+            values.some(
+              (entry) =>
+                entry.kind === 'dot-result-report-marker' &&
+                entry.result_digest === dotResultDigest(target)
+            )
+          )
+            throw new Error('Legacy report original is marker-bound');
+          const updated = {
+            ...target,
+            report_to_dot_id: reportTo,
+            report_enqueued_at: at,
+            ...(suppressed ? { report_suppressed: suppressed } : {}),
+          };
+          projectDotResultRecords(
+            values.map((entry) => (entry === target ? updated : entry)),
+            scope
+          );
+          let found = false;
+          const next = lines
+            .map((line) => {
+              if (!line.trim()) return line;
+              const entry = parseSafeJsonInput(
+                line,
+                'DOT legacy result line'
+              ) as DotWorkResultRow & { kind?: string };
+              if (
+                entry.dot_id !== c.dot_id ||
+                Object.hasOwn(entry, 'kind') ||
+                executorReportKey(entry, entry.report_to_dot_id ?? reportTo) !== key
+              )
+                return line;
+              if (found) throw new Error('Legacy report original ambiguous');
+              found = true;
+              const ending = line.match(/(?:\r\n|\n|\r)$/)?.[0] ?? '';
+              return JSON.stringify(updated) + ending;
+            })
+            .join('');
+          safeWriteFile(file, next);
+        }
+        return {
+          ...original,
+          report_to_dot_id: reportTo,
+          report_enqueued_at: at,
+          ...(suppressed ? { report_suppressed: suppressed } : {}),
+        };
+      });
+    },
+    undefined,
+    c.scope.tenant_slug,
+    c.scope.organization_id
+  );
+}
+
+/** Called only after inbox acknowledgement or the existing explicit no-wake suppression rule. */
+function finishExecutorReport(
+  c: DotCharter,
+  row: DotWorkResultRow,
+  reportTo: string,
+  deps: DotExecutorDeps,
+  suppressed?: DotWorkResultRow['report_suppressed']
+): DotWorkResultRow {
+  if (
+    c.scope.tier !== 'confidential' ||
+    (ordinaryResultPermission(c, deps, 'read') &&
+      (ordinaryResultPermission(c, deps, 'append') || ordinaryResultPermission(c, deps, 'write')))
+  )
+    return markReportEnqueued(c, row, reportTo, deps, suppressed);
+  const rootDir = deps.rootDir ?? pathResolver.rootDir(),
+    scope = dotResultScopeSchema.parse(c.scope);
+  const original = readConfidentialDotResultState(c, { rootDir }).find(
+    (entry) =>
+      executorReportKey({ ...entry, summary: '[protected result]' }, reportTo) ===
+      executorReportKey(row, reportTo)
+  );
+  if (!original || original.report_to_dot_id !== reportTo)
+    throw new Error('Acknowledged report result differs');
+  if (
+    (original.reason_code === 'capability_unavailable') !==
+    (suppressed === 'capability_unavailable')
+  )
+    throw new Error('Report suppression differs from stored result');
+  const marker = parseDotReportMarker({
+    kind: 'dot-result-report-marker',
+    schema_version: '1',
+    scope,
+    dot_id: original.dot_id,
+    work_item_id: original.work_item_id,
+    action_ref: original.action_ref,
+    attempt_id: original.attempt_id,
+    result_digest: original.result_digest,
+    report_key: executorReportKey(row, reportTo),
+    report_to_dot_id: reportTo,
+    report_enqueued_at: original.report_enqueued_at ?? nowOf(deps).toISOString(),
+    ...(suppressed ? { report_suppressed: suppressed } : {}),
+  });
+  const permit = mintDotReportMarkerPermit({
+    rootDir: path.resolve(rootDir),
+    charter: c,
+    scope,
+    marker,
+  });
+  const result = appendConfidentialDotReportMarker(c, marker, permit, { rootDir });
+  return {
+    ...row,
+    report_to_dot_id: reportTo,
+    report_enqueued_at: result.result.report_enqueued_at,
+    ...(result.result.report_suppressed
+      ? { report_suppressed: result.result.report_suppressed }
+      : {}),
+  };
 }
 
 /** Inbox receipt then result marker: either failure is safely retryable without replaying work. */
@@ -282,7 +512,7 @@ export function enqueueExecutorReport(
     // Waking the dot for a capability this runtime lacks only invites a
     // reworded re-proposal; it reads the result on its next natural wake.
     try {
-      return markReportEnqueued(c, row, reportTo, deps, 'capability_unavailable');
+      return finishExecutorReport(c, row, reportTo, deps, 'capability_unavailable');
     } catch (error) {
       logger.warn(
         `report receipt pending for ${reportTo} — ${error instanceof Error ? error.message : String(error)} | next: the next sweep retries without waking the dot | evidence: ${dotStatePath(c, DOT_WORK_RESULTS_FILE)}`
@@ -295,7 +525,7 @@ export function enqueueExecutorReport(
       ? ' — failed before any effect: fix the cause, then re-propose'
       : ' — escalated: ask the operator to verify effects before re-proposing';
   try {
-    (
+    const acknowledgement: unknown = (
       deps.appendInbox ??
       ((input: DotInboxEntryInput) => {
         appendDotInboxEntry(input, { rootDir: deps.rootDir, now: deps.now });
@@ -317,7 +547,17 @@ export function enqueueExecutorReport(
         ...(reportTo !== c.dot_id ? { executed_by: c.dot_id } : {}),
       },
     });
-    return markReportEnqueued(c, row, reportTo, deps);
+    if (
+      c.scope.tier === 'confidential' &&
+      acknowledgement !== null &&
+      (typeof acknowledgement === 'object' || typeof acknowledgement === 'function') &&
+      'then' in acknowledgement
+    ) {
+      // A typed synchronous enqueue port cannot acknowledge by merely returning a promise.
+      void Promise.resolve(acknowledgement).catch(() => undefined);
+      throw new Error('Confidential report enqueue did not acknowledge synchronously');
+    }
+    return finishExecutorReport(c, row, reportTo, deps);
   } catch (error) {
     logger.warn(
       `report-back pending for ${reportTo} — ${error instanceof Error ? error.message : String(error)} | next: the next sweep retries the same inbox identity without re-executing work | evidence: ${dotStatePath(c, DOT_WORK_RESULTS_FILE)}`
@@ -370,7 +610,18 @@ export function isTerminalWorkResult(row: DotWorkResultRow): boolean {
 }
 
 export function scopedWorkResults(c: DotCharter, deps: DotExecutorDeps): DotWorkResultRow[] {
-  const cached = deps.resultsCache?.get(resultsCacheKey(c));
+  if (c.scope.tier === 'confidential' && !ordinaryResultPermission(c, deps, 'read')) {
+    return readConfidentialDotResultState(c, {
+      rootDir: deps.rootDir ?? pathResolver.rootDir(),
+    }).map((entry) => {
+      const { result_digest: _, ...metadata } = entry;
+      const row: DotWorkResultRow = { ...metadata, summary: '[protected result body withheld]' };
+      minimalResults.add(row);
+      return row;
+    });
+  }
+  const cached =
+    c.scope.tier === 'confidential' ? undefined : deps.resultsCache?.get(resultsCacheKey(c));
   if (cached) return cached;
   const rows = withExecutionContext(
     c.authority.authority_role,
@@ -455,6 +706,15 @@ export function attemptsSinceRelease(item: WorkItem): number {
 
 /** IDs are immutable execution identities; a reused item needs operator reconciliation. */
 export function resultMatchesAttempt(row: DotWorkResultRow, item: WorkItem): boolean {
+  // Withheld private verification is unknown, never proof that a diagnostic or continuation succeeded.
+  if (
+    minimalResults.has(row) &&
+    (item.metadata?.front_desk_execution ||
+      row.awaiting_approval ||
+      (item.metadata?.dot_executor as { awaiting_approval?: boolean } | undefined)
+        ?.awaiting_approval)
+  )
+    return false;
   if (row.action_ref !== (meta(item, 'action_ref') ?? item.item_id)) return false;
   // Reopening an already-released item is not orphan recovery. Even if its
   // identifiers were reused unchanged, do not report the reopened work done.

@@ -1,5 +1,6 @@
 /** Deterministic observation-to-proposal policy. External observations never supply actions. */
 import { isReservedScopeName, isValidTenantSlug } from '../entity-scope.js';
+import { classifyStorageFloorPath, storageFloorRelativePath } from '../storage-layout.js';
 import {
   parseContinuousWorkPlan,
   CONTINUOUS_MANAGED_WORK_PIPELINE,
@@ -185,9 +186,29 @@ export function parseContinuousOperationsConfig(value: unknown): ContinuousOpera
       const p = path(source.path);
       const partition = scope.tenant_slug ?? 'shared';
       const knowledgePrefix = `knowledge/${scope.tier}/${scope.tier === 'confidential' ? `${partition}/` : ''}`;
+      const cachePrefix =
+        storageFloorRelativePath(
+          'cache',
+          { kind: 'tier', tier: scope.tier, tenant: scope.tenant_slug },
+          'continuous-operations',
+          'organizations',
+          scope.organization_id,
+          ...(scope.project_id ? ['projects', scope.project_id] : [])
+        ) + '/';
+      const classified = classifyStorageFloorPath(p);
+      const scopedSnapshotCache =
+        (kind === undefined || kind === 'snapshot') &&
+        classified?.floor === 'cache' &&
+        classified.partition.kind === 'tier' &&
+        classified.partition.tier === scope.tier &&
+        classified.partition.tenant === scope.tenant_slug &&
+        p.startsWith(cachePrefix) &&
+        Boolean(p.slice(cachePrefix.length)) &&
+        !p.slice(cachePrefix.length).startsWith('projects/');
       if (
         !p.startsWith(`active/shared/runtime/${scope.tier}/${partition}/`) &&
-        !p.startsWith(knowledgePrefix)
+        !p.startsWith(knowledgePrefix) &&
+        !scopedSnapshotCache
       )
         fail('source outside configured scope');
       if (kind === 'pipeline')

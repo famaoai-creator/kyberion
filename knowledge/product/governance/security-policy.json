@@ -938,6 +938,10 @@
         "active/audit/"
       ]
     },
+    "dot_result_writer": {
+      "allow_read": ["active/shared/runtime/dot/confidential/${KYBERION_TENANT}/"],
+      "allow_write": ["active/shared/runtime/dot/confidential/${KYBERION_TENANT}/"]
+    },
     "dot_lifecycle_writer": {
       "allow_read": [
         "dots/",

@@ -4,6 +4,10 @@ import {
 } from './foundation/discussion-request-capability.js';
 import { isAutonomyLearningCapability } from './foundation/autonomy-learning-capability.js';
 import {
+  DOT_RESULT_STORE_ROLE,
+  isDotResultStoreCapability,
+} from './foundation/dot-result-store-capability.js';
+import {
   MEMORY_PROVENANCE_READER_ROLE,
   currentMemoryProvenanceReadCapability,
 } from './knowledge/memory-provenance-capability.js';
@@ -105,6 +109,7 @@ const LEGACY_ROLE_PERSONA_DEFAULTS: Record<string, Persona> = {
   metrics_cap_reader: 'worker',
   autonomy_learning_store: 'worker',
   pipeline_journal_store: 'worker',
+  dot_result_writer: 'worker',
   audit_mirror_writer: 'worker',
   tenant_ledger_store: 'worker',
   tenant_approval_store: 'worker',
@@ -742,6 +747,7 @@ export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
   'customer_decision_deal_note_writer',
   DISCUSSION_REQUEST_STORAGE_ROLE,
   PIPELINE_JOURNAL_STORE_ROLE,
+  'dot_result_writer',
   'peer_catalog_reader',
   'peer_responder_reader',
   'peer_task_artifact_writer',
@@ -788,6 +794,22 @@ function prepareExecutionContext(
   for (const value of Object.values(executionIdentity)) {
     if (value !== null && value !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value))
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');
+  }
+  if (normalizedRole === DOT_RESULT_STORE_ROLE) {
+    const scope = currentResourceAccessScope();
+    const target = scope?.appendExact?.[0] ?? scope?.readExact[0] ?? '';
+    if (
+      scope?.tenantSlug !== tenantSlug ||
+      scope?.organizationId !== organizationId ||
+      !isDotResultStoreCapability(scope, {
+        rootDir: pathResolver.rootDir(),
+        target,
+        operation: scope?.appendExact?.length ? 'append' : 'read',
+      })
+    )
+      throw new Error(
+        '[DOT_RESULT_CAPABILITY_REQUIRED] Bound active exact DOT result capability required'
+      );
   }
   assertRoleAssumptionAllowed(normalizedRole);
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);

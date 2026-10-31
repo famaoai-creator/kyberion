@@ -16,6 +16,7 @@ import {
   type DotCharter,
 } from '@agent/core/dot/dot-charter';
 import { runAsDotCharter } from '@agent/core/dot/dot-key-results';
+import { projectDotResultRecords, dotResultScopeSchema } from '@agent/core/dot/dot-result-records';
 import {
   DOT_ACTION_LEDGER_PATH,
   readDotActionLedgerStrict,
@@ -144,7 +145,12 @@ function retainedFile(file: string): boolean {
 function strictResults(charter: DotCharter): DotWorkResultRow[] {
   const file = dotStatePath(charter, DOT_WORK_RESULTS_FILE);
   if (!retainedFile(file)) return [];
-  return readJsonLines<DotWorkResultRow>(file).map((row) => {
+  return (
+    projectDotResultRecords(
+      readJsonLines<unknown>(file),
+      charter.scope.tier === 'confidential' ? dotResultScopeSchema.parse(charter.scope) : undefined
+    ) as DotWorkResultRow[]
+  ).map((row) => {
     if (
       !row ||
       !['dot_id', 'work_item_id', 'action_ref', 'started_at', 'completed_at'].every(

@@ -8,7 +8,14 @@ import {
 } from '../organization/continuous-work-plan.js';
 import { reconcileAdmittedDotAction } from './dot-admission-reconciliation.js';
 import { composeDotDigestText, dotCharterTimezone } from './dot-digest-composition.js';
-import { dotWorkItemInput } from './dot-work-item.js';
+import { dotWorkItemInput, assertDotExistingWorkItem } from './dot-work-item.js';
+import {
+  dotJudgmentApprovalRouteFields,
+  dotJudgmentApprovalFeedbackReady,
+  requireCurrentDotJudgmentApproval,
+  recordDotApprovalFeedback,
+  recordDeferredDotJudgmentApprovalFeedback,
+} from './dot-judgment-approval.js';
 import { assertDotAccountabilityCharter } from './dot-authority.js';
 import { isDotIntakeAdmission, loadDotExecutionPolicy } from './dot-execution-policy.js';
 import { dotMissionAdmissionRefusal } from './dot-mission-admission-bounds.js';
@@ -17,6 +24,7 @@ export { DOT_DIGEST_LEDGER_PATH } from './dot-digest-delivery.js';
 import type { DotWorkResultRow } from './dot-state-paths.js';
 import {
   admissionForDotRecord,
+  assertDotJudgmentProposalCharter,
   dotAdmissionItemId,
   dotAdmissionScopeHash,
   dotRecordAdmissionMatches,
@@ -67,6 +75,7 @@ import {
 import { withFrontDeskDispatchLock } from '../surface/front-desk-dispatch-lock.js';
 import { inspectFrontDeskPendingRequest as inspectPendingRequest } from '../surface/front-desk-conversation-persistence.js';
 import { recoveryEvidenceHash } from '../surface/front-desk-recovery-receipt.js';
+import { validateServerDotJudgmentProposal } from './dot-judgment-binding.js';
 import {
   evaluateAutonomousOpsAction,
   getAutonomousOpsPolicy,
@@ -122,10 +131,8 @@ import {
   type DotWorkShape,
 } from './dot-proposals.js';
 import {
-  hasDotFeedbackFor,
   learnedDotDecisionFloor,
   measureDotSuccessSignals,
-  recordDotFeedback,
   type DotFeedbackDeps,
   type DotFeedbackOutcome,
 } from './dot-feedback.js';
@@ -752,6 +759,15 @@ function executeDotAction(
         (row) => row.action_ref === record.action_ref
       );
       if (latest?.status === 'dispatched' || latest?.status === 'declined') return latest;
+      try {
+        requireCurrentDotJudgmentApproval(
+          charter,
+          latest?.status === 'admitted' ? latest : record,
+          deps
+        );
+      } catch {
+        return latest ?? record;
+      }
       const admitted =
         latest?.status === 'admitted'
           ? latest
@@ -817,19 +833,11 @@ function executeDotActionUnlocked(
         ? undefined
         : (ref: string) => defaultFindWorkItemByActionRef(ref, deps.rootDir));
     const existing = options.reuseExisting ? find?.(record.action_ref) : undefined;
-    // The real store verifies the original creation snapshot, including archived items.
-    // Injected ports may use a custom finder but must preserve the action identity.
-    if (
-      existing &&
-      existing.metadata?.action_ref &&
-      existing.metadata.action_ref !== record.action_ref
-    )
-      throw new Error('dot work item identity conflict');
+    const input = dotWorkItemInput(charter, record, deps.rootDir, existing);
+    assertDotExistingWorkItem(record, existing, input, Boolean(deps.createWorkItem));
+    requireCurrentDotJudgmentApproval(charter, record, deps);
     item =
-      (deps.createWorkItem && existing) ||
-      (deps.createWorkItem ?? createWorkItemIfAbsent)(
-        dotWorkItemInput(charter, record, deps.rootDir, existing)
-      );
+      (deps.createWorkItem && existing) || (deps.createWorkItem ?? createWorkItemIfAbsent)(input);
   } catch (error) {
     const reason = `WorkItem creation failed: ${error instanceof Error ? error.message : String(error)}`;
     recordAudit(
@@ -973,6 +981,8 @@ function dispatchDotProposalsUnlocked(
   const duplicates: string[] = [];
   const actor = dotActorId(charter.dot_id);
   for (const [index, proposal] of proposals.entries()) {
+    const judgment = validateServerDotJudgmentProposal(proposal);
+    assertDotJudgmentProposalCharter(charter, proposal);
     const now = nowOf(deps);
     const hash = dotProposalHash(charter.dot_id, proposal);
     const identity = proposal.front_desk_execution
@@ -1034,6 +1044,7 @@ function dispatchDotProposalsUnlocked(
       continue;
     }
     const base: DotActionRecord = {
+      ...(judgment ? { semantic_judgment: judgment } : {}),
       scope: charter.scope,
       action_ref: proposal.front_desk_execution
         ? `frontdesk-${proposal.front_desk_execution.work_item_id}`
@@ -1156,7 +1167,9 @@ function dispatchDotProposalsUnlocked(
         );
         continue;
       }
-      let accountability: RouteAutonomousDecisionInput['accountability'];
+      const judgedRoute = dotJudgmentApprovalRouteFields(charter, base);
+      let accountability: RouteAutonomousDecisionInput['accountability'] =
+        judgedRoute.accountability;
       if (proposal.continuous_work) {
         accountability = {
           payloadHash: identity!.admission!.semantic_hash,
@@ -1205,6 +1218,7 @@ function dispatchDotProposalsUnlocked(
             }
           : {}),
         ...(admissionScope ? { scope: admissionScope } : {}),
+        ...judgedRoute,
         now: now.getTime(),
       });
       const decided: DotActionRecord = {
@@ -1486,6 +1500,8 @@ export function settleDotParkedActions(
         );
         return;
       }
+      if (!dotJudgmentApprovalFeedbackReady(charter, row, approval, () => nowOf(deps).getTime()))
+        return;
       const diagnostic =
         isFrontDeskDiagnosticDot(charter) ||
         hasFirstJobDiagnosticProvenance(row.front_desk_execution, approval);
@@ -1510,26 +1526,13 @@ export function settleDotParkedActions(
       if (approval?.status === 'pending' && dotDecisionExpired(charter, row, approval, deps)) {
         approval = expirePendingDecision(approval, deps);
       }
+      if (!dotJudgmentApprovalFeedbackReady(charter, row, approval, () => nowOf(deps).getTime()))
+        return;
       const outcome = approval ? SETTLED_STATUS[approval.status] : 'cancelled';
       if (!outcome) return;
       const decidedBy = approval?.decidedBy;
-      if (!hasDotFeedbackFor(charter.dot_id, row.action_ref, feedbackDeps)) {
-        recordDotFeedback(
-          {
-            dot_id: charter.dot_id,
-            action_id: row.action_id,
-            action_ref: row.action_ref,
-            outcome,
-            title: row.title,
-            ...(decidedBy ? { decided_by: decidedBy } : {}),
-            ...(approval?.decidedByType ? { decided_by_type: approval.decidedByType } : {}),
-            ...(approval?.changeRequest
-              ? { note: JSON.stringify(approval.changeRequest).slice(0, 300) }
-              : {}),
-          },
-          feedbackDeps
-        );
-      }
+      const deferred = Boolean(row.semantic_judgment) && outcome === 'approved';
+      if (!deferred) recordDotApprovalFeedback(charter, row, approval, outcome, feedbackDeps);
       if (outcome !== 'approved') {
         settled.push(
           declineParked(
@@ -1550,16 +1553,16 @@ export function settleDotParkedActions(
       }
       const sodRefusal = approvalUsabilityRefusal(approval, 'dot_dispatch'); // separation of duties
       if (sodRefusal) return void settled.push(declineParked(charter, row, sodRefusal, deps));
-      settled.push(
-        executeDotAction(
-          charter,
-          { ...row, reason: `approved by ${decidedBy ?? 'operator'}` },
-          deps,
-          {
-            reuseExisting: true,
-          }
-        )
+      const executed = executeDotAction(
+        charter,
+        { ...row, reason: `approved by ${decidedBy ?? 'operator'}` },
+        deps,
+        {
+          reuseExisting: true,
+        }
       );
+      settled.push(executed);
+      if (deferred) recordDeferredDotJudgmentApprovalFeedback(charter, row, executed, deps);
     };
     if (candidate.front_desk_execution)
       withFrontDeskDispatchLock(candidate.front_desk_execution, settle);

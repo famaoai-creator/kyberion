@@ -11,11 +11,15 @@ export interface ResourceAccessScope {
   readonly metadataExact?: readonly string[];
   readonly readExact: readonly string[];
   readonly writeExact: readonly string[];
+  /** Append-only access grants neither ordinary writes nor file descriptor access. */
+  readonly appendExact?: readonly string[];
   readonly mkdirExact: readonly string[];
   readonly allowProductKnowledgeRead?: boolean;
+  /** Internal opaque identity only; possession alone grants nothing. Store guards verify it. */
+  readonly opaqueStoreToken?: object;
 }
 
-export type ResourceAccessOperation = 'read' | 'write' | 'mkdir' | 'metadata';
+export type ResourceAccessOperation = 'read' | 'write' | 'append' | 'mkdir' | 'metadata';
 
 const KEY = Symbol.for('kyberion.core.resource-access-scope.v1');
 type Registry = { storage: AsyncLocalStorage<readonly ResourceAccessScope[]> };
@@ -61,16 +65,20 @@ function freezeScope(scope: ResourceAccessScope): ResourceAccessScope {
     }
     return Object.freeze([...new Set(values)]);
   };
-  return Object.freeze({
+  const result: ResourceAccessScope = {
     tenantSlug: scope.tenantSlug,
     ...(scope.organizationId ? { organizationId: scope.organizationId } : {}),
     ...(scope.projectId ? { projectId: scope.projectId } : {}),
     metadataExact: copy(scope.metadataExact ?? []),
     readExact: copy(scope.readExact),
     writeExact: copy(scope.writeExact),
+    appendExact: copy(scope.appendExact ?? []),
     mkdirExact: copy(scope.mkdirExact),
     allowProductKnowledgeRead: scope.allowProductKnowledgeRead === true,
-  });
+  };
+  if (scope.opaqueStoreToken !== undefined)
+    Object.defineProperty(result, 'opaqueStoreToken', { value: scope.opaqueStoreToken });
+  return Object.freeze(result);
 }
 
 /** Independent of role scopes: nested role assumptions cannot discard this ceiling. */
@@ -106,6 +114,8 @@ function permits(
     );
   }
   if (operation === 'write') return scope.writeExact.includes(target);
+  if (operation === 'append')
+    return scope.writeExact.includes(target) || (scope.appendExact ?? []).includes(target);
   if (operation === 'mkdir') return scope.mkdirExact.includes(target);
   // Metadata inspection permits traversal, never directory enumeration or file content.
   return (
@@ -113,6 +123,7 @@ function permits(
       ...(scope.metadataExact ?? []),
       ...scope.readExact,
       ...scope.writeExact,
+      ...(scope.appendExact ?? []),
       ...scope.mkdirExact,
     ].some((allowed) => target === allowed || target === '' || allowed.startsWith(target + '/')) ||
     (scope.allowProductKnowledgeRead === true &&

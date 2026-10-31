@@ -5,7 +5,6 @@ import {
   eventContinuationCharterChanged,
   isDurableEventKey,
 } from './dot-event-continuation.js';
-import { withoutAutomaticReasoningRedispatch } from '../reasoning/reasoning-dispatch-scope.js';
 import { isFrontDeskDiagnosticDot } from './dot-charter.js';
 import { assertDotAccountabilityCharter } from './dot-authority.js';
 import { loadDotExecutionPolicy } from './dot-execution-policy.js';
@@ -74,8 +73,13 @@ import {
 } from './dot-charter.js';
 import { evaluateStateProbe, probeSpecId, type StateProbeDeps } from '../state-probe.js';
 import { createLogger } from '../logger.js';
-import { getUsageAttribution, withUsageAttribution } from '../usage-accounting.js';
-import { withReasoningPayloadScope } from '../reasoning/reasoning-egress-scope.js';
+import { getUsageAttribution } from '../usage-accounting.js';
+import { estimateWakeTokensFromText, withDotWakeUsage } from './dot-wake-usage.js';
+import {
+  withDotWakeSemanticObserver,
+  type DotWakeSemanticCapture,
+  type DotWakeSemanticFixtureInjection,
+} from './dot-wake-semantic-observer.js';
 import {
   buildDotProposeToolDefinition,
   collectDotProposals,
@@ -186,18 +190,6 @@ function wallClockCancelledReason(result: DotWakeLoopResult): string | undefined
   return `wake tool loop exceeded its wall_clock budget before a backend turn completed (${reason})`;
 }
 
-/** Same ~3-chars/token heuristic as the goal driver; governance-grade only. */
-function estimateWakeTokensFromText(input: {
-  prompt: string;
-  result: { text?: string; toolCalls?: Array<{ name: string; input: unknown }> };
-}): number {
-  const responseText = [
-    input.result.text ?? '',
-    ...(input.result.toolCalls ?? []).map((call) => `${call.name} ${JSON.stringify(call.input)}`),
-  ].join(' ');
-  return estimateTokens(input.prompt) + estimateTokens(responseText);
-}
-
 export type DotWakeOutcome = 'delivered' | 'skipped' | 'failed' | 'rejected';
 
 /** Runtime-only trigger kinds beyond the charter's declared ones. */
@@ -271,6 +263,8 @@ export interface DueDotTrigger {
 }
 
 export interface DotRuntimeDeps {
+  /** Explicit offline-fixture observation only; no production budget/provider adapter. */
+  semanticJudgment?: DotWakeSemanticFixtureInjection;
   /** Internal durable event claim, minted immediately before provider invocation. */
   eventAttemptId?: string;
   /** Resolve provider wiring only after current charter validation. */
@@ -1380,8 +1374,14 @@ function wakePrompt(
 function governProposals(
   charter: DotCharter,
   proposals: readonly DotProposal[],
-  deps: DotRuntimeDeps & { trigger?: DueDotTrigger }
+  deps: DotRuntimeDeps & { trigger?: DueDotTrigger },
+  capture?: DotWakeSemanticCapture
 ): DotActionRecord[] {
+  try {
+    capture?.proposals(proposals);
+  } catch {
+    /* Advisory capture only. */
+  }
   if (proposals.length === 0) return [];
   if (deps.dispatch) return deps.dispatch(charter, proposals);
   return dispatchDotProposals(charter, proposals, {
@@ -1505,7 +1505,8 @@ async function runFencedWake(
   current: DotCharter,
   backend: NonNullable<DotRuntimeDeps['backend']>,
   deps: DotRuntimeDeps & { trigger?: DueDotTrigger },
-  labels: { ledgerReason: string; receiptReason: string }
+  labels: { ledgerReason: string; receiptReason: string },
+  capture?: DotWakeSemanticCapture
 ): Promise<DotWakeReceipt> {
   const prompt = wakePrompt(current, 'fence', deps.trigger, deps);
   const text = await runDelegatedWake(
@@ -1518,7 +1519,7 @@ async function runFencedWake(
   recordDotTokenUsage(current.dot_id, tokens, deps);
   const parsed = parseDotProposalsFromText(text);
   const wakeTools = parseDotWakeToolFences(text);
-  const actions = governProposals(current, parsed.proposals, deps);
+  const actions = governProposals(current, parsed.proposals, deps, capture);
   const failedTools = new Set<string>();
   const toolErrors = [
     ...wakeTools.errors,
@@ -1558,9 +1559,16 @@ async function runFencedWake(
  * Diagnostics durably reject model wakes without consuming executor results.
  * Generic tool loops retain their wall-clock-bounded fenced fallback.
  */
-export async function runDotWake(
+type WakeDeps = DotRuntimeDeps & { trigger?: DueDotTrigger };
+export function runDotWake(loaded: LoadedDotCharter, deps: WakeDeps = {}): Promise<DotWakeReceipt> {
+  return withDotWakeSemanticObserver(loaded, deps, (capture, baselineDeps) =>
+    runDotWakeBaseline(loaded, baselineDeps, capture)
+  );
+}
+async function runDotWakeBaseline(
   loaded: LoadedDotCharter,
-  deps: DotRuntimeDeps & { trigger?: DueDotTrigger } = {}
+  deps: WakeDeps,
+  capture: DotWakeSemanticCapture
 ): Promise<DotWakeReceipt> {
   const { charter } = loaded;
   assertDotStateLayoutReady(charter, deps.rootDir);
@@ -1586,6 +1594,7 @@ export async function runDotWake(
       recordDotWakeFailure(charter, deps.trigger, DOT_WAKE_FAILURE_CATEGORY.charter, reason, deps);
       return { dot_id: charter.dot_id, outcome: 'failed', reason };
     }
+    capture.charter(current); // Internal capture contains its own failure boundary.
     if (current.status !== 'active') {
       const reason = `charter status is ${current.status}, not active`;
       recordDotWakeOutcome(charter, deps.trigger, 'skipped', { ...deps, reason });
@@ -1652,21 +1661,7 @@ export async function runDotWake(
       const accounting_id = randomUUID();
       // Meter from the validated charter, never provider/model-supplied labels.
       const withWakeUsage = <T>(fn: () => T): T =>
-        withUsageAttribution(
-          { actor_id: `dot:${current.dot_id}`, accounting_id, scope: current.scope },
-          () =>
-            withReasoningPayloadScope(
-              {
-                tier: current.scope.tier,
-                tenant_slug: current.scope.tenant_slug,
-                purpose: 'dot-wake',
-                training_use:
-                  current.runtime.reasoning_training_use ??
-                  (current.scope.tier === 'public' ? 'training_eligible' : 'local_only'),
-              },
-              () => (deps.eventAttemptId ? withoutAutomaticReasoningRedispatch(fn) : fn())
-            )
-        );
+        withDotWakeUsage(current, accounting_id, deps.eventAttemptId, fn, capture);
       // Only a caller-injected backend may be the stub (tests, explicit
       // `KYBERION_REASONING_BACKEND=stub`); the process-default stub would
       // record fabricated `[STUB]` text as a delivered wake.
@@ -1681,10 +1676,16 @@ export async function runDotWake(
       if (!execution.runLoop) {
         if (!realBackend) throw new Error(DOT_WAKE_BACKEND_UNAVAILABLE);
         return await withWakeUsage(() =>
-          runFencedWake(current, backend, deps, {
-            ledgerReason: 'delegated-turn (backend lacks generateWithTools)',
-            receiptReason: 'delegated-turn',
-          })
+          runFencedWake(
+            current,
+            backend,
+            deps,
+            {
+              ledgerReason: 'delegated-turn (backend lacks generateWithTools)',
+              receiptReason: 'delegated-turn',
+            },
+            capture
+          )
         );
       }
       const runLoop = execution.runLoop;
@@ -1791,10 +1792,16 @@ export async function runDotWake(
             `tool loop unavailable for ${current.dot_id} — ${message} | next: serving this wake as a fenced delegated turn | evidence: ${DOT_WAKE_LEDGER_PATH}`
           );
           return await withWakeUsage(() =>
-            runFencedWake(current, backend, deps, {
-              ledgerReason: 'degraded: tool backend unavailable → fenced proposals',
-              receiptReason: 'degraded-fenced',
-            })
+            runFencedWake(
+              current,
+              backend,
+              deps,
+              {
+                ledgerReason: 'degraded: tool backend unavailable → fenced proposals',
+                receiptReason: 'degraded-fenced',
+              },
+              capture
+            )
           );
         }
         throw Object.assign(error instanceof Error ? error : new Error(message), {
@@ -1815,7 +1822,7 @@ export async function runDotWake(
         });
       }
       const collected = collectDotProposals(proposalInputs);
-      const actions = governProposals(current, collected.proposals, deps);
+      const actions = governProposals(current, collected.proposals, deps, capture);
       const failedTools = new Set<string>();
       toolErrors.push(
         ...applyDotWakeOutputs(current, toolOutputs, dotExtCtx(deps, deps.trigger), failedTools)

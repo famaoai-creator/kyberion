@@ -1,6 +1,7 @@
 /** Digest labels are observations, never inferred execution success from dispatch. */
 import * as path from 'node:path';
 import { readJsonLines } from '../foundation/json.js';
+import { projectDotResultRecords, dotResultScopeSchema } from './dot-result-records.js';
 import { pathResolver } from '../path-resolver.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
@@ -30,6 +31,7 @@ export function dotDigestActionEvidence(
     !executor ||
     executor.scope.tenant_slug !== charter.scope.tenant_slug ||
     executor.scope.organization_id !== charter.scope.organization_id ||
+    executor.scope.project_id !== charter.scope.project_id ||
     executor.scope.tier !== charter.scope.tier
   )
     return fallback;
@@ -46,15 +48,20 @@ export function dotDigestActionEvidence(
       (item.context?.project_id ?? 'default') !== (charter.scope.project_id ?? 'default')
     )
       return fallback;
-    const rows =
+    const rawRows =
       deps.readWorkResults?.(executor) ??
       readJsonLines<DotWorkResultRow>(
         path.join(
           deps.rootDir ?? pathResolver.rootDir(),
           dotStatePath(executor, DOT_WORK_RESULTS_FILE)
-        ),
-        { onMalformed: 'skip' }
+        )
       );
+    const rows = projectDotResultRecords(
+      rawRows,
+      executor.scope.tier === 'confidential'
+        ? dotResultScopeSchema.parse(executor.scope)
+        : undefined
+    ) as DotWorkResultRow[];
     const result = rows
       .filter(
         (row) =>
