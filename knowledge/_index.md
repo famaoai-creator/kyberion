@@ -405,6 +405,7 @@
 - [Browser Site Learning Playbook (新規サイト→リプレイ可能ADF)](./product/orchestration/browser-site-learning-playbook.md) (public | Kyberion Engineering)
 - [Browser exploration to reviewed pipeline task session](./product/orchestration/browser-exploration-task-session.md) (public | Unknown)
 - [CLI Reliability Baseline — R00 接続表と証拠分類](./product/orchestration/cli-reliability-baseline.ja.md) (public | Unknown)
+- [CLI Reliability PR — reviewer 向け変更地図と residual](./product/orchestration/cli-reliability-pr-notes.ja.md) (public | Unknown)
 - [CLI 信頼性ランブック — 症状から正規復旧まで](./product/orchestration/cli-reliability-runbook.ja.md) (public | Unknown)
 - [Capability Bundle Progressive Disclosure](./product/orchestration/capability-bundle-progressive-disclosure.md) (public | Ecosystem Architect)
 - [Capability Verb Inventory (which capabilities have one verb, which do not)](./product/orchestration/capability-verb-inventory.md) (public | Ecosystem Architect)
