@@ -494,6 +494,7 @@
 - [Voice Interface Protocol (VIP)](./product/orchestration/voice-interface-protocol.md) (public | Ecosystem Architect)
 - [Work Coordination Platform](./product/orchestration/work-coordination-platform.md) (public | Unknown)
 - [Work Coordination Platform Implementation Plan](./product/orchestration/work-coordination-platform-plan.md) (public | Unknown)
+- [listen の confidential scratch — backend 読み取り権限の橋渡し設計ノート (R04 residual)](./product/orchestration/listen-confidential-scratch-bridge.ja.md) (public | Unknown)
 - [meet-copilot live verification runbook](./product/orchestration/meet-copilot-live-verification.md) (public | Unknown)
 - [takt Clean-Room Notes](./product/orchestration/takt-clean-room-notes.md) (public | Unknown)
 - [エンジン実行設定の保存と安全な解決](./product/orchestration/engine-runtime-preferences.ja.md) (public | Unknown)
