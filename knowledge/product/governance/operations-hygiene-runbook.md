@@ -2020,9 +2020,10 @@ link must stay pending during snapshots, even for a viewer of another tenant.
 Generation schedules load the generation implementation without desktop capture;
 the public media actuator wires capture through its typed dependency. Do not import
 the entire system actuator into the scheduled generation path or add broad role
-grants to compensate. After changing imports or child environments, regenerate
-`docs/developer/role-assumption-reachability.json` and run both
-`scripts/analyze_role_assumptions.test.ts` and
+grants to compensate. After changing imports or child environments, run the
+`role-assumption-reachability` gate (`pnpm check -- --only role-assumption-reachability`;
+it computes reachability in memory and fails on any reachable role the policy does not
+grant) and both `scripts/analyze_role_assumptions.test.ts` and
 `scripts/analyze_role_assumptions.contract.test.ts`. The analyzer must resolve
 shorthand environment properties to their value declarations before deciding
 whether the child inherits its parent's system role.

@@ -10265,6 +10265,11 @@
         "ja": "このcheckoutの登録済みChronosサービスを停止",
         "qps-ploc": "⟦Şŧőṗ ŧħïş ƈħėƈķőůŧ'ş řėɠïşŧėřėḓ Ƈħřőñőş şėřṽïƈė ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
       },
+      "cli_cmd_script_chronos_reconcile": {
+        "en": "Register this checkout's resident services (scheduler, watchdog) and migrate legacy units",
+        "ja": "このチェックアウトの常駐サービス（スケジューラ・ウォッチドッグ）を登録し、旧ユニットを移行",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħïş ƈħėƈķőůŧ'ş řėşïḓėñŧ şėřṽïƈėş (şƈħėḓůŀėř, ẇȧŧƈħḓőɠ) ȧñḓ ɱïɠřȧŧė ŀėɠȧƈẏ ůñïŧş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñ⟧"
+      },
       "cli_cmd_script_chronos_restart": {
         "en": "Restart this checkout's Chronos service via the host service manager",
         "ja": "ホストのサービスマネージャ経由でこのcheckoutのChronosサービスを再起動",

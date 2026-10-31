@@ -35,6 +35,11 @@ const {
   readAuditLedgerFreshness,
   AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS,
   janitorSpawnEnv,
+  splitOpsHealthFindings,
+  schedulerLayerObservation,
+  residentOpsLayerObservation,
+  runJanitorMaintenanceJob,
+  janitorMaintenancePipelineArgs,
 } = await import(new URL('./run_baseline_check.js', import.meta.url).href);
 
 function fakeCapability(overrides: Partial<ProviderCapability> = {}): ProviderCapability {
@@ -527,5 +532,121 @@ describe('WI-13 review: baseline-check janitor spawn env', () => {
     expect(env.KYBERION_RUN_ORIGIN).toBe('scheduled');
     expect(env.PATH).toBe('/usr/bin');
     expect(parent).not.toHaveProperty('KYBERION_RUN_ORIGIN');
+  });
+});
+
+describe('resident ops layers (L10 per-schedule / L12)', () => {
+  const healthyScheduler = {
+    enabled_schedule_count: 3,
+    scheduler_alive: { ok: true, reason: null },
+    schedules_firing: { ok: true, reason: null, due_in_window: 3, last_run_in_window: 1 },
+    healthy: true,
+  };
+  const overdue = {
+    id: 'schedule-overdue:daily',
+    severity: 'warn',
+    reason: 'schedule daily missed its run',
+    next: 'pnpm kyberion scheduler status',
+  };
+  const drill = {
+    id: 'backup-drill-missing',
+    severity: 'warn',
+    reason: 'no restore drill receipt',
+    next: 'pnpm pipeline --input pipelines/backup-restore-drill.json',
+  };
+
+  it('a fleet-alive scheduler still fails L10 when one schedule is overdue', () => {
+    const split = splitOpsHealthFindings([overdue, drill]);
+    expect(split.scheduler.map((f: { id: string }) => f.id)).toEqual(['schedule-overdue:daily']);
+    expect(split.resident.map((f: { id: string }) => f.id)).toEqual(['backup-drill-missing']);
+    const l10 = schedulerLayerObservation(healthyScheduler, split.scheduler);
+    expect(l10.passed).toBe(false);
+    expect(l10.evidence[0]).toContain('schedule-overdue:daily');
+    expect(schedulerLayerObservation(healthyScheduler, []).passed).toBe(true);
+  });
+
+  it('L12 fails on resident findings and passes when there are none', () => {
+    const l12 = residentOpsLayerObservation([drill]);
+    expect(l12.passed).toBe(false);
+    expect(l12.reason).toContain('backup-drill-missing');
+    expect(residentOpsLayerObservation([]).passed).toBe(true);
+  });
+
+  it('a failed L12 (or L10) degrades to needs_attention, never needs_recovery — even circuit-broken', () => {
+    const idle = { submitted: false, pending: false, reason: null };
+    expect(deriveBaselineStatus({ success: false, failedLayer: 'L12' }, idle)).toBe(
+      'needs_attention'
+    );
+    expect(
+      deriveBaselineStatus({ success: false, failedLayer: 'L12', circuitBroken: true }, idle)
+    ).toBe('needs_attention');
+    expect(deriveBaselineStatus({ success: false, failedLayer: 'L10' }, idle)).toBe(
+      'needs_attention'
+    );
+    expect(deriveBaselineStatus({ success: true }, idle)).toBe('all_clear');
+  });
+
+  it('a fresh heartbeat whose own status is error is not alive', () => {
+    const report = evaluateSchedulerHealth({
+      schedules: [
+        {
+          id: 'daily',
+          name: 'daily',
+          pipelinePath: 'pipelines/daily.json',
+          actuator: 'run_pipeline',
+          trigger: { type: 'cron', cron: '0 6 * * *' },
+          enabled: true,
+        },
+      ],
+      heartbeat: {
+        daemon_id: 'chronos-daemon',
+        status: 'healthy',
+        age_ms: 1000,
+        heartbeat: {
+          daemon_id: 'chronos-daemon',
+          pid: 1,
+          status: 'error',
+          timestamp: '2026-11-01T00:00:00.000Z',
+          details: { last_tick_error: 'boom' },
+        },
+      },
+      pidAlive: () => true,
+      now: new Date('2026-11-01T00:00:01.000Z'),
+      cronFired: () => false,
+    });
+    expect(report.scheduler_alive.ok).toBe(false);
+    expect(report.scheduler_alive.reason).toContain('boom');
+  });
+});
+
+describe('baseline janitor maintenance job', () => {
+  const now = () => new Date('2026-11-01T12:00:00.000Z');
+
+  it('runs the storage-janitor pipeline, logs its output, and records a failure marker on non-zero exit', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: 'out', stderr: 'boom', status: 2 });
+    const appendLog = vi.fn();
+    const writeFailure = vi.fn();
+    const result = await runJanitorMaintenanceJob({ run, appendLog, writeFailure, now });
+
+    expect(run.mock.calls[0][1]).toEqual(janitorMaintenancePipelineArgs());
+    expect(run.mock.calls[0][2].env.KYBERION_RUN_ORIGIN).toBe('scheduled');
+    expect(result.status).toBe(2);
+    expect(appendLog.mock.calls[0][0]).toContain('baseline-janitor-maintenance.log');
+    expect(appendLog.mock.calls[0][1]).toContain('exit=2');
+    expect(appendLog.mock.calls[0][1]).toContain('boom');
+    expect(writeFailure).toHaveBeenCalledWith(
+      expect.objectContaining({
+        failed_at: '2026-11-01T12:00:00.000Z',
+        exit_code: 2,
+        log_path: expect.stringContaining('baseline-janitor-maintenance.log'),
+      })
+    );
+  });
+
+  it('records no failure marker when the run succeeds', async () => {
+    const run = vi.fn().mockResolvedValue({ stdout: 'ok', stderr: '', status: 0 });
+    const writeFailure = vi.fn();
+    await runJanitorMaintenanceJob({ run, appendLog: vi.fn(), writeFailure, now });
+    expect(writeFailure).not.toHaveBeenCalled();
   });
 });

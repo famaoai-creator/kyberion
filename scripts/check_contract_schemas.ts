@@ -444,6 +444,17 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'resident-services',
+      schemaPath: 'knowledge/product/schemas/resident-services.schema.json',
+      validPayloads: [readGovernanceJson('knowledge/product/governance/resident-services.json')],
+      invalidPayloads: [
+        {
+          version: 1,
+          services: [{ id: 'chronos', requirement: 'always', rationale: 'x' }],
+        },
+      ],
+    },
+    {
       id: 'model-registry',
       schemaPath: 'knowledge/product/schemas/model-registry.schema.json',
       validPayloads: [readGovernanceJson('knowledge/product/governance/model-registry.json')],

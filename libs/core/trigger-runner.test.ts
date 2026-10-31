@@ -4,6 +4,8 @@ import { pathResolver } from './path-resolver.js';
 import {
   safeExistsSync,
   safeMkdir,
+  safeReadFile,
+  safeReaddir,
   safeRmSync,
   safeStat,
   safeUnlinkSync,
@@ -20,6 +22,7 @@ import {
 } from './trigger-runner.js';
 import { auditChain } from './governance/audit-chain.js';
 import { deriveTraceOrigin } from './analysis/trace.js';
+import * as path from 'node:path';
 
 describe('QM-02 trigger runner', () => {
   const stores: string[] = [];
@@ -260,6 +263,141 @@ describe('QM-02 trigger runner', () => {
       async () => 'delivery-new'
     );
     expect(safeStat(store).size).toBeLessThan(64 * 1024);
+    for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+  });
+
+  function rotatedSegments(store: string): string[] {
+    const stem = path.basename(store).replace(/\.jsonl$/u, '');
+    return safeReaddir(path.dirname(store))
+      .filter((name) => name.startsWith(`${stem}-`))
+      .map((name) => path.join(path.dirname(store), name));
+  }
+
+  function journalLine(key: string, recordedAt: string, status = 'delivered'): string {
+    return JSON.stringify({
+      idempotencyKey: key,
+      source: 'cron',
+      status,
+      deliveryId: key,
+      createdBy: authority,
+      requestedAuthority: authority,
+      recordedAt,
+    });
+  }
+
+  it('handles a journal past the 5MB read cap without throwing and still dedupes', async () => {
+    const store = pathResolver.sharedTmp(`qm02-oversize-${randomUUID()}.jsonl`);
+    stores.push(store);
+    const now = new Date();
+    const recent = now.toISOString();
+    // Minute-scoped keys never compact; this is the shape that crash-looped chronos.
+    const filler = Array.from({ length: 24_000 }, (_, i) =>
+      journalLine(`daemon-recovery:chronos:stale:${i}`, recent)
+    );
+    filler.push(journalLine('cron:recent-job:minute', recent));
+    safeWriteFile(store, `${filler.join('\n')}\n`);
+    expect(safeStat(store).size).toBeGreaterThan(5 * 1024 * 1024);
+    try {
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        authorityResolver: (snapshot) => snapshot,
+        now: () => now,
+      });
+      const deliver = vi.fn(async () => 'delivery');
+
+      const duplicate = await triggerRunner.run(
+        { idempotencyKey: 'cron:recent-job:minute', source: 'cron', createdBy: authority },
+        deliver
+      );
+      expect(duplicate.status).toBe('duplicate');
+      expect(deliver).not.toHaveBeenCalled();
+
+      const fresh = await triggerRunner.run(
+        { idempotencyKey: 'cron:new-job:minute', source: 'cron', createdBy: authority },
+        deliver
+      );
+      expect(fresh.status).toBe('delivered');
+      expect(deliver).toHaveBeenCalledTimes(1);
+      // Rotated inline to under the cap; the full history went to a segment.
+      expect(safeStat(store).size).toBeLessThan(4 * 1024 * 1024);
+      expect(rotatedSegments(store)).toHaveLength(1);
+
+      const again = await triggerRunner.run(
+        { idempotencyKey: 'cron:recent-job:minute', source: 'cron', createdBy: authority },
+        deliver
+      );
+      expect(again.status).toBe('duplicate');
+      expect(deliver).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+    }
+  });
+
+  it('rotation keeps the recent dedupe window and in-flight claims, archiving the rest', async () => {
+    const store = pathResolver.sharedTmp(`qm02-window-${randomUUID()}.jsonl`);
+    stores.push(store);
+    const now = new Date();
+    const stale = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const recent = new Date(now.getTime() - 60 * 1000).toISOString();
+    const inFlight = JSON.stringify({
+      idempotencyKey: 'wake:in-flight',
+      source: 'wake',
+      status: 'failed',
+      reason: 'delivery_pending',
+      deliveryId: 'wake:in-flight',
+      createdBy: authority,
+      requestedAuthority: authority,
+      recordedAt: stale,
+      claimId: 'claim-1',
+      claimOwnerPid: process.pid,
+      claimExpiresAt: new Date(now.getTime() + 60_000).toISOString(),
+      attempt: 1,
+    });
+    const lines = [
+      journalLine('cron:stale-job', stale),
+      inFlight,
+      ...Array.from({ length: 600 }, (_, i) => journalLine(`cron:filler:${i}`, recent)),
+      journalLine('cron:recent-job', recent),
+    ];
+    safeWriteFile(store, `${lines.join('\n')}\n`);
+    try {
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        maxStoreBytes: 64 * 1024,
+        authorityResolver: (snapshot) => snapshot,
+        now: () => now,
+      });
+      const deliver = vi.fn(async () => 'delivery');
+      await triggerRunner.run(
+        { idempotencyKey: 'cron:trigger-rotation', source: 'cron', createdBy: authority },
+        deliver
+      );
+
+      const live = String(safeReadFile(store, { encoding: 'utf8' }));
+      expect(safeStat(store).size).toBeLessThanOrEqual(32 * 1024 + 2048);
+      expect(live).toContain('cron:recent-job');
+      expect(live).toContain('wake:in-flight');
+      expect(live).not.toContain('cron:stale-job');
+      expect(live).not.toContain('cron:filler:0"');
+
+      const [segment] = rotatedSegments(store);
+      expect(path.basename(segment)).toMatch(/-\d{8}-\d{6}(-\d+)?\.jsonl$/u);
+      expect(String(safeReadFile(segment, { encoding: 'utf8' }))).toContain('cron:stale-job');
+
+      const recentAgain = await triggerRunner.run(
+        { idempotencyKey: 'cron:recent-job', source: 'cron', createdBy: authority },
+        deliver
+      );
+      const pending = await triggerRunner.run(
+        { idempotencyKey: 'wake:in-flight', source: 'wake', createdBy: authority },
+        deliver
+      );
+      expect(recentAgain.status).toBe('duplicate');
+      expect(pending.status).toBe('duplicate');
+      expect(deliver).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+    }
   });
 
   it('rejects a delivery store outside the repository', () => {

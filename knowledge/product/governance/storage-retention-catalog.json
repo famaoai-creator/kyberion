@@ -412,7 +412,7 @@
       "path": "active/shared/runtime/state",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Miscellaneous runtime state incl. janitor-last-run marker and reasoning failover state (reasoning-failover.ts)."
+      "note": "Miscellaneous runtime state incl. janitor-last-run marker and reasoning failover state (reasoning-failover.ts), plus the ops-health receipts (ops-health-state.ts): backup-drill-last.json (restore drill receipt), janitor-last-failure.json (failed baseline-submitted janitor run) and <daemon>-starts.json (rolling 24h start history; self-bounded, pruned on every start), and resident-services.json (daemon/resident-services.ts: what `pnpm kyberion scheduler reconcile --apply` installed for this checkout — one record per service, rewritten in place, self-bounded)."
     },
     {
       "path": "active/shared/runtime/surfaces",
@@ -635,7 +635,8 @@
       "path": "active/shared/runtime/trigger-deliveries.jsonl",
       "artifact_class": "log",
       "action": "rotate",
-      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys embed daemon+status+minute — every tick mints a NEW key, so latest-per-key compaction never shrinks the file (4.9MB and growing). Minute-scoped keys can never re-match after rotation, so losing rotated history cannot re-deliver. Rotated segments expire under the observability sweep."
+      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys used to embed daemon+status+minute — every tick minted a NEW key, so latest-per-key compaction never shrank the file (4.9MB). daemon_watchdog now keys one recovery per unhealthy episode (stale: last heartbeat timestamp; missing/malformed: 15-minute bucket — daemonRecoveryKey). An episode outliving the retained history can re-deliver at most once more, which only re-raises the same operator-gated recovery. trigger-runner also rotates inline past its 4MB cap (it cannot wait for the janitor, which runs from chronos): the full journal is copied to a <stem>-YYYYMMDD-HHmmss.jsonl segment and the live file keeps in-flight claims plus finished receipts from the last 7 days, newest first, within half the cap; reads are a bounded 8MB tail. Segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
+      "ttl_days": 30
     },
     {
       "path": "active/shared/runtime/vuln-ledger.jsonl",
