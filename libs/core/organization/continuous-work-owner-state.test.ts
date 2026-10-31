@@ -5,7 +5,10 @@ const mocks = vi.hoisted(() => ({
   expired: vi.fn(),
   usable: vi.fn(),
 }));
-vi.mock('../dot/dot-action-ledger.js', () => ({ readDotActionLedgerStrict: mocks.ledger }));
+vi.mock('../dot/dot-action-ledger.js', async (original) => ({
+  ...(await original<typeof import('../dot/dot-action-ledger.js')>()),
+  readDotActionLedgerStrict: mocks.ledger,
+}));
 vi.mock('../governance/approval-store.js', () => ({
   loadApprovalRequest: mocks.approval,
   isApprovalRequestExpired: mocks.expired,

@@ -28,6 +28,8 @@ const allowedManagedProcessConsumers = [
   // Real child-process races validate atomic WorkItem persistence and claims.
   'libs/core/workforce/work-coordination.atomic.test.ts',
   'libs/core/dot/dot-admission-recovery.test.ts',
+  // Two isolated wake processes verify synthetic judgment admission deduplication.
+  'libs/core/dot/judgment-recovery.integration.test.ts',
   // Real child processes verify durable event restart and exclusive attempt claims.
   'libs/core/dot/dot-event-continuation.test.ts',
   // Real recovery contention and process death test the shared diagnostic fence.

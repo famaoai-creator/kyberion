@@ -15,6 +15,8 @@ import {
   safeExistsSync,
   safeRealpath,
   safeCreateExclusiveFileSync,
+  safeAppendFileSync,
+  withSafeAppendFile,
   safeOpenAppendFile,
   safeLstat,
   safeMkdir,
@@ -27,6 +29,10 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
+import { discussionRequestCapability } from './discussion-request-capability.js';
+import { pipelineJournalCapability } from './pipeline-journal-capability.js';
+import { narrowStoreRoleDenial } from './narrow-store-role-denial.js';
+import { DELIVERABLE_INBOX_ENTRIES_PATH } from './deliverable-inbox-writer-capability.js';
 
 vi.mock('../governance/audit-chain.js', () => ({
   auditChain: { record: vi.fn() },
@@ -88,6 +94,120 @@ afterEach(() => {
 });
 
 describe('request resource ceiling', () => {
+  it('retains content-checked legacy write refusals for the actual append verb', () => {
+    expect(
+      narrowStoreRoleDenial({
+        role: 'deliverable_inbox_writer',
+        relativePath: DELIVERABLE_INBOX_ENTRIES_PATH,
+        operation: 'append',
+        scope: undefined,
+        content: undefined,
+        readRepoFile: () => undefined,
+      })
+    ).toContain('DELIVERABLE_INBOX_WRITE_REFUSED');
+  });
+  it.each(['discussion_request_store', 'pipeline_journal_store'])(
+    'does not enlarge the original %s capability with forged append or metadata paths',
+    (role) => {
+      process.env.SYSTEM_ROLE = role;
+      const capability =
+        role === 'discussion_request_store'
+          ? discussionRequestCapability(
+              'active/shared/runtime/discussion-create-requests/confidential/acme-corp/by-actor/' +
+                'a'.repeat(64) +
+                '/' +
+                'b'.repeat(64) +
+                '/12345678-1234-4234-8234-123456789abc',
+              'acme-corp',
+              true
+            )
+          : pipelineJournalCapability(
+              'acme-corp',
+              'active/shared/runtime/pipeline-library-runs/confidential/acme-corp/run.jsonl'
+            );
+      const extra = base + '/forged/foreign.jsonl';
+      runInResourceAccessScope({ ...capability, appendExact: [extra] }, () => {
+        expect(validateWritePermission(abs(extra), 'append').allowed).toBe(false);
+        expect(() => safeAppendFileSync(abs(extra), 'forged')).toThrow(/RESOURCE_SCOPE_REQUIRED/);
+        expect(validateReadPermission(abs(base + '/forged'), 'metadata').allowed).toBe(false);
+      });
+      // Even a read-only old capability cannot grow a new append grant to its real file.
+      const readOnly = {
+        ...capability,
+        writeExact: [],
+        mkdirExact: [],
+        appendExact: [capability.readExact[0]!],
+      };
+      runInResourceAccessScope(readOnly, () => {
+        expect(validateWritePermission(abs(capability.readExact[0]!), 'append').allowed).toBe(
+          false
+        );
+      });
+    }
+  );
+
+  it('permits only actual append operations, never body reads, overwrite, deletion, rename or descriptor escape', () => {
+    safeMkdir(abs(base + '/nested'), { recursive: true });
+    safeWriteFile(abs(exact), 'first\n');
+    runInResourceAccessScope(
+      scope({ readExact: [], writeExact: [], appendExact: [exact], mkdirExact: [] }),
+      () => {
+        expect(currentResourceAccessScope()?.appendExact).toEqual([exact]);
+        expect(Object.isFrozen(currentResourceAccessScope()?.appendExact)).toBe(true);
+        expect(validateWritePermission(abs(exact), 'append').allowed).toBe(true);
+        expect(validateWritePermission(abs(exact)).allowed).toBe(false);
+        safeAppendFileSync(abs(exact), 'second\n');
+        expect(() => safeReadFile(abs(exact))).toThrow();
+        expect(() => safeWriteFile(abs(exact), 'overwrite')).toThrow();
+        expect(() => safeCreateExclusiveFileSync(abs(exact), 'replace')).toThrow();
+        expect(() => safeRmSync(abs(exact))).toThrow();
+        expect(() => safeMoveSync(abs(exact), abs(foreign))).toThrow();
+        expect(() => safeMoveSync(abs(foreign), abs(exact))).toThrow();
+        expect(() => safeOpenAppendFile(abs(exact))).toThrow();
+        expect(() =>
+          withSafeAppendFile(abs(exact), () => {
+            throw new Error('callback must not run');
+          })
+        ).toThrow(/RESOURCE_SCOPE/);
+        expect(() => safeAppendFileSync(abs(foreign), 'foreign')).toThrow();
+        expect(() => safeAppendFileSync(abs(exact), 'truncate', { flag: 'w' })).toThrow();
+        expect(() => safeReaddir(abs(base + '/nested'))).toThrow();
+      }
+    );
+    expect(safeReadFile(abs(exact), { encoding: 'utf8' })).toBe('first\nsecond\n');
+  });
+
+  it('retains legacy writeExact append compatibility and composes nested append ceilings', () => {
+    safeMkdir(abs(base + '/nested'), { recursive: true });
+    safeWriteFile(abs(exact), '');
+    runInResourceAccessScope(scope(), () => {
+      expect(currentResourceAccessScope()?.appendExact).toEqual([]);
+      safeAppendFileSync(abs(exact), 'legacy\n');
+      runInResourceAccessScope(
+        scope({ readExact: [], writeExact: [], appendExact: [exact] }),
+        () => {
+          safeAppendFileSync(abs(exact), 'nested\n');
+          expect(() => safeWriteFile(abs(exact), 'no')).toThrow();
+        }
+      );
+    });
+    runInResourceAccessScope(scope({ readExact: [], writeExact: [], appendExact: [] }), () => {
+      runInResourceAccessScope(scope({ appendExact: [exact] }), () => {
+        expect(() => safeAppendFileSync(abs(exact), 'cannot expand')).toThrow();
+      });
+    });
+    expect(safeReadFile(abs(exact), { encoding: 'utf8' })).toBe('legacy\nnested\n');
+  });
+
+  it('checks both literal and canonical destinations for append-only paths', () => {
+    safeMkdir(abs(base + '/nested'), { recursive: true });
+    safeSymlinkSync(abs(foreign), abs(exact));
+    runInResourceAccessScope(scope({ readExact: [], writeExact: [], appendExact: [exact] }), () => {
+      expect(() => safeAppendFileSync(abs(exact), 'linked')).toThrow();
+    });
+    expect(safeReadFile(abs(foreign), { encoding: 'utf8' })).toBe('foreign');
+  });
+
   it('grants metadata-only paths without contents, listing, mutation, or scope widening', () => {
     runInResourceAccessScope(scope({ metadataExact: [foreign] }), () => {
       expect(safeExistsSync(abs(foreign))).toBe(true);

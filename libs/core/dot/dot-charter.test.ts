@@ -109,6 +109,21 @@ const tenantCharter = (slug: string, dotId: string, scope?: DotCharter['scope'])
 });
 
 describe('tenant dot charters', () => {
+  it('refuses the internal result-store role as a charter execution role', async () => {
+    const { assertDotAccountabilityCharter } = await import('./dot-authority.js');
+    expect(() =>
+      assertDotAccountabilityCharter({
+        ...VALID_CHARTER,
+        authority: { ...VALID_CHARTER.authority, authority_role: 'dot_result_writer' },
+      })
+    ).toThrow(/internal store role/);
+    expect(() =>
+      validateDotCharter({
+        ...VALID_CHARTER,
+        authority: { ...VALID_CHARTER.authority, authority_role: 'dot_result_writer' },
+      })
+    ).toThrow(/Invalid dot charter/);
+  });
   it('discovers only the authenticated personal owner directory and rejects scope spoofing', () => {
     const write = (owner: string, declared = owner) => {
       const dir = personalDotCharterDir(owner, TEST_ROOT);
@@ -379,6 +394,48 @@ describe('dot charter identity collisions', () => {
 describe('dot charter', () => {
   it('validates a well-formed charter', () => {
     expect(validateDotCharter(VALID_CHARTER).dot_id).toBe('repo-guardian');
+  });
+
+  describe('semantic judgment configuration', () => {
+    it('keeps legacy charters unchanged and absent mode equivalent to off', () => {
+      const before = structuredClone(VALID_CHARTER);
+      const parsed = validateDotCharter(VALID_CHARTER);
+      expect(parsed).toEqual(before);
+      expect(parsed.runtime.semantic_judgment).toBeUndefined();
+      expect(parsed.runtime.semantic_judgment?.mode ?? 'off').toBe('off');
+    });
+
+    it.each(['off', 'shadow'] as const)(
+      'accepts and round-trips the optional %s mode without provider configuration',
+      (mode) => {
+        const charter = {
+          ...VALID_CHARTER,
+          runtime: { ...VALID_CHARTER.runtime, semantic_judgment: { mode } },
+        };
+        expect(validateDotCharter(JSON.parse(JSON.stringify(charter)))).toEqual(charter);
+      }
+    );
+
+    it.each([
+      { mode: 'enforce' },
+      { mode: 'apply' },
+      { mode: 'unknown' },
+      {},
+      null,
+      { mode: 'shadow', provider: 'fixture-provider' },
+      { mode: 'shadow', budget: 1000 },
+      { mode: 'shadow', approval: true },
+    ])(
+      'rejects unsupported modes and provider/budget/authority additions: %j',
+      (semantic_judgment) => {
+        expect(() =>
+          validateDotCharter({
+            ...VALID_CHARTER,
+            runtime: { ...VALID_CHARTER.runtime, semantic_judgment },
+          })
+        ).toThrow(/Invalid dot charter/);
+      }
+    );
   });
 
   it('rejects a charter missing required sections', () => {

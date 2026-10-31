@@ -73,12 +73,17 @@ export const SUBAGENT_CAPABILITY_PROFILES: readonly SubagentCapabilityProfile[] 
       'Read',
       'Grep',
       'Glob',
+      'LS',
       'NotebookRead',
       'Write',
       'Edit',
       'MultiEdit',
       'NotebookEdit',
       'Bash',
+      'BashOutput',
+      'KillShell',
+      'WebFetch',
+      'WebSearch',
     ],
   },
   {
@@ -104,7 +109,7 @@ export const SUBAGENT_CAPABILITY_PROFILES: readonly SubagentCapabilityProfile[] 
     ],
     systemPromptPrefix:
       'You are a delegated explorer sub-agent. You are read-only: you may search and read, but you must never write, delete, or execute.',
-    cliTools: ['Read', 'Grep', 'Glob', 'NotebookRead'],
+    cliTools: ['Read', 'Grep', 'Glob', 'LS', 'NotebookRead', 'WebFetch', 'WebSearch'],
   },
   {
     name: 'planner',

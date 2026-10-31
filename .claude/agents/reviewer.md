@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews risk, regression potential, and boundary compliance.
-tools: Read, Grep, Glob, NotebookRead
+tools: Read, Grep, Glob, LS, NotebookRead, WebFetch, WebSearch
 ---
 
 <!--

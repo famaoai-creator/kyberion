@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "orphan-baseline.schema.json",
   "title": "Orphan ratchet baseline",
-  "description": "Known orphans (OW-07) the orphan ratchet tolerates, one reasoned entry each. The list may only shrink.",
+  "description": "Reviewed intentional exceptions (OW-07), one concrete reason per entry. Remove entries when they become reachable or are retired. A new offline acceptance seam requires a reviewed reason identifying its real consumers and qualification boundary; this is not a backlog allowance for unwired production code.",
   "type": "object",
   "additionalProperties": false,
   "required": [
