@@ -72,6 +72,10 @@ pipeline / mission evidence / governed knowledge
 
 V1 は Native Messaging のみを採用する。ローカル loopback HTTP、任意 WebSocket、外部 SaaS への直接通信は採用しない。Native host 名は `com.kyberion.browser_bridge` とし、Chrome extension ID を allowlist する。
 
+ページ構造解析の CLI への受け渡し（`pnpm kyberion browser inspect --mode extension`）も Native Messaging で行う。CLI は選んだ区分（`--tier personal|confidential|public`、confidential は `--tenant` 必須）の staging 区画（`active/shared/staging/<tier>/<tenant|shared>/browser-inspection/`）に有効期限つきの待機チケットを置き、ポートは開かない。Side Panel の「Kyberion CLIへ送信」は service worker が接続中タブを解析し直して PII 除去し、`submit_inspection` を native host へ送る。host は検証・上限適用・再 redaction（入力値は受け取らない、URL のクエリと fragment は落とす、64 KiB 上限）をして、最も新しい有効な待機チケットへ書き込み、監査に記録する。待機中の CLI がなければ `no_waiting_cli` で拒否する。CLI は自分のチケットを読んで削除する（実装: `scripts/lib/browser-inspection-handoff.ts`）。
+
+**例外（別拡張）**: `tools/meet-copilot-extension` は本仕様の対象外で、`ws://127.0.0.1:8779` の loopback WebSocket を使う。会議ドライバ（`libs/core/browser/chrome-extension-meeting-driver.ts`）は長時間動く Kyberion プロセス側がサーバーとなり、字幕・画面フレームの連続イベントと join / mute / leave などのコマンドを双方向に流す必要がある。Native Messaging の host は Chrome が接続ごとに起動する短命の stdio プロセスで、既存の Kyberion プロセスから拡張へ能動的に送れないため、この用途には合わない。代わりに loopback 限定、hello で 32 文字以上の共有トークン（`meetCopilotAuthToken`）を照合し、認証前のメッセージは受け付けない。この例外は会議ドライバに限り、Browser Bridge（本拡張）は loopback HTTP / WebSocket を使わない。
+
 ### 4.3 Kyberion から拡張への依頼（pull mailbox）
 
 Kyberion から拡張への方向も Native Messaging だけで行う。拡張が native host に問い合わせ（`poll_requests`）、host が統制された runtime store（`libs/core/browser/browser-bridge-mailbox.ts`）を読む **pull 型の受信箱** とする。拡張は待ち受けポートを開かない。

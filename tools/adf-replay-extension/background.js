@@ -58,6 +58,7 @@ function routeMessage(message, sender) {
   if (type === 'bridge:respond-request') return routeRespondRequest(message);
   if (INBOX_MESSAGE_TYPES.has(type)) return withInboxLock(() => handleInboxMessage(message));
   if (type === 'bridge:send-page') return sendPage(message.form || {});
+  if (type === 'bridge:submit-inspection') return submitInspection();
   if (type === 'bridge:get-send-draft') return getSendDraft();
   if (type === 'bridge:probe-webmcp') return probeConnectedTabWebMcp();
   return withStateLock(() => handleMessage(message, sender));
@@ -65,6 +66,7 @@ function routeMessage(message, sender) {
 
 const SIDE_PANEL_ONLY_MESSAGE_TYPES = new Set([
   'bridge:send-page',
+  'bridge:submit-inspection',
   'bridge:get-send-draft',
   'bridge:probe-webmcp',
 ]);
@@ -2646,6 +2648,37 @@ async function sendPage(form) {
       ...(response.staged_ref ? { staged_ref: response.staged_ref } : {}),
       ...(response.ingest ? { ingest: response.ingest } : {}),
       ...(response.page ? { page: response.page } : {}),
+    },
+  };
+}
+
+// Page inspection → waiting `pnpm kyberion browser inspect --mode extension`.
+// Native Messaging only (spec §4.2): the connected tab is re-inspected here so
+// the Side Panel cannot supply its own data, scrubbed, then handed to the host.
+async function submitInspection() {
+  const { inspection } = await inspectCurrentPage();
+  const built = Inbox.buildSubmitInspectionPayload(inspection, scrubber());
+  if (!built.ok) throw new Error(built.errors.join(' '));
+  const state = await loadState();
+  if (state.connected?.origin && built.payload.inspection.origin !== state.connected.origin) {
+    throw new Error('解析したページが接続中のタブの origin と一致しません。');
+  }
+  const response = await callNativeHost(built.payload);
+  if (!response?.ok) {
+    throw new Error(
+      response?.code === 'no_waiting_cli'
+        ? '待機中の Kyberion CLI がありません。先に pnpm kyberion browser inspect --mode extension を実行してください。'
+        : response?.error || 'Kyberion CLI への送信に失敗しました。'
+    );
+  }
+  return {
+    state,
+    submitResult: {
+      ticket_id: response.ticket_id,
+      scope: response.scope,
+      counts: response.counts,
+      truncated: response.truncated === true,
+      inspection: built.payload.inspection,
     },
   };
 }

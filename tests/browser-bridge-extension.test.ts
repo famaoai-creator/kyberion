@@ -863,6 +863,7 @@ describe('Browser Bridge mailbox inbox (受信)', () => {
       'bridge:send-page',
       'bridge:get-send-draft',
       'bridge:probe-webmcp',
+      'bridge:submit-inspection',
     ]) {
       const response = await harness.send({ type });
       expect(response.error ?? '', type).not.toBe('Unsupported Browser Bridge message.');
@@ -1728,5 +1729,91 @@ describe('Browser Bridge observe_tab page stalls', () => {
     expect(respondCalls(harness)).toEqual([
       expect.objectContaining({ request_id: RID, status: 'declined' }),
     ]);
+  });
+});
+
+describe('Browser Bridge page inspection hand-off (Native Messaging only)', () => {
+  function inspectHook() {
+    return (message: { type: string }) =>
+      message.type === 'bridge:inspect-page'
+        ? {
+            ok: true,
+            inspection: {
+              mode: 'extension',
+              url: 'https://example.com/start?token=secret#frag',
+              origin: 'https://example.com',
+              title: 'Example',
+              headings: [{ level: 'h1', text: 'Hello user@example.com' }],
+              inputs: [{ tag: 'input', type: 'email', name: 'mail', value: 'leak@example.com' }],
+              buttons: [{ text: 'Send' }],
+              links: [{ text: 'Next', href: 'https://example.com/next?session=abc' }],
+              textExcerpt: 'Body',
+            },
+          }
+        : undefined;
+  }
+
+  it('re-inspects the connected tab and sends a scrubbed submit_inspection to the native host', async () => {
+    const harness = await createHarness();
+    harness.hooks.tabMessage = inspectHook();
+    harness.hooks.native = (payload: { type: string }) =>
+      payload.type === 'submit_inspection'
+        ? {
+            ok: true,
+            ticket_id: 'BIH-1',
+            scope: { tier: 'personal' },
+            counts: { headings: 1, inputs: 1, buttons: 1, links: 1 },
+            truncated: false,
+          }
+        : defaultNative(payload);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    const sent = await harness.send({ type: 'bridge:submit-inspection' });
+
+    expect(sent.ok).toBe(true);
+    expect(sent.submitResult).toMatchObject({ ticket_id: 'BIH-1', scope: { tier: 'personal' } });
+    const call = harness.nativeCalls.find((entry) => entry.type === 'submit_inspection');
+    expect(call.inspection).toMatchObject({
+      url: 'https://example.com/start',
+      origin: 'https://example.com',
+      headings: [{ level: 'h1', text: 'Hello [REDACTED:EMAIL_ADDRESS]' }],
+      links: [{ text: 'Next', href: 'https://example.com/next' }],
+    });
+    expect(call.inspection.inputs[0]).not.toHaveProperty('value');
+  });
+
+  it('explains when no CLI is waiting', async () => {
+    const harness = await createHarness();
+    harness.hooks.tabMessage = inspectHook();
+    harness.hooks.native = (payload: { type: string }) =>
+      payload.type === 'submit_inspection'
+        ? { ok: false, code: 'no_waiting_cli', error: 'none' }
+        : defaultNative(payload);
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    const sent = await harness.send({ type: 'bridge:submit-inspection' });
+    expect(sent.ok).toBe(false);
+    expect(sent.error).toContain('pnpm kyberion browser inspect --mode extension');
+  });
+
+  it('refuses submit-inspection from a content script', async () => {
+    const harness = await createHarness();
+    harness.hooks.tabMessage = inspectHook();
+    await harness.send({ type: 'bridge:connect-active-tab' });
+    const sent = await harness.send({ type: 'bridge:submit-inspection' }, { tab: harness.tab });
+    expect(sent.ok).toBe(false);
+    expect(harness.nativeCalls.some((entry) => entry.type === 'submit_inspection')).toBe(false);
+  });
+
+  it('has no loopback HTTP hand-off left in the side panel', () => {
+    const read = (file: string) =>
+      String(
+        safeReadFile(path.resolve(__dirname, '../tools/adf-replay-extension', file), {
+          encoding: 'utf8',
+        })
+      );
+    const panel = read('sidepanel.js');
+    expect(panel).not.toMatch(/fetch\(\s*`http:\/\/127\.0\.0\.1/);
+    expect(panel).not.toContain('inspectCliPort');
+    expect(read('sidepanel.html')).not.toContain('inspect-port-input');
+    expect(read('background.js')).not.toMatch(/https?:\/\/(127\.0\.0\.1|localhost)/);
   });
 });

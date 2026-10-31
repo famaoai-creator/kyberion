@@ -9,6 +9,8 @@
 // - approval_pending notifications are display-only: they expose the CLI
 //   approve command, never an approve control.
 // - WebMCP tool discovery keeps names, descriptions and input-schema keys only.
+// - Page inspections reach the CLI only through the native host
+//   (submit_inspection) — never a loopback HTTP port — without input values.
 (function (global) {
   const REQUEST_ID_PATTERN = /^BBR-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
   const APPROVAL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$/;
@@ -18,6 +20,15 @@
   const SEND_MAX_TITLE = 300;
   const SEND_MAX_NOTE = 1_000;
   const TENANT_SLUG_PATTERN = /^[a-z0-9][a-z0-9-]{0,62}$/;
+  // Mirrors INSPECTION_LIMITS in scripts/lib/browser-inspection-handoff.ts.
+  const INSPECT_LIMITS = {
+    title: 300,
+    headings: 30,
+    inputs: 40,
+    buttons: 40,
+    links: 40,
+    excerpt: 1_000,
+  };
 
   const KIND_LABELS = {
     observe_tab: 'ページ観測の依頼',
@@ -277,6 +288,83 @@
     };
   }
 
+  /**
+   * Build the native `submit_inspection` payload from a content-script page
+   * inspection: scrubbed, bounded, no input values, and URLs without query
+   * strings or fragments. The host validates and redacts again.
+   */
+  function buildSubmitInspectionPayload(inspection, scrub) {
+    if (typeof scrub !== 'function') {
+      return { ok: false, errors: ['PII scrubber が読み込まれていません。'] };
+    }
+    if (!inspection || typeof inspection !== 'object') {
+      return { ok: false, errors: ['解析結果がありません。'] };
+    }
+    const pageUrl = stripQuery(inspection.url);
+    if (!pageUrl)
+      return { ok: false, errors: ['解析したページの URL が http(s) ではありません。'] };
+    const list = (value, max) => (Array.isArray(value) ? value.slice(0, max) : []);
+    const text = (value, max) => scrubWith(scrub, value, max);
+    const optional = (value, max) => {
+      const cleaned = text(value, max);
+      return cleaned ? cleaned : undefined;
+    };
+    const payload = {
+      type: 'submit_inspection',
+      inspection: {
+        url: pageUrl.toString(),
+        origin: pageUrl.origin,
+        title: text(inspection.title, INSPECT_LIMITS.title),
+        headings: list(inspection.headings, INSPECT_LIMITS.headings)
+          .map((h) => ({ level: String(h?.level || '').toLowerCase(), text: text(h?.text, 200) }))
+          .filter((h) => h.text),
+        inputs: list(inspection.inputs, INSPECT_LIMITS.inputs).map((input) => ({
+          tag: String(input?.tag || '').toLowerCase(),
+          ...(input?.type ? { type: String(input.type).toLowerCase().slice(0, 40) } : {}),
+          ...(optional(input?.name, 200) ? { name: optional(input.name, 200) } : {}),
+          ...(optional(input?.id, 200) ? { id: optional(input.id, 200) } : {}),
+          ...(optional(input?.placeholder, 200)
+            ? { placeholder: optional(input.placeholder, 200) }
+            : {}),
+          ...(optional(input?.label, 200) ? { label: optional(input.label, 200) } : {}),
+          ...(input?.required === true ? { required: true } : {}),
+        })),
+        buttons: list(inspection.buttons, INSPECT_LIMITS.buttons)
+          .map((button) => ({
+            text: text(button?.text, 120),
+            ...(optional(button?.id, 200) ? { id: optional(button.id, 200) } : {}),
+            ...(optional(button?.className, 80)
+              ? { className: optional(button.className, 80) }
+              : {}),
+            ...(button?.disabled === true ? { disabled: true } : {}),
+          }))
+          .filter((button) => button.text),
+        links: list(inspection.links, INSPECT_LIMITS.links)
+          .map((link) => {
+            const href = stripQuery(link?.href);
+            return { text: text(link?.text, 120), href: href ? href.toString() : '' };
+          })
+          .filter((link) => link.text && link.href),
+        textExcerpt: text(inspection.textExcerpt, INSPECT_LIMITS.excerpt),
+      },
+    };
+    return { ok: true, errors: [], payload };
+  }
+
+  function stripQuery(value) {
+    try {
+      const url = new URL(String(value || ''));
+      if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+      url.search = '';
+      url.hash = '';
+      url.username = '';
+      url.password = '';
+      return url;
+    } catch {
+      return null;
+    }
+  }
+
   global.KyberionBridgeInbox = {
     MAX_WEBMCP_TOOLS,
     SEND_MAX_TEXT,
@@ -293,5 +381,6 @@
     canonicalOrigin,
     sanitizeWebMcpTools,
     buildSendPagePayload,
+    buildSubmitInspectionPayload,
   };
 })(globalThis);
