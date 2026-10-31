@@ -1,0 +1,527 @@
+{
+  "schemaVersion": 1,
+  "purpose": "R00 — 26 CLI probes の分類表。expected-denial を欠陥扱いしない。raw 14/12 (exit 0/非0) と report 17/9 は別欄で保持し、分類未確定は unverified とする。",
+  "environment": {
+    "baseSha": "bfefd82b5d0b900506d5c4067bd78d47f737b1cd",
+    "node": "v26.12.1",
+    "pnpm": "11.15.1",
+    "platform": "darwin arm64",
+    "scopeEnv": "KYBERION_TIER=confidential, KYBERION_TENANT=famao-ai, KYBERION_ORGANIZATION_ID=famao-ai (永続 scope.env; 非秘密)",
+    "reasoningBackendObserved": "claude-cli (failover chain claude-cli -> grok-cli -> codex-cli -> agy-cli -> copilot -> cursor-cli -> devin-cli)",
+    "appleSpeechAssets": "not installed for locale ja_JP (supported)",
+    "sourceLog": "active/shared/tmp/cli-usability-20261031/probe-log-round2.txt (R1: archive mission evidence probe-log.txt)"
+  },
+  "counts": {
+    "raw_exit": {
+      "exit0": 14,
+      "nonzero": 12
+    },
+    "report_claimed": {
+      "success": 17,
+      "failure": 9
+    },
+    "count_discrepancy_note": "report の「成功」には attention(doctor/vital)を動作成功として含む推定。3件差分は確定せず未確定として残す"
+  },
+  "probes": [
+    {
+      "id": "P01-doctor",
+      "argv": ["kyberion", "doctor"],
+      "observed_exit": 1,
+      "observed_outcome": "attention",
+      "expected_outcome": "attention",
+      "allowed_exits": [0, 1],
+      "classification": "expected_attention",
+      "prerequisites": ["build current"],
+      "variable_elements": ["pending_approvals", "pipeline schedule last-run", "staleness seconds"],
+      "notes": "repo-build must 検出 + 'undefined:' anomaly label (F8) — attention 自体は合格だが label 欠陥は R10 対象",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 300000,
+        "fixture": {
+          "mirror_dist": true
+        },
+        "assert": {
+          "stderr_excludes": ["undefined:"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P02-vital",
+      "argv": ["kyberion", "vital"],
+      "observed_exit": 3,
+      "observed_outcome": "attention",
+      "expected_outcome": "attention",
+      "allowed_exits": [0, 3],
+      "classification": "expected_attention",
+      "variable_elements": ["identity file presence"],
+      "notes": "exit 3=attention。exit code 意味論は F4 として文書化対象",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 180000,
+        "assert": {
+          "stderr_excludes": ["undefined:"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P03-setup-report",
+      "argv": ["kyberion", "setup", "report"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "variable_elements": ["missing counts"],
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 180000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P04-config-report",
+      "argv": ["kyberion", "config", "report"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P05-home",
+      "argv": ["kyberion"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "variable_elements": ["approval counts", "inbox counts", "running missions"],
+      "notes": "承認8件 vs 承認待ち13件のバケット不整合 (F6/R13)",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P06-capabilities",
+      "argv": ["kyberion", "capabilities"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P07-examples",
+      "argv": ["kyberion", "examples"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 90000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P08-read-md",
+      "argv": ["kyberion", "read", "AGENTS.md"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "prerequisites": ["repo file exists"],
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 90000,
+        "assert": {
+          "stdout_includes": ["cli-reliability smoke"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P09-see-image",
+      "argv": ["kyberion", "see", "docs/assets/kyberion-social-preview.png"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "prerequisites": ["apple_vision OCR"],
+      "notes": "fixture 画像は repo 内。network egress 無しを確認済み",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "env_blocked": "native-ocr",
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P10-listen-invalid-wav",
+      "argv": ["kyberion", "listen", "active/shared/tmp/record-audio-test.wav"],
+      "observed_exit": 1,
+      "observed_outcome": "internal_error",
+      "expected_outcome": "invalid_input",
+      "allowed_exits": [1],
+      "classification": "defect",
+      "prerequisites": ["fixture wav exists"],
+      "notes": "8byte ASCII 'fake-wav'。生 ffmpeg stderr 露出。input 検証欠落 (F1a/R04)",
+      "expectation_revision": "R04 landed: WAV signature sniff が ffmpeg より先に input_invalid を返す。stderr に生の ffmpeg 出力が混ざらないことを smoke が検証する",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 90000,
+        "fixture": {
+          "files": {
+            "active/shared/tmp/record-audio-test.wav": "<binary:fake-wav>"
+          }
+        },
+        "assert": {
+          "combined_includes": ["input_invalid"],
+          "combined_excludes": ["Invalid data found", "Error opening input", "ffmpeg -"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P11-knowledge-rank-positional",
+      "argv": ["kyberion", "knowledge", "rank", "mission usability investigation"],
+      "observed_exit": 1,
+      "observed_outcome": "invalid_input",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "defect",
+      "notes": "positional を拒否し usage のみ。--intent 必須 (F7/R09)",
+      "expectation_revision": "R09 landed: positional query は --intent の alias として受理。allowed_exits を [0] に収束 (usage 拒否はもう出ない)",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P12-memory",
+      "argv": ["kyberion", "memory"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "notes": "bare 呼出で usage — 健全",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 90000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P13-learning-harvest",
+      "argv": ["kyberion", "learning", "harvest"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "variable_elements": ["signal counts"],
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P14-history-search",
+      "argv": ["kyberion", "history", "search", "usability"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "notes": "'No public history results.' — tier 明示の空結果",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P15-approvals-digest",
+      "argv": ["kyberion", "approvals", "digest"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "variable_elements": ["pending counts"],
+      "notes": "冗長表示は minor observation",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P16-audit-verify",
+      "argv": ["kyberion", "audit", "verify"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "variable_elements": ["entry counts"],
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P17-mission-list",
+      "argv": ["mission", "list"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "variable_elements": ["mission rows"],
+      "expectation_revision": "pnpm script 経路 (pnpm mission list) として検証。module 経路とは別ケースクラス",
+      "smoke_contract": {
+        "launcher": "pnpm-script",
+        "timeout_ms": 120000,
+        "fixture": {
+          "mirror_dist": true
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P18-dot-list",
+      "argv": ["kyberion", "dot", "list"],
+      "observed_exit": 0,
+      "observed_outcome": "ok",
+      "expected_outcome": "ok",
+      "allowed_exits": [0],
+      "classification": "ok",
+      "variable_elements": ["dot rows"],
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P19-dot-status",
+      "argv": ["kyberion", "dot", "status"],
+      "observed_exit": 1,
+      "observed_outcome": "data_integrity_error",
+      "expected_outcome": "partial",
+      "allowed_exits": [0, 1],
+      "classification": "defect",
+      "notes": "malformed scoped ledger 1行で全滅 (dot-action-ledger hydratePrivateAction fail-closed)。partial/integrity 表示と修復導線なし (F5/R07)",
+      "expectation_revision": "R07 landed: status は observeDotActions (partial/integrity_error) で全滅しない。smoke は not_visible 行を seed し exit 0 + partial 表示を固定",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "fixture": {
+          "files": {
+            "dots/fixture-guardian.json": "<charter>",
+            "active/shared/runtime/dot-action-ledger.jsonl": "<ledger:not_visible>"
+          }
+        },
+        "assert": {
+          "stdout_includes": ["partial"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P20-unknown-command",
+      "argv": ["kyberion", "definitely-not-a-command"],
+      "observed_exit": 1,
+      "observed_outcome": "invalid_input",
+      "expected_outcome": "invalid_input",
+      "allowed_exits": [1],
+      "classification": "expected_denial",
+      "notes": "日本語で理由 + --help 導線。拒否の良例",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 90000,
+        "assert": {
+          "stderr_includes": ["definitely-not-a-command"]
+        },
+        "side_effects": "none"
+      }
+    },
+    {
+      "id": "P21-read-outside-missing",
+      "argv": ["kyberion", "read", "/nonexistent/file.pdf"],
+      "observed_exit": 1,
+      "observed_outcome": "permission_denied",
+      "expected_outcome": "permission_denied",
+      "allowed_exits": [1],
+      "classification": "defect",
+      "notes": "不存在を 'outside repository' と診断。外部パスの存在判定を漏らす設計確認要 (F2/R05)。expected-denial だが理由コードが誤り",
+      "expectation_revision": "R05 landed: 範囲外パスは stat せず OUTSIDE_ALLOWED_SCOPE(permission_denied) で拒否 — 存在 oracle にならない。分類は expected_denial で正しい",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 90000,
+        "assert": {
+          "stderr_includes": ["outside the repository"],
+          "combined_excludes": ["does not exist inside"]
+        },
+        "side_effects": "none"
+      }
+    },
+    {
+      "id": "P22-calendar-status",
+      "argv": ["kyberion", "calendar", "status"],
+      "observed_exit": 1,
+      "observed_outcome": "binding_required",
+      "expected_outcome": "binding_required",
+      "allowed_exits": [0],
+      "classification": "expected_denial",
+      "prerequisites": ["persisted tenant scope"],
+      "notes": "拒否は契約通りだが人間向け案内が jargon (F3/R03/R06)",
+      "expectation_revision": "R03 landed: status は純粋 readiness view。credential 解決・reasoning bootstrap なしで exit 0 + credential_binding.status=binding_required を表示",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "fixture": {
+          "persisted_scope": true
+        },
+        "assert": {
+          "stdout_includes": ["binding_required"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P23-email-status",
+      "argv": ["kyberion", "email", "status"],
+      "observed_exit": 1,
+      "observed_outcome": "binding_required",
+      "expected_outcome": "binding_required",
+      "allowed_exits": [0],
+      "classification": "expected_denial",
+      "prerequisites": ["persisted tenant scope"],
+      "notes": "P22 と同一構造",
+      "expectation_revision": "R03 landed: P22 と同じ readiness view。exit 0 + credential_binding.status=binding_required",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "fixture": {
+          "persisted_scope": true
+        },
+        "assert": {
+          "stdout_includes": ["binding_required"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P24-intent-trace",
+      "argv": ["kyberion", "intent", "trace", "先週のミッション結果を要約して"],
+      "observed_exit": 1,
+      "observed_outcome": "internal_error",
+      "expected_outcome": "ok",
+      "allowed_exits": [0, 1],
+      "classification": "defect",
+      "notes": "無関係 tenant mission (MSN-SYSTEM-NEXUS-DISPATCH) の OWNER_NOT_VISIBLE で死亡 + ROLE_VIOLATION warn 漏洩 (F5/R08)",
+      "expectation_revision": "R08 landed: 探索は可視 scope のみ。natural-language 引数は INVALID_INPUT、未知 correlation は visible-scope 空結果。fixture では空 scope で exit 0",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "fixture": {
+          "persisted_scope": true
+        },
+        "assert": {
+          "stdout_includes": ["visible scope"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P25-listen-real-wav",
+      "argv": [
+        "kyberion",
+        "listen",
+        "active/shared/tmp/audio-output-tests/Built-in_Output-2026-10-27T15-46-26-778Z.wav"
+      ],
+      "observed_exit": 1,
+      "observed_outcome": "internal_error",
+      "expected_outcome": "backend_runtime_error",
+      "allowed_exits": [1],
+      "classification": "defect",
+      "prerequisites": ["valid RIFF WAV fixture"],
+      "notes": "中間ファイル confidential/famao-ai/perception/ を whisperkit-cli が ROLE_VIOLATION。Apple Speech assets 未導入説と未切り分け (F1b/R04)。voice setup 案内は誤誘導の疑い",
+      "expectation_revision": "R04 landed: backend は分類される (backend_missing/assets_missing/permission_denied/backend_runtime_error)。hermetic では合成 WAV + KYBERION_STT_COMMAND の shell backend を試みるが、外部 exec は governed approval を要求し backend_runtime_error として分類されて拒否される — これが正しい fail-closed 契約 (transcript 捏造なし)。実 backend の正常系は R15 の macOS/native lane でのみ検証する",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 120000,
+        "fixture": {
+          "files": {
+            "active/shared/tmp/audio-output-tests/Built-in_Output-2026-10-27T15-46-26-778Z.wav": "<binary:valid-wav>"
+          },
+          "env": {
+            "KYBERION_STT_COMMAND": "printf 'cli-smoke-transcript-sentinel\\n'"
+          }
+        },
+        "assert": {
+          "combined_includes": ["backend_runtime_error"],
+          "combined_excludes": ["cli-smoke-transcript-sentinel"]
+        },
+        "side_effects": "runtime-state"
+      }
+    },
+    {
+      "id": "P26-list-check",
+      "argv": ["kyberion", "list", "--check"],
+      "observed_exit": 1,
+      "observed_outcome": "binding_required",
+      "expected_outcome": "binding_required",
+      "allowed_exits": [0],
+      "classification": "expected_denial",
+      "prerequisites": ["persisted tenant scope"],
+      "notes": "P22/P23 と同一構造 (F3)",
+      "expectation_revision": "R03 landed: list --check は reasoning bootstrap をスキップする readiness view。exit 0 + capability 一覧 (binding 未解決でも status は動く)",
+      "smoke_contract": {
+        "launcher": "direct",
+        "timeout_ms": 180000,
+        "fixture": {
+          "persisted_scope": true
+        },
+        "assert": {
+          "stdout_includes": ["Runtime Capability Check"]
+        },
+        "side_effects": "runtime-state"
+      }
+    }
+  ],
+  "additional_cases_required": [
+    {
+      "id": "P27-mission-verify-bound",
+      "note": "R1 で永続 scope 下の mission verify が CREDENTIAL_BINDING_REQUIRED を示した経路。26 probes に未収録。claim/binding ありの正常系と無し拒否の両方を R01/R03 で fixture 化する"
+    },
+    {
+      "id": "P28-confidential-lifecycle",
+      "note": "P0 最重要: 合成 confidential intake→claim→dispatch→verify→distill→finish→同 scope 再利用。R01 でテスト化"
+    }
+  ],
+  "smoke_contract_note": "R14: smoke_contract は hermetic process smoke の期待値。expected_outcome/allowed_exits を変えたのは landed 修正で契約が変わったケースのみ (expectation_revision 参照)。observed_* は元観測のまま。side_effects: none=一切書込不可, runtime-state=active//home//tmp/ 配下のみ許可。env_blocked は hermetic では実行せず blocked と記録する条件 (pass 扱いしない)。"
+}
