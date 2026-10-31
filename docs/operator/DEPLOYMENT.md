@@ -108,41 +108,36 @@ pnpm mission:orchestrator       # in another
 
 ### 1.7 Production launchd (optional)
 
-For per-checkout services, use the canonical installer. It generates distinct service
-and log names from the physical checkout root, and pins the daemon's runtime root:
+Register this checkout's resident services with one idempotent command. It reads
+`knowledge/product/governance/resident-services.json` (chronos and the daemon watchdog
+are required; `agent-runtime-supervisor` is optional; `generation-schedule` is owned by
+its surface while that surface is enabled), syncs the schedule registry, compares the
+desired units with what the host service manager already has, and installs
+checkout-scoped units (`com.kyberion.<id>.ws-<hash>`) with distinct log names and a
+pinned runtime root:
 
 ```bash
-pnpm kyberion scheduler install
-pnpm kyberion scheduler install --apply
-pnpm kyberion scheduler install --daemon agent-runtime-supervisor
-pnpm kyberion scheduler status
+pnpm kyberion scheduler reconcile                 # dry-run: plan only
+pnpm kyberion scheduler reconcile --apply         # install / migrate / reinstall
+pnpm kyberion scheduler reconcile --apply --include agent-runtime-supervisor
+pnpm kyberion scheduler status                    # live manager status (per daemon: --daemon <id>)
 ```
+
+Rerunning it changes nothing unless the unit content or node path changed. A legacy
+fixed-name unit (`com.kyberion.chronos`, …) that runs **this** checkout is migrated:
+reconcile boots it out, removes its plist and installs the scoped unit. Units that run
+another checkout are reported and never touched. The record of what reconcile installed
+is `active/shared/runtime/state/resident-services.json`. The per-daemon verbs
+(`pnpm kyberion scheduler install|start|stop|restart|uninstall [--daemon <id>]`) remain
+for single-service work.
 
 See [multi-instance scheduler operations](../../knowledge/product/orchestration/multi-instance-scheduler.md)
-for schedule ownership and explicit legacy-global management. The fixed-name templates
-below are legacy single-instance deployment examples; do not copy them for coexisting checkouts.
+for schedule ownership and explicit legacy-global management (`--legacy-global`).
 
-If maintaining an existing single-instance launchd deployment, its templates are:
-
-```bash
-# Templates live at:
-#   docs/operator/macos/com.kyberion.agent-runtime-supervisor.plist
-#   docs/operator/macos/com.kyberion.chronos.plist
-#
-# Copy them to ~/Library/LaunchAgents/, replace every __...__ placeholder, then edit:
-#   - __KYBERION_REPOSITORY_ROOT__ with the checkout path
-#   - __PNPM_EXECUTABLE_PATH__ with the absolute path returned by `command -v pnpm`
-#   - __OPERATOR_HOME__ with the operator's home directory
-#   - KYBERION_CUSTOMER
-#   - log paths
-cp docs/operator/macos/com.kyberion.agent-runtime-supervisor.plist ~/Library/LaunchAgents/
-cp docs/operator/macos/com.kyberion.chronos.plist ~/Library/LaunchAgents/
-launchctl load -w ~/Library/LaunchAgents/com.kyberion.agent-runtime-supervisor.plist
-launchctl load -w ~/Library/LaunchAgents/com.kyberion.chronos.plist
-launchctl kickstart -k gui/$UID/com.kyberion.agent-runtime-supervisor
-launchctl kickstart -k gui/$UID/com.kyberion.chronos
-pnpm daemon:watchdog -- --json
-```
+The fixed-name templates under `docs/operator/macos/` are retired: do not copy them
+into `~/Library/LaunchAgents/`. They exist only as a reference for an existing
+single-instance deployment; run `pnpm kyberion scheduler reconcile --apply` from that
+checkout to migrate it to scoped units.
 
 The watchdog reads daemon heartbeats from `active/shared/runtime/heartbeats/` and records
 an ops alert to `active/shared/observability/ops-alerts.jsonl` when a configured daemon is
@@ -195,9 +190,9 @@ For production, prefer `LoadCredential=` or a protected environment file. The op
 
 ### 2.4 systemd units
 
-For coexisting checkouts, prefer the same `scheduler install` ceremony above; on
+Prefer the same `pnpm kyberion scheduler reconcile --apply` ceremony above; on
 Linux it plans per-instance systemd **user** services/timers. The root-level fixed-name
-templates below are legacy single-instance examples.
+templates below are legacy single-instance examples — do not use them for new installs.
 
 Templates live under `docs/operator/systemd/`:
 
@@ -444,21 +439,74 @@ tar czf /backup/kyberion-active-$(date +%F).tar.gz active/
 ## 9. Backup and Disaster Recovery
 
 Kyberion state that is intentionally outside git must be backed up before
-decommissioning, host migration, or dependency patch automation:
+decommissioning, host migration, or dependency patch automation. Store the
+backup passphrase once in the OS keychain through the secret actuator (hidden
+prompt; the value never touches argv, a plist or a repo file), then run
+backups without it on the command line:
 
 ```bash
-KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
-  pnpm backup create --scope all --out /Volumes/backup/kyberion-$(date +%F).tar.gz.enc --encrypt
+pnpm kyberion secret introduce kyberion-backup PASSPHRASE
+pnpm backup create --scope all --out /Volumes/backup/kyberion-$(date +%F).tar.gz.enc --encrypt
 ```
+
+Keep an offline copy of the same passphrase in your password manager: the
+keychain entry lives on this host only, and a disaster-recovery restore on a
+new machine needs it from somewhere else.
 
 Use an external volume or remote destination for real DR. A path under the same
 disk is acceptable for local restore drills only; the command warns when source
 and destination appear to share a device.
 
+What `--scope all` archives: `active/`, `vault/`, `knowledge/personal/` and
+`knowledge/confidential/`, minus re-creatable data — the
+`active/shared/{tmp,staging,cache}` floors, every
+`storage-retention-catalog.json` entry classed `cache` or `tmp`, the backup
+output directory and earlier archives in it, and the managed tool-runtime
+installs (only each runtime's `state.json` provenance is kept; reinstall the
+rest with `pnpm tool:setup`). Sockets, FIFOs, devices and symlinks are skipped,
+mission `.git` directories ride as git bundles, and the manifest records
+`excluded_roots`. A mission whose bundle cannot be created (for example macOS
+denying the daemon access to `.git/config`) is reported as a warning; its
+working-tree files are still archived. The tar timeout scales with the
+selected size (10 min + 1 s per 4 MiB, capped at 6 h).
+
+The passphrase is resolved in this order:
+
+1. `--passphrase-env <NAME>` — that variable only; if it is empty the run fails
+   instead of falling back.
+2. `KYBERION_BACKUP_PASSPHRASE` in the running process — a manual override.
+3. The secret identity `kyberion-backup` / `PASSPHRASE`: an external resolver
+   (`KYBERION_SECRET_RESOLVER_COMMAND`) or the OS keychain (service
+   `kyberion-backup`, account `passphrase`).
+
+The secret must live outside the repository. `vault/` and
+`knowledge/personal/` are archived, so a copy held only in an in-repo store
+(`vault/secrets/*.json`, or the `knowledge/personal/connections/kyberion-backup.json`
+document without a keychain entry) is refused with
+`[BACKUP_PASSPHRASE_IN_BACKUP_SCOPE]`. The connection document that
+`secret introduce` writes next to the keychain entry is excluded from every
+archive. Each run audits the source (`env` or `secret:<backend>`), never the
+value. Without any source the run fails immediately with
+`[BACKUP_PASSPHRASE_MISSING]`, naming the `secret introduce` command.
+
+The scheduled `backup-daily` job needs no passphrase in the daemon's
+environment: the chronos launchd agent runs in your GUI login session, so it
+can read the login keychain. Do not put the passphrase in the launchd plist's
+`EnvironmentVariables`: the installer refuses to forward it
+(`[POLICY_VIOLATION]`), and `pnpm kyberion scheduler reconcile` rewrites the
+plist carrying only the forwardable chronos variables, so a hand-added value
+is dropped on the next reconcile. On a
+host without a keychain (Linux, Windows services), configure an external
+resolver or set `KYBERION_BACKUP_PASSPHRASE` in the service manager's secret
+mechanism (systemd `LoadCredential=`/`EnvironmentFile=` outside the checkout).
+
 Restore into a clean Kyberion checkout or staging root:
 
 ```bash
-KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
+# Same host (keychain holds the passphrase):
+pnpm backup restore /Volumes/backup/kyberion-2026-07-04.tar.gz.enc --target /path/to/clean/kyberion --verify-baseline
+# New host: introduce the passphrase from your password manager first, or override once:
+KYBERION_BACKUP_PASSPHRASE='from-your-password-manager' \
   pnpm backup restore /Volumes/backup/kyberion-2026-07-04.tar.gz.enc --target /path/to/clean/kyberion --verify-baseline
 ```
 
@@ -466,8 +514,7 @@ For a tenant export, repeat the scope and tenant explicitly during restore so
 the archive boundary is checked before extraction:
 
 ```bash
-KYBERION_BACKUP_PASSPHRASE='store-in-your-password-manager' \
-  pnpm backup restore /Volumes/backup/tenant-acme.tar.gz.enc \
+pnpm backup restore /Volumes/backup/tenant-acme.tar.gz.enc \
     --scope tenant --tenant acme --target /path/to/clean/kyberion
 ```
 
@@ -547,8 +594,9 @@ pnpm peer:migrate-tenant-runtime -- --plan active/shared/runtime/migrations/peer
 Backups containing `vault/`, `knowledge/confidential/`, or confidential
 mission/project state must remain encrypted. Do not store
 `KYBERION_BACKUP_PASSPHRASE`, audit-chain keys, or SaaS auth encryption keys in
-the archive itself; keep those in the operator password manager or hardware key
-escrow. The scheduled job definition is `pipelines/backup-daily.json` and uses
+the archive itself; keep the backup passphrase in the OS keychain (via
+`secret introduce`) with an offline copy in the operator password manager, and
+the other keys in the password manager or hardware key escrow. The scheduled job definition is `pipelines/backup-daily.json` and uses
 the same `pnpm backup create --scope all --encrypt` command.
 
 ---

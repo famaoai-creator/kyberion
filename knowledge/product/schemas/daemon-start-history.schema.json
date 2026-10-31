@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "daemon-start-history.schema.json",
+  "title": "Daemon start history",
+  "description": "Rolling 24h start timestamps of a resident daemon (active/shared/runtime/state/<daemon>-starts.json); feeds restarts_1h / restarts_24h in its heartbeat for crash-loop detection.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["daemon_id", "starts"],
+  "properties": {
+    "daemon_id": { "type": "string", "minLength": 1 },
+    "starts": {
+      "type": "array",
+      "items": { "type": "string", "format": "date-time" },
+      "maxItems": 10000
+    }
+  }
+}

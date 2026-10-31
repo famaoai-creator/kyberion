@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "backup-drill-receipt.schema.json",
+  "title": "Backup restore drill receipt",
+  "description": "Last restore drill outcome (active/shared/runtime/state/backup-drill-last.json), written by core:run_backup_restore_drill on success, failure, and no-archive skip.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["completed_at", "archive", "ok"],
+  "properties": {
+    "completed_at": { "type": "string", "format": "date-time" },
+    "archive": { "type": ["string", "null"] },
+    "ok": { "type": "boolean" },
+    "reason": { "type": "string", "enum": ["no_archive", "failed"] },
+    "error": { "type": "string", "maxLength": 2048 }
+  }
+}

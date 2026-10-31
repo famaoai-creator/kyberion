@@ -40,6 +40,7 @@ import { safeExecResult, safeExistsSync, safeWriteFile } from '@agent/core/secur
 import {
   daemonUserPath,
   resolveDaemonManager,
+  type DaemonManager,
   type DaemonPlan,
   type DaemonRenderContext,
   type DaemonServiceSpec,
@@ -134,6 +135,31 @@ export function launchAgentTargetPath(label: string, homeDir: string = os.homedi
 
 export function chronosLaunchAgentTargetPath(homeDir: string = os.homedir()): string {
   return launchAgentTargetPath(CHRONOS_LAUNCHD_LABEL, homeDir);
+}
+
+/**
+ * The render context every install/reconcile uses for this host — one place,
+ * so `scheduler install` and `scheduler reconcile` render byte-identical units
+ * (reconcile compares unit hashes to decide on a reinstall).
+ */
+export function buildDaemonRenderContext(
+  manager: Pick<DaemonManager, 'platform'>,
+  repoRoot: string,
+  env: Record<string, string>,
+  platform?: NodeJS.Platform
+): DaemonRenderContext {
+  return {
+    nodePath: resolveStableNodePath(),
+    repoRoot,
+    homeDir: os.homedir(),
+    uid: currentUid(),
+    stagingDir: pathResolver.sharedTmp(`daemon-units/${manager.platform}`),
+    userPath: daemonUserPath(process.env.PATH, path.delimiter),
+    env,
+    userId:
+      platform === 'win32' || process.platform === 'win32' ? os.userInfo().username : undefined,
+    systemRoot: process.env.SystemRoot,
+  } as DaemonRenderContext;
 }
 
 function currentUid(): string {
@@ -257,20 +283,7 @@ export async function main(
     ...resolveForwardedChronosEnv(argv['forward-env'] as string[]),
     KYBERION_ROOT: repoRoot,
   };
-  const ctx: DaemonRenderContext = {
-    nodePath: resolveStableNodePath(),
-    repoRoot,
-    homeDir: os.homedir(),
-    uid: currentUid(),
-    stagingDir: pathResolver.sharedTmp(`daemon-units/${manager.platform}`),
-    userPath: daemonUserPath(process.env.PATH, path.delimiter),
-    env,
-    userId:
-      options.platform === 'win32' || process.platform === 'win32'
-        ? os.userInfo().username
-        : undefined,
-    systemRoot: process.env.SystemRoot,
-  } as DaemonRenderContext;
+  const ctx = buildDaemonRenderContext(manager, repoRoot, env, options.platform);
   const verbFlag = `${daemonId === 'chronos' ? '' : ` --daemon ${daemonId}`}${argv['legacy-global'] ? ' --legacy-global' : ''}`;
   const identityHint = `instance=${argv['legacy-global'] ? 'legacy-global' : instance.id} root=${repoRoot} service=${spec.label}`;
 

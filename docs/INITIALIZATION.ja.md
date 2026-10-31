@@ -216,13 +216,15 @@ identity の保存先と、baseline-check の L3 が確認する場所は、ア�
 ### Stage 8: baseline を all_clear にする
 
 - **実行コマンド**: `pnpm pipeline --input pipelines/baseline-check.json`
-- **目的**: 判定層 L0〜L11 がすべて通ることを確認します。層の一覧は標準フローの Step 0 にあります。
+- **目的**: 判定層 L0〜L12 がすべて通ることを確認します。層の一覧は標準フローの Step 0 にあります。
 - **初回に落ちやすい層**:
   - **L8（storage janitor）**: baseline-check が janitor を自動で投入します。完了後に再実行すれば通ります。手動で走らせる場合は `pnpm pipeline --input pipelines/storage-janitor.json --context '{"dry_run":false}'` を使います。
   - **L2（stale build）**: `dist/` がソースより古いと `needs_recovery` を返します。`pnpm build` で再ビルドして再実行してください（runbook: [stale-build-troubleshooting-runbook](../knowledge/product/orchestration/stale-build-troubleshooting-runbook.md)）。
-  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon を常駐させます。`pnpm kyberion scheduler install` で内容を確認し、`--apply` でホストのユーザーサービスマネージャー（macOS は launchd、Linux は `systemd --user` — `libs/core/daemon/service-manager.ts`）に登録します。その場で動かすだけなら `pnpm scheduler` です。`--daemon generation-schedule` / `--daemon daemon-watchdog` でメディア生成スケジューラーとデーモン監視（5 分間隔の one-shot）も同じ儀式で登録できます。macOS では node が `<prefix>/opt/node/bin/node`（バージョン非依存の symlink）に解決されるため、`brew upgrade node` で壊れません。
+  - **L10（scheduler）**: 有効なスケジュールがなければ通ります。スケジュールを登録したら chronos daemon とデーモン監視を常駐させます。`pnpm kyberion scheduler reconcile` で計画を確認し、`--apply` でこのチェックアウト専用のユニット（`com.kyberion.<id>.ws-<hash>`）をホストのユーザーサービスマネージャー（macOS は launchd、Linux は `systemd --user` — `libs/core/daemon/service-manager.ts`）に登録します。必須/任意は `knowledge/product/governance/resident-services.json` で宣言され、任意のもの（`agent-runtime-supervisor`、surface が無効なときの `generation-schedule`）は `--include <id>` で加えます。このチェックアウトを動かす旧固定名ユニットは移行し、他チェックアウトのユニットには触れず、再実行しても変化しません。onboarding はこれを自動では行いません。setup report の「Resident services [pending]」が合図です。その場で動かすだけなら `pnpm scheduler` です。単一デーモンの操作は `pnpm kyberion scheduler install|restart|status --daemon <id>` のままです。macOS では node が `<prefix>/opt/node/bin/node`（バージョン非依存の symlink）に解決されるため、`brew upgrade node` で壊れません。
   - **L10（stale heartbeat、daemon は生存）**: `pnpm kyberion scheduler status` が daemon の稼働を示すのに heartbeat が古く、エラーログに repo パスへの `EPERM` が繰り返される場合、daemon が OS のファイルアクセス許可を失っています。再インストールではなく `pnpm kyberion scheduler restart --apply`（launchd kickstart / `systemctl --user restart`）で再起動します（[runbook](../knowledge/product/governance/operations-hygiene-runbook.md)）。
+  - **L10（スケジュールごと）**: L10 はスケジュールごとにも判定します。予定時刻から 2 時間（interval は 1 周期）を過ぎても実行されていない、直近が失敗した・自動停止された、chronos が 1 時間に 4 回以上再起動している（crash loop）、直近の tick が失敗した、pipeline がスケジュールを宣言しているのに registry が空、のいずれでも落ちます。heartbeat が新しいだけでは通りません。各指摘に次のコマンドが出ます。
   - **L11（監査台帳）**: 監査記録が一つもないか古いと落ちます。Stage 7 などの governed 操作で記録されます。
+  - **L12（常駐運用）**: 最新のバックアップが 36 時間より古い、`backup-daily` が失敗した、バックアップのパスフレーズが env にも OS キーチェーンにもない、復元演習の記録がない・35 日より古い・失敗した、janitor が 48 時間完了していない・失敗した、必須の常駐ユニットがない、ユニットが別チェックアウトを指している、旧固定名ユニットがこのチェックアウトを動かしている、surface と OS ユニットが同じサービスを二重に動かしている、トリガー配送台帳が上限の 8 割を超えた、のいずれかで落ちます（`needs_attention` のみで `needs_recovery` にはなりません）。ユニットの指摘は `pnpm kyberion scheduler reconcile --apply`、パスフレーズの指摘は `pnpm kyberion secret introduce kyberion-backup PASSPHRASE` で解消します。同じ指摘は `pnpm kyberion doctor` の「Resident ops」行にも出ます。
 
 ### Stage 9: tenant・organization・activation（必要な場合のみ）
 

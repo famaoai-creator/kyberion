@@ -1,7 +1,7 @@
 ---
 title: 'Phase Protocol: Onboarding'
 tags: [governance, lifecycle, onboarding]
-last_updated: 2026-10-18
+last_updated: 2026-11-01
 runtime_stages: [intake, classification]
 ---
 
@@ -45,8 +45,13 @@ pnpm env:bootstrap --manifest kyberion-toolchain   # dist/ を使うので build
 pnpm kyberion doctor
 pnpm kyberion setup report --persona first-time-user
 pnpm kyberion secret introduce <service-id> <secret-key>   # 必要な secret だけ。値は argv に載せない
+pnpm kyberion secret introduce kyberion-backup PASSPHRASE  # 暗号化バックアップの鍵（keychain に保存）
 pnpm surfaces reconcile
 ```
+
+バックアップの passphrase は keychain に置き、同じ値をパスワードマネージャーにもオフラインで控える
+（別マシンでの復元用）。plist や `.env` には書かない。リポジトリ内の保存先にしか無い鍵は
+アーカイブに入るため拒否される（`[BACKUP_PASSPHRASE_IN_BACKUP_SCOPE]`）。詳細は標準フロー Step 2。
 
 baseline が `needs_recovery` または `fatal_error` の場合は、通常の onboarding を始めず、
 それぞれ recovery または障害修復へ分岐する。
@@ -77,7 +82,15 @@ presence-studio を開くと作られる。端末だけで使うなら `pnpm org
 ### Step 4: baseline を all_clear にする
 
 baseline を再実行し、`needs_attention` が残れば失敗層を確認する。初回は L8（storage janitor）、
-L10（chronos scheduler）、L11（監査台帳）が落ちやすい。対処は標準フロー Step 4 を参照する。
+L10（chronos scheduler とスケジュールごとの遅延・失敗）、L11（監査台帳）、L12（常駐運用:
+バックアップ・復元演習・janitor・常駐ユニット）が落ちやすい。L12 のユニット指摘は
+`pnpm kyberion scheduler reconcile --apply`、バックアップのパスフレーズ指摘は
+`pnpm kyberion secret introduce kyberion-backup PASSPHRASE` で解消する。対処は標準フロー Step 4 を参照する。
+
+onboarding は常駐サービス（chronos scheduler・デーモン監視）を自動では登録しない。
+`pnpm kyberion setup report` が「Resident services [pending]」を示したら、
+`pnpm kyberion scheduler reconcile` で計画を確認してから `--apply` で登録する。
+このチェックアウト専用のユニットだけを作り、他のチェックアウトのユニットには触れない。
 
 ルート 1 はここで Step 9 へ進む。
 

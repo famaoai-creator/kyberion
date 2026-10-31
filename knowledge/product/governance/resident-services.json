@@ -1,0 +1,28 @@
+{
+  "$schema": "../schemas/resident-services.schema.json",
+  "version": 1,
+  "description": "Desired resident services per checkout. `pnpm kyberion scheduler reconcile` diffs this against the units the host service manager actually has (libs/core/daemon/installed-units.ts) and installs checkout-scoped units (com.kyberion.<id>.ws-<hash>). Required services are installed by reconcile --apply; optional services only with --include <id>. A service with owner_surface is run by surface-runtime whenever that surface is enabled, so no OS unit is installed for it then.",
+  "services": [
+    {
+      "id": "chronos",
+      "requirement": "required",
+      "rationale": "The only pipeline scheduler; when it is not running every registered schedule silently stops firing."
+    },
+    {
+      "id": "daemon-watchdog",
+      "requirement": "required",
+      "rationale": "Periodic heartbeat check that must fire even when every watched daemon is dead, which a chronos-scheduled pipeline cannot guarantee."
+    },
+    {
+      "id": "agent-runtime-supervisor",
+      "requirement": "optional",
+      "rationale": "Clients spawn the supervisor on demand and it holds a daemon lock; a resident unit is only useful for always-on agent runtimes."
+    },
+    {
+      "id": "generation-schedule",
+      "requirement": "optional",
+      "owner_surface": "generation-schedule",
+      "rationale": "The generation-schedule surface runs this daemon when enabled; an OS unit as well would double every tick."
+    }
+  ]
+}

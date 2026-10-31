@@ -12,8 +12,11 @@ import {
 } from '@agent/core/foundation';
 import {
   assertSafeRepositoryPath,
+  safeAppendFileSync,
+  safeExecResultAsync,
   safeExistsSync,
   safeLstat,
+  safeMkdir,
   safeReaddir,
 } from '@agent/core/secure-io';
 import { logger } from '@agent/core/core';
@@ -78,6 +81,15 @@ import {
   storeBaselineCache,
   type BaselineCacheSnapshot,
 } from '@agent/core/baseline-check-cache';
+import {
+  evaluateOpsHealth,
+  isSchedulerOpsFinding,
+  formatOpsHealthFinding,
+  type OpsHealthFinding,
+  type OpsHealthReport,
+} from '@agent/core/ops-health';
+import { writeJanitorFailureMarker } from '@agent/core/ops-health-state';
+import { collectOpsHealthInput } from './lib/ops-health-input.js';
 import { scanTenantDrift } from './watch_tenant_drift.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { inspectBaselineBuildReadiness, type BuildReadiness } from './baseline_build_readiness.js';
@@ -306,6 +318,17 @@ export function evaluateSchedulerHealth(input: {
       ok: false,
       reason: `heartbeat pid ${heartbeat.heartbeat?.pid ?? 'unknown'} is not alive`,
     };
+  } else if (heartbeat.heartbeat.status === 'error') {
+    // A fresh heartbeat whose own status is `error` is the daemon reporting a
+    // failed tick / fatal crash — fresh is not alive.
+    schedulerAlive = {
+      ok: false,
+      reason: `heartbeat reports status error${
+        typeof heartbeat.heartbeat.details?.last_tick_error === 'string'
+          ? `: ${heartbeat.heartbeat.details.last_tick_error}`
+          : ''
+      }`,
+    };
   }
 
   const dueInWindow = enabled.filter((schedule) => {
@@ -343,6 +366,62 @@ export function evaluateSchedulerHealth(input: {
     },
     healthy: schedulerAlive.ok && schedulesFiring.ok,
   };
+}
+
+// ---------------------------------------------------------------------------
+// Resident ops (ops-health.ts). Scheduler findings (per-schedule overdue /
+// failing, crash loop, tick failing, empty registry) fail L10; everything else
+// (backup + restore drill, janitor, installed units, trigger store) fails L12.
+// Both degrade only to needs_attention — never needs_recovery.
+// ---------------------------------------------------------------------------
+
+/** Structural subset of PfcController's LayerObservation (kept local: TS2742). */
+export interface OpsLayerObservation {
+  passed: boolean;
+  reason?: string;
+  evidence?: string[];
+}
+
+export function splitOpsHealthFindings(findings: readonly OpsHealthFinding[]): {
+  scheduler: OpsHealthFinding[];
+  resident: OpsHealthFinding[];
+} {
+  return {
+    scheduler: findings.filter(isSchedulerOpsFinding),
+    resident: findings.filter((finding) => !isSchedulerOpsFinding(finding)),
+  };
+}
+
+export function schedulerLayerObservation(
+  health: SchedulerHealthReport,
+  schedulerFindings: readonly OpsHealthFinding[]
+): OpsLayerObservation {
+  const reasons = [
+    ...(health.scheduler_alive.ok ? [] : [`scheduler_alive: ${health.scheduler_alive.reason}`]),
+    ...(health.schedules_firing.ok ? [] : [`schedules_firing: ${health.schedules_firing.reason}`]),
+    ...(schedulerFindings.length > 0 ? [`${schedulerFindings.length} scheduler finding(s)`] : []),
+  ];
+  return {
+    passed: health.healthy && schedulerFindings.length === 0,
+    ...(reasons.length > 0 ? { reason: reasons.join('; ') } : {}),
+    ...(schedulerFindings.length > 0
+      ? { evidence: schedulerFindings.map(formatOpsHealthFinding) }
+      : {}),
+  };
+}
+
+export function residentOpsLayerObservation(
+  residentFindings: readonly OpsHealthFinding[]
+): OpsLayerObservation {
+  return residentFindings.length === 0
+    ? { passed: true }
+    : {
+        passed: false,
+        reason: `${residentFindings.length} resident ops finding(s): ${residentFindings
+          .map((finding) => finding.id)
+          .join(', ')}`,
+        evidence: residentFindings.map(formatOpsHealthFinding),
+      };
 }
 
 /**
@@ -523,6 +602,88 @@ export function janitorSpawnEnv(baseEnv: NodeJS.ProcessEnv = process.env): NodeJ
   return env;
 }
 
+export const JANITOR_MAINTENANCE_JOB_FLAG = '--janitor-maintenance-job';
+export const JANITOR_MAINTENANCE_LOG_NAME = 'baseline-janitor-maintenance.log';
+const JANITOR_MAINTENANCE_TIMEOUT_MS = 30 * 60 * 1000;
+
+export function janitorMaintenancePipelineArgs(): string[] {
+  return [
+    'dist/scripts/run_pipeline.js',
+    '--input',
+    'pipelines/storage-janitor.json',
+    '--context',
+    JSON.stringify({ dry_run: false }),
+  ];
+}
+
+/**
+ * Job mode of the baseline-submitted janitor run (detached child). Runs the
+ * storage-janitor pipeline, appends its output to
+ * active/shared/logs/process/baseline-janitor-maintenance.log, and records
+ * active/shared/runtime/state/janitor-last-failure.json when it exits non-zero
+ * — the ops-health janitor finding cites that marker and log.
+ */
+export async function runJanitorMaintenanceJob(
+  deps: {
+    run?: typeof safeExecResultAsync;
+    appendLog?: (filePath: string, content: string) => void;
+    writeFailure?: typeof writeJanitorFailureMarker;
+    now?: () => Date;
+  } = {}
+): Promise<{ status: number | null; logPath: string }> {
+  const run = deps.run ?? safeExecResultAsync;
+  const now = deps.now ?? (() => new Date());
+  const logPath = pathResolver.sharedLogsProcess(JANITOR_MAINTENANCE_LOG_NAME);
+  const appendLog =
+    deps.appendLog ??
+    ((filePath: string, content: string) => {
+      safeMkdir(path.dirname(filePath), { recursive: true });
+      safeAppendFileSync(filePath, content);
+    });
+  const startedAt = now().toISOString();
+  let status: number | null = null;
+  let error: string | undefined;
+  let output = '';
+  try {
+    const result = await run(process.execPath, janitorMaintenancePipelineArgs(), {
+      cwd: pathResolver.rootDir(),
+      env: janitorSpawnEnv(),
+      timeoutMs: JANITOR_MAINTENANCE_TIMEOUT_MS,
+    });
+    status = result.status;
+    output = `${result.stdout || ''}${result.stderr || ''}`;
+    if (result.error) error = result.error.message;
+  } catch (err) {
+    error = err instanceof Error ? err.message : String(err);
+  }
+  const relativeLog = path.relative(pathResolver.rootDir(), logPath);
+  try {
+    appendLog(
+      logPath,
+      `--- ${startedAt} storage-janitor (baseline maintenance) exit=${status ?? 'none'}${error ? ` error=${error}` : ''}\n${output.slice(-64 * 1024)}\n`
+    );
+  } catch (err) {
+    logger.warn(
+      `[BASELINE] janitor maintenance log not written — ${err instanceof Error ? err.message : String(err)} | next: check write access to active/shared/logs/process | evidence: ${relativeLog}`
+    );
+  }
+  if (status !== 0) {
+    try {
+      (deps.writeFailure ?? writeJanitorFailureMarker)({
+        failed_at: now().toISOString(),
+        exit_code: status,
+        log_path: relativeLog,
+        ...(error ? { error: error.slice(0, 2048) } : {}),
+      });
+    } catch (err) {
+      logger.warn(
+        `[BASELINE] janitor failure marker not written — ${err instanceof Error ? err.message : String(err)} | next: run \`pnpm pipeline --input pipelines/storage-janitor.json\` in the foreground | evidence: ${relativeLog}`
+      );
+    }
+  }
+  return { status, logPath };
+}
+
 function maybeSubmitJanitorMaintenanceJob(): {
   submitted: boolean;
   pending: boolean;
@@ -545,19 +706,16 @@ function maybeSubmitJanitorMaintenanceJob(): {
   // Real run (not dry_run): the janitor only writes its completion marker on a
   // real run, so a dry-run submission can never satisfy readJanitorLastRunMs()
   // and would leave the baseline stuck at needs_attention for every TTL window.
+  // The detached child is this script in job mode: it runs the pipeline, keeps
+  // its output in a process log and records a failure marker on non-zero exit
+  // (a bare detached run with stdio 'ignore' failed without a trace).
   spawnManagedProcess({
     resourceId: `baseline-check:storage-janitor:${Date.now().toString(36)}`,
     kind: 'service',
     ownerId: 'baseline-check',
     ownerType: 'baseline-check-maintenance',
     command: process.execPath,
-    args: [
-      'dist/scripts/run_pipeline.js',
-      '--input',
-      'pipelines/storage-janitor.json',
-      '--context',
-      JSON.stringify({ dry_run: false }),
-    ],
+    args: ['dist/scripts/run_baseline_check.js', JANITOR_MAINTENANCE_JOB_FLAG],
     spawnOptions: {
       cwd: pathResolver.rootDir(),
       env: janitorSpawnEnv(),
@@ -587,6 +745,9 @@ export function deriveBaselineStatus(
 ): 'all_clear' | 'needs_onboarding' | 'needs_recovery' | 'needs_attention' {
   if (!result.success) {
     if (result.deferred) return 'needs_attention';
+    // L10 scheduler / L12 resident ops are operational findings for a human:
+    // they never trigger automated recovery, even with a broken circuit.
+    if (result.failedLayer === 'L10' || result.failedLayer === 'L12') return 'needs_attention';
     if (result.failedLayer === 'L3') return 'needs_onboarding';
     if (['L0', 'L1', 'L2'].includes(result.failedLayer || '')) return 'needs_recovery';
     return 'needs_attention';
@@ -796,8 +957,10 @@ export async function runBaselineCheck() {
     healthy: true,
   };
   let failedSchedules: FailedScheduleFinding[] = [];
+  let registrySchedules: ScheduledPipeline[] | null = null;
   try {
     const scheduleRegistry = loadScheduleRegistry();
+    registrySchedules = scheduleRegistry.schedules;
     schedulerHeartbeat = readDaemonHeartbeat(CHRONOS_DAEMON_ID, {
       staleAfterMs: SCHEDULER_HEARTBEAT_MAX_AGE_MS,
       now: schedulerNow,
@@ -818,6 +981,41 @@ export async function runBaselineCheck() {
     schedulerHealth = schedulerHealthEvaluationFailure(reason);
     logger.warn(`[BASELINE] scheduler health evaluation failed (non-fatal): ${reason}`);
   }
+  // Resident ops verdicts (ops-health.ts): per-schedule overdue/failing, crash
+  // loop, backup + restore drill, janitor, installed units, trigger store.
+  // Evaluation failure surfaces as a finding (fail closed to needs_attention).
+  let opsHealth: OpsHealthReport = { findings: [] };
+  let opsHealthError: string | null = null;
+  try {
+    const opsInput = await collectOpsHealthInput({
+      now: schedulerNow,
+      schedules: registrySchedules,
+      heartbeat: schedulerHeartbeat,
+      inspectUnits: !isVitestProcess(),
+    });
+    opsHealth = evaluateOpsHealth(opsInput, schedulerNow);
+  } catch (err: unknown) {
+    opsHealthError = err instanceof Error ? err.message : String(err);
+    opsHealth = {
+      findings: [
+        {
+          id: 'ops-health-unevaluated',
+          severity: 'warn',
+          reason: `resident ops health could not be evaluated: ${opsHealthError}`,
+          next: 'pnpm kyberion doctor',
+        },
+      ],
+    };
+    logger.warn(
+      formatDiagnostic({
+        component: 'baseline',
+        what: 'ops health evaluation failed (non-fatal)',
+        why: opsHealthError,
+        next: 'run `pnpm kyberion doctor` to see which source fails',
+      })
+    );
+  }
+  const opsHealthSplit = splitOpsHealthFindings(opsHealth.findings);
   const auditLedger = readAuditLedgerFreshness(
     pathResolver.sharedLogsAudit(),
     schedulerNow.getTime()
@@ -1084,13 +1282,20 @@ export async function runBaselineCheck() {
 
   // L10: Scheduler Layer (LC-01a) — chronos daemon liveness + schedules
   // actually firing. Fails (→ needs_attention via deriveBaselineStatus) when
-  // enabled schedules exist but the daemon heartbeat is dead/stale or due
-  // schedules recorded no lastRun in 24h. A fresh environment with zero
-  // enabled schedules passes.
-  sentinel.registerLayer('L10', async () => schedulerHealth.healthy);
+  // enabled schedules exist but the daemon heartbeat is dead/stale/error or
+  // due schedules recorded no lastRun in 24h, and — per schedule — when any
+  // schedule is overdue or failing, chronos is crash-looping, or pipelines
+  // declare schedules the registry never synced.
+  sentinel.registerLayer('L10', async () =>
+    schedulerLayerObservation(schedulerHealth, opsHealthSplit.scheduler)
+  );
 
   // EG-03: audit continuity is a first-class health layer.
   sentinel.registerLayer('L11', async () => auditLedger.fresh);
+
+  // L12: Resident ops — backup + restore drill, janitor, installed OS units,
+  // trigger delivery store. Findings degrade to needs_attention only.
+  sentinel.registerLayer('L12', async () => residentOpsLayerObservation(opsHealthSplit.resident));
 
   const result = await sentinel.run();
   const state = sentinel.getState();
@@ -1144,6 +1349,10 @@ export async function runBaselineCheck() {
         age_ms: schedulerHeartbeat.age_ms ?? null,
         pid: schedulerHeartbeat.heartbeat?.pid ?? null,
         max_age_ms: SCHEDULER_HEARTBEAT_MAX_AGE_MS,
+        process_status: schedulerHeartbeat.heartbeat?.status ?? null,
+        started_at: schedulerHeartbeat.heartbeat?.details?.started_at ?? null,
+        restarts_1h: schedulerHeartbeat.heartbeat?.details?.restarts_1h ?? null,
+        restarts_24h: schedulerHeartbeat.heartbeat?.details?.restarts_24h ?? null,
       },
       failed_schedules: failedSchedules,
       alerts: {
@@ -1154,6 +1363,14 @@ export async function runBaselineCheck() {
     audit_ledger: {
       ...auditLedger,
       freshness_max_age_ms: AUDIT_LEDGER_FRESHNESS_MAX_AGE_MS,
+    },
+    // L10/L12: resident ops verdicts — the same findings `pnpm kyberion doctor` prints.
+    ops_health: {
+      evaluated_at: schedulerNow.toISOString(),
+      error: opsHealthError,
+      healthy: opsHealth.findings.length === 0,
+      scheduler_findings: opsHealthSplit.scheduler.map((finding) => finding.id),
+      findings: opsHealth.findings,
     },
     desktop_observation: desktopObservation,
     // XP-01: population job output — never consulted by deriveBaselineStatus,
@@ -1211,6 +1428,11 @@ export const runBaselineCheckCli = defineScript({
   name: 'baseline-check',
   flags: [],
   async run(context) {
+    if (context.argv.includes(JANITOR_MAINTENANCE_JOB_FLAG)) {
+      const job = await runJanitorMaintenanceJob();
+      if (job.status !== 0) throw new ScriptExitError(1, '', true, job);
+      return job;
+    }
     try {
       const report = await runBaselineCheck();
       context.print(report);

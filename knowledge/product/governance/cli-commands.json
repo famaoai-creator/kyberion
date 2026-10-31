@@ -3696,6 +3696,16 @@
       "native_help": true
     },
     {
+      "id": "script.scheduler.reconcile",
+      "module": "scripts/reconcile_resident_services.ts",
+      "command": "scheduler reconcile",
+      "noun": "scheduler",
+      "verb": "reconcile",
+      "audience": "operator",
+      "description": "cli_cmd_script_chronos_reconcile",
+      "group": "operate"
+    },
+    {
       "id": "script.scheduler.uninstall",
       "module": "scripts/install_chronos_launchd.ts",
       "args": ["--uninstall"],

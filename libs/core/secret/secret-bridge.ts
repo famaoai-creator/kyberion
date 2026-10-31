@@ -503,18 +503,29 @@ export async function fetchSecret(service: string, account: string): Promise<str
 }
 
 /**
+ * Synchronous read of the OS keychain only (macOS login keychain; null on
+ * other platforms or on a miss). Unlike {@link fetchSecretSync} it never falls
+ * through to the in-repo file vault or SECRET_* env, so a caller can require
+ * that a value lives outside the repository. Never logs the value.
+ */
+export function fetchOsKeychainSecretSync(service: string, account: string): string | null {
+  if (process.platform !== 'darwin') return null;
+  const result = safeExecResult(
+    'security',
+    ['find-generic-password', '-a', account, '-s', service, '-w'],
+    { timeoutMs: KEYCHAIN_COMMAND_TIMEOUT_MS, maxOutputMB: 1 }
+  );
+  if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+  return null;
+}
+
+/**
  * Synchronous lookup for secret-guard fallthrough. Prefer async {@link fetchSecret}
  * for new call sites. Never logs the value.
  */
 export function fetchSecretSync(service: string, account: string): string | null {
-  if (process.platform === 'darwin') {
-    const result = safeExecResult(
-      'security',
-      ['find-generic-password', '-a', account, '-s', service, '-w'],
-      { timeoutMs: 10_000, maxOutputMB: 1 }
-    );
-    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
-  }
+  const keychainValue = fetchOsKeychainSecretSync(service, account);
+  if (keychainValue) return keychainValue;
 
   if (getRegisteredEnvBool('KYBERION_ALLOW_FILE_SECRETS') === true) {
     try {

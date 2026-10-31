@@ -418,15 +418,24 @@ keep them mergeable:
   tamper-check consumer) is gitignored and rebuilt by `pnpm build`
   (`generate_knowledge_index --manifest-only`, which never rewrites the
   tracked `_index.md`, so a build cannot hide a stale index from the gate).
+- **Check the invariant, not a snapshot.** The role-assumption reachability
+  report (RN-02, ~800 KB) is computed in memory: the `role-assumption-reachability`
+  PR gate (`scripts/analyze_role_assumptions.ts`) fails only on RN-03
+  invariant violations — a reachable role not granted in
+  `role-assumption-policy.json`, a policy/analysis system-role mismatch, a
+  launched `SYSTEM_ROLE` without analysis, or a narrowed role that is no
+  longer fully resolved — with one diagnostic per violation. `--write-report`
+  writes the full report to `active/shared/cache/system/role-assumption/reachability.json`
+  for review; it is never committed. Prefer this shape whenever a committed
+  generated file exists only to be diffed by a gate.
 - **Fragments instead of a shared file.** PRs never edit `CHANGELOG.md`; they
   add `changelog.d/<short-slug>.md` (`category:` front-matter + list items,
   validated by the `changelog-fragments` PR gate). The release runs
   `pnpm kyberion changelog assemble` to fold them into `[Unreleased]`.
 - **Regenerate, don't hand-merge, the files that stay tracked.**
-  `knowledge/_index.md`, `docs/developer/CONFIGURATION.md`,
-  `docs/developer/env.example` and
-  `docs/developer/role-assumption-reachability.json` (plus the curated
-  `env-registry.json`) carry `merge=kyberion-regenerate` in `.gitattributes`.
+  `knowledge/_index.md`, `docs/developer/CONFIGURATION.md` and
+  `docs/developer/env.example` (plus the curated `env-registry.json`) carry
+  `merge=kyberion-regenerate` in `.gitattributes`.
 - **After any merge or rebase that touched them, run
   `pnpm kyberion resolve generated`.** It works without any merge driver:
   unmerged generated files are first rebuilt from their index conflict stages
@@ -435,13 +444,13 @@ keep them mergeable:
   **every committed, CI-drift-checked generated file** in dependency order
   (op-registry → pseudo-locale → vocabulary-types → pii-rules → cli-reference
   → capability-seams → subagent definitions → provider hooks → env registry →
-  role-assumption reachability → knowledge index), validates the changelog
+  knowledge index), validates the changelog
   fragments and stages the results (`--check` is read-only and lists every
   drifted file; `--no-stage` skips `git add`). Never run the individual
   `generate:*` commands by hand to chase a freshness gate — this one command
   regenerates everything. The `.husky/pre-push` hook runs
-  `--check --fast` (`--fast` skips the ~100s role-assumption analysis, which
-  its CI gate still covers) and prints the fix command;
+  `--check --fast` (`--fast` skips any step marked `slow`; none is today) and
+  prints the fix command;
   `KYBERION_SKIP_PRE_PUSH=1 git push` skips it once. Only an `env-registry.json` entry changed
   differently on both sides needs a human: edit its markers keeping both
   descriptions' intent, then rerun. The `post-merge` hook reminds you when
@@ -461,8 +470,7 @@ keep them mergeable:
   drivers, so a PR can still show "conflicts" there: merge `main` locally,
   run `resolve generated`, push. Rebases use the driver (when installed) but
   run no `post-merge` hook. Only regeneration makes a merge correct, and the
-  freshness gates (`env-registry`, `role-assumption-reachability`,
-  `catalogs`) are what enforce it.
+  freshness gates (`env-registry`, `catalogs`) are what enforce it.
 - **Adding a tracked generated file or generator**: add a step (script,
   tracked outputs, `after` dependencies) to `GENERATED_ARTIFACT_STEPS` in
   `scripts/resolve_generated.ts`; for a file with a `.gitattributes`

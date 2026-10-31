@@ -1,7 +1,7 @@
 ---
 title: 全体調査 — 足りないもの・邪魔になった仕組み
 tags: [survey, governance, ci, architecture, runtime, developer-experience, legacy]
-last_updated: 2026-10-31
+last_updated: 2026-11-01
 status: active
 ---
 
@@ -81,3 +81,9 @@ main（fd0a5c2a4）を対象に、5 つの観点で読み取りのみの調査�
   - 推論バックエンドに `maturity` フィールドを追加する（スキーマ変更を伴う）。
   - `@agent/core` の公開面を縮小する。
   - tool-runtime-policy の未使用の `cache_root` を整理する。
+- 2026-11-01：A-1、A-2、A-3、C-8、C-9 に対応した（MSN-OPS-HEALTH-20261101）。
+  - A-1：baseline の L10 をスケジュールごとの判定にし（遅延・失敗・crash loop・tick 失敗・registry 空）、L12（常駐運用）を追加した。バックアップ・パスフレーズ・復元演習・janitor の失敗が `needs_attention` と `pnpm kyberion doctor` に出る。chronos の heartbeat は tick 完了後にだけ更新し、再起動回数を記録する。復元演習は結果を `backup-drill-last.json` に残す。マシンでは `pnpm kyberion secret introduce kyberion-backup PASSPHRASE` でパスフレーズを入れ、`pnpm pipeline --input pipelines/backup-daily.json` と復元演習を一度ずつ成功させる必要がある。
+  - A-2：launchd / systemd のユニットをチェックアウトごとのラベル（`com.kyberion.<id>.ws-<hash>`）に分け、`pnpm kyberion scheduler reconcile` が `resident-services.json` との差分を出す。surface と二重に動くユニットは L12 で指摘する。マシンでは各チェックアウトで `pnpm kyberion scheduler reconcile --apply` を実行し、旧固定名ユニットを移行する必要がある。
+  - A-3：拡張機能の inspect 送信を Native Messaging host 経由に移した。マシンでは native host を登録し直し、拡張機能を再読み込みする必要がある。
+  - C-8：ロール到達可能性のスナップショットをコミット対象から外し、到達可能なロールが許可されているかだけを検査するようにした。マシンでの作業はない。
+  - C-9：pull_request では full のみのゲートだけを実行するようにし、ゲートの二重実行をなくした。マシンでの作業はない。

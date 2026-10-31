@@ -24,7 +24,10 @@ import { createGhPrPort } from './pr_shadow.js';
 import { observePullRequests, DEFAULT_IGNORED_CHECKS } from '@agent/core/governance/pr-shadow';
 import { runApprovalStoreHygieneSweeps } from './approval_store_hygiene.js';
 import { runAutoCheckpoint } from './auto_checkpoint.js';
-import { createBackup, runRestoreDrill } from './backup.js';
+import { createBackup, listBackups, runRestoreDrill } from './backup.js';
+import { writeBackupDrillReceipt } from '@agent/core/ops-health-state';
+import type { BackupDrillReceipt } from '@agent/core/ops-health';
+import { logger } from '@agent/core/core';
 import { generateSoftwareQualityArtifacts } from './software_quality_report.js';
 import { runSoakEnduranceHarness } from './soak_endurance.js';
 import { runSoakRestartE2E } from './soak_restart_e2e.js';
@@ -477,23 +480,61 @@ export function runInlineBackupCreate(
   );
 }
 
+/** Best effort: a receipt write failure must never mask the drill outcome. */
+function recordBackupDrillReceipt(receipt: BackupDrillReceipt): void {
+  try {
+    writeBackupDrillReceipt(receipt);
+  } catch (error) {
+    logger.warn(
+      `[backup-drill] receipt not written — ${error instanceof Error ? error.message : String(error)} | next: check write access to the shared runtime state floor | evidence: ok=${receipt.ok}`
+    );
+  }
+}
+
 export function runInlineBackupRestoreDrill(
   step: PipelineAdfStep,
   params: Record<string, unknown>,
   ctx: Record<string, unknown>
 ): Record<string, unknown> {
-  const result = runRestoreDrill({
-    command: 'drill',
-    scope: 'all',
-    backupDir: String(resolveVars(params.backup_dir ?? ctx.backup_dir ?? '', ctx)) || undefined,
-    target:
-      String(resolveVars(params.restore_target ?? ctx.restore_target ?? '', ctx)) || undefined,
-    prepareCheckout: true,
-    force: true,
-    passphraseEnv: 'KYBERION_BACKUP_PASSPHRASE',
-    retainDaily: 7,
-    retainWeekly: 4,
-  });
+  const backupDir =
+    String(resolveVars(params.backup_dir ?? ctx.backup_dir ?? '', ctx)) || undefined;
+  // The receipt (active/shared/runtime/state/backup-drill-last.json) is the
+  // ops-health evidence that backups are restorable — a schedule lastStatus
+  // alone cannot tell "never drilled" from "drill skipped for lack of archive".
+  if (listBackups(backupDir).length === 0) {
+    recordBackupDrillReceipt({
+      completed_at: nowIso(),
+      archive: null,
+      ok: false,
+      reason: 'no_archive',
+    });
+    return exportValue(params, step, { ok: false, skipped: true, reason: 'no_archive' }, ctx);
+  }
+  let result: ReturnType<typeof runRestoreDrill>;
+  try {
+    result = runRestoreDrill({
+      command: 'drill',
+      scope: 'all',
+      backupDir,
+      target:
+        String(resolveVars(params.restore_target ?? ctx.restore_target ?? '', ctx)) || undefined,
+      prepareCheckout: true,
+      force: true,
+      passphraseEnv: 'KYBERION_BACKUP_PASSPHRASE',
+      retainDaily: 7,
+      retainWeekly: 4,
+    });
+  } catch (error) {
+    recordBackupDrillReceipt({
+      completed_at: nowIso(),
+      archive: null,
+      ok: false,
+      reason: 'failed',
+      error: (error instanceof Error ? error.message : String(error)).slice(0, 2048),
+    });
+    throw error;
+  }
+  recordBackupDrillReceipt({ completed_at: nowIso(), archive: result.archive, ok: true });
   return exportValue(params, step, { ok: true, ...result }, ctx);
 }
 
