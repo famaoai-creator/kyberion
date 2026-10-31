@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, peer, messaging, discovery, routing, coordination, gpt-5.4-mini]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-01
+last_updated: 2026-10-31
 ---
 
 # Kyberion Mesh Hub Implementation Instructions for GPT-5.4 mini
@@ -169,7 +169,7 @@ Every task is one patch. Read the listed current code and tests before editing. 
 - `knowledge/product/schemas/mesh-request.schema.json`
 - `knowledge/product/schemas/mesh-delivery-record.schema.json`
 - `knowledge/product/schemas/mesh-topic-subscription.schema.json`
-- `knowledge/product/governance/mesh-hub-policy.json`
+- `knowledge/product/governance/mesh-hub-policy.json` (retired 2026-10-31 with the router; now under `retired/knowledge/`)
 - `libs/core/mesh/mesh-hub-contract.ts`
 - focused schema/contract tests
 
@@ -255,9 +255,10 @@ Every task is one patch. Read the listed current code and tests before editing. 
 
 > **Status (2026-10-01):** `mesh-router.ts` and the write/routing side of
 > `mesh-topic-registry.ts` (`subscribeMeshTopic`, `resolveMeshTopicRecipients`) were retired —
-> the broker builds its own route and nothing subscribed peers or routed topic selectors. Only
-> the read side used by `inspectMeshHub` remains. See
-> [`retired/README.md`](../../../retired/README.md) before restoring.
+> the broker builds its own route and nothing subscribed peers or routed topic selectors.
+> **2026-10-31:** the remaining read side (`listMeshTopicSubscriptions`, the `topics` view of
+> `inspectMeshHub`) and `mesh-hub-policy.json` (+ schema) were retired too, since no live code
+> writes subscriptions. See [`retired/README.md`](../../../retired/README.md) before restoring.
 
 **Required behavior:**
 

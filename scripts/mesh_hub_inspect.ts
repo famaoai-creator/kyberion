@@ -8,8 +8,7 @@ import { defineScript, isDirectScript } from './lib/harness.js';
 
 type Print = (value: unknown) => void;
 
-type MeshHubInspectionSection =
-  'all' | 'peers' | 'routes' | 'deliveries' | 'dead-letters' | 'topics';
+type MeshHubInspectionSection = 'all' | 'peers' | 'routes' | 'deliveries' | 'dead-letters';
 
 function printJson(data: unknown, print: Print): void {
   print(JSON.stringify(data, null, 2));
@@ -45,14 +44,6 @@ function renderSection(
             `- ${deadLetter.dead_letter_id} | ${deadLetter.delivery_id} | ${deadLetter.failure_class} | ${deadLetter.redacted_reason}`
         ),
       ];
-    case 'topics':
-      return [
-        `Topics (${report.topic_count})`,
-        ...report.topics.map(
-          (topic) =>
-            `- ${topic.tenant_id}:${topic.topic} | subscribers=${topic.subscribers} | fan_out=${topic.fan_out_count} | request_kinds=${topic.request_kinds.join(', ')}`
-        ),
-      ];
     case 'all':
     default:
       return formatMeshHubInspectionReport(report);
@@ -65,7 +56,7 @@ async function main(args: string[] = [], print: Print = () => undefined): Promis
     .usage('$0 [section]')
     .positional('section', {
       type: 'string',
-      choices: ['all', 'peers', 'routes', 'deliveries', 'dead-letters', 'topics'],
+      choices: ['all', 'peers', 'routes', 'deliveries', 'dead-letters'],
       default: 'all',
       describe: 'Which read-only mesh hub view to render',
     })

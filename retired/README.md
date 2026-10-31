@@ -57,7 +57,7 @@ Every module below had no production caller (only its own test and barrel re-exp
 | `libs-core/workforce/worker-proxy.ts`                      | `libs/core/workforce/worker-proxy.ts`                                                        | Worker-thread offload helper with no caller                                                                                                                                                           | 2026-02 Phase 6                                |
 | `libs-core/meeting/booking-preference-profile.ts` (+test)  | `libs/core/meeting/booking-preference-profile.ts`                                            | Preflight-question selector never used by the lifestyle-booking task builder (the contract type in `contracts/` remains)                                                                              | 2026-04-29 brief-first orchestration           |
 | `libs-shared-media/excel-generate-with-design.ts` (+tests) | `libs/shared-media/src/excel-utils.ts` (`generateExcelWithDesign`)                           | Function-level retirement; `distillExcelDesign` stays (media-actuator extraction)                                                                                                                     | project-quality-improvement spec               |
-| `libs-core/mesh/mesh-topic-registry.ts` (+test)            | `libs/core/mesh/mesh-topic-registry.ts` (`subscribeMeshTopic`, `resolveMeshTopicRecipients`) | Function-level retirement (full original module kept): no subscriber entry point and no topic routing after `mesh-router.ts`; the read side (`listMeshTopicSubscriptions`) stays for `inspectMeshHub` | mesh hub implementation instructions           |
+| `libs-core/mesh/mesh-topic-registry.ts` (+test)            | `libs/core/mesh/mesh-topic-registry.ts` (`subscribeMeshTopic`, `resolveMeshTopicRecipients`) | Function-level retirement (full original module kept): no subscriber entry point and no topic routing after `mesh-router.ts`; the read side (`listMeshTopicSubscriptions`) was retired 2026-10-31 too | mesh hub implementation instructions           |
 
 ## Governance data left by retired loaders (2026-10-01, OW follow-up)
 
@@ -75,6 +75,22 @@ Restore the data with its loader, never alone.
 | `governance/operator-learning-dispatch-registry.json` + schema                       | `libs-core/surface/operator-learning.ts`         |
 | `governance/operator-learning-scenario-pack.json` + schema                           | `libs-core/surface/operator-learning.ts`         |
 | `governance/dynamic-policies.json` + `schemas/dynamic-permission-policy.schema.json` | `libs-core/dynamic-permission-guard.ts`          |
+
+## Mesh-hub topic read side and routing policy (2026-10-31)
+
+The topic-subscription writer and router were retired on 2026-10-01 (rows above), but the read
+side stayed so `inspectMeshHub` could list `subscriptions.jsonl`. Nothing writes that file any more
+(no live writer in code, none in the runtime tree), so the read side, the `topics` section of
+`pnpm mesh-hub:inspect`, and the documentation-only routing policy followed. The rest of the mesh
+hub — peer directory, broker, delivery driver, peer-messaging adapter and `inspectMeshHub` for
+peers / deliveries / dead letters — is live and stays. Decision record:
+[agent-communication-layer-model.md §9](../knowledge/product/architecture/agent-communication-layer-model.md#9-messaging-layer-map-2026-10-31).
+Restore the policy with a router, never alone.
+
+| Retired path                                                                                | Original path                                   | Reason                                                                                                                                      |
+| ------------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| `libs-core/mesh/mesh-topic-registry.ts` (already the full module; live copy deleted)        | `libs/core/mesh/mesh-topic-registry.ts` (+test) | Read side over a store with no writer; barrel exports, `concept-consolidation-baseline.json` entry and the inspection `topics` view removed |
+| `knowledge/product/governance/mesh-hub-policy.json` + `schemas/mesh-hub-policy.schema.json` | same paths under `knowledge/product/`           | `documentation_only` policy of the retired router; removed from `governance-catalog-contracts.json` and `tests/mesh-hub-contract.test.ts`   |
 
 ## Conversation learning consolidation (2026-10-05)
 
