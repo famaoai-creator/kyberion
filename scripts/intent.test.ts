@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import * as fs from 'node:fs';
 import { afterEach, describe, expect, it } from 'vitest';
 import { pathResolver, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core';
-import { collectIntentTraceReport, renderIntentTraceReport } from './intent.js';
+import { collectIntentTraceReport, main, renderIntentTraceReport } from './intent.js';
 import type { MissionState } from './refactor/mission-types.js';
 
 const FIXTURE_ROOT = pathResolver.sharedTmp('intent-trace-tests');
@@ -178,6 +178,97 @@ describe('intent trace', () => {
     expect(source).toContain('print(serializeJsonReport(report))');
     expect(source).not.toContain('console.log(');
     expect(source).not.toContain('console.error(');
+  });
+
+  const missionStateFixture = (overrides: Partial<MissionState> = {}): MissionState => ({
+    mission_id: 'MSN-001',
+    correlation_id: 'corr-visible',
+    tier: 'public',
+    status: 'active',
+    execution_mode: 'local',
+    priority: 10,
+    assigned_persona: 'tester',
+    confidence_score: 0.9,
+    git: { branch: 'main', start_commit: 'abc', latest_commit: 'def', checkpoints: [] },
+    history: [],
+    ...overrides,
+  });
+
+  it('keeps a visible trace when another mission refuses the lookup (R08)', () => {
+    const notVisible = Object.assign(new Error('not resolvable'), {
+      code: 'OWNER_NOT_VISIBLE',
+    });
+    const visibleDir = path.join(FIXTURE_ROOT, 'm1');
+    const secretDir = path.join(FIXTURE_ROOT, 'secret');
+    safeMkdir(visibleDir, { recursive: true });
+    safeMkdir(secretDir, { recursive: true });
+    const report = collectIntentTraceReport('corr-visible', {
+      missionRoots: [
+        { missionId: 'MSN-001', missionPath: visibleDir },
+        { missionId: 'MSN-SECRET', missionPath: secretDir },
+      ],
+      loadMissionState: (missionId) => {
+        if (missionId === 'MSN-SECRET') throw notVisible;
+        return missionId === 'MSN-001' ? missionStateFixture() : null;
+      },
+      traceDir: path.join(FIXTURE_ROOT, 'no-traces'),
+      loadMemory: () => ({ entries: [] }),
+      loadAuditEntries: () => [],
+    });
+
+    expect(report.missions.map((hit) => hit.missionId)).toEqual(['MSN-001']);
+    expect(report.integrity).toBe('complete');
+    expect(report.searched_scope).toBe('visible');
+    const rendered = renderIntentTraceReport(report);
+    expect(rendered).not.toContain('MSN-SECRET');
+    expect(JSON.stringify(report)).not.toContain('not resolvable');
+  });
+
+  it('flags a corrupt-but-visible mission state instead of dropping it silently', () => {
+    const brokenPath = path.join(FIXTURE_ROOT, 'missions', 'MSN-BROKEN');
+    safeMkdir(brokenPath, { recursive: true });
+    safeWriteFile(path.join(brokenPath, 'mission-state.json'), '{ definitely not schema\n');
+
+    const report = collectIntentTraceReport('corr-any', {
+      missionRoots: [
+        { missionId: 'MSN-001', missionPath: path.join(FIXTURE_ROOT, 'm1') },
+        { missionId: 'MSN-BROKEN', missionPath: brokenPath },
+      ],
+      loadMissionState: () => null,
+      traceDir: path.join(FIXTURE_ROOT, 'no-traces'),
+      loadMemory: () => ({ entries: [] }),
+      loadAuditEntries: () => [],
+    });
+
+    expect(report.integrity).toBe('integrity_error');
+    expect(report.anomalies.unreadable_states).toBe(1);
+    expect(report.missions).toHaveLength(0);
+    expect(renderIntentTraceReport(report)).toContain('integrity: integrity_error');
+  });
+
+  it('still reads a mission through its enumerated path when the loader misses', () => {
+    const missionPath = path.join(FIXTURE_ROOT, 'missions', 'MSN-ENUM');
+    safeMkdir(missionPath, { recursive: true });
+    safeWriteFile(
+      path.join(missionPath, 'mission-state.json'),
+      JSON.stringify(missionStateFixture({ mission_id: 'MSN-ENUM' }))
+    );
+
+    const report = collectIntentTraceReport('corr-visible', {
+      missionRoots: [{ missionId: 'MSN-ENUM', missionPath }],
+      loadMissionState: () => null,
+      traceDir: path.join(FIXTURE_ROOT, 'no-traces'),
+      loadMemory: () => ({ entries: [] }),
+      loadAuditEntries: () => [],
+    });
+
+    expect(report.missions.map((hit) => hit.missionId)).toEqual(['MSN-ENUM']);
+  });
+
+  it('refuses a natural-language trace argument before any mission scan', async () => {
+    await expect(main(['trace', 'why did this fail'], () => undefined)).rejects.toThrow(
+      /correlation id/i
+    );
   });
 
   it('ignores trace directories that traverse a symbolic link', () => {

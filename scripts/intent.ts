@@ -25,7 +25,15 @@ import type { AuditEntry } from '@agent/core/governance/audit-chain';
 import type { IntentContractMemoryEntry } from '@agent/core/intent/intent-contract-learning';
 import type { IntentDelta, IntentSnapshot } from '@agent/core/intent/intent-delta';
 import type { Trace } from '@agent/core/trace';
-import { listMissionsInSearchDirs, loadState, loadStateAtPath } from './refactor/mission-state.js';
+import {
+  getActiveMissionSearchDirs,
+  listMissionsInSearchDirs,
+  loadState,
+} from './refactor/mission-state.js';
+import { readMissionStateAtPath } from '@agent/core/mission/mission-state-reader';
+import { boundTenant, missionTierScanDirs } from '@agent/core/owner-scope';
+import { isMissionLookupRefusal, missionPathOrNull } from '@agent/core/mission-lookup';
+import { validateReadPermission } from '@agent/core/tier-guard';
 import type { MissionState } from './refactor/mission-types.js';
 
 type IntentTraceSource = 'mission' | 'snapshot' | 'delta' | 'memory' | 'trace' | 'audit';
@@ -66,6 +74,29 @@ interface IntentTraceTraceHit {
 interface IntentTraceReportData {
   correlationId: string;
   locale: string;
+  /**
+   * Observation contract: only mission trees this process may read were
+   * scanned. An empty result therefore means 'no match in the visible scope',
+   * never proof that the correlation id does not exist elsewhere.
+   */
+  searched_scope: 'visible';
+  /**
+   * complete        — every scan root was enumerable and every enumerated
+   *                   mission state parsed.
+   * partial         — one or more scan roots are outside this process's io
+   *                   scope (e.g. another tier under tenant binding); the
+   *                   visible results are still trustworthy.
+   * integrity_error — at least one enumerated mission state failed to parse
+   *                   or validate. Corrupt-but-visible data is flagged, never
+   *                   silently skipped into 'complete'.
+   */
+  integrity: 'complete' | 'partial' | 'integrity_error';
+  anomalies: {
+    /** mission-state.json files inside the visible scope that failed to load. */
+    unreadable_states: number;
+    /** candidate scan roots skipped because this process may not enumerate them. */
+    skipped_scan_roots: number;
+  };
   missions: IntentTraceMissionHit[];
   snapshots: IntentTraceSnapshotHit[];
   deltas: IntentTraceDeltaHit[];
@@ -325,67 +356,173 @@ function resolveTraceSearchDirs(): string[] {
   return Array.from(new Set(dirs));
 }
 
-function discoverAccessibleMissionRoots(): Array<{ missionId: string; missionPath: string }> {
+/**
+ * Candidate mission scan dirs narrowed to the visible scope BEFORE any
+ * enumeration. A tenant-bound process may not enumerate a protected tier
+ * root — the tenant list itself is out of its io scope — and a role without
+ * a grant may not even lstat `knowledge/personal/missions`. Scanning anyway
+ * produced ROLE_VIOLATION warnings that disclosed the denied path, and let
+ * invisible missions reach `loadState`, where one OWNER_NOT_VISIBLE killed
+ * the whole trace. Roots this process may not enumerate are excluded here —
+ * never read-then-failed — and counted, so 'no match' always means 'no match
+ * in the visible scope', not 'scanned everything'.
+ */
+function visibleMissionSearchDirs(): { dirs: string[]; skipped: number } {
+  const activeRoot = pathResolver.active('missions');
+  const archiveRoot = pathResolver.active('archive/missions');
+  const tiers = ['personal', 'confidential', 'public', 'ephemeral'];
+  const bound = boundTenant();
+  const candidates = new Set<string>([
+    ...getActiveMissionSearchDirs(),
+    // The unpartitioned roots only help an unbound identity; bound, their
+    // readdir would lstat denied tier partitions and warn-leak their paths.
+    ...(bound ? [] : [activeRoot, archiveRoot]),
+    ...tiers.flatMap((tier) => [path.join(activeRoot, tier), path.join(archiveRoot, tier)]),
+  ]);
+  const dirs = new Set<string>();
+  let skipped = 0;
+  for (const candidate of candidates) {
+    // missionTierScanDirs narrows a protected tier root to the bound tenant's
+    // own partition; other tenants are invisible by policy anyway.
+    for (const dir of missionTierScanDirs(candidate)) {
+      let allowed = false;
+      try {
+        allowed = validateReadPermission(dir, 'metadata').allowed;
+      } catch {
+        allowed = false; // a root whose policy check fails is not enumerated
+      }
+      if (allowed) dirs.add(dir);
+      else skipped += 1;
+    }
+  }
+  return { dirs: [...dirs], skipped };
+}
+
+function discoverAccessibleMissionRoots(
+  dirs: string[]
+): Array<{ missionId: string; missionPath: string }> {
   const discovered: Array<{ missionId: string; missionPath: string }> = [];
   const visit = (dir: string): void => {
     const safeDir = safeIntentPath(dir);
-    if (!safeDir || !safeExistsSync(safeDir)) return;
-    for (const entry of safeReaddir(safeDir)) {
+    if (!safeDir) return;
+    let entries: string[] = [];
+    try {
+      if (!safeExistsSync(safeDir)) return;
+      entries = safeReaddir(safeDir);
+    } catch {
+      return; // an unreadable directory is simply not in the visible scope
+    }
+    for (const entry of entries) {
       const entryPath = safeIntentPath(path.join(safeDir, entry));
       if (!entryPath) continue;
-      const statePath = safeIntentPath(path.join(entryPath, 'mission-state.json'));
-      if (!statePath) continue;
-      if (safeExistsSync(statePath)) {
-        discovered.push({ missionId: entry, missionPath: entryPath });
-        continue;
-      }
-      if (safeExistsSync(entryPath)) {
-        const nestedState = safeIntentPath(path.join(entryPath, 'mission-state.json'));
-        if (!nestedState) continue;
-        if (safeExistsSync(nestedState)) {
-          discovered.push({ missionId: path.basename(entryPath), missionPath: entryPath });
+      try {
+        const statePath = safeIntentPath(path.join(entryPath, 'mission-state.json'));
+        if (statePath && safeExistsSync(statePath)) {
+          discovered.push({ missionId: entry, missionPath: entryPath });
         }
+      } catch {
+        continue; // a denied entry is outside the visible scope, never fatal
       }
     }
   };
-
-  for (const missionRoot of [
-    pathResolver.active('missions'),
-    pathResolver.active('archive/missions'),
-  ]) {
-    visit(missionRoot);
-    for (const tier of ['confidential', 'public', 'personal', 'ephemeral']) {
-      visit(path.join(missionRoot, tier));
-    }
-  }
+  for (const dir of dirs) visit(dir);
   return discovered;
 }
 
-function discoverMissionRoots(): Array<{ missionId: string; missionPath: string }> {
+function discoverMissionRoots(): {
+  roots: Array<{ missionId: string; missionPath: string }>;
+  skippedScanRoots: number;
+} {
+  const { dirs, skipped } = visibleMissionSearchDirs();
   try {
-    return listMissionsInSearchDirs();
+    return { roots: listMissionsInSearchDirs({ directories: dirs }), skippedScanRoots: skipped };
   } catch {
-    return discoverAccessibleMissionRoots();
+    return { roots: discoverAccessibleMissionRoots(dirs), skippedScanRoots: skipped };
   }
+}
+
+type VisibleMissionState =
+  { kind: 'state'; state: MissionState } | { kind: 'invisible' } | { kind: 'unreadable' };
+
+/**
+ * Load one enumerated mission's state without letting scope or corruption
+ * kill the trace:
+ * - lookup refusals (OWNER_NOT_VISIBLE / AMBIGUOUS / NOT_FOUND) and read
+ *   denials mean the mission is outside the visible scope — it is excluded
+ *   from the scan set, and its existence is never reported back;
+ * - a corrupt-but-visible state is 'unreadable' so the report flags
+ *   integrity instead of silently dropping the mission;
+ * - the enumerated-path fallback keeps tests / pre-materialized dirs working,
+ *   but a state naming another tenant is still excluded — the direct read is
+ *   never a permission escalation.
+ */
+function resolveVisibleMissionState(
+  missionId: string,
+  missionPath: string,
+  loadMissionState: (missionId: string) => MissionState | null
+): VisibleMissionState {
+  let state: MissionState | null = null;
+  try {
+    state = loadMissionState(missionId);
+  } catch (error) {
+    return { kind: isMissionLookupRefusal(error) ? 'invisible' : 'unreadable' };
+  }
+  if (state) return { kind: 'state', state };
+  const statePath = safeIntentPath(path.join(missionPath, 'mission-state.json'));
+  if (!statePath) return { kind: 'unreadable' };
+  let exists = false;
+  try {
+    exists = safeExistsSync(statePath);
+  } catch {
+    return { kind: 'invisible' };
+  }
+  if (!exists) {
+    // The governed locator resolved a path but no state is readable, or the
+    // directory was enumerated without one — flag it, never invent data.
+    return {
+      kind: missionPathOrNull(pathResolver.findMissionPath, missionId) ? 'unreadable' : 'invisible',
+    };
+  }
+  try {
+    const direct = readMissionStateAtPath(statePath);
+    if (!missionStateVisibleToProcess(direct)) return { kind: 'invisible' };
+    return { kind: 'state', state: direct };
+  } catch (error) {
+    if (isMissionLookupRefusal(error) || isReadDenied(error)) return { kind: 'invisible' };
+    return { kind: 'unreadable' };
+  }
+}
+
+/** The same tenant boundary the owner-scope locator applies to a loaded state. */
+function missionStateVisibleToProcess(state: MissionState): boolean {
+  const bound = boundTenant();
+  if (!bound) return true;
+  const slug = String(state.tenant_slug || '')
+    .trim()
+    .toLowerCase();
+  return !slug || slug === bound;
+}
+
+/** A secure-io refusal to read a path — not a data problem, a scope boundary. */
+function isReadDenied(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return /ROLE_VIOLATION|not authorized|access denied|denied to/i.test(message);
 }
 
 function collectMissionHits(
   correlationId: string,
   missionRoots: Array<{ missionId: string; missionPath: string }>,
   loadMissionState: (missionId: string) => MissionState | null
-): IntentTraceMissionHit[] {
-  return missionRoots
+): { missions: IntentTraceMissionHit[]; unreadableStates: number } {
+  let unreadableStates = 0;
+  const missions = missionRoots
     .map(({ missionId, missionPath }) => {
       const safeMissionPath = safeIntentPath(missionPath);
       if (!safeMissionPath) return null;
-      const state =
-        loadMissionState(missionId) ||
-        (() => {
-          const statePath = safeIntentPath(path.join(safeMissionPath, 'mission-state.json'));
-          if (!statePath) return null;
-          return loadStateAtPath(statePath);
-        })();
-      if (!state) return null;
+      const resolved = resolveVisibleMissionState(missionId, safeMissionPath, loadMissionState);
+      if (resolved.kind === 'unreadable') unreadableStates += 1;
+      if (resolved.kind !== 'state') return null;
+      const state = resolved.state;
       const correlationIds = extractMissionCorrelationIds(state);
       if (!correlationIds.includes(correlationId)) return null;
       return {
@@ -397,15 +534,28 @@ function collectMissionHits(
       };
     })
     .filter((entry): entry is IntentTraceMissionHit => Boolean(entry));
+  return { missions, unreadableStates };
 }
 
 export function collectIntentTraceReport(
   correlationId: string,
   options: IntentTraceCollectOptions = {}
 ): IntentTraceReportData {
-  const missionRoots = options.missionRoots || discoverMissionRoots();
+  const discovery = options.missionRoots
+    ? { roots: options.missionRoots, skippedScanRoots: 0 }
+    : discoverMissionRoots();
   const loadMissionStateFn = options.loadMissionState || loadState;
-  const missions = collectMissionHits(correlationId, missionRoots, loadMissionStateFn);
+  const { missions, unreadableStates } = collectMissionHits(
+    correlationId,
+    discovery.roots,
+    loadMissionStateFn
+  );
+  const integrity =
+    unreadableStates > 0
+      ? 'integrity_error'
+      : discovery.skippedScanRoots > 0
+        ? 'partial'
+        : 'complete';
   const snapshots = missions.flatMap((mission) => {
     const entries = loadSnapshotEntries(mission.missionId, mission.evidencePath);
     const hasTraceRefs = entries.some((entry) => typeof entry.snapshot.trace_ref === 'string');
@@ -431,6 +581,12 @@ export function collectIntentTraceReport(
   return {
     correlationId,
     locale: resolveVocabularyLocale(options.locale || resolveLocale()),
+    searched_scope: 'visible',
+    integrity,
+    anomalies: {
+      unreadable_states: unreadableStates,
+      skipped_scan_roots: discovery.skippedScanRoots,
+    },
     missions,
     snapshots,
     deltas,
@@ -570,6 +726,8 @@ export function renderIntentTraceReport(
   const maxRows = options.maxRows ?? 200;
   const header = [
     `correlation_id: ${report.correlationId}`,
+    `searched_scope: ${report.searched_scope}`,
+    `integrity: ${report.integrity}`,
     `missions: ${report.missions.length}`,
     `snapshots: ${report.snapshots.length}`,
     `deltas: ${report.deltas.length}`,
@@ -577,7 +735,24 @@ export function renderIntentTraceReport(
     `traces: ${report.traces.length}`,
     `audit_entries: ${report.auditEntries.length}`,
   ];
-  return `${header.join('\n')}\n\n${formatRows(rows, maxRows)}`;
+  const notes: string[] = [];
+  if (rows.length === 0) {
+    notes.push(
+      `no records matched in the visible scope (searched_scope: ${report.searched_scope})`
+    );
+  }
+  if (report.anomalies.unreadable_states > 0 || report.anomalies.skipped_scan_roots > 0) {
+    const parts: string[] = [];
+    if (report.anomalies.unreadable_states > 0)
+      parts.push(`${report.anomalies.unreadable_states} mission state(s) failed to load`);
+    if (report.anomalies.skipped_scan_roots > 0)
+      parts.push(
+        `${report.anomalies.skipped_scan_roots} scan root(s) outside this process's read scope`
+      );
+    notes.push(`integrity note: ${parts.join('; ')}`);
+  }
+  const tail = notes.length ? `\n\n${notes.join('\n')}` : '';
+  return `${header.join('\n')}\n\n${formatRows(rows, maxRows)}${tail}`;
 }
 
 function serializeJsonReport(report: IntentTraceReportData): Record<string, unknown> {
@@ -603,7 +778,9 @@ function serializeJsonReport(report: IntentTraceReportData): Record<string, unkn
   };
 }
 
-const INTENT_TRACE_USAGE = 'Usage: pnpm intent:trace <correlation_id> [--json] [--limit <n>]';
+const INTENT_TRACE_USAGE =
+  'Usage: pnpm intent:trace <correlation_id> [--json] [--limit <n>]\n' +
+  '  trace takes a correlation id emitted by an earlier run — it is not a natural-language query';
 
 export async function main(
   argv: string[] = [],
@@ -620,12 +797,13 @@ export async function main(
   ])
     .command(
       'trace <correlationId>',
-      'Render the full intent timeline for a correlation id',
+      'Render the full intent timeline for a correlation id (ids only — not a natural-language question)',
       (yargs) =>
         yargs
           .positional('correlationId', {
             type: 'string',
-            describe: 'Correlation id to trace',
+            describe:
+              'Correlation id to trace, e.g. corr-… or a trace/pipeline id from earlier output',
           })
           .option('limit', {
             type: 'number',
@@ -648,14 +826,32 @@ export async function main(
     print(INTENT_TRACE_USAGE);
     throw new ScriptExitError(1, INTENT_TRACE_USAGE);
   }
+  // A multi-word, natural-language argument can never be a correlation id —
+  // refuse it before it becomes an unrelated full-mission scan.
+  if (/\s/.test(correlationId)) {
+    const message =
+      'intent trace takes a correlation id, not a natural-language question — ' +
+      'no scan was run | next: pass the correlation id printed by the earlier run (e.g. corr-…)';
+    print(message);
+    throw new ScriptExitError(1, message, false, undefined, {
+      code: 'INVALID_INPUT',
+      category: 'invalid_input',
+      retryable: true,
+      next_action: 'pass a single correlation id (no spaces)',
+    });
+  }
 
   const report = collectIntentTraceReport(correlationId);
   if (json) {
     print(serializeJsonReport(report));
-    return;
+  } else {
+    print(renderIntentTraceReport(report, { maxRows: Number(parsed.limit) || 200 }));
   }
-
-  print(renderIntentTraceReport(report, { maxRows: Number(parsed.limit) || 200 }));
+  // R05 convention: the typed report may exit non-zero — a corrupt-but-visible
+  // state is flagged as integrity_error, never reported as a clean empty trace.
+  if (report.integrity === 'integrity_error') {
+    throw new ScriptExitError(1, '', true, report);
+  }
 }
 
 const isDirect =
