@@ -104,10 +104,10 @@ const MAX_STORE_BYTES = TRIGGER_STORE_HARD_CAP_BYTES;
 export const TRIGGER_STORE_READ_WINDOW_BYTES = 8 * 1024 * 1024;
 const STORE_READ_WINDOW_BYTES = TRIGGER_STORE_READ_WINDOW_BYTES;
 /**
- * Finished receipts older than this are not needed for dedupe: cron and
- * daemon-recovery keys are minute-scoped and never re-match, and in-flight
- * claims are always kept. Stable keys (mission admission, continuous owner)
- * normally re-fire within minutes of their first attempt.
+ * Dedupe window. Finished receipts younger than this are always kept (stable
+ * keys such as mission admission, continuous owner, reflex or daemon-recovery
+ * episodes must not re-deliver inside it); older ones are dropped at rotation.
+ * Pending claims are dropped once their lease expired longer ago than this.
  */
 const DEDUPE_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -399,11 +399,43 @@ function isInFlight(record: TriggerRecord): boolean {
 }
 
 /**
- * Retention compaction. Latest record per key alone never shrinks this
- * journal (cron and daemon-recovery keys are minted per minute), so finished
- * receipts older than the dedupe window are dropped, in-flight claims are
- * always kept, and the rest is kept newest-first within `targetBytes`.
- * Dropped history stays in the rotated segment.
+ * Keys that can never re-match once their minute passed: cron ticks
+ * (`cron:<id>:<YYYY-MM-DDTHH:MM>`, `gen:<id>:<minute>`) and any other key that
+ * ends in a minute stamp. Only these may be trimmed under byte pressure.
+ */
+const MINUTE_SCOPED_KEY = /:\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u;
+
+function isMinuteScoped(record: TriggerRecord): boolean {
+  return record.source === 'cron' || MINUTE_SCOPED_KEY.test(record.idempotencyKey);
+}
+
+function recordTimeMs(record: TriggerRecord): number {
+  const ms = Date.parse(record.recordedAt);
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+/**
+ * A pending claim whose lease ran out more than the dedupe window ago belongs
+ * to a process that is long dead; run() would already re-claim it, so keeping
+ * it only grows the journal.
+ */
+function isAbandonedClaim(record: TriggerRecord, cutoffMs: number): boolean {
+  const expiresMs = record.claimExpiresAt ? Date.parse(record.claimExpiresAt) : NaN;
+  return (Number.isFinite(expiresMs) ? expiresMs : recordTimeMs(record)) < cutoffMs;
+}
+
+/**
+ * Retention compaction, age-based. Latest record per key alone never shrinks
+ * this journal (cron keys are minted per minute), so:
+ * - finished receipts are kept while younger than the dedupe window and
+ *   dropped after it — a stable key (reflex, mission admission, continuous
+ *   owner, daemon-recovery episode, wake/watch) is never dropped early;
+ * - in-flight claims are kept until their lease expired more than the
+ *   dedupe window ago (a dead claimant's record is then dropped);
+ * - only when the retained set is still above `targetBytes` are the oldest
+ *   minute-scoped (cron) receipts trimmed first.
+ * The hard append cap is the backstop for stable keys alone outgrowing the
+ * budget. Dropped history stays in the rotated segment.
  */
 function retainTriggerDedupeWindow(
   records: TriggerRecord[],
@@ -416,26 +448,23 @@ function retainTriggerDedupeWindow(
     latest.set(record.idempotencyKey, record);
   }
   const cutoff = now.getTime() - DEDUPE_RETENTION_MS;
-  const ordered = [...latest.values()].filter(
-    (record) => isInFlight(record) || Date.parse(record.recordedAt) >= cutoff
+  const ordered = [...latest.values()].filter((record) =>
+    isInFlight(record) ? !isAbandonedClaim(record, cutoff) : recordTimeMs(record) >= cutoff
   );
-  const keep = new Set<TriggerRecord>();
-  let bytes = 0;
   const sizeOf = (record: TriggerRecord) => Buffer.byteLength(JSON.stringify(record), 'utf8') + 1;
-  for (const record of ordered) {
-    if (!isInFlight(record)) continue;
-    keep.add(record);
-    bytes += sizeOf(record);
+  let bytes = ordered.reduce((sum, record) => sum + sizeOf(record), 0);
+  const drop = new Set<TriggerRecord>();
+  if (bytes > targetBytes) {
+    const trimmable = ordered
+      .filter((record) => !isInFlight(record) && isMinuteScoped(record))
+      .sort((a, b) => recordTimeMs(a) - recordTimeMs(b));
+    for (const record of trimmable) {
+      if (bytes <= targetBytes) break;
+      drop.add(record);
+      bytes -= sizeOf(record);
+    }
   }
-  for (let i = ordered.length - 1; i >= 0; i--) {
-    const record = ordered[i];
-    if (keep.has(record)) continue;
-    const size = sizeOf(record);
-    if (bytes + size > targetBytes) break;
-    keep.add(record);
-    bytes += size;
-  }
-  return ordered.filter((record) => keep.has(record)).map((record) => JSON.stringify(record));
+  return ordered.filter((record) => !drop.has(record)).map((record) => JSON.stringify(record));
 }
 
 /**
@@ -451,6 +480,19 @@ function compactRecords(storePath: string, maxStoreBytes: number, now: Date): vo
     Math.floor(maxStoreBytes / 2),
     now
   );
+  const retainedBytes = retained.reduce(
+    (sum, line) => sum + Buffer.byteLength(line, 'utf8') + 1,
+    0
+  );
+  if (retainedBytes > Math.floor((maxStoreBytes * 3) / 4)) {
+    // Stable keys inside the dedupe window alone fill the budget: rotating now
+    // would copy a segment on every append and free almost nothing. Appends
+    // continue up to the hard cap, which ops-health reports.
+    logger.warn(
+      `[TRIGGER_STORE_WINDOW_FULL] delivery journal not rotated — ${retainedBytes} bytes of receipts are inside the ${DEDUPE_RETENTION_MS / 86_400_000}-day dedupe window | next: find the key prefix minting stable keys at this rate (they should be per episode, not per tick); appends continue to the ${MAX_STORE_BYTES}-byte hard cap, then triggers fail closed | evidence: ${storePath}`
+    );
+    return;
+  }
   safeCopyFileSync(storePath, rotatedSegmentPath(storePath, now));
   safeWriteFile(storePath, retained.length > 0 ? `${retained.join('\n')}\n` : '');
 }

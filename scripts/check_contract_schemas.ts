@@ -455,6 +455,17 @@ function createChecks(): ContractCheck[] {
       ],
     },
     {
+      id: 'role-assumption-unresolved-baseline',
+      schemaPath: 'knowledge/product/schemas/role-assumption-unresolved-baseline.schema.json',
+      validPayloads: [
+        readGovernanceJson('knowledge/product/governance/role-assumption-unresolved-baseline.json'),
+      ],
+      invalidPayloads: [
+        { unresolved_sites: { concierge: -1 } },
+        { unresolved_sites: { concierge: 'x' } },
+      ],
+    },
+    {
       id: 'model-registry',
       schemaPath: 'knowledge/product/schemas/model-registry.schema.json',
       validPayloads: [readGovernanceJson('knowledge/product/governance/model-registry.json')],

@@ -12,13 +12,21 @@ import { resolveToolRuntimesRoot } from '@agent/core/tool/tool-runtime-policy';
 
 const RETENTION_CATALOG_REPO_PATH = 'knowledge/product/governance/storage-retention-catalog.json';
 
+/** The fields of a retention catalog entry the backup selection reads. */
+export interface BackupRetentionEntry {
+  path: string;
+  artifact_class: string;
+  /** Explicit opt-out: only `exclude` keeps an entry out of the archive. */
+  backup?: string;
+}
+
 /**
- * `path` + `artifact_class` of every retention catalog entry. Read directly
- * (the full loader is only reachable through the @agent/core barrel, which
- * would pull the authn providers into the backup import chain); on any read
- * problem the floors alone still apply.
+ * `path`, `artifact_class` and `backup` of every retention catalog entry. Read
+ * directly (the full loader is only reachable through the @agent/core barrel,
+ * which would pull the authn providers into the backup import chain); on any
+ * read problem the floors alone still apply.
  */
-function readRetentionClasses(rootDir: string): Array<{ path: string; artifact_class: string }> {
+function readRetentionClasses(rootDir: string): BackupRetentionEntry[] {
   try {
     const catalogPath = path.join(rootDir, RETENTION_CATALOG_REPO_PATH);
     if (!safeExistsSync(catalogPath)) return [];
@@ -26,7 +34,13 @@ function readRetentionClasses(rootDir: string): Array<{ path: string; artifact_c
     if (!isRecord(parsed) || !Array.isArray(parsed.entries)) return [];
     return parsed.entries.flatMap((entry) =>
       isRecord(entry) && typeof entry.path === 'string' && typeof entry.artifact_class === 'string'
-        ? [{ path: entry.path, artifact_class: entry.artifact_class }]
+        ? [
+            {
+              path: entry.path,
+              artifact_class: entry.artifact_class,
+              ...(typeof entry.backup === 'string' ? { backup: entry.backup } : {}),
+            },
+          ]
         : []
     );
   } catch {
@@ -36,8 +50,8 @@ function readRetentionClasses(rootDir: string): Array<{ path: string; artifact_c
 
 const BACKUP_ARCHIVE_SUFFIXES = ['.tar.gz', '.tar.gz.enc'] as const;
 const DEFAULT_BACKUP_DIR_REPO_PATH = 'active/shared/exports/backups';
-/** Retention classes that are re-creatable by contract and never worth archiving. */
-const REGENERABLE_RETENTION_CLASSES = new Set(['cache', 'tmp']);
+/** Catalog opt-out value (storage-retention-catalog.schema.json `backup`). */
+const BACKUP_EXCLUDE = 'exclude';
 const SAMPLE_LIMIT = 5;
 
 /**
@@ -63,7 +77,7 @@ function repoRelativeOrNull(rootDir: string, target: string | undefined): string
 }
 
 export interface BackupExclusions {
-  /** Subtrees never archived (re-generable floors, backup output dir, temp dir). */
+  /** Subtrees never archived (re-generable floors, `backup: "exclude"` catalog entries, backup output dir, temp dir). */
   excludedRoots: string[];
   /**
    * Exact files never archived (the archive being written, its plaintext
@@ -86,19 +100,21 @@ export interface BackupExclusionInput {
   plainArchivePath?: string;
   tempDir?: string;
   /** Override for tests; defaults to the governed storage retention catalog. */
-  retentionEntries?: Array<{ path: string; artifact_class: string }>;
+  retentionEntries?: BackupRetentionEntry[];
   /** Override for tests; defaults to the managed tool-runtime install root. */
   toolRuntimesRoot?: string | null;
 }
 
 /**
  * What a backup leaves out, derived from the storage layout instead of a
- * hand-kept list: the scratch / staging / cache floors and every retention
- * catalog entry classed `cache` or `tmp` are re-creatable by contract, the
- * backup output directory must never archive itself, and the managed
- * tool-runtime install tree keeps only its provenance files. A root that
- * equals or contains an explicitly planned entry (e.g. a tenant's partition
- * under a cache-classed root) is not excluded: an explicit scope wins.
+ * hand-kept list: the scratch / staging / cache floors, plus every retention
+ * catalog entry that opts out with `backup: "exclude"` (fully regenerable
+ * data). A `cache`/`tmp` class alone does not exclude — staging stores such
+ * as distill or promotion candidates and queued events are pending state a
+ * restore needs. The backup output directory must never archive itself, and
+ * the managed tool-runtime install tree keeps only its provenance files. A
+ * root that equals or contains an explicitly planned entry (e.g. a tenant's
+ * partition under an excluded root) is not excluded: an explicit scope wins.
  */
 export function resolveBackupExclusions(input: BackupExclusionInput): BackupExclusions {
   const { rootDir, entries } = input;
@@ -111,7 +127,7 @@ export function resolveBackupExclusions(input: BackupExclusionInput): BackupExcl
     STORAGE_FLOOR_ROOTS.staging,
     STORAGE_FLOOR_ROOTS.cache,
     ...retentionEntries
-      .filter((entry) => REGENERABLE_RETENTION_CLASSES.has(entry.artifact_class))
+      .filter((entry) => entry.backup === BACKUP_EXCLUDE)
       .map((entry) => entry.path),
   ].filter((root) => !coversPlannedEntry(root));
 
@@ -288,7 +304,7 @@ export function selectionWarnings(selection: BackupFileSelection): string[] {
   }
   if (hardLinks.length > 0) {
     warnings.push(
-      `Archived ${hardLinks.length} repeated hard link(s) once; a restore refuses link members: ${sampleList(hardLinks)}`
+      `Skipped ${hardLinks.length} repeated hard link(s): only the first path of each inode is archived (a restore refuses link members), so these paths are absent from the archive: ${sampleList(hardLinks)}`
     );
   }
   if (selection.unlisted.length > 0) {

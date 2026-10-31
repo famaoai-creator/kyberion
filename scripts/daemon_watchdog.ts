@@ -102,24 +102,49 @@ export function resolveWatchdogServiceSpec(
   return legacyOnly ? base : scoped;
 }
 
-/** Recovery bucket for daemons with no last-good heartbeat to anchor an episode. */
+/**
+ * Recovery bucket: missing/malformed heartbeats have no episode anchor and get
+ * one attempt per bucket; a stale episode retries once per bucket.
+ */
 export const DAEMON_RECOVERY_BUCKET_MS = 15 * 60 * 1000;
+/**
+ * Recovery attempts per stale episode. A restart that crash-loops before its
+ * first heartbeat leaves the episode anchor unchanged, so it is retried once
+ * per bucket up to this many times; then the watchdog stops and the ops-health
+ * finding (baseline L10 / doctor) carries the outage to a human.
+ */
+export const DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE = 4;
 
 /**
- * One recovery per unhealthy episode, not per watchdog minute. A stale daemon's
- * episode is anchored on its last heartbeat timestamp (constant until the daemon
- * writes again); missing/malformed heartbeats have no anchor and fall back to a
- * 15-minute bucket. Status stays in the key: stale and later missing are two
- * distinct recoveries.
+ * Bounded recovery per unhealthy episode, not per watchdog minute. A stale
+ * daemon's episode is anchored on its last heartbeat timestamp (constant until
+ * the daemon writes again) — or, for a tick that overran while refreshing its
+ * heartbeat, on the tick start. Within the episode the key advances one retry
+ * bucket per 15 minutes and stays on the last bucket after
+ * DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE, so later runs are duplicates.
+ * Missing/malformed heartbeats have no anchor and fall back to a 15-minute
+ * bucket. Status stays in the key: stale and later missing are two distinct
+ * recoveries.
  */
 export function daemonRecoveryKey(status: DaemonHeartbeatStatus, now: Date): string {
-  const anchor =
-    status.status === 'stale' && status.heartbeat?.timestamp
-      ? `since-${status.heartbeat.timestamp}`
-      : `bucket-${new Date(
-          Math.floor(now.getTime() / DAEMON_RECOVERY_BUCKET_MS) * DAEMON_RECOVERY_BUCKET_MS
-        ).toISOString()}`;
-  return `daemon-recovery:${status.daemon_id}:${status.status}:${anchor}`;
+  const tickStartedAt =
+    status.heartbeat?.details?.phase === 'tick_in_progress' &&
+    typeof status.heartbeat.details.tick_started_at === 'string'
+      ? status.heartbeat.details.tick_started_at
+      : undefined;
+  const episodeAnchor = tickStartedAt ?? status.heartbeat?.timestamp;
+  const episodeStartMs = episodeAnchor ? Date.parse(episodeAnchor) : NaN;
+  if (status.status === 'stale' && episodeAnchor && Number.isFinite(episodeStartMs)) {
+    const attempt = Math.min(
+      DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE - 1,
+      Math.max(0, Math.floor((now.getTime() - episodeStartMs) / DAEMON_RECOVERY_BUCKET_MS))
+    );
+    return `daemon-recovery:${status.daemon_id}:${status.status}:since-${episodeAnchor}:attempt-${attempt + 1}`;
+  }
+  const bucket = new Date(
+    Math.floor(now.getTime() / DAEMON_RECOVERY_BUCKET_MS) * DAEMON_RECOVERY_BUCKET_MS
+  ).toISOString();
+  return `daemon-recovery:${status.daemon_id}:${status.status}:bucket-${bucket}`;
 }
 
 /** Operator hint lines naming this checkout's scoped units. */

@@ -1,0 +1,28 @@
+{
+  "$schema": "../schemas/role-assumption-unresolved-baseline.schema.json",
+  "description": "Per-system-role ratchet of reachable unresolved (\"any role\") role-assumption sites, checked by the role-assumption-reachability gate (scripts/analyze_role_assumptions.ts). A role fails when its count rises above this number; lower it when sites are resolved. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --print-unresolved-baseline > knowledge/product/governance/role-assumption-unresolved-baseline.json`.",
+  "unresolved_sites": {
+    "chronos_mirror_v2": 49,
+    "computer_surface": 50,
+    "concierge": 48,
+    "customer_room": 0,
+    "dev_idp": 0,
+    "discord_bridge": 47,
+    "event_intake_surface": 0,
+    "generation_schedule": 0,
+    "imessage_bridge": 47,
+    "mcp_server_cowork": 48,
+    "nexus_daemon": 60,
+    "oauth_callback_surface": 0,
+    "operator_surface": 48,
+    "personal_pads": 51,
+    "presence_studio": 52,
+    "slack_bridge": 47,
+    "surface_runtime": 0,
+    "system_configurator": 47,
+    "telegram_bridge": 47,
+    "terminal_bridge": 1,
+    "terminal_hud": 49,
+    "voice_hub": 50
+  }
+}

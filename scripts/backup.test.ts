@@ -1030,14 +1030,19 @@ describe('backup file selection', () => {
   });
 
   const retentionEntries = [
-    { path: 'active/shared/runtime/vitest-live', artifact_class: 'tmp' },
-    { path: 'active/shared/runtime/history-search', artifact_class: 'cache' },
+    { path: 'active/shared/runtime/vitest-live', artifact_class: 'tmp', backup: 'exclude' },
+    { path: 'active/shared/runtime/history-search', artifact_class: 'cache', backup: 'exclude' },
     { path: 'active/shared/runtime/grants', artifact_class: 'state' },
+    // Pending state classed cache/tmp without the opt-out: always archived.
     { path: 'active/shared/runtime/feedback-loop/tenants', artifact_class: 'cache' },
+    { path: 'active/shared/runtime/distill-candidates', artifact_class: 'cache' },
+    { path: 'active/shared/coordination/orchestration/events', artifact_class: 'cache' },
+    { path: 'presence/bridge/runtime', artifact_class: 'cache' },
+    { path: 'active/shared/runtime/user-tenant-cache', artifact_class: 'cache', backup: 'exclude' },
   ];
   const toolRuntimesRoot = 'active/shared/runtime/tool-runtimes';
 
-  it('excludes the re-generable floors, cache/tmp catalog roots and the backup output', () => {
+  it('excludes the re-generable floors, opted-out catalog roots and the backup output', () => {
     const exclusions = resolveBackupExclusions({
       rootDir: root,
       entries: ['active', 'vault'],
@@ -1055,10 +1060,17 @@ describe('backup file selection', () => {
         'active/shared/exports/backups',
         'active/shared/runtime/vitest-live',
         'active/shared/runtime/history-search',
-        'active/shared/runtime/feedback-loop/tenants',
       ])
     );
-    expect(exclusions.excludedRoots).not.toContain('active/shared/runtime/grants');
+    for (const pending of [
+      'active/shared/runtime/grants',
+      'active/shared/runtime/feedback-loop/tenants',
+      'active/shared/runtime/distill-candidates',
+      'active/shared/coordination/orchestration/events',
+      'presence/bridge/runtime',
+    ]) {
+      expect(exclusions.excludedRoots).not.toContain(pending);
+    }
     expect(exclusions.excludedFiles).toEqual([
       'active/out/kyberion-all.tar.gz.enc',
       'active/shared/tmp/backup-x/payload.tar.gz',
@@ -1069,14 +1081,27 @@ describe('backup file selection', () => {
     expect(exclusions.provenanceOnlyRoots).toEqual([toolRuntimesRoot]);
   });
 
-  it('keeps an explicitly planned entry that lies under a cache-classed root', () => {
+  it('reports repeated hard links as dropped paths, not as archived once', () => {
+    const [warning] = selectionWarnings({
+      paths: ['active/a.json'],
+      unlisted: [],
+      totalBytes: 1,
+      skipped: { excluded: 0, nonRegular: [], symlinks: [], hardLinks: ['active/b.json'] },
+    });
+    expect(warning).toMatch(/^Skipped 1 repeated hard link\(s\)/);
+    expect(warning).toContain('absent from the archive: active/b.json');
+    expect(warning).not.toMatch(/Archived/);
+  });
+
+  it('keeps an explicitly planned entry that lies under an excluded root', () => {
     const exclusions = resolveBackupExclusions({
       rootDir: root,
-      entries: ['active/shared/runtime/feedback-loop/tenants/acme'],
+      entries: ['active/shared/runtime/user-tenant-cache/acme'],
       retentionEntries,
       toolRuntimesRoot,
     });
-    expect(exclusions.excludedRoots).not.toContain('active/shared/runtime/feedback-loop/tenants');
+    expect(exclusions.excludedRoots).not.toContain('active/shared/runtime/user-tenant-cache');
+    expect(exclusions.excludedRoots).toContain('active/shared/runtime/history-search');
     expect(exclusions.excludedRoots).toContain('active/shared/cache');
   });
 
@@ -1084,6 +1109,7 @@ describe('backup file selection', () => {
     const keep = [
       'active/missions/public/MSN-A/evidence.md',
       'active/shared/runtime/grants/grant.json',
+      'active/shared/runtime/distill-candidates/candidate.json',
       'active/out/notes.txt',
       `${toolRuntimesRoot}/whisper/state.json`,
       'vault/keys.enc',

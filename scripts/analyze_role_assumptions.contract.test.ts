@@ -3,8 +3,12 @@ import { readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
   NARROWED_SYSTEM_ROLES,
+  UNRESOLVED_BASELINE_PATH,
   checkReachabilityInvariants,
+  countUnresolvedSites,
+  formatUnresolvedCounts,
   formatViolations,
+  type UnresolvedSiteBaselineFile,
   type RoleAssumptionPolicyFile,
   type RoleAssumptionReachabilityReport,
   type SystemRoleReachability,
@@ -134,6 +138,57 @@ describe('RN-03 role assumption invariants (role-assumption-reachability gate)',
     expect(violations.map((v) => v.rule)).toEqual(['narrowed-role-unresolved']);
     expect(violations[0]!.message).toContain('any-role site libs/core/dyn.ts#load');
     expect(violations[0]!.message).toContain('child process scripts/x.ts#spawn');
+  });
+
+  describe('per-role unresolved-site ratchet', () => {
+    const report = reportOf({
+      surface_a: entry({ unresolved_sites: ['libs/core/a.ts#x', 'libs/core/b.ts#y'] }),
+    });
+
+    it('fails when a role gains unresolved sites beyond its baseline', () => {
+      const violations = checkReachabilityInvariants(report, fixturePolicy, {}, { surface_a: 1 });
+      expect(violations.map((v) => [v.rule, v.system_role])).toEqual([
+        ['unresolved-sites-increased', 'surface_a'],
+      ]);
+      expect(violations[0]!.message).toContain(
+        '2 unresolved (any role) site(s), above its baseline of 1'
+      );
+      expect(violations[0]!.message).toContain(UNRESOLVED_BASELINE_PATH);
+    });
+
+    it('treats a role missing from the baseline as allowed zero', () => {
+      expect(checkReachabilityInvariants(report, fixturePolicy, {}, {}).map((v) => v.rule)).toEqual(
+        ['unresolved-sites-increased']
+      );
+    });
+
+    it('passes when the count is equal to or below the baseline', () => {
+      expect(checkReachabilityInvariants(report, fixturePolicy, {}, { surface_a: 2 })).toEqual([]);
+      expect(checkReachabilityInvariants(report, fixturePolicy, {}, { surface_a: 5 })).toEqual([]);
+      // Without a baseline (synthetic callers) the ratchet is off.
+      expect(checkReachabilityInvariants(report, fixturePolicy)).toEqual([]);
+    });
+
+    it('prints current/baseline counts for the OK line', () => {
+      expect(countUnresolvedSites(report)).toEqual({ surface_a: 2 });
+      expect(formatUnresolvedCounts({ surface_a: 2, quiet: 0 }, { surface_a: 3 })).toBe(
+        'surface_a=2/3'
+      );
+      expect(formatUnresolvedCounts({ quiet: 0 }, {})).toBe('none');
+    });
+
+    it('the committed baseline covers exactly the governed system roles with counts only', () => {
+      const baseline = readJson<UnresolvedSiteBaselineFile>(
+        pathResolver.rootResolve(UNRESOLVED_BASELINE_PATH)
+      );
+      expect(Object.keys(baseline.unresolved_sites).sort()).toEqual(
+        Object.keys(policy.system_roles ?? {}).sort()
+      );
+      for (const count of Object.values(baseline.unresolved_sites)) {
+        expect(Number.isInteger(count) && count >= 0).toBe(true);
+      }
+      for (const role of NARROWED_SYSTEM_ROLES) expect(baseline.unresolved_sites[role]).toBe(0);
+    });
   });
 
   it('governs every narrowed system role and every launched SYSTEM_ROLE in the real policy', () => {
