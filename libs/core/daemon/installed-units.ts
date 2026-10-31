@@ -71,7 +71,7 @@ export interface InspectInstalledUnitsOptions {
 export interface InstalledUnitDetail extends InstalledUnit {
   /** Absolute unit file path. */
   unitPath: string;
-  /** sha256 of the unit file text as installed; null when unreadable. */
+  /** Drift hash of the installed unit text (unitDriftSha256, PATH masked); null when unreadable. */
   unitSha256: string | null;
   /** Interpreter the unit launches (ProgramArguments[0] / ExecStart argv0). */
   nodePath: string | null;
@@ -216,6 +216,25 @@ function sha256(text: string): string {
   return createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
+/**
+ * Unit text with the baked PATH value masked (launchd `EnvironmentVariables`
+ * PATH string, systemd `Environment=PATH=` line). PATH is derived from the
+ * installing shell (daemonUserPath), so two shells render different text for
+ * the same install; drift detection hashes this form so reconcile never
+ * reinstalls on a PATH difference alone. `scheduler install --apply` still
+ * re-renders PATH on demand.
+ */
+export function maskUnitPathValue(text: string): string {
+  return text
+    .replace(/(<key>PATH<\/key>\s*<string>)[^<]*(<\/string>)/u, '$1*$2')
+    .replace(/^Environment="?PATH=.*$/mu, 'Environment=PATH=*');
+}
+
+/** Drift hash of a unit: sha256 of its text with the PATH value masked. */
+export function unitDriftSha256(text: string): string {
+  return sha256(maskUnitPathValue(text));
+}
+
 interface InspectContext {
   exec: InstalledUnitsExec;
   listDir: (dir: string) => string[];
@@ -282,7 +301,7 @@ function inspectDarwin(ctx: InspectContext): InstalledUnitDetail[] {
       ownedByThisCheckout: ownedBy(ctx, parsed.instanceId, repoRoot),
       loaded,
       unitPath,
-      unitSha256: text === null ? null : sha256(text),
+      unitSha256: text === null ? null : unitDriftSha256(text),
       nodePath: programArguments[0] ?? null,
       environment,
       instanceId: parsed.instanceId,
@@ -360,7 +379,7 @@ function inspectLinux(ctx: InspectContext): InstalledUnitDetail[] {
       ownedByThisCheckout: ownedBy(ctx, instanceId, repoRoot),
       loaded,
       unitPath,
-      unitSha256: text === null ? null : sha256(text),
+      unitSha256: text === null ? null : unitDriftSha256(text),
       nodePath: execStart[0] ?? null,
       environment,
       instanceId,

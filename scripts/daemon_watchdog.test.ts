@@ -17,6 +17,7 @@ import {
   sweepMissionStartCandidates,
   buildWatchdogRestartHints,
   daemonRecoveryKey,
+  DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE,
   resolveWatchdogServiceSpec,
 } from './daemon_watchdog.js';
 import { resolveDaemonInstance } from '@agent/core/daemon/specs';
@@ -535,19 +536,77 @@ describe('daemon_watchdog', () => {
       },
     };
 
-    it('keeps one key for a whole stale episode, anchored on the last heartbeat', () => {
-      const keys = [5, 6, 30, 120].map((minute) =>
-        daemonRecoveryKey(stale, new Date(Date.parse('2026-07-04T00:00:00.000Z') + minute * 60_000))
-      );
-      expect(new Set(keys).size).toBe(1);
-      expect(keys[0]).toBe('daemon-recovery:chronos-daemon:stale:since-2026-07-04T00:00:00.000Z');
+    it('retries a stale episode once per 15-minute bucket, then stops at the attempt cap', () => {
+      const key = (minute: number) =>
+        daemonRecoveryKey(
+          stale,
+          new Date(Date.parse('2026-07-04T00:00:00.000Z') + minute * 60_000)
+        );
+      const base = 'daemon-recovery:chronos-daemon:stale:since-2026-07-04T00:00:00.000Z';
+      expect(key(5)).toBe(`${base}:attempt-1`);
+      expect(key(14)).toBe(key(5));
+      expect(key(15)).toBe(`${base}:attempt-2`);
+      expect(key(30)).toBe(`${base}:attempt-3`);
+      expect(key(45)).toBe(`${base}:attempt-${DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE}`);
+      // Past the cap every run maps to the last attempt: duplicates, no more restarts.
+      expect(new Set([45, 60, 120, 24 * 60].map(key)).size).toBe(1);
       // A new heartbeat then a new outage is a new episode.
       expect(
         daemonRecoveryKey(
           { ...stale, heartbeat: { ...stale.heartbeat, timestamp: '2026-07-04T03:00:00.000Z' } },
           new Date('2026-07-04T03:10:00.000Z')
         )
-      ).not.toBe(keys[0]);
+      ).toBe('daemon-recovery:chronos-daemon:stale:since-2026-07-04T03:00:00.000Z:attempt-1');
+    });
+
+    it('anchors an overrunning in-progress tick on the tick start, not the refreshed heartbeat', () => {
+      const overrun = {
+        ...stale,
+        heartbeat: {
+          ...stale.heartbeat,
+          timestamp: '2026-07-04T09:00:00.000Z',
+          details: { phase: 'tick_in_progress', tick_started_at: '2026-07-04T00:00:00.000Z' },
+        },
+      };
+      const refreshed = {
+        ...overrun,
+        heartbeat: { ...overrun.heartbeat, timestamp: '2026-07-04T09:01:00.000Z' },
+      };
+      expect(daemonRecoveryKey(overrun, new Date('2026-07-04T09:00:30.000Z'))).toBe(
+        daemonRecoveryKey(refreshed, new Date('2026-07-04T09:01:30.000Z'))
+      );
+      expect(daemonRecoveryKey(overrun, new Date('2026-07-04T09:00:30.000Z'))).toContain(
+        `since-2026-07-04T00:00:00.000Z:attempt-${DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE}`
+      );
+    });
+
+    it('treats a fresh in-progress heartbeat as alive and flags an overrunning tick', () => {
+      safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
+      const write = (iso: string) =>
+        recordDaemonHeartbeat(
+          'chronos-daemon',
+          {
+            pid: 101,
+            status: 'running',
+            details: { phase: 'tick_in_progress', tick_started_at: '2026-07-04T00:00:00.000Z' },
+          },
+          { rootDir: ROOT, now: new Date(iso) }
+        );
+      const check = (iso: string) =>
+        checkDaemonHeartbeats({
+          daemons: ['chronos-daemon'],
+          rootDir: ROOT,
+          now: new Date(iso),
+          staleAfterMs: 3 * 60 * 1000,
+          alertLogPath: ALERT_LOG,
+          webhookUrl: '',
+        });
+      write('2026-07-04T02:00:00.000Z');
+      expect(check('2026-07-04T02:00:30.000Z').ok).toBe(true);
+      write('2026-07-04T09:00:00.000Z');
+      const overrun = check('2026-07-04T09:00:30.000Z');
+      expect(overrun.ok).toBe(false);
+      expect(overrun.statuses[0]?.reason).toMatch(/tick in progress since/);
     });
 
     it('buckets missing heartbeats per 15 minutes and keeps status in the key', () => {
@@ -581,6 +640,9 @@ describe('daemon_watchdog', () => {
       const second = await run('2026-07-04T00:11:00.000Z');
       expect(first.recovery?.[0]?.trigger_status).not.toBe('duplicate');
       expect(second.recovery?.[0]?.trigger_status).toBe('duplicate');
+      // The restart crash-looped before writing a heartbeat: the next bucket retries.
+      const retry = await run('2026-07-04T00:16:00.000Z');
+      expect(retry.recovery?.[0]?.trigger_status).not.toBe('duplicate');
     });
   });
 });

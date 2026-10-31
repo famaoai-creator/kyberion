@@ -36,11 +36,14 @@
  * violation. `--write-report` also writes the full report for a human to
  * read to active/shared/cache/system/role-assumption/reachability.json (the
  * re-generable system cache floor); `--check` is
- * accepted for compatibility and changes nothing.
+ * accepted for compatibility and changes nothing. Unresolved ("any role")
+ * sites are ratcheted per system role against the committed counts in
+ * role-assumption-unresolved-baseline.json (counts only, low churn);
+ * `--print-unresolved-baseline` prints that file for the current report.
  */
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
-import { safeMkdir, safeWriteFile } from '@agent/core/secure-io';
+import { safeExistsSync, safeMkdir, safeWriteFile } from '@agent/core/secure-io';
 import { resolveStorageFloor, SYSTEM_PARTITION } from '@agent/core/storage-layout';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { guardCliArgs, hasCliFlag, type CliGuardSpec } from './lib/cli-guard.js';
@@ -67,6 +70,20 @@ export function reachabilityReportPath(): string {
   return resolveStorageFloor('cache', SYSTEM_PARTITION, 'role-assumption', 'reachability.json');
 }
 const POLICY_PATH = 'knowledge/product/governance/role-assumption-policy.json';
+/**
+ * Per-role ratchet of unresolved ("any role") sites. Counts only — never site
+ * paths — so it changes only when a role's count changes, not on every
+ * refactor. `--print-unresolved-baseline` prints it for the current report.
+ */
+export const UNRESOLVED_BASELINE_PATH =
+  'knowledge/product/governance/role-assumption-unresolved-baseline.json';
+
+export interface UnresolvedSiteBaselineFile {
+  $schema?: string;
+  description?: string;
+  /** System role -> number of reachable unresolved sites allowed. */
+  unresolved_sites: Record<string, number>;
+}
 
 export interface ReachableRole {
   example_path: string[];
@@ -376,7 +393,8 @@ export interface RoleAssumptionViolation {
     | 'policy-role-not-analysed'
     | 'analysed-role-not-in-policy'
     | 'launched-role-not-analysed'
-    | 'narrowed-role-unresolved';
+    | 'narrowed-role-unresolved'
+    | 'unresolved-sites-increased';
   system_role: string;
   message: string;
 }
@@ -392,12 +410,15 @@ const POLICY_HINT = `grant it in ${POLICY_PATH} (system_roles.<role>.may_assume,
  *  - the analysis covers exactly the system roles the policy governs;
  *  - every SYSTEM_ROLE a package script launches is analysed;
  *  - every narrowed system role stays fully resolved (no any-role site, no
- *    child process inheriting SYSTEM_ROLE).
+ *    child process inheriting SYSTEM_ROLE);
+ *  - with a baseline, no system role gains unresolved ("any role") sites
+ *    beyond its committed count (a role missing from the baseline allows 0).
  */
 export function checkReachabilityInvariants(
   report: RoleAssumptionReachabilityReport,
   policy: RoleAssumptionPolicyFile,
-  packageScripts: Record<string, string> = {}
+  packageScripts: Record<string, string> = {},
+  unresolvedBaseline?: Record<string, number>
 ): RoleAssumptionViolation[] {
   const violations: RoleAssumptionViolation[] = [];
   const analysed = Object.keys(report.system_roles).sort();
@@ -462,7 +483,51 @@ export function checkReachabilityInvariants(
       message: `${systemRole} had its grants narrowed (RN-03) but is no longer fully resolved: ${reasons.join('; ')} | next: resolve the site or re-review the narrowed grants`,
     });
   }
+  if (unresolvedBaseline) {
+    for (const [systemRole, count] of Object.entries(countUnresolvedSites(report))) {
+      const allowed = unresolvedBaseline[systemRole] ?? 0;
+      if (count <= allowed) continue;
+      violations.push({
+        rule: 'unresolved-sites-increased',
+        system_role: systemRole,
+        message: `${systemRole} reaches ${count} unresolved (any role) site(s), above its baseline of ${allowed} in ${UNRESOLVED_BASELINE_PATH} | next: resolve the new site (a literal role or a typed role union) so the analysis can bound it; only if it is reviewed and intended, raise the count (--print-unresolved-baseline > ${UNRESOLVED_BASELINE_PATH})`,
+      });
+    }
+  }
   return violations;
+}
+
+/** Unresolved-site count per analysed system role, sorted by role. */
+export function countUnresolvedSites(
+  report: RoleAssumptionReachabilityReport
+): Record<string, number> {
+  return Object.fromEntries(
+    Object.keys(report.system_roles)
+      .sort()
+      .map((role) => [role, report.system_roles[role]!.unresolved_sites.length])
+  );
+}
+
+/** `role=current/baseline` pairs for the OK line (roles with no unresolved site and no baseline omitted). */
+export function formatUnresolvedCounts(
+  current: Record<string, number>,
+  baseline: Record<string, number>
+): string {
+  const parts = Object.entries(current)
+    .filter(([role, count]) => count > 0 || (baseline[role] ?? 0) > 0)
+    .map(([role, count]) => `${role}=${count}/${baseline[role] ?? 0}`);
+  return parts.length > 0 ? parts.join(', ') : 'none';
+}
+
+/** Render the committed baseline file for the current counts. */
+export function renderUnresolvedBaseline(report: RoleAssumptionReachabilityReport): string {
+  const file: UnresolvedSiteBaselineFile = {
+    $schema: '../schemas/role-assumption-unresolved-baseline.schema.json',
+    description:
+      'Per-system-role ratchet of reachable unresolved ("any role") role-assumption sites, checked by the role-assumption-reachability gate (scripts/analyze_role_assumptions.ts). A role fails when its count rises above this number; lower it when sites are resolved. Regenerate with `node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts --print-unresolved-baseline > knowledge/product/governance/role-assumption-unresolved-baseline.json`.',
+    unresolved_sites: countUnresolvedSites(report),
+  };
+  return `${JSON.stringify(file, null, 2)}\n`;
 }
 
 export function formatViolations(violations: readonly RoleAssumptionViolation[]): string {
@@ -476,6 +541,7 @@ export function formatViolations(violations: readonly RoleAssumptionViolation[])
 /** Build the report for `root` and check it against that checkout's policy and package.json. */
 export function evaluateReachabilityGate(root: string = pathResolver.rootDir()): {
   report: RoleAssumptionReachabilityReport;
+  baseline: Record<string, number>;
   violations: RoleAssumptionViolation[];
 } {
   const report = buildReachabilityReport(root);
@@ -487,9 +553,17 @@ export function evaluateReachabilityGate(root: string = pathResolver.rootDir()):
     path.join(root, 'package.json'),
     'package.json'
   );
+  const baselinePath = path.join(root, UNRESOLVED_BASELINE_PATH);
+  const baseline = safeExistsSync(baselinePath)
+    ? readSafeJsonFile<UnresolvedSiteBaselineFile>(
+        baselinePath,
+        'role assumption unresolved baseline'
+      ).unresolved_sites
+    : {};
   return {
     report,
-    violations: checkReachabilityInvariants(report, policy, packageJson.scripts ?? {}),
+    baseline,
+    violations: checkReachabilityInvariants(report, policy, packageJson.scripts ?? {}, baseline),
   };
 }
 
@@ -498,6 +572,7 @@ export const ROLE_ASSUMPTION_REACHABILITY_CLI: CliGuardSpec = {
   command: 'node --import ./scripts/ts-loader.mjs scripts/analyze_role_assumptions.ts',
   options: [
     { flag: '--write-report' },
+    { flag: '--print-unresolved-baseline' },
     { flag: '--check' },
     { flag: '--json' },
     { flag: '--quiet' },
@@ -510,21 +585,30 @@ export const main = defineScript({
   async run(context) {
     if (guardCliArgs(context.argv, ROLE_ASSUMPTION_REACHABILITY_CLI, context.print))
       return undefined;
-    const { report, violations } = evaluateReachabilityGate();
+    const evaluated = evaluateReachabilityGate();
+    const { report } = evaluated;
+    const violations = evaluated.violations;
     if (hasCliFlag(context.argv, '--write-report')) {
       const output = reachabilityReportPath();
       safeMkdir(path.dirname(output), { recursive: true });
       safeWriteFile(output, renderReachabilityReport(report));
       context.print(`[role-assumption-reachability] report written to ${output}`);
     }
+    if (hasCliFlag(context.argv, '--print-unresolved-baseline')) {
+      // knowledge/ is outside this script's write scope: print the file for
+      // the developer to redirect into UNRESOLVED_BASELINE_PATH.
+      context.print(renderUnresolvedBaseline(report).trimEnd());
+      return { status: 'ok', violations: [] };
+    }
     if (violations.length > 0) {
       throw new ScriptExitError(1, formatViolations(violations), false, { violations });
     }
     const systemRoles = Object.keys(report.system_roles).length;
+    const unresolved = countUnresolvedSites(report);
     context.print(
       context.json
-        ? { status: 'ok', system_roles: systemRoles, violations: [] }
-        : `[role-assumption-reachability] OK — ${systemRoles} system role(s); every reachable role is granted`
+        ? { status: 'ok', system_roles: systemRoles, unresolved_sites: unresolved, violations: [] }
+        : `[role-assumption-reachability] OK — ${systemRoles} system role(s); every reachable role is granted; unresolved sites per role (current/baseline): ${formatUnresolvedCounts(unresolved, evaluated.baseline)}`
     );
     return { status: 'ok', violations: [] };
   },

@@ -273,10 +273,15 @@ describe('QM-02 trigger runner', () => {
       .map((name) => path.join(path.dirname(store), name));
   }
 
-  function journalLine(key: string, recordedAt: string, status = 'delivered'): string {
+  function journalLine(
+    key: string,
+    recordedAt: string,
+    status = 'delivered',
+    source = 'cron'
+  ): string {
     return JSON.stringify({
       idempotencyKey: key,
-      source: 'cron',
+      source,
       status,
       deliveryId: key,
       createdBy: authority,
@@ -395,6 +400,139 @@ describe('QM-02 trigger runner', () => {
       expect(recentAgain.status).toBe('duplicate');
       expect(pending.status).toBe('duplicate');
       expect(deliver).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+    }
+  });
+
+  it('keeps stable keys for the whole dedupe window under byte pressure, trimming oldest cron keys first', async () => {
+    const store = pathResolver.sharedTmp(`qm02-stable-${randomUUID()}.jsonl`);
+    stores.push(store);
+    const now = new Date();
+    const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+    const day = 24 * 60 * 60 * 1000;
+    const lines = [
+      journalLine('mission-admission:MSN-EXPIRED', ago(8 * day), 'delivered', 'wake'),
+      // Stable keys six days old: older than every cron key below, yet inside the window.
+      ...Array.from({ length: 20 }, (_, i) =>
+        journalLine(`reflex:r-${i}:stimulus-${i}`, ago(6 * day), 'delivered', 'wake')
+      ),
+      journalLine('mission-admission:MSN-OLD', ago(6 * day), 'delivered', 'wake'),
+      ...Array.from({ length: 600 }, (_, i) =>
+        journalLine(`cron:filler-${i}:2026-10-01T00:00`, ago(day - i * 1000))
+      ),
+    ];
+    safeWriteFile(store, `${lines.join('\n')}\n`);
+    try {
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        maxStoreBytes: 64 * 1024,
+        authorityResolver: (snapshot) => snapshot,
+        now: () => now,
+      });
+      const deliver = vi.fn(async () => 'delivery');
+      await triggerRunner.run(
+        { idempotencyKey: 'wake:rotate-now', source: 'wake', createdBy: authority },
+        deliver
+      );
+      const live = String(safeReadFile(store, { encoding: 'utf8' }));
+      expect(safeStat(store).size).toBeLessThanOrEqual(32 * 1024 + 2048);
+      for (let i = 0; i < 20; i++) expect(live).toContain(`reflex:r-${i}:stimulus-${i}`);
+      expect(live).toContain('mission-admission:MSN-OLD');
+      expect(live).not.toContain('mission-admission:MSN-EXPIRED');
+      // The oldest cron receipt went first; the newest survived.
+      expect(live).not.toContain('"cron:filler-0:2026-10-01T00:00"');
+      expect(live).toContain('"cron:filler-599:2026-10-01T00:00"');
+      expect(live).toContain('wake:rotate-now');
+
+      const again = await triggerRunner.run(
+        { idempotencyKey: 'mission-admission:MSN-OLD', source: 'wake', createdBy: authority },
+        deliver
+      );
+      expect(again.status).toBe('duplicate');
+      expect(deliver).toHaveBeenCalledTimes(1);
+    } finally {
+      for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+    }
+  });
+
+  it('does not rotate when stable keys inside the window alone fill the budget', async () => {
+    const store = pathResolver.sharedTmp(`qm02-stable-full-${randomUUID()}.jsonl`);
+    stores.push(store);
+    const now = new Date();
+    const recent = new Date(now.getTime() - 60_000).toISOString();
+    const lines = Array.from({ length: 300 }, (_, i) =>
+      journalLine(`continuous-owner:action-${i}`, recent, 'delivered', 'wake')
+    );
+    safeWriteFile(store, `${lines.join('\n')}\n`);
+    try {
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        maxStoreBytes: 64 * 1024,
+        authorityResolver: (snapshot) => snapshot,
+        now: () => now,
+      });
+      const before = safeStat(store).size;
+      expect(before).toBeGreaterThan(64 * 1024);
+      const receipt = await triggerRunner.run(
+        { idempotencyKey: 'wake:append-anyway', source: 'wake', createdBy: authority },
+        async () => 'delivery'
+      );
+      expect(receipt.status).toBe('delivered');
+      expect(rotatedSegments(store)).toHaveLength(0);
+      const live = String(safeReadFile(store, { encoding: 'utf8' }));
+      expect(live).toContain('continuous-owner:action-0"');
+      expect(live).toContain('wake:append-anyway');
+    } finally {
+      for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+    }
+  });
+
+  it('drops pending claims whose lease expired longer ago than the dedupe window', async () => {
+    const store = pathResolver.sharedTmp(`qm02-dead-claim-${randomUUID()}.jsonl`);
+    stores.push(store);
+    const now = new Date();
+    const day = 24 * 60 * 60 * 1000;
+    const claim = (key: string, expiresAgoMs: number) =>
+      JSON.stringify({
+        idempotencyKey: key,
+        source: 'wake',
+        status: 'failed',
+        reason: 'delivery_pending',
+        deliveryId: key,
+        createdBy: authority,
+        requestedAuthority: authority,
+        recordedAt: new Date(now.getTime() - expiresAgoMs - 15 * 60_000).toISOString(),
+        claimId: `claim-${key}`,
+        claimOwnerPid: 999_999_999,
+        claimExpiresAt: new Date(now.getTime() - expiresAgoMs).toISOString(),
+        attempt: 1,
+      });
+    const lines = [
+      claim('wake:dead-claim', 8 * day),
+      claim('wake:recently-expired-claim', day),
+      ...Array.from({ length: 600 }, (_, i) =>
+        journalLine(`cron:filler:${i}`, new Date(now.getTime() - 60_000).toISOString())
+      ),
+    ];
+    safeWriteFile(store, `${lines.join('\n')}\n`);
+    try {
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        maxStoreBytes: 64 * 1024,
+        authorityResolver: (snapshot) => snapshot,
+        now: () => now,
+      });
+      await triggerRunner.run(
+        { idempotencyKey: 'wake:rotate-claims', source: 'wake', createdBy: authority },
+        async () => 'delivery'
+      );
+      const live = String(safeReadFile(store, { encoding: 'utf8' }));
+      expect(live).not.toContain('wake:dead-claim');
+      expect(live).toContain('wake:recently-expired-claim');
+      expect(String(safeReadFile(rotatedSegments(store)[0], { encoding: 'utf8' }))).toContain(
+        'wake:dead-claim'
+      );
     } finally {
       for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
     }
