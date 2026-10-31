@@ -18,6 +18,21 @@ import {
   type InspectionHandoffTicket,
 } from './lib/browser-inspection-handoff.js';
 
+/** When set, writing a `submitted` ticket fails (simulates a full disk after the audit). */
+const writeFault = vi.hoisted(() => ({ failSubmitted: false }));
+vi.mock('@agent/core/foundation/json', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/foundation/json')>();
+  return {
+    ...actual,
+    writeJson: (filePath: string, value: unknown, options?: never) => {
+      if (writeFault.failSubmitted && (value as { status?: string })?.status === 'submitted') {
+        throw new Error('ENOSPC: no space left on device');
+      }
+      return actual.writeJson(filePath, value, options);
+    },
+  };
+});
+
 vi.mock('@agent/core/organization/tenant-registry', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   resolveTenant: vi.fn((slug: string) => {
@@ -323,6 +338,25 @@ describe('submit_inspection (native host)', () => {
     const stderr = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     expect((await submit(ticket)).ok).toBe(true);
     stderr.mockRestore();
+  });
+
+  it('records a failed audit when the ticket write fails after the delivery was audited', async () => {
+    const ticket = open({ tier: 'personal' });
+    const audit = vi.spyOn(auditChain, 'record');
+    writeFault.failSubmitted = true;
+    let reply: Reply;
+    try {
+      reply = await submit(ticket);
+    } finally {
+      writeFault.failSubmitted = false;
+    }
+    expect(reply.ok).toBe(false);
+    const results = audit.mock.calls
+      .map(([entry]) => entry)
+      .filter((entry) => entry.action === 'browser_bridge_submit_inspection')
+      .map((entry) => entry.result);
+    expect(results).toEqual(['completed', 'failed']);
+    expect(storedTicket(ticket).status).toBe('waiting');
   });
 
   it('sweeps expired tickets', async () => {

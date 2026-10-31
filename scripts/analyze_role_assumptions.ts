@@ -86,7 +86,7 @@ export interface UnresolvedSiteBaselineFile {
   /** System role -> number of reachable unresolved sites allowed. */
   unresolved_sites: Record<string, number>;
   /** System role -> number of child-process entries inheriting SYSTEM_ROLE allowed. */
-  child_process_entries?: Record<string, number>;
+  child_process_entries: Record<string, number>;
 }
 
 /** Ratcheted counts read from the baseline file. */
@@ -425,7 +425,8 @@ const POLICY_HINT = `grant it in ${POLICY_PATH} (system_roles.<role>.may_assume,
  *  - with a baseline, no system role gains unresolved ("any role") sites
  *    beyond its committed count (a role missing from the baseline allows 0);
  *  - with a child-process baseline, no system role gains child-process
- *    entries that inherit SYSTEM_ROLE beyond its committed count.
+ *    entries that inherit SYSTEM_ROLE beyond its committed count (the gate
+ *    always passes one; a role or map missing from the file allows 0).
  */
 export function checkReachabilityInvariants(
   report: RoleAssumptionReachabilityReport,
@@ -641,17 +642,17 @@ export function evaluateReachabilityGate(root: string = pathResolver.rootDir()):
         baselinePath,
         'role assumption unresolved baseline'
       )
-    : { unresolved_sites: {} };
+    : { unresolved_sites: {}, child_process_entries: {} };
   const baseline = file.unresolved_sites ?? {};
-  // A baseline file without child_process_entries leaves that ratchet off.
-  const childProcessBaseline = file.child_process_entries;
+  // Fail closed: a missing child_process_entries map allows 0 per role.
+  const childProcessBaseline = file.child_process_entries ?? {};
   return {
     report,
     baseline,
-    childProcessBaseline: childProcessBaseline ?? {},
+    childProcessBaseline,
     slack: findBaselineSlack(report, {
       unresolved_sites: baseline,
-      child_process_entries: childProcessBaseline ?? {},
+      child_process_entries: childProcessBaseline,
     }),
     violations: checkReachabilityInvariants(
       report,
@@ -661,6 +662,16 @@ export function evaluateReachabilityGate(root: string = pathResolver.rootDir()):
       childProcessBaseline
     ),
   };
+}
+
+/**
+ * `--print-unresolved-baseline`: render the baseline for `root` from the
+ * analysis alone. It never reads the existing baseline, because the documented
+ * `… --print-unresolved-baseline > <baseline file>` redirect truncates that
+ * file before the script starts — an empty file must not break regeneration.
+ */
+export function printUnresolvedBaseline(root: string = pathResolver.rootDir()): string {
+  return renderUnresolvedBaseline(buildReachabilityReport(root));
 }
 
 /** `--help` / typos exit before the ~100s analysis starts. */
@@ -681,6 +692,13 @@ export const main = defineScript({
   async run(context) {
     if (guardCliArgs(context.argv, ROLE_ASSUMPTION_REACHABILITY_CLI, context.print))
       return undefined;
+    if (hasCliFlag(context.argv, '--print-unresolved-baseline')) {
+      // knowledge/ is outside this script's write scope: print the file for
+      // the developer to redirect into UNRESOLVED_BASELINE_PATH. The redirect
+      // has already truncated that file, so this mode never reads it.
+      context.print(printUnresolvedBaseline().trimEnd());
+      return { status: 'ok', violations: [] };
+    }
     const evaluated = evaluateReachabilityGate();
     const { report } = evaluated;
     const violations = evaluated.violations;
@@ -689,12 +707,6 @@ export const main = defineScript({
       safeMkdir(path.dirname(output), { recursive: true });
       safeWriteFile(output, renderReachabilityReport(report));
       context.print(`[role-assumption-reachability] report written to ${output}`);
-    }
-    if (hasCliFlag(context.argv, '--print-unresolved-baseline')) {
-      // knowledge/ is outside this script's write scope: print the file for
-      // the developer to redirect into UNRESOLVED_BASELINE_PATH.
-      context.print(renderUnresolvedBaseline(report).trimEnd());
-      return { status: 'ok', violations: [] };
     }
     if (evaluated.slack.length > 0 && !context.json) {
       context.print(formatBaselineSlack(evaluated.slack));

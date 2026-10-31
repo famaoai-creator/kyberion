@@ -2,9 +2,12 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { compileSchema } from '@agent/core/foundation';
 import {
   buildReachabilityReport,
   evaluateReachabilityGate,
+  printUnresolvedBaseline,
+  UNRESOLVED_BASELINE_PATH,
   type RoleAssumptionReachabilityReport,
   type RoleAssumptionViolation,
 } from './analyze_role_assumptions.js';
@@ -673,5 +676,38 @@ describe('RN-02 role assumption reachability analysis', () => {
     } finally {
       safeWriteFile(policyFile, `${original}\n`);
     }
+  });
+
+  describe('unresolved baseline file', () => {
+    const baselineFile = path.join(FIXTURE_ROOT, UNRESOLVED_BASELINE_PATH);
+    afterAll(() => safeRmSync(baselineFile, { force: true }));
+
+    it('--print-unresolved-baseline works after the redirect truncated the baseline file', () => {
+      // `… --print-unresolved-baseline > <baseline>` empties the file first.
+      safeMkdir(path.dirname(baselineFile), { recursive: true });
+      safeWriteFile(baselineFile, '');
+      const printed = JSON.parse(printUnresolvedBaseline(FIXTURE_ROOT));
+      expect(printed.unresolved_sites.spawn_surface).toBe(1);
+      expect(printed.child_process_entries.spawn_surface).toBe(1);
+      const validate = compileSchema(
+        pathResolver.rootResolve(
+          'knowledge/product/schemas/role-assumption-unresolved-baseline.schema.json'
+        )
+      );
+      expect(validate(printed), JSON.stringify(validate.errors)).toBe(true);
+      expect(validate({ unresolved_sites: {} })).toBe(false);
+    });
+
+    it('fails closed when the baseline file has no child_process_entries map', () => {
+      const generous = Object.fromEntries(
+        Object.keys(report.system_roles).map((role) => [role, 100])
+      );
+      safeMkdir(path.dirname(baselineFile), { recursive: true });
+      safeWriteFile(baselineFile, `${JSON.stringify({ unresolved_sites: generous })}\n`);
+      const violations = evaluateReachabilityGate(FIXTURE_ROOT).violations.filter(
+        (violation) => violation.rule === 'child-process-entries-increased'
+      );
+      expect(violations.map((violation) => violation.system_role)).toContain('spawn_surface');
+    });
   });
 });
