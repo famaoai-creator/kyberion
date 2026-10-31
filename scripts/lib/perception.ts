@@ -3,7 +3,7 @@ import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { withExecutionContextAsync } from '@agent/core/authority';
 import { resolveScopeContext } from '@agent/core/scope-context';
 import { resolveStorageFloor, classifyStorageFloorPath } from '@agent/core/storage-layout';
-import { resolvePerceptionScope } from '@agent/core/perception/observation';
+import { resolvePerceptionScope, type PerceptionScope } from '@agent/core/perception/observation';
 import { inferImagePayloadTier } from '@agent/core/media/image-description-bridge';
 import { KNOWLEDGE_TIER_RANK } from '@agent/core/foundation/knowledge-tier';
 import { parsePerceptionOption } from './perception-enhancements.js';
@@ -250,6 +250,28 @@ export function removeWorkDir(dir: string | undefined): void {
   if (dir) safeRmSync(dir, { recursive: true, force: true });
 }
 
+/**
+ * Run `fn` under the tenant-bound `perception_media_worker` role when the
+ * perception scope sits on a protected tier. The persisted scope's tmp /
+ * staging partitions admit writes via the default_allow, but the guarded
+ * reads a perception command performs on its own input and scratch
+ * (safeLstat / safeReadFile / safeReaddir / safeReadFileRange) deny the
+ * grant-less interactive persona with ROLE_VIOLATION. The assumed role gives
+ * the command the same effective identity on its own tenant partition the
+ * claimed-WorkItem worker path already has — never a wider one: the tenant
+ * comes from `resolvePerceptionScope`, which pins it to the active scope's
+ * own tenant, and a protected scope without a tenant throws
+ * [ROLE_TENANT_SCOPE_REQUIRED] rather than assuming unbound. Public-tier
+ * media is unprotected, so no assumption happens there.
+ */
+export async function withPerceptionMediaRole<T>(
+  scope: PerceptionScope,
+  fn: () => T | Promise<T>
+): Promise<T> {
+  if (scope.tier === 'public') return fn();
+  return withExecutionContextAsync('perception_media_worker', fn, 'worker', scope.tenant_slug);
+}
+
 export { sniffImageDimensions } from '@agent/core/perception/image-dimensions';
 
 /** `mm:ss` (or `h:mm:ss` from one hour). */
@@ -374,18 +396,9 @@ export async function transcribeWav(
   // The STT scratch sits on the persisted scope's own tier partition: writes
   // are admitted by the tmp default_allow, but the bridge adapter's guarded
   // reads (safeLstat/safeReadFile on the wav and transcript) need an
-  // authorized identity on protected tiers. Run the backend loop under the
-  // tenant-bound perception_media_worker role — the same effective identity
-  // the claimed-WorkItem worker path already has on that partition. Public
-  // scratch is unprotected, so no assumption happens there.
+  // authorized identity on protected tiers — see withPerceptionMediaRole.
   const scope = resolvePerceptionScope(wavPath);
-  if (scope.tier === 'public') return attemptBridges();
-  return withExecutionContextAsync(
-    'perception_media_worker',
-    attemptBridges,
-    'worker',
-    scope.tenant_slug
-  );
+  return withPerceptionMediaRole(scope, attemptBridges);
 }
 
 /** R04: classify media errors — never dump raw ffmpeg stderr or scoped paths. */
