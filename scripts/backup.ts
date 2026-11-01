@@ -726,6 +726,8 @@ export function buildBackupManifest(
     chainKeyId?: string;
     warnings: string[];
     excludedRoots?: string[];
+    /** Guarded credential roots read under the backup admission (counts only). */
+    credentialReads?: Array<{ rule_id: string; root: string; file_count: number }>;
   }
 ) {
   return {
@@ -753,6 +755,7 @@ export function buildBackupManifest(
       : {}),
     ...(context.chainKeyId ? { chain_key_id: context.chainKeyId } : {}),
     ...(context.excludedRoots ? { excluded_roots: context.excludedRoots } : {}),
+    ...(context.credentialReads?.length ? { credential_reads: context.credentialReads } : {}),
     warnings: context.warnings,
   };
 }
@@ -807,6 +810,7 @@ export function createBackup(
       entries: plan.entries,
       exclusions,
       missionGitRepos: plan.missionGitRepos.map((repo) => repo.repoRelativePath),
+      encrypted: options.encrypt,
     });
     warnings.push(...selectionWarnings(selection));
     // D2: the chain key itself never rides in a tenant archive; its id lets the
@@ -818,6 +822,7 @@ export function createBackup(
       chainKeyId,
       warnings,
       excludedRoots: exclusions.excludedRoots,
+      credentialReads: selection.credentialReads,
     });
     const manifestRepoPath = normalizeRepoRelative(rootDir, manifestPath);
     safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');

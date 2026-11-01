@@ -58,7 +58,14 @@ describe('encryption master Keychain admission', () => {
     const material = String(options.input).trim().split('\n').at(-1)!;
     expect(material).toMatch(/^[a-f0-9]{64}$/);
     expect(JSON.stringify(args)).not.toContain(material);
-    expect(String(args[1])).not.toContain('SecItemUpdate');
-    expect(String(args[1])).not.toContain('SecItemDelete');
+    const script = String(args.at(-1));
+    expect(args.slice(0, -1)).toEqual(['-suppress-warnings', '-e']);
+    expect(script).not.toContain('SecItemUpdate');
+    expect(script).not.toContain('SecItemDelete');
+    // The created master trusts the `security` reader (no prompt in launchd).
+    expect(script).toContain(
+      'SecTrustedApplicationCreateFromPath("/usr/bin/security", &trustedReader)'
+    );
+    expect(script).toContain('kSecAttrAccess as String: access');
   });
 });
