@@ -30,7 +30,7 @@ import {
   resolveBrowserAutomationRuntime,
   type BrowserAutomationRuntimeBridge,
 } from '@agent/core/browser/browser-automation-runtime-bridge';
-import type { Browser, BrowserContext, Page } from '@playwright/test';
+import type { Browser, BrowserContext, Frame, Page } from '@playwright/test';
 import * as path from 'node:path';
 import { isIP } from 'node:net';
 import { randomUUID } from 'node:crypto';
@@ -77,6 +77,13 @@ export interface BrowserSnapshotElement {
   focused?: boolean;
   value_redacted?: boolean;
   selector: string;
+  /** Frame-local selector (no enter-frame chain) — set only for non-main frames. */
+  inner_selector?: string;
+  /** Present on elements inside a child frame (cross-origin included). */
+  frame?: { url: string; name: string; depth: number };
+  /** Center-point hit test landed on a different element at capture time. */
+  occluded?: boolean;
+  occluded_by?: string;
   /** Viewport CSS pixels at capture time (Set-of-Marks grounding). */
   bbox?: { x: number; y: number; width: number; height: number };
 }
@@ -94,6 +101,10 @@ interface BrowserSnapshot {
   truncated?: boolean;
   /** False when `truncated` — callers must not treat the inventory as exhaustive. */
   complete?: boolean;
+  /** Non-main frames that contributed elements to this snapshot. */
+  frame_count?: number;
+  /** Child frames that could not be harvested (detached/crashed). */
+  frame_errors?: number;
   viewport?: { width: number; height: number; scale: number };
   focused_ref?: string | null;
   ready_state?: string;
@@ -612,6 +623,176 @@ interface CapturedSnapshotElements {
   elements: BrowserSnapshotElement[];
   /** Visible candidates before the `maxElements` cap was applied. */
   total_candidates?: number;
+  /** Child frames whose harvest failed (detached/unreachable) — honest count. */
+  frame_errors?: number;
+  /** Non-main frames that contributed elements. */
+  frame_count?: number;
+}
+
+/**
+ * In-page interactive-element harvest, shared by every frame's evaluate call.
+ * Must stay self-contained: Playwright serializes this function verbatim.
+ */
+function harvestDomElementsInPage(max: number) {
+  const candidates = Array.from(
+    document.querySelectorAll('a, button, input, select, textarea, summary, [role], [tabindex]')
+  );
+  const visible = candidates.filter((node) => {
+    const el = node as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const style = window.getComputedStyle(el);
+    return (
+      rect.width > 0 && rect.height > 0 && style.visibility !== 'hidden' && style.display !== 'none'
+    );
+  });
+
+  const active = document.activeElement;
+  return {
+    viewport: { width: innerWidth, height: innerHeight, scale: devicePixelRatio || 1 },
+    ready_state: document.readyState,
+    total_candidates: visible.length,
+    elements: visible.slice(0, max).map((node, index) => {
+      const el = node as HTMLElement;
+      const rect = el.getBoundingClientRect();
+      const role = el.getAttribute('role');
+      const aria = el.getAttribute('aria-label');
+      const placeholder = el.getAttribute('placeholder');
+      const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
+      const name =
+        aria || placeholder || text || el.getAttribute('name') || el.id || el.tagName.toLowerCase();
+      const href = el instanceof HTMLAnchorElement ? el.href : null;
+      const rawValue =
+        'value' in el
+          ? String((el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value || '')
+          : null;
+      const segments: string[] = [];
+      let current: Element | null = el;
+      while (
+        current &&
+        current.nodeType === Node.ELEMENT_NODE &&
+        current.tagName.toLowerCase() !== 'html'
+      ) {
+        const tag = current.tagName.toLowerCase();
+        const htmlEl = current as HTMLElement;
+        if (htmlEl.id) {
+          segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
+          break;
+        }
+        let elementIndex = 1;
+        let sibling = current.previousElementSibling;
+        while (sibling) {
+          if (sibling.tagName === current.tagName) elementIndex += 1;
+          sibling = sibling.previousElementSibling;
+        }
+        segments.unshift(`${tag}:nth-of-type(${elementIndex})`);
+        current = current.parentElement;
+      }
+      const sensitive =
+        el.getAttribute('type')?.toLowerCase() === 'password' ||
+        /password|secret|token|api[_-]?key|credential/i.test(
+          [el.getAttribute('name'), el.getAttribute('autocomplete'), el.id]
+            .filter(Boolean)
+            .join(' ')
+        );
+      // Paint-order occlusion: hit-test the element's center point. A hit on
+      // the element itself or a descendant leaves it actionable; a hit on
+      // anything else means something paints over the click point. Centers
+      // outside the viewport cannot be tested and stay unmarked — we never
+      // claim occlusion we did not observe.
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      let occluded: boolean | undefined;
+      let occludedBy: string | undefined;
+      if (cx >= 0 && cy >= 0 && cx <= innerWidth && cy <= innerHeight) {
+        const top = document.elementFromPoint(cx, cy) as HTMLElement | null;
+        if (top && top !== el && !el.contains(top)) {
+          occluded = true;
+          occludedBy = top.tagName.toLowerCase() + (top.id ? `#${CSS.escape(top.id)}` : '');
+        } else if (top) {
+          occluded = false;
+        }
+      }
+      return {
+        ref: `@e${index + 1}`,
+        tag: el.tagName.toLowerCase(),
+        role,
+        text,
+        name,
+        type: el.getAttribute('type'),
+        placeholder,
+        href,
+        value: sensitive ? (rawValue ? '<redacted>' : '') : rawValue,
+        value_redacted: sensitive && Boolean(rawValue),
+        visible: true,
+        focused: el === active,
+        editable:
+          el instanceof HTMLInputElement ||
+          el instanceof HTMLTextAreaElement ||
+          el instanceof HTMLSelectElement,
+        selector: segments.length ? segments.join(' > ') : 'body',
+        bbox: {
+          x: Math.round(rect.left),
+          y: Math.round(rect.top),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        },
+        ...(occluded !== undefined ? { occluded } : {}),
+        ...(occludedBy ? { occluded_by: occludedBy } : {}),
+      };
+    }),
+  };
+}
+
+/** cssPath for the iframe element itself, evaluated inside the parent frame. */
+function frameElementSelectorInParent(el: Element): string {
+  const segments: string[] = [];
+  let current: Element | null = el;
+  while (
+    current &&
+    current.nodeType === Node.ELEMENT_NODE &&
+    current.tagName.toLowerCase() !== 'html'
+  ) {
+    const tag = current.tagName.toLowerCase();
+    const htmlEl = current as HTMLElement;
+    if (htmlEl.id) {
+      segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
+      break;
+    }
+    let elementIndex = 1;
+    let sibling = current.previousElementSibling;
+    while (sibling) {
+      if (sibling.tagName === current.tagName) elementIndex += 1;
+      sibling = sibling.previousElementSibling;
+    }
+    segments.unshift(`${tag}:nth-of-type(${elementIndex})`);
+    current = current.parentElement;
+  }
+  return segments.length ? segments.join(' > ') : 'body';
+}
+
+/**
+ * Selector prefix that pierces into `frame`'s document, e.g.
+ * `iframe#pay >> internal:control=enter-frame >> `. Recurses through nested
+ * frames so arbitrarily deep chains resolve with ordinary Playwright calls
+ * (`page.click(chain)`) — every ref resolution path stays frame-blind.
+ */
+async function frameSelectorPrefix(frame: Frame): Promise<string> {
+  const parent = frame.parentFrame();
+  if (!parent) return '';
+  const parentPrefix = await frameSelectorPrefix(parent);
+  const handle = await frame.frameElement();
+  const path = await handle.evaluate(frameElementSelectorInParent);
+  return `${parentPrefix}${path} >> internal:control=enter-frame >> `;
+}
+
+function frameDepth(frame: Frame): number {
+  let depth = 0;
+  let current = frame.parentFrame();
+  while (current) {
+    depth += 1;
+    current = current.parentFrame();
+  }
+  return depth;
 }
 
 /**
@@ -619,111 +800,91 @@ interface CapturedSnapshotElements {
  * need the element list (e.g. resolving a recorded {role,name} target
  * against the live page) don't have to go through the full named-snapshot
  * bookkeeping (session/tab ids, persistence, focused_ref).
+ *
+ * Traverses child frames (cross-origin included — frame.evaluate and
+ * frameElement work regardless of origin). Elements in non-main frames get
+ * `frame` metadata and a selector that already carries the
+ * `internal:control=enter-frame` piercing chain, plus `inner_selector` for
+ * in-frame corroboration. A frame that cannot be harvested (detached,
+ * crashed) is skipped and counted in `frame_errors` rather than failing the
+ * whole capture.
  */
 async function captureSnapshotElements(
   page: Page,
   maxElements: number
 ): Promise<CapturedSnapshotElements> {
-  const evaluated = await page.evaluate((max) => {
-    const candidates = Array.from(
-      document.querySelectorAll('a, button, input, select, textarea, summary, [role], [tabindex]')
-    );
-    const visible = candidates.filter((node) => {
-      const el = node as HTMLElement;
-      const rect = el.getBoundingClientRect();
-      const style = window.getComputedStyle(el);
-      return (
-        rect.width > 0 &&
-        rect.height > 0 &&
-        style.visibility !== 'hidden' &&
-        style.display !== 'none'
-      );
-    });
+  // Page doubles without frame APIs harvest through page.evaluate alone —
+  // same surface as before frame traversal existed.
+  const main = typeof page.mainFrame === 'function' ? page.mainFrame() : (page as unknown as Frame);
+  // Main-frame harvest stays unguarded: its failure is the capture's failure.
+  // Legacy doubles may answer with the bare elements array — keep accepting it.
+  const primary = await main.evaluate(harvestDomElementsInPage, maxElements);
+  const primaryRecord:
+    | {
+        viewport?: CapturedSnapshotElements['viewport'];
+        ready_state?: string;
+        total_candidates?: number;
+        elements: BrowserSnapshotElement[];
+      }
+    | undefined = Array.isArray(primary)
+    ? { elements: primary as BrowserSnapshotElement[] }
+    : primary;
+  const elements: BrowserSnapshotElement[] = (primaryRecord?.elements ?? []).map(
+    (element: BrowserSnapshotElement) => ({ ...element })
+  );
+  const viewport = primaryRecord?.viewport;
+  const readyState = primaryRecord?.ready_state;
+  // Undefined stays undefined: a missing candidate total means "unknown",
+  // never fabricate one (and never fabricate a sum over an unknown base).
+  let totalCandidates = primaryRecord?.total_candidates;
+  let frameErrors = 0;
+  let frameCount = 0;
 
-    const active = document.activeElement;
-    return {
-      viewport: { width: innerWidth, height: innerHeight, scale: devicePixelRatio || 1 },
-      ready_state: document.readyState,
-      total_candidates: visible.length,
-      elements: visible.slice(0, max).map((node, index) => {
-        const el = node as HTMLElement;
-        const rect = el.getBoundingClientRect();
-        const role = el.getAttribute('role');
-        const aria = el.getAttribute('aria-label');
-        const placeholder = el.getAttribute('placeholder');
-        const text = (el.innerText || el.textContent || '').trim().replace(/\s+/g, ' ');
-        const name =
-          aria ||
-          placeholder ||
-          text ||
-          el.getAttribute('name') ||
-          el.id ||
-          el.tagName.toLowerCase();
-        const href = el instanceof HTMLAnchorElement ? el.href : null;
-        const rawValue =
-          'value' in el
-            ? String((el as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement).value || '')
-            : null;
-        const segments: string[] = [];
-        let current: Element | null = el;
-        while (
-          current &&
-          current.nodeType === Node.ELEMENT_NODE &&
-          current.tagName.toLowerCase() !== 'html'
-        ) {
-          const tag = current.tagName.toLowerCase();
-          const htmlEl = current as HTMLElement;
-          if (htmlEl.id) {
-            segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
-            break;
-          }
-          let elementIndex = 1;
-          let sibling = current.previousElementSibling;
-          while (sibling) {
-            if (sibling.tagName === current.tagName) elementIndex += 1;
-            sibling = sibling.previousElementSibling;
-          }
-          segments.unshift(`${tag}:nth-of-type(${elementIndex})`);
-          current = current.parentElement;
-        }
-        const sensitive =
-          el.getAttribute('type')?.toLowerCase() === 'password' ||
-          /password|secret|token|api[_-]?key|credential/i.test(
-            [el.getAttribute('name'), el.getAttribute('autocomplete'), el.id]
-              .filter(Boolean)
-              .join(' ')
-          );
-        return {
-          ref: `@e${index + 1}`,
-          tag: el.tagName.toLowerCase(),
-          role,
-          text,
-          name,
-          type: el.getAttribute('type'),
-          placeholder,
-          href,
-          value: sensitive ? (rawValue ? '<redacted>' : '') : rawValue,
-          value_redacted: sensitive && Boolean(rawValue),
-          visible: true,
-          focused: el === active,
-          editable:
-            el instanceof HTMLInputElement ||
-            el instanceof HTMLTextAreaElement ||
-            el instanceof HTMLSelectElement,
-          selector: segments.length ? segments.join(' > ') : 'body',
-          bbox: {
-            x: Math.round(rect.left),
-            y: Math.round(rect.top),
-            width: Math.round(rect.width),
-            height: Math.round(rect.height),
-          },
-        };
-      }),
-    };
-  }, maxElements);
-  return Array.isArray(evaluated)
-    ? { viewport: undefined, ready_state: undefined, elements: evaluated }
-    : evaluated;
+  const allFrames = typeof page.frames === 'function' ? page.frames() : [];
+  for (const frame of allFrames) {
+    if (frame === main || elements.length >= maxElements) continue;
+    try {
+      const prefix = await frameSelectorPrefix(frame);
+      const evaluated = await frame.evaluate(
+        harvestDomElementsInPage,
+        maxElements - elements.length
+      );
+      const evalRecord:
+        { total_candidates?: number; elements: BrowserSnapshotElement[] } | undefined =
+        Array.isArray(evaluated) ? { elements: evaluated as BrowserSnapshotElement[] } : evaluated;
+      if (!evalRecord?.elements) {
+        frameErrors += 1;
+        continue;
+      }
+      if (typeof totalCandidates === 'number') {
+        totalCandidates += evalRecord.total_candidates ?? evalRecord.elements.length;
+      }
+      if (evalRecord.elements.length) frameCount += 1;
+      for (const element of evalRecord.elements) {
+        const inner = element.selector ?? 'body';
+        elements.push({
+          ...element,
+          selector: prefix + inner,
+          inner_selector: inner,
+          frame: { url: frame.url(), name: frame.name(), depth: frameDepth(frame) },
+        });
+      }
+    } catch {
+      frameErrors += 1;
+    }
+  }
+  elements.forEach((element, index) => {
+    element.ref = `@e${index + 1}`;
+  });
+
+  return {
+    viewport,
+    ready_state: readyState,
+    total_candidates: totalCandidates,
+    elements,
+    ...(frameErrors ? { frame_errors: frameErrors } : {}),
+    ...(frameCount ? { frame_count: frameCount } : {}),
+  };
 }
 
 async function buildSnapshot(
@@ -750,6 +911,8 @@ async function buildSnapshot(
       raw.elements.find((element: BrowserSnapshotElement) => element.focused)?.ref || null,
     ready_state: raw.ready_state,
     elements: raw.elements,
+    ...(raw.frame_count ? { frame_count: raw.frame_count } : {}),
+    ...(raw.frame_errors ? { frame_errors: raw.frame_errors } : {}),
   };
 }
 
