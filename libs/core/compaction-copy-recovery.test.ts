@@ -7,7 +7,11 @@ import {
   resolveRecoveryStorePath,
   STALE_COMPACTION_COPY_MS,
   WRITER_COMPACTION_LOCKS,
+  writerCompactionLockFor,
 } from './compaction-copy-recovery.js';
+import { agentInputQueueLockId } from './agent/agent-input-queue.js';
+import { DOT_LEDGER_COMPACT_LOCK } from './dot/dot-wake-ledger-compaction.js';
+import { coordinationFenceLockId } from './workforce/work-coordination-ledger.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { pathResolver } from './path-resolver.js';
 import {
@@ -162,36 +166,69 @@ describe('compaction-copy recovery', () => {
     expect(read(STORE_REL)).toEqual(['{"id":"live"}']);
   });
 
-  it("waits for the dot wake ledger's own compaction lock", () => {
-    const fixture = { rootDir: pathResolver.rootResolve(`${ROOT_REL}/fixture`) };
-    const dotRel = 'active/shared/runtime/dot-wake-ledger.jsonl';
-    const fixtureLocation = { ...fixture, roots: ['active/shared/runtime'] };
-    const dotCopy = `${dotRel}.compacting-t000000000000001-000000-1-initial`;
-    const inFixture = (rel: string) => `${ROOT_REL}/fixture/${rel}`;
-    safeMkdir(path.dirname(pathResolver.rootResolve(inFixture(dotRel))), { recursive: true });
-    write(inFixture(dotCopy), ['{"id":"old"}']);
-    write(inFixture(dotRel), ['{"id":"live"}']);
-    expect(WRITER_COMPACTION_LOCKS[dotRel]).toBe('dot-wake-ledger-compact');
-    withLockSync('dot-wake-ledger-compact', () => {
-      expect(() =>
-        recoverCompactionCopies(dotRel, [dotCopy], {
+  describe('writer compaction locks (stores not compacted under the store lock)', () => {
+    const FIXTURE_REL = `${ROOT_REL}/fixture`;
+    const fixtureLocation = {
+      rootDir: pathResolver.rootResolve(FIXTURE_REL),
+      roots: ['active/shared/runtime', 'active/missions'],
+    };
+    const fixtureAbs = (rel: string) => pathResolver.rootResolve(`${FIXTURE_REL}/${rel}`);
+
+    /** Recovery refuses (LOCK_TIMEOUT) while `lockId` is held, then merges once released. */
+    function expectRecoveryWaitsFor(storeRel: string, lockId: string): void {
+      const copy = `${storeRel}.compacting-t000000000000001-000000-1-initial`;
+      safeMkdir(path.dirname(fixtureAbs(storeRel)), { recursive: true });
+      write(`${FIXTURE_REL}/${copy}`, ['{"id":"old"}']);
+      write(`${FIXTURE_REL}/${storeRel}`, ['{"id":"live"}']);
+      const run = (lockTimeoutMs?: number) =>
+        recoverCompactionCopies(storeRel, [copy], {
           ...fixtureLocation,
           now: later(),
-          lockTimeoutMs: 1,
+          ...(lockTimeoutMs ? { lockTimeoutMs } : {}),
           audit: (record) => audits.push(record),
-        })
-      ).toThrow(/LOCK_TIMEOUT.*dot-wake-ledger-compact/);
+        });
+      withLockSync(lockId, () => {
+        expect(() => run(1)).toThrow(/LOCK_TIMEOUT/);
+      });
+      expect(read(`${FIXTURE_REL}/${copy}`)).toEqual(['{"id":"old"}']);
+      expect(run().outcome).toBe('merged');
+      expect(read(`${FIXTURE_REL}/${storeRel}`)).toEqual(['{"id":"old"}', '{"id":"live"}']);
+    }
+
+    it("waits for the dot wake ledger's own compaction lock", () => {
+      const dotRel = 'active/shared/runtime/dot-wake-ledger.jsonl';
+      expect(WRITER_COMPACTION_LOCKS[dotRel]).toBe(DOT_LEDGER_COMPACT_LOCK);
+      expectRecoveryWaitsFor(dotRel, DOT_LEDGER_COMPACT_LOCK);
     });
-    expect(read(inFixture(dotCopy))).toEqual(['{"id":"old"}']);
-    // Released: the merge runs.
-    expect(
-      recoverCompactionCopies(dotRel, [dotCopy], {
-        ...fixtureLocation,
-        now: later(),
-        audit: (record) => audits.push(record),
-      }).outcome
-    ).toBe('merged');
-    expect(read(inFixture(dotRel))).toEqual(['{"id":"old"}', '{"id":"live"}']);
+
+    it("waits for a mission agent input queue's per-file lock", () => {
+      const queueRel = 'active/missions/public/MSN-RECOVER-Q/coordination/agent-input-queue.jsonl';
+      const lockId = agentInputQueueLockId(fixtureAbs(queueRel));
+      expect(writerCompactionLockFor(queueRel, fixtureAbs(queueRel))).toBe(lockId);
+      expectRecoveryWaitsFor(queueRel, lockId);
+    });
+
+    it('waits for the work-coordination mutation fence (items, and namespaced leases)', () => {
+      const itemsRel = 'active/shared/runtime/work-coordination/items.jsonl';
+      const itemsLock = coordinationFenceLockId(path.dirname(fixtureAbs(itemsRel)));
+      expect(writerCompactionLockFor(itemsRel, fixtureAbs(itemsRel))).toBe(itemsLock);
+      expectRecoveryWaitsFor(itemsRel, itemsLock);
+
+      const leasesRel = 'active/shared/runtime/work-coordination/ns-a/leases.jsonl';
+      const leasesLock = coordinationFenceLockId(path.dirname(fixtureAbs(leasesRel)));
+      expect(leasesLock).not.toBe(itemsLock);
+      expectRecoveryWaitsFor(leasesRel, leasesLock);
+    });
+
+    it('uses only the store lock for other stores', () => {
+      for (const rel of [
+        'active/shared/runtime/other/items.jsonl',
+        'active/shared/runtime/work-coordination/events.jsonl',
+        STORE_REL,
+      ]) {
+        expect(writerCompactionLockFor(rel, fixtureAbs(rel))).toBeUndefined();
+      }
+    });
   });
 
   it('refuses --path outside the store roots or naming a copy', () => {
