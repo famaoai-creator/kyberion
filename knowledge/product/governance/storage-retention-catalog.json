@@ -543,7 +543,7 @@
       "path": "active/shared/runtime/mesh-hub",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding."
+      "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding. MSN-STORE-BOUNDS: tenants/<tenant>/presence.jsonl (one append per heartbeat) is compacted at write time to the latest record per peer_id (mesh-peer-directory.ts MESH_PRESENCE_COMPACT_MIN_BYTES, 1 MiB, re-run after each doubling) with an explicit policy — the path is per tenant and the runtime root is env-overridable, so an exact-path catalog compact entry cannot express it. The raw pre-compaction history is archived under tenants/<tenant>/presence-archive/ (writer role infrastructure_sentinel cannot write active/archive/), so nothing is dropped outside offboarding; that archive is part of this review_required tree. registrations.jsonl and capabilities.jsonl are low-rate and not compacted (registration history carries revocations; the capability key is the pair peer_id+capability_id). All readers stream with no size cap."
     },
     {
       "path": "active/shared/runtime/pipeline-runs",
@@ -593,7 +593,7 @@
       "path": "active/shared/runtime/dot-action-ledger.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G01: append-only dot action snapshots (dot-action-ledger.ts / dot-dispatch.ts); dispatch and recovery replay it, so it is load-bearing state."
+      "note": "G01: append-only dot action snapshots (dot-action-ledger.ts / dot-dispatch.ts); dispatch and recovery replay it, so it is load-bearing state. MSN-STORE-BOUNDS: no automatic retention — readDotActionLedgerStrict negative proofs need full per-action_ref history (e.g. no row was ever dispatched; the original parked row a recovery receipt hashes), so latest-per-action_ref compaction or truncation could re-fire consumed actions. Readers stream-fold with no size cap (the strict reader 16MB cap was removed); appends warn once per doubling past DOT_ACTION_LEDGER_GROWTH_WARN_BYTES (64 MiB)."
     },
     {
       "path": "active/shared/runtime/dot-digest-ledger.jsonl",
@@ -636,7 +636,7 @@
       "path": "active/shared/runtime/mission_queue.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G01: mission dispatch queue (scripts/mission_controller.ts QUEUE_PATH); pending queue state, never TTL-deleted."
+      "note": "G01: mission dispatch queue (scripts/mission_controller.ts QUEUE_PATH); pending queue state, never TTL-deleted. Self-bounded: the dispatch rewrite (scripts/refactor/mission-queue.ts) prunes terminal rows (dispatched/failed) older than MISSION_QUEUE_TERMINAL_RETENTION_MS (14d, measured from metadata.dispatched_at, else last_attempt_at, else enqueued_at); pending rows are always kept. Only mission-queue.ts reads the queue and it acts on pending rows only. Reads stream."
     },
     {
       "path": "active/shared/runtime/trigger-deliveries.jsonl",
