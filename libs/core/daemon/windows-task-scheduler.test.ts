@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { windowsTaskSchedulerManager, buildWindowsTaskXml } from './windows-task-scheduler.js';
+import { daemonUnitFileBytes } from './service-manager.js';
 import type { DaemonRenderContext } from './service-manager.js';
 import { DAEMON_SPECS } from './specs.js';
 const ctx: DaemonRenderContext & { userId: string; systemRoot: string } = {
@@ -21,6 +22,9 @@ describe('Windows Task Scheduler manager', () => {
     expect(xml).toContain('-EncodedCommand');
     expect(xml).toContain('DOMAIN\\alice');
     expect(xml).not.toContain('KYBERION_PERSONA');
+    const staged = daemonUnitFileBytes('windows-task-scheduler', xml) as Buffer;
+    expect(staged.subarray(0, 2)).toEqual(Buffer.from([0xff, 0xfe]));
+    expect(staged.subarray(2).toString('utf16le')).toContain('encoding="UTF-16"');
   });
   it('plans task registration and start without touching the host', () => {
     const p = windowsTaskSchedulerManager.planInstall(spec, ctx);
