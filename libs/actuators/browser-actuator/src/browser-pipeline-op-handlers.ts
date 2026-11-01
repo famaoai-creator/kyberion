@@ -38,6 +38,7 @@ import type {
   BrowserRuntimeLeaseLike,
   buildRetryOptions,
   distillDomInventory,
+  distillDomStructure,
   fillWithFallback,
   opApply,
   opCapture,
@@ -72,6 +73,7 @@ async function readbackFillValue(
 export interface BrowserOpSupport {
   buildRetryOptions: typeof buildRetryOptions;
   distillDomInventory: typeof distillDomInventory;
+  distillDomStructure: typeof distillDomStructure;
   fillWithFallback: typeof fillWithFallback;
   opApply: typeof opApply;
   recordedRefTargetFromParams: typeof recordedRefTargetFromParams;
@@ -368,12 +370,24 @@ const RAW_CAPTURE_HANDLERS: Record<string, BrowserCaptureOpHandler> = {
       }
     );
   },
-  distill_dom: async ({ op, params, runtime, ctx, page, distillDomInventory }) => {
+  distill_dom: async ({
+    op,
+    params,
+    runtime,
+    ctx,
+    page,
+    distillDomInventory,
+    distillDomStructure,
+  }) => {
     // AR-07: deterministic interactive-element inventory for in-loop
-    // decisions (same DOM -> same output; capped).
-    const inventory = await distillDomInventory(page, {
-      maxElements: typeof params.max_elements === 'number' ? params.max_elements : undefined,
-    });
+    // decisions (same DOM -> same output; capped). `mode: structure` swaps to
+    // the structure-preserving inventory (landmarks/headings/depth across
+    // frames) for judgment — separate shape, never an action-target surface.
+    const maxElements = typeof params.max_elements === 'number' ? params.max_elements : undefined;
+    const inventory =
+      params.mode === 'structure'
+        ? await distillDomStructure(page, { maxElements })
+        : await distillDomInventory(page, { maxElements });
     return browserRuntimeHelpers.recordBrowserAction(
       { ...ctx, [params.export_as || 'dom_distillate']: inventory },
       { kind: 'capture', op: 'distill_dom', tab_id: runtime.activeTabId }

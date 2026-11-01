@@ -164,13 +164,12 @@ export async function resolveRecordedRefSelector(
   const matches = captured.elements.filter((element) => matchesTarget(element, target));
 
   if (matches.length === 1) {
-    const candidateSelector = matches[0].selector;
+    const candidate = matches[0];
+    const candidateSelector = candidate.selector;
     if (target.dom_path) {
-      const sameElement = await recordedDomPathMatchesSelector(
-        page,
-        target.dom_path,
-        candidateSelector
-      );
+      const sameElement = candidate.frame
+        ? await recordedDomPathMatchesInFrame(page, candidate, target.dom_path)
+        : await recordedDomPathMatchesSelector(page, target.dom_path, candidateSelector);
       if (!sameElement) {
         throw new RecordedRefSpoofSuspectedError(
           target,
@@ -222,6 +221,37 @@ async function recordedDomPathMatchesSelector(
     },
     { domPath, candidateSelector }
   );
+}
+
+/**
+ * Frame-aware variant: the candidate lives inside a child frame, so both the
+ * recorded `dom_path` and its `inner_selector` are resolved in that frame's
+ * document. The frame is matched by captured url+name — a detached or
+ * relabeled frame yields no match and fails closed like a missing element.
+ */
+async function recordedDomPathMatchesInFrame(
+  page: Page,
+  candidate: BrowserSnapshotElement,
+  domPath: string
+): Promise<boolean> {
+  const meta = candidate.frame;
+  const inner = candidate.inner_selector;
+  if (!meta || !inner) return false;
+  const frame = page.frames().find((f) => f.url() === meta.url && f.name() === meta.name);
+  if (!frame) return false;
+  try {
+    return await frame.evaluate(
+      ({ domPath: path, innerSelector }) => {
+        const byDomPath = document.querySelectorAll(path);
+        if (byDomPath.length !== 1) return false;
+        const byCandidate = document.querySelector(innerSelector);
+        return byCandidate !== null && byDomPath[0] === byCandidate;
+      },
+      { domPath, innerSelector: inner }
+    );
+  } catch {
+    return false;
+  }
 }
 
 function hasRecordedTargetFallback(target?: RecordedRefTarget): boolean {

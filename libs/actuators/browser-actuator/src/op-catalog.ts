@@ -59,7 +59,11 @@ const BROWSER_EXTRA_CONTRACTS: Record<string, InputSchema> = {
   },
   distill_dom: {
     type: 'object',
-    properties: { export_as: { type: 'string' }, max_elements: { type: 'number' } },
+    properties: {
+      export_as: { type: 'string' },
+      max_elements: { type: 'number' },
+      mode: { type: 'string', enum: ['interactive', 'structure'] },
+    },
     additionalProperties: false,
   },
   console: {

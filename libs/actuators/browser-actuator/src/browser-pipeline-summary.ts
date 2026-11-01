@@ -53,6 +53,9 @@ export function buildBrowserPipelineSummary(ctx: Record<string, unknown>): Brows
       name: typeof row.name === 'string' ? row.name : null,
       text: typeof row.text === 'string' ? row.text.slice(0, 80) : null,
       href: typeof row.href === 'string' ? row.href : null,
+      // Sparse flags for operator triage — only surface meaningful states.
+      ...(row.occluded === true ? { occluded: true } : {}),
+      ...(asRecord(row.frame) ? { frame_depth: asRecord(row.frame)?.depth ?? null } : {}),
     };
   });
   return {
