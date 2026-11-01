@@ -3,6 +3,7 @@
   "providers": [
     {
       "mode": "grok-api",
+      "api_proof": { "protocol": "chat-completions", "base_url": "https://api.x.ai/v1" },
       "provider": "grok-api",
       "module": "./reasoning/reasoning-api-provider",
       "capabilities": {
