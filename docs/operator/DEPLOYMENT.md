@@ -143,10 +143,11 @@ Rerunning reconcile from a shell with a different `PATH` plans nothing: the `PAT
 baked into a unit is left out of the drift comparison.
 
 The trigger delivery journal (`active/shared/runtime/trigger-deliveries.jsonl`) rotates
-itself, but it never drops a stable key younger than its 7-day dedupe window. If those
-keys alone fill it, appends stop at the 5 MB hard cap (`[TRIGGER_STORE_FULL]`, ops-health
-`trigger-store-near-cap` at error) and every trigger fails closed. The escape hatch is
-approval-gated and dry-run by default:
+itself, but it never drops a stable key younger than its 7-day dedupe window. Its size
+never stops appends or reads: dedupe scans backward over the window. If stable keys alone
+keep it large, ops-health reports `trigger-store-growth` (warn) — usually a trigger minting
+a new stable key per tick. To rotate it by hand, use the approval-gated command
+(dry-run by default):
 
 ```bash
 pnpm kyberion scheduler trigger-store rotate                     # plan: what is kept / dropped
