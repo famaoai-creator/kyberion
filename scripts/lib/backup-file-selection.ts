@@ -1,6 +1,11 @@
 import * as path from 'node:path';
 import { isRecord, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
+import {
+  BACKUP_READABLE_CREDENTIAL_RULE_IDS,
+  listSensitivePathRoots,
+  withBackupCredentialReadAdmission,
+} from '@agent/core/sensitive-path-policy';
 import { STORAGE_FLOOR_ROOTS } from '@agent/core/storage-layout';
 import { resolveToolRuntimesRoot } from '@agent/core/tool/tool-runtime-policy';
 
@@ -77,7 +82,11 @@ function repoRelativeOrNull(rootDir: string, target: string | undefined): string
 }
 
 export interface BackupExclusions {
-  /** Subtrees never archived (re-generable floors, `backup: "exclude"` catalog entries, backup output dir, temp dir). */
+  /**
+   * Subtrees never archived (re-generable floors, `backup: "exclude"` catalog
+   * entries, credential roots guarded by the sensitive-path policy, backup
+   * output dir, temp dir).
+   */
   excludedRoots: string[];
   /**
    * Exact files never archived (the archive being written, its plaintext
@@ -86,6 +95,11 @@ export interface BackupExclusions {
   excludedFiles: string[];
   /** Directories whose existing backup archives are skipped (`*.tar.gz[.enc]`). */
   archiveDirs: string[];
+  /**
+   * Backup-readable credential roots (connection documents) that overlap the
+   * planned entries: walked only under the encrypted-archive read admission.
+   */
+  credentialReadRoots: Array<{ ruleId: string; root: string }>;
   /**
    * Install trees kept only for provenance: `<root>/<runtime>/state.json` and
    * top-level regular files ride along, the reinstallable payload does not.
@@ -103,6 +117,8 @@ export interface BackupExclusionInput {
   retentionEntries?: BackupRetentionEntry[];
   /** Override for tests; defaults to the managed tool-runtime install root. */
   toolRuntimesRoot?: string | null;
+  /** Override for tests; absolute credential roots, defaults to the sensitive-path policy. */
+  sensitiveRoots?: Array<{ ruleId: string; root: string }>;
 }
 
 /**
@@ -115,6 +131,12 @@ export interface BackupExclusionInput {
  * the managed tool-runtime install tree keeps only its provenance files. A
  * root that equals or contains an explicitly planned entry (e.g. a tenant's
  * partition under an excluded root) is not excluded: an explicit scope wins.
+ * Credential roots of the sensitive-path policy that overlap a planned entry
+ * are never walked freely: the backup-readable ones (connection documents a
+ * restore needs) become `credentialReadRoots`, read only under the
+ * encrypted-archive admission; every other one (e.g. `vault/secrets`, a
+ * registry of keychain entry names whose secrets live in the OS keychain) is
+ * always excluded, even when an explicit scope lies inside it.
  */
 export function resolveBackupExclusions(input: BackupExclusionInput): BackupExclusions {
   const { rootDir, entries } = input;
@@ -135,6 +157,16 @@ export function resolveBackupExclusions(input: BackupExclusionInput): BackupExcl
   const excludedRoots = new Set<string>([...regenerable, DEFAULT_BACKUP_DIR_REPO_PATH]);
   const tempRel = repoRelativeOrNull(rootDir, input.tempDir);
   if (tempRel) excludedRoots.add(tempRel);
+  const credentialReadRoots: Array<{ ruleId: string; root: string }> = [];
+  for (const { ruleId, root } of input.sensitiveRoots ?? listSensitivePathRoots()) {
+    const rel = repoRelativeOrNull(rootDir, root);
+    if (!rel || !entries.some((entry) => isWithin(rel, entry) || isWithin(entry, rel))) continue;
+    if (BACKUP_READABLE_CREDENTIAL_RULE_IDS.includes(ruleId)) {
+      credentialReadRoots.push({ ruleId, root: rel });
+    } else {
+      excludedRoots.add(rel);
+    }
+  }
 
   const excludedFiles = new Set<string>(BACKUP_PASSPHRASE_CONNECTION_FILES);
   for (const target of [input.outPath, input.plainArchivePath]) {
@@ -157,6 +189,7 @@ export function resolveBackupExclusions(input: BackupExclusionInput): BackupExcl
     excludedRoots: [...excludedRoots].sort(),
     excludedFiles: [...excludedFiles].sort(),
     archiveDirs: outputDir ? [outputDir] : [],
+    credentialReadRoots,
     provenanceOnlyRoots,
   };
 }
@@ -167,6 +200,8 @@ export interface BackupFileSelection {
   /** Directories secure-io would not list; tar archives them recursively. */
   unlisted: string[];
   totalBytes: number;
+  /** What the walk read under the backup credential admission: roots and counts, never contents. */
+  credentialReads: Array<{ rule_id: string; root: string; file_count: number }>;
   skipped: {
     excluded: number;
     nonRegular: string[];
@@ -187,6 +222,29 @@ export function selectBackupFiles(input: {
   entries: string[];
   exclusions: BackupExclusions;
   missionGitRepos?: string[];
+  /** Whether the archive is encrypted; required to walk any credential read root. */
+  encrypted?: boolean;
+}): BackupFileSelection {
+  const { exclusions } = input;
+  if (exclusions.credentialReadRoots.length === 0) return walkBackupFiles(input);
+  // Connection documents ride only inside an encrypted archive, read-only,
+  // and only for this walk; the counts land in the manifest.
+  return withBackupCredentialReadAdmission({ encrypted: input.encrypted === true }, () => {
+    const selection = walkBackupFiles(input);
+    selection.credentialReads = exclusions.credentialReadRoots.map(({ ruleId, root }) => ({
+      rule_id: ruleId,
+      root,
+      file_count: selection.paths.filter((rel) => isWithin(rel, root)).length,
+    }));
+    return selection;
+  });
+}
+
+function walkBackupFiles(input: {
+  rootDir: string;
+  entries: string[];
+  exclusions: BackupExclusions;
+  missionGitRepos?: string[];
 }): BackupFileSelection {
   const { rootDir, exclusions } = input;
   const missionGitDirs = new Set((input.missionGitRepos || []).map((repo) => `${repo}/.git`));
@@ -196,6 +254,7 @@ export function selectBackupFiles(input: {
     paths: [],
     unlisted: [],
     totalBytes: 0,
+    credentialReads: [],
     skipped: { excluded: 0, nonRegular: [], symlinks: [], hardLinks: [] },
   };
   const seenInodes = new Set<string>();

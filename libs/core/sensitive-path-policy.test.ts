@@ -3,9 +3,11 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
+  assertSensitivePathAllowed,
   findSensitivePathInText,
   findSensitivePathMatch,
   getSensitivePathRuleIds,
+  withBackupCredentialReadAdmission,
 } from './sensitive-path-policy.js';
 import { pathResolver } from './path-resolver.js';
 import { safeReadFile } from './secure-io.js';
@@ -26,6 +28,49 @@ describe('sensitive-path-policy', () => {
     ['codex', path.join(os.homedir(), '.codex/auth.json')],
   ])('matches %s credential paths', (_name, candidate) => {
     expect(findSensitivePathMatch(candidate)?.ruleId).toContain('credential.');
+  });
+
+  describe('backup credential read admission', () => {
+    const connection = path.resolve('knowledge/personal/connections/slack.json');
+    const vaultSecret = path.resolve('vault/secrets/keychain-registry.json');
+
+    it('denies every caller outside the admission', () => {
+      expect(() => assertSensitivePathAllowed(connection, 'read')).toThrow(
+        '[SENSITIVE_PATH_DENIED]'
+      );
+    });
+
+    it('admits reads of connection documents only, and only while the walk runs', () => {
+      const roots = withBackupCredentialReadAdmission({ encrypted: true }, (admitted) => {
+        expect(() => assertSensitivePathAllowed(connection, 'read')).not.toThrow();
+        for (const operation of ['write', 'append', 'mkdir', 'read/write']) {
+          expect(() => assertSensitivePathAllowed(connection, operation)).toThrow(
+            '[SENSITIVE_PATH_DENIED]'
+          );
+        }
+        expect(() => assertSensitivePathAllowed(vaultSecret, 'read')).toThrow(
+          '[SENSITIVE_PATH_DENIED]'
+        );
+        expect(() => withBackupCredentialReadAdmission({ encrypted: true }, () => 0)).toThrow(
+          '[BACKUP_CREDENTIAL_READ_NESTED]'
+        );
+        return admitted.map(({ ruleId }) => ruleId);
+      });
+      expect(roots).toEqual(['credential.kyberion-connections']);
+      expect(() => assertSensitivePathAllowed(connection, 'read')).toThrow(
+        '[SENSITIVE_PATH_DENIED]'
+      );
+    });
+
+    it('refuses an unencrypted archive before admitting anything', () => {
+      let ran = false;
+      expect(() =>
+        withBackupCredentialReadAdmission({ encrypted: false }, () => {
+          ran = true;
+        })
+      ).toThrow('[BACKUP_CREDENTIAL_READ_REQUIRES_ENCRYPTION]');
+      expect(ran).toBe(false);
+    });
   });
 
   it('matches Kyberion OAuth storage and shell text while leaving project temp paths alone', () => {
