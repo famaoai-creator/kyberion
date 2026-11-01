@@ -15,29 +15,22 @@
     },
     {
       "id": "implementer-development-engineering",
-      "description": "Development missions pin the primary engineering playbooks and prioritise orchestration retrieval so bug-fix/feature/refactoring/perf guidance is reachable without a second router.",
+      "description": "Development missions pin the short pstack import index and search orchestration/ so playbooks stay findable without exhausting the M-scope hint budget (working-philosophy already occupies one pin slot).",
       "match": {
         "team_role": "implementer",
         "mission_type": "development"
       },
-      "pinned": [
-        "knowledge/product/orchestration/engineering-bug-fix-playbook.md",
-        "knowledge/product/orchestration/engineering-feature-playbook.md",
-        "knowledge/product/orchestration/pstack-import-map.md"
-      ],
+      "pinned": ["knowledge/product/orchestration/pstack-import-map.md"],
       "search_roots": ["knowledge/product/orchestration/"]
     },
     {
       "id": "tester-verification-engineering",
-      "description": "Testers get surface-proof and measurement-vetting playbooks so 'done' cannot mean green unit tests alone.",
+      "description": "Testers pin the verification-skill playbook and search orchestration for benchmark/success-check guidance without filling the entire hint budget.",
       "match": {
         "team_role": "tester"
       },
-      "pinned": [
-        "knowledge/product/orchestration/create-verification-skill-playbook.md",
-        "knowledge/product/orchestration/benchmark-checklist-playbook.md",
-        "knowledge/product/orchestration/procedure-success-check-playbook.md"
-      ]
+      "pinned": ["knowledge/product/orchestration/create-verification-skill-playbook.md"],
+      "search_roots": ["knowledge/product/orchestration/"]
     },
     {
       "id": "reviewer-risk-and-divergence",
