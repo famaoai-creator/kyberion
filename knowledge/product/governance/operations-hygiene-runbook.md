@@ -1564,6 +1564,9 @@ runs at write time (`maintainStoreAfterAppend`), not only in the janitor.
    the reason in the catalog note.
 5. After changing a store's shape, run the janitor dry-run and check the
    `Append-Only Stores` section of `storage-janitor-report.md`.
+6. Plain dot-inbox appends take the inbox lock, so they may wait up to its timeout
+   while a large compaction runs; repeated lock-timeout warnings mean compaction is
+   too slow for that store.
 
 **Gate:** `pnpm check -- --only runtime-store-retention` and
 `--only runtime-store-whole-read` (ratchet against whole-file reads); janitor report

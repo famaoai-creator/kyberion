@@ -11,8 +11,10 @@
  * Rewrites (compact / window) keep the janitor's race-safe park/stage
  * protocol against concurrent appenders:
  *
- *  1. The live file is atomically moved aside to a `.compacting-<pid>-<n>-<tag>`
- *     staging sibling — appends already in flight land on the moved inode,
+ *  1. The live file is atomically moved aside to a
+ *     `.compacting-t<ms>-<seq>-<pid>-<tag>` staging sibling (zero-padded
+ *     wall-clock ms + per-process sequence, so park order sorts across
+ *     processes and runs; a name never overwrites a kept copy) — appends already in flight land on the moved inode,
  *     appends after the move create a fresh live file.
  *  2. The surviving lines are written to a temp sibling and published with an
  *     exclusive hard link (`safeLinkExclusiveSync`; buffered exclusive publish
@@ -205,6 +207,23 @@ function uniqueSibling(base: string, suffix: string): string {
   }
 }
 
+let lastParkMs = 0;
+let parkSeq = 0;
+
+/**
+ * Base name of a parked copy: `<live>.compacting-t<ms>-<seq>-<pid>-<tag>`.
+ * The zero-padded ms (monotonic within a process) and per-process sequence
+ * make lexical order park order across processes and runs, so a reader
+ * (`parkedCompactionCopies`) streams kept copies of a failed rewrite before
+ * newer ones. Callers still pick a non-existing sibling (`uniqueSibling`).
+ */
+function parkedCopyBase(livePath: string, tag: string): string {
+  lastParkMs = Math.max(Date.now(), lastParkMs);
+  const ms = String(lastParkMs).padStart(15, '0');
+  const seq = String(parkSeq++ % 1_000_000).padStart(6, '0');
+  return `${livePath}.compacting-t${ms}-${seq}-${process.pid}-${tag}`;
+}
+
 function isErrno(err: unknown, code: string): boolean {
   return (err as NodeJS.ErrnoException | undefined)?.code === code;
 }
@@ -332,7 +351,7 @@ function rewriteParked(
   let liveRestored = false;
 
   const park = (tag: string): boolean => {
-    const staging = `${livePath}.compacting-${process.pid}-${parked.length}-${tag}`;
+    const staging = uniqueSibling(parkedCopyBase(livePath, tag), '');
     try {
       safeMoveSync(livePath, staging);
     } catch (err) {

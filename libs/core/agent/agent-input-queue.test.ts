@@ -432,6 +432,47 @@ describe('AgentInputQueue', () => {
     );
   });
 
+  it('skips write-time compaction while a parked copy of the queue exists', async () => {
+    const missionId = 'PI15-COMPACT-PARKED';
+    const old = '2026-01-01T00:00:00.000Z';
+    const seed: unknown[] = [];
+    for (let i = 0; i < 20; i++) {
+      seed.push({
+        kind: 'enqueued',
+        recorded_at: old,
+        entry: {
+          id: `old-${i}`,
+          mission_id: missionId,
+          delivery: 'next_run',
+          text: `payload old-${i} ${'x'.repeat(160)}`,
+          enqueued_at: old,
+        },
+      });
+      seed.push({ kind: 'consumed', entry_id: `old-${i}`, recorded_at: old });
+    }
+    safeMkdir(tempRoot, { recursive: true });
+    const lines = seed.map((record) => `${JSON.stringify(record)}\n`);
+    safeWriteFile(queuePath, lines.join(''));
+    // A failed rewrite kept a copy holding a terminal pair.
+    const copy = `${queuePath}.compacting-t000000000000001-000000-999999-initial`;
+    const copyText = lines[0] + lines[1];
+    safeWriteFile(copy, copyText);
+    const queue = new AgentInputQueue({ missionId, queuePath });
+    setAgentInputQueueStoreTuningForTests({
+      compactMinBytes: 2048,
+      terminalHorizonMs: 24 * 60 * 60 * 1000,
+    });
+    const entry = await queue.enqueue({ delivery: 'next_run', text: 'trigger' });
+    expect(await queue.cancelQueued(entry.id)).toBe('cancelled');
+    const live = String(safeReadFile(queuePath, { encoding: 'utf8' }))
+      .split('\n')
+      .filter((line) => line.trim());
+    // Nothing was folded away while the copy exists; the copy is untouched.
+    expect(live).toHaveLength(seed.length + 2);
+    expect(String(safeReadFile(copy, { encoding: 'utf8' }))).toBe(copyText);
+    expect(await queue.cancelQueued('old-0')).toBe('already_consumed');
+  });
+
   it('fails closed on a torn durable record (strict correctness store)', async () => {
     const queue = new AgentInputQueue({ missionId: 'PI15-TORN', queuePath });
     await queue.enqueue({ delivery: 'next_run', text: 'kept' });
