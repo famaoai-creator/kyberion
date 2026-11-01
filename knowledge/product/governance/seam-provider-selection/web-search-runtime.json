@@ -1,0 +1,77 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "web-search-runtime",
+      "default_provider": "stub",
+      "fallback_purpose": "grounding",
+      "traits": {
+        "grounding": "Returns page text usable as agent evidence (raw_content / snippets).",
+        "locality": "Runs without cloud API keys; stays on loopback or offline.",
+        "cost": "Marginal cost per query (cloud billed vs self-hosted free).",
+        "availability": "How often a query returns usable ranked hits without operator babysitting."
+      },
+      "providers": {
+        "stub": {
+          "traits": {
+            "grounding": 0,
+            "locality": 1,
+            "cost": 1,
+            "availability": 1
+          },
+          "trait_basis": {
+            "grounding": "declared",
+            "locality": "declared",
+            "cost": "declared",
+            "availability": "declared"
+          },
+          "evidence": ["knowledge/product/architecture/rustxng-search-runtime.md"]
+        },
+        "rustxng": {
+          "traits": {
+            "grounding": 1,
+            "locality": 0.8,
+            "cost": 1,
+            "availability": 0.7
+          },
+          "trait_basis": {
+            "grounding": "measured",
+            "locality": "declared",
+            "cost": "declared",
+            "availability": "measured"
+          },
+          "evidence": [
+            "knowledge/product/architecture/rustxng-search-runtime.md",
+            "https://github.com/sahenjp/RustXNG"
+          ]
+        }
+      },
+      "purposes": {
+        "offline": {
+          "description": "No network search; keep the pipeline shape without calling engines.",
+          "weights": {
+            "locality": 0.5,
+            "availability": 0.5
+          }
+        },
+        "grounding": {
+          "description": "Need ranked URLs plus page text for agent grounding.",
+          "weights": {
+            "grounding": 0.7,
+            "locality": 0.2,
+            "cost": 0.1
+          }
+        },
+        "keyless_local": {
+          "description": "Self-hosted search without cloud API keys.",
+          "weights": {
+            "locality": 0.5,
+            "cost": 0.3,
+            "grounding": 0.2
+          }
+        }
+      }
+    }
+  ]
+}

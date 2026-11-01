@@ -8,7 +8,13 @@ import { stripElementBlocks, stripTags } from '@agent/core/html-sanitize';
 import { decodeEntities } from '@agent/core/text-escaping';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { createAjv } from '@agent/core/foundation';
+import {
+  resolveWebSearchRuntime,
+  type WebSearchResponse,
+} from '@agent/core/search/web-search-runtime-bridge';
 import type { ValidateFunction } from 'ajv';
+import './web-search-runtime-stub.js';
+import './web-search-runtime-rustxng.js';
 
 export type SearchAction = {
   op: 'web_search' | 'fetch_reader';
@@ -21,6 +27,7 @@ export type SearchAction = {
   };
 };
 
+/** @deprecated Prefer WebSearchResult — kept for callers that typed the offline stub. */
 export type WebSearchStub = {
   provider: string;
   query: string;
@@ -28,6 +35,8 @@ export type WebSearchStub = {
   results: Array<Record<string, never>>;
   hint: string;
 };
+
+export type WebSearchResult = WebSearchResponse;
 
 export type FetchReaderResult = {
   url: string;
@@ -103,22 +112,19 @@ function extractPlainText(html: string): string {
 
 export async function webSearch(
   params: NonNullable<SearchAction['params']>
-): Promise<WebSearchStub> {
+): Promise<WebSearchResult> {
   const query = params.query?.trim() ?? '';
   if (!query) {
     throw new Error('search-actuator: missing required fields: params.query');
   }
   const providerRaw = params.provider?.trim();
-  const provider = providerRaw ? providerRaw : 'unconfigured';
+  const preference = providerRaw && providerRaw.length > 0 ? providerRaw : 'auto';
   const top_k = params.top_k ?? DEFAULT_TOP_K;
-  logger.debug(`search-actuator: web_search query="${query}" provider="${provider}"`);
-  return {
-    provider,
-    query,
-    top_k,
-    results: [],
-    hint: 'configure service binding',
-  };
+  const bridge = resolveWebSearchRuntime(preference);
+  logger.debug(
+    `search-actuator: web_search query="${query}" provider="${preference}" bridge="${bridge.bridge_id}"`
+  );
+  return bridge.search({ query, top_k });
 }
 
 export async function fetchReader(

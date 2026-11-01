@@ -1,0 +1,10 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "rustxng": {
+      "preset_path": "knowledge/product/orchestration/service-presets/rustxng.json",
+      "auth_strategy": "none",
+      "base_url": "http://127.0.0.1:8888"
+    }
+  }
+}

@@ -36,6 +36,14 @@
       "types": "./dist/knowledge/knowledge-verification.d.ts",
       "default": "./dist/knowledge/knowledge-verification.js"
     },
+    "./search": {
+      "types": "./dist/search/index.d.ts",
+      "default": "./dist/search/index.js"
+    },
+    "./search/web-search-runtime-bridge": {
+      "types": "./dist/search/web-search-runtime-bridge.d.ts",
+      "default": "./dist/search/web-search-runtime-bridge.js"
+    },
     "./surface/workspace-work": {
       "types": "./dist/surface/workspace-work.d.ts",
       "default": "./dist/surface/workspace-work.js"
@@ -7743,6 +7751,10 @@
     "./web-design-system": {
       "types": "./dist/web-design-system.d.ts",
       "default": "./dist/web-design-system.js"
+    },
+    "./web-search-runtime-bridge": {
+      "types": "./dist/search/web-search-runtime-bridge.d.ts",
+      "default": "./dist/search/web-search-runtime-bridge.js"
     },
     "./wire-error": {
       "types": "./dist/wire-error.d.ts",
