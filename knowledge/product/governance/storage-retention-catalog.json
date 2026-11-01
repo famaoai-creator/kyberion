@@ -377,7 +377,7 @@
       "path": "active/shared/runtime/peer-messaging",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Peer messaging queues (peer-messaging.ts) — undelivered messages are load-bearing. Also covers the per-peer LLM auto-reply job ledger tenants/<tenant>/peers/<local>/reply-jobs.jsonl (peer-auto-reply.ts): latest row per <sender>:<message_id> is the job state and the idempotency record, so it is never TTL-deleted; skipped rows are coalesced to one per (sender, session, reason) per hour, bounding its growth to real reply jobs."
+      "note": "Peer messaging queues (peer-messaging.ts) — undelivered messages are load-bearing. Also covers the per-peer LLM auto-reply job ledger tenants/<tenant>/peers/<local>/reply-jobs.jsonl (peer-auto-reply.ts): latest row per <sender>:<message_id> is the job state and the idempotency record, so it is never TTL-deleted; skipped rows are coalesced to one per (sender, session, reason) per hour, bounding its growth to real reply jobs. MSN-STORE-BOUNDS-2: task-exchange.jsonl (key direction:task_id) and reply-jobs.jsonl (key) are compacted at write time to the latest row per key (peer-messaging.ts compactPeerLedgerAfterAppend, 4 MiB, no archive) — latest-per-key is exactly what readers and reply dedupe use. inbox.jsonl / outbox.jsonl have no retention (each message row is load-bearing); all readers stream with no size cap."
     },
     {
       "path": "active/shared/runtime/presence",
@@ -512,7 +512,7 @@
       "path": "active/shared/runtime/co-sessions",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Same-checkout co-session presence/leases/handoffs (co-session.ts) — deleting live leases breaks multi-provider write exclusion."
+      "note": "Same-checkout co-session presence/leases/handoffs (co-session.ts) — deleting live leases breaks multi-provider write exclusion. MSN-STORE-BOUNDS-2: <id>/presence.jsonl is compacted at write time to the latest row per provider:participant_id (1 MiB, no archive; staleness is judged at read time). handoffs.jsonl keeps its rewrite-on-ack under the co-session lock; readers skip a torn line. Event feeds observability/co-sessions/<id>/events.jsonl rotate at 8 MiB at write time; segments expire under the observability 90d sweep and the learning-signal reader scans live + segments back to its window."
     },
     {
       "path": "active/shared/runtime/cognitive-routing",
@@ -543,7 +543,7 @@
       "path": "active/shared/runtime/mesh-hub",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding. MSN-STORE-BOUNDS: tenants/<tenant>/presence.jsonl (one append per heartbeat) is compacted at write time to the latest record per peer_id with no archive (presence is ephemeral; latest-per-peer loses nothing a reader uses); each compaction is audited. The writer triggers it (mesh-peer-directory.ts MESH_PRESENCE_COMPACT_MIN_BYTES, 1 MiB, re-run after each doubling) with an explicit policy — the path is per tenant and the runtime root is env-overridable, so an exact-path catalog compact entry cannot express it. registrations.jsonl and capabilities.jsonl are low-rate and not compacted (registration history carries revocations; the capability key is the pair peer_id+capability_id). All readers stream with no size cap."
+      "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding. MSN-STORE-BOUNDS: tenants/<tenant>/presence.jsonl (one append per heartbeat) is compacted at write time to the latest record per peer_id with no archive (presence is ephemeral; latest-per-peer loses nothing a reader uses); each compaction is audited. The writer triggers it (mesh-peer-directory.ts MESH_PRESENCE_COMPACT_MIN_BYTES, 1 MiB, re-run after each doubling) with an explicit policy — the path is per tenant and the runtime root is env-overridable, so an exact-path catalog compact entry cannot express it. registrations.jsonl and capabilities.jsonl are low-rate and not compacted (registration history carries revocations; the capability key is the pair peer_id+capability_id). All readers stream with no size cap. MSN-STORE-BOUNDS-2: tenants/<tenant>/deliveries.jsonl and dead-letter.jsonl are compacted at write time to the latest record per delivery_id / dead_letter_id (mesh-message-broker.ts, 4 MiB, re-run after each doubling); no time window, because idempotency lookups need every delivery id. The raw union is archived to active/shared/observability/mesh-hub[/<ns>]/tenants/<tenant>/compaction-archive/ (writable by the broker roles, expires under the observability 90d sweep). Readers stream and fold latest-per-key, and read the parked copy while another process compacts (jsonl-parked-read.ts)."
     },
     {
       "path": "active/shared/runtime/pipeline-runs",
@@ -574,7 +574,7 @@
       "artifact_class": "log",
       "action": "review_required",
       "audit": true,
-      "note": "G01: append-only per-wake dot token usage (dot-runtime.ts recordDotTokenUsage), read by dotTokensUsedToday and org-budget-governor for the current UTC day only. Usage-accounting history, so no automatic deletion; dotTokensUsedToday replays it incrementally (readJsonLinesCached) instead of parsing the whole history per call. Archive old days by operator decision."
+      "note": "G01: append-only per-wake dot token usage (dot-runtime.ts recordDotTokenUsage), read by dotTokensUsedToday and org-budget-governor for the current UTC day only. MSN-STORE-BOUNDS-2: both readers scan backward to UTC midnight minus 6h (dot-token-usage.ts readDotTokenUsageForDay), so the file size never fails a read. The writer keeps a 3-day time window at write time (explicit policy, DOT_TOKEN_USAGE_* constants, min 8 MiB, re-run after each doubling) — 3 days can never drop a row of the day being enforced, so token_cap_per_day cannot be bypassed; dropped rows are archived (accounting evidence) to <store dir>/compaction-archive/, which expires with active/shared/runtime/compaction-archive. The janitor never rewrites it (review_required)."
     },
     {
       "path": "active/shared/runtime/dot-inbox.jsonl",
@@ -605,13 +605,13 @@
       "path": "active/shared/runtime/dot-feedback.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Operator feedback on dot actions (dot-feedback.ts DOT_FEEDBACK_PATH); feeds later wakes' prompts."
+      "note": "Operator feedback on dot actions (dot-feedback.ts DOT_FEEDBACK_PATH); feeds later wakes' prompts. MSN-STORE-BOUNDS-2: readers scan backward to the 30-day feedback window (readJsonLinesSince); the writer keeps a 37-day time window at write time (DOT_FEEDBACK_RETENTION_MS, min 8 MiB) and archives dropped rows to <store dir>/compaction-archive/. No reader looks past 30 days, so nothing a reader uses is lost. The janitor never rewrites it."
     },
     {
       "path": "active/shared/runtime/dot-signal-ledger.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Dot signal ledger (dot-feedback.ts DOT_SIGNAL_LEDGER_PATH); load-bearing signal history for the feedback loop."
+      "note": "Dot signal ledger (dot-feedback.ts DOT_SIGNAL_LEDGER_PATH); load-bearing signal history for the feedback loop. MSN-STORE-BOUNDS-2: not compacted by key — KR signal_ratio (dot-key-results.ts) reads up to 720h of rows. The writer keeps a 37-day time window at write time (min 8 MiB, no archive: telemetry); readers stream with no size cap. The janitor never rewrites it."
     },
     {
       "path": "active/shared/runtime/dot-watch-state.json",
@@ -782,7 +782,20 @@
       "path": "active/shared/runtime/tenant-ledger",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions."
+      "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions. MSN-STORE-BOUNDS-2: declared unbounded on purpose: rotation must carry the hash chain across segments (new segment genesis = previous last hash, verify spanning segments), which is not built yet. Appends are O(1) (backward tail) and every reader streams, so size never fails a read; growth is watched by the ops-health directory probe."
+    },
+    {
+      "path": "active/audit",
+      "artifact_class": "evidence",
+      "action": "review_required",
+      "note": "System hash-chained ledger active/audit/system-ledger.jsonl (ledger.ts) and audit evidence. MSN-STORE-BOUNDS-2: declared unbounded on purpose: rotation must carry the hash chain across segments, which is not built yet. Appends are O(1) (backward tail) and every reader streams, so size never fails a read; removal or rotation requires an explicit retention decision."
+    },
+    {
+      "path": "active/shared/runtime/compaction-archive",
+      "artifact_class": "evidence",
+      "ttl_days": 90,
+      "action": "delete",
+      "note": "MSN-STORE-BOUNDS-2: raw-union archives written by write-time store maintenance (append-only-store.ts writeTimeArchiveDir: <store dir>/compaction-archive/) for top-level runtime stores such as dot-feedback.jsonl and dot-token-usage.jsonl. Store writers cannot write active/archive/, so the archive sits next to the store, keeping its tier/tenant partition. Kept 90 days, like other observability evidence."
     },
     {
       "path": "active/shared/runtime/tenant-approvals",
@@ -1173,9 +1186,9 @@
     {
       "path": "active/shared/observability/autonomy-outcomes.jsonl",
       "artifact_class": "log",
-      "action": "rotate",
+      "action": "review_required",
       "audit": true,
-      "note": "Autonomy evidence ledger (autonomy-action-state.ts): one row per gate decision with execution outcome — the input to evidence-driven action promotion/demotion. Rotated past rotate_min_bytes; segments expire under the observability 90d sweep."
+      "note": "Autonomy evidence ledger (autonomy-action-state.ts): one row per gate decision with execution outcome — the input to evidence-driven action promotion/demotion. MSN-STORE-BOUNDS-2: no longer rotated: rotation moved the live learning window into a segment no reader scans, resetting promote/demote evidence. Every reader needs only rows inside the learning window (stats via readJsonLinesSince; listAutonomyActionIds streams), so the writer keeps max(policy window, 30d) + 7d at write time (min 8 MiB) and archives dropped rows to active/shared/observability/compaction-archive/ (expires under the observability 90d sweep). Tenant partitions are not trimmed (their scope cannot stage a rewrite); they are never rotated, read without size limits, and watched by the ops-health directory probe."
     },
     {
       "path": "active/shared/observability/work-coordination/events.jsonl",
