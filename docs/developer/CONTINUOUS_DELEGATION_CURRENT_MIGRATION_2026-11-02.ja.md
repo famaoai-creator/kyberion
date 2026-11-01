@@ -11,6 +11,8 @@ status: implemented_pending_live_validation
 
 旧実装の基準は `101b9ad9315f967842fe89189c1693728f267d52`（2026-08-11）。今回の基準は、作業開始時にfetchした `origin/main` の `88ac78e0fbfadecbebe1b564ac620ef35b6f0c50`（2026-11-02）で、間には1,209コミットある。専用branchは `feat/continuous-delegation-current-20261102`、missionは `MSN-DELEGATION-CURRENT-20261102`。
 
+作業中のmain更新（browser watchdog/CDPとcharter client validation）5コミットも取り込み、最終検証の基準を `acd0772e4c805fb122e01efde3ea25f26c9409ad` に更新した。生成registryは新旧を手動で選ばず、新しいsource/buildから再生成する。
+
 旧checkoutのtracked patchとuntracked archiveを、旧checkout内の `active/shared/staging/delegation-rebase-20261102/` に保存した。SHA256はそれぞれ `5865f8e51196363053288218436dcd29649a8185e68e83ff0d5df7a849bb15d2` と `622a0a36eb39bf2d97aea8f5de9d76c7b86db6e74929577317e9ba071a6ca3f4`。旧ソースや別checkoutの未追跡patchを削除・reset・上書きしていない。
 
 旧版のテスト成功は現行版の適合証拠には使わない。旧diffの一括適用、古い権限モデルの再導入、GitHub直結の別経路追加は行わず、現行コードの不足だけを実装する。
@@ -34,7 +36,7 @@ publicは既存のpublic read / write空配列と互換。personalは本人のpe
 
 本文の出所は実ファイルのcanonicalなknowledge/runtime partitionから分類し、worktree間の既存transportでも保持する。shared prefix、group/system registry、存在しないtenant、分類不明のscratchをtenant所有と推測しない。
 
-初期開発bundleは `vcs:pr_create`、`vcs:push`（`agent/kyberion-development`）、`vcs:pr_merge`（`main`）。mainへの直接pushを自動許可しない。候補branchの作成・実装・修復・並行claimは既存WorkItem executorの責任。任意のbranch wildcard権限を新設していない。
+初期開発bundleは `vcs:pr_create`、`vcs:push`（`agent/kyberion-development`）、`vcs:pr_merge`（`main`）。設定画面のbundleもこの対応branchに固定し、個別push / merge設定の任意branch委任と区別する。mainへの直接pushを自動許可しない。候補branchの作成・実装・修復・並行claimは既存WorkItem executorの責任。任意のbranch wildcard権限を新設していない。
 
 ## VCS確認ループ
 
@@ -44,6 +46,8 @@ publicは既存のpublic read / write空配列と互換。personalは本人のpe
 
 このopは、実装済みWorkItemを既存の公開基盤へつなぐ確認処理であり、別のモデル実行hostを導入しない。実装・修復が必要なら既存mission executorの次作業を返す。merge受付やqueue投入を完了とせず、実merge SHAとそのCIを確認する。
 
+CIの出所はworkflowだけでなくローカルaction、検証script、root設定のimmutable treeにも束縛する。これらを変更するPRは、この確認処理ではunverifiedとなる。genericなVCS merge grant自体を検証器へ置き換える変更ではなく、準備済み開発opに対する追加の品質条件である。
+
 ## 検証と実運用の境界
 
 既存の認証済みowner同意、実charter保存、NHI有効化、正規VCS境界を使ったhermetic回帰試験を行う。mockしたGitHub metadataやHTTP認証transportはlive成功と区別する。実GitHubの権限変更・保護条件変更・merge、実秘密鍵のrotation、外部監査先の導入は行わない。
@@ -51,3 +55,11 @@ publicは既存のpublic read / write空配列と互換。personalは本人のpe
 旧版の実Seatbelt試験は、現行provider/permission modelの証明として移さない。現行sandbox・credential allocation・WorkItem境界を維持する。外部サービスが決まった後は、既存service/secret/audit拡張点へ接続し、実repoでのcanaryを別途確認する。
 
 利用手順：[外部操作のオンボーディング](../../knowledge/product/orchestration/onboarding-action-authority.md)。
+
+## 最終レビューと検証記録
+
+現行base上で `pnpm check -- --scope pr` は51件成功・失敗0、`pnpm lint` と `pnpm build` は終了コード0。buildはpackages/repository、bundle、Chronos/Concierge本番UI、source shadowまで完了した。関連回帰は21 suites / 277 tests成功。最終レビューでは、merge後もレビュー時の空でないCI policy digestとの一致を必須にし、不一致時は既知のmerge SHAを保持して `post_merge_unverified` に留める回帰を追加した。
+
+初期設定の開発bundleと確認ループのbranch不一致も修正し、個別設定で独自branchを選んだ後にbundleへ切り替えても対応branchへ戻ることをUI試験で確認した。レビュー対象はローカルの権限境界・VCS確認処理・同意UIであり、実GitHubのcanaryではない。
+
+旧checkoutの保全、新しい専用branchへの移植、ローカル検証までを今回の到達点とする。push・PR公開・実merge・稼働中identityへの新規grant適用は未実施。実装を別executorへ複製したり、未実行の外部操作を完了として記録したりしない。

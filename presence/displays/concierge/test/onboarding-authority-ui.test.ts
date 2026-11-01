@@ -116,7 +116,18 @@ describe('onboarding authority review and resumption', () => {
             base_hash: 'base',
           })
     );
+    await m.change('select', 'vcs:pr_merge', 1);
+    await m.change('input[type="text"]', 'release/custom');
+    const genericBranch = m.container.querySelector('input[type="text"]')!;
+    expect(Reflect.get(genericBranch, 'value')).toBe('release/custom');
+    expect(genericBranch.hasAttribute('readOnly')).toBe(false);
     await m.change('select', 'vcs:development', 1);
+    const fixedBranches = [...m.container.querySelectorAll('input[type="text"]')];
+    expect(fixedBranches.map((input) => Reflect.get(input, 'value'))).toEqual([
+      'agent/kyberion-development',
+      'main',
+    ]);
+    expect(fixedBranches.every((input) => input.hasAttribute('readOnly'))).toBe(true);
     await m.change('input[type="url"]', 'https://github.com/owner/repo');
     await m.change('input[type="datetime-local"]', '2099-10-21T12:00');
     await m.check('Require a verified private repository', true);

@@ -646,6 +646,7 @@ export function OnboardingAuthorityPanel({
                 <input
                   type="text"
                   value={branch}
+                  readOnly={operation === 'vcs:development'}
                   onChange={(event) => setBranch(event.target.value)}
                   placeholder="main"
                 />
@@ -657,7 +658,7 @@ export function OnboardingAuthorityPanel({
                 <input
                   type="text"
                   value={mergeBase}
-                  onChange={(event) => setMergeBase(event.target.value)}
+                  readOnly
                 />
               </label>
             ) : null}
