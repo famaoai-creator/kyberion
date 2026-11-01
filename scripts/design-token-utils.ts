@@ -86,6 +86,7 @@ export function renderKyberionDesignTokenBlock(tokens: KyberionDesignTokens): st
     `  --kb-danger: ${light.danger || light.warning};`,
     `  --kb-font-sans: ${fonts.sans};`,
     `  --kb-font-mono: ${fonts.mono};`,
+    `  --kb-font-campaign-display: ${fonts.campaign_display || fonts.sans};`,
     '  --kb-blur: blur(12px);',
     '  --kb-glow-cyan: 0 0 15px rgba(0, 242, 255, 0.4);',
     '}',
@@ -379,10 +380,18 @@ function fontScaleDeclarations(scale: Record<string, string>, indent: string): s
 }
 
 /** Web font stacks: `tokens.ui.font_family` overrides the media `tokens.fonts`. */
-function webFontStacks(tokens: KyberionDesignTokens): { sans: string; mono: string } {
+function webFontStacks(tokens: KyberionDesignTokens): {
+  sans: string;
+  mono: string;
+  campaign_display?: string;
+} {
   const base = tokens.tokens.fonts;
   const web = tokens.tokens.ui?.font_family;
-  return { sans: web?.sans ?? base.sans, mono: web?.mono ?? base.mono };
+  return {
+    sans: web?.sans ?? base.sans,
+    mono: web?.mono ?? base.mono,
+    ...(base.campaign_display ? { campaign_display: base.campaign_display } : {}),
+  };
 }
 
 /**

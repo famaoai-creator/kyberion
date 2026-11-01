@@ -39,8 +39,9 @@
       }
     },
     "fonts": {
-      "sans": "Inter, 'Noto Sans JP', sans-serif",
-      "mono": "'JetBrains Mono', monospace"
+      "sans": "'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif",
+      "mono": "'JetBrains Mono', monospace",
+      "campaign_display": "'Helvetica Neue', Arial, 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif"
     },
     "typography": {
       "_meta": "MP-01 modular type scale. size_pt is the pptx/doc surface size; min_size_pt is the floor layout-fit may shrink to. Weight contrast between display/headline and body is intentional.",
@@ -271,7 +272,7 @@
         }
       },
       "font_family": {
-        "sans": "Inter, \"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", Meiryo, system-ui, sans-serif"
+        "sans": "\"Hiragino Sans\", \"Noto Sans JP\", \"Yu Gothic UI\", Meiryo, system-ui, sans-serif"
       }
     }
   }

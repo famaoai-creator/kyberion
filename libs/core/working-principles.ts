@@ -30,6 +30,13 @@ export const CORE_WORKING_PRINCIPLES: readonly string[] = [
   'Report failures plainly with the failing output attached. A hidden or softened failure costs the team more than the failure itself.',
   'Before reading or writing knowledge, resolve the tenant and containment chain; customer stance, labels, and caller-supplied scope are never authorization.',
   'When knowledge is missing or unhelpful, record the scoped gap or feedback with its provenance; do not silently broaden retrieval to make the result look complete.',
+  // Full-mode only (compact keeps the top 6). Distilled from pstack principles (MIT).
+  'When two or more fixes that share one premise have failed the same gate, write the premise down and test it directly before another fix that assumes it.',
+  'Break multi-step work into units that each end in a checkable state; verify before the next unit, and order commits so a reviewer can replay failing-then-passing proof.',
+  'When evolving a system, remove dead weight (dead code, stubs, redundant validators) before adding new structure — build on the simpler base.',
+  'Before trusting or shipping a measured number (speedup, regression, eval), name the limiter, rule out alternate explanations, and keep run count and spread with the claim.',
+  'For non-trivial work, build the smallest rerunnable tool (script, codemod, generator, or delegate skill) that does or proves the job instead of unverifiable hand edits.',
+  'When debugging, fix the first wrong decision or the place a legitimate state should have been handled — not only where the symptom surfaced; do not hide illegal states with guards.',
 ] as const;
 
 /** Role-specific addenda, applied on top of the core rules. */
@@ -38,6 +45,8 @@ export const ROLE_WORKING_PRINCIPLES: Readonly<Record<string, readonly string[]>
     'Make the smallest diff that satisfies the acceptance criteria; match the surrounding code style, naming, and idiom.',
     'New behavior needs a check that fails without your change and passes with it — run both directions when feasible.',
     'Before editing, locate an existing similar implementation in the codebase and follow its pattern instead of inventing a new one.',
+    'When two same-premise fixes have already failed the gate, attack the premise (write it down and test it) before a third patch.',
+    'Prefer subtracting dead paths and stubs before adding the new shape.',
   ],
   reviewer: [
     'Your job is to refute, not to confirm. Actively look for the input or state that breaks the work.',

@@ -1,7 +1,7 @@
 {
   "$schema": "../schemas/knowledge-slices.schema.json",
-  "version": "0.2.0",
-  "description": "Initial knowledge slice declarations (KP-03). Deliberately small: one role/phase-specific slice and one wildcard default. Extend as pinned needs surface from delivered/used telemetry (KP-05).",
+  "version": "0.4.0",
+  "description": "Knowledge slice declarations (KP-03). Engineering pins (MSN-PSTACK-WIRE) plus company-ops marketing/design pins (MSN-BIZ-SKILLS). Extend from telemetry (KP-05).",
   "slices": [
     {
       "id": "implementer-execution",
@@ -10,11 +10,95 @@
         "team_role": "implementer",
         "phase": "*"
       },
+      "pinned": ["knowledge/product/governance/working-philosophy.md"],
+      "exclude": ["knowledge/product/evolution/distill_*.md"]
+    },
+    {
+      "id": "implementer-development-engineering",
+      "description": "Development missions pin the short pstack import index and search orchestration/ so playbooks stay findable without exhausting the M-scope hint budget (working-philosophy already occupies one pin slot).",
+      "match": {
+        "team_role": "implementer",
+        "mission_type": "development"
+      },
+      "pinned": ["knowledge/product/orchestration/pstack-import-map.md"],
+      "search_roots": ["knowledge/product/orchestration/"]
+    },
+    {
+      "id": "tester-verification-engineering",
+      "description": "Testers pin the verification-skill playbook and search orchestration for benchmark/success-check guidance without filling the entire hint budget.",
+      "match": {
+        "team_role": "tester"
+      },
+      "pinned": ["knowledge/product/orchestration/create-verification-skill-playbook.md"],
+      "search_roots": ["knowledge/product/orchestration/"]
+    },
+    {
+      "id": "reviewer-risk-and-divergence",
+      "description": "Reviewers refute with blast-radius proof and contested-design wiring to existing independence roles.",
+      "match": {
+        "team_role": "reviewer"
+      },
       "pinned": [
-        "knowledge/product/governance/working-philosophy.md"
+        "knowledge/product/orchestration/blast-radius-playbook.md",
+        "knowledge/product/orchestration/design-divergence-playbook.md"
+      ]
+    },
+    {
+      "id": "devils-advocate-design-divergence",
+      "description": "Opposing-position role reads the Kyberion mapping of arena/interrogate intents.",
+      "match": {
+        "team_role": "devils_advocate"
+      },
+      "pinned": ["knowledge/product/orchestration/design-divergence-playbook.md"]
+    },
+    {
+      "id": "experience-designer-visual-direction",
+      "description": "Experience designers get intentional visual direction and marketing context before polishing UI or brand surfaces.",
+      "match": {
+        "team_role": "experience_designer"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/visual-direction-playbook.md",
+        "knowledge/product/orchestration/product-marketing-context-playbook.md"
       ],
-      "exclude": [
-        "knowledge/product/evolution/distill_*.md"
+      "search_roots": ["knowledge/product/orchestration/", "knowledge/public/design-patterns/"]
+    },
+    {
+      "id": "product-strategist-gtm-foundations",
+      "description": "Product strategists get marketing context, strategy, and launch/GTM playbooks for company-facing decisions.",
+      "match": {
+        "team_role": "product_strategist"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/product-marketing-context-playbook.md",
+        "knowledge/product/orchestration/marketing-strategy-playbook.md",
+        "knowledge/product/orchestration/launch-gtm-playbook.md"
+      ]
+    },
+    {
+      "id": "designer-visual-and-content-gates",
+      "description": "Designer authority role: visual direction plus content pipeline quality gates for customer-facing artifacts.",
+      "match": {
+        "team_role": "designer"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/visual-direction-playbook.md",
+        "knowledge/product/orchestration/marketing-content-pipeline-playbook.md",
+        "knowledge/product/orchestration/company-ops-skills-import-map.md"
+      ]
+    },
+    {
+      "id": "marketing-growth-content-and-gtm",
+      "description": "Marketing growth authority: product context, content pipeline, strategy, and launch/GTM foundations.",
+      "match": {
+        "team_role": "marketing_growth"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/product-marketing-context-playbook.md",
+        "knowledge/product/orchestration/marketing-content-pipeline-playbook.md",
+        "knowledge/product/orchestration/marketing-strategy-playbook.md",
+        "knowledge/product/orchestration/launch-gtm-playbook.md",
+        "knowledge/product/orchestration/company-ops-skills-import-map.md"
       ]
     },
     {
@@ -23,9 +107,7 @@
       "match": {
         "tenant": "*"
       },
-      "exclude": [
-        "knowledge/product/evolution/distill_*.md"
-      ]
+      "exclude": ["knowledge/product/evolution/distill_*.md"]
     },
     {
       "id": "default-exclude-unreviewed-distills",
@@ -35,9 +117,7 @@
         "phase": "*",
         "mission_type": "*"
       },
-      "exclude": [
-        "knowledge/product/evolution/distill_*.md"
-      ]
+      "exclude": ["knowledge/product/evolution/distill_*.md"]
     },
     {
       "id": "productization-governed-evidence-tools",
@@ -46,9 +126,7 @@
         "team_role": "implementer",
         "project": "PRJ-KYBERION-PRODUCTIZATION"
       },
-      "pinned": [
-        "knowledge/product/orchestration/governed-evidence-tools.md"
-      ]
+      "pinned": ["knowledge/product/orchestration/governed-evidence-tools.md"]
     }
   ]
 }
