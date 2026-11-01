@@ -234,7 +234,13 @@ tool runtime — Kyberion works unchanged without it.
   PATH (`resolveAgentDesktopBin`).
 - **Bridge**: `libs/core/desktop-ax-bridge.ts` spawns the binary with an
   allowlisted subcommand set (`snapshot`, `find`, `click`, `type`, `press`,
-  `scroll`, `set-value`, `select`, `list-windows`, `session`, `version`),
+  `scroll`, `set-value`, `select`, `list-windows`, window geometry
+  (`focus-window`, `resize-window`, `move-window`, `minimize`, `maximize`,
+  `restore`), `open-system-surface`, `launch`, `close-app`, `wait`,
+  `permissions`, notification actions (`dismiss-notification`,
+  `dismiss-all-notifications`, `notification-action`), clipboard
+  (`clipboard-get`, `clipboard-set`, `clipboard-clear`), `session`,
+  `version`),
   redirects `AGENT_DESKTOP_HOME` to
   `active/shared/runtime/system/agent-desktop` (owner-only mode; refmaps
   and traces contain screen content and never reach the knowledge tier),
@@ -250,17 +256,39 @@ tool runtime — Kyberion works unchanged without it.
   (observation); `ax_click`, `ax_right_click`, `ax_type`, `ax_press`,
   `ax_scroll`, `ax_scroll_to`, `ax_set_value`, `ax_select`, `ax_clear`,
   `ax_focus`, `ax_toggle`, `ax_check`, `ax_uncheck`, `ax_expand`,
-  `ax_collapse` (mutating); and `ax_session_end`, `ax_session_gc`
+  `ax_collapse` (mutating); `ax_wait` (server-side blocking wait on ms /
+  element / window title / text / menu / notification / lifecycle event —
+  stronger than a client retry loop because upstream polls inside the
+  session namespace) and `ax_permissions` (accessibility / screen-recording
+  / automation grant states — the preflight complement to
+  `ax_runtime_status`, which only proves the binary exists); window
+  management ops `ax_focus_window`, `ax_move_window`, `ax_resize_window`,
+  `ax_minimize_window`, `ax_maximize_window`, `ax_restore_window`;
+  `ax_open_system_surface` (dock / spotlight / menu-bar-extras / shell
+  surfaces); app lifecycle `ax_launch` (`--activate`, `--cdp`, `--arg`,
+  `--env`, `--cwd`, `--no-attach`) and `ax_close_app` (`--force`);
+  notification ops `ax_dismiss_notification`, `ax_dismiss_all_notifications`,
+  `ax_notification_action`; clipboard ops `ax_clipboard_get`
+  (`--format`), `ax_clipboard_set` (text / `--image` / `--file-url`),
+  `ax_clipboard_clear`; and `ax_session_end`, `ax_session_gc`
   (lifecycle — seal/gc governed runtime sessions, no approval).
 - **Approval tiers**: mutating ops split by risk, matching the existing
   per-op policy of the mark/coordinate path. Navigation-class ops
   (`ax_click`, `ax_scroll`, `ax_scroll_to`, `ax_focus`, `ax_expand`,
-  `ax_collapse`) run ungated — same risk as `left_click`/`scroll`, but
-  strictly safer since they act on a resolved ref. Commit-class ops
-  (`ax_type`, `ax_press`, `ax_set_value`, `ax_select`, `ax_clear`,
-  `ax_toggle`, `ax_check`, `ax_uncheck`, `ax_right_click`) keep the
-  `wf_computer_destructive_v1` approval workflow — they commit value
-  changes or invoke menus. Headed/physical commands (`hover`, `drag`,
+  `ax_collapse`, and the window-management group — `ax_focus_window`,
+  `ax_move_window`, `ax_resize_window`, `ax_minimize_window`,
+  `ax_maximize_window`, `ax_restore_window`, `ax_open_system_surface`)
+  run ungated — same risk as `left_click`/`scroll`/`focus_window`, but
+  strictly safer since they act on a resolved ref or window id. Commit-class
+  ops (`ax_type`, `ax_press`, `ax_set_value`, `ax_select`, `ax_clear`,
+  `ax_toggle`, `ax_check`, `ax_uncheck`, `ax_right_click`, plus
+  `ax_launch`, `ax_close_app`, the notification ops, and the clipboard ops)
+  keep the `wf_computer_destructive_v1` approval workflow — they commit
+  value changes, start/terminate processes, consume user notifications, or
+  touch the paste buffer. `ax_clipboard_get` sits in the commit tier even
+  though it mutates nothing: a paste-buffer read can expose secrets, so it
+  is gated as a sensitive read with its own approval narrative. Headed/
+  physical commands (`hover`, `drag`,
   `mouse-*`, `double/triple-click`, `key-down/up`) stay excluded —
   upstream rejects them in stateless mode, and physical input already
   has a governed channel (marks + CGEvent); a `POLICY_DENIED` outcome
@@ -281,6 +309,14 @@ use_physical_channel`.
   stale (runtime gc / idle expiry, `SESSION_*` errors) the bridge evicts
   it, re-mints, and retries the command exactly once — never loops.
   `ax_list_windows` is session-independent and skips the bootstrap.
+- **Per-actor audit**: `action.agent_id` (1-64 letters/digits/`-`/`_`)
+  maps to upstream `--agent-id` / `AGENT_DESKTOP_AGENT_ID`, stamped on
+  trace rows inside the session — several workers can share one snapshot
+  namespace while remaining distinguishable in the audit trail.
+- **Notification identity gate**: upstream refuses an unverified positional
+  dismiss/action — `ax_dismiss_notification` and `ax_notification_action`
+  require `application`, `expected_app`, or `expected_title` mirroring
+  that fail-closed rule (index alone can shift under a changed list).
 - **Observation budget**: upstream's 3s snapshot deadline timed out on a
   real 597-element Finder window; ax ops default `--timeout-ms` to 15s
   unless the caller passes `timeout_ms`, and a `TIMEOUT` code still

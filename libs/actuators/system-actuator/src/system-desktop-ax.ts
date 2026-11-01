@@ -27,6 +27,42 @@ import { randomUUID } from 'node:crypto';
  */
 
 const QUALIFIED_REF = /^@[A-Za-z0-9_-]+:e[0-9]+$/;
+/** Upstream --agent-id constraint: 1-64 letters/digits/dash/underscore. */
+const AGENT_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/** Surfaces `open-system-surface` accepts upstream (shell + AX surfaces). */
+const SYSTEM_SURFACES = new Set([
+  'window',
+  'focused',
+  'menu',
+  'menubar',
+  'sheet',
+  'popover',
+  'alert',
+  'desktop',
+  'taskbar',
+  'system-tray',
+  'quick-settings',
+  'notification-center',
+  'toolbar',
+  'dock',
+  'spotlight',
+  'menu-bar-extras',
+  'system-tray-overflow',
+  'start-menu',
+  'action-center',
+]);
+/** Desktop lifecycle signals `wait --event` accepts upstream. */
+const WAIT_EVENTS = new Set([
+  'window-opened',
+  'window-closed',
+  'app-launched',
+  'app-terminated',
+  'focus-changed',
+  'surface-appeared',
+  'surface-dismissed',
+]);
+const WAIT_PREDICATES = new Set(['exists', 'enabled', 'visible', 'actionable', 'value']);
+const CLIPBOARD_FORMATS = new Set(['text', 'auto', 'image', 'file-urls']);
 
 /**
  * Upstream's 3s snapshot deadline is too tight for dense real-world trees —
@@ -46,6 +82,8 @@ export const AX_OBSERVATION_OPS = new Set([
   'ax_list_notifications',
   'ax_get',
   'ax_is',
+  'ax_wait',
+  'ax_permissions',
 ]);
 /** Runtime lifecycle ops — no approval needed; they only seal/gc governed session state. */
 export const AX_LIFECYCLE_OPS = new Set(['ax_session_end', 'ax_session_gc']);
@@ -62,6 +100,13 @@ export const AX_NAV_OPS = new Set([
   'ax_focus',
   'ax_expand',
   'ax_collapse',
+  'ax_focus_window',
+  'ax_move_window',
+  'ax_resize_window',
+  'ax_minimize_window',
+  'ax_maximize_window',
+  'ax_restore_window',
+  'ax_open_system_surface',
 ]);
 /**
  * Commit-class mutating ops — enter text, set/clear values, toggle state,
@@ -78,6 +123,14 @@ export const AX_COMMIT_OPS = new Set([
   'ax_toggle',
   'ax_check',
   'ax_uncheck',
+  'ax_launch',
+  'ax_close_app',
+  'ax_dismiss_notification',
+  'ax_dismiss_all_notifications',
+  'ax_notification_action',
+  'ax_clipboard_get',
+  'ax_clipboard_set',
+  'ax_clipboard_clear',
 ]);
 export const AX_MUTATING_OPS = new Set([...AX_NAV_OPS, ...AX_COMMIT_OPS]);
 /** Observation commands that carry no session-scoped state. */
@@ -87,6 +140,7 @@ const AX_SESSION_INDEPENDENT_OPS = new Set([
   'ax_list_displays',
   'ax_list_surfaces',
   'ax_list_notifications',
+  'ax_permissions',
 ]);
 export const AX_OPS = new Set([...AX_OBSERVATION_OPS, ...AX_MUTATING_OPS, ...AX_LIFECYCLE_OPS]);
 
@@ -115,6 +169,32 @@ interface AxInteraction {
   surface?: string;
   wait_for?: string;
   wait_for_gone?: string;
+  agent_id?: string;
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  ms?: number;
+  event?: string;
+  predicate?: string;
+  action?: string;
+  count?: number;
+  menu?: boolean;
+  menu_closed?: boolean;
+  notification?: boolean;
+  index?: number;
+  expected_app?: string;
+  expected_title?: string;
+  format?: string;
+  image?: string;
+  file_urls?: string[];
+  force?: boolean;
+  activate?: boolean;
+  cdp?: boolean | number;
+  no_attach?: boolean;
+  app_args?: string[];
+  app_env?: Record<string, string>;
+  cwd?: string;
 }
 
 export interface AxHandlerContext {
@@ -171,6 +251,18 @@ function scopeArgs(interaction: AxInteraction, application?: string): string[] {
 
 function buildArgs(interaction: AxInteraction, application?: string): string[] | { error: string } {
   const timeout = ['--timeout-ms', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS)];
+  // --timeout-ms exists only on snapshot/find/list-windows/list-apps/ref
+  // actions; window/lifecycle/notification/clipboard commands take no
+  // deadline flag (launch and wait use --timeout). Verified against the
+  // upstream --help surface.
+  if (interaction.agent_id !== undefined && !AGENT_ID.test(interaction.agent_id)) {
+    return { error: 'agent_id must match /^[A-Za-z0-9_-]{1,64}$/ (upstream --agent-id)' };
+  }
+  const appScope = (allowTitle = false): string[] => {
+    const args = scopeArgs(interaction, application);
+    if (allowTitle && interaction.title) args.push('--title', interaction.title);
+    return args;
+  };
   switch (interaction.type) {
     case 'ax_snapshot': {
       const args = ['snapshot', ...scopeArgs(interaction, application)];
@@ -290,6 +382,207 @@ function buildArgs(interaction: AxInteraction, application?: string): string[] |
       if (!interaction.value) return { error: 'ax_select requires action.value' };
       return ['select', ...ref, interaction.value, ...timeout];
     }
+    case 'ax_focus_window':
+      return ['focus-window', ...appScope(true)];
+    case 'ax_minimize_window':
+      return ['minimize', ...appScope()];
+    case 'ax_maximize_window':
+      return ['maximize', ...appScope()];
+    case 'ax_restore_window':
+      return ['restore', ...appScope()];
+    case 'ax_move_window': {
+      if (typeof interaction.x !== 'number' || typeof interaction.y !== 'number') {
+        return { error: 'ax_move_window requires numeric action.x and action.y' };
+      }
+      // --x=N form is required for negative values upstream.
+      return ['move-window', `--x=${interaction.x}`, `--y=${interaction.y}`, ...appScope()];
+    }
+    case 'ax_resize_window': {
+      if (typeof interaction.width !== 'number' || typeof interaction.height !== 'number') {
+        return { error: 'ax_resize_window requires numeric action.width and action.height' };
+      }
+      if (interaction.width <= 0 || interaction.height <= 0) {
+        return { error: 'ax_resize_window width/height must be positive' };
+      }
+      return [
+        'resize-window',
+        `--width=${interaction.width}`,
+        `--height=${interaction.height}`,
+        ...appScope(),
+      ];
+    }
+    case 'ax_open_system_surface': {
+      if (!interaction.surface || !SYSTEM_SURFACES.has(interaction.surface)) {
+        return {
+          error: `ax_open_system_surface requires action.surface in ${[...SYSTEM_SURFACES].join('|')}`,
+        };
+      }
+      return ['open-system-surface', '--surface', interaction.surface];
+    }
+    case 'ax_permissions':
+      return ['permissions'];
+    case 'ax_wait': {
+      const args = ['wait'];
+      const conditionFlags: string[] = [];
+      if (typeof interaction.ms === 'number') args.push(String(interaction.ms));
+      if (interaction.qualified_ref) {
+        if (!QUALIFIED_REF.test(interaction.qualified_ref)) {
+          return { error: 'ax_wait element wait requires a snapshot-qualified ref' };
+        }
+        conditionFlags.push('--element', interaction.qualified_ref);
+      }
+      if (interaction.title) conditionFlags.push('--window', interaction.title);
+      if (interaction.text) conditionFlags.push('--text', interaction.text);
+      if (interaction.menu) conditionFlags.push('--menu');
+      if (interaction.menu_closed) conditionFlags.push('--menu-closed');
+      if (interaction.notification) conditionFlags.push('--notification');
+      if (interaction.event) {
+        if (!WAIT_EVENTS.has(interaction.event)) {
+          return {
+            error: `ax_wait event must be one of ${[...WAIT_EVENTS].join('|')}`,
+          };
+        }
+        conditionFlags.push('--event', interaction.event);
+      }
+      if (interaction.predicate) {
+        if (!WAIT_PREDICATES.has(interaction.predicate)) {
+          return {
+            error: `ax_wait predicate must be one of ${[...WAIT_PREDICATES].join('|')}`,
+          };
+        }
+        conditionFlags.push('--predicate', interaction.predicate);
+      }
+      if (interaction.value !== undefined) conditionFlags.push('--value', interaction.value);
+      if (interaction.action) conditionFlags.push('--action', interaction.action);
+      if (typeof interaction.count === 'number') {
+        conditionFlags.push('--count', String(interaction.count));
+      }
+      if (conditionFlags.length === 0 && typeof interaction.ms !== 'number') {
+        return {
+          error:
+            'ax_wait requires a condition: ms, qualified_ref (element), title (window), ' +
+            'text, menu, menu_closed, notification, or event',
+        };
+      }
+      args.push(...conditionFlags);
+      if (interaction.application || application) {
+        args.push('--app', interaction.application ?? application ?? '');
+      }
+      if (interaction.window_id) args.push('--window-id', interaction.window_id);
+      args.push('--timeout', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS));
+      return args;
+    }
+    case 'ax_launch': {
+      const app = interaction.application ?? application;
+      if (!app) return { error: 'ax_launch requires action.application' };
+      const args = ['launch', app];
+      args.push('--timeout', String(interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS));
+      for (const arg of interaction.app_args ?? []) args.push(`--arg=${arg}`);
+      for (const [key, value] of Object.entries(interaction.app_env ?? {})) {
+        args.push('--env', `${key}=${value}`);
+      }
+      if (interaction.cwd) args.push('--cwd', interaction.cwd);
+      if (interaction.activate) args.push('--activate');
+      if (interaction.no_attach) args.push('--no-attach');
+      if (interaction.cdp === true) args.push('--cdp');
+      else if (typeof interaction.cdp === 'number') args.push(`--cdp=${interaction.cdp}`);
+      return args;
+    }
+    case 'ax_close_app': {
+      const app = interaction.application ?? application;
+      if (!app) return { error: 'ax_close_app requires action.application' };
+      const args = ['close-app', app];
+      if (interaction.force) args.push('--force');
+      return args;
+    }
+    case 'ax_dismiss_notification': {
+      if (!Number.isInteger(interaction.index) || (interaction.index ?? 0) < 1) {
+        return { error: 'ax_dismiss_notification requires integer action.index >= 1' };
+      }
+      // Upstream refuses an unverified positional dismiss: one identity
+      // field (--app counts) must pin which notification index N is.
+      const args = ['dismiss-notification', String(interaction.index)];
+      if (interaction.application || application) {
+        args.push('--app', interaction.application ?? application ?? '');
+      }
+      if (interaction.expected_app) args.push('--expected-app', interaction.expected_app);
+      if (interaction.expected_title) {
+        args.push('--expected-title', interaction.expected_title);
+      }
+      if (args.length === 2) {
+        return {
+          error:
+            'ax_dismiss_notification requires an identity check: application, ' +
+            'expected_app, or expected_title',
+        };
+      }
+      return args;
+    }
+    case 'ax_dismiss_all_notifications': {
+      const args = ['dismiss-all-notifications'];
+      if (interaction.application || application) {
+        args.push('--app', interaction.application ?? application ?? '');
+      }
+      return args;
+    }
+    case 'ax_notification_action': {
+      if (!Number.isInteger(interaction.index) || (interaction.index ?? 0) < 1) {
+        return { error: 'ax_notification_action requires integer action.index >= 1' };
+      }
+      if (!interaction.action) {
+        return { error: 'ax_notification_action requires action.action (button name)' };
+      }
+      const args = ['notification-action', String(interaction.index), interaction.action];
+      if (interaction.expected_app) args.push('--expected-app', interaction.expected_app);
+      if (interaction.expected_title) {
+        args.push('--expected-title', interaction.expected_title);
+      }
+      if (!interaction.expected_app && !interaction.expected_title) {
+        return {
+          error:
+            'ax_notification_action requires an identity check: expected_app or expected_title',
+        };
+      }
+      return args;
+    }
+    case 'ax_clipboard_get': {
+      const args = ['clipboard-get'];
+      if (interaction.format) {
+        if (!CLIPBOARD_FORMATS.has(interaction.format)) {
+          return {
+            error: `ax_clipboard_get format must be one of ${[...CLIPBOARD_FORMATS].join('|')}`,
+          };
+        }
+        args.push('--format', interaction.format);
+      }
+      // --out deliberately unexposed: upstream writes image payloads to a
+      // private temp under the governed session dir by default.
+      return args;
+    }
+    case 'ax_clipboard_set': {
+      const args = ['clipboard-set'];
+      let payload = 0;
+      if (typeof interaction.text === 'string') {
+        args.push(interaction.text);
+        payload += 1;
+      }
+      if (interaction.image) {
+        args.push('--image', interaction.image);
+        payload += 1;
+      }
+      for (const fileUrl of interaction.file_urls ?? []) {
+        args.push('--file-url', fileUrl);
+        payload += 1;
+      }
+      if (payload === 0) {
+        return {
+          error: 'ax_clipboard_set requires a payload: text, image, or file_urls',
+        };
+      }
+      return args;
+    }
+    case 'ax_clipboard_clear':
+      return ['clipboard-clear'];
     default:
       return { error: `Unsupported ax interaction: ${interaction.type}` };
   }
@@ -341,6 +634,8 @@ const AX_EVIDENCE_FIELDS: Record<string, string[]> = {
   ax_list_displays: ['displays'],
   ax_list_surfaces: ['surfaces'],
   ax_list_notifications: ['notifications'],
+  ax_wait: ['waited_ms'],
+  ax_permissions: ['accessibility', 'automation', 'screen_recording'],
 };
 
 /**
@@ -368,17 +663,22 @@ function buildAxEvidence(
   }
   const fields = AX_EVIDENCE_FIELDS[interaction.type];
   if (!fields) return undefined;
+  const hasData = result.ok && result.envelope?.data != null;
   const data =
-    result.ok && result.envelope?.data && typeof result.envelope.data === 'object'
+    hasData && typeof result.envelope?.data === 'object'
       ? (result.envelope.data as Record<string, unknown>)
       : undefined;
   const evidence: Record<string, 'known' | 'absent' | 'unknown'> = {};
   for (const field of fields) {
-    evidence[field] = !data
+    // Upstream returns some collections as a bare array payload
+    // (list-windows, list-displays) — the array itself is the field.
+    evidence[field] = !hasData
       ? 'unknown'
-      : data[field] === undefined || data[field] === null
-        ? 'absent'
-        : 'known';
+      : Array.isArray(data)
+        ? 'known'
+        : data?.[field] === undefined || data?.[field] === null
+          ? 'absent'
+          : 'known';
   }
   return evidence;
 }
@@ -428,6 +728,10 @@ function mapResult(interaction: AxInteraction, result: AgentDesktopResult) {
     'SESSION_UNAVAILABLE',
     'SESSION_END_FAILED',
     'SESSION_GC_FAILED',
+    'WINDOW_NOT_FOUND',
+    'APP_NOT_FOUND',
+    'NOTIFICATION_NOT_FOUND',
+    'PERM_DENIED',
   ]);
   // Refused for a reason an identical retry cannot fix — callers must not
   // machine-retry these even though delivery classification is honest.
@@ -437,18 +741,33 @@ function mapResult(interaction: AxInteraction, result: AgentDesktopResult) {
     'INVALID_ARGS',
     'COMMAND_NOT_ALLOWED',
     'ACTION_NOT_SUPPORTED',
+    'PERM_DENIED',
   ]);
   // strict:false — `ok` narrowing is unavailable; take the error variant.
   const error = result as Extract<AgentDesktopResult, { ok: false }>;
   const notDelivered = NOT_DELIVERED_CODES.has(error.code);
+  // Upstream attaches its own recovery contract (strategy/retryable/
+  // requires_fresh_snapshot) to many errors — surface it when present and
+  // fall back to the local classification table otherwise.
+  const upstreamRecovery = error.envelope?.error?.recovery;
   const strategy =
-    error.code === 'TOOL_UNAVAILABLE'
+    upstreamRecovery?.strategy ??
+    (error.code === 'TOOL_UNAVAILABLE'
       ? 'install_tool_runtime'
       : error.code === 'POLICY_DENIED'
         ? 'use_physical_channel'
-        : ['STALE_REF', 'SNAPSHOT_NOT_FOUND', 'AMBIGUOUS_TARGET'].includes(error.code)
-          ? 're_observe_then_retry'
-          : undefined;
+        : error.code === 'PERM_DENIED'
+          ? 'grant_permissions'
+          : [
+                'STALE_REF',
+                'SNAPSHOT_NOT_FOUND',
+                'AMBIGUOUS_TARGET',
+                'WINDOW_NOT_FOUND',
+                'APP_NOT_FOUND',
+                'NOTIFICATION_NOT_FOUND',
+              ].includes(error.code)
+            ? 're_observe_then_retry'
+            : undefined);
   const stamped = stampOutcome(
     {},
     {
@@ -459,11 +778,20 @@ function mapResult(interaction: AxInteraction, result: AgentDesktopResult) {
       ),
       recovery: {
         strategy,
-        retryable: notDelivered && !NON_RETRYABLE_CODES.has(error.code),
+        // Precedence: upstream error.recovery.retryable > upstream
+        // disposition.retry (safe/unsafe) > the local refusal table.
+        retryable:
+          upstreamRecovery?.retryable ??
+          (error.disposition?.retry === 'safe'
+            ? true
+            : error.disposition?.retry === 'unsafe'
+              ? false
+              : notDelivered && !NON_RETRYABLE_CODES.has(error.code)),
         requires_fresh_observation:
-          error.code === 'STALE_REF' ||
-          error.code === 'SNAPSHOT_NOT_FOUND' ||
-          error.code === 'AMBIGUOUS_TARGET',
+          upstreamRecovery?.requires_fresh_snapshot ??
+          (error.code === 'STALE_REF' ||
+            error.code === 'SNAPSHOT_NOT_FOUND' ||
+            error.code === 'AMBIGUOUS_TARGET'),
       },
     }
   );
@@ -533,12 +861,68 @@ function approvalBlocked(interaction: AxInteraction, ctx: AxHandlerContext, requ
   };
 }
 
+/**
+ * Approval narrative per commit-class op family — clipboard reads are
+ * sensitive reads (secrets may be present), not mutations, and app/notification
+ * lifecycle ops change more than element state.
+ */
+function approvalNarrative(interaction: AxInteraction): {
+  summary: string;
+  reason: string;
+  target: string;
+} {
+  const target = interaction.qualified_ref ?? interaction.application ?? 'target';
+  if (interaction.type === 'ax_clipboard_get') {
+    return {
+      summary:
+        'A computer interaction requested reading the system clipboard, which may contain secrets or personal data.',
+      reason: 'agent-desktop clipboard reads expose paste-buffer contents to the agent.',
+      target: 'system clipboard',
+    };
+  }
+  if (interaction.type === 'ax_clipboard_set' || interaction.type === 'ax_clipboard_clear') {
+    return {
+      summary:
+        'A computer interaction requested overwriting the system clipboard, destroying its current contents.',
+      reason: 'agent-desktop clipboard writes destructively replace paste-buffer contents.',
+      target: 'system clipboard',
+    };
+  }
+  if (interaction.type === 'ax_launch' || interaction.type === 'ax_close_app') {
+    return {
+      summary: `A computer interaction requested ${interaction.type === 'ax_launch' ? 'launching' : 'quitting'} an application via the desktop runtime.`,
+      reason: 'agent-desktop app lifecycle commands start or terminate OS processes.',
+      target,
+    };
+  }
+  if (
+    interaction.type === 'ax_dismiss_notification' ||
+    interaction.type === 'ax_dismiss_all_notifications' ||
+    interaction.type === 'ax_notification_action'
+  ) {
+    return {
+      summary:
+        'A computer interaction requested dismissing or acting on a user notification, which cannot be undone.',
+      reason: 'agent-desktop notification commands consume user-facing notifications.',
+      target,
+    };
+  }
+  return {
+    summary:
+      'A computer interaction requested an agent-desktop accessibility action that mutates application state.',
+    reason:
+      'agent-desktop AX action mutates application state through the accessibility interface.',
+    target,
+  };
+}
+
 async function ensureAxApproval(
   interaction: AxInteraction,
   ctx: AxHandlerContext
 ): Promise<ReturnType<typeof approvalBlocked> | null> {
   const requestId = interaction.approval_request_id;
   if (!requestId) {
+    const narrative = approvalNarrative(interaction);
     const request = createApprovalRequest('sovereign_concierge', {
       channel: 'computer',
       storageChannel: 'computer',
@@ -548,9 +932,8 @@ async function ensureAxApproval(
       kind: 'channel-approval',
       draft: {
         title: `Approval required: ${interaction.type}`,
-        summary:
-          'A computer interaction requested an agent-desktop accessibility action that mutates application state.',
-        details: `Approve this request before running ${interaction.type} on ${interaction.qualified_ref ?? 'target'}.`,
+        summary: narrative.summary,
+        details: `Approve this request before running ${interaction.type} on ${narrative.target}.`,
         severity: 'medium',
       },
       requestedByContext: {
@@ -560,9 +943,8 @@ async function ensureAxApproval(
         runtimeId: ctx.sessionId,
       },
       justification: {
-        reason:
-          'agent-desktop AX action mutates application state through the accessibility interface.',
-        impactSummary: `${interaction.type} on ${interaction.qualified_ref ?? 'target'}`,
+        reason: narrative.reason,
+        impactSummary: `${interaction.type} on ${narrative.target}`,
         requestedEffects: [interaction.type],
       },
       risk: {
@@ -686,6 +1068,7 @@ export async function handleAxInteraction(
     // Inventory commands carry no session-scoped state; skip the bootstrap.
     requireSession: !AX_SESSION_INDEPENDENT_OPS.has(interaction.type),
     timeoutMs: (interaction.timeout_ms ?? AX_DEFAULT_TIMEOUT_MS) + 15_000,
+    agentId: interaction.agent_id,
   });
   const mapped = mapResult(interaction, result);
   if (result.ok && AX_MUTATING_OPS.has(interaction.type)) {
