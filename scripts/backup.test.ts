@@ -819,6 +819,45 @@ describe('tenant runtime partitions in backup and restore', () => {
       expect(run).toThrow('BACKUP_RESTORE_LEDGER_CORRUPT');
       expect(safeExistsSync(`${target}/${SEGMENT_A}`)).toBe(false);
     });
+
+    it('refuses a partition whose oldest segment is missing (unproven anchor)', () => {
+      const [a] = splitChain([2]);
+      const lastOfA = String(
+        (JSON.parse(a!.trim().split('\n').at(-1)!) as Record<string, unknown>).hash
+      );
+      // Segment B opens with a validly keyed marker naming segment A, but A is
+      // not in the archive and tenant partitions are never archived by code.
+      let parent = lastOfA;
+      const lines = [
+        {
+          type: 'LEDGER_SEGMENT_OPENED',
+          payload: {
+            previous_segment: 'ledger-20261102-101010.jsonl',
+            previous_last_hash: lastOfA,
+          },
+        },
+        { type: 'TEST_EVENT_AFTER', payload: {} },
+      ].map((data, i) => {
+        const entry: Record<string, unknown> = {
+          timestamp: `2026-10-26T00:01:0${i}.000Z`,
+          scope: { tier: 'confidential', tenant_slug: 'acme' },
+          role: 'ledger',
+          mission_id: 'None',
+          ...data,
+          parent_hash: parent,
+          chain_alg: 'hmac-sha256',
+          chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY),
+        };
+        entry.hash = computeLedgerEntryHash(entry, { alg: 'hmac-sha256', key: TEST_CHAIN_KEY });
+        parent = String(entry.hash);
+        return JSON.stringify(entry);
+      });
+      const { target, run } = restoreChain('segment-unproven-anchor', {
+        [SEGMENT_B]: lines.join('\n') + '\n',
+      });
+      expect(run).toThrow(/BACKUP_RESTORE_LEDGER_INCOMPLETE.*unproven_anchor/u);
+      expect(safeExistsSync(`${target}/${SEGMENT_B}`)).toBe(false);
+    });
   });
 
   it('rejects an archive carrying a symlink member before extraction', () => {
