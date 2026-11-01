@@ -16,7 +16,7 @@ export interface StandingGrantCapabilityPolicy {
   kind: 'standing_grant';
   description?: string;
   /** `meeting` = at least one of `meeting_series_ids` / `meeting_urls`. */
-  scope_keys: Array<'tenant_slug' | 'meeting'>;
+  scope_keys: Array<'tenant_slug' | 'meeting' | 'credential_provider' | 'credential_ref'>;
   external_io: boolean;
   max_ttl_days: number;
   mission_binding: 'auto' | 'none';

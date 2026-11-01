@@ -67,7 +67,7 @@
           "description": "Scope axes a grant must bind. `meeting` means at least one of meeting_series_ids / meeting_urls.",
           "items": {
             "type": "string",
-            "enum": ["tenant_slug", "meeting"]
+            "enum": ["tenant_slug", "meeting", "credential_provider", "credential_ref"]
           }
         },
         "external_io": {

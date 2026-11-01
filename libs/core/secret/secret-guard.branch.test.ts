@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   safeReaddir: vi.fn(),
   safeLstat: vi.fn(),
   safeFsyncFile: vi.fn(),
+  safeExecResult: vi.fn(),
   safeExistsSync: vi.fn(),
   assertSafeRepositoryPath: vi.fn((filePath: string) => filePath),
   ledgerRecord: vi.fn(),
@@ -22,6 +23,7 @@ vi.mock('../secure-io.js', () => ({
   safeReaddir: mocks.safeReaddir,
   safeLstat: mocks.safeLstat,
   safeFsyncFile: mocks.safeFsyncFile,
+  safeExecResult: mocks.safeExecResult,
   safeExistsSync: mocks.safeExistsSync,
   assertSafeRepositoryPath: mocks.assertSafeRepositoryPath,
 }));
@@ -89,6 +91,7 @@ describe('secret-guard branch coverage', () => {
     mocks.safeReaddir.mockReset();
     mocks.safeLstat.mockReset();
     mocks.safeFsyncFile.mockReset();
+    mocks.safeExecResult.mockReset();
     mocks.safeExistsSync.mockReset();
     mocks.ledgerRecord.mockReset();
     mocks.pathResolve.mockReset();
@@ -293,6 +296,98 @@ describe('secret-guard branch coverage', () => {
     mod.storeConnectionDocument('slack', { token: 'new-cached-token' }, { backup: false });
     expect(mod.getSecret('SLACK_TOKEN')).toBe('new-cached-token');
     expect(mod.getSecret('GITHUB_TOKEN')).toBe('gh-keep');
+  });
+
+  it('resolves a declared connection added after the startup scan without keychain access', async () => {
+    const mod = await import('./secret-guard.js');
+    mocks.safeExistsSync.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/connections/anthropic.json')
+    );
+    mocks.safeReadFile.mockImplementation((p: string) =>
+      p.endsWith('/knowledge/personal/connections/anthropic.json')
+        ? JSON.stringify({ api_key: 'test-late-connection-key' })
+        : '{}'
+    );
+    expect(
+      mod.getSecretForIdentity({
+        envName: 'ANTHROPIC_API_KEY',
+        keychainService: 'anthropic',
+        keychainAccount: 'api_key',
+      })
+    ).toBe('test-late-connection-key');
+    expect(mod.getActiveSecrets()).toContain('test-late-connection-key');
+    expect(mocks.safeExecResult).not.toHaveBeenCalled();
+  });
+
+  it('does not unlock encrypted accounts on import or retry refusal within one operation', async () => {
+    const envelope = {
+      __kyberion__: 'kyberion-encrypted',
+      version: 1,
+      algorithm: 'aes-256-gcm',
+      iv: '',
+      tag: '',
+      ciphertext: 'AAAA',
+    };
+    mocks.safeExistsSync.mockImplementation(
+      (p: string) => p.endsWith('/connections') || p.endsWith('/connections/anthropic.json')
+    );
+    mocks.safeReaddir.mockReturnValue(['anthropic.json']);
+    mocks.safeReadFile.mockReturnValue(JSON.stringify(envelope));
+    mocks.safeExecResult.mockReturnValue({ status: 51, stdout: '', stderr: 'denied' });
+    const mod = await import('./secret-guard.js');
+    expect(mocks.safeExecResult).not.toHaveBeenCalled();
+    const { withSecretResolutionSession } =
+      await import('../foundation/secret-resolution-session.js');
+    withSecretResolutionSession(() => {
+      const read = () =>
+        mod.getSecretForIdentity({
+          envName: 'ANTHROPIC_API_KEY',
+          keychainService: 'anthropic',
+          keychainAccount: 'api_key',
+        });
+      expect(read).toThrow();
+      expect(read).toThrow();
+    });
+    if (process.platform === 'darwin') expect(mocks.safeExecResult).toHaveBeenCalledOnce();
+    else expect(mocks.safeExecResult).not.toHaveBeenCalled();
+  });
+
+  it('does not read a personal connection for an unbound tenant execution', async () => {
+    const mod = await import('./secret-guard.js');
+    const { runInExecutionScope } = await import('../foundation/execution-scope.js');
+    mocks.safeReadFile.mockClear();
+    expect(() =>
+      runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () =>
+        mod.getSecretForIdentity({
+          envName: 'ANTHROPIC_API_KEY',
+          keychainService: 'anthropic',
+          keychainAccount: 'api_key',
+        })
+      )
+    ).toThrow('CREDENTIAL_BINDING_REQUIRED');
+    expect(
+      mocks.safeReadFile.mock.calls.some(([p]) => String(p).includes('connections/anthropic.json'))
+    ).toBe(false);
+  });
+
+  it('keeps a bound tenant miss final instead of reading an operator connection', async () => {
+    const mod = await import('./secret-guard.js');
+    const { runInExecutionScope } = await import('../foundation/execution-scope.js');
+    const { withTaskCredentialBinding } = await import('../foundation/credential-binding.js');
+    mocks.safeReadFile.mockClear();
+    const value = runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () =>
+      withTaskCredentialBinding({ tenantSlug: 'alpha', secrets: {} }, () =>
+        mod.getSecretForIdentity({
+          envName: 'ANTHROPIC_API_KEY',
+          keychainService: 'anthropic',
+          keychainAccount: 'api_key',
+        })
+      )
+    );
+    expect(value).toBeNull();
+    expect(
+      mocks.safeReadFile.mock.calls.some(([p]) => String(p).includes('connections/anthropic.json'))
+    ).toBe(false);
   });
 
   it('returns false from checkAuthority when grants file is invalid JSON', async () => {

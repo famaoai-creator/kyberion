@@ -5448,6 +5448,14 @@
       "types": "./dist/reasoning/reasoning-api-provider.d.ts",
       "default": "./dist/reasoning/reasoning-api-provider.js"
     },
+    "./foundation/secret-resolution-session": {
+      "types": "./dist/foundation/secret-resolution-session.d.ts",
+      "default": "./dist/foundation/secret-resolution-session.js"
+    },
+    "./secret/credential-allocations": {
+      "types": "./dist/secret/credential-allocations.d.ts",
+      "default": "./dist/secret/credential-allocations.js"
+    },
     "./reasoning/reasoning-api-credentials": {
       "types": "./dist/reasoning/reasoning-api-credentials.d.ts",
       "default": "./dist/reasoning/reasoning-api-credentials.js"
