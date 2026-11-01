@@ -184,6 +184,12 @@ function ensureRegularLedgerFile(ledgerPath: string): void {
 }
 
 export const record = (type: string, data: any) => {
+  // Chain-structure entries are written only by the ledger itself: a caller
+  // must never mint a segment marker or an archive receipt (a forged receipt
+  // would make deleting that segment pass verification).
+  if (RESERVED_LEDGER_TYPES.has(type)) {
+    throw new Error(`[LEDGER_RESERVED_TYPE] ${type} is written only by the ledger itself`);
+  }
   const timestamp = nowIso();
   const missionId = data.mission_id;
 
@@ -484,6 +490,7 @@ export const LEDGER_SEGMENT_OPENED_TYPE = 'LEDGER_SEGMENT_OPENED';
  * verified chain — deleting segments by hand never yields a clean report.
  */
 export const LEDGER_SEGMENT_ARCHIVED_TYPE = 'LEDGER_SEGMENT_ARCHIVED';
+const RESERVED_LEDGER_TYPES = new Set([LEDGER_SEGMENT_OPENED_TYPE, LEDGER_SEGMENT_ARCHIVED_TYPE]);
 
 export interface LedgerSegmentArchivedReceipt {
   /** The archived segment (its basename is recorded). */
@@ -828,6 +835,8 @@ export const verifyLedgerIntegrityDetailed = (
   ledgerPath: string = GLOBAL_LEDGER_PATH,
   options: LedgerIntegrityOptions = {}
 ): LedgerIntegrityReport => {
+  const acceptsArchiveReceipts =
+    !options.requireKeyed && path.resolve(ledgerPath) === path.resolve(GLOBAL_LEDGER_PATH);
   const safePath = safeLedgerPath(ledgerPath);
   ensureRegularLedgerFile(safePath);
   // MSN-STORE-BOUNDS-3: one chain across rotated segments (oldest first),
@@ -927,8 +936,12 @@ export const verifyLedgerIntegrityDetailed = (
               : `${label}line:${lineNumber}:${check.reason ?? 'invalid'}`
           );
         }
+        // Only the system ledger is ever archived by the janitor: a receipt on
+        // any other chain (tenant partitions) is never a valid anchor proof.
         const receipt =
-          check.ok && chainAlg === 'hmac-sha256' ? archiveReceiptOf(entry) : undefined;
+          acceptsArchiveReceipts && check.ok && chainAlg === 'hmac-sha256'
+            ? archiveReceiptOf(entry)
+            : undefined;
         if (receipt) receipts.add(receipt);
         expectedParentHash = String(entry.hash ?? '');
       } catch (_e) {
