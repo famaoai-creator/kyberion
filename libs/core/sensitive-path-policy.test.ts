@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
@@ -11,7 +11,7 @@ import {
   withBackupCredentialReadAdmission,
 } from './sensitive-path-policy.js';
 import { pathResolver } from './path-resolver.js';
-import { safeReadFile } from './secure-io.js';
+import { safeExistsSync, safeLstat, safeReadFile, safeReaddir } from './secure-io.js';
 
 describe('sensitive-path-policy', () => {
   it('keeps the OH-02 credential registry explicit and unique', () => {
@@ -29,6 +29,24 @@ describe('sensitive-path-policy', () => {
     ['codex', path.join(os.homedir(), '.codex/auth.json')],
   ])('matches %s credential paths', (_name, candidate) => {
     expect(findSensitivePathMatch(candidate)?.ruleId).toContain('credential.');
+  });
+
+  describe('relative paths from another working directory', () => {
+    const originalCwd = process.cwd();
+    afterEach(() => {
+      process.chdir(originalCwd);
+      vi.unstubAllEnvs();
+    });
+
+    it.each([
+      ['safeReaddir', (p: string) => safeReaddir(p)],
+      ['safeLstat', (p: string) => safeLstat(p)],
+      ['safeExistsSync', (p: string) => safeExistsSync(p)],
+    ])('%s judges the project-root resolution, not the cwd one', (_name, probe) => {
+      vi.stubEnv('KYBERION_ROOT', pathResolver.rootDir());
+      process.chdir(path.join(pathResolver.rootDir(), 'libs'));
+      expect(() => probe('knowledge/personal/connections')).toThrow('[SENSITIVE_PATH_DENIED]');
+    });
   });
 
   describe('backup credential read admission', () => {

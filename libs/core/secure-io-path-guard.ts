@@ -1011,9 +1011,14 @@ export function guardReadPath(
   mode: CanonicalMode = 'follow',
   operation: 'read' | 'metadata' = 'read'
 ): string {
-  if (operation === 'metadata') assertSensitiveMetadataAllowed(filePath, mediationProbe());
-  else assertSensitivePathAllowed(filePath, 'read', mediationProbe());
+  const assertSensitive = (candidate: string): void => {
+    if (operation === 'metadata') assertSensitiveMetadataAllowed(candidate, mediationProbe());
+    else assertSensitivePathAllowed(candidate, 'read', mediationProbe());
+  };
+  assertSensitive(filePath);
   const resolved = pathResolver.resolve(filePath);
+  // A relative path resolves against the project root, not the cwd: judge that too.
+  assertSensitive(resolved);
   const guard = validateReadPermission(resolved, operation);
   if (!guard.allowed) throw new Error(deny(guard.reason));
   assertCanonicalReadable(resolved, filePath, mode, operation);
