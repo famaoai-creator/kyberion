@@ -1659,6 +1659,7 @@ registerFoundationIo({
   readFile: (filePath, options) =>
     safeReadFile(filePath, { ...options, encoding: 'utf8' }) as string,
   stat: safeStat,
+  readRange: safeReadFileRange,
   writeFile: (filePath, content) => safeWriteFile(filePath, content),
 });
 

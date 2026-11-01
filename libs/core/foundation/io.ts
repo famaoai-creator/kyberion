@@ -14,6 +14,12 @@ export interface FoundationIo {
   exists(filePath: string): boolean;
   readFile(filePath: string, options?: FoundationReadOptions): string;
   stat(filePath: string): { mtimeMs: number; size: number };
+  /**
+   * Bounded byte-range read (secure-io `safeReadFileRange`). Lets streaming
+   * readers (`jsonl-read.ts`) scan a store of any size in fixed chunks
+   * without importing secure-io (which would cycle through audit-chain).
+   */
+  readRange?(filePath: string, position: number, length: number): Buffer;
   writeFile(filePath: string, content: string): void;
 }
 
