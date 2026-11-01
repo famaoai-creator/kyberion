@@ -1,5 +1,5 @@
 /** Read-only WorkItem inventory validation and unchanged latest-record folding. */
-import { readJsonLines } from '../foundation/json.js';
+import { streamJsonLines } from '../jsonl-read.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { validateWorkItem } from './work-coordination-identity.js';
 import type { WorkItem } from './work-coordination-types.js';
@@ -22,7 +22,8 @@ export function readWorkItemInventoryAtPath(logicalPath: string): {
 } {
   const file = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
   if (!safeExistsSync(file)) return { present: false, items: [] };
-  const records = readJsonLines<WorkItem>(file);
+  // Streamed (size never fails the read); strict: a malformed row still throws.
+  const records = Array.from(streamJsonLines<WorkItem>(file));
   for (const record of records) validateWorkItem(record);
   return { present: true, items: latestById(records, 'item_id') };
 }

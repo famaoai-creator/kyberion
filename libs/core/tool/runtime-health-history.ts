@@ -1,16 +1,11 @@
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine } from '../foundation/json.js';
 import * as path from 'node:path';
 import { logger } from '../core.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
-import { readTextFile } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeMkdir,
-  safeWriteFile,
-} from '../secure-io.js';
+import { fileEndsWithNewline, readJsonLinesSince } from '../jsonl-read.js';
+import { maintainStoreAfterAppend } from '../append-only-store.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 
 /**
  * OP-04: durable RSS / restart history. The degradation watch could only
@@ -36,16 +31,44 @@ export interface RuntimeTrendFinding {
 }
 
 const HISTORY_RELATIVE = 'active/shared/runtime/health/runtime-health.jsonl';
-const MAX_LINES = 5000;
-const KEEP_LINES = 2500;
+/**
+ * Write-time retention (explicit `window` policy — the catalog has no window
+ * action): once the file passes the threshold, samples older than the
+ * horizon are dropped (no archive — a lossy time series by design). Readers
+ * need at most a day (health-thresholds `trend_window_ms`, the learning
+ * harvest's 24h lookback); 30 days keeps a month of trend for operators.
+ */
+export const RUNTIME_HEALTH_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
+export const RUNTIME_HEALTH_WINDOW_MIN_BYTES = 1024 * 1024;
+
+interface RuntimeHealthStoreTuning {
+  windowMinBytes?: number;
+  /** Test seam: history location (default: the shared runtime path). */
+  historyPath?: string;
+}
+let storeTuning: RuntimeHealthStoreTuning = {};
+
+/** Test seam: override the window threshold / history path; `{}` resets. */
+export function setRuntimeHealthStoreTuningForTests(tuning: RuntimeHealthStoreTuning): void {
+  storeTuning = { ...tuning };
+}
+
+function sampleTime(value: unknown): number | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const at = Date.parse(String((value as { timestamp?: unknown }).timestamp ?? ''));
+  return Number.isFinite(at) ? at : undefined;
+}
 const HEALTH_SAMPLE_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/runtime-health-sample.schema.json'
 );
 
 function historyPath(): string {
-  return assertSafeRepositoryPath(pathResolver.rootResolve(HISTORY_RELATIVE), {
-    allowMissingLeaf: true,
-  });
+  return assertSafeRepositoryPath(
+    storeTuning.historyPath ?? pathResolver.rootResolve(HISTORY_RELATIVE),
+    {
+      allowMissingLeaf: true,
+    }
+  );
 }
 
 function healthSampleCatalog(filePath: string): GovernedCatalog<RuntimeHealthSample> {
@@ -81,26 +104,32 @@ export function recordRuntimeHealthSample(input: {
     const filePath = historyPath();
     safeMkdir(path.dirname(filePath), { recursive: true });
     ensureRegularHistoryFile(filePath);
-    appendJsonLine(filePath, healthSampleCatalog(filePath).validate(sample, filePath));
-    pruneIfOversized(filePath);
+    // A torn tail would swallow this sample into one unparseable line.
+    appendJsonLine(filePath, healthSampleCatalog(filePath).validate(sample, filePath), {
+      leadingNewline: !fileEndsWithNewline(filePath),
+    });
+    maintainStoreAfterAppend(
+      filePath,
+      {
+        action: 'window',
+        minBytes: storeTuning.windowMinBytes ?? RUNTIME_HEALTH_WINDOW_MIN_BYTES,
+        windowMs: RUNTIME_HEALTH_RETENTION_MS,
+        timeOf: sampleTime,
+        archiveDir: null,
+      },
+      { now: new Date(input.now ?? Date.now()) }
+    );
   } catch (err: any) {
     logger.warn(`[runtime-health] sample append failed: ${err?.message || err}`);
   }
   return sample;
 }
 
-function pruneIfOversized(filePath: string): void {
-  try {
-    ensureRegularHistoryFile(filePath);
-    const raw = readTextFile(filePath);
-    const lines = raw.split('\n').filter(Boolean);
-    if (lines.length <= MAX_LINES) return;
-    safeWriteFile(filePath, `${lines.slice(-KEEP_LINES).join('\n')}\n`);
-  } catch {
-    /* prune is best-effort housekeeping */
-  }
-}
-
+/**
+ * Samples at or after `now - windowMs`, oldest first. A backward scan that
+ * stops at the first older sample, so the cost tracks the window, not the
+ * file. Malformed, torn and schema-invalid lines are skipped.
+ */
 export function loadRuntimeHealthSamples(
   windowMs: number,
   now = Date.now()
@@ -110,12 +139,14 @@ export function loadRuntimeHealthSamples(
   ensureRegularHistoryFile(filePath);
   const since = now - windowMs;
   const catalog = healthSampleCatalog(filePath);
-  return readJsonLines<RuntimeHealthSample | null>(filePath, {
+  return readJsonLinesSince<RuntimeHealthSample | null>(filePath, {
     onMalformed: 'skip',
     map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
+    timeOf: sampleTime,
+    sinceMs: since,
   }).filter((sample): sample is RuntimeHealthSample => {
-    const at = Date.parse(sample?.timestamp || '');
-    return Number.isFinite(at) && at >= since;
+    const at = sampleTime(sample);
+    return at !== undefined && at >= since;
   });
 }
 

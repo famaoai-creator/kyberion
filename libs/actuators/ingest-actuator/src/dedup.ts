@@ -10,8 +10,15 @@
  * Registry: JSONL, one first-seen record per content hash, at
  * active/shared/runtime/ingest/content-hash-registry.jsonl by default
  * (registry_path overridable for hermetic tests).
+ *
+ * The registry is full history by design (dedupe needs every hash ever seen):
+ * it is never windowed or compacted. Lookups stream it forward with an early
+ * exit, so its size never makes a check fail, and check→register runs under
+ * a per-registry lock so two concurrent ingests of the same content cannot
+ * both register it.
  */
 
+import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -20,7 +27,9 @@ import {
   safeLstat,
   safeMkdir,
 } from '@agent/core/secure-io';
-import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, nowIso } from '@agent/core/foundation';
+import { fileEndsWithNewline, streamJsonLines } from '@agent/core/jsonl-read';
+import { withLockSync } from '@agent/core/lock-utils';
 
 export const DEFAULT_INGEST_REGISTRY_PATH =
   'active/shared/runtime/ingest/content-hash-registry.jsonl';
@@ -88,15 +97,49 @@ export function parseIngestRegistryRecord(value: unknown): IngestRegistryRecord 
   return value as unknown as IngestRegistryRecord;
 }
 
-function readRegistry(absPath: string): IngestRegistryRecord[] {
-  if (!safeExistsSync(absPath)) return [];
+export interface IngestRegistryLookup {
+  /** First registered record with the same content hash. */
+  existing?: IngestRegistryRecord;
+  /** First record with the same source and a different hash (DA-05 supersede). */
+  supersedesCandidate?: IngestRegistryRecord;
+}
+
+/**
+ * One forward streaming pass (constant memory). Stops at the first exact hash
+ * match — a duplicate needs nothing after it; otherwise the whole registry is
+ * scanned for the first same-source/different-hash record.
+ */
+export function lookupIngestRegistry(
+  absPath: string,
+  input: Pick<DedupInput, 'content_sha256' | 'source_system' | 'source_id'>,
+  options: { chunkBytes?: number } = {}
+): IngestRegistryLookup {
+  if (!safeExistsSync(absPath)) return {};
   if (!safeLstat(absPath).isFile()) {
     throw new Error(`ingest:dedup — registry_path must be a regular file: ${absPath}`);
   }
-  return readJsonLines<unknown>(absPath, { onMalformed: 'skip' }).flatMap((value) => {
+  let supersedesCandidate: IngestRegistryRecord | undefined;
+  for (const value of streamJsonLines<unknown>(absPath, {
+    onMalformed: 'skip',
+    ...(options.chunkBytes ? { chunkBytes: options.chunkBytes } : {}),
+  })) {
     const record = parseIngestRegistryRecord(value);
-    return record ? [record] : [];
-  });
+    if (!record) continue;
+    if (record.content_sha256 === input.content_sha256) return { existing: record };
+    if (
+      !supersedesCandidate &&
+      input.source_id !== undefined &&
+      record.source_id === input.source_id &&
+      (record.source_system ?? '') === (input.source_system ?? '')
+    ) {
+      supersedesCandidate = record;
+    }
+  }
+  return supersedesCandidate ? { supersedesCandidate } : {};
+}
+
+function registryLockId(absPath: string): string {
+  return `ingest-content-hash-registry-${createHash('sha256').update(absPath).digest('hex').slice(0, 32)}`;
 }
 
 export function dedupContent(input: DedupInput): DedupResult {
@@ -105,23 +148,15 @@ export function dedupContent(input: DedupInput): DedupResult {
   }
   assertTargetPath(input.target_path);
   const absPath = resolveRegistryPath(input.registry_path);
-  const records = readRegistry(absPath);
+  if (input.register === false) return checkAndRegister(absPath, input);
+  return withLockSync(registryLockId(absPath), () => checkAndRegister(absPath, input));
+}
 
-  const existing = records.find((record) => record.content_sha256 === input.content_sha256);
+function checkAndRegister(absPath: string, input: DedupInput): DedupResult {
+  const { existing, supersedesCandidate } = lookupIngestRegistry(absPath, input);
   if (existing) {
     return { duplicate: true, existing, registered: false };
   }
-
-  // Same source, different hash → update, not duplicate (DA-05 supersede).
-  const supersedesCandidate =
-    input.source_id !== undefined
-      ? records.find(
-          (record) =>
-            record.source_id === input.source_id &&
-            (record.source_system ?? '') === (input.source_system ?? '') &&
-            record.content_sha256 !== input.content_sha256
-        )
-      : undefined;
 
   let registered = false;
   if (input.register !== false) {
@@ -133,7 +168,9 @@ export function dedupContent(input: DedupInput): DedupResult {
       ...(input.target_path !== undefined ? { target_path: input.target_path } : {}),
     };
     safeMkdir(path.dirname(absPath), { recursive: true });
-    appendJsonLine(absPath, record);
+    // A torn tail (writer died mid-append) would swallow this record into one
+    // unparseable line; start it on its own line instead.
+    appendJsonLine(absPath, record, { leadingNewline: !fileEndsWithNewline(absPath) });
     registered = true;
   }
 

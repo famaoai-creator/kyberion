@@ -212,7 +212,7 @@
       "artifact_class": "log",
       "ttl_days": 90,
       "action": "delete",
-      "note": "Runtime health history (runtime-health-history.ts) — log-like time series, aligned with report retention."
+      "note": "Runtime health history (runtime-health-history.ts) — log-like time series, aligned with report retention. MSN-STORE-BOUNDS-2: the mtime-based TTL never fires for runtime-health.jsonl because every sample refreshes its mtime; runtime-health-history.ts keeps a 30-day window at write time (1 MiB threshold, no archive) and reads backward to its window."
     },
     {
       "path": "active/shared/runtime/voice-loopback-receipts",
@@ -327,7 +327,7 @@
       "path": "active/shared/runtime/ingest",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "DA-08: ingest dedup content-hash registry (content-hash-registry.jsonl, ingest-actuator dedup.ts) — load-bearing append-only dedup state; TTL deletion would re-open duplicate ingests. Tenant lines are pruned only by the audited tenant offboarding ceremony (scope-offboarding.ts)."
+      "note": "DA-08: ingest dedup content-hash registry (content-hash-registry.jsonl, ingest-actuator dedup.ts) — load-bearing append-only dedup state; TTL deletion would re-open duplicate ingests. Tenant lines are pruned only by the audited tenant offboarding ceremony (scope-offboarding.ts). MSN-STORE-BOUNDS-2: the registry is read by one forward streaming pass that stops at the first matching hash (no size cap); check-then-register runs under a per-registry lock."
     },
     {
       "path": "active/shared/runtime/ingest/quota",
@@ -651,7 +651,7 @@
       "artifact_class": "evidence",
       "action": "review_required",
       "audit": true,
-      "note": "Dependency vulnerability ledger (libs/core/dependency-vulnerability-ledger.ts); security evidence trail."
+      "note": "Dependency vulnerability ledger (libs/core/dependency-vulnerability-ledger.ts); security evidence trail. MSN-STORE-BOUNDS-2: full history is load-bearing (previous-state fold over every scan), so no retention; the reader streams with no size cap."
     },
     {
       "path": "active/shared/runtime/current_mission_focus.json",
@@ -1151,7 +1151,8 @@
       "compact_key": "item_id",
       "compact_min_bytes": 2097152,
       "audit": true,
-      "note": "Versioned WorkItem store — every update appends a full record, so the file grows O(items x versions); observed 31MB/853 lines for 101 items with 240KB lines from embedded attempt history. Compaction folds to latest-per-item_id and archives the pre-compaction file under active/archive/jsonl-compaction/. The parent dir stays review_required (leases/boards untouched)."
+      "note": "Versioned WorkItem store — every update appends a full record, so the file grows O(items x versions); observed 31MB/853 lines for 101 items with 240KB lines from embedded attempt history. Compaction folds to latest-per-item_id and archives the pre-compaction file under active/archive/jsonl-compaction/. The parent dir stays review_required (leases/boards untouched). MSN-STORE-BOUNDS-2: self_managed — the janitor must not fold it by plain item_id: createWorkItemIfAbsent compares a replay against the creation (version 1) snapshot and treats several version-1 snapshots as ambiguous ownership. The writer compacts at write time inside the coordination mutation fence (work-coordination-ledger.ts workItemCompactionKey: version-1 rows kept verbatim, later versions folded by item_id; WORK_ITEMS_COMPACT_MIN_BYTES 2 MiB). The old inline 64MB non-atomic fold is gone. Readers stream (strict: a malformed line fails closed by contract).",
+      "self_managed": true
     },
     {
       "path": "active/shared/runtime/work-coordination/leases.jsonl",
@@ -1160,7 +1161,7 @@
       "compact_key": "lease_id",
       "compact_min_bytes": 1048576,
       "audit": true,
-      "note": "Versioned WorkLease store — same append-per-update pattern as items.jsonl; folded by lease_id. Active leases are always the latest record per id, so folding never drops a live lease."
+      "note": "Versioned WorkLease store — same append-per-update pattern as items.jsonl; folded by lease_id. Active leases are always the latest record per id, so folding never drops a live lease. MSN-STORE-BOUNDS-2: also compacted by the writer at write time inside the coordination mutation fence (WORK_LEASES_COMPACT_MIN_BYTES 1 MiB), so correctness no longer depends on the janitor; readers stream."
     },
     {
       "path": "active/shared/observability/delegations.jsonl",

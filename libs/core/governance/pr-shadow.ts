@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { isVitestProcess } from '../foundation/env.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine } from '../foundation/json.js';
+import { fileEndsWithNewline, streamJsonLines } from '../jsonl-read.js';
 import { createLogger } from '../logger.js';
 import * as pathResolver from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
@@ -182,17 +183,21 @@ function ledgerFile(): string | null {
 export function listPrShadowRecords(): PrShadowRecord[] {
   const file = ledgerFile();
   if (!file) return [];
-  return readJsonLines<PrShadowRecord>(file, {
-    onMalformed: 'skip',
-    map: (value) => value as PrShadowRecord,
-  }).filter((record) => record && (record.kind === 'observation' || record.kind === 'outcome'));
+  // Streamed (constant read buffer): the ledger's size never fails a read.
+  const records: PrShadowRecord[] = [];
+  for (const record of streamJsonLines<PrShadowRecord | null>(file, { onMalformed: 'skip' })) {
+    if (record && (record.kind === 'observation' || record.kind === 'outcome'))
+      records.push(record);
+  }
+  return records;
 }
 
 export function appendPrShadowRecord(record: PrShadowRecord): boolean {
   try {
     const file = ledgerFile();
     if (!file) return false;
-    appendJsonLine(file, record);
+    // A torn tail would swallow this record into one unparseable line.
+    appendJsonLine(file, record, { leadingNewline: !fileEndsWithNewline(file) });
     return true;
   } catch (error) {
     logger.warn(

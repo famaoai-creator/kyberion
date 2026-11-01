@@ -1,4 +1,5 @@
-import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { appendJsonLine } from './foundation/json.js';
+import { streamJsonLines } from './jsonl-read.js';
 import {
   assertSafeRepositoryPath,
   safeLstat,
@@ -1093,20 +1094,25 @@ export class MetricsCollector {
       const onMalformed = options.onMalformed;
       const offset = lineOffset;
       let lastLine = 0;
-      const rows = readJsonLines<Record<string, any>>(
-        assertSafeRepositoryPath(filePath, { allowMissingLeaf: optional }),
-        options.strict && onMalformed
-          ? {
-              map: (value, lineNumber) => {
-                lastLine = lineNumber;
-                return value as Record<string, any>;
-              },
-              onMalformed: (_error, lineNumber, rawLine) => {
-                lastLine = lineNumber;
-                onMalformed(offset + lineNumber, rawLine);
-              },
-            }
-          : {}
+      // Streamed (constant read buffer): the history's size never fails a
+      // read. Malformed-line handling is unchanged: a callback when given,
+      // otherwise the read throws (lenient callers then fail closed to []).
+      const rows = Array.from(
+        streamJsonLines<Record<string, any>>(
+          assertSafeRepositoryPath(filePath, { allowMissingLeaf: optional }),
+          options.strict && onMalformed
+            ? {
+                map: (value, lineNumber) => {
+                  lastLine = lineNumber;
+                  return value as Record<string, any>;
+                },
+                onMalformed: (_error, lineNumber, rawLine) => {
+                  lastLine = lineNumber;
+                  onMalformed(offset + lineNumber, rawLine);
+                },
+              }
+            : {}
+        )
       );
       lineOffset += lastLine;
       return rows;
@@ -1156,16 +1162,35 @@ export class MetricsCollector {
     );
   }
 
+  /**
+   * Streamed (size never fails the read). A torn/malformed line is skipped
+   * and counted; an unreadable file warns — usage totals feed spend guards,
+   * so an undercount must never be silent.
+   */
   private _readUsageFile(filePath: string): ResourceUsageRecord[] {
+    let malformed = 0;
     try {
       if (!safeExistsSync(filePath)) return [];
       this._ensureRegularMetricsFile(filePath);
-      return readJsonLines<ResourceUsageRecord>(
-        assertSafeRepositoryPath(filePath, { allowMissingLeaf: true })
+      const rows = Array.from(
+        streamJsonLines<ResourceUsageRecord>(
+          assertSafeRepositoryPath(filePath, { allowMissingLeaf: true }),
+          {
+            onMalformed: () => {
+              malformed++;
+            },
+          }
+        )
       );
+      if (malformed > 0) {
+        logger.warn(
+          `resource usage ledger: skipped ${malformed} malformed line(s) — torn append or corrupt row, usage totals exclude them | next: inspect the file | evidence: ${filePath}`
+        );
+      }
+      return rows;
     } catch (err) {
-      logger.debug(
-        `resource usage ledger skipped — unreadable file | next: check the file | evidence: ${filePath}: ${err}`
+      logger.warn(
+        `resource usage ledger skipped — unreadable file, usage totals undercount | next: check the file's permissions/type | evidence: ${filePath}: ${err instanceof Error ? err.message : String(err)}`
       );
       return [];
     }

@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
-import { safeRmSync } from '../secure-io.js';
+import * as path from 'node:path';
+import { safeAppendFileSync, safeRmSync } from '../secure-io.js';
 import {
   SHADOW_EXIT_MIN_SAMPLES,
   buildObservation,
@@ -139,6 +140,17 @@ describe('observePullRequests and summarizePrShadow', () => {
     port.open = [pr(1, { headSha: 'new' })];
     expect(observePullRequests(port).observed).toBe(1);
     expect(listPrShadowRecords()).toHaveLength(3);
+  });
+
+  it('streams the ledger past a torn tail and keeps appending on a fresh line', () => {
+    const port = new FakePort();
+    port.open = [pr(1)];
+    port.filesByPr.set(1, [file('docs/a.md')]);
+    expect(observePullRequests(port).observed).toBe(1);
+    safeAppendFileSync(path.join(root, 'ledger.jsonl'), 'null\n{"kind":"observation","pr');
+    port.ci.set(1, { state: 'failure', failing: ['lint'] });
+    expect(observePullRequests(port).observed).toBe(1);
+    expect(listPrShadowRecords()).toHaveLength(2);
   });
 
   it('passes the ignored checks to the port', () => {

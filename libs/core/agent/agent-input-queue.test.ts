@@ -6,8 +6,11 @@ import {
   enqueueMissionAgentInput,
   enqueueSurfaceAgentInput,
   registerMissionAgentInputWorker,
+  reduceAgentInputQueueFile,
   renderAgentInputQueueEntries,
+  setAgentInputQueueStoreTuningForTests,
 } from './agent-input-queue.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
@@ -35,6 +38,8 @@ function seedMission(missionDir: string, state: Record<string, unknown>): void {
 }
 
 afterEach(() => {
+  setAgentInputQueueStoreTuningForTests({});
+  resetAppendOnlyStoreMaintenanceState();
   safeRmSync(tempRoot, { recursive: true, force: true });
   withExecutionContext('mission_controller', () => {
     for (const dir of seededMissionDirs.splice(0))
@@ -357,5 +362,77 @@ describe('AgentInputQueue', () => {
       sessionId: 'SESSION-2',
     });
     expect(agentTwoEntries.map((entry) => entry.id)).toEqual([agentTwo.id]);
+  });
+
+  it('compacts terminal pairs past the horizon at write time with an identical active set', async () => {
+    const missionId = 'PI15-COMPACT';
+    const old = '2026-01-01T00:00:00.000Z';
+    const recent = new Date().toISOString();
+    const entry = (id: string, at: string) => ({
+      kind: 'enqueued',
+      recorded_at: at,
+      entry: {
+        id,
+        mission_id: missionId,
+        delivery: 'next_run',
+        text: `payload ${id} ${'x'.repeat(160)}`,
+        enqueued_at: at,
+      },
+    });
+    const seed: unknown[] = [];
+    for (let i = 0; i < 20; i++) {
+      seed.push(entry(`old-${i}`, old));
+      seed.push({ kind: i % 2 ? 'cancelled' : 'consumed', entry_id: `old-${i}`, recorded_at: old });
+    }
+    for (let i = 0; i < 3; i++) seed.push(entry(`pending-${i}`, old));
+    seed.push(entry('recent-consumed', recent));
+    seed.push({ kind: 'consumed', entry_id: 'recent-consumed', recorded_at: recent });
+    safeMkdir(tempRoot, { recursive: true });
+    safeWriteFile(queuePath, seed.map((record) => `${JSON.stringify(record)}\n`).join(''));
+    const lineCount = () =>
+      fs
+        .readFileSync(queuePath, 'utf8')
+        .split('\n')
+        .filter((line) => line.trim()).length;
+
+    const queue = new AgentInputQueue({ missionId, queuePath });
+    // Threshold far above the fixture: the full-history reduction to compare against.
+    setAgentInputQueueStoreTuningForTests({ compactMinBytes: 1024 * 1024 * 1024 });
+    const first = await queue.enqueue({ delivery: 'next_run', text: 'first' });
+    expect(await queue.cancelQueued(first.id)).toBe('cancelled');
+    const full = reduceAgentInputQueueFile(queuePath);
+    const linesBefore = lineCount();
+
+    setAgentInputQueueStoreTuningForTests({
+      compactMinBytes: 2048,
+      terminalHorizonMs: 24 * 60 * 60 * 1000,
+    });
+    const second = await queue.enqueue({ delivery: 'next_run', text: 'second' });
+    expect(await queue.cancelQueued(second.id)).toBe('cancelled');
+    const compacted = reduceAgentInputQueueFile(queuePath);
+
+    expect(lineCount()).toBe(linesBefore + 2 - 40);
+    // The active set is identical — same entries, same order.
+    expect(compacted.active).toEqual(full.active);
+    expect(compacted.active.map((e) => e.id)).toEqual(['pending-0', 'pending-1', 'pending-2']);
+    // Bookkeeping within the horizon is identical; older pairs left together.
+    expect(compacted.consumed).toEqual(full.consumed.filter((id) => !id.startsWith('old-')));
+    expect(compacted.cleared).toEqual([
+      ...full.cleared.filter((id) => !id.startsWith('old-')),
+      second.id,
+    ]);
+    expect(await queue.cancelQueued('recent-consumed')).toBe('already_consumed');
+    expect(await queue.cancelQueued('old-0')).toBe('already_cleared');
+    // Still consumable after compaction.
+    expect((await queue.consume('next_run', 10)).map((e) => e.id)).toEqual(
+      full.active.map((e) => e.id)
+    );
+  });
+
+  it('fails closed on a torn durable record (strict correctness store)', async () => {
+    const queue = new AgentInputQueue({ missionId: 'PI15-TORN', queuePath });
+    await queue.enqueue({ delivery: 'next_run', text: 'kept' });
+    safeAppendFileSync(queuePath, '{"kind":"consumed","entry_');
+    await expect(queue.consume('next_run')).rejects.toThrow(/AGENT_INPUT_QUEUE_CORRUPT/);
   });
 });

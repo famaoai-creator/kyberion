@@ -14,7 +14,7 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
-import { dedupContent, parseIngestRegistryRecord } from './dedup.js';
+import { dedupContent, lookupIngestRegistry, parseIngestRegistryRecord } from './dedup.js';
 import { handleAction } from './index.js';
 
 const HASH_A = 'a'.repeat(64);
@@ -213,5 +213,44 @@ describe('ingest:dedup (DA-04 acceptance 3)', () => {
         target_path: '/tmp/outside-card.md',
       })
     ).toThrow('target_path must be repository-relative');
+  });
+
+  it('dedupes across a large streamed registry and tolerates a torn tail', () => {
+    const bigPath = path.join(fixtureDir, 'big-registry.jsonl');
+    const hashOf = (i: number) => i.toString(16).padStart(64, '0');
+    const rows: string[] = [];
+    for (let i = 0; i < 500; i++) {
+      rows.push(
+        JSON.stringify({
+          content_sha256: hashOf(i),
+          source_system: 'drive',
+          source_id: `DOC-${i % 50}`,
+          first_seen: NOW,
+        })
+      );
+    }
+    // A torn final line (writer died mid-append) must not break lookups.
+    safeWriteFile(bigPath, `${rows.join('\n')}\n{"content_sha256":"${hashOf(9999)}","first_s`);
+    // Small chunks force record boundaries to straddle range reads.
+    const late = lookupIngestRegistry(bigPath, { content_sha256: hashOf(499) }, { chunkBytes: 64 });
+    expect(late.existing?.content_sha256).toBe(hashOf(499));
+    const update = lookupIngestRegistry(
+      bigPath,
+      { content_sha256: 'c'.repeat(64), source_system: 'drive', source_id: 'DOC-7' },
+      { chunkBytes: 64 }
+    );
+    // The FIRST same-source record is the supersede candidate, as before.
+    expect(update.supersedesCandidate?.content_sha256).toBe(hashOf(7));
+    expect(dedupContent({ content_sha256: hashOf(250), registry_path: bigPath })).toMatchObject({
+      duplicate: true,
+      registered: false,
+    });
+    expect(
+      dedupContent({ content_sha256: hashOf(9999), registry_path: bigPath, now: NOW })
+    ).toMatchObject({ duplicate: false, registered: true });
+    // Registration after a torn tail starts on its own line and is found next time.
+    expect(dedupContent({ content_sha256: hashOf(9999), registry_path: bigPath })).toMatchObject({
+      duplicate: true,
+    });
   });
 });

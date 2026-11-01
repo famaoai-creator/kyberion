@@ -1,4 +1,7 @@
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine } from '../foundation/json.js';
+import { jsonlFileSize, streamJsonLines } from '../jsonl-read.js';
+import { maintainStoreAfterAppend } from '../append-only-store.js';
+import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 /**
  * PI-15: governed input queues for an agent operation.
@@ -386,6 +389,7 @@ export class AgentInputQueue {
           recorded_at: nowIso(),
         } satisfies AgentInputQueueRecord);
       }
+      if (entries.length > 0) this.compactDurableQueue();
       return entries;
     });
   }
@@ -449,6 +453,7 @@ export class AgentInputQueue {
           entry_id: id,
           recorded_at: nowIso(),
         } satisfies AgentInputQueueRecord);
+        this.compactDurableQueue();
         return 'cancelled';
       }
       if (state.consumed.has(id)) return 'already_consumed';
@@ -461,19 +466,130 @@ export class AgentInputQueue {
       return { active: new Map(), consumed: new Set(), cleared: new Set() };
     }
     ensureDurableQueueFile(this.queuePath);
-    const catalog = queueRecordCatalog(this.queuePath);
-    return reduceDurableRecords(
-      readJsonLines<AgentInputQueueRecord>(this.queuePath, {
-        map: (value, lineNumber) => parseRecord(value, lineNumber, catalog),
-        onMalformed: (error, lineNumber) => {
-          if (error instanceof Error && error.message.startsWith('[AGENT_INPUT_QUEUE')) {
-            throw error;
-          }
-          throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] unreadable record:${lineNumber}`);
-        },
-      })
-    );
+    return reduceDurableRecords(readDurableRecords(this.queuePath));
   }
+
+  /**
+   * Write-time retention, called under the queue lock right after a
+   * consume/cancel append. Drops terminal pairs (the `enqueued` record AND its
+   * `consumed`/`cancelled` record, never one half) whose terminal record is
+   * older than the horizon. Active entries are never touched, so the reduced
+   * `active` map is identical (content and order); `consumed` / `cleared`
+   * keep every id terminated within the horizon.
+   */
+  private compactDurableQueue(): void {
+    try {
+      this.compactDurableQueueUnsafe();
+    } catch (error) {
+      // Never fail the append that triggered it: the consumed/cancelled record
+      // is already durable and the caller must receive its result.
+      logger.warn(
+        `[agent-input-queue] write-time compaction failed for ${this.queuePath} — ${error instanceof Error ? error.message : String(error)} | next: the append succeeded; compaction retries on a later consume/cancel | evidence: mission ${this.missionId}`
+      );
+    }
+  }
+
+  private compactDurableQueueUnsafe(): void {
+    const minBytes = queueTuning.compactMinBytes ?? AGENT_INPUT_QUEUE_COMPACT_MIN_BYTES;
+    const size = jsonlFileSize(this.queuePath);
+    const floor = Math.max(minBytes, 2 * (lastCompactedQueueSize.get(this.queuePath) ?? 0));
+    if (size < floor) return;
+    const horizonMs = queueTuning.terminalHorizonMs ?? AGENT_INPUT_QUEUE_TERMINAL_HORIZON_MS;
+    const now = queueTuning.now?.() ?? new Date();
+    const droppable = terminalEntryIdsBefore(
+      readDurableRecords(this.queuePath),
+      now.getTime() - horizonMs
+    );
+    lastCompactedQueueSize.set(this.queuePath, size);
+    if (droppable.size === 0) return;
+    maintainStoreAfterAppend(
+      this.queuePath,
+      {
+        action: 'window',
+        minBytes,
+        windowMs: 1,
+        // Records of a droppable entry fall outside the window; every other
+        // record (active entries, recent terminal pairs) has unknown time and
+        // is kept verbatim.
+        timeOf: (value) => (droppable.has(queueRecordEntryId(value) ?? '') ? 0 : undefined),
+      },
+      { lockId: null, now }
+    );
+    lastCompactedQueueSize.set(this.queuePath, jsonlFileSize(this.queuePath));
+  }
+}
+
+/** Size at which a durable queue's terminal pairs are folded away. */
+export const AGENT_INPUT_QUEUE_COMPACT_MIN_BYTES = 1024 * 1024;
+/**
+ * How long a consumed/cancelled id stays answerable as such: within it,
+ * `cancelQueued` reports `already_consumed`; afterwards the pair is dropped
+ * and the id reads as `already_cleared` (still not cancellable).
+ */
+export const AGENT_INPUT_QUEUE_TERMINAL_HORIZON_MS = 30 * 24 * 60 * 60 * 1000;
+
+interface AgentInputQueueStoreTuning {
+  compactMinBytes?: number;
+  terminalHorizonMs?: number;
+  now?: () => Date;
+}
+let queueTuning: AgentInputQueueStoreTuning = {};
+const lastCompactedQueueSize = new Map<string, number>();
+
+/** Test seam: override compaction threshold / horizon / clock; `{}` resets. */
+export function setAgentInputQueueStoreTuningForTests(tuning: AgentInputQueueStoreTuning): void {
+  queueTuning = { ...tuning };
+  lastCompactedQueueSize.clear();
+}
+
+/** Strict streaming read: size never fails it, but any corrupt record does (correctness store). */
+function readDurableRecords(queuePath: string): AgentInputQueueRecord[] {
+  const catalog = queueRecordCatalog(queuePath);
+  return Array.from(
+    streamJsonLines<AgentInputQueueRecord>(queuePath, {
+      map: (value, lineNumber) => parseRecord(value, lineNumber, catalog),
+      onMalformed: (error, lineNumber) => {
+        if (error instanceof Error && error.message.startsWith('[AGENT_INPUT_QUEUE')) {
+          throw error;
+        }
+        throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] unreadable record:${lineNumber}`);
+      },
+    })
+  );
+}
+
+function queueRecordEntryId(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') return undefined;
+  const record = value as { kind?: unknown; entry?: { id?: unknown }; entry_id?: unknown };
+  if (record.kind === 'enqueued') {
+    return typeof record.entry?.id === 'string' ? record.entry.id : undefined;
+  }
+  return typeof record.entry_id === 'string' ? record.entry_id : undefined;
+}
+
+/** Ids whose consumed/cancelled record is older than `cutoffMs` (whole pair droppable). */
+function terminalEntryIdsBefore(records: AgentInputQueueRecord[], cutoffMs: number): Set<string> {
+  const ids = new Set<string>();
+  for (const record of records) {
+    if (record.kind === 'enqueued') continue;
+    const at = Date.parse(record.recorded_at);
+    if (Number.isFinite(at) && at < cutoffMs) ids.add(record.entry_id);
+  }
+  return ids;
+}
+
+/** @internal Reducer exposed for the compaction invariant test. */
+export function reduceAgentInputQueueFile(queuePath: string): {
+  active: AgentInputQueueEntry[];
+  consumed: string[];
+  cleared: string[];
+} {
+  const state = reduceDurableRecords(readDurableRecords(queuePath));
+  return {
+    active: [...state.active.values()],
+    consumed: [...state.consumed],
+    cleared: [...state.cleared],
+  };
 }
 
 function resolveMissionAgentInputQueuePath(options: AgentInputQueueOptions): string {
