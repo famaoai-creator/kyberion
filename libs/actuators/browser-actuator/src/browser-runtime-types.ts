@@ -1,11 +1,44 @@
 import type { Browser, BrowserContext, CDPSession, Page } from '@playwright/test';
 
+export interface BrowserWatchdog {
+  /** How page-attached JS dialogs are settled when no step handles them. */
+  dialog_policy: 'accept' | 'dismiss';
+  dialog_events: Array<{
+    tab_id: string;
+    type: string;
+    message: string;
+    disposition: string;
+    ts: string;
+    error?: string;
+  }>;
+  download_events: Array<{
+    tab_id: string;
+    suggested_filename: string;
+    url: string;
+    ts: string;
+    path?: string;
+  }>;
+  crash_events: Array<{ tab_id: string; ts: string }>;
+  popup_events: Array<{
+    tab_id: string;
+    popup_tab_id: string;
+    opener_url: string;
+    ts: string;
+  }>;
+  /** Main-frame navigations, including redirects between steps. */
+  navigation_events: Array<{ tab_id: string; url: string; ts: string }>;
+  close_events: Array<{ tab_id: string; url: string; ts: string }>;
+  /** Tab ids whose renderer crashed and has not been closed since. */
+  crashed_tab_ids: string[];
+}
+
 export interface BrowserRuntime {
   context: BrowserContext;
   tabs: Map<string, Page>;
   pageIds: WeakMap<Page, string>;
   cdpSessions: WeakMap<Page, CDPSession>;
   activeTabId: string;
+  watchdog: BrowserWatchdog;
   consoleEvents: Array<{ tab_id: string; type: string; text: string; ts: string }>;
   networkEvents: Array<{
     tab_id: string;

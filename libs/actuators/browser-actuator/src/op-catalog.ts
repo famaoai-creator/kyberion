@@ -343,6 +343,7 @@ const BROWSER_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
 };
 
 export const BROWSER_ACTUATOR_CAPTURE_OPS = [
+  'cdp',
   'distill_dom',
   'console',
   'content',
@@ -350,6 +351,7 @@ export const BROWSER_ACTUATOR_CAPTURE_OPS = [
   'export_session_handoff',
   'goto',
   'network',
+  'watchdog_events',
   'passkey_credentials',
   'passkey_events',
   'query_elements',
@@ -383,6 +385,7 @@ export const BROWSER_ACTUATOR_APPLY_OPS = [
   'click_first_match',
   'click_ref',
   'delete_passkey',
+  'dialog_policy',
   'extension_session',
   'fill',
   'fill_ref',

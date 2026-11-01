@@ -186,6 +186,7 @@
     "browser": {
       "capture": [
         "action_trail",
+        "cdp",
         "console",
         "content",
         "distill_dom",
@@ -203,7 +204,8 @@
         "snapshot",
         "tabs",
         "title",
-        "url"
+        "url",
+        "watchdog_events"
       ],
       "transform": [
         "export_adf",
@@ -220,6 +222,7 @@
         "click_first_match",
         "click_ref",
         "delete_passkey",
+        "dialog_policy",
         "extension_session",
         "fill",
         "fill_ref",
