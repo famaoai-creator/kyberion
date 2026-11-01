@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReaddir } from '../secure-io.js';
+import { readJsonLinesSince } from '../jsonl-read.js';
 import { listConversationSignals } from '../intent/conversation-signals.js';
 import { loadApprovalRequest } from '../governance/approval-store.js';
 import {
@@ -550,7 +551,10 @@ export const executionMetricSource: LearningSignalSource = {
       const component = stringField(row, 'component');
       const duration = Number(row.duration_ms);
       if (component && Number.isFinite(duration)) {
-        durations.set(component, [...(durations.get(component) || []), duration]);
+        // Push in place: re-spreading per row made a full-history pass O(n^2).
+        const list = durations.get(component);
+        if (list) list.push(duration);
+        else durations.set(component, [duration]);
       }
     }
     const medians = new Map([...durations].map(([key, values]) => [key, median(values)]));
@@ -713,7 +717,30 @@ export const collaborationSource: LearningSignalSource = {
 
     const coRoot = pathResolver.shared('observability/co-sessions');
     for (const sessionId of listSubdirs(coRoot)) {
-      for (const event of readJsonlRecords(path.join(coRoot, sessionId, 'events.jsonl'))) {
+      // events.jsonl rotates at write time (events-<stamp>.jsonl beside it);
+      // a backward scan per file stops at the window start, so the cost is
+      // proportional to the window, not the log.
+      const sessionDir = path.join(coRoot, sessionId);
+      let names: string[] = [];
+      try {
+        names = safeReaddir(sessionDir);
+      } catch {
+        continue; // not a session directory
+      }
+      const files = names.filter(
+        (name) => name === 'events.jsonl' || /^events-\d{8}-\d{6}(?:-\d+)?\.jsonl$/u.test(name)
+      );
+      const events = files.flatMap((name) =>
+        readJsonLinesSince<Record<string, unknown>>(path.join(sessionDir, name), {
+          onMalformed: 'skip',
+          timeOf: (record) => {
+            const ms = Date.parse(stringField(asRecord(record), 'at'));
+            return Number.isFinite(ms) ? ms : undefined;
+          },
+          sinceMs: window.since.getTime(),
+        }).map(asRecord)
+      );
+      for (const event of events) {
         if (stringField(event, 'type') !== 'lease_expired') continue;
         const ts = stringField(event, 'at');
         if (!inWindow(ts, window)) continue;

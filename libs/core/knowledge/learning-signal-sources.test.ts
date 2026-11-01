@@ -50,7 +50,13 @@ vi.mock('../security-screen.js', () => ({ listQuarantineRecords: mocks.quarantin
 vi.mock('../task/task-session.js', () => ({ listTaskSessions: mocks.sessions }));
 
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  safeExistsSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import { approvalStoreRoots } from '../governance/approval-store-paths.js';
 import {
   asTenantApprovalStore,
@@ -514,6 +520,23 @@ describe('built-in learning-signal sources (LS-02)', () => {
       expect.objectContaining({ key: 'discussion:review_reject' }),
       expect.objectContaining({ key: 'co-session:lease_expired:codex' }),
     ]);
+  });
+
+  it('reads co-session lease expiries from rotated event segments and skips torn lines', () => {
+    const OLD = '2026-09-01T12:00:00.000Z';
+    writeJsonl('observability/co-sessions/cs-2/events-20261001-130000.jsonl', [
+      { event_id: 'r0', type: 'lease_expired', at: OLD, actor_provider: 'gemini' },
+      { event_id: 'r1', type: 'lease_expired', at: IN, actor_provider: 'claude' },
+    ]);
+    const live = writeJsonl('observability/co-sessions/cs-2/events.jsonl', [
+      { event_id: 'l1', type: 'lease_expired', at: IN, actor_provider: 'codex' },
+    ]);
+    safeWriteFile(live, `${String(safeReadFile(live, { encoding: 'utf8' }))}{"event_id":"torn`);
+    const refs = collaborationSource
+      .read(WINDOW)
+      .map((row) => row.ref)
+      .filter((ref) => ref.startsWith('co-session:'));
+    expect(refs.sort()).toEqual(['co-session:cs-2/l1', 'co-session:cs-2/r1']);
   });
 
   it('groups quarantined content by source and indicators, never by content', () => {

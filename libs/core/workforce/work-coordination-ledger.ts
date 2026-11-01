@@ -1,7 +1,10 @@
 /** Work-coordination append-only ledger internals: roots, mutation fence, JSONL/state writers. */
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
-import { appendJsonLine, readJsonLines, writeJson } from '../foundation/json.js';
+import { appendJsonLine, writeJson } from '../foundation/json.js';
+import { streamJsonLines } from '../jsonl-read.js';
+import { maintainStoreAfterAppend } from '../append-only-store.js';
+import { logger } from '../core.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
@@ -9,7 +12,7 @@ import { withExecutionContext } from '../authority.js';
 import { selectCurrentWorkItems } from './work-coordination-snapshot.js';
 import { latestById } from './work-coordination-inventory.js';
 import { validateWorkItem } from './work-coordination-identity.js';
-import { assertSafeRepositoryPath, safeLstat, safeMkdir, safeWriteFile } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeMkdir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { WORK_COORDINATION_ROOT_PATH } from '../foundation/runtime-state-roots.js';
 import type {
@@ -132,23 +135,46 @@ export function ensureStore(): void {
   safeMkdir(observabilityRoot(), { recursive: true });
 }
 
+/**
+ * Streaming whole-history read: constant memory, so a store's size never
+ * makes a read fail. Strict by default — the item/lease stores fail closed on
+ * a torn or malformed record rather than adopting an unverifiable ID.
+ * `tolerant` (the observability event feed) skips such lines and warns once.
+ */
+export function* streamJsonl<T>(
+  logicalPath: string,
+  options: { tolerant?: boolean } = {}
+): Generator<T> {
+  const file = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
+  if (!safeExistsSync(file)) return;
+  if (!options.tolerant) {
+    yield* streamJsonLines<T>(file, { chunkBytes: storeTuning.chunkBytes });
+    return;
+  }
+  let malformed = 0;
+  let firstMalformedLine = 0;
+  yield* streamJsonLines<T>(file, {
+    chunkBytes: storeTuning.chunkBytes,
+    onMalformed: (_error, lineNumber) => {
+      if (malformed === 0) firstMalformedLine = lineNumber;
+      malformed++;
+    },
+  });
+  if (malformed > 0) {
+    logger.warn(
+      `[work-coordination] skipped ${malformed} malformed line(s) in ${file} — torn append or corrupt record | next: inspect the line; the remaining events are listed | evidence: first malformed line ${firstMalformedLine}`
+    );
+  }
+}
+
 export function readJsonl<T>(logicalPath: string): T[] {
-  return readJsonLines<T>(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }));
+  return Array.from(streamJsonl<T>(logicalPath));
 }
 
 export function appendJsonl(logicalPath: string, record: unknown): void {
   withExecutionContext('infrastructure_sentinel', () => {
     ensureStore();
     appendJsonLine(assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true }), record);
-  });
-}
-
-/** Whole-file JSONL rewrite (compaction): truncate once, then append each record through the canonical line writer. */
-export function rewriteJsonl(absolutePath: string, records: readonly unknown[]): void {
-  withExecutionContext('infrastructure_sentinel', () => {
-    ensureStore();
-    safeWriteFile(absolutePath, '');
-    for (const record of records) appendJsonLine(absolutePath, record);
   });
 }
 
@@ -269,44 +295,67 @@ export function boundItemAttempts(item: WorkItem): WorkItem {
 }
 
 /**
- * Store growth guard: the append-only stores are also the read path, and
- * `readJsonLines` enforces the secure 100 MB read cap — a store that grows past
- * it self-DoSes every reader, including the janitor that exists to compact it
- * (observed: one crash-looping item inflated items.jsonl to 100 MB and halted
- * all `pnpm work` commands). Appends run inside the coordination mutation
- * fence, so once a store crosses the threshold we fold it in place: latest
- * record per key, keyless rows verbatim, original archived under
- * `active/archive/jsonl-compaction/` matching the janitor's layout.
+ * Write-time retention (storage-retention-catalog `compact` entries for
+ * items.jsonl / leases.jsonl). The readers stream, so size never makes a read
+ * fail; folding only bounds disk. The policy is explicit rather than
+ * `'catalog'` because the namespace / root override moves the store off the
+ * catalog's exact path. Runs inside the coordination mutation fence, so the
+ * store lock is already held (`lockId: null`); the shared append-only-store
+ * rewrite is race-safe for lock-free readers. The pre-compaction union is
+ * archived under `<coordination base>/active/archive/jsonl-compaction/`.
  */
-const APPEND_ONLY_COMPACT_AT_BYTES = 64 * 1024 * 1024;
+export const WORK_ITEMS_COMPACT_MIN_BYTES = 2 * 1024 * 1024;
+export const WORK_LEASES_COMPACT_MIN_BYTES = 1024 * 1024;
 const COMPACTION_ARCHIVE_REPO_SUBPATH = 'active/archive/jsonl-compaction';
 
-function maybeCompactAppendOnlyStore(filePath: string, keyField: string): void {
-  const stat = safeLstat(filePath);
-  if (!stat.isFile() || stat.size < APPEND_ONLY_COMPACT_AT_BYTES) return;
-  const records = readJsonLines<Record<string, unknown>>(filePath);
-  const lastIndex = new Map<string, number>();
-  records.forEach((record, index) => {
-    const key = record[keyField];
-    if (typeof key === 'string' && key) lastIndex.set(key, index);
-  });
-  const kept = records.filter((record, index) => {
-    const key = record[keyField];
-    return typeof key !== 'string' || !key || lastIndex.get(key) === index;
-  });
-  const stamp = nowIso().replace(/[-:]/g, '').replace(/\..*$/, '');
-  const repoRel = path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
-  const archivePath = assertSafeRepositoryPath(
-    path.resolve(
-      pathResolver.rootDir(),
+interface WorkCoordinationStoreTuning {
+  itemsCompactMinBytes?: number;
+  leasesCompactMinBytes?: number;
+  /** Range-read chunk size for the streaming readers (tests inject small values). */
+  chunkBytes?: number;
+}
+let storeTuning: WorkCoordinationStoreTuning = {};
+
+/** Test seam: override compaction thresholds / read chunking; call with `{}` to reset. */
+export function setWorkCoordinationStoreTuningForTests(tuning: WorkCoordinationStoreTuning): void {
+  storeTuning = { ...tuning };
+}
+
+/**
+ * Items fold to the latest snapshot per item_id, except creation snapshots
+ * (version 1), which are kept verbatim: `createWorkItemIfAbsent` compares a
+ * replay against the original creation identity and treats several version-1
+ * snapshots as ambiguous ownership, so both facts must survive compaction.
+ */
+export function workItemCompactionKey(record: Record<string, unknown>): string | undefined {
+  if (record.version === 1) return undefined;
+  const id = record.item_id;
+  return typeof id === 'string' && id ? id : undefined;
+}
+
+function maintainCoordinationStore(
+  filePath: string,
+  key: 'item_id' | 'lease_id',
+  minBytes: number
+): void {
+  withCoordinationMutation(() => {
+    const base = coordinationBase();
+    const archiveDir = path.join(
+      base,
       COMPACTION_ARCHIVE_REPO_SUBPATH,
-      `${repoRel.replace(/\.jsonl$/, '')}.${stamp}Z-${process.pid}.jsonl`
-    ),
-    { allowMissingLeaf: true }
-  );
-  safeMkdir(path.dirname(archivePath), { recursive: true });
-  rewriteJsonl(archivePath, records);
-  rewriteJsonl(filePath, kept);
+      path.dirname(path.relative(base, filePath))
+    );
+    maintainStoreAfterAppend(
+      filePath,
+      {
+        action: 'compact',
+        key: key === 'item_id' ? workItemCompactionKey : 'lease_id',
+        minBytes,
+        archiveDir,
+      },
+      { lockId: null, chunkBytes: storeTuning.chunkBytes }
+    );
+  });
 }
 
 export function appendItemSnapshot(item: WorkItem): WorkItem {
@@ -314,14 +363,22 @@ export function appendItemSnapshot(item: WorkItem): WorkItem {
   validateWorkItem(bounded);
   const file = itemsPath();
   appendJsonl(file, bounded);
-  maybeCompactAppendOnlyStore(file, 'item_id');
+  maintainCoordinationStore(
+    file,
+    'item_id',
+    storeTuning.itemsCompactMinBytes ?? WORK_ITEMS_COMPACT_MIN_BYTES
+  );
   return bounded;
 }
 
 export function appendLeaseSnapshot(lease: WorkLease): WorkLease {
   const file = leasesPath();
   appendJsonl(file, lease);
-  maybeCompactAppendOnlyStore(file, 'lease_id');
+  maintainCoordinationStore(
+    file,
+    'lease_id',
+    storeTuning.leasesCompactMinBytes ?? WORK_LEASES_COMPACT_MIN_BYTES
+  );
   return lease;
 }
 
