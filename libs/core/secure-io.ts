@@ -1684,6 +1684,9 @@ registerOptionalAuditIo('registerAuditChainIo', {
   readdir: safeReaddir,
   append: (filePath, content) => safeAppendFileSync(filePath, content),
   assertSafePath: (filePath, options) => assertSafeRepositoryPath(filePath, options),
+  // Range access keeps appends and seeding independent of the daily file size.
+  size: (filePath) => (safeExistsSync(filePath) ? safeStat(filePath).size : undefined),
+  readRange: safeReadFileRange,
 });
 registerOptionalAuditIo('registerChainIntegrityIo', {
   exists: safeExistsSync,
