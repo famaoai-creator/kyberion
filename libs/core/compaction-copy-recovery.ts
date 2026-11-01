@@ -11,9 +11,12 @@
  * implemented here.
  *
  * The merge runs under the store's write-time maintenance lock
- * (`appendOnlyStoreLockId`), refuses any store with a copy younger than the
- * stale threshold (it may belong to a rewrite still running), and only
- * touches the exact copy set the operator approved.
+ * (`appendOnlyStoreLockId`, also taken by the storage janitor's compaction
+ * and rotation) and, for a store whose writer rewrites it under its own
+ * compaction lock ({@link WRITER_COMPACTION_LOCKS}), under that lock too —
+ * so no other rewrite interleaves with the merge. It refuses any store with a
+ * copy younger than the stale threshold (it may belong to a rewrite still
+ * running), and only touches the exact copy set the operator approved.
  */
 import * as nodePath from 'node:path';
 import { withLockSync } from './foundation/lock-utils.js';
@@ -24,6 +27,7 @@ import {
 } from './append-only-store.js';
 import { parkedCompactionCopies } from './jsonl-parked-read.js';
 import { jsonlFileSize } from './jsonl-read.js';
+import { runtimeStatePath } from './foundation/runtime-state-roots.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
@@ -44,6 +48,18 @@ export const COMPACTION_COPY_ROOTS = [
 export const COMPACTION_COPY_MARKER = '.compacting-';
 /** Operator command that recovers leftover copies (named by the ops-health finding). */
 export const RECOVER_COMPACTION_COPIES_COMMAND = 'pnpm kyberion storage recover-compaction-copies';
+
+/**
+ * Stores (repo-relative) whose writer rewrites them under a lock of its own
+ * rather than `appendOnlyStoreLockId`: the recovery merge takes that lock as
+ * well (outer), so it never interleaves with the writer's compaction — an
+ * interleaving could order older rows after newer ones. The dot wake ledger
+ * is compacted under `dot-wake-ledger-compact`
+ * (dot/dot-wake-ledger-compaction.ts DOT_LEDGER_COMPACT_LOCK).
+ */
+export const WRITER_COMPACTION_LOCKS: Readonly<Record<string, string>> = {
+  [runtimeStatePath('dot.wakeLedger').logicalPath]: 'dot-wake-ledger-compact',
+};
 
 const COMPACTION_COPY_MAX_DEPTH = 6;
 const COMPACTION_COPY_MAX_ENTRIES = 20_000;
@@ -250,67 +266,73 @@ export function recoverCompactionCopies(
   const rootDir = rootOf(options);
   const storeAbs = resolveRecoveryStorePath(store, options);
   const storeRel = toRel(rootDir, storeAbs);
-  return withLockSync(
-    appendOnlyStoreLockId(storeAbs),
-    (): CompactionCopyRecoveryResult => {
-      const plan = planStore(rootDir, storeAbs, (options.now ?? new Date()).getTime());
-      const current = plan.copies.map((copy) => copy.path);
-      const expected = [...expectedCopies].sort();
-      if (current.length === 0 || [...current].sort().join('\n') !== expected.join('\n')) {
+  const lockTimeoutMs = options.lockTimeoutMs ?? 10_000;
+  const writerLock = WRITER_COMPACTION_LOCKS[storeRel];
+  const underStoreLock = (): CompactionCopyRecoveryResult =>
+    withLockSync(
+      appendOnlyStoreLockId(storeAbs),
+      (): CompactionCopyRecoveryResult => {
+        const plan = planStore(rootDir, storeAbs, (options.now ?? new Date()).getTime());
+        const current = plan.copies.map((copy) => copy.path);
+        const expected = [...expectedCopies].sort();
+        if (current.length === 0 || [...current].sort().join('\n') !== expected.join('\n')) {
+          return {
+            store: storeRel,
+            outcome: 'changed',
+            copies: current,
+            detail: `copy set changed since the plan (now ${current.length}, planned ${expected.length}) — re-run the dry-run and request a new approval`,
+          };
+        }
+        if (plan.action !== 'merge') {
+          return { store: storeRel, outcome: 'refused', copies: current, detail: plan.detail };
+        }
+        const copyAbs = current.map((rel) => repoFile(rootDir, rel));
+        const result = mergeCompactionCopies(storeAbs, copyAbs, options);
+        if (!result) {
+          return {
+            store: storeRel,
+            outcome: 'changed',
+            copies: current,
+            detail: 'neither the store nor its copies exist any more',
+          };
+        }
+        const outcome: CompactionCopyRecoveryOutcome = result.published
+          ? 'merged'
+          : 'not_converged';
+        const liveAfter = safeExistsSync(storeAbs) ? jsonlFileSize(storeAbs) : 0;
+        (options.audit ?? appendRetentionAudit)({
+          event: 'RETENTION_RECOVER',
+          path: storeRel,
+          copies: current,
+          copy_bytes: plan.copies.reduce((sum, copy) => sum + copy.size_bytes, 0),
+          size_before_bytes: plan.live_bytes,
+          size_after_bytes: liveAfter,
+          before_lines: result.before,
+          after_lines: result.after,
+          duplicates_dropped: result.duplicatesDropped,
+          published: result.published,
+          policy_ref: RETENTION_CATALOG_REPO_PATH,
+          reason: 'leftover compaction copies merged back into the live store (operator recovery)',
+        });
+        if (!result.published) {
+          logger.warn(
+            `compaction-copy recovery did not converge for ${storeRel} — writers out-paced the merge | next: re-run ${RECOVER_COMPACTION_COPIES_COMMAND} --path ${storeRel} when the store is quieter | evidence: copies kept: ${current.join(', ')}`
+          );
+        }
         return {
           store: storeRel,
-          outcome: 'changed',
+          outcome,
           copies: current,
-          detail: `copy set changed since the plan (now ${current.length}, planned ${expected.length}) — re-run the dry-run and request a new approval`,
+          detail: result.published
+            ? `merged ${current.length} copy(ies) into the live store and removed them`
+            : 'writers out-paced the merge; the copies were kept untouched',
+          before_lines: result.before,
+          after_lines: result.after,
+          duplicates_dropped: result.duplicatesDropped,
+          live_bytes_after: liveAfter,
         };
-      }
-      if (plan.action !== 'merge') {
-        return { store: storeRel, outcome: 'refused', copies: current, detail: plan.detail };
-      }
-      const copyAbs = current.map((rel) => repoFile(rootDir, rel));
-      const result = mergeCompactionCopies(storeAbs, copyAbs, options);
-      if (!result) {
-        return {
-          store: storeRel,
-          outcome: 'changed',
-          copies: current,
-          detail: 'neither the store nor its copies exist any more',
-        };
-      }
-      const outcome: CompactionCopyRecoveryOutcome = result.published ? 'merged' : 'not_converged';
-      const liveAfter = safeExistsSync(storeAbs) ? jsonlFileSize(storeAbs) : 0;
-      (options.audit ?? appendRetentionAudit)({
-        event: 'RETENTION_RECOVER',
-        path: storeRel,
-        copies: current,
-        copy_bytes: plan.copies.reduce((sum, copy) => sum + copy.size_bytes, 0),
-        size_before_bytes: plan.live_bytes,
-        size_after_bytes: liveAfter,
-        before_lines: result.before,
-        after_lines: result.after,
-        duplicates_dropped: result.duplicatesDropped,
-        published: result.published,
-        policy_ref: RETENTION_CATALOG_REPO_PATH,
-        reason: 'leftover compaction copies merged back into the live store (operator recovery)',
-      });
-      if (!result.published) {
-        logger.warn(
-          `compaction-copy recovery did not converge for ${storeRel} — writers out-paced the merge | next: re-run ${RECOVER_COMPACTION_COPIES_COMMAND} --path ${storeRel} when the store is quieter | evidence: copies kept: ${current.join(', ')}`
-        );
-      }
-      return {
-        store: storeRel,
-        outcome,
-        copies: current,
-        detail: result.published
-          ? `merged ${current.length} copy(ies) into the live store and removed them`
-          : 'writers out-paced the merge; the copies were kept untouched',
-        before_lines: result.before,
-        after_lines: result.after,
-        duplicates_dropped: result.duplicatesDropped,
-        live_bytes_after: liveAfter,
-      };
-    },
-    options.lockTimeoutMs ?? 10_000
-  );
+      },
+      lockTimeoutMs
+    );
+  return writerLock ? withLockSync(writerLock, underStoreLock, lockTimeoutMs) : underStoreLock();
 }

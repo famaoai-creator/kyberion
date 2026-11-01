@@ -876,8 +876,12 @@ function policyThreshold(policy: AppendOnlyStorePolicy): number {
 
 /**
  * Inter-process lock id `maintainStoreAfterAppend` takes for `filePath` by
- * default. Anything else that rewrites the store (e.g. the compaction-copy
- * recovery command) takes the same id so it never races write-time maintenance.
+ * default. The storage janitor's compaction/rotation and the compaction-copy
+ * recovery command take the same id, so they exclude write-time maintenance
+ * that uses it. A writer that rewrites its store under a lock of its own
+ * (`lockId: null` under a queue/fence lock, or the dot wake ledger's
+ * compaction lock) is excluded only by callers that also take that lock —
+ * see compaction-copy-recovery.ts WRITER_COMPACTION_LOCKS.
  */
 export function appendOnlyStoreLockId(filePath: string): string {
   return `append-only-store-${createHash('sha256')

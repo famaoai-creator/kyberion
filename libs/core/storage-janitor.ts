@@ -2,10 +2,18 @@ import { defineCatalog } from './foundation/governed-catalog.js';
 import { loadJsonIfPresent } from './foundation/json.js';
 import {
   analyzeStoreKeys,
+  appendOnlyStoreLockId,
   compactStoreByKey,
   rotateStore,
   rotatedSegmentStem,
 } from './append-only-store.js';
+import { withLockSync } from './foundation/lock-utils.js';
+import {
+  ledgerSegmentLastHash,
+  listLedgerSegments,
+  recordLedgerSegmentArchived,
+  SYSTEM_LEDGER_REPO_PATH,
+} from './ledger.js';
 import { nowIso } from './foundation/time.js';
 export {
   readSchedulerOpsAlertDays,
@@ -81,6 +89,7 @@ import { trashedAtFor } from './storage-trash-grace.js';
 import {
   repoRelativePosix,
   TRASH_REPO_SUBPATH,
+  ARCHIVE_REPO_SUBPATH,
   COMPACTION_ARCHIVE_REPO_SUBPATH,
   DEFAULT_ROTATE_MIN_BYTES,
   DEFAULT_COMPACT_MIN_BYTES,
@@ -857,7 +866,11 @@ export function listUncoveredEventStoreDirs(catalog?: LoadedRetentionCatalog): s
  *
  * Every mutation emits a RETENTION_ROTATE / RETENTION_COMPACT / segment
  * expiry record to the retention audit log. Nothing here deletes the live
- * file itself.
+ * file itself. Live-file rotation and compaction run under the store's
+ * write-time maintenance lock and skip a busy store until the next sweep.
+ * The hash-chained system ledger's segments are archived oldest-first in
+ * chain order with a signed receipt on the ledger
+ * ({@link archiveExpiredLedgerSegments}).
  */
 export interface SweepAppendOnlyStoresResult {
   rotated: string[];
@@ -873,7 +886,8 @@ export interface SweepAppendOnlyStoresResult {
  * `compactStoreByKey` (append-only-store.ts) — the same park/stage protocol
  * the janitor used before, without whole-file reads, so a store past the
  * 100MB read cap stays compactable. This wrapper keeps the janitor's
- * RETENTION_COMPACT_ARCHIVE audit and log line.
+ * RETENTION_COMPACT_ARCHIVE audit and log line. The caller holds the store's
+ * write-time maintenance lock ({@link withStoreLock}).
  */
 function compactAppendOnlyFile(
   livePath: string,
@@ -909,11 +923,73 @@ function compactAppendOnlyFile(
   );
 }
 
+/** How long the janitor waits for a store's maintenance lock before skipping it this sweep. */
+export const JANITOR_STORE_LOCK_TIMEOUT_MS = 2000;
+
+/**
+ * Run a live-file mutation (rotate / compact) under the store's write-time
+ * maintenance lock (`appendOnlyStoreLockId`, the lock `maintainStoreAfterAppend`
+ * and the compaction-copy recovery take), so a parked rewrite never
+ * interleaves with another one. A busy store is skipped this sweep (returns
+ * false) — the next sweep retries.
+ */
+function withStoreLock(livePath: string, timeoutMs: number, fn: () => void): boolean {
+  try {
+    withLockSync(appendOnlyStoreLockId(livePath), fn, timeoutMs);
+    return true;
+  } catch (err) {
+    if (!(err instanceof Error) || !err.message.startsWith('[LOCK_TIMEOUT]')) throw err;
+    logger.warn(
+      `[JANITOR] store maintenance skipped — another writer holds the store lock | next: none, the next sweep retries | evidence: ${repoRelativePosix(livePath)} (waited ${timeoutMs}ms)`
+    );
+    return false;
+  }
+}
+
+/**
+ * Archive expired segments of the hash-chained system ledger, oldest first
+ * in chain order (stamp, then numeric suffix — ledger.ts ordering), stopping
+ * at the first segment that has not expired so the remaining segments stay
+ * a contiguous suffix of the chain. The newest segment is never archived (it
+ * may carry the chain tail while the live file is empty). After each move a
+ * keyed LEDGER_SEGMENT_ARCHIVED receipt goes on the live ledger — the proof
+ * verification needs to accept a chain that starts at a segment marker.
+ * Segments are only ever archived, never deleted.
+ */
+function archiveExpiredLedgerSegments(
+  livePath: string,
+  entry: RetentionCatalogEntry,
+  ttlMs: number,
+  nowMs: number,
+  dryRun: boolean,
+  result: SweepAppendOnlyStoresResult
+): void {
+  const segments = listLedgerSegments(livePath).slice(0, -1);
+  const archiveEntry: RetentionCatalogEntry = { ...entry, action: 'archive' };
+  for (const segmentPath of segments) {
+    if (nowMs - safeStat(segmentPath).mtimeMs <= ttlMs) break;
+    result.segmentsExpired.push(segmentPath);
+    if (dryRun) continue;
+    const lastHash = ledgerSegmentLastHash(segmentPath);
+    const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
+    expireFilePerPolicy(segmentPath, archiveEntry, outcome);
+    result.segmentsArchived.push(...outcome.archived);
+    recordLedgerSegmentArchived({
+      segment: segmentPath,
+      last_hash: lastHash,
+      archive_path: `${ARCHIVE_REPO_SUBPATH}/${repoRelativePosix(segmentPath)}`,
+    });
+  }
+}
+
 export function sweepAppendOnlyStores(opts: {
   dryRun: boolean;
   catalog?: LoadedRetentionCatalog;
   now?: Date;
+  /** Wait for a busy store's maintenance lock (default {@link JANITOR_STORE_LOCK_TIMEOUT_MS}). */
+  lockTimeoutMs?: number;
 }): SweepAppendOnlyStoresResult {
+  const lockTimeoutMs = opts.lockTimeoutMs ?? JANITOR_STORE_LOCK_TIMEOUT_MS;
   const catalog = opts.catalog ?? loadRetentionCatalog();
   const now = opts.now ?? new Date();
   const nowMs = now.getTime();
@@ -932,7 +1008,16 @@ export function sweepAppendOnlyStores(opts: {
       if (entry.action === 'rotate') {
         // Expire aged segments first — they age by mtime even when the live
         // file never does.
-        if (entry.ttl_days !== undefined) {
+        if (entry.ttl_days !== undefined && entry.path === SYSTEM_LEDGER_REPO_PATH) {
+          archiveExpiredLedgerSegments(
+            livePath,
+            entry,
+            entry.ttl_days * RETENTION_DAY_MS,
+            nowMs,
+            opts.dryRun,
+            result
+          );
+        } else if (entry.ttl_days !== undefined) {
           const stem = rotatedSegmentStem(livePath);
           const dir = nodePath.dirname(livePath);
           const segmentOutcome: ExpiryOutcome = {
@@ -972,8 +1057,20 @@ export function sweepAppendOnlyStores(opts: {
         const stat = safeStat(livePath);
         const threshold = entry.rotate_min_bytes ?? DEFAULT_ROTATE_MIN_BYTES;
         if (stat.size > 0 && stat.size >= threshold) {
+          if (opts.dryRun) {
+            result.rotated.push(livePath);
+            continue;
+          }
+          let segmentPath: string | null = null;
+          if (
+            !withStoreLock(
+              livePath,
+              lockTimeoutMs,
+              () => (segmentPath = rotateStore(livePath, { now }))
+            )
+          )
+            continue;
           result.rotated.push(livePath);
-          const segmentPath = opts.dryRun ? null : rotateStore(livePath, { now });
           if (segmentPath) {
             appendRetentionAudit({
               event: 'RETENTION_ROTATE',
@@ -1000,20 +1097,27 @@ export function sweepAppendOnlyStores(opts: {
         const { records, distinctKeys } = analyzeStoreKeys(livePath, keyField);
         if (distinctKeys === records) continue; // nothing to fold
 
-        result.compacted.push(livePath);
-        if (!opts.dryRun) {
-          compactAppendOnlyFile(livePath, entry, keyField, now);
-          appendRetentionAudit({
-            event: 'RETENTION_COMPACT',
-            path: repoRelativePosix(livePath),
-            compact_key: keyField,
-            size_before_bytes: stat.size,
-            policy_path: entry.path,
-            artifact_class: entry.artifact_class,
-            policy_ref: RETENTION_CATALOG_REPO_PATH,
-            reason: 'versioned keyed store exceeded compact_min_bytes (storage janitor)',
-          });
+        if (opts.dryRun) {
+          result.compacted.push(livePath);
+          continue;
         }
+        if (
+          !withStoreLock(livePath, lockTimeoutMs, () =>
+            compactAppendOnlyFile(livePath, entry, keyField, now)
+          )
+        )
+          continue;
+        result.compacted.push(livePath);
+        appendRetentionAudit({
+          event: 'RETENTION_COMPACT',
+          path: repoRelativePosix(livePath),
+          compact_key: keyField,
+          size_before_bytes: stat.size,
+          policy_path: entry.path,
+          artifact_class: entry.artifact_class,
+          policy_ref: RETENTION_CATALOG_REPO_PATH,
+          reason: 'versioned keyed store exceeded compact_min_bytes (storage janitor)',
+        });
       }
     } catch (err) {
       // One bad entry must not abort the pass — report and continue.

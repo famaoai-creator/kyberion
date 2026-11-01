@@ -6,6 +6,7 @@ import {
   recoverCompactionCopies,
   resolveRecoveryStorePath,
   STALE_COMPACTION_COPY_MS,
+  WRITER_COMPACTION_LOCKS,
 } from './compaction-copy-recovery.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { pathResolver } from './path-resolver.js';
@@ -159,6 +160,38 @@ describe('compaction-copy recovery', () => {
     });
     expect(copiesOnDisk()).toHaveLength(1);
     expect(read(STORE_REL)).toEqual(['{"id":"live"}']);
+  });
+
+  it("waits for the dot wake ledger's own compaction lock", () => {
+    const fixture = { rootDir: pathResolver.rootResolve(`${ROOT_REL}/fixture`) };
+    const dotRel = 'active/shared/runtime/dot-wake-ledger.jsonl';
+    const fixtureLocation = { ...fixture, roots: ['active/shared/runtime'] };
+    const dotCopy = `${dotRel}.compacting-t000000000000001-000000-1-initial`;
+    const inFixture = (rel: string) => `${ROOT_REL}/fixture/${rel}`;
+    safeMkdir(path.dirname(pathResolver.rootResolve(inFixture(dotRel))), { recursive: true });
+    write(inFixture(dotCopy), ['{"id":"old"}']);
+    write(inFixture(dotRel), ['{"id":"live"}']);
+    expect(WRITER_COMPACTION_LOCKS[dotRel]).toBe('dot-wake-ledger-compact');
+    withLockSync('dot-wake-ledger-compact', () => {
+      expect(() =>
+        recoverCompactionCopies(dotRel, [dotCopy], {
+          ...fixtureLocation,
+          now: later(),
+          lockTimeoutMs: 1,
+          audit: (record) => audits.push(record),
+        })
+      ).toThrow(/LOCK_TIMEOUT.*dot-wake-ledger-compact/);
+    });
+    expect(read(inFixture(dotCopy))).toEqual(['{"id":"old"}']);
+    // Released: the merge runs.
+    expect(
+      recoverCompactionCopies(dotRel, [dotCopy], {
+        ...fixtureLocation,
+        now: later(),
+        audit: (record) => audits.push(record),
+      }).outcome
+    ).toBe('merged');
+    expect(read(inFixture(dotRel))).toEqual(['{"id":"old"}', '{"id":"live"}']);
   });
 
   it('refuses --path outside the store roots or naming a copy', () => {
