@@ -45,6 +45,21 @@ describe('check_runtime_store_whole_read', () => {
     expect(sites.map((site) => site.line)).toEqual([2, 3, 4, 5]);
   });
 
+  it('resolves renamed imports of the tracked readers', () => {
+    const sites = findWholeStoreReads(
+      'd.ts',
+      lines(
+        "import { readJsonLines as rjl, streamJsonLines as sjl } from '@agent/core';",
+        "import { safeReadFile as srf } from '@agent/core/secure-io';",
+        "const P = 'active/shared/runtime/x.jsonl';",
+        'const rows = rjl<Row>(P);',
+        'for (const r of sjl(P)) use(r);',
+        "const parts = String(srf(P)).split('\\n');"
+      )
+    );
+    expect(sites.map((site) => site.line)).toEqual([4, 6]);
+  });
+
   it('ignores strings, comments, purpose readers, split in non-jsonl files and split-later', () => {
     expect(
       findWholeStoreReads(

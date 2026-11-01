@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { streamJsonLines } from '../jsonl-read.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
@@ -15,6 +15,7 @@ import {
   isDotWakeChannel,
   dotInboxPath,
   dotInboxRowWakesCharter,
+  setDotInboxTestHooks,
 } from './dot-inbox.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-inbox-tests';
@@ -22,6 +23,7 @@ const appendDotInboxEntry = (input: DotInboxEntryInput, deps?: DotInboxAppendDep
   appendScopedDotInboxEntry({ ...input, scope: input.scope ?? { tier: 'public' } }, deps);
 
 afterEach(() => {
+  setDotInboxTestHooks({});
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -335,5 +337,66 @@ describe('compactDotInbox', () => {
       expect(after[i]).toBe(line);
       if (line.trim()) expect(dotInboxWakeKey(i + 1, after[i]!)).toBe(oldKeys.get(i + 1));
     });
+  });
+  it('never overwrites a row appended mid-compaction — aborts and keeps it', () => {
+    appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'pending' },
+      { rootDir: TEST_ROOT }
+    );
+    appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'consumed' },
+      { rootDir: TEST_ROOT }
+    );
+    const before = (safeReadFile(inbox(TEST_ROOT)) as string).split('\n');
+    safeWriteFile(
+      ledger(TEST_ROOT),
+      JSON.stringify({
+        dot_id: 'repo-guardian',
+        trigger_key: dotInboxWakeKey(2, before[1]!),
+        outcome: 'delivered',
+        fired_at: new Date().toISOString(),
+      }) + '\n'
+    );
+    safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/dots/dot.json`, JSON.stringify(CHARTER) + '\n');
+    // A writer outside the lock lands a wake after the audit, before the move.
+    setDotInboxTestHooks({
+      beforeCompactMove: (file) =>
+        appendJsonLine(file, {
+          channel: 'inbox',
+          dot_id: 'repo-guardian',
+          text: 'late',
+          scope: { tier: 'public' },
+        }),
+    });
+    expect(() => compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 })).toThrow(
+      /grew during compaction/
+    );
+    const after = readJsonLines<{ text?: string }>(inbox(TEST_ROOT));
+    expect(after.map((r) => r.text)).toEqual(['pending', 'consumed', 'late']);
+
+    // Through the append path (compaction after the locked append): the wake survives too.
+    setDotInboxTestHooks({
+      beforeCompactMove: (file) =>
+        appendJsonLine(file, {
+          channel: 'inbox',
+          dot_id: 'repo-guardian',
+          text: 'late-2',
+          scope: { tier: 'public' },
+        }),
+    });
+    appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'plain' },
+      { rootDir: TEST_ROOT, compactMinBytes: 1 }
+    );
+    expect(readJsonLines<{ text?: string }>(inbox(TEST_ROOT)).map((r) => r.text)).toEqual([
+      'pending',
+      'consumed',
+      'late',
+      'plain',
+      'late-2',
+    ]);
+    setDotInboxTestHooks({});
+    expect(compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 }).tombstoned).toBe(1);
   });
 });

@@ -212,12 +212,12 @@ export function appendDotInboxEntry(
     { allowMissingLeaf: true }
   );
   safeMkdir(path.dirname(filePath), { recursive: true });
+  const lock = dotInboxLockId(filePath);
   if (idempotencyKey) {
     // The inbox row is the delivery receipt. Keep lookup and append under one
     // file-scoped lock so a retry after an uncertain append returns that receipt
     // rather than emitting a second wake. A parseable matching row with an
     // invalid timestamp is unreadable evidence and still fails closed.
-    const lock = `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
     const result = withLockSync(lock, () => {
       let exists = true;
       try {
@@ -252,9 +252,38 @@ export function appendDotInboxEntry(
     if (appended) maybeCompactDotInbox(filePath, { ...deps, scope });
     return result;
   }
-  appendJsonLine(filePath, entry);
+  // Plain appends take the inbox lock too, so compaction (which rewrites the
+  // file under this lock) can never overwrite a row appended mid-rewrite.
+  // Compaction runs after the release, so the lock is never re-entered. A lock
+  // timeout must not fail the append (P3): append unlocked — compaction
+  // re-checks the live size right before its move and aborts if it grew.
+  try {
+    withLockSync(lock, () => appendJsonLine(filePath, entry));
+  } catch (error) {
+    if (!String((error as Error)?.message).includes('[LOCK_TIMEOUT]')) throw error;
+    logger.warn(
+      `[DOT_INBOX] inbox lock busy — appending without it | next: compaction's pre-move size check protects this row | evidence: ${(error as Error).message}`
+    );
+    appendJsonLine(filePath, entry);
+  }
   maybeCompactDotInbox(filePath, { ...deps, scope });
   return entry;
+}
+
+function dotInboxLockId(filePath: string): string {
+  return `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
+}
+
+/** Test seams for the inbox compaction. */
+export interface DotInboxTestHooks {
+  /** Runs after the audit, right before the size re-check and the move. */
+  beforeCompactMove?: (filePath: string) => void;
+}
+let inboxTestHooks: DotInboxTestHooks = {};
+
+/** Test seam: install compaction hooks; call with `{}` to reset. */
+export function setDotInboxTestHooks(hooks: DotInboxTestHooks): void {
+  inboxTestHooks = { ...hooks };
 }
 
 /**
@@ -382,8 +411,7 @@ export function compactDotInbox(deps: DotInboxAppendDeps = {}): DotInboxCompactR
   const compactMinBytes = deps.compactMinBytes ?? DOT_INBOX_COMPACT_MIN_BYTES;
   if (!safeExistsSync(filePath)) return empty;
 
-  const lockId = `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
-  return withLockSync(lockId, () => {
+  return withLockSync(dotInboxLockId(filePath), () => {
     const bytesBefore = safeStat(filePath).size;
     if (bytesBefore < compactMinBytes) return { ...empty, bytes_before: bytesBefore };
 
@@ -505,6 +533,15 @@ export function compactDotInbox(deps: DotInboxAppendDeps = {}): DotInboxCompactR
       live.return(undefined);
       if (drift || oversized) {
         throw new Error('[DOT_INBOX] tombstone audit detected positional drift — rolled back');
+      }
+      inboxTestHooks.beforeCompactMove?.(filePath);
+      // A row appended outside the lock after the audit would be overwritten
+      // by the move: abort instead (the live file is untouched; next pass retries).
+      const bytesNow = safeStat(filePath).size;
+      if (bytesNow !== bytesBefore) {
+        throw new Error(
+          `[DOT_INBOX] inbox grew during compaction (${bytesBefore} -> ${bytesNow} bytes) — rolled back`
+        );
       }
       safeMoveSync(staging, filePath);
     } finally {
