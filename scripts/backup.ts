@@ -142,7 +142,7 @@ function usage(): string {
     '  pnpm backup restore <archive.tar.gz.enc|archive.tar.gz> --target <clean-root> [--scope all|mission|tenant] [--tenant <slug>] [--verify-baseline] [--force]',
     '  pnpm backup list [--dir <backup-dir>]',
     '  pnpm backup prune [--dir <backup-dir>] [--retain-daily 7] [--retain-weekly 4]',
-    '  pnpm backup drill [--archive <path>|--dir <backup-dir>] [--scope all|mission|tenant] [--tenant <slug>] [--target <clean-root>] [--prepare-checkout] [--verify-baseline] [--force]',
+    '  pnpm backup drill [--archive <path>|--dir <backup-dir>] [--scope all|mission|tenant] [--tenant <slug>] [--target <dir under active/shared/tmp>] [--prepare-checkout] [--verify-baseline] [--force]',
     '',
     `Sensitive scopes require --encrypt and a passphrase: ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND} (keychain), or ${DEFAULT_PASSPHRASE_ENV} / --passphrase-env as an override.`,
   ].join('\n');
@@ -1350,7 +1350,7 @@ export function restoreBackup(
   const targetRel = path.relative(pathResolver.rootDir(), target);
   if (targetRel.startsWith('..') || path.isAbsolute(targetRel)) {
     throw new Error(
-      `[BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY] restore target is outside this checkout — governed I/O cannot write or verify it | next: run pnpm backup restore from the clean checkout itself (--target .), or restore under this checkout (e.g. active/shared/tmp/<restore>) | evidence: ${target}`
+      `[BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY] restore target is outside this checkout — governed I/O cannot write or verify it | next: restore under this checkout (e.g. active/shared/tmp/<restore>), or run pnpm backup restore from inside the clean checkout you are rebuilding (its --target . restores over that checkout's state; never point a drill there) | evidence: ${target}`
     );
   }
   if (safeExistsSync(target) && safeReaddir(target).length > 0 && !options.force) {
@@ -1472,12 +1472,24 @@ export function runRestoreDrill(options: BackupCliOptions): {
       `No backup archive found for restore drill${options.backupDir ? ` in ${options.backupDir}` : ''}`
     );
   }
+  const scratchRoot = path.resolve(pathResolver.sharedTmp());
   const target = path.resolve(
-    options.target || pathResolver.sharedTmp(`backup-restore-drill-${stamp()}`)
+    options.target || path.join(scratchRoot, `backup-restore-drill-${stamp()}`)
   );
+  // A drill restores over its target and then deletes it: confine it to the
+  // scratch floor so it can never land on (or remove) live state.
+  const scratchRel = path.relative(scratchRoot, target);
+  if (!scratchRel || scratchRel.startsWith('..') || path.isAbsolute(scratchRel)) {
+    throw new Error(
+      `[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH] a restore drill target must lie under ${scratchRoot} | next: omit --target, or pass one such as active/shared/tmp/backup-restore-drill | evidence: ${target}`
+    );
+  }
   if (options.force && safeExistsSync(target)) {
     safeRmSync(target, { recursive: true, force: true });
   }
+  // Only a target this run creates is removed afterwards; an existing one the
+  // operator pointed at (without --force) is left in place.
+  const createdByDrill = !safeExistsSync(target);
   try {
     if (options.prepareCheckout) {
       safeMkdir(path.dirname(target));
@@ -1510,11 +1522,12 @@ export function runRestoreDrill(options: BackupCliOptions): {
       restoredManifestCount: findRestoredManifests(result.target).length,
       quarantinePaths: result.quarantinePaths,
       credentialMembers,
-      targetRemoved: true,
+      targetRemoved: createdByDrill,
     };
   } finally {
-    // The restored copy is plaintext personal / confidential state: never left behind.
-    safeRmSync(target, { recursive: true, force: true });
+    // The restored copy is plaintext personal / confidential state: never
+    // left behind when this run created it.
+    if (createdByDrill) safeRmSync(target, { recursive: true, force: true });
   }
 }
 
