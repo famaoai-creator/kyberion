@@ -57,6 +57,93 @@ describe('checkDraft', () => {
   });
 });
 
+describe('processor delegation pre-check', () => {
+  const validScope = {
+    approved_processors: 'claude',
+    processing_purposes: 'customer_service',
+    processing_categories: 'routine_business',
+  };
+
+  it.each([
+    { approved_processors: 'INVALID!' },
+    { approved_processors: 'Uppercase' },
+    { approved_processors: 'a'.repeat(129) },
+    { approved_processors: Array.from({ length: 21 }, (_, i) => 'p' + i).join(',') },
+    { processing_purposes: 'not/a/purpose' },
+    { processing_purposes: 'a'.repeat(129) },
+    { processing_purposes: Array.from({ length: 21 }, (_, i) => 'purpose' + i).join(',') },
+    { processing_categories: 'not_a_category' },
+    { processing_categories: 'routine_business,NOT_VALID' },
+    { approved_processors: '', processing_purposes: 'purpose', processing_categories: '' },
+    { approved_processors: '', processing_purposes: '', processing_categories: 'personal_data' },
+    {
+      approved_processors: '',
+      processing_purposes: 'purpose',
+      processing_categories: 'personal_data',
+    },
+    { approved_processors: 'claude', processing_purposes: '', processing_categories: '' },
+    { approved_processors: 'claude', processing_purposes: 'purpose', processing_categories: '' },
+    {
+      approved_processors: 'claude',
+      processing_purposes: '',
+      processing_categories: 'personal_data',
+    },
+  ])('rejects invalid or incomplete scope %j', (over) => {
+    expect(checkDraft(draft({ ...validScope, ...over }))).toEqual({
+      ok: false,
+      reason: 'processor',
+    });
+  });
+
+  it('allows an empty or separator-only scope', () => {
+    expect(checkDraft(draft())).toEqual({ ok: true });
+    expect(
+      checkDraft(
+        draft({
+          approved_processors: ' , 、\n',
+          processing_purposes: ' , 、\n',
+          processing_categories: ' , 、\n',
+        })
+      )
+    ).toEqual({ ok: true });
+  });
+
+  it('accepts boundary-length IDs, all categories and the server list limits', () => {
+    expect(
+      checkDraft(
+        draft({
+          approved_processors: Array.from({ length: 20 }, (_, i) => 'p' + i).join(','),
+          processing_purposes: Array.from({ length: 20 }, (_, i) => 'purpose' + i).join(','),
+          processing_categories: 'routine_business,personal_data,sensitive_business,unknown',
+        })
+      )
+    ).toEqual({ ok: true });
+    expect(
+      checkDraft(
+        draft({
+          ...validScope,
+          approved_processors: 'a'.repeat(128),
+          processing_purposes: 'a'.repeat(128),
+        })
+      )
+    ).toEqual({ ok: true });
+  });
+
+  it('checks the same deduplicated list and separators sent to the API', () => {
+    const input = draft({
+      approved_processors: Array(25).fill('claude').join('、'),
+      processing_purposes: 'customer_service, analysis:quote\nreasoning-v2',
+      processing_categories: 'routine_business personal_data,unknown',
+    });
+    expect(checkDraft(input)).toEqual({ ok: true });
+    expect(draftToForm('acme', input)).toMatchObject({
+      approved_processors: ['claude'],
+      processing_purposes: ['customer_service', 'analysis:quote', 'reasoning-v2'],
+      processing_categories: ['routine_business', 'personal_data', 'unknown'],
+    });
+  });
+});
+
 describe('form <-> draft', () => {
   it('preserves processor delegation and risk appetite through amendments and proposals', () => {
     const scope = {
