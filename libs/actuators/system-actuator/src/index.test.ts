@@ -345,6 +345,8 @@ const listChromeTabs = vi.fn(() => [
 ]);
 const activateChromeTabByTitle = vi.fn((title: string) => ({ matched: title === 'Docs' }));
 const activateChromeTabByUrl = vi.fn((url: string) => ({ matched: url === 'docs.example' }));
+const getFrontmostApplicationName = vi.fn(() => '');
+const getActiveChromeTab = vi.fn(() => ({ title: 'Docs', url: 'https://docs.example' }));
 const closeChromeTabByTitle = vi.fn((title: string) => ({ matched: title === 'Docs' }));
 const closeChromeTabByUrl = vi.fn((url: string) => ({ matched: url === 'docs.example' }));
 const emptyFinderTrash = vi.fn();
@@ -1161,6 +1163,8 @@ vi.mock('@agent/core/virtual/os-automation', () => ({
   listKnownAppCapabilities,
   listTerminalTargets,
   listChromeTabs,
+  getFrontmostApplicationName,
+  getActiveChromeTab,
   activateChromeTabByTitle,
   activateChromeTabByUrl,
   closeChromeTabByTitle,

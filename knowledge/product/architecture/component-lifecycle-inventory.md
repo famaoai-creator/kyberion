@@ -17,7 +17,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - Rule: If a component should be discoverable by the CLI or governance layer, it needs a `manifest.json`.
 
 - `agent-actuator`: Meta-Actuator for Agent Lifecycle and A2A (7 ops, v1.1.0, schema knowledge/product/schemas/agent-action.schema.json)
-- `android-actuator`: Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search) (1 ops, v1.1.0, schema knowledge/product/schemas/mobile-device-pipeline.schema.json)
+- `android-actuator`: Android Device Actuator — ADB pipeline + Android CLI for AI agents (layout, screen capture/resolve, describe, docs search) (1 ops, v1.2.0, schema knowledge/product/schemas/mobile-device-pipeline.schema.json)
 - `approval-actuator`: Human approval request state transitions and decision handling (6 ops, v1.1.0, schema knowledge/product/schemas/approval-action.schema.json)
 - `artifact-actuator`: Governed Artifact and Delivery Pack Manager (4 ops, v1.0.0, schema knowledge/product/schemas/artifact-action.schema.json)
 - `blockchain-actuator`: Local Ledger Anchoring Simulation (3 ops, v1.1.0, schema knowledge/product/schemas/blockchain-action.schema.json)
@@ -31,7 +31,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `email-actuator`: Adapter-based email composition and sending with selectable macOS Mail.app (JXA) and SMTP backends (3 ops, v1.2.0, schema libs/actuators/email-actuator/schemas/email-action.schema.json)
 - `file-actuator`: Generic File-Actuator for Kyberion (1 ops, v1.1.0, schema knowledge/product/schemas/file-pipeline.schema.json)
 - `ingest-actuator`: DA-03/DA-04/DA-05 ingest pipeline: unstructured internal documents (docx/pdf/xlsx/html/slack threads) into governed knowledge cards — incremental sync_source change-listing (watermark store), parse/normalize/dedup capture-transforms, plus the explicit ingest:commit ceremony (Hybrid Sovereign Ledger asset records, supersede, staleness detection) (7 ops, v1.2.0)
-- `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.1.0, schema knowledge/product/schemas/mobile-device-pipeline.schema.json)
+- `ios-actuator`: simctl-driven iOS Simulator Actuator (1 ops, v1.2.0, schema knowledge/product/schemas/mobile-device-pipeline.schema.json)
 - `media-actuator`: Document and asset generation engine. Reads pdf/pptx/docx/xlsx with the native engines (document_digest, pdf_extract, pptx_slide_text, docx_extract, xlsx_extract; opt-in local OCR for embedded images) and includes pptx_filter_slides for template-inheriting partial-update workflows. (1 ops, v1.3.0, schema knowledge/product/schemas/media-pipeline.schema.json)
 - `media-generation-actuator`: Generative image, video, music, and screen capture actuator (16 ops, v1.4.0, schema knowledge/product/schemas/media-generation-action.schema.json)
 - `meeting-actuator`: Layered online-meeting bridge: session transport (Zoom/Teams/Meet join-leave-speak-listen-chat-status) plus intelligence (action items, facilitation, reminders), target resolution, and guided dialogue. Single-op `{ op, params }`, legacy `{ action, params }`, and pipeline envelopes are all accepted. (19 ops, v1.4.0, schema knowledge/product/schemas/meeting-action.schema.json)

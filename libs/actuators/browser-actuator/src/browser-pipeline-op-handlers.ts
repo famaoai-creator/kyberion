@@ -46,6 +46,23 @@ import type {
  * browser-pipeline-helpers.ts (avoids a runtime import cycle; handler bodies
  * use them by their original names via destructuring).
  */
+/**
+ * Postcondition readback for fills: compare the element's live value with the
+ * intended text. Returns undefined when the read is unsupported (select,
+ * contenteditable, detached element) — never reports a value it did not read.
+ */
+async function readbackFillValue(
+  page: { inputValue: (selector: string) => Promise<string> },
+  selector: string,
+  expected: string
+): Promise<boolean | undefined> {
+  try {
+    return (await page.inputValue(selector)) === expected;
+  } catch {
+    return undefined;
+  }
+}
+
 export interface BrowserOpSupport {
   buildRetryOptions: typeof buildRetryOptions;
   distillDomInventory: typeof distillDomInventory;
@@ -753,12 +770,14 @@ const RAW_APPLY_HANDLERS: Record<string, BrowserApplyOpHandler> = {
         timeout: params.timeout || 5000,
       });
     }, buildRetryOptions(params));
+    const verified = await readbackFillValue(page, selector, String(text ?? ''));
     return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
       kind: 'apply',
       op: 'fill_ref',
       tab_id: runtime.activeTabId,
       ref,
       selector,
+      ...(verified !== undefined ? { verified } : {}),
       ...(secretKey
         ? {
             classification: 'secret_ref' as const,
@@ -797,12 +816,14 @@ const RAW_APPLY_HANDLERS: Record<string, BrowserApplyOpHandler> = {
       async () => page.fill(selector, secret, { timeout: params.timeout || 5000 }),
       buildRetryOptions(params)
     );
+    const verified = await readbackFillValue(page, selector, secret);
     return browserRuntimeHelpers.recordBrowserAction(resolvedCtx, {
       kind: 'apply',
       op: 'fill_secret_ref',
       tab_id: runtime.activeTabId,
       ref,
       selector,
+      ...(verified !== undefined ? { verified } : {}),
       secret_ref: secretKey,
       classification: 'secret_ref',
       dom_path: recordedSecretDomPath(params, selector),

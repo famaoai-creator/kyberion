@@ -38,6 +38,18 @@ export function activateApplication(application: string) {
   ]);
 }
 
+/** Postcondition read: which app is frontmost after an activate dispatch. */
+export function getFrontmostApplicationName(): string {
+  if (!isDarwin()) return '';
+  try {
+    return runAppleScript(
+      'tell application "System Events" to get name of first application process whose frontmost is true'
+    );
+  } catch {
+    return '';
+  }
+}
+
 export function detectFocusedInput(): FocusedInputState {
   return getMacOSFocusedInput();
 }
