@@ -3729,6 +3729,16 @@
       "group": "operate"
     },
     {
+      "id": "script.storage.recover-compaction-copies",
+      "module": "scripts/storage_recover_compaction_copies.ts",
+      "command": "storage recover-compaction-copies",
+      "noun": "storage",
+      "verb": "recover-compaction-copies",
+      "audience": "operator",
+      "description": "cli_cmd_script_storage_recover_compaction_copies",
+      "group": "operate"
+    },
+    {
       "id": "script.scheduler.uninstall",
       "module": "scripts/install_chronos_launchd.ts",
       "args": ["--uninstall"],

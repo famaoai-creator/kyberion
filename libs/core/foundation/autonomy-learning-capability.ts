@@ -24,10 +24,9 @@ export function autonomyLearningCapability(
   ) {
     throw new Error('[RESOURCE_SCOPE_INVALID] Invalid autonomy store directory');
   }
-  const files = [
-    directory + '/autonomy-outcomes.jsonl',
-    directory + '/autonomy-action-overrides.json',
-  ];
+  const outcomes = directory + '/autonomy-outcomes.jsonl';
+  const files = [outcomes, directory + '/autonomy-action-overrides.json'];
+  const archive = directory + '/compaction-archive';
   return {
     tenantSlug,
     readExact: files,
@@ -36,6 +35,17 @@ export function autonomyLearningCapability(
       path.posix.dirname(path.posix.dirname(directory)),
       path.posix.dirname(directory),
       directory,
+      archive,
+    ],
+    // Write-time window retention of the outcomes ledger only
+    // (libs/core/append-only-store.ts rewriteParked): its parked staging
+    // copies, its two publish temp names, and its sibling compaction archive.
+    // The store lock stays outside this capability, under the caller.
+    namePrefixExact: [
+      outcomes + '.compacting-',
+      outcomes + '.compact-out-',
+      outcomes + '.compact-restore-',
+      archive + '/',
     ],
   };
 }
@@ -57,7 +67,8 @@ export function isAutonomyLearningCapability(scope: ResourceAccessScope | undefi
     return (
       JSON.stringify(scope.readExact) === JSON.stringify(expected.readExact) &&
       JSON.stringify(scope.writeExact) === JSON.stringify(expected.writeExact) &&
-      JSON.stringify(scope.mkdirExact) === JSON.stringify(expected.mkdirExact)
+      JSON.stringify(scope.mkdirExact) === JSON.stringify(expected.mkdirExact) &&
+      JSON.stringify(scope.namePrefixExact ?? []) === JSON.stringify(expected.namePrefixExact ?? [])
     );
   } catch {
     return false;
