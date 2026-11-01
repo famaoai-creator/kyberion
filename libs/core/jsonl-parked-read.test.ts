@@ -1,6 +1,21 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
+
+/** Fake mtimes for legacy-name ordering (no real-time sleep). */
+const mtimeOverride = vi.hoisted(() => new Map<string, number>());
+
+vi.mock('./secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./secure-io.js')>();
+  return {
+    ...actual,
+    safeStat: (filePath: string) => {
+      const stat = actual.safeStat(filePath);
+      const fake = mtimeOverride.get(path.basename(filePath));
+      return fake === undefined ? stat : Object.assign(stat, { mtimeMs: fake });
+    },
+  };
+});
 
 import { sharedTmp } from './path-resolver.js';
 import {
@@ -35,6 +50,7 @@ describe('jsonl-parked-read', () => {
   });
 
   afterEach(() => {
+    mtimeOverride.clear();
     setAppendOnlyStoreTestHooks({});
     safeRmSync(dir, { recursive: true, force: true });
   });
@@ -142,7 +158,7 @@ describe('jsonl-parked-read', () => {
     expect(Object.fromEntries(latest)).toEqual({ task: 2, other: 1 });
   });
 
-  it('orders parked copies by their park stamp across processes, then legacy copies by mtime', async () => {
+  it('orders parked copies by their park stamp across processes, then legacy copies by mtime', () => {
     // Stamped names: time first, pid last — a newer copy from a lower pid sorts after.
     safeWriteFile(
       `${live}.compacting-t000000000000002-000000-1-initial`,
@@ -158,7 +174,8 @@ describe('jsonl-parked-read', () => {
     safeMkdir(dir, { recursive: true });
     // Legacy `<pid>-<n>` copies from two pids tie on n: the older write goes first.
     safeWriteFile(`${live}.compacting-9-0-initial`, `${JSON.stringify({ id: 'a', v: 1 })}\n`);
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    mtimeOverride.set('store.jsonl.compacting-9-0-initial', 1_000);
+    mtimeOverride.set('store.jsonl.compacting-1-0-initial', 2_000);
     safeWriteFile(`${live}.compacting-1-0-initial`, `${JSON.stringify({ id: 'a', v: 2 })}\n`);
     expect([...streamJsonLinesAcrossCompaction<Row>(live)].map((row) => row.v)).toEqual([1, 2]);
   });
