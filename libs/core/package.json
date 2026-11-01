@@ -2656,6 +2656,10 @@
       "types": "./dist/local-ipc.d.ts",
       "default": "./dist/local-ipc.js"
     },
+    "./windows-named-pipe-security": {
+      "types": "./dist/windows-named-pipe-security.d.ts",
+      "default": "./dist/windows-named-pipe-security.js"
+    },
     "./locale": {
       "types": "./dist/locale.d.ts",
       "default": "./dist/locale.js"

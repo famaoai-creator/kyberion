@@ -10,6 +10,7 @@ import { pathResolver } from './path-resolver.js';
 import { safeMkdir, safeUnlinkSync, safeExistsSync } from './secure-io.js';
 import { ToolRepeatAdvisor, type ToolRepeatObservation } from './tool/tool-repeat-advisor.js';
 import { isWindowsNamedPipeAddress, resolveLocalIpcAddress } from './local-ipc.js';
+import { restrictWindowsNamedPipeAcl } from './windows-named-pipe-security.js';
 
 export const PROGRAMMATIC_TOOL_SANDBOX_ALLOWLIST = [
   'system:read_file',
@@ -252,6 +253,7 @@ export async function executeProgrammaticToolCall(
   safeMkdir(socketDir, { recursive: true });
   const socketPath = resolveLocalIpcAddress(path.join(socketDir, `${token}.sock`));
   const server = net.createServer();
+  let ipcReady = false;
   let connection: net.Socket | undefined;
   let callCount = 0;
   const repeatAdvisor = new ToolRepeatAdvisor();
@@ -263,6 +265,10 @@ export async function executeProgrammaticToolCall(
   });
 
   server.on('connection', (socket) => {
+    if (!ipcReady) {
+      socket.destroy();
+      return;
+    }
     if (connection) {
       socket.destroy();
       return;
@@ -362,7 +368,15 @@ export async function executeProgrammaticToolCall(
 
   const listenPromise = new Promise<void>((resolve, reject) => {
     server.once('error', reject);
-    server.listen(socketPath, resolve);
+    server.listen(socketPath, async () => {
+      try {
+        await restrictWindowsNamedPipeAcl(socketPath);
+        ipcReady = true;
+        resolve();
+      } catch (error) {
+        reject(error);
+      }
+    });
   });
   let child: ChildProcess | undefined;
   let stdout = '';
