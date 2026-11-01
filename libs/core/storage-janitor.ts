@@ -850,6 +850,10 @@ export function listUncoveredEventStoreDirs(catalog?: LoadedRetentionCatalog): s
  *    kept verbatim). The pre-compaction file is first copied under
  *    `active/archive/jsonl-compaction/<repo-rel>.<stamp>.jsonl`, then the
  *    live file is rewritten through safeWriteFile's atomic temp+rename.
+ *  - `self_managed: true` (either action): the writer owns live-file
+ *    retention under its own lock (the trigger journal's 7-day dedupe
+ *    window), so the janitor never rotates or compacts the live file and
+ *    only expires already-rotated segments by `ttl_days`.
  *
  * Every mutation emits a RETENTION_ROTATE / RETENTION_COMPACT / segment
  * expiry record to the retention audit log. Nothing here deletes the live
@@ -961,6 +965,9 @@ export function sweepAppendOnlyStores(opts: {
           result.segmentsArchived.push(...segmentOutcome.archived);
         }
 
+        // The writer owns the live file (e.g. the trigger journal's dedupe
+        // window): rotating it here would drop history the writer depends on.
+        if (entry.self_managed) continue;
         if (!safeExistsSync(livePath)) continue;
         const stat = safeStat(livePath);
         const threshold = entry.rotate_min_bytes ?? DEFAULT_ROTATE_MIN_BYTES;
@@ -983,6 +990,7 @@ export function sweepAppendOnlyStores(opts: {
         }
       } else if (entry.action === 'compact') {
         const keyField = entry.compact_key as string; // validated at catalog load
+        if (entry.self_managed) continue; // the writer compacts inline
         if (!safeExistsSync(livePath)) continue;
         const stat = safeStat(livePath);
         const threshold = entry.compact_min_bytes ?? DEFAULT_COMPACT_MIN_BYTES;

@@ -66,6 +66,10 @@ interface RangeIo extends AuditChainIo {
   reads: string[];
   rangeReads: Array<{ file: string; position: number; length: number }>;
   failRangeFor?: string;
+  /** How a range read of `failRangeFor` fails (default EACCES). */
+  failRangeWith?: 'EACCES' | 'ENOENT' | 'SCOPE_DENIED' | 'SYMLINK';
+  /** Serve whole-file `read` from disk instead of failing it. */
+  allowWholeRead?: boolean;
 }
 
 /** Real-filesystem audit I/O with range reads; whole-file `read` is recorded. */
@@ -75,6 +79,7 @@ function rangeIo(): RangeIo {
     rangeReads: [],
     read: (file) => {
       io.reads.push(file);
+      if (io.allowWholeRead) return fs.readFileSync(file, 'utf8');
       throw new Error('File too large: whole-file read past the cap');
     },
     loadJson: <T>(file: string) => JSON.parse(fs.readFileSync(file, 'utf8')) as T,
@@ -90,9 +95,22 @@ function rangeIo(): RangeIo {
     readRange: (file, position, length) => {
       io.rangeReads.push({ file, position, length });
       if (io.failRangeFor && file.endsWith(io.failRangeFor)) {
-        throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), {
-          code: 'EACCES',
-        });
+        switch (io.failRangeWith ?? 'EACCES') {
+          case 'ENOENT':
+            // Deleted (or rotated away) between the listing and this read.
+            fs.rmSync(file, { force: true });
+            throw Object.assign(new Error(`File not found: ${file}`), { code: 'ENOENT' });
+          case 'SCOPE_DENIED':
+            throw new Error(
+              `[SECURITY] Read access denied to ${file}: [RESOURCE_SCOPE_DENIED] Resource operation is outside the request capability`
+            );
+          case 'SYMLINK':
+            throw new Error(`[SECURITY] Refusing to read symbolic link: ${file}`);
+          default:
+            throw Object.assign(new Error(`EACCES: permission denied, open '${file}'`), {
+              code: 'EACCES',
+            });
+        }
       }
       const fd = fs.openSync(file, 'r');
       try {
@@ -240,6 +258,80 @@ describe('audit-chain — size-independent append and seed', () => {
     io.failRangeFor = undefined;
     next.restore();
     expect(fs.statSync(auditFile('2026-07-02')).size).toBe(day2Size);
+  });
+
+  // Review R2 (3b): a daily file deleted or rotated between the listing and
+  // the read is absent, not unreadable — it must not block every append.
+  it('treats a daily file that vanished before its read as absent', async () => {
+    const io = rangeIo();
+    const first = await freshChain(new Date('2026-07-01T10:00:00.000Z'), io);
+    const older = first.auditChain.record(event('day-1'));
+    first.restore();
+    // Listed, but gone by the time it is read (the size probe still saw it).
+    fs.writeFileSync(auditFile('2026-07-02'), '{"id":"AUD-ROTATED-AWAY"}\n');
+
+    io.failRangeFor = 'audit-2026-07-02.jsonl';
+    io.failRangeWith = 'ENOENT';
+    const next = await freshChain(new Date('2026-07-01T11:00:00.000Z'), io);
+    const after = next.auditChain.record(event('after-race'));
+    next.restore();
+    expect(after.previousHash).toBe(older.currentHash);
+    expect(readEntries('2026-07-01').map((entry) => entry.id)).toEqual([older.id, after.id]);
+  });
+
+  // Review R2 (3c): lines but no readable record in the newest file must take
+  // the loud fail-safe, never silently chain from an older file.
+  it('refuses to append when the newest daily file holds only junk lines', async () => {
+    const io = rangeIo();
+    const first = await freshChain(new Date('2026-07-01T10:00:00.000Z'), io);
+    first.auditChain.record(event('day-1'));
+    first.restore();
+    const junk = 'not json\n{"id":"AUD-FORGED","currentHash":"ab"}\n';
+    fs.writeFileSync(auditFile('2026-07-02'), junk);
+
+    const next = await freshChain(new Date('2026-07-02T10:00:00.000Z'), io);
+    expect(() => next.auditChain.record(event('day-2'))).toThrow('[AUDIT_CHAIN_TAIL_UNREADABLE]');
+    next.restore();
+    expect(fs.readFileSync(auditFile('2026-07-02'), 'utf8')).toBe(junk);
+  });
+
+  // Review R2 (3a): a caller whose own access scope denies the seed read
+  // (narrow role, request resource ceiling) must not throw from record().
+  it('does not throw for a caller whose access scope denies the seed read, and never forks', async () => {
+    const io = rangeIo();
+    const first = await freshChain(new Date('2026-07-01T10:00:00.000Z'), io);
+    first.auditChain.record(event('day-1'));
+    first.restore();
+    const second = await freshChain(new Date('2026-07-02T10:00:00.000Z'), io);
+    second.auditChain.record(event('day-2'));
+    second.restore();
+    const day2Size = fs.statSync(auditFile('2026-07-02')).size;
+
+    io.failRangeFor = 'audit-2026-07-02.jsonl';
+    io.failRangeWith = 'SCOPE_DENIED';
+    const next = await freshChain(new Date('2026-07-02T11:00:00.000Z'), io);
+    expect(() => next.auditChain.record(event('narrow-caller'))).not.toThrow();
+    next.restore();
+    // Not chained from day 1's older hash: the write was skipped.
+    expect(fs.statSync(auditFile('2026-07-02')).size).toBe(day2Size);
+  });
+
+  // Review R2 (3a): the range reader refuses symlinks that appends follow; a
+  // symlinked daily file is read whole and the chain continues from its tail.
+  it('seeds from a symlinked daily file instead of refusing appends', async () => {
+    const io = rangeIo();
+    const first = await freshChain(new Date('2026-07-01T10:00:00.000Z'), io);
+    const tip = first.auditChain.record(event('day-1'));
+    first.restore();
+
+    io.failRangeFor = 'audit-2026-07-01.jsonl';
+    io.failRangeWith = 'SYMLINK';
+    io.allowWholeRead = true;
+    const next = await freshChain(new Date('2026-07-01T11:00:00.000Z'), io);
+    const after = next.auditChain.record(event('after'));
+    next.restore();
+    expect(after.previousHash).toBe(tip.currentHash);
+    expect(readEntries('2026-07-01').map((entry) => entry.id)).toEqual([tip.id, after.id]);
   });
 
   it('streams verification of a multi-chunk file without a whole-file read', async () => {

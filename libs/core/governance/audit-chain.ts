@@ -294,6 +294,76 @@ function auditScan(io: AuditChainIo): JsonlScanOptions {
   return { ...auditScanOptions, source: auditByteSource(io) };
 }
 
+/**
+ * A refusal by the caller's own access scope (role grant, request resource
+ * ceiling, store capability) — secure-io's governed denial, not a property of
+ * the file. OS-level errors (EACCES, EIO) carry an errno code and are not this.
+ */
+function isAccessDenial(error: unknown): boolean {
+  if ((error as NodeJS.ErrnoException | undefined)?.code) return false;
+  return /\[SECURITY\] Read access denied|\[ROLE_VIOLATION\]|_DENIED\]|_REQUIRED\]/u.test(
+    errorMessage(error)
+  );
+}
+
+/**
+ * Last record of one daily file plus the count of malformed lines skipped to
+ * reach it. The range reader refuses a symlinked daily file, which appends
+ * (and the pre-range reader) follow; such a file is read whole through `read`
+ * instead of being treated as unreadable.
+ */
+function readSeedTail(
+  io: AuditChainIo,
+  filePath: string
+): { last: AuditEntry | null; skipped: number } {
+  const scan = (options: JsonlScanOptions) => {
+    let skipped = 0;
+    const last = readLastJsonLine<AuditEntry>(filePath, {
+      ...options,
+      map: (value) => normalizePersistedAuditEntry(value),
+      onMalformed: () => {
+        skipped++;
+      },
+    });
+    return { last, skipped };
+  };
+  try {
+    return scan(auditScan(io));
+  } catch (err) {
+    if (!/Refusing to read symbolic link/u.test(errorMessage(err))) throw err;
+    const bytes = Buffer.from(io.read(filePath), 'utf8');
+    return scan({
+      ...auditScanOptions,
+      source: {
+        size: () => bytes.length,
+        readRange: (_file, position, length) => bytes.subarray(position, position + length),
+      },
+    });
+  }
+}
+
+/**
+ * {@link readSeedTail}, or undefined when the file is gone — deleted or
+ * rotated between the directory listing and the read (ENOENT, or a scan that
+ * saw it disappear). A file replaced mid-scan is read once more.
+ */
+function readSeedTailUnlessGone(
+  io: AuditChainIo,
+  filePath: string
+): { last: AuditEntry | null; skipped: number } | undefined {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return readSeedTail(io, filePath);
+    } catch (err) {
+      const code = (err as { code?: unknown } | undefined)?.code;
+      if (code === 'ENOENT') return undefined;
+      if (code !== 'JSONL_SOURCE_CHANGED') throw err;
+      if (!io.exists(filePath)) return undefined;
+      if (attempt > 0) throw err;
+    }
+  }
+}
+
 /** Numeric suffix of an `AUD-<time>-<n>` id: the writer's entry counter at that record. */
 function auditIdCounter(id: string): number | undefined {
   const match = id.match(/-(\d+)$/);
@@ -455,6 +525,8 @@ class AuditChainImpl {
   private entryCount: number = 0;
   /** Why the newest daily file could not be read at the last seed (appends refuse). */
   private seedFault: string | undefined;
+  /** Why the caller's own access scope denied the last seed read (the append is skipped). */
+  private seedDenied: string | undefined;
   private auditDir: string;
   private static readonly AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
@@ -637,6 +709,16 @@ class AuditChainImpl {
     );
     this.lastHash = nextEntry.currentHash;
 
+    if (this.seedDenied) {
+      // The caller's scope cannot read the chain tail. Its append would be
+      // denied by the same scope, or — if only the append were allowed — would
+      // chain from a stale cursor and fork; either way it is not written, the
+      // same outcome as a failed persist below (logged, record() returns).
+      logger.error(
+        `[AUDIT_CHAIN] Failed to persist ${nextEntry.id} — the caller's access scope cannot read the chain tail, so appending could fork the chain | next: record this action outside the narrow role / request scope, or grant it read on active/shared/logs/audit/ | evidence: ${this.seedDenied}`
+      );
+      return nextEntry;
+    }
     this.appendToFile(nextEntry);
     return nextEntry;
   }
@@ -913,33 +995,49 @@ class AuditChainImpl {
    * Seed the cursor from the last readable record of the newest non-empty
    * daily file — its tail only, read backward in chunks, so the cost does not
    * grow with the chain. Older files are read only while newer ones hold no
-   * record. A junk line is skipped (the writer chains from the last readable
-   * entry; verify reports the junk), but a file that cannot be read at all is
-   * never skipped: falling back to an older file would fork the chain, so the
-   * fault is logged and {@link appendUnderLock} refuses to append, like
-   * `missing_audit_chain_key`.
+   * record: a missing file (deleted or rotated between the listing and the
+   * read), an empty one, or one holding only a torn first append. A junk line
+   * after a readable entry is skipped (the writer chains from that entry;
+   * verify reports the junk). Falling back to an older file when the newest
+   * one exists but cannot be read — or holds lines but no readable record —
+   * would fork the chain, so that fault is logged and {@link appendUnderLock}
+   * refuses to append, like `missing_audit_chain_key`. A read the caller's own
+   * access scope denies is not a damaged chain: {@link appendUnderLock} skips
+   * the write (its append would be denied too, or would fork) and logs it.
    */
   private seedFromDisk(): void {
     this.seedFault = undefined;
+    this.seedDenied = undefined;
     if (!auditIo) return;
     const io = auditIo;
-    const files = this.listAuditFiles();
+    let files: string[];
+    try {
+      files = this.listAuditFiles();
+    } catch (err) {
+      if (!isAccessDenial(err)) throw err;
+      this.seedDenied = `${this.auditDir}: ${errorMessage(err)}`;
+      return;
+    }
     for (let index = files.length - 1; index >= 0; index -= 1) {
       const filePath = path.join(this.auditDir, files[index]);
-      let skipped = 0;
-      let last: AuditEntry | null;
+      let tail: { last: AuditEntry | null; skipped: number } | undefined;
       try {
-        last = readLastJsonLine<AuditEntry>(filePath, {
-          ...auditScan(io),
-          map: (value) => normalizePersistedAuditEntry(value),
-          onMalformed: () => {
-            skipped++;
-          },
-        });
+        tail = readSeedTailUnlessGone(io, filePath);
+        if (!tail) continue; // deleted or rotated away after the listing
       } catch (err) {
-        this.seedFault = `${filePath}: ${errorMessage(err)}`;
-        logger.warn(
-          `[AUDIT_CHAIN_TAIL_UNREADABLE] newest audit file cannot be read — chaining from an older file would fork the chain, so appends are refused | next: restore read access to the file or repair it, then run the audit verify | evidence: ${this.seedFault}`
+        if (isAccessDenial(err)) {
+          this.seedDenied = `${filePath}: ${errorMessage(err)}`;
+          return;
+        }
+        this.refuseSeed(`${filePath}: ${errorMessage(err)}`, 'cannot be read');
+        return;
+      }
+      const { last, skipped } = tail;
+      if (!last) {
+        if (skipped === 0) continue; // empty, or only a torn first append
+        this.refuseSeed(
+          `${filePath}: ${skipped} line(s), none a valid audit record`,
+          'holds no readable record'
         );
         return;
       }
@@ -948,12 +1046,18 @@ class AuditChainImpl {
           `[AUDIT_CHAIN] skipped ${skipped} unreadable line(s) at the tail of ${files[index]} — chaining from the last readable entry | next: run the audit verify to locate them | evidence: ${filePath}`
         );
       }
-      if (!last) continue;
       if (last.currentHash) this.lastHash = last.currentHash;
       const counter = auditIdCounter(last.id);
       if (counter !== undefined && counter > this.entryCount) this.entryCount = counter;
       return;
     }
+  }
+
+  private refuseSeed(fault: string, why: string): void {
+    this.seedFault = fault;
+    logger.warn(
+      `[AUDIT_CHAIN_TAIL_UNREADABLE] newest audit file ${why} — chaining from an older file would fork the chain, so appends are refused | next: restore read access to the file or repair it, then run the audit verify | evidence: ${fault}`
+    );
   }
 
   private listAuditFiles(): string[] {

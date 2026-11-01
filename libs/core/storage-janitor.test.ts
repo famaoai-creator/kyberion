@@ -2259,6 +2259,58 @@ describe('storage-janitor', () => {
       expect(fs.existsSync(freshSegment)).toBe(true);
     });
 
+    it('never rotates a self_managed live file over the threshold but still expires its segments', () => {
+      // MSN-STORE-BOUNDS review R2: the trigger journal's writer keeps a 7-day
+      // dedupe window; a janitor rotation would forget it and re-deliver.
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/trigger-deliveries.jsonl',
+            artifact_class: 'log',
+            action: 'rotate',
+            rotate_min_bytes: 128,
+            self_managed: true,
+            ttl_days: 30,
+          },
+        ],
+      });
+      const live = runtimeFile('trigger-deliveries.jsonl');
+      const content = `${JSON.stringify({ idempotencyKey: 'reflex:in-window' })}\n`.repeat(200);
+      writeFile(live, content);
+      const dir = path.dirname(live);
+      const oldSegment = path.join(dir, 'trigger-deliveries-20200101-000000.jsonl');
+      const freshSegment = path.join(dir, 'trigger-deliveries-29990101-000000.jsonl');
+      writeFile(oldSegment);
+      writeFile(freshSegment);
+      setMtime(oldSegment, 31 * RETENTION_DAY_MS);
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.errors).toHaveLength(0);
+      expect(result.rotated).toHaveLength(0);
+      expect(fs.readFileSync(live, 'utf8')).toBe(content);
+      expect(result.segmentsExpired).toEqual([oldSegment]);
+      expect(fs.existsSync(oldSegment)).toBe(false);
+      expect(fs.existsSync(freshSegment)).toBe(true);
+      expect(readRetentionAudit().some((r) => r.event === 'RETENTION_ROTATE')).toBe(false);
+    });
+
+    it('the shipped catalog marks the trigger journal self_managed', () => {
+      const shipped = JSON.parse(
+        fs.readFileSync(
+          path.join(
+            path.dirname(fileURLToPath(import.meta.url)),
+            '../../knowledge/product/governance/storage-retention-catalog.json'
+          ),
+          'utf8'
+        )
+      ) as { entries: Array<{ path: string; action: string; self_managed?: boolean }> };
+      const entry = shipped.entries.find(
+        (e) => e.path === 'active/shared/runtime/trigger-deliveries.jsonl'
+      );
+      expect(entry).toMatchObject({ action: 'rotate', self_managed: true });
+    });
+
     it('archives expired segments instead of deleting when segment_action is archive', () => {
       writeCatalogFile({
         version: '1.10.0',
