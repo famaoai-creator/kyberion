@@ -81,6 +81,89 @@ function repoRelativeOrNull(rootDir: string, target: string | undefined): string
   return rel;
 }
 
+/**
+ * Repo-relative roots of every sensitive-path credential rule that lies inside
+ * this checkout (e.g. `vault/secrets`, `knowledge/personal/connections`).
+ */
+export function repoCredentialRoots(
+  rootDir: string,
+  sensitiveRoots: Array<{ ruleId: string; root: string }> = listSensitivePathRoots()
+): Array<{ ruleId: string; root: string }> {
+  return sensitiveRoots.flatMap(({ ruleId, root }) => {
+    const rel = repoRelativeOrNull(rootDir, root);
+    return rel ? [{ ruleId, root: rel }] : [];
+  });
+}
+
+/** A manifest `credential_reads` record: a guarded root the backup read, and how many files. */
+export interface ManifestCredentialRead {
+  rule_id: string;
+  root: string;
+  file_count: number;
+}
+
+/** Validate a restored manifest's `credential_reads` (roots via the archive member normalizer). */
+export function parseManifestCredentialReads(
+  value: unknown,
+  normalizeRoot: (root: string) => string
+): ManifestCredentialRead[] {
+  if (!Array.isArray(value)) throw new Error('Backup manifest credential reads are invalid.');
+  return value.map((entry) => {
+    if (
+      !isRecord(entry) ||
+      typeof entry.rule_id !== 'string' ||
+      typeof entry.root !== 'string' ||
+      typeof entry.file_count !== 'number' ||
+      !Number.isInteger(entry.file_count) ||
+      entry.file_count < 0
+    ) {
+      throw new Error('Backup manifest credential read is invalid.');
+    }
+    return {
+      rule_id: entry.rule_id,
+      root: normalizeRoot(entry.root),
+      file_count: entry.file_count,
+    };
+  });
+}
+
+/** One archive subtree a restore withheld from the target, with what the archive holds. */
+export interface WithheldRestoreRoot {
+  root: string;
+  /** Archive members strictly inside `root`. */
+  archived_members: number;
+  /** `credential_reads[].file_count` the manifest recorded for `root`, if any. */
+  manifest_file_count: number | null;
+}
+
+/**
+ * The restore drill's credential check: the withheld roots the archive or its
+ * manifest mentions, refusing any whose archived member count differs from
+ * what the manifest recorded at backup time.
+ */
+export function verifyWithheldCredentialMembers(
+  withheld: WithheldRestoreRoot[]
+): WithheldRestoreRoot[] {
+  const present = withheld.filter(
+    (entry) => entry.archived_members > 0 || entry.manifest_file_count !== null
+  );
+  const mismatched = present.filter(
+    (entry) =>
+      entry.manifest_file_count !== null && entry.manifest_file_count !== entry.archived_members
+  );
+  if (mismatched.length > 0) {
+    throw new Error(
+      `[BACKUP_DRILL_CREDENTIAL_COUNT_MISMATCH] the archive does not hold the credential documents its manifest recorded | next: take a fresh encrypted backup and drill it again | evidence: ${mismatched
+        .map(
+          (entry) =>
+            `${entry.root}: archived ${entry.archived_members}, manifest ${entry.manifest_file_count}`
+        )
+        .join('; ')}`
+    );
+  }
+  return present;
+}
+
 export interface BackupExclusions {
   /**
    * Subtrees never archived (re-generable floors, `backup: "exclude"` catalog
@@ -158,9 +241,8 @@ export function resolveBackupExclusions(input: BackupExclusionInput): BackupExcl
   const tempRel = repoRelativeOrNull(rootDir, input.tempDir);
   if (tempRel) excludedRoots.add(tempRel);
   const credentialReadRoots: Array<{ ruleId: string; root: string }> = [];
-  for (const { ruleId, root } of input.sensitiveRoots ?? listSensitivePathRoots()) {
-    const rel = repoRelativeOrNull(rootDir, root);
-    if (!rel || !entries.some((entry) => isWithin(rel, entry) || isWithin(entry, rel))) continue;
+  for (const { ruleId, root: rel } of repoCredentialRoots(rootDir, input.sensitiveRoots)) {
+    if (!entries.some((entry) => isWithin(rel, entry) || isWithin(entry, rel))) continue;
     if (BACKUP_READABLE_CREDENTIAL_RULE_IDS.includes(ruleId)) {
       credentialReadRoots.push({ ruleId, root: rel });
     } else {

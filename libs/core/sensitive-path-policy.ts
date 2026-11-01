@@ -180,8 +180,20 @@ export function assertSensitivePathAllowed(
 ): void {
   if (mediated) return;
   const match = findSensitivePathMatch(candidate);
-  if (match && !(operation === 'read' && isAdmittedBackupCredentialRead(match))) {
-    throw sensitivePathDeniedError(operation, match);
+  if (match) throw sensitivePathDeniedError(operation, match);
+}
+
+/**
+ * Metadata-only probes (exists / lstat / readdir — no content). Same deny
+ * layer as {@link assertSensitivePathAllowed}, except that an active
+ * {@link withBackupCredentialReadAdmission} admits its exact roots here and
+ * nowhere else: content reads stay denied inside the admission.
+ */
+export function assertSensitiveMetadataAllowed(candidate: string, mediated = false): void {
+  if (mediated) return;
+  const match = findSensitivePathMatch(candidate);
+  if (match && !isAdmittedBackupCredentialRead(match)) {
+    throw sensitivePathDeniedError('read', match);
   }
 }
 
@@ -215,9 +227,11 @@ function isAdmittedBackupCredentialRead(match: SensitivePathMatch): boolean {
 }
 
 /**
- * Run the backup create walk with read access (`read` checks only — never a
- * write, append or mkdir) to exactly the {@link BACKUP_READABLE_CREDENTIAL_RULE_IDS}
- * roots. Refused unless the archive is encrypted. The admission is
+ * Run the backup create walk with metadata access (exists / lstat / readdir —
+ * never a content read, write, append or mkdir) to exactly the
+ * {@link BACKUP_READABLE_CREDENTIAL_RULE_IDS} roots; tar reads the bytes into
+ * the encrypted archive. Only scripts/lib/backup-file-selection.ts may import
+ * it (pinned by sensitive-path-policy.test.ts). Refused unless the archive is encrypted. The admission is
  * synchronous and not re-entrant, so it ends with `run`; the caller records
  * what it read (roots and file counts, never contents) in the backup manifest.
  */
