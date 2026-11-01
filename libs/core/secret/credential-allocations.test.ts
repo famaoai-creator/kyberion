@@ -184,7 +184,7 @@ describe('local credential allocation broker', () => {
     tenant(async () => {
       const binding = await bindAllocatedTaskCredentials(input);
       await withTaskCredentialBinding(binding!, async () => {
-        state.key = 'rotated-test-key';
+        state.key = 'allocated-test-kex';
         expect(() => resolveTaskCredential('ANTHROPIC_API_KEY')).toThrow(
           'CREDENTIAL_ALLOCATION_DENIED'
         );

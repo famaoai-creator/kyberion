@@ -50,6 +50,13 @@ describe('reasoning:credentials', () => {
     const print = vi.fn();
     await runCredentialCommand(['status', '--provider', 'anthropic'], print);
     expect(print).toHaveBeenLastCalledWith(expect.stringContaining('"verified":true'));
+    const validProof = mocks.proof();
+    for (const credential_version of ['a'.repeat(64), 'scrypt-v1:malformed']) {
+      mocks.proof.mockReturnValue({ ...validProof, credential_version });
+      await runCredentialCommand(['status', '--provider', 'anthropic'], print);
+      expect(print).toHaveBeenLastCalledWith(expect.stringContaining('"verified":false'));
+    }
+    mocks.proof.mockReturnValue(validProof);
     mocks.resolveKey.mockReturnValue('rotated-test-key');
     await runCredentialCommand(['status', '--provider', 'anthropic'], print);
     expect(print).toHaveBeenLastCalledWith(expect.stringContaining('"verified":false'));
