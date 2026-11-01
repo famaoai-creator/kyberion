@@ -1,6 +1,7 @@
 import { appendJsonLine } from '../foundation/json.js';
 import { jsonlFileSize, streamJsonLines } from '../jsonl-read.js';
 import { maintainStoreAfterAppend } from '../append-only-store.js';
+import { parkedCompactionCopies } from '../jsonl-parked-read.js';
 import { logger } from '../core.js';
 import { nowIso } from '../foundation/time.js';
 /**
@@ -13,7 +14,7 @@ import { nowIso } from '../foundation/time.js';
  * malformed records instead of guessing how to repair them.
  */
 
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
@@ -306,6 +307,17 @@ function ensureDurableQueueFile(filePath: string): void {
   }
 }
 
+/**
+ * The queue mutex is keyed by the resolved queue file, so every process that
+ * reaches the same file — with or without an explicit tenant/tier, or via an
+ * explicit `queuePath` — excludes the others' appends and write-time rewrite
+ * (`maintainStoreAfterAppend` runs with `lockId: null` under this lock).
+ */
+export function agentInputQueueLockId(queuePath: string): string {
+  const digest = createHash('sha256').update(path.resolve(queuePath)).digest('hex');
+  return `agent-input-queue:${digest.slice(0, 32)}`;
+}
+
 export class AgentInputQueue {
   private readonly missionId: string;
   private readonly queuePath: string;
@@ -321,7 +333,7 @@ export class AgentInputQueue {
       ...options,
       missionId: this.missionId,
     });
-    this.lockId = `agent-input-queue-${this.missionId}-${options.tenantSlug || 'shared'}`;
+    this.lockId = agentInputQueueLockId(this.queuePath);
   }
 
   get durablePath(): string {
@@ -463,9 +475,14 @@ export class AgentInputQueue {
 
   private readDurableState(): ReturnType<typeof reduceDurableRecords> {
     if (!safeExistsSync(this.queuePath)) {
-      return { active: new Map(), consumed: new Set(), cleared: new Set() };
+      // A rewrite that failed (or another lock holder's, mid-flight) leaves
+      // the records in parked copies: never report them as cleared.
+      if (parkedCompactionCopies(this.queuePath).length === 0) {
+        return { active: new Map(), consumed: new Set(), cleared: new Set() };
+      }
+    } else {
+      ensureDurableQueueFile(this.queuePath);
     }
-    ensureDurableQueueFile(this.queuePath);
     return reduceDurableRecords(readDurableRecords(this.queuePath));
   }
 
@@ -542,11 +559,18 @@ export function setAgentInputQueueStoreTuningForTests(tuning: AgentInputQueueSto
   lastCompactedQueueSize.clear();
 }
 
-/** Strict streaming read: size never fails it, but any corrupt record does (correctness store). */
+/**
+ * Strict streaming read: size never fails it, but any corrupt record does
+ * (correctness store). When a window rewrite left parked copies (it failed,
+ * or another holder is mid-rewrite), they are read first in park order, then
+ * the live file; a record a later file repeats from an earlier one (the
+ * published rewrite already holds the copies' survivors) is read once, so the
+ * reducer's duplicate checks still fire only on duplicates within one file.
+ */
 function readDurableRecords(queuePath: string): AgentInputQueueRecord[] {
   const catalog = queueRecordCatalog(queuePath);
-  return Array.from(
-    streamJsonLines<AgentInputQueueRecord>(queuePath, {
+  const read = (file: string): Generator<AgentInputQueueRecord> =>
+    streamJsonLines<AgentInputQueueRecord>(file, {
       map: (value, lineNumber) => parseRecord(value, lineNumber, catalog),
       onMalformed: (error, lineNumber) => {
         if (error instanceof Error && error.message.startsWith('[AGENT_INPUT_QUEUE')) {
@@ -554,8 +578,22 @@ function readDurableRecords(queuePath: string): AgentInputQueueRecord[] {
         }
         throw new Error(`[AGENT_INPUT_QUEUE_CORRUPT] unreadable record:${lineNumber}`);
       },
-    })
-  );
+    });
+  const copies = parkedCompactionCopies(queuePath);
+  if (copies.length === 0) return Array.from(read(queuePath));
+  const records: AgentInputQueueRecord[] = [];
+  const seenInEarlierFiles = new Set<string>();
+  for (const file of [...copies, queuePath]) {
+    const seenHere: string[] = [];
+    for (const record of read(file)) {
+      const key = `${record.kind}:${queueRecordEntryId(record) ?? ''}`;
+      if (seenInEarlierFiles.has(key)) continue;
+      seenHere.push(key);
+      records.push(record);
+    }
+    for (const key of seenHere) seenInEarlierFiles.add(key);
+  }
+  return records;
 }
 
 function queueRecordEntryId(value: unknown): string | undefined {

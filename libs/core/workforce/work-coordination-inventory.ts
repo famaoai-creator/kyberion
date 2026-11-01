@@ -1,5 +1,5 @@
 /** Read-only WorkItem inventory validation and unchanged latest-record folding. */
-import { streamJsonLines } from '../jsonl-read.js';
+import { parkedCompactionCopies, streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
 import { assertSafeRepositoryPath, safeExistsSync } from '../secure-io.js';
 import { validateWorkItem } from './work-coordination-identity.js';
 import type { WorkItem } from './work-coordination-types.js';
@@ -21,9 +21,12 @@ export function readWorkItemInventoryAtPath(logicalPath: string): {
   items: WorkItem[];
 } {
   const file = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
-  if (!safeExistsSync(file)) return { present: false, items: [] };
+  // A store parked by a concurrent compaction is present: read its copies.
+  if (!safeExistsSync(file) && parkedCompactionCopies(file).length === 0) {
+    return { present: false, items: [] };
+  }
   // Streamed (size never fails the read); strict: a malformed row still throws.
-  const records = Array.from(streamJsonLines<WorkItem>(file));
+  const records = Array.from(streamJsonLinesAcrossCompaction<WorkItem>(file));
   for (const record of records) validateWorkItem(record);
   return { present: true, items: latestById(records, 'item_id') };
 }

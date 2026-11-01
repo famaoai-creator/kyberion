@@ -3,7 +3,16 @@ import { randomUUID } from 'node:crypto';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { withExecutionContext } from '../authority.js';
-import { safeAppendFileSync, safeReadFile, safeReaddir, safeRmSync } from '../secure-io.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMoveSync,
+  safeReadFile,
+  safeReaddir,
+  safeRmSync,
+} from '../secure-io.js';
+import { validateWritePermission } from '../tier-guard.js';
+import { WORK_COORDINATION_ROOT_PATH } from '../foundation/runtime-state-roots.js';
 import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
 import {
   claimWorkItem,
@@ -11,10 +20,13 @@ import {
   getWorkItem,
   listCoordinationEvents,
   listWorkItems,
+  readWorkItemInventory,
   renewWorkItemLease,
   updateWorkItem,
 } from './work-coordination.js';
 import {
+  coordinationCompactionArchiveDir,
+  currentLeaseForItem,
   currentLeaseRecords,
   eventsPath,
   itemsPath,
@@ -115,13 +127,14 @@ describe('work-coordination write-time compaction', () => {
       ).toThrow(/identity conflict/);
       const records = lines(itemsPath()).map((line) => JSON.parse(line) as WorkItem);
       expect(records.filter((record) => record.version === 1)).toHaveLength(3);
-      // The pre-compaction union is archived under the coordination root.
-      const archiveDir = path.join(
-        fixtureRoot,
-        'active/archive/jsonl-compaction',
-        path.dirname(path.relative(fixtureRoot, itemsPath()))
-      );
+      // The pre-compaction union is archived next to the store, and no
+      // staging copy leaked (a failed archive write keeps every copy).
+      const archiveDir = path.join(path.dirname(itemsPath()), 'compaction-archive');
+      expect(coordinationCompactionArchiveDir(itemsPath())).toBe(archiveDir);
       expect(safeReaddir(archiveDir).some((name) => name.startsWith('items.'))).toBe(true);
+      expect(
+        safeReaddir(path.dirname(itemsPath())).filter((name) => name.includes('.compacting-'))
+      ).toEqual([]);
     });
   });
 
@@ -173,6 +186,65 @@ describe('work-coordination write-time compaction', () => {
       });
       // The item store is a correctness store: an unverifiable record fails closed.
       expect(() => getWorkItem('torn', { rootDir: fixtureRoot })).toThrow();
+    });
+  });
+
+  it('archives where the fence role may write in the production layout', () => {
+    // The fixture root lives under active/shared/tmp/, which every role may
+    // write, so the compaction tests above cannot catch an archive directory
+    // the production writer is denied. Check the production store paths
+    // against the role the mutation fence runs as.
+    const root = pathResolver.rootDir();
+    for (const store of ['items.jsonl', 'leases.jsonl']) {
+      const file = path.join(root, WORK_COORDINATION_ROOT_PATH, store);
+      const archived = path.join(coordinationCompactionArchiveDir(file), `${store}.x.jsonl`);
+      const verdict = withExecutionContext('infrastructure_sentinel', () =>
+        validateWritePermission(archived, 'write')
+      );
+      expect(verdict, `${archived}: ${verdict.reason ?? ''}`).toMatchObject({ allowed: true });
+    }
+    // The janitor's archive root is not writable by the fence role.
+    const janitorArchive = path.join(
+      root,
+      'active/archive/jsonl-compaction',
+      WORK_COORDINATION_ROOT_PATH,
+      'items.x.jsonl'
+    );
+    expect(
+      withExecutionContext('infrastructure_sentinel', () =>
+        validateWritePermission(janitorArchive, 'write')
+      ).allowed
+    ).toBe(false);
+  });
+
+  it('readers outside the fence see items and leases while another process has them parked', () => {
+    inRoot(() => {
+      createWorkItemIfAbsent({
+        itemId: 'parked',
+        title: 'parked',
+        description: 'd',
+        status: 'ready',
+        rootDir: fixtureRoot,
+      });
+      const { lease } = claimWorkItem({
+        itemId: 'parked',
+        actorPeerId: 'peer-a',
+        purpose: 'test',
+        ttlMs: 60_000,
+      });
+      // Simulate another process mid-compaction: both stores moved aside.
+      withExecutionContext('infrastructure_sentinel', () => {
+        safeMoveSync(itemsPath(), `${itemsPath()}.compacting-999999-0-initial`);
+        safeMoveSync(leasesPath(), `${leasesPath()}.compacting-999999-0-initial`);
+      });
+      expect(safeExistsSync(itemsPath())).toBe(false);
+      expect(listWorkItems({}, { rootDir: fixtureRoot }).map((item) => item.item_id)).toEqual([
+        'parked',
+      ]);
+      expect(currentLeaseForItem('parked')?.lease_id).toBe(lease.lease_id);
+      const inventory = readWorkItemInventory({ rootDir: fixtureRoot });
+      expect(inventory.present).toBe(true);
+      expect(inventory.items.map((item) => item.item_id)).toEqual(['parked']);
     });
   });
 });

@@ -4,11 +4,16 @@
  * rewriting in another process.
  *
  * Between the compaction's park (live file renamed to
- * `<name>.compacting-<pid>-<n>-<tag>`) and its publish, the live file does not
- * exist. A reader in that window reads the parked copies instead, so a
- * lookup never comes back empty (and a caller never re-creates state it would
- * otherwise have found) because maintenance was running. Same protocol as the
- * mesh presence reader in `mesh/mesh-peer-directory.ts`.
+ * `<name>.compacting-<pid>-<n>-<tag>`) and its publish, the live file either
+ * does not exist or — because appenders do not take the compaction lock — was
+ * recreated by a writer and holds only the rows appended since the park.
+ * Whenever parked copies exist they are therefore streamed first (in park
+ * order), then the live file: every row is seen, older before newer. Rows may
+ * repeat (between the publish and the cleanup of the copies, the live file
+ * already holds the folded union), so this reader is for consumers that keep
+ * the latest row per key — never for counting or append-order-sensitive
+ * history. Same protocol as the mesh presence reader in
+ * `mesh/mesh-peer-directory.ts`.
  *
  * Callers validate the path (and that it is a regular file) beforehand.
  */
@@ -37,29 +42,27 @@ export function parkedCompactionCopies(safePath: string): string[] {
 }
 
 /**
- * Constant-memory forward stream of `safePath`'s records; when the live file
- * is momentarily parked by a compaction, streams the parked copies instead.
- * A missing store with no parked copies yields nothing.
+ * Constant-memory forward stream of `safePath`'s records across a concurrent
+ * compaction: parked copies first (park order), then the live file. A missing
+ * store with no parked copies yields nothing.
  */
 export function* streamJsonLinesAcrossCompaction<T = unknown>(
   safePath: string,
   options: JsonlReadOptions<T> = {}
 ): Generator<T> {
-  let emitted = false;
-  if (safeExistsSync(safePath)) {
-    for (const record of streamJsonLines<T>(safePath, options)) {
-      emitted = true;
-      yield record;
-    }
-    // Parked between the existence check and the open: read the copies.
-    if (emitted || safeExistsSync(safePath)) return;
+  const copies = parkedCompactionCopies(safePath);
+  // A copy unlinked after listing (the compaction published) yields nothing;
+  // its rows are in the live file read below.
+  for (const copy of copies) yield* streamJsonLines<T>(copy, options);
+  let liveEmitted = false;
+  for (const record of streamJsonLines<T>(safePath, options)) {
+    liveEmitted = true;
+    yield record;
   }
-  for (const copy of parkedCompactionCopies(safePath)) {
-    for (const record of streamJsonLines<T>(copy, options)) {
-      emitted = true;
-      yield record;
-    }
-  }
-  // The copies were cleaned up because the compaction just published.
-  if (!emitted && safeExistsSync(safePath)) yield* streamJsonLines<T>(safePath, options);
+  if (copies.length > 0 || liveEmitted || safeExistsSync(safePath)) return;
+  // No copies were listed, yet the live file is gone: a compaction parked it
+  // after the listing. Nothing was emitted, so re-read without duplicates.
+  const late = parkedCompactionCopies(safePath);
+  for (const copy of late) yield* streamJsonLines<T>(copy, options);
+  if (late.length > 0) yield* streamJsonLines<T>(safePath, options);
 }
