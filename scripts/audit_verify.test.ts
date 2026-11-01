@@ -214,4 +214,40 @@ describe('audit_verify', () => {
     expect(text).toContain('unkeyed legacy entries: 3');
     expect(text).toContain('unkeyed legacy entries: 1');
   });
+
+  it('reports a rotated ledger by its segments, not as missing (MSN-STORE-BOUNDS-3)', async () => {
+    const segment = 'active/audit/system-ledger-20261102-101010.jsonl';
+    mocks.ledgerVerify.mockReturnValue({
+      ok: false,
+      total: 3,
+      corrupted: [`segment_boundary:${segment}:parent_hash_mismatch:after:x`],
+      missingKey: false,
+      unkeyed: 0,
+      segments: [segment],
+      anchoredFrom: 'system-ledger-20261101-000000.jsonl',
+    });
+    // The live file was just rotated away.
+    const defaultExists = mocks.safeExistsSync.getMockImplementation();
+    mocks.safeExistsSync.mockImplementation(
+      (filePath?: string) =>
+        !String(filePath || '').endsWith('system-ledger.jsonl') &&
+        Boolean(defaultExists?.(filePath))
+    );
+    const { collectAuditVerifyReport, formatAuditVerifyReport } = await import('./audit_verify.js');
+
+    const report = collectAuditVerifyReport();
+
+    expect(report.ok).toBe(false);
+    expect(report.ledgers[0]).toMatchObject({
+      segments: [segment],
+      anchoredFrom: 'system-ledger-20261101-000000.jsonl',
+    });
+    expect(report.ledgers[0]?.missing).toBeUndefined();
+    const text = formatAuditVerifyReport(report).join('\n');
+    expect(text).toContain('segments=1');
+    expect(text).toContain(`segment_boundary:${segment}`);
+    expect(text).toContain(
+      'chain continues from archived segment system-ledger-20261101-000000.jsonl'
+    );
+  });
 });
