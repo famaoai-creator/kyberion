@@ -4,7 +4,8 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { missionPathOrNull } from '../mission-lookup.js';
 import { parseSafeJsonInput, parseSafeJsonObjectValue } from '../foundation/safe-json.js';
-import { assertSafeRepositoryPath, safeExecResult, safeReadFile } from '../secure-io.js';
+import { readTextFile } from '../foundation/text.js';
+import { assertSafeRepositoryPath, safeExecResult } from '../secure-io.js';
 import { findMissionPath, pathResolver } from '../path-resolver.js';
 import { getWorkItem } from '../workforce/work-coordination.js';
 import { loadArtifactReviewReceipt } from '../workforce/artifact-review.js';
@@ -13,6 +14,7 @@ import { validateMissionArtifactReviewGate } from '../mission/mission-governance
 import {
   readVcsDevelopmentPr,
   readVcsDevelopmentCiProof,
+  readVcsDevelopmentMergedCiProof,
   type VcsDevelopmentPr,
   type VcsDevelopmentCiProof,
 } from './development-proof.js';
@@ -29,7 +31,10 @@ export interface PreparedDevelopmentInput {
 export interface DevelopmentLoopPorts {
   snapshot(): VcsDevelopmentPr;
   ci(pr: VcsDevelopmentPr): VcsDevelopmentCiProof;
-  review(pr: VcsDevelopmentPr, ci: VcsDevelopmentCiProof): { ok: boolean; reason?: string };
+  review(
+    pr: VcsDevelopmentPr,
+    ci: VcsDevelopmentCiProof
+  ): { ok: boolean; reason?: string; reviewedBaseSha?: string };
   promote(pr: VcsDevelopmentPr): VcsCommandResult;
   verifyMerged?(pr: VcsDevelopmentPr): VcsDevelopmentCiProof;
 }
@@ -88,7 +93,7 @@ export function reconcileVcsDevelopment(
         ),
         ...(pr.mergeCommitSha ? { knownMergeCommitSha: pr.mergeCommitSha } : {}),
       };
-    return verifyMerged(ports, pr);
+    return verifyMerged(ports, pr, review.reviewedBaseSha, ci.policyDigest);
   }
   if (pr.queued)
     return result(
@@ -152,7 +157,8 @@ export function reconcileVcsDevelopment(
     pr.baseBranch !== after.baseBranch
   )
     return result('blocked', 'Remote revision changed during promotion; verify the remote result');
-  if (after.state === 'merged') return verifyMerged(ports, after);
+  if (after.state === 'merged')
+    return verifyMerged(ports, after, liveReview.reviewedBaseSha, fresh.policyDigest);
   return result(
     'queued',
     'Reconcile remote merge state; acceptance is not proof of merge',
@@ -170,8 +176,7 @@ export function runPreparedVcsDevelopment(
     {
       snapshot: () => readVcsDevelopmentPr(input.ref, options, run),
       ci: (pr) => readVcsDevelopmentCiProof(pr, options, run),
-      verifyMerged: (pr) =>
-        readVcsDevelopmentCiProof({ ...pr, headSha: pr.mergeCommitSha! }, options, run),
+      verifyMerged: (pr) => readVcsDevelopmentMergedCiProof(pr, options, run),
       review: (pr, ci) => verifyPreparedWorkItemReview(input, pr, ci),
       promote: (pr) =>
         publicationHost({
@@ -193,7 +198,7 @@ export function verifyPreparedWorkItemReview(
   input: PreparedDevelopmentInput,
   pr: VcsDevelopmentPr,
   ci: VcsDevelopmentCiProof
-): { ok: boolean; reason?: string } {
+): { ok: boolean; reason?: string; reviewedBaseSha?: string } {
   try {
     const item = getWorkItem(input.workItemId);
     if (
@@ -266,7 +271,7 @@ export function verifyPreparedWorkItemReview(
     };
     if (Object.entries(expected).some(([k, v]) => manifest[k] !== v))
       throw new Error('Review manifest does not bind current revision and CI policy');
-    return { ok: true };
+    return { ok: true, reviewedBaseSha: String(manifest.base_sha) };
   } catch (error) {
     return {
       ok: false,
@@ -280,7 +285,7 @@ export function readReviewedDevelopmentManifest(
   artifactPath: string,
   expectedSha256: string,
   readBytes: (filePath: string) => Buffer = (filePath) =>
-    safeReadFile(filePath, { encoding: null }) as Buffer
+    Buffer.from(readTextFile(filePath), 'utf8')
 ): Record<string, unknown> {
   const bytes = Buffer.from(readBytes(artifactPath));
   if (createHash('sha256').update(bytes).digest('hex') !== expectedSha256)
@@ -291,7 +296,12 @@ export function readReviewedDevelopmentManifest(
   );
 }
 
-function verifyMerged(ports: DevelopmentLoopPorts, pr: VcsDevelopmentPr): DevelopmentLoopResult {
+function verifyMerged(
+  ports: DevelopmentLoopPorts,
+  pr: VcsDevelopmentPr,
+  reviewedBaseSha?: string,
+  reviewedPolicyDigest?: string
+): DevelopmentLoopResult {
   if (!pr.mergeCommitSha)
     return {
       status: 'post_merge_unverified',
@@ -300,12 +310,16 @@ function verifyMerged(ports: DevelopmentLoopPorts, pr: VcsDevelopmentPr): Develo
     };
   let proof: VcsDevelopmentCiProof | undefined;
   try {
-    proof = ports.verifyMerged?.(pr);
+    if (reviewedBaseSha && /^[a-f0-9]{40,64}$/i.test(reviewedBaseSha))
+      proof = ports.verifyMerged?.({ ...pr, baseSha: reviewedBaseSha });
   } catch {
     /* Retain the known effect on transport failure. */
   }
   const status =
-    !proof || proof.state === 'unverified'
+    !reviewedPolicyDigest ||
+    !proof ||
+    proof.policyDigest !== reviewedPolicyDigest ||
+    proof.state === 'unverified'
       ? 'post_merge_unverified'
       : proof.state === 'pending'
         ? 'post_merge_waiting'

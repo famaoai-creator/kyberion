@@ -235,7 +235,10 @@ describe('canonical prepared WorkItem review admission', () => {
     }));
   it('admits a real mission WorkItem and independently built schema-valid receipt for exact revision and CI policy', () =>
     run(() => {
-      expect(reader.verifyPreparedWorkItemReview(input, revision, ci)).toEqual({ ok: true });
+      expect(reader.verifyPreparedWorkItemReview(input, revision, ci)).toEqual({
+        ok: true,
+        reviewedBaseSha: revision.baseSha,
+      });
     }));
   it.each(['repository', 'headSha', 'baseSha'] as const)(
     'rejects changed %s against the reviewed manifest',

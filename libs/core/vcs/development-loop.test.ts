@@ -27,7 +27,7 @@ function fixture(): DevelopmentLoopPorts {
       requiredChecks: ['CI'],
       reasons: [],
     })),
-    review: vi.fn(() => ({ ok: true })),
+    review: vi.fn(() => ({ ok: true, reviewedBaseSha: pr.baseSha })),
     promote: vi.fn(() => ({ status: 0, stdout: '', stderr: '' })),
   };
 }
@@ -197,5 +197,59 @@ describe('review manifest immutable snapshot', () => {
       )
     ).toThrow('Reviewed manifest changed');
     expect(read).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('post-merge reviewed baseline transport', () => {
+  it('uses reviewed original base instead of current PR base', () => {
+    const p = fixture();
+    p.snapshot = () => ({
+      ...pr,
+      state: 'merged',
+      baseSha: 'e'.repeat(40),
+      mergeCommitSha: 'e'.repeat(40),
+    });
+    const verify = vi.fn((_revision: VcsDevelopmentPr) => ({
+      state: 'success' as const,
+      policyDigest: 'policy',
+      requiredChecks: ['CI'],
+      reasons: [],
+    }));
+    p.verifyMerged = verify;
+    expect(reconcileVcsDevelopment(p, false).status).toBe('merged');
+    expect(verify.mock.calls[0]?.[0]).toMatchObject({ baseSha: pr.baseSha });
+  });
+  it('cannot complete without established reviewed baseline', () => {
+    const p = fixture();
+    p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
+    p.review = () => ({ ok: true });
+    expect(reconcileVcsDevelopment(p, false).status).toBe('post_merge_unverified');
+  });
+});
+
+describe('post-merge reviewed CI policy continuity', () => {
+  it.each(['different-policy', ''])(
+    'retains merge receipt without completing under %j policy',
+    (policyDigest) => {
+      const p = fixture();
+      p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
+      p.verifyMerged = () => ({
+        state: 'success',
+        policyDigest,
+        requiredChecks: ['CI'],
+        reasons: [],
+      });
+      const r = reconcileVcsDevelopment(p, false);
+      expect(r.status).toBe('post_merge_unverified');
+      expect(r.knownMergeCommitSha).toBe('e'.repeat(40));
+      expect(p.promote).not.toHaveBeenCalled();
+    }
+  );
+  it('requires nonempty reviewed policy even if postmerge policy is equally empty', () => {
+    const p = fixture();
+    p.snapshot = () => ({ ...pr, state: 'merged', mergeCommitSha: 'e'.repeat(40) });
+    p.ci = () => ({ state: 'success', policyDigest: '', requiredChecks: ['CI'], reasons: [] });
+    p.verifyMerged = p.ci;
+    expect(reconcileVcsDevelopment(p, false).status).toBe('post_merge_unverified');
   });
 });
