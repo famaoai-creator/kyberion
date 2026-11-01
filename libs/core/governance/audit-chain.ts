@@ -29,6 +29,13 @@ import {
   type EventScopeFilter,
 } from '../event-scope.js';
 import { parseActorRef, type ActorRef } from '../actor.js';
+import {
+  fileEndsWithNewline,
+  readLastJsonLine,
+  streamTextLines,
+  type JsonlByteSource,
+  type JsonlScanOptions,
+} from '../jsonl-read.js';
 
 const logger = createLogger('audit-chain');
 
@@ -216,8 +223,8 @@ export interface AuditVerifyResult {
 function appendRecordLine(io: AuditChainIo, filePath: string, entry: AuditEntry): void {
   let separator = '';
   try {
-    const content = io.exists(filePath) ? io.read(filePath) : '';
-    if (content.length > 0 && !content.endsWith('\n')) separator = '\n';
+    // Last byte only: the append cost never grows with the daily file.
+    if (io.exists(filePath) && !fileEndsWithNewline(filePath, auditScan(io))) separator = '\n';
   } catch {
     // An unreadable tail must not cost the record: readers skip blank lines.
     separator = '\n';
@@ -227,6 +234,14 @@ function appendRecordLine(io: AuditChainIo, filePath: string, entry: AuditEntry)
 
 export interface AuditChainIo {
   read(filePath: string): string;
+  /**
+   * Size in bytes, undefined when missing. With {@link AuditChainIo.readRange}
+   * it lets the chain read a daily file's tail in fixed chunks (secure-io
+   * `safeStat` / `safeReadFileRange`). A reduced adapter without them falls
+   * back to `read` — correct, but its cost grows with the file.
+   */
+  size?(filePath: string): number | undefined;
+  readRange?(filePath: string, position: number, length: number): Buffer;
   loadJson<T>(filePath: string): T;
   exists(filePath: string): boolean;
   mkdir(dirPath: string): void;
@@ -239,6 +254,53 @@ export interface AuditChainIo {
 }
 
 let auditIo: AuditChainIo | undefined;
+
+/** Range-read options for tail / stream scans (tests inject a small chunk size). */
+let auditScanOptions: JsonlScanOptions = {};
+
+/** Test seam: override the chain's range-read options (pass `{}` to reset). */
+export function setAuditChainScanOptionsForTests(options: JsonlScanOptions): void {
+  auditScanOptions = { ...options };
+}
+
+/**
+ * Byte source over the registered audit I/O. Range reads when the adapter has
+ * them; otherwise one cached `read` per scan (reduced test/plugin adapters).
+ */
+function auditByteSource(io: AuditChainIo): JsonlByteSource {
+  if (io.size && io.readRange) {
+    const { size, readRange } = io;
+    return {
+      size: (filePath) => (io.exists(filePath) ? size.call(io, filePath) : undefined),
+      readRange: (filePath, position, length) => readRange.call(io, filePath, position, length),
+    };
+  }
+  const cache = new Map<string, Buffer>();
+  const bytes = (filePath: string): Buffer | undefined => {
+    if (!cache.has(filePath)) {
+      if (!io.exists(filePath)) return undefined;
+      cache.set(filePath, Buffer.from(io.read(filePath), 'utf8'));
+    }
+    return cache.get(filePath);
+  };
+  return {
+    size: (filePath) => bytes(filePath)?.length,
+    readRange: (filePath, position, length) =>
+      bytes(filePath)?.subarray(position, position + length) ?? Buffer.alloc(0),
+  };
+}
+
+function auditScan(io: AuditChainIo): JsonlScanOptions {
+  return { ...auditScanOptions, source: auditByteSource(io) };
+}
+
+/** Numeric suffix of an `AUD-<time>-<n>` id: the writer's entry counter at that record. */
+function auditIdCounter(id: string): number | undefined {
+  const match = id.match(/-(\d+)$/);
+  if (!match) return undefined;
+  const value = Number(match[1]);
+  return Number.isSafeInteger(value) ? value : undefined;
+}
 
 type AuditForwarderPublisher = (entry: AuditEntry) => Promise<void> | void;
 let auditForwarderPublisher: AuditForwarderPublisher | undefined;
@@ -391,6 +453,8 @@ function safeAuditPath(
 class AuditChainImpl {
   private lastHash: string = GENESIS_HASH;
   private entryCount: number = 0;
+  /** Why the newest daily file could not be read at the last seed (appends refuse). */
+  private seedFault: string | undefined;
   private auditDir: string;
   private static readonly AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
 
@@ -517,6 +581,11 @@ class AuditChainImpl {
     // Refresh the in-memory cursor while holding the inter-process lock;
     // another process may have appended since this module was loaded.
     this.seedFromDisk();
+    if (this.seedFault) {
+      throw new Error(
+        `[AUDIT_CHAIN_TAIL_UNREADABLE] audit chain tail cannot be read — appending would fork the chain | next: restore read access to the newest audit file or repair it | evidence: ${this.seedFault}`
+      );
+    }
     this.entryCount++;
     const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
     const timestamp = nowIso();
@@ -840,21 +909,51 @@ class AuditChainImpl {
     return entries;
   }
 
+  /**
+   * Seed the cursor from the last readable record of the newest non-empty
+   * daily file — its tail only, read backward in chunks, so the cost does not
+   * grow with the chain. Older files are read only while newer ones hold no
+   * record. A junk line is skipped (the writer chains from the last readable
+   * entry; verify reports the junk), but a file that cannot be read at all is
+   * never skipped: falling back to an older file would fork the chain, so the
+   * fault is logged and {@link appendUnderLock} refuses to append, like
+   * `missing_audit_chain_key`.
+   */
   private seedFromDisk(): void {
+    this.seedFault = undefined;
     if (!auditIo) return;
+    const io = auditIo;
     const files = this.listAuditFiles();
-    if (files.length === 0) return;
-
-    const allEntries = files.flatMap((fileName) =>
-      this.readAuditFileEntries(path.join(this.auditDir, fileName))
-    );
-    if (allEntries.length === 0) return;
-
-    const lastEntry = allEntries[allEntries.length - 1];
-    if (lastEntry?.currentHash) {
-      this.lastHash = lastEntry.currentHash;
+    for (let index = files.length - 1; index >= 0; index -= 1) {
+      const filePath = path.join(this.auditDir, files[index]);
+      let skipped = 0;
+      let last: AuditEntry | null;
+      try {
+        last = readLastJsonLine<AuditEntry>(filePath, {
+          ...auditScan(io),
+          map: (value) => normalizePersistedAuditEntry(value),
+          onMalformed: () => {
+            skipped++;
+          },
+        });
+      } catch (err) {
+        this.seedFault = `${filePath}: ${errorMessage(err)}`;
+        logger.warn(
+          `[AUDIT_CHAIN_TAIL_UNREADABLE] newest audit file cannot be read — chaining from an older file would fork the chain, so appends are refused | next: restore read access to the file or repair it, then run the audit verify | evidence: ${this.seedFault}`
+        );
+        return;
+      }
+      if (skipped > 0) {
+        logger.warn(
+          `[AUDIT_CHAIN] skipped ${skipped} unreadable line(s) at the tail of ${files[index]} — chaining from the last readable entry | next: run the audit verify to locate them | evidence: ${filePath}`
+        );
+      }
+      if (!last) continue;
+      if (last.currentHash) this.lastHash = last.currentHash;
+      const counter = auditIdCounter(last.id);
+      if (counter !== undefined && counter > this.entryCount) this.entryCount = counter;
+      return;
     }
-    this.entryCount = allEntries.length;
   }
 
   private listAuditFiles(): string[] {
@@ -905,20 +1004,22 @@ class AuditChainImpl {
     const entries: AuditEntry[] = [];
     const invalidLines: number[] = [];
     if (!auditIo || !auditIo.exists(filePath)) return { entries, invalidLines };
-    let content: string;
+    // Forward stream in fixed chunks: no whole-file size cap, so a large day
+    // is verified rather than reported unreadable.
     try {
-      content = auditIo.read(filePath);
-    } catch {
-      return { entries, invalidLines, unreadable: true };
-    }
-    const lines = content.split('\n');
-    for (const [index, line] of lines.entries()) {
-      if (!line.trim()) continue;
-      try {
-        entries.push(normalizePersistedAuditEntry(parseSafeJsonInput(line, 'audit chain entry')));
-      } catch {
-        invalidLines.push(index + 1);
+      for (const { text, lineNumber } of streamTextLines(filePath, {
+        ...auditScan(auditIo),
+        onOversized: (line) => invalidLines.push(line.lineNumber),
+      })) {
+        if (!text.trim()) continue;
+        try {
+          entries.push(normalizePersistedAuditEntry(parseSafeJsonInput(text, 'audit chain entry')));
+        } catch {
+          invalidLines.push(lineNumber);
+        }
       }
+    } catch {
+      return { entries: [], invalidLines: [], unreadable: true };
     }
     return { entries, invalidLines };
   }
