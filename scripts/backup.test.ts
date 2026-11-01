@@ -15,6 +15,7 @@ import { createServer, type Server } from 'node:net';
 import * as path from 'node:path';
 import {
   backupArchiveTimeoutMs,
+  credentialReadsFor,
   interpretTarResult,
   manifestCredentialCount,
   parseManifestCredentialReads,
@@ -1799,5 +1800,42 @@ describe('credential reads tar archived under an unlisted ancestor', () => {
     expect(() =>
       verifyWithheldCredentialMembers([{ root, archived_members: 4, manifest_file_count: 0 }])
     ).toThrow('[BACKUP_DRILL_CREDENTIAL_COUNT_MISMATCH]');
+  });
+
+  it('records a root under an unlisted ancestor as uncounted, and counts a listed root strictly inside', () => {
+    const roots = [{ ruleId: 'credential.kyberion-connections', root }];
+    expect(
+      credentialReadsFor(roots, { paths: ['knowledge/personal'], unlisted: ['knowledge/personal'] })
+    ).toEqual([
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true },
+    ]);
+    expect(
+      credentialReadsFor(roots, {
+        paths: [`${root}/a.json`, `${root}/b.json`, 'knowledge/personal/other.md'],
+        unlisted: [],
+      })
+    ).toEqual([{ rule_id: 'credential.kyberion-connections', root, file_count: 2 }]);
+    // An empty credential root (pushed as the directory itself) counts 0, like the drill.
+    expect(credentialReadsFor(roots, { paths: [root], unlisted: [] })).toEqual([
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0 },
+    ]);
+    // An unlisted directory BELOW the root keeps the root counted (drill then fails safe).
+    expect(
+      credentialReadsFor(roots, { paths: [`${root}/sub`], unlisted: [`${root}/sub`] })[0]
+    ).not.toHaveProperty('uncounted');
+  });
+
+  it('requires file_count 0 on an uncounted read and keeps uncounted roots in the drill report', () => {
+    expect(() =>
+      parseManifestCredentialReads(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 7, uncounted: true }],
+        (r) => r
+      )
+    ).toThrow('Backup manifest credential read is invalid.');
+    expect(
+      verifyWithheldCredentialMembers([
+        { root, archived_members: 0, manifest_file_count: null, uncounted: true },
+      ])
+    ).toEqual([{ root, archived_members: 0, manifest_file_count: null, uncounted: true }]);
   });
 });

@@ -1412,6 +1412,9 @@ export function restoreBackup(
         root,
         archived_members: members.filter((member) => member.startsWith(`${root}/`)).length,
         manifest_file_count: manifestCredentialCount(manifest.credential_reads, root),
+        ...(manifest.credential_reads?.find((entry) => entry.root === root)?.uncounted
+          ? { uncounted: true }
+          : {}),
       };
     });
     const trimmedTails = extracted.trimmedTails;

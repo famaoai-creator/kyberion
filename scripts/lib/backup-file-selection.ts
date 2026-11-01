@@ -122,7 +122,8 @@ export function parseManifestCredentialReads(
       typeof entry.file_count !== 'number' ||
       !Number.isInteger(entry.file_count) ||
       entry.file_count < 0 ||
-      (entry.uncounted !== undefined && entry.uncounted !== true)
+      (entry.uncounted !== undefined && entry.uncounted !== true) ||
+      (entry.uncounted === true && entry.file_count !== 0)
     ) {
       throw new Error('Backup manifest credential read is invalid.');
     }
@@ -148,6 +149,28 @@ export function manifestCredentialCount(
   return entry.file_count;
 }
 
+/**
+ * Manifest `credential_reads` for a finished walk. A root under an unlisted
+ * ancestor (e.g. the personal tier the backup role may not list) is archived
+ * by tar itself, so the walk never saw its files: it is recorded `uncounted`.
+ * Otherwise the count is the selected paths strictly inside the root — the
+ * same rule the drill uses for archive members (an empty root counts 0).
+ */
+export function credentialReadsFor(
+  roots: Array<{ ruleId: string; root: string }>,
+  selection: { paths: string[]; unlisted: string[] }
+): ManifestCredentialRead[] {
+  return roots.map(({ ruleId, root }) => {
+    const archivedByTar = selection.unlisted.some((rel) => isWithin(root, rel));
+    if (archivedByTar) return { rule_id: ruleId, root, file_count: 0, uncounted: true as const };
+    return {
+      rule_id: ruleId,
+      root,
+      file_count: selection.paths.filter((rel) => rel !== root && isWithin(rel, root)).length,
+    };
+  });
+}
+
 /** One archive subtree a restore withheld from the target, with what the archive holds. */
 export interface WithheldRestoreRoot {
   root: string;
@@ -155,6 +178,8 @@ export interface WithheldRestoreRoot {
   archived_members: number;
   /** `credential_reads[].file_count` the manifest recorded for `root`, if any. */
   manifest_file_count: number | null;
+  /** The manifest recorded the root as `uncounted` (tar archived an unlisted ancestor). */
+  uncounted?: boolean;
 }
 
 /**
@@ -165,8 +190,11 @@ export interface WithheldRestoreRoot {
 export function verifyWithheldCredentialMembers(
   withheld: WithheldRestoreRoot[]
 ): WithheldRestoreRoot[] {
+  // Uncounted roots stay in the report (presence only), so "uncounted, 0
+  // archived" is visible in the drill result instead of disappearing.
   const present = withheld.filter(
-    (entry) => entry.archived_members > 0 || entry.manifest_file_count !== null
+    (entry) =>
+      entry.archived_members > 0 || entry.manifest_file_count !== null || entry.uncounted === true
   );
   const mismatched = present.filter(
     (entry) =>
@@ -334,18 +362,7 @@ export function selectBackupFiles(input: {
   // and only for this walk; the counts land in the manifest.
   return withBackupCredentialReadAdmission({ encrypted: input.encrypted === true }, () => {
     const selection = walkBackupFiles(input);
-    selection.credentialReads = exclusions.credentialReadRoots.map(({ ruleId, root }) => {
-      // An unlisted ancestor (e.g. the personal tier this role may not list)
-      // is archived by tar itself, so the walk never sees the root's files.
-      const archivedByTar = selection.unlisted.some((rel) => isWithin(root, rel));
-      return archivedByTar
-        ? { rule_id: ruleId, root, file_count: 0, uncounted: true as const }
-        : {
-            rule_id: ruleId,
-            root,
-            file_count: selection.paths.filter((rel) => isWithin(rel, root)).length,
-          };
-    });
+    selection.credentialReads = credentialReadsFor(exclusions.credentialReadRoots, selection);
     return selection;
   });
 }
