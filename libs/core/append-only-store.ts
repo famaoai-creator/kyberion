@@ -141,17 +141,26 @@ export interface StoreScanOptions {
   maxLineBytes?: number;
 }
 
-interface LineFilter {
+/**
+ * Per-line rewrite filter. `index` counts non-blank, line-guard-sized lines
+ * across every parked copy in order, identically in both passes. Malformed
+ * lines reach the filter as raw text; oversized lines and late (in-flight)
+ * bytes never reach it — they are always kept verbatim.
+ */
+export interface StoreLineFilter {
   /** Pass 1, once per parked file as it is parked: `index` is global across files. */
   observe(text: string, index: number): void;
   /** Pass 2: whether the line survives. */
   keep(text: string, index: number): boolean;
 }
+type LineFilter = StoreLineFilter;
 
 /** Test seams for the parked rewrite. */
 export interface AppendOnlyStoreTestHooks {
   /** Runs right before pass 2 streams the parked copies (simulate a late append). */
   beforeWriteSurvivors?: (stagingPaths: readonly string[]) => void;
+  /** Runs right before the exclusive publish (throw to simulate ENOSPC etc.). */
+  beforePublish?: (livePath: string) => void;
 }
 let testHooks: AppendOnlyStoreTestHooks = {};
 
@@ -404,6 +413,7 @@ function rewriteParked(
         const temp = uniqueSibling(`${livePath}.compact-out-${process.pid}-${i}`, '.tmp');
         try {
           kept = writeSurvivors(temp);
+          testHooks.beforePublish?.(livePath);
           publishExclusive(temp, livePath, chunkBytes);
           published = true;
           liveRestored = true;
@@ -477,6 +487,32 @@ function rewriteParked(
     oversizedLines,
     lateLines,
   };
+}
+
+export interface RewriteStoreLinesOptions extends StoreScanOptions {
+  /** Raw-union archive file (made unique if taken); null/undefined = no archive. */
+  archivePath?: string | null;
+  /** Diagnostic label for warns (e.g. `'wake-ledger compaction'`). */
+  label?: string;
+}
+
+/**
+ * Narrow entry to the race-safe parked rewrite for stores whose fold rule is
+ * not expressible as compact-by-key or a time window (e.g. the dot wake
+ * ledger). Same guarantees as {@link compactStoreByKey}: malformed and
+ * oversized lines kept verbatim, raw union restored on any error, re-park
+ * only on EEXIST. Returns null when the live file does not exist.
+ */
+export function rewriteStoreLines(
+  filePath: string,
+  filter: StoreLineFilter,
+  options: RewriteStoreLinesOptions = {}
+): StoreRewriteResult | null {
+  return rewriteParked(filePath, filter, {
+    ...options,
+    archivePath: options.archivePath ?? null,
+    label: options.label ?? 'rewrite',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -791,7 +827,10 @@ function runPolicy(
     const result = compactStoreByKey(filePath, {
       ...options,
       key: policy.key,
-      archiveDir: policy.archiveDir,
+      // Write-time: the store's writer cannot write `active/archive/` (the
+      // janitor's default), so archive next to the store unless overridden.
+      archiveDir:
+        policy.archiveDir === undefined ? writeTimeArchiveDir(filePath) : policy.archiveDir,
       now,
     });
     if (!result) return 'nothing-to-do';

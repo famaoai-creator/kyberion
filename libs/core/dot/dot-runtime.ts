@@ -40,17 +40,15 @@ import {
   safeExistsSync,
   safeLstat,
   safeMkdir,
-  safeMoveSync,
-  safePublishExclusiveFileSync,
   safeReadFile,
-  safeStat,
-  safeUnlinkSync,
-  safeWriteFile,
 } from '../secure-io.js';
-import { withLockSync } from '../foundation/lock-utils.js';
 import { appendJsonLine, readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { readJsonLinesCached } from '../jsonl-tail.js';
 import { streamJsonLines } from '../jsonl-read.js';
+import {
+  compactDotWakeLedgerAt,
+  type DotWakeLedgerCompactionResult,
+} from './dot-wake-ledger-compaction.js';
 import {
   DOT_TOKEN_USAGE_PATH,
   maintainDotTokenUsageAfterAppend,
@@ -354,157 +352,24 @@ export function readScopedDotWakeLedger(
   return [...rows.values()];
 }
 
-/** Compact only when the ledger is large — hot sweeps stat once and skip. */
-export const DOT_WAKE_LEDGER_COMPACT_MIN_BYTES = 8 * 1024 * 1024;
-const DOT_LEDGER_COMPACT_LOCK = 'dot-wake-ledger-compact';
-const COMPACTION_ARCHIVE_REPO_SUBPATH = 'active/archive/jsonl-compaction';
-const DOT_COMPACT_MAX_PARK_ATTEMPTS = 5;
+export {
+  DOT_WAKE_LEDGER_COMPACT_MIN_BYTES,
+  type DotWakeLedgerCompactionResult,
+} from './dot-wake-ledger-compaction.js';
 
-export interface DotWakeLedgerCompactionResult {
-  compacted: boolean;
-  before_lines: number;
-  after_lines: number;
-  merged_during_compaction: number;
-  archive_path?: string;
-}
-
-function ledgerConsumedKey(row: Record<string, unknown>): string | undefined {
-  if (typeof row?.dot_id !== 'string' || typeof row?.trigger_key !== 'string') return undefined;
-  return `${row.dot_id} ${row.trigger_key}`;
-}
-
-function isConsumingLedgerRow(row: Record<string, unknown>): boolean {
-  return (
-    row.outcome === 'rejected' || (row.outcome === 'delivered' && row.trigger_retained !== true)
-  );
-}
-
-/**
- * Replay-safe compaction of `dot-wake-ledger.jsonl`. Generic janitor
- * compaction cannot express the ledger's semantics, so it lives next to the
- * reader. Fold rule: a (dot_id, trigger_key) pair consumed by a terminal row
- * (`rejected`, or `delivered` without `trigger_retained`) keeps only that last
- * consuming row — the consumed set is byte-identical. Keys still live keep
- * every row: backoff counts consecutive failures, so folding a live key would
- * reset its retry schedule. Rows without a usable key pass through verbatim.
- *
- * Race-safe under appenders that reopen the path per write: the live file is
- * moved aside, recreated siblings are merged in a bounded loop, and the fold
- * is published exclusively — on EEXIST we merge again instead of overwriting.
- * Non-convergence restores the raw union uncompressed; nothing is dropped.
- * The pre-compaction union is archived under `active/archive/jsonl-compaction/`.
- */
+/** Replay-safe, size-gated compaction of the wake ledger (see dot-wake-ledger-compaction.ts). */
 export function compactDotWakeLedger(
-  deps: DotRuntimeDeps & { compactMinBytes?: number } = {}
+  deps: DotRuntimeDeps & {
+    compactMinBytes?: number;
+    chunkBytes?: number;
+    maxLineBytes?: number;
+  } = {}
 ): DotWakeLedgerCompactionResult {
-  const livePath = runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH);
-  return withLockSync(DOT_LEDGER_COMPACT_LOCK, () => {
-    if (!safeExistsSync(livePath)) {
-      return { compacted: false, before_lines: 0, after_lines: 0, merged_during_compaction: 0 };
-    }
-    const stat = safeStat(livePath);
-    if (stat.size < (deps.compactMinBytes ?? DOT_WAKE_LEDGER_COMPACT_MIN_BYTES)) {
-      return {
-        compacted: false,
-        before_lines: 0,
-        after_lines: 0,
-        merged_during_compaction: 0,
-      };
-    }
-    const stagingPaths: string[] = [];
-    const allRows: Array<Record<string, unknown>> = [];
-    let merged = 0;
-    const park = (src: string, tag: string): void => {
-      const staging = `${src}.compacting-${process.pid}-${stagingPaths.length}-${tag}`;
-      safeMoveSync(src, staging);
-      stagingPaths.push(staging);
-      for (const row of streamJsonLines<Record<string, unknown>>(staging)) allRows.push(row);
-    };
-    const fold = (rows: Array<Record<string, unknown>>): Array<Record<string, unknown>> => {
-      const lastConsumedAt = new Map<string, number>();
-      rows.forEach((row, i) => {
-        const key = ledgerConsumedKey(row);
-        if (key && isConsumingLedgerRow(row)) lastConsumedAt.set(key, i);
-      });
-      return rows.filter((row, i) => {
-        const key = ledgerConsumedKey(row);
-        if (!key) return true;
-        const last = lastConsumedAt.get(key);
-        if (last === undefined) return true;
-        return i === last;
-      });
-    };
-    try {
-      park(livePath, 'initial');
-      let kept = fold(allRows);
-      let published = false;
-      for (let i = 0; i <= DOT_COMPACT_MAX_PARK_ATTEMPTS; i++) {
-        if (!safeExistsSync(livePath)) {
-          try {
-            safePublishExclusiveFileSync(
-              livePath,
-              kept.map((r) => JSON.stringify(r)).join('\n') + '\n'
-            );
-            published = true;
-            break;
-          } catch {
-            // a writer recreated the file — merge it below
-          }
-        }
-        if (i >= DOT_COMPACT_MAX_PARK_ATTEMPTS) break;
-        park(livePath, `merge-${i}`);
-        merged++;
-        kept = fold(allRows);
-      }
-      if (!published) {
-        if (safeExistsSync(livePath)) {
-          park(livePath, 'restore-merge');
-          merged++;
-        }
-        safeWriteFile(livePath, allRows.map((r) => JSON.stringify(r)).join('\n') + '\n');
-        logger.warn(
-          `[DOT] wake-ledger compaction did not converge for ${livePath} — restored raw rows`
-        );
-        return {
-          compacted: false,
-          before_lines: allRows.length,
-          after_lines: allRows.length,
-          merged_during_compaction: merged,
-        };
-      }
-      const stamp = (deps.now?.() ?? new Date())
-        .toISOString()
-        .replace(/[-:]/g, '')
-        .replace(/\..*$/, '');
-      const archivePath = assertSafeRepositoryPath(
-        path.join(
-          deps.rootDir ?? pathResolver.rootDir(),
-          COMPACTION_ARCHIVE_REPO_SUBPATH,
-          `${DOT_WAKE_LEDGER_PATH.replace(/\.jsonl$/, '')}.${stamp}Z-${process.pid}.jsonl`
-        ),
-        { allowMissingLeaf: true }
-      );
-      safeMkdir(path.dirname(archivePath), { recursive: true });
-      safeWriteFile(archivePath, allRows.map((r) => JSON.stringify(r)).join('\n') + '\n');
-      logger.info(
-        `[DOT] wake-ledger compacted: ${allRows.length} -> ${kept.length} rows (${merged} live merge(s)), union archived to ${archivePath}`
-      );
-      return {
-        compacted: true,
-        before_lines: allRows.length,
-        after_lines: kept.length,
-        merged_during_compaction: merged,
-        archive_path: archivePath,
-      };
-    } finally {
-      for (const staging of stagingPaths) {
-        try {
-          safeUnlinkSync(staging);
-        } catch {
-          // best-effort staging cleanup
-        }
-      }
-    }
+  return compactDotWakeLedgerAt(runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH), {
+    compactMinBytes: deps.compactMinBytes,
+    chunkBytes: deps.chunkBytes,
+    maxLineBytes: deps.maxLineBytes,
+    now: deps.now?.(),
   });
 }
 
