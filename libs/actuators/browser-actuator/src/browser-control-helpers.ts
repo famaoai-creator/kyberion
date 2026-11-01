@@ -77,7 +77,14 @@ async function executeControl(
         }
         const url = resolvedUrl;
         browserRuntimeHelpers.assertNavigationAllowed(url, runtime.navigationPolicy);
-        await page.goto(url, { waitUntil: params.waitUntil || 'networkidle' });
+        const waitUntil =
+          params.waitUntil === 'load' ||
+          params.waitUntil === 'domcontentloaded' ||
+          params.waitUntil === 'commit' ||
+          params.waitUntil === 'networkidle'
+            ? params.waitUntil
+            : 'networkidle';
+        await page.goto(url, { waitUntil });
       }
       if (params.select !== false) runtime.activeTabId = tabId;
       return browserRuntimeHelpers.recordBrowserAction(

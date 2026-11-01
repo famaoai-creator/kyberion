@@ -32,6 +32,9 @@ export const LIGHTPANDA_CAPABILITIES: Readonly<BrowserAutomationRuntimeCapabilit
     webauthn: false,
     persistent_profile: false,
     attach_existing_browser: false,
+    // Lightpanda speaks a subset of CDP, not the page-scoped surface the
+    // `cdp` op promises; answer false so preflight fails honestly.
+    raw_cdp: false,
   });
 
 const STARTUP_TIMEOUT_MS = 10_000;

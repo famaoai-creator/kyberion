@@ -11,6 +11,7 @@ import {
   opApply,
   type BrowserRuntime,
 } from '../libs/actuators/browser-actuator/src/browser-pipeline-helpers.js';
+import { createBrowserWatchdog } from '../libs/actuators/browser-actuator/src/browser-watchdog.js';
 import {
   registerVoicePlaybackPlatformAdapter,
   resolveVoicePlaybackPlatformAdapter,
@@ -59,6 +60,7 @@ describe('external adapters with real approval persistence simulation', () => {
       context: {} as BrowserRuntime['context'],
       pageIds: new WeakMap(),
       cdpSessions: new WeakMap(),
+      watchdog: createBrowserWatchdog(),
       consoleEvents: [],
       networkEvents: [],
       navigationPolicy: { allowed_origins: ['https://example.com'] },
