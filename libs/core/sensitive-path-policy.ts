@@ -183,9 +183,102 @@ export function assertSensitivePathAllowed(
   if (match) throw sensitivePathDeniedError(operation, match);
 }
 
+/**
+ * Metadata-only probes (exists / lstat / readdir — no content). Same deny
+ * layer as {@link assertSensitivePathAllowed}, except that an active
+ * {@link withBackupCredentialReadAdmission} admits its exact roots here and
+ * nowhere else: content reads stay denied inside the admission.
+ */
+export function assertSensitiveMetadataAllowed(candidate: string, mediated = false): void {
+  if (mediated) return;
+  const match = findSensitivePathMatch(candidate);
+  if (match && !isAdmittedBackupCredentialRead(match)) {
+    throw sensitivePathDeniedError('read', match);
+  }
+}
+
+/**
+ * Credential roots whose documents a restore needs (OAuth / service
+ * connection documents, possibly encrypted at rest). Only the backup create
+ * path may read them, read-only and only into an encrypted archive, through
+ * {@link withBackupCredentialReadAdmission}. Every other credential root (the
+ * vault's keychain registry, home-directory keys) is never read by a backup.
+ */
+export const BACKUP_READABLE_CREDENTIAL_RULE_IDS: readonly string[] = [
+  'credential.kyberion-connections',
+];
+
+export interface BackupCredentialReadRoot {
+  ruleId: string;
+  /** Absolute resolved root. */
+  root: string;
+}
+
+// `var`: this module sits inside secure-io's import cycle (see rootSnapshot).
+// eslint-disable-next-line no-var
+var admittedBackupReadRoots: readonly BackupCredentialReadRoot[] | null = null;
+
+function isAdmittedBackupCredentialRead(match: SensitivePathMatch): boolean {
+  return Boolean(
+    admittedBackupReadRoots?.some(
+      (admitted) => admitted.ruleId === match.ruleId && admitted.root === match.matchedRoot
+    )
+  );
+}
+
+/**
+ * Run the backup create walk with metadata access (exists / lstat / readdir —
+ * never a content read, write, append or mkdir) to exactly the
+ * {@link BACKUP_READABLE_CREDENTIAL_RULE_IDS} roots; tar reads the bytes into
+ * the encrypted archive. Only scripts/lib/backup-file-selection.ts may import
+ * it (pinned by sensitive-path-policy.test.ts). Refused unless the archive is encrypted. The admission is
+ * synchronous and not re-entrant, so it ends with `run`; the caller records
+ * what it read (roots and file counts, never contents) in the backup manifest.
+ */
+export function withBackupCredentialReadAdmission<T>(
+  input: { encrypted: boolean },
+  run: (roots: readonly BackupCredentialReadRoot[]) => T
+): T {
+  if (input.encrypted !== true) {
+    throw new Error(
+      '[BACKUP_CREDENTIAL_READ_REQUIRES_ENCRYPTION] a backup that covers connection documents must be encrypted | next: rerun with --encrypt | evidence: ' +
+        BACKUP_READABLE_CREDENTIAL_RULE_IDS.join(', ')
+    );
+  }
+  if (admittedBackupReadRoots) {
+    throw new Error('[BACKUP_CREDENTIAL_READ_NESTED] a backup credential read is already admitted');
+  }
+  const roots = listSensitivePathRoots().filter(({ ruleId }) =>
+    BACKUP_READABLE_CREDENTIAL_RULE_IDS.includes(ruleId)
+  );
+  admittedBackupReadRoots = Object.freeze(roots);
+  try {
+    const result = run(admittedBackupReadRoots);
+    if (result instanceof Promise) {
+      throw new Error(
+        '[BACKUP_CREDENTIAL_READ_ASYNC] the admitted backup walk must be synchronous'
+      );
+    }
+    return result;
+  } finally {
+    admittedBackupReadRoots = null;
+  }
+}
+
 export function assertSensitiveTextAllowed(text: string, operation: string): void {
   const match = findSensitivePathInText(text);
   if (match) throw sensitivePathDeniedError(operation, match);
+}
+
+/**
+ * Every resolved credential root (absolute), for walkers such as backup that
+ * must skip guarded subtrees up front instead of tripping the deny layer.
+ */
+export function listSensitivePathRoots(): Array<{ ruleId: string; root: string }> {
+  const snapshot = currentRootSnapshot();
+  return SENSITIVE_PATH_RULES.flatMap((rule, index) =>
+    snapshot.roots[index].map((root) => ({ ruleId: rule.id, root }))
+  );
 }
 
 export function getSensitivePathRuleIds(): string[] {

@@ -3,7 +3,10 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import * as pathResolver from './path-resolver.js';
-import { assertSensitivePathAllowed } from './sensitive-path-policy.js';
+import {
+  assertSensitiveMetadataAllowed,
+  assertSensitivePathAllowed,
+} from './sensitive-path-policy.js';
 import {
   validateReadPermission,
   validateWritePermission,
@@ -368,7 +371,8 @@ export function assertCanonicalReadable(
 ): string {
   const canonical = canonicalGuardPath(resolved, mode);
   if (canonical === path.resolve(resolved)) return canonical;
-  assertSensitivePathAllowed(canonical, 'read', mediationProbe());
+  if (operation === 'metadata') assertSensitiveMetadataAllowed(canonical, mediationProbe());
+  else assertSensitivePathAllowed(canonical, 'read', mediationProbe());
   const guard = validateReadPermission(canonical, operation);
   if (!guard.allowed) {
     throw new Error(
@@ -627,8 +631,12 @@ export function openDirVetted(
 }
 
 /** readdir of the directory actually opened and vetted (not of whatever the path names later). */
-export function readdirVetted(resolved: string, displayPath: string): string[] {
-  const fd = openDirVetted(resolved, displayPath, 'read');
+export function readdirVetted(
+  resolved: string,
+  displayPath: string,
+  authorizedCanonical?: string
+): string[] {
+  const fd = openDirVetted(resolved, displayPath, 'read', authorizedCanonical);
   try {
     if (procFdAvailable()) {
       try {
@@ -1003,8 +1011,14 @@ export function guardReadPath(
   mode: CanonicalMode = 'follow',
   operation: 'read' | 'metadata' = 'read'
 ): string {
-  assertSensitivePathAllowed(filePath, 'read', mediationProbe());
+  const assertSensitive = (candidate: string): void => {
+    if (operation === 'metadata') assertSensitiveMetadataAllowed(candidate, mediationProbe());
+    else assertSensitivePathAllowed(candidate, 'read', mediationProbe());
+  };
+  assertSensitive(filePath);
   const resolved = pathResolver.resolve(filePath);
+  // A relative path resolves against the project root, not the cwd: judge that too.
+  assertSensitive(resolved);
   const guard = validateReadPermission(resolved, operation);
   if (!guard.allowed) throw new Error(deny(guard.reason));
   assertCanonicalReadable(resolved, filePath, mode, operation);

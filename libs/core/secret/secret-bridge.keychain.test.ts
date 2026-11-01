@@ -61,19 +61,89 @@ describe('MacKeychainSecretProvider child supervision (G12)', () => {
     await expect(pending).resolves.toBe('sekret');
   });
 
-  it('updates or adds once without a delete-first child or secret-bearing argv', async () => {
-    const child = createFakeChild();
-    mocks.spawn.mockReturnValue(child);
+  it('replaces via the trusted reader, then adds with a reader ACL and no secret-bearing argv', async () => {
+    const removeChild = createFakeChild();
+    const writeChild = createFakeChild();
+    mocks.spawn.mockReturnValueOnce(removeChild).mockReturnValueOnce(writeChild);
     const pending = new MacKeychainSecretProvider().set('svc', 'acct', 'synthetic-new-value');
     expect(mocks.spawn).toHaveBeenCalledOnce();
-    expect(mocks.spawn.mock.calls[0][0]).toBe('swift');
-    const args = mocks.spawn.mock.calls[0][1];
-    expect(args[1]).toContain('SecItemUpdate');
-    expect(args[1]).not.toContain('SecItemDelete');
-    expect(JSON.stringify(args)).not.toContain('synthetic-new-value');
-    child.emit('close', 0);
+    expect(mocks.spawn.mock.calls[0][0]).toBe('security');
+    expect(mocks.spawn.mock.calls[0][1]).toEqual([
+      'delete-generic-password',
+      '-a',
+      'acct',
+      '-s',
+      'svc',
+    ]);
+    removeChild.emit('close', 44);
+    await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(2));
+    expect(mocks.spawn.mock.calls[1][0]).toBe('swift');
+    const args: string[] = mocks.spawn.mock.calls[1][1];
+    const script = args[args.indexOf('-e') + 1];
+    expect(script).toContain(
+      'SecTrustedApplicationCreateFromPath("/usr/bin/security", &trustedReader)'
+    );
+    expect(script).toContain(
+      'SecAccessCreate(service as CFString, [reader] as CFArray, &accessRef)'
+    );
+    expect(script).toContain('add[kSecAttrAccess as String] = access');
+    // SecItemUpdate keeps an existing item's ACL, so a duplicate is replaced.
+    expect(script).not.toContain('SecItemUpdate');
+    expect(script).toMatch(/errSecDuplicateItem[\s\S]*SecItemDelete[\s\S]*SecItemAdd/);
+    expect(JSON.stringify(mocks.spawn.mock.calls)).not.toContain('synthetic-new-value');
+    expect(writeChild.stdin.write).toHaveBeenCalledWith('svc\nacct\nsynthetic-new-value');
+    writeChild.emit('close', 0);
     await expect(pending).resolves.toBeUndefined();
+    expect(mocks.safeWriteFile).toHaveBeenCalledOnce();
   });
+
+  it('leaves the entry and registry untouched when the existing item cannot be removed', async () => {
+    const removeChild = createFakeChild();
+    mocks.spawn.mockReturnValueOnce(removeChild);
+    const pending = new MacKeychainSecretProvider().set('svc', 'acct', 'synthetic-new-value');
+    const assertion = expect(pending).rejects.toThrow('entry unchanged');
+    removeChild.emit('close', 128);
+    await assertion;
+    expect(mocks.spawn).toHaveBeenCalledOnce();
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('reports that the previous entry was removed when the add fails', async () => {
+    const removeChild = createFakeChild();
+    const writeChild = createFakeChild();
+    mocks.spawn.mockReturnValueOnce(removeChild).mockReturnValueOnce(writeChild);
+    const pending = new MacKeychainSecretProvider().set('svc', 'acct', 'synthetic-new-value');
+    const assertion = expect(pending).rejects.toThrow(/code 7 \(any previous entry was removed/);
+    removeChild.emit('close', 0);
+    await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(2));
+    writeChild.emit('close', 7);
+    await assertion;
+    // The entry is gone, so the registry drops it too.
+    expect(mocks.safeWriteFile).toHaveBeenCalledOnce();
+    const saved = JSON.parse(String(mocks.safeWriteFile.mock.calls[0][1])) as {
+      entries: Array<{ service: string; account: string }>;
+    };
+    expect(saved.entries).not.toContainEqual(
+      expect.objectContaining({ service: 'svc', account: 'acct' })
+    );
+  });
+
+  it.each([
+    ['a multi-line value', 'svc', 'acct', 'line-one\nline-two', 'line break'],
+    ['a carriage return in the value', 'svc', 'acct', 'value\r', 'line break'],
+    ['an empty value', 'svc', 'acct', '', 'empty'],
+    ['a newline in the service', 'svc\nacct', 'acct', 'value', 'single-line'],
+    ['a newline in the account', 'svc', 'acct\nother', 'value', 'single-line'],
+  ])(
+    'refuses %s before touching the existing entry',
+    async (_case, service, account, value, why) => {
+      await expect(new MacKeychainSecretProvider().set(service, account, value)).rejects.toThrow(
+        why
+      );
+      expect(mocks.spawn).not.toHaveBeenCalled();
+      expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not remove the registry or retry when deletion is refused', async () => {
     const child = createFakeChild();
@@ -133,13 +203,16 @@ describe('MacKeychainSecretProvider child supervision (G12)', () => {
 
   it('rejects a hung swift write after its bound (stdin still piped)', async () => {
     vi.useFakeTimers();
+    const removeChild = createFakeChild();
     const writeChild = createFakeChild();
-    mocks.spawn.mockReturnValueOnce(writeChild);
+    mocks.spawn.mockReturnValueOnce(removeChild).mockReturnValueOnce(writeChild);
     const provider = new MacKeychainSecretProvider();
     const pending = provider.set('svc', 'acct', 'value');
     const assertion = expect(pending).rejects.toThrow(
       `macOS Keychain write failed: timed out after ${KEYCHAIN_WRITE_TIMEOUT_MS}ms`
     );
+    removeChild.emit('close', 0);
+    await vi.advanceTimersByTimeAsync(0);
     expect(writeChild.stdin.write).toHaveBeenCalledWith('svc\nacct\nvalue');
     expect(writeChild.stdin.end).toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(KEYCHAIN_WRITE_TIMEOUT_MS);
