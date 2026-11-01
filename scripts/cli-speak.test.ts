@@ -1,9 +1,10 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import {
   pathResolver,
   safeExistsSync,
+  safeLstat,
   safeMkdir,
   safeReadFile,
   safeRmSync,
@@ -11,6 +12,25 @@ import {
 } from '@agent/core';
 import { MAX_SPEAK_CHARS, runSpeakCommand, SPEAK_USAGE, type SpeakDeps } from './cli-speak.js';
 import type { MediaTool } from './lib/perception.js';
+
+// Tier-guard denials emit best-effort audit events; keep them off the real
+// audit chain so the suite stays hermetic.
+vi.mock('@agent/core/governance/audit-chain', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/governance/audit-chain')>();
+  return { ...actual, auditChain: { ...actual.auditChain, record: vi.fn() } };
+});
+
+const SCOPE_ENV_KEYS = [
+  'KYBERION_TENANT',
+  'KYBERION_TIER',
+  'KYBERION_PERSONA',
+  'MISSION_ROLE',
+  'SYSTEM_ROLE',
+  'MISSION_ID',
+  'KYBERION_SCOPE_ENV_PATH',
+  'KYBERION_TENANT_SCOPE_REQUIRED',
+  'KYBERION_ENTITY_GOVERNANCE',
+] as const;
 
 interface FakeSpeakDeps extends SpeakDeps {
   actions: Record<string, unknown>[];
@@ -61,10 +81,27 @@ function createFakeSpeakDeps(
 
 describe('pnpm kyberion speak', () => {
   let workDir = '';
+  const saved: Partial<Record<(typeof SCOPE_ENV_KEYS)[number], string | undefined>> = {};
 
   beforeAll(() => {
     workDir = pathResolver.sharedTmp(`cli-speak-${randomUUID()}`);
     safeMkdir(workDir, { recursive: true });
+  });
+
+  beforeEach(() => {
+    for (const key of SCOPE_ENV_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+    // Public interactive identity — existing cases write to unprotected tmp.
+    process.env.KYBERION_TIER = 'public';
+  });
+
+  afterEach(() => {
+    for (const key of SCOPE_ENV_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
   });
 
   afterAll(() => {
@@ -203,5 +240,69 @@ describe('pnpm kyberion speak', () => {
     const output: string[] = [];
     await runSpeakCommand(['--help'], (t) => output.push(t));
     expect(output[0]).toBe(SPEAK_USAGE);
+  });
+
+  it('refuses --out on a lower-tier floor than the active scope', async () => {
+    process.env.KYBERION_TIER = 'confidential';
+    process.env.KYBERION_TENANT = 'acme-corp';
+    const deps = createFakeSpeakDeps();
+    await expect(
+      runSpeakCommand(['hi', '--out', path.join(workDir, 'leak.wav')], () => {}, deps)
+    ).rejects.toThrow(/PERCEPTION_SCOPE.*lower source tier/);
+    expect(deps.actions).toEqual([]);
+  });
+});
+
+describe('pnpm kyberion speak under a confidential tenant scope', () => {
+  const TENANT = 'acme-corp';
+  const saved: Partial<Record<(typeof SCOPE_ENV_KEYS)[number], string | undefined>> = {};
+  let outDir = '';
+
+  beforeEach(() => {
+    for (const key of SCOPE_ENV_KEYS) {
+      saved[key] = process.env[key];
+      delete process.env[key];
+    }
+    process.env.KYBERION_TIER = 'confidential';
+    process.env.KYBERION_TENANT = TENANT;
+    outDir = path.join(
+      pathResolver.rootDir(),
+      `active/shared/tmp/confidential/${TENANT}/cli-speak-${randomUUID()}`
+    );
+    safeMkdir(outDir, { recursive: true });
+  });
+
+  afterEach(() => {
+    if (outDir) safeRmSync(outDir, { recursive: true, force: true });
+    for (const key of SCOPE_ENV_KEYS) {
+      if (saved[key] === undefined) delete process.env[key];
+      else process.env[key] = saved[key];
+    }
+  });
+
+  it('renders under perception_media_worker so confidential scratch validates and copies', async () => {
+    // Before-state: grant-less identity cannot lstat the protected out dir.
+    expect(() => safeLstat(outDir)).toThrow(/ROLE_VIOLATION/);
+    const deps = createFakeSpeakDeps();
+    const out = path.join(outDir, 'hello.wav');
+    const result = await runSpeakCommand(
+      ['こんにちは', '--out', out, '--lang', 'ja'],
+      () => {},
+      deps
+    );
+    expect(deps.actions).toHaveLength(1);
+    expect(result).toMatchObject({
+      backend: 'fake_say',
+      language: 'ja',
+      bytes: 8,
+      out: path.relative(pathResolver.rootDir(), out),
+    });
+    const scratch = path.dirname(
+      (deps.actions[0]!.delivery as { artifact_path: string }).artifact_path
+    );
+    expect(scratch).toContain(`/tmp/confidential/${TENANT}/`);
+    // Scratch is removed in finally; grant-less metadata reads still deny on
+    // the protected floor (existence is not observable without the media role).
+    expect(() => safeLstat(scratch)).toThrow(/ROLE_VIOLATION/);
   });
 });
