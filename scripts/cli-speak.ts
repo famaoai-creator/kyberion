@@ -9,6 +9,11 @@
  *   - --out     → `voice:generate_voice` (artifact delivery) rendered into a
  *                 unique shared-tmp scratch dir, then copied / transcoded to
  *                 the requested file; the scratch dir is always removed.
+ *                 On a protected active scope the render / validate / copy
+ *                 path runs under `withPerceptionMediaRole` — the same
+ *                 grant-less-CLI pattern as listen / watch / see — because
+ *                 confidential tenant scratch admits writes but denies the
+ *                 lstat/read the TTS validator needs.
  *
  * Engines are restricted to local ones (`local_only`): the text never leaves
  * the machine. Inputs and outputs must be inside the repository.
@@ -16,6 +21,7 @@
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { pathResolver } from '@agent/core/path-resolver';
+import { resolveScopeContext } from '@agent/core/scope-context';
 import { streamTtsAudioPlayback } from '@agent/core/streaming-voice-playback';
 import { ShellStreamingTextToSpeechBridge } from '@agent/core/shell/shell-streaming-tts-bridge';
 import { getVoiceEngineRegistry } from '@agent/core/voice/voice-engine-registry';
@@ -26,6 +32,7 @@ import { primaryLanguageSubtag, supportsSpeechLanguage } from '@agent/core/voice
 import type { AudioChunk } from '@agent/core/meeting/meeting-session-types';
 import type { PlaybackHandle, PlaybackResult } from '@agent/core/voice/audio-playback';
 import type { AudioDeviceDescriptor } from '@agent/core/voice/audio-route';
+import type { PerceptionScope } from '@agent/core/perception/observation';
 import {
   safeCopyFileSync,
   safeExistsSync,
@@ -36,6 +43,7 @@ import {
 import { ScriptExitError } from './lib/harness.js';
 import {
   assertExtension,
+  assertPerceptionOutput,
   createPerceptionWorkDir,
   defaultPerceptionDeps,
   explainMediaError,
@@ -43,6 +51,7 @@ import {
   parseCommonOption,
   removeWorkDir,
   resolveRepositoryInput,
+  withPerceptionMediaRole,
   type CommonArgs,
   type MediaTool,
 } from './lib/perception.js';
@@ -218,6 +227,15 @@ export function renderSpeakResult(result: SpeakResult, options: { json: boolean 
   return lines.join('\n');
 }
 
+/** Active scope for speak scratch — same source createPerceptionWorkDir uses. */
+function speakScratchScope(): PerceptionScope {
+  const scope = resolveScopeContext();
+  return {
+    tier: scope.tier,
+    ...(scope.tenant_slug ? { tenant_slug: scope.tenant_slug } : {}),
+  };
+}
+
 async function speakToFile(
   deps: SpeakDeps,
   text: string,
@@ -234,64 +252,73 @@ async function speakToFile(
       `--voice/--rate apply to playback only; file output uses the language-default voice${defaults.voice ? ` (${defaults.voice})` : ''}`
     );
   }
+  // Refuse writing derived audio to a lower-tier floor than the active scope
+  // (same gate as watch --frames / see --out).
+  assertPerceptionOutput(undefined, target);
+  const scope = speakScratchScope();
   const workDir = createPerceptionWorkDir('speak');
   try {
-    const result = await deps.voice({
-      action: 'generate_voice',
-      request_id: `speak-${randomUUID()}`,
-      text,
-      profile_ref: { profile_id: defaults.profileId },
-      engine: { engine_id: args.engine ?? 'auto', local_only: true },
-      rendering: {
-        language,
-        chunking: { max_chunk_chars: 5000, crossfade_ms: 0, preserve_paralinguistic_tags: false },
-      },
-      delivery: {
-        mode: 'artifact',
-        format,
-        artifact_path: path.join(workDir, `speech.${format}`),
-        emit_progress_packets: false,
-      },
-    });
-    assertVoiceSucceeded(result, 'generate_voice');
-    warnings.push(...toWarnings(result.warnings));
-    const refs = Array.isArray(result.artifact_refs) ? result.artifact_refs : [];
-    const rendered = typeof refs[0] === 'string' ? refs[0] : undefined;
-    if (!rendered || !safeExistsSync(rendered)) {
-      throw new ScriptExitError(
-        1,
-        '[speak] voice:generate_voice reported success but wrote no audio'
-      );
-    }
-    safeMkdir(path.dirname(target), { recursive: true });
-    if (ext === `.${format}`) {
-      safeCopyFileSync(rendered, target);
-    } else {
-      const codec =
-        ext === '.mp3' ? ['-c:a', 'libmp3lame', '-q:a', '4'] : ['-c:a', 'aac', '-b:a', '128k'];
-      try {
-        await deps.runMedia('ffmpeg', [
-          '-y',
-          '-hide_banner',
-          '-loglevel',
-          'error',
-          '-i',
-          rendered,
-          ...codec,
-          target,
-        ]);
-      } catch (error) {
-        explainMediaError('speak', error);
+    // Protected-tier scratch admits writes without a role, but the TTS
+    // validator's safeLstat / ffprobe and the post-render copy need the
+    // tenant-bound perception_media_worker identity — see withPerceptionMediaRole.
+    return await withPerceptionMediaRole(scope, async () => {
+      const result = await deps.voice({
+        action: 'generate_voice',
+        request_id: `speak-${randomUUID()}`,
+        text,
+        profile_ref: { profile_id: defaults.profileId },
+        engine: { engine_id: args.engine ?? 'auto', local_only: true },
+        rendering: {
+          language,
+          chunking: { max_chunk_chars: 5000, crossfade_ms: 0, preserve_paralinguistic_tags: false },
+        },
+        delivery: {
+          mode: 'artifact',
+          format,
+          artifact_path: path.join(workDir, `speech.${format}`),
+          emit_progress_packets: false,
+        },
+      });
+      assertVoiceSucceeded(result, 'generate_voice');
+      warnings.push(...toWarnings(result.warnings));
+      const refs = Array.isArray(result.artifact_refs) ? result.artifact_refs : [];
+      const rendered = typeof refs[0] === 'string' ? refs[0] : undefined;
+      if (!rendered || !safeExistsSync(rendered)) {
+        throw new ScriptExitError(
+          1,
+          '[speak] voice:generate_voice reported success but wrote no audio'
+        );
       }
-    }
-    return {
-      backend: String(result.resolved_engine_id ?? result.backend_id ?? 'unknown'),
-      voice: defaults.voice ?? null,
-      language,
-      out: path.relative(pathResolver.rootDir(), target),
-      bytes: safeStat(target).size,
-      warnings,
-    };
+      safeMkdir(path.dirname(target), { recursive: true });
+      if (ext === `.${format}`) {
+        safeCopyFileSync(rendered, target);
+      } else {
+        const codec =
+          ext === '.mp3' ? ['-c:a', 'libmp3lame', '-q:a', '4'] : ['-c:a', 'aac', '-b:a', '128k'];
+        try {
+          await deps.runMedia('ffmpeg', [
+            '-y',
+            '-hide_banner',
+            '-loglevel',
+            'error',
+            '-i',
+            rendered,
+            ...codec,
+            target,
+          ]);
+        } catch (error) {
+          explainMediaError('speak', error);
+        }
+      }
+      return {
+        backend: String(result.resolved_engine_id ?? result.backend_id ?? 'unknown'),
+        voice: defaults.voice ?? null,
+        language,
+        out: path.relative(pathResolver.rootDir(), target),
+        bytes: safeStat(target).size,
+        warnings,
+      };
+    });
   } finally {
     removeWorkDir(workDir);
   }
