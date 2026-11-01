@@ -55,7 +55,8 @@ export function parseAmount(text: string): number {
 }
 
 export type DraftCheck =
-  { ok: true } | { ok: false; reason: 'number' | 'order' | 'loss' | 'days' | 'deputy' };
+  | { ok: true }
+  | { ok: false; reason: 'number' | 'order' | 'loss' | 'days' | 'deputy' | 'processor' };
 
 export function checkDraft(draft: CharterFormDraft): DraftCheck {
   const perAction = parseAmount(draft.per_action);
@@ -75,6 +76,24 @@ export function checkDraft(draft: CharterFormDraft): DraftCheck {
   if (!Number.isInteger(days) || days < 1 || days > 365) return { ok: false, reason: 'days' };
   if (parseDeputies(draft.deputies).some((d) => !/^user:[a-z][a-z0-9-]*$/.test(d))) {
     return { ok: false, reason: 'deputy' };
+  }
+  // Check the same de-duplicated lists that draftToForm sends to the server.
+  const processors = parseList(draft.approved_processors);
+  const purposes = parseList(draft.processing_purposes);
+  const categories = parseList(draft.processing_categories);
+  const validIds = (items: string[]) =>
+    items.length <= 20 && items.every((item) => /^[a-z0-9][a-z0-9:_-]{0,127}$/.test(item));
+  if (
+    !validIds(processors) ||
+    !validIds(purposes) ||
+    categories.some(
+      (category) =>
+        !['routine_business', 'personal_data', 'sensitive_business', 'unknown'].includes(category)
+    ) ||
+    (processors.length > 0 && (purposes.length === 0 || categories.length === 0)) ||
+    (processors.length === 0 && (purposes.length > 0 || categories.length > 0))
+  ) {
+    return { ok: false, reason: 'processor' };
   }
   return { ok: true };
 }
