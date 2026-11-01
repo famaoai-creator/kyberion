@@ -92,6 +92,10 @@ import type { ProcedureEntry } from '@agent/core/knowledge/procedure-types';
 import { nowIso } from '@agent/core/foundation';
 import { formatWireError } from '@agent/core/wire-error';
 import { parseBrowserBridgeMessage } from './browser-bridge-input.js';
+import {
+  InspectionHandoffError,
+  submitInspectionToWaitingTicket,
+} from './lib/browser-inspection-handoff.js';
 
 /** Load + allowlist-guard + validate a browser procedure's backing recording. */
 function loadBrowserProcedure(procedureId: string): {
@@ -1348,6 +1352,46 @@ async function handleSendPage(message: any): Promise<HostResponse> {
   return { ok: true, mode: 'knowledge', staged_ref: stagedRef, ingest, page };
 }
 
+/**
+ * submit_inspection: the side panel hands a page inspection to a waiting
+ * `pnpm kyberion browser inspect --mode extension`. The payload is validated,
+ * bounded and re-redacted here, then written only into the waiting ticket whose
+ * pairing code (printed by the CLI, typed by the operator) matches — on that
+ * CLI's tier/tenant staging partition (scripts/lib/browser-inspection-handoff.ts).
+ * Replaces the former loopback HTTP listener (spec §4.2: Native Messaging only).
+ */
+/** Self-authored hand-off errors carry no paths or stack; safe for the wire. */
+function describeInspectionError(err: InspectionHandoffError): string {
+  return String(err.message);
+}
+
+function handleSubmitInspection(message: any): HostResponse {
+  try {
+    const delivered = submitInspectionToWaitingTicket(message.inspection, {
+      pairingCode: message.pairing_code,
+    });
+    const { inspection } = delivered;
+    return {
+      ok: true,
+      ticket_id: delivered.ticket_id,
+      scope: delivered.scope,
+      origin: inspection.origin,
+      counts: {
+        headings: inspection.headings.length,
+        inputs: inspection.inputs.length,
+        buttons: inspection.buttons.length,
+        links: inspection.links.length,
+      },
+      truncated: inspection.truncated,
+    };
+  } catch (err) {
+    if (err instanceof InspectionHandoffError) {
+      return { ok: false, code: err.code, error: describeInspectionError(err) };
+    }
+    return { ok: false, error: formatWireError(err, 'submit_inspection failed') };
+  }
+}
+
 export function handle(message: any): HostResponse | Promise<HostResponse> {
   switch (message?.type) {
     case 'ping':
@@ -1388,6 +1432,8 @@ export function handle(message: any): HostResponse | Promise<HostResponse> {
       return handleRespondRequest(message);
     case 'send_page':
       return handleSendPage(message);
+    case 'submit_inspection':
+      return handleSubmitInspection(message);
     default:
       return { ok: false, error: `Unsupported message type: ${String(message?.type)}` };
   }

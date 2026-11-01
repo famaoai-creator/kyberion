@@ -11,9 +11,19 @@ import {
   safeSymlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
+import { createServer, type Server } from 'node:net';
+import {
+  backupArchiveTimeoutMs,
+  interpretTarResult,
+  resolveBackupExclusions,
+  selectBackupFiles,
+  selectionWarnings,
+} from './lib/backup-file-selection.js';
 import {
   buildBackupManifest,
   copyTree,
+  createBackup,
+  createMissionGitBundles,
   parseBackupArgs,
   parseRestoredBackupManifest,
   main,
@@ -1005,5 +1015,263 @@ describe('backup manifest', () => {
       { repo_relative_path: 'active/missions/public/MSN-B', bundle_path: null },
     ]);
     expect(manifest).not.toHaveProperty('tenant_runtime_partitions');
+  });
+});
+
+describe('backup file selection', () => {
+  const root = `${FIXTURE_DIR}-select`;
+  let server: Server | undefined;
+
+  afterEach(async () => {
+    if (server) await new Promise<void>((resolve) => server!.close(() => resolve()));
+    server = undefined;
+    safeRmSync(root, { recursive: true, force: true });
+    vi.unstubAllEnvs();
+  });
+
+  const retentionEntries = [
+    { path: 'active/shared/runtime/vitest-live', artifact_class: 'tmp', backup: 'exclude' },
+    { path: 'active/shared/runtime/history-search', artifact_class: 'cache', backup: 'exclude' },
+    { path: 'active/shared/runtime/grants', artifact_class: 'state' },
+    // Pending state classed cache/tmp without the opt-out: always archived.
+    { path: 'active/shared/runtime/feedback-loop/tenants', artifact_class: 'cache' },
+    { path: 'active/shared/runtime/distill-candidates', artifact_class: 'cache' },
+    { path: 'active/shared/coordination/orchestration/events', artifact_class: 'cache' },
+    { path: 'presence/bridge/runtime', artifact_class: 'cache' },
+    { path: 'active/shared/runtime/user-tenant-cache', artifact_class: 'cache', backup: 'exclude' },
+    { path: 'active/archive/.trash', artifact_class: 'tmp', backup: 'exclude' },
+    { path: 'active/shared/data-vault', artifact_class: 'cache', backup: 'exclude' },
+  ];
+  const toolRuntimesRoot = 'active/shared/runtime/tool-runtimes';
+
+  it('excludes the re-generable floors, opted-out catalog roots and the backup output', () => {
+    const exclusions = resolveBackupExclusions({
+      rootDir: root,
+      entries: ['active', 'vault'],
+      outPath: `${root}/active/out/kyberion-all.tar.gz.enc`,
+      plainArchivePath: `${root}/active/shared/tmp/backup-x/payload.tar.gz`,
+      tempDir: `${root}/active/shared/tmp/backup-x`,
+      retentionEntries,
+      toolRuntimesRoot,
+    });
+    expect(exclusions.excludedRoots).toEqual(
+      expect.arrayContaining([
+        'active/shared/tmp',
+        'active/shared/staging',
+        'active/shared/cache',
+        'active/shared/exports/backups',
+        'active/shared/runtime/vitest-live',
+        'active/shared/runtime/history-search',
+        'active/archive/.trash',
+        'active/shared/data-vault',
+      ])
+    );
+    for (const pending of [
+      'active/shared/runtime/grants',
+      'active/shared/runtime/feedback-loop/tenants',
+      'active/shared/runtime/distill-candidates',
+      'active/shared/coordination/orchestration/events',
+      'presence/bridge/runtime',
+    ]) {
+      expect(exclusions.excludedRoots).not.toContain(pending);
+    }
+    expect(exclusions.excludedFiles).toEqual([
+      'active/out/kyberion-all.tar.gz.enc',
+      'active/shared/tmp/backup-x/payload.tar.gz',
+      'knowledge/personal/connections/kyberion-backup.json',
+      'knowledge/personal/connections/kyberion-backup.json.bak',
+    ]);
+    expect(exclusions.archiveDirs).toEqual(['active/out']);
+    expect(exclusions.provenanceOnlyRoots).toEqual([toolRuntimesRoot]);
+  });
+
+  it('the governed catalog opts .trash and data-vault out but keeps pending staging stores', () => {
+    const exclusions = resolveBackupExclusions({
+      rootDir: pathResolver.rootDir(),
+      entries: ['active'],
+      toolRuntimesRoot: null,
+    });
+    expect(exclusions.excludedRoots).toEqual(
+      expect.arrayContaining(['active/archive/.trash', 'active/shared/data-vault'])
+    );
+    for (const pending of [
+      'active/shared/runtime/distill-candidates',
+      'active/shared/runtime/feedback-loop/tenants',
+      'active/shared/coordination/orchestration/events',
+    ]) {
+      expect(exclusions.excludedRoots).not.toContain(pending);
+    }
+  });
+
+  it('reports repeated hard links as dropped paths, not as archived once', () => {
+    const [warning] = selectionWarnings({
+      paths: ['active/a.json'],
+      unlisted: [],
+      totalBytes: 1,
+      skipped: { excluded: 0, nonRegular: [], symlinks: [], hardLinks: ['active/b.json'] },
+    });
+    expect(warning).toMatch(/^Skipped 1 repeated hard link\(s\)/);
+    expect(warning).toContain('absent from the archive: active/b.json');
+    expect(warning).not.toMatch(/Archived/);
+  });
+
+  it('keeps an explicitly planned entry that lies under an excluded root', () => {
+    const exclusions = resolveBackupExclusions({
+      rootDir: root,
+      entries: ['active/shared/runtime/user-tenant-cache/acme'],
+      retentionEntries,
+      toolRuntimesRoot,
+    });
+    expect(exclusions.excludedRoots).not.toContain('active/shared/runtime/user-tenant-cache');
+    expect(exclusions.excludedRoots).toContain('active/shared/runtime/history-search');
+    expect(exclusions.excludedRoots).toContain('active/shared/cache');
+  });
+
+  it('archives durable state only: no sockets, links, caches, scratch or earlier archives', async () => {
+    const keep = [
+      'active/missions/public/MSN-A/evidence.md',
+      'active/shared/runtime/grants/grant.json',
+      'active/shared/runtime/distill-candidates/candidate.json',
+      'active/out/notes.txt',
+      `${toolRuntimesRoot}/whisper/state.json`,
+      'vault/keys.enc',
+    ];
+    const drop = [
+      'active/shared/cache/system/model.bin',
+      'active/shared/tmp/job/scratch.txt',
+      'active/shared/staging/inbound.pdf',
+      'active/shared/exports/backups/kyberion-all-old.tar.gz.enc',
+      'active/shared/runtime/vitest-live/run.json',
+      'active/archive/.trash/active/old/removed.json',
+      'active/shared/data-vault/entry.json',
+      'active/out/kyberion-all-previous.tar.gz.enc',
+      'active/out/kyberion-all.tar.gz.enc',
+      `${toolRuntimesRoot}/whisper/bin/python`,
+      'active/missions/public/MSN-A/.git/HEAD',
+    ];
+    for (const rel of [...keep, ...drop]) safeWriteFile(`${root}/${rel}`, `${rel}\n`);
+    safeMkdir(`${root}/active/projects/empty`, { recursive: true });
+    safeSymlinkSync(`${root}/vault/keys.enc`, `${root}/active/keys-alias`, 'file');
+    // Short path: a unix socket path is limited to ~104 bytes.
+    server = createServer();
+    await new Promise<void>((resolve) => server!.listen(`${root}/active/s.sock`, resolve));
+
+    const exclusions = resolveBackupExclusions({
+      rootDir: root,
+      entries: ['active', 'vault'],
+      outPath: `${root}/active/out/kyberion-all.tar.gz.enc`,
+      retentionEntries,
+      toolRuntimesRoot,
+    });
+    const selection = selectBackupFiles({
+      rootDir: root,
+      entries: ['active', 'vault'],
+      exclusions,
+      missionGitRepos: ['active/missions/public/MSN-A'],
+    });
+
+    expect([...selection.paths].sort()).toEqual([...keep, 'active/projects/empty'].sort());
+    expect(selection.skipped.nonRegular).toEqual(['active/s.sock']);
+    expect(selection.skipped.symlinks).toEqual(['active/keys-alias']);
+    expect(selection.unlisted).toEqual([]);
+    expect(selection.totalBytes).toBeGreaterThan(0);
+    expect(selectionWarnings(selection).join('\n')).toContain('active/s.sock');
+
+    // The list is what tar receives: it archives cleanly although a socket sits in the tree.
+    const listPath = `${root}-list.txt`;
+    const archive = `${root}-out.tar.gz`;
+    try {
+      safeWriteFile(listPath, `${selection.paths.join('\n')}\n`);
+      const tar = safeExecResult('tar', ['-czf', archive, '-C', root, '-T', listPath], {
+        timeoutMs: 60000,
+      });
+      expect(tar.status, tar.stderr).toBe(0);
+      const members = safeExecResult('tar', ['-tzf', archive], { timeoutMs: 60000 })
+        .stdout.split('\n')
+        .filter(Boolean)
+        .map((member) => member.replace(/\/$/, ''));
+      expect(members).toEqual(expect.arrayContaining(keep));
+      expect(members.some((member) => member.endsWith('.sock'))).toBe(false);
+    } finally {
+      safeRmSync(listPath, { force: true });
+      safeRmSync(archive, { force: true });
+    }
+  });
+
+  it('scales the tar timeout with the payload and caps it', () => {
+    expect(backupArchiveTimeoutMs(0)).toBe(10 * 60 * 1000);
+    const elevenGiB = 11 * 1024 * 1024 * 1024;
+    expect(backupArchiveTimeoutMs(elevenGiB)).toBeGreaterThan(45 * 60 * 1000);
+    expect(backupArchiveTimeoutMs(Number.MAX_SAFE_INTEGER)).toBe(6 * 60 * 60 * 1000);
+  });
+
+  it('reports a tar timeout with the payload size and the limit', () => {
+    const error = Object.assign(new Error('spawnSync tar ETIMEDOUT'), { code: 'ETIMEDOUT' });
+    expect(() =>
+      interpretTarResult(
+        { status: null, stdout: '', stderr: '', error },
+        { timeoutMs: 600000, fileCount: 42, totalBytes: 1024, archive: '/x/a.tar.gz.enc' }
+      )
+    ).toThrow(/\[BACKUP_ARCHIVE_TIMEOUT\] tar did not finish within 600s .*42 files.*\| next:/);
+  });
+
+  it('treats files that vanished during the walk as warnings, other tar failures as errors', () => {
+    const context = { timeoutMs: 1000, fileCount: 1, totalBytes: 1, archive: '/x/a.tar.gz' };
+    expect(
+      interpretTarResult(
+        {
+          status: 1,
+          stdout: '',
+          stderr:
+            'tar: active/shared/runtime/locks/a.lock: Cannot stat: No such file or directory\ntar: Error exit delayed from previous errors.\n',
+        },
+        context
+      ).warnings
+    ).toEqual([expect.stringContaining('a.lock')]);
+    expect(() =>
+      interpretTarResult(
+        { status: 1, stdout: '', stderr: 'tar: x.sock: pax format cannot archive sockets\n' },
+        context
+      )
+    ).toThrow('backup archive creation failed');
+  });
+
+  it('fails an encrypted backup on a missing passphrase before writing anything', () => {
+    vi.stubEnv('KYBERION_BACKUP_PASSPHRASE', '');
+    const out = `${root}/out/kyberion-all.tar.gz.enc`;
+    expect(() =>
+      createBackup(
+        {
+          command: 'create',
+          scope: 'all',
+          encrypt: true,
+          out,
+          passphraseEnv: 'KYBERION_BACKUP_PASSPHRASE',
+          retainDaily: 7,
+          retainWeekly: 4,
+        },
+        {
+          // Hermetic: never consult the host keychain or secret stores.
+          backend: { lookupOutsideBackupScope: () => null, inBackupScopeStores: () => [] },
+        }
+      )
+    ).toThrow('[BACKUP_PASSPHRASE_MISSING]');
+    expect(safeExistsSync(`${root}/out`)).toBe(false);
+  });
+
+  it('keeps going when one mission bundle fails and reports it as a warning', () => {
+    safeMkdir(root, { recursive: true });
+    const warnings: string[] = [];
+    const bundles = createMissionGitBundles(
+      root,
+      [{ missionPath: `${root}/missing-repo`, repoRelativePath: 'active/missions/public/MSN-X' }],
+      warnings
+    );
+    expect(bundles).toEqual([null]);
+    expect(warnings).toEqual([
+      expect.stringMatching(
+        /^\[BACKUP_MISSION_BUNDLE_FAILED\] git bundle for active\/missions\/public\/MSN-X failed — .*\| next: .*\| evidence: /
+      ),
+    ]);
   });
 });

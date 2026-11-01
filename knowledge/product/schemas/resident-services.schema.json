@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "resident-services.schema.json",
+  "title": "Resident services policy",
+  "description": "Which DAEMON_SPECS entries a checkout keeps registered with the host service manager (launchd / systemd --user / Task Scheduler). Consumed by `pnpm kyberion scheduler reconcile` (libs/core/daemon/resident-services.ts).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "services"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "const": 1 },
+    "description": { "type": "string" },
+    "services": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "requirement", "rationale"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "requirement": { "type": "string", "enum": ["required", "optional"] },
+          "owner_surface": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+            "description": "When this surface is enabled in active-surfaces.json (plus the operator overlay), surface-runtime runs the daemon and no OS unit is installed."
+          },
+          "rationale": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

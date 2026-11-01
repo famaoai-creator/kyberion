@@ -114,6 +114,10 @@ jobs:
             active/shared/exports/ci/SHA256SUMS
           if-no-files-found: error
 
+      # On pull_request and merge_group, pr-validation.yml (pr-gates) already
+      # runs `--scope pr`; `full-only` is full minus the pr gates, so the two
+      # workflows together cover `full` without running a pr gate twice.
+      # push to main and the weekly schedule still run every full gate here.
       - name: Run manifest-driven full checks
         if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
         env:
@@ -122,8 +126,9 @@ jobs:
           # relying on a developer shell's ambient role.
           KYBERION_PERSONA: worker
           MISSION_ROLE: mission_controller
+          CHECK_SCOPE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'full-only' || 'full' }}
         shell: bash
-        run: pnpm run check -- --scope full 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
+        run: pnpm run check -- --scope "$CHECK_SCOPE" 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
       # After build: the checker imports @agent/core, which resolves to the
       # package dist. Running it pre-build broke every main push since the
@@ -274,12 +279,15 @@ jobs:
           - test-suite: scripts
             shard: '3/3'
             command: pnpm test -- --suite scripts --shard=3/3
+          # --skip-gate-tests leaves out the boundary/registration test files
+          # the pr-scope registration-tests gate already runs (pr-gates on
+          # pull_request/merge_group, `--scope full` above on push/schedule).
           - test-suite: integration
             shard: '1/2'
-            command: pnpm test -- --suite integration --shard=1/2
+            command: pnpm test -- --suite integration --skip-gate-tests --shard=1/2
           - test-suite: integration
             shard: '2/2'
-            command: pnpm test -- --suite integration --shard=2/2
+            command: pnpm test -- --suite integration --skip-gate-tests --shard=2/2
     steps:
       # core and actuators run in pr-validation.yml on pull requests and in the
       # merge queue; keep the job (and its check name) but skip the duplicate

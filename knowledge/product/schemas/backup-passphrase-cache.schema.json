@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "backup-passphrase-cache.schema.json",
+  "title": "Backup passphrase availability baseline cache",
+  "description": "Cached positive result of describeBackupPassphraseAvailability (never the value). Only available=true results are cached so a newly introduced secret is seen on the next run.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["computed_at", "ttl_ms", "value"],
+  "properties": {
+    "computed_at": { "type": "string", "format": "date-time" },
+    "ttl_ms": { "type": "integer", "minimum": 0 },
+    "value": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["available", "source"],
+      "properties": {
+        "available": { "const": true },
+        "source": { "type": "string", "enum": ["env", "secret"] },
+        "backend": { "type": "string", "maxLength": 64 }
+      }
+    }
+  }
+}

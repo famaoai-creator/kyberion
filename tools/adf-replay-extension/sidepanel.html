@@ -224,23 +224,21 @@
         <div class="execution-inputs">
           <p class="section-kicker">PAGE DISCOVERY & INSPECTION</p>
           <p>
-            現在のページDOM（入力欄・ボタン・見出し・リンク）を解析し、Kyberion
-            CLIやエージェント連携用に取得・送信します。
+            現在のページDOM（入力欄・ボタン・見出し・リンク）を解析し、Native Bridge 経由で待機中の
+            Kyberion CLI（pnpm kyberion browser inspect --mode extension）へ送信します。
           </p>
-          <div class="intent-input-row" style="margin-bottom: 8px">
-            <label
-              for="inspect-port-input"
-              style="font-size: 12px; color: var(--text-muted, #666); margin-right: 6px"
-              >Port:</label
-            >
+          <div id="inspect-pairing-row" class="intent-input-row" hidden>
+            <label for="inspect-pairing-input">ペアリングコード（CLI に表示された 6 文字）</label>
             <input
-              id="inspect-port-input"
-              type="number"
+              id="inspect-pairing-input"
               class="intent-input"
-              style="width: 80px; padding: 4px 8px; font-size: 12px"
-              value="8788"
-              min="1024"
-              max="65535"
+              type="text"
+              inputmode="text"
+              autocomplete="off"
+              autocapitalize="characters"
+              spellcheck="false"
+              maxlength="9"
+              aria-describedby="inspect-page-status"
             />
           </div>
           <div class="button-row">

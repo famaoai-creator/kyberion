@@ -9,7 +9,16 @@ import { installBaselineBuildReadinessInspector } from './baseline_build_readine
 import { readJanitorLastRunMs, readJanitorLastSubmissionMs } from '@agent/core/storage-janitor';
 import { inspectMeshHub } from '@agent/core/mesh/mesh-hub-inspection';
 import { getGovernanceControlSummary } from '@agent/core/governance/governance-status';
-import { listScheduledPipelines } from '@agent/core/pipeline-scheduler';
+import {
+  BACKUP_ARCHIVE_MAX_AGE_HOURS,
+  BACKUP_PASSPHRASE_INTRODUCE_COMMAND,
+  evaluateOpsHealth,
+  type BackupPassphraseObservation,
+  formatOpsHealthFinding,
+  type OpsHealthReport,
+} from '@agent/core/ops-health';
+import { readBackupDrillReceipt, readJanitorFailureMarker } from '@agent/core/ops-health-state';
+import { collectOpsHealthInput, probeBackupPassphraseCached } from './lib/ops-health-input.js';
 import {
   listSurfaceDeadLetters,
   listSurfaceDeadTargets,
@@ -50,7 +59,7 @@ import {
   type ScriptContext,
 } from './lib/harness.js';
 import { formatCliUsage, hasHelpFlag, type CliGuardSpec } from './lib/cli-guard.js';
-import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation';
+import { getRegisteredEnvText, isVitestProcess, setRegisteredEnv } from '@agent/core/foundation';
 import {
   formatAppPreflightReport,
   runAppPreflight,
@@ -187,26 +196,45 @@ export function collectSemanticSearchDoctorLine(): string {
     return 'Semantic search: status unavailable (' + err + ')';
   }
 }
-export function collectPipelineScheduleDoctorLines(): string[] {
-  const schedules = listScheduledPipelines().sort((a, b) => a.id.localeCompare(b.id));
-  const lines = [`Pipeline schedules: ${schedules.length} registered`];
-  if (schedules.length === 0) {
-    lines.push(
-      '  - none registered; start `node dist/scripts/chronos_daemon.js` to sync scheduled pipeline ADFs'
-    );
-    return lines;
+/**
+ * Pure: one verdict line per resident-ops finding (ops-health.ts) — the same
+ * findings the baseline maps onto L10/L12, so doctor and baseline agree.
+ */
+export function collectOpsHealthDoctorLines(
+  report: OpsHealthReport,
+  registeredScheduleCount: number | null
+): string[] {
+  const scheduleNote =
+    registeredScheduleCount === null
+      ? 'schedule registry unreadable'
+      : `${registeredScheduleCount} schedule(s) registered`;
+  if (report.findings.length === 0) {
+    return [`Resident ops: healthy; ${scheduleNote}`];
   }
-  for (const schedule of schedules.slice(0, 8)) {
-    const trigger =
-      schedule.trigger.type === 'cron'
-        ? `${schedule.trigger.cron}${schedule.trigger.timezone ? ` ${schedule.trigger.timezone}` : ''}`
-        : `${schedule.trigger.intervalMs ?? 0}ms`;
-    lines.push(
-      `  - ${schedule.id}: ${schedule.enabled ? 'enabled' : 'disabled'}; ${trigger}; last=${schedule.lastRun ?? 'never'}; status=${schedule.lastStatus ?? 'unknown'}`
-    );
+  const errors = report.findings.filter((finding) => finding.severity === 'error').length;
+  const lines = [
+    `Resident ops: ${report.findings.length} finding(s) (${errors} error, ${report.findings.length - errors} warn); ${scheduleNote}`,
+  ];
+  for (const finding of report.findings) {
+    lines.push(`  - ${formatOpsHealthFinding(finding)}`);
   }
-  if (schedules.length > 8) lines.push(`  - ... ${schedules.length - 8} more`);
   return lines;
+}
+
+export async function collectPipelineScheduleDoctorLines(): Promise<string[]> {
+  try {
+    const now = new Date();
+    // OS unit inspection shells out to the host service manager — never under test.
+    const input = await collectOpsHealthInput({ now, inspectUnits: !isVitestProcess() });
+    return collectOpsHealthDoctorLines(
+      evaluateOpsHealth(input, now),
+      input.schedules ? input.schedules.length : null
+    );
+  } catch (err) {
+    return [
+      `Resident ops: evaluation unavailable (${err instanceof Error ? err.message : String(err)}); rerun \`pnpm pipeline --input pipelines/baseline-check.json\``,
+    ];
+  }
 }
 
 export async function collectMeshDeliveryDoctorLines(): Promise<string[]> {
@@ -293,16 +321,41 @@ export function collectSurfaceDeliveryDoctorLines(): string[] {
   return lines;
 }
 
+export function formatBackupDrillLine(receipt: ReturnType<typeof readBackupDrillReceipt>): string {
+  if (!receipt) return 'restore drill: never run';
+  if (receipt.ok) return `restore drill: ok at ${receipt.completed_at}`;
+  if (receipt.reason === 'no_archive')
+    return `restore drill: skipped at ${receipt.completed_at} (no archive — backup-daily must succeed first)`;
+  return `restore drill: FAILED at ${receipt.completed_at}${receipt.error ? ` (${receipt.error.slice(0, 160)})` : ''}`;
+}
+
+/** Pure: where the backup passphrase comes from (never the value). */
+export function formatBackupPassphraseNote(passphrase: BackupPassphraseObservation | null): string {
+  if (!passphrase) return 'passphrase=not probed';
+  if (passphrase.available) {
+    return `passphrase=${passphrase.source}${passphrase.backend ? `(${passphrase.backend})` : ''}`;
+  }
+  return `passphrase=UNAVAILABLE (run \`${BACKUP_PASSPHRASE_INTRODUCE_COMMAND}\`)`;
+}
+
 export function collectBackupDoctorLines(): string[] {
-  const status = summarizeBackupStatus();
+  // Same freshness threshold as the ops-health backup finding.
+  const status = summarizeBackupStatus(undefined, {
+    staleAfterHours: BACKUP_ARCHIVE_MAX_AGE_HOURS,
+  });
+  // One keychain read at most (cached once reachable); never under test.
+  const passphraseNote = formatBackupPassphraseNote(
+    isVitestProcess() ? null : probeBackupPassphraseCached()
+  );
+  const drill = `${formatBackupDrillLine(readBackupDrillReceipt())}; ${passphraseNote}`;
   if (status.status === 'missing') {
     return [
-      'Backup status: missing; run `KYBERION_BACKUP_PASSPHRASE=... pnpm backup create --scope all --encrypt`',
+      `Backup status: missing; ${drill}; run \`KYBERION_BACKUP_PASSPHRASE=... pnpm backup create --scope all --encrypt\``,
     ];
   }
   const age = status.latestAgeHours?.toFixed(1) ?? 'unknown';
   return [
-    `Backup status: ${status.status}; latest=${status.latestName}; age=${age}h; archives=${status.count}; dir=${status.backupDir}`,
+    `Backup status: ${status.status}; latest=${status.latestName}; age=${age}h (limit ${BACKUP_ARCHIVE_MAX_AGE_HOURS}h); archives=${status.count}; ${drill}; dir=${status.backupDir}`,
   ];
 }
 
@@ -340,8 +393,14 @@ export function collectMaintenanceDoctorLines(): string[] {
     pendingState = 'idle';
   }
 
+  const failure = readJanitorFailureMarker();
+  const failedAtMs = failure ? Date.parse(failure.failed_at) : NaN;
+  const failureNote =
+    failure && Number.isFinite(failedAtMs) && (lastRunMs === null || failedAtMs > lastRunMs)
+      ? `; last_failure=${failure.failed_at} exit=${failure.exit_code ?? 'unknown'}${failure.log_path ? ` log=${failure.log_path}` : ''}`
+      : '';
   return [
-    `Maintenance: janitor ${pendingState}; last_run=${lastRunMs === null ? 'never' : `${ageHours}h ago`}; submit_marker=${submitPending ? 'present' : 'absent'}`,
+    `Maintenance: janitor ${pendingState}; last_run=${lastRunMs === null ? 'never' : `${ageHours}h ago`}; submit_marker=${submitPending ? 'present' : 'absent'}${failureNote}`,
   ];
 }
 
@@ -464,7 +523,7 @@ export async function collectDoctorReport(argv: {
     totalMissing,
     rollupLines: collectHealthRollupLines(totalMissing, envReport),
     summaries,
-    scheduleLines: collectPipelineScheduleDoctorLines(),
+    scheduleLines: await collectPipelineScheduleDoctorLines(),
     maintenanceLines: collectMaintenanceDoctorLines(),
     governanceLines,
     backupLines: collectBackupDoctorLines(),

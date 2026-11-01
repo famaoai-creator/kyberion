@@ -12,6 +12,18 @@ const WORKFLOW_SCOPE_REFS = {
   release: '.github/workflows/release.yml',
 } as const;
 const WORKFLOW_PATHS = [...Object.values(WORKFLOW_SCOPE_REFS), '.github/workflows/cross-os.yml'];
+/**
+ * The command each scope's workflow must run. ci.yml runs `full` on push and
+ * schedule but `full-only` (full minus the pr gates) on pull_request and
+ * merge_group, where pr-validation.yml already runs `--scope pr`.
+ */
+export const FULL_SCOPE_SELECTOR =
+  "CHECK_SCOPE: ${{ (github.event_name == 'pull_request' || github.event_name == 'merge_group') && 'full-only' || 'full' }}";
+const WORKFLOW_SCOPE_COMMANDS: Record<keyof typeof WORKFLOW_SCOPE_REFS, string[]> = {
+  pr: ['pnpm run check -- --scope pr'],
+  full: [FULL_SCOPE_SELECTOR, 'pnpm run check -- --scope "$CHECK_SCOPE"'],
+  release: ['pnpm run check -- --scope release'],
+};
 const SETUP_ACTION_MARKER = 'uses: ./.github/actions/setup-kyberion';
 
 export function readCiGateParityTextFile(filePath: string): string {
@@ -141,9 +153,10 @@ export function checkCiGateParity(): string[] {
       failures.push(`manifest has no ${scope} gate`);
     }
     const workflow = read(WORKFLOW_SCOPE_REFS[scope]);
-    const command = `pnpm run check -- --scope ${scope}`;
-    if (!workflow.includes(command)) {
-      failures.push(`${WORKFLOW_SCOPE_REFS[scope]} is missing ${command}`);
+    for (const command of WORKFLOW_SCOPE_COMMANDS[scope]) {
+      if (!workflow.includes(command)) {
+        failures.push(`${WORKFLOW_SCOPE_REFS[scope]} is missing ${command}`);
+      }
     }
   }
   if (!packageJson.scripts?.check?.includes('scripts/run_checks.ts')) {
