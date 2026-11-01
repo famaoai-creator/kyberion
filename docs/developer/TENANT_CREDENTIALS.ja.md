@@ -98,6 +98,8 @@ pnpm kyberion reasoning credentials probe --provider anthropic --tenant "$TENANT
 
 成功時は `work_item_id`、`task_id` と `proof.status=success` / `proof.code=verified` を返します。
 proofにはキーのバージョンを表すハッシュ・endpoint・モデル・日時・tenant/mission/task・通信経路を記録し、キー本体を保存しません。
+識別値はランダムsalt付きscrypt形式です。旧SHA-256形式のproofは `verified=false` になります。
+キーの再登録は不要です。実証結果を更新する場合だけ、`verify` / `probe` を `--allow-paid` 付きで再実行してください。
 失敗時もWorkItemのattemptと状態に結果を残します。通常タスクも同じdispatch経路に入れば割り当てを利用できます。
 WorkItem claimを持たないmission kickoffや単独CLIへ、tenantの資格情報を自動貸与する機能ではありません。
 

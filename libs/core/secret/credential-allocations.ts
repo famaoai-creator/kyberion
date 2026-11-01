@@ -1,4 +1,5 @@
 /** Local credential allocations reuse standing grants; material stays in the secret store. */
+import { timingSafeEqual } from 'node:crypto';
 import { withExecutionContext } from '../authority.js';
 import {
   credentialExecutionIdentity,
@@ -18,7 +19,6 @@ import {
 import {
   listReasoningApiProviders,
   requireReasoningApiProvider,
-  reasoningCredentialVersion,
 } from '../reasoning/reasoning-api-credentials.js';
 import { resolveSecretIdentity } from './secret-identity.js';
 import { decryptConnectionDocument, isEncryptedConnectionEnvelope } from './secret-encryption.js';
@@ -41,9 +41,6 @@ export function installLocalCredentialAllocations(): boolean {
     { provenance: 'generated', source: 'local-credential-allocation-default' }
   );
   return true;
-}
-export function credentialVersion(value: string): string {
-  return reasoningCredentialVersion(value);
 }
 const denied = () =>
   new Error('[CREDENTIAL_ALLOCATION_DENIED] Allocation missing, expired, revoked, or changed');
@@ -138,7 +135,7 @@ export async function bindAllocatedTaskCredentials(
   const claim = assertTaskCredentialClaim(input);
   const allowed = currentScopeEnvelope()?.policy.allowed_reasoning_backends;
   const secrets: Record<string, string> = {};
-  const admitted: Array<{ grantId: string; provider: string; version: string }> = [];
+  const admitted: Array<{ grantId: string; provider: string; key: string }> = [];
   const providers = new Set<string>(listReasoningApiProviders().map((p) => p.mode));
   for (const grant of grants) {
     const provider = grant.scope.credential_provider;
@@ -152,7 +149,7 @@ export async function bindAllocatedTaskCredentials(
     const key = readAllocatedMaterial(tenant, grant.grant_id, provider);
     for (const name of requireReasoningApiProvider(provider).secret_refs![0]!.env_keys)
       secrets[name] = key;
-    admitted.push({ grantId: grant.grant_id, provider, version: credentialVersion(key) });
+    admitted.push({ grantId: grant.grant_id, provider, key });
   }
   if (claim !== assertTaskCredentialClaim(input)) throw denied();
   if (!admitted.length) return null;
@@ -160,7 +157,11 @@ export async function bindAllocatedTaskCredentials(
     if (claim !== assertTaskCredentialClaim(input)) throw denied();
     for (const entry of admitted) {
       const current = readAllocatedMaterial(tenant, entry.grantId, entry.provider);
-      if (credentialVersion(current) !== entry.version) throw denied();
+      // Binding already holds the key in memory; compare directly instead of
+      // deriving a persistent verifier on every managed credential use.
+      const actual = Buffer.from(current);
+      const expected = Buffer.from(entry.key);
+      if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) throw denied();
     }
   };
   validate();

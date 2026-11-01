@@ -13,6 +13,8 @@ import {
   resolveReasoningApiModel,
   registerReasoningApiProofAdapter,
   verifyReasoningApiCredential,
+  reasoningCredentialVersion,
+  matchesReasoningCredentialVersion,
 } from './reasoning-api-credentials.js';
 const mock = vi.hoisted(() => ({
   environment: vi.fn((descriptor: { mode: string }) => ({
@@ -32,6 +34,26 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe('API credential proofs', () => {
+  it('uses independently salted, serializable verifiers and rejects changed keys and legacy proofs', () => {
+    const first = reasoningCredentialVersion('synthetic-key');
+    const second = reasoningCredentialVersion('synthetic-key');
+    expect(first).not.toBe(second);
+    expect(first).toMatch(/^scrypt-v1:[a-f0-9]{32}:[a-f0-9]{64}$/);
+    expect(
+      matchesReasoningCredentialVersion('synthetic-key', JSON.parse(JSON.stringify(first)))
+    ).toBe(true);
+    expect(matchesReasoningCredentialVersion('changed-key', first)).toBe(false);
+    for (const malformed of [
+      undefined,
+      null,
+      '',
+      'a'.repeat(64),
+      first + ':extra',
+      first.replace('scrypt-v1', 'scrypt-v2'),
+      first.slice(0, -1) + 'Z',
+    ])
+      expect(matchesReasoningCredentialVersion('synthetic-key', malformed)).toBe(false);
+  });
   it.each([
     [401, 'authentication_failed'],
     [403, 'authorization_failed'],
@@ -48,7 +70,7 @@ describe('API credential proofs', () => {
       );
       expect(result.code).toBe(code);
       expect(JSON.stringify(result)).not.toContain('test-private-key');
-      expect(result.credential_version).toMatch(/^[a-f0-9]{64}$/);
+      expect(result.credential_version).toMatch(/^scrypt-v1:[a-f0-9]{32}:[a-f0-9]{64}$/);
     }
   );
   it('attributes transport and key version and distinguishes DNS from authentication', async () => {
