@@ -313,6 +313,9 @@ function ensureDurableQueueFile(filePath: string): void {
  * explicit `queuePath` — excludes the others' appends and write-time rewrite
  * (`maintainStoreAfterAppend` runs with `lockId: null` under this lock).
  */
+/** File name of a mission's durable agent input queue. */
+export const AGENT_INPUT_QUEUE_FILENAME = 'agent-input-queue.jsonl';
+
 export function agentInputQueueLockId(queuePath: string): string {
   const digest = createHash('sha256').update(path.resolve(queuePath)).digest('hex');
   return `agent-input-queue:${digest.slice(0, 32)}`;
@@ -641,7 +644,7 @@ function resolveMissionAgentInputQueuePath(options: AgentInputQueueOptions): str
     path.join(
       resolveMissionQueueDir(options.missionId.trim(), options),
       'coordination',
-      'agent-input-queue.jsonl'
+      AGENT_INPUT_QUEUE_FILENAME
     );
   return assertSafeRepositoryPath(candidate, { allowMissingLeaf: true });
 }

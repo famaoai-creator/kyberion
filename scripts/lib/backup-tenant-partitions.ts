@@ -13,6 +13,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { isRecord, nowIso, parseSafeJsonInput, readTextFile } from '@agent/core/foundation';
 import { writeJson } from '@agent/core/foundation/json';
 import {
+  isLedgerChainFileName,
   TENANT_LEDGER_FILE,
   verifyLedgerIntegrityDetailed,
   verifyTenantLedgerIntegrity,
@@ -300,13 +301,19 @@ export function verifyRestoredTenantLedgers(
   members: string[],
   archiveChainKeyId: string | undefined
 ): RestoredLedgerVerification {
-  const ledgers = members.filter((member) => {
+  // One chain per partition: the live ledger.jsonl and/or its rotated
+  // segments (MSN-STORE-BOUNDS-3) — a partition right after a rotation
+  // holds segments only.
+  const chainFiles = new Map<string, string[]>();
+  for (const member of members) {
     const partition = tenantRuntimePartitionOf(member);
-    return (
-      partition?.key === 'tenant_ledger' &&
-      member === `${partition.root}/${partition.tier}/${partition.tenant}/${TENANT_LEDGER_FILE}`
-    );
-  });
+    if (partition?.key !== 'tenant_ledger') continue;
+    const partitionDir = `${partition.root}/${partition.tier}/${partition.tenant}`;
+    if (path.posix.dirname(member) !== partitionDir) continue;
+    if (!isLedgerChainFileName(TENANT_LEDGER_FILE, path.posix.basename(member))) continue;
+    chainFiles.set(partitionDir, [...(chainFiles.get(partitionDir) ?? []), member]);
+  }
+  const ledgers = [...chainFiles.keys()].sort((a, b) => a.localeCompare(b));
   if (ledgers.length === 0) return 'not_applicable';
   const keyId = currentAuditChainKeyId();
   if (!archiveChainKeyId || keyId !== archiveChainKeyId) {
@@ -315,15 +322,29 @@ export function verifyRestoredTenantLedgers(
     );
     return 'deferred_key_mismatch';
   }
-  for (const member of ledgers) {
+  for (const partitionDir of ledgers) {
+    for (const file of chainFiles.get(partitionDir) ?? []) {
+      const unkeyed = unkeyedEntries(path.join(staging, file), archiveChainKeyId);
+      if (unkeyed.length > 0) {
+        throw new Error(
+          `[BACKUP_RESTORE_LEDGER_DOWNGRADED] restored tenant ledger has entries not HMAC-chained under the archive's key — nothing was restored to the target | next: do not use this archive; restore an earlier backup | evidence: ${file} (${unkeyed.slice(0, 5).join(', ')}${unkeyed.length > 5 ? ', …' : ''})`
+        );
+      }
+    }
+    // Verifies the whole chain: the staged segments in order, then the live
+    // file when the archive carries one (the live path may be absent).
+    const member = `${partitionDir}/${TENANT_LEDGER_FILE}`;
     const stagedPath = path.join(staging, member);
-    const unkeyed = unkeyedEntries(stagedPath, archiveChainKeyId);
-    if (unkeyed.length > 0) {
+    const report = verifyLedgerIntegrityDetailed(stagedPath);
+    // A chain that opens on a segment marker without an archive receipt lost
+    // its oldest segments outside the governed janitor (tenant partitions are
+    // never archived by code): the archive is incomplete.
+    const unproven = report.corrupted.filter((finding) => finding.includes(':unproven_anchor:'));
+    if (unproven.length > 0) {
       throw new Error(
-        `[BACKUP_RESTORE_LEDGER_DOWNGRADED] restored tenant ledger has entries not HMAC-chained under the archive's key — nothing was restored to the target | next: do not use this archive; restore an earlier backup | evidence: ${member} (${unkeyed.slice(0, 5).join(', ')}${unkeyed.length > 5 ? ', …' : ''})`
+        `[BACKUP_RESTORE_LEDGER_INCOMPLETE] restored tenant ledger starts after segments that are not in the archive — nothing was restored to the target | next: do not use this archive; restore an earlier backup that carries the whole chain | evidence: ${member} (${unproven.join(', ')})`
       );
     }
-    const report = verifyLedgerIntegrityDetailed(stagedPath);
     if (!report.ok) {
       throw new Error(
         `[BACKUP_RESTORE_LEDGER_CORRUPT] restored tenant ledger fails hash-chain verification — nothing was restored to the target | next: do not use this archive; inspect it and restore an earlier backup | evidence: ${member} (${report.corrupted.length} corrupted of ${report.total})`

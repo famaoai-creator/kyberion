@@ -45,6 +45,14 @@ export interface AuditVerifyCliReport {
     /** Unkeyed (`sha256`) legacy entries: not tamper-evident without the key. */
     unkeyed: number;
     missing?: boolean;
+    /** Rotated segments verified before the live file (MSN-STORE-BOUNDS-3). */
+    segments?: string[];
+    /**
+     * Oldest present file opens with a keyed segment marker. Clean only with a
+     * signed LEDGER_SEGMENT_ARCHIVED receipt on the chain; otherwise an
+     * `unproven_anchor` finding is reported.
+     */
+    anchoredFrom?: string;
     /** Set for a tenant ledger partition (D9). */
     tier?: string;
     tenant_slug?: string;
@@ -89,7 +97,10 @@ export function collectAuditVerifyReport(
       corrupted: report.corrupted,
       missingKey: report.missingKey,
       unkeyed: report.unkeyed,
-      ...(safeExistsSync(ledgerPath) ? {} : { missing: true }),
+      ...(report.segments ? { segments: report.segments } : {}),
+      ...(report.anchoredFrom ? { anchoredFrom: report.anchoredFrom } : {}),
+      // Right after a rotation the live file is absent but its segments hold the chain.
+      ...(safeExistsSync(ledgerPath) || report.segments ? {} : { missing: true }),
     };
   });
   // D9: tenant mission events live in the tenant ledger partitions — one hash
@@ -105,6 +116,8 @@ export function collectAuditVerifyReport(
       corrupted: tenantLedger.corrupted,
       missingKey: tenantLedger.missingKey,
       unkeyed: tenantLedger.unkeyed,
+      ...(tenantLedger.segments ? { segments: tenantLedger.segments } : {}),
+      ...(tenantLedger.anchoredFrom ? { anchoredFrom: tenantLedger.anchoredFrom } : {}),
       tier: tenantLedger.tier,
       tenant_slug: tenantLedger.tenant_slug,
     });
@@ -177,8 +190,17 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
   for (const ledger of report.ledgers) {
     lines.push(
       `Ledger: ${ledger.ok ? 'ok' : 'failed'}; entries=${ledger.total}; path=${ledger.path}` +
-        (ledger.tenant_slug ? `; tenant=${ledger.tenant_slug}; tier=${ledger.tier}` : '')
+        (ledger.tenant_slug ? `; tenant=${ledger.tenant_slug}; tier=${ledger.tier}` : '') +
+        (ledger.segments?.length ? `; segments=${ledger.segments.length}` : '')
     );
+    if (ledger.anchoredFrom) {
+      const unproven = ledger.corrupted.some((finding) => finding.includes(':unproven_anchor:'));
+      lines.push(
+        unproven
+          ? `  - chain starts after segment ${ledger.anchoredFrom}, which has no archive receipt on the chain (segments were removed outside the storage janitor)`
+          : `  - chain continues from archived segment ${ledger.anchoredFrom} (storage-janitor archive receipt on the chain)`
+      );
+    }
     if (ledger.corrupted.length > 0) {
       lines.push(`  - findings: ${ledger.corrupted.join(', ')}`);
     }
