@@ -1,5 +1,13 @@
 import { isCredentialMaterialCapability } from './foundation/credential-material-capability.js';
 import {
+  PERSONAL_APPROVAL_STORE_ROLE,
+  personalApprovalIoAllowed,
+} from './foundation/personal-approval-io-capability.js';
+import {
+  TASK_SOURCE_WORKSPACE_ROLE,
+  taskSourceWorkspaceIoActive,
+} from './foundation/task-source-workspace-capability.js';
+import {
   isDiscussionRequestCapability,
   DISCUSSION_REQUEST_STORAGE_ROLE,
 } from './foundation/discussion-request-capability.js';
@@ -794,6 +802,10 @@ function prepareExecutionContext(
 ): PreparedExecutionContext {
   const normalizedRole = normalizeRoleName(role.trim());
   const executionIdentity = { ...currentExecutionScope()?.executionIdentity, ...identity };
+  if (normalizedRole === PERSONAL_APPROVAL_STORE_ROLE && !personalApprovalIoAllowed())
+    throw new Error('[PERSONAL_APPROVAL_SCOPE_REQUIRED] Exact personal owner IO window required');
+  if (normalizedRole === TASK_SOURCE_WORKSPACE_ROLE && !taskSourceWorkspaceIoActive())
+    throw new Error('[TASK_SOURCE_SCOPE_DENIED] Active exact workspace IO capability required');
   for (const value of Object.values(executionIdentity)) {
     if (value !== null && value !== undefined && !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(value))
       throw new Error('[SCOPE_CONTEXT_INVALID] invalid execution identity');

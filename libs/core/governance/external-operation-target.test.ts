@@ -101,6 +101,85 @@ const resolve = () =>
     ownerActor: 'user:owner',
     invocationId: 'actual-stable-command',
   });
+
+describe('reachable push source authority across tiers', () => {
+  it.each(['public', 'personal', 'confidential'] as const)(
+    'admits exact %s source scope only, with verified private destinations for nonpublic',
+    (tier) => {
+      const tenant = tier === 'confidential' ? 'acme' : undefined;
+      state.tier = tier;
+      state.tenant = tenant;
+      const scope = tenant
+        ? { kind: 'organization' as const, tenant_slug: tenant }
+        : { kind: 'person' as const };
+      const c = charter();
+      c.scope = scope;
+      c.envelope.data_tier.read = [tenant ? `confidential:${tenant}` : tier];
+      c.envelope.external_operations = [
+        {
+          operation_id: 'vcs:push',
+          repository: grant.repository,
+          branch: 'feature',
+          ...(tier !== 'public' ? { visibility: 'private' as const } : {}),
+        },
+      ];
+      state.charter = c;
+      const resolver = createOnboardingExternalOperationAuthority({
+        scope,
+        agentId: 'kyberion://agent/local/installed-worker',
+        ownerActor: 'user:owner',
+        invocationId: `push-${tier}`,
+      });
+      const input = {
+        operationId: 'vcs:push',
+        requiresApproval: true,
+        delegable: true,
+        effect: {
+          url: grant.repository,
+          destination: 'refs/heads/feature',
+          publication_source_tier: tier,
+          ...(tenant ? { publication_source_tenant: tenant } : {}),
+          repository_visibility: tier === 'public' ? 'unknown' : 'private',
+        },
+      };
+      expect(resolver(input)).toMatchObject({
+        charter: { action: { data: { tier, mode: 'read' } } },
+      });
+      expect(
+        resolver({ ...input, effect: { ...input.effect, publication_source_tier: undefined } })
+      ).not.toHaveProperty('charter');
+      expect(
+        resolver({
+          ...input,
+          effect: { ...input.effect, publication_source_tier: 'protected_or_unknown' },
+        })
+      ).not.toHaveProperty('charter');
+      if (tier !== 'public') {
+        expect(
+          resolver({ ...input, effect: { ...input.effect, repository_visibility: 'unknown' } })
+        ).not.toHaveProperty('charter');
+        expect(
+          resolver({ ...input, effect: { ...input.effect, repository_visibility: 'public' } })
+        ).not.toHaveProperty('charter');
+      }
+      expect(
+        resolver({
+          ...input,
+          effect: { ...input.effect, publication_source_tenant: 'other' },
+        })
+      ).not.toHaveProperty('charter');
+      if (tier === 'public') {
+        expect(
+          resolver({
+            ...input,
+            effect: { ...input.effect, publication_source_tier: 'personal' },
+          })
+        ).not.toHaveProperty('charter');
+      }
+    }
+  );
+});
+
 beforeEach(() => {
   vi.restoreAllMocks();
   state.installed = false;
@@ -292,7 +371,11 @@ describe('exact public operation target grants', () => {
       operationId: 'vcs:push',
       requiresApproval: true,
       delegable: true,
-      effect: { url: mergeGrant.repository, destination: 'refs/heads/release/1' },
+      effect: {
+        url: mergeGrant.repository,
+        destination: 'refs/heads/release/1',
+        publication_source_tier: 'public',
+      },
     });
     expect(pushAuthority).toMatchObject({
       charter: { action: { external_operation: pushGrant, reputational_class: 'A' } },
@@ -310,7 +393,11 @@ describe('exact public operation target grants', () => {
         operationId: 'vcs:push',
         requiresApproval: true,
         delegable: true,
-        effect: { url: 'git@github.com:acme/project.git', destination: 'refs/heads/release/1' },
+        effect: {
+          url: 'git@github.com:acme/project.git',
+          destination: 'refs/heads/release/1',
+          publication_source_tier: 'public',
+        },
       })
     ).toMatchObject({ charter: { action: { external_operation: pushGrant } } });
   });
@@ -484,6 +571,7 @@ describe('exact public operation target grants', () => {
               url: grant.repository,
               destination: 'refs/heads/main',
               repository_visibility: 'private',
+              publication_source_tier: 'public',
             }
           : {
               repository: facts.effect.repository,

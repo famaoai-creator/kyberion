@@ -799,6 +799,13 @@ describe('mission_controller argument parsing', () => {
   });
 
   it('rejects unsupported ticket and work-item dispatch option values', () => {
+    expect(
+      resolveMissionWorkItemDispatchOptionsFromArgv(['--dispatch-item-ids', 'WI-ONE,WI-TWO'])
+        .itemIds
+    ).toEqual(['WI-ONE', 'WI-TWO']);
+    expect(() =>
+      resolveMissionWorkItemDispatchOptionsFromArgv(['--dispatch-item-ids', 'WI-ONE,,WI-TWO'])
+    ).toThrow('distinct canonical');
     expect(() =>
       resolveMissionTicketDispatchOptionsFromArgv(['--ticket-targets', 'workitem,unknown'])
     ).toThrow('--ticket-targets contains unsupported value(s): unknown');
