@@ -10,8 +10,12 @@ type FontFamilyPair = {
 };
 
 const BRAND_TOKENS_RELATIVE_PATH = 'knowledge/public/design-patterns/brand-tokens/kyberion.json';
-const FALLBACK_SANS_STACK = "Inter, 'Noto Sans JP', sans-serif";
+const FALLBACK_SANS_STACK =
+  "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif";
 const FALLBACK_MONO_STACK = "'JetBrains Mono', monospace";
+const FALLBACK_LATIN_FONT = 'Helvetica Neue';
+const EAST_ASIAN_FONT_RE =
+  /noto sans jp|hiragino|yu gothic|meiryo|ms gothic|source han sans|pingfang|apple sd gothic/i;
 
 let cachedBrandTokens: BrandTokens | null = null;
 
@@ -86,7 +90,23 @@ export const KYBERION_BRAND_MONO_STACK =
   loadBrandTokensOrFallback().tokens?.fonts?.mono ?? FALLBACK_MONO_STACK;
 
 export function resolveLatinFontFamily(fontStack?: string): string {
-  return firstFontFamily(fontStack ?? KYBERION_BRAND_FONT_STACK, 'Inter');
+  const stack = fontStack ?? KYBERION_BRAND_FONT_STACK;
+  const families = stack
+    .split(',')
+    .map((family) => family.trim().replace(/^['"]|['"]$/g, ''))
+    .filter(Boolean);
+
+  for (const family of families) {
+    if (
+      /^(sans-serif|serif|monospace|system-ui|ui-sans-serif|ui-serif|ui-monospace)$/i.test(family)
+    ) {
+      continue;
+    }
+    if (EAST_ASIAN_FONT_RE.test(family)) continue;
+    return family;
+  }
+
+  return firstFontFamily(stack, FALLBACK_LATIN_FONT);
 }
 
 export function resolveEastAsianFontFamily(fontStack?: string): string {
@@ -97,11 +117,7 @@ export function resolveEastAsianFontFamily(fontStack?: string): string {
     .filter(Boolean);
 
   for (const family of families) {
-    if (
-      /noto sans jp|hiragino|yu gothic|meiryo|ms gothic|source han sans|pingfang|apple sd gothic/i.test(
-        family
-      )
-    ) {
+    if (EAST_ASIAN_FONT_RE.test(family)) {
       return family;
     }
   }

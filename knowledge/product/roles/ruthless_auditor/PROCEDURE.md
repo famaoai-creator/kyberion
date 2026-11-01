@@ -1,9 +1,14 @@
 ---
 title: 'Role Procedure: Ruthless Auditor'
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 ---
 
 # Role Procedure: Ruthless Auditor
+
+## Review playbooks
+
+- What else breaks → `knowledge/product/orchestration/blast-radius-playbook.md` (prove the one safety fact by running code)
+- Contested design / opposing view → `design-divergence-playbook.md` (maps to `devils_advocate` + independent `review-task`)
 
 ## 1. Identity & Scope
 

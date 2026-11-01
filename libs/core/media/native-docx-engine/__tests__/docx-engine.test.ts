@@ -562,9 +562,9 @@ describe('Native DOCX Engine', () => {
     it('fontTable.xml should contain font definitions', () => {
       const fontTable = files.get('word/fontTable.xml')!;
       expect(fontTable).toContain('<w:fonts');
-      expect(fontTable).toContain('w:name="Inter"');
+      expect(fontTable).toContain('w:name="Helvetica Neue"');
       expect(fontTable).toContain('w:name="Times New Roman"');
-      expect(fontTable).toContain('w:name="Noto Sans JP"');
+      expect(fontTable).toContain('w:name="Hiragino Sans"');
       expect(fontTable).toContain('w:name="MS Mincho"');
     });
 

@@ -68,7 +68,11 @@
           "type": "object",
           "properties": {
             "sans": { "type": "string" },
-            "mono": { "type": "string" }
+            "mono": { "type": "string" },
+            "campaign_display": {
+              "type": "string",
+              "description": "Optional marketing/campaign display stack. Product UI keeps sans; override only with an evidenced brand decision (see visual-direction-playbook)."
+            }
           },
           "required": ["sans", "mono"]
         },
