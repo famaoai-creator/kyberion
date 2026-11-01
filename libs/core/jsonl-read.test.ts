@@ -2,10 +2,11 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { sharedTmp } from './path-resolver.js';
-import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import { safeMkdir, safeMoveSync, safeRmSync, safeWriteFile } from './secure-io.js';
 import {
   fileEndsWithNewline,
   JsonlLineTooLongError,
+  JsonlSourceChangedError,
   readJsonLinesBackward,
   readJsonLinesSince,
   readLastJsonLine,
@@ -13,6 +14,7 @@ import {
   streamTextLines,
   streamTextLinesBackward,
   type JsonlByteSource,
+  type JsonlPinnedReader,
 } from './jsonl-read.js';
 
 /** In-memory byte source that counts the bytes it serves. */
@@ -97,10 +99,10 @@ describe('jsonl-read', () => {
     it('skips blank lines and keeps line numbers for raw scans', () => {
       const { source } = memorySource({ f: '\n{"a":1}\n\n{"a":2}' });
       expect([...streamTextLines('f', { source, chunkBytes: 2 })]).toEqual([
-        { text: '', lineNumber: 1, terminated: true },
-        { text: '{"a":1}', lineNumber: 2, terminated: true },
-        { text: '', lineNumber: 3, terminated: true },
-        { text: '{"a":2}', lineNumber: 4, terminated: false },
+        { text: '', lineNumber: 1, terminated: true, byteStart: 0, byteEnd: 1 },
+        { text: '{"a":1}', lineNumber: 2, terminated: true, byteStart: 1, byteEnd: 9 },
+        { text: '', lineNumber: 3, terminated: true, byteStart: 9, byteEnd: 10 },
+        { text: '{"a":2}', lineNumber: 4, terminated: false, byteStart: 10, byteEnd: 17 },
       ]);
       expect(
         [...streamTextLinesBackward('f', { source, chunkBytes: 2 })].map((l) => l.text)
@@ -304,6 +306,110 @@ describe('jsonl-read', () => {
       expect(readLastJsonLine(file, { chunkBytes: 17 })).toEqual(records[49]);
       expect(fileEndsWithNewline(file)).toBe(false);
       expect(readLastJsonLine(path.join(dir, 'missing.jsonl'))).toBeNull();
+    });
+
+    it('a scan stays on its inode when the path is renamed aside and replaced mid-scan', () => {
+      const file = path.join(dir, 'store.jsonl');
+      const records = Array.from({ length: 40 }, (_, i) => ({ n: i }));
+      const replacement = jsonl({ replaced: true });
+      const replaceMidScan = (): void => {
+        safeMoveSync(file, path.join(dir, 'store.jsonl.compacting-1'));
+        safeWriteFile(file, replacement);
+      };
+
+      safeWriteFile(file, jsonl(...records));
+      const forward = streamJsonLines<{ n: number }>(file, { chunkBytes: 16 });
+      const seen = [forward.next().value, forward.next().value];
+      replaceMidScan();
+      expect([...seen, ...forward]).toEqual(records);
+
+      safeWriteFile(file, jsonl(...records));
+      const backward = readJsonLinesBackward<{ n: number }>(file, { chunkBytes: 16 });
+      const newest = [backward.next().value, backward.next().value];
+      replaceMidScan();
+      expect([...newest, ...backward]).toEqual([...records].reverse());
+    });
+  });
+
+  describe('scan handle lifecycle', () => {
+    function pinnedSource(content: string) {
+      const events: string[] = [];
+      const buf = Buffer.from(content);
+      const source: JsonlByteSource = {
+        size: () => buf.length,
+        readRange: () => {
+          throw new Error('by-path read must not be used when open() exists');
+        },
+        open: (): JsonlPinnedReader => {
+          events.push('open');
+          return {
+            size: buf.length,
+            read: (position, length) => Buffer.from(buf.subarray(position, position + length)),
+            close: () => events.push('close'),
+          };
+        },
+      };
+      return { source, events };
+    }
+
+    it('opens once per scan and closes on completion, early break and error', () => {
+      const content = jsonl({ a: 1 }, { a: 2 }, { a: 3 });
+      const done = pinnedSource(content);
+      expect([...streamJsonLines('f', { source: done.source, chunkBytes: 4 })]).toHaveLength(3);
+      expect(done.events).toEqual(['open', 'close']);
+
+      const early = pinnedSource(content);
+      for (const record of streamJsonLines('f', { source: early.source, chunkBytes: 4 })) {
+        expect(record).toEqual({ a: 1 });
+        break;
+      }
+      expect(early.events).toEqual(['open', 'close']);
+
+      const last = pinnedSource(content);
+      expect(readLastJsonLine('f', { source: last.source, chunkBytes: 4 })).toEqual({ a: 3 });
+      expect(last.events).toEqual(['open', 'close']);
+
+      const broken = pinnedSource(`${content}not json\n`);
+      expect(() => [...streamJsonLines('f', { source: broken.source })]).toThrow();
+      expect(broken.events).toEqual(['open', 'close']);
+
+      const unstarted = pinnedSource(content);
+      streamJsonLines('f', { source: unstarted.source });
+      expect(unstarted.events).toEqual([]);
+    });
+
+    it('a by-path source restarts once when the file is replaced before anything was emitted', () => {
+      const files: Record<string, Buffer> = { f: Buffer.from(jsonl({ old: 1 }, { old: 2 })) };
+      let ino = 1;
+      let reads = 0;
+      const source: JsonlByteSource = {
+        size: (p) => files[p]?.length,
+        identity: (p) => (files[p] ? { dev: 1, ino } : undefined),
+        readRange: (p, position, length) => {
+          reads++;
+          if (reads === 1) {
+            files.f = Buffer.from(jsonl({ fresh: 1 }));
+            ino = 2;
+          }
+          return Buffer.from(files[p]!.subarray(position, position + length));
+        },
+      };
+      expect([...streamJsonLines('f', { source, chunkBytes: 4 })]).toEqual([{ fresh: 1 }]);
+    });
+
+    it('a by-path source raises JsonlSourceChangedError when the file is replaced after lines were emitted', () => {
+      const files: Record<string, Buffer> = {
+        f: Buffer.from(jsonl({ n: 1 }, { n: 2 }, { n: 3 }, { n: 4 })),
+      };
+      const source: JsonlByteSource = {
+        size: (p) => files[p]?.length,
+        readRange: (p, position, length) =>
+          Buffer.from(files[p]!.subarray(position, position + length)),
+      };
+      const scan = streamJsonLines('f', { source, chunkBytes: 8 });
+      expect(scan.next().value).toEqual({ n: 1 });
+      files.f = Buffer.from(jsonl({ n: 9 })); // smaller replacement (rotation)
+      expect(() => [...scan]).toThrow(JsonlSourceChangedError);
     });
   });
 });

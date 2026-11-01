@@ -377,6 +377,78 @@ export function safeReadFileRange(filePath: string, position: number, length: nu
   }
 }
 
+/** A range reader pinned to one inode; see {@link openSafeRangeReader}. */
+export interface SafeRangeReader {
+  /** File size when the reader was opened. */
+  readonly size: number;
+  readonly dev: number;
+  readonly ino: number;
+  /** Up to `length` bytes at `position` from the pinned inode (fewer at end of file). */
+  read(position: number, length: number): Buffer;
+  /** Release the descriptor. Idempotent. */
+  close(): void;
+}
+
+/**
+ * Opens one file for repeated range reads with the governance of
+ * {@link safeReadFileRange} (repository-scoped, no symlinks, regular files
+ * only), checked once at open. Every read goes to the inode that was opened,
+ * so a scan stays consistent when the path is renamed or replaced mid-scan
+ * (rotation, rename-aside compaction). The caller must `close()` it.
+ * Missing files throw an error with code `ENOENT`.
+ */
+export function openSafeRangeReader(filePath: string): SafeRangeReader {
+  const resolved = assertReadableRepositoryFile(filePath, 'range');
+  if (!fs.existsSync(resolved)) {
+    throw Object.assign(new Error(`File not found: ${resolved}`), { code: 'ENOENT' });
+  }
+  if (fs.lstatSync(resolved).isSymbolicLink()) {
+    throw new Error(`[SECURITY] Refusing to read symbolic link: ${filePath}`);
+  }
+  let fd: number | undefined = openInPlace(resolved, filePath, 'r', 'read', undefined, true);
+  let stat: fs.Stats;
+  try {
+    stat = fs.fstatSync(fd);
+    if (!stat.isFile()) throw new Error(`Not a regular file: ${resolved}`);
+  } catch (err) {
+    fs.closeSync(fd);
+    throw err;
+  }
+  return {
+    size: stat.size,
+    dev: stat.dev,
+    ino: stat.ino,
+    read(position: number, length: number): Buffer {
+      if (fd === undefined) throw new Error(`Range reader already closed: ${filePath}`);
+      if (!Number.isInteger(position) || position < 0) {
+        throw new Error(`Invalid position for range read: ${position}`);
+      }
+      if (!Number.isInteger(length) || length <= 0) {
+        throw new Error(`Invalid length for range read: ${length}`);
+      }
+      if (length > MAX_RANGE_READ_BYTES) {
+        throw new Error(
+          `Range read length ${length} exceeds the ${MAX_RANGE_READ_BYTES}-byte window limit`
+        );
+      }
+      const buffer = Buffer.alloc(length);
+      let offset = 0;
+      while (offset < length) {
+        const read = fs.readSync(fd, buffer, offset, length - offset, position + offset);
+        if (read <= 0) break;
+        offset += read;
+      }
+      return offset === length ? buffer : buffer.subarray(0, offset);
+    },
+    close(): void {
+      if (fd === undefined) return;
+      const held = fd;
+      fd = undefined;
+      fs.closeSync(held);
+    },
+  };
+}
+
 export { MAX_SNAPSHOT_READ_BYTES } from './fs-primitives.js';
 export function safeReadFileSnapshot(filePath: string, maxBytes: number): Buffer {
   const resolved = assertReadableRepositoryFile(filePath, 'snapshot');
@@ -1660,6 +1732,7 @@ registerFoundationIo({
     safeReadFile(filePath, { ...options, encoding: 'utf8' }) as string,
   stat: safeStat,
   readRange: safeReadFileRange,
+  openRangeReader: openSafeRangeReader,
   writeFile: (filePath, content) => safeWriteFile(filePath, content),
 });
 

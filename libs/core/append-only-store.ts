@@ -15,14 +15,20 @@
  *     staging sibling — appends already in flight land on the moved inode,
  *     appends after the move create a fresh live file.
  *  2. The surviving lines are written to a temp sibling and published with an
- *     exclusive hard link (`safeLinkExclusiveSync`) — EEXIST means a writer
- *     recreated the live file in the gap, so it is parked too, merged, and the
- *     publish is retried (at most {@link COMPACT_MAX_PARK_ATTEMPTS} rounds).
+ *     exclusive hard link (`safeLinkExclusiveSync`; buffered exclusive publish
+ *     where hard links are unsupported) — EEXIST means a writer recreated the
+ *     live file in the gap, so it is parked too, merged, and the publish is
+ *     retried (at most {@link COMPACT_MAX_PARK_ATTEMPTS} rounds). Pass 1
+ *     records how many bytes of each parked copy it indexed; pass 2 filters
+ *     exactly that prefix and copies any bytes an in-flight append added
+ *     afterwards verbatim, so the two passes always agree on line numbers.
+ *     A line over the per-line guard is copied verbatim, never dropped.
  *  3. If the merge loop does not converge, the raw union of every parked file
  *     is restored uncompressed — nothing is ever dropped.
- *  4. Staging siblings are removed only once the live file holds the result
- *     and (for compaction) the raw union is archived. On any failure before
- *     that point the staging files are kept, so no record is lost.
+ *  4. Staging siblings are removed once the live file holds the result and
+ *     (when requested) the raw union is archived, or once the raw union was
+ *     restored to the live file. They are kept only while they are the sole
+ *     full-fidelity copy, so no record is lost and nothing is kept twice.
  *
  * Residual risk (same as before): a writer holding a long-lived open fd could
  * append to a staging inode after its last read. The repo's appenders reopen
@@ -47,6 +53,7 @@ import {
   safeLinkExclusiveSync,
   safeMkdir,
   safeMoveSync,
+  safePublishExclusiveFileSync,
   safeUnlinkSync,
 } from './secure-io.js';
 import {
@@ -108,7 +115,7 @@ export function rotateStore(filePath: string, options: { now?: Date } = {}): str
 // ---------------------------------------------------------------------------
 
 export interface StoreRewriteResult {
-  /** Non-blank lines across every parked copy (the raw union). */
+  /** Lines across every parked copy (the raw union), oversized and late lines included. */
   before: number;
   /** Lines in the live file after the rewrite (`before` when not converged). */
   after: number;
@@ -118,8 +125,13 @@ export interface StoreRewriteResult {
   merged: number;
   /** Raw-union archive written before staging cleanup, or null. */
   archivePath: string | null;
-  /** Lines over the per-line guard: dropped from the live file, kept in the archive. */
+  /** Lines over the per-line guard: kept byte-verbatim in the live file, never dropped. */
   oversizedLines: number;
+  /**
+   * Lines that reached a parked copy after pass 1 indexed it (an append in
+   * flight at park time): carried over verbatim, never filtered.
+   */
+  lateLines: number;
 }
 
 export interface StoreScanOptions {
@@ -135,6 +147,23 @@ interface LineFilter {
   /** Pass 2: whether the line survives. */
   keep(text: string, index: number): boolean;
 }
+
+/** Test seams for the parked rewrite. */
+export interface AppendOnlyStoreTestHooks {
+  /** Runs right before pass 2 streams the parked copies (simulate a late append). */
+  beforeWriteSurvivors?: (stagingPaths: readonly string[]) => void;
+}
+let testHooks: AppendOnlyStoreTestHooks = {};
+
+/** Test seam: install rewrite hooks; call with `{}` to reset. */
+export function setAppendOnlyStoreTestHooks(hooks: AppendOnlyStoreTestHooks): void {
+  testHooks = { ...hooks };
+}
+
+/** Largest result the no-hard-link publish fallback buffers in memory. */
+const PUBLISH_COPY_MAX_BYTES = 64 * 1024 * 1024;
+
+const NEWLINE = 0x0a;
 
 class BatchedAppender {
   private pending: string[] = [];
@@ -179,20 +208,103 @@ function tryUnlink(filePath: string): void {
   }
 }
 
-/** Byte-verbatim copy of `src` onto `out`, newline-terminated. */
-function copyBytes(src: string, out: BatchedAppender, chunkBytes: number): void {
-  const size = jsonlFileSize(src);
+/**
+ * Visit bytes [start, end) of `src` in chunks from one pinned inode (`end`
+ * defaults to the size at open). Returns the number of bytes visited.
+ */
+function forEachChunk(
+  src: string,
+  chunkBytes: number,
+  visit: (buf: Buffer) => void,
+  start = 0,
+  end?: number
+): number {
   const io = getFoundationIo();
-  if (!io.readRange) throw new Error('secure_foundation_range_io_not_registered');
-  let lastByte = 0x0a;
-  for (let position = 0; position < size;) {
-    const buf = io.readRange(src, position, Math.min(chunkBytes, size - position));
-    if (buf.length === 0) break;
-    out.writeBuffer(buf);
-    lastByte = buf[buf.length - 1]!;
-    position += buf.length;
+  const reader = io.openRangeReader?.(src);
+  try {
+    const readRange = io.readRange;
+    if (!reader && !readRange) throw new Error('secure_foundation_range_io_not_registered');
+    const stop = end ?? (reader ? reader.size : jsonlFileSize(src));
+    let position = start;
+    while (position < stop) {
+      const length = Math.min(chunkBytes, stop - position);
+      const buf = reader
+        ? reader.read(position, length)
+        : readRange!.call(io, src, position, length);
+      if (buf.length === 0) break;
+      visit(buf);
+      position += buf.length;
+    }
+    return position - start;
+  } finally {
+    reader?.close();
   }
-  if (lastByte !== 0x0a) out.write('\n');
+}
+
+/**
+ * Byte-verbatim copy of `src` bytes [start, end) onto `out`, newline-terminated
+ * when anything was copied. Returns the number of lines copied.
+ */
+function copyBytes(
+  src: string,
+  out: BatchedAppender,
+  chunkBytes: number,
+  start = 0,
+  end?: number
+): number {
+  let lines = 0;
+  let lastByte = NEWLINE;
+  const copied = forEachChunk(
+    src,
+    chunkBytes,
+    (buf) => {
+      out.writeBuffer(buf);
+      for (let i = buf.indexOf(NEWLINE); i !== -1; i = buf.indexOf(NEWLINE, i + 1)) lines++;
+      lastByte = buf[buf.length - 1]!;
+    },
+    start,
+    end
+  );
+  if (copied > 0 && lastByte !== NEWLINE) {
+    out.write('\n');
+    lines++;
+  }
+  return lines;
+}
+
+function isLinkUnsupported(err: unknown): boolean {
+  return ['ENOTSUP', 'ENOSYS', 'EPERM', 'EXDEV'].some((code) => isErrno(err, code));
+}
+
+/**
+ * Publish `temp` at `livePath` exclusively (EEXIST when a writer recreated
+ * it). Filesystems without hard links fall back to the buffered exclusive
+ * publish the janitor used before (`safePublishExclusiveFileSync`, which in
+ * turn falls back to an exclusive create).
+ */
+function publishExclusive(temp: string, livePath: string, chunkBytes: number): void {
+  try {
+    safeLinkExclusiveSync(temp, livePath);
+    return;
+  } catch (err) {
+    if (!isLinkUnsupported(err)) throw err;
+    const size = jsonlFileSize(temp);
+    if (size > PUBLISH_COPY_MAX_BYTES) throw err;
+    const parts: Buffer[] = [];
+    forEachChunk(temp, chunkBytes, (buf) => parts.push(Buffer.from(buf)));
+    safePublishExclusiveFileSync(livePath, Buffer.concat(parts));
+  }
+}
+
+interface ParkedCopy {
+  path: string;
+  /**
+   * Bytes pass 1 indexed — always on a line boundary. Pass 2 filters exactly
+   * this prefix, so its line numbering matches pass 1 even when an in-flight
+   * append lands on the parked inode between the passes; anything after it
+   * is copied verbatim.
+   */
+  indexedBytes: number;
 }
 
 function rewriteParked(
@@ -203,25 +315,32 @@ function rewriteParked(
   if (!safeExistsSync(livePath)) return null;
   const chunkBytes = options.chunkBytes ?? DEFAULT_JSONL_CHUNK_BYTES;
   const scan = { chunkBytes, maxLineBytes: options.maxLineBytes };
-  const stagingPaths: string[] = [];
+  const parked: ParkedCopy[] = [];
   let total = 0;
   let merged = 0;
   let oversizedLines = 0;
+  let lateLines = 0;
   let liveRestored = false;
-  const countOversized = (_line: JsonlOversizedLine): void => {
-    oversizedLines++;
-  };
 
   const park = (tag: string): boolean => {
-    const staging = `${livePath}.compacting-${process.pid}-${stagingPaths.length}-${tag}`;
+    const staging = `${livePath}.compacting-${process.pid}-${parked.length}-${tag}`;
     try {
       safeMoveSync(livePath, staging);
     } catch (err) {
       if (isErrno(err, 'ENOENT')) return false; // another maintainer took it
       throw err;
     }
-    stagingPaths.push(staging);
-    for (const line of streamTextLines(staging, { ...scan, onOversized: countOversized })) {
+    const copy: ParkedCopy = { path: staging, indexedBytes: 0 };
+    parked.push(copy);
+    const onOversized = (line: JsonlOversizedLine): void => {
+      if (!line.terminated) return; // runs to EOF: carried verbatim with the late bytes
+      oversizedLines++;
+      copy.indexedBytes = line.byteEnd!;
+    };
+    for (const line of streamTextLines(staging, { ...scan, onOversized })) {
+      // An unterminated tail is an append in flight (or torn): pass 2 copies it verbatim.
+      if (!line.terminated) break;
+      copy.indexedBytes = line.byteEnd!;
       if (!line.text.trim()) continue;
       filter.observe(line.text, total++);
     }
@@ -229,25 +348,36 @@ function rewriteParked(
   };
 
   const writeSurvivors = (dest: string): number => {
+    testHooks.beforeWriteSurvivors?.(parked.map((copy) => copy.path));
     const out = new BatchedAppender(dest);
     let index = 0;
     let kept = 0;
-    for (const staging of stagingPaths) {
-      for (const line of streamTextLines(staging, scan)) {
+    lateLines = 0;
+    for (const copy of parked) {
+      // An oversized line is never buffered and never dropped: copy its bytes.
+      const onOversized = (line: JsonlOversizedLine): void => {
+        kept += copyBytes(copy.path, out, chunkBytes, line.byteStart!, line.byteEnd!);
+      };
+      for (const line of streamTextLines(copy.path, {
+        ...scan,
+        endOffset: copy.indexedBytes,
+        onOversized,
+      })) {
         if (!line.text.trim()) continue;
         if (filter.keep(line.text, index++)) {
           out.write(`${line.text}\n`);
           kept++;
         }
       }
+      lateLines += copyBytes(copy.path, out, chunkBytes, copy.indexedBytes);
     }
     out.flush();
-    return kept;
+    return kept + lateLines;
   };
 
   const writeUnion = (dest: string): void => {
     const out = new BatchedAppender(dest);
-    for (const staging of stagingPaths) copyBytes(staging, out, chunkBytes);
+    for (const copy of parked) copyBytes(copy.path, out, chunkBytes);
     out.flush();
   };
 
@@ -274,7 +404,7 @@ function rewriteParked(
         const temp = uniqueSibling(`${livePath}.compact-out-${process.pid}-${i}`, '.tmp');
         try {
           kept = writeSurvivors(temp);
-          safeLinkExclusiveSync(temp, livePath);
+          publishExclusive(temp, livePath, chunkBytes);
           published = true;
           liveRestored = true;
         } catch (err) {
@@ -292,47 +422,60 @@ function rewriteParked(
     if (!published) {
       restoreRawUnion();
       logger.warn(
-        `[append-only-store] ${options.label} did not converge for ${livePath} — writers out-paced ${COMPACT_MAX_PARK_ATTEMPTS} merge rounds | next: raw records restored uncompressed; the next maintenance pass retries | evidence: ${stagingPaths.length} parked copies`
+        `[append-only-store] ${options.label} did not converge for ${livePath} — writers out-paced ${COMPACT_MAX_PARK_ATTEMPTS} merge rounds | next: raw records restored uncompressed; the next maintenance pass retries | evidence: ${parked.length} parked copies`
       );
     }
     if (oversizedLines > 0) {
       logger.warn(
-        `[append-only-store] ${oversizedLines} oversized line(s) dropped from ${livePath} during ${options.label} — a line exceeded the per-line guard | next: inspect the writer | evidence: ${options.archivePath ? `raw union archived at ${options.archivePath}` : 'no archive requested'}`
+        `[append-only-store] ${oversizedLines} oversized line(s) in ${livePath} during ${options.label} — a line exceeded the per-line guard | next: inspect the writer; the line was kept byte-verbatim in the live file | evidence: ${options.archivePath ? `raw union archived at ${options.archivePath}` : 'no archive requested'}`
       );
     }
 
     if (options.archivePath) {
       safeMkdir(nodePath.dirname(options.archivePath), { recursive: true });
       const target = uniqueSibling(options.archivePath.replace(/\.jsonl$/, ''), '.jsonl');
-      writeUnion(target);
+      try {
+        writeUnion(target);
+      } catch (err) {
+        tryUnlink(target); // a partial archive is not evidence of anything
+        throw err;
+      }
       archivePath = target;
     }
   } catch (err) {
-    if (!liveRestored && stagingPaths.length > 0) {
+    if (!liveRestored && parked.length > 0) {
       try {
         restoreRawUnion();
       } catch (restoreErr) {
         logger.warn(
-          `[append-only-store] ${options.label} failed and the raw union could not be restored for ${livePath} — ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)} | next: recover records from the staging files by hand | evidence: ${stagingPaths.join(', ')}`
+          `[append-only-store] ${options.label} failed and the raw union could not be restored for ${livePath} — ${restoreErr instanceof Error ? restoreErr.message : String(restoreErr)} | next: recover records from the staging files by hand | evidence: ${parked.map((copy) => copy.path).join(', ')}`
         );
       }
     }
-    if (!liveRestored || (options.archivePath && !archivePath)) {
-      // Keep the staging copies: they are the only full-fidelity record.
-      stagingPaths.length = 0;
+    // Keep the staging copies only while they are the sole full-fidelity
+    // record: the live file lost the data, or it holds the compacted result
+    // and the requested raw-union archive was not written. When the raw
+    // union was restored to the live file, the copies are redundant.
+    if (!liveRestored || (published && options.archivePath && !archivePath)) {
+      logger.warn(
+        `[append-only-store] ${options.label} failed for ${livePath}; staging copies kept — they hold records found nowhere else | next: fix the cause; recover or archive the copies, then delete them | evidence: ${parked.map((copy) => copy.path).join(', ')}`
+      );
+      parked.length = 0;
     }
     throw err;
   } finally {
-    for (const staging of stagingPaths) tryUnlink(staging);
+    for (const copy of parked) tryUnlink(copy.path);
   }
 
+  const before = total + oversizedLines + lateLines;
   return {
-    before: total,
-    after: published ? kept : total,
+    before,
+    after: published ? kept : before,
     published,
     merged,
     archivePath,
     oversizedLines,
+    lateLines,
   };
 }
 
@@ -384,8 +527,12 @@ export function defaultCompactionArchiveDir(filePath: string): string {
 export interface CompactStoreOptions extends StoreScanOptions {
   /** Record field identifying the keyed entity. */
   key: string;
-  /** Where the raw-union archive lands. Default {@link defaultCompactionArchiveDir}. */
-  archiveDir?: string;
+  /**
+   * Where the raw-union archive lands. Default {@link defaultCompactionArchiveDir}.
+   * `null` = no archive, for ephemeral stores whose readers use only the
+   * latest record per key (nothing a reader uses is lost).
+   */
+  archiveDir?: string | null;
   now?: Date;
 }
 
@@ -394,8 +541,8 @@ export interface CompactStoreOptions extends StoreScanOptions {
  * records lacking the key, and unparseable lines, are kept verbatim). Two
  * streaming passes: pass 1 records the last line index per key, pass 2
  * writes the survivors to a temp file that is published exclusively. The raw
- * union is archived to `<archiveDir>/<stem>.<stamp>Z-<pid>.jsonl`. Returns
- * null when the live file does not exist.
+ * union is archived to `<archiveDir>/<stem>.<stamp>Z-<pid>.jsonl` unless
+ * `archiveDir` is null. Returns null when the live file does not exist.
  */
 export function compactStoreByKey(
   filePath: string,
@@ -404,11 +551,12 @@ export function compactStoreByKey(
   const lastIndex = new Map<string, number>();
   const now = options.now ?? new Date();
   const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '');
-  const archiveDir = options.archiveDir ?? defaultCompactionArchiveDir(filePath);
-  const archivePath = nodePath.join(
-    archiveDir,
-    `${rotatedSegmentStem(filePath)}.${stamp}Z-${process.pid}.jsonl`
-  );
+  const archiveDir =
+    options.archiveDir === undefined ? defaultCompactionArchiveDir(filePath) : options.archiveDir;
+  const archivePath =
+    archiveDir === null
+      ? null
+      : nodePath.join(archiveDir, `${rotatedSegmentStem(filePath)}.${stamp}Z-${process.pid}.jsonl`);
   return rewriteParked(
     filePath,
     {
@@ -442,8 +590,9 @@ export interface RetainWindowOptions<T = unknown> extends StoreScanOptions {
 
 /**
  * Drop records older than `sinceMs` (unless `keep` says otherwise) with the
- * same race-safe parked rewrite as compaction. Unparseable lines are kept
- * verbatim. Returns null when the live file does not exist.
+ * same race-safe parked rewrite as compaction. Unparseable lines, and lines
+ * over the per-line guard, are kept verbatim — the window never loses a
+ * record it cannot read. Returns null when the live file does not exist.
  */
 export function retainWindow<T = unknown>(
   filePath: string,
@@ -475,7 +624,7 @@ export function retainWindow<T = unknown>(
 
 export type AppendOnlyStorePolicy =
   | { action: 'rotate'; minBytes?: number }
-  | { action: 'compact'; key: string; minBytes?: number; archiveDir?: string }
+  | { action: 'compact'; key: string; minBytes?: number; archiveDir?: string | null }
   | {
       /** Explicit-policy only: the retention catalog has no `window` action. */
       action: 'window';
@@ -496,6 +645,12 @@ export interface MaintainStoreOptions extends StoreScanOptions {
   now?: Date;
   /** Catalog override for `'catalog'` policy resolution (tests). */
   catalog?: LoadedRetentionCatalog;
+  /**
+   * Where the RETENTION_* record goes. Default: the storage-retention audit
+   * log (`appendRetentionAudit`). A writer whose role cannot write there
+   * routes it through a governed recorder it can use (e.g. the audit chain).
+   */
+  audit?: (record: Record<string, unknown>) => void;
 }
 
 export type MaintainStoreOutcome =
@@ -516,6 +671,7 @@ const warnedNoPolicy = new Set<string>();
 /** Test seam: forget cached catalog and per-store hysteresis. */
 export function resetAppendOnlyStoreMaintenanceState(): void {
   catalogCache = undefined;
+  testHooks = {};
   lastMaintainedSize.clear();
   warnedNoPolicy.clear();
 }
@@ -555,6 +711,16 @@ function defaultLockId(filePath: string): string {
     .slice(0, 32)}`;
 }
 
+function recordAudit(options: MaintainStoreOptions, record: Record<string, unknown>): void {
+  try {
+    (options.audit ?? appendRetentionAudit)(record);
+  } catch (err) {
+    logger.warn(
+      `[append-only-store] ${String(record.event)} audit record for ${String(record.path)} could not be written — ${err instanceof Error ? err.message : String(err)} | next: check the audit recorder for this store | evidence: maintenance itself completed`
+    );
+  }
+}
+
 function runPolicy(
   filePath: string,
   policy: AppendOnlyStorePolicy,
@@ -574,7 +740,7 @@ function runPolicy(
   if (policy.action === 'rotate') {
     const segment = rotateStore(filePath, { now });
     if (!segment) return 'nothing-to-do';
-    appendRetentionAudit({
+    recordAudit(options, {
       event: 'RETENTION_ROTATE',
       ...base,
       segment_path: repoRelativePosix(segment),
@@ -591,7 +757,7 @@ function runPolicy(
       now,
     });
     if (!result) return 'nothing-to-do';
-    appendRetentionAudit({
+    recordAudit(options, {
       event: 'RETENTION_COMPACT',
       ...base,
       compact_key: policy.key,
@@ -609,7 +775,7 @@ function runPolicy(
     sinceMs: now.getTime() - policy.windowMs,
   });
   if (!result) return 'nothing-to-do';
-  appendRetentionAudit({
+  recordAudit(options, {
     event: 'RETENTION_WINDOW',
     ...base,
     window_ms: policy.windowMs,
@@ -635,6 +801,7 @@ export function maintainStoreAfterAppend(
   policy: AppendOnlyStorePolicy | 'catalog',
   options: MaintainStoreOptions = {}
 ): MaintainStoreOutcome {
+  let attemptedSize: number | undefined;
   try {
     const size = jsonlFileSize(filePath);
     const resolved =
@@ -654,6 +821,7 @@ export function maintainStoreAfterAppend(
     const floor = Math.max(threshold, 2 * (lastMaintainedSize.get(filePath) ?? 0));
     if (size < floor) return 'below-threshold';
 
+    attemptedSize = size;
     const run = (): MaintainStoreOutcome => runPolicy(filePath, resolved, threshold, options);
     const lockId = options.lockId === undefined ? defaultLockId(filePath) : options.lockId;
     const outcome =
@@ -668,8 +836,11 @@ export function maintainStoreAfterAppend(
     }
     return outcome;
   } catch (err) {
+    // Back off like a success: retry only once the store doubles, so a
+    // persistent failure does not re-run an O(N) pass on every append.
+    if (attemptedSize !== undefined) lastMaintainedSize.set(filePath, attemptedSize);
     logger.warn(
-      `[append-only-store] write-time maintenance failed for ${filePath} — ${err instanceof Error ? err.message : String(err)} | next: the append succeeded; the janitor or the next append retries | evidence: policy ${policy === 'catalog' ? 'catalog' : policy.action}`
+      `[append-only-store] write-time maintenance failed for ${filePath} — ${err instanceof Error ? err.message : String(err)} | next: the append succeeded; the janitor retries, and so does an append once the store reaches ${attemptedSize !== undefined ? 2 * attemptedSize : 'its threshold'} bytes | evidence: policy ${policy === 'catalog' ? 'catalog' : policy.action}`
     );
     return 'failed';
   }

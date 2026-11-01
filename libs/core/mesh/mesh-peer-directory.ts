@@ -5,7 +5,8 @@ import { maintainStoreAfterAppend, type MaintainStoreOutcome } from '../append-o
 import { withExecutionContext } from '../authority.js';
 import { normalizeIso } from '../foundation/time.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
+import * as nodePath from 'node:path';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import type {
@@ -25,7 +26,9 @@ const ALLOWED_REGISTRATION_AUTHORITIES = new Set(['infrastructure_sentinel', 'mi
  * presence.jsonl gets one append per heartbeat and every reader wants only the
  * latest record per peer, so the writer folds it to latest-per-`peer_id` once
  * it passes this size (and again each time it doubles — see
- * `maintainStoreAfterAppend`). The policy is explicit rather than a catalog
+ * `maintainStoreAfterAppend`). Presence is ephemeral, so the folded-away
+ * heartbeats are not archived: latest-per-peer keeps everything a reader
+ * uses. The policy is explicit rather than a catalog
  * `compact` entry because the store path is per tenant (and the runtime root is
  * env-overridable), while catalog file entries match one exact path.
  *
@@ -36,8 +39,6 @@ const ALLOWED_REGISTRATION_AUTHORITIES = new Set(['infrastructure_sentinel', 'mi
  * Their readers stream, so their size never makes a read fail.
  */
 export const MESH_PRESENCE_COMPACT_MIN_BYTES = 1024 * 1024;
-/** Raw pre-compaction presence history, kept inside the tenant's mesh-hub tree. */
-const PRESENCE_ARCHIVE_SEGMENT = 'presence-archive';
 
 interface MeshPeerDirectoryStoreTuning {
   /** Presence compaction threshold (tests inject small values). */
@@ -125,16 +126,78 @@ function runtimePath(tenantId: string, segment: string): string {
   return `${meshHubRuntimeRoot(tenantId)}/${segment}`;
 }
 
-/** Streams records (constant memory, no size cap); validates the path before the first read. */
+function isMissing(err: unknown): boolean {
+  return (err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
+}
+
+const PARKED_COPY_ORDER = /^\d+-(\d+)-/u;
+
+/**
+ * Parked copies of a store a compaction is rewriting
+ * (`<name>.compacting-<pid>-<n>-<tag>`), in park order. Between the park and
+ * the publish the live file does not exist; together these hold every record
+ * it had, so a reader in that window still sees the latest state.
+ */
+function parkedCopies(safePath: string): string[] {
+  const dir = nodePath.dirname(safePath);
+  const prefix = `${nodePath.basename(safePath)}.compacting-`;
+  let names: string[];
+  try {
+    names = safeReaddir(dir);
+  } catch {
+    return [];
+  }
+  const order = (name: string): number =>
+    Number(name.slice(prefix.length).match(PARKED_COPY_ORDER)?.[1] ?? 0);
+  return names
+    .filter((name) => name.startsWith(prefix))
+    .sort((a, b) => order(a) - order(b))
+    .map((name) => nodePath.join(dir, name));
+}
+
+/**
+ * Streams records (constant memory, no size cap); validates the path before
+ * the first read. Each scan holds one inode, so a write-time compaction that
+ * renames the file mid-scan cannot tear it, and a file momentarily missing
+ * because a compaction parked it is read from its parked copies — a lookup
+ * never fails or comes back empty because maintenance was running.
+ */
 function readJsonlRecords<T>(logicalPath: string): Iterable<T> {
   const safePath = assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
     allowMissingLeaf: true,
   });
-  if (!safeExistsSync(safePath)) return [];
-  if (!safeLstat(safePath).isFile()) {
-    throw new Error(`mesh peer directory JSONL must be a regular file: ${safePath}`);
+  const options = { chunkBytes: storeTuning.chunkBytes };
+  let present = false;
+  try {
+    if (safeExistsSync(safePath)) {
+      if (!safeLstat(safePath).isFile()) {
+        throw new Error(`mesh peer directory JSONL must be a regular file: ${safePath}`);
+      }
+      present = true;
+    }
+  } catch (err) {
+    if (!isMissing(err)) throw err;
   }
-  return streamJsonLines<T>(safePath, { chunkBytes: storeTuning.chunkBytes });
+  if (!present && parkedCopies(safePath).length === 0) return [];
+  return (function* (): Generator<T> {
+    let emitted = false;
+    if (present) {
+      for (const record of streamJsonLines<T>(safePath, options)) {
+        emitted = true;
+        yield record;
+      }
+      // Parked between the existence check and the open: read the copies.
+      if (emitted || safeExistsSync(safePath)) return;
+    }
+    for (const copy of parkedCopies(safePath)) {
+      for (const record of streamJsonLines<T>(copy, options)) {
+        emitted = true;
+        yield record;
+      }
+    }
+    // The copies were cleaned up because the compaction just published.
+    if (!emitted && safeExistsSync(safePath)) yield* streamJsonLines<T>(safePath, options);
+  })();
 }
 
 function latestByPeerId<T extends { peer_id: string }>(records: Iterable<T>): Map<string, T> {
@@ -223,17 +286,18 @@ function appendPresence(record: MeshPeerPresence): string {
     runtimePath(record.tenant_id, 'presence.jsonl'),
     record
   );
-  compactPresenceStore(record.tenant_id, resolved);
+  compactPresenceStore(resolved);
   return resolved;
 }
 
 /**
  * Write-time retention for presence.jsonl: fold to the latest heartbeat per
- * peer. Runs as the store's writer role, archives the raw union inside the
- * tenant's mesh-hub tree (removed with the tenant at offboarding), and never
- * throws into the heartbeat — failures and unshrinkable growth only warn.
+ * peer. Runs as the store's writer role, keeps no archive (presence is
+ * ephemeral), records the compaction in the storage-retention audit log like
+ * every other store, and never throws into the heartbeat — failures and
+ * unshrinkable growth only warn.
  */
-function compactPresenceStore(tenantId: string, presencePath: string): MaintainStoreOutcome {
+function compactPresenceStore(presencePath: string): MaintainStoreOutcome {
   return withExecutionContext('infrastructure_sentinel', () =>
     maintainStoreAfterAppend(
       presencePath,
@@ -241,7 +305,7 @@ function compactPresenceStore(tenantId: string, presencePath: string): MaintainS
         action: 'compact',
         key: 'peer_id',
         minBytes: storeTuning.presenceCompactMinBytes ?? MESH_PRESENCE_COMPACT_MIN_BYTES,
-        archiveDir: pathResolver.resolve(runtimePath(tenantId, PRESENCE_ARCHIVE_SEGMENT)),
+        archiveDir: null,
       },
       { chunkBytes: storeTuning.chunkBytes }
     )

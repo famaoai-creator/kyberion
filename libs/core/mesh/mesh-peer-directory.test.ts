@@ -4,6 +4,7 @@ import {
   pathResolver,
   safeExistsSync,
   safeMkdir,
+  safeMoveSync,
   safeReaddir,
   safeRmSync,
   safeSymlinkSync,
@@ -11,6 +12,8 @@ import {
 } from '../index.js';
 import { readJsonLines } from '../foundation/json.js';
 import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
+import { STORAGE_RETENTION_AUDIT_FILENAME } from '../storage-retention-catalog.js';
+import { sharedLogsAudit, vitestLivePath } from '../path-resolver.js';
 import {
   advertiseMeshCapabilities,
   expireMeshPresence,
@@ -25,17 +28,20 @@ import {
   setMeshPeerDirectoryStoreTuningForTests,
 } from './mesh-peer-directory.js';
 
-// Compaction audit records would otherwise land in the live audit log.
-const retentionAudit = vi.hoisted(() => vi.fn());
-vi.mock('../storage-retention-expiry.js', async (importOriginal) => ({
-  ...(await importOriginal<typeof import('../storage-retention-expiry.js')>()),
-  appendRetentionAudit: retentionAudit,
-}));
-
 const ROOT = pathResolver.rootDir();
 const TEST_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub-tests';
 const TEST_RUNTIME_ROOT_ABS = path.join(ROOT, TEST_RUNTIME_ROOT);
 const TEST_CATALOG_PATH = path.join(ROOT, 'tests/mesh-peer-network.bootstrap.json');
+// Under Vitest, secure-io writes shared/logs/audit/ into the per-pool sandbox
+// (path-resolver VITEST_LIVE_SUBTREES), so the live log is never written.
+const TEST_RETENTION_AUDIT = vitestLivePath(sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME));
+const TEST_PRESENCE_REL = `${TEST_RUNTIME_ROOT}/tenants/tenant-acme/presence.jsonl`;
+/** This suite's presence retention records written at or after `sinceIso`. */
+const retentionRecords = (sinceIso: string): Array<Record<string, unknown>> =>
+  (safeExistsSync(TEST_RETENTION_AUDIT)
+    ? readJsonLines<Record<string, unknown>>(TEST_RETENTION_AUDIT)
+    : []
+  ).filter((r) => r.path === TEST_PRESENCE_REL && String(r.ts) >= sinceIso);
 
 describe('mesh-peer-directory', () => {
   let savedRuntimeRoot: string | undefined;
@@ -49,7 +55,6 @@ describe('mesh-peer-directory', () => {
     safeRmSync(TEST_RUNTIME_ROOT_ABS, { recursive: true, force: true });
     resetAppendOnlyStoreMaintenanceState();
     setMeshPeerDirectoryStoreTuningForTests({});
-    retentionAudit.mockClear();
   });
 
   afterEach(() => {
@@ -384,29 +389,54 @@ describe('mesh-peer-directory', () => {
       const retained = readJsonLines<{ peer_id: string; heartbeat_at: string }>(presencePath);
       // Bounded: far fewer rows than the 54 heartbeats appended.
       expect(retained.length).toBeLessThan(30);
-      expect(retentionAudit).toHaveBeenCalledWith(
-        expect.objectContaining({ event: 'RETENTION_COMPACT', compact_key: 'peer_id' })
-      );
       // The latest heartbeat per peer survives compaction.
       const latest = new Map(retained.map((row) => [row.peer_id, row.heartbeat_at] as const));
       expect(latest.get('peer-a1')).toBe('2099-06-24T01:39:00.000Z');
       expect(latest.get('peer-b1')).toBe('2099-06-24T01:39:00.000Z');
       const entries = listMeshPeerDirectoryEntries('tenant-acme', '2099-06-24T01:50:00.000Z');
       expect(entries.map((entry) => entry.presence?.capacity.available_slots)).toEqual([39, 39]);
-      // Raw history is archived inside the tenant's mesh-hub tree, not dropped.
-      const archiveDir = path.join(tenantDir, 'presence-archive');
-      expect(safeExistsSync(archiveDir)).toBe(true);
-      expect(safeReaddir(archiveDir).length).toBeGreaterThan(0);
-      // No staging leftovers beside the live file.
-      expect(safeReaddir(tenantDir).filter((name) => name.includes('.compacting-'))).toEqual([]);
+      // Presence is ephemeral: no archive, and no staging leftovers beside the live file.
+      expect(safeReaddir(tenantDir).sort()).toEqual(['presence.jsonl', 'registrations.jsonl']);
+    });
+
+    it('records each presence compaction in the storage-retention audit log', () => {
+      const startedAt = new Date().toISOString();
+      expect(TEST_RETENTION_AUDIT).not.toBe(sharedLogsAudit(STORAGE_RETENTION_AUDIT_FILENAME));
+      setMeshPeerDirectoryStoreTuningForTests({ presenceCompactMinBytes: 2048 });
+      enroll('peer-a1');
+      for (let minute = 0; minute < 30; minute++) beat('peer-a1', minute);
+      const compactions = retentionRecords(startedAt).filter(
+        (r) => r.event === 'RETENTION_COMPACT'
+      );
+      expect(compactions.length).toBeGreaterThan(0);
+      expect(compactions[0]).toMatchObject({
+        compact_key: 'peer_id',
+      });
+      expect(compactions[0]!.archive_path).toBeUndefined();
+    });
+
+    it('reads the parked copies while a compaction has the live file moved aside', () => {
+      enroll('peer-a1');
+      for (let minute = 0; minute < 3; minute++) beat('peer-a1', minute);
+      const parked = `${presencePath}.compacting-4242-0-initial`;
+      safeMoveSync(presencePath, parked);
+      try {
+        expect(resolveMeshPeer('tenant-acme', 'peer-a1')?.presence?.heartbeat_at).toBe(
+          '2099-06-24T01:02:00.000Z'
+        );
+        expect(listMeshPeerPresenceRecords('tenant-acme')).toHaveLength(3);
+      } finally {
+        safeMoveSync(parked, presencePath);
+      }
     });
 
     it('does not compact presence below the threshold', () => {
+      const startedAt = new Date().toISOString();
       enroll('peer-a1');
       for (let minute = 0; minute < 5; minute++) beat('peer-a1', minute);
       expect(readJsonLines(presencePath)).toHaveLength(5);
       expect(listMeshPeerPresenceRecords('tenant-acme')).toHaveLength(5);
-      expect(retentionAudit).not.toHaveBeenCalled();
+      expect(retentionRecords(startedAt)).toEqual([]);
     });
 
     it('streams records across many read chunks with the same results as a whole-file read', () => {

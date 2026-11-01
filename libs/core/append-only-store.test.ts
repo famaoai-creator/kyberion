@@ -42,6 +42,7 @@ import {
   retainWindow,
   rotatedSegmentPath,
   rotateStore,
+  setAppendOnlyStoreTestHooks,
 } from './append-only-store.js';
 import { repoRelativePosix } from './storage-retention-expiry.js';
 import type { LoadedRetentionCatalog } from './storage-retention-catalog.js';
@@ -72,6 +73,7 @@ describe('append-only-store', () => {
 
   afterEach(() => {
     linkHook.beforeLink = undefined;
+    setAppendOnlyStoreTestHooks({});
     safeRmSync(dir, { recursive: true, force: true });
   });
 
@@ -162,6 +164,101 @@ describe('append-only-store', () => {
         records: 5,
         distinctKeys: 2,
       });
+    });
+  });
+
+  describe('parked rewrite edge cases', () => {
+    const errno = (code: string): Error =>
+      Object.assign(new Error(`link failed (${code})`), { code });
+
+    it('pass 2 filters only the bytes pass 1 indexed; an append landing between the passes is kept', () => {
+      safeWriteFile(live, jsonl({ id: 'a', v: 1 }, { id: 'b', v: 1 }, { id: 'a', v: 2 }));
+      setAppendOnlyStoreTestHooks({
+        beforeWriteSurvivors: (staging) =>
+          safeAppendFileSync(staging[0]!, jsonl({ id: 'a', v: 3 })),
+      });
+      const result = compactStoreByKey(live, { key: 'id', archiveDir: null, chunkBytes: 5 });
+      expect(readRecords(live)).toEqual([
+        { id: 'b', v: 1 },
+        { id: 'a', v: 2 },
+        { id: 'a', v: 3 },
+      ]);
+      expect(result).toMatchObject({ published: true, lateLines: 1, after: 3 });
+      expect(leftovers()).toEqual([]);
+    });
+
+    it('an unterminated tail at park time is carried verbatim, completed by the late bytes', () => {
+      safeWriteFile(live, jsonl({ id: 'a', v: 1 }, { id: 'b', v: 1 }) + '{"id":"a","v":2');
+      setAppendOnlyStoreTestHooks({
+        beforeWriteSurvivors: (staging) => safeAppendFileSync(staging[0]!, '}\n'),
+      });
+      compactStoreByKey(live, { key: 'id', archiveDir: null });
+      expect(readRecords(live)).toEqual([
+        { id: 'a', v: 1 },
+        { id: 'b', v: 1 },
+        { id: 'a', v: 2 },
+      ]);
+    });
+
+    it('archiveDir null compacts without writing any archive', () => {
+      safeWriteFile(live, jsonl({ id: 'a', v: 1 }, { id: 'a', v: 2 }));
+      const result = compactStoreByKey(live, { key: 'id', archiveDir: null });
+      expect(result).toMatchObject({ published: true, archivePath: null, after: 1 });
+      expect(safeReaddir(dir).sort()).toEqual(['items.jsonl']);
+    });
+
+    it('keeps an oversized line verbatim in place when compacting (with or without an archive)', () => {
+      const huge = JSON.stringify({ id: 'h', big: 'x'.repeat(300) });
+      const content = jsonl({ id: 'a', v: 1 }) + `${huge}\n` + jsonl({ id: 'a', v: 2 });
+      for (const dirOption of [null, archiveDir]) {
+        safeWriteFile(live, content);
+        const result = compactStoreByKey(live, {
+          key: 'id',
+          archiveDir: dirOption,
+          chunkBytes: 16,
+          maxLineBytes: 100,
+        });
+        expect(read(live)).toBe(`${huge}\n${JSON.stringify({ id: 'a', v: 2 })}\n`);
+        expect(result).toMatchObject({ oversizedLines: 1, before: 3, after: 2 });
+      }
+    });
+
+    it('keeps an oversized line verbatim in the time window (no archive)', () => {
+      const huge = JSON.stringify({ t: 1, big: 'y'.repeat(300) });
+      safeWriteFile(live, jsonl({ t: 1 }) + `${huge}\n` + jsonl({ t: 10 }));
+      const result = retainWindow<{ t: number }>(live, {
+        timeOf: (r) => r.t,
+        sinceMs: 5,
+        chunkBytes: 32,
+        maxLineBytes: 100,
+      });
+      expect(read(live)).toBe(`${huge}\n{"t":10}\n`);
+      expect(result).toMatchObject({ oversizedLines: 1, archivePath: null });
+    });
+
+    it('falls back to a buffered exclusive publish when hard links are unsupported', () => {
+      for (const code of ['EPERM', 'ENOTSUP', 'EXDEV']) {
+        safeWriteFile(live, jsonl({ id: 'a', v: 1 }, { id: 'a', v: 2 }));
+        linkHook.beforeLink = (to) => {
+          if (to === live) throw errno(code);
+        };
+        const result = compactStoreByKey(live, { key: 'id', archiveDir: null });
+        expect(result?.published).toBe(true);
+        expect(readRecords(live)).toEqual([{ id: 'a', v: 2 }]);
+        expect(leftovers()).toEqual([]);
+      }
+    });
+
+    it('a failed compaction whose raw union was restored keeps no redundant staging copy', () => {
+      const content = jsonl({ id: 'a', v: 1 }, { id: 'a', v: 2 });
+      safeWriteFile(live, content);
+      linkHook.beforeLink = (to) => {
+        if (to === live) throw errno('EIO');
+      };
+      expect(() => compactStoreByKey(live, { key: 'id', archiveDir })).toThrow(/EIO/);
+      expect(read(live)).toBe(content);
+      expect(leftovers()).toEqual([]);
+      expect(safeExistsSync(archiveDir)).toBe(false);
     });
   });
 
@@ -284,6 +381,23 @@ describe('append-only-store', () => {
       // The failed rewrite restored every record and left no staging behind.
       expect(readRecords(live)).toEqual([{ at: 1 }, { at: 2 }]);
       expect(leftovers()).toEqual([]);
+    });
+
+    it('backs off after a failure: no retry until the store doubles', () => {
+      safeWriteFile(live, jsonl({ at: 1 }, { at: 2 }));
+      const exploding = {
+        action: 'window' as const,
+        minBytes: 1,
+        windowMs: 1,
+        timeOf: (): number => {
+          throw new Error('boom');
+        },
+      };
+      expect(maintainStoreAfterAppend(live, exploding)).toBe('failed');
+      safeAppendFileSync(live, jsonl({ at: 3 }));
+      expect(maintainStoreAfterAppend(live, exploding)).toBe('below-threshold');
+      safeAppendFileSync(live, jsonl({ at: 4 }, { at: 5 }, { at: 6 }));
+      expect(maintainStoreAfterAppend(live, exploding)).toBe('failed');
     });
   });
 });
