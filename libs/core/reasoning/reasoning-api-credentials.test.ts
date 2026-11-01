@@ -32,6 +32,39 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe('API credential proofs', () => {
+  it.each([
+    [401, 'authentication_failed'],
+    [403, 'authorization_failed'],
+    [404, 'model_or_endpoint_unavailable'],
+    [429, 'rate_limited'],
+  ] as const)(
+    'reports safe HTTP failure code for %s without retaining raw errors',
+    async (httpStatus, code) => {
+      const result = await verifyReasoningApiCredential(
+        { provider: 'openai', model: 'test-model', allowPaid: true },
+        async () => {
+          throw Object.assign(new Error('test-private-key must not be logged'), { httpStatus });
+        }
+      );
+      expect(result.code).toBe(code);
+      expect(JSON.stringify(result)).not.toContain('test-private-key');
+      expect(result.credential_version).toMatch(/^[a-f0-9]{64}$/);
+    }
+  );
+  it('attributes transport and key version and distinguishes DNS from authentication', async () => {
+    const result = await verifyReasoningApiCredential(
+      { provider: 'openai', model: 'test-model', allowPaid: true },
+      async () => {
+        throw new Error('Network Error: ENOTFOUND api.openai.com');
+      }
+    );
+    expect(result).toMatchObject({
+      code: 'dns_failed',
+      execution: { kind: 'operator' },
+      transport: 'custom-request',
+      endpoint: 'https://api.openai.com/v1/responses',
+    });
+  });
   it('uses only tenant-bound credentials and refuses ambient operator credentials without a binding', async () => {
     const response = {
       status: 'completed',

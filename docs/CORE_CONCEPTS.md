@@ -31,6 +31,12 @@ Knowledge and data are split by **tier** — `personal/` → `confidential/` →
 
 - Glossary: [Tenant](./GLOSSARY.md#tenant) · [Tier Isolation](./GLOSSARY.md#tier-isolation) · [Stance (vs tenant customer)](./GLOSSARY.md#stance-vs-tenant-customer) _(advanced)_
 
+For external API access, registering a personal key does not allocate it to a tenant.
+An explicit allocation permits use; trusted dispatch binds the allowed credential
+to the current task. Model selection and connectivity proofs are separate decisions.
+See [Credential lifecycle, allocation, and execution](../knowledge/product/architecture/api-credential-proof-boundary.md)
+for the conceptual contract and implemented versus planned capabilities.
+
 ## 5. Surface
 
 A human-facing entrance, each with one role: **Concierge** (what do I decide?), **Presence Studio** (what are we doing together?), **Chronos Mirror** (control tower), the audit monitor, the hands-on mirror, the terminal home (`pnpm kyberion`), chat bridges, and the local capture **pads** (`pnpm pads`). Surfaces show state and take requests; they do not own missions.
