@@ -3,10 +3,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   GLOBAL_LEDGER_PATH,
+  LEDGER_SEGMENT_OPENED_TYPE,
+  listLedgerSegments,
   loadForScope,
   normalizeLedgerRecord,
   record,
+  setLedgerRotationOptionsForTests,
   setLedgerScanOptionsForTests,
+  TENANT_LEDGER_STORE_ROLE,
   TENANT_LEDGER_ROOT,
   tenantLedgerPath,
   verifyAllLedgerIntegrity,
@@ -17,6 +21,8 @@ import * as pathResolver from './path-resolver.js';
 import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
 import { getFoundationIo } from './foundation/io.js';
 import { readTextFile } from './foundation/text.js';
+import { withExecutionContext } from './authority.js';
+import { validateWritePermission } from './tier-guard.js';
 
 /** Append an unkeyed (`sha256`) entry — what anyone can compute without the chain key. */
 function appendUnkeyedEntry(ledgerPath: string, type: string): void {
@@ -329,6 +335,233 @@ describe('ledger core', () => {
       record('SECOND', {});
       const lines = fs.readFileSync(LEDGER_FILE, 'utf8').split('\n').filter(Boolean);
       expect(JSON.parse(lines[1]).parent_hash).toBe(first);
+    });
+  });
+
+  describe('hash-chained segment rotation (MSN-STORE-BOUNDS-3)', () => {
+    const FIXED_NOW = new Date('2026-11-02T10:10:10.000Z');
+    const STAMP = '20261102-101010';
+    const ledgerDir = path.dirname(LEDGER_FILE);
+    const rel = (file: string) =>
+      path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+    type Entry = Record<string, unknown> & { hash: string; parent_hash: string; type: string };
+    const readEntries = (file: string): Entry[] =>
+      fs
+        .readFileSync(file, 'utf8')
+        .split('\n')
+        .filter(Boolean)
+        .map((line) => JSON.parse(line) as Entry);
+    const removeSystemSegments = () => {
+      for (const name of fs.readdirSync(ledgerDir)) {
+        if (/^system-ledger-\d{8}-\d{6}(?:-\d+)?\.jsonl$/u.test(name)) {
+          fs.rmSync(path.join(ledgerDir, name), { force: true });
+        }
+      }
+    };
+
+    beforeEach(() => {
+      removeSystemSegments();
+      // Every append crosses the threshold: one rotation per record.
+      setLedgerRotationOptionsForTests({ maxBytes: 1, now: () => FIXED_NOW });
+    });
+
+    afterEach(() => {
+      setLedgerRotationOptionsForTests({});
+      removeSystemSegments();
+    });
+
+    it('rotates at the threshold into dated segments and keeps one chain across them', () => {
+      const hashes = ['ROT_1', 'ROT_2', 'ROT_3'].map((type) => record(type, { type }));
+      const segments = listLedgerSegments();
+      expect(segments.map((file) => path.basename(file))).toEqual([
+        `system-ledger-${STAMP}.jsonl`,
+        `system-ledger-${STAMP}-1.jsonl`,
+        `system-ledger-${STAMP}-2.jsonl`,
+      ]);
+      // The live file was renamed by the last append's rotation.
+      expect(fs.existsSync(LEDGER_FILE)).toBe(false);
+
+      const [first, second, third] = segments.map(readEntries);
+      expect(first!.map((entry) => entry.type)).toEqual(['ROT_1']);
+      expect(first![0]!.parent_hash).toBe(GENESIS_HASH);
+      // Each later segment opens with a keyed marker continuing the previous one.
+      expect(second!.map((entry) => entry.type)).toEqual([LEDGER_SEGMENT_OPENED_TYPE, 'ROT_2']);
+      expect(second![0]).toMatchObject({
+        parent_hash: hashes[0],
+        payload: { previous_segment: path.basename(segments[0]!), previous_last_hash: hashes[0] },
+      });
+      expect(second![1]!.parent_hash).toBe(second![0]!.hash);
+      expect(third![0]!.parent_hash).toBe(hashes[1]);
+      expect(third![1]!.hash).toBe(hashes[2]);
+
+      expect(verifyLedgerIntegrityDetailed()).toMatchObject({
+        ok: true,
+        total: 5,
+        corrupted: [],
+        segments: segments.map(rel),
+      });
+      expect(verifyIntegrity()).toBe(true);
+      // A history reader sees every segment.
+      expect(loadForScope({ scope_kind: 'system' }).map((entry) => entry.type)).toEqual([
+        'ROT_1',
+        LEDGER_SEGMENT_OPENED_TYPE,
+        'ROT_2',
+        LEDGER_SEGMENT_OPENED_TYPE,
+        'ROT_3',
+      ]);
+    });
+
+    it('orders collision suffixes numerically (-10 after -9)', () => {
+      for (let i = 0; i < 12; i++) record(`MANY_${i}`, { i });
+      const names = listLedgerSegments().map((file) => path.basename(file));
+      expect(names.slice(9, 12)).toEqual([
+        `system-ledger-${STAMP}-9.jsonl`,
+        `system-ledger-${STAMP}-10.jsonl`,
+        `system-ledger-${STAMP}-11.jsonl`,
+      ]);
+      expect(verifyLedgerIntegrityDetailed()).toMatchObject({ ok: true, total: 23 });
+    });
+
+    it('never stamps a segment before the newest one when the clock goes backward', () => {
+      record('BEFORE_SKEW', {});
+      setLedgerRotationOptionsForTests({
+        maxBytes: 1,
+        now: () => new Date('2026-11-01T00:00:00.000Z'),
+      });
+      record('AFTER_SKEW', {});
+      expect(listLedgerSegments().map((file) => path.basename(file))).toEqual([
+        `system-ledger-${STAMP}.jsonl`,
+        `system-ledger-${STAMP}-1.jsonl`,
+      ]);
+      expect(verifyLedgerIntegrityDetailed().ok).toBe(true);
+    });
+
+    it('names the segment whose first entry does not link to the previous segment', () => {
+      ['B_1', 'B_2', 'B_3'].forEach((type) => record(type, {}));
+      const segments = listLedgerSegments();
+      const second = readEntries(segments[1]!);
+      second[0] = { ...second[0]!, parent_hash: 'f'.repeat(64) };
+      fs.writeFileSync(
+        segments[1]!,
+        second.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
+      );
+
+      const report = verifyLedgerIntegrityDetailed();
+      expect(report.ok).toBe(false);
+      expect(report.corrupted).toContain(
+        `segment_boundary:${rel(segments[1]!)}:parent_hash_mismatch:after:${rel(segments[0]!)}`
+      );
+    });
+
+    it('detects a removed middle segment at the next boundary', () => {
+      ['M_1', 'M_2', 'M_3'].forEach((type) => record(type, {}));
+      const segments = listLedgerSegments();
+      fs.rmSync(segments[1]!);
+      const report = verifyLedgerIntegrityDetailed();
+      expect(report.ok).toBe(false);
+      expect(report.corrupted).toEqual(
+        expect.arrayContaining([
+          `segment_boundary:${rel(segments[2]!)}:marker_names:${path.basename(segments[1]!)}`,
+          `segment_boundary:${rel(segments[2]!)}:parent_hash_mismatch:after:${rel(segments[0]!)}`,
+        ])
+      );
+    });
+
+    it('verifies from the keyed marker once older segments are archived away, not from a forged start', () => {
+      ['A_1', 'A_2', 'A_3'].forEach((type) => record(type, {}));
+      const segments = listLedgerSegments();
+      fs.rmSync(segments[0]!);
+      expect(verifyLedgerIntegrityDetailed()).toMatchObject({
+        ok: true,
+        total: 4,
+        anchoredFrom: path.basename(segments[0]!),
+      });
+
+      // Dropping the marker leaves an unanchored start: it fails, naming the file.
+      const third = readEntries(segments[2]!);
+      fs.rmSync(segments[1]!);
+      fs.writeFileSync(segments[2]!, JSON.stringify(third[1]) + '\n');
+      const report = verifyLedgerIntegrityDetailed();
+      expect(report.ok).toBe(false);
+      expect(report.corrupted).toEqual([`chain_start:${rel(segments[2]!)}:parent_hash_mismatch`]);
+    });
+
+    it('chains from the newest segment when the live file is missing or empty after rotation', () => {
+      const lastRotated = record('LIVE_GONE', {});
+      expect(fs.existsSync(LEDGER_FILE)).toBe(false);
+      // Stop rotating so the live file stays observable.
+      setLedgerRotationOptionsForTests({ now: () => FIXED_NOW });
+
+      // A concurrent writer created the live file empty in the gap.
+      fs.writeFileSync(LEDGER_FILE, '\n');
+      const next = record('AFTER_EMPTY_LIVE', {});
+      const again = record('RIGHT_AFTER', {});
+      const live = readEntries(LEDGER_FILE);
+      expect(live.map((entry) => entry.type)).toEqual([
+        LEDGER_SEGMENT_OPENED_TYPE,
+        'AFTER_EMPTY_LIVE',
+        'RIGHT_AFTER',
+      ]);
+      expect(live[0]!.parent_hash).toBe(lastRotated);
+      expect(live[1]).toMatchObject({ parent_hash: live[0]!.hash, hash: next });
+      expect(live[2]).toMatchObject({ parent_hash: next, hash: again });
+      expect(verifyLedgerIntegrityDetailed()).toMatchObject({ ok: true, total: 4 });
+    });
+
+    it('never fails an append when rotation fails (warns, keeps the live file)', () => {
+      setLedgerRotationOptionsForTests({ maxBytes: 1, now: () => new Date(Number.NaN) });
+      const first = record('ROTATION_BROKEN_1', {});
+      const second = record('ROTATION_BROKEN_2', {});
+      expect(listLedgerSegments()).toEqual([]);
+      expect(readEntries(LEDGER_FILE).map((entry) => entry.hash)).toEqual([first, second]);
+      expect(verifyLedgerIntegrityDetailed().ok).toBe(true);
+    });
+
+    it('rotates a tenant partition as the tenant-bound store role', () => {
+      const partition = tenantLedgerPath('confidential', 'client-rot');
+      const segmentPath = path.join(path.dirname(partition), `ledger-${STAMP}.jsonl`);
+      // The production role's write scope covers the live file and its segments.
+      const scope = withExecutionContext(
+        TENANT_LEDGER_STORE_ROLE,
+        () => ({
+          live: validateWritePermission(partition).allowed,
+          segment: validateWritePermission(segmentPath).allowed,
+        }),
+        undefined,
+        'client-rot'
+      );
+      expect(scope).toEqual({ live: true, segment: true });
+
+      ['T_1', 'T_2', 'T_3'].forEach((type) =>
+        record(type, { tenant_slug: 'client-rot', tier: 'confidential' })
+      );
+      const segments = withExecutionContext(
+        TENANT_LEDGER_STORE_ROLE,
+        () => listLedgerSegments(partition),
+        undefined,
+        'client-rot'
+      );
+      expect(segments.map((file) => path.basename(file))).toEqual([
+        `ledger-${STAMP}.jsonl`,
+        `ledger-${STAMP}-1.jsonl`,
+        `ledger-${STAMP}-2.jsonl`,
+      ]);
+      expect(fs.existsSync(partition)).toBe(false);
+      // Listed and verified across segments though the live file is gone.
+      const all = verifyAllLedgerIntegrity();
+      expect(all.ok).toBe(true);
+      expect(all.ledgers.find((entry) => entry.tenant_slug === 'client-rot')).toMatchObject({
+        ok: true,
+        total: 5,
+        segments: segments.map(rel),
+      });
+      expect(
+        loadForScope({ tenant_slug: 'client-rot' })
+          .map((entry) => entry.type)
+          .filter((type) => type !== LEDGER_SEGMENT_OPENED_TYPE)
+      ).toEqual(['T_1', 'T_2', 'T_3']);
+      // The marker carries the tenant scope, never a system scope.
+      expect(readEntries(segments[1]!)[0]!.scope).toMatchObject({ tenant_slug: 'client-rot' });
     });
   });
 });

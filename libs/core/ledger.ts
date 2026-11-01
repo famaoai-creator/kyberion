@@ -1,11 +1,13 @@
 import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
 import {
+  jsonlFileSize,
   streamJsonLines,
   streamTextLines,
   streamTextLinesBackward,
   type JsonlScanOptions,
 } from './jsonl-read.js';
+import { rotatedSegmentStem, rotateStore } from './append-only-store.js';
 import {
   assertSafeRepositoryPath,
   safeMkdir,
@@ -412,32 +414,208 @@ function missionLedgerScope(missionPath: string): {
 
 /**
  * Internal helper to write an entry with hash chaining to a specific file.
+ *
+ * MSN-STORE-BOUNDS-3: the chain spans rotated segments. When the live file
+ * is absent or blank and a segment exists (it was just rotated), the chain
+ * continues from the newest segment's last hash, and the live file opens
+ * with a chained {@link LEDGER_SEGMENT_OPENED_TYPE} marker naming that
+ * segment before the entry itself. After the append, a live file past
+ * {@link LEDGER_SEGMENT_ROTATE_BYTES} is renamed to a dated segment — under
+ * this same lock, and never failing the append.
  */
 function _writeToLedger(ledgerPath: string, entryData: any): string {
   ledgerPath = safeLedgerPath(ledgerPath);
   const lockId = `ledger-${createHash('sha256').update(ledgerPath).digest('hex')}`;
   return withLockSync(lockId, () => {
-    const lastHash = _getLastHash(ledgerPath);
+    const tail = resolveChainTail(ledgerPath);
     const chainKey = resolveAuditChainKey({ createIfMissing: true });
     if (!chainKey) throw new Error('missing_audit_chain_key');
-    const entry: any = {
-      ...entryData,
-      parent_hash: lastHash,
-      chain_alg: 'hmac-sha256' satisfies ChainAlg,
-      chain_key_id: getAuditChainKeyId(chainKey),
-    };
-
-    const hash = computeLedgerEntryHash(entry, { alg: 'hmac-sha256', key: chainKey });
-    entry.hash = hash;
 
     const dir = path.dirname(ledgerPath);
     if (!safeExistsSync(dir)) {
       safeMkdir(dir, { recursive: true });
     }
 
-    appendJsonLine(ledgerPath, entry);
+    const appendChained = (data: Record<string, unknown>, parentHash: string): string => {
+      const entry: any = {
+        ...data,
+        parent_hash: parentHash,
+        chain_alg: 'hmac-sha256' satisfies ChainAlg,
+        chain_key_id: getAuditChainKeyId(chainKey),
+      };
+      const hash = computeLedgerEntryHash(entry, { alg: 'hmac-sha256', key: chainKey });
+      entry.hash = hash;
+      appendJsonLine(ledgerPath, entry);
+      return hash;
+    };
+
+    const parentHash = tail.openedFrom
+      ? appendChained(segmentOpenedMarker(entryData, tail.openedFrom, tail.hash), tail.hash)
+      : tail.hash;
+    const hash = appendChained(entryData, parentHash);
+    rotateLedgerIfDue(ledgerPath);
     return hash;
   });
+}
+
+/**
+ * Chained entry type that opens a live file after a rotation: its
+ * `parent_hash` is the previous segment's last hash and its payload names
+ * that segment, so a chain whose older segments were archived away still
+ * verifies from an HMAC-authenticated anchor.
+ */
+export const LEDGER_SEGMENT_OPENED_TYPE = 'LEDGER_SEGMENT_OPENED';
+
+/** Live ledger size past which the append that crossed it rotates it to a dated segment. */
+export const LEDGER_SEGMENT_ROTATE_BYTES = 64 * 1024 * 1024;
+
+interface LedgerRotationOptions {
+  /** Rotation threshold in bytes (default {@link LEDGER_SEGMENT_ROTATE_BYTES}). */
+  maxBytes?: number;
+  /** Clock for segment stamps. */
+  now?: () => Date;
+}
+
+let ledgerRotationOptions: LedgerRotationOptions = {};
+/** Live size at the last failed rotation per ledger — retry only once it doubles. */
+const rotationBackoff = new Map<string, number>();
+
+/** Test seam: inject a small rotation threshold / clock (pass `{}` to reset). */
+export function setLedgerRotationOptionsForTests(options: LedgerRotationOptions): void {
+  ledgerRotationOptions = { ...options };
+  rotationBackoff.clear();
+}
+
+function segmentOpenedMarker(
+  entryData: Record<string, unknown>,
+  previousSegment: string,
+  previousLastHash: string
+): Record<string, unknown> {
+  return {
+    timestamp: nowIso(),
+    type: LEDGER_SEGMENT_OPENED_TYPE,
+    scope: markerScope(entryData.scope),
+    role: 'ledger',
+    mission_id: 'None',
+    payload: {
+      previous_segment: path.basename(previousSegment),
+      previous_last_hash: previousLastHash,
+    },
+    note: 'Chain continues from the previous ledger segment.',
+  };
+}
+
+/** The tier/tenant of the entry that opened the file (system scope when untenanted). */
+function markerScope(scope: unknown): EventScope {
+  const rawTier = nestedString(scope, 'tier');
+  const tier = STORAGE_DATA_TIERS.includes(rawTier as StorageDataTier)
+    ? (rawTier as StorageDataTier)
+    : undefined;
+  const tenant = nestedString(scope, 'tenant_slug');
+  if (tenant) {
+    try {
+      return normalizeEventScope({ tier: tier ?? 'confidential', tenant_slug: tenant });
+    } catch {
+      return normalizeEventScope({ tier: 'confidential', tenant_slug: tenant });
+    }
+  }
+  return normalizeEventScope({ tier: tier ?? 'public', scope_kind: 'system' });
+}
+
+interface LedgerSegment {
+  path: string;
+  stamp: string;
+  seq: number;
+}
+
+const SEGMENT_SUFFIX = /^(\d{8})-(\d{6})(?:-(\d+))?\.jsonl$/u;
+
+/**
+ * Rotated segments of a ledger (`<stem>-YYYYMMDD-HHmmss[-n].jsonl` beside it),
+ * oldest first: by stamp, then by rotatedSegmentPath's collision suffix
+ * (numeric, so `-10` follows `-9` and the unsuffixed name comes first).
+ * Rotation never stamps a segment older than the newest one, so this order is
+ * the chain order across processes. A directory that cannot be listed
+ * throws: skipping segments would hide history from verification.
+ */
+function ledgerSegmentsOf(ledgerPath: string): LedgerSegment[] {
+  const dir = path.dirname(ledgerPath);
+  if (!safeExistsSync(dir)) return [];
+  const prefix = `${rotatedSegmentStem(ledgerPath)}-`;
+  const segments: LedgerSegment[] = [];
+  for (const name of safeReaddir(dir)) {
+    if (!name.startsWith(prefix)) continue;
+    const match = SEGMENT_SUFFIX.exec(name.slice(prefix.length));
+    if (!match) continue;
+    segments.push({
+      path: path.join(dir, name),
+      stamp: `${match[1]}-${match[2]}`,
+      seq: match[3] ? Number(match[3]) : 0,
+    });
+  }
+  return segments.sort((a, b) =>
+    a.stamp === b.stamp ? a.seq - b.seq : a.stamp < b.stamp ? -1 : 1
+  );
+}
+
+/** Rotated segment paths of a ledger, oldest first (chain order). */
+export function listLedgerSegments(ledgerPath: string = GLOBAL_LEDGER_PATH): string[] {
+  return ledgerSegmentsOf(safeLedgerPath(ledgerPath)).map((segment) => segment.path);
+}
+
+/** Every file of one ledger chain in order: segments, then the live file when it exists. */
+function ledgerChainFiles(safePath: string): string[] {
+  const files = ledgerSegmentsOf(safePath).map((segment) => segment.path);
+  if (safeExistsSync(safePath)) files.push(safePath);
+  return files;
+}
+
+function segmentStampDate(stamp: string): Date {
+  const [d = '', t = ''] = stamp.split('-');
+  return new Date(
+    `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}T${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}Z`
+  );
+}
+
+function repoRelative(filePath: string): string {
+  return path.relative(pathResolver.rootDir(), filePath).split(path.sep).join('/');
+}
+
+/**
+ * Rotate the live ledger once it passes the threshold. Runs under the
+ * ledger's lock (the caller holds it). Never throws: a failure (e.g. a role
+ * whose write scope does not cover the segment name) warns, backs off until
+ * the file doubles, and the append that triggered it stands.
+ */
+function rotateLedgerIfDue(ledgerPath: string): void {
+  const threshold = ledgerRotationOptions.maxBytes ?? LEDGER_SEGMENT_ROTATE_BYTES;
+  let size = 0;
+  try {
+    size = jsonlFileSize(ledgerPath);
+    if (size < threshold) return;
+    const failedAt = rotationBackoff.get(ledgerPath);
+    if (failedAt !== undefined && size < 2 * failedAt) return;
+    const now = ledgerRotationOptions.now?.() ?? new Date();
+    // A clock that went backward must not stamp a segment before the newest
+    // one (segment order is chain order): reuse its stamp, and
+    // rotatedSegmentPath appends the next collision suffix.
+    const newest = ledgerSegmentsOf(ledgerPath).at(-1);
+    const newestDate = newest ? segmentStampDate(newest.stamp) : undefined;
+    const segment = rotateStore(ledgerPath, {
+      now: newestDate && newestDate.getTime() > now.getTime() ? newestDate : now,
+    });
+    rotationBackoff.delete(ledgerPath);
+    if (segment) {
+      logger.info(
+        `ledger rotated — live file reached ${size} bytes (threshold ${threshold}); the hash chain continues in a fresh live file | next: none | evidence: ${repoRelative(segment)}`
+      );
+    }
+  } catch (err) {
+    rotationBackoff.set(ledgerPath, size);
+    logger.warn(
+      `ledger rotation failed — ${err instanceof Error ? err.message : String(err)} | next: the append succeeded and the live file keeps growing; rotation retries once it doubles — check the writer role's write scope on the ledger directory | evidence: ${repoRelative(ledgerPath)} ${size} bytes, threshold ${threshold}`
+    );
+  }
 }
 
 /**
@@ -465,32 +643,61 @@ function readLedgerTailLine(ledgerPath: string): string | undefined {
   return undefined;
 }
 
-function _getLastHash(ledgerPath: string) {
-  ledgerPath = safeLedgerPath(ledgerPath);
-  if (!safeExistsSync(ledgerPath)) return GENESIS_HASH;
-  ensureRegularLedgerFile(ledgerPath);
-  // An existing ledger whose tail cannot be read or parsed must not restart
-  // its chain at genesis (that would silently fork it): fail with a
-  // diagnostic. record() keeps a metadata-entry failure non-fatal. A torn
-  // last line (a writer that died mid-append) fails the same way: appending
-  // after it would glue the new entry onto the fragment.
+/**
+ * The last entry hash of one chain file, or undefined when it holds no
+ * entry. An existing file whose tail cannot be read or parsed must not
+ * restart the chain at genesis (that would silently fork it): fail with a
+ * diagnostic. record() keeps a metadata-entry failure non-fatal. A torn last
+ * line (a writer that died mid-append) fails the same way: appending after it
+ * would glue the new entry onto the fragment.
+ */
+function readTailHash(filePath: string): string | undefined {
+  ensureRegularLedgerFile(filePath);
   let tailHash: unknown;
   try {
-    const tail = readLedgerTailLine(ledgerPath);
-    if (tail === undefined) return GENESIS_HASH;
+    const tail = readLedgerTailLine(filePath);
+    if (tail === undefined) return undefined;
     const lastEntry = normalizeLedgerRecord(parseSafeJsonInput(tail, 'ledger tail entry'));
     tailHash = lastEntry?.hash;
   } catch (err) {
     throw new Error(
-      `[LEDGER_TAIL_UNREADABLE] ledger tail cannot be read — appending would fork its hash chain | next: run pnpm audit:verify and repair the ledger | evidence: ${ledgerPath}: ${err instanceof Error ? err.message : String(err)}`
+      `[LEDGER_TAIL_UNREADABLE] ledger tail cannot be read — appending would fork its hash chain | next: run pnpm audit:verify and repair the ledger | evidence: ${filePath}: ${err instanceof Error ? err.message : String(err)}`
     );
   }
   if (typeof tailHash !== 'string' || !tailHash) {
     throw new Error(
-      `[LEDGER_TAIL_UNREADABLE] ledger tail entry has no hash — appending would fork its hash chain | next: run pnpm audit:verify and repair the ledger | evidence: ${ledgerPath}`
+      `[LEDGER_TAIL_UNREADABLE] ledger tail entry has no hash — appending would fork its hash chain | next: run pnpm audit:verify and repair the ledger | evidence: ${filePath}`
     );
   }
   return tailHash;
+}
+
+/**
+ * Where the next append chains from: the live file's last hash; when the
+ * live file is absent or blank (just rotated), the newest non-blank
+ * segment's last hash — `openedFrom` names that segment so the append opens
+ * the live file with a marker; genesis only for a ledger with no entry in
+ * any file. Never restarts at genesis while a segment holds entries.
+ */
+function resolveChainTail(ledgerPath: string): { hash: string; openedFrom?: string } {
+  ledgerPath = safeLedgerPath(ledgerPath);
+  if (safeExistsSync(ledgerPath)) {
+    const live = readTailHash(ledgerPath);
+    if (live !== undefined) return { hash: live };
+  }
+  let segments: LedgerSegment[];
+  try {
+    segments = ledgerSegmentsOf(ledgerPath);
+  } catch (err) {
+    throw new Error(
+      `[LEDGER_TAIL_UNREADABLE] ledger segments cannot be listed — appending from genesis could fork its hash chain | next: check read access to the ledger directory and run pnpm audit:verify | evidence: ${ledgerPath}: ${err instanceof Error ? err.message : String(err)}`
+    );
+  }
+  for (const segment of [...segments].reverse()) {
+    const hash = readTailHash(segment.path);
+    if (hash !== undefined) return { hash, openedFrom: segment.path };
+  }
+  return { hash: GENESIS_HASH };
 }
 
 export interface LedgerIntegrityReport {
@@ -500,6 +707,14 @@ export interface LedgerIntegrityReport {
   missingKey: boolean;
   /** Unkeyed (`sha256`) entries: a legacy prefix anyone could recompute. */
   unkeyed: number;
+  /** Rotated segments verified before the live file (repo-relative, chain order). */
+  segments?: string[];
+  /**
+   * The chain's oldest present file opens with a keyed segment marker instead
+   * of genesis: older segments were archived away. Names the segment the
+   * marker continues from, so an operator can confirm that archive exists.
+   */
+  anchoredFrom?: string;
 }
 
 export interface LedgerIntegrityOptions {
@@ -519,56 +734,106 @@ export const verifyLedgerIntegrityDetailed = (
   options: LedgerIntegrityOptions = {}
 ): LedgerIntegrityReport => {
   const safePath = safeLedgerPath(ledgerPath);
-  if (!safeExistsSync(safePath)) {
+  ensureRegularLedgerFile(safePath);
+  // MSN-STORE-BOUNDS-3: one chain across rotated segments (oldest first),
+  // then the live file. Each segment's first entry must link to the previous
+  // file's last hash; a break names the segment.
+  const files = ledgerChainFiles(safePath);
+  const segments = files.filter((file) => file !== safePath).map(repoRelative);
+  if (files.length === 0) {
     return { ok: true, total: 0, corrupted: [], missingKey: false, unkeyed: 0 };
   }
-  ensureRegularLedgerFile(safePath);
 
   let expectedParentHash = GENESIS_HASH;
   const corrupted: string[] = [];
   let total = 0;
   let missingKey = false;
+  let anchoredFrom: string | undefined;
+  let chainStarted = false;
+  let previousFile: string | undefined;
   const algTracker = createChainAlgTracker(options);
 
-  // Forward stream in fixed chunks: constant memory, no whole-file size cap.
-  const lines = streamTextLines(safePath, {
-    ...ledgerScanOptions,
-    onOversized: (oversized) => {
+  for (const file of files) {
+    ensureRegularLedgerFile(file);
+    // Live-file findings keep their historic `line:N:...` form; segment
+    // findings are prefixed with the segment's repo-relative path.
+    const label = file === safePath ? '' : `${repoRelative(file)}:`;
+    let firstInFile = true;
+    // Forward stream in fixed chunks: constant memory, no whole-file size cap.
+    const lines = streamTextLines(file, {
+      ...ledgerScanOptions,
+      onOversized: (oversized) => {
+        total++;
+        corrupted.push(`${label}line:${oversized.lineNumber}:parse_error`);
+      },
+    });
+    for (const { text: line, lineNumber } of lines) {
+      if (!line.trim()) continue;
       total++;
-      corrupted.push(`line:${oversized.lineNumber}:parse_error`);
-    },
-  });
-  for (const { text: line, lineNumber } of lines) {
-    if (!line.trim()) continue;
-    total++;
-    try {
-      const entry = normalizeLedgerRecord(parseSafeJsonInput(line, 'ledger entry'));
-      if (!entry) {
-        corrupted.push(`line:${lineNumber}:invalid_record`);
-        continue;
+      const opensFile = firstInFile;
+      firstInFile = false;
+      try {
+        const entry = normalizeLedgerRecord(parseSafeJsonInput(line, 'ledger entry'));
+        if (!entry) {
+          corrupted.push(`${label}line:${lineNumber}:invalid_record`);
+          continue;
+        }
+        const chainAlg = (entry.chain_alg ?? 'sha256') as ChainAlg;
+        const algFinding = algTracker.observe(chainAlg);
+        const chainKey =
+          chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
+        const marker = segmentMarkerOf(entry);
+        if (!chainStarted && marker && chainAlg === 'hmac-sha256') {
+          // Older segments were archived: the keyed marker is the anchor
+          // (its HMAC still has to verify below).
+          expectedParentHash = marker.previousLastHash;
+          anchoredFrom = marker.previousSegment;
+        }
+        chainStarted = true;
+        const check = verifyLedgerEntryHash(entry, expectedParentHash, {
+          alg: chainAlg,
+          ...(chainKey ? { key: chainKey } : {}),
+        });
+        const boundary = opensFile && previousFile !== undefined;
+        if (
+          boundary &&
+          marker &&
+          previousFile &&
+          marker.previousSegment !== path.basename(previousFile)
+        ) {
+          corrupted.push(
+            `segment_boundary:${repoRelative(file)}:marker_names:${marker.previousSegment}`
+          );
+        }
+        if (algFinding) {
+          corrupted.push(
+            `${label}line:${lineNumber}:${algFinding}${check.ok ? '' : `+${check.reason ?? 'invalid'}`}`
+          );
+        } else if (!check.ok && boundary && check.reason === 'parent_hash_mismatch') {
+          corrupted.push(
+            `segment_boundary:${repoRelative(file)}:parent_hash_mismatch:after:${repoRelative(previousFile as string)}`
+          );
+        } else if (
+          !check.ok &&
+          opensFile &&
+          segments.length > 0 &&
+          check.reason === 'parent_hash_mismatch'
+        ) {
+          corrupted.push(`chain_start:${repoRelative(file)}:parent_hash_mismatch`);
+        } else if (!check.ok) {
+          if (check.reason === 'missing_audit_chain_key') missingKey = true;
+          corrupted.push(
+            entry.id
+              ? `${label}${String(entry.id)}`
+              : `${label}line:${lineNumber}:${check.reason ?? 'invalid'}`
+          );
+        }
+        expectedParentHash = String(entry.hash ?? '');
+      } catch (_e) {
+        corrupted.push(`${label}line:${lineNumber}:parse_error`);
       }
-      const chainAlg = (entry.chain_alg ?? 'sha256') as ChainAlg;
-      const algFinding = algTracker.observe(chainAlg);
-      const chainKey =
-        chainAlg === 'hmac-sha256' ? resolveAuditChainKey({ createIfMissing: false }) : null;
-      const check = verifyLedgerEntryHash(entry, expectedParentHash, {
-        alg: chainAlg,
-        ...(chainKey ? { key: chainKey } : {}),
-      });
-      if (algFinding) {
-        corrupted.push(
-          `line:${lineNumber}:${algFinding}${check.ok ? '' : `+${check.reason ?? 'invalid'}`}`
-        );
-      } else if (!check.ok) {
-        if (check.reason === 'missing_audit_chain_key') missingKey = true;
-        corrupted.push(
-          entry.id ? String(entry.id) : `line:${lineNumber}:${check.reason ?? 'invalid'}`
-        );
-      }
-      expectedParentHash = String(entry.hash ?? '');
-    } catch (_e) {
-      corrupted.push(`line:${lineNumber}:parse_error`);
     }
+    if (!firstInFile) previousFile = file;
   }
   return {
     ok: corrupted.length === 0,
@@ -576,8 +841,23 @@ export const verifyLedgerIntegrityDetailed = (
     corrupted,
     missingKey,
     unkeyed: algTracker.unkeyed,
+    ...(segments.length > 0 ? { segments } : {}),
+    ...(anchoredFrom ? { anchoredFrom } : {}),
   };
 };
+
+/** The continuation payload of a segment-opened marker entry, if `entry` is one. */
+function segmentMarkerOf(
+  entry: Record<string, unknown>
+): { previousSegment: string; previousLastHash: string } | undefined {
+  if (entry.type !== LEDGER_SEGMENT_OPENED_TYPE) return undefined;
+  const previousSegment = nestedString(entry.payload, 'previous_segment');
+  const previousLastHash = nestedString(entry.payload, 'previous_last_hash');
+  if (!previousSegment || !previousLastHash || previousLastHash !== entry.parent_hash) {
+    return undefined;
+  }
+  return { previousSegment, previousLastHash };
+}
 
 export interface TenantLedgerPartition {
   tier: StorageDataTier;
@@ -596,7 +876,11 @@ function listDirectory(dir: string): string[] {
   }
 }
 
-/** Every tenant ledger partition file that exists (`<root>/<personal|confidential>/<tenant>/ledger.jsonl`). */
+/**
+ * Every tenant ledger partition that holds a chain
+ * (`<root>/<personal|confidential>/<tenant>/ledger.jsonl`, or only rotated
+ * segments right after a rotation). `path` is always the live file path.
+ */
 export function listTenantLedgerPartitions(): TenantLedgerPartition[] {
   const root = pathResolver.resolve(TENANT_LEDGER_ROOT);
   const partitions: TenantLedgerPartition[] = [];
@@ -607,7 +891,7 @@ export function listTenantLedgerPartitions(): TenantLedgerPartition[] {
       if (!isValidTenantSlug(tenant)) continue;
       const filePath = tenantLedgerPath(tier as StorageDataTier, tenant);
       try {
-        if (safeExistsSync(filePath)) {
+        if (safeExistsSync(filePath) || partitionHasSegments(tenant, filePath)) {
           partitions.push({ tier: tier as StorageDataTier, tenant_slug: tenant, path: filePath });
         }
       } catch {
@@ -616,6 +900,21 @@ export function listTenantLedgerPartitions(): TenantLedgerPartition[] {
     }
   }
   return partitions;
+}
+
+/**
+ * Whether a partition without a live file still holds rotated segments,
+ * listed as its tenant-bound store role. A listing this process may not make
+ * (a caller bound to another tenant) counts as present, so the verifier
+ * withholds it rather than silently dropping it.
+ */
+function partitionHasSegments(tenantSlug: string, livePath: string): boolean {
+  if (!safeExistsSync(path.dirname(livePath))) return false;
+  try {
+    return asTenantLedgerStore(tenantSlug, () => ledgerSegmentsOf(livePath).length > 0);
+  } catch {
+    return true;
+  }
 }
 
 export interface ScopedLedgerIntegrityReport extends LedgerIntegrityReport {
@@ -691,23 +990,30 @@ export function verifyScopedIntegrity(scope: { tier?: string; tenant_slug?: stri
   return verifyTenantLedgerIntegrity(tier, tenant).ok;
 }
 
+/**
+ * Scoped history of one ledger chain: every rotated segment (oldest first),
+ * then the live file — a scoped read is a history reader, so rotation never
+ * hides older entries from it.
+ */
 function readScopedEntries(safePath: string, filter: EventScopeFilter): Record<string, unknown>[] {
   ensureRegularLedgerFile(safePath);
-  if (!safeExistsSync(safePath)) return [];
   // Forward stream: a scoped read never fails on the ledger's size.
   const matched: Record<string, unknown>[] = [];
-  for (const value of streamJsonLines<unknown>(safePath, {
-    ...ledgerScanOptions,
-    onMalformed: 'skip',
-  })) {
-    try {
-      const entry = normalizeLedgerRecord(value);
-      if (!entry) continue;
-      const scopeResult = resolveScopeForRecord(entry);
-      if (scopeResult.disposition === 'invalid') continue;
-      if (eventScopeMatches(scopeResult.scope, filter)) matched.push(entry);
-    } catch {
-      continue;
+  for (const file of ledgerChainFiles(safePath)) {
+    ensureRegularLedgerFile(file);
+    for (const value of streamJsonLines<unknown>(file, {
+      ...ledgerScanOptions,
+      onMalformed: 'skip',
+    })) {
+      try {
+        const entry = normalizeLedgerRecord(value);
+        if (!entry) continue;
+        const scopeResult = resolveScopeForRecord(entry);
+        if (scopeResult.disposition === 'invalid') continue;
+        if (eventScopeMatches(scopeResult.scope, filter)) matched.push(entry);
+      } catch {
+        continue;
+      }
     }
   }
   return matched;
@@ -724,14 +1030,14 @@ function filterTenants(filter: EventScopeFilter): string[] | 'all' {
  * With the default path this is the system ledger plus — for a filter that
  * names tenants — those tenants' partitions, each read under the caller's own
  * tier-guard decision (a partition this reader may not see is skipped, never
- * widened by the filter). An explicit path reads that one file.
+ * widened by the filter). An explicit path reads that one chain (its segments, then the live file).
  */
 export const loadForScope = (
   filter: EventScopeFilter,
   ledgerPath: string = GLOBAL_LEDGER_PATH
 ): Record<string, unknown>[] => {
   const safePath = safeLedgerPath(ledgerPath);
-  const entries = safeExistsSync(safePath) ? readScopedEntries(safePath, filter) : [];
+  const entries = readScopedEntries(safePath, filter);
   if (ledgerPath !== GLOBAL_LEDGER_PATH) return entries;
   const tenants = filterTenants(filter);
   if (tenants !== 'all' && tenants.length === 0) return entries;
@@ -756,7 +1062,10 @@ export const loadForScope = (
       continue;
     }
     try {
-      if (!safeExistsSync(partition.path)) continue;
+      // A partition right after rotation has segments but no live file yet.
+      if (!safeExistsSync(partition.path) && !safeExistsSync(path.dirname(partition.path))) {
+        continue;
+      }
     } catch {
       continue;
     }
