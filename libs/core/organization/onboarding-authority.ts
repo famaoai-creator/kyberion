@@ -56,6 +56,8 @@ export interface OnboardingAuthorityInput {
   grants: ExternalOperationGrant[];
   /** Business decision types delegated by policy (allow/allow_with_review/forbid). */
   delegated_decisions?: Record<string, ExternalEffectPolicy>;
+  /** Explicit owner-reviewed tier scope; omission retains the current charter. */
+  data_tier?: { read: string[]; write: string[] };
   expires_at: string;
   mode: 'grant' | 'revoke' | 'activate';
   renew_existing?: boolean;
@@ -119,6 +121,25 @@ function ownerFor(principal: OnboardingAuthorityPrincipal, scope: CharterScope, 
     return deny('tenant owner required');
   return { id: principal.accountableId, display_name: member.display_name };
 }
+function parseDataTier(raw: unknown, scope: CharterScope): OnboardingAuthorityInput['data_tier'] {
+  if (raw === undefined) return undefined;
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw))
+    return deny('data_tier must contain read and write arrays');
+  const value = raw as Record<string, unknown>;
+  if (Object.keys(value).some((key) => key !== 'read' && key !== 'write'))
+    return deny('unknown data_tier field');
+  const allowed = new Set([
+    'public',
+    scope.kind === 'person' ? 'personal' : `confidential:${scope.tenant_slug}`,
+  ]);
+  const parse = (key: 'read' | 'write'): string[] => {
+    const rows = value[key];
+    if (!Array.isArray(rows) || rows.some((row) => typeof row !== 'string' || !allowed.has(row)))
+      return deny(`data_tier.${key} must name only public and this actual scope's tier`);
+    return [...new Set(rows as string[])].sort();
+  };
+  return { read: parse('read'), write: parse('write') };
+}
 export function onboardingAuthorityScope(raw: unknown): CharterScope {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return deny('scope required');
   const value = raw as Record<string, unknown>;
@@ -142,14 +163,16 @@ function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
     'expires_at',
     'mode',
     'renew_existing',
+    'data_tier',
   ];
   if (Object.keys(value).some((k) => !allowed.includes(k))) return deny('unknown plan field');
   const grants = parseExternalOperationGrants(value.grants);
   const delegated_decisions = parseDelegatedDecisions(value.delegated_decisions);
+  const data_tier = parseDataTier(value.data_tier, scope);
   const decisionCount = Object.keys(delegated_decisions ?? {}).length;
-  if (!grants || (value.mode !== 'activate' && !grants.length && !decisionCount))
+  if (!grants || (value.mode !== 'activate' && !grants.length && !decisionCount && !data_tier))
     return deny('choose at least one exact operation, target or delegated decision');
-  if (value.mode === 'activate' && (grants.length || decisionCount))
+  if (value.mode === 'activate' && (grants.length || decisionCount || data_tier))
     return deny('activation-only consent must not include external grants or delegated decisions');
   const expires = typeof value.expires_at === 'string' ? Date.parse(value.expires_at) : NaN;
   if (
@@ -167,6 +190,7 @@ function parseInput(raw: unknown, now: Date): OnboardingAuthorityInput {
     ...(scope.kind === 'organization' ? { tenant_slug: scope.tenant_slug } : {}),
     grants,
     ...(delegated_decisions !== undefined ? { delegated_decisions } : {}),
+    ...(data_tier !== undefined ? { data_tier } : {}),
     expires_at: new Date(expires).toISOString(),
     mode: value.mode,
     ...(value.renew_existing === true ? { renew_existing: true } : {}),
@@ -224,6 +248,16 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
           input.mode === 'activate' ? ('forbid' as const) : ('named_actions_only' as const),
       };
   envelope.external_operations = grants;
+  if (input.data_tier) {
+    if (
+      input.mode === 'revoke' &&
+      (['read', 'write'] as const).some((key) =>
+        input.data_tier![key].some((tier) => !envelope.data_tier[key].includes(tier))
+      )
+    )
+      return deny('revocation cannot expand existing data tiers');
+    envelope.data_tier = structuredClone(input.data_tier);
+  }
   if (input.delegated_decisions !== undefined) {
     if (Object.keys(oldDecisions).length) envelope.delegated_decisions = oldDecisions;
     else delete envelope.delegated_decisions;
@@ -282,6 +316,10 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
         ]
       : []),
     ...input.grants.map((g) => JSON.stringify(g)),
+    ...Object.entries(input.delegated_decisions ?? {}).map(
+      ([type, policy]) => `Requested ${input.mode} delegated decision ${type}: ${policy}`
+    ),
+    `Resulting delegated decisions: ${JSON.stringify(envelope.delegated_decisions ?? {})}`,
     `Expires: ${expires_at}`,
     ...(active && !live
       ? [
@@ -296,13 +334,13 @@ function buildPlan(principal: OnboardingAuthorityPrincipal, raw: unknown, option
           'This approval also activates this existing provisioned execution identity. Suspended and retired identities cannot be reactivated here.',
         ]
       : []),
-    'Standing execution is restricted to verified public-data work. Connection authentication is separate.',
+    `Delegated read tiers: ${envelope.data_tier.read.join(', ') || 'none'}; write tiers: ${envelope.data_tier.write.join(', ') || 'none'}. Destination grants never declassify source data. Connection authentication is separate.`,
     ...(input.mode === 'activate'
       ? []
       : [
           'Target-scoped operations have reputational class B. URL queries and fragments require individual approval.',
         ]),
-    'Arbitrary browser click/evaluate/submit and GitHub merge are not delegated.',
+    'Only the exact reviewed VCS repository and branch targets are delegated, including PR merge when listed. Arbitrary browser click/evaluate/submit is not delegated.',
     'Existing unrelated grants, limits and restrictions are retained; replacement follows the canonical charter lifecycle.',
     `Replaces: ${active?.charter_id ?? 'none'}; existing charter fingerprint: ${base_hash}`,
     'Stopping delegation blocks future admissions; it does not cancel effects already started.',
@@ -611,6 +649,7 @@ export function readOnboardingAuthority(
           id: charter.charter_id,
           expires_at: charter.accountable.expires_at,
           grants: charter.envelope.external_operations ?? [],
+          data_tier: structuredClone(charter.envelope.data_tier),
           delegated_decisions: charter.envelope.delegated_decisions ?? {},
           stopped:
             loadCharterUsage(charter, options.now ?? new Date(), options).tripwires_hit.length > 0,

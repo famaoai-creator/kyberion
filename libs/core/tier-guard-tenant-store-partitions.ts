@@ -13,6 +13,25 @@ import { tenantStoreLedgerPartitionOf } from './storage-layout.js';
 import { isRecord } from './foundation/primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
 
+function trimTrailingSlashes(value: string): string {
+  // A linear scan avoids quadratic regexp backtracking on long slash runs.
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+}
+
+/** Security policy paths use POSIX separators, including on Windows. */
+export function normalizeTenantPolicyPath(value: string): string {
+  return trimTrailingSlashes(value.replace(/\\/g, '/'));
+}
+
+/** Exact directory-boundary match; similarly named tenants never collide. */
+export function tenantPolicyPathStartsWith(targetPath: string, patternPath: string): boolean {
+  const target = normalizeTenantPolicyPath(targetPath);
+  const prefix = normalizeTenantPolicyPath(patternPath);
+  return target === prefix || target.startsWith(prefix + '/');
+}
+
 interface TenantScopePolicy {
   tenant_scope?: {
     slug_pattern?: unknown;
