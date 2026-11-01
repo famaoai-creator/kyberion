@@ -18,7 +18,13 @@ import { dotStatePath } from './dot-state-paths.js';
 
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import { appendJsonLine, parseSafeJsonInput, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from '../foundation/json.js';
+import {
+  fileEndsWithNewline,
+  streamJsonLines,
+  streamTextLines,
+  type JsonlRawLine,
+} from '../jsonl-read.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -26,11 +32,12 @@ import {
   assertSafeRepositoryPath,
   safeExistsSync,
   safeLstat,
+  safeAppendFileSync,
   safeMkdir,
-  safeReadFile,
+  safeMoveSync,
   safeStat,
   safeReadFileTail,
-  safeWriteFile,
+  safeUnlinkSync,
 } from '../secure-io.js';
 import type { DotCharter, DotTrigger } from './dot-charter.js';
 import { isFrontDeskDiagnosticDot, listDotCharters } from './dot-charter.js';
@@ -145,6 +152,8 @@ export interface DotInboxAppendDeps {
   now?: () => Date;
   /** Test seam: override the byte threshold that gates tombstone compaction. */
   compactMinBytes?: number;
+  /** Test seam: range-read chunk size for the streamed compaction. */
+  chunkBytes?: number;
 }
 
 export interface AppendedDotInboxEntry extends DotInboxEntryInput {
@@ -203,12 +212,12 @@ export function appendDotInboxEntry(
     { allowMissingLeaf: true }
   );
   safeMkdir(path.dirname(filePath), { recursive: true });
+  const lock = dotInboxLockId(filePath);
   if (idempotencyKey) {
     // The inbox row is the delivery receipt. Keep lookup and append under one
     // file-scoped lock so a retry after an uncertain append returns that receipt
     // rather than emitting a second wake. A parseable matching row with an
     // invalid timestamp is unreadable evidence and still fails closed.
-    const lock = `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
     const result = withLockSync(lock, () => {
       let exists = true;
       try {
@@ -243,9 +252,38 @@ export function appendDotInboxEntry(
     if (appended) maybeCompactDotInbox(filePath, { ...deps, scope });
     return result;
   }
-  appendJsonLine(filePath, entry);
+  // Plain appends take the inbox lock too, so compaction (which rewrites the
+  // file under this lock) can never overwrite a row appended mid-rewrite.
+  // Compaction runs after the release, so the lock is never re-entered. A lock
+  // timeout must not fail the append (P3): append unlocked — compaction
+  // re-checks the live size right before its move and aborts if it grew.
+  try {
+    withLockSync(lock, () => appendJsonLine(filePath, entry));
+  } catch (error) {
+    if (!String((error as Error)?.message).includes('[LOCK_TIMEOUT]')) throw error;
+    logger.warn(
+      `[DOT_INBOX] inbox lock busy — appending without it | next: compaction's pre-move size check protects this row | evidence: ${(error as Error).message}`
+    );
+    appendJsonLine(filePath, entry);
+  }
   maybeCompactDotInbox(filePath, { ...deps, scope });
   return entry;
+}
+
+function dotInboxLockId(filePath: string): string {
+  return `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
+}
+
+/** Test seams for the inbox compaction. */
+export interface DotInboxTestHooks {
+  /** Runs after the audit, right before the size re-check and the move. */
+  beforeCompactMove?: (filePath: string) => void;
+}
+let inboxTestHooks: DotInboxTestHooks = {};
+
+/** Test seam: install compaction hooks; call with `{}` to reset. */
+export function setDotInboxTestHooks(hooks: DotInboxTestHooks): void {
+  inboxTestHooks = { ...hooks };
 }
 
 /**
@@ -277,7 +315,8 @@ export const DOT_EXECUTOR_REPORT_SOURCE_VALUE = 'dot-executor';
 
 /** Wake trigger key — MUST stay identical to the consumer's derivation:
  *  `${lineIndex}:${rawLine}` hashed. Line index is 1-based over raw split
- *  lines (blank lines count) because readJsonLines maps `index + 1`. */
+ *  lines (blank lines count, `\r\n` stripped) — the numbering `readJsonLines`
+ *  used (`index + 1`) and `streamJsonLines` / `streamTextLines` keep. */
 export function dotInboxWakeKey(lineIndex: number, rawLine: string): string {
   return `wake:${createHash('sha256')
     .update(`${lineIndex}:${rawLine}`)
@@ -372,14 +411,23 @@ export function compactDotInbox(deps: DotInboxAppendDeps = {}): DotInboxCompactR
   const compactMinBytes = deps.compactMinBytes ?? DOT_INBOX_COMPACT_MIN_BYTES;
   if (!safeExistsSync(filePath)) return empty;
 
-  const lockId = `dot-inbox-${createHash('sha256').update(filePath).digest('hex').slice(0, 24)}`;
-  return withLockSync(lockId, () => {
+  return withLockSync(dotInboxLockId(filePath), () => {
     const bytesBefore = safeStat(filePath).size;
     if (bytesBefore < compactMinBytes) return { ...empty, bytes_before: bytesBefore };
 
-    const raw = safeReadFile(filePath, { encoding: 'utf8' }) as string;
-    // 1-based raw indices mirror the consumer's __index exactly — blanks count.
-    const lines = raw.split(/\r?\n/);
+    // MSN-STORE-BOUNDS-2 (P1): streamed, never a whole-file read, so the
+    // inbox's size cannot stop its own compaction. Forward line numbers are
+    // 1-based and count blank lines — exactly the old `split(/\r?\n/)` index
+    // + 1 that the consumer's `__index` (and so every wake key) uses.
+    const scanOptions = { chunkBytes: deps.chunkBytes };
+    let oversized = false;
+    const scan = (file: string): Generator<JsonlRawLine> =>
+      streamTextLines(file, {
+        ...scanOptions,
+        onOversized: () => {
+          oversized = true;
+        },
+      });
     const charters = listDotCharters(deps.rootDir ?? pathResolver.rootDir(), { status: 'active' })
       .map((c) => ('charter' in c ? (c as { charter: DotCharter }).charter : (c as DotCharter)))
       .filter((c) => !isFrontDeskDiagnosticDot(c));
@@ -391,7 +439,8 @@ export function compactDotInbox(deps: DotInboxAppendDeps = {}): DotInboxCompactR
     );
     const consumedByDot = new Map<string, Set<string>>();
     if (safeExistsSync(ledgerPath)) {
-      for (const row of readJsonLines<Record<string, unknown>>(ledgerPath, {
+      for (const row of streamJsonLines<Record<string, unknown>>(ledgerPath, {
+        ...scanOptions,
         onMalformed: 'skip',
       })) {
         const consumed =
@@ -405,9 +454,10 @@ export function compactDotInbox(deps: DotInboxAppendDeps = {}): DotInboxCompactR
     }
 
     const nowMs = (deps.now?.() ?? new Date()).getTime();
-    const tombstonedIdx = new Set<number>();
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
+    const tombstonedLines = new Set<number>();
+    let lineCount = 0;
+    for (const { text: line, lineNumber } of scan(filePath)) {
+      lineCount = lineNumber;
       if (!line || !line.trim() || line === DOT_INBOX_TOMBSTONE) continue;
       let parsed: Record<string, unknown>;
       try {
@@ -419,42 +469,95 @@ export function compactDotInbox(deps: DotInboxAppendDeps = {}): DotInboxCompactR
       if (matched.length === 0) {
         const enq = Date.parse(String(parsed.enqueued_at ?? ''));
         if (Number.isFinite(enq) && nowMs - enq >= DOT_INBOX_ORPHAN_TOMBSTONE_MS)
-          tombstonedIdx.add(i);
+          tombstonedLines.add(lineNumber);
         continue;
       }
-      const key = dotInboxWakeKey(i + 1, line);
-      if (matched.every((c) => consumedByDot.get(c.dot_id)?.has(key))) tombstonedIdx.add(i);
+      const key = dotInboxWakeKey(lineNumber, line);
+      if (matched.every((c) => consumedByDot.get(c.dot_id)?.has(key))) {
+        tombstonedLines.add(lineNumber);
+      }
     }
-    if (tombstonedIdx.size === 0)
+    // `scanned` keeps the old split-based count (the segment after the last
+    // newline counted even when empty).
+    const scanned = lineCount + (fileEndsWithNewline(filePath) ? 1 : 0);
+    if (oversized) {
+      // A line over the per-line guard cannot be copied without buffering it;
+      // compaction would lose it, so leave the file untouched.
+      logger.warn(
+        `[DOT_INBOX] compaction skipped for ${filePath} — a line exceeds the per-line read guard | next: inspect the writer that produced it | evidence: ${bytesBefore} bytes`
+      );
+      return { tombstoned: 0, scanned, bytes_before: bytesBefore, bytes_after: bytesBefore };
+    }
+    if (tombstonedLines.size === 0)
       return {
         tombstoned: 0,
-        scanned: lines.length,
+        scanned,
         bytes_before: bytesBefore,
         bytes_after: bytesBefore,
       };
 
-    const rewritten = lines
-      .map((l, i) => (tombstonedIdx.has(i) ? DOT_INBOX_TOMBSTONE : l))
-      .join('\n');
-    safeWriteFile(filePath, rewritten.endsWith('\n') ? rewritten : `${rewritten}\n`);
+    // Stream the rewrite into a sibling staging file, audit it against the
+    // live file, then rename it over the live file (still under the lock).
+    const staging = `${filePath}.compacting-${process.pid}`;
+    try {
+      safeUnlinkSync(staging);
+      let batch = '';
+      for (const { text, lineNumber } of scan(filePath)) {
+        batch += `${tombstonedLines.has(lineNumber) ? DOT_INBOX_TOMBSTONE : text}\n`;
+        if (batch.length >= 1024 * 1024) {
+          safeAppendFileSync(staging, batch);
+          batch = '';
+        }
+      }
+      safeAppendFileSync(staging, batch);
 
-    // Audit: surviving non-tombstone lines must sit at identical indices —
-    // any drift means a key re-derivation happened; restore the original.
-    const after = (safeReadFile(filePath, { encoding: 'utf8' }) as string).split(/\r?\n/);
-    const drift =
-      after.length !== lines.length ||
-      lines.some((l, i) => !tombstonedIdx.has(i) && after[i] !== l);
-    if (drift) {
-      safeWriteFile(filePath, raw);
-      throw new Error('[DOT_INBOX] tombstone audit detected positional drift — rolled back');
+      // Audit: surviving non-tombstone lines must sit at identical line
+      // numbers — any drift means a key would be re-derived; keep the original.
+      const live = scan(filePath);
+      let drift = false;
+      for (const rewritten of scan(staging)) {
+        const original = live.next();
+        if (original.done || original.value.lineNumber !== rewritten.lineNumber) {
+          drift = true;
+          break;
+        }
+        const expected = tombstonedLines.has(rewritten.lineNumber)
+          ? DOT_INBOX_TOMBSTONE
+          : original.value.text;
+        if (rewritten.text !== expected) {
+          drift = true;
+          break;
+        }
+      }
+      if (!live.next().done) drift = true;
+      live.return(undefined);
+      if (drift || oversized) {
+        throw new Error('[DOT_INBOX] tombstone audit detected positional drift — rolled back');
+      }
+      inboxTestHooks.beforeCompactMove?.(filePath);
+      // A row appended outside the lock after the audit would be overwritten
+      // by the move: abort instead (the live file is untouched; next pass retries).
+      const bytesNow = safeStat(filePath).size;
+      if (bytesNow !== bytesBefore) {
+        throw new Error(
+          `[DOT_INBOX] inbox grew during compaction (${bytesBefore} -> ${bytesNow} bytes) — rolled back`
+        );
+      }
+      safeMoveSync(staging, filePath);
+    } finally {
+      try {
+        safeUnlinkSync(staging);
+      } catch {
+        // best-effort staging cleanup
+      }
     }
     const bytesAfter = safeStat(filePath).size;
     logger.info(
-      `[DOT_INBOX] tombstoned ${tombstonedIdx.size} row(s): ${bytesBefore} -> ${bytesAfter} bytes (positions preserved)`
+      `[DOT_INBOX] tombstoned ${tombstonedLines.size} row(s): ${bytesBefore} -> ${bytesAfter} bytes (positions preserved)`
     );
     return {
-      tombstoned: tombstonedIdx.size,
-      scanned: lines.length,
+      tombstoned: tombstonedLines.size,
+      scanned,
       bytes_before: bytesBefore,
       bytes_after: bytesAfter,
     };

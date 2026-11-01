@@ -9,6 +9,7 @@ import {
   JsonlSourceChangedError,
   readJsonLinesBackward,
   readJsonLinesSince,
+  DEFAULT_SINCE_STOP_AFTER_OLDER,
   readLastJsonLine,
   streamJsonLines,
   streamTextLines,
@@ -258,7 +259,7 @@ describe('jsonl-read', () => {
       expect(stats.bytesRead).toBeLessThan(total);
     });
 
-    it('readJsonLinesSince returns oldest-first and stops at the first older record', () => {
+    it('readJsonLinesSince returns oldest-first and stops after a run of older records', () => {
       const records = Array.from({ length: 1000 }, (_, i) => ({ t: i * 10 }));
       const { source, stats } = memorySource({ f: jsonl(...records) });
       const total = Buffer.byteLength(jsonl(...records));
@@ -270,6 +271,25 @@ describe('jsonl-read', () => {
       });
       expect(recent.map((r) => r.t)).toEqual([9950, 9960, 9970, 9980, 9990]);
       expect(stats.bytesRead).toBeLessThan(total / 10);
+    });
+
+    it('readJsonLinesSince skips a skewed-clock old row instead of stopping at it', () => {
+      // A row stamped long before the window sits between in-window rows.
+      const { source } = memorySource({
+        f: jsonl({ t: 1 }, { t: 2 }, { t: 50 }, { t: 60 }, { t: 3 }, { t: 70 }, { t: 80 }),
+      });
+      const since = (stopAfterOlder?: number) =>
+        readJsonLinesSince<{ t: number }>('f', {
+          source,
+          timeOf: (r) => r.t,
+          sinceMs: 10,
+          stopAfterOlder,
+        }).map((r) => r.t);
+      expect(since()).toEqual([50, 60, 70, 80]);
+      expect(DEFAULT_SINCE_STOP_AFTER_OLDER).toBe(64);
+      // The bound is a run of consecutive older rows: K=1 restores the old early stop.
+      expect(since(1)).toEqual([70, 80]);
+      expect(since(2)).toEqual([50, 60, 70, 80]);
     });
 
     it('readJsonLinesSince honours maxRecords and keeps records without a time', () => {

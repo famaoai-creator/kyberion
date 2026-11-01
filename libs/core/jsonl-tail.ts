@@ -48,7 +48,14 @@ export interface JsonlTailCursor {
 }
 
 export interface JsonlTailOptions {
+  /**
+   * MSN-STORE-BOUNDS-2 (P1/P3): warn threshold, not a cap. A backlog larger
+   * than this is still read (chunk by chunk) and the cursor still advances;
+   * the tail only logs one diagnostic warning per instance.
+   */
   maxSizeMB?: number;
+  /** Range-read chunk size (tests inject small values). Default: the secure-io window cap. */
+  chunkBytes?: number;
   fingerprintBytes?: number;
   /** Project parsed JSON into a trusted record shape before delivery. */
   parse?: (value: unknown) => unknown;
@@ -152,6 +159,8 @@ export class JsonlTail<T = unknown> {
   private readonly filePath: string;
   private readonly maxSizeMB: number;
   private readonly fingerprintBytes: number;
+  private readonly chunkBytes: number;
+  private warnedLargeBacklog = false;
   private readonly parse: ((value: unknown) => T) | undefined;
   private readonly onMalformed: ((line: string, error: unknown) => void) | undefined;
   private position: JsonlTailCursor;
@@ -160,6 +169,10 @@ export class JsonlTail<T = unknown> {
     this.filePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
     this.maxSizeMB = options.maxSizeMB ?? DEFAULT_MAX_SIZE_MB;
     this.fingerprintBytes = options.fingerprintBytes ?? DEFAULT_FINGERPRINT_BYTES;
+    this.chunkBytes = Math.max(
+      1,
+      Math.min(MAX_RANGE_READ_BYTES, Math.floor(options.chunkBytes ?? MAX_RANGE_READ_BYTES))
+    );
     this.parse = options.parse as ((value: unknown) => T) | undefined;
     this.onMalformed = options.onMalformed;
     this.position = { ...EMPTY_JSONL_CURSOR };
@@ -224,17 +237,22 @@ export class JsonlTail<T = unknown> {
     }
 
     const pending = size - this.position.offset;
-    if (pending > this.maxSizeMB * 1024 * 1024) {
-      throw new Error(
-        `File too large: ${this.filePath} has ${(pending / (1024 * 1024)).toFixed(1)}MB unread (limit: ${this.maxSizeMB}MB)`
+    if (pending > this.maxSizeMB * 1024 * 1024 && !this.warnedLargeBacklog) {
+      // P1/P3: a large backlog is abnormal growth worth a warning, never a
+      // reason to stop following the file (that stalled the subscription on
+      // the same offset forever).
+      this.warnedLargeBacklog = true;
+      logger.warn(
+        `[jsonl-tail] large unread backlog in ${this.filePath} — ${(pending / (1024 * 1024)).toFixed(1)}MB pending exceeds the ${this.maxSizeMB}MB warn threshold | ` +
+          'reading it chunk by chunk; check the writer or the store retention policy | ' +
+          `offset=${this.position.offset} size=${size}`
       );
     }
-    const slice = readRange(this.filePath, this.position.offset, size).toString('utf8');
-    const { lines, consumedChars } = splitCompleteLines(slice);
 
     const records: T[] = [];
     let malformed = 0;
-    for (const line of lines) {
+    const handleLine = (line: string): void => {
+      if (line.length === 0) return;
       try {
         const parsed = parseSafeJsonInput(line, 'jsonl tail record');
         records.push(this.parse ? this.parse(parsed) : (parsed as T));
@@ -243,10 +261,36 @@ export class JsonlTail<T = unknown> {
         // A torn or hand-edited line must not stop the rest of the batch.
         this.onMalformed?.(line, err);
       }
+    };
+
+    // Read the pending range chunk by chunk, carrying a partial line between
+    // chunks; the cursor advances past the last complete line only.
+    let position = this.position.offset;
+    let nextOffset = this.position.offset;
+    let carry: Buffer[] = [];
+    while (position < size) {
+      const chunk = safeReadFileRange(
+        this.filePath,
+        position,
+        Math.min(this.chunkBytes, size - position)
+      );
+      if (chunk.length === 0) break;
+      const base = position;
+      position += chunk.length;
+      let start = 0;
+      for (;;) {
+        const nl = chunk.indexOf(0x0a, start);
+        if (nl === -1) break;
+        const piece = chunk.subarray(start, nl);
+        const lineBuf = carry.length > 0 ? Buffer.concat([...carry, piece]) : piece;
+        carry = [];
+        handleLine(lineBuf.toString('utf8'));
+        nextOffset = base + nl + 1;
+        start = nl + 1;
+      }
+      if (start < chunk.length) carry.push(Buffer.from(chunk.subarray(start)));
     }
 
-    const nextOffset =
-      this.position.offset + Buffer.byteLength(slice.slice(0, consumedChars), 'utf8');
     const nextBasis = this.basisFor(nextOffset);
     this.position = {
       offset: nextOffset,
@@ -334,8 +378,10 @@ export function subscribeJsonl<T = unknown>(
  *
  * Returned rows are frozen and shared across calls: callers must not mutate
  * them. The cache keeps each ledger's parsed history resident for the life of
- * the process (bounded by `maxSizeMB` per call), which is the trade for
- * O(appended) reads; use it only for ledgers whose history must stay whole.
+ * the process, which is the trade for O(appended) reads; use it only for
+ * ledgers whose history must stay whole. MSN-STORE-BOUNDS-2 (P1): size never
+ * makes a call fail — the replay is read chunk by chunk and a backlog above
+ * `maxSizeMB` only logs one warning per cached ledger.
  */
 const LEDGER_TAIL_CHECK_BYTES = 64;
 const DEFAULT_LEDGER_MAX_SIZE_MB = 100;
@@ -371,8 +417,13 @@ function consumedTailHash(filePath: string, offset: number): string {
 }
 
 export interface ReadJsonLinesCachedOptions {
-  /** Ceiling on the bytes one call may have to parse (the first call parses the whole file). */
+  /**
+   * Warn threshold (not a cap) for the bytes one call has to parse; the first
+   * call parses the whole file.
+   */
   maxSizeMB?: number;
+  /** Range-read chunk size (tests). */
+  chunkBytes?: number;
 }
 
 export function readJsonLinesCached<T>(
@@ -408,6 +459,7 @@ export function readJsonLinesCached<T>(
     cached = {
       tail: new JsonlTail<unknown>(resolved, {
         maxSizeMB: options.maxSizeMB ?? DEFAULT_LEDGER_MAX_SIZE_MB,
+        ...(options.chunkBytes !== undefined ? { chunkBytes: options.chunkBytes } : {}),
       }),
       rows: [],
       tailCheck: '',

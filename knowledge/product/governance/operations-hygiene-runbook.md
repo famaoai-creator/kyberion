@@ -1543,8 +1543,10 @@ Never invoke real providers, notifications or resident daemons for these fixture
 
 **Rule.** A `.jsonl` file that only ever grows by appending is never expired by the
 janitor's mtime TTL — the append keeps its mtime fresh forever. Every such store
-needs one of three declared lifecycle actions in the retention catalog, or an
-explicit `review_required` note naming what bounds it.
+needs a declared lifecycle in the retention catalog, or an explicit
+`review_required` note naming what bounds it. Its size must never fail a read or an
+append: readers come from `libs/core/jsonl-read.ts`, chosen by need, and retention
+runs at write time (`maintainStoreAfterAppend`), not only in the janitor.
 
 **Procedure:**
 
@@ -1555,11 +1557,21 @@ explicit `review_required` note naming what bounds it.
    table and reader contract.
 2. Never embed unbounded history inside a versioned record — cap arrays like
    `WorkItem.attempts` at write time and keep the full history in the event feed.
-3. After changing a store's shape, run the janitor dry-run and check the
+3. Never add a size cap that throws to a runtime store reader or writer; growth warns
+   (diagnostic log + ops-health). Caps are only for untrusted input.
+4. Never apply a window, rotation or plain-key compaction to a store whose readers
+   need older rows (dedupe, idempotency, hash chains, ratios over long windows); state
+   the reason in the catalog note.
+5. After changing a store's shape, run the janitor dry-run and check the
    `Append-Only Stores` section of `storage-janitor-report.md`.
+6. Plain dot-inbox appends take the inbox lock, so they may wait up to its timeout
+   while a large compaction runs; repeated lock-timeout warnings mean compaction is
+   too slow for that store.
 
-**Gate:** `pnpm check -- --only runtime-store-retention`; janitor report
-`uncoveredRuntimeFiles` must stay empty for declared stores.
+**Gate:** `pnpm check -- --only runtime-store-retention` and
+`--only runtime-store-whole-read` (ratchet against whole-file reads); janitor report
+`uncoveredRuntimeFiles` must stay empty for declared stores; ops-health
+`store-overgrowth` findings for directory stores.
 
 ## Outcome settlement must resume the resident Dot loop
 

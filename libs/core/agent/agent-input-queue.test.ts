@@ -3,15 +3,21 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   AgentInputQueue,
+  agentInputQueueLockId,
   enqueueMissionAgentInput,
   enqueueSurfaceAgentInput,
   registerMissionAgentInputWorker,
+  reduceAgentInputQueueFile,
   renderAgentInputQueueEntries,
+  setAgentInputQueueStoreTuningForTests,
 } from './agent-input-queue.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
 import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  safeMoveSync,
+  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
@@ -35,6 +41,8 @@ function seedMission(missionDir: string, state: Record<string, unknown>): void {
 }
 
 afterEach(() => {
+  setAgentInputQueueStoreTuningForTests({});
+  resetAppendOnlyStoreMaintenanceState();
   safeRmSync(tempRoot, { recursive: true, force: true });
   withExecutionContext('mission_controller', () => {
     for (const dir of seededMissionDirs.splice(0))
@@ -357,5 +365,158 @@ describe('AgentInputQueue', () => {
       sessionId: 'SESSION-2',
     });
     expect(agentTwoEntries.map((entry) => entry.id)).toEqual([agentTwo.id]);
+  });
+
+  it('compacts terminal pairs past the horizon at write time with an identical active set', async () => {
+    const missionId = 'PI15-COMPACT';
+    const old = '2026-01-01T00:00:00.000Z';
+    const recent = new Date().toISOString();
+    const entry = (id: string, at: string) => ({
+      kind: 'enqueued',
+      recorded_at: at,
+      entry: {
+        id,
+        mission_id: missionId,
+        delivery: 'next_run',
+        text: `payload ${id} ${'x'.repeat(160)}`,
+        enqueued_at: at,
+      },
+    });
+    const seed: unknown[] = [];
+    for (let i = 0; i < 20; i++) {
+      seed.push(entry(`old-${i}`, old));
+      seed.push({ kind: i % 2 ? 'cancelled' : 'consumed', entry_id: `old-${i}`, recorded_at: old });
+    }
+    for (let i = 0; i < 3; i++) seed.push(entry(`pending-${i}`, old));
+    seed.push(entry('recent-consumed', recent));
+    seed.push({ kind: 'consumed', entry_id: 'recent-consumed', recorded_at: recent });
+    safeMkdir(tempRoot, { recursive: true });
+    safeWriteFile(queuePath, seed.map((record) => `${JSON.stringify(record)}\n`).join(''));
+    const lineCount = () =>
+      fs
+        .readFileSync(queuePath, 'utf8')
+        .split('\n')
+        .filter((line) => line.trim()).length;
+
+    const queue = new AgentInputQueue({ missionId, queuePath });
+    // Threshold far above the fixture: the full-history reduction to compare against.
+    setAgentInputQueueStoreTuningForTests({ compactMinBytes: 1024 * 1024 * 1024 });
+    const first = await queue.enqueue({ delivery: 'next_run', text: 'first' });
+    expect(await queue.cancelQueued(first.id)).toBe('cancelled');
+    const full = reduceAgentInputQueueFile(queuePath);
+    const linesBefore = lineCount();
+
+    setAgentInputQueueStoreTuningForTests({
+      compactMinBytes: 2048,
+      terminalHorizonMs: 24 * 60 * 60 * 1000,
+    });
+    const second = await queue.enqueue({ delivery: 'next_run', text: 'second' });
+    expect(await queue.cancelQueued(second.id)).toBe('cancelled');
+    const compacted = reduceAgentInputQueueFile(queuePath);
+
+    expect(lineCount()).toBe(linesBefore + 2 - 40);
+    // The active set is identical — same entries, same order.
+    expect(compacted.active).toEqual(full.active);
+    expect(compacted.active.map((e) => e.id)).toEqual(['pending-0', 'pending-1', 'pending-2']);
+    // Bookkeeping within the horizon is identical; older pairs left together.
+    expect(compacted.consumed).toEqual(full.consumed.filter((id) => !id.startsWith('old-')));
+    expect(compacted.cleared).toEqual([
+      ...full.cleared.filter((id) => !id.startsWith('old-')),
+      second.id,
+    ]);
+    expect(await queue.cancelQueued('recent-consumed')).toBe('already_consumed');
+    expect(await queue.cancelQueued('old-0')).toBe('already_cleared');
+    // Still consumable after compaction.
+    expect((await queue.consume('next_run', 10)).map((e) => e.id)).toEqual(
+      full.active.map((e) => e.id)
+    );
+  });
+
+  it('skips write-time compaction while a parked copy of the queue exists', async () => {
+    const missionId = 'PI15-COMPACT-PARKED';
+    const old = '2026-01-01T00:00:00.000Z';
+    const seed: unknown[] = [];
+    for (let i = 0; i < 20; i++) {
+      seed.push({
+        kind: 'enqueued',
+        recorded_at: old,
+        entry: {
+          id: `old-${i}`,
+          mission_id: missionId,
+          delivery: 'next_run',
+          text: `payload old-${i} ${'x'.repeat(160)}`,
+          enqueued_at: old,
+        },
+      });
+      seed.push({ kind: 'consumed', entry_id: `old-${i}`, recorded_at: old });
+    }
+    safeMkdir(tempRoot, { recursive: true });
+    const lines = seed.map((record) => `${JSON.stringify(record)}\n`);
+    safeWriteFile(queuePath, lines.join(''));
+    // A failed rewrite kept a copy holding a terminal pair.
+    const copy = `${queuePath}.compacting-t000000000000001-000000-999999-initial`;
+    const copyText = lines[0] + lines[1];
+    safeWriteFile(copy, copyText);
+    const queue = new AgentInputQueue({ missionId, queuePath });
+    setAgentInputQueueStoreTuningForTests({
+      compactMinBytes: 2048,
+      terminalHorizonMs: 24 * 60 * 60 * 1000,
+    });
+    const entry = await queue.enqueue({ delivery: 'next_run', text: 'trigger' });
+    expect(await queue.cancelQueued(entry.id)).toBe('cancelled');
+    const live = String(safeReadFile(queuePath, { encoding: 'utf8' }))
+      .split('\n')
+      .filter((line) => line.trim());
+    // Nothing was folded away while the copy exists; the copy is untouched.
+    expect(live).toHaveLength(seed.length + 2);
+    expect(String(safeReadFile(copy, { encoding: 'utf8' }))).toBe(copyText);
+    expect(await queue.cancelQueued('old-0')).toBe('already_consumed');
+  });
+
+  it('fails closed on a torn durable record (strict correctness store)', async () => {
+    const queue = new AgentInputQueue({ missionId: 'PI15-TORN', queuePath });
+    await queue.enqueue({ delivery: 'next_run', text: 'kept' });
+    safeAppendFileSync(queuePath, '{"kind":"consumed","entry_');
+    await expect(queue.consume('next_run')).rejects.toThrow(/AGENT_INPUT_QUEUE_CORRUPT/);
+  });
+
+  it('keys the queue lock by the resolved file, not by how the caller named the tenant', () => {
+    const lockOf = (queue: AgentInputQueue): string =>
+      (queue as unknown as { lockId: string }).lockId;
+    const implicit = new AgentInputQueue({ missionId: 'PI15-LOCK', queuePath });
+    const explicit = new AgentInputQueue({ missionId: 'PI15-LOCK', queuePath, tenantSlug: 'acme' });
+    expect(lockOf(implicit)).toBe(lockOf(explicit));
+    expect(lockOf(implicit)).toBe(agentInputQueueLockId(queuePath));
+    const other = new AgentInputQueue({
+      missionId: 'PI15-LOCK',
+      queuePath: path.join(tempRoot, 'other.jsonl'),
+    });
+    expect(lockOf(other)).not.toBe(lockOf(implicit));
+  });
+
+  it('reads parked copies so a parked queue never reports consumed input as cleared', async () => {
+    const queue = new AgentInputQueue({ missionId: 'PI15-PARKED', queuePath });
+    const consumed = await queue.enqueue({ delivery: 'next_run', text: 'consume me' });
+    expect(await queue.consume('next_run')).toEqual([consumed]);
+    const pending = await queue.enqueue({ delivery: 'next_run', text: 'still pending' });
+    // A window rewrite that failed (or is mid-flight) left the file parked.
+    safeMoveSync(queuePath, `${queuePath}.compacting-999999-0-initial`);
+    expect(await queue.peek('next_run', 10)).toEqual([pending]);
+    expect(await queue.cancelQueued(consumed.id)).toBe('already_consumed');
+    // The cancel appended to a recreated live file; the union stays coherent.
+    expect(await queue.cancelQueued(pending.id)).toBe('cancelled');
+    expect(await queue.cancelQueued(pending.id)).toBe('already_cleared');
+  });
+
+  it('reads a published rewrite beside its leftover parked copy without false duplicates', async () => {
+    const queue = new AgentInputQueue({ missionId: 'PI15-LEFTOVER', queuePath });
+    const entry = await queue.enqueue({ delivery: 'next_run', text: 'once' });
+    // Between publish and cleanup the live file repeats the copy's records.
+    safeWriteFile(
+      `${queuePath}.compacting-999999-0-initial`,
+      String(safeReadFile(queuePath, { encoding: 'utf8' }))
+    );
+    expect(await queue.consume('next_run')).toEqual([entry]);
+    expect(await queue.cancelQueued(entry.id)).toBe('already_consumed');
   });
 });

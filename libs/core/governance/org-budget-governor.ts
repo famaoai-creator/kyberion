@@ -25,8 +25,9 @@
 import * as path from 'node:path';
 import { createLogger } from '../logger.js';
 import { listDotCharters, type LoadedDotCharter } from '../dot/dot-charter.js';
+import { readDotTokenUsageForDay } from '../dot/dot-token-usage.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
-import { readJsonIfPresent, readJsonLines } from '../foundation/json.js';
+import { readJsonIfPresent } from '../foundation/json.js';
 import { generationQuotaCounterPath } from '../generation-quota.js';
 import {
   aggregateMetricsForEnforcement,
@@ -337,10 +338,13 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
   try {
     const rows = deps.readDotTokenUsage
       ? deps.readDotTokenUsage()
-      : readJsonLines<{ dot_id?: string; accounting_id?: string; day?: string; tokens?: number }>(
-          path.join(root, DOT_TOKEN_USAGE_REL),
-          { onMalformed: 'skip' }
-        );
+      : // Today's rows only, by backward scan: the ledger's size never fails this read.
+        readDotTokenUsageForDay<{
+          dot_id?: string;
+          accounting_id?: string;
+          day?: string;
+          tokens?: number;
+        }>(path.join(root, DOT_TOKEN_USAGE_REL), day);
     for (const row of rows) {
       if (row?.day !== day || !row.dot_id || !(Number(row.tokens) > 0)) continue;
       const s = dotScope.get(row.dot_id) ?? {};
@@ -352,8 +356,9 @@ export function computeBudgetUsage(scope: OrgBudgetScope, deps: OrgBudgetDeps = 
       }
     }
   } catch (error) {
+    // Never undercount in silence: the budget below excludes dot tokens.
     logger.warn(
-      `dot token usage unreadable — ${error instanceof Error ? error.message : String(error)}`
+      `dot token usage unreadable — dot tokens are excluded, so ${day} usage is undercounted | next: inspect ${DOT_TOKEN_USAGE_REL} | evidence: ${error instanceof Error ? error.message : String(error)}`
     );
   }
 

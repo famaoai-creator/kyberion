@@ -52,16 +52,18 @@ describe('work coordination', () => {
       metadata: { nested: { value: 1 } },
     });
     const observed: string[] = [];
-    // Foundation JSON readers capture the governed secure-io bridge at registration.
-    // Spy the actual read entrypoint, not the original module's exported binding.
+    // The store is read by the streaming JSONL reader through the foundation
+    // bridge's range reader. Spy the actual read entrypoint, not the original
+    // module's exported binding.
     const io = getFoundationIo();
-    const originalRead = io.readFile;
-    const spy = vi.spyOn(io, 'readFile').mockImplementation((filePath, options) => {
+    const originalOpen = io.openRangeReader;
+    if (!originalOpen) throw new Error('foundation range reader not registered');
+    const spy = vi.spyOn(io, 'openRangeReader').mockImplementation((filePath) => {
       if (String(filePath).endsWith('/items.jsonl')) {
         observed.push(resolveRole() || 'unknown');
         if (resolveRole() === 'operator_surface') throw new Error('caller_inventory_read_denied');
       }
-      return originalRead(filePath, options);
+      return originalOpen.call(io, filePath);
     });
     try {
       withExecutionContext('ecosystem_architect', () =>

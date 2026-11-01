@@ -12,12 +12,22 @@
  *   improvement — feedback never silently rewrites a charter.
  * - `dot-signal-ledger.jsonl` — success-signal measurements from
  *   `goal.signal_probes` (healthy while the probe matches).
+ *
+ * MSN-STORE-BOUNDS-2: both ledgers own their retention at write time
+ * (`maintainStoreAfterAppend` with an explicit time-window policy) and are
+ * read without a whole-file load, so their size never makes a read fail.
  */
 
 import * as path from 'node:path';
 import { pathResolver } from '../path-resolver.js';
 import { safeMkdir } from '../secure-io.js';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine } from '../foundation/json.js';
+import { readJsonLinesSince, streamJsonLines } from '../jsonl-read.js';
+import {
+  writeTimeArchiveDir,
+  maintainStoreAfterAppend,
+  type AppendOnlyStorePolicy,
+} from '../append-only-store.js';
 import { evaluateStateProbe, type StateProbeDeps } from '../state-probe.js';
 import { VETO_WINDOW_DECIDER } from '../governance/approval-veto-window.js';
 import type { DotCharter } from './dot-charter.js';
@@ -33,6 +43,70 @@ export const DOT_FEEDBACK_WINDOW_MS = 30 * 24 * 60 * 60 * 1000;
 /** Approvals after the latest rejection needed before a learned floor lifts. */
 export const DOT_FLOOR_RELEASE_APPROVALS = 3;
 const DEFAULT_SIGNAL_EVERY_S = 900;
+const DAY_MS = 24 * 60 * 60 * 1000;
+/**
+ * Write-time window for dot-feedback.jsonl: the 30-day read window plus a
+ * 7-day margin. Dropped rows go to the compaction archive (learning evidence).
+ */
+export const DOT_FEEDBACK_RETENTION_MS = DOT_FEEDBACK_WINDOW_MS + 7 * DAY_MS;
+/** dot-feedback.jsonl size that triggers write-time window retention. */
+export const DOT_FEEDBACK_RETENTION_MIN_BYTES = 8 * 1024 * 1024;
+/**
+ * Write-time window for dot-signal-ledger.jsonl. Not compacted to the latest
+ * row per (dot_id, signal): KR `signal_ratio` reads the healthy ratio over up
+ * to 720h (dot-charter.schema.json `window_hours` maximum), so the ledger keeps
+ * 30 days plus a 7-day margin. Measurements are telemetry: no archive.
+ */
+export const DOT_SIGNAL_RETENTION_MS = 30 * DAY_MS + 7 * DAY_MS;
+/** dot-signal-ledger.jsonl size that triggers write-time window retention. */
+export const DOT_SIGNAL_RETENTION_MIN_BYTES = 8 * 1024 * 1024;
+
+interface DotFeedbackStoreTuning {
+  /** Retention thresholds (tests inject small values). */
+  feedbackMinBytes?: number;
+  signalMinBytes?: number;
+  /** Range-read chunk size for the readers (tests inject small values). */
+  chunkBytes?: number;
+  /** Feedback archive directory (tests point it at a scratch dir). */
+  archiveDir?: string;
+}
+let storeTuning: DotFeedbackStoreTuning = {};
+
+/** Test seam: override store thresholds / read chunking; call with `{}` to reset. */
+export function setDotFeedbackStoreTuningForTests(tuning: DotFeedbackStoreTuning): void {
+  storeTuning = { ...tuning };
+}
+
+function timeField(field: 'recorded_at' | 'measured_at'): (record: unknown) => number | undefined {
+  return (record) => {
+    const raw = (record as Record<string, unknown> | null)?.[field];
+    if (typeof raw !== 'string') return undefined;
+    const t = Date.parse(raw);
+    return Number.isFinite(t) ? t : undefined;
+  };
+}
+const feedbackTime = timeField('recorded_at');
+const signalTime = timeField('measured_at');
+
+function feedbackPolicy(filePath: string): AppendOnlyStorePolicy {
+  return {
+    action: 'window',
+    minBytes: storeTuning.feedbackMinBytes ?? DOT_FEEDBACK_RETENTION_MIN_BYTES,
+    windowMs: DOT_FEEDBACK_RETENTION_MS,
+    timeOf: feedbackTime,
+    archiveDir: storeTuning.archiveDir ?? writeTimeArchiveDir(filePath),
+  };
+}
+
+function signalPolicy(): AppendOnlyStorePolicy {
+  return {
+    action: 'window',
+    minBytes: storeTuning.signalMinBytes ?? DOT_SIGNAL_RETENTION_MIN_BYTES,
+    windowMs: DOT_SIGNAL_RETENTION_MS,
+    timeOf: signalTime,
+    archiveDir: null,
+  };
+}
 
 export type DotFeedbackOutcome = 'approved' | 'rejected' | 'expired' | 'cancelled';
 
@@ -67,16 +141,31 @@ function runtimeFile(rootDir: string | undefined, rel: string): string {
   return path.join(rootDir ?? pathResolver.rootDir(), rel);
 }
 
-function appendRow(rel: string, value: unknown, rootDir?: string): void {
+function appendRow(
+  rel: string,
+  value: unknown,
+  rootDir: string | undefined,
+  policy: (filePath: string) => AppendOnlyStorePolicy,
+  now: Date
+): void {
   const filePath = runtimeFile(rootDir, rel);
   safeMkdir(path.dirname(filePath), { recursive: true });
   appendJsonLine(filePath, value);
+  // Never throws: a failed or unshrinkable maintenance only warns (P3).
+  maintainStoreAfterAppend(filePath, policy(filePath), {
+    now,
+    chunkBytes: storeTuning.chunkBytes,
+  });
 }
 
 export function readDotFeedback(dotId: string, deps: DotFeedbackDeps = {}): DotFeedbackEntry[] {
   const cutoff = (deps.now?.() ?? new Date()).getTime() - DOT_FEEDBACK_WINDOW_MS;
-  return readJsonLines<DotFeedbackEntry>(runtimeFile(deps.rootDir, DOT_FEEDBACK_PATH), {
+  // Backward scan to the window start: cost follows the window, not the file.
+  return readJsonLinesSince<DotFeedbackEntry>(runtimeFile(deps.rootDir, DOT_FEEDBACK_PATH), {
     onMalformed: 'skip',
+    sinceMs: cutoff,
+    timeOf: feedbackTime,
+    chunkBytes: storeTuning.chunkBytes,
   }).filter(
     (row) =>
       row?.dot_id === dotId &&
@@ -105,11 +194,9 @@ export function recordDotFeedback(
   entry: Omit<DotFeedbackEntry, 'recorded_at'>,
   deps: DotFeedbackDeps = {}
 ): DotFeedbackEntry {
-  const row: DotFeedbackEntry = {
-    ...entry,
-    recorded_at: (deps.now?.() ?? new Date()).toISOString(),
-  };
-  appendRow(DOT_FEEDBACK_PATH, row, deps.rootDir);
+  const now = deps.now?.() ?? new Date();
+  const row: DotFeedbackEntry = { ...entry, recorded_at: now.toISOString() };
+  appendRow(DOT_FEEDBACK_PATH, row, deps.rootDir, feedbackPolicy, now);
   if (row.outcome === 'rejected') {
     const hook =
       deps.onRejection ??
@@ -184,10 +271,20 @@ export function dotFeedbackPromptLines(
     );
 }
 
+/**
+ * This dot's signal rows, oldest first. Constant-memory forward scan (the
+ * write-time window bounds what it returns); KR `signal_ratio` needs the
+ * history inside its window, not just the latest row per signal.
+ */
 export function readDotSignals(dotId: string, deps: { rootDir?: string } = {}): DotSignalEntry[] {
-  return readJsonLines<DotSignalEntry>(runtimeFile(deps.rootDir, DOT_SIGNAL_LEDGER_PATH), {
-    onMalformed: 'skip',
-  }).filter((row) => row?.dot_id === dotId && typeof row.signal === 'string');
+  const rows: DotSignalEntry[] = [];
+  for (const row of streamJsonLines<DotSignalEntry>(
+    runtimeFile(deps.rootDir, DOT_SIGNAL_LEDGER_PATH),
+    { onMalformed: 'skip', chunkBytes: storeTuning.chunkBytes }
+  )) {
+    if (row?.dot_id === dotId && typeof row.signal === 'string') rows.push(row);
+  }
+  return rows;
 }
 
 /** Latest measurement per declared signal (undefined entries are unmeasured). */
@@ -249,7 +346,7 @@ export async function measureDotSuccessSignals(
         measured_at: now.toISOString(),
       };
     }
-    appendRow(DOT_SIGNAL_LEDGER_PATH, entry, deps.rootDir);
+    appendRow(DOT_SIGNAL_LEDGER_PATH, entry, deps.rootDir, signalPolicy, now);
     measured.push(entry);
   }
   return measured;

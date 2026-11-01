@@ -5,6 +5,20 @@ import { randomUUID } from 'node:crypto';
 import { pathResolver, sharedTmp } from './path-resolver.js';
 import * as secureIo from './secure-io.js';
 import { readJsonLines } from './foundation/json.js';
+
+// Capture the jsonl-tail logger's warn lines; secure-io stays REAL.
+const tailWarnings = vi.hoisted(() => [] as string[]);
+vi.mock('./logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./logger.js')>();
+  return {
+    ...actual,
+    createLogger: (name: string) => {
+      const real = actual.createLogger(name);
+      if (name !== 'jsonl-tail') return real;
+      return { ...real, warn: (message: string) => tailWarnings.push(String(message)) };
+    },
+  };
+});
 import { getFoundationIo } from './foundation/io.js';
 import {
   createJsonlTail,
@@ -163,6 +177,56 @@ describe('jsonl-tail', () => {
   it('リポジトリ外のファイルを tail しない', () => {
     const outside = path.join(pathResolver.rootDir(), '..', 'jsonl-tail-outside.jsonl');
     expect(() => createJsonlTail(outside)).toThrow('[RESOURCE_PATH_SCOPE]');
+  });
+
+  describe('MSN-STORE-BOUNDS-2: a large backlog never stalls the tail', () => {
+    beforeEach(() => {
+      tailWarnings.length = 0;
+    });
+
+    it('reads a backlog above the threshold chunk by chunk, advances, and warns once', () => {
+      const big = 'x'.repeat(300);
+      append(...Array.from({ length: 200 }, (_, n) => ({ n, big })));
+      const size = fs.statSync(file).size;
+      // threshold ≈ 1KB, far below the ~62KB backlog; chunks split lines
+      const tail = createJsonlTail<{ n: number }>(file, { maxSizeMB: 0.001, chunkBytes: 97 });
+      const batch = tail.read();
+      expect(batch.records.map((r) => r.n)).toEqual(Array.from({ length: 200 }, (_, n) => n));
+      expect(batch.cursor.offset).toBe(size);
+      expect(tailWarnings.filter((w) => w.includes('large unread backlog'))).toHaveLength(1);
+      expect(tailWarnings[0]).toMatch(/ — .* \| .* \| offset=0 size=/);
+
+      append(...Array.from({ length: 200 }, (_, n) => ({ n: 200 + n, big })));
+      expect(tail.read().records).toHaveLength(200);
+      // warned once per tail, not every pass
+      expect(tailWarnings.filter((w) => w.includes('large unread backlog'))).toHaveLength(1);
+    });
+
+    it('keeps a torn tail unconsumed across chunk boundaries and multi-byte characters', () => {
+      const msg = 'あいうえお🙂'.repeat(5);
+      append({ msg, n: 1 }, { msg, n: 2 });
+      fs.appendFileSync(file, `{"msg":"${msg}","n":`);
+      const tail = createJsonlTail<{ msg: string; n: number }>(file, { chunkBytes: 7 });
+      const first = tail.read();
+      expect(first.records).toEqual([
+        { msg, n: 1 },
+        { msg, n: 2 },
+      ]);
+      expect(first.malformed).toBe(0);
+      fs.appendFileSync(file, '3}\r\n');
+      expect(tail.read().records).toEqual([{ msg, n: 3 }]);
+      expect(tail.cursor().offset).toBe(fs.statSync(file).size);
+    });
+
+    it('readJsonLinesCached replays a ledger above its warn threshold instead of throwing', () => {
+      const big = 'y'.repeat(500);
+      append(...Array.from({ length: 100 }, (_, n) => ({ n, big })));
+      fs.appendFileSync(file, '{"n":100,"big":"torn');
+      const rows = readJsonLinesCached<{ n: number }>(file, { maxSizeMB: 0.001, chunkBytes: 333 });
+      expect(rows.map((r) => r.n)).toEqual(Array.from({ length: 100 }, (_, n) => n));
+      expect(tailWarnings.some((w) => w.includes('large unread backlog'))).toBe(true);
+      resetJsonLinesCache();
+    });
   });
 
   describe('detectRotation', () => {
