@@ -41,6 +41,18 @@ async function installTestIoSeams(): Promise<void> {
     exists: (filePath: string): boolean => fs.existsSync(testPath(filePath)),
     mkdir: (dirPath: string): void => fs.mkdirSync(testPath(dirPath), { recursive: true }),
     readdir: (dirPath: string): string[] => fs.readdirSync(testPath(dirPath)),
+    size: (filePath: string): number | undefined =>
+      fs.existsSync(testPath(filePath)) ? fs.statSync(testPath(filePath)).size : undefined,
+    readRange: (filePath: string, position: number, length: number): Buffer => {
+      const fd = fs.openSync(testPath(filePath), 'r');
+      try {
+        const buffer = Buffer.alloc(length);
+        const read = fs.readSync(fd, buffer, 0, length, position);
+        return buffer.subarray(0, read);
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
     append: (filePath: string, content: string): void => {
       const resolved = testPath(filePath);
       fs.mkdirSync(path.dirname(resolved), { recursive: true });
