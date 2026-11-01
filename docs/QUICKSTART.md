@@ -67,7 +67,7 @@ pnpm kyberion doctor
 pnpm pipeline --input pipelines/verify-session.json
 ```
 
-`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. Use `pnpm kyberion doctor` for the readiness check: bare `pnpm doctor` is pnpm's own built-in diagnostic and does not run Kyberion's checks. If a later `baseline-check` reports `needs_recovery` because `dist/` is older than its sources, rebuild with `pnpm build`.
+`env:bootstrap` verifies the Node 24+ floor and warns if Playwright browsers are missing. Use `pnpm kyberion doctor` for the readiness check: bare `pnpm doctor` is pnpm's own built-in diagnostic and does not run Kyberion's checks. If a later `baseline-check` reports `needs_recovery` because `dist/` is older than its sources, rebuild with `pnpm build`. A `needs_attention` on L10 (scheduler, judged per schedule) or L12 (resident ops: backups, restore drill, janitor, resident units) lists each finding with its next command; most are resolved by `pnpm kyberion scheduler reconcile --apply` and `pnpm kyberion secret introduce kyberion-backup PASSPHRASE` ([INITIALIZATION.md](./INITIALIZATION.md)).
 
 ### Day-2 setup: AI company, tenant activation (optional)
 
@@ -172,6 +172,8 @@ These are the default registry URLs. The setup report probes the configured loca
 External messaging bridges such as Slack are optional and disabled by default. Their missing credentials do not block local Concierge use, and `reconcile` deliberately skips disabled surfaces. Set up a bridge only when you need that channel; inspect `pnpm surfaces setup`, then explicitly opt in with `pnpm surfaces enable --surface slack-bridge` once its prerequisites are ready.
 
 Do not launch `pnpm agent-runtime:supervisor` or `pnpm mission:orchestrator` as startup daemons. They are one-shot workers that require a `--request` or `--event` payload; managed execution dispatches them as needed. `pnpm chronos:dev` is for developing Chronos alone and is not the complete startup path.
+
+Scheduled pipelines fire only while the Chronos scheduler runs as an OS service. Setup never installs resident services by itself; when the setup report lists **Resident services [pending]**, register this checkout's scheduler and daemon watchdog with `pnpm kyberion scheduler reconcile` (dry-run plan) and then `pnpm kyberion scheduler reconcile --apply`. It installs checkout-scoped units, migrates a legacy unit of this checkout, never touches another checkout's units, and is safe to rerun.
 
 ## 4. Use Kyberion By Asking For Outcomes
 

@@ -1180,9 +1180,17 @@
       "types": "./dist/daemon-heartbeat.d.ts",
       "default": "./dist/daemon-heartbeat.js"
     },
+    "./daemon/installed-units": {
+      "types": "./dist/daemon/installed-units.d.ts",
+      "default": "./dist/daemon/installed-units.js"
+    },
     "./daemon/launchd": {
       "types": "./dist/daemon/launchd.d.ts",
       "default": "./dist/daemon/launchd.js"
+    },
+    "./daemon/resident-services": {
+      "types": "./dist/daemon/resident-services.d.ts",
+      "default": "./dist/daemon/resident-services.js"
     },
     "./daemon/service-manager": {
       "types": "./dist/daemon/service-manager.d.ts",
@@ -4127,6 +4135,14 @@
     "./verification-source-snapshot": {
       "types": "./dist/verification-source-snapshot.d.ts",
       "default": "./dist/verification-source-snapshot.js"
+    },
+    "./ops-health": {
+      "types": "./dist/ops-health.d.ts",
+      "default": "./dist/ops-health.js"
+    },
+    "./ops-health-state": {
+      "types": "./dist/ops-health-state.d.ts",
+      "default": "./dist/ops-health-state.js"
     },
     "./ops-health-probe": {
       "types": "./dist/ops-health-probe.d.ts",

@@ -174,7 +174,7 @@ describe('inspect_browser_page', () => {
     });
 
     expect(mockWaitForExtension).toHaveBeenCalledWith({
-      port: 8788,
+      scope: { tier: 'personal' },
       timeoutMs: 60000,
     });
     expect(result.mode).toBe('extension');
@@ -182,5 +182,54 @@ describe('inspect_browser_page', () => {
     expect(print).toHaveBeenCalledWith(
       expect.stringContaining('"title": "Extension Captured Page"')
     );
+  });
+
+  it('passes the tier/tenant scope to the native-host hand-off in extension mode', async () => {
+    const waiter = vi.fn().mockResolvedValue({
+      mode: 'extension',
+      url: 'https://example.com/',
+      title: 'T',
+      headings: [],
+      inputs: [],
+      buttons: [],
+      links: [],
+      textExcerpt: '',
+    } satisfies PageInspectionResult);
+    const normalizeScope = vi.fn((scope: { tier: string; tenant_slug?: string }) => ({
+      tier: scope.tier as 'confidential',
+      tenant_slug: scope.tenant_slug?.toLowerCase(),
+    }));
+    await main(
+      [
+        '--mode',
+        'extension',
+        '--tier',
+        'confidential',
+        '--tenant',
+        'ACME',
+        '--timeout',
+        '5000',
+        '--origin',
+        'https://example.com',
+      ],
+      vi.fn(),
+      { nodeVersion: 'v24.1.0', waitForExtensionInspection: waiter, normalizeScope }
+    );
+    expect(waiter).toHaveBeenCalledWith({
+      scope: { tier: 'confidential', tenant_slug: 'acme' },
+      timeoutMs: 5000,
+      origin: 'https://example.com',
+    });
+  });
+
+  it('rejects an invalid extension scope before waiting', async () => {
+    const waiter = vi.fn();
+    await expect(
+      main(['--mode', 'extension', '--tier', 'confidential'], vi.fn(), {
+        nodeVersion: 'v24.1.0',
+        waitForExtensionInspection: waiter,
+      })
+    ).rejects.toBeInstanceOf(ScriptExitError);
+    expect(waiter).not.toHaveBeenCalled();
   });
 });

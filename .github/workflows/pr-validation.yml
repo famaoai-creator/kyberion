@@ -239,11 +239,9 @@ jobs:
         shell: bash
         run: pnpm test -- --suite actuators 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
 
-      - name: Run governance boundary tests
-        # Independent of the actuator suite: report both in one round.
-        if: ${{ !cancelled() && steps.workspace.outcome == 'success' }}
-        shell: bash
-        run: pnpm exec vitest run tests/foundation-io-boundary.test.ts tests/core-fs-exception-boundary.test.ts tests/process-boundary-governance.test.ts tests/runtime-child-process-boundary.test.ts 2>&1 | tee -a "$RUNNER_TEMP/kyberion-ci-output.log"
+      # The governance boundary tests (foundation-io, core-fs-exception,
+      # process-boundary-governance, runtime-child-process) run once, in the
+      # pr-gates job's registration-tests gate (knowledge/product/governance/ci-gates.json).
 
       # Runs after the suites above so it sees anything they left behind: a
       # test that writes into active/missions/ instead of a uniquely named

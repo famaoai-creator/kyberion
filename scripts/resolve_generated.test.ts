@@ -218,10 +218,10 @@ describe('resolveGeneratedArtifacts', () => {
       steps
     );
     expect(full.skipped).toEqual([]);
-    // Every slow step stays covered by a CI gate (ci-gates.json cross-check above).
-    expect(GENERATED_ARTIFACT_STEPS.filter((item) => item.slow).map((item) => item.id)).toEqual([
-      'role-assumption-reachability',
-    ]);
+    // A slow step must stay covered by a CI gate (ci-gates.json cross-check
+    // above). None is registered: the role-assumption reachability report is
+    // no longer committed — its gate checks policy invariants in memory.
+    expect(GENERATED_ARTIFACT_STEPS.filter((item) => item.slow).map((item) => item.id)).toEqual([]);
   });
 
   it('prints the exact fix command on drift', () => {

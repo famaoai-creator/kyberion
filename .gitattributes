@@ -9,7 +9,6 @@
 # Either way, after a merge run `pnpm kyberion resolve generated`.
 docs/developer/CONFIGURATION.md linguist-generated=true merge=kyberion-regenerate
 docs/developer/env.example linguist-generated=true merge=kyberion-regenerate
-docs/developer/role-assumption-reachability.json linguist-generated=true merge=kyberion-regenerate
 knowledge/_index.md linguist-generated=true merge=kyberion-regenerate
 # Curated + generated: the driver merges entries by name and only leaves a
 # conflict when the same entry changed on both sides. Not linguist-generated —

@@ -8,6 +8,7 @@ const BASELINE_CACHE_DIR = 'runtime/baseline-check-cache';
 const CACHE_SCHEMAS = {
   'tenant-drift': knowledge('product/schemas/tenant-drift-cache.schema.json'),
   'cowork-health': knowledge('product/schemas/cowork-health-cache.schema.json'),
+  'backup-passphrase': knowledge('product/schemas/backup-passphrase-cache.schema.json'),
 } as const;
 
 export type BaselineCacheName = keyof typeof CACHE_SCHEMAS;

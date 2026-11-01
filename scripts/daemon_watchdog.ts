@@ -23,8 +23,13 @@ import {
 } from '@agent/core/governance/approval-decision-routing';
 import { listActiveDotHeartbeatSpecs, type DotHeartbeatSpec } from '@agent/core/dot/dot-runtime';
 import { logger } from '@agent/core/core';
-import { DAEMON_SPECS } from '@agent/core/daemon/specs';
-import { resolveDaemonManager } from '@agent/core/daemon/service-manager';
+import {
+  DAEMON_SPECS,
+  resolveDaemonInstance,
+  scopeDaemonServiceSpec,
+} from '@agent/core/daemon/specs';
+import { resolveDaemonManager, type DaemonServiceSpec } from '@agent/core/daemon/service-manager';
+import { inspectInstalledUnits, type InstalledUnit } from '@agent/core/daemon/installed-units';
 import { safeExecResult } from '@agent/core/secure-io';
 import { pathResolver } from '@agent/core/path-resolver';
 import {
@@ -66,6 +71,104 @@ export const DEFAULT_DAEMONS = [
   'generation-schedule-daemon',
 ];
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 1000;
+
+/**
+ * The service unit that runs `daemonId` (heartbeat id or DAEMON_SPECS id) for
+ * THIS checkout: the checkout-scoped label (com.kyberion.<id>.ws-<hash>) that
+ * `pnpm kyberion scheduler install|reconcile` registers. A legacy global unit
+ * is used only when the host shows one owned by this checkout and no scoped
+ * unit — never another checkout's unit.
+ */
+export function resolveWatchdogServiceSpec(
+  daemonId: string,
+  options: { repoRoot?: string; installedUnits?: () => InstalledUnit[] } = {}
+): DaemonServiceSpec | undefined {
+  const base = DAEMON_SPECS[daemonId.replace(/-daemon$/, '')];
+  if (!base) return undefined;
+  const instance = resolveDaemonInstance(options.repoRoot ?? pathResolver.rootDir());
+  const scoped = scopeDaemonServiceSpec(base, instance);
+  let units: InstalledUnit[] = [];
+  try {
+    units = (
+      options.installedUnits ??
+      (() => inspectInstalledUnits({ repoRoot: instance.repoRoot, probeLoaded: false }).units)
+    )();
+  } catch {
+    return scoped;
+  }
+  const mine = units.filter((unit) => unit.id === base.id && unit.ownedByThisCheckout);
+  const legacyOnly =
+    mine.some((unit) => unit.scope === 'legacy') && !mine.some((unit) => unit.scope === 'scoped');
+  return legacyOnly ? base : scoped;
+}
+
+/**
+ * Recovery bucket: missing/malformed heartbeats have no episode anchor and get
+ * one attempt per bucket; a stale episode retries once per bucket.
+ */
+export const DAEMON_RECOVERY_BUCKET_MS = 15 * 60 * 1000;
+/**
+ * Recovery attempts per stale episode. A restart that crash-loops before its
+ * first heartbeat leaves the episode anchor unchanged, so it is retried once
+ * per bucket up to this many times; then the watchdog stops and the ops-health
+ * finding (baseline L10 / doctor) carries the outage to a human.
+ */
+export const DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE = 4;
+
+/**
+ * Bounded recovery per unhealthy episode, not per watchdog minute. A stale
+ * daemon's episode is anchored on its last heartbeat timestamp (constant until
+ * the daemon writes again) — or, for a tick that overran while refreshing its
+ * heartbeat, on the tick start. Within the episode the key advances one retry
+ * bucket per 15 minutes and stays on the last bucket after
+ * DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE, so later runs are duplicates.
+ * Missing/malformed heartbeats have no anchor and fall back to a 15-minute
+ * bucket. Status stays in the key: stale and later missing are two distinct
+ * recoveries.
+ */
+export function daemonRecoveryKey(status: DaemonHeartbeatStatus, now: Date): string {
+  const tickStartedAt =
+    status.heartbeat?.details?.phase === 'tick_in_progress' &&
+    typeof status.heartbeat.details.tick_started_at === 'string'
+      ? status.heartbeat.details.tick_started_at
+      : undefined;
+  const episodeAnchor = tickStartedAt ?? status.heartbeat?.timestamp;
+  const episodeStartMs = episodeAnchor ? Date.parse(episodeAnchor) : NaN;
+  if (status.status === 'stale' && episodeAnchor && Number.isFinite(episodeStartMs)) {
+    const attempt = Math.min(
+      DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE - 1,
+      Math.max(0, Math.floor((now.getTime() - episodeStartMs) / DAEMON_RECOVERY_BUCKET_MS))
+    );
+    return `daemon-recovery:${status.daemon_id}:${status.status}:since-${episodeAnchor}:attempt-${attempt + 1}`;
+  }
+  const bucket = new Date(
+    Math.floor(now.getTime() / DAEMON_RECOVERY_BUCKET_MS) * DAEMON_RECOVERY_BUCKET_MS
+  ).toISOString();
+  return `daemon-recovery:${status.daemon_id}:${status.status}:bucket-${bucket}`;
+}
+
+/** Operator hint lines naming this checkout's scoped units. */
+export function buildWatchdogRestartHints(daemonIds: string[], repoRoot?: string): string[] {
+  const instance = resolveDaemonInstance(repoRoot ?? pathResolver.rootDir());
+  const specs = [
+    ...new Set(daemonIds.map((id) => id.replace(/-daemon$/, '')).filter((id) => DAEMON_SPECS[id])),
+  ].map((id) => scopeDaemonServiceSpec(DAEMON_SPECS[id]!, instance));
+  const first = specs[0];
+  return [
+    ...specs.map(
+      (spec) =>
+        `pnpm kyberion scheduler restart --apply${spec.id === 'chronos' ? '' : ` --daemon ${spec.id}`}`
+    ),
+    first
+      ? `macOS: launchctl kickstart -k gui/$UID/${first.label}`
+      : `macOS: launchctl kickstart -k gui/$UID/com.kyberion.<daemon>.${instance.id}`,
+    first
+      ? `Linux: systemctl --user restart ${first.label.replace(/^com\./, '').replaceAll('.', '-')}.service`
+      : `Linux: systemctl --user restart kyberion-<daemon>-${instance.id}.service`,
+    'Legacy global units (com.kyberion.<daemon>): pnpm kyberion scheduler reconcile --apply migrates them',
+    'Run pnpm daemon:watchdog -- --json after restart to confirm recovery',
+  ];
+}
 
 export interface DaemonWatchdogReport {
   ok: boolean;
@@ -208,11 +311,7 @@ export function checkDaemonHeartbeats(options: DaemonWatchdogOptions = {}): Daem
         },
         recommendation:
           'Verify the launchd/systemd unit for each unhealthy daemon, restart the unit if needed, and inspect the daemon logs before resuming unattended operation.',
-        options: [
-          'macOS: launchctl kickstart -k gui/$UID/com.kyberion.<daemon>',
-          'Linux: sudo systemctl restart kyberion-<daemon>',
-          'Run pnpm daemon:watchdog -- --json after restart to confirm recovery',
-        ],
+        options: buildWatchdogRestartHints(failed.map((status) => status.daemon_id)),
         dedupe_key: `daemon-watchdog:${failed.map((status) => `${status.daemon_id}:${status.status}`).join(',')}`,
       },
       {
@@ -306,7 +405,6 @@ export async function requestDaemonRecovery(
   const runner = createTriggerRunner(
     options.triggerStorePath ? { storePath: options.triggerStorePath } : {}
   );
-  const minuteKey = now.toISOString().slice(0, 16);
 
   return withExecutionContextAsync(DAEMON_WATCHDOG_ROLE, async () => {
     const outcomes: DaemonRecoveryOutcome[] = [];
@@ -319,7 +417,7 @@ export async function requestDaemonRecovery(
         {
           // Status is part of the key: a daemon going stale and later missing
           // are two distinct recoveries, not a duplicate of one.
-          idempotencyKey: `daemon-recovery:${status.daemon_id}:${status.status}:${minuteKey}`,
+          idempotencyKey: daemonRecoveryKey(status, now),
           createdBy: { authority_role: DAEMON_WATCHDOG_ROLE, level: 40 },
           payload: {
             daemon_id: status.daemon_id,
@@ -352,7 +450,7 @@ export async function requestDaemonRecovery(
       let autoExecuted: boolean | undefined;
       let autoExecError: string | undefined;
       if (!requiresOperator) {
-        const spec = DAEMON_SPECS[status.daemon_id.replace(/-daemon$/, '')];
+        const spec = resolveWatchdogServiceSpec(status.daemon_id);
         const manager = resolveDaemonManager();
         if (spec?.id === 'daemon-watchdog') {
           // kickstart -k would SIGTERM this very run before it could relaunch;
@@ -391,7 +489,7 @@ export async function requestDaemonRecovery(
           recordAutonomyExecution(
             {
               action_id: 'daemon_restart',
-              receipt_id: `daemon-recovery:${status.daemon_id}:${status.status}:${minuteKey}`,
+              receipt_id: daemonRecoveryKey(status, now),
               ok: autoExecuted,
               ...(autoExecError ? { error: autoExecError } : {}),
             },

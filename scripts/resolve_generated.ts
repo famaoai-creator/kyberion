@@ -154,16 +154,6 @@ export const GENERATED_ARTIFACT_STEPS: readonly GeneratedArtifactStep[] = [
     passes: 2,
   },
   {
-    id: 'role-assumption-reachability',
-    script: 'scripts/analyze_role_assumptions.ts',
-    tracked: ['docs/developer/role-assumption-reachability.json'],
-    mergeDriver: true,
-    after: ['vocabulary-types'],
-    // Builds a full TypeScript program (~100s); its PR-scope CI gate covers it.
-    slow: true,
-    run: async (argv) => (await import('./analyze_role_assumptions.js')).main(argv),
-  },
-  {
     // Indexes knowledge/, so it runs after every generator that writes there.
     id: 'knowledge-index',
     script: 'scripts/generate_knowledge_index.ts',

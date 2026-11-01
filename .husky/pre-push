@@ -2,8 +2,8 @@
 # drift the CI freshness gates (op-registry, vocabulary-types, pseudo-locale,
 # pii-rules, env-registry, catalogs, ...) would report one CI round later.
 # Read-only and fast (~20s): it runs only `pnpm kyberion resolve generated
-# --check --fast`, which skips the ~100s role-assumption reachability analysis
-# (its CI gate still runs).
+# --check --fast`, which skips any step marked slow (the role-assumption
+# reachability report is no longer committed; its CI gate checks the policy).
 #
 # Skip for one push (e.g. pushing a WIP branch on purpose):
 #   KYBERION_SKIP_PRE_PUSH=1 git push

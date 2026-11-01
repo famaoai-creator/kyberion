@@ -9,6 +9,7 @@ import {
   isDirectScript,
   ScriptExitError,
 } from './lib/harness.js';
+import { readSafeJsonFile } from './lib/json-input.js';
 
 export const TEST_SUITES = {
   smoke: ['tests/smoke.test.ts'],
@@ -42,16 +43,46 @@ export const TEST_SUITES = {
 
 export type TestSuite = keyof typeof TEST_SUITES;
 
+/**
+ * `--skip-gate-tests`: leave out the test files a pr-scope ci gate already runs
+ * through vitest (registration-tests). CI runs every pr gate on every event —
+ * pr-validation.yml `--scope pr` on pull_request/merge_group, ci.yml
+ * `--scope full` on push/schedule — so the integration suite need not repeat
+ * them. Local runs without the flag still execute all of tests/.
+ */
+export const SKIP_GATE_TESTS_FLAG = '--skip-gate-tests';
+
+interface GateTestManifest {
+  gates: Array<{ id: string; scope: string; args?: string[] }>;
+}
+
+/** Test files run by pr-scope gates that invoke vitest directly. */
+export function gateCoveredTestFiles(manifest: GateTestManifest): string[] {
+  return [
+    ...new Set(
+      manifest.gates
+        .filter(
+          (gate) => gate.scope === 'pr' && gate.args?.some((arg) => arg.endsWith('vitest.mjs'))
+        )
+        .flatMap((gate) => (gate.args ?? []).filter((arg) => /\.test\.tsx?$/u.test(arg)))
+    ),
+  ].sort();
+}
+
 export function parseTestSuiteArgs(argv: readonly string[]): {
   suite: TestSuite;
   vitestArgs: string[];
+  skipGateTests?: true;
 } {
   let suite: TestSuite = 'smoke';
+  let skipGateTests = false;
   const vitestArgs: string[] = [];
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === '--') continue;
-    if (arg === '--suite') {
+    if (arg === SKIP_GATE_TESTS_FLAG) {
+      skipGateTests = true;
+    } else if (arg === '--suite') {
       const value = argv[index + 1];
       if (!value) throw new Error('--suite requires a suite name');
       suite = asTestSuite(value);
@@ -62,7 +93,7 @@ export function parseTestSuiteArgs(argv: readonly string[]): {
       vitestArgs.push(arg);
     }
   }
-  return { suite, vitestArgs };
+  return { suite, vitestArgs, ...(skipGateTests ? { skipGateTests: true as const } : {}) };
 }
 
 function asTestSuite(value: string): TestSuite {
@@ -92,8 +123,16 @@ export function buildVitestEnv(
 }
 
 export function runTestSuite(argv: readonly string[]): number {
-  const { suite, vitestArgs } = parseTestSuiteArgs(argv);
-  const args = buildVitestArgs(suite, vitestArgs);
+  const { suite, vitestArgs, skipGateTests } = parseTestSuiteArgs(argv);
+  const excludes = skipGateTests
+    ? gateCoveredTestFiles(
+        readSafeJsonFile<GateTestManifest>(
+          pathResolver.knowledge('product/governance/ci-gates.json'),
+          'ci gate manifest'
+        )
+      ).flatMap((file) => ['--exclude', file])
+    : [];
+  const args = buildVitestArgs(suite, [...vitestArgs, ...excludes]);
   const vitestEntry = pathResolver.rootResolve('node_modules/vitest/vitest.mjs');
   const result = safeExecResult(process.execPath, [vitestEntry, ...args.slice(1)], {
     cwd: pathResolver.rootDir(),

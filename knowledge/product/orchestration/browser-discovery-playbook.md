@@ -4,7 +4,7 @@ category: Orchestration
 tags: [orchestration, browser, discovery, inspection, adf, playbook]
 importance: 9
 author: Kyberion Engineering
-last_updated: 2026-10-31
+last_updated: 2026-11-01
 ---
 
 # Browser Discovery & Inspection Playbook
@@ -61,10 +61,12 @@ pnpm kyberion browser inspect [url] [options]
   - `browser` (デフォルト): Playwright を起動して動的 DOM を解析
   - `fetch`: HTTP リクエストのみで静的 HTML を高速解析（Node fetch）
   - `cdp`: 既存の Chrome (`--remote-debugging-port=9222`) にアタッチして解析
-  - `extension`: 拡張機能（Kyberion Browser Bridge）からのプッシュ受信待ち受け（127.0.0.1:8788）
+  - `extension`: 拡張機能（Kyberion Browser Bridge）の「Kyberion CLIへ送信」を native host（`submit_inspection`）経由で受け取る。CLI が表示する 6 文字のペアリングコードを Live タブに入力した送信だけを受け付ける。ポートは開かない
 - `--cdp-port <number>`: CDP 接続ポート（デフォルト 9222）
 - `--cdp-url <string>`: 明示的な CDP エンドポイント URL
-- `--extension-port <number>`: 拡張機能プッシュ受け取りポート（デフォルト 8788）
+- `--tier <personal|confidential|public>` / `--tenant <slug>`: extension モードで受け渡しを置く区分（既定 personal、confidential はテナント必須）
+- `--origin <origin>`: extension モードで受け付ける origin を固定（任意）
+- `--timeout <ms>`: extension モードの待ち時間（既定 60000、最大 10 分）
 - `--wait <ms>`: Inspect の観測前の固定待機時間（ミリ秒、デフォルト 2500）。ページの準備完了や操作成功を保証する条件待機ではない
 - `--headed`: 実際のブラウザウィンドウを表示して視覚確認（browser モード）
 - `--screenshot <path>`: 解析時にスクリーンショットを保存

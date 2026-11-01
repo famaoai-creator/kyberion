@@ -46,6 +46,25 @@ import {
   readTextFile,
 } from '@agent/core/foundation';
 import {
+  backupArchiveTimeoutMs,
+  interpretTarResult,
+  resolveBackupExclusions,
+  selectBackupFiles,
+  selectionWarnings,
+  tarExcludesFor,
+} from './lib/backup-file-selection.js';
+import {
+  BACKUP_PASSPHRASE_ENV,
+  BACKUP_PASSPHRASE_INTRODUCE_COMMAND,
+  resolveBackupPassphrase,
+  type BackupPassphraseDeps,
+} from './lib/backup-passphrase.js';
+export {
+  describeBackupPassphraseAvailability,
+  resolveBackupPassphrase,
+  type BackupPassphraseAvailability,
+} from './lib/backup-passphrase.js';
+import {
   defineScript,
   isDirectScript,
   ScriptExitError,
@@ -109,7 +128,7 @@ interface PlanOptions {
   tenantResolver?: (tenant: string, rootDir: string) => void;
 }
 
-const DEFAULT_PASSPHRASE_ENV = 'KYBERION_BACKUP_PASSPHRASE';
+const DEFAULT_PASSPHRASE_ENV = BACKUP_PASSPHRASE_ENV;
 
 function usage(): string {
   return [
@@ -120,7 +139,7 @@ function usage(): string {
     '  pnpm backup prune [--dir <backup-dir>] [--retain-daily 7] [--retain-weekly 4]',
     '  pnpm backup drill [--archive <path>|--dir <backup-dir>] [--scope all|mission|tenant] [--tenant <slug>] [--target <clean-root>] [--prepare-checkout] [--verify-baseline] [--force]',
     '',
-    `Sensitive scopes require --encrypt and ${DEFAULT_PASSPHRASE_ENV}.`,
+    `Sensitive scopes require --encrypt and a passphrase: ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND} (keychain), or ${DEFAULT_PASSPHRASE_ENV} / --passphrase-env as an override.`,
   ].join('\n');
 }
 
@@ -503,24 +522,15 @@ function sameDeviceWarning(targetPath: string): string | null {
   return null;
 }
 
-function requirePassphrase(envName: string): string {
-  const passphrase = getRegisteredEnvText(envName);
-  if (!passphrase) {
-    throw new Error(
-      `Missing ${envName}; encrypted backups require a passphrase in that environment variable.`
-    );
-  }
-  return passphrase;
-}
-
 function runRequired(
   command: string,
   args: string[],
   errorPrefix: string,
-  env: Record<string, string> = {}
+  env: Record<string, string> = {},
+  timeoutMs = 120000
 ): void {
   const result = safeExecResult(command, args, {
-    timeoutMs: 120000,
+    timeoutMs,
     maxOutputMB: 50,
     env,
   });
@@ -601,39 +611,43 @@ export function copyTree(source: string, target: string): void {
   }
 }
 
-function tarExcludesFor(outPath: string, payloadPath?: string): string[] {
-  const excludes = ['active/shared/exports/backups'];
-  const rootDir = pathResolver.rootDir();
-  for (const target of [outPath, payloadPath]) {
-    if (!target) continue;
-    const outputRel = path.relative(rootDir, target).split(path.sep).join('/');
-    if (outputRel && !outputRel.startsWith('..') && !path.isAbsolute(outputRel)) {
-      excludes.push(outputRel);
-    }
-  }
-  return [...new Set(excludes)].flatMap((entry) => ['--exclude', entry]);
-}
-
 function missionGitExcludes(repos: MissionGitRepo[]): string[] {
   return repos.flatMap((repo) => ['--exclude', `${repo.repoRelativePath}/.git`]);
 }
 
-function createMissionGitBundles(tempDir: string, repos: MissionGitRepo[]): string[] {
+/**
+ * One bundle per mission repository, aligned with `repos` (null = failed).
+ * A bundle failure (e.g. macOS denying `.git/config` to a daemon) loses only
+ * that mission's history: its working-tree files are still archived, so the
+ * rest of the backup proceeds and the failure is reported as a warning.
+ */
+export function createMissionGitBundles(
+  tempDir: string,
+  repos: MissionGitRepo[],
+  warnings: string[]
+): Array<string | null> {
   if (repos.length === 0) return [];
   const bundleDir = path.join(tempDir, 'mission-git-bundles');
   safeMkdir(bundleDir);
-  const bundleRepoPaths: string[] = [];
-  for (const repo of repos) {
+  return repos.map((repo) => {
     const bundleName = `${repo.repoRelativePath.replace(/[\\/]+/g, '__')}.bundle`;
     const bundlePath = path.join(bundleDir, bundleName);
-    runRequired(
+    const result = safeExecResult(
       'git',
       ['-C', repo.missionPath, 'bundle', 'create', bundlePath, '--all'],
-      `git bundle creation failed for ${repo.repoRelativePath}`
+      { timeoutMs: 120000, maxOutputMB: 50 }
     );
-    bundleRepoPaths.push(normalizeRepoRelative(pathResolver.rootDir(), bundlePath));
-  }
-  return bundleRepoPaths.sort((a, b) => a.localeCompare(b));
+    if (result.status === 0) {
+      return normalizeRepoRelative(pathResolver.rootDir(), bundlePath);
+    }
+    const reason = (result.stderr || result.stdout || result.error?.message || 'command failed')
+      .trim()
+      .split('\n')[0];
+    warnings.push(
+      `[BACKUP_MISSION_BUNDLE_FAILED] git bundle for ${repo.repoRelativePath} failed — its git history is not in this archive (working-tree files are) | next: give the backup process read access to ${repo.repoRelativePath}/.git (macOS: Full Disk Access for the daemon's node binary) and rerun pnpm backup create | evidence: ${reason}`
+    );
+    return null;
+  });
 }
 
 interface BackupFileEntry {
@@ -707,7 +721,12 @@ export function pruneBackups(
 export function buildBackupManifest(
   plan: BackupPlan,
   options: Pick<BackupCliOptions, 'mission' | 'tenant' | 'encrypt'>,
-  context: { missionGitBundles: string[]; chainKeyId?: string; warnings: string[] }
+  context: {
+    missionGitBundles: Array<string | null>;
+    chainKeyId?: string;
+    warnings: string[];
+    excludedRoots?: string[];
+  }
 ) {
   return {
     format: 'kyberion-backup-v1',
@@ -733,11 +752,15 @@ export function buildBackupManifest(
         }
       : {}),
     ...(context.chainKeyId ? { chain_key_id: context.chainKeyId } : {}),
+    ...(context.excludedRoots ? { excluded_roots: context.excludedRoots } : {}),
     warnings: context.warnings,
   };
 }
 
-export function createBackup(options: BackupCliOptions): {
+export function createBackup(
+  options: BackupCliOptions,
+  passphraseDeps: BackupPassphraseDeps = {}
+): {
   archive: string;
   plan: BackupPlan;
   warnings: string[];
@@ -755,18 +778,37 @@ export function createBackup(options: BackupCliOptions): {
   if (plan.includesSensitive && !options.encrypt) {
     throw new Error('This backup includes confidential/vault data; rerun with --encrypt.');
   }
+  // Fail before any expensive work (walk, bundles, tar) when the key is absent.
+  const passphrase = options.encrypt
+    ? resolveBackupPassphrase(options.passphraseEnv, 'create', passphraseDeps).value
+    : undefined;
 
   safeMkdir(path.dirname(outPath));
   // The temp dir holds plaintext (payload, mission bundles): removed on every path.
   return withPlaintextTempDir(`backup-${stamp()}-${randomUUID().slice(0, 8)}`, (tempDir) => {
+    const rootDir = pathResolver.rootDir();
     const manifestPath = path.join(tempDir, 'manifest.json');
     const includeListPath = path.join(tempDir, 'include.txt');
     const plainArchivePath = options.encrypt ? path.join(tempDir, 'payload.tar.gz') : outPath;
     const archivePath = options.encrypt && !outPath.endsWith('.enc') ? `${outPath}.enc` : outPath;
-    const missionGitBundles = createMissionGitBundles(tempDir, plan.missionGitRepos);
+    const missionGitBundles = createMissionGitBundles(tempDir, plan.missionGitRepos, warnings);
     if (plan.scope === 'tenant' && options.tenant) {
       assertTenantLedgerPartitionsIntact(options.tenant, plan.tenantRuntimePartitions);
     }
+    const exclusions = resolveBackupExclusions({
+      rootDir,
+      entries: plan.entries,
+      outPath: archivePath,
+      plainArchivePath,
+      tempDir,
+    });
+    const selection = selectBackupFiles({
+      rootDir,
+      entries: plan.entries,
+      exclusions,
+      missionGitRepos: plan.missionGitRepos.map((repo) => repo.repoRelativePath),
+    });
+    warnings.push(...selectionWarnings(selection));
     // D2: the chain key itself never rides in a tenant archive; its id lets the
     // restore verify the chains only on a host holding the same key.
     const chainKeyId = currentAuditChainKeyId();
@@ -775,31 +817,41 @@ export function createBackup(options: BackupCliOptions): {
       missionGitBundles,
       chainKeyId,
       warnings,
+      excludedRoots: exclusions.excludedRoots,
     });
-    const manifestRepoPath = normalizeRepoRelative(pathResolver.rootDir(), manifestPath);
+    const manifestRepoPath = normalizeRepoRelative(rootDir, manifestPath);
     safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
+    const bundlePaths = missionGitBundles.filter((bundle): bundle is string => Boolean(bundle));
     safeWriteFile(
       includeListPath,
-      [...plan.entries, ...missionGitBundles, manifestRepoPath].join('\n') + '\n'
+      [...selection.paths, ...bundlePaths, manifestRepoPath].join('\n') + '\n'
     );
 
-    runRequired(
+    const timeoutMs = backupArchiveTimeoutMs(selection.totalBytes);
+    const tarResult = safeExecResult(
       'tar',
       [
-        ...tarExcludesFor(archivePath, plainArchivePath),
+        ...tarExcludesFor(exclusions, normalizeRepoRelative(rootDir, tempDir)),
         ...missionGitExcludes(plan.missionGitRepos),
         '-czf',
         plainArchivePath,
         '-C',
-        pathResolver.rootDir(),
+        rootDir,
         '-T',
         includeListPath,
       ],
-      'backup archive creation failed'
+      { timeoutMs, maxOutputMB: 50 }
+    );
+    warnings.push(
+      ...interpretTarResult(tarResult, {
+        timeoutMs,
+        fileCount: selection.paths.length,
+        totalBytes: selection.totalBytes,
+        archive: archivePath,
+      }).warnings
     );
 
-    if (options.encrypt) {
-      const passphrase = requirePassphrase(options.passphraseEnv);
+    if (options.encrypt && passphrase) {
       runRequired(
         'openssl',
         [
@@ -815,7 +867,8 @@ export function createBackup(options: BackupCliOptions): {
           `env:${options.passphraseEnv}`,
         ],
         'backup encryption failed',
-        { [options.passphraseEnv]: passphrase }
+        { [options.passphraseEnv]: passphrase },
+        timeoutMs
       );
       safeRmSync(plainArchivePath, { force: true });
     }
@@ -1254,7 +1307,10 @@ function quarantineRestoredPeerRuntime(
   return { quarantinePath: quarantineRoot, moved };
 }
 
-export function restoreBackup(options: BackupCliOptions): {
+export function restoreBackup(
+  options: BackupCliOptions,
+  passphraseDeps: BackupPassphraseDeps = {}
+): {
   target: string;
   archive: string;
   quarantinePaths: string[];
@@ -1280,7 +1336,11 @@ export function restoreBackup(options: BackupCliOptions): {
   return withPlaintextTempDir(`restore-${stamp()}-${randomUUID().slice(0, 8)}`, (tempDir) => {
     const plainArchive = archive.endsWith('.enc') ? path.join(tempDir, 'payload.tar.gz') : archive;
     if (archive.endsWith('.enc')) {
-      const passphrase = requirePassphrase(options.passphraseEnv);
+      const passphrase = resolveBackupPassphrase(
+        options.passphraseEnv,
+        'restore',
+        passphraseDeps
+      ).value;
       runRequired(
         'openssl',
         [

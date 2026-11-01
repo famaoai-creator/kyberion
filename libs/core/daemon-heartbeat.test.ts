@@ -5,6 +5,8 @@ import {
   listDaemonHeartbeatStatuses,
   readDaemonHeartbeat,
   recordDaemonHeartbeat,
+  DAEMON_TICK_IN_PROGRESS_MAX_MS,
+  tickInProgressAgeMs,
 } from './daemon-heartbeat.js';
 import { pathResolver } from './index.js';
 import { safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
@@ -35,6 +37,36 @@ describe('daemon-heartbeat', () => {
     expect(status.status).toBe('healthy');
     expect(status.heartbeat?.pid).toBe(123);
     expect(status.heartbeat?.details).toEqual({ phase: 'tick' });
+  });
+
+  it('treats a fresh in-progress heartbeat as alive until the tick overruns its limit', () => {
+    safeRmSync(HEARTBEAT_TEST_ROOT, { recursive: true, force: true });
+    const read = (heartbeatAt: string, nowAt: string) => {
+      recordDaemonHeartbeat(
+        'chronos-daemon',
+        {
+          pid: 123,
+          status: 'running',
+          details: { phase: 'tick_in_progress', tick_started_at: '2026-07-04T00:00:00.000Z' },
+        },
+        { rootDir: HEARTBEAT_TEST_ROOT, now: new Date(heartbeatAt) }
+      );
+      return readDaemonHeartbeat('chronos-daemon', {
+        rootDir: HEARTBEAT_TEST_ROOT,
+        now: new Date(nowAt),
+        staleAfterMs: 180_000,
+      });
+    };
+    // A 3-hour backup tick refreshing every minute is healthy.
+    expect(read('2026-07-04T03:00:00.000Z', '2026-07-04T03:00:30.000Z').status).toBe('healthy');
+    const overrun = read('2026-07-04T08:30:00.000Z', '2026-07-04T08:30:30.000Z');
+    expect(DAEMON_TICK_IN_PROGRESS_MAX_MS).toBeLessThan(8.5 * 60 * 60 * 1000);
+    expect(overrun.status).toBe('stale');
+    expect(overrun.reason).toMatch(/tick in progress since 2026-07-04T00:00:00.000Z/);
+    expect(tickInProgressAgeMs(overrun.heartbeat, Date.parse('2026-07-04T08:30:30.000Z'))).toBe(
+      8.5 * 60 * 60 * 1000 + 30_000
+    );
+    expect(tickInProgressAgeMs({ details: { phase: 'tick' } }, Date.now())).toBeNull();
   });
 
   it('classifies stale and missing heartbeat files', () => {

@@ -7,10 +7,12 @@
  *
  * Usage:
  *   pnpm kyberion browser inspect <url> [--mode browser|fetch] [--locale ja|en] [--headed] [--json]
+ *   pnpm kyberion browser inspect --mode extension [--tier personal|confidential|public] [--tenant <slug>] [--origin <origin>]
+ *     (prints a pairing code; the extension hands the inspection over through the native host — no network listener)
  */
 
-import http from 'node:http';
 import { createStandardYargs } from '@agent/core/cli-utils';
+import { normalizeBrowserBridgeScope } from '@agent/core/browser/browser-bridge-mailbox';
 import { htmlToMarkdown, extractHtmlTitle } from '@agent/core/html-to-markdown';
 import { stripTags } from '@agent/core/html-sanitize';
 import {
@@ -20,6 +22,13 @@ import {
 } from './browser_playwright_executor.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { withExecutionContextAsync } from '@agent/core/authority';
+import {
+  awaitInspectionTicket,
+  InspectionHandoffError,
+  openInspectionTicket,
+  type InspectionHandoffPayload,
+  type InspectionHandoffScope,
+} from './lib/browser-inspection-handoff.js';
 
 export interface PageInspectionResult {
   mode: 'browser' | 'fetch' | 'cdp' | 'extension';
@@ -54,10 +63,10 @@ export interface InspectBrowserPageDeps {
   loadActuator?: () => Promise<BrowserActuatorHandle>;
   fetchFn?: typeof fetch;
   nodeVersion?: string;
-  waitForExtensionInspection?: (options: {
-    port: number;
-    timeoutMs: number;
-  }) => Promise<PageInspectionResult>;
+  waitForExtensionInspection?: (
+    options: ExtensionInspectionWaitOptions
+  ) => Promise<PageInspectionResult>;
+  normalizeScope?: (scope: InspectionHandoffScope) => InspectionHandoffScope;
 }
 
 export function formatHumanReport(res: PageInspectionResult): string {
@@ -440,101 +449,100 @@ export async function inspectWithCdp(
   };
 }
 
-export function defaultWaitForExtensionInspection(options: {
-  port: number;
+export interface ExtensionInspectionWaitOptions {
+  scope: InspectionHandoffScope;
   timeoutMs: number;
+  /** Optional origin pin enforced by the native host. */
+  origin?: string;
   print?: (msg: string) => void;
-}): Promise<PageInspectionResult> {
-  const { port, timeoutMs, print = console.error } = options;
-  return new Promise((resolve, reject) => {
-    let resolved = false;
-    let timer: NodeJS.Timeout | null = null;
+}
 
-    const server = http.createServer((req, res) => {
-      // Enable CORS for Chrome Extension requests
-      res.setHeader('Access-Control-Allow-Origin', '*');
-      res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
-      res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+/** Operator guidance goes to stderr so `--json` stdout stays pure data. */
+function writeOperatorGuidance(msg: string): void {
+  process.stderr.write(`${msg}\n`);
+}
 
-      if (req.method === 'OPTIONS') {
-        res.writeHead(204);
-        res.end();
-        return;
-      }
+function toExtensionReport(payload: InspectionHandoffPayload): PageInspectionResult {
+  return {
+    mode: 'extension',
+    url: payload.url,
+    title: payload.title,
+    headings: payload.headings,
+    inputs: payload.inputs,
+    buttons: payload.buttons,
+    links: payload.links,
+    textExcerpt: payload.textExcerpt,
+  };
+}
 
-      if (req.method === 'POST' && req.url === '/inspection') {
-        const chunks: Buffer[] = [];
-        req.on('data', (c) => chunks.push(c));
-        req.on('end', () => {
-          try {
-            const rawBody = Buffer.concat(chunks).toString('utf8');
-            const data = JSON.parse(rawBody) as PageInspectionResult;
-            res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: true }));
-
-            if (!resolved) {
-              resolved = true;
-              if (timer) clearTimeout(timer);
-              server.close();
-              resolve({
-                ...data,
-                mode: 'extension',
-              });
-            }
-          } catch {
-            res.writeHead(400, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ ok: false, error: 'Invalid inspection payload' }));
-          }
-        });
-        return;
-      }
-
-      res.writeHead(404);
-      res.end();
+/**
+ * Wait for the Chrome extension's inspection through the native host
+ * (`submit_inspection`). Opens a ticket on the chosen tier/tenant staging
+ * partition and polls it; there is no network listener (spec §4.2).
+ */
+export async function defaultWaitForExtensionInspection(
+  options: ExtensionInspectionWaitOptions
+): Promise<PageInspectionResult> {
+  const { scope, timeoutMs, print = writeOperatorGuidance } = options;
+  const { origin } = options;
+  let ticket: ReturnType<typeof openInspectionTicket>;
+  try {
+    ticket = openInspectionTicket(scope, {
+      ttlMs: timeoutMs,
+      ...(origin ? { allowedOrigin: origin } : {}),
     });
-
-    server.listen(port, '127.0.0.1', () => {
-      print(
-        `📡 [EXTENSION MODE] Listening on http://127.0.0.1:${port}/inspection\n` +
-          `   1. Open Chrome with target page (e.g. JAL / ANA)\n` +
-          `   2. Click Kyberion Browser Bridge icon -> Open Side Panel\n` +
-          // i18n-exempt: Chrome Extension button label literal for operator guidance
-          `   3. Go to "Live" tab -> Click "このタブを接続"\n` +
-          // i18n-exempt: Chrome Extension button labels literal for operator guidance
-          `   4. In "PAGE DISCOVERY & INSPECTION" -> Click "ページ構造を解析" -> Click "Kyberion CLIへ送信"\n` +
-          `   (Note: If port is changed, ensure Port field matches ${port})`
-      );
-    });
-
-    server.on('error', (err) => {
-      if (!resolved) {
-        resolved = true;
-        if (timer) clearTimeout(timer);
-        reject(err);
-      }
-    });
-
-    timer = setTimeout(() => {
-      if (!resolved) {
-        resolved = true;
-        server.close();
-        reject(new Error(`Extension inspection timed out after ${Math.round(timeoutMs / 1000)}s`));
-      }
-    }, timeoutMs);
-  });
+  } catch (err) {
+    if (err instanceof InspectionHandoffError && err.code === 'invalid_input') {
+      throw new ScriptExitError(1, err.message);
+    }
+    throw err;
+  }
+  const scopeLabel = `${scope.tier}${scope.tenant_slug ? `/${scope.tenant_slug}` : ''}`;
+  print(
+    `📡 [EXTENSION MODE] Waiting up to ${Math.round(timeoutMs / 1000)}s for the Chrome extension ` +
+      `(native host com.kyberion.browser_bridge, scope ${scopeLabel}` +
+      `${origin ? `, origin ${origin}` : ''})\n` +
+      `   Pairing code: ${ticket.pairing_code}\n` +
+      `   1. Open Chrome with the target page\n` +
+      `   2. Click Kyberion Browser Bridge icon -> Open Side Panel\n` +
+      // i18n-exempt: Chrome Extension button label literal for operator guidance
+      `   3. Go to "Live" tab -> Click "このタブを接続"\n` +
+      // i18n-exempt: Chrome Extension button label literal for operator guidance
+      `   4. In "PAGE DISCOVERY & INSPECTION" -> Click "ページ構造を解析"\n` +
+      // i18n-exempt: Chrome Extension button label literal for operator guidance
+      `   5. Enter the pairing code ${ticket.pairing_code} -> Click "Kyberion CLIへ送信"`
+  );
+  try {
+    return toExtensionReport(await awaitInspectionTicket(ticket));
+  } catch (err) {
+    if (err instanceof InspectionHandoffError && err.code === 'timeout') {
+      throw new Error(`Extension inspection timed out after ${Math.round(timeoutMs / 1000)}s`);
+    }
+    throw err;
+  }
 }
 
 export async function inspectWithExtension(
   options: {
-    port?: number;
+    tier?: string;
+    tenant?: string;
+    origin?: string;
     timeoutMs?: number;
   },
   deps: InspectBrowserPageDeps = {}
 ): Promise<PageInspectionResult> {
-  const port = options.port || 8788;
   const timeoutMs = options.timeoutMs || 60_000;
+  let scope: InspectionHandoffScope;
+  try {
+    scope = (deps.normalizeScope ?? normalizeBrowserBridgeScope)({
+      tier: (options.tier || 'personal') as InspectionHandoffScope['tier'],
+      ...(options.tenant ? { tenant_slug: options.tenant } : {}),
+    });
+  } catch (err) {
+    throw new ScriptExitError(1, err instanceof Error ? err.message : String(err));
+  }
   const waiter = deps.waitForExtensionInspection ?? defaultWaitForExtensionInspection;
-  return waiter({ port, timeoutMs });
+  return waiter({ scope, timeoutMs, ...(options.origin ? { origin: options.origin } : {}) });
 }
 
 export async function main(
@@ -569,10 +577,20 @@ export async function main(
       type: 'string',
       description: 'Optional explicit Chrome CDP URL (e.g. http://127.0.0.1:9222)',
     })
-    .option('extension-port', {
-      type: 'number',
-      default: 8788,
-      description: 'Local loopback port to receive extension inspection payload',
+    .option('tier', {
+      type: 'string',
+      choices: ['personal', 'confidential', 'public'],
+      default: 'personal',
+      description: 'Extension mode: tier partition the inspection hand-off is staged in',
+    })
+    .option('tenant', {
+      type: 'string',
+      description: 'Extension mode: tenant slug (required for --tier confidential)',
+    })
+    .option('origin', {
+      type: 'string',
+      description:
+        'Extension mode: only accept an inspection of this origin (e.g. https://example.com)',
     })
     .option('wait', {
       type: 'number',
@@ -621,7 +639,9 @@ export async function main(
   } else if (mode === 'extension') {
     report = await inspectWithExtension(
       {
-        port: Number(argv['extension-port'] || 8788),
+        tier: String(argv.tier || 'personal'),
+        tenant: argv.tenant ? String(argv.tenant) : undefined,
+        origin: argv.origin ? String(argv.origin) : undefined,
         timeoutMs: Number(argv.timeout || 60000),
       },
       deps

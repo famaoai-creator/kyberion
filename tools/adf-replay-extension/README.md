@@ -40,11 +40,18 @@ Kyberion から拡張への連絡は、拡張が Native Messaging host に問い
 3. 保存先の区分を選ぶ: personal（既定）/ confidential（テナント slug が必要）/ public（「公開してよい内容です」の確認が必要）。
 4. PII 除去済みのプレビューを確認して「Kyberion に送信」。
 
+## ページ構造を Kyberion CLI へ渡す
+
+1. ターミナルで `pnpm kyberion browser inspect --mode extension` を実行します（保存先の区分は `--tier personal|confidential|public`、confidential は `--tenant <slug>` が必要。既定は personal、待ち時間は `--timeout` ミリ秒で最大 10 分。`--origin https://example.com` を付けるとその origin 以外は受け付けません）。CLI に 6 文字の **ペアリングコード** が表示されます。
+2. Live タブで対象ページを接続し、「ページ構造を解析」を押します。
+3. 表示された入力欄にペアリングコードを入れて「Kyberion CLIへ送信」を押します。
+4. 送信は native host（`submit_inspection`）経由です。ポートの設定はありません。コードが一致する待機中の CLI にだけ届き、コードがない・一致しない場合は送信が拒否されます。入力欄の値は送らず、URL のクエリと fragment は落とします。
+
 ## 既存の導入を更新する
 
 すでに拡張を読み込み済みの環境で、この版へ更新する手順です。
 
-1. Kyberion 側を更新したら `pnpm build`（または `pnpm build:actuators`）で `dist/scripts/browser_bridge_host.js` を作り直します。host スクリプトに `poll_requests` / `respond_request` / `send_page` が加わったためです。
+1. Kyberion 側を更新したら `pnpm build`（または `pnpm build:actuators`）で `dist/scripts/browser_bridge_host.js` を作り直します。host スクリプトに `poll_requests` / `respond_request` / `send_page` / `submit_inspection` が加わったためです。
 2. `chrome://extensions` で、読み込み済みの拡張（unpacked）の「再読み込み」を押します。
 3. Chrome が新しい権限 `alarms` / `contextMenus` / `notifications` の承認を求めるので受け入れます。拒否すると受信箱の定期問い合わせ、右クリック送信、通知が動きません。
 4. native host の再導入（`native-host/install.sh`）は、通常は不要です。host の manifest（`com.kyberion.browser_bridge.json`）は変わっておらず、Chrome が起動するのは同じ `launch.sh` です。拡張 ID を変えた、リポジトリの場所を移した、`node` を入れ替えたなど、manifest の `path` や `allowed_origins` が変わる場合だけ再実行し、Chrome を完全に終了して開き直します。
