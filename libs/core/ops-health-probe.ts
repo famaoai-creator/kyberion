@@ -22,13 +22,22 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { pathResolver } from './path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeMkdir, safeStat } from './secure-io.js';
-import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeMkdir,
+  safeReaddir,
+  safeStat,
+} from './secure-io.js';
+import { appendJsonLine } from './foundation/json.js';
+import { streamJsonLines } from './jsonl-read.js';
 import { createLogger } from './logger.js';
 import { createWorkItemIfAbsent } from './workforce/work-coordination.js';
 import { appendDotInboxEntry } from './dot/dot-inbox.js';
 import { listDotCharters } from './dot/dot-charter.js';
-import { loadRetentionCatalog } from './storage-retention-catalog.js';
+import { loadRetentionCatalog, type RetentionCatalogEntry } from './storage-retention-catalog.js';
+import { DEFAULT_COMPACT_MIN_BYTES, DEFAULT_ROTATE_MIN_BYTES } from './storage-retention-expiry.js';
 import { listUncoveredRuntimeFiles, listUncoveredRuntimeDirs } from './storage-runtime-coverage.js';
 
 const logger = createLogger('ops-health-probe');
@@ -47,6 +56,15 @@ export const STORE_OVERGROWTH_FACTOR = 2;
 export const STORE_MIN_BYTES = 1024 * 1024;
 /** Ungoverned-growth ceiling for review_required / action-less stores — the delegations.jsonl 13MB class. */
 export const REVIEW_REQUIRED_MAX_BYTES = 32 * 1024 * 1024;
+/**
+ * Probe-cost caps for walking review_required runtime directories (not store
+ * correctness bounds): how deep the walk descends and how many directory
+ * entries it visits per cataloged directory before moving on.
+ */
+export const DIRECTORY_PROBE_MAX_DEPTH = 4;
+export const DIRECTORY_PROBE_MAX_ENTRIES = 2000;
+/** Only runtime-store directories are walked (not archive/knowledge trees). */
+const DIRECTORY_PROBE_PREFIX = 'active/shared/runtime/';
 
 export interface OpsFinding {
   /** Stable dedupe identity — same finding class+subject ⇒ same id. */
@@ -67,6 +85,86 @@ export interface OpsHealthProbeDeps {
   now?: () => Date;
   /** When false (default) only records findings; true also files WorkItems. */
   fileWorkItems?: boolean;
+  /** Ceiling for review_required stores (tests inject small values). */
+  reviewRequiredMaxBytes?: number;
+}
+
+/**
+ * Size that should trigger a store's rotate/compact action — the janitor's
+ * default when the entry declares none — or undefined for action-less stores.
+ */
+export function storeActionThreshold(entry: RetentionCatalogEntry): number | undefined {
+  if (entry.action === 'rotate') return entry.rotate_min_bytes ?? DEFAULT_ROTATE_MIN_BYTES;
+  if (entry.action === 'compact') return entry.compact_min_bytes ?? DEFAULT_COMPACT_MIN_BYTES;
+  return undefined;
+}
+
+function reviewRequiredFinding(
+  rel: string,
+  size: number,
+  entry: RetentionCatalogEntry,
+  deps: OpsHealthProbeDeps
+): OpsFinding {
+  const where = rel === entry.path ? '' : ` (in ${entry.path})`;
+  return {
+    finding_id: findingId('store_overgrowth', rel),
+    kind: 'store_overgrowth',
+    severity: 'warning',
+    summary: `review_required store ${rel}${where} at ${(size / 1e6).toFixed(1)}MB with no self-bounding action — needs a lifecycle decision`,
+    evidence: {
+      path: rel,
+      size_bytes: size,
+      action: entry.action,
+      ...(rel === entry.path ? {} : { catalog_path: entry.path }),
+    },
+    detected_at: (deps.now?.() ?? new Date()).toISOString(),
+  };
+}
+
+/**
+ * Bounded walk of one review_required runtime directory: every `.jsonl` file
+ * over the ceiling is a finding. Children with their own catalog entry are
+ * skipped (that entry governs them). A path this role may not read is
+ * skipped with a debug log — the probe never fails on access.
+ */
+function probeReviewRequiredDirectory(
+  entry: RetentionCatalogEntry,
+  cataloged: ReadonlySet<string>,
+  ceiling: number,
+  deps: OpsHealthProbeDeps
+): OpsFinding[] {
+  const findings: OpsFinding[] = [];
+  let visited = 0;
+  const walk = (rel: string, depth: number): void => {
+    let names: string[];
+    try {
+      names = safeReaddir(repoFile(deps.rootDir, rel));
+    } catch (error) {
+      logger.debug(
+        `[OPS-PROBE] skipped ${rel}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return;
+    }
+    for (const name of names.sort()) {
+      if (visited++ >= DIRECTORY_PROBE_MAX_ENTRIES) return;
+      const child = `${rel}/${name}`;
+      if (cataloged.has(child)) continue;
+      try {
+        const stat = safeLstat(repoFile(deps.rootDir, child));
+        if (stat.isDirectory()) {
+          if (depth < DIRECTORY_PROBE_MAX_DEPTH) walk(child, depth + 1);
+        } else if (stat.isFile() && name.endsWith('.jsonl') && stat.size > ceiling) {
+          findings.push(reviewRequiredFinding(child, stat.size, entry, deps));
+        }
+      } catch (error) {
+        logger.debug(
+          `[OPS-PROBE] skipped ${child}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  };
+  walk(entry.path, 1);
+  return findings;
 }
 
 function repoFile(rootDir: string | undefined, rel: string): string {
@@ -87,27 +185,18 @@ export function probeStoreOvergrowth(deps: OpsHealthProbeDeps = {}): OpsFinding[
   const targets = catalog.entries.filter(
     (e) => e.path.endsWith('.jsonl') && !e.path.includes('{') && e.self_managed !== true
   );
+  const ceiling = deps.reviewRequiredMaxBytes ?? REVIEW_REQUIRED_MAX_BYTES;
   for (const entry of targets) {
     const filePath = repoFile(deps.rootDir, entry.path);
     if (!safeExistsSync(filePath)) continue;
     const size = safeStat(filePath).size;
-    const threshold =
-      entry.action === 'rotate' || entry.action === 'compact'
-        ? (entry.rotate_min_bytes ?? entry.compact_min_bytes ?? Number.POSITIVE_INFINITY)
-        : Number.POSITIVE_INFINITY;
-    if (!Number.isFinite(threshold)) {
-      // No declared action threshold (review_required etc.) — the mechanism
-      // can never fire, so a fixed ceiling is the only bound. Past it the
-      // store needs a lifecycle entry or a manual archive decision.
-      if (size <= REVIEW_REQUIRED_MAX_BYTES) continue;
-      findings.push({
-        finding_id: findingId('store_overgrowth', entry.path),
-        kind: 'store_overgrowth',
-        severity: 'warning',
-        summary: `review_required store ${entry.path} at ${(size / 1e6).toFixed(1)}MB with no self-bounding action — needs a lifecycle decision`,
-        evidence: { path: entry.path, size_bytes: size, action: entry.action },
-        detected_at: (deps.now?.() ?? new Date()).toISOString(),
-      });
+    const threshold = storeActionThreshold(entry);
+    if (threshold === undefined) {
+      // No action threshold (review_required etc.) — the mechanism can never
+      // fire, so a fixed ceiling is the only bound. Past it the store needs a
+      // lifecycle entry or a manual archive decision.
+      if (size <= ceiling) continue;
+      findings.push(reviewRequiredFinding(entry.path, size, entry, deps));
       continue;
     }
     if (size < threshold * STORE_OVERGROWTH_FACTOR || size < STORE_MIN_BYTES) continue;
@@ -125,6 +214,21 @@ export function probeStoreOvergrowth(deps: OpsHealthProbeDeps = {}): OpsFinding[
       detected_at: (deps.now?.() ?? new Date()).toISOString(),
     });
   }
+  // review_required runtime directories (mesh-hub, peer-messaging, ledgers…)
+  // hold per-tenant/per-session JSONL files no file-level entry names; the
+  // same ceiling applies to each file found by a bounded walk.
+  const cataloged = new Set(catalog.entries.map((e) => e.path));
+  for (const entry of catalog.entries) {
+    if (
+      entry.action !== 'review_required' ||
+      entry.self_managed === true ||
+      !entry.path.startsWith(DIRECTORY_PROBE_PREFIX) ||
+      entry.path.includes('{') ||
+      /\.(?:jsonl|json|env)$/u.test(entry.path)
+    )
+      continue;
+    findings.push(...probeReviewRequiredDirectory(entry, cataloged, ceiling, deps));
+  }
   return findings;
 }
 
@@ -138,7 +242,11 @@ export function probeAlertDominance(deps: OpsHealthProbeDeps = {}): OpsFinding[]
   const counts = new Map<string, number>();
   const topKey = new Map<string, { key: string; count: number }>();
   let total = 0;
-  for (const row of readJsonLines<Record<string, unknown>>(alertPath)) {
+  // Streamed (the live file is rotation-bounded, but size must never make the
+  // probe fail) and torn/malformed lines are skipped, not fatal.
+  for (const row of streamJsonLines<Record<string, unknown>>(alertPath, {
+    onMalformed: 'skip',
+  })) {
     // Alert records carry id/title/severity; `kind` is only present on
     // meta-records (undelivered-notification / redelivery / ack markers).
     if (typeof row?.dedupe_key !== 'string' && typeof row?.title !== 'string') continue;
@@ -226,7 +334,9 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
   // reruns daily, so the same defect would otherwise produce a new identical
   // row each run and drown the signal.
   const seenIds = new Set<string>();
-  for (const row of readJsonLines<Record<string, unknown>>(findingsPath, { onMalformed: 'skip' })) {
+  for (const row of streamJsonLines<Record<string, unknown>>(findingsPath, {
+    onMalformed: 'skip',
+  })) {
     if (typeof row?.finding_id === 'string') seenIds.add(row.finding_id);
   }
   const dedupedFindings = findings.filter((f) => {

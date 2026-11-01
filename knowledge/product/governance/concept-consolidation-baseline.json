@@ -1352,6 +1352,10 @@
     "scripts/check_runtime_store_retention.ts": {
       "runtime_path_literal_budget": 1
     },
+    "scripts/check_runtime_store_whole_read.ts": {
+      "json_state_write_budget": 1,
+      "bespoke_cli_parser_budget": 1
+    },
     "scripts/check_test_sleep_ratchet.ts": {
       "json_state_write_budget": 1,
       "bespoke_cli_parser_budget": 1
