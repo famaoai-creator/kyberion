@@ -1,18 +1,28 @@
 {
-  "generated_at": "2026-10-28T16:43:09.125Z",
+  "generated_at": "2026-11-01T19:49:39.573Z",
   "generator_note": "Baseline of actuator extension-point surfaces for semver enforcement. See docs/developer/EXTENSION_POINTS.md. Update via `pnpm check:contract-semver -- --rebaseline`.",
   "actuators": [
     {
       "actuator_id": "agent-actuator",
       "version": "1.1.0",
-      "ops": ["a2a", "ask", "delegate", "health", "list", "spawn", "team_plan"],
+      "ops": [
+        "a2a",
+        "ask",
+        "delegate",
+        "health",
+        "list",
+        "spawn",
+        "team_plan"
+      ],
       "contract_schema": "knowledge/product/schemas/agent-action.schema.json",
       "contract_schema_sha256": "a348ef4ee8e0dccc8ae67e3cc67e3044c27ca60bc168ee8015b120debabc50f2"
     },
     {
       "actuator_id": "android-actuator",
       "version": "1.2.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
       "contract_schema_sha256": "b6177c8de394dba346d2f7fcf35a8a16c6bfaefdf5a4f2e638bba4ee9040968e"
     },
@@ -33,21 +43,33 @@
     {
       "actuator_id": "artifact-actuator",
       "version": "1.0.0",
-      "ops": ["append_event", "read_json", "write_delivery_pack", "write_json"],
+      "ops": [
+        "append_event",
+        "read_json",
+        "write_delivery_pack",
+        "write_json"
+      ],
       "contract_schema": "knowledge/product/schemas/artifact-action.schema.json",
       "contract_schema_sha256": "4ef1368f07742141344864c29cfff22a85164efb46157395e947a1922c2ab6aa"
     },
     {
       "actuator_id": "blockchain-actuator",
       "version": "1.1.0",
-      "ops": ["anchor_mission", "anchor_trust", "verify_anchor"],
+      "ops": [
+        "anchor_mission",
+        "anchor_trust",
+        "verify_anchor"
+      ],
       "contract_schema": "knowledge/product/schemas/blockchain-action.schema.json",
       "contract_schema_sha256": "a5949f228e3ac534f7c43cb709c11844791002250ff251edc1c2983da316d57a"
     },
     {
       "actuator_id": "browser-actuator",
       "version": "1.3.0",
-      "ops": ["computer_interaction", "pipeline"],
+      "ops": [
+        "computer_interaction",
+        "pipeline"
+      ],
       "contract_schema": "knowledge/product/schemas/browser-automation-pipeline.schema.json",
       "contract_schema_sha256": "d58754f5f529e0a1f7c0e8c02739903310043f5cfd1e1062e290d3040f659ab1"
     },
@@ -85,42 +107,65 @@
     {
       "actuator_id": "code-actuator",
       "version": "2.2.0",
-      "ops": ["impact_analysis", "pipeline", "reconcile", "semgrep_scan"],
+      "ops": [
+        "impact_analysis",
+        "pipeline",
+        "reconcile",
+        "semgrep_scan"
+      ],
       "contract_schema": "knowledge/product/schemas/code-pipeline.schema.json",
       "contract_schema_sha256": "05817263d4aa203f891281296137db571504564fd9c663abe2f89c88b671481d"
     },
     {
       "actuator_id": "compute-actuator",
       "version": "1.0.0",
-      "ops": ["cancel_job", "collect_artifact", "poll_status", "submit_job"],
+      "ops": [
+        "cancel_job",
+        "collect_artifact",
+        "poll_status",
+        "submit_job"
+      ],
       "contract_schema": null,
       "contract_schema_sha256": null
     },
     {
       "actuator_id": "data-actuator",
       "version": "1.1.0",
-      "ops": ["aggregate", "filter", "join", "query"],
+      "ops": [
+        "aggregate",
+        "filter",
+        "join",
+        "query"
+      ],
       "contract_schema": "knowledge/product/schemas/data-action.schema.json",
       "contract_schema_sha256": "434514a7887476ac156a071090a39a8c4111f8f4166ea2cfef780d4322f1da71"
     },
     {
       "actuator_id": "deployment-actuator",
       "version": "1.1.0",
-      "ops": ["deploy_release"],
+      "ops": [
+        "deploy_release"
+      ],
       "contract_schema": "knowledge/product/schemas/deployment-action.schema.json",
       "contract_schema_sha256": "4af8ff40d23e1aaf12da7bfedafb87ba124d821c0eac5dd572585694ddeffd52"
     },
     {
       "actuator_id": "email-actuator",
       "version": "1.2.0",
-      "ops": ["create_draft", "send", "send_from_file"],
+      "ops": [
+        "create_draft",
+        "send",
+        "send_from_file"
+      ],
       "contract_schema": "libs/actuators/email-actuator/schemas/email-action.schema.json",
       "contract_schema_sha256": "0566c8073665c5ae983d46b709d15b510f09a67d2baa5b716ba38b364df10777"
     },
     {
       "actuator_id": "file-actuator",
       "version": "1.1.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "knowledge/product/schemas/file-pipeline.schema.json",
       "contract_schema_sha256": "6967873aa80c46284643659bfd2033086dc4dd15cf7d9941c8a52d9c81b5b2f3"
     },
@@ -142,14 +187,18 @@
     {
       "actuator_id": "ios-actuator",
       "version": "1.2.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "knowledge/product/schemas/mobile-device-pipeline.schema.json",
       "contract_schema_sha256": "b6177c8de394dba346d2f7fcf35a8a16c6bfaefdf5a4f2e638bba4ee9040968e"
     },
     {
       "actuator_id": "media-actuator",
       "version": "1.3.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "knowledge/product/schemas/media-pipeline.schema.json",
       "contract_schema_sha256": "8a8d5feb7e1fedce344dfd27739caec21ebd1109f3e21e707ef3a67ea3285c53"
     },
@@ -207,70 +256,111 @@
     {
       "actuator_id": "meeting-browser-driver",
       "version": "1.0.0",
-      "ops": ["join", "leave"],
+      "ops": [
+        "join",
+        "leave"
+      ],
       "contract_schema": null,
       "contract_schema_sha256": null
     },
     {
       "actuator_id": "modeling-actuator",
       "version": "1.1.0",
-      "ops": ["pipeline", "reconcile"],
+      "ops": [
+        "pipeline",
+        "reconcile"
+      ],
       "contract_schema": "knowledge/product/schemas/modeling-pipeline.schema.json",
       "contract_schema_sha256": "b9fbfcdaba0e125cd25fd422b1fc9ea5d122713bd4a1b7cc6bb48d9626729147"
     },
     {
       "actuator_id": "network-actuator",
       "version": "2.2.0",
-      "ops": ["pipeline"],
+      "ops": [
+        "pipeline"
+      ],
       "contract_schema": "knowledge/product/schemas/network-pipeline.schema.json",
       "contract_schema_sha256": "cfca2bd33415bcffacacd7a6dcbfc79caf1cc69cec12cb42b025c4e04413cb26"
     },
     {
       "actuator_id": "orchestrator-actuator",
       "version": "1.0.0",
-      "ops": ["pipeline", "reconcile"],
+      "ops": [
+        "pipeline",
+        "reconcile"
+      ],
       "contract_schema": "knowledge/product/schemas/orchestrator-pipeline.schema.json",
       "contract_schema_sha256": "5a7d225192520052a0a73c3430940d9860a707a2c9d18a3e2bc60d9f1312ae2d"
     },
     {
       "actuator_id": "presence-actuator",
       "version": "1.0.0",
-      "ops": ["dispatch", "dispatch_timeline", "receive_event"],
+      "ops": [
+        "dispatch",
+        "dispatch_timeline",
+        "receive_event"
+      ],
       "contract_schema": "knowledge/product/schemas/presence-action.schema.json",
       "contract_schema_sha256": "435a45e6d49e6c16ea926e5067d9f1c087d8ea462a291102b88f476946fe1940"
     },
     {
       "actuator_id": "process-actuator",
       "version": "1.0.0",
-      "ops": ["list", "spawn", "status", "stop"],
+      "ops": [
+        "list",
+        "spawn",
+        "status",
+        "stop"
+      ],
       "contract_schema": "knowledge/product/schemas/process-action.schema.json",
       "contract_schema_sha256": "3cdfa30561aa37d76588d888af5ee44444020b2006426f296583d4f8dfd5fe8a"
     },
     {
       "actuator_id": "scheduler-actuator",
       "version": "1.1.0",
-      "ops": ["cancel", "fire", "list", "schedule"],
+      "ops": [
+        "cancel",
+        "fire",
+        "list",
+        "schedule"
+      ],
       "contract_schema": "knowledge/product/schemas/scheduler-action.schema.json",
       "contract_schema_sha256": "31eea99da9003f101ae099c4243f431402d635c7d2ec2f7372d5eb3603cd25bc"
     },
     {
       "actuator_id": "search-actuator",
       "version": "1.0.0",
-      "ops": ["fetch_reader", "web_search"],
+      "ops": [
+        "fetch_reader",
+        "web_search"
+      ],
       "contract_schema": "knowledge/product/schemas/search-action.schema.json",
       "contract_schema_sha256": "559e31b1f557d994e674e5025c5aa2e06095eaa141604a25c1fa4619ce10ea77"
     },
     {
       "actuator_id": "secret-actuator",
       "version": "1.2.0",
-      "ops": ["delete", "get", "list", "set"],
+      "ops": [
+        "delete",
+        "get",
+        "list",
+        "set"
+      ],
       "contract_schema": "knowledge/product/schemas/secret-action.schema.json",
       "contract_schema_sha256": "7886fbbeb38845c3110b985e975c26511e1e3f709e77d12242770e2dc195f5b2"
     },
     {
       "actuator_id": "service-actuator",
       "version": "1.3.0",
-      "ops": ["api", "cli", "mcp", "oauth", "pipeline", "preset", "reconcile"],
+      "ops": [
+        "api",
+        "cli",
+        "mcp",
+        "oauth",
+        "pipeline",
+        "preset",
+        "reconcile"
+      ],
       "contract_schema": "knowledge/product/schemas/service-action.schema.json",
       "contract_schema_sha256": "5d34d95d6495b02cf0644f8218a5247ae84e2c0588822b60b8c77e352279d976"
     },
@@ -324,17 +414,24 @@
     {
       "actuator_id": "terminal-actuator",
       "version": "1.0.0",
-      "ops": ["computer_interaction", "kill", "poll", "spawn", "write"],
+      "ops": [
+        "computer_interaction",
+        "kill",
+        "poll",
+        "spawn",
+        "write"
+      ],
       "contract_schema": "knowledge/product/schemas/terminal-action.schema.json",
       "contract_schema_sha256": "aff7129e9d112ec00a183d37c7ff8200e2c8059a5a400aaee6cb75a91d759553"
     },
     {
       "actuator_id": "vcs-actuator",
-      "version": "1.3.0",
+      "version": "1.4.0",
       "ops": [
         "branch",
         "checkout",
         "commit",
+        "development_loop",
         "diff",
         "fetch",
         "gh_status",
@@ -351,7 +448,7 @@
         "worktree"
       ],
       "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
-      "contract_schema_sha256": "a4ee0eefa6fbd917eeb6537f628aa035f85920d7292b10e7d8246ee830b4c06c"
+      "contract_schema_sha256": "a79ab8432fe04481c7d87369f5494811d90a2e6712ba928cc280547a58f27267"
     },
     {
       "actuator_id": "video-composition-actuator",

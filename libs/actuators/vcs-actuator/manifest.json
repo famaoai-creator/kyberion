@@ -1,6 +1,6 @@
 {
   "actuator_id": "vcs-actuator",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "Governed VCS surface: git (status/diff/log/branch/commit/push/fetch/pull/checkout/worktree) plus GitHub PR ops via gh (pr_create/pr_view/pr_list/pr_checks watch/pr_merge/repo_view/gh_status)",
   "contract_schema": "knowledge/product/schemas/vcs-action.schema.json",
   "resilience_tier": "adaptive_retry",
@@ -9,6 +9,13 @@
     "retry_profile": "vcs-actuator"
   },
   "capabilities": [
+    {
+      "op": "development_loop",
+      "description": "Reconciles a prepared mission WorkItem PR with independent revision review and server CI proofs; defaults to read-only preflight",
+      "platforms": ["darwin", "linux", "win32"],
+      "requirements": { "bin": ["git", "gh"] },
+      "effect": "egress"
+    },
     {
       "op": "status",
       "description": "Shows the working-tree status via git status",
