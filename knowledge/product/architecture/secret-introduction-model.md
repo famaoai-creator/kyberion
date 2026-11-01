@@ -4,7 +4,7 @@ category: Architecture
 tags: [architecture, secrets, approvals, surfaces, governance]
 importance: 8
 author: Ecosystem Architect
-last_updated: 2026-09-22
+last_updated: 2026-11-01
 ---
 
 # Secret Introduction Model
@@ -47,6 +47,11 @@ Canonical helpers live in `libs/core/secret/secret-identity.ts`.
 
 `secret-guard.getSecret` also falls through to `fetchSecretSync` for keychain-only legacy entries.
 
+Declared identities resolve their governed connection lazily before the OS keychain.
+Imports skip encrypted connection decryption. Explicit CLI operations memoize
+Keychain reads, including refusal, within the operation; decrypt never creates a
+replacement encryption master. Writes update or add once without a delete-first step.
+
 ## Flow
 
 ```
@@ -66,6 +71,7 @@ Low-risk local sessions (`risk=low`, terminal/concierge surface) may auto-approv
 
 ## Related
 
+- [Credential lifecycle, allocation, and execution](./api-credential-proof-boundary.md): registration, tenant allocation, task binding, selection, and proof are independent decisions. Introduction approval authorizes storage, not use by every tenant.
 - [secret-mutation-approval-model.md](./secret-mutation-approval-model.md)
 - `libs/core/secret/secret-introduction.ts`
 - `scripts/secret_introduce.ts`

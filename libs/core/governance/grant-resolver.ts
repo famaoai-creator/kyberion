@@ -46,6 +46,8 @@ export interface GrantResolution {
 
 export interface GrantResolveContext {
   tenant_slug?: string;
+  credential_provider?: string;
+  credential_ref?: string;
   mission_id?: string;
   meeting?: { url?: string; series_id?: string };
   now?: Date;
@@ -134,6 +136,11 @@ export function resolveStandingGrant(
   const matching = records.filter(
     (record) =>
       record.scope.tenant_slug === tenant &&
+      (!policy.scope_keys.includes('credential_ref') ||
+        (!!context.credential_ref && record.scope.credential_ref === context.credential_ref)) &&
+      (!policy.scope_keys.includes('credential_provider') ||
+        (!!context.credential_provider &&
+          record.scope.credential_provider === context.credential_provider)) &&
       (!policy.scope_keys.includes('meeting') || grantMatchesMeeting(record, context.meeting))
   );
   // One approval creates one record: when several records name the same

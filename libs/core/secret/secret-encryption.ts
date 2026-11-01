@@ -17,6 +17,7 @@
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { safeExecResult } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
+import { memoizedKeychainRead } from '../foundation/secret-resolution-session.js';
 
 export type SecretEncryptionMode = 'none' | 'keychain';
 
@@ -71,32 +72,39 @@ export function overrideSecretEncryptionKeyForTests(key: Buffer | null): void {
   cachedKey = null;
 }
 
-function keychainRead(): Buffer | null {
-  const result = safeExecResult('security', [
-    'find-generic-password',
-    '-s',
-    KEYCHAIN_SERVICE,
-    '-a',
-    KEYCHAIN_ACCOUNT,
-    '-w',
-  ]);
-  if (result.status !== 0) return null;
-  const hex = String(result.stdout || '').trim();
-  return /^[0-9a-f]{64}$/.test(hex) ? Buffer.from(hex, 'hex') : null;
+function keychainRead(): { key: Buffer | null; missing: boolean } {
+  let missing = false;
+  const hex = memoizedKeychainRead(KEYCHAIN_SERVICE, KEYCHAIN_ACCOUNT, () => {
+    const result = safeExecResult(
+      'security',
+      ['find-generic-password', '-s', KEYCHAIN_SERVICE, '-a', KEYCHAIN_ACCOUNT, '-w'],
+      { timeoutMs: 10_000, maxOutputMB: 1 }
+    );
+    // security's exit status for errSecItemNotFound (-25300) is 44. Refusal,
+    // cancellation, locked keychains and timeouts never authorize creation.
+    missing = result.status === 44;
+    if (result.status !== 0) return null;
+    const value = String(result.stdout || '').trim();
+    return /^[0-9a-f]{64}$/.test(value) ? value : null;
+  });
+  return { key: hex ? Buffer.from(hex, 'hex') : null, missing };
 }
 
 function keychainCreate(): Buffer {
   const key = randomBytes(32);
-  const result = safeExecResult('security', [
-    'add-generic-password',
-    '-s',
-    KEYCHAIN_SERVICE,
-    '-a',
-    KEYCHAIN_ACCOUNT,
-    '-w',
-    key.toString('hex'),
-    '-U',
-  ]);
+  const script = [
+    'import Foundation',
+    'import Security',
+    'guard let service = readLine(), let account = readLine(), let password = readLine(), let data = password.data(using: .utf8) else { exit(2) }',
+    'let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account, kSecValueData as String: data]',
+    'let status = SecItemAdd(query as CFDictionary, nil)',
+    'exit(status == errSecSuccess ? 0 : Int32(status))',
+  ].join('\n');
+  const result = safeExecResult('swift', ['-e', script], {
+    input: `${KEYCHAIN_SERVICE}\n${KEYCHAIN_ACCOUNT}\n${key.toString('hex')}\n`,
+    timeoutMs: 60_000,
+    maxOutputMB: 1,
+  });
   if (result.status !== 0) {
     throw new Error(
       `[secret-encryption] failed to store the encryption key in the keychain: ${result.stderr || result.status}`
@@ -105,7 +113,7 @@ function keychainCreate(): Buffer {
   return key;
 }
 
-function getEncryptionKey(): Buffer {
+function getEncryptionKey(createIfMissing = false): Buffer {
   if (testKeyOverride) return testKeyOverride;
   if (cachedKey) return cachedKey;
   if (process.platform !== 'darwin') {
@@ -114,7 +122,12 @@ function getEncryptionKey(): Buffer {
         'use none on this host or wait for the age-based mode'
     );
   }
-  cachedKey = keychainRead() ?? keychainCreate();
+  const read = keychainRead();
+  if (!read.key && !(createIfMissing && read.missing))
+    throw new Error(
+      '[secret-encryption] Encryption key unavailable; access was refused, timed out, or the key is missing. No replacement key was created.'
+    );
+  cachedKey = read.key ?? keychainCreate();
   return cachedKey;
 }
 
@@ -123,7 +136,7 @@ function getEncryptionKey(): Buffer {
 export function encryptConnectionDocument(
   document: Record<string, unknown>
 ): EncryptedConnectionEnvelope {
-  const key = getEncryptionKey();
+  const key = getEncryptionKey(true);
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const plaintext = Buffer.from(JSON.stringify(document), 'utf8');
