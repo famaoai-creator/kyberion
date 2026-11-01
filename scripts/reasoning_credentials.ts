@@ -6,7 +6,7 @@ import {
   resolveReasoningApiModel,
   resolveReasoningApiKey,
   verifyReasoningApiCredential,
-  reasoningCredentialVersion,
+  matchesReasoningCredentialVersion,
 } from '@agent/core/reasoning/reasoning-api-credentials';
 import { pathResolver } from '@agent/core/path-resolver';
 import { withExecutionContextAsync } from '@agent/core/authority';
@@ -154,7 +154,6 @@ async function runCredentialCommandImpl(
         proof?.status === 'success' &&
         proofProvider === descriptor.mode &&
         proof.transport === 'secure-fetch' &&
-        proof.credential_version === reasoningCredentialVersion(key) &&
         typeof proof.endpoint === 'string' &&
         proof.endpoint.startsWith(`${descriptor.api_proof!.base_url.replace(/\/+$/u, '')}/`) &&
         proof.model === resolveReasoningApiModel(options.provider) &&
@@ -163,7 +162,8 @@ async function runCredentialCommandImpl(
         execution?.kind === (identity.tenantSlug ? 'tenant' : 'operator') &&
         execution?.tenant === identity.tenantSlug &&
         execution?.mission === identity.missionId &&
-        execution?.task === identity.taskId
+        execution?.task === identity.taskId &&
+        matchesReasoningCredentialVersion(key, proof.credential_version)
       );
     } catch {
       /* metadata only */

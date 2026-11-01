@@ -1,7 +1,7 @@
 /** API proof and model selection consume the canonical provider descriptors.
  * Secret introduction remains owned by secret-introduction / Secret Guard.
  */
-import { createHash } from 'node:crypto';
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { secureFetch, type SecureFetchOptions } from '../network.js';
 import {
   credentialExecutionIdentity,
@@ -16,7 +16,25 @@ import {
 } from './reasoning-provider-registry.js';
 
 export function reasoningCredentialVersion(value: string): string {
-  return createHash('sha256').update(value).digest('hex');
+  const salt = randomBytes(16).toString('hex');
+  return `scrypt-v1:${salt}:${deriveCredentialVersion(value, salt).toString('hex')}`;
+}
+
+function deriveCredentialVersion(value: string, salt: string): Buffer {
+  // Fixed costs are versioned here; receipt input cannot select KDF parameters.
+  return scryptSync(value, Buffer.from(salt, 'hex'), 32, {
+    N: 131072,
+    r: 8,
+    p: 1,
+    maxmem: 256 * 1024 * 1024,
+  });
+}
+
+export function matchesReasoningCredentialVersion(value: string, version: unknown): boolean {
+  if (typeof version !== 'string' || version.length !== 107) return false;
+  const match = /^scrypt-v1:([a-f0-9]{32}):([a-f0-9]{64})$/.exec(version);
+  if (!match) return false; // Legacy unsalted proofs require explicit verification again.
+  return timingSafeEqual(deriveCredentialVersion(value, match[1]), Buffer.from(match[2], 'hex'));
 }
 
 export function listReasoningApiProviders(): ReasoningProviderDescriptor[] {
