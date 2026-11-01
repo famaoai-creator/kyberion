@@ -1,7 +1,8 @@
 import { dotStatePath } from './dot-state-paths.js';
 /** Durable digest admission, bounded catch-up and safe notification retry. */
 import * as path from 'node:path';
-import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { appendJsonLine } from '../foundation/json.js';
+import { streamJsonLines } from '../jsonl-read.js';
 import { safeMkdir } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { matchesCron } from '../pipeline/cron-utils.js';
@@ -48,20 +49,38 @@ export function sendDueDotDigest(
       dotStatePath(charter, 'digest-ledger.jsonl')
     );
     const legacyFile = path.join(deps.rootDir ?? pathResolver.rootDir(), DOT_DIGEST_LEDGER_PATH);
-    const legacy = readJsonLines<DigestRow>(legacyFile, { onMalformed: 'skip' })
-      .filter((row) =>
-        Boolean(row && typeof row.dot_id === 'string' && typeof row.key === 'string' && !row.status)
-      )
-      .map<DigestRow>((row) => ({
+    // Streamed fold to the latest row per key (constant memory per scan; no
+    // whole-file read, so neither ledger's size can stop digest delivery).
+    const latest = new Map<string, DigestRow>();
+    /** Minutes of status-less (wall-clock keyed) receipts. */
+    const receiptMinutes = new Set<number>();
+    /** Newest content time over delivered / accepted rows. */
+    let lastDelivered: Date | undefined;
+    const observe = (row: DigestRow): void => {
+      latest.set(row.key, row);
+      if (!row.status) receiptMinutes.add(Math.floor(Date.parse(row.sent_at) / 60000));
+      if (row.delivered || row.status === 'accepted') {
+        const at = new Date(row.content_at ?? row.scheduled_at ?? row.sent_at);
+        if (!lastDelivered || at > lastDelivered) lastDelivered = at;
+      }
+    };
+    const belongs = (row: DigestRow): boolean =>
+      row?.dot_id === charter.dot_id && (!row.scope_hash || row.scope_hash === scope);
+    for (const row of streamJsonLines<DigestRow>(legacyFile, { onMalformed: 'skip' })) {
+      if (!row || typeof row.dot_id !== 'string' || typeof row.key !== 'string' || row.status) {
+        continue;
+      }
+      const projected: DigestRow = {
         dot_id: row.dot_id,
         key: row.key,
         sent_at: row.sent_at,
         delivered: row.delivered,
-      }));
-    const all = [...legacy, ...readJsonLines<DigestRow>(file, { onMalformed: 'skip' })].filter(
-      (row) => row?.dot_id === charter.dot_id && (!row.scope_hash || row.scope_hash === scope)
-    );
-    const latest = new Map(all.map((row) => [row.key, row]));
+      };
+      if (belongs(projected)) observe(projected);
+    }
+    for (const row of streamJsonLines<DigestRow>(file, { onMalformed: 'skip' })) {
+      if (belongs(row)) observe(row);
+    }
     const append = (row: DigestRow): DigestRow => {
       safeMkdir(path.dirname(file), { recursive: true });
       appendJsonLine(file, row);
@@ -96,20 +115,8 @@ export function sendDueDotDigest(
       const key = [scope, cron, timezone ?? 'local', scheduled.toISOString()].join('@');
       if (latest.has(key)) return false;
       // Legacy receipts use wall-clock cron keys: avoid re-sending their already observed minute.
-      if (
-        all.some(
-          (row) =>
-            !row.status &&
-            Math.floor(Date.parse(row.sent_at) / 60000) === Math.floor(scheduled!.getTime() / 60000)
-        )
-      )
-        return false;
-      const last = all
-        .filter((row) => row.delivered || row.status === 'accepted')
-        .reduce<Date | undefined>((cursor, row) => {
-          const at = new Date(row.content_at ?? row.scheduled_at ?? row.sent_at);
-          return !cursor || at > cursor ? at : cursor;
-        }, undefined);
+      if (receiptMinutes.has(Math.floor(scheduled.getTime() / 60000))) return false;
+      const last = lastDelivered;
       pending = append({
         dot_id: charter.dot_id,
         scope_hash: scope,

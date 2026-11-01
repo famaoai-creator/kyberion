@@ -48,8 +48,15 @@ import {
   safeWriteFile,
 } from '../secure-io.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { appendJsonLine, readJsonIfPresent, readJsonLines, writeJson } from '../foundation/json.js';
+import { appendJsonLine, readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { readJsonLinesCached } from '../jsonl-tail.js';
+import { streamJsonLines } from '../jsonl-read.js';
+import {
+  DOT_TOKEN_USAGE_PATH,
+  maintainDotTokenUsageAfterAppend,
+  readDotTokenUsageForDay,
+  type DotTokenUsageEntry,
+} from './dot-token-usage.js';
 import { parseSafeJsonObjectInput } from '../foundation/safe-json.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
 import { recordDaemonHeartbeat } from '../daemon-heartbeat.js';
@@ -111,7 +118,7 @@ import {
 const logger = createLogger('dot-runtime');
 
 export const DOT_WAKE_LEDGER_PATH = runtimeStatePath('dot.wakeLedger').logicalPath;
-export const DOT_TOKEN_USAGE_PATH = 'active/shared/runtime/dot-token-usage.jsonl';
+export { DOT_TOKEN_USAGE_PATH, type DotTokenUsageEntry } from './dot-token-usage.js';
 export const DOT_WATCH_STATE_PATH = 'active/shared/runtime/dot-watch-state.json';
 export const DOT_PROBE_STATE_PATH = 'active/shared/runtime/dot-probe-state.json';
 export { DOT_INBOX_PATH } from './dot-inbox.js';
@@ -235,15 +242,6 @@ export function dotWakeSummary(text: string | undefined): string | undefined {
   }
   prose = prose.replace(/\s+/g, ' ').trim();
   return prose ? prose.slice(0, DOT_WAKE_SUMMARY_MAX) : undefined;
-}
-
-export interface DotTokenUsageEntry {
-  dot_id: string;
-  accounting_id?: string;
-  /** UTC day bucket (YYYY-MM-DD) the tokens accrue to. */
-  day: string;
-  tokens: number;
-  recorded_at: string;
 }
 
 export interface DotInboxEntry {
@@ -420,7 +418,8 @@ export function compactDotWakeLedger(
       const staging = `${src}.compacting-${process.pid}-${stagingPaths.length}-${tag}`;
       safeMoveSync(src, staging);
       stagingPaths.push(staging);
-      allRows.push(...readJsonLines<Record<string, unknown>>(staging));
+      // Streamed: no whole-file cap on the parked segment (same throw-on-malformed contract).
+      for (const row of streamJsonLines<Record<string, unknown>>(staging)) allRows.push(row);
     };
     const fold = (rows: Array<Record<string, unknown>>): Array<Record<string, unknown>> => {
       const lastConsumedAt = new Map<string, number>();
@@ -616,17 +615,22 @@ export function recordDotTokenUsage(
     } satisfies DotTokenUsageEntry,
     deps
   );
+  // Write-time retention (3-day window, archived): never drops today's rows.
+  maintainDotTokenUsageAfterAppend(runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH), now);
 }
 
 /**
  * Tokens accrued by this dot today (UTC day bucket), across all processes.
- * Incremental replay (G01): a call parses only usage rows appended since the
- * previous call in this process, not the whole history.
+ * Backward scan to just before the day starts: the cost follows today's rows,
+ * not the history, and the ledger's size never makes the check fail.
  */
 export function dotTokensUsedToday(dotId: string, deps: DotRuntimeDeps = {}): number {
   const day = (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
-  return readJsonLinesCached<DotTokenUsageEntry>(runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH))
-    .filter((row) => row?.dot_id === dotId && row?.day === day)
+  return readDotTokenUsageForDay<DotTokenUsageEntry>(
+    runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH),
+    day
+  )
+    .filter((row) => row?.dot_id === dotId)
     .reduce((sum, row) => sum + (Number(row.tokens) || 0), 0);
 }
 
@@ -740,7 +744,9 @@ function wakeTriggerKeys(
 ): Array<{ key: string; detail: string }> {
   // Match + key derivation live in dot-inbox.ts so this consumer and the
   // tombstone compactor can never drift apart.
-  const rows = readJsonLines<DotInboxEntry & { __line?: string; __index?: number }>(
+  // Streamed (constant memory, no size cap): forward line numbers match the
+  // old whole-file `split(/\r?\n/)` index + 1, so wake keys are unchanged.
+  const rows = streamJsonLines<DotInboxEntry & { __line?: string; __index?: number }>(
     runtimePath(deps.rootDir, dotInboxPath(charter.scope)),
     {
       onMalformed: 'skip',

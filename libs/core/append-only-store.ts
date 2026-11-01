@@ -546,6 +546,16 @@ export function defaultCompactionArchiveDir(filePath: string): string {
   );
 }
 
+/**
+ * Archive directory for WRITE-TIME maintenance: `<store dir>/compaction-archive`.
+ * The writer of a store can always write next to it, and the archive keeps the
+ * store's tier / tenant partition — unlike {@link defaultCompactionArchiveDir}
+ * (`active/archive/...`), which only the janitor's role may write.
+ */
+export function writeTimeArchiveDir(filePath: string): string {
+  return nodePath.join(nodePath.dirname(filePath), 'compaction-archive');
+}
+
 export interface CompactStoreOptions extends StoreScanOptions {
   /** Record field (or composite-key function) identifying the keyed entity. */
   key: StoreKey;

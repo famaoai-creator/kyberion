@@ -40,7 +40,7 @@ import {
 import { appendJsonLine, readJsonIfPresent } from '../foundation/json.js';
 import { readJsonLinesSince, streamJsonLines } from '../jsonl-read.js';
 import {
-  defaultCompactionArchiveDir,
+  writeTimeArchiveDir,
   maintainStoreAfterAppend,
   type AppendOnlyStorePolicy,
   type MaintainStoreOutcome,
@@ -103,7 +103,7 @@ export function autonomyOutcomesRetentionPolicy(filePath: string): AppendOnlySto
     minBytes: storeTuning.minBytes ?? AUTONOMY_OUTCOMES_RETENTION_MIN_BYTES,
     windowMs,
     timeOf: recordedAtMs,
-    archiveDir: storeTuning.archiveDir ?? defaultCompactionArchiveDir(filePath),
+    archiveDir: storeTuning.archiveDir ?? writeTimeArchiveDir(filePath),
   };
 }
 
