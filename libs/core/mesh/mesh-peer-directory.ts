@@ -1,6 +1,8 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { readJsonLines } from '../foundation/json.js';
+import { streamJsonLines } from '../jsonl-read.js';
+import { maintainStoreAfterAppend, type MaintainStoreOutcome } from '../append-only-store.js';
+import { withExecutionContext } from '../authority.js';
 import { normalizeIso } from '../foundation/time.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
@@ -18,6 +20,39 @@ import type {
 
 const DEFAULT_RUNTIME_ROOT = 'active/shared/runtime/mesh-hub';
 const ALLOWED_REGISTRATION_AUTHORITIES = new Set(['infrastructure_sentinel', 'mission_controller']);
+
+/**
+ * presence.jsonl gets one append per heartbeat and every reader wants only the
+ * latest record per peer, so the writer folds it to latest-per-`peer_id` once
+ * it passes this size (and again each time it doubles — see
+ * `maintainStoreAfterAppend`). The policy is explicit rather than a catalog
+ * `compact` entry because the store path is per tenant (and the runtime root is
+ * env-overridable), while catalog file entries match one exact path.
+ *
+ * registrations.jsonl and capabilities.jsonl are not compacted: they change
+ * only on enrollment / advertisement (low rate), registrations carry the
+ * revocation history, and the capability key is the pair
+ * (`peer_id`, `capability_id`), which single-field compaction cannot express.
+ * Their readers stream, so their size never makes a read fail.
+ */
+export const MESH_PRESENCE_COMPACT_MIN_BYTES = 1024 * 1024;
+/** Raw pre-compaction presence history, kept inside the tenant's mesh-hub tree. */
+const PRESENCE_ARCHIVE_SEGMENT = 'presence-archive';
+
+interface MeshPeerDirectoryStoreTuning {
+  /** Presence compaction threshold (tests inject small values). */
+  presenceCompactMinBytes?: number;
+  /** Range-read chunk size for the streaming readers (tests inject small values). */
+  chunkBytes?: number;
+}
+let storeTuning: MeshPeerDirectoryStoreTuning = {};
+
+/** Test seam: override store thresholds / read chunking; call with `{}` to reset. */
+export function setMeshPeerDirectoryStoreTuningForTests(
+  tuning: MeshPeerDirectoryStoreTuning
+): void {
+  storeTuning = { ...tuning };
+}
 
 export interface MeshPeerDirectoryPolicyContext {
   tenant_id: string;
@@ -90,7 +125,8 @@ function runtimePath(tenantId: string, segment: string): string {
   return `${meshHubRuntimeRoot(tenantId)}/${segment}`;
 }
 
-function readJsonlRecords<T>(logicalPath: string): T[] {
+/** Streams records (constant memory, no size cap); validates the path before the first read. */
+function readJsonlRecords<T>(logicalPath: string): Iterable<T> {
   const safePath = assertSafeRepositoryPath(pathResolver.resolve(logicalPath), {
     allowMissingLeaf: true,
   });
@@ -98,10 +134,10 @@ function readJsonlRecords<T>(logicalPath: string): T[] {
   if (!safeLstat(safePath).isFile()) {
     throw new Error(`mesh peer directory JSONL must be a regular file: ${safePath}`);
   }
-  return readJsonLines<T>(safePath);
+  return streamJsonLines<T>(safePath, { chunkBytes: storeTuning.chunkBytes });
 }
 
-function latestByPeerId<T extends { peer_id: string }>(records: T[]): Map<string, T> {
+function latestByPeerId<T extends { peer_id: string }>(records: Iterable<T>): Map<string, T> {
   const latest = new Map<string, T>();
   for (const record of records) {
     latest.set(record.peer_id, record);
@@ -114,7 +150,7 @@ function latestCapabilityKey(record: MeshCapabilityAdvertisement): string {
 }
 
 function latestCapabilityAds(
-  records: MeshCapabilityAdvertisement[]
+  records: Iterable<MeshCapabilityAdvertisement>
 ): Map<string, MeshCapabilityAdvertisement> {
   const latest = new Map<string, MeshCapabilityAdvertisement>();
   for (const record of records) {
@@ -161,15 +197,15 @@ function normalizeHeartbeatCapacity(
   };
 }
 
-function loadRegistrations(tenantId: string): MeshPeerRegistration[] {
+function loadRegistrations(tenantId: string): Iterable<MeshPeerRegistration> {
   return readJsonlRecords<MeshPeerRegistration>(runtimePath(tenantId, 'registrations.jsonl'));
 }
 
-function loadPresence(tenantId: string): MeshPeerPresence[] {
+function loadPresence(tenantId: string): Iterable<MeshPeerPresence> {
   return readJsonlRecords<MeshPeerPresence>(runtimePath(tenantId, 'presence.jsonl'));
 }
 
-function loadCapabilities(tenantId: string): MeshCapabilityAdvertisement[] {
+function loadCapabilities(tenantId: string): Iterable<MeshCapabilityAdvertisement> {
   return readJsonlRecords<MeshCapabilityAdvertisement>(runtimePath(tenantId, 'capabilities.jsonl'));
 }
 
@@ -182,10 +218,33 @@ function appendRegistration(record: MeshPeerRegistration): string {
 }
 
 function appendPresence(record: MeshPeerPresence): string {
-  return appendGovernedArtifactJsonl(
+  const resolved = appendGovernedArtifactJsonl(
     'infrastructure_sentinel',
     runtimePath(record.tenant_id, 'presence.jsonl'),
     record
+  );
+  compactPresenceStore(record.tenant_id, resolved);
+  return resolved;
+}
+
+/**
+ * Write-time retention for presence.jsonl: fold to the latest heartbeat per
+ * peer. Runs as the store's writer role, archives the raw union inside the
+ * tenant's mesh-hub tree (removed with the tenant at offboarding), and never
+ * throws into the heartbeat — failures and unshrinkable growth only warn.
+ */
+function compactPresenceStore(tenantId: string, presencePath: string): MaintainStoreOutcome {
+  return withExecutionContext('infrastructure_sentinel', () =>
+    maintainStoreAfterAppend(
+      presencePath,
+      {
+        action: 'compact',
+        key: 'peer_id',
+        minBytes: storeTuning.presenceCompactMinBytes ?? MESH_PRESENCE_COMPACT_MIN_BYTES,
+        archiveDir: pathResolver.resolve(runtimePath(tenantId, PRESENCE_ARCHIVE_SEGMENT)),
+      },
+      { chunkBytes: storeTuning.chunkBytes }
+    )
   );
 }
 
@@ -509,13 +568,18 @@ export function expireMeshPresence(tenantId: string, now: string | Date): MeshPe
 }
 
 export function listMeshPeerRegistrationRecords(tenantId: string): MeshPeerRegistration[] {
-  return loadRegistrations(normalizeTenantId(tenantId));
+  return [...loadRegistrations(normalizeTenantId(tenantId))];
 }
 
+/**
+ * Retained presence records, oldest first. presence.jsonl is compacted to the
+ * latest heartbeat per peer at write time, so this is not a full heartbeat
+ * history — the last record per peer is always present.
+ */
 export function listMeshPeerPresenceRecords(tenantId: string): MeshPeerPresence[] {
-  return loadPresence(normalizeTenantId(tenantId));
+  return [...loadPresence(normalizeTenantId(tenantId))];
 }
 
 export function listMeshPeerCapabilityRecords(tenantId: string): MeshCapabilityAdvertisement[] {
-  return loadCapabilities(normalizeTenantId(tenantId));
+  return [...loadCapabilities(normalizeTenantId(tenantId))];
 }
