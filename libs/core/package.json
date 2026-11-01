@@ -5440,6 +5440,10 @@
       "types": "./dist/reasoning/reasoning-api-provider.d.ts",
       "default": "./dist/reasoning/reasoning-api-provider.js"
     },
+    "./reasoning/reasoning-api-credentials": {
+      "types": "./dist/reasoning/reasoning-api-credentials.d.ts",
+      "default": "./dist/reasoning/reasoning-api-credentials.js"
+    },
     "./reasoning/reasoning-auth-preflight": {
       "types": "./dist/reasoning/reasoning-auth-preflight.d.ts",
       "default": "./dist/reasoning/reasoning-auth-preflight.js"

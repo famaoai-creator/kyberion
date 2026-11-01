@@ -10335,6 +10335,11 @@
         "ja": "シームのプロバイダ選択を確認・較正・設定",
         "qps-ploc": "⟦Ïñşṗėƈŧ, ƈȧŀïƀřȧŧė, ȧñḓ şėŧ şėȧɱ ṗřőṽïḓėř şėŀėƈŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
+      "cli_cmd_script_reasoning_credentials": {
+        "en": "Register and verify reasoning API credentials",
+        "ja": "推論 API のキー登録と実証",
+        "qps-ploc": "⟦Řėɠïşŧėř ȧñḓ ṽėřïƒẏ řėȧşőñïñɠ ȦṖÏ ƈřėḓėñŧïȧŀş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "cli_cmd_script_reasoning_setup": {
         "en": "Set up a reasoning backend",
         "ja": "推論バックエンドをセットアップ",

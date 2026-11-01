@@ -1,0 +1,39 @@
+{
+  "version": "1.0.0",
+  "providers": [
+    {
+      "mode": "openai-api",
+      "provider": "openai",
+      "module": "./reasoning/reasoning-api-provider",
+      "capabilities": {
+        "reasoning": true,
+        "structured_output": true,
+        "abort": true,
+        "session_continuity": false,
+        "input_modalities": ["text"]
+      },
+      "env_keys": ["OPENAI_API_KEY"],
+      "secret_refs": [
+        { "service_id": "openai", "secret_key": "API_KEY", "env_keys": ["OPENAI_API_KEY"] }
+      ],
+      "api_proof": { "protocol": "responses", "base_url": "https://api.openai.com/v1" },
+      "cost_tier": "metered",
+      "transport": "api",
+      "data_egress": "external-api",
+      "adapter": "openai-responses",
+      "profile": {
+        "streaming": false,
+        "tool_calling": false,
+        "native_subagent": false,
+        "thinking_levels": {},
+        "supports_strict_tools": false,
+        "supports_grammar_tools": false,
+        "utility_fit": ["judge", "classify", "summarize", "divergent"]
+      },
+      "model_vendor": "openai",
+      "endpoint": "https://api.openai.com",
+      "model_env_keys": ["KYBERION_OPENAI_MODEL"],
+      "setup_hint": "Use reasoning:credentials register --provider openai --model <API model> --activate. Codex CLI login is independent."
+    }
+  ]
+}

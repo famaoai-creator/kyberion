@@ -3,6 +3,7 @@
   "providers": [
     {
       "mode": "gemini-api",
+      "api_proof": { "protocol": "generate-content", "base_url": "https://generativelanguage.googleapis.com/v1beta", "default_model_role": "gemini-default" },
       "provider": "gemini-api",
       "module": "./reasoning/reasoning-api-provider",
       "capabilities": {
