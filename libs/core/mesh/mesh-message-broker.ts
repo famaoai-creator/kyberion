@@ -263,7 +263,7 @@ function storeCompactKey(logicalPath: string): string | undefined {
 
 /** `runtime/mesh-hub[/<ns>]/tenants/<t>/x.jsonl` → `observability/mesh-hub[/<ns>]/tenants/<t>/compaction-archive`. */
 function compactionArchiveDir(logicalPath: string): string {
-  const runtimeRoot = 'active/shared/runtime/mesh-hub';
+  const runtimeRoot = meshHubRoot();
   if (!logicalPath.startsWith(`${runtimeRoot}/`)) {
     throw new Error(`mesh-hub store outside the runtime root: ${logicalPath}`);
   }
