@@ -80,6 +80,7 @@ import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
 import {
   currentResourceAccessScope,
+  matchesNamePrefix,
   type ResourceAccessOperation,
 } from './foundation/resource-access-scope.js';
 import type {
@@ -962,13 +963,17 @@ function requestResourceDenial(
     };
   // Old dedicated-store capability validators predate appendExact. An added append path
   // cannot enlarge their original write or metadata ceiling, even under ambient grants.
-  const legacyStoreCapability = (valid: boolean): boolean => {
+  // Name prefixes count only for a validator that checks them (`withNamePrefixes`).
+  const legacyStoreCapability = (valid: boolean, withNamePrefixes = false): boolean => {
     if (!valid) return false;
     const scope = currentResourceAccessScope();
     if (!scope) return false;
+    if (!withNamePrefixes && (scope.namePrefixExact?.length ?? 0) > 0) return false;
     const candidates = denyCandidatePaths(relativePath);
+    const prefixed = (target: string): boolean =>
+      withNamePrefixes && operation !== 'mkdir' && matchesNamePrefix(scope, target);
     if (operation === 'append')
-      return candidates.every((target) => scope.writeExact.includes(target));
+      return candidates.every((target) => scope.writeExact.includes(target) || prefixed(target));
     if (operation === 'metadata') {
       const original = [
         ...(scope.metadataExact ?? []),
@@ -978,6 +983,7 @@ function requestResourceDenial(
       ];
       return candidates.every(
         (target) =>
+          prefixed(target) ||
           original.some(
             (allowed) => target === allowed || target === '' || allowed.startsWith(target + '/')
           ) ||
@@ -1029,7 +1035,7 @@ function requestResourceDenial(
     };
   if (
     normalizedRole === 'autonomy_learning_store' &&
-    !legacyStoreCapability(isAutonomyLearningCapability(currentResourceAccessScope()))
+    !legacyStoreCapability(isAutonomyLearningCapability(currentResourceAccessScope()), true)
   ) {
     return {
       allowed: false,
