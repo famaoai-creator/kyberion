@@ -34,6 +34,8 @@ export interface BrowserAutomationRuntimeCapabilities {
   persistent_profile: boolean;
   /** Attach to an already running browser over CDP. */
   attach_existing_browser: boolean;
+  /** Page-scoped raw CDP method dispatch (the `cdp` op's escape lane). */
+  raw_cdp: boolean;
 }
 
 export const FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES: Readonly<BrowserAutomationRuntimeCapabilities> =
@@ -44,6 +46,7 @@ export const FULL_BROWSER_AUTOMATION_RUNTIME_CAPABILITIES: Readonly<BrowserAutom
     webauthn: true,
     persistent_profile: true,
     attach_existing_browser: true,
+    raw_cdp: true,
   });
 
 export interface BrowserAutomationRuntimeBridge {
