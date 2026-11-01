@@ -58,6 +58,27 @@ describe('team-composition-obligations (TC-03)', () => {
     expect(roles).toContain('devils_advocate');
   });
 
+  it('requires devils_advocate for high-stakes or approval-gated code/product changes', () => {
+    expect(
+      resolveObligatoryRoles({
+        classification: classification({ risk_profile: 'high_stakes' }),
+      })
+    ).toContain('devils_advocate');
+    expect(
+      resolveObligatoryRoles({
+        classification: classification({
+          mission_class: 'product_delivery',
+          risk_profile: 'approval_required',
+        }),
+      })
+    ).toContain('devils_advocate');
+    expect(
+      resolveObligatoryRoles({
+        classification: classification({ risk_profile: 'review_required' }),
+      })
+    ).not.toContain('devils_advocate');
+  });
+
   it('routes approvals to a human-facing role', () => {
     const roles = resolveObligatoryRoles({
       classification: classification({ risk_profile: 'approval_required' }),

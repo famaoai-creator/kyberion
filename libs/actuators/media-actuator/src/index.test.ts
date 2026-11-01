@@ -1712,7 +1712,7 @@ describe('media-actuator pdf to pptx bridge', () => {
         accent1: '0066cc',
       })
     );
-    expect(result.context.report_design.theme.minorFont).toContain('Inter');
+    expect(result.context.report_design.theme.minorFont).toContain('Helvetica Neue');
   });
 
   it('classifies appendix sections in report outlines and carries composition metadata', async () => {

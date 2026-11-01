@@ -10,7 +10,7 @@
         "text": "#c13515"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -237,7 +237,7 @@
         "text": "#181d26"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -642,7 +642,7 @@
         "text": "#ffffff"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -700,12 +700,7 @@
           "**Compressed content**: Body text areas use tight line-heights and compact spacing — information-dense, no waste.",
           "**None detected.** BMW uses sharp corners exclusively — every element is a precise rectangle. This is the most angular design system analyzed."
         ],
-        "component_sections": [
-          "Buttons",
-          "Cards & Containers",
-          "Navigation",
-          "Image Treatment"
-        ],
+        "component_sections": ["Buttons", "Cards & Containers", "Navigation", "Image Treatment"],
         "prompt_guide": [
           "Background: Pure White (`#ffffff`)",
           "Text: Near Black (`#262626`)",
@@ -1265,7 +1260,7 @@
         "text": "#000000"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -2009,7 +2004,7 @@
         "text": "#0a0b0d"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -2085,10 +2080,7 @@
           "Pill (56px): Primary CTAs",
           "Full (100000px): Maximum pill"
         ],
-        "component_sections": [
-          "Buttons",
-          "Cards & Containers"
-        ],
+        "component_sections": ["Buttons", "Cards & Containers"],
         "prompt_guide": [
           "Brand: Coinbase Blue (`#0052ff`)",
           "Background: White (`#ffffff`)",
@@ -2167,7 +2159,7 @@
         "text": "#ffffff"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "JetBrains Mono"
       },
@@ -2695,7 +2687,7 @@
         "text": "#000000"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -2944,7 +2936,7 @@
         "text": "#1c2024"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "JetBrains Mono"
       },
@@ -3220,7 +3212,7 @@
         "text": "#000000"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "figmaMono"
       },
@@ -3593,7 +3585,7 @@
         "text": "#000000"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -3868,7 +3860,7 @@
         "text": "#ffffff"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "IBM Plex Mono"
       },
@@ -4155,7 +4147,7 @@
         "text": "#111111"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -4276,11 +4268,7 @@
           }
         ],
         "layout_principles": [],
-        "component_sections": [
-          "Buttons",
-          "Cards & Containers",
-          "Navigation"
-        ],
+        "component_sections": ["Buttons", "Cards & Containers", "Navigation"],
         "prompt_guide": [
           "Text: Off Black (`#111111`)",
           "Background: Warm Cream (`#faf9f6`)",
@@ -4357,7 +4345,7 @@
         "text": "#101114"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -4436,10 +4424,7 @@
           }
         ],
         "layout_principles": [],
-        "component_sections": [
-          "Buttons",
-          "Badges"
-        ],
+        "component_sections": ["Buttons", "Badges"],
         "prompt_guide": [
           "Brand: Kraken Purple (`#7132f5`)",
           "Dark variant: `#5741d8`",
@@ -4512,7 +4497,7 @@
         "text": "#f7f8f8"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "Berkeley Mono"
       },
@@ -4817,7 +4802,7 @@
         "text": "#1c1c1c"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -5043,7 +5028,7 @@
         "text": "#222222"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -5323,7 +5308,7 @@
         "text": "#0d0d0d"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "Geist Mono"
       },
@@ -5607,7 +5592,7 @@
         "text": "#1c1c1e"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -5782,7 +5767,7 @@
         "text": "#1f1f1f"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -6011,7 +5996,7 @@
         "text": "#00684a"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -6246,7 +6231,7 @@
         "text": "#ffffff"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -6524,7 +6509,7 @@
         "text": "#000000"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -7002,7 +6987,7 @@
         "text": "#201d1d"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -7271,7 +7256,7 @@
         "text": "#211922"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -7784,7 +7769,7 @@
         "text": "#ffffff"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "GeistMono"
       },
@@ -8239,7 +8224,7 @@
         "text": "#f0f0f0"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -8556,7 +8541,7 @@
         "text": "#191c1f"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -8690,11 +8675,7 @@
           "Card (20px): Feature cards",
           "Pill (9999px): All buttons"
         ],
-        "component_sections": [
-          "Buttons",
-          "Cards & Containers",
-          "Navigation"
-        ],
+        "component_sections": ["Buttons", "Cards & Containers", "Navigation"],
         "prompt_guide": [
           "Dark: Revolut Dark (`#191c1f`)",
           "Light: White (`#ffffff`)",
@@ -8775,7 +8756,7 @@
         "text": "#000000"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -9170,13 +9151,7 @@
           "Multi-column layouts: 2-3 columns on desktop, single column on mobile",
           "Card grids: CSS Grid with consistent gaps (16-24px)"
         ],
-        "component_sections": [
-          "Buttons",
-          "Cards",
-          "Inputs",
-          "Navigation",
-          "Badges / Pills"
-        ],
+        "component_sections": ["Buttons", "Cards", "Inputs", "Navigation", "Badges / Pills"],
         "prompt_guide": [],
         "keywords": [
           "0b0b0b",
@@ -9254,7 +9229,7 @@
         "text": "#ffffff"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -9402,13 +9377,7 @@
           "Rounded (13px): Primary muted buttons",
           "Pill (18px): Image containers, badges"
         ],
-        "component_sections": [
-          "Buttons",
-          "Inputs",
-          "Links",
-          "Cards & Containers",
-          "Navigation"
-        ],
+        "component_sections": ["Buttons", "Inputs", "Links", "Cards & Containers", "Navigation"],
         "prompt_guide": [
           "Background: `#1f1633` (primary), `#150f23` (deeper)",
           "Text: `#ffffff` (primary), `#e5e7eb` (secondary)",
@@ -9499,7 +9468,7 @@
         "text": "#f0f0fa"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -9651,7 +9620,7 @@
         "text": "#b3b3b3"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -9808,12 +9777,7 @@
           "Full Pill (9999px): Navigation pills, search",
           "Circle (50%): Play buttons, avatars, icons"
         ],
-        "component_sections": [
-          "Buttons",
-          "Cards & Containers",
-          "Inputs",
-          "Navigation"
-        ],
+        "component_sections": ["Buttons", "Cards & Containers", "Inputs", "Navigation"],
         "prompt_guide": [
           "Background: Near Black (`#121212`)",
           "Surface: Dark Card (`#181818`)",
@@ -9903,7 +9867,7 @@
         "text": "#533afd"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "SourceCodePro"
       },
@@ -10221,7 +10185,7 @@
         "text": "#4d4d4d"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -10359,13 +10323,7 @@
           "Large (16px): Feature cards, major containers",
           "Pill (9999px): Primary buttons, tab indicators"
         ],
-        "component_sections": [
-          "Buttons",
-          "Cards & Containers",
-          "Tabs",
-          "Links",
-          "Navigation"
-        ],
+        "component_sections": ["Buttons", "Cards & Containers", "Tabs", "Links", "Navigation"],
         "prompt_guide": [
           "Background: `#0f0f0f` (button), `#171717` (page)",
           "Text: `#fafafa` (primary), `#b4b4b4` (secondary), `#898989` (muted)",
@@ -10665,7 +10623,7 @@
         "text": "#00000066"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "PP Neue Montreal Mono"
       },
@@ -11107,7 +11065,7 @@
         "text": "#171717"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif",
         "mono": "Geist Mono"
       },
@@ -11890,7 +11848,7 @@
         "text": "#080808"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -12087,7 +12045,7 @@
         "text": "#0e0f0c"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {
@@ -12190,11 +12148,7 @@
           "Pill (9999px): All buttons, images",
           "Circle (50%): Icons, badges"
         ],
-        "component_sections": [
-          "Buttons",
-          "Cards & Containers",
-          "Navigation"
-        ],
+        "component_sections": ["Buttons", "Cards & Containers", "Navigation"],
         "prompt_guide": [
           "Text: Near Black (`#0e0f0c`)",
           "Background: White (`#ffffff` / off-white)",
@@ -12491,7 +12445,7 @@
         "text": "#201515"
       },
       "fonts": {
-        "heading": "Inter, sans-serif",
+        "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
         "body": "System-ui, sans-serif"
       },
       "metadata": {

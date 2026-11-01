@@ -164,14 +164,15 @@ export function checkPrerequisites(): void {
 
   // When KYBERION_TENANT is set, confidential mission dirs are tenant-scoped
   // (`active/missions/confidential/{tenant}/`). Creating the bare confidential
-  // prefix fails the tenant-segment path policy and breaks `mission kickoff`.
+  // prefix fails the tenant-segment path policy and breaks `mission kickoff`
+  // / `mission start` — so skip confidential entirely until a tenant is bound.
   const tenantSlug = String(getRegisteredEnvText('KYBERION_TENANT') || '')
     .trim()
     .toLowerCase();
-  const confidentialMissionRoot = tenantSlug
-    ? `active/missions/confidential/${tenantSlug}`
-    : 'active/missions/confidential';
-  const tiers = ['knowledge/personal/missions', confidentialMissionRoot, 'active/missions/public'];
+  const tiers = ['knowledge/personal/missions', 'active/missions/public'];
+  if (tenantSlug) {
+    tiers.push(`active/missions/confidential/${tenantSlug}`);
+  }
   tiers.forEach((tier) => {
     const fullPath = pathResolver.rootResolve(tier);
     if (!safeExistsSync(fullPath)) {

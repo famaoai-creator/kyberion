@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/team-composition-obligations.schema.json",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "roster_headroom": 2,
   "roster_proposal": {
     "enabled": false,
@@ -41,6 +41,15 @@
       "when": { "mission_class": ["decision_support"] },
       "require_roles": ["devils_advocate"],
       "reason": "Decision-support work converges too early without a role whose job is to argue the opposing position before the recommendation is written."
+    },
+    {
+      "id": "code-change-design-divergence",
+      "when": {
+        "mission_class": ["code_change", "product_delivery"],
+        "risk_profile": ["approval_required", "high_stakes"]
+      },
+      "require_roles": ["devils_advocate"],
+      "reason": "High-stakes or approval-gated code/product changes need an explicit opposing view before the shape locks — maps pstack arena/interrogate intent onto the existing devils_advocate role (see design-divergence-playbook)."
     }
   ]
 }

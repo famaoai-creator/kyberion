@@ -516,6 +516,16 @@ Patterns proven in yc-software/qm and adopted as repo-wide discipline
   resolution — an early-return floor that REPLACES stronger requirements
   is a downgrade wearing a strict label (`resolveApprovalPolicy`).
 
+## Recurring agent mistakes → structural fixes
+
+When the operator corrects agents for the **same** coding or procedure mistake
+twice or more, do not add another paragraph of instructions first. Follow
+[agent-mistake-correction-playbook](../orchestration/agent-mistake-correction-playbook.md):
+architecture → types → lint/CI → tests → docs last; prove each gate on a real
+past failure; keep a rule↔enforcement row here or in
+[operations-hygiene-runbook](./operations-hygiene-runbook.md). That playbook is
+the pstack `/correct` distillation for this repo.
+
 ## Maintenance
 
 When a CI failure or review finding reveals a NEW repo-specific rule (not

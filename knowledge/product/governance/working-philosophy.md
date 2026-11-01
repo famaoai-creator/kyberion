@@ -1,7 +1,7 @@
 ---
 title: 'Working Philosophy — Frontier-Model Operating Rules for Every Tier'
 kind: evergreen
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 ---
 
 # Working Philosophy — Frontier-Model Operating Rules for Every Tier
@@ -129,6 +129,76 @@ decision built on it.
 **Anti-pattern**: "Mostly working (some tests need environment adjustments)"
 for a suite that is red.
 
+### 11. Attack the premise (when shared assumptions fail)
+
+**Rule**: When two or more fixes that share one premise have failed the same
+gate, write the premise down and test it directly before another fix that
+assumes it. Do not start the next patch until that check exists.
+**Why**: Each failed fix is evidence against the belief it assumed. A third
+fix on the same premise spends effort where the evidence already says the
+cause is not. Distinct from "redesign from first principles" (new requirement)
+and from "two failures → switch planes" (change method) — here the shared
+_fact_ is what must be questioned.
+**Anti-pattern**: Three patches that all assume "the cache is stale," each
+failing for the same reason, without ever proving whether the cache is involved.
+**Provenance**: Distilled from pstack `principle-attack-the-premise` (MIT); see
+[pstack-import-map](../orchestration/pstack-import-map.md).
+
+### 12. Sequence verifiable units
+
+**Rule**: Break multi-step work (sweeps, migrations, stacked commits) into
+units that each end in a checkable state; verify before advancing. Order
+delivery so a reviewer can replay the argument (often: failing repro/test
+first, then the fix).
+**Why**: A break caught at the unit that caused it is cheap; a break after a
+batch is buried under further work on a broken base.
+**Anti-pattern**: Ten file edits, one test run at the end; a fix commit with
+no preceding failing repro in history.
+**Provenance**: pstack `principle-sequence-verifiable-units` (MIT).
+
+### 13. Subtract before you add
+
+**Rule**: When evolving a system, remove dead weight (dead code, stub
+references, redundant validators) first, then build on the simpler base.
+**Why**: New behavior that carries obsolete paths pays complexity tax forever.
+**Anti-pattern**: Adding a parallel API while leaving every caller and the
+legacy path untouched "for now."
+**Provenance**: pstack `principle-subtract-before-you-add` (MIT).
+
+### 14. Explain the number
+
+**Rule**: Before measuring, and before trusting or shipping a speedup,
+regression, throughput, latency, or eval result: name the decision the number
+would change, name the limiter ("why not double?"), rule out alternate
+explanations (errors, untuned sides, work that never ran), and keep run count
+
+- spread with the claim. Use
+  [benchmark-checklist-playbook](../orchestration/benchmark-checklist-playbook.md).
+  **Why**: A persuasive number without a limiter is often measuring something
+  else.
+  **Anti-pattern**: "30% faster" from a single noisy run with no error count.
+  **Provenance**: pstack `principle-explain-the-number` (MIT).
+
+### 15. Build the lever
+
+**Rule**: For non-trivial work, build the smallest tool that does or proves it
+(script, codemod, generator, or a skill delegates follow) instead of hand
+edits that a reviewer cannot re-run. Prove the lever on the first unit.
+**Why**: Hand-done changes can only be re-verified by redoing them.
+**Anti-pattern**: Manually rewriting fifty call sites when a codemod would
+encode the recipe.
+**Provenance**: pstack `principle-build-the-lever` (MIT).
+
+### 16. Fix root causes
+
+**Rule**: When debugging, fix the first wrong decision (or the place a
+legitimate state should have been handled) — not only where the symptom
+surfaced. Guards/retries/clamps that hide an illegal state are not fixes.
+**Why**: Symptom patches bury evidence and spawn the next incident elsewhere.
+**Anti-pattern**: Catching and swallowing an error that should never be
+produced, with a long comment justifying the workaround.
+**Provenance**: pstack `principle-fix-root-causes` (MIT).
+
 ---
 
 ## Role addenda
@@ -140,6 +210,9 @@ for a suite that is red.
 - New behavior needs a check that fails without the change and passes with it.
 - Before writing, find an existing similar implementation and follow its
   pattern — pattern reuse is cheaper and more consistent than invention.
+- When two same-premise fixes have already failed the gate, attack the premise
+  before a third patch (rule 11).
+- Prefer subtraction of dead paths before adding the new shape (rule 13).
 
 ### Reviewer
 

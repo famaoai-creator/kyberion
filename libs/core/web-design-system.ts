@@ -1,4 +1,5 @@
-const KYBERION_BRAND_FONT_STACK = "Inter, 'Noto Sans JP', sans-serif";
+const KYBERION_BRAND_FONT_STACK =
+  "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif";
 
 export interface WebThemePack {
   kind: 'web-theme-pack';
@@ -369,8 +370,8 @@ export const DEFAULT_CHRONOS_WEB_THEME_PACK: WebThemePack = {
       'trace-viewer',
     ],
     typography: {
-      heading: 'Inter, sans-serif',
-      body: 'Inter, sans-serif',
+      heading: "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
+      body: "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
     },
   },
 };

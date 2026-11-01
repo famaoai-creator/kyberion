@@ -240,10 +240,10 @@ const FALLBACK_COLORS: Record<CreativeDesignMode, CreativeDesignColors> = {
 };
 
 const FALLBACK_FONTS: CreativeDesignFonts = {
-  sans: "Inter, 'Noto Sans JP', sans-serif",
+  sans: "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif",
   mono: "'JetBrains Mono', monospace",
-  heading: "Inter, 'Noto Sans JP', sans-serif",
-  body: "Inter, 'Noto Sans JP', sans-serif",
+  heading: "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
+  body: "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
 };
 
 /**
