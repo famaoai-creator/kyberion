@@ -34,6 +34,7 @@ const OPS_REQUIRING_CAPABILITY: Readonly<Record<string, Capability>> = {
   passkey_events: 'webauthn',
   list_profiles: 'persistent_profile',
   extension_session: 'attach_existing_browser',
+  cdp: 'raw_cdp',
 };
 
 export interface BrowserRuntimePreflightIssue {

@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-CHARTER-CLIENT-VALIDATION-20261101-2026_11_01",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Validate charter processor lists after form normalization",
+  "summary": "Client validation must inspect the same normalized lists that draftToForm submits, so separators and duplicates cannot change the server-facing limits.",
+  "candidate_id": "mem-MSN-CHARTER-CLIENT-VALIDATION-20261101-2026_11_01",
+  "evidence_refs": [
+    "active/missions/public/MSN-CHARTER-CLIENT-VALIDATION-20261101/evidence/implementation-report.md",
+    "active/missions/public/MSN-CHARTER-CLIENT-VALIDATION-20261101/evidence/test-report.md",
+    "active/missions/public/MSN-CHARTER-CLIENT-VALIDATION-20261101/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-01T18:12:25.065Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "For the Concierge charter processor fields, reuse parseList in checkDraft and draftToForm. Apply the server lowercase ID pattern and 20-entry limit to normalized processor/purpose lists, validate each data category, and require either all three lists or none. Keep parseCharterForm authoritative; browser checks only give earlier feedback and disable review/proposal actions. Regression cases should include more than 20 repeated copies of one ID, 20 versus 21 unique IDs, whitespace/Japanese-comma separators, partial triples, and empty input. Exercise both owner preview and approver proposal: invalid drafts make zero POSTs, corrected drafts re-enable submission and serialize the intended arrays."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-CHARTER-CLIENT-VALIDATION-20261101/evidence/implementation-report.md",
+    "active/missions/public/MSN-CHARTER-CLIENT-VALIDATION-20261101/evidence/test-report.md",
+    "active/missions/public/MSN-CHARTER-CLIENT-VALIDATION-20261101/evidence/REVIEW-execution-implement.md"
+  ],
+  "source_branch": "fix/charter-processor-validation-20261101",
+  "source_commit": "32cf7c4028342b3caf8d97f36ea26d822d8990f8"
+}

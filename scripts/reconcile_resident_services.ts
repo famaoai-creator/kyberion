@@ -29,6 +29,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import {
+  daemonUnitFileBytes,
   resolveDaemonManager,
   type DaemonManager,
   type DaemonPlan,
@@ -197,8 +198,9 @@ export function inspectResidentServices(
   return { plan, desired, installed, manager, contexts };
 }
 
-function runPlan(plan: DaemonPlan, exec: InstalledUnitsExec): void {
-  for (const unit of plan.unitFiles) safeWriteFile(unit.stagedPath, unit.content);
+function runPlan(plan: DaemonPlan, manager: DaemonManager, exec: InstalledUnitsExec): void {
+  for (const unit of plan.unitFiles)
+    safeWriteFile(unit.stagedPath, daemonUnitFileBytes(manager.platform, unit.content));
   for (const command of plan.commands) {
     const [cmd, ...args] = command.run;
     const result = exec(cmd!, args);
@@ -248,8 +250,8 @@ export async function reconcileResidentServices(
         const spec = scopeDaemonServiceSpec(base, resolveDaemonInstance(ctx.repoRoot));
         // Migrate: unload and remove this checkout's legacy global unit first,
         // so the next login does not start a second copy.
-        if (item.action === 'migrate') runPlan(manager.planUninstall(base, ctx), exec);
-        runPlan(manager.planInstall(spec, ctx), exec);
+        if (item.action === 'migrate') runPlan(manager.planUninstall(base, ctx), manager, exec);
+        runPlan(manager.planInstall(spec, ctx), manager, exec);
         changed.add(item.id);
         applied.push({ id: item.id, action: item.action, ok: true });
         logger.info(`[resident-services] ${item.action} ${spec.label}: done`);

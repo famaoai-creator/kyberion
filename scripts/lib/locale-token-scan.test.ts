@@ -64,6 +64,12 @@ describe('scanFileForLocaleTokens', () => {
       expect(r.counts.locale_literal).toBe(0);
       expect(r.exemptions).toBe(1);
     });
+
+    it('honours previous-line exemptions with Windows CRLF line endings', () => {
+      const r = scan("// i18n-exempt: schema locale enum\r\nif (locale === 'en') {}\r\n");
+      expect(r.counts.locale_compare).toBe(0);
+      expect(r.exemptions).toBe(1);
+    });
   });
 
   describe('engine_hex', () => {
@@ -98,6 +104,15 @@ describe('scanFileForLocaleTokens', () => {
         "const shadow = 'box-shadow: 0 0 2px rgba(0,0,0,0.3)';",
       ].join('\n');
       expect(scan(code, engine).counts.engine_hex).toBe(3);
+    });
+
+    it('honours previous-line exemptions with Windows CRLF line endings', () => {
+      const r = scan(
+        "// i18n-exempt: required VML colour token\r\nconst fill = 'fill: #fff';\r\n",
+        engine
+      );
+      expect(r.counts.engine_hex).toBe(0);
+      expect(r.exemptions).toBe(1);
     });
 
     it('scopes the engine directories', () => {

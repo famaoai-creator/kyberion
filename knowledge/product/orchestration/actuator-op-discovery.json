@@ -3343,6 +3343,41 @@
       "source": "describeOps",
       "ops": [
         {
+          "op": "cdp",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "required": ["method"],
+            "properties": {
+              "method": {
+                "type": "string",
+                "minLength": 1,
+                "pattern": "^[A-Za-z]+\\.[A-Za-z]+$"
+              },
+              "params": {
+                "type": "object"
+              },
+              "timeout_ms": {
+                "type": "number",
+                "minimum": 1,
+                "maximum": 60000
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "method": "DOMSnapshot.captureSnapshot",
+              "params": {
+                "computedStyles": []
+              }
+            }
+          ]
+        },
+        {
           "op": "distill_dom",
           "kind": "capture",
           "input_schema": {
@@ -3507,6 +3542,34 @@
           "examples": [
             {
               "limit": 20
+            }
+          ]
+        },
+        {
+          "op": "watchdog_events",
+          "kind": "capture",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": ["dialog", "download", "crash", "popup", "navigation", "close"]
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 200
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "kind": "dialog",
+              "limit": 10
             }
           ]
         },
@@ -4117,6 +4180,29 @@
             "additionalProperties": false
           },
           "examples": [{}]
+        },
+        {
+          "op": "dialog_policy",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "required": ["policy"],
+            "properties": {
+              "policy": {
+                "type": "string",
+                "enum": ["accept", "dismiss"]
+              },
+              "export_as": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "examples": [
+            {
+              "policy": "dismiss"
+            }
+          ]
         },
         {
           "op": "extension_session",

@@ -132,6 +132,13 @@ Every one of these took a red CI round to learn (PR #475):
   leaf: health-probe it instead of `exists`/unlink cleanup. Integration tests must
   exercise listen/connect on the host platform, and direct-entry checks must
   normalize separators and case before comparing Windows paths.
+  Node's Windows named-pipe default DACL grants read access to Everyone and
+  Anonymous. Every application-owned pipe listener must await
+  `restrictWindowsNamedPipeAcl()` before advertising readiness or processing a
+  client; it replaces and reads back the DACL for the current user, SYSTEM and
+  Administrators, and startup fails closed if hardening fails. Keep this behavior
+  in the shared core helper and cover its platform guard and failure path in
+  `windows-named-pipe-security.test.ts`.
 - **Linux runners have no CJK fonts.** Anything exercising CJK rendering
   needs `fonts-noto-cjk` in the workflow (already in ci.yml,
   pr-validation.yml, cross-os.yml — keep new workflows consistent).

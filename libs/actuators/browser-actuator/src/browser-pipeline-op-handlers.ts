@@ -26,6 +26,12 @@ import {
 } from './browser-passkey-helpers.js';
 import { discoverBrowserProfiles } from './browser-profile-provider-registry.js';
 import * as browserMarks from './browser-mark-target.js';
+import {
+  collectWatchdogEvents,
+  isBrowserDialogPolicy,
+  setBrowserDialogPolicy,
+} from './browser-watchdog.js';
+import { executeBrowserCdp, resolveCdpTimeoutMs } from './browser-cdp-op.js';
 import * as path from 'node:path';
 import type {
   BrowserRuntime,
@@ -237,6 +243,44 @@ const RAW_CAPTURE_HANDLERS: Record<string, BrowserCaptureOpHandler> = {
         kind: 'capture',
         op: 'network',
         tab_id: runtime.activeTabId,
+      }
+    );
+  },
+  watchdog_events: async ({ op, params, runtime, ctx }) => {
+    const kind = typeof params.kind === 'string' ? params.kind : undefined;
+    const limit = clamp(Number(params.limit || 50), 1, 200);
+    const events = collectWatchdogEvents(runtime, kind, limit);
+    return browserRuntimeHelpers.recordBrowserAction(
+      {
+        ...ctx,
+        [params.export_as || 'watchdog_events']: events,
+      },
+      {
+        kind: 'capture',
+        op: 'watchdog_events',
+        tab_id: runtime.activeTabId,
+      }
+    );
+  },
+  cdp: async ({ op, params, runtime, ctx, page }) => {
+    const method = typeof params.method === 'string' ? params.method.trim() : '';
+    const timeoutMs = resolveCdpTimeoutMs(params.timeout_ms);
+    const callParams =
+      params.params && typeof params.params === 'object' && !Array.isArray(params.params)
+        ? (params.params as Record<string, unknown>)
+        : undefined;
+    const result = await executeBrowserCdp(runtime, page, method, callParams, timeoutMs);
+    return browserRuntimeHelpers.recordBrowserAction(
+      {
+        ...ctx,
+        last_capture: result,
+        [params.export_as || 'last_capture']: result,
+      },
+      {
+        kind: 'capture',
+        op: 'cdp',
+        tab_id: runtime.activeTabId,
+        method,
       }
     );
   },
@@ -971,6 +1015,24 @@ const RAW_APPLY_HANDLERS: Record<string, BrowserApplyOpHandler> = {
       op: 'log',
       tab_id: runtime.activeTabId,
     });
+  },
+  dialog_policy: async ({ op, params, runtime, ctx, resolve }) => {
+    const policy = resolve(params.policy);
+    if (!isBrowserDialogPolicy(policy)) {
+      throw new Error(
+        `[INVALID_ARGS] dialog_policy requires policy in {accept, dismiss}; got: ${String(policy)}`
+      );
+    }
+    const previous = runtime.watchdog.dialog_policy;
+    setBrowserDialogPolicy(runtime, policy);
+    return browserRuntimeHelpers.recordBrowserAction(
+      { ...ctx, [params.export_as || 'dialog_policy']: { previous, current: policy } },
+      {
+        kind: 'apply',
+        op: 'dialog_policy',
+        tab_id: runtime.activeTabId,
+      }
+    );
   },
   list_profiles: async ({ op, params, runtime, ctx }) => {
     let managedProfiles: string[] = [];
