@@ -73,6 +73,14 @@
       "documented": true
     },
     {
+      "name": "KYBERION_AGENT_DESKTOP_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional path override for agent desktop bin; keep it inside governed repository or runtime storage.",
+      "documented": true
+    },
+    {
       "name": "KYBERION_AGENT_ID",
       "category": "runtime",
       "type": "string",
