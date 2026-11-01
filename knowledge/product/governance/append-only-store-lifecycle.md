@@ -117,6 +117,9 @@ one open file (inode) even if the store is rotated or compacted mid-read.
   count drops, lower the baseline with `--write-baseline`.
 - ops-health `probeStoreOvergrowth` warns on catalogued stores past twice their
   threshold and on any `.jsonl` over 32 MiB inside a `review_required` runtime directory.
+- ops-health `probeStaleCompactionCopies` warns on any `.compacting-*` copy older than an
+  hour: a failed parked rewrite keeps it, parked-aware readers re-read it on every call
+  and agent-input-queue compaction stays skipped until it is merged back and removed.
 - `scripts/check_runtime_store_retention.ts` fails when source introduces an
   undeclared `active/shared/runtime/<name>` store.
 - The janitor report surfaces `uncoveredRuntimeFiles` for top-level ledgers with no

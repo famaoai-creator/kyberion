@@ -5,6 +5,8 @@ import { safeExistsSync, safeMkdir, safeReadFile, safeRmSync, safeWriteFile } fr
 import {
   runOpsHealthProbe,
   probeStoreOvergrowth,
+  probeStaleCompactionCopies,
+  STALE_COMPACTION_COPY_MS,
   storeActionThreshold,
   OPS_FINDINGS_PATH,
   OPS_ALERTS_PATH,
@@ -134,5 +136,21 @@ describe('ops-health-probe', () => {
     expect(
       storeActionThreshold({ path: 'd', artifact_class: 'log', action: 'review_required' })
     ).toBeUndefined();
+  });
+  it('flags leftover .compacting-* copies older than an hour, not fresh ones', () => {
+    safeRmSync(TEST_ROOT, { recursive: true, force: true });
+    const dir = path.join(TEST_ROOT, 'active/shared/runtime/store-x');
+    safeMkdir(dir, { recursive: true });
+    safeWriteFile(path.join(dir, 'items.jsonl.compacting-t000000000000001-000000-1-a'), '{}\n');
+    safeWriteFile(path.join(dir, 'items.jsonl'), '{}\n');
+    const later = new Date(Date.now() + STALE_COMPACTION_COPY_MS + 60_000);
+    const findings = probeStaleCompactionCopies({ rootDir: TEST_ROOT, now: () => later });
+    expect(findings).toHaveLength(1);
+    expect(findings[0].kind).toBe('stale_compaction_copy');
+    expect(findings[0].evidence.path).toBe(
+      'active/shared/runtime/store-x/items.jsonl.compacting-t000000000000001-000000-1-a'
+    );
+    expect(probeStaleCompactionCopies({ rootDir: TEST_ROOT })).toEqual([]);
+    safeRmSync(TEST_ROOT, { recursive: true, force: true });
   });
 });
