@@ -144,7 +144,10 @@ baked into a unit is left out of the drift comparison.
 
 The trigger delivery journal (`active/shared/runtime/trigger-deliveries.jsonl`) rotates
 itself, but it never drops a stable key younger than its 7-day dedupe window. Its size
-never stops appends or reads: dedupe scans backward over the window. If stable keys alone
+never stops appends or reads: dedupe scans backward over the window. The journal is
+self-managed: the storage janitor never rotates the live file (that would drop the
+dedupe window and in-flight claims and re-deliver triggers); it only expires rotated
+`trigger-deliveries-<stamp>.jsonl` segments after 30 days. If stable keys alone
 keep it large, ops-health reports `trigger-store-growth` (warn) — usually a trigger minting
 a new stable key per tick. To rotate it by hand, use the approval-gated command
 (dry-run by default):
@@ -156,7 +159,8 @@ pnpm kyberion approvals --approve <id>
 pnpm kyberion scheduler trigger-store rotate --apply --approval-request-id <id>
 ```
 
-It archives the full journal to a `trigger-deliveries-<stamp>.jsonl` segment, keeps
+It moves every record it drops to a `trigger-deliveries-<stamp>.jsonl` segment (segment
+plus live file hold the old journal exactly), keeps
 in-flight claims, the newest 2000 stable keys (`--keep-stable <n>`) and cron receipts of
 the last 10 minutes, uses the approval once and records `trigger.store_rotate` on the
 audit chain. A dropped stable key may deliver once more: the dry run, the approval

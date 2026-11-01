@@ -9,9 +9,10 @@
  * Dry-run by default: prints what a rotation keeps (in-flight claims, the
  * newest N stable keys, cron receipts of the last 10 minutes) and drops.
  * Applying needs an authenticated human approval bound to the store path and
- * N; the approval is used once. The full journal is archived to a segment
- * first, the rewrite runs under the store lock, and the result is recorded on
- * the audit chain. A dropped stable key may re-deliver once.
+ * N; the approval is used once. Under the store lock the journal is split:
+ * dropped records go to a segment, kept records replace the live file
+ * atomically (segment + live = the old journal), and the result is recorded
+ * on the audit chain. A dropped stable key may re-deliver once.
  *
  *   pnpm kyberion scheduler trigger-store rotate [--keep-stable <n>]
  *   pnpm kyberion scheduler trigger-store rotate --request-approval [--requested-by <actor>]
