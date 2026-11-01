@@ -42,7 +42,7 @@ This inventory is generated from the filesystem. Manifest-backed actuators are t
 - `presence-actuator`: Human Presence and Messaging Bridge (3 ops, v1.0.0, schema knowledge/product/schemas/presence-action.schema.json)
 - `process-actuator`: Managed process lifecycle actuator backed by the runtime supervisor (4 ops, v1.0.0, schema knowledge/product/schemas/process-action.schema.json)
 - `scheduler-actuator`: Declaration-only schedule store: persists cron declarations as JSON under active/shared/runtime/scheduler/ for later execution by a runner. No daemonization — this actuator only declares, lists, cancels, and manually fires stored payloads. (4 ops, v1.1.0, schema knowledge/product/schemas/scheduler-action.schema.json)
-- `search-actuator`: Query-origin web search stub and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines. (2 ops, v1.0.0, schema knowledge/product/schemas/search-action.schema.json)
+- `search-actuator`: Query-origin web search (opt-in RustXNG provider) and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines. (2 ops, v1.0.0, schema knowledge/product/schemas/search-action.schema.json)
 - `secret-actuator`: OS Native Secret Manager Bridge. Prefer kyberion secret introduce / Concierge for value collection. (4 ops, v1.2.0, schema knowledge/product/schemas/secret-action.schema.json)
 - `service-actuator`: Unified External SaaS/API/MCP Reachability Layer (7 ops, v1.3.0, schema knowledge/product/schemas/service-action.schema.json)
 - `system-actuator`: OS-level control plane for diagnostics, input toggles, and short-lived OS actions (39 ops, v1.13.0, schema knowledge/product/schemas/system-pipeline.schema.json)
