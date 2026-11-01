@@ -340,6 +340,70 @@ describe('append-only-store', () => {
       expect(readRecords(live).map((r) => r.s)).toEqual(['new']);
     });
 
+    it('archives the dropped window when the policy names an archiveDir', () => {
+      const now = new Date('2026-11-01T00:00:00.000Z');
+      safeWriteFile(
+        live,
+        jsonl({ at: now.getTime() - 10_000, s: 'old' }, { at: now.getTime() - 10, s: 'new' })
+      );
+      const outcome = maintainStoreAfterAppend(
+        live,
+        {
+          action: 'window',
+          minBytes: 10,
+          windowMs: 1000,
+          timeOf: (r) => (r as { at: number }).at,
+          archiveDir,
+        },
+        { now, audit: () => {} }
+      );
+      expect(outcome).toBe('windowed');
+      expect(readRecords(live).map((r) => r.s)).toEqual(['new']);
+      const archived = safeReaddir(archiveDir);
+      expect(archived).toHaveLength(1);
+      expect(readRecords(path.join(archiveDir, archived[0])).map((r) => r.s)).toEqual([
+        'old',
+        'new',
+      ]);
+    });
+
+    it('compacts by a composite key function; keyless or throwing keys stay verbatim', () => {
+      safeWriteFile(
+        live,
+        jsonl(
+          { dot: 'a', signal: 'x', v: 1 },
+          { dot: 'a', signal: 'y', v: 2 },
+          { dot: 'a', signal: 'x', v: 3 },
+          { other: true },
+          { dot: 'boom', signal: 'x' }
+        )
+      );
+      const records: Array<Record<string, unknown>> = [];
+      const outcome = maintainStoreAfterAppend(
+        live,
+        {
+          action: 'compact',
+          minBytes: 10,
+          archiveDir: null,
+          key: function dotSignal(r) {
+            if (r.dot === 'boom') throw new Error('bad key');
+            return typeof r.dot === 'string' && typeof r.signal === 'string'
+              ? `${r.dot}:${r.signal}`
+              : undefined;
+          },
+        },
+        { audit: (r) => records.push(r) }
+      );
+      expect(outcome).toBe('compacted');
+      expect(readRecords(live)).toEqual([
+        { dot: 'a', signal: 'y', v: 2 },
+        { dot: 'a', signal: 'x', v: 3 },
+        { other: true },
+        { dot: 'boom', signal: 'x' },
+      ]);
+      expect(records[0]?.compact_key).toBe('fn:dotSignal');
+    });
+
     it('resolves rotate / compact policies from exact-path catalog entries', () => {
       const catalog: LoadedRetentionCatalog = {
         source: 'catalog',

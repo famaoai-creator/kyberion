@@ -483,7 +483,19 @@ function rewriteParked(
 // Compaction
 // ---------------------------------------------------------------------------
 
-function recordKey(text: string, keyField: string): string | undefined {
+/**
+ * How a compaction identifies the keyed entity: a record field name, or a
+ * function for composite keys (e.g. `${dot_id}:${signal}`). A function that
+ * returns undefined marks the record keyless, so it is kept verbatim.
+ */
+export type StoreKey = string | ((record: Record<string, unknown>) => string | undefined);
+
+/** Printable form of a {@link StoreKey} for audit records and diagnostics. */
+export function describeStoreKey(key: StoreKey): string {
+  return typeof key === 'string' ? key : `fn:${key.name || 'anonymous'}`;
+}
+
+function recordKey(text: string, key: StoreKey): string | undefined {
   let value: unknown;
   try {
     value = parseSafeJsonInput(text, 'JSONL entry');
@@ -491,8 +503,18 @@ function recordKey(text: string, keyField: string): string | undefined {
     return undefined; // malformed lines are kept verbatim like keyless records
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  const key = (value as Record<string, unknown>)[keyField];
-  return typeof key === 'string' || typeof key === 'number' ? String(key) : undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof key === 'function') {
+    let derived: string | undefined;
+    try {
+      derived = key(record);
+    } catch {
+      return undefined; // a key function that throws leaves the record verbatim
+    }
+    return typeof derived === 'string' && derived !== '' ? derived : undefined;
+  }
+  const field = record[key];
+  return typeof field === 'string' || typeof field === 'number' ? String(field) : undefined;
 }
 
 /**
@@ -501,7 +523,7 @@ function recordKey(text: string, keyField: string): string | undefined {
  */
 export function analyzeStoreKeys(
   filePath: string,
-  key: string,
+  key: StoreKey,
   options: StoreScanOptions = {}
 ): { records: number; distinctKeys: number } {
   const keys = new Set<string>();
@@ -525,8 +547,8 @@ export function defaultCompactionArchiveDir(filePath: string): string {
 }
 
 export interface CompactStoreOptions extends StoreScanOptions {
-  /** Record field identifying the keyed entity. */
-  key: string;
+  /** Record field (or composite-key function) identifying the keyed entity. */
+  key: StoreKey;
   /**
    * Where the raw-union archive lands. Default {@link defaultCompactionArchiveDir}.
    * `null` = no archive, for ephemeral stores whose readers use only the
@@ -624,7 +646,7 @@ export function retainWindow<T = unknown>(
 
 export type AppendOnlyStorePolicy =
   | { action: 'rotate'; minBytes?: number }
-  | { action: 'compact'; key: string; minBytes?: number; archiveDir?: string | null }
+  | { action: 'compact'; key: StoreKey; minBytes?: number; archiveDir?: string | null }
   | {
       /** Explicit-policy only: the retention catalog has no `window` action. */
       action: 'window';
@@ -632,6 +654,11 @@ export type AppendOnlyStorePolicy =
       windowMs: number;
       timeOf: (record: unknown) => number | undefined;
       keep?: (record: unknown) => boolean;
+      /**
+       * Raw-union archive directory for the dropped window (evidence stores,
+       * e.g. accounting rows). Default: none — the window is lossy by design.
+       */
+      archiveDir?: string | null;
     };
 
 export interface MaintainStoreOptions extends StoreScanOptions {
@@ -761,7 +788,7 @@ function runPolicy(
     recordAudit(options, {
       event: 'RETENTION_COMPACT',
       ...base,
-      compact_key: policy.key,
+      compact_key: describeStoreKey(policy.key),
       archive_path: result.archivePath ? repoRelativePosix(result.archivePath) : undefined,
       before_lines: result.before,
       after_lines: result.after,
@@ -769,17 +796,27 @@ function runPolicy(
     });
     return 'compacted';
   }
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '');
+  const archivePath =
+    policy.archiveDir == null
+      ? undefined
+      : nodePath.join(
+          policy.archiveDir,
+          `${rotatedSegmentStem(filePath)}.${stamp}Z-${process.pid}.jsonl`
+        );
   const result = retainWindow(filePath, {
     ...options,
     timeOf: policy.timeOf,
     keep: policy.keep,
     sinceMs: now.getTime() - policy.windowMs,
+    archivePath,
   });
   if (!result) return 'nothing-to-do';
   recordAudit(options, {
     event: 'RETENTION_WINDOW',
     ...base,
     window_ms: policy.windowMs,
+    archive_path: result.archivePath ? repoRelativePosix(result.archivePath) : undefined,
     before_lines: result.before,
     after_lines: result.after,
   });
