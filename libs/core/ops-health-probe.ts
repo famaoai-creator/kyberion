@@ -82,7 +82,11 @@ export function probeStoreOvergrowth(deps: OpsHealthProbeDeps = {}): OpsFinding[
   // Cataloged file-level stores: rotate/compact get threshold-multiple checks;
   // action-less or review_required .jsonl files get the fixed ceiling — their
   // mechanism can never fire, so silence is what the probe exists to break.
-  const targets = catalog.entries.filter((e) => e.path.endsWith('.jsonl') && !e.path.includes('{'));
+  // Self-managed stores bound their own live file and report growth through
+  // their own finding (e.g. trigger-store-growth), so they are not probed here.
+  const targets = catalog.entries.filter(
+    (e) => e.path.endsWith('.jsonl') && !e.path.includes('{') && e.self_managed !== true
+  );
   for (const entry of targets) {
     const filePath = repoFile(deps.rootDir, entry.path);
     if (!safeExistsSync(filePath)) continue;

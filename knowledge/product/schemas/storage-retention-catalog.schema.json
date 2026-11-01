@@ -63,6 +63,10 @@
           "type": "string",
           "description": "compact action: record field identifying the keyed entity (e.g. item_id). Required for action=compact."
         },
+        "self_managed": {
+          "type": "boolean",
+          "description": "rotate / compact action: the writer owns live-file retention (it maintains the file inline under its own lock, e.g. a dedupe window that must survive). The janitor never rotates or compacts the live file; it only expires already-rotated segments by ttl_days via segment_action."
+        },
         "compact_min_bytes": {
           "type": "number",
           "exclusiveMinimum": 0,

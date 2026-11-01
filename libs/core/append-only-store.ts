@@ -690,7 +690,8 @@ export function resolveAppendOnlyStorePolicy(
   catalog: LoadedRetentionCatalog = cachedCatalog()
 ): AppendOnlyStorePolicy | null {
   const entry = retentionEntryForExactPath(catalog, repoRelativePosix(filePath));
-  if (!entry) return null;
+  // A self-managed store's writer owns its live-file retention.
+  if (!entry || entry.self_managed === true) return null;
   if (entry.action === 'rotate') return { action: 'rotate', minBytes: entry.rotate_min_bytes };
   if (entry.action === 'compact' && entry.compact_key) {
     return { action: 'compact', key: entry.compact_key, minBytes: entry.compact_min_bytes };
