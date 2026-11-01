@@ -541,6 +541,13 @@ describe('ledger core', () => {
       ]);
     });
 
+    it('refuses chain-structure entry types through the generic record API', () => {
+      expect(() => record('LEDGER_SEGMENT_ARCHIVED', { segment: 'x', last_hash: 'y' })).toThrow(
+        /LEDGER_RESERVED_TYPE/
+      );
+      expect(() => record('LEDGER_SEGMENT_OPENED', {})).toThrow(/LEDGER_RESERVED_TYPE/);
+    });
+
     it('refuses archive receipts for a tenant partition', () => {
       expect(() =>
         recordLedgerSegmentArchived(

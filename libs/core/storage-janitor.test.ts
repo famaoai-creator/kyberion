@@ -166,6 +166,7 @@ vi.mock('./core.js', () => ({
 // archive receipts the janitor writes.
 const ledgerMock = vi.hoisted(() => ({
   receipts: [] as Array<{ segment: string; last_hash: string; archive_path: string }>,
+  failReceipt: false,
 }));
 vi.mock('./ledger.js', () => ({
   SYSTEM_LEDGER_REPO_PATH: 'active/audit/system-ledger.jsonl',
@@ -189,6 +190,7 @@ vi.mock('./ledger.js', () => ({
     last_hash: string;
     archive_path: string;
   }) => {
+    if (ledgerMock.failReceipt) throw new Error('ledger lock timeout');
     ledgerMock.receipts.push(receipt);
     return 'receipt-hash';
   },
@@ -2397,6 +2399,21 @@ describe('storage-janitor', () => {
       const segment = (name: string) => path.join(ledgerDir(), `system-ledger-${name}.jsonl`);
       beforeEach(() => {
         ledgerMock.receipts.length = 0;
+        ledgerMock.failReceipt = false;
+      });
+
+      it('writes the receipt before the move: a failed receipt leaves the segment in place', () => {
+        writeCatalogFile(ledgerCatalog);
+        const names = ['20260101-000000', '20260101-000000-1'];
+        for (const name of names) {
+          writeFile(segment(name), '{}\n');
+          setMtime(segment(name), 40 * RETENTION_DAY_MS);
+        }
+        ledgerMock.failReceipt = true;
+        const result = sweepAppendOnlyStores({ dryRun: false });
+        expect(result.segmentsArchived).toEqual([]);
+        expect(fs.existsSync(segment(names[0]!))).toBe(true);
+        expect(result.errors.length).toBeGreaterThan(0);
       });
 
       it('archives in chain order, stops at the first unexpired segment and writes a receipt per archive', () => {

@@ -971,14 +971,18 @@ function archiveExpiredLedgerSegments(
     result.segmentsExpired.push(segmentPath);
     if (dryRun) continue;
     const lastHash = ledgerSegmentLastHash(segmentPath);
-    const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
-    expireFilePerPolicy(segmentPath, archiveEntry, outcome);
-    result.segmentsArchived.push(...outcome.archived);
+    // Receipt BEFORE the move: a receipt for a segment that is still present is
+    // inert (verify only consults the receipt matching an anchor), while a
+    // move whose receipt then failed would leave a permanent unproven_anchor
+    // that no later sweep could repair. A failed receipt stops archiving.
     recordLedgerSegmentArchived({
       segment: segmentPath,
       last_hash: lastHash,
       archive_path: `${ARCHIVE_REPO_SUBPATH}/${repoRelativePosix(segmentPath)}`,
     });
+    const outcome: ExpiryOutcome = { deleted: [], softDeleted: [], archived: [] };
+    expireFilePerPolicy(segmentPath, archiveEntry, outcome);
+    result.segmentsArchived.push(...outcome.archived);
   }
 }
 
