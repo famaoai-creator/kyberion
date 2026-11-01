@@ -624,10 +624,7 @@ export function recordDotTokenUsage(
  */
 export function dotTokensUsedToday(dotId: string, deps: DotRuntimeDeps = {}): number {
   const day = (deps.now?.() ?? new Date()).toISOString().slice(0, 10);
-  return readDotTokenUsageForDay<DotTokenUsageEntry>(
-    runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH),
-    day
-  )
+  return readDotTokenUsageForDay(runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH), day)
     .filter((row) => row?.dot_id === dotId)
     .reduce((sum, row) => sum + (Number(row.tokens) || 0), 0);
 }
