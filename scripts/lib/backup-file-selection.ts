@@ -100,6 +100,12 @@ export interface ManifestCredentialRead {
   rule_id: string;
   root: string;
   file_count: number;
+  /**
+   * True when the walk could not count the root's files: an ancestor was not
+   * listable by secure-io (e.g. the personal tier), so tar archived that
+   * subtree itself. `file_count` is then 0 and carries no information.
+   */
+  uncounted?: true;
 }
 
 /** Validate a restored manifest's `credential_reads` (roots via the archive member normalizer). */
@@ -115,7 +121,8 @@ export function parseManifestCredentialReads(
       typeof entry.root !== 'string' ||
       typeof entry.file_count !== 'number' ||
       !Number.isInteger(entry.file_count) ||
-      entry.file_count < 0
+      entry.file_count < 0 ||
+      (entry.uncounted !== undefined && entry.uncounted !== true)
     ) {
       throw new Error('Backup manifest credential read is invalid.');
     }
@@ -123,8 +130,22 @@ export function parseManifestCredentialReads(
       rule_id: entry.rule_id,
       root: normalizeRoot(entry.root),
       file_count: entry.file_count,
+      ...(entry.uncounted === true ? { uncounted: true as const } : {}),
     };
   });
+}
+
+/**
+ * The file count a manifest recorded for `root`, or null when it recorded
+ * none or could not count it (`uncounted`: tar archived an unlisted ancestor).
+ */
+export function manifestCredentialCount(
+  reads: ManifestCredentialRead[] | undefined,
+  root: string
+): number | null {
+  const entry = reads?.find((read) => read.root === root);
+  if (!entry || entry.uncounted) return null;
+  return entry.file_count;
 }
 
 /** One archive subtree a restore withheld from the target, with what the archive holds. */
@@ -283,7 +304,7 @@ export interface BackupFileSelection {
   unlisted: string[];
   totalBytes: number;
   /** What the walk read under the backup credential admission: roots and counts, never contents. */
-  credentialReads: Array<{ rule_id: string; root: string; file_count: number }>;
+  credentialReads: ManifestCredentialRead[];
   skipped: {
     excluded: number;
     nonRegular: string[];
@@ -313,11 +334,18 @@ export function selectBackupFiles(input: {
   // and only for this walk; the counts land in the manifest.
   return withBackupCredentialReadAdmission({ encrypted: input.encrypted === true }, () => {
     const selection = walkBackupFiles(input);
-    selection.credentialReads = exclusions.credentialReadRoots.map(({ ruleId, root }) => ({
-      rule_id: ruleId,
-      root,
-      file_count: selection.paths.filter((rel) => isWithin(rel, root)).length,
-    }));
+    selection.credentialReads = exclusions.credentialReadRoots.map(({ ruleId, root }) => {
+      // An unlisted ancestor (e.g. the personal tier this role may not list)
+      // is archived by tar itself, so the walk never sees the root's files.
+      const archivedByTar = selection.unlisted.some((rel) => isWithin(root, rel));
+      return archivedByTar
+        ? { rule_id: ruleId, root, file_count: 0, uncounted: true as const }
+        : {
+            rule_id: ruleId,
+            root,
+            file_count: selection.paths.filter((rel) => isWithin(rel, root)).length,
+          };
+    });
     return selection;
   });
 }
