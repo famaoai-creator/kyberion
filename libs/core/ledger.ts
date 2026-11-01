@@ -7,12 +7,13 @@ import {
   streamTextLinesBackward,
   type JsonlScanOptions,
 } from './jsonl-read.js';
-import { rotatedSegmentStem, rotateStore } from './append-only-store.js';
+import { rotatedSegmentStem } from './append-only-store.js';
 import {
   assertSafeRepositoryPath,
   safeMkdir,
   safeExistsSync,
   safeLstat,
+  safeMoveSync,
   safeReaddir,
 } from './secure-io.js';
 import { validateReadPermission } from './tier-guard.js';
@@ -65,7 +66,9 @@ const logger = createLogger('ledger');
  * ledger. See knowledge/product/architecture/runtime-storage-layout.md.
  */
 
-export const GLOBAL_LEDGER_PATH = pathResolver.resolve('active/audit/system-ledger.jsonl');
+/** Repo-relative path of the system ledger (its retention catalog entry). */
+export const SYSTEM_LEDGER_REPO_PATH = 'active/audit/system-ledger.jsonl';
+export const GLOBAL_LEDGER_PATH = pathResolver.resolve(SYSTEM_LEDGER_REPO_PATH);
 
 /** Repo-relative root of the tier/tenant-partitioned ledgers (storage-layout). */
 export const TENANT_LEDGER_ROOT = PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_ledger;
@@ -205,9 +208,11 @@ export const record = (type: string, data: any) => {
     (mission.kind === 'active' || mission.kind === 'archived' ? mission.conflict : undefined) ??
     (tenantSlug ? tenantBindingConflict(tenantSlug) : undefined);
   const writeScoped = (entry: Record<string, unknown>): string => {
-    if (!tenantSlug) return _writeToLedger(GLOBAL_LEDGER_PATH, entry);
+    if (!tenantSlug) return _writeToLedger(GLOBAL_LEDGER_PATH, entry, { rotate: true });
     const tenantPath = tenantLedgerPath(scope.tier, tenantSlug);
-    return asTenantLedgerStore(tenantSlug, () => _writeToLedger(tenantPath, entry));
+    return asTenantLedgerStore(tenantSlug, () =>
+      _writeToLedger(tenantPath, entry, { rotate: true })
+    );
   };
 
   const detail = {
@@ -255,9 +260,12 @@ export const record = (type: string, data: any) => {
   //    detailed entry is durable evidence, so a refused or failed metadata
   //    entry is a diagnostic warn, never an error thrown into the lifecycle
   //    step that recorded it after changing state.
+  // Mission evidence ledgers never rotate: they are bounded by the mission's
+  // life, and their readers (mission-distill) read the live file only.
   const detailHash = _writeToLedger(
     safeLedgerPath(path.join(mission.path, 'evidence/ledger.jsonl')),
-    detail
+    detail,
+    { rotate: false }
   );
   if (refusal) {
     logger.warn(
@@ -421,9 +429,11 @@ function missionLedgerScope(missionPath: string): {
  * with a chained {@link LEDGER_SEGMENT_OPENED_TYPE} marker naming that
  * segment before the entry itself. After the append, a live file past
  * {@link LEDGER_SEGMENT_ROTATE_BYTES} is renamed to a dated segment — under
- * this same lock, and never failing the append.
+ * this same lock, and never failing the append. Only the system ledger and
+ * the tenant partitions rotate (`rotate: true`); mission evidence ledgers
+ * stay one file.
  */
-function _writeToLedger(ledgerPath: string, entryData: any): string {
+function _writeToLedger(ledgerPath: string, entryData: any, options: { rotate: boolean }): string {
   ledgerPath = safeLedgerPath(ledgerPath);
   const lockId = `ledger-${createHash('sha256').update(ledgerPath).digest('hex')}`;
   return withLockSync(lockId, () => {
@@ -453,7 +463,7 @@ function _writeToLedger(ledgerPath: string, entryData: any): string {
       ? appendChained(segmentOpenedMarker(entryData, tail.openedFrom, tail.hash), tail.hash)
       : tail.hash;
     const hash = appendChained(entryData, parentHash);
-    rotateLedgerIfDue(ledgerPath);
+    if (options.rotate) rotateLedgerIfDue(ledgerPath);
     return hash;
   });
 }
@@ -465,6 +475,73 @@ function _writeToLedger(ledgerPath: string, entryData: any): string {
  * verifies from an HMAC-authenticated anchor.
  */
 export const LEDGER_SEGMENT_OPENED_TYPE = 'LEDGER_SEGMENT_OPENED';
+
+/**
+ * Chained, keyed receipt the governed janitor appends to the live ledger when
+ * it archives a rotated segment away: names the segment and its last hash.
+ * A chain whose oldest present file opens with a segment marker verifies
+ * only when such a receipt for the marker's previous segment is on the
+ * verified chain — deleting segments by hand never yields a clean report.
+ */
+export const LEDGER_SEGMENT_ARCHIVED_TYPE = 'LEDGER_SEGMENT_ARCHIVED';
+
+export interface LedgerSegmentArchivedReceipt {
+  /** The archived segment (its basename is recorded). */
+  segment: string;
+  /** Hash of the segment's last entry. */
+  last_hash: string;
+  /** Where the segment now lives (repo-relative). */
+  archive_path: string;
+}
+
+/**
+ * Record that a rotated segment of the system ledger was archived away, as a
+ * keyed, chained entry on the live ledger (under the ledger lock). Only the
+ * system ledger is archived by code; tenant partitions are moved only by an
+ * operator decision or the offboarding ceremony, so this API refuses them.
+ */
+export function recordLedgerSegmentArchived(
+  receipt: LedgerSegmentArchivedReceipt,
+  ledgerPath: string = GLOBAL_LEDGER_PATH
+): string {
+  const safePath = safeLedgerPath(ledgerPath);
+  if (safePath !== safeLedgerPath(GLOBAL_LEDGER_PATH)) {
+    throw new Error(
+      `[LEDGER_ARCHIVE_RECEIPT_REFUSED] only system ledger segments are archived by code | next: move tenant ledger segments only through the offboarding ceremony | evidence: ${repoRelative(safePath)}`
+    );
+  }
+  return _writeToLedger(
+    safePath,
+    {
+      timestamp: nowIso(),
+      type: LEDGER_SEGMENT_ARCHIVED_TYPE,
+      scope: normalizeEventScope({ tier: 'public', scope_kind: 'system' }),
+      role: 'storage_janitor',
+      mission_id: 'None',
+      payload: {
+        segment: path.basename(receipt.segment),
+        last_hash: receipt.last_hash,
+        archive_path: receipt.archive_path,
+      },
+      note: 'A rotated ledger segment was archived by the storage janitor.',
+    },
+    { rotate: true }
+  );
+}
+
+/**
+ * Hash of a rotated segment's last entry (for the archive receipt). Throws
+ * when the segment holds no entry or its tail cannot be read.
+ */
+export function ledgerSegmentLastHash(segmentPath: string): string {
+  const hash = readTailHash(safeLedgerPath(segmentPath));
+  if (hash === undefined) {
+    throw new Error(
+      `[LEDGER_TAIL_UNREADABLE] ledger segment holds no entry | next: inspect the segment before archiving it | evidence: ${repoRelative(segmentPath)}`
+    );
+  }
+  return hash;
+}
 
 /** Live ledger size past which the append that crossed it rotates it to a dated segment. */
 export const LEDGER_SEGMENT_ROTATE_BYTES = 64 * 1024 * 1024;
@@ -580,11 +657,23 @@ function ledgerChainFiles(safePath: string): string[] {
   return files;
 }
 
-function segmentStampDate(stamp: string): Date {
-  const [d = '', t = ''] = stamp.split('-');
-  return new Date(
-    `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}T${t.slice(0, 2)}:${t.slice(2, 4)}:${t.slice(4, 6)}Z`
-  );
+/**
+ * The name the next rotation renames the live file to: always sorts after
+ * every existing segment, so segment order stays chain order. A clock that
+ * went backward (or one second holding several rotations) reuses the newest
+ * stamp with the newest suffix + 1 — never the first free suffix, which could
+ * be a name freed by archiving and sort before the newest segment.
+ */
+function nextLedgerSegmentPath(ledgerPath: string, now: Date): string {
+  const nowStamp = now.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
+  const segments = ledgerSegmentsOf(ledgerPath);
+  const newest = segments.at(-1);
+  const stamp = newest && newest.stamp >= nowStamp ? newest.stamp : nowStamp;
+  let seq = newest && newest.stamp === stamp ? newest.seq + 1 : 0;
+  const base = path.join(path.dirname(ledgerPath), `${rotatedSegmentStem(ledgerPath)}-${stamp}`);
+  const nameOf = (n: number) => `${base}${n > 0 ? `-${n}` : ''}.jsonl`;
+  while (safeExistsSync(nameOf(seq))) seq += 1;
+  return nameOf(seq);
 }
 
 function repoRelative(filePath: string): string {
@@ -605,15 +694,8 @@ function rotateLedgerIfDue(ledgerPath: string): void {
     if (size < threshold) return;
     const failedAt = rotationBackoff.get(ledgerPath);
     if (failedAt !== undefined && size < 2 * failedAt) return;
-    const now = ledgerRotationOptions.now?.() ?? new Date();
-    // A clock that went backward must not stamp a segment before the newest
-    // one (segment order is chain order): reuse its stamp, and
-    // rotatedSegmentPath appends the next collision suffix.
-    const newest = ledgerSegmentsOf(ledgerPath).at(-1);
-    const newestDate = newest ? segmentStampDate(newest.stamp) : undefined;
-    const segment = rotateStore(ledgerPath, {
-      now: newestDate && newestDate.getTime() > now.getTime() ? newestDate : now,
-    });
+    const segment = nextLedgerSegmentPath(ledgerPath, ledgerRotationOptions.now?.() ?? new Date());
+    safeMoveSync(ledgerPath, segment);
     rotationBackoff.delete(ledgerPath);
     if (segment) {
       logger.info(
@@ -722,7 +804,10 @@ export interface LedgerIntegrityReport {
   /**
    * The chain's oldest present file opens with a keyed segment marker instead
    * of genesis: older segments were archived away. Names the segment the
-   * marker continues from, so an operator can confirm that archive exists.
+   * marker continues from. Clean only when a keyed
+   * {@link LEDGER_SEGMENT_ARCHIVED_TYPE} receipt for that segment and its last
+   * hash is on the verified chain; otherwise a
+   * `chain_start:<file>:unproven_anchor:<segment>` finding is reported.
    */
   anchoredFrom?: string;
 }
@@ -759,6 +844,9 @@ export const verifyLedgerIntegrityDetailed = (
   let total = 0;
   let missingKey = false;
   let anchoredFrom: string | undefined;
+  let anchor: { file: string; previousLastHash: string } | undefined;
+  /** `<segment>\u0000<last_hash>` of every keyed, verified archive receipt. */
+  const receipts = new Set<string>();
   let chainStarted = false;
   let previousFile: string | undefined;
   const algTracker = createChainAlgTracker(options);
@@ -798,6 +886,7 @@ export const verifyLedgerIntegrityDetailed = (
           // (its HMAC still has to verify below).
           expectedParentHash = marker.previousLastHash;
           anchoredFrom = marker.previousSegment;
+          anchor = { file, previousLastHash: marker.previousLastHash };
         }
         chainStarted = true;
         const check = verifyLedgerEntryHash(entry, expectedParentHash, {
@@ -838,12 +927,20 @@ export const verifyLedgerIntegrityDetailed = (
               : `${label}line:${lineNumber}:${check.reason ?? 'invalid'}`
           );
         }
+        const receipt =
+          check.ok && chainAlg === 'hmac-sha256' ? archiveReceiptOf(entry) : undefined;
+        if (receipt) receipts.add(receipt);
         expectedParentHash = String(entry.hash ?? '');
       } catch (_e) {
         corrupted.push(`${label}line:${lineNumber}:parse_error`);
       }
     }
     if (!firstInFile) previousFile = file;
+  }
+  // Anchoring on a marker is legitimate only when the governed janitor
+  // archived the previous segment and said so on the chain.
+  if (anchor && anchoredFrom && !receipts.has(`${anchoredFrom}\u0000${anchor.previousLastHash}`)) {
+    corrupted.push(`chain_start:${repoRelative(anchor.file)}:unproven_anchor:${anchoredFrom}`);
   }
   return {
     ok: corrupted.length === 0,
@@ -855,6 +952,14 @@ export const verifyLedgerIntegrityDetailed = (
     ...(anchoredFrom ? { anchoredFrom } : {}),
   };
 };
+
+/** `<segment>\u0000<last_hash>` of an archive receipt entry, if `entry` is one. */
+function archiveReceiptOf(entry: Record<string, unknown>): string | undefined {
+  if (entry.type !== LEDGER_SEGMENT_ARCHIVED_TYPE) return undefined;
+  const segment = nestedString(entry.payload, 'segment');
+  const lastHash = nestedString(entry.payload, 'last_hash');
+  return segment && lastHash ? `${segment}\u0000${lastHash}` : undefined;
+}
 
 /** The continuation payload of a segment-opened marker entry, if `entry` is one. */
 function segmentMarkerOf(

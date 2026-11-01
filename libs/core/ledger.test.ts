@@ -3,11 +3,14 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   GLOBAL_LEDGER_PATH,
+  LEDGER_SEGMENT_ARCHIVED_TYPE,
   LEDGER_SEGMENT_OPENED_TYPE,
+  ledgerSegmentLastHash,
   listLedgerSegments,
   loadForScope,
   normalizeLedgerRecord,
   record,
+  recordLedgerSegmentArchived,
   setLedgerRotationOptionsForTests,
   setLedgerScanOptionsForTests,
   TENANT_LEDGER_STORE_ROLE,
@@ -467,14 +470,16 @@ describe('ledger core', () => {
       );
     });
 
-    it('verifies from the keyed marker once older segments are archived away, not from a forged start', () => {
+    it('reports an unproven anchor when the oldest segment was deleted by hand', () => {
       ['A_1', 'A_2', 'A_3'].forEach((type) => record(type, {}));
       const segments = listLedgerSegments();
       fs.rmSync(segments[0]!);
       expect(verifyLedgerIntegrityDetailed()).toMatchObject({
-        ok: true,
-        total: 4,
+        ok: false,
         anchoredFrom: path.basename(segments[0]!),
+        corrupted: [
+          `chain_start:${rel(segments[1]!)}:unproven_anchor:${path.basename(segments[0]!)}`,
+        ],
       });
 
       // Dropping the marker leaves an unanchored start: it fails, naming the file.
@@ -484,6 +489,128 @@ describe('ledger core', () => {
       const report = verifyLedgerIntegrityDetailed();
       expect(report.ok).toBe(false);
       expect(report.corrupted).toEqual([`chain_start:${rel(segments[2]!)}:parent_hash_mismatch`]);
+    });
+
+    it('reports an unproven anchor when every segment was deleted', () => {
+      ['D_1', 'D_2'].forEach((type) => record(type, {}));
+      setLedgerRotationOptionsForTests({ now: () => FIXED_NOW });
+      record('D_LIVE', {});
+      const segments = listLedgerSegments();
+      segments.forEach((segment) => fs.rmSync(segment));
+      const report = verifyLedgerIntegrityDetailed();
+      expect(report.ok).toBe(false);
+      expect(report.corrupted).toEqual([
+        `chain_start:${rel(LEDGER_FILE)}:unproven_anchor:${path.basename(segments.at(-1)!)}`,
+      ]);
+    });
+
+    it('verifies from the marker once the janitor archived the oldest segment with a receipt', () => {
+      ['R_1', 'R_2'].forEach((type) => record(type, {}));
+      setLedgerRotationOptionsForTests({ now: () => FIXED_NOW });
+      const segments = listLedgerSegments();
+      const lastHash = ledgerSegmentLastHash(segments[0]!);
+      fs.rmSync(segments[0]!);
+      recordLedgerSegmentArchived({
+        segment: segments[0]!,
+        last_hash: lastHash,
+        archive_path: `active/archive/${path.basename(segments[0]!)}`,
+      });
+      expect(readEntries(LEDGER_FILE).map((entry) => entry.type)).toEqual([
+        LEDGER_SEGMENT_OPENED_TYPE,
+        LEDGER_SEGMENT_ARCHIVED_TYPE,
+      ]);
+      expect(verifyLedgerIntegrityDetailed()).toMatchObject({
+        ok: true,
+        corrupted: [],
+        anchoredFrom: path.basename(segments[0]!),
+      });
+    });
+
+    it('rejects an archive receipt whose last hash is not the anchor', () => {
+      ['W_1', 'W_2'].forEach((type) => record(type, {}));
+      setLedgerRotationOptionsForTests({ now: () => FIXED_NOW });
+      const segments = listLedgerSegments();
+      fs.rmSync(segments[0]!);
+      recordLedgerSegmentArchived({
+        segment: segments[0]!,
+        last_hash: 'e'.repeat(64),
+        archive_path: `active/archive/${path.basename(segments[0]!)}`,
+      });
+      expect(verifyLedgerIntegrityDetailed().corrupted).toEqual([
+        `chain_start:${rel(segments[1]!)}:unproven_anchor:${path.basename(segments[0]!)}`,
+      ]);
+    });
+
+    it('refuses archive receipts for a tenant partition', () => {
+      expect(() =>
+        recordLedgerSegmentArchived(
+          { segment: 'ledger-20261102-101010.jsonl', last_hash: 'a'.repeat(64), archive_path: 'x' },
+          tenantLedgerPath('confidential', 'client-rot')
+        )
+      ).toThrow(/LEDGER_ARCHIVE_RECEIPT_REFUSED/u);
+    });
+
+    it('reports a tenant partition missing its oldest segment as an unproven anchor', () => {
+      ['TA_1', 'TA_2', 'TA_3'].forEach((type) =>
+        record(type, { tenant_slug: 'client-anchor', tier: 'confidential' })
+      );
+      const partition = tenantLedgerPath('confidential', 'client-anchor');
+      const segments = withExecutionContext(
+        TENANT_LEDGER_STORE_ROLE,
+        () => listLedgerSegments(partition),
+        undefined,
+        'client-anchor'
+      );
+      fs.rmSync(segments[0]!);
+      const tenant = verifyAllLedgerIntegrity().ledgers.find(
+        (entry) => entry.tenant_slug === 'client-anchor'
+      );
+      expect(tenant).toMatchObject({
+        ok: false,
+        corrupted: [
+          `chain_start:${rel(segments[1]!)}:unproven_anchor:${path.basename(segments[0]!)}`,
+        ],
+      });
+    });
+
+    it('never reuses a freed suffix that would sort before the newest segment', () => {
+      ['F_1', 'F_2', 'F_3'].forEach((type) => record(type, {}));
+      const before = listLedgerSegments();
+      // The `-1` name is freed (e.g. archived); the next rotation must not reuse it.
+      fs.rmSync(before[1]!);
+      record('F_4', {});
+      const names = listLedgerSegments().map((file) => path.basename(file));
+      expect(names).toEqual([
+        `system-ledger-${STAMP}.jsonl`,
+        `system-ledger-${STAMP}-2.jsonl`,
+        `system-ledger-${STAMP}-3.jsonl`,
+      ]);
+    });
+
+    it('never rotates a mission evidence ledger', () => {
+      const missionId = `MSN-LEDGER-NOROTATE-${process.pid}`;
+      const missionDir = path.join(pathResolver.rootDir(), 'active/missions/public', missionId);
+      const key = Symbol.for('kyberion.pathResolver.missionLocator');
+      const globals = globalThis as Record<symbol, unknown>;
+      const previous = globals[key];
+      fs.mkdirSync(path.join(missionDir, 'evidence'), { recursive: true });
+      pathResolver.registerMissionLocator((id) => (id === missionId ? missionDir : undefined));
+      process.env.MISSION_ROLE = 'mission_controller';
+      try {
+        ['MR_1', 'MR_2', 'MR_3'].forEach((type) => record(type, { mission_id: missionId }));
+        const missionLedger = path.join(missionDir, 'evidence/ledger.jsonl');
+        expect(readEntries(missionLedger).map((entry) => entry.type)).toEqual([
+          'MR_1',
+          'MR_2',
+          'MR_3',
+        ]);
+        expect(listLedgerSegments(missionLedger)).toEqual([]);
+        // The system ledger's metadata entries still rotate.
+        expect(listLedgerSegments()).toHaveLength(3);
+      } finally {
+        globals[key] = previous;
+        fs.rmSync(missionDir, { recursive: true, force: true });
+      }
     });
 
     it('chains from the newest segment when the live file is missing or empty after rotation', () => {

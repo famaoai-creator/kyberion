@@ -47,7 +47,11 @@ export interface AuditVerifyCliReport {
     missing?: boolean;
     /** Rotated segments verified before the live file (MSN-STORE-BOUNDS-3). */
     segments?: string[];
-    /** Oldest present file opens with a keyed segment marker: older segments were archived. */
+    /**
+     * Oldest present file opens with a keyed segment marker. Clean only with a
+     * signed LEDGER_SEGMENT_ARCHIVED receipt on the chain; otherwise an
+     * `unproven_anchor` finding is reported.
+     */
     anchoredFrom?: string;
     /** Set for a tenant ledger partition (D9). */
     tier?: string;
@@ -190,8 +194,11 @@ export function formatAuditVerifyReport(report: AuditVerifyCliReport): string[] 
         (ledger.segments?.length ? `; segments=${ledger.segments.length}` : '')
     );
     if (ledger.anchoredFrom) {
+      const unproven = ledger.corrupted.some((finding) => finding.includes(':unproven_anchor:'));
       lines.push(
-        `  - chain continues from archived segment ${ledger.anchoredFrom} (confirm it is in the archive)`
+        unproven
+          ? `  - chain starts after segment ${ledger.anchoredFrom}, which has no archive receipt on the chain (segments were removed outside the storage janitor)`
+          : `  - chain continues from archived segment ${ledger.anchoredFrom} (storage-janitor archive receipt on the chain)`
       );
     }
     if (ledger.corrupted.length > 0) {
