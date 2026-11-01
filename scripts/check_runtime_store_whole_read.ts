@@ -12,7 +12,8 @@
  * Counted shapes (TypeScript AST, so strings and comments never match):
  *   - any call of `readJsonLines(...)` (foundation/json whole-file reader) or
  *     `readJsonLinesCached(...)` (jsonl-tail whole-file cache), by bare name
- *     or as a property (`json.readJsonLines(...)`);
+ *     as a renamed import (`import { readJsonLines as rjl }`), or as a
+ *     property (`json.readJsonLines(...)`);
  *   - `<expr>.split('\n')` / `.split(/\r?\n/)` (any string or regex literal
  *     containing a newline) whose receiver expression itself contains a call
  *     of `safeReadFile` / `safeReadFileSync` / `readTextFile` / `readFileSync`
@@ -92,9 +93,25 @@ export interface WholeReadReport {
   improved: string[];
 }
 
-function calleeName(node: ts.CallExpression): string | undefined {
+/** Local name → imported name for renamed imports (`import { readJsonLines as rjl }`). */
+type ImportAliases = ReadonlyMap<string, string>;
+
+function collectImportAliases(source: ts.SourceFile): ImportAliases {
+  const aliases = new Map<string, string>();
+  for (const statement of source.statements) {
+    if (!ts.isImportDeclaration(statement)) continue;
+    const bindings = statement.importClause?.namedBindings;
+    if (!bindings || !ts.isNamedImports(bindings)) continue;
+    for (const element of bindings.elements) {
+      if (element.propertyName) aliases.set(element.name.text, element.propertyName.text);
+    }
+  }
+  return aliases;
+}
+
+function calleeName(node: ts.CallExpression, aliases: ImportAliases): string | undefined {
   const callee = node.expression;
-  if (ts.isIdentifier(callee)) return callee.text;
+  if (ts.isIdentifier(callee)) return aliases.get(callee.text) ?? callee.text;
   if (ts.isPropertyAccessExpression(callee)) return callee.name.text;
   return undefined;
 }
@@ -108,14 +125,14 @@ function isNewlineSeparator(node: ts.Expression | undefined): boolean {
   return false;
 }
 
-function containsWholeTextRead(node: ts.Node): boolean {
+function containsWholeTextRead(node: ts.Node, aliases: ImportAliases): boolean {
   if (ts.isCallExpression(node)) {
-    const name = calleeName(node);
+    const name = calleeName(node, aliases);
     if (name && WHOLE_FILE_TEXT_READERS.has(name)) return true;
   }
   // Do not descend into nested functions: `.split` must apply to this read.
   if (ts.isFunctionLike(node)) return false;
-  return ts.forEachChild(node, containsWholeTextRead) === true;
+  return ts.forEachChild(node, (child) => containsWholeTextRead(child, aliases)) === true;
 }
 
 function mentionsJsonlPath(source: ts.SourceFile): boolean {
@@ -148,6 +165,7 @@ export function findWholeStoreReads(repoRelativePath: string, text: string): Who
     repoRelativePath.endsWith('x') ? ts.ScriptKind.TSX : ts.ScriptKind.TS
   );
   const jsonlFile = mentionsJsonlPath(source);
+  const aliases = collectImportAliases(source);
   const sites: WholeReadSite[] = [];
   const record = (node: ts.Node): void => {
     const { line } = source.getLineAndCharacterOfPosition(node.getStart(source));
@@ -155,14 +173,14 @@ export function findWholeStoreReads(repoRelativePath: string, text: string): Who
   };
   const visit = (node: ts.Node): void => {
     if (ts.isCallExpression(node)) {
-      const name = calleeName(node);
+      const name = calleeName(node, aliases);
       if (name && WHOLE_FILE_JSONL_READERS.has(name)) record(node);
       else if (
         jsonlFile &&
         name === 'split' &&
         ts.isPropertyAccessExpression(node.expression) &&
         isNewlineSeparator(node.arguments[0]) &&
-        containsWholeTextRead(node.expression.expression)
+        containsWholeTextRead(node.expression.expression, aliases)
       )
         record(node);
     }

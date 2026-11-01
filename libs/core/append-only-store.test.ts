@@ -429,6 +429,39 @@ describe('append-only-store', () => {
       );
     });
 
+    it('write-time compaction without an archiveDir archives next to the store (catalog or explicit)', () => {
+      const catalog: LoadedRetentionCatalog = {
+        source: 'catalog',
+        warnings: [],
+        entries: [
+          {
+            path: repoRelativePosix(live),
+            artifact_class: 'log',
+            action: 'compact',
+            compact_key: 'id',
+            compact_min_bytes: 20,
+          } as LoadedRetentionCatalog['entries'][number],
+        ],
+      };
+      const audits: Array<Record<string, unknown>> = [];
+      const audit = (record: Record<string, unknown>) => audits.push(record);
+      for (const policy of [
+        'catalog',
+        { action: 'compact' as const, key: 'id', minBytes: 20 },
+      ] as const) {
+        resetAppendOnlyStoreMaintenanceState();
+        safeWriteFile(live, jsonl({ id: 'a', v: 1 }, { id: 'a', v: 2 }));
+        expect(maintainStoreAfterAppend(live, policy, { catalog, audit })).toBe('compacted');
+        expect(readRecords(live)).toEqual([{ id: 'a', v: 2 }]);
+        const archivePath = String(audits.at(-1)?.archive_path);
+        expect(archivePath).toContain(`${repoRelativePosix(dir)}/compaction-archive/items.`);
+        expect(archivePath).not.toContain('active/archive/');
+        // No staging copy is left behind (the archive write succeeded).
+        expect(safeReaddir(dir).filter((n) => n.includes('.compacting-'))).toEqual([]);
+      }
+      expect(safeReaddir(path.join(dir, 'compaction-archive'))).toHaveLength(2);
+    });
+
     it('never throws into the append: failures log and return "failed"', () => {
       safeWriteFile(live, jsonl({ at: 1 }, { at: 2 }));
       const exploding = {

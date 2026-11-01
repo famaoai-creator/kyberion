@@ -1,7 +1,7 @@
 {
   "version": 1,
-  "generated_at": "2026-11-01T13:54:06.676Z",
-  "total": 131,
+  "generated_at": "2026-11-01T14:22:44.368Z",
+  "total": 132,
   "files": {
     "libs/actuators/blockchain-actuator/src/index.ts": 1,
     "libs/core/action-item-store.ts": 1,
@@ -88,7 +88,7 @@
     "presence/displays/chronos-mirror-v2/src/lib/agent-message-feed.ts": 1,
     "presence/displays/chronos-mirror-v2/src/lib/intelligence-observations.ts": 1,
     "presence/displays/chronos-mirror-v2/src/lib/trace-feed.ts": 1,
-    "presence/displays/operator-surface/src/lib/intent-snapshots.ts": 2,
+    "presence/displays/operator-surface/src/lib/intent-snapshots.ts": 3,
     "satellites/discord-bridge/src/index.ts": 1,
     "satellites/telegram-bridge/src/index.ts": 1,
     "scripts/audit_mirror_reconcile.ts": 1,

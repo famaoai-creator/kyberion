@@ -616,19 +616,33 @@ export function readLastJsonLine<T = unknown>(
   return null;
 }
 
+/**
+ * Consecutive older-than-cutoff records (scanning newest first) after which
+ * {@link readJsonLinesSince} stops. One skewed-clock row must not hide older
+ * in-window rows behind it, so a single old row is skipped, not a stop.
+ */
+export const DEFAULT_SINCE_STOP_AFTER_OLDER = 64;
+
 export interface ReadJsonLinesSinceOptions<T> extends JsonlReadOptions<T> {
   /** Record time in epoch ms; undefined = unknown (the record is kept). */
   timeOf: (record: T) => number | undefined;
-  /** Stop at the first record (scanning newest first) older than this. */
+  /** Records older than this are skipped; the scan stops after a run of them. */
   sinceMs: number;
+  /**
+   * Stop after this many consecutive older records (default
+   * {@link DEFAULT_SINCE_STOP_AFTER_OLDER}). Records with unknown time neither
+   * count toward nor reset the run.
+   */
+  stopAfterOlder?: number;
   /** Optional cap on the number of records returned (the newest ones). */
   maxRecords?: number;
 }
 
 /**
  * Records newer than `sinceMs`, oldest first. Built from the backward scan;
- * stops at the first record older than `sinceMs` (stores are append-ordered
- * by time), so the cost is proportional to the window, not the file.
+ * stores are append-ordered by time, so the scan stops after
+ * `stopAfterOlder` consecutive older records and the cost is proportional to
+ * the window (plus that run), not the file. Older records are never returned.
  */
 export function readJsonLinesSince<T = unknown>(
   filePath: string,
@@ -636,9 +650,15 @@ export function readJsonLinesSince<T = unknown>(
 ): T[] {
   const out: T[] = [];
   if (options.maxRecords !== undefined && options.maxRecords <= 0) return out;
+  const stopAfter = Math.max(1, options.stopAfterOlder ?? DEFAULT_SINCE_STOP_AFTER_OLDER);
+  let olderRun = 0;
   for (const record of readJsonLinesBackward<T>(filePath, options)) {
     const t = options.timeOf(record);
-    if (t !== undefined && t < options.sinceMs) break;
+    if (t !== undefined && t < options.sinceMs) {
+      if (++olderRun >= stopAfter) break;
+      continue;
+    }
+    if (t !== undefined) olderRun = 0;
     out.push(record);
     if (options.maxRecords !== undefined && out.length >= options.maxRecords) break;
   }
