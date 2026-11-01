@@ -67,15 +67,20 @@ export interface ToolRuntimeRecord {
 export interface ToolRuntimeManagedBinaryArtifact {
   url: string;
   sha256: string;
+  /** Per-platform override of `managed_binary.relative_path` (e.g. `bin/tool.exe` on win32). */
+  relative_path?: string;
 }
 
 /**
  * A single-file upstream release installed into the tool's managed env
  * (`{managed_env_path}/{relative_path}`) instead of through a package manager.
+ * When `archive` is set the artifact payload is an archive whose entries are
+ * extracted beside `relative_path` after checksum verification.
  */
 export interface ToolRuntimeManagedBinary {
   version: string;
   relative_path: string;
+  archive?: 'tar.gz';
   artifacts: Record<string, ToolRuntimeManagedBinaryArtifact>;
 }
 
@@ -581,13 +586,18 @@ export function resolveManagedBinaryArtifact(
 }
 
 /** Target path of a tool's managed binary, or null when the tool declares none. */
-export function resolveManagedBinaryPath(toolId: string): string | null {
+export function resolveManagedBinaryPath(
+  toolId: string,
+  platform: NodeJS.Platform = process.platform,
+  arch: string = process.arch
+): string | null {
   const record = getToolRuntimeRecord(toolId);
   if (record.tool_id !== toolId || !record.managed_binary) return null;
-  return assertManagedRuntimePath(
-    resolveManagedEnvPath(record),
-    path.join(resolveManagedEnvPath(record), record.managed_binary.relative_path)
-  );
+  const managedEnvPath = resolveManagedEnvPath(record);
+  const relativePath =
+    record.managed_binary.artifacts[`${platform}-${arch}`]?.relative_path ??
+    record.managed_binary.relative_path;
+  return assertManagedRuntimePath(managedEnvPath, path.join(managedEnvPath, relativePath));
 }
 
 /** Installed managed binary path, or null when absent (callers fall back to PATH). */

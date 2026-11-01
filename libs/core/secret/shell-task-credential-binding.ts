@@ -33,7 +33,7 @@ function strings(value: unknown): Record<string, string> {
 }
 
 /** Only the current canonical claim holder may ask the configured secret service. */
-function admittedClaim(input: BindingInput): string {
+export function assertTaskCredentialClaim(input: BindingInput): string {
   const scope = assertScopeContext(input.scope, { requireTenant: true, requireMission: true });
   const identity = credentialExecutionIdentity();
   const envelope = currentScopeEnvelope();
@@ -94,11 +94,11 @@ export async function bindShellTaskCredentials(
   input: BindingInput,
   resolve: (request: Readonly<Record<string, unknown>>) => string | null
 ): Promise<TaskCredentialBinding | null> {
-  const claim = admittedClaim(input);
+  const claim = assertTaskCredentialClaim(input);
   const raw = resolve(
     Object.freeze({ version: 1, scope: input.scope, workItemId: input.workItemId })
   );
-  if (claim !== admittedClaim(input)) throw denied();
+  if (claim !== assertTaskCredentialClaim(input)) throw denied();
   if (raw === null) return null;
   if (Buffer.byteLength(raw, 'utf8') > 128 * 1024) throw denied();
   let value: unknown;

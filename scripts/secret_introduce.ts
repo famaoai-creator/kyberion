@@ -18,6 +18,7 @@ import { resolveSecretIdentity } from '@agent/core/secret/secret-identity';
 import { pathResolver } from '@agent/core/path-resolver';
 import { assertSafeRepositoryPath, safeReadFile } from '@agent/core/secure-io';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import { withSecretResolutionSession } from '@agent/core/foundation/secret-resolution-session';
 
 type Print = (value: unknown) => void;
 
@@ -136,6 +137,12 @@ async function collectSecret(flags: Record<string, string | boolean>): Promise<s
 export async function runSecretCli(
   argv: string[],
   options: { print?: Print } = {}
+): Promise<Record<string, unknown>> {
+  return withSecretResolutionSession(() => runSecretCliImpl(argv, options));
+}
+async function runSecretCliImpl(
+  argv: string[],
+  options: { print?: Print }
 ): Promise<Record<string, unknown>> {
   assertNoValueOnArgv(argv);
   const print = options.print ?? ((value) => process.stdout.write(`${String(value)}\n`));

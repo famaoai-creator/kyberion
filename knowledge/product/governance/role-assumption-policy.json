@@ -4,6 +4,8 @@
   "description": "RA-02 defense in depth for in-process role assumption. When a process runs with SYSTEM_ROLE (surface_runtime launches every surface with SYSTEM_ROLE=<surface id>; `pnpm surfaces` and `pnpm config-mission` set it for their own runtimes), withExecutionContext / withExecutionContextAsync may only assume the SYSTEM_ROLE itself, the shared core roles (narrow libs/core store-writer roles), or the roles listed for that system role here; anything else throws [ROLE_ASSUMPTION_DENIED]. A SYSTEM_ROLE without an entry may only assume itself. Processes without SYSTEM_ROLE are unaffected. Lists are backed by the call-level reachability report computed in memory by scripts/analyze_role_assumptions.ts (not committed; `--write-report` writes it to active/shared/cache/system/role-assumption/; RN-02: call sites and role-forwarding wrappers walked from each entry point, including child processes that inherit SYSTEM_ROLE) and by opt-in runtime traces (KYBERION_ROLE_ASSUMPTION_TRACE, RN-01). The same bounds apply to a delegated child role (DR-01: a child spawned with buildExecutionEnv(env, role) under an inherited SYSTEM_ROLE runs as role only when this policy lets SYSTEM_ROLE assume it; the report counts each such call as an assumption site). A grant is only removed when the report proves it unreachable and no trace observed it; the role-assumption-reachability CI gate fails when a reachable role is missing. See knowledge/product/governance/AUTHORITY_MODEL.md section 3.B2.",
   "shared_core_roles": {
     "roles": [
+      "credential_allocation_reader",
+      "credential_material_reader",
       "audit_mirror_writer",
       "autonomy_learning_store",
       "chronos_gateway",

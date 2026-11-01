@@ -259,6 +259,17 @@ describe('durable partitioned runtime state', () => {
         expect(JSON.stringify(grant)).not.toContain('runtime/customer-decision-invites');
     for (const field of ['default_allow', 'persona_permissions', 'authority_permissions'])
       expect(JSON.stringify(policy[field])).not.toContain('runtime/customer-decision-invites');
+    // Credential allocation administration and dispatch metadata access reuse
+    // the existing GrantStore. Both grants are confined to the selected tenant;
+    // the dispatch reader cannot mutate approvals or allocation records.
+    const allocationPartition = 'active/shared/runtime/grants/confidential/${KYBERION_TENANT}/';
+    expect(policy.authority_role_permissions.credential_allocation_manager).toEqual({
+      allow_read: [allocationPartition],
+      allow_write: [allocationPartition],
+    });
+    expect(policy.authority_role_permissions.credential_allocation_reader).toEqual({
+      allow_read: [allocationPartition],
+    });
     for (const store of ['hearing', 'grants', 'autonomy-learning']) {
       expect(
         policy.tenant_scope.shared_prefixes.some((prefix: string) => prefix.includes(`/${store}/`))
@@ -268,6 +279,11 @@ describe('durable partitioned runtime state', () => {
       }
       for (const [role, grant] of Object.entries(policy.authority_role_permissions)) {
         if (store === 'autonomy-learning' && role === 'autonomy_learning_store') continue;
+        if (
+          store === 'grants' &&
+          ['credential_allocation_manager', 'credential_allocation_reader'].includes(role)
+        )
+          continue;
         expect(JSON.stringify(grant)).not.toContain(`runtime/${store}`);
       }
     }

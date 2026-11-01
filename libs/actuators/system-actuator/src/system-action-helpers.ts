@@ -12,6 +12,8 @@ import {
 import {
   activateApplication,
   detectFocusedInput,
+  getFrontmostApplicationName,
+  getActiveChromeTab,
   listKnownAppCapabilities,
   listTerminalTargets,
   listChromeTabs,
@@ -28,10 +30,82 @@ import { systemFocusHelpers } from './system-focus-helpers.js';
 import { executePipeline } from './system-pipeline-helpers.js';
 import { resolveSystemClickCoordinate } from './system-mark-target.js';
 import { executeComputerAssist } from './computer-assist.js';
+import { applyInteractionOutcome, stampInteractionError } from './system-computer-outcome.js';
+import { handleAxInteraction, isAxInteraction } from './system-desktop-ax.js';
 
 /** Separation of duties: an unusable approval is treated as missing (refusal audited). */
 const isUsableComputerApproval = (request: ApprovalRequestRecord): boolean =>
   !approvalUsabilityRefusal(request, 'system_actuator_computer');
+
+/**
+ * Postcondition evidence attached to a mutating result. `matched === true`
+ * promotes the outcome to `delivered_verified`, `false` demotes it to
+ * `delivery_uncertain`; an unavailable read attaches nothing.
+ */
+interface InteractionVerification {
+  kind: 'frontmost_application' | 'active_tab' | 'tab_absence';
+  expected: string;
+  observed: string;
+  matched: boolean;
+}
+
+const sleepMs = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function verifyFrontmostApplication(
+  expected: string
+): Promise<InteractionVerification | null> {
+  const target = expected.trim();
+  if (!target) return null;
+  // `activate` is asynchronous: poll briefly for the frontmost flip.
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const observed = getFrontmostApplicationName();
+    if (!observed) return null;
+    if (observed.trim().toLowerCase() === target.toLowerCase()) {
+      return { kind: 'frontmost_application', expected: target, observed, matched: true };
+    }
+    if (attempt < 2) await sleepMs(200);
+  }
+  const observed = getFrontmostApplicationName();
+  if (!observed) return null;
+  return { kind: 'frontmost_application', expected: target, observed, matched: false };
+}
+
+function verifyActiveTab(expected: {
+  title?: string;
+  url?: string;
+  application: string;
+}): InteractionVerification | null {
+  const active = getActiveChromeTab(expected.application);
+  if (!active) return null;
+  const needle = (expected.title || expected.url || '').trim().toLowerCase();
+  if (!needle) return null;
+  const haystack = (expected.title ? active.title : active.url).toLowerCase();
+  return {
+    kind: 'active_tab',
+    expected: expected.title || expected.url || '',
+    observed: expected.title ? active.title : active.url,
+    matched: haystack.includes(needle),
+  };
+}
+
+function verifyTabAbsence(expected: {
+  title?: string;
+  url?: string;
+  application: string;
+}): InteractionVerification | null {
+  const needle = (expected.title || expected.url || '').trim().toLowerCase();
+  if (!needle) return null;
+  const tabs = listChromeTabs(expected.application);
+  const remaining = tabs.find((tab) =>
+    (expected.title ? tab.title : tab.url).toLowerCase().includes(needle)
+  );
+  return {
+    kind: 'tab_absence',
+    expected: expected.title || expected.url || '',
+    observed: remaining ? (expected.title ? remaining.title : remaining.url) : '',
+    matched: !remaining,
+  };
+}
 
 export interface SystemPipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
@@ -86,7 +160,51 @@ export interface ComputerInteractionAction {
       | 'key'
       | 'voice_input_toggle'
       | 'wait'
-      | 'llm_assist';
+      | 'llm_assist'
+      | 'ax_runtime_status'
+      | 'ax_snapshot'
+      | 'ax_find'
+      | 'ax_list_windows'
+      | 'ax_list_apps'
+      | 'ax_list_displays'
+      | 'ax_list_surfaces'
+      | 'ax_list_notifications'
+      | 'ax_click'
+      | 'ax_type'
+      | 'ax_press'
+      | 'ax_scroll'
+      | 'ax_scroll_to'
+      | 'ax_set_value'
+      | 'ax_select'
+      | 'ax_clear'
+      | 'ax_focus'
+      | 'ax_toggle'
+      | 'ax_check'
+      | 'ax_uncheck'
+      | 'ax_expand'
+      | 'ax_collapse'
+      | 'ax_right_click'
+      | 'ax_get'
+      | 'ax_is'
+      | 'ax_session_end'
+      | 'ax_session_gc'
+      | 'ax_wait'
+      | 'ax_permissions'
+      | 'ax_focus_window'
+      | 'ax_move_window'
+      | 'ax_resize_window'
+      | 'ax_minimize_window'
+      | 'ax_maximize_window'
+      | 'ax_restore_window'
+      | 'ax_open_system_surface'
+      | 'ax_launch'
+      | 'ax_close_app'
+      | 'ax_dismiss_notification'
+      | 'ax_dismiss_all_notifications'
+      | 'ax_notification_action'
+      | 'ax_clipboard_get'
+      | 'ax_clipboard_set'
+      | 'ax_clipboard_clear';
     goal?: string;
     observation?: string;
     coordinate?: { x: number; y: number };
@@ -106,6 +224,45 @@ export interface ComputerInteractionAction {
     focus_target_id?: string;
     input_strategy?: 'keystroke' | 'paste';
     timeout_ms?: number;
+    qualified_ref?: string;
+    native_id?: string;
+    window_id?: string;
+    role?: string;
+    name?: string;
+    value?: string;
+    direction?: string;
+    task_session_id?: string;
+    property?: string;
+    limit?: number;
+    surface?: string;
+    wait_for?: string;
+    wait_for_gone?: string;
+    agent_id?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    ms?: number;
+    event?: string;
+    predicate?: string;
+    action?: string;
+    count?: number;
+    menu?: boolean;
+    menu_closed?: boolean;
+    notification?: boolean;
+    index?: number;
+    expected_app?: string;
+    expected_title?: string;
+    format?: string;
+    image?: string;
+    file_urls?: string[];
+    force?: boolean;
+    activate?: boolean;
+    cdp?: boolean | number;
+    no_attach?: boolean;
+    app_args?: string[];
+    app_env?: Record<string, string>;
+    cwd?: string;
   };
 }
 
@@ -155,6 +312,14 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       metadata,
     });
   };
+
+  if (isAxInteraction(interaction.type)) {
+    return handleAxInteraction(interaction, {
+      sessionId,
+      application,
+      emitPatch,
+    });
+  }
 
   if (interaction.type === 'detect_focused_input') {
     if (application) {
@@ -314,6 +479,15 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
           title: interaction.title || '',
           matched: result.matched,
         },
+        ...(result.matched
+          ? {
+              verification:
+                verifyActiveTab({
+                  title: interaction.title || '',
+                  application: application || 'Google Chrome',
+                }) ?? undefined,
+            }
+          : {}),
       },
       total_steps: 1,
     };
@@ -343,6 +517,15 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
           url: interaction.url || interaction.title || '',
           matched: result.matched,
         },
+        ...(result.matched
+          ? {
+              verification:
+                verifyActiveTab({
+                  url: interaction.url || interaction.title || '',
+                  application: application || 'Google Chrome',
+                }) ?? undefined,
+            }
+          : {}),
       },
       total_steps: 1,
     };
@@ -460,6 +643,15 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
           title: interaction.title || '',
           matched: result.matched,
         },
+        ...(result.matched
+          ? {
+              verification:
+                verifyTabAbsence({
+                  title: interaction.title || '',
+                  application: application || 'Google Chrome',
+                }) ?? undefined,
+            }
+          : {}),
       },
       total_steps: 1,
     };
@@ -580,6 +772,15 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
           url: interaction.url || interaction.title || '',
           matched: result.matched,
         },
+        ...(result.matched
+          ? {
+              verification:
+                verifyTabAbsence({
+                  url: interaction.url || interaction.title || '',
+                  application: application || 'Google Chrome',
+                }) ?? undefined,
+            }
+          : {}),
       },
       total_steps: 1,
     };
@@ -840,7 +1041,26 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       );
   }
 
-  return executePipeline(steps, {}, { timeout_ms: interaction.timeout_ms || 60000 });
+  const pipelineResult = await executePipeline(
+    steps,
+    {},
+    {
+      timeout_ms: interaction.timeout_ms || 60000,
+    }
+  );
+  if (
+    interaction.type === 'activate_application' &&
+    (pipelineResult as Record<string, any>)?.status === 'succeeded'
+  ) {
+    const verification = await verifyFrontmostApplication(application || '');
+    if (verification) {
+      (pipelineResult as Record<string, any>).context = {
+        ...(pipelineResult as Record<string, any>).context,
+        verification,
+      };
+    }
+  }
+  return pipelineResult;
 }
 
 async function performReconcile(input: SystemAction) {
@@ -882,25 +1102,30 @@ export async function handleSystemAction(
   }
   if ((input as any).kind === 'computer_interaction') {
     const interaction = input as ComputerInteractionAction;
-    ensureDefaultOpPreflight();
-    const preflight = await runOpPreflight({
-      op: `system:computer_interaction:${interaction.action.type}`,
-      params: interaction.action as unknown as Record<string, unknown>,
-      context: {
-        ...(interaction.session_id ? { session_id: interaction.session_id } : {}),
-        ...(interaction.target ? { target: interaction.target } : {}),
-      },
-      source: 'actuator',
-    });
-    if (preflight.decision !== 'allow') {
-      throw new Error(
-        `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation system:computer_interaction:${interaction.action.type} was not admitted.`}`
-      );
+    try {
+      ensureDefaultOpPreflight();
+      const preflight = await runOpPreflight({
+        op: `system:computer_interaction:${interaction.action.type}`,
+        params: interaction.action as unknown as Record<string, unknown>,
+        context: {
+          ...(interaction.session_id ? { session_id: interaction.session_id } : {}),
+          ...(interaction.target ? { target: interaction.target } : {}),
+        },
+        source: 'actuator',
+      });
+      if (preflight.decision !== 'allow') {
+        throw new Error(
+          `[OP_PREFLIGHT_${preflight.decision.toUpperCase()}] ${preflight.reason || `Operation system:computer_interaction:${interaction.action.type} was not admitted.`}`
+        );
+      }
+      const result = await handleComputerInteraction({
+        ...interaction,
+        action: { ...interaction.action, ...preflight.input },
+      });
+      return applyInteractionOutcome(result, interaction.action.type);
+    } catch (error) {
+      throw stampInteractionError(error, interaction.action.type);
     }
-    return await handleComputerInteraction({
-      ...interaction,
-      action: { ...interaction.action, ...preflight.input },
-    });
   }
   if ((input as SystemAction).action === 'reconcile') {
     const systemInput = input as SystemAction;

@@ -1,7 +1,147 @@
+import {
+  dispositionFor,
+  stampOutcome,
+  type ComputerInteractionOutcome,
+} from '@agent/core/computer-interaction-outcome';
+
 export interface PipelineStep {
   type: 'capture' | 'transform' | 'apply' | 'control';
   op: string;
   params: any;
+}
+
+const MUTATING_INTERACTION_TYPES = new Set([
+  'left_click',
+  'double_click',
+  'right_click',
+  'mouse_move',
+  'left_mouse_down',
+  'left_mouse_up',
+  'drag',
+  'scroll',
+  'type',
+  'key',
+  'click_ref',
+  'fill_ref',
+  'fill_secret_ref',
+  'press_ref',
+  'click_if_present',
+  'open_tab',
+  'select_tab',
+  'llm_assist',
+]);
+
+const STALE_REF_OUTCOME: ComputerInteractionOutcome = {
+  code: 'STALE_REF',
+  disposition: dispositionFor('not_delivered'),
+  recovery: {
+    strategy: 'snapshot_then_retry_with_fresh_ref',
+    retryable: true,
+    requires_fresh_observation: true,
+  },
+};
+
+function failureText(result: unknown): string {
+  const record = result as Record<string, any>;
+  const parts: string[] = [];
+  if (typeof record?.error === 'string') parts.push(record.error);
+  if (Array.isArray(record?.results)) {
+    for (const step of record.results) {
+      if (step && typeof step.error === 'string') parts.push(step.error);
+    }
+  }
+  return parts.join('\n');
+}
+
+function classifyBrowserOutcome(message: string, actionType?: string): ComputerInteractionOutcome {
+  if (message.includes('Unknown browser ref')) return STALE_REF_OUTCOME;
+  // Chrome-extension recorded-target resolutions (recorded-ref-resolver.ts):
+  // corroboration failure is a fail-closed identity refusal, unresolved is a
+  // stale target, and multi-match is ambiguous — never flatten to ACTION_FAILED.
+  if (/Refusing to resolve recorded ref/i.test(message)) {
+    return {
+      code: 'TARGET_MISMATCH',
+      disposition: dispositionFor('not_delivered'),
+      recovery: {
+        strategy: 're_record_or_reapprove_target',
+        retryable: false,
+        requires_fresh_observation: true,
+      },
+    };
+  }
+  if (/matched \d+ elements on the live page/i.test(message)) {
+    return {
+      code: 'AMBIGUOUS_TARGET',
+      disposition: dispositionFor('not_delivered'),
+      recovery: {
+        strategy: 'narrow_target_or_fresh_observation',
+        retryable: true,
+        requires_fresh_observation: true,
+      },
+    };
+  }
+  if (/Could not resolve recorded ref/i.test(message)) {
+    return {
+      code: 'STALE_REF',
+      disposition: dispositionFor('not_delivered'),
+      recovery: {
+        strategy: 're_observe_then_retry',
+        retryable: true,
+        requires_fresh_observation: true,
+      },
+    };
+  }
+  if (/refusing snapshot\+@eN stand-in/i.test(message)) {
+    return { code: 'POLICY_DENIED', disposition: dispositionFor('not_delivered') };
+  }
+  if (/timed out|timeout/i.test(message)) {
+    return { code: 'TIMEOUT', disposition: dispositionFor('unknown') };
+  }
+  if (/requires|required|Unsupported computer interaction/i.test(message)) {
+    return { code: 'INVALID_ARGS', disposition: dispositionFor('not_delivered') };
+  }
+  return {
+    code: 'ACTION_FAILED',
+    disposition: dispositionFor(
+      actionType && MUTATING_INTERACTION_TYPES.has(actionType) ? 'unknown' : 'not_delivered'
+    ),
+  };
+}
+
+export function applyBrowserInteractionOutcome<T>(result: T, actionType?: string): T {
+  if (!result || typeof result !== 'object') return result;
+  const record = result as Record<string, any>;
+  const status = record.status;
+  if (status === 'denied' || status === 'blocked') {
+    return stampOutcome(record, {
+      code: 'POLICY_DENIED',
+      disposition: dispositionFor('not_delivered'),
+    }) as T;
+  }
+  if (status === 'failed') {
+    return stampOutcome(record, classifyBrowserOutcome(failureText(record), actionType)) as T;
+  }
+  if (status === 'succeeded' && actionType && MUTATING_INTERACTION_TYPES.has(actionType)) {
+    // Postcondition readbacks (e.g. fill value echo) land on the action-trail
+    // entry: verified promotes to delivered_verified, contradicted demotes.
+    const trail = Array.isArray(record.context?.action_trail) ? record.context.action_trail : [];
+    const lastAction = trail.length ? trail[trail.length - 1] : undefined;
+    const delivery =
+      lastAction?.verified === true
+        ? 'delivered_verified'
+        : lastAction?.verified === false
+          ? 'delivery_uncertain'
+          : 'delivered_unverified';
+    return stampOutcome(record, { disposition: dispositionFor(delivery) }) as T;
+  }
+  return result;
+}
+
+export function stampBrowserInteractionError<T>(error: T, actionType?: string): T {
+  if (error instanceof Error) {
+    stampOutcome(error, classifyBrowserOutcome(error.message || String(error), actionType));
+  }
+  return error;
 }
 
 /**
@@ -513,13 +653,19 @@ export function createBrowserInteractionHelpers(deps: {
   }
 
   async function handleComputerInteraction(input: ComputerInteractionAction) {
-    const browserAction = translateComputerInteractionToBrowserAction(input);
-    const result = await deps.executePipeline(
-      browserAction.steps || [],
-      browserAction.session_id || 'default',
-      browserAction.options || {},
-      browserAction.context || {}
-    );
+    let result: any;
+    let browserAction: BrowserAction;
+    try {
+      browserAction = translateComputerInteractionToBrowserAction(input);
+      result = await deps.executePipeline(
+        browserAction.steps || [],
+        browserAction.session_id || 'default',
+        browserAction.options || {},
+        browserAction.context || {}
+      );
+    } catch (error) {
+      throw stampBrowserInteractionError(error, input.action?.type);
+    }
     const ctx = (result as any).context || {};
     deps.emitComputerSurfacePatch({
       sessionId: ctx.session_id || browserAction.session_id || 'default',
@@ -531,7 +677,7 @@ export function createBrowserInteractionHelpers(deps: {
       screenshotPath: typeof ctx.last_screenshot === 'string' ? ctx.last_screenshot : undefined,
       actionCount: Array.isArray(ctx.action_trail) ? ctx.action_trail.length : undefined,
     });
-    return result;
+    return applyBrowserInteractionOutcome(result, input.action?.type);
   }
 
   return {
