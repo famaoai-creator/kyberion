@@ -3,6 +3,7 @@
   "providers": [
     {
       "mode": "nemotron-api",
+      "api_proof": { "protocol": "chat-completions", "base_url": "https://integrate.api.nvidia.com/v1", "runtime_url_env": "KYBERION_NEMOTRON_URL" },
       "provider": "nemotron",
       "module": "./reasoning/reasoning-openai-compatible-provider",
       "capabilities": {

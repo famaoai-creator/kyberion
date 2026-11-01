@@ -3474,6 +3474,19 @@
       "native_help": true
     },
     {
+      "id": "script.reasoning.credentials",
+      "module": "scripts/reasoning_credentials.ts",
+      "command": "reasoning credentials",
+      "noun": "reasoning",
+      "verb": "credentials",
+      "audience": "operator",
+      "description": "cli_cmd_script_reasoning_credentials",
+      "group": "start",
+      "interactive": true,
+      "native_help": true,
+      "effect": "state_change"
+    },
+    {
       "id": "script.reasoning.setup",
       "script": "reasoning:setup",
       "command": "reasoning setup",
