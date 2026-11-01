@@ -107,9 +107,10 @@ describe('generate_op_registry discovery output', () => {
     const operations = discovery.actuators.flatMap((entry) => entry.ops || []);
     // Ratchet count regenerated via `pnpm generate:op-registry` against the
     // ops actually registered on disk; update this when an actuator contract
-    // intentionally adds or removes operations. 654 combines the thirteen
-    // mobile interactive/mirror ops with the four Apple Intelligence ops.
-    expect(operations).toHaveLength(654);
+    // intentionally adds or removes operations. 657 combines the thirteen
+    // mobile interactive/mirror ops with the four Apple Intelligence ops and
+    // the three browser watchdog/cdp ops.
+    expect(operations).toHaveLength(657);
     expect(operations.every((item) => item.input_schema)).toBe(true);
     expect(operations.every((item) => Array.isArray(item.examples))).toBe(true);
     expect(
