@@ -63,6 +63,7 @@ export const RUNTIME_STATE_PATHS = {
   'memory.tenantRoot': 'active/shared/runtime/tenants',
   'organization.projectsRoot': 'active/shared/runtime/projects',
   'quota.tenantBuckets': 'active/shared/runtime/tenant-rate-limit-state.json',
+  'desktopAx.agentDesktopHome': 'active/shared/runtime/system/agent-desktop',
 } as const;
 
 export type RuntimeStateKey = keyof typeof RUNTIME_STATE_PATHS;
