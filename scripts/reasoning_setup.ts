@@ -19,6 +19,7 @@ import {
 // libs/core/reasoning/reasoning-backend-policy.ts (allowed_modes) — keep them aligned
 // with that policy, docs/INITIALIZATION.md, and AGENTS.md §2 (LC-04c).
 const REASONING_SETUP_GUIDANCE = [
+  '  - API credentials: `pnpm kyberion reasoning credentials register --provider <provider> [--model <model>] --activate`; list providers with `--help` and verify with `verify --model <model> --allow-paid`',
   'Reasoning backend is required for real work. Configure one of:',
   '  - Claude CLI: authenticate `claude` (Claude Code), then set `KYBERION_REASONING_BACKEND=claude-cli`',
   '    Pitfall (LC-03): if `claude` prints "claude native binary not installed", the pnpm placeholder shim in node_modules/.bin is shadowing your real CLI.',

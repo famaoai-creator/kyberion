@@ -93,6 +93,7 @@ Every governed `kyberion` command and `pnpm` script, generated from the command 
 | `pnpm kyberion onboarding context`     | `pnpm onboarding:context` | Resolve tenant and organization context for onboarding                                         |
 | `pnpm kyberion onboarding nhi-session` |                           | Request, apply, list and revoke human-approved NHI session admissions                          |
 | `pnpm kyberion provider-cli setup`     | `pnpm provider-cli:setup` | Install or inspect managed provider CLIs                                                       |
+| `pnpm kyberion reasoning credentials`  |                           | Register and verify reasoning API credentials — **[state change]**                             |
 | `pnpm kyberion reasoning setup`        | `pnpm reasoning:setup`    | Set up a reasoning backend — **[state change]**                                                |
 | `pnpm kyberion service setup`          | `pnpm service:setup`      | Set up external service connections — **[state change]**                                       |
 | `pnpm kyberion setup`                  |                           | Set up one area (onboarding, reasoning, env, services, tools, voice, ...) — **[state change]** |

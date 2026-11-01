@@ -3,6 +3,7 @@
   "providers": [
     {
       "mode": "openrouter",
+      "api_proof": { "protocol": "openrouter-chat", "base_url": "https://openrouter.ai/api/v1", "default_model": "openrouter/free" },
       "provider": "openrouter",
       "module": "./reasoning/reasoning-api-provider",
       "capabilities": {

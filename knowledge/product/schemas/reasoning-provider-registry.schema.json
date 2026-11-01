@@ -78,6 +78,7 @@
               "claude-agent-sdk",
               "provider-cli",
               "anthropic-api",
+              "openai-responses",
               "gemini-api",
               "grok-api",
               "openrouter-api",
@@ -145,6 +146,21 @@
             "description": "Provider id declared in provider-egress-policy.json.",
             "type": "string",
             "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
+          "api_proof": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["protocol", "base_url"],
+            "properties": {
+              "protocol": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+              "base_url": { "type": "string", "pattern": "^https://[^?#]+$" },
+              "default_model": {
+                "type": "string",
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,159}$"
+              },
+              "default_model_role": { "enum": ["anthropic-default", "gemini-default"] },
+              "runtime_url_env": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }
+            }
           },
           "model_env_keys": {
             "description": "Registered env vars that override the model for this mode, highest precedence first.",
