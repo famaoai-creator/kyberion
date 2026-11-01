@@ -124,9 +124,12 @@ export function isVoiceSttBackendAvailable(
 ): boolean {
   if (backend === 'auto') return true;
   const adapter = resolveVoiceSttAdapter(backend);
-  if (adapter.adapter_id === 'speech_to_text_bridge') return true;
+  // Declared availability probes win over the generic speech-to-text-bridge
+  // catch-all so managed binaries (e.g. speech_cpp) stay needs_setup until installed.
   const availabilityKey = adapter.availability_key;
-  return availabilityKey ? availability[availabilityKey] === true : false;
+  if (availabilityKey) return availability[availabilityKey] === true;
+  if (adapter.adapter_id === 'speech_to_text_bridge') return true;
+  return false;
 }
 
 /**
@@ -209,8 +212,8 @@ export function resolveVoiceSttBackendOrder(
   const preference = (
     explicitPreference ||
     (process.platform === 'win32'
-      ? 'server,faster_whisper,whisper_cpp,native_speech'
-      : 'server,fluid_audio,mlx_whisper,whisper_cpp,native_speech')
+      ? 'server,faster_whisper,speech_cpp,whisper_cpp,native_speech'
+      : 'server,fluid_audio,mlx_whisper,speech_cpp,whisper_cpp,native_speech')
   )
     .split(',')
     .map((item) => parseVoiceSttBackend(item))

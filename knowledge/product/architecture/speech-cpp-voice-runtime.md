@@ -48,6 +48,14 @@ This is a cross-platform alternative to the MLX Python bridges
 replacement; pick by platform and privacy/latency purpose on
 `voice-tts-engine`.
 
+Selection surfaces (so operators can actually pick it):
+
+- `voice-tts-engine` seam + `voice-engines/speech_cpp.json`
+- `speech-to-text-bridge` and `voice-hub-stt` seam providers
+- voice-hub `auto` preference includes `speech_cpp` when the binary is installed
+- preferences schema allows persisting `stt_backend=speech_cpp`
+- loopback / `verify_tts_loopback`: `stt_bridge_id=speech_cpp` (buffers PCM → one `speech asr`)
+
 ## HTTP / voice-hub
 
 ```bash
