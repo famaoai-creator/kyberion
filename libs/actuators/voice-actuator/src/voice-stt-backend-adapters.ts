@@ -30,6 +30,9 @@ export function registerVoiceLoopbackSttAdapter(
   if (bridgeId === 'faster_whisper') {
     registerStreamingSttBridge(bridgeId, () => createFasterWhisperBridge(options));
   }
+  if (bridgeId === 'speech_cpp') {
+    registerStreamingSttBridge(bridgeId, () => createSpeechCppBridge(options));
+  }
 }
 
 function createFasterWhisperBridge(
@@ -77,6 +80,46 @@ function createFasterWhisperBridge(
           );
         }
         const text = response.text.trim();
+        if (text) {
+          yield {
+            utterance_id: `${options.request_id}-final`,
+            is_final: true,
+            text,
+            emitted_at: nowIso(),
+          };
+        }
+      } finally {
+        safeRmSync(audioPath, { force: true });
+      }
+    },
+  };
+}
+
+function createSpeechCppBridge(
+  options: VoiceLoopbackSttAdapterOptions
+): StreamingSpeechToTextBridge {
+  return {
+    bridge_id: 'speech_cpp',
+    async *transcribeStream(audio) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of audio) {
+        assertLoopbackFormat(chunk);
+        chunks.push(Buffer.from(chunk.payload));
+      }
+      if (chunks.length === 0) return;
+
+      const audioPath = pathResolver.sharedTmp(
+        `voice-loopback/${options.request_id}.speech-cpp.wav`
+      );
+      safeMkdir(path.dirname(audioPath), { recursive: true });
+      try {
+        safeWriteFile(audioPath, pcmToWav(Buffer.concat(chunks), 16_000));
+        const { transcribeSpeechCppCli } = await import('@agent/core/voice/speech-cpp-client');
+        const result = transcribeSpeechCppCli({
+          audioPath,
+          language: options.language,
+        });
+        const text = result.text.trim();
         if (text) {
           yield {
             utterance_id: `${options.request_id}-final`,
