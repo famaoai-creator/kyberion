@@ -36,6 +36,7 @@ import {
 } from './browser-pipeline-helpers.js';
 import { opControl } from './browser-control-helpers.js';
 import { browserRuntimeHelpers } from './browser-runtime-helpers.js';
+import { createBrowserWatchdog } from './browser-watchdog.js';
 import { countBrowserExternalEffects } from './browser-external-governance.js';
 import { runBrowserAssist } from './browser-assist.js';
 
@@ -66,6 +67,7 @@ describe('browser external governance', () => {
       context: { newPage: vi.fn() },
       pageIds: new WeakMap(),
       cdpSessions: new WeakMap(),
+      watchdog: createBrowserWatchdog(),
       consoleEvents: [],
       networkEvents: [],
       navigationPolicy: { allowed_origins: ['https://example.com'] },

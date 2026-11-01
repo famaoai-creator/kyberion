@@ -208,6 +208,54 @@ const INPUT_CONTRACTS: ContractCatalog = {
         additionalProperties: true,
       },
     },
+    watchdog_events: {
+      summary: 'Read bounded browser side-effect events recorded by the session watchdogs.',
+      examples: [{ kind: 'dialog', limit: 10 }],
+      schema: {
+        type: 'object',
+        properties: {
+          kind: {
+            type: 'string',
+            enum: ['dialog', 'download', 'crash', 'popup', 'navigation', 'close'],
+          },
+          limit: { type: 'integer', minimum: 1, maximum: 200 },
+          export_as: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+      accesses: [],
+    },
+    cdp: {
+      summary:
+        'Send a page-scoped raw CDP method (DOM/DOMSnapshot/Accessibility/…) as a governed escape lane.',
+      examples: [{ method: 'DOMSnapshot.captureSnapshot', params: { computedStyles: [] } }],
+      schema: {
+        type: 'object',
+        required: ['method'],
+        properties: {
+          method: { type: 'string', minLength: 1, pattern: '^[A-Za-z]+\\.[A-Za-z]+$' },
+          params: { type: 'object' },
+          timeout_ms: { type: 'number', minimum: 1, maximum: 60000 },
+          export_as: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+      accesses: [],
+    },
+    dialog_policy: {
+      summary: 'Set how unattached JS dialogs are settled (accept preserves the prior default).',
+      examples: [{ policy: 'dismiss' }],
+      schema: {
+        type: 'object',
+        required: ['policy'],
+        properties: {
+          policy: { type: 'string', enum: ['accept', 'dismiss'] },
+          export_as: { type: 'string' },
+        },
+        additionalProperties: false,
+      },
+      accesses: [],
+    },
     scroll_ref: {
       summary: 'Scroll a captured browser ref into view.',
       examples: [{ ref: '@e1' }],

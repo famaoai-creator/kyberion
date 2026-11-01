@@ -42,6 +42,7 @@ import './browser-automation-runtime-playwright.js';
 import './browser-automation-runtime-lightpanda.js';
 import { completeBrowserOperatorApproval } from './browser-approval-records.js';
 import { parseChromeCdpVersionResponse } from './browser-cdp-response.js';
+import { summarizeWatchdog } from './browser-watchdog.js';
 import {
   assertBrowserSessionOwner,
   assertPersistedBrowserSessionOwner,
@@ -174,6 +175,11 @@ function browserSessionArtifactPath(directory: string, sessionId: string, suffix
 function getActivePage(runtime: BrowserRuntime): Page {
   const page = runtime.tabs.get(runtime.activeTabId);
   if (!page) throw new Error(`Active browser tab not found: ${runtime.activeTabId}`);
+  if (runtime.watchdog.crashed_tab_ids.includes(runtime.activeTabId)) {
+    throw new Error(
+      `[BROWSER_TAB_CRASHED] active tab ${runtime.activeTabId} crashed; open a new tab or select_tab before continuing`
+    );
+  }
   return page;
 }
 
@@ -188,6 +194,7 @@ const BROWSER_RUNTIME_CAPABILITY_KEYS = [
   'webauthn',
   'persistent_profile',
   'attach_existing_browser',
+  'raw_cdp',
 ] as const;
 
 function resolveValidatedBrowserRuntime(preference?: string): BrowserAutomationRuntimeBridge {
@@ -591,6 +598,7 @@ async function getSessionHealth(sessionId: string, runtime: BrowserRuntime, trai
     active_tab_closed: page?.isClosed?.() ?? true,
     console_event_count: runtime.consoleEvents.length,
     network_event_count: runtime.networkEvents.length,
+    watchdog: summarizeWatchdog(runtime.watchdog),
     action_trail_count: Array.isArray(trail) ? trail.length : 0,
     last_action_at: last?.ts,
     cdp_url: lease?.cdpUrl,
