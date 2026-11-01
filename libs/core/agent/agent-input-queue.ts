@@ -511,6 +511,11 @@ export class AgentInputQueue {
     const size = jsonlFileSize(this.queuePath);
     const floor = Math.max(minBytes, 2 * (lastCompactedQueueSize.get(this.queuePath) ?? 0));
     if (size < floor) return;
+    // A parked copy (kept by a failed rewrite, or another compaction in
+    // flight) holds records the live file lacks, but the rewrite only sees
+    // the live file: it could drop one half of a pair whose other half lives
+    // in the copy. Skip until the copy is recovered or cleaned up.
+    if (parkedCompactionCopies(this.queuePath).length > 0) return;
     const horizonMs = queueTuning.terminalHorizonMs ?? AGENT_INPUT_QUEUE_TERMINAL_HORIZON_MS;
     const now = queueTuning.now?.() ?? new Date();
     const droppable = terminalEntryIdsBefore(

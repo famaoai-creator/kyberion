@@ -1743,6 +1743,44 @@ describe('dot wake usage attribution', () => {
       expect(safeReaddir(dir).filter((f) => f.includes('.compacting-'))).toEqual([]);
     });
 
+    it('keeps consumed keys visible to readers while the ledger is parked', () => {
+      safeWriteFile(
+        ledgerPath,
+        [row('repo-guardian', 'wake:k1', 'failed'), row('repo-guardian', 'wake:k1', 'delivered')]
+          .join('\n')
+          .concat('\n')
+      );
+      const consumedNow = () =>
+        readDotWakeLedger({ rootDir: TEST_ROOT })
+          .filter((r) => r.outcome === 'delivered' && r.trigger_retained !== true)
+          .map((r) => `${r.dot_id}:${r.trigger_key}`);
+      expect(consumedNow()).toEqual(['repo-guardian:wake:k1']); // primes the cache
+      const seen: Array<{ consumed: string[]; rows: number }> = [];
+      setAppendOnlyStoreTestHooks({
+        beforeWriteSurvivors: () => {
+          if (seen.length === 0) {
+            // Another process's writer recreates the live ledger mid-compaction.
+            secureIo.safeAppendFileSync(
+              ledgerPath,
+              row('repo-guardian', 'wake:k2', 'failed') + '\n'
+            );
+          }
+          const rows = readDotWakeLedger({ rootDir: TEST_ROOT });
+          seen.push({ consumed: consumedNow(), rows: rows.length });
+        },
+      });
+      try {
+        expect(compactDotWakeLedger({ rootDir: TEST_ROOT, compactMinBytes: 1 }).compacted).toBe(
+          true
+        );
+      } finally {
+        setAppendOnlyStoreTestHooks({});
+      }
+      // The parked history (k1 consumed) plus the recreated live row, no duplicates.
+      expect(seen[0]).toEqual({ consumed: ['repo-guardian:wake:k1'], rows: 3 });
+      expect(consumedNow()).toEqual(['repo-guardian:wake:k1']);
+    });
+
     it('skips below the byte threshold and tolerates a missing file', () => {
       safeRmSync(ledgerPath, { force: true });
       expect(compactDotWakeLedger({ rootDir: TEST_ROOT }).compacted).toBe(false);

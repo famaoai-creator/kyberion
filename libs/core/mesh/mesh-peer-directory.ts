@@ -1,12 +1,12 @@
 import { loadPeerNetworkCatalog, type PeerNetworkPeerRecord } from './peer-messaging.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { streamJsonLines } from '../jsonl-read.js';
+import { parkedCompactionCopies } from '../jsonl-parked-read.js';
 import { maintainStoreAfterAppend, type MaintainStoreOutcome } from '../append-only-store.js';
 import { withExecutionContext } from '../authority.js';
 import { normalizeIso } from '../foundation/time.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
-import * as nodePath from 'node:path';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from '../secure-io.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import type {
@@ -130,31 +130,6 @@ function isMissing(err: unknown): boolean {
   return (err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
 }
 
-const PARKED_COPY_ORDER = /^\d+-(\d+)-/u;
-
-/**
- * Parked copies of a store a compaction is rewriting
- * (`<name>.compacting-<pid>-<n>-<tag>`), in park order. Between the park and
- * the publish the live file does not exist; together these hold every record
- * it had, so a reader in that window still sees the latest state.
- */
-function parkedCopies(safePath: string): string[] {
-  const dir = nodePath.dirname(safePath);
-  const prefix = `${nodePath.basename(safePath)}.compacting-`;
-  let names: string[];
-  try {
-    names = safeReaddir(dir);
-  } catch {
-    return [];
-  }
-  const order = (name: string): number =>
-    Number(name.slice(prefix.length).match(PARKED_COPY_ORDER)?.[1] ?? 0);
-  return names
-    .filter((name) => name.startsWith(prefix))
-    .sort((a, b) => order(a) - order(b))
-    .map((name) => nodePath.join(dir, name));
-}
-
 /**
  * Streams records (constant memory, no size cap); validates the path before
  * the first read. Each scan holds one inode, so a write-time compaction that
@@ -178,7 +153,7 @@ function readJsonlRecords<T>(logicalPath: string): Iterable<T> {
   } catch (err) {
     if (!isMissing(err)) throw err;
   }
-  if (!present && parkedCopies(safePath).length === 0) return [];
+  if (!present && parkedCompactionCopies(safePath).length === 0) return [];
   return (function* (): Generator<T> {
     let emitted = false;
     if (present) {
@@ -189,7 +164,7 @@ function readJsonlRecords<T>(logicalPath: string): Iterable<T> {
       // Parked between the existence check and the open: read the copies.
       if (emitted || safeExistsSync(safePath)) return;
     }
-    for (const copy of parkedCopies(safePath)) {
+    for (const copy of parkedCompactionCopies(safePath)) {
       for (const record of streamJsonLines<T>(copy, options)) {
         emitted = true;
         yield record;
