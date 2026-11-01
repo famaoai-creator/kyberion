@@ -14838,6 +14838,11 @@
         "ja": "この操作ができるのは、責任者か代理責任者だけです。",
         "qps-ploc": "⟦Őñŀẏ ŧħė ȧƈƈőůñŧȧƀŀė ṗėřşőñ őř ȧ ḓėṗůŧẏ ƈȧñ ḓő ŧħïş. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
+      "setup.charter_processors_invalid": {
+        "en": "Enter valid processor IDs and purposes (up to 20 each), and supported data categories. Fill all three fields together, or leave all three blank.",
+        "ja": "プロバイダーID・処理目的（各20件まで）と情報区分を確認してください。3項目をセットで指定するか、すべて空欄にしてください。",
+        "qps-ploc": "⟦Ėñŧėř ṽȧŀïḓ ṗřőƈėşşőř ÏḒş ȧñḓ ṗůřṗőşėş (ůṗ ŧő 20 ėȧƈħ), ȧñḓ şůṗṗőřŧėḓ ḓȧŧȧ ƈȧŧėɠőřïėş. Ƒïŀŀ ȧŀŀ ŧħřėė ƒïėŀḓş ŧőɠėŧħėř, őř ŀėȧṽė ȧŀŀ ŧħřėė ƀŀȧñķ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+      },
       "setup.charter_err_generic": {
         "en": "Could not save: {detail}",
         "ja": "保存できませんでした: {detail}",

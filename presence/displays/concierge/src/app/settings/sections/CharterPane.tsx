@@ -524,7 +524,11 @@ export function CharterPane({ t }: { t: SettingsTranslate }) {
               )}
             </div>
             {!check.ok ? (
-              <p role="status">{t('setup.charter_err_generic', { detail: check.reason })}</p>
+              <p role="status">
+                {check.reason === 'processor'
+                  ? t('setup.charter_processors_invalid')
+                  : t('setup.charter_err_generic', { detail: check.reason })}
+              </p>
             ) : null}
             {preview ? (
               <div className="charter-statement settings-row-block">
