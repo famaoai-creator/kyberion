@@ -29,8 +29,9 @@ vi.mock('../secure-io.js', async () => {
     },
     safeExistsSync: (p: string) => actualFs.existsSync(p),
     safeReaddir: (p: string) => actualFs.readdirSync(p),
-    safeMkdir: (p: string, opts: any) => actualFs.mkdirSync(p, opts),
-    safeReadFile: (p: string, opts: any) => actualFs.readFileSync(p, opts),
+    safeMkdir: (p: string, opts?: { recursive?: boolean }) => actualFs.mkdirSync(p, opts),
+    safeReadFile: (p: string, opts?: { encoding?: BufferEncoding | null }) =>
+      actualFs.readFileSync(p, opts?.encoding === undefined ? 'utf8' : opts.encoding),
     safeCreateExclusiveFileSync: (p: string, data: string) => {
       actualFs.mkdirSync(path.dirname(p), { recursive: true });
       actualFs.writeFileSync(p, data, { flag: 'wx' });
@@ -38,8 +39,8 @@ vi.mock('../secure-io.js', async () => {
     safeUnlinkSync: (p: string) => {
       try {
         actualFs.unlinkSync(p);
-      } catch (error: any) {
-        if (error?.code !== 'ENOENT') throw error;
+      } catch (error: unknown) {
+        if ((error as NodeJS.ErrnoException)?.code !== 'ENOENT') throw error;
       }
     },
     safeWriteFile: (p: string, data: string) => {
@@ -124,7 +125,7 @@ const readEntries = (date: string): AuditEntry[] =>
 async function freshChain(at: Date, io: AuditChainIo) {
   vi.setSystemTime(at);
   vi.resetModules();
-  delete (globalThis as any)[GLOBAL_KEY];
+  delete (globalThis as Record<symbol, unknown>)[GLOBAL_KEY];
   const mod = await import('./audit-chain.js');
   mod.setAuditChainScanOptionsForTests({ chunkBytes: 64 });
   const restore = mod.registerAuditChainIo(io);
@@ -148,7 +149,7 @@ describe('audit-chain — size-independent append and seed', () => {
       delete process.env[key];
     }
     vi.useFakeTimers();
-    delete (globalThis as any)[GLOBAL_KEY];
+    delete (globalThis as Record<symbol, unknown>)[GLOBAL_KEY];
   });
 
   afterEach(() => {
@@ -157,7 +158,7 @@ describe('audit-chain — size-independent append and seed', () => {
       else process.env[key] = value;
     }
     fs.rmSync(testRoot, { recursive: true, force: true });
-    delete (globalThis as any)[GLOBAL_KEY];
+    delete (globalThis as Record<symbol, unknown>)[GLOBAL_KEY];
     vi.useRealTimers();
   });
 

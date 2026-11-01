@@ -13,6 +13,7 @@ const allowedCoreFsImports = [
   'libs/core/reasoning/reasoning-failover.test.ts',
   'libs/core/reconcile-ops.test.ts',
   'libs/core/review-reentry.test.ts',
+  'libs/core/governance/audit-chain-store-bounds.test.ts',
   'libs/core/governance/audit-chain-tenant.test.ts',
   // Mock-loader fixtures that read tmp-dir JSON outside the project root (secure-io denies it).
   'libs/core/governance/policy-engine.test.ts',
