@@ -31,7 +31,8 @@ import { safeExistsSync } from '../secure-io.js';
 
 /** Compact only when the ledger is large — hot sweeps stat once and skip. */
 export const DOT_WAKE_LEDGER_COMPACT_MIN_BYTES = 8 * 1024 * 1024;
-const DOT_LEDGER_COMPACT_LOCK = 'dot-wake-ledger-compact';
+/** Lock the wake-ledger compaction runs under (compaction-copy recovery takes it too). */
+export const DOT_LEDGER_COMPACT_LOCK = 'dot-wake-ledger-compact';
 const logger = createLogger('dot-wake-ledger-compaction');
 
 export interface DotWakeLedgerCompactionResult {

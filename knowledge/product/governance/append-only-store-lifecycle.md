@@ -94,8 +94,18 @@ the live file passes `LEDGER_SEGMENT_ROTATE_BYTES`: the live file becomes
 streams every segment, then live; findings name the segment
 (`segment_boundary:<segment>:parent_hash_mismatch:after:<previous>`,
 `segment_boundary:<segment>:marker_names:<name>`, `chain_start:<file>:parent_hash_mismatch`).
-Archive segments oldest first only — removing one from the middle breaks verification —
-and declare the live file `self_managed` so nothing else rotates it.
+The janitor archives system-ledger segments in chain order, oldest first, stops at the
+first unexpired one, never moves the newest, and appends a signed `LEDGER_SEGMENT_ARCHIVED`
+receipt for each; verification accepts a chain starting at a segment-opened marker only
+with a matching receipt (`chain_start:<file>:unproven_anchor:<segment>` otherwise), so
+deleting the oldest segments is detected. Tenant segments are never archived by code, and
+mission evidence ledgers do not rotate. Declare the live file `self_managed` so nothing
+else rotates it.
+
+**Locks.** Janitor rotation and compaction take the store lock (`appendOnlyStoreLockId`)
+and skip a busy store until the next sweep; compaction-copy recovery also takes the
+writer's own compaction lock where one exists (dot wake ledger, agent-input-queue,
+work-coordination), so no two rewrites of one store interleave.
 
 ## Narrow store capabilities
 

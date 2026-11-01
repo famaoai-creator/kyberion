@@ -13,7 +13,7 @@
  * The merge runs under the store's write-time maintenance lock
  * (`appendOnlyStoreLockId`, also taken by the storage janitor's compaction
  * and rotation) and, for a store whose writer rewrites it under its own
- * compaction lock ({@link WRITER_COMPACTION_LOCKS}), under that lock too —
+ * compaction lock ({@link writerCompactionLockFor}), under that lock too —
  * so no other rewrite interleaves with the merge. It refuses any store with a
  * copy younger than the stale threshold (it may belong to a rewrite still
  * running), and only touches the exact copy set the operator approved.
@@ -27,7 +27,10 @@ import {
 } from './append-only-store.js';
 import { parkedCompactionCopies } from './jsonl-parked-read.js';
 import { jsonlFileSize } from './jsonl-read.js';
-import { runtimeStatePath } from './foundation/runtime-state-roots.js';
+import { runtimeStatePath, WORK_COORDINATION_ROOT_PATH } from './foundation/runtime-state-roots.js';
+import { AGENT_INPUT_QUEUE_FILENAME, agentInputQueueLockId } from './agent/agent-input-queue.js';
+import { DOT_LEDGER_COMPACT_LOCK } from './dot/dot-wake-ledger-compaction.js';
+import { coordinationFenceLockId } from './workforce/work-coordination-ledger.js';
 import { createLogger } from './logger.js';
 import { pathResolver } from './path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
@@ -50,16 +53,40 @@ export const COMPACTION_COPY_MARKER = '.compacting-';
 export const RECOVER_COMPACTION_COPIES_COMMAND = 'pnpm kyberion storage recover-compaction-copies';
 
 /**
- * Stores (repo-relative) whose writer rewrites them under a lock of its own
- * rather than `appendOnlyStoreLockId`: the recovery merge takes that lock as
- * well (outer), so it never interleaves with the writer's compaction — an
- * interleaving could order older rows after newer ones. The dot wake ledger
- * is compacted under `dot-wake-ledger-compact`
- * (dot/dot-wake-ledger-compaction.ts DOT_LEDGER_COMPACT_LOCK).
+ * Stores (repo-relative) whose writer rewrites them under a fixed lock of its
+ * own rather than `appendOnlyStoreLockId` (see {@link writerCompactionLockFor}).
  */
 export const WRITER_COMPACTION_LOCKS: Readonly<Record<string, string>> = {
-  [runtimeStatePath('dot.wakeLedger').logicalPath]: 'dot-wake-ledger-compact',
+  [runtimeStatePath('dot.wakeLedger').logicalPath]: DOT_LEDGER_COMPACT_LOCK,
 };
+
+const WORK_COORDINATION_STORES = new Set(['items.jsonl', 'leases.jsonl']);
+
+/**
+ * The lock a store's writer compacts it under, when that is not
+ * `appendOnlyStoreLockId`: the recovery merge takes it as well (outer), so it
+ * never interleaves with the writer's compaction — an interleaving could
+ * order older rows after newer ones and latest-wins would keep a stale value.
+ *  - the dot wake ledger: `DOT_LEDGER_COMPACT_LOCK`;
+ *  - a mission's agent input queue: its per-file `agentInputQueueLockId`;
+ *  - work-coordination items/leases (namespaced too): the coordination
+ *    mutation fence of their directory (`coordinationFenceLockId`).
+ */
+export function writerCompactionLockFor(storeRel: string, storeAbs: string): string | undefined {
+  const fixed = WRITER_COMPACTION_LOCKS[storeRel];
+  if (fixed) return fixed;
+  const name = nodePath.posix.basename(storeRel);
+  if (name === AGENT_INPUT_QUEUE_FILENAME) return agentInputQueueLockId(storeAbs);
+  const dir = nodePath.posix.dirname(storeRel);
+  if (
+    WORK_COORDINATION_STORES.has(name) &&
+    (dir === WORK_COORDINATION_ROOT_PATH ||
+      nodePath.posix.dirname(dir) === WORK_COORDINATION_ROOT_PATH)
+  ) {
+    return coordinationFenceLockId(nodePath.dirname(storeAbs));
+  }
+  return undefined;
+}
 
 const COMPACTION_COPY_MAX_DEPTH = 6;
 const COMPACTION_COPY_MAX_ENTRIES = 20_000;
@@ -267,7 +294,7 @@ export function recoverCompactionCopies(
   const storeAbs = resolveRecoveryStorePath(store, options);
   const storeRel = toRel(rootDir, storeAbs);
   const lockTimeoutMs = options.lockTimeoutMs ?? 10_000;
-  const writerLock = WRITER_COMPACTION_LOCKS[storeRel];
+  const writerLock = writerCompactionLockFor(storeRel, storeAbs);
   const underStoreLock = (): CompactionCopyRecoveryResult =>
     withLockSync(
       appendOnlyStoreLockId(storeAbs),
