@@ -12,6 +12,8 @@ export interface TaskCredentialBinding {
   readonly missionId?: string;
   readonly taskId?: string;
   readonly secrets: Readonly<Record<string, string>>;
+  /** Trusted broker freshness check, run before every credential consumption. */
+  readonly validate?: () => void;
   /** Complete provider env, including an isolated HOME. Never merged with operator env. */
   readonly providerEnvironments?: Readonly<Record<string, Readonly<NodeJS.ProcessEnv>>>;
 }
@@ -94,6 +96,7 @@ function checkedBinding(): TaskCredentialBinding | undefined {
   if (identity.tenantSlug && !binding) {
     throw new Error('[CREDENTIAL_BINDING_REQUIRED] Tenant credentials require a trusted binding');
   }
+  binding?.validate?.();
   return binding;
 }
 
@@ -124,6 +127,8 @@ export function hasTaskCredentialBinding(): boolean {
 
 /** Only the authenticated dispatch boundary may bind credentials; ordinary grants still apply. */
 export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run: () => T): T {
+  if (binding.validate !== undefined && typeof binding.validate !== 'function')
+    throw new Error('[CREDENTIAL_BINDING_INVALID] Expected a trusted freshness check');
   const identity = credentialExecutionIdentity();
   if (
     !identity.tenantSlug ||
@@ -142,7 +147,8 @@ export function withTaskCredentialBinding<T>(binding: TaskCredentialBinding, run
       parent.missionId !== missionId ||
       parent.taskId !== taskId ||
       Object.entries(binding.secrets).some(([key, value]) => parent.secrets[key] !== value) ||
-      binding.providerEnvironments !== parent.providerEnvironments)
+      binding.providerEnvironments !== parent.providerEnvironments ||
+      binding.validate !== parent.validate)
   ) {
     throw new Error('[CREDENTIAL_SCOPE_DENIED] Nested credential bindings may only narrow');
   }

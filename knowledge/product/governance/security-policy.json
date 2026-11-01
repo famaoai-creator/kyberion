@@ -758,6 +758,22 @@
         "active/shared/runtime/approvals.json"
       ]
     },
+    "credential_allocation_manager": {
+      "allow_read": ["active/shared/runtime/grants/confidential/${KYBERION_TENANT}/"],
+      "allow_write": ["active/shared/runtime/grants/confidential/${KYBERION_TENANT}/"]
+    },
+    "credential_allocation_reader": {
+      "allow_read": ["active/shared/runtime/grants/confidential/${KYBERION_TENANT}/"]
+    },
+    "credential_material_reader": {
+      "allow_read": ["knowledge/personal/connections/"]
+    },
+    "credential_allocation_probe": {
+      "allow_read": ["active/missions/confidential/${KYBERION_TENANT}/"],
+      "allow_write": [
+        "active/shared/runtime/health/api-verification/confidential/${KYBERION_TENANT}/"
+      ]
+    },
     "build_repository": { "allow_write": ["dist/.build-generation.json"] },
     "customer_create": { "allow_write": ["customer/"] },
     "onboarding": { "allow_write": ["customer/"] },

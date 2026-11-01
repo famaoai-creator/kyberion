@@ -4,6 +4,20 @@ const mocks = vi.hoisted(() => ({
   persist: vi.fn(),
   persistEnv: vi.fn(),
   read: vi.fn(),
+  resolveKey: vi.fn(),
+  verify: vi.fn(),
+  write: vi.fn(),
+  proof: vi.fn(),
+}));
+vi.mock('@agent/core/reasoning/reasoning-api-credentials', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/reasoning/reasoning-api-credentials')>()),
+  resolveReasoningApiKey: mocks.resolveKey,
+  verifyReasoningApiCredential: mocks.verify,
+}));
+vi.mock('@agent/core/foundation/json', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/foundation/json')>()),
+  writeJson: mocks.write,
+  readJsonIfPresent: mocks.proof,
 }));
 vi.mock('./secret_introduce.js', () => ({ runSecretCli: mocks.introduce }));
 vi.mock('./reasoning_backend_selection.js', () => ({
@@ -12,11 +26,111 @@ vi.mock('./reasoning_backend_selection.js', () => ({
   readPersistedEnvValue: mocks.read,
 }));
 import { parseCredentialArgs, runCredentialCommand } from './reasoning_credentials.js';
+import { resolveRole, withExecutionContextAsync } from '@agent/core/authority';
+import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
 afterEach(() => {
   vi.resetAllMocks();
   vi.unstubAllEnvs();
 });
 describe('reasoning:credentials', () => {
+  it('marks only recent proofs of the current key, model, endpoint and scope as verified', async () => {
+    const { reasoningCredentialVersion, resolveReasoningApiModel } =
+      await import('@agent/core/reasoning/reasoning-api-credentials');
+    mocks.resolveKey.mockReturnValue('current-test-key');
+    mocks.proof.mockReturnValue({
+      provider: 'anthropic',
+      status: 'success',
+      transport: 'secure-fetch',
+      checked_at: new Date().toISOString(),
+      credential_version: reasoningCredentialVersion('current-test-key'),
+      endpoint: 'https://api.anthropic.com/v1/messages',
+      model: resolveReasoningApiModel('anthropic'),
+      execution: { kind: 'operator' },
+    });
+    const print = vi.fn();
+    await runCredentialCommand(['status', '--provider', 'anthropic'], print);
+    expect(print).toHaveBeenLastCalledWith(expect.stringContaining('"verified":true'));
+    mocks.resolveKey.mockReturnValue('rotated-test-key');
+    await runCredentialCommand(['status', '--provider', 'anthropic'], print);
+    expect(print).toHaveBeenLastCalledWith(expect.stringContaining('"verified":false'));
+    expect(print.mock.calls.flat().join('')).not.toContain('current-test-key');
+  });
+  it('preserves tenant and task identity while checking credentials', async () => {
+    mocks.resolveKey.mockImplementation(() => {
+      expect(credentialExecutionIdentity()).toEqual({
+        tenantSlug: 'alpha',
+        missionId: 'MSN-A',
+        taskId: 'task-a',
+      });
+      return undefined;
+    });
+    await withExecutionContextAsync(
+      'reasoning_credentials',
+      async () => {
+        expect(await runCredentialCommand(['status', '--provider', 'anthropic'], () => {})).toBe(1);
+      },
+      undefined,
+      'alpha',
+      undefined,
+      { missionId: 'MSN-A', taskId: 'task-a' }
+    );
+    expect(mocks.resolveKey).toHaveBeenCalledOnce();
+  });
+
+  it('rejects tenant registration before collecting or storing a personal key', async () => {
+    await withExecutionContextAsync(
+      'reasoning_credentials',
+      async () => {
+        await expect(
+          runCredentialCommand(['register', '--provider', 'anthropic'], () => {})
+        ).rejects.toThrow('Key registration requires an operator scope');
+      },
+      undefined,
+      'alpha'
+    );
+    expect(mocks.introduce).not.toHaveBeenCalled();
+  });
+  it('uses secret introduction read authority for status without printing the key', async () => {
+    mocks.resolveKey.mockImplementation(() => {
+      expect(resolveRole()).toBe('secret_introduce');
+      return 'test-private-key';
+    });
+    const print = vi.fn();
+    expect(await runCredentialCommand(['status', '--provider', 'anthropic'], print)).toBe(0);
+    expect(print.mock.calls.flat().join('')).not.toContain('test-private-key');
+    expect(print).toHaveBeenCalledWith(expect.stringContaining('"configured":true'));
+  });
+
+  it('verifies under secret introduction authority and writes metadata after restoring the caller', async () => {
+    mocks.verify.mockImplementation(async () => {
+      await Promise.resolve();
+      expect(resolveRole()).toBe('secret_introduce');
+      return { provider: 'anthropic', model: 'test-model', status: 'success', code: 'verified' };
+    });
+    mocks.write.mockImplementation(() => expect(resolveRole()).toBe('reasoning_credentials'));
+    await withExecutionContextAsync('reasoning_credentials', async () => {
+      expect(
+        await runCredentialCommand(
+          ['verify', '--provider', 'anthropic', '--model', 'test-model', '--allow-paid'],
+          () => {}
+        )
+      ).toBe(0);
+      expect(resolveRole()).toBe('reasoning_credentials');
+    });
+    expect(mocks.write).toHaveBeenCalledOnce();
+  });
+  it('uses the secret introduction role across awaits and restores the caller role', async () => {
+    mocks.introduce.mockImplementation(async () => {
+      expect(resolveRole()).toBe('secret_introduce');
+      await Promise.resolve();
+      expect(resolveRole()).toBe('secret_introduce');
+      return { status: 'pending' };
+    });
+    await withExecutionContextAsync('reasoning_credentials', async () => {
+      expect(await runCredentialCommand(['register', '--provider', 'anthropic'], () => {})).toBe(1);
+      expect(resolveRole()).toBe('reasoning_credentials');
+    });
+  });
   it.each([
     ['register', '--provider', 'openai', '--key', 'secret'],
     ['register', '--provider', 'codex-cli'],

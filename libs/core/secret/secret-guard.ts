@@ -6,7 +6,6 @@ export {
 } from '../foundation/credential-binding.js';
 import * as secureIo from '../secure-io.js';
 import { operatorProbeSecretAccess } from '../service/operator-service-connection-admission.js';
-import { logger } from '../core.js';
 import { ledger } from '../ledger.js';
 import * as pathResolver from '../path-resolver.js';
 import * as path from 'node:path';
@@ -28,6 +27,7 @@ import { RISKY_OPS } from '../risky-op-ids.js';
 import { readJson } from '../foundation/json.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonObjectValue } from '../foundation/safe-json.js';
+import { withSecretResolutionSession } from '../foundation/secret-resolution-session.js';
 import {
   assertPluginGrantAllows,
   findPluginGrantDenial,
@@ -144,16 +144,11 @@ const _loadPersonalSecrets = () => {
         }
       } else if (stat.isFile() && item.endsWith('.json')) {
         const serviceName = path.basename(item, '.json').toUpperCase();
-        let content = readSensitiveJson<unknown>(fullPath);
+        const content = readSensitiveJson<unknown>(fullPath);
         if (isEncryptedConnectionEnvelope(content)) {
-          // Startup scan runs at module import — an undecryptable file must
-          // degrade to a warning here, not crash every importer.
-          try {
-            content = decryptConnectionDocument(content);
-          } catch (err) {
-            logger.warn(`[secret-guard] cannot decrypt ${item} during startup scan: ${err}`);
-            continue;
-          }
+          // Imports/discovery must not unlock every encrypted account. Resolve
+          // the requested identity lazily inside its explicit operation.
+          continue;
         }
         const record = parseSecretRecord(content, `personal connection ${fullPath}`);
         if (record) _mapContentToSecrets(serviceName, record);
@@ -315,7 +310,15 @@ export const checkAuthority = (missionId: string, authority: string): boolean =>
 /**
  * Retrieve a secret value, enforcing temporal and intent-based gates.
  */
-export const getSecret = (key: string, scope?: string, operation?: string): string | null => {
+export const getSecret = (key: string, scope?: string, operation?: string): string | null =>
+  withSecretResolutionSession(() => resolveGuardedSecret(key, scope, operation));
+
+function resolveGuardedSecret(
+  key: string,
+  scope?: string,
+  operation?: string,
+  declaredIdentity?: { envName: string; keychainService: string; keychainAccount: string }
+): string | null {
   assertPluginGrantAllows('secrets', key);
   const probeAccess = operatorProbeSecretAccess(key, scope, operation);
   if (probeAccess === false) throw new Error('[OPERATOR_SERVICE_PROBE_DENIED]');
@@ -388,27 +391,48 @@ export const getSecret = (key: string, scope?: string, operation?: string): stri
   // keychain-only entries for service consumers. Lazy-require keeps
   // secret-bridge / secret-identity off the hot import graph for callers
   // that only need env / connection resolution (and for hermetic mocks).
+  let identity = declaredIdentity;
+  if (!identity) {
+    try {
+      const { parseEnvSecretName } = requireSecretModules(
+        './secret-identity.js'
+      ) as typeof import('./secret-identity.js');
+      identity = parseEnvSecretName(key, scope) ?? undefined;
+    } catch {
+      return null;
+    }
+  }
+  if (!identity) return null;
   try {
-    const { parseEnvSecretName } = requireSecretModules(
-      './secret-identity.js'
-    ) as typeof import('./secret-identity.js');
+    const stored = loadConnectionDocument(identity.keychainService)[identity.keychainAccount];
+    if (typeof stored === 'string' && stored.trim()) {
+      if (stored.length > 8) _rememberActiveSecret(key, stored);
+      return stored;
+    }
+  } catch (error) {
+    // File read denial leaves the independent OS keychain path available;
+    // decryption/refusal errors must not trigger another credential prompt.
+    if (!(
+      error instanceof Error &&
+      /^\[(?:SECURITY|POLICY_VIOLATION|SENSITIVE_PATH_DENIED)\]/.test(error.message)
+    ))
+      throw error;
+  }
+  try {
     const { fetchSecretSync } = requireSecretModules(
       './secret-bridge.js'
     ) as typeof import('./secret-bridge.js');
-    const identity = parseEnvSecretName(key, scope);
-    if (identity) {
-      const bridged = fetchSecretSync(identity.keychainService, identity.keychainAccount);
-      if (bridged && bridged.length > 0) {
-        if (bridged.length > 8) _rememberActiveSecret(key, bridged);
-        return bridged;
-      }
+    const bridged = fetchSecretSync(identity.keychainService, identity.keychainAccount);
+    if (bridged && bridged.length > 0) {
+      if (bridged.length > 8) _rememberActiveSecret(key, bridged);
+      return bridged;
     }
   } catch {
     /* fallthrough miss stays null */
   }
 
   return null;
-};
+}
 
 /** Resolve a declared service/key identity when its service is not in the
  * general service-endpoint catalog (for example, a reasoning provider). */
@@ -416,23 +440,9 @@ export function getSecretForIdentity(
   identity: { envName: string; keychainService: string; keychainAccount: string },
   operation?: string
 ): string | null {
-  const value = getSecret(identity.envName, undefined, operation);
-  if (value) return value;
-  assertPluginGrantAllows('secrets', identity.envName);
-  if (resolveTaskCredential(identity.envName) !== undefined) return null;
-  try {
-    const { fetchSecretSync } = requireSecretModules(
-      './secret-bridge.js'
-    ) as typeof import('./secret-bridge.js');
-    const bridged = fetchSecretSync(identity.keychainService, identity.keychainAccount);
-    if (bridged && bridged.length > 0) {
-      if (bridged.length > 8) _rememberActiveSecret(identity.envName, bridged);
-      return bridged;
-    }
-  } catch {
-    /* An unavailable platform keychain is a miss, matching getSecret(). */
-  }
-  return null;
+  return withSecretResolutionSession(() =>
+    resolveGuardedSecret(identity.envName, undefined, operation, identity)
+  );
 }
 
 export const loadConnectionDocument = (serviceId: string): Record<string, any> => {

@@ -31,7 +31,6 @@
 
 ## 📁 product/architecture
 - [AI-Run Meetings Use Case](./product/architecture/meeting-facilitator-use-case.md) (public | Unknown)
-- [API credential registration and proof boundaries](./product/architecture/api-credential-proof-boundary.md) (public | Unknown)
 - [Actuator Contract Map](./product/architecture/actuator-contract-map.md) (public | Ecosystem Architect)
 - [Actuator Operation Taxonomy](./product/architecture/actuator-op-taxonomy.md) (public | Ecosystem Architect)
 - [Agent Collaboration View](./product/architecture/agent-collaboration-view.md) (public | Ecosystem Architect)
@@ -70,6 +69,7 @@
 - [Continuous Operations Loop](./product/architecture/continuous-operations-loop.md) (public | Unknown)
 - [Contract Lifecycle](./product/architecture/contract-lifecycle.md) (public | Ecosystem Architect)
 - [Corporate Memory Loop](./product/architecture/corporate-memory-loop.md) (public | Ecosystem Architect)
+- [Credential lifecycle, allocation, and execution boundaries](./product/architecture/api-credential-proof-boundary.md) (public | Unknown)
 - [DOCX Markdown Ingestion Model](./product/architecture/docx-markdown-ingestion-model.md) (public | Unknown)
 - [Decision-Support Design Rationale](./product/architecture/decision-support-design-rationale.md) (public | famao)
 - [Default-disabled HTTP MCP human request resource server](./product/architecture/mcp-http-human-requests.md) (public | Unknown)
