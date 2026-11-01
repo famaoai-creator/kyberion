@@ -33,12 +33,17 @@ import { withExecutionContext } from '../authority.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import { pathResolver } from '../path-resolver.js';
 import { nowIso } from '../foundation/time.js';
-import { readJson, readJsonLines } from '../foundation/json.js';
+import { readJson } from '../foundation/json.js';
 import { isRecord } from '../foundation/text.js';
 import { safeExecResultAsync, safeExistsSync } from '../secure-io.js';
 import { appendGovernedArtifactJsonl, writeScopedArtifact } from '../workforce/artifact-store.js';
 import { createWorkItemIfAbsent, updateWorkItem } from '../workforce/work-coordination.js';
-import { peerRuntimeLogicalPath, type PeerMessageEnvelope } from './peer-messaging.js';
+import {
+  compactPeerLedgerAfterAppend,
+  peerRuntimeLogicalPath,
+  streamPeerStoreRecords,
+  type PeerMessageEnvelope,
+} from './peer-messaging.js';
 import {
   PEER_CATALOG_READER_ROLE,
   sendPeerConversationMessageToPeer,
@@ -274,23 +279,27 @@ function recordKey(record: Pick<PeerTaskRecord, 'direction' | 'task_id'>): strin
   return `${record.direction}:${record.task_id}`;
 }
 
+/** Composite compaction key — the same identity {@link listPeerTasks} folds on. */
+function ledgerCompactionKey(record: Record<string, unknown>): string | undefined {
+  return typeof record.task_id === 'string' && typeof record.state === 'string'
+    ? recordKey({ direction: record.direction as PeerTaskDirection, task_id: record.task_id })
+    : undefined;
+}
+
 export function listPeerTasks(
   tenantId: string,
   localPeerId: string,
   filter: { direction?: PeerTaskDirection; state?: PeerTaskState } = {}
 ): PeerTaskRecord[] {
-  const rows = readJsonLines<PeerTaskRecord | null>(
-    pathResolver.resolve(ledgerLogicalPath(tenantId, localPeerId)),
-    {
-      map: (value) =>
-        isRecord(value) && typeof value.task_id === 'string' && typeof value.state === 'string'
-          ? (value as unknown as PeerTaskRecord)
-          : null,
-      onMalformed: 'skip',
-    }
+  const rows = streamPeerStoreRecords<PeerTaskRecord>(
+    ledgerLogicalPath(tenantId, localPeerId),
+    (value) =>
+      isRecord(value) && typeof value.task_id === 'string' && typeof value.state === 'string'
+        ? (value as unknown as PeerTaskRecord)
+        : null
   );
   const latest = new Map<string, PeerTaskRecord>();
-  for (const row of rows) if (row) latest.set(recordKey(row), row);
+  for (const row of rows) latest.set(recordKey(row), row);
   const now = Date.now();
   return Array.from(latest.values())
     .map((record) =>
@@ -319,11 +328,10 @@ export function getPeerTask(
 
 function appendRecord(record: PeerTaskRecord): PeerTaskRecord {
   const row = { ...record, updated_at: nowIso() };
-  appendGovernedArtifactJsonl(
-    LEDGER_ROLE,
-    ledgerLogicalPath(row.tenant_id, row.local_peer_id),
-    row
-  );
+  const logicalPath = ledgerLogicalPath(row.tenant_id, row.local_peer_id);
+  appendGovernedArtifactJsonl(LEDGER_ROLE, logicalPath, row);
+  // Readers use only the latest row per direction:task_id — fold the rest.
+  compactPeerLedgerAfterAppend(logicalPath, ledgerCompactionKey);
   return row;
 }
 
