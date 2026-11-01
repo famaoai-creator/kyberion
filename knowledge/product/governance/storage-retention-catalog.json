@@ -1151,7 +1151,7 @@
       "compact_key": "item_id",
       "compact_min_bytes": 2097152,
       "audit": true,
-      "note": "Versioned WorkItem store — every update appends a full record, so the file grows O(items x versions); observed 31MB/853 lines for 101 items with 240KB lines from embedded attempt history. Compaction folds to latest-per-item_id and archives the pre-compaction file (the janitor under active/archive/jsonl-compaction/; the writer, which runs as infrastructure_sentinel, under work-coordination/compaction-archive/). The parent dir stays review_required (leases/boards untouched). MSN-STORE-BOUNDS-2: self_managed — the janitor must not fold it by plain item_id: createWorkItemIfAbsent compares a replay against the creation (version 1) snapshot and treats several version-1 snapshots as ambiguous ownership. The writer compacts at write time inside the coordination mutation fence (work-coordination-ledger.ts workItemCompactionKey: version-1 rows kept verbatim, later versions folded by item_id; WORK_ITEMS_COMPACT_MIN_BYTES 2 MiB). The old inline 64MB non-atomic fold is gone. Readers stream (strict: a malformed line fails closed by contract).",
+      "note": "Versioned WorkItem store — every update appends a full record, so the file grows O(items x versions); observed 31MB/853 lines for 101 items with 240KB lines from embedded attempt history. Compaction folds to latest-per-item_id and archives the pre-compaction file under work-coordination/compaction-archive/ (the writer runs as infrastructure_sentinel, which cannot write active/archive/). The parent dir stays review_required (leases/boards untouched). MSN-STORE-BOUNDS-2: self_managed — the janitor must not fold it by plain item_id: createWorkItemIfAbsent compares a replay against the creation (version 1) snapshot and treats several version-1 snapshots as ambiguous ownership. The writer compacts at write time inside the coordination mutation fence (work-coordination-ledger.ts workItemCompactionKey: version-1 rows kept verbatim, later versions folded by item_id; WORK_ITEMS_COMPACT_MIN_BYTES 2 MiB). The old inline 64MB non-atomic fold is gone. Readers stream (strict: a malformed line fails closed by contract).",
       "self_managed": true
     },
     {
@@ -1169,7 +1169,7 @@
       "artifact_class": "evidence",
       "ttl_days": 90,
       "action": "delete",
-      "note": "MSN-STORE-BOUNDS-2: raw-union archives from write-time compaction of items.jsonl / leases.jsonl (work-coordination-ledger.ts, writeTimeArchiveDir). The writer runs as infrastructure_sentinel, which cannot write active/archive/. Kept 90 days."
+      "note": "MSN-STORE-BOUNDS-2: raw-union archives from write-time compaction of items.jsonl / leases.jsonl (work-coordination-ledger.ts, writeTimeArchiveDir). The writer runs as infrastructure_sentinel, which cannot write active/archive/. Kept 90 days. Namespaced stores (work-coordination/<ns>/) archive to <ns>/compaction-archive/, which sits under the review_required parent and is not auto-expired; namespaces are used for isolated runs and are removed with them."
     },
     {
       "path": "active/shared/observability/delegations.jsonl",

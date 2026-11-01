@@ -10,8 +10,17 @@ import {
   setRuntimeHealthStoreTuningForTests,
   type RuntimeHealthSample,
 } from './runtime-health-history.js';
-import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
-import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
+import {
+  resetAppendOnlyStoreMaintenanceState,
+  setAppendOnlyStoreTestHooks,
+} from '../append-only-store.js';
+import {
+  safeAppendFileSync,
+  safeMkdir,
+  safeReadFile,
+  safeRmSync,
+  safeWriteFile,
+} from '../secure-io.js';
 import { pathResolver } from '../path-resolver.js';
 
 const THRESHOLDS = {
@@ -156,6 +165,49 @@ describe('runtime health trends (OP-04)', () => {
       expect(after.slice(0, 4)).toEqual(before);
       expect(after).toHaveLength(5);
     } finally {
+      setRuntimeHealthStoreTuningForTests({});
+      resetAppendOnlyStoreMaintenanceState();
+      safeRmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('reads the window from parked copies while a rewrite has the file moved aside', () => {
+    const dir = pathResolver.sharedTmp(`runtime-health-parked-${process.pid}-${Date.now()}`);
+    const file = path.join(dir, 'runtime-health.jsonl');
+    setRuntimeHealthStoreTuningForTests({ historyPath: file, windowMinBytes: 1024 });
+    resetAppendOnlyStoreMaintenanceState();
+    try {
+      const end = Date.parse('2026-10-01T00:00:00.000Z');
+      const hour = 60 * 60 * 1000;
+      const rows: string[] = [];
+      for (let t = end - 60 * 24 * hour; t < end; t += 6 * hour) {
+        rows.push(JSON.stringify(sample({ timestamp: new Date(t).toISOString() })));
+      }
+      safeMkdir(dir, { recursive: true });
+      safeWriteFile(file, `${rows.join('\n')}\n`);
+      const before = loadRuntimeHealthSamples(24 * hour, end);
+      expect(before).toHaveLength(4);
+      const late = sample({ timestamp: new Date(end + 1000).toISOString(), rss_mb: 120 });
+      let parkedMissing: RuntimeHealthSample[] | undefined;
+      let parkedRecreated: RuntimeHealthSample[] | undefined;
+      setAppendOnlyStoreTestHooks({
+        beforeWriteSurvivors: () => {
+          if (parkedMissing) return; // the merge round re-runs the hook
+          parkedMissing = loadRuntimeHealthSamples(24 * hour + 2000, end + 2000);
+          // An append without the store lock recreates the live file.
+          safeAppendFileSync(file, `${JSON.stringify(late)}\n`);
+          parkedRecreated = loadRuntimeHealthSamples(24 * hour + 2000, end + 2000);
+        },
+      });
+      recordRuntimeHealthSample({ processName: 'supervisor', now: end });
+      expect(parkedMissing?.slice(0, 4)).toEqual(before);
+      expect(parkedMissing).toHaveLength(5); // + the sample that triggered the rewrite
+      expect(parkedRecreated?.slice(0, 5)).toEqual(parkedMissing);
+      expect(parkedRecreated?.[5]).toEqual(late);
+      // Published: no parked copies left, the late sample merged in once.
+      expect(loadRuntimeHealthSamples(24 * hour + 2000, end + 2000)).toEqual(parkedRecreated);
+    } finally {
+      setAppendOnlyStoreTestHooks({});
       setRuntimeHealthStoreTuningForTests({});
       resetAppendOnlyStoreMaintenanceState();
       safeRmSync(dir, { recursive: true, force: true });
