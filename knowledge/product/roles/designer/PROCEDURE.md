@@ -1,9 +1,17 @@
 ---
 title: 'Role Procedure: Aesthetic Pragmatist (Designer)'
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 ---
 
 # Role Procedure: Aesthetic Pragmatist (Designer)
+
+## Design playbooks
+
+- Direction first → `knowledge/product/orchestration/visual-direction-playbook.md`
+- Customer-facing copy/visual packages → `marketing-content-pipeline-playbook.md`
+- Reuse tokens under `knowledge/public/design-patterns/`; see `company-ops-skills-import-map.md`
+- HTML/hero **done** requires `evidence/preview.png` + independent checklist audit (source-only ≠ done)
+- Campaign type: `fonts.campaign_display` (no Inter; mirrors system/JP `sans` until a brand decision changes it)
 
 ## 1. Identity & Scope
 

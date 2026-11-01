@@ -15,8 +15,8 @@
       "text": "#F8FAFC"
     },
     "fonts": {
-      "heading": "Inter, sans-serif",
-      "body": "Inter, sans-serif"
+      "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
+      "body": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif"
     }
   },
   "web": {
@@ -40,10 +40,17 @@
       "xl": "40px"
     },
     "breakpoints": ["640px", "1024px", "1280px"],
-    "sections": ["hero", "design-system", "quick-actions", "operator-views", "mission-intelligence", "trace-viewer"],
+    "sections": [
+      "hero",
+      "design-system",
+      "quick-actions",
+      "operator-views",
+      "mission-intelligence",
+      "trace-viewer"
+    ],
     "typography": {
-      "heading": "Inter, sans-serif",
-      "body": "Inter, sans-serif"
+      "heading": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
+      "body": "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif"
     }
   }
 }
