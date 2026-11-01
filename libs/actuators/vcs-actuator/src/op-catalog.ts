@@ -6,6 +6,9 @@ import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry
 import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
 const VCS_PROPERTIES = {
+  work_item_id: { type: 'string' },
+  review_task_id: { type: 'string' },
+  dry_run: { type: 'boolean' },
   cwd: { type: 'string' },
   short: { type: 'boolean' },
   ref: { type: 'string' },
@@ -57,6 +60,9 @@ const VCS_EXAMPLES = {
   pr_list: [{ state: 'open', limit: 50 }],
   pr_checks: [{ ref: '123', watch: true, timeout_ms: 1200000, interval_ms: 15000 }],
   pr_merge: [{ ref: '123', method: 'merge', delete_branch: true }],
+  development_loop: [
+    { ref: '123', work_item_id: 'work-item', review_task_id: 'review-task', dry_run: true },
+  ],
   repo_view: [{}],
   gh_status: [{}],
 };
@@ -86,9 +92,11 @@ export const VCS_ACTUATOR_APPLY_OPS = [
   'checkout',
   'worktree',
   'pr_merge',
+  'development_loop',
 ] as const;
 
 const REQUIRED = {
+  development_loop: ['ref', 'work_item_id', 'review_task_id'],
   commit: ['message'],
   pr_create: ['title'],
   branch: ['action'],

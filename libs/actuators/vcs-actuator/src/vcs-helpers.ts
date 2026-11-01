@@ -19,6 +19,7 @@ import {
   ghPrView,
   ghRepoDefaultBranch,
   ghVersion,
+  runPreparedVcsDevelopment,
   gitCheckout,
   gitFetch,
   gitPull,
@@ -51,10 +52,14 @@ export type VcsOp =
   | 'pr_list'
   | 'pr_checks'
   | 'pr_merge'
+  | 'development_loop'
   | 'repo_view'
   | 'gh_status';
 
 export type VcsParams = {
+  work_item_id?: string;
+  review_task_id?: string;
+  dry_run?: boolean;
   cwd?: string;
   short?: boolean;
   ref?: string;
@@ -145,6 +150,10 @@ function missingRequiredFields(action: VcsAction): string[] {
       return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
     case 'pr_merge':
       return params.ref?.trim() ? [] : ['params.ref (PR number, URL, or branch)'];
+    case 'development_loop':
+      return ['ref', 'work_item_id', 'review_task_id'].filter(
+        (key) => !String(params[key as keyof VcsParams] ?? '').trim()
+      );
     default:
       return [];
   }
@@ -221,6 +230,18 @@ export async function handleAction(
   logger.info(`[vcs-actuator] ${valid.op} (cwd: ${cwd})`);
 
   switch (valid.op) {
+    case 'development_loop':
+      return runPreparedVcsDevelopment(
+        {
+          cwd,
+          ref: params.ref!,
+          workItemId: params.work_item_id!,
+          reviewTaskId: params.review_task_id!,
+          dryRun: params.dry_run,
+        },
+        publicationHost,
+        runGhResult
+      );
     case 'status': {
       const result = gitStatus(cwd, { short: params.short });
       assertOk(result, 'git status');

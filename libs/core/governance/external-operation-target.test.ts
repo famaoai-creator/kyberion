@@ -18,6 +18,7 @@ import {
 } from './charter-service.js';
 const state = vi.hoisted(() => ({
   tier: 'public',
+  tenant: undefined as string | undefined,
   charter: undefined as unknown,
   installed: false,
   active: true,
@@ -37,7 +38,9 @@ vi.mock('../organization/onboarding-runtime-identity.js', () => ({
 import * as externalOps from './external-operation.js';
 import { withExternalOperationOccurrence } from './external-operation-occurrence.js';
 import { currentInstalledPersonCharterRuntime } from './person-charter-runtime.js';
-vi.mock('../scope-context.js', () => ({ resolveScopeContext: () => ({ tier: state.tier }) }));
+vi.mock('../scope-context.js', () => ({
+  resolveScopeContext: () => ({ tier: state.tier, tenant_slug: state.tenant }),
+}));
 vi.mock('../scope-envelope.js', () => ({ currentScopeEnvelope: () => state.envelope }));
 vi.mock('./accountability-charter-registry.js', async (original) => ({
   ...(await original<typeof import('./accountability-charter-registry.js')>()),
@@ -66,7 +69,7 @@ function charter(): Charter {
     },
     envelope: {
       money: { currency: 'JPY', per_action: 0, per_day: 0, per_month: 0 },
-      data_tier: { read: [], write: [] },
+      data_tier: { read: ['public'], write: [] },
       external_effects: {},
       irreversible: 'named_actions_only',
       irreversible_named_actions: ['vcs:pr_create', 'browser:goto'],
@@ -104,6 +107,7 @@ beforeEach(() => {
   state.active = true;
   state.envelope = undefined;
   state.tier = 'public';
+  state.tenant = undefined;
   state.charter = charter();
 });
 describe('exact public operation target grants', () => {
@@ -341,6 +345,7 @@ describe('exact public operation target grants', () => {
     const other = charter();
     other.scope = { kind: 'organization', tenant_slug: 'acme' };
     other.accountable.actor = 'user:other-owner';
+    state.tenant = 'acme';
     state.charter = other;
     const authority = createOnboardingExternalOperationAuthority({
       scope: other.scope,
@@ -363,6 +368,139 @@ describe('exact public operation target grants', () => {
     state.tier = tier;
     expect(resolve()(facts)).not.toHaveProperty('charter');
   });
+  it('allows personal source only with person scope, explicit read and verified-private exact destination', () => {
+    const c = charter();
+    c.envelope.data_tier.read = ['personal'];
+    c.envelope.external_operations = [{ ...grant, visibility: 'private' }];
+    state.charter = c;
+    state.tier = 'personal';
+    const privateFacts = {
+      ...facts,
+      effect: { ...facts.effect, repository_visibility: 'private', body_source_tier: 'personal' },
+    };
+    expect(resolve()(privateFacts)).toMatchObject({
+      charter: { action: { data: { tier: 'personal', mode: 'read' } } },
+    });
+    state.tenant = 'acme';
+    expect(resolve()(privateFacts)).not.toHaveProperty('charter');
+    state.tenant = undefined;
+    expect(
+      resolve()({
+        ...privateFacts,
+        effect: { ...privateFacts.effect, repository_visibility: 'public' },
+      })
+    ).not.toHaveProperty('charter');
+    c.envelope.data_tier.read = ['public'];
+    expect(resolve()(privateFacts)).not.toHaveProperty('charter');
+  });
+  it('confines confidential source, runtime, charter and body tenant to the same organization', () => {
+    const c = charter();
+    c.scope = { kind: 'organization', tenant_slug: 'acme' };
+    c.envelope.data_tier.read = ['confidential:acme'];
+    c.envelope.external_operations = [{ ...grant, visibility: 'private' }];
+    state.charter = c;
+    state.tier = 'confidential';
+    state.tenant = 'acme';
+    const resolver = createOnboardingExternalOperationAuthority({
+      scope: c.scope,
+      agentId: 'kyberion://agent/local/installed-worker',
+      ownerActor: 'user:owner',
+      invocationId: 'scoped',
+    });
+    const privateFacts = {
+      ...facts,
+      effect: {
+        ...facts.effect,
+        repository_visibility: 'private',
+        body_source_tier: 'confidential',
+        body_source_tenant: 'acme',
+      },
+    };
+    expect(resolver(privateFacts)).toMatchObject({
+      charter: { action: { data: { tier: 'confidential', tenant_slug: 'acme', mode: 'read' } } },
+    });
+    expect(
+      resolver({ ...privateFacts, effect: { ...privateFacts.effect, body_source_tenant: 'beta' } })
+    ).not.toHaveProperty('charter');
+    state.tenant = 'beta';
+    expect(resolver(privateFacts)).not.toHaveProperty('charter');
+    state.tenant = 'acme';
+    state.envelope = {
+      identity: { tier: 'confidential', tenant_slug: 'acme' },
+      policy: { read_tiers: ['public'], external_egress: 'allow' },
+    };
+    expect(resolver(privateFacts)).not.toHaveProperty('charter');
+  });
+  it('does not let public body provenance lower a private runtime or confidential body raise a public ceiling', () => {
+    const c = charter();
+    c.envelope.external_operations = [{ ...grant, visibility: 'private' }];
+    c.envelope.data_tier.read = ['public', 'personal'];
+    state.charter = c;
+    state.tier = 'personal';
+    expect(
+      resolve()({
+        ...facts,
+        effect: { ...facts.effect, body_source_tier: 'public', repository_visibility: 'private' },
+      })
+    ).toMatchObject({ charter: { action: { data: { tier: 'personal' } } } });
+    state.tier = 'public';
+    expect(
+      resolve()({
+        ...facts,
+        effect: { ...facts.effect, body_source_tier: 'personal', repository_visibility: 'private' },
+      })
+    ).not.toHaveProperty('charter');
+    expect(
+      resolve()({
+        ...facts,
+        effect: {
+          ...facts.effect,
+          body_source_tier: 'protected_or_unknown',
+          repository_visibility: 'private',
+        },
+      })
+    ).not.toHaveProperty('charter');
+    c.envelope.data_tier.read = [];
+    expect(resolve()(facts)).not.toHaveProperty('charter');
+  });
+  it.each(['vcs:push', 'vcs:pr_merge'] as const)(
+    'uses the same exact private/read scope boundary for %s',
+    (operationId) => {
+      const c = charter();
+      c.envelope.data_tier.read = ['personal'];
+      c.envelope.external_operations = [
+        {
+          operation_id: operationId,
+          repository: grant.repository,
+          branch: 'main',
+          visibility: 'private',
+        },
+      ];
+      state.charter = c;
+      state.tier = 'personal';
+      const effect =
+        operationId === 'vcs:push'
+          ? {
+              url: grant.repository,
+              destination: 'refs/heads/main',
+              repository_visibility: 'private',
+            }
+          : {
+              repository: facts.effect.repository,
+              baseRefName: 'main',
+              repository_visibility: 'private',
+            };
+      const input = { operationId, requiresApproval: true, delegable: true, effect };
+      expect(resolve()(input)).toMatchObject({
+        charter: { action: { data: { tier: 'personal', mode: 'read' } } },
+      });
+      expect(
+        resolve()({ ...input, effect: { ...effect, repository_visibility: 'public' } })
+      ).not.toHaveProperty('charter');
+      c.envelope.data_tier.read = ['public'];
+      expect(resolve()(input)).not.toHaveProperty('charter');
+    }
+  );
   it('never delegates opaque browser interactions or query URL egress', () => {
     for (const [operationId, url] of [
       ['browser:goto', 'https://example.com/public'],

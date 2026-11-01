@@ -6,8 +6,13 @@ import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 import { conciergeText, type ConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 
 type Grant =
-  | { operation_id: 'vcs:pr_create'; repository: string }
-  | { operation_id: 'vcs:pr_merge' | 'vcs:push'; repository: string; branch: string }
+  | { operation_id: 'vcs:pr_create'; repository: string; visibility?: 'private' }
+  | {
+      operation_id: 'vcs:pr_merge' | 'vcs:push';
+      repository: string;
+      branch: string;
+      visibility?: 'private';
+    }
   | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string };
 type Pending = {
   request_id: string;
@@ -27,6 +32,7 @@ type Overview = {
     grants: Grant[];
     delegated_decisions: Record<string, string>;
     stopped: boolean;
+    data_tier?: { read: string[]; write: string[] };
   };
   delegable_decisions: { decision_type: string; label: Record<string, string> }[];
   pending_requests: Pending[];
@@ -41,8 +47,15 @@ type Overview = {
 type Preview = { statement: string; digest: string; base_hash: string; fingerprint: string };
 const record = (value: unknown): value is Record<string, unknown> =>
   !!value && typeof value === 'object' && !Array.isArray(value);
+const validDataTiers = (value: unknown): value is { read: string[]; write: string[] } =>
+  record(value) &&
+  ['read', 'write'].every(
+    (key) =>
+      Array.isArray(value[key]) && value[key].every((token: unknown) => typeof token === 'string')
+  );
 const validGrant = (value: unknown): value is Grant =>
   record(value) &&
+  (value.visibility === undefined || value.visibility === 'private') &&
   (value.operation_id === 'vcs:pr_create'
     ? typeof value.repository === 'string'
     : ['vcs:pr_merge', 'vcs:push'].includes(String(value.operation_id))
@@ -89,7 +102,8 @@ function readOverview(value: unknown): Overview | null {
       typeof value.charter.stopped !== 'boolean' ||
       !Array.isArray(value.charter.grants) ||
       !value.charter.grants.every(validGrant) ||
-      !record(value.charter.delegated_decisions))
+      !record(value.charter.delegated_decisions) ||
+      (value.charter.data_tier !== undefined && !validDataTiers(value.charter.data_tier)))
   )
     return null;
   return value as unknown as Overview;
@@ -119,6 +133,11 @@ export function OnboardingAuthorityPanel({
   const [operation, setOperation] = React.useState('');
   const [target, setTarget] = React.useState('');
   const [branch, setBranch] = React.useState('');
+  const [mergeBase, setMergeBase] = React.useState('');
+  const [privateRepository, setPrivateRepository] = React.useState(false);
+  const [editTiers, setEditTiers] = React.useState(false);
+  const [readTiers, setReadTiers] = React.useState<string[]>([]);
+  const [writeTiers, setWriteTiers] = React.useState<string[]>([]);
   const [decisions, setDecisions] = React.useState<Record<string, string>>({});
   const [expires, setExpires] = React.useState('');
   const [mode, setMode] = React.useState<'grant' | 'revoke'>('grant');
@@ -136,13 +155,46 @@ export function OnboardingAuthorityPanel({
   active.current = scopeKey;
   const inFlight = React.useRef(false);
   const grants: Grant[] =
-    operation === 'vcs:pr_create'
-      ? [{ operation_id: operation, repository: target }]
-      : operation === 'vcs:pr_merge' || operation === 'vcs:push'
-        ? [{ operation_id: operation, repository: target, branch }]
-        : operation === 'browser:goto' || operation === 'browser:open_tab'
-          ? [{ operation_id: operation, origin: target }]
-          : [];
+    operation === 'vcs:development'
+      ? [
+          {
+            operation_id: 'vcs:pr_create',
+            repository: target,
+            ...(privateRepository ? { visibility: 'private' as const } : {}),
+          },
+          {
+            operation_id: 'vcs:push',
+            repository: target,
+            branch,
+            ...(privateRepository ? { visibility: 'private' as const } : {}),
+          },
+          {
+            operation_id: 'vcs:pr_merge',
+            repository: target,
+            branch: mergeBase,
+            ...(privateRepository ? { visibility: 'private' as const } : {}),
+          },
+        ]
+      : operation === 'vcs:pr_create'
+        ? [
+            {
+              operation_id: operation,
+              repository: target,
+              ...(privateRepository ? { visibility: 'private' as const } : {}),
+            },
+          ]
+        : operation === 'vcs:pr_merge' || operation === 'vcs:push'
+          ? [
+              {
+                operation_id: operation,
+                repository: target,
+                branch,
+                ...(privateRepository ? { visibility: 'private' as const } : {}),
+              },
+            ]
+          : operation === 'browser:goto' || operation === 'browser:open_tab'
+            ? [{ operation_id: operation, origin: target }]
+            : [];
   const expiry =
     expires && Number.isFinite(Date.parse(expires)) ? new Date(expires).toISOString() : '';
   const chosenDecisions = Object.fromEntries(
@@ -157,6 +209,7 @@ export function OnboardingAuthorityPanel({
     expires_at: expiry,
     mode,
     ...(renewExisting ? { renew_existing: true } : {}),
+    ...(editTiers ? { data_tier: { read: readTiers, write: writeTiers } } : {}),
   };
   const fingerprint = JSON.stringify(draft);
   const currentDraft = React.useRef(fingerprint);
@@ -177,6 +230,12 @@ export function OnboardingAuthorityPanel({
     setError(null);
     setOperation('');
     setTarget('');
+    setBranch('');
+    setMergeBase('');
+    setPrivateRepository(false);
+    setEditTiers(false);
+    setReadTiers([]);
+    setWriteTiers([]);
     setExpires('');
     setMode('grant');
     setRenewExisting(false);
@@ -362,6 +421,8 @@ export function OnboardingAuthorityPanel({
     setOperation('');
     setTarget('');
     setBranch('');
+    setPrivateRepository(false);
+    setEditTiers(false);
     setDecisions({ [type]: '__revoke__' });
     const timestamp = Date.parse(overview?.charter?.expires_at || '');
     const date = new Date(timestamp);
@@ -374,8 +435,12 @@ export function OnboardingAuthorityPanel({
   }
   function revoke(grant: Grant) {
     setMode('revoke');
+    setDecisions({});
     setOperation(grant.operation_id);
     setTarget('repository' in grant ? grant.repository : grant.origin);
+    setBranch('branch' in grant ? grant.branch : '');
+    setPrivateRepository('visibility' in grant && grant.visibility === 'private');
+    setEditTiers(false);
     const timestamp = Date.parse(overview?.charter?.expires_at || '');
     const date = new Date(timestamp);
     setExpires(
@@ -456,6 +521,9 @@ export function OnboardingAuthorityPanel({
                   <li key={index}>
                     {grant.operation_id} · {'repository' in grant ? grant.repository : grant.origin}
                     {'branch' in grant ? ` · ${grant.branch}` : ''}{' '}
+                    {'visibility' in grant && grant.visibility === 'private'
+                      ? t('authority.private_repository')
+                      : null}{' '}
                     <button type="button" disabled={busy} onClick={() => revoke(grant)}>
                       {t('authority.revoke')}
                     </button>
@@ -472,6 +540,14 @@ export function OnboardingAuthorityPanel({
                   )
                 )}
               </ul>
+              {overview.charter.data_tier ? (
+                <p>
+                  {t('authority.tier_read')}:{' '}
+                  {overview.charter.data_tier.read.join(', ') || t('authority.tier_none')} ·{' '}
+                  {t('authority.tier_write')}:{' '}
+                  {overview.charter.data_tier.write.join(', ') || t('authority.tier_none')}
+                </p>
+              ) : null}
             </>
           ) : (
             <p>{t('authority.none')}</p>
@@ -504,9 +580,13 @@ export function OnboardingAuthorityPanel({
               type="button"
               onClick={() => {
                 setMode('grant');
+                setDecisions({});
                 setOperation('');
                 setTarget('');
                 setBranch('');
+                setMergeBase('');
+                setPrivateRepository(false);
+                setEditTiers(false);
                 setExpires('');
               }}
             >
@@ -519,9 +599,14 @@ export function OnboardingAuthorityPanel({
                 onChange={(event) => {
                   setOperation(event.target.value);
                   setMode('grant');
+                  if (event.target.value === 'vcs:development') {
+                    setBranch('agent/kyberion-development');
+                    setMergeBase('main');
+                  }
                 }}
               >
                 <option value="">{t('authority.choose')}</option>
+                <option value="vcs:development">{t('authority.development')}</option>
                 <option value="vcs:pr_create">{t('authority.pr')}</option>
                 <option value="vcs:pr_merge">{t('authority.merge')}</option>
                 <option value="vcs:push">{t('authority.push')}</option>
@@ -529,6 +614,16 @@ export function OnboardingAuthorityPanel({
                 <option value="browser:open_tab">{t('authority.tab')}</option>
               </select>
             </label>
+            {operation.startsWith('vcs:') ? (
+              <label>
+                <input
+                  type="checkbox"
+                  checked={privateRepository}
+                  onChange={(event) => setPrivateRepository(event.target.checked)}
+                />
+                {t('authority.private_repository')}
+              </label>
+            ) : null}
             <label>
               {t('authority.target')}
               <input
@@ -538,9 +633,16 @@ export function OnboardingAuthorityPanel({
                 placeholder="https://github.com/owner/repository"
               />
             </label>
-            {operation === 'vcs:pr_merge' || operation === 'vcs:push' ? (
+            {operation === 'vcs:development' ? <p>{t('authority.development_bounds')}</p> : null}
+            {operation === 'vcs:pr_merge' ||
+            operation === 'vcs:push' ||
+            operation === 'vcs:development' ? (
               <label>
-                {t('authority.branch')}
+                {t(
+                  operation === 'vcs:development'
+                    ? 'authority.candidate_branch'
+                    : 'authority.branch'
+                )}
                 <input
                   type="text"
                   value={branch}
@@ -548,6 +650,73 @@ export function OnboardingAuthorityPanel({
                   placeholder="main"
                 />
               </label>
+            ) : null}
+            {operation === 'vcs:development' ? (
+              <label>
+                {t('authority.merge_base')}
+                <input
+                  type="text"
+                  value={mergeBase}
+                  onChange={(event) => setMergeBase(event.target.value)}
+                />
+              </label>
+            ) : null}
+            <label>
+              <input
+                type="checkbox"
+                checked={editTiers}
+                onChange={(event) => {
+                  setEditTiers(event.target.checked);
+                  if (event.target.checked) {
+                    setReadTiers(overview.charter?.data_tier?.read ?? ['public']);
+                    setWriteTiers(overview.charter?.data_tier?.write ?? []);
+                  }
+                }}
+              />
+              {t('authority.tier_edit')}
+            </label>
+            {editTiers ? (
+              <fieldset>
+                <legend>{t('authority.tier_scope')}</legend>
+                <p>{t('authority.tier_bounds')}</p>
+                {(['read', 'write'] as const).map((access) => (
+                  <fieldset key={access}>
+                    <legend>
+                      {t(access === 'read' ? 'authority.tier_read' : 'authority.tier_write')}
+                    </legend>
+                    {[
+                      { token: 'public', label: t('authority.tier_public') },
+                      {
+                        token: kind === 'person' ? 'personal' : `confidential:${tenant}`,
+                        label: t(
+                          kind === 'person'
+                            ? 'authority.tier_personal'
+                            : 'authority.tier_confidential'
+                        ),
+                      },
+                    ].map((choice) => {
+                      const values = access === 'read' ? readTiers : writeTiers;
+                      const update = access === 'read' ? setReadTiers : setWriteTiers;
+                      return (
+                        <label key={choice.token}>
+                          <input
+                            type="checkbox"
+                            checked={values.includes(choice.token)}
+                            onChange={(event) =>
+                              update((previous) =>
+                                event.target.checked
+                                  ? [...new Set([...previous, choice.token])]
+                                  : previous.filter((value) => value !== choice.token)
+                              )
+                            }
+                          />
+                          {choice.label}
+                        </label>
+                      );
+                    })}
+                  </fieldset>
+                ))}
+              </fieldset>
             ) : null}
             {(overview.delegable_decisions ?? []).length ? (
               <fieldset>
@@ -607,8 +776,10 @@ export function OnboardingAuthorityPanel({
             <button
               type="button"
               disabled={
-                (!grants.length && !Object.keys(chosenDecisions).length) ||
+                (!grants.length && !Object.keys(chosenDecisions).length && !editTiers) ||
                 (grants.length && !target) ||
+                (['vcs:push', 'vcs:pr_merge', 'vcs:development'].includes(operation) && !branch) ||
+                (operation === 'vcs:development' && (!mergeBase || mergeBase === branch)) ||
                 !expiry ||
                 Date.parse(expiry) <= Date.now() ||
                 (overview.renewal_required && !renewExisting)

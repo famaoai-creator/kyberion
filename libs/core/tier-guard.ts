@@ -67,6 +67,8 @@ import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
 import {
   tenantStorePartitionWriteDecision,
   tenantScopeConfig,
+  normalizeTenantPolicyPath as normalizePath,
+  tenantPolicyPathStartsWith as pathStartsWith,
   normalizeRegisteredTenantProfile,
   isValidTenantGroupProfile,
   extractTenantGroupFromSharedPath,
@@ -111,27 +113,6 @@ function projectRoot(): string {
     // root is the safe fallback for that one-time project-local probe.
     return process.cwd();
   }
-}
-
-function trimTrailingSlashes(value: string): string {
-  // A linear scan instead of `/\/+$/`, which backtracks quadratically on long
-  // runs of '/' (CodeQL js/polynomial-redos).
-  let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
-  return value.slice(0, end);
-}
-
-function normalizePath(p: string): string {
-  // Policy paths use POSIX separators even when Kyberion runs on Windows.
-  // `path.relative()` returns `\\` on Windows, so normalize both forms before
-  // matching policy prefixes.
-  return trimTrailingSlashes(p.replace(/\\/g, '/'));
-}
-
-function pathStartsWith(targetPath: string, patternPath: string): boolean {
-  const t = normalizePath(targetPath);
-  const p = normalizePath(patternPath);
-  return t === p || t.startsWith(p + '/');
 }
 
 function isOutsideProjectRoot(relativePath: string): boolean {
@@ -486,6 +467,27 @@ function isRegisteredActiveTenant(tenantSlug: string): boolean {
   } catch {
     return false;
   }
+}
+
+/** Proven tenant ownership for publication provenance, never an access grant.
+ * Shared policy exceptions, group shares and cross-tenant registries have no
+ * single tenant owner even when their first segment happens to be a valid slug. */
+export function isTenantOwnedPolicyPath(relativePath: string, tenantSlug: string): boolean {
+  const loaded = loadPolicy();
+  if (loaded.status !== 'loaded' || !isValidTenantSlug(tenantSlug)) return false;
+  const cfg = tenantScopeConfig(loaded.policy, false);
+  if (
+    cfg.sharedPrefixes.some((prefix) => pathStartsWith(relativePath, prefix)) ||
+    cfg.systemRegistryReads.some((entry) => pathStartsWith(relativePath, entry.path)) ||
+    extractTenantGroupFromSharedPath(relativePath)
+  )
+    return false;
+  const scoped = extractTenantFromProtectedPrefix(relativePath, cfg.protectedPrefixes);
+  return (
+    scoped?.tenant === tenantSlug &&
+    cfg.slugPattern.test(tenantSlug) &&
+    isRegisteredActiveTenant(tenantSlug)
+  );
 }
 
 function loadTenantGroupProfile(groupId: string): TenantGroupProfile | null {
