@@ -125,7 +125,7 @@ type ChatContentPart =
 
 type ChatMessageContent = string | null | ChatContentPart[];
 
-interface ChatMessage {
+export interface ChatMessage {
   role: ChatRole;
   content?: ChatMessageContent;
   tool_call_id?: string;
@@ -170,7 +170,7 @@ interface ChatCompletionRequest {
   };
 }
 
-interface ChatCompletionResponse {
+export interface ChatCompletionResponse {
   choices: Array<{
     message: ChatMessage;
   }>;
@@ -645,7 +645,7 @@ async function probeBackendAvailabilityFromEnvNames(
  * boundary compaction in `worker-context-compaction.ts`.
  */
 export class OpenAiCompatibleBackend implements ReasoningBackend {
-  readonly name = 'openai-compatible';
+  readonly name: string = 'openai-compatible';
   readonly egressEndpoint: string;
   readonly providerPreset: LocalLlmProviderPreset;
   readonly supportsVision: boolean;
@@ -722,7 +722,7 @@ export class OpenAiCompatibleBackend implements ReasoningBackend {
     return budget;
   }
 
-  private async fetchChatCompletion(
+  protected async fetchChatCompletion(
     messages: ChatMessage[],
     opts: {
       useTools?: boolean;

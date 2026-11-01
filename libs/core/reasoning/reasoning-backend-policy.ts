@@ -8,6 +8,7 @@ export type ReasoningBackendMode =
   | 'codex-cli'
   | 'claude-agent'
   | 'anthropic'
+  | 'openai-api'
   | 'gemini-cli'
   | 'gemini-api'
   | 'agy-cli'

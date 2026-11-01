@@ -62,6 +62,7 @@ export const REASONING_PROVIDER_ADAPTERS = [
   'claude-agent-sdk',
   'provider-cli',
   'anthropic-api',
+  'openai-responses',
   'gemini-api',
   'grok-api',
   'openrouter-api',
@@ -168,6 +169,7 @@ export interface ReasoningProviderDescriptor {
   capabilities: ReasoningProviderCapabilities;
   env_keys: string[];
   secret_refs?: readonly ReasoningProviderSecretRef[];
+  api_proof?: ReasoningApiProofConfiguration;
   cost_tier?: ReasoningProviderCostTier;
   transport: BackendTransport;
   data_egress: BackendDataEgress;
@@ -184,6 +186,14 @@ export interface ReasoningProviderDescriptor {
   /** Declares support for isolated (tool-free) text generation; absent = unsupported. */
   isolated_text_generation?: ReasoningProviderIsolatedTextGeneration;
   cli?: ReasoningProviderCli;
+}
+
+export interface ReasoningApiProofConfiguration {
+  protocol: string;
+  base_url: string;
+  default_model?: string;
+  default_model_role?: 'anthropic-default' | 'gemini-default';
+  runtime_url_env?: string;
 }
 
 export interface ReasoningProviderSecretRef {
@@ -684,6 +694,71 @@ export function explainReasoningProviderDescriptor(value: unknown): ParseResult 
     return { reason: 'model_env_keys must be env var names' };
   }
   let secretRefs: ReasoningProviderSecretRef[] | undefined;
+  let apiProof: ReasoningApiProofConfiguration | undefined;
+  if (value.api_proof !== undefined) {
+    const raw = value.api_proof;
+    if (
+      !isRecord(raw) ||
+      Object.keys(raw).some(
+        (key) =>
+          ![
+            'protocol',
+            'base_url',
+            'default_model',
+            'default_model_role',
+            'runtime_url_env',
+          ].includes(key)
+      ) ||
+      typeof raw.protocol !== 'string' ||
+      !PROVIDER_ID_PATTERN.test(raw.protocol) ||
+      typeof raw.base_url !== 'string'
+    )
+      return { reason: 'api_proof needs a protocol and HTTPS base_url' };
+    let endpoint: URL;
+    try {
+      endpoint = new URL(raw.base_url);
+    } catch {
+      return { reason: 'api_proof base_url is invalid' };
+    }
+    if (
+      endpoint.protocol !== 'https:' ||
+      endpoint.username ||
+      endpoint.password ||
+      endpoint.search ||
+      endpoint.hash ||
+      isLocalReasoningEndpoint(endpoint.origin)
+    )
+      return {
+        reason:
+          'api_proof base_url must be a public HTTPS URL without credentials, query, or fragment',
+      };
+    if (
+      raw.default_model !== undefined &&
+      (typeof raw.default_model !== 'string' ||
+        !/^[a-zA-Z0-9][a-zA-Z0-9._:/-]{0,159}$/u.test(raw.default_model))
+    )
+      return { reason: 'api_proof default_model is invalid' };
+    if (
+      raw.default_model_role !== undefined &&
+      !['anthropic-default', 'gemini-default'].includes(String(raw.default_model_role))
+    )
+      return { reason: 'api_proof default_model_role is invalid' };
+    if (
+      raw.runtime_url_env !== undefined &&
+      (typeof raw.runtime_url_env !== 'string' || !ENV_KEY_PATTERN.test(raw.runtime_url_env))
+    )
+      return { reason: 'api_proof runtime_url_env is invalid' };
+    apiProof = {
+      protocol: raw.protocol,
+      base_url: raw.base_url,
+      ...(typeof raw.default_model === 'string' ? { default_model: raw.default_model } : {}),
+      ...(raw.default_model_role === 'anthropic-default' ||
+      raw.default_model_role === 'gemini-default'
+        ? { default_model_role: raw.default_model_role }
+        : {}),
+      ...(typeof raw.runtime_url_env === 'string' ? { runtime_url_env: raw.runtime_url_env } : {}),
+    };
+  }
   if (value.secret_refs !== undefined) {
     if (!Array.isArray(value.secret_refs)) return { reason: 'secret_refs must be an array' };
     secretRefs = [];
@@ -736,6 +811,7 @@ export function explainReasoningProviderDescriptor(value: unknown): ParseResult 
     },
     env_keys: value.env_keys.map((entry) => entry.trim()),
     ...(secretRefs ? { secret_refs: secretRefs } : {}),
+    ...(apiProof ? { api_proof: apiProof } : {}),
     ...(costTier !== undefined ? { cost_tier: costTier } : {}),
     transport,
     data_egress: value.data_egress as BackendDataEgress,

@@ -161,6 +161,7 @@ generated registries, validation, and security boundaries), follow the
 #### 4c. Reasoning backend setup
 
 - **Command**: `pnpm reasoning:setup`
+- API キーの登録・少量の実証・provider 拡張は [API provider guide](developer/REASONING_API_PROVIDERS.ja.md) を参照してください。
 - **Purpose**: see which reasoning backends this host can use. The source of truth for candidates is `allowed_modes` in `knowledge/product/governance/reasoning-backend-policy.json`; the main ones are:
   - Local CLIs: `claude-cli` / `codex-cli` / `gemini-cli` / `agy-cli` / `grok-cli` / `copilot` / `cursor-cli` / `opencode-cli` / `devin-cli`
   - APIs: `anthropic` / `claude-agent` / `gemini-api` / `grok-api` / `openrouter` / `nemotron-api`

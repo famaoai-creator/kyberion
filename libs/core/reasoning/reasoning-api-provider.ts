@@ -8,6 +8,7 @@ import { AnthropicVoiceBridge } from '../provider/anthropic-voice-bridge.js';
 import { buildGeminiApiBackendFromEnv } from '../provider/gemini-api-backend.js';
 import { buildGrokApiBackendFromEnv } from '../provider/grok-api-backend.js';
 import { buildOpenRouterBackendFromEnv } from '../provider/openrouter-backend.js';
+import { OpenAiResponsesBackend } from '../provider/openai-responses-backend.js';
 import { maybeWrapWithDispatcher } from '../agent/agent-dispatch.js';
 import type { ReasoningToolName, SamplingParams } from './reasoning-route-resolver.js';
 import type { ReasoningBackendMode } from './reasoning-backend-policy.js';
@@ -43,6 +44,26 @@ type ApiAdapterBuilder = (
  * one builder here.
  */
 const API_ADAPTER_BUILDERS: Partial<Record<ReasoningProviderAdapterId, ApiAdapterBuilder>> = {
+  'openai-responses': (options, env) => {
+    const descriptor = getReasoningProviderDescriptor(options.mode);
+    const keys = descriptor?.secret_refs?.[0]?.env_keys ?? [];
+    const key = keys.map((name) => env[name]?.trim()).find(Boolean);
+    const model =
+      options.model || descriptor?.model_env_keys?.map((name) => env[name]?.trim()).find(Boolean);
+    if ((!key && !credentialExecutionIdentity().tenantSlug) || !model) return null;
+    const backend = new OpenAiResponsesBackend({
+      apiKey: key ?? '',
+      model,
+      credentialKeys: keys,
+      endpoint: descriptor?.api_proof
+        ? `${descriptor.api_proof.base_url.replace(/\/+$/u, '')}/responses`
+        : undefined,
+    });
+    return {
+      mode: options.mode,
+      backend: { backend, provider: options.provider, label: options.mode },
+    };
+  },
   'anthropic-api': (options, env) => {
     const { mode, provider } = options;
     const tenant = credentialExecutionIdentity().tenantSlug;

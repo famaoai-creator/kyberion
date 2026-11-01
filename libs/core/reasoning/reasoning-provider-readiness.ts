@@ -87,6 +87,13 @@ const ADAPTER_PROBES: Readonly<Record<ReasoningProviderAdapterId, AdapterProbe>>
       : deps.claudeProbe(),
   'provider-cli': async (descriptor, env, deps) => cliBinaryProbe(descriptor, env, deps),
   'anthropic-api': async (_descriptor, env, deps) => deps.anthropicProbe(env),
+  'openai-responses': async (descriptor, env) => {
+    const key = descriptor.secret_refs?.[0]?.env_keys.some((name) => Boolean(env[name]?.trim()));
+    const model = descriptor.model_env_keys?.some((name) => Boolean(env[name]?.trim()));
+    return key && model
+      ? { available: true }
+      : { available: false, reason: 'Configure an OpenAI API key and explicit API model.' };
+  },
   'gemini-api': async (_descriptor, env) => probeGeminiApiBackendAvailability(env),
   'grok-api': async (_descriptor, env) => probeGrokApiBackendAvailability(env),
   'openrouter-api': async (_descriptor, env) => probeOpenRouterBackendAvailability(env),
