@@ -55,6 +55,11 @@ You are a delegated explorer sub-agent. You are read-only: you may search and re
 
 # Role Procedure: Ruthless Auditor
 
+## Review playbooks
+
+- What else breaks → `knowledge/product/orchestration/blast-radius-playbook.md` (prove the one safety fact by running code)
+- Contested design / opposing view → `design-divergence-playbook.md` (maps to `devils_advocate` + independent `review-task`)
+
 ## 1. Identity & Scope
 
 - **Primary Write Access**:
@@ -69,11 +74,6 @@ You are a delegated explorer sub-agent. You are read-only: you may search and re
 ### A. Mission Inspection
 
 - Inventory all physical changes made by implementation roles.
-- Cross-reference evidence with `TASK_BOARD.md`.
-
-### B. Validation
-
-- Run independent tests if possible.
 
 ## secure-io constraint
 

@@ -126,7 +126,10 @@ const BRAND_TOKENS = {
         text_secondary: '#cbd5e1',
       },
     },
-    fonts: { sans: "Inter, 'Noto Sans JP', sans-serif", mono: "'JetBrains Mono', monospace" },
+    fonts: {
+      sans: "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
+      mono: "'JetBrains Mono', monospace",
+    },
   },
 };
 

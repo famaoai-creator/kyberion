@@ -93,7 +93,7 @@ export function buildVideoDesignCssVars(input: {
     '--kb-text-muted': palette.textMuted,
     '--kb-text-subtle': palette.textSubtle,
     '--kb-text-inverse': palette.textInverse,
-    '--kb-font-sans': '"Inter", -apple-system, BlinkMacSystemFont, sans-serif',
+    '--kb-font-sans': '"Helvetica Neue", Arial, -apple-system, BlinkMacSystemFont, sans-serif',
     '--kb-panel-radius': input.layoutFamily === 'vtuber-stage' ? '32px' : '24px',
     '--kb-surface-radius': input.layoutFamily === 'vtuber-stage' ? '30px' : '24px',
     '--kb-section-gap': input.layoutFamily === 'vtuber-stage' ? '28px' : '24px',

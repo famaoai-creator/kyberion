@@ -22,6 +22,19 @@ describe('working principles brief', () => {
     const lines = buildWorkingPrinciplesLines(undefined, { compact: false });
     const ruleLines = lines.filter((line) => line.startsWith('- '));
     expect(ruleLines).toHaveLength(CORE_WORKING_PRINCIPLES.length);
+    const text = lines.join('\n');
+    expect(text).toContain('share one premise');
+    expect(text).toContain('checkable state');
+    expect(text).toContain('remove dead weight');
+    expect(text).toContain('name the limiter');
+    expect(text).toContain('rerunnable tool');
+    expect(text).toContain('first wrong decision');
+  });
+
+  it('implementer addendum includes attack-the-premise and subtract-before-add', () => {
+    const text = buildWorkingPrinciplesLines('implementer').join('\n');
+    expect(text).toContain('attack the premise');
+    expect(text).toContain('subtracting dead paths');
   });
 
   it('role aliases map to canonical addenda and unknown roles degrade to core-only', () => {

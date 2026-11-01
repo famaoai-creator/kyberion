@@ -147,7 +147,7 @@ export function buildLandingPageHtml(
   const varLines = Object.entries(cssVars)
     .map(([key, value]) => `      ${key}: ${value};`)
     .join('\n');
-  const heading = pack?.theme.fonts.heading || 'Inter, sans-serif';
+  const heading = pack?.theme.fonts.heading || "'Helvetica Neue', Arial, system-ui, sans-serif";
   const sections = briefSections(brief)
     .map(
       (section) => `      <section class="panel">
@@ -175,7 +175,7 @@ ${varLines}
       body {
         background: var(--kb-bg-main, #020617);
         color: var(--kb-text-primary, #e2e8f0);
-        font-family: var(--kb-font-sans, 'Inter', sans-serif);
+        font-family: var(--kb-font-sans, 'Helvetica Neue', Arial, sans-serif);
         line-height: 1.7;
       }
       main { max-width: 960px; margin: 0 auto; padding: 48px 24px 96px; }
