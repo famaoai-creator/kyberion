@@ -187,7 +187,24 @@ export interface ComputerInteractionAction {
       | 'ax_get'
       | 'ax_is'
       | 'ax_session_end'
-      | 'ax_session_gc';
+      | 'ax_session_gc'
+      | 'ax_wait'
+      | 'ax_permissions'
+      | 'ax_focus_window'
+      | 'ax_move_window'
+      | 'ax_resize_window'
+      | 'ax_minimize_window'
+      | 'ax_maximize_window'
+      | 'ax_restore_window'
+      | 'ax_open_system_surface'
+      | 'ax_launch'
+      | 'ax_close_app'
+      | 'ax_dismiss_notification'
+      | 'ax_dismiss_all_notifications'
+      | 'ax_notification_action'
+      | 'ax_clipboard_get'
+      | 'ax_clipboard_set'
+      | 'ax_clipboard_clear';
     goal?: string;
     observation?: string;
     coordinate?: { x: number; y: number };
@@ -220,6 +237,32 @@ export interface ComputerInteractionAction {
     surface?: string;
     wait_for?: string;
     wait_for_gone?: string;
+    agent_id?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    ms?: number;
+    event?: string;
+    predicate?: string;
+    action?: string;
+    count?: number;
+    menu?: boolean;
+    menu_closed?: boolean;
+    notification?: boolean;
+    index?: number;
+    expected_app?: string;
+    expected_title?: string;
+    format?: string;
+    image?: string;
+    file_urls?: string[];
+    force?: boolean;
+    activate?: boolean;
+    cdp?: boolean | number;
+    no_attach?: boolean;
+    app_args?: string[];
+    app_env?: Record<string, string>;
+    cwd?: string;
   };
 }
 
