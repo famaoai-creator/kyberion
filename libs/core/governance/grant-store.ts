@@ -76,6 +76,8 @@ import {
 
 export interface GrantScope {
   tenant_slug?: string;
+  credential_provider?: string;
+  credential_ref?: string;
   /** Calendar series ids of the meetings this grant covers. */
   meeting_series_ids?: string[];
   /** Normalized meeting URLs (see {@link normalizeMeetingUrl}). */
@@ -114,6 +116,8 @@ export interface GrantRecord {
 export interface GrantDraft {
   capability: string;
   tenant_slug: string;
+  credential_provider?: string;
+  credential_ref?: string;
   meeting_series_ids?: string[];
   meeting_urls?: string[];
   purpose: string;
@@ -125,6 +129,8 @@ export interface GrantDraft {
 export interface NormalizedGrantDraft {
   capability: string;
   tenant_slug: string;
+  credential_provider?: string;
+  credential_ref?: string;
   meeting_series_ids: string[];
   meeting_urls: string[];
   purpose: string;
@@ -217,8 +223,21 @@ function uniqueSorted(values: string[]): string[] {
 
 /** Validate and canonicalize a draft against its capability policy. */
 export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
+  const provider = draft.credential_provider?.trim();
+  if (provider !== undefined && !/^[a-z][a-z0-9-]{0,63}$/.test(provider))
+    throw new GrantError('invalid_input', 'invalid credential provider');
+  const reference = draft.credential_ref?.trim();
+  if (
+    reference !== undefined &&
+    !/^[a-z0-9][a-z0-9._-]{0,63}\/[A-Z][A-Z0-9_]{0,63}$/.test(reference)
+  )
+    throw new GrantError('invalid_input', 'invalid credential reference');
   const capability = String(draft?.capability ?? '').trim();
   const policy = requireStandingGrantPolicy(capability);
+  if (policy.scope_keys.includes('credential_provider') && !provider)
+    throw new GrantError('invalid_input', 'credential_provider is required');
+  if (policy.scope_keys.includes('credential_ref') && !reference)
+    throw new GrantError('invalid_input', 'credential_ref is required');
   const tenant = String(draft.tenant_slug ?? '').trim();
   if (!isValidTenantSlug(tenant)) {
     throw new GrantError('invalid_input', `invalid tenant slug: ${draft.tenant_slug}`);
@@ -257,6 +276,8 @@ export function normalizeGrantDraft(draft: GrantDraft): NormalizedGrantDraft {
   }
   return {
     capability,
+    ...(provider ? { credential_provider: provider } : {}),
+    ...(reference ? { credential_ref: reference } : {}),
     tenant_slug: tenant,
     meeting_series_ids: seriesIds,
     meeting_urls: meetingUrls,
@@ -304,6 +325,10 @@ export function validateGrantRecord(input: unknown): { valid: boolean; errors: s
     if (normalizeMeetingUrl(url) !== url) errors.push(`meeting URL is not normalized: ${url}`);
   }
   if (policy) {
+    if (policy.scope_keys.includes('credential_provider') && !record.scope.credential_provider)
+      errors.push('scope.credential_provider is required');
+    if (policy.scope_keys.includes('credential_ref') && !record.scope.credential_ref)
+      errors.push('scope.credential_ref is required');
     if (policy.scope_keys.includes('tenant_slug') && !tenant) {
       errors.push('scope.tenant_slug is required');
     }
@@ -514,6 +539,8 @@ function writeNewGrant(
     capability: draft.capability,
     scope: {
       tenant_slug: draft.tenant_slug,
+      ...(draft.credential_provider ? { credential_provider: draft.credential_provider } : {}),
+      ...(draft.credential_ref ? { credential_ref: draft.credential_ref } : {}),
       ...(draft.meeting_series_ids.length ? { meeting_series_ids: draft.meeting_series_ids } : {}),
       ...(draft.meeting_urls.length ? { meeting_urls: draft.meeting_urls } : {}),
     },
@@ -540,12 +567,14 @@ function writeNewGrant(
 // ---------------------------------------------------------------------------
 
 export function grantApprovalEffectBinding(draft: NormalizedGrantDraft): string {
-  return `grant-standing:${draft.capability}:${draft.tenant_slug}`;
+  return `grant-standing:${draft.capability}:${draft.tenant_slug}${draft.credential_provider ? `:${draft.credential_provider}` : ''}`;
 }
 
 /** Canonical payload hashed into the approval: every field the human approved. */
 export function grantApprovalPayload(draft: NormalizedGrantDraft): Record<string, unknown> {
   return {
+    ...(draft.credential_provider ? { credential_provider: draft.credential_provider } : {}),
+    ...(draft.credential_ref ? { credential_ref: draft.credential_ref } : {}),
     action: 'grant_standing',
     capability: draft.capability,
     tenant_slug: draft.tenant_slug,
@@ -563,6 +592,8 @@ export function buildGrantApprovalDetails(
   requestedBy: string
 ): string {
   const lines = [`Capability: ${draft.capability}`, `Tenant: ${draft.tenant_slug}`];
+  if (draft.credential_provider) lines.push(`Credential provider: ${draft.credential_provider}`);
+  if (draft.credential_ref) lines.push(`Credential reference: ${draft.credential_ref}`);
   if (draft.meeting_series_ids.length) {
     lines.push(`Meeting series: ${draft.meeting_series_ids.join(', ')}`);
   }
@@ -571,7 +602,9 @@ export function buildGrantApprovalDetails(
     `Purpose: ${draft.purpose}`,
     `Expires: ${draft.ttl_days} day(s) after the grant is applied`,
     `Requested by: ${requestedBy}`,
-    'Effect if approved: a standing grant is created; matching meetings may be recorded without a per-mission consent until it expires or is revoked (`pnpm kyberion grants revoke <grant_id>`).'
+    draft.credential_provider
+      ? 'Effect if approved: matching tenant tasks may resolve the named provider credential until expiry or revocation. Tool authority, egress and budgets remain separate.'
+      : 'Effect if approved: a standing grant is created; matching meetings may be recorded without a per-mission consent until it expires or is revoked (`pnpm kyberion grants revoke <grant_id>`).'
   );
   return lines.join('\n');
 }
@@ -764,6 +797,10 @@ export function verifyGrantBasis(record: GrantRecord): boolean {
     if (!Number.isInteger(ttlDays) || ttlDays < 1) return false;
     const draft: NormalizedGrantDraft = {
       capability: record.capability,
+      ...(record.scope.credential_provider
+        ? { credential_provider: record.scope.credential_provider }
+        : {}),
+      ...(record.scope.credential_ref ? { credential_ref: record.scope.credential_ref } : {}),
       tenant_slug: record.scope.tenant_slug,
       meeting_series_ids: record.scope.meeting_series_ids ?? [],
       meeting_urls: record.scope.meeting_urls ?? [],

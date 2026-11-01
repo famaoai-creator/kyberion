@@ -79,6 +79,13 @@ export function registerSecretResolver(
   if (!resolver || typeof resolver.name !== 'string' || !resolver.name.trim()) {
     throw new TypeError('Secret resolver must have a non-empty name');
   }
+  if (
+    secretResolverSeam.getOptional()?.name === 'local-credential-allocations' &&
+    resolver.name !== 'local-credential-allocations'
+  ) {
+    registeredDisposer?.();
+    registeredDisposer = null;
+  }
   registeredDisposer = secretResolverSeam.register(resolver.name, resolver, metadata);
   return registeredDisposer;
 }

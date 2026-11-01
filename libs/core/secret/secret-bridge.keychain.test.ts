@@ -46,6 +46,7 @@ function createFakeChild() {
 describe('MacKeychainSecretProvider child supervision (G12)', () => {
   beforeEach(() => {
     mocks.spawn.mockReset();
+    mocks.safeWriteFile.mockReset();
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -58,6 +59,57 @@ describe('MacKeychainSecretProvider child supervision (G12)', () => {
     child.stdout.emit('data', 'sekret\n');
     child.emit('close', 0);
     await expect(pending).resolves.toBe('sekret');
+  });
+
+  it('updates or adds once without a delete-first child or secret-bearing argv', async () => {
+    const child = createFakeChild();
+    mocks.spawn.mockReturnValue(child);
+    const pending = new MacKeychainSecretProvider().set('svc', 'acct', 'synthetic-new-value');
+    expect(mocks.spawn).toHaveBeenCalledOnce();
+    expect(mocks.spawn.mock.calls[0][0]).toBe('swift');
+    const args = mocks.spawn.mock.calls[0][1];
+    expect(args[1]).toContain('SecItemUpdate');
+    expect(args[1]).not.toContain('SecItemDelete');
+    expect(JSON.stringify(args)).not.toContain('synthetic-new-value');
+    child.emit('close', 0);
+    await expect(pending).resolves.toBeUndefined();
+  });
+
+  it('does not remove the registry or retry when deletion is refused', async () => {
+    const child = createFakeChild();
+    mocks.spawn.mockReturnValue(child);
+    const pending = new MacKeychainSecretProvider().delete('svc', 'acct');
+    const assertion = expect(pending).rejects.toThrow('refused');
+    child.emit('close', 51);
+    await assertion;
+    expect(mocks.spawn).toHaveBeenCalledOnce();
+    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+  });
+
+  it('rejects registry removal errors instead of throwing from the child callback', async () => {
+    const child = createFakeChild();
+    mocks.spawn.mockReturnValue(child);
+    mocks.safeWriteFile.mockImplementation(() => {
+      throw new Error('registry write denied');
+    });
+    const pending = new MacKeychainSecretProvider().delete('svc', 'acct');
+    const assertion = expect(pending).rejects.toThrow('registry write denied');
+    expect(() => child.emit('close', 0)).not.toThrow();
+    await assertion;
+  });
+
+  it('rejects registry addition errors instead of throwing from the child callback', async () => {
+    mocks.safeWriteFile.mockImplementationOnce(() => {
+      throw new Error('registry write denied');
+    });
+    mocks.spawn.mockImplementation(() => {
+      const child = createFakeChild();
+      queueMicrotask(() => child.emit('close', 0));
+      return child;
+    });
+    await expect(new MacKeychainSecretProvider().set('svc', 'acct', 'test-value')).rejects.toThrow(
+      'registry write denied'
+    );
   });
 
   it("resolves null instead of crashing when 'security' cannot be spawned", async () => {
@@ -81,17 +133,13 @@ describe('MacKeychainSecretProvider child supervision (G12)', () => {
 
   it('rejects a hung swift write after its bound (stdin still piped)', async () => {
     vi.useFakeTimers();
-    const deleteChild = createFakeChild();
     const writeChild = createFakeChild();
-    mocks.spawn.mockReturnValueOnce(deleteChild).mockReturnValueOnce(writeChild);
+    mocks.spawn.mockReturnValueOnce(writeChild);
     const provider = new MacKeychainSecretProvider();
     const pending = provider.set('svc', 'acct', 'value');
     const assertion = expect(pending).rejects.toThrow(
       `macOS Keychain write failed: timed out after ${KEYCHAIN_WRITE_TIMEOUT_MS}ms`
     );
-    // The delete step must not hang the write either: let it time out too.
-    await vi.advanceTimersByTimeAsync(KEYCHAIN_COMMAND_TIMEOUT_MS);
-    expect(deleteChild.kill).toHaveBeenCalledWith('SIGKILL');
     expect(writeChild.stdin.write).toHaveBeenCalledWith('svc\nacct\nvalue');
     expect(writeChild.stdin.end).toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(KEYCHAIN_WRITE_TIMEOUT_MS);
