@@ -132,11 +132,19 @@ describe('iMessage bridge event log write-time rotation', () => {
     ).toBe(true);
   });
 
-  it('rotates the live log to a segment once it crosses the injected threshold', () => {
+  it('rotates the live log to a segment once it crosses the injected threshold', async () => {
     bridge.setIMessageLogTuningForTests({ rotateMinBytes: 600 });
+    const { auditChain } = await import('./governance/audit-chain.js');
+    const recorded = vi.spyOn(auditChain, 'record');
     const ids = Array.from({ length: 6 }, (_, i) => `evt-${i}`);
     for (const id of ids) bridge.appendIMessageBridgeEvent(event(id));
     expect(segments()).toHaveLength(1);
+    // The bridge identity cannot write the retention log: the rotation is
+    // recorded on the governed audit chain instead of being dropped.
+    expect(recorded).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'storage_retention', operation: 'RETENTION_ROTATE' })
+    );
+    recorded.mockRestore();
     const all = [...segments().map(text), text(logPath())].join('');
     // Moved aside, never lost: every event is in the segment or the live log.
     for (const id of ids) expect(all).toContain(`"${id}"`);
