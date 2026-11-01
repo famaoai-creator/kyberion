@@ -139,9 +139,9 @@
     },
     {
       "file": "libs/actuators/voice-actuator/src/voice-stt-backend-adapters.ts",
-      "count": 2,
+      "count": 3,
       "classification": "legit-tmp",
-      "note": "STT intermediate wav"
+      "note": "STT intermediate wav (mlx_whisper, faster_whisper, speech_cpp loopback)"
     },
     {
       "file": "libs/core/agent/agent-runtime-root.ts",
