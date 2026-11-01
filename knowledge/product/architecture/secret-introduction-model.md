@@ -54,6 +54,10 @@ replacement encryption master. macOS Keychain writes attach an access list that 
 `/usr/bin/security` (the reader), so launchd / non-interactive reads need no prompt. An
 existing item keeps its ACL on update and only a binary it trusts may delete it, so a
 rewrite first deletes it with `security` (refusal leaves it untouched), then adds it once.
+Trade-off: trusting `/usr/bin/security` means any process running as the same macOS user can
+read the item without a prompt — intended, so launchd jobs (e.g. `backup-daily`) can read it
+unattended. Values must be single-line (`security -w` returns multi-line values hex-encoded);
+a write that would fail that check is refused before the existing entry is touched.
 
 ## Flow
 

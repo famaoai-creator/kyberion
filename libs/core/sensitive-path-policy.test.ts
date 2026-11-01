@@ -3,6 +3,7 @@ import * as os from 'node:os';
 import * as path from 'node:path';
 import { getRegisteredEnvText, setRegisteredEnv } from './foundation/env.js';
 import {
+  assertSensitiveMetadataAllowed,
   assertSensitivePathAllowed,
   findSensitivePathInText,
   findSensitivePathMatch,
@@ -40,10 +41,15 @@ describe('sensitive-path-policy', () => {
       );
     });
 
-    it('admits reads of connection documents only, and only while the walk runs', () => {
+    it('admits metadata probes of connection documents only, and only while the walk runs', () => {
       const roots = withBackupCredentialReadAdmission({ encrypted: true }, (admitted) => {
-        expect(() => assertSensitivePathAllowed(connection, 'read')).not.toThrow();
-        for (const operation of ['write', 'append', 'mkdir', 'read/write']) {
+        expect(() => assertSensitiveMetadataAllowed(connection)).not.toThrow();
+        expect(() => assertSensitiveMetadataAllowed(vaultSecret)).toThrow(
+          '[SENSITIVE_PATH_DENIED]'
+        );
+        // Content stays denied inside the admission: tar reads the bytes.
+        expect(() => safeReadFile(connection)).toThrow('[SENSITIVE_PATH_DENIED]');
+        for (const operation of ['read', 'write', 'append', 'mkdir', 'read/write']) {
           expect(() => assertSensitivePathAllowed(connection, operation)).toThrow(
             '[SENSITIVE_PATH_DENIED]'
           );
@@ -57,9 +63,7 @@ describe('sensitive-path-policy', () => {
         return admitted.map(({ ruleId }) => ruleId);
       });
       expect(roots).toEqual(['credential.kyberion-connections']);
-      expect(() => assertSensitivePathAllowed(connection, 'read')).toThrow(
-        '[SENSITIVE_PATH_DENIED]'
-      );
+      expect(() => assertSensitiveMetadataAllowed(connection)).toThrow('[SENSITIVE_PATH_DENIED]');
     });
 
     it('refuses an unencrypted archive before admitting anything', () => {

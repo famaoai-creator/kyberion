@@ -150,4 +150,22 @@ describe('security boundary contract', () => {
       .map((filePath) => filePath.slice(repoRoot.length + 1));
     expect(importers).toEqual(['libs/core/secure-io.ts']);
   });
+
+  it('lets only the backup file walk use the backup credential read admission', () => {
+    const repoRoot = pathResolver.rootDir();
+    const users = [
+      ...collectProductionTsFiles(`${repoRoot}/libs`),
+      ...collectProductionTsFiles(`${repoRoot}/scripts`),
+      ...collectProductionTsFiles(`${repoRoot}/satellites`),
+      ...collectProductionTsFiles(`${repoRoot}/presence`),
+    ]
+      .filter((filePath) => !filePath.endsWith('/libs/core/sensitive-path-policy.ts'))
+      .filter((filePath) =>
+        /\bwithBackupCredentialReadAdmission\b/.test(
+          safeReadFile(filePath, { encoding: 'utf8' }) as string
+        )
+      )
+      .map((filePath) => filePath.slice(repoRoot.length + 1));
+    expect(users).toEqual(['scripts/lib/backup-file-selection.ts']);
+  });
 });

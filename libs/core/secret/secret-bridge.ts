@@ -132,6 +132,19 @@ function superviseKeychainChild(
   child.on('close', (code) => settle({ code }));
 }
 
+/** Single-line service / account / value (never logged: the error names no value). */
+function assertKeychainWritable(service: string, account: string, value: string): void {
+  if (/[\r\n]/u.test(service) || /[\r\n]/u.test(account)) {
+    throw new Error('macOS Keychain write refused: service and account must be single-line');
+  }
+  if (!value) throw new Error('macOS Keychain write refused: the value is empty');
+  if (/[\r\n]/u.test(value)) {
+    throw new Error(
+      'macOS Keychain write refused: the value contains a line break, which the keychain reader cannot return intact | next: store it base64-encoded or as a file secret'
+    );
+  }
+}
+
 // 1. macOS Keychain native provider
 export class MacKeychainSecretProvider implements SecretProvider {
   readonly id = 'mac_keychain';
@@ -160,6 +173,10 @@ export class MacKeychainSecretProvider implements SecretProvider {
   }
 
   async set(service: string, account: string, value: string): Promise<void> {
+    // The helper reads three stdin lines, and `security -w` returns a value
+    // holding a newline hex-encoded, so such a value could never be read back:
+    // refuse it here, before the existing entry is touched.
+    assertKeychainWritable(service, account, value);
     // An existing item keeps whatever ACL it was created with (SecItemUpdate
     // never changes it), and only a binary that item trusts may delete it. The
     // trusted reader (`security`) removes it first; refusal leaves it intact.
@@ -211,10 +228,19 @@ export class MacKeychainSecretProvider implements SecretProvider {
         // Any previous entry is already gone: keep the registry and read cache
         // honest, and say so, so the operator re-runs the write.
         invalidateKeychainRead(service, account);
+        // The entry is gone, so the registry must not keep listing it.
+        let registryNote = '';
+        if (error || code !== 0) {
+          try {
+            registryRemove(service, account);
+          } catch (registryError) {
+            registryNote = `; the registry still lists it (${registryError instanceof Error ? registryError.message : String(registryError)})`;
+          }
+        }
         if (error) {
           reject(
             new Error(
-              `macOS Keychain write failed: ${error.message} (any previous entry was removed; re-run the write)`
+              `macOS Keychain write failed: ${error.message} (any previous entry was removed; re-run the write)${registryNote}`
             )
           );
         } else if (code === 0) {
@@ -227,7 +253,7 @@ export class MacKeychainSecretProvider implements SecretProvider {
         } else {
           reject(
             new Error(
-              `macOS Keychain write failed with code ${code} (any previous entry was removed; re-run the write): ${stderr}`
+              `macOS Keychain write failed with code ${code} (any previous entry was removed; re-run the write)${registryNote}: ${stderr}`
             )
           );
         }

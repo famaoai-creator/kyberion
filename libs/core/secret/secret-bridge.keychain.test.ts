@@ -118,8 +118,32 @@ describe('MacKeychainSecretProvider child supervision (G12)', () => {
     await vi.waitFor(() => expect(mocks.spawn).toHaveBeenCalledTimes(2));
     writeChild.emit('close', 7);
     await assertion;
-    expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+    // The entry is gone, so the registry drops it too.
+    expect(mocks.safeWriteFile).toHaveBeenCalledOnce();
+    const saved = JSON.parse(String(mocks.safeWriteFile.mock.calls[0][1])) as {
+      entries: Array<{ service: string; account: string }>;
+    };
+    expect(saved.entries).not.toContainEqual(
+      expect.objectContaining({ service: 'svc', account: 'acct' })
+    );
   });
+
+  it.each([
+    ['a multi-line value', 'svc', 'acct', 'line-one\nline-two', 'line break'],
+    ['a carriage return in the value', 'svc', 'acct', 'value\r', 'line break'],
+    ['an empty value', 'svc', 'acct', '', 'empty'],
+    ['a newline in the service', 'svc\nacct', 'acct', 'value', 'single-line'],
+    ['a newline in the account', 'svc', 'acct\nother', 'value', 'single-line'],
+  ])(
+    'refuses %s before touching the existing entry',
+    async (_case, service, account, value, why) => {
+      await expect(new MacKeychainSecretProvider().set(service, account, value)).rejects.toThrow(
+        why
+      );
+      expect(mocks.spawn).not.toHaveBeenCalled();
+      expect(mocks.safeWriteFile).not.toHaveBeenCalled();
+    }
+  );
 
   it('does not remove the registry or retry when deletion is refused', async () => {
     const child = createFakeChild();
