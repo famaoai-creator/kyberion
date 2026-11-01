@@ -14,6 +14,13 @@ export interface ResourceAccessScope {
   /** Append-only access grants neither ordinary writes nor file descriptor access. */
   readonly appendExact?: readonly string[];
   readonly mkdirExact: readonly string[];
+  /**
+   * Read/write/append/metadata of paths that complete one of these exact
+   * prefixes with a single path component (no further `/`; never mkdir), for
+   * stores whose maintenance names its own siblings at run time (e.g.
+   * `<store>.compacting-`, `<store dir>/compaction-archive/`).
+   */
+  readonly namePrefixExact?: readonly string[];
   readonly allowProductKnowledgeRead?: boolean;
   /** Internal opaque identity only; possession alone grants nothing. Store guards verify it. */
   readonly opaqueStoreToken?: object;
@@ -46,6 +53,23 @@ function validPath(value: unknown): value is string {
   );
 }
 
+/** A prefix is canonical when it is a valid path plus an optional trailing `/`, below a directory. */
+function validNamePrefix(value: unknown): value is string {
+  if (typeof value !== 'string') return false;
+  const stem = value.endsWith('/') ? value.slice(0, -1) : value;
+  return validPath(stem) && stem.includes('/');
+}
+
+/** Does `target` complete one of the scope's name prefixes with a single path component? */
+export function matchesNamePrefix(scope: ResourceAccessScope, target: string): boolean {
+  return (scope.namePrefixExact ?? []).some(
+    (prefix) =>
+      target.length > prefix.length &&
+      target.startsWith(prefix) &&
+      !target.slice(prefix.length).includes('/')
+  );
+}
+
 function freezeScope(scope: ResourceAccessScope): ResourceAccessScope {
   if (
     !scope ||
@@ -74,6 +98,12 @@ function freezeScope(scope: ResourceAccessScope): ResourceAccessScope {
     writeExact: copy(scope.writeExact),
     appendExact: copy(scope.appendExact ?? []),
     mkdirExact: copy(scope.mkdirExact),
+    namePrefixExact: (() => {
+      const values = scope.namePrefixExact ?? [];
+      if (!Array.isArray(values) || !values.every(validNamePrefix))
+        throw new Error('[RESOURCE_SCOPE_INVALID] Expected canonical repository-relative prefixes');
+      return Object.freeze([...new Set(values)]);
+    })(),
     allowProductKnowledgeRead: scope.allowProductKnowledgeRead === true,
   };
   if (scope.opaqueStoreToken !== undefined)
@@ -107,6 +137,7 @@ function permits(
   target: string,
   operation: ResourceAccessOperation
 ): boolean {
+  if (operation !== 'mkdir' && matchesNamePrefix(scope, target)) return true;
   if (operation === 'read') {
     return (
       scope.readExact.includes(target) ||

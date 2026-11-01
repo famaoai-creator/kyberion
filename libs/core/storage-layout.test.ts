@@ -302,10 +302,29 @@ describe('durable partitioned runtime state', () => {
         tenantRoot + '/autonomy-outcomes.jsonl',
         tenantRoot + '/autonomy-action-overrides.json',
       ],
-      mkdirExact: [runtime, runtime + '/confidential', tenantRoot],
+      mkdirExact: [
+        runtime,
+        runtime + '/confidential',
+        tenantRoot,
+        tenantRoot + '/compaction-archive',
+      ],
+      // Write-time window retention: only the outcomes ledger's own rewrite
+      // siblings and its sibling archive (one path component each).
+      namePrefixExact: [
+        tenantRoot + '/autonomy-outcomes.jsonl.compacting-',
+        tenantRoot + '/autonomy-outcomes.jsonl.compact-out-',
+        tenantRoot + '/autonomy-outcomes.jsonl.compact-restore-',
+        tenantRoot + '/compaction-archive/',
+      ],
     });
     expect(isAutonomyLearningCapability(capability)).toBe(true);
     expect(isAutonomyLearningCapability({ ...capability, writeExact: [tenantRoot] })).toBe(false);
+    expect(
+      isAutonomyLearningCapability({
+        ...capability,
+        namePrefixExact: [...(capability.namePrefixExact ?? []), tenantRoot + '/'],
+      })
+    ).toBe(false);
     expect(isAutonomyLearningCapability({ ...capability, tenantSlug: 'tenant-b' })).toBe(false);
   });
 });

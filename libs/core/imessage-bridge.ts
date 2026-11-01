@@ -2,6 +2,7 @@ import { appendJsonLine } from './foundation/json.js';
 import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
+import { maintainStoreAfterAppend } from './append-only-store.js';
 import { pathResolver } from './path-resolver.js';
 import {
   evaluateBlueBubblesConfiguration,
@@ -83,9 +84,44 @@ function ensureLogDir(): void {
   }
 }
 
-function appendEvent(event: Record<string, unknown>): void {
+/**
+ * The event log is a pure log nobody replays: the writer rotates it (live file
+ * renamed to `events-<stamp>.jsonl` beside it) once it passes this size. The
+ * path follows the (overridable) project root, so it cannot rely on an
+ * exact-path catalog entry: the policy is explicit. Rotated segments are
+ * archived — never deleted — by the storage janitor after 90 days (user
+ * decision, storage-retention-catalog.json).
+ */
+export const IMESSAGE_LOG_ROTATE_MIN_BYTES = 8 * 1024 * 1024;
+
+interface IMessageLogTuning {
+  rotateMinBytes?: number;
+  lockTimeoutMs?: number;
+}
+let logTuning: IMessageLogTuning = {};
+
+/** Test seam: override the rotation threshold / lock wait; call with `{}` to reset. */
+export function setIMessageLogTuningForTests(tuning: IMessageLogTuning): void {
+  logTuning = { ...tuning };
+}
+
+/** Absolute path of the bridge event log (`active/shared/runtime/imessage-bridge/events.jsonl`). */
+export function iMessageBridgeLogPath(): string {
+  return IMESSAGE_LOG_PATH;
+}
+
+/**
+ * Append one bridge event, then run write-time rotation. Rotation never
+ * throws (a failure warns), so the log's size can never fail a send.
+ */
+export function appendIMessageBridgeEvent(event: Record<string, unknown>): void {
   ensureLogDir();
   appendJsonLine(IMESSAGE_LOG_PATH, event);
+  maintainStoreAfterAppend(
+    IMESSAGE_LOG_PATH,
+    { action: 'rotate', minBytes: logTuning.rotateMinBytes ?? IMESSAGE_LOG_ROTATE_MIN_BYTES },
+    logTuning.lockTimeoutMs !== undefined ? { lockTimeoutMs: logTuning.lockTimeoutMs } : {}
+  );
 }
 
 /** Derive capability truth from the installed imsg subcommand help text. */
@@ -177,7 +213,7 @@ export function sendIMessage(request: IMessageSendRequest): IMessageSendResult {
 
   if (!isDarwin()) {
     const detail = 'iMessage bridge requires macOS (Darwin).';
-    appendEvent({ ...eventBase, sent: false, detail });
+    appendIMessageBridgeEvent({ ...eventBase, sent: false, detail });
     throw new Error(detail);
   }
 
@@ -187,7 +223,7 @@ export function sendIMessage(request: IMessageSendRequest): IMessageSendResult {
     safeExec('imsg', args);
 
     const detail = `sent to ${recipient || request.chatId} via imsg`;
-    appendEvent({ ...eventBase, sent: true, detail });
+    appendIMessageBridgeEvent({ ...eventBase, sent: true, detail });
     logger.success(`📨 [iMessageBridge] ${detail}`);
 
     return {
@@ -199,7 +235,7 @@ export function sendIMessage(request: IMessageSendRequest): IMessageSendResult {
     };
   } catch (err: any) {
     const detail = `failed to send via imsg: ${err.message}`;
-    appendEvent({ ...eventBase, sent: false, detail });
+    appendIMessageBridgeEvent({ ...eventBase, sent: false, detail });
     throw new Error(detail);
   }
 }
