@@ -367,3 +367,40 @@ export function readVcsDevelopmentCiProof(
     };
   }
 }
+
+/** Squash promotion must retain the original reviewed baseline as its one parent.
+ * Never use the moving PR baseRefOid to authenticate post-merge CI sources. */
+export function readVcsDevelopmentMergedCiProof(
+  pr: VcsDevelopmentPr,
+  options: GhCallOptions,
+  run: VcsCommandRunner = safeExecResult
+): VcsDevelopmentCiProof {
+  const unavailable = (): VcsDevelopmentCiProof => ({
+    state: 'unverified',
+    policyDigest: '',
+    requiredChecks: [],
+    reasons: ['Original reviewed baseline is not the verified squash merge parent'],
+  });
+  if (!pr.mergeCommitSha || !sha.test(pr.baseSha)) return unavailable();
+  try {
+    const repo = readVcsDevelopmentRepository(options, run);
+    if (repo.url !== pr.repository) return unavailable();
+    const commit = JSON.parse(
+      ghMust(
+        ['api', `repos/${repo.slug}/commits/${pr.mergeCommitSha}`, '--hostname', repo.host],
+        options,
+        run
+      )
+    ) as { sha: string; parents: Array<{ sha: string }> };
+    if (
+      commit.sha !== pr.mergeCommitSha ||
+      !Array.isArray(commit.parents) ||
+      commit.parents.length !== 1 ||
+      commit.parents[0].sha !== pr.baseSha
+    )
+      return unavailable();
+    return readVcsDevelopmentCiProof({ ...pr, headSha: pr.mergeCommitSha }, options, run);
+  } catch {
+    return unavailable();
+  }
+}

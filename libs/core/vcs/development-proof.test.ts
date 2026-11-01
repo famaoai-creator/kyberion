@@ -132,3 +132,50 @@ describe('typed merge queue transport', () => {
     ).toThrow('VCS_TYPED_VERB_REQUIRED');
   });
 });
+
+import { readVcsDevelopmentMergedCiProof } from './development-proof.js';
+describe('post-merge original verification baseline', () => {
+  const mergeSha = 'e'.repeat(40);
+  function mergedFixture(rootConfigChanged = false): VcsCommandRunner {
+    const base = fixture({ rootConfigChanged });
+    return (cmd, args, opts) =>
+      args[1] === `repos/o/r/commits/${mergeSha}`
+        ? {
+            status: 0,
+            stdout: JSON.stringify({ sha: mergeSha, parents: [{ sha: pr.baseSha }] }),
+            stderr: '',
+          }
+        : (() => {
+            const result = base(
+              cmd,
+              args.map((arg) => arg.replaceAll(mergeSha, pr.headSha)),
+              opts
+            );
+            return { ...result, stdout: result.stdout.replaceAll(pr.headSha, mergeSha) };
+          })();
+  }
+  it('rejects moving base which now points to merge itself', () =>
+    expect(
+      readVcsDevelopmentMergedCiProof(
+        { ...pr, state: 'merged', baseSha: mergeSha, mergeCommitSha: mergeSha },
+        {},
+        mergedFixture(true)
+      ).state
+    ).toBe('unverified'));
+  it('rejects modified verification infrastructure against original parent', () =>
+    expect(
+      readVcsDevelopmentMergedCiProof(
+        { ...pr, state: 'merged', mergeCommitSha: mergeSha },
+        {},
+        mergedFixture(true)
+      ).state
+    ).toBe('unverified'));
+  it('verifies unchanged infrastructure against actual original squash parent', () =>
+    expect(
+      readVcsDevelopmentMergedCiProof(
+        { ...pr, state: 'merged', mergeCommitSha: mergeSha },
+        {},
+        mergedFixture()
+      ).state
+    ).toBe('success'));
+});
