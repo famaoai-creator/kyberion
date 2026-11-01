@@ -1,8 +1,10 @@
 /**
  * `pnpm kyberion scheduler trigger-store rotate` — operator escape hatch for a
- * trigger delivery journal stuck at its hard append cap ([TRIGGER_STORE_FULL]),
- * which happens only when stable keys inside the 7-day dedupe window alone
- * fill it (libs/core/trigger-runner.ts never drops those on its own).
+ * trigger delivery journal that keeps growing because stable keys inside the
+ * 7-day dedupe window alone exceed its retention threshold
+ * ([TRIGGER_STORE_WINDOW_FULL], ops-health trigger-store-growth;
+ * libs/core/trigger-runner.ts never drops those on its own). Size never stops
+ * appends or dedupe, so this sheds growth; it does not unblock triggers.
  *
  * Dry-run by default: prints what a rotation keeps (in-flight claims, the
  * newest N stable keys, cron receipts of the last 10 minutes) and drops.
@@ -152,7 +154,8 @@ export function openTriggerStoreRotateApproval(
         actorRole: APPROVAL_ROLE,
       },
       justification: {
-        reason: 'The delivery journal is at its hard append cap; every trigger fails closed.',
+        reason:
+          'Stable keys inside the 7-day dedupe window keep the delivery journal above its retention threshold; it keeps growing until they are shed.',
         impactSummary: `Full history is kept in a rotated segment; up to ${plan.dropped_keys} key(s) lose dedupe protection.`,
         requestedEffects: [TRIGGER_STORE_ROTATE_EFFECT_BINDING],
       },
