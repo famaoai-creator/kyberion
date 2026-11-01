@@ -73,7 +73,7 @@
   --kb-ui-space-5: 24px;
   --kb-ui-space-6: 32px;
   --kb-ui-space-7: 48px;
-  --kb-ui-font-sans: Inter, "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
+  --kb-ui-font-sans: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", Meiryo, system-ui, sans-serif;
   --kb-ui-font-mono: 'JetBrains Mono', monospace;
   --kb-ui-font-size-xs: 12px;
   --kb-ui-font-size-sm: 13px;
@@ -519,7 +519,7 @@
   --kb-ui-radius-sm: 8px;
   --kb-ui-radius-md: 12px;
   --kb-ui-radius-lg: 16px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
@@ -591,7 +591,7 @@
     --kb-ui-radius-sm: 8px;
     --kb-ui-radius-md: 12px;
     --kb-ui-radius-lg: 16px;
-    --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: none;
   }
 }
@@ -663,7 +663,7 @@
   --kb-ui-radius-sm: 8px;
   --kb-ui-radius-md: 12px;
   --kb-ui-radius-lg: 16px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
@@ -735,7 +735,7 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
@@ -807,7 +807,7 @@
     --kb-ui-radius-sm: 0px;
     --kb-ui-radius-md: 2px;
     --kb-ui-radius-lg: 4px;
-    --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: none;
   }
 }
@@ -879,7 +879,7 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
@@ -951,7 +951,7 @@
   --kb-ui-radius-sm: 16px;
   --kb-ui-radius-md: 24px;
   --kb-ui-radius-lg: 24px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: linear-gradient(135deg, #6d28d9, #2563eb, #07809d);
 }
 
@@ -1023,7 +1023,7 @@
     --kb-ui-radius-sm: 16px;
     --kb-ui-radius-md: 24px;
     --kb-ui-radius-lg: 24px;
-    --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: linear-gradient(135deg, #a78bfa, #3b82f6, #22d3ee);
   }
 }
@@ -1095,7 +1095,7 @@
   --kb-ui-radius-sm: 16px;
   --kb-ui-radius-md: 24px;
   --kb-ui-radius-lg: 24px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: linear-gradient(135deg, #a78bfa, #3b82f6, #22d3ee);
 }
 
@@ -1167,7 +1167,7 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 
@@ -1239,7 +1239,7 @@
     --kb-ui-radius-sm: 0px;
     --kb-ui-radius-md: 2px;
     --kb-ui-radius-lg: 4px;
-    --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+    --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
     --kb-ui-gradient-accent: none;
   }
 }
@@ -1311,7 +1311,7 @@
   --kb-ui-radius-sm: 0px;
   --kb-ui-radius-md: 2px;
   --kb-ui-radius-lg: 4px;
-  --kb-ui-font-heading: Inter, 'Noto Sans JP', sans-serif;
+  --kb-ui-font-heading: 'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', 'Yu Gothic UI', Meiryo, system-ui, sans-serif;
   --kb-ui-gradient-accent: none;
 }
 /* end kyberion-ui tokens */

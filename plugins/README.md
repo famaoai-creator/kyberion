@@ -6,7 +6,8 @@ Extend skill execution with beforeSkill/afterSkill lifecycle hooks.
 
 `plugins/kyberion-agent-plugin/` is the additive Agent Plugins v1.0.0 package
 for reusable Kyberion skills and the portable MCP declaration. It contains the
-standard root `plugin.json`, optional root `mcp.json`, and `skills/` directory.
+standard root `plugin.json`, optional root `mcp.json`, and `skills/` directory
+(`kyberion`, `kyberion-coordination`, `create-verification-skill`).
 
 The existing `plugins/kyberion-claude-code/` and `plugins/kyberion/` directories
 remain client-specific compatibility packages. Claude hooks/commands and

@@ -293,7 +293,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+        font-family: var(--font-sans, 'Helvetica Neue', Arial, -apple-system, BlinkMacSystemFont, sans-serif);
         background: radial-gradient(circle at top left, rgba(59,130,246,0.16), transparent 32%), var(--bg);
         color: var(--text);
       }
@@ -498,7 +498,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+        font-family: var(--font-sans, 'Helvetica Neue', Arial, -apple-system, BlinkMacSystemFont, sans-serif);
         background: radial-gradient(circle at top right, rgba(249,115,22,0.18), transparent 30%), var(--bg, #060913);
         color: var(--text, white);
       }
@@ -695,7 +695,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+        font-family: var(--font-sans, 'Helvetica Neue', Arial, -apple-system, BlinkMacSystemFont, sans-serif);
         background:
           radial-gradient(circle at top left, rgba(34,197,94,0.14), transparent 24%),
           radial-gradient(circle at bottom right, rgba(59,130,246,0.18), transparent 28%),
@@ -941,7 +941,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
         overflow: hidden;
-        font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, sans-serif);
+        font-family: var(--font-sans, 'Helvetica Neue', Arial, -apple-system, BlinkMacSystemFont, sans-serif);
         background: var(--bg);
         color: var(--text);
       }
@@ -1105,7 +1105,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
       body {
         width: ${adf.composition.width}px;
         height: ${adf.composition.height}px;
-        font-family: var(--font-sans, 'Inter', 'Noto Sans JP', -apple-system, sans-serif);
+        font-family: var(--font-sans, 'Helvetica Neue', 'Noto Sans JP', -apple-system, sans-serif);
         background: radial-gradient(circle at 50% 18%, rgba(255,255,255,0.05), transparent 46%), var(--bg, #0B1020);
         color: var(--text);
         display: flex;
@@ -1175,7 +1175,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: var(--font-sans, 'Inter', sans-serif);
+        font-family: var(--font-sans, 'Helvetica Neue', Arial, sans-serif);
         overflow: hidden;
       }
       .center {
@@ -1244,7 +1244,7 @@ function renderSceneHtml(adf: VideoCompositionADF, scene: CompiledVideoCompositi
         display: flex;
         align-items: center;
         justify-content: center;
-        font-family: var(--font-sans, 'Inter', sans-serif);
+        font-family: var(--font-sans, 'Helvetica Neue', Arial, sans-serif);
         text-align: center;
       }
       .hero-text {
@@ -1478,7 +1478,7 @@ function renderTimelineHtmlScene(
         overflow: hidden;
         background: ${background};
         color: var(--text);
-        font-family: var(--font-sans, 'Noto Sans CJK JP', 'Noto Sans JP', 'Inter', sans-serif);
+        font-family: var(--font-sans, 'Noto Sans CJK JP', 'Noto Sans JP', 'Helvetica Neue', Arial, sans-serif);
       }
       ${sceneCssVars}
     </style>

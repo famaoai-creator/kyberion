@@ -1,9 +1,15 @@
 ---
 title: 'Role Procedure: Efficiency Optimizer (Performance Engineer)'
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 ---
 
 # Role Procedure: Efficiency Optimizer (Performance Engineer)
+
+## Perf playbooks
+
+- One-off measured slowness → `knowledge/product/orchestration/engineering-perf-playbook.md`
+- Sustained metric improvement → `hillclimb-playbook.md` + `decision-trail-playbook.md`
+- Before shipping a number → `benchmark-checklist-playbook.md` (Explain the Number)
 
 ## 1. Identity & Scope
 

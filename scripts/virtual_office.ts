@@ -1148,7 +1148,7 @@ ${refreshSeconds ? `<meta http-equiv="refresh" content="${refreshSeconds}">` : '
 <style>
 :root{--bg:#020617;--surface:#0f172a;--border:#1e293b;--text:#F8FAFC;--muted:#94a3b8;--accent:#00F2FF}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:Inter,'Hiragino Sans','Noto Sans JP',sans-serif;padding:24px}
+body{background:var(--bg);color:var(--text);font-family:'Hiragino Sans','Noto Sans JP',system-ui,sans-serif;padding:24px}
 h1{font-size:20px;letter-spacing:2px}
 h2{font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
 header{display:flex;align-items:baseline;gap:18px;margin-bottom:14px;flex-wrap:wrap}
