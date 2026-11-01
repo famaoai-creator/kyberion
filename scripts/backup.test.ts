@@ -16,10 +16,13 @@ import * as path from 'node:path';
 import {
   backupArchiveTimeoutMs,
   interpretTarResult,
+  manifestCredentialCount,
+  parseManifestCredentialReads,
   resolveBackupExclusions,
   selectBackupFiles,
   selectionWarnings,
   tarExcludesFor,
+  verifyWithheldCredentialMembers,
 } from './lib/backup-file-selection.js';
 import {
   buildBackupManifest,
@@ -1752,5 +1755,49 @@ describe('backup file selection', () => {
         /^\[BACKUP_MISSION_BUNDLE_FAILED\] git bundle for active\/missions\/public\/MSN-X failed — .*\| next: .*\| evidence: /
       ),
     ]);
+  });
+});
+
+describe('credential reads tar archived under an unlisted ancestor', () => {
+  const root = 'knowledge/personal/connections';
+  it('parses an uncounted credential read and rejects a malformed flag', () => {
+    expect(
+      parseManifestCredentialReads(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true }],
+        (r) => r
+      )
+    ).toEqual([
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true },
+    ]);
+    expect(() =>
+      parseManifestCredentialReads(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: 'yes' }],
+        (r) => r
+      )
+    ).toThrow('Backup manifest credential read is invalid.');
+  });
+
+  it('treats an uncounted root as no recorded count, so the drill checks presence instead', () => {
+    const reads = [
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true as const },
+    ];
+    expect(manifestCredentialCount(reads, root)).toBeNull();
+    expect(
+      manifestCredentialCount(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 4 }],
+        root
+      )
+    ).toBe(4);
+    // Observed on a real Mac: tar archived 4 connection files under the unlisted
+    // personal tier; the manifest could not count them. The drill must pass.
+    expect(() =>
+      verifyWithheldCredentialMembers([
+        { root, archived_members: 4, manifest_file_count: manifestCredentialCount(reads, root) },
+      ])
+    ).not.toThrow();
+    // A counted root that disagrees with the archive still fails.
+    expect(() =>
+      verifyWithheldCredentialMembers([{ root, archived_members: 4, manifest_file_count: 0 }])
+    ).toThrow('[BACKUP_DRILL_CREDENTIAL_COUNT_MISMATCH]');
   });
 });
