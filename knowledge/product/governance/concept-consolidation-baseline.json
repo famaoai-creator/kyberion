@@ -331,7 +331,7 @@
     },
     "libs/core/dot/dot-runtime.ts": {
       "json_state_write_budget": 2,
-      "runtime_path_literal_budget": 4
+      "runtime_path_literal_budget": 3
     },
     "libs/core/dot/dot-state-paths.ts": {
       "runtime_path_literal_budget": 1
@@ -1888,6 +1888,12 @@
     },
     "libs/core/plugin/plugin-publication.ts": {
       "json_state_write_budget": 2
+    },
+    "libs/core/dot/dot-token-usage.ts": {
+      "runtime_path_literal_budget": 1
+    },
+    "libs/core/ops-health-probe.ts": {
+      "runtime_path_literal_budget": 1
     }
   },
   "exported_types": {
