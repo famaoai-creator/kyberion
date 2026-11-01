@@ -23,6 +23,7 @@
     "libs/core/fs-primitives.ts",
     "libs/core/governance/approval-rejection-reason.test.ts",
     "libs/core/governance/approval-session-runtime.test.ts",
+    "libs/core/governance/audit-chain-store-bounds.test.ts",
     "libs/core/governance/audit-chain-tenant.test.ts",
     "libs/core/governance/policy-engine.test.ts",
     "libs/core/heuristic-feedback.test.ts",

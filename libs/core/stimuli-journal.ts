@@ -1,20 +1,14 @@
+import * as path from 'node:path';
 import { withExecutionContext } from './authority.js';
-import { appendJsonLine, parseSafeJsonInput, readJsonLines } from './foundation/json.js';
-import { isRecord, readTextFile } from './foundation/text.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
+import { isRecord } from './foundation/text.js';
 import * as pathResolver from './path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeLstat,
-  safeStat,
-  safeWriteFile,
-} from './secure-io.js';
-import { createLogger } from './logger.js';
+import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeReaddir } from './secure-io.js';
+import { readJsonLinesBackward } from './jsonl-read.js';
+import { maintainStoreAfterAppend, rotatedSegmentStem } from './append-only-store.js';
 import type { NerveMessage } from './nerve-bridge.js';
 import type { SlackSurfaceArtifact } from './surface/channel-surface-types.js';
 import type { SensorStimulus } from './sensor-engine.js';
-
-const logger = createLogger('stimuli-journal');
 
 const STIMULI_PATH = pathResolver.resolve('presence/bridge/runtime/stimuli.jsonl');
 
@@ -57,13 +51,50 @@ export function isRegularStimuliJournalPath(filePath: string = STIMULI_PATH): bo
 
 /**
  * EV-06: the journal is append-only and was previously unbounded — readers only
- * ever looked at the last N records, so nothing ever forced it to shrink. Kept
- * at the same 5MB ceiling as the quarantine store (QM-04) for one reason to
- * remember instead of two.
+ * ever looked at the last N records, so nothing ever forced it to shrink.
+ * Write-time rotation threshold (the same 5MB as the quarantine store, QM-04):
+ * past it, the shared append-only-store rotation renames the journal to a
+ * `stimuli-YYYYMMDD-HHmmss.jsonl` segment (expired by the janitor's 7-day
+ * presence/bridge/runtime sweep). It is not a cap — reads scan backwards and
+ * never fail on size, and an append never throws because of size
+ * (MSN-STORE-BOUNDS-20261101).
  */
 export const STIMULI_MAX_BYTES = 5 * 1024 * 1024;
-/** After rotation, retain this share of the tail so live context survives. */
-const STIMULI_RETAIN_BYTES = Math.floor(STIMULI_MAX_BYTES / 2);
+
+const ROTATED_SEGMENT_SUFFIX = /^(\d{8}-\d{6})(?:-(\d+))?\.jsonl$/u;
+
+function isRegularFile(filePath: string): boolean {
+  try {
+    return safeExistsSync(filePath) && safeLstat(filePath).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Rotated segments of the journal, newest first. Readers continue into them so
+ * the context a rotation moved aside is not lost to the next hydration.
+ */
+function rotatedStimuliSegments(stimuliPath: string): string[] {
+  const dir = path.dirname(stimuliPath);
+  const prefix = `${rotatedSegmentStem(stimuliPath)}-`;
+  let names: string[];
+  try {
+    names = safeReaddir(dir);
+  } catch {
+    return [];
+  }
+  const segments: Array<{ name: string; stamp: string; n: number }> = [];
+  for (const name of names) {
+    if (!name.startsWith(prefix)) continue;
+    const match = name.slice(prefix.length).match(ROTATED_SEGMENT_SUFFIX);
+    if (match) segments.push({ name, stamp: match[1]!, n: Number(match[2] ?? 0) });
+  }
+  return segments
+    .sort((a, b) => (a.stamp === b.stamp ? b.n - a.n : a.stamp < b.stamp ? 1 : -1))
+    .map((entry) => path.join(dir, entry.name))
+    .filter(isRegularFile);
+}
 
 function requiredString(record: Record<string, unknown>, key: string): string {
   const value = record[key];
@@ -158,33 +189,76 @@ export interface LoadRecentStimuliOptions {
   nowMs?: number;
 }
 
+/** Test seams: simulate a rotation at the racy points of {@link loadRecentStimuli}. */
+export interface StimuliJournalReadHooks {
+  /** After the live journal was found, before its scan opens it. */
+  beforeLiveScan?: () => void;
+  /** After the first record of the live scan. */
+  afterFirstLiveRecord?: () => void;
+}
+let readHooks: StimuliJournalReadHooks = {};
+
+/** Test seam: install read hooks; call with `{}` to reset. */
+export function setStimuliJournalReadHooksForTests(hooks: StimuliJournalReadHooks): void {
+  readHooks = { ...hooks };
+}
+
+/**
+ * The newest `limit` live stimuli, oldest first. Scans the journal backwards
+ * (then its rotated segments, newest first) and stops once `limit` records
+ * survive the TTL filter, so the cost follows `limit`, not the journal size.
+ *
+ * Safe against a concurrent rotation: the live scan holds the inode it opened,
+ * the segment list is taken after it (so a journal rotated before the scan
+ * opened it is read as a segment, not lost), and a record id already read is
+ * skipped (so a journal rotated during the scan is not read twice).
+ */
 export function loadRecentStimuli(
   limit: number,
   options: LoadRecentStimuliOptions = {}
 ): NerveMessage[] {
+  if (!(limit > 0)) return [];
   const stimuliPath = safeStimuliPath();
-  if (!isRegularStimuliJournalPath(stimuliPath)) return [];
   const { enforceTtl = true, nowMs = Date.now() } = options;
-
-  const parsed = readJsonLines<NerveMessage>(stimuliPath, {
-    onMalformed: 'skip',
-    readOptions: {
-      maxSizeMB: Math.ceil(STIMULI_MAX_BYTES / (1024 * 1024)),
-    },
-    map: normalizeNerveMessage,
-  });
-  const live = enforceTtl
-    ? parsed.filter((stimulus) => !isStimulusExpired(stimulus, nowMs))
-    : parsed;
-  // Slice after TTL filtering: taking the last N first would let expired
-  // records crowd out live ones and shrink the effective context window.
-  return live.slice(-limit);
+  const newestFirst: NerveMessage[] = [];
+  const seenIds = new Set<string>();
+  /** Scans one source; true once `limit` records were collected. */
+  const take = (source: string, live: boolean): boolean => {
+    let first = live;
+    for (const stimulus of readJsonLinesBackward<NerveMessage>(source, {
+      onMalformed: 'skip',
+      map: normalizeNerveMessage,
+    })) {
+      if (first) {
+        first = false;
+        readHooks.afterFirstLiveRecord?.();
+      }
+      if (seenIds.has(stimulus.id)) continue;
+      seenIds.add(stimulus.id);
+      // Filter before counting: expired records must not crowd out live ones
+      // and shrink the effective context window.
+      if (enforceTtl && isStimulusExpired(stimulus, nowMs)) continue;
+      newestFirst.push(stimulus);
+      if (newestFirst.length >= limit) return true;
+    }
+    return false;
+  };
+  if (isRegularStimuliJournalPath(stimuliPath)) {
+    readHooks.beforeLiveScan?.();
+    if (take(stimuliPath, true)) return newestFirst.reverse();
+  }
+  for (const segment of rotatedStimuliSegments(stimuliPath)) {
+    if (take(segment, false)) break;
+  }
+  return newestFirst.reverse();
 }
 
 /**
- * Trim the journal to its retention tail when it exceeds the ceiling.
- * Truncation is a rotation as far as readers are concerned; `jsonl-tail`
- * detects it via size regression and fingerprint change and restarts cleanly.
+ * Rotate the journal through the shared append-only-store rotation once it
+ * exceeds `maxBytes`. Rotation is a rename to a segment; `jsonl-tail` detects
+ * it via size regression and fingerprint change and restarts cleanly, and
+ * {@link loadRecentStimuli} reads on into the segment. Never throws (a failure
+ * warns); returns whether it rotated.
  */
 export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTES): boolean {
   return withExecutionContext(STIMULI_JOURNAL_WRITER_ROLE, () => rotateStimuliJournal(maxBytes));
@@ -193,26 +267,10 @@ export function rotateStimuliJournalIfNeeded(maxBytes: number = STIMULI_MAX_BYTE
 function rotateStimuliJournal(maxBytes: number): boolean {
   const stimuliPath = safeStimuliPath();
   if (!isRegularStimuliJournalPath(stimuliPath)) return false;
-  let size = 0;
-  try {
-    size = safeStat(stimuliPath).size;
-  } catch {
-    return false;
-  }
-  if (size <= maxBytes) return false;
-
-  const content = readTextFile(stimuliPath, {
-    maxSizeMB: Math.ceil((maxBytes * 2) / (1024 * 1024)) + 1,
-  });
-  // Cut on a record boundary so the retained head is never a partial line.
-  const tail = content.slice(-STIMULI_RETAIN_BYTES);
-  const firstNewline = tail.indexOf('\n');
-  const retained = firstNewline >= 0 ? tail.slice(firstNewline + 1) : '';
-  safeWriteFile(stimuliPath, retained);
-  logger.warn(
-    `[stimuli-journal] rotated ${stimuliPath}: ${size} bytes exceeded ${maxBytes}; retained ${Buffer.byteLength(retained, 'utf8')} bytes`
+  return (
+    maintainStoreAfterAppend(stimuliPath, { action: 'rotate', minBytes: maxBytes + 1 }) ===
+    'rotated'
   );
-  return true;
 }
 
 /**
@@ -224,6 +282,7 @@ export type StimuliJournalRecord = NerveMessage | SlackSurfaceArtifact['stimulus
 export function appendStimulus(stimulus: StimuliJournalRecord): void {
   withExecutionContext(STIMULI_JOURNAL_WRITER_ROLE, () => {
     appendJsonLine(safeStimuliPath(), stimulus);
+    // Write-time retention; it never throws, so size cannot fail the append.
     rotateStimuliJournal(STIMULI_MAX_BYTES);
   });
 }

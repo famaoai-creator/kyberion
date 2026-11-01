@@ -11,7 +11,8 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { withLock } from '@agent/core/lock-utils';
-import { appendJsonLine, isRecord, nowIso, readJsonLines } from '@agent/core/foundation';
+import { appendJsonLine, isRecord, nowIso } from '@agent/core/foundation';
+import { streamJsonLines } from '@agent/core/jsonl-read';
 import {
   assertValidMissionIdList,
   normalizeMissionIdList,
@@ -20,6 +21,14 @@ import {
 /** A start that fails this many times is parked as `failed` instead of blocking the queue. */
 export const MAX_DISPATCH_ATTEMPTS = 3;
 
+/**
+ * Terminal (`dispatched` / `failed`) rows older than this are pruned when the
+ * queue is rewritten. Only this module reads the queue, and it only acts on
+ * `pending` rows; terminal rows are kept for a while so an operator can see
+ * what was recently dispatched or parked.
+ */
+export const MISSION_QUEUE_TERMINAL_RETENTION_MS = 14 * 24 * 60 * 60 * 1000;
+
 export interface MissionQueueEntry {
   mission_id: string;
   tier: 'personal' | 'confidential' | 'public';
@@ -27,7 +36,53 @@ export interface MissionQueueEntry {
   status: 'pending' | 'dispatched' | 'failed';
   enqueued_at: string;
   dependencies: string[];
-  metadata?: { dispatch_attempts?: number; last_error?: string; last_attempt_at?: string };
+  metadata?: {
+    dispatch_attempts?: number;
+    last_error?: string;
+    last_attempt_at?: string;
+    dispatched_at?: string;
+  };
+}
+
+function isTerminal(entry: MissionQueueEntry): boolean {
+  return entry.status === 'dispatched' || entry.status === 'failed';
+}
+
+/** When the row became terminal: dispatch time, last attempt, else enqueue time. */
+function terminalAtMs(entry: MissionQueueEntry): number {
+  for (const candidate of [
+    entry.metadata?.dispatched_at,
+    entry.metadata?.last_attempt_at,
+    entry.enqueued_at,
+  ]) {
+    const ms = typeof candidate === 'string' ? Date.parse(candidate) : NaN;
+    if (Number.isFinite(ms)) return ms;
+  }
+  return Number.NaN;
+}
+
+/**
+ * Rows to keep on a rewrite: every non-terminal row, and terminal rows newer
+ * than `retentionMs` (or whose age is unknown). Order is preserved.
+ */
+export function pruneMissionQueue(
+  queue: MissionQueueEntry[],
+  nowMs: number = Date.now(),
+  retentionMs: number = MISSION_QUEUE_TERMINAL_RETENTION_MS
+): MissionQueueEntry[] {
+  return queue.filter((entry) => {
+    if (!isTerminal(entry)) return true;
+    const at = terminalAtMs(entry);
+    return !Number.isFinite(at) || nowMs - at < retentionMs;
+  });
+}
+
+function writeMissionQueue(resolvedQueuePath: string, queue: MissionQueueEntry[]): void {
+  const kept = pruneMissionQueue(queue);
+  safeWriteFile(
+    resolvedQueuePath,
+    kept.length ? kept.map((entry) => JSON.stringify(entry)).join('\n') + '\n' : ''
+  );
 }
 
 function parseMissionQueueEntry(value: unknown): MissionQueueEntry | null {
@@ -127,12 +182,11 @@ export async function dispatchNextQueuedMission(
       return;
     }
 
-    const queue = readJsonLines<unknown>(resolvedQueuePath, { onMalformed: 'skip' }).flatMap(
-      (value) => {
-        const entry = parseMissionQueueEntry(value);
-        return entry ? [entry] : [];
-      }
-    );
+    const queue: MissionQueueEntry[] = [];
+    for (const value of streamJsonLines<unknown>(resolvedQueuePath, { onMalformed: 'skip' })) {
+      const entry = parseMissionQueueEntry(value);
+      if (entry) queue.push(entry);
+    }
     const pending = queue.filter((mission) => mission.status === 'pending');
 
     if (pending.length === 0) {
@@ -155,10 +209,7 @@ export async function dispatchNextQueuedMission(
           last_error: error instanceof Error ? error.message : String(error),
           last_attempt_at: nowIso(),
         };
-        safeWriteFile(
-          resolvedQueuePath,
-          queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
-        );
+        writeMissionQueue(resolvedQueuePath, queue);
         logger.warn(
           `Queue entry ${mission.mission_id} is unreadable and was parked as failed — ${mission.metadata.last_error} ` +
             `| next: re-enqueue with a valid id | evidence: ${resolvedQueuePath}`
@@ -172,11 +223,7 @@ export async function dispatchNextQueuedMission(
       }
 
       logger.info(`🚀 Dispatching Mission: ${mission.mission_id}...`);
-      const persist = () =>
-        safeWriteFile(
-          resolvedQueuePath,
-          queue.map((entry) => JSON.stringify(entry)).join('\n') + '\n'
-        );
+      const persist = () => writeMissionQueue(resolvedQueuePath, queue);
       // Mark dispatched only after start succeeded. A failed start stays
       // pending for a retry, and is parked as failed after
       // MAX_DISPATCH_ATTEMPTS so it cannot block the rest of the queue.
@@ -200,6 +247,7 @@ export async function dispatchNextQueuedMission(
         throw error;
       }
       mission.status = 'dispatched';
+      mission.metadata = { ...(mission.metadata || {}), dispatched_at: nowIso() };
       persist();
       return;
     }

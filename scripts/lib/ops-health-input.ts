@@ -32,14 +32,14 @@ import { readBackupDrillReceipt, readJanitorFailureMarker } from '@agent/core/op
 import { summarizeBackupStatus } from '../backup.js';
 import { describeBackupPassphraseAvailability } from './backup-passphrase.js';
 import { loadBaselineCache, storeBaselineCache } from '@agent/core/baseline-check-cache';
-import { TRIGGER_STORE_HARD_CAP_BYTES } from '@agent/core/trigger-runner';
+import { TRIGGER_STORE_GROWTH_WARN_BYTES } from '@agent/core/trigger-runner';
 
 export const CHRONOS_HEARTBEAT_ID = 'chronos-daemon';
 export const CHRONOS_HEARTBEAT_MAX_AGE_MS = 10 * 60 * 1000;
 /** Trigger delivery store (trigger-runner.ts DEFAULT_STORE_PATH), relative to the shared floor. */
 export const TRIGGER_DELIVERY_STORE_SUBPATH = 'runtime/trigger-deliveries.jsonl';
-/** Appends past trigger-runner's hard cap fail with [TRIGGER_STORE_FULL]. */
-export const TRIGGER_DELIVERY_STORE_CAP_BYTES = TRIGGER_STORE_HARD_CAP_BYTES;
+/** Growth warning level of the trigger delivery store (a warning, never an append cap). */
+export const TRIGGER_DELIVERY_STORE_WARN_BYTES = TRIGGER_STORE_GROWTH_WARN_BYTES;
 /** A reachable passphrase is re-probed at most this often (one keychain read, up to 10s). */
 export const BACKUP_PASSPHRASE_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 export const BACKUP_DAILY_ID = 'backup-daily';
@@ -155,7 +155,7 @@ function triggerStoreObservation(): OpsHealthInput['triggerStore'] {
     return {
       path: path.relative(pathResolver.rootDir(), storePath),
       size_bytes: safeStat(storePath).size,
-      cap_bytes: TRIGGER_DELIVERY_STORE_CAP_BYTES,
+      warn_bytes: TRIGGER_DELIVERY_STORE_WARN_BYTES,
     };
   } catch {
     return null;
