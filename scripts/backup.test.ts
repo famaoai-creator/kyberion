@@ -32,6 +32,7 @@ import {
   pruneBackups,
   resolveBackupPlan,
   restoreBackup,
+  runRestoreDrill,
   summarizeBackupStatus,
 } from './backup.js';
 import {
@@ -41,7 +42,11 @@ import {
 } from '@agent/core/chain-integrity';
 import { TENANT_RUNTIME_PARTITION_ROOTS } from '@agent/core/storage-layout';
 import { createHash } from 'node:crypto';
-import { assertExclusionsHeld } from './lib/backup-tenant-partitions.js';
+import {
+  assertExclusionsHeld,
+  PLAINTEXT_TEMP_DIR_STALE_MS,
+  sweepStalePlaintextTempDirs,
+} from './lib/backup-tenant-partitions.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('backup-test');
 
@@ -1487,6 +1492,117 @@ describe('backup file selection', () => {
         safeRmSync(target, { recursive: true, force: true });
       }
     });
+  });
+
+  describe('restore drill and credential roots', () => {
+    const drillTarget = `${root}-drill`;
+    const plainArchive = `${root}-drill.tar.gz`;
+
+    afterEach(() => {
+      safeRmSync(drillTarget, { recursive: true, force: true });
+      safeRmSync(plainArchive, { force: true });
+    });
+
+    /** An `all` archive holding one connection document and its manifest count. */
+    function buildDrillArchive(manifestFileCount: number): void {
+      const manifestRel = 'active/shared/tmp/backup-drill-fixture/manifest.json';
+      const members = [
+        'knowledge/personal/connections/github.json',
+        'knowledge/personal/notes.md',
+        manifestRel,
+      ];
+      safeWriteFile(
+        `${root}/knowledge/personal/connections/github.json`,
+        '{"token":"synthetic"}\n'
+      );
+      safeWriteFile(`${root}/knowledge/personal/notes.md`, 'notes\n');
+      safeWriteFile(
+        `${root}/${manifestRel}`,
+        JSON.stringify({
+          format: 'kyberion-backup-v1',
+          scope: 'all',
+          entries: ['knowledge/personal'],
+          mission_git_repos: [],
+          credential_reads: [
+            {
+              rule_id: 'credential.kyberion-connections',
+              root: 'knowledge/personal/connections',
+              file_count: manifestFileCount,
+            },
+          ],
+        })
+      );
+      const tar = safeExecResult('tar', ['-czf', plainArchive, '-C', root, ...members], {
+        timeoutMs: 60000,
+      });
+      expect(tar.status, tar.stderr).toBe(0);
+    }
+
+    const drillOptions = () => ({
+      command: 'drill' as const,
+      scope: 'all' as const,
+      archive: plainArchive,
+      target: drillTarget,
+      force: true,
+      passphraseEnv: 'KYBERION_BACKUP_PASSPHRASE',
+      retainDaily: 7,
+      retainWeekly: 4,
+    });
+
+    it('withholds credential roots from a restore and reports their archived counts', () => {
+      buildDrillArchive(1);
+      const result = restoreBackup(
+        drillOptions(),
+        {},
+        {
+          withholdRoots: ['knowledge/personal/connections', 'vault/secrets'],
+        }
+      );
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/notes.md`)).toBe(true);
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/connections`)).toBe(false);
+      expect(result.withheld).toEqual([
+        { root: 'knowledge/personal/connections', archived_members: 1, manifest_file_count: 1 },
+        { root: 'vault/secrets', archived_members: 0, manifest_file_count: null },
+      ]);
+    });
+
+    it('leaves no connection file (nor the target) behind after a drill', () => {
+      buildDrillArchive(1);
+      const result = runRestoreDrill(drillOptions());
+      expect(result.credentialMembers).toEqual([
+        { root: 'knowledge/personal/connections', archived_members: 1, manifest_file_count: 1 },
+      ]);
+      expect(result.restoredManifestCount).toBe(1);
+      expect(result.targetRemoved).toBe(true);
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/connections/github.json`)).toBe(
+        false
+      );
+      expect(safeExistsSync(drillTarget)).toBe(false);
+    });
+
+    it('fails a drill whose archive lacks the credential documents its manifest recorded', () => {
+      buildDrillArchive(2);
+      expect(() => runRestoreDrill(drillOptions())).toThrow(
+        '[BACKUP_DRILL_CREDENTIAL_COUNT_MISMATCH]'
+      );
+      expect(safeExistsSync(drillTarget)).toBe(false);
+    });
+  });
+
+  it('sweeps only stale plaintext backup/restore temp dirs a killed run left behind', () => {
+    const stale = `${root}/backup-2026-11-01T03-00-00-000Z-0123abcd`;
+    const staleRestore = `${root}/restore-2026-11-01T03-00-00-000Z-89abcdef`;
+    const operatorDir = `${root}/backup-restore-drill`;
+    for (const dir of [stale, staleRestore, operatorDir]) {
+      safeWriteFile(`${dir}/payload.tar.gz`, 'plaintext');
+    }
+    const later = Date.now() + PLAINTEXT_TEMP_DIR_STALE_MS + 60_000;
+    // Fresh: nothing is swept (a live run keeps its dir).
+    expect(sweepStalePlaintextTempDirs(root, Date.now())).toEqual([]);
+    expect(sweepStalePlaintextTempDirs(root, later).sort()).toEqual([stale, staleRestore]);
+    expect(safeExistsSync(stale)).toBe(false);
+    expect(safeExistsSync(staleRestore)).toBe(false);
+    expect(safeExistsSync(`${operatorDir}/payload.tar.gz`)).toBe(true);
   });
 
   it('scales the tar timeout with the payload and caps it', () => {
