@@ -543,7 +543,7 @@
       "path": "active/shared/runtime/mesh-hub",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding."
+      "note": "Mesh hub delivery and peer state; tenant-scoped records are removed only through audited offboarding. MSN-STORE-BOUNDS: tenants/<tenant>/presence.jsonl (one append per heartbeat) is compacted at write time to the latest record per peer_id with no archive (presence is ephemeral; latest-per-peer loses nothing a reader uses); each compaction is audited. The writer triggers it (mesh-peer-directory.ts MESH_PRESENCE_COMPACT_MIN_BYTES, 1 MiB, re-run after each doubling) with an explicit policy — the path is per tenant and the runtime root is env-overridable, so an exact-path catalog compact entry cannot express it. registrations.jsonl and capabilities.jsonl are low-rate and not compacted (registration history carries revocations; the capability key is the pair peer_id+capability_id). All readers stream with no size cap."
     },
     {
       "path": "active/shared/runtime/pipeline-runs",
@@ -593,7 +593,7 @@
       "path": "active/shared/runtime/dot-action-ledger.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G01: append-only dot action snapshots (dot-action-ledger.ts / dot-dispatch.ts); dispatch and recovery replay it, so it is load-bearing state."
+      "note": "G01: append-only dot action snapshots (dot-action-ledger.ts / dot-dispatch.ts); dispatch and recovery replay it, so it is load-bearing state. MSN-STORE-BOUNDS: no automatic retention — readDotActionLedgerStrict negative proofs need full per-action_ref history (e.g. no row was ever dispatched; the original parked row a recovery receipt hashes), so latest-per-action_ref compaction or truncation could re-fire consumed actions. Readers stream-fold with no size cap (the strict reader 16MB cap was removed); appends warn once per doubling past DOT_ACTION_LEDGER_GROWTH_WARN_BYTES (64 MiB)."
     },
     {
       "path": "active/shared/runtime/dot-digest-ledger.jsonl",
@@ -636,13 +636,14 @@
       "path": "active/shared/runtime/mission_queue.jsonl",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "G01: mission dispatch queue (scripts/mission_controller.ts QUEUE_PATH); pending queue state, never TTL-deleted."
+      "note": "G01: mission dispatch queue (scripts/mission_controller.ts QUEUE_PATH); pending queue state, never TTL-deleted. Self-bounded: the dispatch rewrite (scripts/refactor/mission-queue.ts) prunes terminal rows (dispatched/failed) older than MISSION_QUEUE_TERMINAL_RETENTION_MS (14d, measured from metadata.dispatched_at, else last_attempt_at, else enqueued_at); pending rows are always kept. Only mission-queue.ts reads the queue and it acts on pending rows only. Reads stream."
     },
     {
       "path": "active/shared/runtime/trigger-deliveries.jsonl",
       "artifact_class": "log",
       "action": "rotate",
-      "note": "Trigger delivery receipts (trigger-runner). The catalog used to call this self-bounding, but daemon-recovery idempotency keys used to embed daemon+status+minute — every tick minted a NEW key, so latest-per-key compaction never shrank the file (4.9MB). daemon_watchdog now keys recovery per unhealthy episode (stale: last heartbeat timestamp plus a 15-minute retry bucket, at most 4 attempts; missing/malformed: 15-minute bucket — daemonRecoveryKey). trigger-runner also rotates inline past its 4MB cap (it cannot wait for the janitor, which runs from chronos): the full journal is copied to a <stem>-YYYYMMDD-HHmmss.jsonl segment and the live file keeps every finished receipt younger than 7 days (stable keys never re-deliver inside the window) and every pending claim whose lease expired less than 7 days ago; only above half the cap are the oldest cron (minute-scoped) receipts trimmed first. When stable keys alone exceed 3/4 of the cap it skips rotation and appends run to the 5MB hard cap (ops-health trigger-store-near-cap; operator escape hatch: pnpm kyberion scheduler trigger-store rotate, approval-gated); reads are a bounded 8MB tail. Segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
+      "self_managed": true,
+      "note": "Trigger delivery receipts (trigger-runner). self_managed: the storage janitor never rotates the live file — rotating it would drop the 7-day dedupe window and in-flight claims and re-deliver triggers; it only expires already-rotated segments by ttl_days. The catalog used to call this self-bounding, but daemon-recovery idempotency keys used to embed daemon+status+minute — every tick minted a NEW key, so latest-per-key compaction never shrank the file (4.9MB). daemon_watchdog now keys recovery per unhealthy episode (stale: last heartbeat timestamp plus a 15-minute retry bucket, at most 4 attempts; missing/malformed: 15-minute bucket — daemonRecoveryKey). trigger-runner rotates inline, under its store lock, once the journal passes its retention threshold (TRIGGER_STORE_DEFAULT_MAX_BYTES, 4MB) and the rotation frees at least max(threshold/4, half the journal): only the dropped records move to a <stem>-YYYYMMDD-HHmmss.jsonl segment (segment + live = the old journal) and the live file keeps every finished receipt younger than 7 days (stable keys never re-deliver inside the window) and every pending claim whose lease expired less than 7 days ago; above target the oldest cron (minute-scoped) receipts are trimmed first. MSN-STORE-BOUNDS: there is no append cap and no fixed read window — dedupe scans backward to 7 days plus the 24h max claim lease, so the journal size never fails a read or an append; growth past TRIGGER_STORE_GROWTH_WARN_BYTES is ops-health trigger-store-growth (warn), with pnpm kyberion scheduler trigger-store rotate (approval-gated) as the manual rotation. Segments expire at 30d (runtime top-level files have no dir sweep, so ttl_days here governs the segments).",
       "ttl_days": 30
     },
     {

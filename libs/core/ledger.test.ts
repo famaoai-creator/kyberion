@@ -6,6 +6,7 @@ import {
   loadForScope,
   normalizeLedgerRecord,
   record,
+  setLedgerScanOptionsForTests,
   TENANT_LEDGER_ROOT,
   tenantLedgerPath,
   verifyAllLedgerIntegrity,
@@ -14,6 +15,8 @@ import {
 } from './ledger.js';
 import * as pathResolver from './path-resolver.js';
 import { computeLedgerEntryHash, GENESIS_HASH } from './chain-integrity.js';
+import { getFoundationIo } from './foundation/io.js';
+import { readTextFile } from './foundation/text.js';
 
 /** Append an unkeyed (`sha256`) entry — what anyone can compute without the chain key. */
 function appendUnkeyedEntry(ledgerPath: string, type: string): void {
@@ -262,5 +265,70 @@ describe('ledger core', () => {
     } finally {
       fs.rmSync(LEDGER_FILE, { recursive: true, force: true });
     }
+  });
+  describe('size-independent tail and verify (MSN-STORE-BOUNDS-20261101)', () => {
+    afterEach(() => {
+      setLedgerScanOptionsForTests({});
+      vi.restoreAllMocks();
+    });
+
+    /** Whole-file reads fail as they would past the old 100MB cap. */
+    function failWholeFileReadsOfLedger() {
+      const io = getFoundationIo();
+      const original = io.readFile.bind(io);
+      return vi.spyOn(io, 'readFile').mockImplementation((filePath, options) => {
+        if (path.resolve(filePath) === path.resolve(LEDGER_FILE)) {
+          throw new Error('File too large: exceeds the 100MB read cap');
+        }
+        return original(filePath, options);
+      });
+    }
+
+    it('chains and verifies a multi-chunk ledger without a whole-file read', () => {
+      // 64-byte chunks: every entry spans several chunks, as a >cap file would.
+      setLedgerScanOptionsForTests({ chunkBytes: 64 });
+      const readFile = failWholeFileReadsOfLedger();
+      const hashes = Array.from({ length: 5 }, (_, i) => record(`BIG_LEDGER_EVENT_${i}`, { i }));
+      const lines = fs.readFileSync(LEDGER_FILE, 'utf8').trim().split('\n');
+      expect(lines).toHaveLength(5);
+      expect(lines.map((line) => JSON.parse(line).parent_hash)).toEqual([
+        GENESIS_HASH,
+        ...hashes.slice(0, 4),
+      ]);
+      expect(verifyLedgerIntegrityDetailed()).toMatchObject({ ok: true, total: 5, corrupted: [] });
+      expect(loadForScope({ scope_kind: 'system' })).toHaveLength(5);
+      const ledgerReads = readFile.mock.calls.filter(
+        ([filePath]) => path.resolve(filePath) === path.resolve(LEDGER_FILE)
+      );
+      expect(ledgerReads).toEqual([]);
+      // The spy is live: a whole-file read of this ledger would have failed.
+      expect(() => readTextFile(LEDGER_FILE)).toThrow('File too large');
+    });
+
+    it('fails with LEDGER_TAIL_UNREADABLE on a torn last line instead of forking', () => {
+      setLedgerScanOptionsForTests({ chunkBytes: 32 });
+      record('BEFORE_TORN', {});
+      fs.appendFileSync(LEDGER_FILE, '{"id":"torn","hash":"abc');
+      expect(() => record('AFTER_TORN', {})).toThrow('[LEDGER_TAIL_UNREADABLE]');
+      // Nothing was glued onto the fragment.
+      expect(fs.readFileSync(LEDGER_FILE, 'utf8').endsWith('"hash":"abc')).toBe(true);
+    });
+
+    it('reports a torn last line as a verify finding', () => {
+      record('BEFORE_TORN', {});
+      fs.appendFileSync(LEDGER_FILE, '{"id":"torn"');
+      const report = verifyLedgerIntegrityDetailed();
+      expect(report.ok).toBe(false);
+      expect(report.corrupted).toEqual(['line:2:parse_error']);
+    });
+
+    it('reads the tail past trailing blank lines', () => {
+      setLedgerScanOptionsForTests({ chunkBytes: 16 });
+      const first = record('FIRST', {});
+      fs.appendFileSync(LEDGER_FILE, '\n\n');
+      record('SECOND', {});
+      const lines = fs.readFileSync(LEDGER_FILE, 'utf8').split('\n').filter(Boolean);
+      expect(JSON.parse(lines[1]).parent_hash).toBe(first);
+    });
   });
 });

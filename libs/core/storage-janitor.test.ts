@@ -51,6 +51,8 @@ vi.mock('./secure-io.js', async () => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
       actual.writeFileSync(p, data, { flag: 'wx' });
     },
+    // MSN-STORE-BOUNDS-20261101: streaming compaction publishes by exclusive link.
+    safeLinkExclusiveSync: (from: string, to: string) => actual.linkSync(from, to),
   };
 });
 
@@ -59,6 +61,11 @@ vi.mock('./secure-io.js', async () => {
 const jsonReadHook = vi.hoisted(() => ({
   afterRead: undefined as undefined | ((p: string) => void),
 }));
+
+// MSN-STORE-BOUNDS-20261101: lowered stand-in for the 100MB whole-file read
+// cap (secure-io assertSizeWithin) so a test can prove a store "over the cap"
+// stays compactable without writing 100MB.
+const wholeFileReadCap = vi.hoisted(() => ({ maxBytes: Number.POSITIVE_INFINITY }));
 
 vi.mock('./foundation/io.js', () => ({
   getFoundationIo: () => ({
@@ -79,8 +86,25 @@ vi.mock('./foundation/io.js', () => ({
       fs.appendFileSync(p, data);
     },
     exists: (p: string) => fs.existsSync(p),
-    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    readFile: (p: string) => {
+      const size = fs.statSync(p).size;
+      if (size > wholeFileReadCap.maxBytes) {
+        throw new Error(`File too large: ${size} bytes exceeds the whole-file read cap`);
+      }
+      return fs.readFileSync(p, 'utf8');
+    },
     stat: (p: string) => fs.statSync(p),
+    // MSN-STORE-BOUNDS-20261101: jsonl-read range reads (secure-io safeReadFileRange).
+    readRange: (p: string, position: number, length: number) => {
+      const fd = fs.openSync(p, 'r');
+      try {
+        const buf = Buffer.alloc(length);
+        const n = fs.readSync(fd, buf, 0, length, position);
+        return buf.subarray(0, n);
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
     writeFile: (p: string, data: string) => {
       fs.mkdirSync(path.dirname(p), { recursive: true });
       fs.writeFileSync(p, data);
@@ -184,6 +208,7 @@ import {
   scratchPromotionCandidatesWarning,
 } from './scratch-promotion-grace.js';
 import { createHash } from 'node:crypto';
+import { readJsonLines } from './foundation/json.js';
 
 function writeFile(filePath: string, content = 'x'): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -2234,6 +2259,58 @@ describe('storage-janitor', () => {
       expect(fs.existsSync(freshSegment)).toBe(true);
     });
 
+    it('never rotates a self_managed live file over the threshold but still expires its segments', () => {
+      // MSN-STORE-BOUNDS review R2: the trigger journal's writer keeps a 7-day
+      // dedupe window; a janitor rotation would forget it and re-deliver.
+      writeCatalogFile({
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/shared/runtime/trigger-deliveries.jsonl',
+            artifact_class: 'log',
+            action: 'rotate',
+            rotate_min_bytes: 128,
+            self_managed: true,
+            ttl_days: 30,
+          },
+        ],
+      });
+      const live = runtimeFile('trigger-deliveries.jsonl');
+      const content = `${JSON.stringify({ idempotencyKey: 'reflex:in-window' })}\n`.repeat(200);
+      writeFile(live, content);
+      const dir = path.dirname(live);
+      const oldSegment = path.join(dir, 'trigger-deliveries-20200101-000000.jsonl');
+      const freshSegment = path.join(dir, 'trigger-deliveries-29990101-000000.jsonl');
+      writeFile(oldSegment);
+      writeFile(freshSegment);
+      setMtime(oldSegment, 31 * RETENTION_DAY_MS);
+
+      const result = sweepAppendOnlyStores({ dryRun: false });
+      expect(result.errors).toHaveLength(0);
+      expect(result.rotated).toHaveLength(0);
+      expect(fs.readFileSync(live, 'utf8')).toBe(content);
+      expect(result.segmentsExpired).toEqual([oldSegment]);
+      expect(fs.existsSync(oldSegment)).toBe(false);
+      expect(fs.existsSync(freshSegment)).toBe(true);
+      expect(readRetentionAudit().some((r) => r.event === 'RETENTION_ROTATE')).toBe(false);
+    });
+
+    it('the shipped catalog marks the trigger journal self_managed', () => {
+      const shipped = JSON.parse(
+        fs.readFileSync(
+          path.join(
+            path.dirname(fileURLToPath(import.meta.url)),
+            '../../knowledge/product/governance/storage-retention-catalog.json'
+          ),
+          'utf8'
+        )
+      ) as { entries: Array<{ path: string; action: string; self_managed?: boolean }> };
+      const entry = shipped.entries.find(
+        (e) => e.path === 'active/shared/runtime/trigger-deliveries.jsonl'
+      );
+      expect(entry).toMatchObject({ action: 'rotate', self_managed: true });
+    });
+
     it('archives expired segments instead of deleting when segment_action is archive', () => {
       writeCatalogFile({
         version: '1.10.0',
@@ -2319,6 +2396,52 @@ describe('storage-janitor', () => {
         .map((l) => JSON.parse(l));
       expect(result.compacted).toContain(live);
       expect(kept.some((k) => k.note === 'keyless header record')).toBe(true);
+    });
+
+    it('compacts a store larger than the whole-file read cap by streaming (MSN-STORE-BOUNDS)', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      const lines = Array.from({ length: 60 }, (_, i) => ({
+        item_id: `item-${i % 5}`,
+        version: i,
+        pad: 'p'.repeat(40),
+      }));
+      writeFile(live, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+      wholeFileReadCap.maxBytes = 1024; // the store is ~5KB: every whole-file read throws
+      try {
+        expect(() => readJsonLines(live)).toThrow(/whole-file read cap/);
+        const result = sweepAppendOnlyStores({ dryRun: false });
+        expect(result.errors.filter((e) => e.includes('items.jsonl'))).toEqual([]);
+        expect(result.compacted).toContain(live);
+        const kept = fs
+          .readFileSync(live, 'utf8')
+          .trim()
+          .split('\n')
+          .map((l) => JSON.parse(l));
+        expect(kept.map((k) => k.version)).toEqual([55, 56, 57, 58, 59]);
+        const rec = readRetentionAudit().find((r) => r.event === 'RETENTION_COMPACT_ARCHIVE');
+        expect(rec?.before_lines).toBe(60);
+        expect(rec?.after_lines).toBe(5);
+        expect(readRetentionAudit().some((r) => r.event === 'RETENTION_COMPACT')).toBe(true);
+      } finally {
+        wholeFileReadCap.maxBytes = Number.POSITIVE_INFINITY;
+      }
+    });
+
+    it('dry-run reports a compaction without mutating the store', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      const content =
+        [
+          { item_id: 'a', version: 1, pad: 'x'.repeat(40) },
+          { item_id: 'a', version: 2, pad: 'z'.repeat(40) },
+        ]
+          .map((l) => JSON.stringify(l))
+          .join('\n') + '\n';
+      writeFile(live, content);
+      const result = sweepAppendOnlyStores({ dryRun: true });
+      expect(result.compacted).toContain(live);
+      expect(fs.readFileSync(live, 'utf8')).toBe(content);
     });
 
     it('skips compaction when the file is under compact_min_bytes', () => {

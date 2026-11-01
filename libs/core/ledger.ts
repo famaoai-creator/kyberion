@@ -1,5 +1,11 @@
-import { appendJsonLine, parseSafeJsonInput, readJsonLines } from './foundation/json.js';
+import { appendJsonLine, parseSafeJsonInput } from './foundation/json.js';
 import { readTextFile } from './foundation/text.js';
+import {
+  streamJsonLines,
+  streamTextLines,
+  streamTextLinesBackward,
+  type JsonlScanOptions,
+} from './jsonl-read.js';
 import {
   assertSafeRepositoryPath,
   safeMkdir,
@@ -434,21 +440,45 @@ function _writeToLedger(ledgerPath: string, entryData: any): string {
   });
 }
 
+/**
+ * Range-read options for the ledger's tail and verify scans. Production uses
+ * the jsonl-read defaults; tests inject a small chunk size so multi-chunk
+ * files stay tiny.
+ */
+let ledgerScanOptions: JsonlScanOptions = {};
+
+/** Test seam: override the ledger's range-read options (pass `{}` to reset). */
+export function setLedgerScanOptionsForTests(options: JsonlScanOptions): void {
+  ledgerScanOptions = { ...options };
+}
+
+/** The last non-blank line of the ledger, read backward in chunks (O(tail), not O(file)). */
+function readLedgerTailLine(ledgerPath: string): string | undefined {
+  for (const line of streamTextLinesBackward(ledgerPath, {
+    ...ledgerScanOptions,
+    onOversized: (oversized) => {
+      throw new Error(`tail line ${oversized.lineNumber} from the end exceeds the line guard`);
+    },
+  })) {
+    if (line.text.trim()) return line.text;
+  }
+  return undefined;
+}
+
 function _getLastHash(ledgerPath: string) {
   ledgerPath = safeLedgerPath(ledgerPath);
   if (!safeExistsSync(ledgerPath)) return GENESIS_HASH;
   ensureRegularLedgerFile(ledgerPath);
   // An existing ledger whose tail cannot be read or parsed must not restart
   // its chain at genesis (that would silently fork it): fail with a
-  // diagnostic. record() keeps a metadata-entry failure non-fatal.
+  // diagnostic. record() keeps a metadata-entry failure non-fatal. A torn
+  // last line (a writer that died mid-append) fails the same way: appending
+  // after it would glue the new entry onto the fragment.
   let tailHash: unknown;
   try {
-    const trimmed = readTextFile(ledgerPath).trim();
-    if (!trimmed) return GENESIS_HASH;
-    const lines = trimmed.split('\n');
-    const lastEntry = normalizeLedgerRecord(
-      parseSafeJsonInput(lines[lines.length - 1], 'ledger tail entry')
-    );
+    const tail = readLedgerTailLine(ledgerPath);
+    if (tail === undefined) return GENESIS_HASH;
+    const lastEntry = normalizeLedgerRecord(parseSafeJsonInput(tail, 'ledger tail entry'));
     tailHash = lastEntry?.hash;
   } catch (err) {
     throw new Error(
@@ -494,21 +524,27 @@ export const verifyLedgerIntegrityDetailed = (
   }
   ensureRegularLedgerFile(safePath);
 
-  const content = readTextFile(safePath);
-  const lines = content.trim().split('\n');
   let expectedParentHash = GENESIS_HASH;
   const corrupted: string[] = [];
   let total = 0;
   let missingKey = false;
   const algTracker = createChainAlgTracker(options);
 
-  for (const [index, line] of lines.entries()) {
-    if (!line) continue;
+  // Forward stream in fixed chunks: constant memory, no whole-file size cap.
+  const lines = streamTextLines(safePath, {
+    ...ledgerScanOptions,
+    onOversized: (oversized) => {
+      total++;
+      corrupted.push(`line:${oversized.lineNumber}:parse_error`);
+    },
+  });
+  for (const { text: line, lineNumber } of lines) {
+    if (!line.trim()) continue;
     total++;
     try {
       const entry = normalizeLedgerRecord(parseSafeJsonInput(line, 'ledger entry'));
       if (!entry) {
-        corrupted.push(`line:${index + 1}:invalid_record`);
+        corrupted.push(`line:${lineNumber}:invalid_record`);
         continue;
       }
       const chainAlg = (entry.chain_alg ?? 'sha256') as ChainAlg;
@@ -521,17 +557,17 @@ export const verifyLedgerIntegrityDetailed = (
       });
       if (algFinding) {
         corrupted.push(
-          `line:${index + 1}:${algFinding}${check.ok ? '' : `+${check.reason ?? 'invalid'}`}`
+          `line:${lineNumber}:${algFinding}${check.ok ? '' : `+${check.reason ?? 'invalid'}`}`
         );
       } else if (!check.ok) {
         if (check.reason === 'missing_audit_chain_key') missingKey = true;
         corrupted.push(
-          entry.id ? String(entry.id) : `line:${index + 1}:${check.reason ?? 'invalid'}`
+          entry.id ? String(entry.id) : `line:${lineNumber}:${check.reason ?? 'invalid'}`
         );
       }
       expectedParentHash = String(entry.hash ?? '');
     } catch (_e) {
-      corrupted.push(`line:${index + 1}:parse_error`);
+      corrupted.push(`line:${lineNumber}:parse_error`);
     }
   }
   return {
@@ -657,18 +693,24 @@ export function verifyScopedIntegrity(scope: { tier?: string; tenant_slug?: stri
 
 function readScopedEntries(safePath: string, filter: EventScopeFilter): Record<string, unknown>[] {
   ensureRegularLedgerFile(safePath);
-  return readJsonLines<unknown>(safePath, { onMalformed: 'skip' }).flatMap((value) => {
+  if (!safeExistsSync(safePath)) return [];
+  // Forward stream: a scoped read never fails on the ledger's size.
+  const matched: Record<string, unknown>[] = [];
+  for (const value of streamJsonLines<unknown>(safePath, {
+    ...ledgerScanOptions,
+    onMalformed: 'skip',
+  })) {
     try {
       const entry = normalizeLedgerRecord(value);
-      if (!entry) return [];
+      if (!entry) continue;
       const scopeResult = resolveScopeForRecord(entry);
-      if (scopeResult.disposition === 'invalid') return [];
-      const scope = scopeResult.scope;
-      return eventScopeMatches(scope, filter) ? [entry] : [];
+      if (scopeResult.disposition === 'invalid') continue;
+      if (eventScopeMatches(scopeResult.scope, filter)) matched.push(entry);
     } catch {
-      return [];
+      continue;
     }
-  });
+  }
+  return matched;
 }
 
 /** Tenants a filter names explicitly ('all' = every partition). */

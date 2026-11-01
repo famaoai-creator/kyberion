@@ -14,13 +14,17 @@ import {
 } from '@agent/core';
 import {
   MAX_DISPATCH_ATTEMPTS,
+  MISSION_QUEUE_TERMINAL_RETENTION_MS,
   dispatchNextQueuedMission,
   enqueueMission,
+  pruneMissionQueue,
+  type MissionQueueEntry,
 } from './mission-queue.js';
+import { DEFAULT_JSONL_CHUNK_BYTES } from '@agent/core/jsonl-read';
 
 const Ajv = (AjvModule as any).default ?? AjvModule;
 const addFormats = (addFormatsModule as any).default ?? addFormatsModule;
-const QUEUE_DIR = pathResolver.shared('runtime/memory');
+const QUEUE_DIR = pathResolver.shared('tmp/mission-queue-tests');
 const QUEUE_PATH = path.join(QUEUE_DIR, 'mission-queue-schema-test.jsonl');
 
 describe('mission-queue', () => {
@@ -224,5 +228,115 @@ describe('mission-queue', () => {
       safeRmSync(linkPath, { force: true });
       safeRmSync(targetPath, { force: true });
     }
+  });
+  describe('terminal-row retention', () => {
+    const DAY = 24 * 60 * 60 * 1000;
+    const now = Date.parse('2026-11-01T00:00:00.000Z');
+    const row = (
+      missionId: string,
+      status: MissionQueueEntry['status'],
+      enqueuedAgoMs: number,
+      metadata?: MissionQueueEntry['metadata']
+    ): MissionQueueEntry => ({
+      mission_id: missionId,
+      tier: 'confidential',
+      priority: 5,
+      status,
+      enqueued_at: new Date(now - enqueuedAgoMs).toISOString(),
+      dependencies: [],
+      ...(metadata ? { metadata } : {}),
+    });
+
+    it('keeps every pending row and recent terminal rows, drops old terminal rows', () => {
+      const queue = [
+        row('MSN-OLD-PENDING', 'pending', 90 * DAY),
+        row('MSN-OLD-DISPATCHED', 'dispatched', 30 * DAY),
+        row('MSN-OLD-FAILED', 'failed', 30 * DAY),
+        row('MSN-RECENT-DISPATCHED', 'dispatched', 2 * DAY),
+        // Enqueued long ago, dispatched recently: age counts from dispatch.
+        row('MSN-LATE-DISPATCH', 'dispatched', 60 * DAY, {
+          dispatched_at: new Date(now - DAY).toISOString(),
+        }),
+        row('MSN-LATE-FAIL', 'failed', 60 * DAY, {
+          last_attempt_at: new Date(now - DAY).toISOString(),
+        }),
+      ];
+      expect(pruneMissionQueue(queue, now).map((entry) => entry.mission_id)).toEqual([
+        'MSN-OLD-PENDING',
+        'MSN-RECENT-DISPATCHED',
+        'MSN-LATE-DISPATCH',
+        'MSN-LATE-FAIL',
+      ]);
+      expect(MISSION_QUEUE_TERMINAL_RETENTION_MS).toBe(14 * DAY);
+    });
+
+    it('prunes old terminal rows on the dispatch rewrite and stamps dispatched_at', async () => {
+      const old = new Date(Date.now() - MISSION_QUEUE_TERMINAL_RETENTION_MS - DAY).toISOString();
+      const recent = new Date(Date.now() - DAY).toISOString();
+      const line = (missionId: string, status: string, enqueuedAt: string) =>
+        JSON.stringify({
+          mission_id: missionId,
+          tier: 'confidential',
+          priority: 5,
+          status,
+          enqueued_at: enqueuedAt,
+          dependencies: [],
+        });
+      safeWriteFile(
+        QUEUE_PATH,
+        [
+          line('MSN-ANCIENT-DONE', 'dispatched', old),
+          line('MSN-ANCIENT-FAILED', 'failed', old),
+          line('MSN-RECENT-DONE', 'dispatched', recent),
+          line('MSN-WAITING', 'pending', old),
+          line('MSN-NEXT', 'pending', recent),
+        ].join('\n') + '\n'
+      );
+      await dispatchNextQueuedMission(
+        QUEUE_PATH,
+        (missionId) => ({ ok: missionId === 'MSN-NEXT', missing: ['MSN-DEP'] }),
+        async () => undefined
+      );
+      const rows = (safeReadFile(QUEUE_PATH, { encoding: 'utf8' }) as string)
+        .trim()
+        .split('\n')
+        .map((raw) => JSON.parse(raw));
+      expect(rows.map((r) => [r.mission_id, r.status])).toEqual([
+        ['MSN-RECENT-DONE', 'dispatched'],
+        ['MSN-WAITING', 'pending'],
+        ['MSN-NEXT', 'dispatched'],
+      ]);
+      expect(Number.isFinite(Date.parse(rows[2].metadata.dispatched_at))).toBe(true);
+    });
+
+    it('reads a queue that spans several read chunks', async () => {
+      const filler = 'x'.repeat(2000);
+      const lines: string[] = [];
+      for (let i = 0; lines.join('\n').length < 2 * DEFAULT_JSONL_CHUNK_BYTES + 1; i++) {
+        lines.push(
+          JSON.stringify({
+            mission_id: `MSN-DONE-${i}`,
+            tier: 'confidential',
+            priority: 5,
+            status: 'dispatched',
+            enqueued_at: new Date().toISOString(),
+            dependencies: [],
+            metadata: { last_error: filler },
+          })
+        );
+      }
+      lines.push(entry('MSN-AFTER-CHUNKS', 5));
+      safeWriteFile(QUEUE_PATH, lines.join('\n') + '\n');
+      const dispatched: string[] = [];
+      await dispatchNextQueuedMission(
+        QUEUE_PATH,
+        () => ({ ok: true, missing: [] }),
+        async (missionId) => {
+          dispatched.push(missionId);
+        }
+      );
+      expect(dispatched).toEqual(['MSN-AFTER-CHUNKS']);
+      expect(statuses()['MSN-AFTER-CHUNKS']).toBe('dispatched');
+    });
   });
 });

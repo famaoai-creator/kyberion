@@ -10,20 +10,21 @@
 
 import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
-import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { clamp, isRecord } from './foundation/text.js';
 import {
   assertSafeRepositoryPath,
   safeAppendFileSync,
-  safeCopyFileSync,
   safeExistsSync,
   safeMkdir,
   safeLstat,
-  safeReadFileTail,
+  safeMoveSync,
+  safeReaddir,
   safeStat,
-  safeWriteFile,
+  safeUnlinkSync,
 } from './secure-io.js';
+import { readJsonLinesBackward, streamTextLines } from './jsonl-read.js';
+import { parseSafeJsonInput } from './foundation/safe-json.js';
 import { pathResolver } from './path-resolver.js';
 import { loadAuthorityRoleIndex } from './organization/authority-role-registry.js';
 import { auditChain } from './governance/audit-chain.js';
@@ -81,28 +82,36 @@ interface TriggerRecord extends TriggerReceipt {
 export interface TriggerRunnerOptions {
   storePath?: string;
   now?: () => Date;
+  /** Claim lease; clamped to [1s, TRIGGER_STORE_MAX_CLAIM_LEASE_MS]. */
   claimLeaseMs?: number;
+  /** Write-time retention threshold (never an append cap). */
   maxStoreBytes?: number;
+  /** Range-read chunk size for journal scans (test seam; default 256KB). */
+  readChunkBytes?: number;
   /** Trusted resolver used by governed callers and deterministic tests. */
   authorityResolver?: (authority: TriggerAuthoritySnapshot) => TriggerAuthoritySnapshot;
 }
 
 const DEFAULT_STORE_PATH = 'active/shared/runtime/trigger-deliveries.jsonl';
 const DEFAULT_CLAIM_LEASE_MS = 15 * 60 * 1000;
-/** Default rotation threshold of the delivery journal. */
-export const TRIGGER_STORE_DEFAULT_MAX_BYTES = 4 * 1024 * 1024;
-/** Hard cap: an append past this size fails with [TRIGGER_STORE_FULL]. */
-export const TRIGGER_STORE_HARD_CAP_BYTES = 5 * 1024 * 1024;
-const DEFAULT_MAX_STORE_BYTES = TRIGGER_STORE_DEFAULT_MAX_BYTES;
-const MAX_STORE_BYTES = TRIGGER_STORE_HARD_CAP_BYTES;
 /**
- * Dedupe only ever needs the latest record per idempotency key, and recent
- * keys sit at the end of the journal. Reads take a bounded tail of this size,
- * so a journal that outgrew its cap (keys minted per minute never compact)
- * can no longer fail the read and take the scheduler down with it.
+ * Write-time retention threshold of the delivery journal: past it, an append
+ * first rewrites the journal down to its dedupe window. It is not a cap — an
+ * append never fails because of the journal's size (MSN-STORE-BOUNDS-20261101).
  */
-export const TRIGGER_STORE_READ_WINDOW_BYTES = 8 * 1024 * 1024;
-const STORE_READ_WINDOW_BYTES = TRIGGER_STORE_READ_WINDOW_BYTES;
+export const TRIGGER_STORE_DEFAULT_MAX_BYTES = 4 * 1024 * 1024;
+/**
+ * Growth warning level (ops-health trigger-store-growth). Retention keeps a
+ * healthy journal under the threshold, so twice the threshold means receipts
+ * inside the dedupe window alone keep it from shrinking. Warn only.
+ */
+export const TRIGGER_STORE_GROWTH_WARN_BYTES = 2 * TRIGGER_STORE_DEFAULT_MAX_BYTES;
+const DEFAULT_MAX_STORE_BYTES = TRIGGER_STORE_DEFAULT_MAX_BYTES;
+/**
+ * Longest claim lease a runner grants. Bounding it bounds how far back a
+ * non-abandoned claim can have been recorded (see {@link readCutoffMs}).
+ */
+export const TRIGGER_STORE_MAX_CLAIM_LEASE_MS = 24 * 60 * 60 * 1000;
 /**
  * Dedupe window. Finished receipts younger than this are always kept (stable
  * keys such as mission admission, continuous owner, reflex or daemon-recovery
@@ -349,24 +358,128 @@ export function normalizeTriggerRecord(value: unknown): TriggerRecord | null {
   };
 }
 
-function readRecords(storePath: string): TriggerRecord[] {
-  if (!safeExistsSync(storePath)) return [];
+/**
+ * Oldest `recordedAt` a dedupe read must reach. Retention keeps finished
+ * receipts younger than {@link DEDUPE_RETENTION_MS} and pending claims whose
+ * lease expired less than that long ago; a claim records `recordedAt` one lease
+ * before `claimExpiresAt`, and leases are capped at
+ * {@link TRIGGER_STORE_MAX_CLAIM_LEASE_MS}, so every record retention keeps was
+ * recorded after this cutoff.
+ */
+function readCutoffMs(now: Date): number {
+  return now.getTime() - DEDUPE_RETENTION_MS - TRIGGER_STORE_MAX_CLAIM_LEASE_MS;
+}
+
+function journalReadOptions(chunkBytes: number | undefined) {
+  return {
+    chunkBytes,
+    // A torn or malformed line must not hide the rest of the journal.
+    onMalformed: 'skip' as const,
+    map: (value: unknown) => normalizeTriggerRecord(value),
+  };
+}
+
+/**
+ * Newest-first scan of the dedupe window. Size-independent: it range-reads
+ * backwards and stops at the first finished receipt recorded before
+ * {@link readCutoffMs} (the journal is appended in time order). Pending claims
+ * never stop the scan — one recorded before the cutoff (a legacy long lease)
+ * is still yielded if the scan reaches it.
+ */
+function* scanDedupeWindowBackward(
+  storePath: string,
+  now: Date,
+  chunkBytes?: number
+): Generator<TriggerRecord> {
+  if (!safeExistsSync(storePath)) return;
   assertTriggerStoreFile(storePath);
-  const { buffer, truncated } = safeReadFileTail(storePath, STORE_READ_WINDOW_BYTES);
-  const lines = buffer.toString('utf8').split(/\r?\n/u);
-  // A truncated window starts mid-record; the torn first line is not a record.
-  if (truncated) lines.shift();
-  const records: TriggerRecord[] = [];
-  for (const line of lines) {
-    if (!line.trim()) continue;
+  const cutoff = readCutoffMs(now);
+  for (const record of readJsonLinesBackward<TriggerRecord | null>(
+    storePath,
+    journalReadOptions(chunkBytes)
+  )) {
+    if (!record) continue;
+    if (!isInFlight(record) && recordTimeMs(record) < cutoff) return;
+    yield record;
+  }
+}
+
+/** Every record of the dedupe window, oldest first. */
+function readRecords(storePath: string, now: Date, chunkBytes?: number): TriggerRecord[] {
+  return [...scanDedupeWindowBackward(storePath, now, chunkBytes)].reverse();
+}
+
+/** Latest record for one key inside the dedupe window; stops as soon as it is found. */
+function findLatestRecord(
+  storePath: string,
+  idempotencyKey: string,
+  now: Date,
+  chunkBytes?: number
+): TriggerRecord | undefined {
+  for (const record of scanDedupeWindowBackward(storePath, now, chunkBytes)) {
+    if (record.idempotencyKey === idempotencyKey) return record;
+  }
+  return undefined;
+}
+
+/** One journal line that retention may keep: the parsed record and where it sits. */
+interface WindowEntry {
+  record: TriggerRecord;
+  /** One-based raw line number (the key {@link splitJournal} keeps lines by). */
+  lineNumber: number;
+  /** Bytes of the raw line including its newline. */
+  bytes: number;
+}
+
+/**
+ * Latest record per key that retention keeps (finished receipts younger than
+ * the dedupe window, pending claims not yet abandoned), in order of last
+ * appearance. Streams the whole journal forward in constant read memory, so
+ * the rewrite is right regardless of size or record order; memory is bounded
+ * by the keys inside the window. Also returns the total record count and the
+ * last line number scanned (lines past it were appended after this scan).
+ */
+function collectDedupeWindow(
+  storePath: string,
+  now: Date,
+  chunkBytes?: number
+): { records: number; latest: WindowEntry[]; lastLine: number } {
+  if (!safeExistsSync(storePath)) return { records: 0, latest: [], lastLine: 0 };
+  assertTriggerStoreFile(storePath);
+  const cutoff = now.getTime() - DEDUPE_RETENTION_MS;
+  const latest = new Map<string, WindowEntry>();
+  let records = 0;
+  let lastLine = 0;
+  const onOversized = (line: { lineNumber: number }): void => {
+    // A rewrite cannot carry a line it never buffered; refuse rather than lose it.
+    throw new Error(
+      `[TRIGGER_STORE_LINE_TOO_LONG] journal line ${line.lineNumber} exceeds the per-line guard; the journal is left unrewritten`
+    );
+  };
+  for (const line of streamTextLines(storePath, { chunkBytes, onOversized })) {
+    lastLine = line.lineNumber;
+    if (!line.text.trim()) continue;
+    let record: TriggerRecord | null = null;
     try {
-      const record = normalizeTriggerRecord(parseSafeJsonInput(line, 'trigger delivery record'));
-      if (record) records.push(record);
+      record = normalizeTriggerRecord(parseSafeJsonInput(line.text, 'trigger journal entry'));
     } catch {
-      /* a torn or malformed line must not hide the rest of the journal */
+      record = null; // a torn or malformed line must not hide the rest
+    }
+    if (!record) continue;
+    records++;
+    latest.delete(record.idempotencyKey);
+    const kept = isInFlight(record)
+      ? !isAbandonedClaim(record, cutoff)
+      : recordTimeMs(record) >= cutoff;
+    if (kept) {
+      latest.set(record.idempotencyKey, {
+        record,
+        lineNumber: line.lineNumber,
+        bytes: Buffer.byteLength(line.text, 'utf8') + 1,
+      });
     }
   }
-  return records;
+  return { records, latest: [...latest.values()], lastLine };
 }
 
 function assertTriggerStoreFile(storePath: string): void {
@@ -434,47 +547,130 @@ function isAbandonedClaim(record: TriggerRecord, cutoffMs: number): boolean {
  *   dedupe window ago (a dead claimant's record is then dropped);
  * - only when the retained set is still above `targetBytes` are the oldest
  *   minute-scoped (cron) receipts trimmed first.
- * The hard append cap is the backstop for stable keys alone outgrowing the
- * budget. Dropped history stays in the rotated segment.
+ * Stable keys alone outgrowing the budget only warn
+ * ([TRIGGER_STORE_WINDOW_FULL]); appends never fail on size. Dropped history
+ * goes to the rotated segment. `entries` are already latest-per-key and
+ * inside the window ({@link collectDedupeWindow}).
  */
-function retainTriggerDedupeWindow(
-  records: TriggerRecord[],
-  targetBytes: number,
-  now: Date
-): string[] {
-  const latest = new Map<string, TriggerRecord>();
-  for (const record of records) {
-    latest.delete(record.idempotencyKey);
-    latest.set(record.idempotencyKey, record);
-  }
-  const cutoff = now.getTime() - DEDUPE_RETENTION_MS;
-  const ordered = [...latest.values()].filter((record) =>
-    isInFlight(record) ? !isAbandonedClaim(record, cutoff) : recordTimeMs(record) >= cutoff
-  );
-  const sizeOf = (record: TriggerRecord) => Buffer.byteLength(JSON.stringify(record), 'utf8') + 1;
-  let bytes = ordered.reduce((sum, record) => sum + sizeOf(record), 0);
-  const drop = new Set<TriggerRecord>();
+function retainTriggerDedupeWindow(entries: WindowEntry[], targetBytes: number): WindowEntry[] {
+  let bytes = entries.reduce((sum, entry) => sum + entry.bytes, 0);
+  const drop = new Set<WindowEntry>();
   if (bytes > targetBytes) {
-    const trimmable = ordered
-      .filter((record) => !isInFlight(record) && isMinuteScoped(record))
-      .sort((a, b) => recordTimeMs(a) - recordTimeMs(b));
-    for (const record of trimmable) {
+    const trimmable = entries
+      .filter((entry) => !isInFlight(entry.record) && isMinuteScoped(entry.record))
+      .sort((a, b) => recordTimeMs(a.record) - recordTimeMs(b.record));
+    for (const entry of trimmable) {
       if (bytes <= targetBytes) break;
-      drop.add(record);
-      bytes -= sizeOf(record);
+      drop.add(entry);
+      bytes -= entry.bytes;
     }
   }
-  return ordered.filter((record) => !drop.has(record)).map((record) => JSON.stringify(record));
+  return entries.filter((entry) => !drop.has(entry));
+}
+
+/** Lines buffered before one append to a split output file. */
+const SPLIT_WRITE_BATCH_BYTES = 256 * 1024;
+
+class BatchedLineWriter {
+  private pending: string[] = [];
+  private pendingBytes = 0;
+  constructor(readonly filePath: string) {
+    safeAppendFileSync(filePath, '');
+  }
+  write(line: string): void {
+    this.pending.push(`${line}\n`);
+    this.pendingBytes += line.length + 1;
+    if (this.pendingBytes >= SPLIT_WRITE_BATCH_BYTES) this.flush();
+  }
+  flush(): void {
+    if (this.pending.length === 0) return;
+    safeAppendFileSync(this.filePath, this.pending.join(''));
+    this.pending = [];
+    this.pendingBytes = 0;
+  }
+}
+
+function tryUnlink(filePath: string): void {
+  try {
+    if (safeExistsSync(filePath)) safeUnlinkSync(filePath);
+  } catch {
+    // best-effort temp cleanup
+  }
+}
+
+/**
+ * Split the journal by raw line: lines in `keep` (and any line appended after
+ * the scan that produced `keep`, i.e. past `lastLine`) stay live; every other
+ * non-blank line goes to a new janitor-named segment. Segment + live file is
+ * exactly the old content (minus blank lines), so nothing is copied twice and
+ * nothing is lost. Both outputs stream through temp files; the segment is
+ * published first, then the live file is replaced by an atomic rename, so a
+ * crash in between leaves duplicates at worst, never a gap. The caller holds
+ * the store lock.
+ */
+function splitJournal(
+  storePath: string,
+  keep: ReadonlySet<number>,
+  lastLine: number,
+  now: Date,
+  chunkBytes?: number
+): string {
+  removeStaleRotationTemps(storePath);
+  const tag = `${process.pid}-${randomUUID().slice(0, 8)}`;
+  const liveTemp = `${storePath}.rotate-live-${tag}.tmp`;
+  const segmentTemp = `${storePath}.rotate-segment-${tag}.tmp`;
+  try {
+    const live = new BatchedLineWriter(liveTemp);
+    const segment = new BatchedLineWriter(segmentTemp);
+    const onOversized = (line: { lineNumber: number }): void => {
+      throw new Error(
+        `[TRIGGER_STORE_LINE_TOO_LONG] journal line ${line.lineNumber} exceeds the per-line guard; the journal is left unrewritten`
+      );
+    };
+    for (const line of streamTextLines(storePath, { chunkBytes, onOversized })) {
+      if (!line.text.trim()) continue;
+      if (line.lineNumber > lastLine || keep.has(line.lineNumber)) live.write(line.text);
+      else segment.write(line.text);
+    }
+    live.flush();
+    segment.flush();
+    const segmentPath = rotatedSegmentPath(storePath, now);
+    safeMoveSync(segmentTemp, segmentPath);
+    safeMoveSync(liveTemp, storePath);
+    return segmentPath;
+  } finally {
+    tryUnlink(liveTemp);
+    tryUnlink(segmentTemp);
+  }
+}
+
+/**
+ * Temps left by a rotation that crashed between writing and publishing are
+ * full copies of the journal; the janitor's segment pattern never matches
+ * them. The caller holds the store lock, so any present now are orphans.
+ */
+function removeStaleRotationTemps(storePath: string): void {
+  const dir = path.dirname(storePath);
+  const prefix = `${path.basename(storePath)}.rotate-`;
+  let names: string[];
+  try {
+    names = safeReaddir(dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (name.startsWith(prefix) && name.endsWith('.tmp')) tryUnlink(path.join(dir, name));
+  }
 }
 
 /** After a window-full attempt, re-parse only once the journal grew this much... */
 export const TRIGGER_STORE_WINDOW_FULL_REGROWTH_BYTES = 256 * 1024;
 /** ...or this long passed (also the warning rate limit). */
 export const TRIGGER_STORE_WINDOW_FULL_RETRY_MS = 60 * 60 * 1000;
-/** Escape hatch named by the hard-cap diagnostics and the ops-health finding. */
+/** Operator escape hatch named by the window-full diagnostic and the ops-health finding. */
 export const TRIGGER_STORE_ROTATE_COMMAND = 'pnpm kyberion scheduler trigger-store rotate';
 
-/** Per-journal memory of the last window-full compaction attempt (this process). */
+/** Per-journal memory of the last compaction attempt that left the journal large (this process). */
 const windowFullAttempts = new Map<string, { sizeBytes: number; atMs: number }>();
 const windowFullWarnedAt = new Map<string, number>();
 
@@ -496,41 +692,71 @@ function shouldAttemptCompaction(storePath: string, sizeBytes: number, now: Date
 }
 
 /**
- * Rotate inline: the janitor that would rotate this journal runs from chronos,
- * so waiting for it is self-defeating when the journal is what stops chronos.
- * The full journal is copied to a janitor-named segment first, then the live
- * file is atomically replaced with the dedupe window, so a crash in between
- * loses nothing.
+ * Minimum bytes a rotation must free: a quarter of the threshold, and at least
+ * half the journal once it is larger — so every rotation at least halves the
+ * live file and the total rewrite cost stays proportional to what was appended,
+ * however large the retained window has grown.
  */
-function compactRecords(storePath: string, maxStoreBytes: number, now: Date): void {
-  const retained = retainTriggerDedupeWindow(
-    readRecords(storePath),
-    Math.floor(maxStoreBytes / 2),
-    now
-  );
-  const retainedBytes = retained.reduce(
-    (sum, line) => sum + Buffer.byteLength(line, 'utf8') + 1,
-    0
-  );
-  if (retainedBytes > Math.floor((maxStoreBytes * 3) / 4)) {
-    // Stable keys inside the dedupe window alone fill the budget: rotating now
-    // would copy a segment on every append and free almost nothing. Appends
-    // continue up to the hard cap, which ops-health reports. The next attempt
-    // waits for real regrowth or an hour, and the warning is rate-limited, so
-    // a stuck journal is not re-parsed and re-logged on every append.
-    windowFullAttempts.set(storePath, { sizeBytes: storeSize(storePath), atMs: now.getTime() });
-    const warnedAt = windowFullWarnedAt.get(storePath);
-    if (warnedAt === undefined || now.getTime() - warnedAt >= TRIGGER_STORE_WINDOW_FULL_RETRY_MS) {
-      windowFullWarnedAt.set(storePath, now.getTime());
-      logger.warn(
-        `[TRIGGER_STORE_WINDOW_FULL] delivery journal not rotated — ${retainedBytes} bytes of receipts are inside the ${DEDUPE_RETENTION_MS / 86_400_000}-day dedupe window | next: find the key prefix minting stable keys at this rate (they should be per episode, not per tick); appends continue to the ${MAX_STORE_BYTES}-byte hard cap, then triggers fail closed — at the cap: ${TRIGGER_STORE_ROTATE_COMMAND} | evidence: ${storePath}`
-      );
+function minFreeableBytes(maxStoreBytes: number, sizeBytes: number): number {
+  return Math.max(Math.floor(maxStoreBytes / 4), Math.floor(sizeBytes / 2));
+}
+
+/**
+ * Rotate inline: the janitor never rotates this journal (its catalog entry is
+ * `self_managed`), and it runs from chronos anyway, so waiting for it is
+ * self-defeating when the journal is what stops chronos. Only the dropped
+ * records move to a janitor-named segment ({@link splitJournal}); the live file
+ * keeps the dedupe window. Every appender holds the store lock, so no append
+ * races the rewrite (the shared park/publish rewrite in append-only-store.ts
+ * exists for lock-free appenders, and leaves the live file absent mid-rewrite).
+ */
+function compactRecords(
+  storePath: string,
+  maxStoreBytes: number,
+  now: Date,
+  chunkBytes?: number
+): void {
+  // Recorded in `finally` unless the journal ended small: a failed or skipped
+  // attempt then waits for real regrowth or an hour instead of re-reading (and
+  // re-copying) the journal on every append.
+  let settled = false;
+  try {
+    const window = collectDedupeWindow(storePath, now, chunkBytes);
+    const retained = retainTriggerDedupeWindow(window.latest, Math.floor(maxStoreBytes / 2));
+    const retainedBytes = retained.reduce((sum, entry) => sum + entry.bytes, 0);
+    const sizeBytes = storeSize(storePath);
+    const windowFull = retainedBytes > Math.floor((maxStoreBytes * 3) / 4);
+    if (windowFull) {
+      // Stable keys inside the dedupe window alone fill the budget. Growth only
+      // warns: appends and dedupe keep working at any size. The warning is
+      // rate-limited and the next attempt waits for real regrowth or an hour, so
+      // a stuck journal is not re-parsed and re-logged on every append.
+      const warnedAt = windowFullWarnedAt.get(storePath);
+      if (
+        warnedAt === undefined ||
+        now.getTime() - warnedAt >= TRIGGER_STORE_WINDOW_FULL_RETRY_MS
+      ) {
+        windowFullWarnedAt.set(storePath, now.getTime());
+        logger.warn(
+          `[TRIGGER_STORE_WINDOW_FULL] delivery journal cannot shrink below its ${maxStoreBytes}-byte retention threshold — ${retainedBytes} bytes of receipts are inside the ${DEDUPE_RETENTION_MS / 86_400_000}-day dedupe window | next: find the key prefix minting stable keys at this rate (they should be per episode, not per tick); appends and dedupe continue at any size — to shed in-window stable keys: ${TRIGGER_STORE_ROTATE_COMMAND} | evidence: ${storePath} (${sizeBytes} bytes)`
+        );
+      }
     }
-    return;
+    // Rotating now would rewrite the window and free too little.
+    if (sizeBytes - retainedBytes < minFreeableBytes(maxStoreBytes, sizeBytes)) return;
+    splitJournal(
+      storePath,
+      new Set(retained.map((entry) => entry.lineNumber)),
+      window.lastLine,
+      now,
+      chunkBytes
+    );
+    settled = !windowFull;
+  } finally {
+    if (settled) windowFullAttempts.delete(storePath);
+    else
+      windowFullAttempts.set(storePath, { sizeBytes: storeSize(storePath), atMs: now.getTime() });
   }
-  windowFullAttempts.delete(storePath);
-  safeCopyFileSync(storePath, rotatedSegmentPath(storePath, now));
-  safeWriteFile(storePath, retained.length > 0 ? `${retained.join('\n')}\n` : '');
 }
 
 function storeSize(storePath: string): number {
@@ -542,34 +768,34 @@ function storeSize(storePath: string): number {
   }
 }
 
+/**
+ * Append one receipt. Write-time retention runs first once the journal is past
+ * `maxStoreBytes`; its failure is housekeeping and only warns. There is no size
+ * cap: a journal of any size accepts the append.
+ */
 function appendRecord(
   storePath: string,
   record: TriggerRecord,
   maxStoreBytes: number,
-  now: Date = new Date()
+  now: Date = new Date(),
+  chunkBytes?: number
 ): void {
   safeMkdir(path.dirname(pathResolver.rootResolve(storePath)));
   assertTriggerStoreFile(storePath);
   const serialized = `${JSON.stringify(record)}\n`;
   const lineBytes = Buffer.byteLength(serialized, 'utf8');
-  let size = storeSize(storePath);
+  const size = storeSize(storePath);
   if (size + lineBytes > maxStoreBytes && shouldAttemptCompaction(storePath, size, now)) {
     try {
-      compactRecords(storePath, maxStoreBytes, now);
+      compactRecords(storePath, maxStoreBytes, now, chunkBytes);
     } catch (error) {
       // Rotation is housekeeping; the receipt append below is the contract.
       logger.warn(
         `[TRIGGER_STORE_ROTATE_FAILED] delivery journal rotation failed — ${
           error instanceof Error ? error.message : String(error)
-        } | next: the storage janitor rotates the journal on its next sweep (pnpm pipeline --input pipelines/storage-janitor.json) | evidence: ${storePath} (${size} bytes)`
+        } | next: appends continue; the next append retries after 256KB of regrowth or an hour (the storage janitor never rotates this journal); to rotate now: ${TRIGGER_STORE_ROTATE_COMMAND} | evidence: ${storePath} (${size} bytes)`
       );
     }
-    size = storeSize(storePath);
-  }
-  if (size + lineBytes > MAX_STORE_BYTES) {
-    throw new Error(
-      `[TRIGGER_STORE_FULL] delivery journal is at its ${MAX_STORE_BYTES}-byte hard cap and could not be rotated: ${storePath} | next: ${TRIGGER_STORE_ROTATE_COMMAND} (dry-run, then --request-approval and --apply)`
-    );
   }
   safeAppendFileSync(storePath, serialized);
 }
@@ -579,15 +805,16 @@ function appendOutcomeRecord(
   storePath: string,
   record: TriggerRecord,
   maxStoreBytes: number,
-  now: Date
+  now: Date,
+  chunkBytes?: number
 ): void {
   try {
-    appendRecord(storePath, record, maxStoreBytes, now);
+    appendRecord(storePath, record, maxStoreBytes, now, chunkBytes);
   } catch (error) {
     logger.warn(
       `[TRIGGER_RECEIPT_APPEND_FAILED] ${record.status} receipt for ${record.idempotencyKey} not persisted — ${
         error instanceof Error ? error.message : String(error)
-      } | next: rotate the delivery journal; the in-flight claim expires after its lease and may re-deliver | evidence: ${storePath}`
+      } | next: check the journal's filesystem and permissions (size never refuses an append); the in-flight claim expires after its lease and may re-deliver | evidence: ${storePath}`
     );
   }
 }
@@ -659,7 +886,9 @@ export interface TriggerStoreRotationOptions {
 export interface TriggerStoreRotationPlan {
   store_path: string;
   size_bytes: number;
+  /** Records in the journal. */
   records: number;
+  /** Keys retention still holds (finished inside the dedupe window, or claims not abandoned). */
   keys: number;
   keep_stable: number;
   kept: { in_flight: number; stable: number; recent_cron: number };
@@ -685,31 +914,27 @@ function selectRotationKeep(
   storePath: string,
   keepStable: number,
   now: Date
-): { plan: TriggerStoreRotationPlan; lines: string[] } {
-  const records = safeExistsSync(storePath) ? readRecords(storePath) : [];
-  const latest = new Map<string, TriggerRecord>();
-  for (const record of records) {
-    latest.delete(record.idempotencyKey);
-    latest.set(record.idempotencyKey, record);
-  }
+): { plan: TriggerStoreRotationPlan; keep: Set<number>; lastLine: number } {
+  // Streams the journal; keys retention already drops (finished receipts older
+  // than the dedupe window, abandoned claims) are not candidates.
+  const { records, latest: all, lastLine } = collectDedupeWindow(storePath, now);
   const cutoff = now.getTime() - DEDUPE_RETENTION_MS;
-  const all = [...latest.values()];
-  const inFlight = all.filter((r) => isInFlight(r) && !isAbandonedClaim(r, cutoff));
-  const finished = all.filter((r) => !isInFlight(r));
+  const inFlight = all.filter((e) => isInFlight(e.record) && !isAbandonedClaim(e.record, cutoff));
+  const finished = all.filter((e) => !isInFlight(e.record));
   const recentCron = finished.filter(
-    (r) => isMinuteScoped(r) && recordTimeMs(r) >= now.getTime() - ROTATE_RECENT_CRON_MS
+    (e) =>
+      isMinuteScoped(e.record) && recordTimeMs(e.record) >= now.getTime() - ROTATE_RECENT_CRON_MS
   );
   const stable = finished
-    .filter((r) => !isMinuteScoped(r))
-    .sort((a, b) => recordTimeMs(b) - recordTimeMs(a))
+    .filter((e) => !isMinuteScoped(e.record))
+    .sort((a, b) => recordTimeMs(b.record) - recordTimeMs(a.record))
     .slice(0, keepStable);
-  const keep = new Set<TriggerRecord>([...inFlight, ...recentCron, ...stable]);
-  const lines = all.filter((r) => keep.has(r)).map((r) => JSON.stringify(r));
+  const kept = new Set<WindowEntry>([...inFlight, ...recentCron, ...stable]);
   const droppedInWindow = finished.filter(
-    (r) => !isMinuteScoped(r) && !keep.has(r) && recordTimeMs(r) >= cutoff
+    (e) => !isMinuteScoped(e.record) && !kept.has(e) && recordTimeMs(e.record) >= cutoff
   );
   const prefixCounts = new Map<string, number>();
-  for (const record of droppedInWindow) {
+  for (const { record } of droppedInWindow) {
     const prefix = record.idempotencyKey.split(':')[0] || record.idempotencyKey;
     prefixCounts.set(prefix, (prefixCounts.get(prefix) ?? 0) + 1);
   }
@@ -721,16 +946,17 @@ function selectRotationKeep(
     plan: {
       store_path: path.relative(pathResolver.rootDir(), storePath).split(path.sep).join('/'),
       size_bytes: storeSize(storePath),
-      records: records.length,
+      records,
       keys: all.length,
       keep_stable: keepStable,
       kept: { in_flight: inFlight.length, stable: stable.length, recent_cron: recentCron.length },
-      dropped_keys: all.length - keep.size,
+      dropped_keys: all.length - kept.size,
       dropped_stable_in_window: droppedInWindow.length,
       dropped_stable_in_window_prefixes: prefixes,
-      kept_bytes: lines.reduce((sum, line) => sum + Buffer.byteLength(line, 'utf8') + 1, 0),
+      kept_bytes: [...kept].reduce((sum, e) => sum + e.bytes, 0),
     },
-    lines,
+    keep: new Set([...kept].map((e) => e.lineNumber)),
+    lastLine,
   };
 }
 
@@ -754,8 +980,10 @@ export function planTriggerStoreRotation(
 }
 
 /**
- * Operator escape hatch for a journal stuck at the hard cap: under the store
- * lock, copy the full journal to a segment and rewrite it with the in-flight
+ * Operator escape hatch for a journal whose dedupe window alone keeps it
+ * above its retention threshold ([TRIGGER_STORE_WINDOW_FULL]). Size never
+ * stops appends, so this is about shedding growth, not unblocking. Under the
+ * store lock, move every other record to a segment and keep the in-flight
  * claims, the newest `keepStable` stable keys and cron receipts of the last
  * 10 minutes. Dropped stable keys may re-deliver once. `wrap` runs around the
  * write inside the lock (the CLI consumes its approval there) and the caller
@@ -774,10 +1002,8 @@ export async function rotateTriggerStore(
       if (!safeExistsSync(storePath)) {
         throw new Error(`[TRIGGER_STORE_ROTATE] no delivery journal at ${storePath}`);
       }
-      const { plan, lines } = selectRotationKeep(storePath, keepStable, now);
-      const segment = rotatedSegmentPath(storePath, now);
-      safeCopyFileSync(storePath, segment);
-      safeWriteFile(storePath, lines.length > 0 ? `${lines.join('\n')}\n` : '');
+      const { plan, keep, lastLine } = selectRotationKeep(storePath, keepStable, now);
+      const segment = splitJournal(storePath, keep, lastLine, now);
       windowFullAttempts.delete(storePath);
       return {
         ...plan,
@@ -792,6 +1018,7 @@ export class TriggerRunner {
   private readonly now: () => Date;
   private readonly claimLeaseMs: number;
   private readonly maxStoreBytes: number;
+  private readonly readChunkBytes: number | undefined;
   private readonly authorityResolver: (
     authority: TriggerAuthoritySnapshot
   ) => TriggerAuthoritySnapshot;
@@ -803,18 +1030,21 @@ export class TriggerRunner {
       { allowMissingLeaf: true }
     );
     this.now = options.now || (() => new Date());
-    this.claimLeaseMs = Math.max(1000, options.claimLeaseMs ?? DEFAULT_CLAIM_LEASE_MS);
-    this.maxStoreBytes = clamp(
-      options.maxStoreBytes ?? DEFAULT_MAX_STORE_BYTES,
-      64 * 1024,
-      MAX_STORE_BYTES
+    this.claimLeaseMs = clamp(
+      options.claimLeaseMs ?? DEFAULT_CLAIM_LEASE_MS,
+      1000,
+      TRIGGER_STORE_MAX_CLAIM_LEASE_MS
     );
+    this.maxStoreBytes = Math.max(64 * 1024, options.maxStoreBytes ?? DEFAULT_MAX_STORE_BYTES);
+    this.readChunkBytes = options.readChunkBytes;
     this.authorityResolver = options.authorityResolver || resolveGovernedAuthority;
     this.lockId = triggerStoreLockId(this.storePath);
   }
 
   records(): TriggerReceipt[] {
-    return readRecords(this.storePath).map((record) => receiptFrom(record, record.status));
+    return readRecords(this.storePath, this.now(), this.readChunkBytes).map((record) =>
+      receiptFrom(record, record.status)
+    );
   }
 
   async run(
@@ -825,15 +1055,20 @@ export class TriggerRunner {
     if (!idempotencyKey) throw new Error('Trigger idempotencyKey is required.');
     if (!request.source) throw new Error('Trigger source is required.');
     const claim = await withLock(this.lockId, async () => {
-      let records: TriggerRecord[];
+      let existing: TriggerRecord | undefined;
       try {
-        records = readRecords(this.storePath);
+        existing = findLatestRecord(
+          this.storePath,
+          idempotencyKey,
+          this.now(),
+          this.readChunkBytes
+        );
       } catch (error) {
         // Fail closed for this one trigger (at-most-once), never for the caller:
         // an unreadable journal must not crash the scheduler that hosts it.
         const reason = `trigger_store_unreadable: ${error instanceof Error ? error.message : String(error)}`;
         logger.warn(
-          `[TRIGGER_STORE_UNREADABLE] trigger ${idempotencyKey} not delivered — ${reason} | next: inspect or rotate the delivery journal (pnpm pipeline --input pipelines/storage-janitor.json); the next tick retries | evidence: ${this.storePath}`
+          `[TRIGGER_STORE_UNREADABLE] trigger ${idempotencyKey} not delivered — ${reason} | next: inspect the delivery journal (its size never fails a read — look for a non-file path or an I/O error); the next tick retries | evidence: ${this.storePath}`
         );
         return {
           receipt: {
@@ -845,7 +1080,6 @@ export class TriggerRunner {
           },
         };
       }
-      const existing = records.reverse().find((record) => record.idempotencyKey === idempotencyKey);
       if (existing) {
         const pendingUntil = existing.claimExpiresAt ? Date.parse(existing.claimExpiresAt) : 0;
         const pending = existing.reason === 'delivery_pending';
@@ -880,7 +1114,13 @@ export class TriggerRunner {
           status: 'rejected',
           reason: error instanceof Error ? error.message : String(error),
         };
-        appendOutcomeRecord(this.storePath, rejected, this.maxStoreBytes, this.now());
+        appendOutcomeRecord(
+          this.storePath,
+          rejected,
+          this.maxStoreBytes,
+          this.now(),
+          this.readChunkBytes
+        );
         recordTriggerAudit(rejected);
         return { receipt: receiptFrom(rejected, 'rejected') };
       }
@@ -896,12 +1136,12 @@ export class TriggerRunner {
         attempt: ((existing?.attempt as number | undefined) || 0) + 1,
       };
       try {
-        appendRecord(this.storePath, claimed, this.maxStoreBytes, this.now());
+        appendRecord(this.storePath, claimed, this.maxStoreBytes, this.now(), this.readChunkBytes);
       } catch (error) {
         // No claim record means no idempotency guard: fail closed, do not deliver.
         const reason = `trigger_store_unwritable: ${error instanceof Error ? error.message : String(error)}`;
         logger.warn(
-          `[TRIGGER_STORE_UNWRITABLE] trigger ${idempotencyKey} not delivered — ${reason} | next: rotate the delivery journal (pnpm pipeline --input pipelines/storage-janitor.json); the next tick retries | evidence: ${this.storePath}`
+          `[TRIGGER_STORE_UNWRITABLE] trigger ${idempotencyKey} not delivered — ${reason} | next: check the journal's filesystem and permissions (its size never refuses an append); the next tick retries | evidence: ${this.storePath}`
         );
         return { receipt: receiptFrom({ ...claimed, reason }, 'failed') };
       }
@@ -935,7 +1175,13 @@ export class TriggerRunner {
         recordedAt: this.now().toISOString(),
       };
       await withLock(this.lockId, async () => {
-        appendOutcomeRecord(this.storePath, delivered, this.maxStoreBytes, this.now());
+        appendOutcomeRecord(
+          this.storePath,
+          delivered,
+          this.maxStoreBytes,
+          this.now(),
+          this.readChunkBytes
+        );
       });
       recordTriggerAudit(delivered);
       return receiptFrom(delivered, 'delivered');
@@ -947,7 +1193,13 @@ export class TriggerRunner {
         recordedAt: this.now().toISOString(),
       };
       await withLock(this.lockId, async () => {
-        appendOutcomeRecord(this.storePath, failed, this.maxStoreBytes, this.now());
+        appendOutcomeRecord(
+          this.storePath,
+          failed,
+          this.maxStoreBytes,
+          this.now(),
+          this.readChunkBytes
+        );
       });
       recordTriggerAudit(failed);
       return receiptFrom(failed, 'failed');

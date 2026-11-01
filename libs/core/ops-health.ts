@@ -50,7 +50,7 @@ export const BACKUP_ARCHIVE_MAX_AGE_HOURS = 36;
 export const BACKUP_DRILL_MAX_AGE_MS = 35 * 24 * 60 * 60 * 1000;
 /** Janitor marker freshness — 2x the daily maintenance TTL (AL-01). */
 export const JANITOR_MARKER_MAX_AGE_MS = 48 * 60 * 60 * 1000;
-/** Warn when the trigger delivery store reaches this share of its hard append cap. */
+/** Warn when the trigger delivery store reaches this share of its growth warning level. */
 export const TRIGGER_STORE_WARN_RATIO = 0.8;
 /** Schedule id of the daily encrypted backup (pipelines/backup-daily.json). */
 export const BACKUP_DAILY_SCHEDULE_ID = 'backup-daily';
@@ -134,7 +134,11 @@ export const BACKUP_PASSPHRASE_INTRODUCE_COMMAND =
 export interface OpsHealthTriggerStore {
   path: string;
   size_bytes: number;
-  cap_bytes: number;
+  /**
+   * Growth warning level (trigger-runner TRIGGER_STORE_GROWTH_WARN_BYTES). Not
+   * a cap: the journal accepts appends and dedupes at any size.
+   */
+  warn_bytes: number;
 }
 
 export interface OpsHealthInput {
@@ -528,14 +532,15 @@ function unitFindings(input: OpsHealthInput): OpsHealthFinding[] {
 
 function triggerStoreFindings(input: OpsHealthInput): OpsHealthFinding[] {
   const store = input.triggerStore;
-  if (!store || store.cap_bytes <= 0) return [];
-  const ratio = store.size_bytes / store.cap_bytes;
+  if (!store || store.warn_bytes <= 0) return [];
+  const ratio = store.size_bytes / store.warn_bytes;
   if (ratio < TRIGGER_STORE_WARN_RATIO) return [];
   return [
     {
-      id: 'trigger-store-near-cap',
-      severity: ratio >= 1 ? 'error' : 'warn',
-      reason: `trigger delivery store is ${(ratio * 100).toFixed(0)}% of its ${(store.cap_bytes / 1_048_576).toFixed(0)}MB hard cap — past the cap, appends are refused ([TRIGGER_STORE_FULL]) and triggers fail closed`,
+      id: 'trigger-store-growth',
+      // Growth warns, never fails closed: appends and dedupe work at any size.
+      severity: 'warn',
+      reason: `trigger delivery store is ${(ratio * 100).toFixed(0)}% of its ${(store.warn_bytes / 1_048_576).toFixed(0)}MB growth warning level — receipts inside the 7-day dedupe window keep it from shrinking; triggers still deliver and dedupe`,
       next:
         ratio >= 1
           ? `${TRIGGER_STORE_ROTATE_COMMAND}  # dry-run first; then --request-approval, and --apply --approval-request-id <id> once a human approved`

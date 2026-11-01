@@ -32,6 +32,26 @@ function journalPath(): string {
   return path.join(root, JOURNAL_RELATIVE);
 }
 
+/** Rotated `stimuli-YYYYMMDD-HHmmss[-n].jsonl` segments next to the journal. */
+function segmentPaths(): string[] {
+  const dir = path.dirname(journalPath());
+  return fs
+    .readdirSync(dir)
+    .filter((name) => /^stimuli-\d{8}-\d{6}(-\d+)?\.jsonl$/u.test(name))
+    .map((name) => path.join(dir, name));
+}
+
+function segmentText(): string {
+  return segmentPaths()
+    .map((file) => fs.readFileSync(file, 'utf8'))
+    .join('');
+}
+
+/** Rotation renames the live journal to a segment; appends recreate it. */
+function liveSize(): number {
+  return fs.existsSync(journalPath()) ? fs.statSync(journalPath()).size : 0;
+}
+
 type AuthorityModule = typeof import('./authority.js');
 type JournalModule = typeof import('./stimuli-journal.js');
 type JsonModule = typeof import('./foundation/json.js');
@@ -90,13 +110,15 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
     delete process.env.MISSION_ROLE;
     delete process.env.KYBERION_PERSONA;
     authority.resetRoleAssumptionPolicyCache();
+    for (const segment of segmentPaths()) fs.rmSync(segment, { force: true });
     fs.writeFileSync(journalPath(), journalLines(20));
   });
 
   it('rotates under the ambient slack_bridge role', async () => {
     const before = fs.statSync(journalPath()).size;
     expect(journal.rotateStimuliJournalIfNeeded(MAX_BYTES)).toBe(true);
-    expect(fs.statSync(journalPath()).size).toBeLessThan(before);
+    expect(liveSize()).toBeLessThan(before);
+    expect(segmentPaths()).toHaveLength(1);
   });
 
   it('rotates from inside a mission_controller assumption', async () => {
@@ -106,8 +128,9 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
       return journal.rotateStimuliJournalIfNeeded(MAX_BYTES);
     });
     expect(rotated).toBe(true);
-    expect(fs.statSync(journalPath()).size).toBeLessThan(before);
-    expect(fs.readFileSync(journalPath(), 'utf8')).not.toContain('"msg-0"');
+    expect(liveSize()).toBeLessThan(before);
+    // Moved aside, not lost: the full history is in the segment.
+    expect(segmentText()).toContain('"msg-0"');
   });
 
   it('rotates from an async continuation (await + timer) of that assumption', async () => {
@@ -127,7 +150,7 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
       });
     });
     expect(rotated).toBe(true);
-    expect(fs.statSync(journalPath()).size).toBeLessThan(before);
+    expect(liveSize()).toBeLessThan(before);
   });
 
   it('appends and rotates through appendStimulus inside the assumption', async () => {
@@ -151,10 +174,13 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
         payload: {},
       })
     );
-    const after = fs.readFileSync(journalPath(), 'utf8');
-    expect(after).toContain('"msg-appended"');
-    expect(Buffer.byteLength(after)).toBeLessThan(journal.STIMULI_MAX_BYTES);
-    expect(after.startsWith('{')).toBe(true);
+    // The append landed, then write-time rotation moved the journal aside.
+    expect(liveSize()).toBeLessThan(journal.STIMULI_MAX_BYTES);
+    expect(segmentText()).toContain('"msg-appended"');
+    // Readers continue into the segment, so the rotation loses no context.
+    expect(journal.loadRecentStimuli(1, { enforceTtl: false }).map((m) => m.id)).toEqual([
+      'msg-appended',
+    ]);
   });
 
   it('appends a Slack surface stimulus unchanged from inside another assumption (SB-02)', async () => {
@@ -205,6 +231,100 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
       origin: { channel: 'sensor', source_id: 'probe' },
       signal: { intent: 'probe.sensor', priority: 3, payload: { ok: true } },
       control: { status: 'pending', feedback: 'auto', evidence: [] },
+    });
+  });
+
+  describe('size bounds (MSN-STORE-BOUNDS-20261101)', () => {
+    const message = (id: string, extra: Record<string, unknown> = {}) =>
+      `${JSON.stringify({
+        id,
+        ts: '2026-11-01T00:00:00.000Z',
+        from: 'probe',
+        node_id: 'node-probe',
+        to: 'broadcast',
+        type: 'event',
+        intent: 'probe',
+        payload: { pad: 'x'.repeat(10_000) },
+        ...extra,
+      })}\n`;
+
+    beforeEach(() => {
+      for (const segment of segmentPaths()) fs.rmSync(segment, { force: true });
+    });
+
+    it('reads the newest stimuli from a journal past the old 5MB read cap', () => {
+      const filler = message('msg-filler');
+      fs.writeFileSync(
+        journalPath(),
+        filler.repeat(Math.ceil((6 * 1024 * 1024) / Buffer.byteLength(filler))) +
+          message('msg-newest-1') +
+          message('msg-newest-2')
+      );
+      expect(fs.statSync(journalPath()).size).toBeGreaterThan(5 * 1024 * 1024);
+      expect(journal.loadRecentStimuli(2, { enforceTtl: false }).map((m) => m.id)).toEqual([
+        'msg-newest-1',
+        'msg-newest-2',
+      ]);
+    });
+
+    it('keeps scanning past expired records so they cannot crowd out live ones', () => {
+      const nowMs = Date.parse('2026-11-01T01:00:00.000Z');
+      fs.writeFileSync(
+        journalPath(),
+        message('msg-live') +
+          message('msg-expired-1', { metadata: { ttl: 60 } }) +
+          message('msg-expired-2', { metadata: { ttl: 60 } })
+      );
+      expect(journal.loadRecentStimuli(1, { nowMs }).map((m) => m.id)).toEqual(['msg-live']);
+    });
+
+    it('reads each stimulus exactly once when the journal rotates during loadRecentStimuli', () => {
+      const ids = ['msg-r1', 'msg-r2', 'msg-r3', 'msg-r4'];
+      const rotateNow = (): void =>
+        fs.renameSync(
+          journalPath(),
+          path.join(path.dirname(journalPath()), 'stimuli-20261101-000000.jsonl')
+        );
+      try {
+        for (const hook of ['beforeLiveScan', 'afterFirstLiveRecord'] as const) {
+          for (const segment of segmentPaths()) fs.rmSync(segment, { force: true });
+          fs.writeFileSync(journalPath(), ids.map((id) => message(id)).join(''));
+          journal.setStimuliJournalReadHooksForTests({ [hook]: rotateNow });
+          expect(
+            journal.loadRecentStimuli(10, { enforceTtl: false }).map((m) => m.id),
+            hook
+          ).toEqual(ids);
+        }
+      } finally {
+        journal.setStimuliJournalReadHooksForTests({});
+      }
+    });
+
+    it('never throws from appendStimulus past the old 11MB rotation read cap', () => {
+      const big = message('msg-big', { payload: { pad: 'y'.repeat(100_000) } });
+      fs.writeFileSync(
+        journalPath(),
+        big.repeat(Math.ceil((12 * 1024 * 1024) / Buffer.byteLength(big)))
+      );
+      expect(fs.statSync(journalPath()).size).toBeGreaterThan(11 * 1024 * 1024);
+      expect(() =>
+        journal.appendStimulus({
+          id: 'msg-after-oversize',
+          ts: '2026-11-01T00:00:00.000Z',
+          from: 'probe',
+          node_id: 'node-probe',
+          to: 'broadcast',
+          type: 'event',
+          intent: 'probe',
+          payload: {},
+        })
+      ).not.toThrow();
+      // Rotated by rename (no whole-file read): the live journal starts over.
+      expect(liveSize()).toBe(0);
+      expect(segmentPaths()).toHaveLength(1);
+      expect(journal.loadRecentStimuli(1, { enforceTtl: false }).map((m) => m.id)).toEqual([
+        'msg-after-oversize',
+      ]);
     });
   });
 });
