@@ -491,6 +491,190 @@ describe('QM-02 trigger runner', () => {
     }
   });
 
+  describe('size-independent dedupe (MSN-STORE-BOUNDS-20261101)', () => {
+    const day = 24 * 60 * 60 * 1000;
+    const pendingClaim = (key: string, recordedAt: string, expiresAt: string) =>
+      JSON.stringify({
+        idempotencyKey: key,
+        source: 'wake',
+        status: 'failed',
+        reason: 'delivery_pending',
+        deliveryId: key,
+        createdBy: authority,
+        requestedAuthority: authority,
+        recordedAt,
+        claimId: `claim-${key}`,
+        claimOwnerPid: 999_999_999,
+        claimExpiresAt: expiresAt,
+        attempt: 1,
+      });
+
+    it('dedupes a stable key whose receipt lies far behind the read chunk (any distance inside 7d)', async () => {
+      const store = pathResolver.sharedTmp(`qm02-deep-${randomUUID()}.jsonl`);
+      stores.push(store);
+      const now = new Date();
+      const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+      const lines = [
+        journalLine('mission-admission:MSN-DEEP', ago(6 * day), 'delivered', 'wake'),
+        // ~600 lines of newer receipts: hundreds of 512-byte chunks behind the tail,
+        // standing in for the 8MB fixed tail window the old reader stopped at.
+        ...Array.from({ length: 600 }, (_, i) =>
+          journalLine(`cron:filler-${i}:2026-10-30T00:00`, ago(day - i * 1000))
+        ),
+      ];
+      safeWriteFile(store, `${lines.join('\n')}\n`);
+      expect(safeStat(store).size).toBeGreaterThan(300 * 512);
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        readChunkBytes: 512,
+        authorityResolver: (snapshot) => snapshot,
+        now: () => now,
+      });
+      const deliver = vi.fn(async () => 'delivery');
+      const again = await triggerRunner.run(
+        { idempotencyKey: 'mission-admission:MSN-DEEP', source: 'wake', createdBy: authority },
+        deliver
+      );
+      expect(again.status).toBe('duplicate');
+      expect(deliver).not.toHaveBeenCalled();
+      expect(triggerRunner.records()).toHaveLength(601);
+    });
+
+    it('accepts an append past the old 5MB hard cap (growth warns, never fails closed)', async () => {
+      resetTriggerStoreWindowFullState();
+      const store = pathResolver.sharedTmp(`qm02-past-cap-${randomUUID()}.jsonl`);
+      stores.push(store);
+      const now = new Date();
+      const recent = new Date(now.getTime() - 60_000).toISOString();
+      // Stable keys inside the window: retention cannot shrink this journal.
+      const lines = Array.from({ length: 22_000 }, (_, i) =>
+        journalLine(`continuous-owner:action-${i}`, recent, 'delivered', 'wake')
+      );
+      safeWriteFile(store, `${lines.join('\n')}\n`);
+      expect(safeStat(store).size).toBeGreaterThan(5 * 1024 * 1024);
+      try {
+        const triggerRunner = new TriggerRunner({
+          storePath: store,
+          authorityResolver: (snapshot) => snapshot,
+          now: () => now,
+        });
+        const deliver = vi.fn(async () => 'delivery');
+        const receipt = await triggerRunner.run(
+          { idempotencyKey: 'wake:past-the-old-cap', source: 'wake', createdBy: authority },
+          deliver
+        );
+        expect(receipt.status).toBe('delivered');
+        expect(deliver).toHaveBeenCalledTimes(1);
+        const duplicate = await triggerRunner.run(
+          { idempotencyKey: 'continuous-owner:action-0', source: 'wake', createdBy: authority },
+          deliver
+        );
+        expect(duplicate.status).toBe('duplicate');
+        expect(deliver).toHaveBeenCalledTimes(1);
+        expect(rotatedSegments(store)).toHaveLength(0);
+      } finally {
+        for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+      }
+    });
+
+    it('keeps an in-flight claim visible even when it was recorded before the read cutoff', async () => {
+      const store = pathResolver.sharedTmp(`qm02-claim-visible-${randomUUID()}.jsonl`);
+      stores.push(store);
+      const now = new Date();
+      const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+      const lines = [
+        // Beyond the cutoff (7d + max lease): forgotten, and the scan stops here.
+        journalLine('wake:ancient', ago(30 * day), 'delivered', 'wake'),
+        // A legacy long lease: recorded 9 days ago, still unexpired.
+        pendingClaim(
+          'wake:long-claim',
+          ago(9 * day),
+          new Date(now.getTime() + 60_000).toISOString()
+        ),
+        // A normal claim from a live lease.
+        pendingClaim(
+          'wake:fresh-claim',
+          ago(5 * 60_000),
+          new Date(now.getTime() + 60_000).toISOString()
+        ),
+        ...Array.from({ length: 300 }, (_, i) =>
+          journalLine(`cron:filler-${i}:2026-10-31T00:00`, ago(60_000))
+        ),
+      ];
+      safeWriteFile(store, `${lines.join('\n')}\n`);
+      const triggerRunner = new TriggerRunner({
+        storePath: store,
+        readChunkBytes: 512,
+        claimLeaseMs: 30 * day,
+        authorityResolver: (snapshot) => snapshot,
+        now: () => now,
+      });
+      const deliver = vi.fn(async () => 'delivery');
+      for (const key of ['wake:long-claim', 'wake:fresh-claim']) {
+        const receipt = await triggerRunner.run(
+          { idempotencyKey: key, source: 'wake', createdBy: authority },
+          deliver
+        );
+        expect(receipt.status, key).toBe('duplicate');
+      }
+      expect(deliver).not.toHaveBeenCalled();
+      const ancient = await triggerRunner.run(
+        { idempotencyKey: 'wake:ancient', source: 'wake', createdBy: authority },
+        deliver
+      );
+      expect(ancient.status).toBe('delivered');
+      // New claims never exceed the max lease, so the read cutoff always covers them.
+      const claims = String(safeReadFile(store, { encoding: 'utf8' }))
+        .trim()
+        .split('\n')
+        .map((line) => JSON.parse(line))
+        .filter((r) => r.idempotencyKey === 'wake:ancient' && r.reason === 'delivery_pending');
+      expect(claims).toHaveLength(1);
+      expect(Date.parse(claims[0].claimExpiresAt) - now.getTime()).toBeLessThanOrEqual(day);
+    });
+
+    it('compaction keeps in-window receipts written before out-of-order old records', async () => {
+      const store = pathResolver.sharedTmp(`qm02-out-of-order-${randomUUID()}.jsonl`);
+      stores.push(store);
+      const now = new Date();
+      const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+      const lines = [
+        journalLine('reflex:keep-me', ago(day), 'delivered', 'wake'),
+        // Old receipts appended later (clock skew / merged file): the backward
+        // dedupe scan would stop at them, but the rewrite streams everything.
+        ...Array.from({ length: 600 }, (_, i) =>
+          journalLine(`cron:old-${i}:2026-09-01T00:00`, ago(30 * day))
+        ),
+      ];
+      safeWriteFile(store, `${lines.join('\n')}\n`);
+      try {
+        const triggerRunner = new TriggerRunner({
+          storePath: store,
+          maxStoreBytes: 64 * 1024,
+          readChunkBytes: 512,
+          authorityResolver: (snapshot) => snapshot,
+          now: () => now,
+        });
+        await triggerRunner.run(
+          { idempotencyKey: 'wake:compact-now', source: 'wake', createdBy: authority },
+          async () => 'delivery'
+        );
+        expect(rotatedSegments(store)).toHaveLength(1);
+        const live = String(safeReadFile(store, { encoding: 'utf8' }));
+        expect(live).toContain('reflex:keep-me');
+        expect(live).not.toContain('cron:old-0:');
+        const deliver = vi.fn(async () => 'delivery');
+        const again = await triggerRunner.run(
+          { idempotencyKey: 'reflex:keep-me', source: 'wake', createdBy: authority },
+          deliver
+        );
+        expect(again.status).toBe('duplicate');
+      } finally {
+        for (const segment of rotatedSegments(store)) safeUnlinkSync(segment);
+      }
+    });
+  });
+
   describe('window-full backoff', () => {
     const minute = 60_000;
     const T0 = new Date('2026-11-01T00:00:00.000Z');
