@@ -69,7 +69,7 @@ const DIRECTORY_PROBE_PREFIX = 'active/shared/runtime/';
 export interface OpsFinding {
   /** Stable dedupe identity — same finding class+subject ⇒ same id. */
   finding_id: string;
-  kind: 'store_overgrowth' | 'alert_dominance' | 'uncovered_store';
+  kind: 'store_overgrowth' | 'alert_dominance' | 'uncovered_store' | 'stale_compaction_copy';
   severity: 'info' | 'warning' | 'critical';
   summary: string;
   evidence: Record<string, unknown>;
@@ -232,6 +232,75 @@ export function probeStoreOvergrowth(deps: OpsHealthProbeDeps = {}): OpsFinding[
   return findings;
 }
 
+/** A `.compacting-*` copy older than this is left over from a failed rewrite. */
+export const STALE_COMPACTION_COPY_MS = 60 * 60 * 1000;
+/** Trees that hold append-only stores with write-time maintenance. */
+export const COMPACTION_COPY_ROOTS = [
+  DIRECTORY_PROBE_PREFIX.slice(0, -1),
+  'active/shared/observability',
+  'active/missions',
+] as const;
+const COMPACTION_COPY_MAX_DEPTH = 6;
+const COMPACTION_COPY_MAX_ENTRIES = 20_000;
+
+/**
+ * Leftover `.compacting-*` copies. A parked rewrite keeps its copies when the
+ * data would otherwise not be intact (append-only-store `rewriteParked`), and
+ * nothing removes them later: parked-aware readers then re-read every copy on
+ * each call (the wake ledger bypasses its cache) and agent-input-queue
+ * compaction stays skipped. Each copy older than an hour is a finding naming
+ * its path so an operator can merge it back into the live store.
+ */
+export function probeStaleCompactionCopies(deps: OpsHealthProbeDeps = {}): OpsFinding[] {
+  const findings: OpsFinding[] = [];
+  const now = (deps.now?.() ?? new Date()).getTime();
+  let visited = 0;
+  const walk = (rel: string, depth: number): void => {
+    let names: string[];
+    try {
+      names = safeReaddir(repoFile(deps.rootDir, rel));
+    } catch (error) {
+      logger.debug(
+        `[OPS-PROBE] skipped ${rel}: ${error instanceof Error ? error.message : String(error)}`
+      );
+      return;
+    }
+    for (const name of names.sort()) {
+      if (visited++ >= COMPACTION_COPY_MAX_ENTRIES) return;
+      const child = `${rel}/${name}`;
+      try {
+        const stat = safeLstat(repoFile(deps.rootDir, child));
+        if (stat.isDirectory()) {
+          if (depth < COMPACTION_COPY_MAX_DEPTH) walk(child, depth + 1);
+        } else if (
+          stat.isFile() &&
+          name.includes('.compacting-') &&
+          now - stat.mtimeMs > STALE_COMPACTION_COPY_MS
+        ) {
+          findings.push({
+            finding_id: findingId('stale_compaction_copy', child),
+            kind: 'stale_compaction_copy',
+            severity: 'warning',
+            summary: `leftover compaction copy ${child} (${(stat.size / 1e6).toFixed(1)}MB) — a failed rewrite kept it; parked-aware readers re-read it on every call | next: merge its records back into the live store, then remove it`,
+            evidence: {
+              path: child,
+              size_bytes: stat.size,
+              mtime: new Date(stat.mtimeMs).toISOString(),
+            },
+            detected_at: new Date(now).toISOString(),
+          });
+        }
+      } catch (error) {
+        logger.debug(
+          `[OPS-PROBE] skipped ${child}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+    }
+  };
+  for (const root of COMPACTION_COPY_ROOTS) walk(root, 1);
+  return findings;
+}
+
 /** One alert source dominating the log — the 93%-watchdog defect class.
  *  Keys embed detail segments (daemon sets, minute stamps), so dominance must
  *  group by the source prefix before the first ':' — a per-key count would
@@ -327,6 +396,7 @@ export function runOpsHealthProbe(deps: OpsHealthProbeDeps = {}): OpsHealthProbe
     ...probeStoreOvergrowth(deps),
     ...probeAlertDominance(deps),
     ...probeUncoveredStores(deps),
+    ...probeStaleCompactionCopies(deps),
   ];
   const findingsPath = repoFile(deps.rootDir, OPS_FINDINGS_PATH);
   safeMkdir(path.dirname(findingsPath), { recursive: true });
