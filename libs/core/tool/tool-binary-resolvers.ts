@@ -132,6 +132,14 @@ export function resolveLightpandaBin(): string {
 }
 
 /**
+ * RustXNG local search / grounding engine (AGPL-3.0-or-later).
+ * Invoke as an external binary over HTTP — never vendor or link.
+ */
+export function resolveRustxngBin(): string {
+  return resolveExternalToolBin('rustxng', ['KYBERION_RUSTXNG_BIN'], 'rustxng');
+}
+
+/**
  * macOS locations of the Tailscale CLI, most specific first: the symlink the
  * app's "Install CLI" creates, a Homebrew formula, then the binary inside the
  * app bundle (`brew install --cask tailscale-app`), which works as the CLI

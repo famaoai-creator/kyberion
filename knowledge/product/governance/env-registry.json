@@ -3666,6 +3666,42 @@
       "documented": true
     },
     {
+      "name": "KYBERION_RUSTXNG_AUTOSTART",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "When unset or true, search-actuator provider=rustxng may spawn a detached loopback sidecar if /healthz is down. Set to 0/false/off to require a manually started instance.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_RUSTXNG_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for the RustXNG local search engine; when unset, the governed tool-runtime registry command (`rustxng`) is used.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_RUSTXNG_IDLE_TIMEOUT",
+      "category": "tuning",
+      "type": "number",
+      "required": false,
+      "description": "Idle seconds before an auto-started RustXNG sidecar exits (passed as RUSTXNG_IDLE_TIMEOUT; default 300). Set 0 to disable idle exit.",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
+      "name": "KYBERION_RUSTXNG_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional base URL for the local RustXNG HTTP API used by search-actuator provider=rustxng (default http://127.0.0.1:8888).",
+      "documented": true,
+      "subsystem": "runtime"
+    },
+    {
       "name": "KYBERION_SCENARIO_KEEP_ROOT",
       "category": "flag",
       "type": "boolean",

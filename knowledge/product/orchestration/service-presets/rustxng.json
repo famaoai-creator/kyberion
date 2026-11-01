@@ -1,0 +1,34 @@
+{
+  "service_id": "rustxng",
+  "name": "RustXNG Local Search Presets",
+  "description": "Self-hosted AGPL search/grounding engine (HTTP on 127.0.0.1). Install with `pnpm tool:setup -- --tool rustxng --apply`. search-actuator provider=rustxng auto-starts a detached loopback sidecar when /healthz is down (idle timeout via KYBERION_RUSTXNG_IDLE_TIMEOUT).",
+  "recovery_policy": {
+    "retry": { "maxRetries": 1 }
+  },
+  "operations": {
+    "healthz": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "healthz",
+      "method": "GET",
+      "description": "RustXNG liveness probe"
+    },
+    "web_search": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "search",
+      "method": "GET",
+      "description": "SearXNG-compatible JSON search; pass q, format=json, optional include_raw_content=1 and max_results",
+      "parameters": {
+        "q": { "required": true, "type": "string" },
+        "format": { "required": false, "type": "string" },
+        "include_raw_content": { "required": false, "type": "string" },
+        "max_results": { "required": false, "type": "string" }
+      },
+      "payload_template": {
+        "q": "{{q}}",
+        "format": "json"
+      }
+    }
+  }
+}
