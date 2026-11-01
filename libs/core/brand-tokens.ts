@@ -24,6 +24,8 @@ export interface BrandTokenColors {
 export interface BrandTokenFonts {
   sans: string;
   mono: string;
+  /** Optional campaign/marketing display stack; omit or mirror `sans` until a brand decision lands. */
+  campaign_display?: string;
 }
 
 export type BrandUiStatusName = 'success' | 'warning' | 'danger' | 'info';

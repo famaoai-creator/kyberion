@@ -1,9 +1,17 @@
 ---
 title: 'Role Procedure: Growth Evangelist (Marketing Growth)'
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 ---
 
 # Role Procedure: Growth Evangelist (Marketing Growth)
+
+## Marketing playbooks
+
+- Foundation context → `knowledge/product/orchestration/product-marketing-context-playbook.md`
+- ICP / positioning / GTM → `marketing-strategy-playbook.md`
+- Draft quality gate → `marketing-content-pipeline-playbook.md`
+- Public launch → `launch-gtm-playbook.md`
+- Index → `company-ops-skills-import-map.md`
 
 ## 1. Identity & Scope
 

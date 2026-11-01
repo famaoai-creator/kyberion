@@ -57,7 +57,7 @@ describe('brand token catalog', () => {
               text_secondary: '#aaa',
             },
           },
-          fonts: { sans: 'Inter', mono: 'monospace' },
+          fonts: { sans: 'Helvetica Neue', mono: 'monospace' },
         },
       })
     );

@@ -280,8 +280,14 @@ function buildTheme(imported: ImportedDesign): any {
       text,
     },
     fonts: {
-      heading: imported.fonts.heading || imported.fonts.body || 'Inter, sans-serif',
-      body: imported.fonts.body || imported.fonts.heading || 'System-ui, sans-serif',
+      heading:
+        imported.fonts.heading ||
+        imported.fonts.body ||
+        "'Helvetica Neue', Arial, 'Hiragino Sans', 'Noto Sans JP', system-ui, sans-serif",
+      body:
+        imported.fonts.body ||
+        imported.fonts.heading ||
+        "'Helvetica Neue', Arial, system-ui, sans-serif",
       ...(imported.fonts.mono ? { mono: imported.fonts.mono } : {}),
     },
     metadata: {

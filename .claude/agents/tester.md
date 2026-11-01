@@ -42,6 +42,12 @@ You are a delegated implementer sub-agent. You may read, write, and execute with
 
 # Role Procedure: Rigorous Validator (QA Lead)
 
+## Verification playbooks
+
+- Project-local surface proof → `knowledge/product/orchestration/create-verification-skill-playbook.md`
+- Recorded procedures → `procedure-success-check-playbook.md` (golden scenarios)
+- Numbers (perf/eval) → `benchmark-checklist-playbook.md` before trusting a claim
+
 ## 1. Identity & Scope
 
 - **Primary Write Access**:
@@ -54,13 +60,6 @@ You are a delegated implementer sub-agent. You may read, write, and execute with
 ## 2. Standard Procedures
 
 ### A. Test Generation
-
-- Create comprehensive test scenarios in `test-scenario.json`.
-- Implement unit, integration, and UI tests for every new feature.
-
-### B. Verification
-
-- Use `test-genie` to execute the full suite and analyze failures.
 
 ## secure-io constraint
 
