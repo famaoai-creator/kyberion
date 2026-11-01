@@ -12,9 +12,11 @@ import { isTenantOwnedPolicyPath } from '../tier-guard.js';
 import { governVcsCommand } from './external-vcs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { assertNotFlagLike, type VcsCommandResult, type VcsCommandRunner } from './git.js';
+import type { VcsCommandResult, VcsCommandRunner } from './git.js';
+import { assertNotFlagLike } from './git-arguments.js';
 import { redactActiveSecretsForHostLog } from '../secret/secret-guard.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { assertVcsCwdScope } from './cwd-scope.js';
 
 export type PrBodySourceTier =
   | 'public'
@@ -28,6 +30,18 @@ const publicationBodySource = new AsyncLocalStorage<PrBodySourceTier>();
 export function prPublicationBodySourceForPath(bodyFile: string | undefined): PrBodySourceTier {
   if (!bodyFile) return 'inline';
   const relative = toRepoRelative(assertSafeRepositoryPath(bodyFile)).replace(/\\/gu, '/');
+  return prPublicationSourceForRelativePath(relative);
+}
+
+/** Classify names in immutable git history, whose files may have been deleted.
+ * This resolves scope metadata only; it never grants access to file contents. */
+export function prPublicationSourceForRelativePath(relative: string): PrBodySourceTier {
+  if (
+    relative.startsWith('/') ||
+    relative.includes('\\') ||
+    relative.split('/').some((part) => part === '..' || part === '.')
+  )
+    return 'protected_or_unknown';
   if (relative.startsWith('knowledge/public/')) return 'public';
   if (relative.startsWith('knowledge/personal/')) return { tier: 'personal' };
   const confidential = relative.match(/^knowledge\/confidential\/([^/]+)\/.+/u);
@@ -214,6 +228,7 @@ export interface GhCallOptions {
 }
 
 function ghExecOptions(options: GhCallOptions): SafeExecOptions {
+  assertVcsCwdScope(options.cwd);
   const registeredTokens = {
     GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
     GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
@@ -230,6 +245,7 @@ export function ghRun(
   options: GhCallOptions = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(options.cwd);
   // GH_TOKEN/GITHUB_TOKEN are excluded from the ambient exec allowlist, so
   // attach the *registered* values explicitly — the same explicit-override
   // channel publish_pull_request/pr_shadow use. Without this, the gh ops
@@ -329,6 +345,7 @@ export function ghMust(
   options: GhCallOptions = {},
   run?: VcsCommandRunner
 ): string {
+  assertVcsCwdScope(options.cwd);
   const authProbe = args[0] === 'auth' && args[1] === 'status';
   // Only fixed operation names are safe in errors; resource refs and flags may contain secrets.
   const knownOperations = new Set([
@@ -444,9 +461,14 @@ export interface PrListEntry {
 }
 
 export function ghPrList(
-  params: { state?: 'open' | 'closed' | 'merged' | 'all'; limit?: number } & GhCallOptions = {},
+  params: {
+    state?: 'open' | 'closed' | 'merged' | 'all';
+    limit?: number;
+    head?: string;
+  } & GhCallOptions = {},
   run: VcsCommandRunner = safeExecResult
 ): PrListEntry[] {
+  if (params.head) assertNotFlagLike(params.head, 'head branch');
   const stdout = ghMust(
     [
       'pr',
@@ -457,6 +479,7 @@ export function ghPrList(
       String(params.limit || 100),
       '--json',
       'number,title,headRefOid,headRefName,isDraft,author,state',
+      ...(params.head ? ['--head', params.head] : []),
     ],
     params,
     run
@@ -590,6 +613,7 @@ export function ghPrMerge(
   } & GhCallOptions,
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(params.cwd);
   assertNotFlagLike(params.ref, 'pr ref');
   const repository = ghPrRepository(params, run);
   const snapshot = () =>
@@ -657,6 +681,7 @@ export function ghPrCreate(
   } & GhCallOptions,
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(params.cwd);
   if (!params.title?.trim()) throw new Error('[VCS_GH_INVALID] pr create requires a title');
   if (params.head !== undefined) assertNotFlagLike(params.head, 'head');
   if (params.base !== undefined) assertNotFlagLike(params.base, 'base');

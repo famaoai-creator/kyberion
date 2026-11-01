@@ -1,5 +1,6 @@
 import { externalApprovalFixture } from '../../../../tests/helpers/external-approval-fixture.js';
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+vi.mock('@agent/core/vcs/cwd-scope', () => ({ assertVcsCwdScope: vi.fn() }));
 const mocks = vi.hoisted(() => ({ gate: vi.fn(), run: vi.fn() }));
 vi.mock('@agent/core/secure-io', async (original) => ({
   ...(await original<typeof import('@agent/core/secure-io')>()),

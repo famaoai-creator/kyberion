@@ -17,7 +17,7 @@ import {
   approvalPartitionForScope,
   approvalPasskeyChallengesLogicalDirAt,
   approvalRequestLogicalPathAt,
-  approvalFileExistsAt,
+  approvalFileExistsAtCurrentIdentity,
   approvalRequestsLogicalDirAt,
   listApprovalDirAt,
   listApprovalPartitions,
@@ -339,7 +339,8 @@ export function purgeFixtureApprovals(options: {
       ) {
         continue;
       }
-      if (!approvalFileExistsAt(undefined, candidate.partition, candidate.logicalPath)) continue;
+      if (!approvalFileExistsAtCurrentIdentity(candidate.partition, candidate.logicalPath))
+        continue;
       const { trashPath } = softDeleteToTrash(absolute);
       result.applied.push(candidate.requestId);
       appendRetentionAudit({

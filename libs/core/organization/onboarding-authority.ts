@@ -1,3 +1,4 @@
+import { withAuthenticatedPersonalApprovals } from '../governance/authenticated-personal-approvals.js';
 /** Shared onboarding plan and once-only human-approved charter amendment.
  * Principals come from authenticated adapters, never from request JSON.
  */
@@ -120,6 +121,23 @@ function ownerFor(principal: OnboardingAuthorityPrincipal, scope: CharterScope, 
   )
     return deny('tenant owner required');
   return { id: principal.accountableId, display_name: member.display_name };
+}
+/** Trusted onboarding adapter: validates the canonical owner before installing data visibility.
+ * This confers no decision assurance and cannot widen an existing agent envelope. */
+function withOnboardingApprovalScope<T>(
+  principal: OnboardingAuthorityPrincipal,
+  scope: CharterScope,
+  options: Options,
+  run: () => T
+): T {
+  if (scope.kind !== 'person') return run();
+  const owner = ownerFor(principal, scope, options);
+  const installed = inspectInstalledOnboardingRuntime(scope);
+  if (!installed.ready || installed.ownerId !== owner.id)
+    return deny('installed personal owner identity required');
+  const result = withAuthenticatedPersonalApprovals(principal, () => ({ value: run() }));
+  if (!result) return deny('personal approval scope conflicts with the current execution scope');
+  return result.value;
 }
 function parseDataTier(raw: unknown, scope: CharterScope): OnboardingAuthorityInput['data_tier'] {
   if (raw === undefined) return undefined;
@@ -396,40 +414,44 @@ export function requestOnboardingAuthority(
         'Re-run `pnpm onboarding authority preview --file <plan> --out <profile-path>` yourself and request with the fresh envelope.'
     );
   const correlationId = `onboarding-authority:${digest}`;
-  const prior = listApprovalRequests({ storageChannels: [ONBOARDING_AUTHORITY_CHANNEL] }).find(
-    (r) => r.correlationId === correlationId && !isApprovalRequestExpired(r)
+  const prior = withOnboardingApprovalScope(principal, plan.scope, options, () =>
+    listApprovalRequests({ storageChannels: [ONBOARDING_AUTHORITY_CHANNEL] }).find(
+      (r) => r.correlationId === correlationId && !isApprovalRequestExpired(r)
+    )
   );
   if (prior && prior.requestedBy === requesterId && !prior.applyClaim) return requestReceipt(prior);
   const now = options.now ?? new Date();
-  const record = createApprovalRequest('mission_controller', {
-    channel: ONBOARDING_AUTHORITY_CHANNEL,
-    threadTs: now.toISOString(),
-    correlationId,
-    requestedBy: requesterId,
-    requestedByContext: {
-      surface: 'system',
-      actorId: requesterId,
-      actorRole: 'delegation-recipient-proposal-service',
-    },
-    draft: {
-      title: 'Onboarding action authority',
-      summary:
-        plan.input.mode === 'activate'
-          ? 'Activate the installed execution identity without standing external grants'
-          : `${plan.input.mode}: ${plan.input.grants.map((g) => g.operation_id).join(', ')}`,
-      details: plan.statement,
-      severity: 'high',
-    },
-    sourceText: JSON.stringify(plan),
-    expiresAt: new Date(
-      Math.min(Date.parse(plan.draft.accountable.expires_at), now.getTime() + 86_400_000)
-    ).toISOString(),
-    accountability: { finalDecision: 'human_only', payloadHash: digest, effectBinding: digest },
-    scope:
-      plan.scope.kind === 'person'
-        ? { tier: 'personal', scope_kind: 'system' }
-        : { tier: 'confidential', tenant_slug: plan.scope.tenant_slug },
-  });
+  const record = withOnboardingApprovalScope(principal, plan.scope, options, () =>
+    createApprovalRequest('mission_controller', {
+      channel: ONBOARDING_AUTHORITY_CHANNEL,
+      threadTs: now.toISOString(),
+      correlationId,
+      requestedBy: requesterId,
+      requestedByContext: {
+        surface: 'system',
+        actorId: requesterId,
+        actorRole: 'delegation-recipient-proposal-service',
+      },
+      draft: {
+        title: 'Onboarding action authority',
+        summary:
+          plan.input.mode === 'activate'
+            ? 'Activate the installed execution identity without standing external grants'
+            : `${plan.input.mode}: ${plan.input.grants.map((g) => g.operation_id).join(', ')}`,
+        details: plan.statement,
+        severity: 'high',
+      },
+      sourceText: JSON.stringify(plan),
+      expiresAt: new Date(
+        Math.min(Date.parse(plan.draft.accountable.expires_at), now.getTime() + 86_400_000)
+      ).toISOString(),
+      accountability: { finalDecision: 'human_only', payloadHash: digest, effectBinding: digest },
+      scope:
+        plan.scope.kind === 'person'
+          ? { tier: 'personal', scope_kind: 'system', nhi_id: installed.agentId }
+          : { tier: 'confidential', tenant_slug: plan.scope.tenant_slug },
+    })
+  );
   return requestReceipt(record);
 }
 function requestReceipt(record: ApprovalRequestRecord) {
@@ -446,7 +468,9 @@ function readPlan(
   id: string,
   options: Options
 ) {
-  const record = loadApprovalRequest(ONBOARDING_AUTHORITY_CHANNEL, id);
+  const record = withOnboardingApprovalScope(principal, scope, options, () =>
+    loadApprovalRequest(ONBOARDING_AUTHORITY_CHANNEL, id)
+  );
   if (!record?.sourceText || record.channel !== ONBOARDING_AUTHORITY_CHANNEL)
     return deny('request not found');
   let plan: Plan;
@@ -459,7 +483,9 @@ function readPlan(
     return deny('request outside selected scope');
   if (
     scope.kind === 'person'
-      ? record.scope?.tier !== 'personal' || record.scope?.tenant_slug !== undefined
+      ? record.scope?.tier !== 'personal' ||
+        record.scope?.tenant_slug !== undefined ||
+        record.scope?.nhi_id !== plan.runtime?.agent_id
       : record.scope?.tier !== 'confidential' || record.scope?.tenant_slug !== scope.tenant_slug
   )
     return deny('approval storage scope does not match plan');
@@ -561,12 +587,14 @@ export function applyOnboardingAuthority(
       installed.agentId !== plan.runtime.agent_id)
   )
     return deny('reviewed execution identity changed or was suspended');
-  const claimed = claimApprovalApply('mission_controller', {
-    channel: record.channel,
-    requestId: record.id,
-    appliedBy: principal.requesterId,
-    expectedRecordHash: computeApprovalPayloadHash({ record }),
-  });
+  const claimed = withOnboardingApprovalScope(principal, scope, options, () =>
+    claimApprovalApply('mission_controller', {
+      channel: record.channel,
+      requestId: record.id,
+      appliedBy: principal.requesterId,
+      expectedRecordHash: computeApprovalPayloadHash({ record }),
+    })
+  );
   // A started claim is never retried automatically if acceptance or result persistence fails.
   const charter = acceptCharter(
     {
@@ -586,16 +614,18 @@ export function applyOnboardingAuthority(
       activateProvisionedAgentIdentity(plan.runtime!.agent_id)
     );
   }
-  recordApprovalApplyResult('mission_controller', {
-    channel: record.channel,
-    requestId: record.id,
-    claimId: claimed.applyClaim.claimId,
-    applyResult: {
-      result: 'success',
-      appliedAt: (options.now ?? new Date()).toISOString(),
-      appliedBy: principal.requesterId,
-    },
-  });
+  withOnboardingApprovalScope(principal, scope, options, () =>
+    recordApprovalApplyResult('mission_controller', {
+      channel: record.channel,
+      requestId: record.id,
+      claimId: claimed.applyClaim.claimId,
+      applyResult: {
+        result: 'success',
+        appliedAt: (options.now ?? new Date()).toISOString(),
+        appliedBy: principal.requesterId,
+      },
+    })
+  );
   return {
     ok: true as const,
     charter_id: charter.charter_id,
@@ -610,7 +640,9 @@ export function readOnboardingAuthority(
   const accountable = ownerFor(principal, scope, options);
   const charter = findActiveCharter(scope, options.now ?? new Date(), options);
   const renewal = charter ? null : findLatestCharterForRenewal(scope, options);
-  const pending_requests = listApprovalRequests({ storageChannels: [ONBOARDING_AUTHORITY_CHANNEL] })
+  const pending_requests = withOnboardingApprovalScope(principal, scope, options, () =>
+    listApprovalRequests({ storageChannels: [ONBOARDING_AUTHORITY_CHANNEL] })
+  )
     .flatMap((record) => {
       try {
         return [onboardingAuthorityRequestStatus(principal, scope, record.id, options)];

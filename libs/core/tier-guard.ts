@@ -1,4 +1,12 @@
 import { engineRuntimeResourceAccessDenial as resourceAccessDenial } from './voice/engine-runtime-preferences-access.js';
+import {
+  PERSONAL_APPROVAL_STORE_ROLE,
+  personalApprovalIoAllowed,
+} from './foundation/personal-approval-io-capability.js';
+import {
+  TASK_SOURCE_WORKSPACE_ROLE,
+  taskSourceWorkspaceIoAllowed,
+} from './foundation/task-source-workspace-capability.js';
 import { personCharterResourceAccessAllowed } from './governance/person-charter-runtime.js';
 import {
   prPublicationResourceAllowed,
@@ -59,13 +67,15 @@ import {
   partitionedRuntimeStateKnowledgePath,
   partitionedRuntimeStateTierInPath,
   STORAGE_FLOOR_ROOTS,
-  classifyStorageFloorPath,
   storageFloorTier,
   storageFloorTierInPath,
 } from './storage-layout.js';
 import { assertSandboxWriteAllowed } from './shell/sandbox-policy.js';
 import {
   tenantStorePartitionWriteDecision,
+  protectedFloorPartitionPrefix,
+  isProtectedStorageFloorTier,
+  partitionedRuntimeTier,
   tenantScopeConfig,
   normalizeTenantPolicyPath as normalizePath,
   tenantPolicyPathStartsWith as pathStartsWith,
@@ -161,20 +171,6 @@ function isProtectedTierPath(relativePath: string): boolean {
     isProtectedStorageFloorTier(storageFloorTier(relativePath)) ||
     isProtectedRuntimeStatePath(relativePath)
   );
-}
-
-/** `<floor>/<tier>/` prefix when the path is in a personal/confidential floor partition. */
-function protectedFloorPartitionPrefix(relativePath: string): string | undefined {
-  const floor = classifyStorageFloorPath(relativePath);
-  if (floor?.partition.kind !== 'tier') return undefined;
-  const { tier } = floor.partition;
-  if (!isProtectedStorageFloorTier(tier)) return undefined;
-  return `${STORAGE_FLOOR_ROOTS[floor.floor]}/${tier}/`;
-}
-
-/** Personal/confidential partitions of the shared storage floors (storage-layout.ts). */
-function isProtectedStorageFloorTier(tier: TierLevel | undefined): boolean {
-  return tier === 'personal' || tier === 'confidential';
 }
 
 /** Exact registered durable-state root; copies in scratch keep their own boundary. */
@@ -1207,6 +1203,8 @@ export function validateWritePermission(
         isDiscussionRequestCapability(currentResourceAccessScope())) ||
       (currentRole === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
         isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
+      (currentRole === TASK_SOURCE_WORKSPACE_ROLE &&
+        taskSourceWorkspaceIoAllowed(relativePath, operation)) ||
       (currentRole === PR_PUBLICATION_STORE_ROLE &&
         prPublicationResourceAllowed(relativePath, operation))
     )
@@ -1215,6 +1213,11 @@ export function validateWritePermission(
   }
 
   // Dedicated-store tenant partitions skip runtime defaults (tier-guard-tenant-store-partitions.ts).
+  if (
+    currentRole === PERSONAL_APPROVAL_STORE_ROLE &&
+    personalApprovalIoAllowed(relativePath, operation)
+  )
+    return personaTierWriteDecision(policy, relativePath, identity, operation);
   const storeDecision = tenantStorePartitionWriteDecision(policy, relativePath, identity, {
     operation,
     sudoAllows: (scope) => hasScopedSudoAccess(relativePath, scope),
@@ -1398,6 +1401,8 @@ export function inspectReadPermission(
               isDiscussionRequestCapability(currentResourceAccessScope())) ||
             (identity.role === CUSTOMER_DECISION_INVITE_STORE_ROLE &&
               isCustomerDecisionInviteCapability(currentResourceAccessScope())) ||
+            (identity.role === TASK_SOURCE_WORKSPACE_ROLE &&
+              taskSourceWorkspaceIoAllowed(relativePath, operation)) ||
             (identity.role === PR_PUBLICATION_STORE_ROLE &&
               prPublicationResourceAllowed(relativePath, operation))) &&
           loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
@@ -1514,23 +1519,6 @@ export function validateReadPermission(
 ): { allowed: boolean; reason?: string } {
   const { denialKind: _denialKind, ...decision } = inspectReadPermission(filePath, operation);
   return decision;
-}
-
-/**
- * Tier of a partitioned runtime ledger or durable state's protected prefix
- * (`active/shared/runtime/<ledger>/<tier>/`), or undefined for any other prefix.
- */
-function partitionedRuntimeTier(prefix: string): 'personal' | 'confidential' | undefined {
-  const normalized = normalizePath(prefix);
-  for (const root of [
-    ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
-    ...Object.values(PARTITIONED_RUNTIME_STATE_ROOTS),
-  ]) {
-    for (const tier of ['personal', 'confidential'] as const) {
-      if (normalized === `${root}/${tier}`) return tier;
-    }
-  }
-  return undefined;
 }
 
 /**
