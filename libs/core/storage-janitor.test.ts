@@ -160,7 +160,45 @@ vi.mock('./core.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), debug: vi.fn(), error: vi.fn() },
 }));
 
+// The real ledger module needs the full path resolver this suite mocks. The
+// stand-in lists segments in ledger.ts chain order (stamp, then numeric
+// suffix — covered for the real module in ledger.test.ts) and records the
+// archive receipts the janitor writes.
+const ledgerMock = vi.hoisted(() => ({
+  receipts: [] as Array<{ segment: string; last_hash: string; archive_path: string }>,
+  failReceipt: false,
+}));
+vi.mock('./ledger.js', () => ({
+  SYSTEM_LEDGER_REPO_PATH: 'active/audit/system-ledger.jsonl',
+  listLedgerSegments: (livePath: string) => {
+    const dir = path.dirname(livePath);
+    const stem = path.basename(livePath).replace(/\.jsonl$/u, '');
+    if (!fs.existsSync(dir)) return [];
+    return fs
+      .readdirSync(dir)
+      .flatMap((name) => {
+        if (!name.startsWith(`${stem}-`)) return [];
+        const match = name.slice(stem.length + 1).match(/^(\d{8}-\d{6})(?:-(\d+))?\.jsonl$/u);
+        return match ? [{ name, stamp: match[1]!, seq: match[2] ? Number(match[2]) : 0 }] : [];
+      })
+      .sort((a, b) => (a.stamp === b.stamp ? a.seq - b.seq : a.stamp < b.stamp ? -1 : 1))
+      .map((segment) => path.join(dir, segment.name));
+  },
+  ledgerSegmentLastHash: (segmentPath: string) => `last-of-${path.basename(segmentPath)}`,
+  recordLedgerSegmentArchived: (receipt: {
+    segment: string;
+    last_hash: string;
+    archive_path: string;
+  }) => {
+    if (ledgerMock.failReceipt) throw new Error('ledger lock timeout');
+    ledgerMock.receipts.push(receipt);
+    return 'receipt-hash';
+  },
+}));
+
 import { holdsAuditChainLock } from './governance/audit-chain.js';
+import { withLockSync } from './foundation/lock-utils.js';
+import { appendOnlyStoreLockId } from './append-only-store.js';
 import {
   scanTmp,
   rotateLogs,
@@ -2340,6 +2378,118 @@ describe('storage-janitor', () => {
       expect(fs.readFileSync(archivedCopy, 'utf8')).toBe('evidence');
       const audit = readRetentionAudit();
       expect(audit.some((r) => r.event === 'RETENTION_ARCHIVE')).toBe(true);
+    });
+
+    describe('system ledger segments (MSN-STORE-BOUNDS-3)', () => {
+      const ledgerCatalog = {
+        version: '1.10.0',
+        entries: [
+          {
+            path: 'active/audit/system-ledger.jsonl',
+            artifact_class: 'evidence',
+            action: 'rotate',
+            self_managed: true,
+            ttl_days: 30,
+            segment_action: 'archive',
+            audit: true,
+          },
+        ],
+      };
+      const ledgerDir = () => path.join(testRootDir(), 'active/audit');
+      const segment = (name: string) => path.join(ledgerDir(), `system-ledger-${name}.jsonl`);
+      beforeEach(() => {
+        ledgerMock.receipts.length = 0;
+        ledgerMock.failReceipt = false;
+      });
+
+      it('writes the receipt before the move: a failed receipt leaves the segment in place', () => {
+        writeCatalogFile(ledgerCatalog);
+        const names = ['20260101-000000', '20260101-000000-1'];
+        for (const name of names) {
+          writeFile(segment(name), '{}\n');
+          setMtime(segment(name), 40 * RETENTION_DAY_MS);
+        }
+        ledgerMock.failReceipt = true;
+        const result = sweepAppendOnlyStores({ dryRun: false });
+        expect(result.segmentsArchived).toEqual([]);
+        expect(fs.existsSync(segment(names[0]!))).toBe(true);
+        expect(result.errors.length).toBeGreaterThan(0);
+      });
+
+      it('archives in chain order, stops at the first unexpired segment and writes a receipt per archive', () => {
+        writeCatalogFile(ledgerCatalog);
+        // Chain order: -1, -2, -10, then the next stamp. -2 is fresh, so -10
+        // (old by mtime) must stay: archiving it alone would break the chain.
+        const names = [
+          '20260101-000000-1',
+          '20260101-000000-2',
+          '20260101-000000-10',
+          '20260102-000000',
+        ];
+        for (const name of names) writeFile(segment(name), '{}\n');
+        writeFile(path.join(ledgerDir(), 'system-ledger.jsonl'), '{}\n');
+        setMtime(segment(names[0]!), 40 * RETENTION_DAY_MS);
+        setMtime(segment(names[2]!), 40 * RETENTION_DAY_MS);
+        setMtime(segment(names[3]!), 40 * RETENTION_DAY_MS);
+
+        const result = sweepAppendOnlyStores({ dryRun: false });
+        expect(result.errors).toEqual([]);
+        expect(result.segmentsArchived).toEqual([segment(names[0]!)]);
+        expect(fs.existsSync(segment(names[2]!))).toBe(true);
+        expect(fs.existsSync(archiveFileOf(`active/audit/system-ledger-${names[0]}.jsonl`))).toBe(
+          true
+        );
+        expect(ledgerMock.receipts).toEqual([
+          {
+            segment: segment(names[0]!),
+            last_hash: `last-of-system-ledger-${names[0]}.jsonl`,
+            archive_path: `active/archive/active/audit/system-ledger-${names[0]}.jsonl`,
+          },
+        ]);
+      });
+
+      it('never archives the newest segment, even when every segment expired', () => {
+        writeCatalogFile(ledgerCatalog);
+        const names = ['20260101-000000', '20260101-000000-1'];
+        for (const name of names) {
+          writeFile(segment(name), '{}\n');
+          setMtime(segment(name), 40 * RETENTION_DAY_MS);
+        }
+        const result = sweepAppendOnlyStores({ dryRun: false });
+        expect(result.segmentsArchived).toEqual([segment(names[0]!)]);
+        expect(fs.existsSync(segment(names[1]!))).toBe(true);
+        expect(ledgerMock.receipts.map((receipt) => path.basename(receipt.segment))).toEqual([
+          `system-ledger-${names[0]}.jsonl`,
+        ]);
+      });
+    });
+
+    it('skips a store whose maintenance lock is held and leaves it untouched', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      const lines = [
+        { item_id: 'a', version: 1, pad: 'x'.repeat(40) },
+        { item_id: 'a', version: 2, pad: 'z'.repeat(40) },
+      ];
+      const content = lines.map((l) => JSON.stringify(l)).join('\n') + '\n';
+      writeFile(live, content);
+      const metrics = path.join(observabilityDir(), 'metrics.jsonl');
+      writeFile(metrics, 'x'.repeat(200));
+
+      const result = withLockSync(appendOnlyStoreLockId(live), () =>
+        withLockSync(appendOnlyStoreLockId(metrics), () =>
+          sweepAppendOnlyStores({ dryRun: false, lockTimeoutMs: 1 })
+        )
+      );
+      expect(result.errors).toEqual([]);
+      expect(result.compacted).toEqual([]);
+      expect(result.rotated).toEqual([]);
+      expect(fs.readFileSync(live, 'utf8')).toBe(content);
+      expect(fs.existsSync(metrics)).toBe(true);
+      // Released: the next sweep does the work.
+      const next = sweepAppendOnlyStores({ dryRun: false });
+      expect(next.compacted).toEqual([live]);
+      expect(next.rotated).toEqual([metrics]);
     });
 
     it('compacts a versioned keyed store to the last record per key and archives the original', () => {

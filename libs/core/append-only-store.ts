@@ -150,10 +150,13 @@ export interface StoreScanOptions {
  * bytes never reach it — they are always kept verbatim.
  */
 export interface StoreLineFilter {
-  /** Pass 1, once per parked file as it is parked: `index` is global across files. */
-  observe(text: string, index: number): void;
+  /**
+   * Pass 1, once per parked file as it is parked: `index` is global across
+   * files; `fileIndex` is the file's position in park order.
+   */
+  observe(text: string, index: number, fileIndex: number): void;
   /** Pass 2: whether the line survives. */
-  keep(text: string, index: number): boolean;
+  keep(text: string, index: number, fileIndex: number): boolean;
 }
 type LineFilter = StoreLineFilter;
 
@@ -333,14 +336,26 @@ interface ParkedCopy {
    * is copied verbatim.
    */
   indexedBytes: number;
+  /**
+   * A copy left by an earlier, failed rewrite and adopted by this one
+   * ({@link mergeCompactionCopies}). It is removed only once the live file
+   * holds the published result; a raw-union restore never includes it.
+   */
+  adopted?: boolean;
 }
 
 function rewriteParked(
   livePath: string,
   filter: LineFilter,
-  options: StoreScanOptions & { archivePath?: string | null; label: string }
+  options: StoreScanOptions & {
+    archivePath?: string | null;
+    label: string;
+    /** Leftover parked copies (park order) streamed before the live file. */
+    adoptCopies?: readonly string[];
+  }
 ): StoreRewriteResult | null {
-  if (!safeExistsSync(livePath)) return null;
+  const adoptCopies = options.adoptCopies ?? [];
+  if (!safeExistsSync(livePath) && adoptCopies.length === 0) return null;
   const chunkBytes = options.chunkBytes ?? DEFAULT_JSONL_CHUNK_BYTES;
   const scan = { chunkBytes, maxLineBytes: options.maxLineBytes };
   const parked: ParkedCopy[] = [];
@@ -350,6 +365,23 @@ function rewriteParked(
   let lateLines = 0;
   let liveRestored = false;
 
+  const indexCopy = (copy: ParkedCopy): void => {
+    const fileIndex = parked.length;
+    parked.push(copy);
+    const onOversized = (line: JsonlOversizedLine): void => {
+      if (!line.terminated) return; // runs to EOF: carried verbatim with the late bytes
+      oversizedLines++;
+      copy.indexedBytes = line.byteEnd!;
+    };
+    for (const line of streamTextLines(copy.path, { ...scan, onOversized })) {
+      // An unterminated tail is an append in flight (or torn): pass 2 copies it verbatim.
+      if (!line.terminated) break;
+      copy.indexedBytes = line.byteEnd!;
+      if (!line.text.trim()) continue;
+      filter.observe(line.text, total++, fileIndex);
+    }
+  };
+
   const park = (tag: string): boolean => {
     const staging = uniqueSibling(parkedCopyBase(livePath, tag), '');
     try {
@@ -358,20 +390,7 @@ function rewriteParked(
       if (isErrno(err, 'ENOENT')) return false; // another maintainer took it
       throw err;
     }
-    const copy: ParkedCopy = { path: staging, indexedBytes: 0 };
-    parked.push(copy);
-    const onOversized = (line: JsonlOversizedLine): void => {
-      if (!line.terminated) return; // runs to EOF: carried verbatim with the late bytes
-      oversizedLines++;
-      copy.indexedBytes = line.byteEnd!;
-    };
-    for (const line of streamTextLines(staging, { ...scan, onOversized })) {
-      // An unterminated tail is an append in flight (or torn): pass 2 copies it verbatim.
-      if (!line.terminated) break;
-      copy.indexedBytes = line.byteEnd!;
-      if (!line.text.trim()) continue;
-      filter.observe(line.text, total++);
-    }
+    indexCopy({ path: staging, indexedBytes: 0 });
     return true;
   };
 
@@ -381,7 +400,7 @@ function rewriteParked(
     let index = 0;
     let kept = 0;
     lateLines = 0;
-    for (const copy of parked) {
+    for (const [fileIndex, copy] of parked.entries()) {
       // An oversized line is never buffered and never dropped: copy its bytes.
       const onOversized = (line: JsonlOversizedLine): void => {
         kept += copyBytes(copy.path, out, chunkBytes, line.byteStart!, line.byteEnd!);
@@ -392,7 +411,7 @@ function rewriteParked(
         onOversized,
       })) {
         if (!line.text.trim()) continue;
-        if (filter.keep(line.text, index++)) {
+        if (filter.keep(line.text, index++, fileIndex)) {
           out.write(`${line.text}\n`);
           kept++;
         }
@@ -403,18 +422,24 @@ function rewriteParked(
     return kept + lateLines;
   };
 
-  const writeUnion = (dest: string): void => {
+  const writeUnion = (dest: string, copies: readonly ParkedCopy[] = parked): void => {
     const out = new BatchedAppender(dest);
-    for (const copy of parked) copyBytes(copy.path, out, chunkBytes);
+    for (const copy of copies) copyBytes(copy.path, out, chunkBytes);
     out.flush();
   };
 
   const restoreRawUnion = (): void => {
     // Park any live file that reappeared so its records are not lost.
     if (safeExistsSync(livePath) && park('restore-merge')) merged++;
+    // Adopted copies stay where they were: only this run's parks are restored.
+    const own = parked.filter((copy) => !copy.adopted);
+    if (own.length === 0) {
+      liveRestored = true;
+      return;
+    }
     const temp = uniqueSibling(`${livePath}.compact-restore-${process.pid}`, '.tmp');
     try {
-      writeUnion(temp);
+      writeUnion(temp, own);
       safeMoveSync(temp, livePath);
     } finally {
       tryUnlink(temp);
@@ -426,7 +451,10 @@ function rewriteParked(
   let kept = 0;
   let archivePath: string | null = null;
   try {
-    if (!park('initial')) return null;
+    for (const copyPath of adoptCopies) {
+      indexCopy({ path: copyPath, indexedBytes: 0, adopted: true });
+    }
+    if (!park('initial') && parked.length === 0) return null;
     for (let i = 0; i <= COMPACT_MAX_PARK_ATTEMPTS; i++) {
       if (!safeExistsSync(livePath)) {
         const temp = uniqueSibling(`${livePath}.compact-out-${process.pid}-${i}`, '.tmp');
@@ -493,7 +521,7 @@ function rewriteParked(
     }
     throw err;
   } finally {
-    for (const copy of parked) tryUnlink(copy.path);
+    for (const copy of parked) if (!copy.adopted || published) tryUnlink(copy.path);
   }
 
   const before = total + oversizedLines + lateLines;
@@ -532,6 +560,55 @@ export function rewriteStoreLines(
     archivePath: options.archivePath ?? null,
     label: options.label ?? 'rewrite',
   });
+}
+
+export interface MergeCompactionCopiesResult extends StoreRewriteResult {
+  /** Lines dropped because a byte-identical line was kept from an earlier file. */
+  duplicatesDropped: number;
+}
+
+/**
+ * Merge leftover parked copies of a failed rewrite back into the live store:
+ * the copies (pass them in park order — `parkedCompactionCopies`), then the
+ * live file, through the same race-safe parked rewrite. A line byte-identical
+ * to a line already kept from an EARLIER file is dropped (the copies and a
+ * published result overlap), so strict stores never get cross-file
+ * duplicates; repeats inside one file are kept. Oversized and in-flight lines
+ * are kept verbatim. The copies are removed only once the result is
+ * published; when writers out-pace the merge (`published: false`) they stay
+ * untouched. The caller holds the store lock ({@link appendOnlyStoreLockId}).
+ * Returns null when neither the live file nor any copy exists.
+ */
+export function mergeCompactionCopies(
+  filePath: string,
+  copies: readonly string[],
+  options: StoreScanOptions = {}
+): MergeCompactionCopiesResult | null {
+  const seen = new Set<string>();
+  let fileSeen = new Set<string>();
+  let currentFile = -1;
+  const dropped = new Set<number>();
+  const digest = (text: string): string => createHash('sha256').update(text).digest('base64');
+  const result = rewriteParked(
+    filePath,
+    {
+      observe(text, index, fileIndex) {
+        if (fileIndex !== currentFile) {
+          for (const hash of fileSeen) seen.add(hash);
+          fileSeen = new Set();
+          currentFile = fileIndex;
+        }
+        const hash = digest(text);
+        if (seen.has(hash)) dropped.add(index);
+        else fileSeen.add(hash);
+      },
+      keep(_text, index) {
+        return !dropped.has(index);
+      },
+    },
+    { ...options, archivePath: null, label: 'compaction-copy recovery', adoptCopies: copies }
+  );
+  return result ? { ...result, duplicatesDropped: result.published ? dropped.size : 0 } : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -797,11 +874,33 @@ function policyThreshold(policy: AppendOnlyStorePolicy): number {
   return policy.minBytes;
 }
 
-function defaultLockId(filePath: string): string {
+/**
+ * Inter-process lock id `maintainStoreAfterAppend` takes for `filePath` by
+ * default. The storage janitor's compaction/rotation and the compaction-copy
+ * recovery command take the same id, so they exclude write-time maintenance
+ * that uses it. A writer that rewrites its store under a lock of its own
+ * (`lockId: null` under a queue/fence lock, or the dot wake ledger's
+ * compaction lock) is excluded only by callers that also take that lock —
+ * see compaction-copy-recovery.ts WRITER_COMPACTION_LOCKS.
+ */
+export function appendOnlyStoreLockId(filePath: string): string {
   return `append-only-store-${createHash('sha256')
     .update(nodePath.resolve(filePath))
     .digest('hex')
     .slice(0, 32)}`;
+}
+
+/**
+ * Cheap pre-check (one stat): would {@link maintainStoreAfterAppend} run
+ * `policy` now? For a caller that takes the store lock itself under another
+ * identity (`lockId: null`), so most appends skip the lock.
+ */
+export function appendOnlyStoreMaintenanceDue(
+  filePath: string,
+  policy: AppendOnlyStorePolicy
+): boolean {
+  const floor = Math.max(policyThreshold(policy), 2 * (lastMaintainedSize.get(filePath) ?? 0));
+  return jsonlFileSize(filePath) >= floor;
 }
 
 function recordAudit(options: MaintainStoreOptions, record: Record<string, unknown>): void {
@@ -929,7 +1028,7 @@ export function maintainStoreAfterAppend(
 
     attemptedSize = size;
     const run = (): MaintainStoreOutcome => runPolicy(filePath, resolved, threshold, options);
-    const lockId = options.lockId === undefined ? defaultLockId(filePath) : options.lockId;
+    const lockId = options.lockId === undefined ? appendOnlyStoreLockId(filePath) : options.lockId;
     const outcome =
       lockId === null ? run() : withLockSync(lockId, run, options.lockTimeoutMs ?? 2000);
 
