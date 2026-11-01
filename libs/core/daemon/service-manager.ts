@@ -108,6 +108,20 @@ export interface DaemonPlan {
 
 export type DaemonManagerPlatform = 'launchd' | 'systemd-user' | 'windows-task-scheduler';
 
+/**
+ * Task Scheduler's XML reader expects a BOM-marked UTF-16 document. Keep the
+ * planners' content as strings for hashing and inspection, and encode only
+ * when the unit is staged for Windows.
+ */
+export function daemonUnitFileBytes(
+  platform: DaemonManagerPlatform,
+  content: string
+): string | Buffer {
+  if (platform !== 'windows-task-scheduler') return content;
+  const xml = content.replace('encoding="UTF-8"', 'encoding="UTF-16"');
+  return Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(xml, 'utf16le')]);
+}
+
 export interface DaemonManager {
   readonly platform: DaemonManagerPlatform;
   planInstall(spec: DaemonServiceSpec, ctx: DaemonRenderContext): DaemonPlan;
