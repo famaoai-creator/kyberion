@@ -171,3 +171,12 @@ export function resolveTailscaleBin(
 export function resolveYtDlpBin(): string {
   return resolveExternalToolBin('yt_dlp', ['KYBERION_YTDLP_BIN'], 'yt-dlp');
 }
+
+/**
+ * agent-desktop accessibility-tree CLI (optional managed tool runtime).
+ * Resolution order: KYBERION_AGENT_DESKTOP_BIN override, installed managed
+ * binary, registry command, bare `agent-desktop` on PATH.
+ */
+export function resolveAgentDesktopBin(): string {
+  return resolveExternalToolBin('agent_desktop', ['KYBERION_AGENT_DESKTOP_BIN'], 'agent-desktop');
+}

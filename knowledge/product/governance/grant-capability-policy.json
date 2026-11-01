@@ -3,6 +3,14 @@
   "version": "1.0.0",
   "description": "PG-03: per-capability rules for the Grant model (PERMISSION_GRANT_UNIFICATION_PLAN_2026-10-19 §2.2/§5/§6). standing_grant capabilities are stored by libs/core/governance/grant-store.ts; per_mission and os_permission capabilities are read through adapters by libs/core/governance/grant-resolver.ts. external_io=true means granting needs a human approval bound by payloadHash to the grant (basis.approval_request_id). readiness_profiles (PG-06) list the capabilities a kind of work needs; `pnpm kyberion grants status` and meeting preflight evaluate them.",
   "capabilities": {
+    "credential.use": {
+      "kind": "standing_grant",
+      "description": "Use an explicitly allocated reasoning credential for the bound tenant and canonical provider. Tool, egress and budget authority remain separate.",
+      "scope_keys": ["tenant_slug", "credential_provider", "credential_ref"],
+      "external_io": true,
+      "max_ttl_days": 30,
+      "mission_binding": "none"
+    },
     "meeting.recording": {
       "kind": "standing_grant",
       "description": "Record audio from an external meeting service for the bound meeting series / URLs.",

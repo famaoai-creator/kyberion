@@ -10,6 +10,10 @@ export interface BrowserPipelineSummary {
   url: string | null;
   title: string | null;
   element_count: number;
+  /** Visible interactive candidates before the snapshot cap — when known. */
+  element_total?: number;
+  /** The snapshot cap cut off candidates: `refs`/`element_count` are a prefix. */
+  snapshot_truncated?: boolean;
   refs: BrowserPipelineRefSummary[];
   screenshot: string | null;
   last_url: string | null;
@@ -56,6 +60,10 @@ export function buildBrowserPipelineSummary(ctx: Record<string, unknown>): Brows
     title,
     element_count:
       typeof snapshot?.element_count === 'number' ? snapshot.element_count : elements.length,
+    ...(typeof snapshot?.element_total === 'number'
+      ? { element_total: snapshot.element_total }
+      : {}),
+    ...(snapshot?.truncated === true ? { snapshot_truncated: true } : {}),
     refs: refs.filter((row) => row.ref),
     screenshot: typeof ctx.last_screenshot === 'string' ? ctx.last_screenshot : null,
     last_url: typeof ctx.last_url === 'string' ? ctx.last_url : url,

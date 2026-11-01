@@ -28,10 +28,8 @@ export async function withConfiguredTaskCredentials<T>(
   });
   let binding;
   try {
-    binding = await binder.call(
-      resolver,
-      Object.freeze({ scope: Object.freeze(scope), workItemId })
-    );
+    const input = Object.freeze({ scope: Object.freeze(scope), workItemId });
+    binding = await binder.call(resolver, input);
   } catch {
     throw new Error(
       '[CREDENTIAL_BINDING_UNAVAILABLE] Configured resolver could not bind the current task'

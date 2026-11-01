@@ -13,6 +13,8 @@ import {
   resolveReasoningApiModel,
   registerReasoningApiProofAdapter,
   verifyReasoningApiCredential,
+  reasoningCredentialVersion,
+  matchesReasoningCredentialVersion,
 } from './reasoning-api-credentials.js';
 const mock = vi.hoisted(() => ({
   environment: vi.fn((descriptor: { mode: string }) => ({
@@ -32,6 +34,59 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 describe('API credential proofs', () => {
+  it('uses independently salted, serializable verifiers and rejects changed keys and legacy proofs', () => {
+    const first = reasoningCredentialVersion('synthetic-key');
+    const second = reasoningCredentialVersion('synthetic-key');
+    expect(first).not.toBe(second);
+    expect(first).toMatch(/^scrypt-v1:[a-f0-9]{32}:[a-f0-9]{64}$/);
+    expect(
+      matchesReasoningCredentialVersion('synthetic-key', JSON.parse(JSON.stringify(first)))
+    ).toBe(true);
+    expect(matchesReasoningCredentialVersion('changed-key', first)).toBe(false);
+    for (const malformed of [
+      undefined,
+      null,
+      '',
+      'a'.repeat(64),
+      first + ':extra',
+      first.replace('scrypt-v1', 'scrypt-v2'),
+      first.slice(0, -1) + 'Z',
+    ])
+      expect(matchesReasoningCredentialVersion('synthetic-key', malformed)).toBe(false);
+  });
+  it.each([
+    [401, 'authentication_failed'],
+    [403, 'authorization_failed'],
+    [404, 'model_or_endpoint_unavailable'],
+    [429, 'rate_limited'],
+  ] as const)(
+    'reports safe HTTP failure code for %s without retaining raw errors',
+    async (httpStatus, code) => {
+      const result = await verifyReasoningApiCredential(
+        { provider: 'openai', model: 'test-model', allowPaid: true },
+        async () => {
+          throw Object.assign(new Error('test-private-key must not be logged'), { httpStatus });
+        }
+      );
+      expect(result.code).toBe(code);
+      expect(JSON.stringify(result)).not.toContain('test-private-key');
+      expect(result.credential_version).toMatch(/^scrypt-v1:[a-f0-9]{32}:[a-f0-9]{64}$/);
+    }
+  );
+  it('attributes transport and key version and distinguishes DNS from authentication', async () => {
+    const result = await verifyReasoningApiCredential(
+      { provider: 'openai', model: 'test-model', allowPaid: true },
+      async () => {
+        throw new Error('Network Error: ENOTFOUND api.openai.com');
+      }
+    );
+    expect(result).toMatchObject({
+      code: 'dns_failed',
+      execution: { kind: 'operator' },
+      transport: 'custom-request',
+      endpoint: 'https://api.openai.com/v1/responses',
+    });
+  });
   it('uses only tenant-bound credentials and refuses ambient operator credentials without a binding', async () => {
     const response = {
       status: 'completed',

@@ -5,6 +5,8 @@ import type { FocusedInputState } from '../apple-event-bridge.js';
 export interface OsAutomationPlatformAdapter {
   launchApplication(application: string): boolean;
   activateApplication(application: string): void;
+  /** Postcondition read for activate dispatches; absent where unimplemented. */
+  getFrontmostApplicationName?(): string;
   detectFocusedInput(): FocusedInputState;
   keystrokeText(text: string): void;
   pasteText(text: string): void;

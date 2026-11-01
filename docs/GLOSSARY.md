@@ -467,6 +467,27 @@ Service bindings should be read together with:
 - `Vault`
   - where the secret material is actually governed
 
+### Credential Reference
+
+A non-secret name resolving an API key, token, or session credential through the
+governed secret plane. A model ID selects a model; it is not a credential identity.
+
+### Credential Allocation
+
+An explicit permission for a consumer tenant to use a credential reference under
+defined restrictions. It is distinct from registration, scope selection, and
+backend activation. Local management uses human-approved `credential.use` standing
+grants. A configured external task resolver remains authoritative when present.
+
+### Task Credential Binding
+
+An in-memory supply of credentials bound to a verified tenant/mission/task identity
+at trusted dispatch. Missing tenant credentials cannot fall back to operator keys.
+The binding does not itself grant tool/service authority or external data egress.
+
+Canonical lifecycle, implementation status, and evidence boundaries:
+[Credential lifecycle, allocation, and execution](../knowledge/product/architecture/api-credential-proof-boundary.md).
+
 ### Specialist Team
 
 The internal set of specialists Kyberion assigns to a request, such as a browser operator, document specialist, knowledge specialist, or mission lead. Users usually interact with one front-facing assistant while the specialist team works behind it.

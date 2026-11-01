@@ -1,11 +1,30 @@
 ---
 title: テナント資格情報のタスク束縛
 tags: [security, credentials, tenant, workitem, providers]
-last_updated: 2026-10-29
+last_updated: 2026-11-01
 runtime_stages: [execution]
 ---
 
 # テナント資格情報のタスク束縛
+
+概念の正準定義は[資格情報のライフサイクル・割り当て・実行境界](../architecture/api-credential-proof-boundary.md)。
+この文書は実装済みのタスク束縛プロトコルを定義する。
+「割り当て」は利用者への継続的な利用許可、「束縛」はその許可を現在の実行へ適用すること。
+外部binderを設定した場合は下記のsecret serviceが割り当てを判定する。未設定の場合は
+人が承認した `credential.use` standing Grantをローカルbrokerが解決する。
+登録キーの割り当て・確認・取り消し・実タスク経路の実証は
+[tenant資格情報の手順](../../../docs/developer/TENANT_CREDENTIALS.ja.md)を参照する。
+
+## ローカル割り当て
+
+`reasoning credentials assign` はtenant・canonical provider・secret参照名・理由・期限を
+既存の承認へ束縛し、承認後に既存のGrant storeへ保存する。別のキー保管庫は作らない。
+dispatchは現在のclaimを検証してから、許可された参照先のconnection documentだけを
+短命のread-only capabilityで読む。通常のtenantコードがpersonal documentを読めるようにはしない。
+Grant/承認の取り消し・期限切れ・claim変更・キー更新は次の管理されたAPI利用時にも検査する。
+送信済みリクエストや起動済みCLIセッションを取り消す機構ではない。
+
+外部binderが存在するときはローカルへfallbackしない。外部binderの資格情報はその外部管理境界で失効させる。
 
 `ShellSecretResolver.bindTask` は、既存の `KYBERION_SECRET_RESOLVER_COMMAND`
 で設定された信頼済みsecret serviceから、現在のタスク専用の資格情報を受け取る。

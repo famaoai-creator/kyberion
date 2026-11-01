@@ -1,6 +1,7 @@
 /** API proof and model selection consume the canonical provider descriptors.
  * Secret introduction remains owned by secret-introduction / Secret Guard.
  */
+import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import { secureFetch, type SecureFetchOptions } from '../network.js';
 import {
   credentialExecutionIdentity,
@@ -13,6 +14,28 @@ import {
   resolveReasoningProviderEnvironment,
   type ReasoningProviderDescriptor,
 } from './reasoning-provider-registry.js';
+
+export function reasoningCredentialVersion(value: string): string {
+  const salt = randomBytes(16).toString('hex');
+  return `scrypt-v1:${salt}:${deriveCredentialVersion(value, salt).toString('hex')}`;
+}
+
+function deriveCredentialVersion(value: string, salt: string): Buffer {
+  // Fixed costs are versioned here; receipt input cannot select KDF parameters.
+  return scryptSync(value, Buffer.from(salt, 'hex'), 32, {
+    N: 131072,
+    r: 8,
+    p: 1,
+    maxmem: 256 * 1024 * 1024,
+  });
+}
+
+export function matchesReasoningCredentialVersion(value: string, version: unknown): boolean {
+  if (typeof version !== 'string' || version.length !== 107) return false;
+  const match = /^scrypt-v1:([a-f0-9]{32}):([a-f0-9]{64})$/.exec(version);
+  if (!match) return false; // Legacy unsalted proofs require explicit verification again.
+  return timingSafeEqual(deriveCredentialVersion(value, match[1]), Buffer.from(match[2], 'hex'));
+}
 
 export function listReasoningApiProviders(): ReasoningProviderDescriptor[] {
   return listReasoningProviderDescriptors().filter((entry) =>
@@ -185,12 +208,23 @@ export interface ReasoningApiVerification {
   status: 'success' | 'failed';
   checked_at: string;
   max_output_tokens: number;
+  endpoint?: string;
+  credential_version?: string;
+  execution?: { kind: 'operator' | 'tenant'; tenant?: string; mission?: string; task?: string };
+  transport?: 'secure-fetch' | 'custom-request';
   code:
     | 'verified'
     | 'consent_required'
     | 'unsupported_adapter'
     | 'credential_unavailable'
     | 'request_failed'
+    | 'dns_failed'
+    | 'network_timeout'
+    | 'authentication_failed'
+    | 'authorization_failed'
+    | 'model_or_endpoint_unavailable'
+    | 'rate_limited'
+    | 'policy_denied'
     | 'unexpected_response';
 }
 export async function verifyReasoningApiCredential(
@@ -206,8 +240,10 @@ export async function verifyReasoningApiCredential(
     checked_at: new Date().toISOString(),
     max_output_tokens: 128,
   };
+  let attribution: Partial<ReasoningApiVerification> = {};
   const fail = (code: ReasoningApiVerification['code']): ReasoningApiVerification => ({
     ...base,
+    ...attribution,
     status: 'failed',
     code,
   });
@@ -226,6 +262,16 @@ export async function verifyReasoningApiCredential(
     return fail('credential_unavailable');
   }
   if (!key) return fail('credential_unavailable');
+  attribution = {
+    credential_version: reasoningCredentialVersion(key),
+    execution: {
+      kind: owner.tenantSlug ? 'tenant' : 'operator',
+      ...(owner.tenantSlug ? { tenant: owner.tenantSlug } : {}),
+      ...(owner.missionId ? { mission: owner.missionId } : {}),
+      ...(owner.taskId ? { task: owner.taskId } : {}),
+    },
+    transport: request === secureFetch ? 'secure-fetch' : 'custom-request',
+  };
   try {
     assertCredentialOwner(owner);
     const config = adapter.request({
@@ -235,6 +281,7 @@ export async function verifyReasoningApiCredential(
       prompt: 'Reply with exactly OK.',
       maxTokens: 128,
     });
+    attribution.endpoint = String(config.url);
     const body = await request({
       ...config,
       method: 'POST',
@@ -245,8 +292,19 @@ export async function verifyReasoningApiCredential(
       kyberion_egress_context: { tier: 'public', purpose: 'synthetic API credential verification' },
     });
     if (adapter.text(body)?.trim() !== 'OK') return fail('unexpected_response');
-    return { ...base, status: 'success', code: 'verified' };
-  } catch {
+    return { ...base, ...attribution, status: 'success', code: 'verified' };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const status =
+      error && typeof error === 'object' && 'httpStatus' in error ? error.httpStatus : undefined;
+    if (/ENOTFOUND|EAI_AGAIN/.test(message)) return fail('dns_failed');
+    if (/ETIMEDOUT|ECONNABORTED|timed? ?out|timeout/i.test(message)) return fail('network_timeout');
+    if (status === 401) return fail('authentication_failed');
+    if (status === 403) return fail('authorization_failed');
+    if (status === 404) return fail('model_or_endpoint_unavailable');
+    if (status === 429) return fail('rate_limited');
+    if (/^\[(?:POLICY_VIOLATION|SENSITIVE_PATH_DENIED|EGRESS_[A-Z_]+)\]/.test(message))
+      return fail('policy_denied');
     return fail('request_failed');
   }
 }
