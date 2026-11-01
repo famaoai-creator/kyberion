@@ -23,7 +23,10 @@ const MUTATING_CONTROL = new Set([
 ]);
 
 export function browserOperationRequiresAdmission(kind: string, op: string): boolean {
-  if (kind === 'capture') return ['goto', 'navigate', 'evaluate'].includes(op);
+  // `cdp` admits the same page-scoped power as `evaluate` (Runtime.evaluate,
+  // Input.dispatch*), so it needs the same human admission — the domain
+  // allowlist only bounds it further, never weakens it.
+  if (kind === 'capture') return ['goto', 'navigate', 'evaluate', 'cdp'].includes(op);
   if (kind === 'apply') return !READ_APPLY.has(op);
   return kind === 'control' && MUTATING_CONTROL.has(op);
 }

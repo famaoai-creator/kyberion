@@ -1,7 +1,7 @@
-import { logger } from '@agent/core/core';
 import { nowIso } from '@agent/core/foundation';
 import type { BrowserContext, CDPSession, Page } from '@playwright/test';
 import type { BrowserRuntime } from './browser-runtime-types.js';
+import { attachWatchdogObservers, createBrowserWatchdog } from './browser-watchdog.js';
 
 export function createBrowserRuntime(
   context: BrowserContext,
@@ -16,6 +16,7 @@ export function createBrowserRuntime(
     pageIds,
     cdpSessions,
     activeTabId: '',
+    watchdog: createBrowserWatchdog(),
     consoleEvents: [],
     networkEvents: [],
     navigationPolicy,
@@ -39,12 +40,7 @@ export function registerBrowserPage(runtime: BrowserRuntime, page: Page, tabId: 
 
 export function attachPageObservers(runtime: BrowserRuntime, page: Page): void {
   const tabId = runtime.pageIds.get(page) || `tab-${runtime.tabs.size}`;
-  page.on('dialog', async (dialog) => {
-    logger.info(
-      `[BROWSER] Dialog intercepted: ${dialog.type()} - "${dialog.message().substring(0, 100)}"`
-    );
-    await dialog.accept();
-  });
+  attachWatchdogObservers(runtime, page, tabId);
   page.on('console', (msg) => {
     runtime.consoleEvents.push({
       tab_id: tabId,

@@ -4,6 +4,7 @@ import '@agent/core/workforce/worker-goal-driver';
 import { timingSafeEqual } from 'node:crypto';
 import { resolveLocalIpcAddress } from '@agent/core/local-ipc';
 import { tryInspectCompilerOutputs } from '@agent/core/build-coordination';
+import { restrictWindowsNamedPipeAcl } from '@agent/core/windows-named-pipe-security';
 import * as path from 'node:path';
 import { defineScript, isDirectScript, setProcessExitCode } from './lib/harness.js';
 import {
@@ -1352,7 +1353,12 @@ export async function startAgentRuntimeSupervisorDaemon(
     }
   }
 
+  let ipcReady = false;
   const server = net.createServer((socket) => {
+    if (!ipcReady) {
+      socket.destroy();
+      return;
+    }
     let buffer = '';
     socket.on('error', (error: NodeJS.ErrnoException) => {
       if (error.code !== 'EPIPE' && error.code !== 'ECONNRESET') {
@@ -1462,8 +1468,10 @@ export async function startAgentRuntimeSupervisorDaemon(
       clearTimeout(timeout);
       resolve();
     };
-    const onListening = () => {
+    const onListening = async () => {
       try {
+        await restrictWindowsNamedPipeAcl(String(listenTarget));
+        ipcReady = true;
         const address = server.address();
         if (transport === 'tcp' && typeof address === 'object' && address) {
           socketLabel = `${address.address}:${address.port}`;
@@ -1478,6 +1486,9 @@ export async function startAgentRuntimeSupervisorDaemon(
           details: { socket_path: socketLabel || socketPath, transport },
         });
         logger.info(`[agent-runtime-supervisor-daemon] listening on ${socketLabel || socketPath}`);
+      } catch (error) {
+        server.close();
+        reject(error);
       } finally {
         finish();
       }

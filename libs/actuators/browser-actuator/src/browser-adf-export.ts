@@ -31,6 +31,8 @@ export interface BrowserRecordedAction {
   element_name?: string;
   element_role?: string | null;
   content_excerpt?: string;
+  /** Raw CDP method name when the op dispatched through the `cdp` escape lane. */
+  method?: string;
   classification?: 'user_input' | 'secret_ref';
   secret_ref?: string;
   redacted?: boolean;
@@ -92,6 +94,7 @@ export function parseRecordedAction(value: unknown): BrowserRecordedAction | nul
     'key',
     'element_name',
     'content_excerpt',
+    'method',
     'secret_ref',
     'approval_request_id',
     'fallback_strategy',
@@ -137,6 +140,7 @@ export function parseRecordedAction(value: unknown): BrowserRecordedAction | nul
     ...(optionalString(value, 'content_excerpt') !== undefined
       ? { content_excerpt: value.content_excerpt as string }
       : {}),
+    ...(optionalString(value, 'method') !== undefined ? { method: value.method as string } : {}),
     ...(classification !== undefined ? { classification } : {}),
     ...(optionalString(value, 'secret_ref') !== undefined
       ? { secret_ref: value.secret_ref as string }
