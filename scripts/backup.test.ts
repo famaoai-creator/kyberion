@@ -752,6 +752,75 @@ describe('tenant runtime partitions in backup and restore', () => {
     expect(safeReadFile(`${target}/${LEDGER}`, { encoding: 'utf8' })).toBe(full);
   });
 
+  describe('rotated tenant-ledger segments (MSN-STORE-BOUNDS-3)', () => {
+    const PARTITION = 'active/shared/runtime/tenant-ledger/confidential/acme';
+    const SEGMENT_A = `${PARTITION}/ledger-20261102-101010.jsonl`;
+    const SEGMENT_B = `${PARTITION}/ledger-20261102-101010-1.jsonl`;
+    /** One chain of `count` entries split into consecutive files. */
+    function splitChain(sizes: number[], alg: 'hmac-sha256' | 'sha256' = 'hmac-sha256') {
+      const total = sizes.reduce((sum, size) => sum + size, 0);
+      const lines = chainedLedger(TEST_CHAIN_KEY, total, alg).trim().split('\n');
+      let offset = 0;
+      return sizes.map((size) => {
+        const part = lines.slice(offset, offset + size).join('\n') + '\n';
+        offset += size;
+        return part;
+      });
+    }
+    const restoreChain = (name: string, files: Record<string, string>) => {
+      vi.stubEnv('KYBERION_AUDIT_CHAIN_KEY', TEST_CHAIN_KEY);
+      const archive = tenantArchive(name, [PARTITION], files, {
+        chain_key_id: getAuditChainKeyId(TEST_CHAIN_KEY),
+      });
+      const target = `${FIXTURE_DIR}/${name}-target`;
+      return { target, run: () => restoreBackup(restoreOptions(archive, target)) };
+    };
+
+    it('verifies a chain spanning segments and the live file, and restores every file', () => {
+      const [a, b, live] = splitChain([2, 2, 1]);
+      const { target, run } = restoreChain('segments-live', {
+        [SEGMENT_A]: a!,
+        [SEGMENT_B]: b!,
+        [LEDGER]: live!,
+      });
+      expect(run().ledger_verification).toBe('verified');
+      for (const [member, content] of [
+        [SEGMENT_A, a],
+        [SEGMENT_B, b],
+        [LEDGER, live],
+      ] as const) {
+        expect(safeReadFile(`${target}/${member}`, { encoding: 'utf8' })).toBe(content);
+      }
+    });
+
+    it('verifies a partition that holds segments only (live file just rotated away)', () => {
+      const [a, b] = splitChain([2, 3]);
+      const { target, run } = restoreChain('segments-only', { [SEGMENT_A]: a!, [SEGMENT_B]: b! });
+      expect(run().ledger_verification).toBe('verified');
+      expect(safeExistsSync(`${target}/${SEGMENT_B}`)).toBe(true);
+      expect(safeExistsSync(`${target}/${LEDGER}`)).toBe(false);
+    });
+
+    it('refuses a keyless (sha256) segment, naming it', () => {
+      const [keyless] = splitChain([2], 'sha256');
+      const [, live] = splitChain([2, 1]);
+      const { target, run } = restoreChain('segment-keyless', {
+        [SEGMENT_A]: keyless!,
+        [LEDGER]: live!,
+      });
+      expect(run).toThrow(/BACKUP_RESTORE_LEDGER_DOWNGRADED.*ledger-20261102-101010\.jsonl/u);
+      expect(safeExistsSync(`${target}/${LEDGER}`)).toBe(false);
+    });
+
+    it('refuses a chain whose segment boundary is broken', () => {
+      const [a, , live] = splitChain([2, 2, 1]);
+      // The middle segment is missing: the live file no longer links to segment A.
+      const { target, run } = restoreChain('segment-gap', { [SEGMENT_A]: a!, [LEDGER]: live! });
+      expect(run).toThrow('BACKUP_RESTORE_LEDGER_CORRUPT');
+      expect(safeExistsSync(`${target}/${SEGMENT_A}`)).toBe(false);
+    });
+  });
+
   it('rejects an archive carrying a symlink member before extraction', () => {
     const source = `${FIXTURE_DIR}/link-source`;
     const manifestMember = 'active/shared/tmp/backup-link/manifest.json';
