@@ -51,6 +51,8 @@ vi.mock('./secure-io.js', async () => {
       actual.mkdirSync(path.dirname(p), { recursive: true });
       actual.writeFileSync(p, data, { flag: 'wx' });
     },
+    // MSN-STORE-BOUNDS-20261101: streaming compaction publishes by exclusive link.
+    safeLinkExclusiveSync: (from: string, to: string) => actual.linkSync(from, to),
   };
 });
 
@@ -59,6 +61,11 @@ vi.mock('./secure-io.js', async () => {
 const jsonReadHook = vi.hoisted(() => ({
   afterRead: undefined as undefined | ((p: string) => void),
 }));
+
+// MSN-STORE-BOUNDS-20261101: lowered stand-in for the 100MB whole-file read
+// cap (secure-io assertSizeWithin) so a test can prove a store "over the cap"
+// stays compactable without writing 100MB.
+const wholeFileReadCap = vi.hoisted(() => ({ maxBytes: Number.POSITIVE_INFINITY }));
 
 vi.mock('./foundation/io.js', () => ({
   getFoundationIo: () => ({
@@ -79,8 +86,25 @@ vi.mock('./foundation/io.js', () => ({
       fs.appendFileSync(p, data);
     },
     exists: (p: string) => fs.existsSync(p),
-    readFile: (p: string) => fs.readFileSync(p, 'utf8'),
+    readFile: (p: string) => {
+      const size = fs.statSync(p).size;
+      if (size > wholeFileReadCap.maxBytes) {
+        throw new Error(`File too large: ${size} bytes exceeds the whole-file read cap`);
+      }
+      return fs.readFileSync(p, 'utf8');
+    },
     stat: (p: string) => fs.statSync(p),
+    // MSN-STORE-BOUNDS-20261101: jsonl-read range reads (secure-io safeReadFileRange).
+    readRange: (p: string, position: number, length: number) => {
+      const fd = fs.openSync(p, 'r');
+      try {
+        const buf = Buffer.alloc(length);
+        const n = fs.readSync(fd, buf, 0, length, position);
+        return buf.subarray(0, n);
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
     writeFile: (p: string, data: string) => {
       fs.mkdirSync(path.dirname(p), { recursive: true });
       fs.writeFileSync(p, data);
@@ -184,6 +208,7 @@ import {
   scratchPromotionCandidatesWarning,
 } from './scratch-promotion-grace.js';
 import { createHash } from 'node:crypto';
+import { readJsonLines } from './foundation/json.js';
 
 function writeFile(filePath: string, content = 'x'): void {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -2319,6 +2344,52 @@ describe('storage-janitor', () => {
         .map((l) => JSON.parse(l));
       expect(result.compacted).toContain(live);
       expect(kept.some((k) => k.note === 'keyless header record')).toBe(true);
+    });
+
+    it('compacts a store larger than the whole-file read cap by streaming (MSN-STORE-BOUNDS)', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      const lines = Array.from({ length: 60 }, (_, i) => ({
+        item_id: `item-${i % 5}`,
+        version: i,
+        pad: 'p'.repeat(40),
+      }));
+      writeFile(live, lines.map((l) => JSON.stringify(l)).join('\n') + '\n');
+      wholeFileReadCap.maxBytes = 1024; // the store is ~5KB: every whole-file read throws
+      try {
+        expect(() => readJsonLines(live)).toThrow(/whole-file read cap/);
+        const result = sweepAppendOnlyStores({ dryRun: false });
+        expect(result.errors.filter((e) => e.includes('items.jsonl'))).toEqual([]);
+        expect(result.compacted).toContain(live);
+        const kept = fs
+          .readFileSync(live, 'utf8')
+          .trim()
+          .split('\n')
+          .map((l) => JSON.parse(l));
+        expect(kept.map((k) => k.version)).toEqual([55, 56, 57, 58, 59]);
+        const rec = readRetentionAudit().find((r) => r.event === 'RETENTION_COMPACT_ARCHIVE');
+        expect(rec?.before_lines).toBe(60);
+        expect(rec?.after_lines).toBe(5);
+        expect(readRetentionAudit().some((r) => r.event === 'RETENTION_COMPACT')).toBe(true);
+      } finally {
+        wholeFileReadCap.maxBytes = Number.POSITIVE_INFINITY;
+      }
+    });
+
+    it('dry-run reports a compaction without mutating the store', () => {
+      writeCatalogFile(appendOnlyCatalog);
+      const live = runtimeFile('work-coordination/items.jsonl');
+      const content =
+        [
+          { item_id: 'a', version: 1, pad: 'x'.repeat(40) },
+          { item_id: 'a', version: 2, pad: 'z'.repeat(40) },
+        ]
+          .map((l) => JSON.stringify(l))
+          .join('\n') + '\n';
+      writeFile(live, content);
+      const result = sweepAppendOnlyStores({ dryRun: true });
+      expect(result.compacted).toContain(live);
+      expect(fs.readFileSync(live, 'utf8')).toBe(content);
     });
 
     it('skips compaction when the file is under compact_min_bytes', () => {
