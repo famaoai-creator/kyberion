@@ -18,6 +18,7 @@ import {
   resolveLightpandaBin,
   resolvePython3Bin,
   resolveRustxngBin,
+  resolveSpeechCppBin,
   resolveTailscaleBin,
   resolveXcodebuildBin,
   resolveXcrunBin,
@@ -72,6 +73,13 @@ describe('tool binary resolvers', () => {
     expect(resolveRustxngBin()).toBe('/opt/kyberion/bin/rustxng');
     vi.stubEnv('KYBERION_RUSTXNG_BIN', '');
     expect(resolveRustxngBin()).toMatch(/rustxng$/);
+  });
+
+  it('resolves speech.cpp through its env override, then the registry command', () => {
+    vi.stubEnv('KYBERION_SPEECH_CPP_BIN', '/opt/kyberion/bin/speech');
+    expect(resolveSpeechCppBin()).toBe('/opt/kyberion/bin/speech');
+    vi.stubEnv('KYBERION_SPEECH_CPP_BIN', '');
+    expect(resolveSpeechCppBin()).toMatch(/speech$/);
   });
 
   it('finds the Tailscale CLI on macOS without Install CLI, env override first', () => {

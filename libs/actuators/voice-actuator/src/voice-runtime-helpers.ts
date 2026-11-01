@@ -1098,6 +1098,17 @@ async function renderVoiceArtifactWithEngine(
   engine: ReturnType<typeof getVoiceEngineRecord>
 ): Promise<string> {
   const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
+  if (engine.tts_adapter_id === 'speech_cpp' || engine.runtime_id === 'speech_cpp') {
+    const { synthesizeSpeechCppCli } = await import('@agent/core/voice/speech-cpp-client');
+    synthesizeSpeechCppCli({
+      text,
+      outputPath: artifactPath,
+      language: options.language,
+      voice: options.voice,
+      model: engine.model_id,
+    });
+    return artifactPath;
+  }
   if (engine.bridge_script) {
     await runPythonTtsBridge(
       engine.bridge_script,

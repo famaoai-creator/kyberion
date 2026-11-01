@@ -41,6 +41,7 @@ import {
   discoverLocalSttBackends,
   selectPreferredLocalSttBackend,
 } from '../local-stt-discovery.js';
+import { resolveSpeechCppBin } from '../tool/tool-binary-resolvers.js';
 import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import {
   getSeamSelectionPolicy,
@@ -1029,6 +1030,52 @@ export function installManagedFasterWhisperSpeechToTextBridgeIfAvailable(
 }
 
 /**
+ * Register speech.cpp ASR when the managed (or PATH) binary is available.
+ * Uses `speech asr` for batch file transcription — OpenAI HTTP remains optional
+ * via KYBERION_SPEECH_CPP_URL for voice-hub.
+ */
+export function installSpeechCppSpeechToTextBridgeIfAvailable(
+  env: NodeJS.ProcessEnv = process.env
+): boolean {
+  if (envText(env, 'KYBERION_STT_COMMAND')?.trim() || fluidAudioSttCommandConfigured(env)) {
+    return false;
+  }
+  if (getSpeechToTextBridges().some((bridge) => bridge.name === 'speech_cpp')) return true;
+
+  const bin = resolveSpeechCppBin();
+  const probe = safeExecResult(bin, ['--help'], { timeoutMs: 5_000, maxOutputMB: 1 });
+  if (probe.error || probe.status !== 0) return false;
+
+  registerSpeechToTextBridge(
+    {
+      name: 'speech_cpp',
+      priority: 55,
+      capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
+      async transcribe(input) {
+        const { transcribeSpeechCppCli } = await import('./speech-cpp-client.js');
+        const audioAbs = resolveAudioPath(input.audioPath);
+        const result = transcribeSpeechCppCli({
+          audioPath: audioAbs,
+          ...(input.language ? { language: input.language } : {}),
+        });
+        const outputPath = resolveTranscriptPath(input.outputPath, audioAbs);
+        safeWriteFile(outputPath, `${result.text}\n`, { encoding: 'utf8', mkdir: true });
+        return {
+          text: result.text,
+          language: input.language || resolveLocale(),
+          written_to: outputPath,
+          backend: 'speech_cpp',
+          capabilities: NO_TIMESTAMP_STT_CAPABILITIES,
+        };
+      },
+    },
+    RUNTIME_STT_METADATA
+  );
+  logger.debug('[stt-bridge] installed speech.cpp SpeechToTextBridge');
+  return true;
+}
+
+/**
  * Register all locally available synchronous STT bridges, then let the seam
  * select the winner from the governed discovery catalog priorities. Explicit
  * operator commands remain an intentional configuration override; discovered
@@ -1043,5 +1090,6 @@ export function installAvailableSpeechToTextBridges(
   installManagedFasterWhisperSpeechToTextBridgeIfAvailable(env);
   installWhisperKitSpeechToTextBridgeIfAvailable(env);
   installManagedMlxWhisperSpeechToTextBridgeIfAvailable(env);
+  installSpeechCppSpeechToTextBridgeIfAvailable(env);
   return getSpeechToTextBridge();
 }

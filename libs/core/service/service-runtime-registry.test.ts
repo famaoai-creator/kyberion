@@ -92,6 +92,7 @@ describe('service-runtime-registry', () => {
     expect(inventory.items.map((item) => item.service.service_id).sort()).toEqual([
       'comfyui',
       'rustxng',
+      'speech_cpp',
     ]);
     expect(inventory.items.find((item) => item.service.service_id === 'comfyui')).toMatchObject({
       service: expect.objectContaining({ service_id: 'comfyui' }),

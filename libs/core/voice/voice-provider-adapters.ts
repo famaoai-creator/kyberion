@@ -10,7 +10,7 @@ import { getSpeechToTextBridges } from './speech-to-text-bridge.js';
  * Adding another engine that uses an existing adapter therefore requires no
  * change to voice-hub or Presence Studio.
  */
-export type VoiceTtsAdapterId = 'native_tts' | 'python_bridge' | 'unsupported';
+export type VoiceTtsAdapterId = 'native_tts' | 'python_bridge' | 'speech_cpp' | 'unsupported';
 export type VoiceSttAdapterId =
   | 'native_speech'
   | 'fluid_audio_native'
@@ -49,6 +49,11 @@ const TTS_ADAPTERS: Record<VoiceTtsAdapterId, VoiceTtsAdapterDescriptor> = {
   python_bridge: {
     adapter_id: 'python_bridge',
     display_name: 'Governed Python bridge adapter',
+    live_presence: true,
+  },
+  speech_cpp: {
+    adapter_id: 'speech_cpp',
+    display_name: 'speech.cpp managed binary adapter',
     live_presence: true,
   },
   unsupported: {
@@ -106,6 +111,15 @@ const STT_ADAPTERS: Partial<Record<VoiceSttBackend, VoiceSttAdapterDescriptor>> 
     setup_guidance: 'Requires the configured whisper.cpp CLI and model.',
     cli_path: 'active/shared/tmp/whisper.cpp/build/bin/whisper-cli',
     model_path: 'active/shared/tmp/whisper.cpp/models/ggml-small.bin',
+  },
+  speech_cpp: {
+    backend: 'speech_cpp',
+    adapter_id: 'speech_to_text_bridge',
+    display_name: 'speech.cpp ASR adapter',
+    availability_key: 'speechCpp',
+    setup_guidance:
+      'Install with `pnpm tool:setup -- --tool speech_cpp --apply`, or point KYBERION_SPEECH_CPP_BIN at `speech`.',
+    runtime_id: 'speech_cpp',
   },
   native_speech: {
     backend: 'native_speech',

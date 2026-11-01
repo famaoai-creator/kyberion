@@ -7596,6 +7596,10 @@
       "types": "./dist/voice/speech-languages.d.ts",
       "default": "./dist/voice/speech-languages.js"
     },
+    "./voice/speech-cpp-client": {
+      "types": "./dist/voice/speech-cpp-client.d.ts",
+      "default": "./dist/voice/speech-cpp-client.js"
+    },
     "./voice/speech-to-text-bridge": {
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
       "default": "./dist/voice/speech-to-text-bridge.js"
