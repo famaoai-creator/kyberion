@@ -15,6 +15,10 @@ import {
   withSensitivePathMediation,
 } from '../secure-io.js';
 import { SecretProvider, RegistryEntry } from './secret-types.js';
+import {
+  memoizedKeychainRead,
+  invalidateKeychainRead,
+} from '../foundation/secret-resolution-session.js';
 
 // Resolve vault/knowledge paths lazily so importing this module (via
 // secret-guard fallthrough) does not require a fully-mocked pathResolver.
@@ -155,9 +159,6 @@ export class MacKeychainSecretProvider implements SecretProvider {
   }
 
   async set(service: string, account: string, value: string): Promise<void> {
-    // Delete first to overwrite safely
-    await this.delete(service, account);
-
     // Write via a short-lived Swift helper that reads service/account/value from
     // stdin — never place the secret on process argv (unlike `security -w`).
     const script = [
@@ -170,10 +171,11 @@ export class MacKeychainSecretProvider implements SecretProvider {
       '  kSecAttrService as String: service,',
       '  kSecAttrAccount as String: account,',
       ']',
-      'SecItemDelete(query as CFDictionary)',
+      'let update = [kSecValueData as String: passwordData]',
+      'var status = SecItemUpdate(query as CFDictionary, update as CFDictionary)',
       'var add = query',
       'add[kSecValueData as String] = passwordData',
-      'let status = SecItemAdd(add as CFDictionary, nil)',
+      'if status == errSecItemNotFound { status = SecItemAdd(add as CFDictionary, nil) }',
       'exit(status == errSecSuccess ? 0 : Int32(status))',
     ].join('\n');
 
@@ -189,8 +191,13 @@ export class MacKeychainSecretProvider implements SecretProvider {
         if (error) {
           reject(new Error(`macOS Keychain write failed: ${error.message}`));
         } else if (code === 0) {
-          registryAdd(service, account);
-          resolve();
+          try {
+            invalidateKeychainRead(service, account);
+            registryAdd(service, account);
+            resolve();
+          } catch (registryError) {
+            reject(registryError);
+          }
         } else {
           reject(new Error(`macOS Keychain write failed with code ${code}: ${stderr}`));
         }
@@ -203,13 +210,22 @@ export class MacKeychainSecretProvider implements SecretProvider {
   }
 
   async delete(service: string, account: string): Promise<void> {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       const child = spawn('security', ['delete-generic-password', '-a', account, '-s', service], {
         stdio: ['ignore', 'ignore', 'ignore'],
       });
-      superviseKeychainChild(child, KEYCHAIN_COMMAND_TIMEOUT_MS, () => {
-        registryRemove(service, account);
-        resolve();
+      superviseKeychainChild(child, KEYCHAIN_COMMAND_TIMEOUT_MS, ({ code, error }) => {
+        if (error || (code !== 0 && code !== 44)) {
+          reject(new Error('macOS Keychain deletion refused or unavailable; registry unchanged'));
+          return;
+        }
+        try {
+          invalidateKeychainRead(service, account);
+          registryRemove(service, account);
+          resolve();
+        } catch (registryError) {
+          reject(registryError);
+        }
       });
     });
   }
@@ -510,13 +526,15 @@ export async function fetchSecret(service: string, account: string): Promise<str
  */
 export function fetchOsKeychainSecretSync(service: string, account: string): string | null {
   if (process.platform !== 'darwin') return null;
-  const result = safeExecResult(
-    'security',
-    ['find-generic-password', '-a', account, '-s', service, '-w'],
-    { timeoutMs: KEYCHAIN_COMMAND_TIMEOUT_MS, maxOutputMB: 1 }
-  );
-  if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
-  return null;
+  return memoizedKeychainRead(service, account, () => {
+    const result = safeExecResult(
+      'security',
+      ['find-generic-password', '-a', account, '-s', service, '-w'],
+      { timeoutMs: KEYCHAIN_COMMAND_TIMEOUT_MS, maxOutputMB: 1 }
+    );
+    if (result.status === 0 && result.stdout.trim()) return result.stdout.trim();
+    return null;
+  });
 }
 
 /**
