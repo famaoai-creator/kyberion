@@ -18,7 +18,11 @@ import {
   getRegisteredEnvText,
   registerEnvironmentRegistryReader,
 } from './foundation/env.js';
-import { assertSensitivePathAllowed, assertSensitiveTextAllowed } from './sensitive-path-policy.js';
+import {
+  assertSensitiveMetadataAllowed,
+  assertSensitivePathAllowed,
+  assertSensitiveTextAllowed,
+} from './sensitive-path-policy.js';
 import { assertSandboxNetworkAllowed } from './shell/sandbox-policy.js';
 import { registerFoundationIo } from './foundation/io.js';
 import { parseSafeJsonInput } from './foundation/safe-json.js';
@@ -1119,8 +1123,10 @@ export function safeChmodSync(filePath: string, mode: number): void {
  */
 export function safeExistsSync(filePath: string): boolean {
   if (!filePath) return false;
-  assertSensitivePathAllowed(filePath, 'read', isSensitivePathMediated());
+  assertSensitiveMetadataAllowed(filePath, isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
+  // A relative path resolves against the project root, not the cwd: judge that too.
+  assertSensitiveMetadataAllowed(resolved, isSensitivePathMediated());
   assertScopedMetadataReadable(resolved, filePath);
   return fs.existsSync(resolved);
 }
@@ -1631,16 +1637,21 @@ export const safeUnlink = safeUnlinkSync;
  * Safely read a directory with permission validation.
  */
 export function safeReaddir(dirPath: string): string[] {
-  assertSensitivePathAllowed(dirPath, 'read', isSensitivePathMediated());
+  assertSensitiveMetadataAllowed(dirPath, isSensitivePathMediated());
   const resolved = pathResolver.resolve(dirPath);
+  // A relative path resolves against the project root, not the cwd: judge that
+  // too, since the descriptor opened at the authorized canonical is not re-judged.
+  assertSensitiveMetadataAllowed(resolved, isSensitivePathMediated());
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
     throw new Error(
       `[ROLE_VIOLATION] Role is NOT authorized to read directory '${dirPath}'. ${check.reason || ''} See knowledge/product/governance/security-policy.json for allowed paths.`
     );
   }
-  assertCanonicalReadable(resolved, dirPath, 'follow');
-  return readdirVetted(resolved, dirPath);
+  // A listing is metadata: the descriptor opened at the canonical path the
+  // checks above authorized is not re-judged as a content read.
+  const canonical = assertCanonicalReadable(resolved, dirPath, 'follow');
+  return readdirVetted(resolved, dirPath, canonical);
 }
 
 /**

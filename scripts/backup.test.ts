@@ -12,12 +12,14 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { createServer, type Server } from 'node:net';
+import * as path from 'node:path';
 import {
   backupArchiveTimeoutMs,
   interpretTarResult,
   resolveBackupExclusions,
   selectBackupFiles,
   selectionWarnings,
+  tarExcludesFor,
 } from './lib/backup-file-selection.js';
 import {
   buildBackupManifest,
@@ -30,6 +32,7 @@ import {
   pruneBackups,
   resolveBackupPlan,
   restoreBackup,
+  runRestoreDrill,
   summarizeBackupStatus,
 } from './backup.js';
 import {
@@ -39,7 +42,11 @@ import {
 } from '@agent/core/chain-integrity';
 import { TENANT_RUNTIME_PARTITION_ROOTS } from '@agent/core/storage-layout';
 import { createHash } from 'node:crypto';
-import { assertExclusionsHeld } from './lib/backup-tenant-partitions.js';
+import {
+  assertExclusionsHeld,
+  PLAINTEXT_TEMP_DIR_STALE_MS,
+  sweepStalePlaintextTempDirs,
+} from './lib/backup-tenant-partitions.js';
 
 const FIXTURE_DIR = pathResolver.sharedTmp('backup-test');
 
@@ -1216,6 +1223,7 @@ describe('backup file selection', () => {
       paths: ['active/a.json'],
       unlisted: [],
       totalBytes: 1,
+      credentialReads: [],
       skipped: { excluded: 0, nonRegular: [], symlinks: [], hardLinks: ['active/b.json'] },
     });
     expect(warning).toMatch(/^Skipped 1 repeated hard link\(s\)/);
@@ -1304,6 +1312,369 @@ describe('backup file selection', () => {
       safeRmSync(listPath, { force: true });
       safeRmSync(archive, { force: true });
     }
+  });
+
+  it('excludes guarded credential roots but admits connection documents for an encrypted walk', () => {
+    vi.stubEnv('KYBERION_ROOT', root);
+    const exclusions = resolveBackupExclusions({
+      rootDir: root,
+      entries: ['active', 'vault'],
+      retentionEntries,
+      toolRuntimesRoot,
+    });
+    expect(exclusions.excludedRoots).toContain('vault/secrets');
+    // Not planned: knowledge/personal is outside this scope.
+    expect(exclusions.credentialReadRoots).toEqual([]);
+
+    const full = resolveBackupExclusions({
+      rootDir: root,
+      entries: ['active', 'vault', 'knowledge/personal'],
+      retentionEntries,
+      toolRuntimesRoot,
+    });
+    expect(full.excludedRoots).toContain('vault/secrets');
+    expect(full.excludedRoots).not.toContain('knowledge/personal/connections');
+    expect(full.credentialReadRoots).toEqual([
+      { ruleId: 'credential.kyberion-connections', root: 'knowledge/personal/connections' },
+    ]);
+    // A non-readable credential root wins over an explicit scope inside it.
+    const nested = resolveBackupExclusions({
+      rootDir: root,
+      entries: ['vault/secrets/keychain-registry.json'],
+      retentionEntries,
+      toolRuntimesRoot,
+    });
+    expect(nested.excludedRoots).toContain('vault/secrets');
+  });
+
+  describe('guarded credential roots', () => {
+    const credentialFixture = [
+      'vault/secrets/keychain-registry.json',
+      'vault/keys.enc',
+      'knowledge/personal/connections/github.json',
+      'knowledge/personal/notes.md',
+    ];
+    const archived = [
+      'knowledge/personal/connections/github.json',
+      'knowledge/personal/notes.md',
+      'vault/keys.enc',
+    ];
+    const entries = ['vault', 'knowledge/personal'];
+
+    function prepare() {
+      for (const rel of credentialFixture) safeWriteFile(`${root}/${rel}`, `${rel}\n`);
+      vi.stubEnv('KYBERION_ROOT', root);
+      return resolveBackupExclusions({
+        rootDir: root,
+        entries,
+        retentionEntries,
+        toolRuntimesRoot,
+      });
+    }
+
+    it('refuses to walk connection documents for an unencrypted archive', () => {
+      const exclusions = prepare();
+      expect(() => selectBackupFiles({ rootDir: root, entries, exclusions })).toThrow(
+        '[BACKUP_CREDENTIAL_READ_REQUIRES_ENCRYPTION]'
+      );
+      expect(() =>
+        selectBackupFiles({ rootDir: root, entries, exclusions, encrypted: false })
+      ).toThrow('[BACKUP_CREDENTIAL_READ_REQUIRES_ENCRYPTION]');
+    });
+
+    it('archives connections into an encrypted backup, never vault/secrets, and restores them', () => {
+      const exclusions = prepare();
+      // Before the admission this walk threw [SENSITIVE_PATH_DENIED].
+      const selection = selectBackupFiles({ rootDir: root, entries, exclusions, encrypted: true });
+      expect([...selection.paths].sort()).toEqual(archived);
+      expect(selection.unlisted).toEqual([]);
+      expect(selection.credentialReads).toEqual([
+        {
+          rule_id: 'credential.kyberion-connections',
+          root: 'knowledge/personal/connections',
+          file_count: 1,
+        },
+      ]);
+      // The admission ended with the walk: a plain secure-io read is denied again.
+      expect(() => safeReadFile(`${root}/knowledge/personal/connections/github.json`)).toThrow(
+        '[SENSITIVE_PATH_DENIED]'
+      );
+
+      const listPath = `${root}-list.txt`;
+      const plain = `${root}-out.tar.gz`;
+      const archive = `${root}-out.tar.gz.enc`;
+      const target = `${root}-restore`;
+      const passphrase = 'synthetic-test-passphrase';
+      try {
+        const manifestRel = 'active/shared/tmp/backup-credential-fixture/manifest.json';
+        const manifest = buildBackupManifest(
+          {
+            scope: 'all',
+            includesSensitive: true,
+            entries,
+            missionGitRepos: [],
+            tenantRuntimePartitions: [],
+            warnings: [],
+          },
+          { encrypt: true },
+          {
+            missionGitBundles: [],
+            warnings: [],
+            excludedRoots: exclusions.excludedRoots,
+            credentialReads: selection.credentialReads,
+          }
+        );
+        // Counts only, never contents.
+        expect(manifest.credential_reads).toEqual(selection.credentialReads);
+        expect(JSON.stringify(manifest)).not.toContain('github.json');
+        safeWriteFile(`${root}/${manifestRel}`, JSON.stringify(manifest));
+        safeWriteFile(listPath, `${[...selection.paths, manifestRel].join('\n')}\n`);
+        const tar = safeExecResult(
+          'tar',
+          [
+            ...tarExcludesFor(exclusions, path.posix.dirname(manifestRel)),
+            '-czf',
+            plain,
+            '-C',
+            root,
+            '-T',
+            listPath,
+          ],
+          { timeoutMs: 60000 }
+        );
+        expect(tar.status, tar.stderr).toBe(0);
+        const encrypt = safeExecResult(
+          'openssl',
+          [
+            'enc',
+            '-aes-256-cbc',
+            '-pbkdf2',
+            '-salt',
+            '-in',
+            plain,
+            '-out',
+            archive,
+            '-pass',
+            'env:KYBERION_BACKUP_PASSPHRASE',
+          ],
+          { timeoutMs: 60000, env: { KYBERION_BACKUP_PASSPHRASE: passphrase } }
+        );
+        expect(encrypt.status, encrypt.stderr).toBe(0);
+        const members = safeExecResult('tar', ['-tzf', plain], { timeoutMs: 60000 })
+          .stdout.split('\n')
+          .filter(Boolean);
+        expect(members.filter((member) => !member.startsWith('active/')).sort()).toEqual(archived);
+
+        // Restore into a checkout whose connections root is guarded: tar
+        // places the files, restore itself never reads them through secure-io.
+        vi.stubEnv('KYBERION_ROOT', target);
+        restoreBackup(
+          {
+            command: 'restore',
+            scope: 'all',
+            archive,
+            target,
+            passphraseEnv: 'KYBERION_BACKUP_PASSPHRASE',
+            retainDaily: 7,
+            retainWeekly: 4,
+          },
+          { readEnv: () => passphrase, audit: () => undefined }
+        );
+        vi.unstubAllEnvs();
+        expect(String(safeReadFile(`${target}/knowledge/personal/connections/github.json`))).toBe(
+          'knowledge/personal/connections/github.json\n'
+        );
+        expect(safeExistsSync(`${target}/vault/keys.enc`)).toBe(true);
+        expect(safeExistsSync(`${target}/vault/secrets`)).toBe(false);
+      } finally {
+        vi.unstubAllEnvs();
+        for (const file of [listPath, plain, archive]) safeRmSync(file, { force: true });
+        safeRmSync(target, { recursive: true, force: true });
+      }
+    });
+  });
+
+  describe('restore drill and credential roots', () => {
+    const drillTarget = `${root}-drill`;
+    const plainArchive = `${root}-drill.tar.gz`;
+
+    afterEach(() => {
+      safeRmSync(drillTarget, { recursive: true, force: true });
+      safeRmSync(plainArchive, { force: true });
+    });
+
+    /** An `all` archive holding one connection document and its manifest count. */
+    function buildDrillArchive(manifestFileCount: number): void {
+      const manifestRel = 'active/shared/tmp/backup-drill-fixture/manifest.json';
+      const members = [
+        'knowledge/personal/connections/github.json',
+        'knowledge/personal/notes.md',
+        manifestRel,
+      ];
+      safeWriteFile(
+        `${root}/knowledge/personal/connections/github.json`,
+        '{"token":"synthetic"}\n'
+      );
+      safeWriteFile(`${root}/knowledge/personal/notes.md`, 'notes\n');
+      safeWriteFile(
+        `${root}/${manifestRel}`,
+        JSON.stringify({
+          format: 'kyberion-backup-v1',
+          scope: 'all',
+          entries: ['knowledge/personal'],
+          mission_git_repos: [],
+          credential_reads: [
+            {
+              rule_id: 'credential.kyberion-connections',
+              root: 'knowledge/personal/connections',
+              file_count: manifestFileCount,
+            },
+          ],
+        })
+      );
+      const tar = safeExecResult('tar', ['-czf', plainArchive, '-C', root, ...members], {
+        timeoutMs: 60000,
+      });
+      expect(tar.status, tar.stderr).toBe(0);
+    }
+
+    const drillOptions = () => ({
+      command: 'drill' as const,
+      scope: 'all' as const,
+      archive: plainArchive,
+      target: drillTarget,
+      force: true,
+      passphraseEnv: 'KYBERION_BACKUP_PASSPHRASE',
+      retainDaily: 7,
+      retainWeekly: 4,
+    });
+
+    it('withholds credential roots from a restore and reports their archived counts', () => {
+      buildDrillArchive(1);
+      const result = restoreBackup(
+        drillOptions(),
+        {},
+        {
+          withholdRoots: ['knowledge/personal/connections', 'vault/secrets'],
+        }
+      );
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/notes.md`)).toBe(true);
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/connections`)).toBe(false);
+      expect(result.withheld).toEqual([
+        { root: 'knowledge/personal/connections', archived_members: 1, manifest_file_count: 1 },
+        { root: 'vault/secrets', archived_members: 0, manifest_file_count: null },
+      ]);
+    });
+
+    it('leaves no connection file (nor the target) behind after a drill', () => {
+      buildDrillArchive(1);
+      const result = runRestoreDrill(drillOptions());
+      expect(result.credentialMembers).toEqual([
+        { root: 'knowledge/personal/connections', archived_members: 1, manifest_file_count: 1 },
+      ]);
+      expect(result.restoredManifestCount).toBe(1);
+      expect(result.targetRemoved).toBe(true);
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/connections/github.json`)).toBe(
+        false
+      );
+      expect(safeExistsSync(drillTarget)).toBe(false);
+    });
+
+    it('removes the default drill target it created', () => {
+      buildDrillArchive(1);
+      const { target: _unused, ...withoutTarget } = drillOptions();
+      const result = runRestoreDrill(withoutTarget);
+      expect(result.target.startsWith(pathResolver.sharedTmp())).toBe(true);
+      expect(result.targetRemoved).toBe(true);
+      expect(safeExistsSync(result.target)).toBe(false);
+    });
+
+    it('never deletes a pre-existing (empty) target it did not create', () => {
+      buildDrillArchive(1);
+      safeMkdir(drillTarget, { recursive: true });
+      const { force: _noForce, ...withoutForce } = drillOptions();
+      const result = runRestoreDrill(withoutForce);
+      expect(result.targetRemoved).toBe(false);
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/notes.md`)).toBe(true);
+      // Credential roots are still never extracted into it.
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/connections`)).toBe(false);
+    });
+
+    it('refuses a non-empty target without --force and leaves it untouched', () => {
+      buildDrillArchive(1);
+      safeWriteFile(`${drillTarget}/operator-notes.txt`, 'keep\n');
+      const { force: _noForce, ...withoutForce } = drillOptions();
+      expect(() => runRestoreDrill(withoutForce)).toThrow('[BACKUP_DRILL_TARGET_NOT_EMPTY]');
+      expect(String(safeReadFile(`${drillTarget}/operator-notes.txt`))).toBe('keep\n');
+      expect(safeReaddir(drillTarget)).toEqual(['operator-notes.txt']);
+    });
+
+    it('refuses a symlinked target or one under a symlinked scratch directory', () => {
+      buildDrillArchive(1);
+      const linkedTarget = `${root}-drill-link`;
+      const linkedParent = `${root}-drill-parent-link`;
+      const outsideScratch = `${pathResolver.rootDir()}/active/shared/cache/backup-drill-link-${process.pid}`;
+      try {
+        // A scratch link into scratch itself is still refused (the target is a link).
+        safeMkdir(`${root}-drill-real`, { recursive: true });
+        safeSymlinkSync(`${root}-drill-real`, linkedTarget, 'dir');
+        expect(() => runRestoreDrill({ ...drillOptions(), target: linkedTarget })).toThrow(
+          '[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH]'
+        );
+        // A scratch link to a directory outside scratch must not redirect
+        // extraction or cleanup there.
+        safeWriteFile(`${outsideScratch}/live/state.json`, '{}\n');
+        safeSymlinkSync(outsideScratch, linkedParent, 'dir');
+        expect(() =>
+          runRestoreDrill({ ...drillOptions(), target: `${linkedParent}/live` })
+        ).toThrow('[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH]');
+        expect(safeReaddir(`${outsideScratch}/live`)).toEqual(['state.json']);
+      } finally {
+        for (const link of [linkedTarget, linkedParent]) safeRmSync(link, { force: true });
+        safeRmSync(`${root}-drill-real`, { recursive: true, force: true });
+        safeRmSync(outsideScratch, { recursive: true, force: true });
+      }
+    });
+
+    it.each([
+      ['the repository root', () => pathResolver.rootDir()],
+      ['live runtime state', () => `${pathResolver.rootDir()}/active/shared/runtime`],
+      ['the scratch floor itself', () => pathResolver.sharedTmp()],
+    ])('refuses a drill target at %s before touching it', (_case, resolveTarget) => {
+      buildDrillArchive(1);
+      const target = resolveTarget();
+      // A fresh checkout (CI) may not have the target yet: assert it is
+      // untouched — same existence before and after — not that it exists.
+      const existedBefore = safeExistsSync(target);
+      expect(() => runRestoreDrill({ ...drillOptions(), target })).toThrow(
+        '[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH]'
+      );
+      expect(safeExistsSync(target)).toBe(existedBefore);
+    });
+
+    it('fails a drill whose archive lacks the credential documents its manifest recorded', () => {
+      buildDrillArchive(2);
+      expect(() => runRestoreDrill(drillOptions())).toThrow(
+        '[BACKUP_DRILL_CREDENTIAL_COUNT_MISMATCH]'
+      );
+      expect(safeExistsSync(drillTarget)).toBe(false);
+    });
+  });
+
+  it('sweeps only stale plaintext backup/restore temp dirs a killed run left behind', () => {
+    const stale = `${root}/backup-2026-11-01T03-00-00-000Z-0123abcd`;
+    const staleRestore = `${root}/restore-2026-11-01T03-00-00-000Z-89abcdef`;
+    const operatorDir = `${root}/backup-restore-drill`;
+    for (const dir of [stale, staleRestore, operatorDir]) {
+      safeWriteFile(`${dir}/payload.tar.gz`, 'plaintext');
+    }
+    const later = Date.now() + PLAINTEXT_TEMP_DIR_STALE_MS + 60_000;
+    // Fresh: nothing is swept (a live run keeps its dir).
+    expect(sweepStalePlaintextTempDirs(root, Date.now())).toEqual([]);
+    expect(sweepStalePlaintextTempDirs(root, later).sort()).toEqual([stale, staleRestore]);
+    expect(safeExistsSync(stale)).toBe(false);
+    expect(safeExistsSync(staleRestore)).toBe(false);
+    expect(safeExistsSync(`${operatorDir}/payload.tar.gz`)).toBe(true);
   });
 
   it('scales the tar timeout with the payload and caps it', () => {

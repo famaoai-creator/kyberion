@@ -15,6 +15,7 @@ import {
   withSensitivePathMediation,
 } from '../secure-io.js';
 import { SecretProvider, RegistryEntry } from './secret-types.js';
+import { keychainReaderAccessSwiftLines, keychainSwiftArgs } from './keychain-access.js';
 import {
   memoizedKeychainRead,
   invalidateKeychainRead,
@@ -131,6 +132,19 @@ function superviseKeychainChild(
   child.on('close', (code) => settle({ code }));
 }
 
+/** Single-line service / account / value (never logged: the error names no value). */
+function assertKeychainWritable(service: string, account: string, value: string): void {
+  if (/[\r\n]/u.test(service) || /[\r\n]/u.test(account)) {
+    throw new Error('macOS Keychain write refused: service and account must be single-line');
+  }
+  if (!value) throw new Error('macOS Keychain write refused: the value is empty');
+  if (/[\r\n]/u.test(value)) {
+    throw new Error(
+      'macOS Keychain write refused: the value contains a line break, which the keychain reader cannot return intact | next: store it base64-encoded or as a file secret'
+    );
+  }
+}
+
 // 1. macOS Keychain native provider
 export class MacKeychainSecretProvider implements SecretProvider {
   readonly id = 'mac_keychain';
@@ -159,28 +173,51 @@ export class MacKeychainSecretProvider implements SecretProvider {
   }
 
   async set(service: string, account: string, value: string): Promise<void> {
+    // The helper reads three stdin lines, and `security -w` returns a value
+    // holding a newline hex-encoded, so such a value could never be read back:
+    // refuse it here, before the existing entry is touched.
+    assertKeychainWritable(service, account, value);
+    // An existing item keeps whatever ACL it was created with (SecItemUpdate
+    // never changes it), and only a binary that item trusts may delete it. The
+    // trusted reader (`security`) removes it first; refusal leaves it intact.
+    await this.removeBeforeWrite(service, account);
+
     // Write via a short-lived Swift helper that reads service/account/value from
-    // stdin — never place the secret on process argv (unlike `security -w`).
+    // stdin — never place the secret on process argv (unlike `security -w`). The
+    // item trusts the reader so later non-interactive reads need no prompt.
+    // Exit codes: 2 bad stdin, 3 empty value, 4/5 access object, 6 delete
+    // refused, 7 add failed (the OSStatus goes to stderr).
     const script = [
       'import Foundation',
       'import Security',
+      'func fail(_ step: String, _ status: OSStatus, _ code: Int32) -> Never {',
+      '  FileHandle.standardError.write("\\(step) failed: OSStatus \\(status)\\n".data(using: .utf8)!)',
+      '  exit(code)',
+      '}',
       'guard let service = readLine(), let account = readLine(), let password = readLine() else { exit(2) }',
       'guard let passwordData = password.data(using: .utf8), !passwordData.isEmpty else { exit(3) }',
+      ...keychainReaderAccessSwiftLines(),
       'let query: [String: Any] = [',
       '  kSecClass as String: kSecClassGenericPassword,',
       '  kSecAttrService as String: service,',
       '  kSecAttrAccount as String: account,',
       ']',
-      'let update = [kSecValueData as String: passwordData]',
-      'var status = SecItemUpdate(query as CFDictionary, update as CFDictionary)',
       'var add = query',
       'add[kSecValueData as String] = passwordData',
-      'if status == errSecItemNotFound { status = SecItemAdd(add as CFDictionary, nil) }',
-      'exit(status == errSecSuccess ? 0 : Int32(status))',
+      'add[kSecAttrAccess as String] = access',
+      'var status = SecItemAdd(add as CFDictionary, nil)',
+      'if status == errSecDuplicateItem {',
+      '  // Re-created concurrently: replace it so the item carries the reader ACL.',
+      '  let removed = SecItemDelete(query as CFDictionary)',
+      '  if removed != errSecSuccess && removed != errSecItemNotFound { fail("SecItemDelete", removed, 6) }',
+      '  status = SecItemAdd(add as CFDictionary, nil)',
+      '}',
+      'if status != errSecSuccess { fail("SecItemAdd", status, 7) }',
+      'exit(0)',
     ].join('\n');
 
     return new Promise((resolve, reject) => {
-      const child = spawn('swift', ['-e', script], {
+      const child = spawn('swift', keychainSwiftArgs(script), {
         stdio: ['pipe', 'ignore', 'pipe'],
       });
       let stderr = '';
@@ -188,24 +225,63 @@ export class MacKeychainSecretProvider implements SecretProvider {
         stderr += String(chunk);
       });
       superviseKeychainChild(child, KEYCHAIN_WRITE_TIMEOUT_MS, ({ code, error }) => {
+        // Any previous entry is already gone: keep the registry and read cache
+        // honest, and say so, so the operator re-runs the write.
+        invalidateKeychainRead(service, account);
+        // The entry is gone, so the registry must not keep listing it.
+        let registryNote = '';
+        if (error || code !== 0) {
+          try {
+            registryRemove(service, account);
+          } catch (registryError) {
+            registryNote = `; the registry still lists it (${registryError instanceof Error ? registryError.message : String(registryError)})`;
+          }
+        }
         if (error) {
-          reject(new Error(`macOS Keychain write failed: ${error.message}`));
+          reject(
+            new Error(
+              `macOS Keychain write failed: ${error.message} (any previous entry was removed; re-run the write)${registryNote}`
+            )
+          );
         } else if (code === 0) {
           try {
-            invalidateKeychainRead(service, account);
             registryAdd(service, account);
             resolve();
           } catch (registryError) {
             reject(registryError);
           }
         } else {
-          reject(new Error(`macOS Keychain write failed with code ${code}: ${stderr}`));
+          reject(
+            new Error(
+              `macOS Keychain write failed with code ${code} (any previous entry was removed; re-run the write)${registryNote}: ${stderr}`
+            )
+          );
         }
       });
       // A child that dies before reading stdin must not crash the caller (EPIPE).
       child.stdin?.on('error', () => undefined);
       child.stdin?.write(`${service}\n${account}\n${value}`);
       child.stdin?.end();
+    });
+  }
+
+  /** Delete an existing item with the trusted reader; a miss (44) is fine. */
+  private removeBeforeWrite(service: string, account: string): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const child = spawn('security', ['delete-generic-password', '-a', account, '-s', service], {
+        stdio: ['ignore', 'ignore', 'ignore'],
+      });
+      superviseKeychainChild(child, KEYCHAIN_COMMAND_TIMEOUT_MS, ({ code, error }) => {
+        if (error || (code !== 0 && code !== 44)) {
+          reject(
+            new Error(
+              `macOS Keychain write refused: the existing entry could not be replaced (${error ? error.message : `code ${code}`}); entry unchanged`
+            )
+          );
+          return;
+        }
+        resolve();
+      });
     });
   }
 

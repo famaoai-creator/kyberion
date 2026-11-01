@@ -25,6 +25,7 @@ import {
   type TenantRuntimePartitionPath,
 } from '@agent/core/storage-layout';
 import {
+  assertDrillTargetConfined,
   assertNoAppendOnlyConflict,
   assertTenantLedgerPartitionsIntact,
   currentAuditChainKeyId,
@@ -48,10 +49,15 @@ import {
 import {
   backupArchiveTimeoutMs,
   interpretTarResult,
+  parseManifestCredentialReads,
+  repoCredentialRoots,
   resolveBackupExclusions,
   selectBackupFiles,
   selectionWarnings,
   tarExcludesFor,
+  verifyWithheldCredentialMembers,
+  type ManifestCredentialRead,
+  type WithheldRestoreRoot,
 } from './lib/backup-file-selection.js';
 import {
   BACKUP_PASSPHRASE_ENV,
@@ -137,7 +143,7 @@ function usage(): string {
     '  pnpm backup restore <archive.tar.gz.enc|archive.tar.gz> --target <clean-root> [--scope all|mission|tenant] [--tenant <slug>] [--verify-baseline] [--force]',
     '  pnpm backup list [--dir <backup-dir>]',
     '  pnpm backup prune [--dir <backup-dir>] [--retain-daily 7] [--retain-weekly 4]',
-    '  pnpm backup drill [--archive <path>|--dir <backup-dir>] [--scope all|mission|tenant] [--tenant <slug>] [--target <clean-root>] [--prepare-checkout] [--verify-baseline] [--force]',
+    '  pnpm backup drill [--archive <path>|--dir <backup-dir>] [--scope all|mission|tenant] [--tenant <slug>] [--target <dir under active/shared/tmp>] [--prepare-checkout] [--verify-baseline] [--force]',
     '',
     `Sensitive scopes require --encrypt and a passphrase: ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND} (keychain), or ${DEFAULT_PASSPHRASE_ENV} / --passphrase-env as an override.`,
   ].join('\n');
@@ -726,6 +732,8 @@ export function buildBackupManifest(
     chainKeyId?: string;
     warnings: string[];
     excludedRoots?: string[];
+    /** Guarded credential roots read under the backup admission (counts only). */
+    credentialReads?: Array<{ rule_id: string; root: string; file_count: number }>;
   }
 ) {
   return {
@@ -753,6 +761,7 @@ export function buildBackupManifest(
       : {}),
     ...(context.chainKeyId ? { chain_key_id: context.chainKeyId } : {}),
     ...(context.excludedRoots ? { excluded_roots: context.excludedRoots } : {}),
+    ...(context.credentialReads?.length ? { credential_reads: context.credentialReads } : {}),
     warnings: context.warnings,
   };
 }
@@ -807,6 +816,7 @@ export function createBackup(
       entries: plan.entries,
       exclusions,
       missionGitRepos: plan.missionGitRepos.map((repo) => repo.repoRelativePath),
+      encrypted: options.encrypt,
     });
     warnings.push(...selectionWarnings(selection));
     // D2: the chain key itself never rides in a tenant archive; its id lets the
@@ -818,6 +828,7 @@ export function createBackup(
       chainKeyId,
       warnings,
       excludedRoots: exclusions.excludedRoots,
+      credentialReads: selection.credentialReads,
     });
     const manifestRepoPath = normalizeRepoRelative(rootDir, manifestPath);
     safeWriteFile(manifestPath, JSON.stringify(manifest, null, 2) + '\n');
@@ -900,6 +911,7 @@ interface RestoredBackupManifest {
     hash_chained: boolean;
   }>;
   chain_key_id?: string;
+  credential_reads?: ManifestCredentialRead[];
 }
 
 const CHAIN_KEY_ID_PATTERN = /^[0-9a-f]{16}$/u;
@@ -960,6 +972,10 @@ export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest
     }
     chainKeyId = parsed.chain_key_id;
   }
+  const credentialReads =
+    parsed.credential_reads === undefined
+      ? undefined
+      : parseManifestCredentialReads(parsed.credential_reads, normalizeArchiveMember);
   let missionGitRepos: RestoredBackupManifest['mission_git_repos'];
   if (parsed.mission_git_repos !== undefined) {
     if (!Array.isArray(parsed.mission_git_repos)) {
@@ -997,6 +1013,7 @@ export function parseRestoredBackupManifest(raw: string): RestoredBackupManifest
         }
       : {}),
     ...(chainKeyId !== undefined ? { chain_key_id: chainKeyId } : {}),
+    ...(credentialReads ? { credential_reads: credentialReads } : {}),
   };
 }
 
@@ -1309,13 +1326,22 @@ function quarantineRestoredPeerRuntime(
 
 export function restoreBackup(
   options: BackupCliOptions,
-  passphraseDeps: BackupPassphraseDeps = {}
+  passphraseDeps: BackupPassphraseDeps = {},
+  controls: {
+    /**
+     * Archive subtrees never written to the target (the restore drill withholds
+     * credential roots so a disposable copy never holds tokens). A member that
+     * still lands there (tar ignored --exclude) is removed and the restore fails.
+     */
+    withholdRoots?: string[];
+  } = {}
 ): {
   target: string;
   archive: string;
   quarantinePaths: string[];
   ledger_verification: RestoredLedgerVerification;
   trimmed_tails: string[];
+  withheld: WithheldRestoreRoot[];
 } {
   if (!options.archive) throw new Error('restore requires an archive path');
   const archive = path.resolve(options.archive);
@@ -1325,7 +1351,7 @@ export function restoreBackup(
   const targetRel = path.relative(pathResolver.rootDir(), target);
   if (targetRel.startsWith('..') || path.isAbsolute(targetRel)) {
     throw new Error(
-      `[BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY] restore target is outside this checkout — governed I/O cannot write or verify it | next: run pnpm backup restore from the clean checkout itself (--target .), or restore under this checkout (e.g. active/shared/tmp/<restore>) | evidence: ${target}`
+      `[BACKUP_RESTORE_TARGET_OUTSIDE_REPOSITORY] restore target is outside this checkout — governed I/O cannot write or verify it | next: restore under this checkout (e.g. active/shared/tmp/<restore>), or run pnpm backup restore from inside the clean checkout you are rebuilding (its --target . restores over that checkout's state; never point a drill there) | evidence: ${target}`
     );
   }
   if (safeExistsSync(target) && safeReaddir(target).length > 0 && !options.force) {
@@ -1371,6 +1397,22 @@ export function restoreBackup(
       archiveChainKeyId: manifest.chain_key_id,
       tenant: tenantRestore,
       stampId: stamp(),
+      withheldRoots: controls.withholdRoots,
+    });
+    const withheld = (controls.withholdRoots ?? []).map((root) => {
+      const landed = path.join(target, root);
+      if (safeExistsSync(landed)) {
+        safeRmSync(landed, { recursive: true, force: true });
+        throw new Error(
+          `[BACKUP_RESTORE_WITHHOLD_FAILED] tar wrote withheld archive members into the target; they were removed | next: restore with a tar that honours --exclude | evidence: ${root}`
+        );
+      }
+      return {
+        root,
+        archived_members: members.filter((member) => member.startsWith(`${root}/`)).length,
+        manifest_file_count:
+          manifest.credential_reads?.find((entry) => entry.root === root)?.file_count ?? null,
+      };
     });
     const trimmedTails = extracted.trimmedTails;
     const ledgerVerification = extracted.ledgerVerification;
@@ -1399,10 +1441,18 @@ export function restoreBackup(
       quarantinePaths,
       ledger_verification: ledgerVerification,
       trimmed_tails: trimmedTails,
+      withheld,
     };
   });
 }
 
+/**
+ * Restore the latest (or given) archive into a disposable target, verify it,
+ * then delete the target. Credential roots (connection documents, vault
+ * secrets) are never extracted: the drill only checks that the archive holds
+ * as many of their members as the manifest recorded, so no token copy is left
+ * outside the credential deny rule (which is anchored to the live checkout).
+ */
 export function runRestoreDrill(options: BackupCliOptions): {
   archive: string;
   target: string;
@@ -1410,6 +1460,8 @@ export function runRestoreDrill(options: BackupCliOptions): {
   baselineVerified: boolean;
   restoredManifestCount: number;
   quarantinePaths: string[];
+  credentialMembers: WithheldRestoreRoot[];
+  targetRemoved: boolean;
 } {
   const archive =
     options.archive ||
@@ -1421,38 +1473,57 @@ export function runRestoreDrill(options: BackupCliOptions): {
       `No backup archive found for restore drill${options.backupDir ? ` in ${options.backupDir}` : ''}`
     );
   }
+  const scratchRoot = path.resolve(pathResolver.sharedTmp());
   const target = path.resolve(
-    options.target || pathResolver.sharedTmp(`backup-restore-drill-${stamp()}`)
+    options.target || path.join(scratchRoot, `backup-restore-drill-${stamp()}`)
   );
+  assertDrillTargetConfined(target, scratchRoot, Boolean(options.force));
   if (options.force && safeExistsSync(target)) {
     safeRmSync(target, { recursive: true, force: true });
   }
-  if (options.prepareCheckout) {
-    safeMkdir(path.dirname(target));
-    runRequired(
-      'git',
-      ['clone', '--local', '--no-hardlinks', '--', pathResolver.rootDir(), target],
-      'clean checkout preparation failed'
-    );
-    if (options.verifyBaseline) {
-      installCleanCheckoutDependencies(target);
-      buildCleanCheckout(target);
+  // Only a target this run creates is removed afterwards; an existing one the
+  // operator pointed at (without --force) is left in place.
+  const createdByDrill = !safeExistsSync(target);
+  try {
+    if (options.prepareCheckout) {
+      safeMkdir(path.dirname(target));
+      runRequired(
+        'git',
+        ['clone', '--local', '--no-hardlinks', '--', pathResolver.rootDir(), target],
+        'clean checkout preparation failed'
+      );
+      if (options.verifyBaseline) {
+        installCleanCheckoutDependencies(target);
+        buildCleanCheckout(target);
+      }
     }
+    const result = restoreBackup(
+      {
+        ...options,
+        archive,
+        target,
+        // Its own fresh (or freshly cloned) target is the drill's to fill.
+        force: options.force || createdByDrill,
+      },
+      {},
+      { withholdRoots: repoCredentialRoots(pathResolver.rootDir()).map(({ root }) => root) }
+    );
+    const credentialMembers = verifyWithheldCredentialMembers(result.withheld);
+    return {
+      archive: result.archive,
+      target: result.target,
+      checkoutPrepared: Boolean(options.prepareCheckout),
+      baselineVerified: Boolean(options.verifyBaseline),
+      restoredManifestCount: findRestoredManifests(result.target).length,
+      quarantinePaths: result.quarantinePaths,
+      credentialMembers,
+      targetRemoved: createdByDrill,
+    };
+  } finally {
+    // The restored copy is plaintext personal / confidential state: never
+    // left behind when this run created it.
+    if (createdByDrill) safeRmSync(target, { recursive: true, force: true });
   }
-  const result = restoreBackup({
-    ...options,
-    archive,
-    target,
-    force: options.force ?? true,
-  });
-  return {
-    archive: result.archive,
-    target: result.target,
-    checkoutPrepared: Boolean(options.prepareCheckout),
-    baselineVerified: Boolean(options.verifyBaseline),
-    restoredManifestCount: findRestoredManifests(result.target).length,
-    quarantinePaths: result.quarantinePaths,
-  };
 }
 
 export function listBackups(dir = defaultBackupDir()): string[] {

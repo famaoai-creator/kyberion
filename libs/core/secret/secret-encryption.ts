@@ -18,6 +18,7 @@ import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { safeExecResult } from '../secure-io.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { memoizedKeychainRead } from '../foundation/secret-resolution-session.js';
+import { keychainReaderAccessSwiftLines, keychainSwiftArgs } from './keychain-access.js';
 
 export type SecretEncryptionMode = 'none' | 'keychain';
 
@@ -96,11 +97,14 @@ function keychainCreate(): Buffer {
     'import Foundation',
     'import Security',
     'guard let service = readLine(), let account = readLine(), let password = readLine(), let data = password.data(using: .utf8) else { exit(2) }',
-    'let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account, kSecValueData as String: data]',
+    // Trust the `security` reader so later non-interactive reads need no prompt.
+    ...keychainReaderAccessSwiftLines(),
+    'let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: service, kSecAttrAccount as String: account, kSecValueData as String: data, kSecAttrAccess as String: access]',
     'let status = SecItemAdd(query as CFDictionary, nil)',
-    'exit(status == errSecSuccess ? 0 : Int32(status))',
+    'if status != errSecSuccess { FileHandle.standardError.write("SecItemAdd failed: OSStatus \\(status)\\n".data(using: .utf8)!); exit(7) }',
+    'exit(0)',
   ].join('\n');
-  const result = safeExecResult('swift', ['-e', script], {
+  const result = safeExecResult('swift', keychainSwiftArgs(script), {
     input: `${KEYCHAIN_SERVICE}\n${KEYCHAIN_ACCOUNT}\n${key.toString('hex')}\n`,
     timeoutMs: 60_000,
     maxOutputMB: 1,

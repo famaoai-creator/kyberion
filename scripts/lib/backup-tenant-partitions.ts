@@ -27,6 +27,7 @@ import {
   safeMoveSync,
   safeReadFile,
   safeReaddir,
+  safeRealpath,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
@@ -82,12 +83,106 @@ export function archiveMembers(plainArchive: string): string[] {
 }
 
 /**
+ * A restore drill restores over its target and may then delete it: the target
+ * must be a real directory strictly under the scratch floor, judged on its
+ * canonical location too (a symlinked target or ancestor must not redirect
+ * extraction or cleanup into the checkout), and a non-empty existing target
+ * needs --force.
+ */
+export function assertDrillTargetConfined(
+  target: string,
+  scratchRoot: string,
+  force: boolean
+): void {
+  const outside = (candidate: string, root: string): boolean => {
+    const rel = path.relative(root, candidate);
+    return !rel || rel.startsWith('..') || path.isAbsolute(rel);
+  };
+  let canonicalOutside: boolean;
+  try {
+    canonicalOutside = outside(safeRealpath(target), safeRealpath(scratchRoot));
+  } catch {
+    canonicalOutside = true;
+  }
+  if (
+    outside(target, scratchRoot) ||
+    canonicalOutside ||
+    (safeExistsSync(target) && safeLstat(target).isSymbolicLink())
+  ) {
+    throw new Error(
+      `[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH] a restore drill target must be a real directory under ${scratchRoot} (no symlink) | next: omit --target, or pass one such as active/shared/tmp/backup-restore-drill | evidence: ${target}`
+    );
+  }
+  if (!force && safeExistsSync(target) && safeReaddir(target).length > 0) {
+    throw new Error(
+      `[BACKUP_DRILL_TARGET_NOT_EMPTY] the drill target already holds files | next: pass --force to replace it, or choose an empty target | evidence: ${target}`
+    );
+  }
+}
+
+/** `backup-<stamp>-<id>` / `restore-<stamp>-<id>`: the names withPlaintextTempDir callers use. */
+const PLAINTEXT_TEMP_DIR_NAME =
+  /^(?:backup|restore)-\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d{3}Z-[0-9a-f]{8}$/u;
+/**
+ * Older than the longest a backup/restore step may run (the 6 h tar cap) plus
+ * margin, so a live run is never swept; the daily schedule sweeps well before
+ * the next run would otherwise find the leftovers.
+ */
+export const PLAINTEXT_TEMP_DIR_STALE_MS = 7 * 60 * 60 * 1000;
+
+/**
+ * Remove plaintext backup/restore temp dirs a killed run (SIGKILL, power
+ * loss) left behind: only exact temp-dir names, only real directories, only
+ * when neither the dir nor any direct child changed within
+ * {@link PLAINTEXT_TEMP_DIR_STALE_MS}. Returns the removed paths.
+ */
+export function sweepStalePlaintextTempDirs(
+  tmpRoot: string,
+  now = Date.now(),
+  staleMs = PLAINTEXT_TEMP_DIR_STALE_MS
+): string[] {
+  const removed: string[] = [];
+  let names: string[];
+  try {
+    names = safeExistsSync(tmpRoot) ? safeReaddir(tmpRoot) : [];
+  } catch {
+    return removed;
+  }
+  for (const name of names) {
+    if (!PLAINTEXT_TEMP_DIR_NAME.test(name)) continue;
+    const dir = path.join(tmpRoot, name);
+    try {
+      const stat = safeLstat(dir);
+      if (!stat.isDirectory()) continue;
+      let newest = stat.mtimeMs;
+      for (const child of safeReaddir(dir)) {
+        newest = Math.max(newest, safeLstat(path.join(dir, child)).mtimeMs);
+      }
+      if (now - newest < staleMs) continue;
+      safeRmSync(dir, { recursive: true, force: true });
+      removed.push(dir);
+    } catch (error) {
+      logger.warn(
+        `[backup] stale temp dir not swept — it may hold plaintext data | next: delete it by hand | evidence: ${dir}: ${error instanceof Error ? error.message : String(error)}`
+      );
+    }
+  }
+  if (removed.length > 0) {
+    logger.info(
+      `[backup] swept ${removed.length} stale plaintext temp dir(s) left by a killed run`
+    );
+  }
+  return removed;
+}
+
+/**
  * Run `fn` with a fresh `active/shared/tmp/<name>` directory that is removed
  * on every path, success or failure: backup and restore temp dirs hold
  * plaintext tenant data (decrypted payloads, staged partitions, bundles).
  */
 export function withPlaintextTempDir<T>(name: string, fn: (tempDir: string) => T): T {
   const tempDir = pathResolver.sharedTmp(name);
+  sweepStalePlaintextTempDirs(path.dirname(tempDir));
   safeMkdir(tempDir, { recursive: true });
   try {
     return fn(tempDir);
@@ -532,6 +627,8 @@ export function extractWithStagedPartitions(input: {
   archiveChainKeyId: string | undefined;
   tenant: string | undefined;
   stampId: string;
+  /** Archive subtrees the main extraction must not write (restore drill: credential roots). */
+  withheldRoots?: string[];
 }): {
   trimmedTails: string[];
   ledgerVerification: RestoredLedgerVerification;
@@ -557,6 +654,7 @@ export function extractWithStagedPartitions(input: {
   runTar(
     [
       ...stagedPaths.flatMap((partition) => ['--exclude', partition]),
+      ...(input.withheldRoots ?? []).flatMap((root) => ['--exclude', root]),
       '-xzf',
       plainArchive,
       '-C',
