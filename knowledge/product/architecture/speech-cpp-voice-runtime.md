@@ -56,6 +56,14 @@ Selection surfaces (so operators can actually pick it):
 - preferences schema allows persisting `stt_backend=speech_cpp`
 - loopback / `verify_tts_loopback`: `stt_bridge_id=speech_cpp` (buffers PCM → one `speech asr`)
 
+Execution dispatch (no provider if-chains at call sites):
+
+- TTS artifacts: `registerVoiceArtifactRenderer(adapter_id, …)` then
+  `resolveVoiceTtsAdapter(engine)` → renderer map
+- Loopback STT: `registerVoiceLoopbackSttFactory(id, …)` then
+  `registerVoiceLoopbackSttAdapter` looks up the factory and installs into
+  the `streaming-stt-bridge` seam
+
 ## HTTP / voice-hub
 
 ```bash

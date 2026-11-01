@@ -103,6 +103,7 @@ const KNOWN_STREAMING_STT_CAPABILITIES: Record<string, StreamingSttCapabilities>
   stub: { synthetic: true, local_only: true },
   mlx_whisper: { local_only: true, languages: [...WHISPER_LANGUAGES] },
   faster_whisper: { local_only: true, languages: [...WHISPER_LANGUAGES] },
+  speech_cpp: { local_only: true },
 };
 
 const streamingSttSeam = createSeam<() => StreamingSpeechToTextBridge>({
