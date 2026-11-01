@@ -87,6 +87,12 @@ interface BrowserSnapshot {
   title: string;
   captured_at: string;
   element_count: number;
+  /** Visible interactive candidates before the element cap — present when known. */
+  element_total?: number;
+  /** The cap cut off candidates: `elements` is a prefix of the real inventory. */
+  truncated?: boolean;
+  /** False when `truncated` — callers must not treat the inventory as exhaustive. */
+  complete?: boolean;
   viewport?: { width: number; height: number; scale: number };
   focused_ref?: string | null;
   ready_state?: string;
@@ -596,6 +602,8 @@ interface CapturedSnapshotElements {
   viewport?: { width: number; height: number; scale: number };
   ready_state?: string;
   elements: BrowserSnapshotElement[];
+  /** Visible candidates before the `maxElements` cap was applied. */
+  total_candidates?: number;
 }
 
 /**
@@ -628,6 +636,7 @@ async function captureSnapshotElements(
     return {
       viewport: { width: innerWidth, height: innerHeight, scale: devicePixelRatio || 1 },
       ready_state: document.readyState,
+      total_candidates: visible.length,
       elements: visible.slice(0, max).map((node, index) => {
         const el = node as HTMLElement;
         const rect = el.getBoundingClientRect();
@@ -715,6 +724,8 @@ async function buildSnapshot(
 ): Promise<BrowserSnapshot> {
   const { sessionId, tabId, maxElements } = options;
   const raw = await captureSnapshotElements(page, maxElements);
+  const truncated =
+    typeof raw.total_candidates === 'number' && raw.total_candidates > raw.elements.length;
 
   return {
     session_id: sessionId,
@@ -723,6 +734,9 @@ async function buildSnapshot(
     title: await page.title(),
     captured_at: nowIso(),
     element_count: raw.elements.length,
+    ...(typeof raw.total_candidates === 'number' ? { element_total: raw.total_candidates } : {}),
+    truncated,
+    complete: !truncated,
     viewport: raw.viewport,
     focused_ref:
       raw.elements.find((element: BrowserSnapshotElement) => element.focused)?.ref || null,

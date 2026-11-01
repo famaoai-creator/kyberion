@@ -31,6 +31,31 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "summary": { "type": "string", "maxLength": 1000 },
+    "step_outcomes": {
+      "type": "array",
+      "description": "Per-step delivery outcomes for the replay run. `delivery` uses the shared computer-interaction vocabulary.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["op", "status"],
+        "properties": {
+          "action_id": { "type": "string" },
+          "step_index": { "type": "integer" },
+          "op": { "type": "string", "minLength": 1 },
+          "status": { "enum": ["done", "error", "blocked", "skipped"] },
+          "delivery": {
+            "enum": [
+              "unknown",
+              "not_delivered",
+              "delivery_uncertain",
+              "delivered_unverified",
+              "delivered_verified"
+            ]
+          },
+          "detail": { "type": "string", "maxLength": 1000 }
+        }
+      }
+    },
     "created_at": { "type": "string", "format": "date-time" }
   }
 }

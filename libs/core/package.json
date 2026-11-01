@@ -924,9 +924,17 @@
       "types": "./dist/company.d.ts",
       "default": "./dist/company.js"
     },
+    "./computer-interaction-outcome": {
+      "types": "./dist/computer-interaction-outcome.d.ts",
+      "default": "./dist/computer-interaction-outcome.js"
+    },
     "./computer-surface": {
       "types": "./dist/virtual/computer-surface.d.ts",
       "default": "./dist/virtual/computer-surface.js"
+    },
+    "./desktop-ax-bridge": {
+      "types": "./dist/desktop-ax-bridge.d.ts",
+      "default": "./dist/desktop-ax-bridge.js"
     },
     "./config-change": {
       "types": "./dist/config-change.d.ts",

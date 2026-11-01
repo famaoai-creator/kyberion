@@ -37,6 +37,7 @@
     "adb",
     "xcrun",
     "xcodebuild",
-    "tailscale"
+    "tailscale",
+    "agent_desktop"
   ]
 }

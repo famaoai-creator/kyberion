@@ -36,6 +36,8 @@ export interface BrowserRecordedAction {
   redacted?: boolean;
   approval_request_id?: string;
   resume_status?: 'pending' | 'approved' | 'rejected' | 'expired';
+  /** Postcondition readback matched the intent (e.g. fill value echoed back). */
+  verified?: boolean;
   ts: string;
 }
 
@@ -105,6 +107,7 @@ export function parseRecordedAction(value: unknown): BrowserRecordedAction | nul
     return null;
   }
   if (value.redacted !== undefined && typeof value.redacted !== 'boolean') return null;
+  if (value.verified !== undefined && typeof value.verified !== 'boolean') return null;
 
   return {
     kind,
@@ -143,6 +146,7 @@ export function parseRecordedAction(value: unknown): BrowserRecordedAction | nul
       ? { approval_request_id: value.approval_request_id as string }
       : {}),
     ...(resumeStatus !== undefined ? { resume_status: resumeStatus } : {}),
+    ...(value.verified !== undefined ? { verified: value.verified as boolean } : {}),
   };
 }
 
