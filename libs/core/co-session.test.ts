@@ -9,19 +9,44 @@ import {
   closeCoSession,
   createCoSessionHandoff,
   getCoSessionStatus,
+  heartbeatCoSession,
   joinCoSession,
   leaveCoSession,
   listCoSessionHandoffs,
   listCoSessionLeases,
+  listCoSessionPresence,
   normalizeCoSessionPath,
   releaseCoSessionLease,
   setCoSessionNamespace,
+  setCoSessionStoreTuningForTests,
   startCoSession,
   CoSessionError,
 } from './co-session.js';
 import { registerLockIo, type LockIo } from './foundation/lock-utils.js';
 import { readJsonLines } from './foundation/json.js';
 import { pathResolver } from './path-resolver.js';
+import { withExecutionContext } from './authority.js';
+import { resetAppendOnlyStoreMaintenanceState } from './append-only-store.js';
+import { safeReadFile, safeReaddir, safeWriteFile } from './secure-io.js';
+
+function sessionStorePath(root: 'runtime' | 'observability', sessionId: string, name = ''): string {
+  return pathResolver.rootResolve(
+    `active/shared/${root}/co-sessions/co-session-test-${process.pid}/${sessionId}${name ? `/${name}` : ''}`
+  );
+}
+
+function storeLines(filePath: string): string[] {
+  return String(safeReadFile(filePath, { encoding: 'utf8' }))
+    .split('\n')
+    .filter((line) => line.trim());
+}
+
+/** Append raw text (a fixture row or a torn tail) to a store. */
+function appendRaw(filePath: string, text: string): void {
+  withExecutionContext('infrastructure_sentinel', () => {
+    safeWriteFile(filePath, `${String(safeReadFile(filePath, { encoding: 'utf8' }))}${text}`);
+  });
+}
 
 beforeEach(() => {
   setCoSessionNamespace(`co-session-test-${process.pid}`);
@@ -31,6 +56,8 @@ beforeEach(() => {
 afterEach(() => {
   clearCoSessionStore();
   clearCoSessionNamespace();
+  setCoSessionStoreTuningForTests({});
+  resetAppendOnlyStoreMaintenanceState();
 });
 
 describe('co-session', () => {
@@ -166,6 +193,75 @@ describe('co-session', () => {
       )
     );
     expect(events.filter((e) => e.type === 'session_left')).toHaveLength(0);
+  });
+
+  it('folds presence to the latest row per provider:participant_id and keeps staleness', () => {
+    resetAppendOnlyStoreMaintenanceState();
+    setCoSessionStoreTuningForTests({ presenceCompactMinBytes: 1024, chunkBytes: 41 });
+    startCoSession({ goal: 'presence fold', provider: 'claude', session_id: 'cos-fold' });
+    const presence = sessionStorePath('runtime', 'cos-fold', 'presence.jsonl');
+    // A participant whose last heartbeat is long stale.
+    const staleAt = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+    appendRaw(
+      presence,
+      `${JSON.stringify({ provider: 'codex', participant_id: 'shared-id', seen_at: staleAt, pid: 1 })}\n`
+    );
+    // Same participant id under another provider: a distinct composite key.
+    for (let i = 0; i < 20; i++) {
+      heartbeatCoSession({
+        session_id: 'cos-fold',
+        provider: 'grok',
+        participant_id: 'shared-id',
+        note: `beat ${i}`,
+      });
+    }
+    expect(storeLines(presence).length).toBeLessThan(21);
+    const live = listCoSessionPresence('cos-fold');
+    expect(live.map((row) => `${row.provider}:${row.participant_id}`).sort()).toEqual([
+      'claude:claude-' + process.pid,
+      'grok:shared-id',
+    ]);
+    expect(live.find((row) => row.provider === 'grok')!.note).toBe('beat 19');
+    // The stale participant's latest row survived compaction; only staleness hides it.
+    expect(
+      listCoSessionPresence('cos-fold', { staleMs: 24 * 60 * 60 * 1000 }).map((row) => row.provider)
+    ).toContain('codex');
+    // A torn tail line (crash mid-append) never breaks the reader.
+    appendRaw(presence, '{"provider":"grok","partic');
+    expect(listCoSessionPresence('cos-fold')).toHaveLength(2);
+  });
+
+  it('rotates session events at write time', () => {
+    resetAppendOnlyStoreMaintenanceState();
+    setCoSessionStoreTuningForTests({ eventsRotateMinBytes: 1024 });
+    startCoSession({ goal: 'events rotate', provider: 'claude', session_id: 'cos-rot' });
+    for (let i = 0; i < 12; i++) {
+      heartbeatCoSession({ session_id: 'cos-rot', provider: 'claude', note: `beat ${i}` });
+    }
+    const names = safeReaddir(sessionStorePath('observability', 'cos-rot'));
+    expect(names.some((name) => /^events-\d{8}-\d{6}(?:-\d+)?\.jsonl$/u.test(name))).toBe(true);
+  });
+
+  it('lists handoffs past a torn tail line', () => {
+    startCoSession({ goal: 'torn handoffs', provider: 'claude', session_id: 'cos-torn' });
+    const handoff = createCoSessionHandoff({
+      session_id: 'cos-torn',
+      kind: 'workitem.handoff',
+      from_provider: 'claude',
+      to_provider: 'codex',
+      body: 'pick this up',
+    });
+    appendRaw(sessionStorePath('runtime', 'cos-torn', 'handoffs.jsonl'), '{"handoff_id":"csh-to');
+    expect(listCoSessionHandoffs('cos-torn').map((row) => row.handoff_id)).toEqual([
+      handoff.handoff_id,
+    ]);
+    const acked = ackCoSessionHandoff({
+      session_id: 'cos-torn',
+      handoff_id: handoff.handoff_id,
+      provider: 'codex',
+    });
+    expect(acked.acked_by).toBe('codex');
+    expect(listCoSessionHandoffs('cos-torn', { pendingOnly: true })).toEqual([]);
   });
 
   it('records Mesh-aligned handoffs and ack', () => {

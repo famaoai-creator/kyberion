@@ -10,10 +10,12 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import {
   appendJsonLine,
-  readJsonLines,
   writeJson as foundationWriteJson,
   readJsonIfPresent,
 } from './foundation/json.js';
+import { streamJsonLinesAcrossCompaction } from './jsonl-parked-read.js';
+import { maintainStoreAfterAppend } from './append-only-store.js';
+import { logger } from './core.js';
 import { nowIso } from './foundation/time.js';
 import { withLockSync } from './foundation/lock-utils.js';
 import { pathResolver } from './path-resolver.js';
@@ -144,6 +146,66 @@ const OBS_ROOT = 'active/shared/observability/co-sessions';
 export const DEFAULT_LEASE_TTL_MS = 15 * 60 * 1000;
 export const DEFAULT_PRESENCE_STALE_MS = 5 * 60 * 1000;
 
+/**
+ * presence.jsonl gets one append per join/heartbeat and every reader wants
+ * only the latest row per `provider:participant_id` (staleness is judged on
+ * that row), so the writer folds it to latest-per-participant once it passes
+ * this size (and again each time it doubles — see `maintainStoreAfterAppend`).
+ * Presence is ephemeral: nothing a reader uses is lost, so no archive.
+ */
+export const CO_SESSION_PRESENCE_COMPACT_MIN_BYTES = 1024 * 1024;
+/**
+ * observability events.jsonl is an append-only event log: rotated (live file
+ * renamed to `events-<stamp>.jsonl` beside it) once it passes this size.
+ * Window readers scan the live file and its rotated segments.
+ */
+export const CO_SESSION_EVENTS_ROTATE_MIN_BYTES = 8 * 1024 * 1024;
+
+interface CoSessionStoreTuning {
+  presenceCompactMinBytes?: number;
+  eventsRotateMinBytes?: number;
+  /** Range-read chunk size for the streaming readers (tests inject small values). */
+  chunkBytes?: number;
+}
+let storeTuning: CoSessionStoreTuning = {};
+
+/** Test seam: override store thresholds / read chunking; call with `{}` to reset. */
+export function setCoSessionStoreTuningForTests(tuning: CoSessionStoreTuning): void {
+  storeTuning = { ...tuning };
+}
+
+/** Composite presence identity — the key {@link listCoSessionPresence} folds on. */
+function presenceKey(record: Record<string, unknown>): string | undefined {
+  return typeof record.provider === 'string' && typeof record.participant_id === 'string'
+    ? `${record.provider}:${record.participant_id}`
+    : undefined;
+}
+
+/**
+ * Streams a session JSONL store (constant memory, no size cap), skipping torn
+ * or malformed lines with one warn per scan, and reading a compaction's parked
+ * copies while the live file is moved aside.
+ */
+function readCoSessionJsonl<T>(filePath: string): T[] {
+  const safePath = assertSafeRepositoryPath(filePath, { allowMissingLeaf: true });
+  let malformed = 0;
+  const rows: T[] = [];
+  for (const row of streamJsonLinesAcrossCompaction<T>(safePath, {
+    chunkBytes: storeTuning.chunkBytes,
+    onMalformed: () => {
+      malformed += 1;
+    },
+  })) {
+    if (row && typeof row === 'object') rows.push(row);
+  }
+  if (malformed > 0) {
+    logger.warn(
+      `[co-session] skipped ${malformed} malformed line(s) in ${pathResolver.toRepoRelative(filePath)} — torn append or corrupted row | next: inspect the store if this repeats | evidence: remaining rows were read`
+    );
+  }
+  return rows;
+}
+
 let namespaceOverride: string | undefined;
 
 export function setCoSessionNamespace(namespace: string): void {
@@ -268,7 +330,18 @@ function appendEvent(
     ...(actor ? { actor_provider: actor } : {}),
     ...(detail ? { detail } : {}),
   };
-  appendJsonl(eventsFile(sessionId), event);
+  const file = eventsFile(sessionId);
+  appendJsonl(file, event);
+  withCoSessionWrite(() =>
+    maintainStoreAfterAppend(
+      file,
+      {
+        action: 'rotate',
+        minBytes: storeTuning.eventsRotateMinBytes ?? CO_SESSION_EVENTS_ROTATE_MIN_BYTES,
+      },
+      { chunkBytes: storeTuning.chunkBytes }
+    )
+  );
 }
 
 function readSession(sessionId: string): CoSessionRecord {
@@ -363,7 +436,20 @@ function writePresence(input: {
     pid: process.pid,
     ...(input.note?.trim() ? { note: input.note.trim() } : {}),
   };
-  appendJsonl(presenceFile(input.session_id), presence);
+  const file = presenceFile(input.session_id);
+  appendJsonl(file, presence);
+  withCoSessionWrite(() =>
+    maintainStoreAfterAppend(
+      file,
+      {
+        action: 'compact',
+        key: presenceKey,
+        minBytes: storeTuning.presenceCompactMinBytes ?? CO_SESSION_PRESENCE_COMPACT_MIN_BYTES,
+        archiveDir: null,
+      },
+      { chunkBytes: storeTuning.chunkBytes }
+    )
+  );
   return presence;
 }
 
@@ -420,9 +506,7 @@ export function listCoSessionPresence(
   const session_id = resolveCoSessionId(sessionId);
   readSession(session_id);
   const staleMs = opts.staleMs ?? DEFAULT_PRESENCE_STALE_MS;
-  const rows = readJsonLines<CoSessionPresence>(
-    assertSafeRepositoryPath(presenceFile(session_id), { allowMissingLeaf: true })
-  );
+  const rows = readCoSessionJsonl<CoSessionPresence>(presenceFile(session_id));
   const latest = new Map<string, CoSessionPresence>();
   for (const row of rows) {
     const key = `${row.provider}:${row.participant_id}`;
@@ -872,9 +956,8 @@ export function listCoSessionHandoffs(
 ): CoSessionHandoff[] {
   const session_id = resolveCoSessionId(sessionId);
   readSession(session_id);
-  let rows = readJsonLines<CoSessionHandoff>(
-    assertSafeRepositoryPath(handoffsFile(session_id), { allowMissingLeaf: true })
-  );
+  // Tolerates a torn tail line (crash mid-append); an ack rewrite drops it.
+  let rows = readCoSessionJsonl<CoSessionHandoff>(handoffsFile(session_id));
   if (opts.pendingOnly) rows = rows.filter((row) => !row.acked_at);
   if (opts.to_participant_id?.trim()) {
     const target = opts.to_participant_id.trim();

@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { withExecutionContext } from '../authority.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
 import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeReaddir,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
@@ -12,12 +14,16 @@ import {
   createMeshMessageBroker,
   listMeshDeliveries,
   MeshHubCommandLoop,
+  setMeshMessageBrokerStoreTuningForTests,
 } from './mesh-message-broker.js';
 import type { MeshRequest } from './mesh-hub-contract.js';
 
 function namespacePath(namespace: string, segment: string, tenantId = 'tenant-acme'): string {
   return `active/shared/runtime/mesh-hub/${namespace}/tenants/${tenantId}/${segment}`;
 }
+
+const COMPACTION_ARCHIVE =
+  'active/shared/observability/mesh-hub/mesh-message-broker-compaction-test/tenants/tenant-acme/compaction-archive';
 
 function observabilityPath(namespace: string, tenantId = 'tenant-acme'): string {
   return `active/shared/observability/mesh-hub/${namespace}/tenants/${tenantId}/events.jsonl`;
@@ -85,6 +91,62 @@ describe('mesh-message-broker', () => {
     clearMeshMessageBrokerNamespace('mesh-message-broker-ack-test');
     clearMeshMessageBrokerNamespace('mesh-message-broker-invalid-tenant-test');
     clearMeshMessageBrokerNamespace('mesh-message-broker-duplicate-validation-test');
+    clearMeshMessageBrokerNamespace('mesh-message-broker-compaction-test');
+    setMeshMessageBrokerStoreTuningForTests({});
+    resetAppendOnlyStoreMaintenanceState();
+  });
+
+  it('folds deliveries to the latest row per delivery_id at write time and keeps idempotency', async () => {
+    const namespace = 'mesh-message-broker-compaction-test';
+    resetAppendOnlyStoreMaintenanceState();
+    setMeshMessageBrokerStoreTuningForTests({
+      compactMinBytes: 2048,
+      chunkBytes: 97,
+    });
+    const broker = createMeshMessageBroker({ namespace });
+    activeBroker = broker;
+    const requestTime = new Date().toISOString();
+    const requests = Array.from({ length: 12 }, (_, i) =>
+      buildRequest({
+        requestId: `meshreq-compact-${i}`,
+        idempotencyKey: `idem-compact-${i}`,
+        createdAt: requestTime,
+        ttlMs: 60_000,
+      })
+    );
+    const firsts: string[] = [];
+    for (const request of requests) {
+      const result = await broker.acceptMeshRequest(request, { now: requestTime });
+      firsts.push(result.delivery.delivery_id);
+    }
+
+    const file = namespacePath(namespace, 'deliveries.jsonl');
+    const rows = readJsonl(file) as Array<{ delivery_id: string; status: string }>;
+    // 12 accepts append 24 rows; compaction folded the accepted+queued pairs.
+    expect(rows.length).toBeLessThan(24);
+    // The folded-away history is delivery evidence: the raw union is archived.
+    expect(safeReaddir(COMPACTION_ARCHIVE).length).toBeGreaterThan(0);
+    // No parked staging copy is left behind next to the live store.
+    expect(safeReaddir(namespacePath(namespace, '')).sort()).toEqual(['deliveries.jsonl']);
+
+    const listed = await listMeshDeliveries(namespace);
+    expect(listed.map((row) => row.delivery_id).sort()).toEqual([...firsts].sort());
+    expect(listed.every((row) => row.status === 'queued')).toBe(true);
+
+    // Idempotency survives compaction: every replay is recognized as a duplicate.
+    for (const request of requests) {
+      const replay = await broker.acceptMeshRequest(request, { now: requestTime });
+      expect(replay.duplicate).toBe(true);
+    }
+
+    // A torn tail line (crash mid-append) never breaks the listing.
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeWriteFile(
+        file,
+        `${String(safeReadFile(file, { encoding: 'utf8' }))}{"delivery_id":"mhd-torn`
+      );
+    });
+    await expect(listMeshDeliveries(namespace)).resolves.toHaveLength(12);
   });
 
   it('rejects reserved scope names before persisting a delivery', async () => {

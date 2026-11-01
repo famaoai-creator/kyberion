@@ -130,6 +130,7 @@ import {
   randomId,
   readJsonl,
   runtimeRoot,
+  streamJsonl,
   withCoordinationMutation,
   withCoordinationRoot,
   writeCoordinationState,
@@ -672,15 +673,17 @@ export function appendCoordinationEvent(input: AppendCoordinationEventInput): Co
 export function listCoordinationEvents(
   filter: Partial<CoordinationEvent> = {}
 ): CoordinationEvent[] {
-  const events = readJsonl<CoordinationEvent>(eventsPath());
-  return events.filter((event) => {
-    if (filter.event_id && event.event_id !== filter.event_id) return false;
-    if (filter.event_type && event.event_type !== filter.event_type) return false;
-    if (filter.item_id && event.item_id !== filter.item_id) return false;
-    if (filter.board_id && event.board_id !== filter.board_id) return false;
-    if (filter.lease_id && event.lease_id !== filter.lease_id) return false;
-    return true;
-  });
+  // Streamed and filtered inline: only matching events are held in memory.
+  const matches: CoordinationEvent[] = [];
+  for (const event of streamJsonl<CoordinationEvent>(eventsPath(), { tolerant: true })) {
+    if (filter.event_id && event.event_id !== filter.event_id) continue;
+    if (filter.event_type && event.event_type !== filter.event_type) continue;
+    if (filter.item_id && event.item_id !== filter.item_id) continue;
+    if (filter.board_id && event.board_id !== filter.board_id) continue;
+    if (filter.lease_id && event.lease_id !== filter.lease_id) continue;
+    matches.push(event);
+  }
+  return matches;
 }
 
 function appendLeaseEvent(
