@@ -39,6 +39,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeExecResult, safeExistsSync, safeWriteFile } from '@agent/core/secure-io';
 import {
   daemonUserPath,
+  daemonUnitFileBytes,
   resolveDaemonManager,
   type DaemonManager,
   type DaemonPlan,
@@ -356,7 +357,7 @@ export async function main(
   // Stage unit files under the secure-io write root, then copy into the
   // service-manager location via governed exec — see header note.
   for (const unit of plan.unitFiles) {
-    safeWriteFile(unit.stagedPath, unit.content);
+    safeWriteFile(unit.stagedPath, daemonUnitFileBytes(manager.platform, unit.content));
   }
   for (const command of plan.commands) {
     runOrThrow(command.run[0], command.run.slice(1), command.tolerateFailure === true);

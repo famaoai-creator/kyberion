@@ -30,6 +30,7 @@ import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { getRegisteredEnv, nowIso } from '@agent/core/foundation';
 import { isWindowsNamedPipeAddress, resolveLocalIpcAddress } from '@agent/core/local-ipc';
+import { restrictWindowsNamedPipeAcl } from '@agent/core/windows-named-pipe-security';
 import {
   defineScript,
   isDirectScript,
@@ -147,6 +148,7 @@ async function startDaemon(): Promise<void> {
 
   const waiters = new Map<string, Waiter>();
   const connections = new Set<net.Socket>();
+  let ipcReady = false;
   const reply = (conn: net.Socket, value: Record<string, unknown>): void => {
     safeWrite(conn, `${JSON.stringify(value)}\n`);
   };
@@ -170,6 +172,10 @@ async function startDaemon(): Promise<void> {
   });
 
   const server = net.createServer((conn) => {
+    if (!ipcReady) {
+      conn.destroy();
+      return;
+    }
     connections.add(conn);
     conn.on('close', () => connections.delete(conn));
     conn.on('error', () => {
@@ -251,9 +257,16 @@ async function startDaemon(): Promise<void> {
     logLine(`socket error on ${SOCK}: ${errMsg(err)}`);
     shutdown(1);
   });
-  server.listen(SOCK, () => {
-    writeFileSync(PIDFILE, String(process.pid));
-    logLine(`listening on ${SOCK} (pid ${process.pid})`);
+  server.listen(SOCK, async () => {
+    try {
+      await restrictWindowsNamedPipeAcl(SOCK);
+      ipcReady = true;
+      writeFileSync(PIDFILE, String(process.pid));
+      logLine(`listening on ${SOCK} (pid ${process.pid})`);
+    } catch (err) {
+      logLine(`named-pipe ACL hardening failed: ${errMsg(err)}`);
+      shutdown(1);
+    }
   });
 
   process.on('SIGTERM', () => shutdown(0));

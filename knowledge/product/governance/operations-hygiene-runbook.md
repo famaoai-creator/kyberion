@@ -332,6 +332,15 @@ This covers directories and top-level `*.jsonl` / `*.json` files.
 **Daemon contract.** This applies to every long-running loop: scheduler, supervisor,
 generation-schedule, bridges.
 
+**Windows local IPC ACL.** Node's default named-pipe DACL grants read access to
+Everyone and Anonymous. Every application-owned Windows pipe listener must await
+`restrictWindowsNamedPipeAcl()` before it advertises readiness or processes a
+client. The helper applies and reads back a DACL limited to the current user,
+SYSTEM and Administrators. Treat a hardening failure as startup failure. Keep the
+platform guard and fail-closed behavior covered by
+`libs/core/windows-named-pipe-security.test.ts`; run it with the terminal,
+supervisor and PTC IPC tests when changing a listener.
+
 - **No overlapping ticks.** Use a self-rescheduling `setTimeout` loop with an in-flight flag, not an
   async `setInterval`.
 - **Handle `SIGTERM` and `SIGINT`.** Stop the timer, wait for the in-flight tick (bounded), release

@@ -42,7 +42,7 @@ export type LocaleTokenScanResult = {
 
 /** Hiragana, Katakana and CJK ideographs, written as \u escapes so this file stays ASCII. */
 const CJK_PATTERN = /[぀-ヿ一-鿿]/u;
-const EXEMPT_PATTERN = /\/\/\s*i18n-exempt:\s*(.*)$/u;
+const EXEMPT_PATTERN = /\/\/\s*i18n-exempt:\s*([^\r\n]*)\r?$/u;
 /** One colour value: #rgb / #rgba / #rrggbb / #rrggbbaa (not part of a longer word) or rgb()/rgba(). */
 const COLOUR_VALUE = String.raw`(?:(?<![\w&#])#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3,4})(?![\w-])|rgba?\(\s*\d)`;
 /** The whole string is a colour token. */
