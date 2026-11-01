@@ -1,5 +1,11 @@
 import { defineCatalog } from './foundation/governed-catalog.js';
-import { loadJsonIfPresent, readJsonLines } from './foundation/json.js';
+import { loadJsonIfPresent } from './foundation/json.js';
+import {
+  analyzeStoreKeys,
+  compactStoreByKey,
+  rotateStore,
+  rotatedSegmentStem,
+} from './append-only-store.js';
 import { nowIso } from './foundation/time.js';
 export {
   readSchedulerOpsAlertDays,
@@ -17,9 +23,6 @@ import {
   safeRmdirSync,
   safeExistsSync,
   safeWriteFile,
-  safeMkdir,
-  safeMoveSync,
-  safePublishExclusiveFileSync,
 } from './secure-io.js';
 import { reportScratchCodeGrace, selectExpiredTmpFiles } from './scratch-promotion-grace.js';
 import { collectDirsPostOrder, collectFiles } from './storage-walk.js';
@@ -861,157 +864,45 @@ export interface SweepAppendOnlyStoresResult {
   errors: string[];
 }
 
-function rotatedSegmentPath(liveFilePath: string, now: Date): string {
-  const stamp = now.toISOString().replace(/[-:]/g, '').replace('T', '-').slice(0, 15);
-  // Second-granularity stamps can collide when a busy log rotates twice in one
-  // second (or a retry follows a partial failure); disambiguate deterministically.
-  for (let i = 0; ; i++) {
-    const candidate = liveFilePath.replace(/\.jsonl$/, `-${stamp}${i > 0 ? `-${i}` : ''}.jsonl`);
-    if (!safeExistsSync(candidate)) return candidate;
-  }
-}
-
-function rotatedSegmentStem(liveFilePath: string): string {
-  return nodePath.basename(liveFilePath).replace(/\.jsonl$/, '');
-}
-
-function foldRecordsByKey(
-  records: Array<Record<string, unknown>>,
-  keyField: string
-): Array<Record<string, unknown>> {
-  const lastIndex = new Map<string, number>();
-  records.forEach((record, i) => {
-    const key = record?.[keyField];
-    if (typeof key === 'string' || typeof key === 'number') {
-      lastIndex.set(String(key), i);
-    }
-  });
-  return records.filter((record, i) => {
-    const key = record?.[keyField];
-    if (typeof key !== 'string' && typeof key !== 'number') return true;
-    return lastIndex.get(String(key)) === i;
-  });
-}
-
 /**
- * Race-safe compaction of a live append-only store. A naive read→fold→rename
- * loses records appended between the snapshot and the rename, so instead:
- *
- *  1. The live file is atomically moved aside to a `.compacting-<pid>-<n>`
- *     staging sibling — appends already in flight land on the moved inode
- *     (captured when we read it), appends after the move create a fresh live
- *     file (captured in the merge loop).
- *  2. Fresh live files are repeatedly moved aside and their records merged,
- *     until no live file exists at the publish moment.
- *  3. The folded output is published with safePublishExclusiveFileSync —
- *     EEXIST means a writer recreated the file in the gap, so we merge it and
- *     retry instead of overwriting.
- *  4. The union of all raw records (pre-fold) is archived to
- *     `active/archive/jsonl-compaction/<repo-rel>.<stamp>.jsonl`; staging
- *     siblings are removed only after the live file is restored.
- *
- * Residual risk: a writer holding a long-lived open fd could append to a
- * staging inode after its last read. The repo's appenders reopen the path per
- * record (appendJsonLine), so the window is nil in practice; if the merge loop
- * cannot converge in COMPACT_MAX_PARK_ATTEMPTS rounds, the raw union is
- * restored uncompressed — nothing is ever dropped.
+ * Race-safe streaming compaction of a live append-only store, delegated to
+ * `compactStoreByKey` (append-only-store.ts) — the same park/stage protocol
+ * the janitor used before, without whole-file reads, so a store past the
+ * 100MB read cap stays compactable. This wrapper keeps the janitor's
+ * RETENTION_COMPACT_ARCHIVE audit and log line.
  */
-const COMPACT_MAX_PARK_ATTEMPTS = 5;
-
 function compactAppendOnlyFile(
   livePath: string,
   entry: RetentionCatalogEntry,
   keyField: string,
   now: Date
 ): void {
-  const stagingPaths: string[] = [];
-  const allRecords: Array<Record<string, unknown>> = [];
-  let mergedCopies = 0;
-
-  const park = (src: string, tag: string): void => {
-    const staging = `${src}.compacting-${process.pid}-${stagingPaths.length}-${tag}`;
-    safeMoveSync(src, staging);
-    stagingPaths.push(staging);
-    allRecords.push(...readJsonLines<Record<string, unknown>>(staging));
-  };
-
-  const serialize = (records: Array<Record<string, unknown>>): string =>
-    records.map((r) => JSON.stringify(r)).join('\n') + '\n';
-
-  try {
-    park(livePath, 'initial');
-    let kept = foldRecordsByKey(allRecords, keyField);
-    const rawContent = () => serialize(allRecords);
-
-    // Exclusive publish: a recreated live file means another append landed —
-    // park it, merge its records into the fold, and retry. Converges when no
-    // live file exists at the publish instant.
-    let published = false;
-    for (let i = 0; i <= COMPACT_MAX_PARK_ATTEMPTS; i++) {
-      if (!safeExistsSync(livePath)) {
-        try {
-          safePublishExclusiveFileSync(livePath, serialize(kept));
-          published = true;
-          break;
-        } catch {
-          // lost the race — a writer recreated the file; merge it below
-        }
-      }
-      if (i >= COMPACT_MAX_PARK_ATTEMPTS) break;
-      park(livePath, `merge-${i}`);
-      mergedCopies++;
-      kept = foldRecordsByKey(allRecords, keyField);
-    }
-
-    if (!published) {
-      // Writers out-paced the merge loop — restore the raw union uncompressed.
-      // Park any live file that still exists so its records are not lost.
-      if (safeExistsSync(livePath)) {
-        park(livePath, 'restore-merge');
-        mergedCopies++;
-      }
-      safeWriteFile(livePath, rawContent());
-      logger.warn(
-        `[JANITOR] compact merge did not converge for ${livePath} — restored raw records`
-      );
-    }
-
-    // Archive the pre-compaction union (full fidelity) then clean staging.
-    // The stamp carries pid so two compactions of the same store within one
-    // second cannot collide on the archive destination.
-    const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '');
-    const archivePath = nodePath.join(
+  const result = compactStoreByKey(livePath, {
+    key: keyField,
+    now,
+    archiveDir: nodePath.join(
       rootDir(),
       COMPACTION_ARCHIVE_REPO_SUBPATH,
-      `${entry.path.replace(/\.jsonl$/, '')}.${stamp}Z-${process.pid}.jsonl`
-    );
-    safeMkdir(nodePath.dirname(archivePath), { recursive: true });
-    safeWriteFile(archivePath, rawContent());
-    appendRetentionAudit({
-      event: 'RETENTION_COMPACT_ARCHIVE',
-      path: repoRelativePosix(livePath),
-      archive_path: repoRelativePosix(archivePath),
-      compact_key: keyField,
-      before_lines: allRecords.length,
-      after_lines: published ? kept.length : allRecords.length,
-      merged_during_compaction: mergedCopies,
-      policy_path: entry.path,
-      artifact_class: entry.artifact_class,
-      policy_ref: RETENTION_CATALOG_REPO_PATH,
-      reason: 'pre-compaction archive (storage janitor)',
-    });
-    logger.info(
-      `[JANITOR] compacted: ${livePath} (${allRecords.length} -> ${published ? kept.length : allRecords.length} records; union archived, ${mergedCopies} live merge(s))`
-    );
-  } finally {
-    for (const staging of stagingPaths) {
-      try {
-        safeUnlinkSync(staging);
-      } catch {
-        // best-effort cleanup
-      }
-    }
-  }
+      nodePath.dirname(entry.path)
+    ),
+  });
+  if (!result) return;
+  appendRetentionAudit({
+    event: 'RETENTION_COMPACT_ARCHIVE',
+    path: repoRelativePosix(livePath),
+    archive_path: result.archivePath ? repoRelativePosix(result.archivePath) : undefined,
+    compact_key: keyField,
+    before_lines: result.before,
+    after_lines: result.after,
+    merged_during_compaction: result.merged,
+    policy_path: entry.path,
+    artifact_class: entry.artifact_class,
+    policy_ref: RETENTION_CATALOG_REPO_PATH,
+    reason: 'pre-compaction archive (storage janitor)',
+  });
+  logger.info(
+    `[JANITOR] compacted: ${livePath} (${result.before} -> ${result.after} records; union archived, ${result.merged} live merge(s))`
+  );
 }
 
 export function sweepAppendOnlyStores(opts: {
@@ -1074,10 +965,9 @@ export function sweepAppendOnlyStores(opts: {
         const stat = safeStat(livePath);
         const threshold = entry.rotate_min_bytes ?? DEFAULT_ROTATE_MIN_BYTES;
         if (stat.size > 0 && stat.size >= threshold) {
-          const segmentPath = rotatedSegmentPath(livePath, now);
           result.rotated.push(livePath);
-          if (!opts.dryRun) {
-            safeMoveSync(livePath, segmentPath);
+          const segmentPath = opts.dryRun ? null : rotateStore(livePath, { now });
+          if (segmentPath) {
             appendRetentionAudit({
               event: 'RETENTION_ROTATE',
               path: repoRelativePosix(livePath),
@@ -1098,13 +988,9 @@ export function sweepAppendOnlyStores(opts: {
         const threshold = entry.compact_min_bytes ?? DEFAULT_COMPACT_MIN_BYTES;
         if (stat.size < threshold) continue;
 
-        const firstPass = readJsonLines<Record<string, unknown>>(livePath);
-        const keyCount = new Set(
-          firstPass
-            .map((r) => r?.[keyField])
-            .filter((k) => typeof k === 'string' || typeof k === 'number')
-        ).size;
-        if (keyCount === firstPass.length) continue; // nothing to fold
+        // Streaming pre-check (no whole-file read, so no size cap applies).
+        const { records, distinctKeys } = analyzeStoreKeys(livePath, keyField);
+        if (distinctKeys === records) continue; // nothing to fold
 
         result.compacted.push(livePath);
         if (!opts.dryRun) {
