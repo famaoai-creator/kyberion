@@ -924,6 +924,10 @@
       "types": "./dist/company.d.ts",
       "default": "./dist/company.js"
     },
+    "./compaction-copy-recovery": {
+      "types": "./dist/compaction-copy-recovery.d.ts",
+      "default": "./dist/compaction-copy-recovery.js"
+    },
     "./computer-interaction-outcome": {
       "types": "./dist/computer-interaction-outcome.d.ts",
       "default": "./dist/computer-interaction-outcome.js"

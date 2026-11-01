@@ -93,6 +93,16 @@ function coordinationFenceKey(): string {
   return crypto.createHash('sha256').update(runtimeRoot()).digest('hex');
 }
 
+/**
+ * Inter-process lock id of the coordination mutation fence for the store
+ * root `root` (the directory holding items.jsonl / leases.jsonl). Write-time
+ * compaction of those stores runs under it; compaction-copy recovery takes it
+ * too.
+ */
+export function coordinationFenceLockId(root: string = runtimeRoot()): string {
+  return `work-coordination:${crypto.createHash('sha256').update(root).digest('hex')}`;
+}
+
 /** True while this process holds the mutation fence for the current store root. */
 function holdsCoordinationMutation(): boolean {
   return heldCoordinationMutations.has(coordinationFenceKey());
@@ -103,7 +113,7 @@ export function withCoordinationMutation<T>(fn: () => T): T {
   const key = coordinationFenceKey();
   if (heldCoordinationMutations.has(key)) return fn();
   return withExecutionContext('infrastructure_sentinel', () =>
-    withLockSync(`work-coordination:${key}`, () => {
+    withLockSync(coordinationFenceLockId(), () => {
       heldCoordinationMutations.add(key);
       try {
         return fn();

@@ -40,6 +40,8 @@ import {
 import { appendJsonLine, readJsonIfPresent } from '../foundation/json.js';
 import { readJsonLinesSince, streamJsonLines } from '../jsonl-read.js';
 import {
+  appendOnlyStoreLockId,
+  appendOnlyStoreMaintenanceDue,
   writeTimeArchiveDir,
   maintainStoreAfterAppend,
   type AppendOnlyStorePolicy,
@@ -49,6 +51,7 @@ import { createLogger } from '../logger.js';
 import { storagePartitionSegments, PARTITIONED_RUNTIME_STATE_ROOTS } from '../storage-layout.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { loadAutonomyLearningPolicy } from './autonomy-learning-policy.js';
+import { appendRetentionAudit } from '../storage-retention-expiry.js';
 import type { AutonomousOpsDecision } from './autonomous-ops-gate.js';
 import { withExecutionContext } from '../authority.js';
 import { autonomyLearningCapability } from '../foundation/autonomy-learning-capability.js';
@@ -108,23 +111,48 @@ export function autonomyOutcomesRetentionPolicy(filePath: string): AppendOnlySto
 }
 
 /**
- * Write-time retention after an append. Runs for the shared (system) ledger
- * only: a tenant partition is written under an exact-file capability that
- * cannot create the rewrite's staging siblings, lock or archive. Tenant
- * partitions are never rotated either (review_required directory), so no
- * evidence is erased there; their growth is surfaced by the ops-health probe
- * and their readers are size-independent. Never throws.
+ * Write-time retention after an append, for the shared ledger and each tenant
+ * partition alike. A tenant partition is maintained inside its own store
+ * capability, which admits exactly this store's rewrite siblings
+ * (`.compacting-*`, `.compact-out-*`, `.compact-restore-*`) and its sibling
+ * `compaction-archive/` — so dropped rows are archived in the tenant's own
+ * partition. The store lock and the retention audit live in shared runtime /
+ * log floors the capability does not admit, so both stay under the caller's
+ * identity, outside the store role (same rule as the customer decision case
+ * lock). Never throws.
  */
 function maintainOutcomesAfterAppend(
   p: string,
   deps: AutonomyStateDeps,
   now: Date
 ): MaintainStoreOutcome | undefined {
-  if (deps.tenantSlug) return undefined;
-  return maintainStoreAfterAppend(p, autonomyOutcomesRetentionPolicy(p), {
-    now,
-    chunkBytes: storeTuning.chunkBytes,
-  });
+  const policy = autonomyOutcomesRetentionPolicy(p);
+  const options = { now, chunkBytes: storeTuning.chunkBytes };
+  if (!deps.tenantSlug) return maintainStoreAfterAppend(p, policy, options);
+  try {
+    if (!withTenantAutonomyStore(deps, () => appendOnlyStoreMaintenanceDue(p, policy)))
+      return 'below-threshold';
+    const audits: Array<Record<string, unknown>> = [];
+    const outcome = withLockSync(
+      appendOnlyStoreLockId(p),
+      () =>
+        withTenantAutonomyStore(deps, () =>
+          maintainStoreAfterAppend(p, policy, {
+            ...options,
+            lockId: null,
+            audit: (record) => audits.push(record),
+          })
+        ),
+      2000
+    );
+    for (const record of audits) appendRetentionAudit(record);
+    return outcome;
+  } catch (err) {
+    logger.warn(
+      `[autonomy-action-state] tenant outcomes retention skipped for ${deps.tenantSlug} — ${err instanceof Error ? err.message : String(err)} | next: the append succeeded; a later append retries | evidence: ${pathResolver.toRepoRelative(p)}`
+    );
+    return 'failed';
+  }
 }
 
 export interface AutonomyOutcomeRow {

@@ -20,12 +20,18 @@ vi.mock('../governance/kill-switch.js', () => ({
 }));
 
 let tmpDir: string;
+// The mock factory runs at import time (storage-janitor's import graph reaches
+// path-resolver before `tmpDir` is assigned), so it reads a hoisted holder.
+const tmpHolder = vi.hoisted(() => ({ dir: '/tmp/kyberion-delegation-concurrency-unset' }));
 
-vi.mock('../path-resolver.js', () => ({
+vi.mock('../path-resolver.js', async (importOriginal) => ({
+  // Keep every real export (the janitor's import graph needs more than the
+  // overrides below), overriding only the roots this test redirects.
+  ...(await importOriginal<typeof import('../path-resolver.js')>()),
   rootResolve: (sub = '') => path.join('/tmp', 'kyberion-test-root', sub),
   pathResolver: {
     rootDir: () => path.join('/tmp', 'kyberion-test-root'),
-    shared: (sub = '') => path.join(tmpDir, sub),
+    shared: (sub = '') => path.join(tmpHolder.dir, sub),
     knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
     rootResolve: (sub = '') => path.join('/tmp', 'kyberion-test-root', sub),
   },
@@ -34,8 +40,8 @@ vi.mock('../path-resolver.js', () => ({
   // crash-recovery tests below can import `sweepDelegationChildren` and have
   // it resolve the exact same tmp registry file this module's own
   // `pathResolver.shared(...)` writes to.
-  shared: (sub = '') => path.join(tmpDir, sub),
-  sharedTmp: (sub = '') => path.join(tmpDir, 'tmp', sub),
+  shared: (sub = '') => path.join(tmpHolder.dir, sub),
+  sharedTmp: (sub = '') => path.join(tmpHolder.dir, 'tmp', sub),
   knowledge: (sub = '') => path.join(process.cwd(), 'knowledge', sub),
 }));
 
@@ -103,6 +109,7 @@ function makeDeferred<T = void>() {
 describe('delegation-concurrency', () => {
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'delegation-concurrency-'));
+    tmpHolder.dir = tmpDir;
     killSwitchListeners = [];
     recordGovernanceAction.mockClear();
     onKillSwitchTermination.mockClear();

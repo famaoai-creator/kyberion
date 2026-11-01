@@ -131,6 +131,10 @@ describe('request resource ceiling', () => {
         expect(() => safeAppendFileSync(abs(extra), 'forged')).toThrow(/RESOURCE_SCOPE_REQUIRED/);
         expect(validateReadPermission(abs(base + '/forged'), 'metadata').allowed).toBe(false);
       });
+      // A forged name prefix is not honoured by a validator that does not check it.
+      runInResourceAccessScope({ ...capability, namePrefixExact: [base + '/forged/'] }, () => {
+        expect(validateWritePermission(abs(extra)).allowed).toBe(false);
+      });
       // Even a read-only old capability cannot grow a new append grant to its real file.
       const readOnly = {
         ...capability,
@@ -421,6 +425,22 @@ describe('request resource ceiling', () => {
       expect(() => safeWriteFile(abs(exact), 'wrong')).toThrow(/RESOURCE_SCOPE/);
     });
     expect(safeReadFile(abs(foreign), { encoding: 'utf8' })).toBe('foreign');
+  });
+
+  it('name prefixes grant one path component, never mkdir or a deeper path', () => {
+    for (const namePrefixExact of [['active/../x-'], ['/etc/x-'], ['top-'], ['active/*-']])
+      expect(() => runInResourceAccessScope(scope({ namePrefixExact }), () => null)).toThrow(
+        /RESOURCE_SCOPE_INVALID/
+      );
+    const prefixed = scope({ namePrefixExact: [exact + '.staging-', base + '/archive/'] });
+    runInResourceAccessScope(prefixed, () => {
+      expect(validateWritePermission(abs(exact + '.staging-1')).allowed).toBe(true);
+      expect(validateWritePermission(abs(base + '/archive/a.jsonl')).allowed).toBe(true);
+      expect(validateWritePermission(abs(exact + '.staging-')).allowed).toBe(false);
+      expect(validateWritePermission(abs(base + '/archive/x/a.jsonl')).allowed).toBe(false);
+      expect(validateWritePermission(abs(base + '/archive/x'), 'mkdir').allowed).toBe(false);
+      expect(validateWritePermission(abs(base + '/other.jsonl')).allowed).toBe(false);
+    });
   });
 });
 

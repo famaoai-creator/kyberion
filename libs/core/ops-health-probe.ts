@@ -39,6 +39,13 @@ import { listDotCharters } from './dot/dot-charter.js';
 import { loadRetentionCatalog, type RetentionCatalogEntry } from './storage-retention-catalog.js';
 import { DEFAULT_COMPACT_MIN_BYTES, DEFAULT_ROTATE_MIN_BYTES } from './storage-retention-expiry.js';
 import { listUncoveredRuntimeFiles, listUncoveredRuntimeDirs } from './storage-runtime-coverage.js';
+import {
+  COMPACTION_COPY_ROOTS,
+  compactionCopyStore,
+  listCompactionCopies,
+  RECOVER_COMPACTION_COPIES_COMMAND,
+  STALE_COMPACTION_COPY_MS,
+} from './compaction-copy-recovery.js';
 
 const logger = createLogger('ops-health-probe');
 
@@ -232,16 +239,7 @@ export function probeStoreOvergrowth(deps: OpsHealthProbeDeps = {}): OpsFinding[
   return findings;
 }
 
-/** A `.compacting-*` copy older than this is left over from a failed rewrite. */
-export const STALE_COMPACTION_COPY_MS = 60 * 60 * 1000;
-/** Trees that hold append-only stores with write-time maintenance. */
-export const COMPACTION_COPY_ROOTS = [
-  DIRECTORY_PROBE_PREFIX.slice(0, -1),
-  'active/shared/observability',
-  'active/missions',
-] as const;
-const COMPACTION_COPY_MAX_DEPTH = 6;
-const COMPACTION_COPY_MAX_ENTRIES = 20_000;
+export { COMPACTION_COPY_ROOTS, STALE_COMPACTION_COPY_MS };
 
 /**
  * Leftover `.compacting-*` copies. A parked rewrite keeps its copies when the
@@ -249,56 +247,24 @@ const COMPACTION_COPY_MAX_ENTRIES = 20_000;
  * nothing removes them later: parked-aware readers then re-read every copy on
  * each call (the wake ledger bypasses its cache) and agent-input-queue
  * compaction stays skipped. Each copy older than an hour is a finding naming
- * its path so an operator can merge it back into the live store.
+ * its path and the recovery command (compaction-copy-recovery.ts).
  */
 export function probeStaleCompactionCopies(deps: OpsHealthProbeDeps = {}): OpsFinding[] {
-  const findings: OpsFinding[] = [];
   const now = (deps.now?.() ?? new Date()).getTime();
-  let visited = 0;
-  const walk = (rel: string, depth: number): void => {
-    let names: string[];
-    try {
-      names = safeReaddir(repoFile(deps.rootDir, rel));
-    } catch (error) {
-      logger.debug(
-        `[OPS-PROBE] skipped ${rel}: ${error instanceof Error ? error.message : String(error)}`
-      );
-      return;
-    }
-    for (const name of names.sort()) {
-      if (visited++ >= COMPACTION_COPY_MAX_ENTRIES) return;
-      const child = `${rel}/${name}`;
-      try {
-        const stat = safeLstat(repoFile(deps.rootDir, child));
-        if (stat.isDirectory()) {
-          if (depth < COMPACTION_COPY_MAX_DEPTH) walk(child, depth + 1);
-        } else if (
-          stat.isFile() &&
-          name.includes('.compacting-') &&
-          now - stat.mtimeMs > STALE_COMPACTION_COPY_MS
-        ) {
-          findings.push({
-            finding_id: findingId('stale_compaction_copy', child),
-            kind: 'stale_compaction_copy',
-            severity: 'warning',
-            summary: `leftover compaction copy ${child} (${(stat.size / 1e6).toFixed(1)}MB) — a failed rewrite kept it; parked-aware readers re-read it on every call | next: merge its records back into the live store, then remove it`,
-            evidence: {
-              path: child,
-              size_bytes: stat.size,
-              mtime: new Date(stat.mtimeMs).toISOString(),
-            },
-            detected_at: new Date(now).toISOString(),
-          });
-        }
-      } catch (error) {
-        logger.debug(
-          `[OPS-PROBE] skipped ${child}: ${error instanceof Error ? error.message : String(error)}`
-        );
-      }
-    }
-  };
-  for (const root of COMPACTION_COPY_ROOTS) walk(root, 1);
-  return findings;
+  return listCompactionCopies({ rootDir: deps.rootDir })
+    .filter((copy) => now - copy.mtimeMs > STALE_COMPACTION_COPY_MS)
+    .map((copy) => ({
+      finding_id: findingId('stale_compaction_copy', copy.path),
+      kind: 'stale_compaction_copy' as const,
+      severity: 'warning' as const,
+      summary: `leftover compaction copy ${copy.path} (${(copy.sizeBytes / 1e6).toFixed(1)}MB) — a failed rewrite kept it; parked-aware readers re-read it on every call | next: ${RECOVER_COMPACTION_COPIES_COMMAND} --path ${compactionCopyStore(copy.path)} (dry-run lists the merge; --request-approval, then --apply --approval-request-id <id>)`,
+      evidence: {
+        path: copy.path,
+        size_bytes: copy.sizeBytes,
+        mtime: new Date(copy.mtimeMs).toISOString(),
+      },
+      detected_at: new Date(now).toISOString(),
+    }));
 }
 
 /** One alert source dominating the log — the 93%-watchdog defect class.
