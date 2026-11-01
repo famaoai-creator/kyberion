@@ -29,7 +29,10 @@ const READER_SCHEMA = {
 } as const;
 
 const SEARCH_EXAMPLES = {
-  web_search: [{ query: 'kyberion actuator contract', top_k: 5 }],
+  web_search: [
+    { query: 'kyberion actuator contract', top_k: 5 },
+    { query: 'tokio runtime', provider: 'rustxng', top_k: 5 },
+  ],
   fetch_reader: [{ url: 'https://example.com/', max_chars: 8000 }],
 };
 

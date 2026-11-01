@@ -17,6 +17,7 @@ import {
   resolveFfprobeBin,
   resolveLightpandaBin,
   resolvePython3Bin,
+  resolveRustxngBin,
   resolveTailscaleBin,
   resolveXcodebuildBin,
   resolveXcrunBin,
@@ -64,6 +65,13 @@ describe('tool binary resolvers', () => {
     expect(resolveLightpandaBin()).toBe('/opt/kyberion/bin/lightpanda');
     vi.stubEnv('KYBERION_LIGHTPANDA_BIN', '');
     expect(resolveLightpandaBin()).toMatch(/lightpanda$/);
+  });
+
+  it('resolves RustXNG through its env override, then the registry command', () => {
+    vi.stubEnv('KYBERION_RUSTXNG_BIN', '/opt/kyberion/bin/rustxng');
+    expect(resolveRustxngBin()).toBe('/opt/kyberion/bin/rustxng');
+    vi.stubEnv('KYBERION_RUSTXNG_BIN', '');
+    expect(resolveRustxngBin()).toMatch(/rustxng$/);
   });
 
   it('finds the Tailscale CLI on macOS without Install CLI, env override first', () => {
