@@ -278,6 +278,28 @@ describe('SB-01 stimuli-journal rotation under SYSTEM_ROLE=slack_bridge', () => 
       expect(journal.loadRecentStimuli(1, { nowMs }).map((m) => m.id)).toEqual(['msg-live']);
     });
 
+    it('reads each stimulus exactly once when the journal rotates during loadRecentStimuli', () => {
+      const ids = ['msg-r1', 'msg-r2', 'msg-r3', 'msg-r4'];
+      const rotateNow = (): void =>
+        fs.renameSync(
+          journalPath(),
+          path.join(path.dirname(journalPath()), 'stimuli-20261101-000000.jsonl')
+        );
+      try {
+        for (const hook of ['beforeLiveScan', 'afterFirstLiveRecord'] as const) {
+          for (const segment of segmentPaths()) fs.rmSync(segment, { force: true });
+          fs.writeFileSync(journalPath(), ids.map((id) => message(id)).join(''));
+          journal.setStimuliJournalReadHooksForTests({ [hook]: rotateNow });
+          expect(
+            journal.loadRecentStimuli(10, { enforceTtl: false }).map((m) => m.id),
+            hook
+          ).toEqual(ids);
+        }
+      } finally {
+        journal.setStimuliJournalReadHooksForTests({});
+      }
+    });
+
     it('never throws from appendStimulus past the old 11MB rotation read cap', () => {
       const big = message('msg-big', { payload: { pad: 'y'.repeat(100_000) } });
       fs.writeFileSync(

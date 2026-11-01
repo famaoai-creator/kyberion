@@ -13,9 +13,12 @@
  *  - full history         → {@link streamJsonLines} (constant memory)
  *  - append hygiene       → {@link fileEndsWithNewline}
  *
- * I/O goes through the foundation bridge (`getFoundationIo().readRange` =
- * secure-io `safeReadFileRange`, `stat` = `safeStat`) so modules secure-io
+ * I/O goes through the foundation bridge (`getFoundationIo().openRangeReader`
+ * = secure-io `openSafeRangeReader`, `stat` = `safeStat`) so modules secure-io
  * itself imports (audit-chain) can use these readers without an import cycle.
+ * Each scan holds one descriptor on one inode from start to finish (closed
+ * when the generator ends, including an early `break`), so inline rotation or
+ * rename-aside compaction of the path cannot tear a scan in progress.
  * Size caps stay only for untrusted input; there is no total-size cap here —
  * only a per-line guard ({@link DEFAULT_JSONL_MAX_LINE_BYTES}) so one
  * pathological line is never accumulated unbounded.
@@ -31,12 +34,30 @@ export const DEFAULT_JSONL_MAX_LINE_BYTES = 64 * 1024 * 1024;
 
 const NEWLINE = 0x0a;
 
+/** A reader pinned to one inode for a whole scan; the scan closes it. */
+export interface JsonlPinnedReader {
+  /** Size when opened; a scan never reads past it. */
+  readonly size: number;
+  read(position: number, length: number): Buffer;
+  close(): void;
+}
+
 /** Byte access a reader needs. Defaults to the governed foundation bridge. */
 export interface JsonlByteSource {
   /** File size in bytes, or undefined when the file does not exist. */
   size(filePath: string): number | undefined;
   /** Up to `length` bytes starting at `position` (fewer at end of file). */
   readRange(filePath: string, position: number, length: number): Buffer;
+  /**
+   * Open the file once and read every chunk of a scan from that inode
+   * (undefined when missing). Preferred: a rotation or rename-aside
+   * compaction of the path mid-scan cannot tear the scan. Without it the scan
+   * reads by path, checks size (and {@link identity}) after every chunk, and
+   * restarts once if the file changed before anything was emitted.
+   */
+  open?(filePath: string): JsonlPinnedReader | undefined;
+  /** File identity for the by-path fallback (undefined when missing). */
+  identity?(filePath: string): { dev: number; ino: number } | undefined;
 }
 
 export type JsonlMalformedPolicy =
@@ -81,6 +102,26 @@ export class JsonlLineTooLongError extends Error {
   }
 }
 
+/**
+ * The file changed under a by-path scan (replaced, truncated, or a short
+ * read) after lines were already emitted, so the scan cannot be restarted
+ * without duplicates. Never raised for a pinned ({@link JsonlByteSource.open})
+ * scan of an append-only file.
+ */
+export class JsonlSourceChangedError extends Error {
+  readonly code = 'JSONL_SOURCE_CHANGED';
+  constructor(
+    readonly filePath: string,
+    readonly detail: string
+  ) {
+    super(
+      `JSONL file changed during a scan: ${filePath} — ${detail} | ` +
+        'retry the read; use a pinned byte source (open) to avoid this'
+    );
+    this.name = 'JsonlSourceChangedError';
+  }
+}
+
 /** One raw line from a scan; `text` has its `\n` / `\r\n` terminator removed. */
 export interface JsonlRawLine {
   text: string;
@@ -88,6 +129,10 @@ export interface JsonlRawLine {
   lineNumber: number;
   /** False only for a final line with no newline terminator (possibly torn). */
   terminated: boolean;
+  /** Forward scans: byte offset of the line start. */
+  byteStart?: number;
+  /** Forward scans: byte offset just past the line (after its `\n` when terminated). */
+  byteEnd?: number;
 }
 
 /** An oversized line, reported instead of yielded. */
@@ -95,25 +140,58 @@ export interface JsonlOversizedLine {
   lineNumber: number;
   /** First bytes of the line (forward scans only), for diagnostics. */
   prefix: string;
+  /** Forward scans: byte range of the line (end after its `\n` when terminated). */
+  byteStart?: number;
+  byteEnd?: number;
+  /** Forward scans: false when the line runs to the end of the scanned range. */
+  terminated?: boolean;
 }
 
-const defaultSource: JsonlByteSource = {
-  size(filePath) {
-    const io = getFoundationIo();
-    if (!io.exists(filePath)) return undefined;
-    try {
-      return io.stat(filePath).size;
-    } catch (err) {
-      if ((err as NodeJS.ErrnoException)?.code === 'ENOENT') return undefined;
-      throw err;
-    }
-  },
-  readRange(filePath, position, length) {
-    const io = getFoundationIo();
-    if (!io.readRange) throw new Error('secure_foundation_range_io_not_registered');
-    return io.readRange(filePath, position, length);
-  },
-};
+function isEnoent(err: unknown): boolean {
+  return (err as NodeJS.ErrnoException | undefined)?.code === 'ENOENT';
+}
+
+function defaultSource(): JsonlByteSource {
+  const io = getFoundationIo();
+  const source: JsonlByteSource = {
+    size(filePath) {
+      if (!io.exists(filePath)) return undefined;
+      try {
+        return io.stat(filePath).size;
+      } catch (err) {
+        if (isEnoent(err)) return undefined;
+        throw err;
+      }
+    },
+    readRange(filePath, position, length) {
+      if (!io.readRange) throw new Error('secure_foundation_range_io_not_registered');
+      return io.readRange(filePath, position, length);
+    },
+    identity(filePath) {
+      try {
+        const stat = io.stat(filePath);
+        return stat.dev !== undefined && stat.ino !== undefined
+          ? { dev: stat.dev, ino: stat.ino }
+          : undefined;
+      } catch (err) {
+        if (isEnoent(err)) return undefined;
+        throw err;
+      }
+    },
+  };
+  const openRangeReader = io.openRangeReader;
+  if (openRangeReader) {
+    source.open = (filePath) => {
+      try {
+        return openRangeReader.call(io, filePath);
+      } catch (err) {
+        if (isEnoent(err)) return undefined;
+        throw err;
+      }
+    };
+  }
+  return source;
+}
 
 interface ResolvedScan {
   chunk: number;
@@ -128,7 +206,7 @@ function resolveScan(options: JsonlScanOptions): ResolvedScan {
   if (!Number.isInteger(maxLine) || maxLine <= 0) {
     throw new Error(`Invalid maxLineBytes: ${maxLine}`);
   }
-  return { chunk, maxLine, source: options.source ?? defaultSource };
+  return { chunk, maxLine, source: options.source ?? defaultSource() };
 }
 
 function decodeLine(parts: Buffer[]): string {
@@ -141,53 +219,188 @@ export function jsonlFileSize(filePath: string, options: JsonlScanOptions = {}):
   return resolveScan(options).source.size(filePath) ?? 0;
 }
 
+/** One scan's view of a file: a fixed size and exact-length reads. */
+interface ScanHandle {
+  size: number;
+  /** Exactly `length` bytes, or throws {@link JsonlSourceChangedError}. */
+  read(position: number, length: number): Buffer;
+  close(): void;
+}
+
+function openScanHandle(source: JsonlByteSource, filePath: string): ScanHandle | undefined {
+  if (source.open) {
+    const reader = source.open(filePath);
+    if (!reader) return undefined;
+    return {
+      size: reader.size,
+      read(position, length) {
+        const buf = reader.read(position, length);
+        if (buf.length !== length) {
+          throw new JsonlSourceChangedError(filePath, `short read at ${position} (truncated)`);
+        }
+        return buf;
+      },
+      close: () => reader.close(),
+    };
+  }
+  // By-path fallback (a reduced adapter): verify the file is still the one
+  // the scan started on after every chunk.
+  const size = source.size(filePath);
+  if (size === undefined) return undefined;
+  const identity = source.identity?.(filePath);
+  return {
+    size,
+    read(position, length) {
+      let buf: Buffer;
+      try {
+        buf = source.readRange(filePath, position, length);
+      } catch (err) {
+        if (isEnoent(err)) throw new JsonlSourceChangedError(filePath, 'file disappeared');
+        throw err;
+      }
+      if (buf.length !== length) {
+        throw new JsonlSourceChangedError(filePath, `short read at ${position}`);
+      }
+      const now = source.size(filePath);
+      if (now === undefined || now < size) {
+        throw new JsonlSourceChangedError(
+          filePath,
+          `size went from ${size} to ${now ?? 'missing'}`
+        );
+      }
+      if (identity) {
+        const current = source.identity?.(filePath);
+        if (!current || current.dev !== identity.dev || current.ino !== identity.ino) {
+          throw new JsonlSourceChangedError(filePath, 'file was replaced');
+        }
+      }
+      return buf;
+    },
+    close() {},
+  };
+}
+
+/**
+ * Runs one scan on one handle and closes it when the scan ends — including an
+ * early `return` / `break` by the consumer. A by-path scan whose file changed
+ * before anything was emitted restarts once.
+ */
+function* pinnedScan<L>(
+  filePath: string,
+  source: JsonlByteSource,
+  run: (handle: ScanHandle, noteEmitted: () => void) => Generator<L>
+): Generator<L> {
+  for (let attempt = 0; ; attempt++) {
+    const handle = openScanHandle(source, filePath);
+    if (!handle) return;
+    let emitted = false;
+    const noteEmitted = (): void => {
+      emitted = true;
+    };
+    try {
+      for (const item of run(handle, noteEmitted)) {
+        emitted = true;
+        yield item;
+      }
+      return;
+    } catch (err) {
+      if (!(err instanceof JsonlSourceChangedError) || emitted || attempt >= 1) throw err;
+    } finally {
+      handle.close();
+    }
+  }
+}
+
+type OversizedSink = (line: JsonlOversizedLine) => void;
+
+export interface StreamTextLinesOptions extends JsonlScanOptions {
+  onOversized?: OversizedSink;
+  /** Scan at most this many bytes from the start (clamped to the file size). */
+  endOffset?: number;
+}
+
 /**
  * Forward raw-line scan with constant memory (one chunk plus the current
  * line). Blank lines are yielded too (callers decide). Reads up to the size
- * observed at start, so a concurrent append is not half-read. Oversized lines
- * go to `onOversized` and are skipped.
+ * observed at open, from one pinned inode, so a concurrent append is not
+ * half-read and a concurrent rotation does not tear the scan. Oversized
+ * lines go to `onOversized` (with their byte range) and are skipped.
  */
 export function* streamTextLines(
   filePath: string,
-  options: JsonlScanOptions & { onOversized?: (line: JsonlOversizedLine) => void } = {}
+  options: StreamTextLinesOptions = {}
 ): Generator<JsonlRawLine> {
   const { chunk, maxLine, source } = resolveScan(options);
-  const size = source.size(filePath);
-  if (!size) return;
+  yield* pinnedScan(filePath, source, (handle, noteEmitted) =>
+    forwardLines(handle, chunk, maxLine, options.endOffset, (line) => {
+      noteEmitted();
+      options.onOversized?.(line);
+    })
+  );
+}
+
+function* forwardLines(
+  handle: ScanHandle,
+  chunk: number,
+  maxLine: number,
+  endOffset: number | undefined,
+  onOversized: OversizedSink
+): Generator<JsonlRawLine> {
+  const limit = endOffset === undefined ? handle.size : Math.min(handle.size, endOffset);
   let parts: Buffer[] = [];
   let partsLen = 0;
   let skipping = false;
+  let skipPrefix = '';
   let lineNumber = 0;
   let position = 0;
-  while (position < size) {
-    const buf = source.readRange(filePath, position, Math.min(chunk, size - position));
-    if (buf.length === 0) break;
+  let lineStart = 0;
+  while (position < limit) {
+    const base = position;
+    const buf = handle.read(position, Math.min(chunk, limit - position));
     position += buf.length;
     let start = 0;
     for (;;) {
       const nl = buf.indexOf(NEWLINE, start);
       if (nl === -1) break;
       lineNumber++;
+      const end = base + nl + 1;
       if (skipping) {
         skipping = false;
+        onOversized({
+          lineNumber,
+          prefix: skipPrefix,
+          byteStart: lineStart,
+          byteEnd: end,
+          terminated: true,
+        });
       } else if (partsLen + (nl - start) > maxLine) {
         const head = parts[0] ?? buf.subarray(start, nl);
-        options.onOversized?.({ lineNumber, prefix: decodeLine([head.subarray(0, 256)]) });
+        onOversized({
+          lineNumber,
+          prefix: decodeLine([head.subarray(0, 256)]),
+          byteStart: lineStart,
+          byteEnd: end,
+          terminated: true,
+        });
       } else {
         parts.push(buf.subarray(start, nl));
-        yield { text: decodeLine(parts), lineNumber, terminated: true };
+        yield {
+          text: decodeLine(parts),
+          lineNumber,
+          terminated: true,
+          byteStart: lineStart,
+          byteEnd: end,
+        };
       }
       parts = [];
       partsLen = 0;
       start = nl + 1;
+      lineStart = end;
     }
     if (start < buf.length && !skipping) {
       const rest = buf.subarray(start);
       if (partsLen + rest.length > maxLine) {
-        options.onOversized?.({
-          lineNumber: lineNumber + 1,
-          prefix: decodeLine([(parts[0] ?? rest).subarray(0, 256)]),
-        });
+        skipPrefix = decodeLine([(parts[0] ?? rest).subarray(0, 256)]);
         parts = [];
         partsLen = 0;
         skipping = true;
@@ -198,24 +411,50 @@ export function* streamTextLines(
       }
     }
   }
-  if (partsLen > 0 && !skipping) {
+  if (skipping) {
+    onOversized({
+      lineNumber: lineNumber + 1,
+      prefix: skipPrefix,
+      byteStart: lineStart,
+      byteEnd: limit,
+      terminated: false,
+    });
+  } else if (partsLen > 0) {
     lineNumber++;
-    yield { text: decodeLine(parts), lineNumber, terminated: false };
+    yield {
+      text: decodeLine(parts),
+      lineNumber,
+      terminated: false,
+      byteStart: lineStart,
+      byteEnd: limit,
+    };
   }
 }
 
 /**
- * Backward raw-line scan, newest first. The empty segment after a final
- * newline is not yielded; other blank lines are. Oversized lines go to
- * `onOversized` and are skipped without buffering.
+ * Backward raw-line scan, newest first, from one pinned inode. The empty
+ * segment after a final newline is not yielded; other blank lines are.
+ * Oversized lines go to `onOversized` and are skipped without buffering.
  */
 export function* streamTextLinesBackward(
   filePath: string,
-  options: JsonlScanOptions & { onOversized?: (line: JsonlOversizedLine) => void } = {}
+  options: JsonlScanOptions & { onOversized?: OversizedSink } = {}
 ): Generator<JsonlRawLine> {
   const { chunk, maxLine, source } = resolveScan(options);
-  const size = source.size(filePath);
-  if (!size) return;
+  yield* pinnedScan(filePath, source, (handle, noteEmitted) =>
+    backwardLines(handle, chunk, maxLine, (line) => {
+      noteEmitted();
+      options.onOversized?.(line);
+    })
+  );
+}
+
+function* backwardLines(
+  handle: ScanHandle,
+  chunk: number,
+  maxLine: number,
+  onOversized: OversizedSink
+): Generator<JsonlRawLine> {
   // `carry` holds the bytes after the current chunk that belong to the line
   // whose start has not been seen yet (in file order).
   let carry: Buffer[] = [];
@@ -223,7 +462,7 @@ export function* streamTextLinesBackward(
   let skipping = false;
   let first = true; // the segment after the last newline (possibly empty / torn)
   let lineNumber = 0;
-  let position = size;
+  let position = handle.size;
 
   const emit = function* (tail: Buffer[], isFirst: boolean): Generator<JsonlRawLine | undefined> {
     if (isFirst) {
@@ -239,8 +478,7 @@ export function* streamTextLinesBackward(
 
   while (position > 0) {
     const start = Math.max(0, position - chunk);
-    const buf = source.readRange(filePath, start, position - start);
-    if (buf.length === 0) break;
+    const buf = handle.read(start, position - start);
     position = start;
     let end = buf.length;
     for (;;) {
@@ -250,11 +488,11 @@ export function* streamTextLinesBackward(
       if (skipping) {
         skipping = false;
         lineNumber++;
-        options.onOversized?.({ lineNumber, prefix: '' });
+        onOversized({ lineNumber, prefix: '' });
         first = false;
       } else if (carryLen + piece.length > maxLine) {
         lineNumber++;
-        options.onOversized?.({ lineNumber, prefix: '' });
+        onOversized({ lineNumber, prefix: '' });
         first = false;
       } else {
         for (const line of emit([piece, ...carry], first)) if (line) yield line;
@@ -278,7 +516,7 @@ export function* streamTextLinesBackward(
   }
   if (skipping) {
     lineNumber++;
-    options.onOversized?.({ lineNumber, prefix: '' });
+    onOversized({ lineNumber, prefix: '' });
   } else if (carryLen > 0 || !first) {
     for (const line of emit(carry, first)) if (line) yield line;
   }

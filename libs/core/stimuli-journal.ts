@@ -189,10 +189,29 @@ export interface LoadRecentStimuliOptions {
   nowMs?: number;
 }
 
+/** Test seams: simulate a rotation at the racy points of {@link loadRecentStimuli}. */
+export interface StimuliJournalReadHooks {
+  /** After the live journal was found, before its scan opens it. */
+  beforeLiveScan?: () => void;
+  /** After the first record of the live scan. */
+  afterFirstLiveRecord?: () => void;
+}
+let readHooks: StimuliJournalReadHooks = {};
+
+/** Test seam: install read hooks; call with `{}` to reset. */
+export function setStimuliJournalReadHooksForTests(hooks: StimuliJournalReadHooks): void {
+  readHooks = { ...hooks };
+}
+
 /**
  * The newest `limit` live stimuli, oldest first. Scans the journal backwards
  * (then its rotated segments, newest first) and stops once `limit` records
  * survive the TTL filter, so the cost follows `limit`, not the journal size.
+ *
+ * Safe against a concurrent rotation: the live scan holds the inode it opened,
+ * the segment list is taken after it (so a journal rotated before the scan
+ * opened it is read as a segment, not lost), and a record id already read is
+ * skipped (so a journal rotated during the scan is not read twice).
  */
 export function loadRecentStimuli(
   limit: number,
@@ -201,22 +220,35 @@ export function loadRecentStimuli(
   if (!(limit > 0)) return [];
   const stimuliPath = safeStimuliPath();
   const { enforceTtl = true, nowMs = Date.now() } = options;
-  const sources = [
-    ...(isRegularStimuliJournalPath(stimuliPath) ? [stimuliPath] : []),
-    ...rotatedStimuliSegments(stimuliPath),
-  ];
   const newestFirst: NerveMessage[] = [];
-  for (const source of sources) {
+  const seenIds = new Set<string>();
+  /** Scans one source; true once `limit` records were collected. */
+  const take = (source: string, live: boolean): boolean => {
+    let first = live;
     for (const stimulus of readJsonLinesBackward<NerveMessage>(source, {
       onMalformed: 'skip',
       map: normalizeNerveMessage,
     })) {
+      if (first) {
+        first = false;
+        readHooks.afterFirstLiveRecord?.();
+      }
+      if (seenIds.has(stimulus.id)) continue;
+      seenIds.add(stimulus.id);
       // Filter before counting: expired records must not crowd out live ones
       // and shrink the effective context window.
       if (enforceTtl && isStimulusExpired(stimulus, nowMs)) continue;
       newestFirst.push(stimulus);
-      if (newestFirst.length >= limit) return newestFirst.reverse();
+      if (newestFirst.length >= limit) return true;
     }
+    return false;
+  };
+  if (isRegularStimuliJournalPath(stimuliPath)) {
+    readHooks.beforeLiveScan?.();
+    if (take(stimuliPath, true)) return newestFirst.reverse();
+  }
+  for (const segment of rotatedStimuliSegments(stimuliPath)) {
+    if (take(segment, false)) break;
   }
   return newestFirst.reverse();
 }
