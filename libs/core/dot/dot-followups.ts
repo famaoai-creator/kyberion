@@ -19,7 +19,7 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { readJsonLines } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
-import { readJsonLinesCached } from '../jsonl-tail.js';
+import { readJsonLinesCachedAcrossCompaction } from '../jsonl-parked-read.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
 import { getZonedDateParts, matchesCron } from '../pipeline/cron-utils.js';
@@ -56,7 +56,7 @@ const root = (deps: { rootDir?: string }): string => deps.rootDir ?? pathResolve
 
 function readLedger(c: DotCharter, deps: DotFollowupDeps): DotWakeLedgerEntry[] {
   // Same incremental replay as dot-runtime's readDotWakeLedger (G01).
-  return readJsonLinesCached<DotWakeLedgerEntry>(
+  return readJsonLinesCachedAcrossCompaction<DotWakeLedgerEntry>(
     path.join(root(deps), DOT_FOLLOWUP_WAKE_LEDGER_PATH)
   ).filter((r) => r?.dot_id === c.dot_id && typeof r.trigger_key === 'string');
 }

@@ -7,11 +7,17 @@ import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  safeMoveSync,
+  safeReaddir,
   safeRmSync,
   safeWriteFile,
 } from './secure-io.js';
 import { compactStoreByKey, setAppendOnlyStoreTestHooks } from './append-only-store.js';
-import { parkedCompactionCopies, streamJsonLinesAcrossCompaction } from './jsonl-parked-read.js';
+import {
+  parkedCompactionCopies,
+  readJsonLinesCachedAcrossCompaction,
+  streamJsonLinesAcrossCompaction,
+} from './jsonl-parked-read.js';
 
 interface Row {
   id: string;
@@ -117,5 +123,108 @@ describe('jsonl-parked-read', () => {
     safeWriteFile(`${live}.compacting-1-0-initial`, `${JSON.stringify({ id: 'a', v: 1 })}\n`);
     safeWriteFile(`${live}.compacting-1-1-merge-0`, `${JSON.stringify({ id: 'a', v: 2 })}\n`);
     expect([...streamJsonLinesAcrossCompaction<Row>(live)].map((row) => row.v)).toEqual([1, 2, 3]);
+  });
+  it('re-reads when a compaction parks the live file mid-read and a writer recreates it', () => {
+    write([
+      { id: 'task', v: 1 },
+      { id: 'task', v: 2 },
+    ]);
+    const stream = streamJsonLinesAcrossCompaction<Row>(live);
+    const rows: Row[] = [stream.next().value as Row];
+    // After the listing (no copies) and while the live read is under way,
+    // another process parks the live file and a writer recreates it.
+    safeMoveSync(live, `${live}.compacting-t000000000000001-000000-999999-initial`);
+    safeAppendFileSync(live, `${JSON.stringify({ id: 'other', v: 1 })}\n`);
+    for (let next = stream.next(); !next.done; next = stream.next()) rows.push(next.value);
+    const latest = new Map<string, number>();
+    for (const row of rows) latest.set(row.id, row.v);
+    // The recreated live row is not lost; duplicates are allowed.
+    expect(Object.fromEntries(latest)).toEqual({ task: 2, other: 1 });
+  });
+
+  it('orders parked copies by their park stamp across processes, then legacy copies by mtime', async () => {
+    // Stamped names: time first, pid last — a newer copy from a lower pid sorts after.
+    safeWriteFile(
+      `${live}.compacting-t000000000000002-000000-1-initial`,
+      `${JSON.stringify({ id: 'a', v: 2 })}\n`
+    );
+    safeWriteFile(
+      `${live}.compacting-t000000000000001-000007-9-initial`,
+      `${JSON.stringify({ id: 'a', v: 1 })}\n`
+    );
+    write([{ id: 'a', v: 3 }]);
+    expect([...streamJsonLinesAcrossCompaction<Row>(live)].map((row) => row.v)).toEqual([1, 2, 3]);
+    safeRmSync(dir, { recursive: true, force: true });
+    safeMkdir(dir, { recursive: true });
+    // Legacy `<pid>-<n>` copies from two pids tie on n: the older write goes first.
+    safeWriteFile(`${live}.compacting-9-0-initial`, `${JSON.stringify({ id: 'a', v: 1 })}\n`);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    safeWriteFile(`${live}.compacting-1-0-initial`, `${JSON.stringify({ id: 'a', v: 2 })}\n`);
+    expect([...streamJsonLinesAcrossCompaction<Row>(live)].map((row) => row.v)).toEqual([1, 2]);
+  });
+
+  it('parks under park-ordered names and leaves a kept copy alone', () => {
+    write([{ id: 'a', v: 1 }]);
+    let names: string[] = [];
+    setAppendOnlyStoreTestHooks({
+      beforeWriteSurvivors: (staging) => {
+        names = staging.map((copy) => path.basename(copy));
+        // Force a merge round: a writer recreates the live file before the publish.
+        if (staging.length === 1)
+          safeAppendFileSync(live, `${JSON.stringify({ id: 'b', v: 1 })}\n`);
+      },
+    });
+    compactStoreByKey(live, { key: 'id', archiveDir: null });
+    expect(names).toHaveLength(2);
+    for (const name of names) {
+      expect(name).toMatch(
+        new RegExp(`^store\\.jsonl\\.compacting-t\\d{15}-\\d{6}-${process.pid}-`)
+      );
+    }
+    expect([...names].sort()).toEqual(names);
+    // A copy kept by an earlier failed rewrite survives a later compaction.
+    const kept = `${live}.compacting-kept`;
+    safeWriteFile(kept, `${JSON.stringify({ id: 'a', v: 0 })}\n`);
+    setAppendOnlyStoreTestHooks({});
+    compactStoreByKey(live, { key: 'id', archiveDir: null });
+    expect(safeReaddir(dir).filter((name) => name.includes('.compacting-'))).toEqual([
+      'store.jsonl.compacting-kept',
+    ]);
+  });
+
+  it('bypasses the incremental cache while parked copies exist and collapses repeated rows', () => {
+    write([
+      { id: 'k1', v: 1 },
+      { id: 'k1', v: 2 },
+    ]);
+    expect(readJsonLinesCachedAcrossCompaction<Row>(live)).toHaveLength(2); // primes the cache
+    let seen: Row[] | undefined;
+    setAppendOnlyStoreTestHooks({
+      beforeWriteSurvivors: () => {
+        if (seen) return;
+        safeAppendFileSync(live, `${JSON.stringify({ id: 'k2', v: 1 })}\n`);
+        seen = readJsonLinesCachedAcrossCompaction<Row>(live);
+      },
+    });
+    compactStoreByKey(live, { key: 'id', archiveDir: null });
+    expect(seen).toEqual([
+      { id: 'k1', v: 1 },
+      { id: 'k1', v: 2 },
+      { id: 'k2', v: 1 },
+    ]);
+    // Published and cleaned up: the cached path again, on the folded file.
+    expect(readJsonLinesCachedAcrossCompaction<Row>(live)).toEqual([
+      { id: 'k1', v: 2 },
+      { id: 'k2', v: 1 },
+    ]);
+    // A leftover copy repeating live rows does not double them.
+    safeWriteFile(
+      `${live}.compacting-t000000000000001-000000-1-initial`,
+      `${JSON.stringify({ id: 'k1', v: 2 })}\n`
+    );
+    expect(readJsonLinesCachedAcrossCompaction<Row>(live)).toEqual([
+      { id: 'k1', v: 2 },
+      { id: 'k2', v: 1 },
+    ]);
   });
 });

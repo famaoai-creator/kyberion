@@ -44,6 +44,7 @@ import {
 } from '../secure-io.js';
 import { appendJsonLine, readJsonIfPresent, writeJson } from '../foundation/json.js';
 import { readJsonLinesCached } from '../jsonl-tail.js';
+import { readJsonLinesCachedAcrossCompaction } from '../jsonl-parked-read.js';
 import { streamJsonLines } from '../jsonl-read.js';
 import {
   compactDotWakeLedgerAt,
@@ -308,7 +309,10 @@ function runtimePath(rootDir: string | undefined, rel: string): string {
  * replay that parses only the rows appended since the previous call (G01).
  */
 export function readDotWakeLedger(deps: DotRuntimeDeps = {}): DotWakeLedgerEntry[] {
-  return readJsonLinesCached<DotWakeLedgerEntry>(runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH))
+  // Parked-aware: a compaction in another process never hides consumed keys.
+  return readJsonLinesCachedAcrossCompaction<DotWakeLedgerEntry>(
+    runtimePath(deps.rootDir, DOT_WAKE_LEDGER_PATH)
+  )
     .filter((row) => typeof row?.dot_id === 'string' && typeof row?.trigger_key === 'string')
     .map((row) => {
       if (row.scope?.tier === 'public' && !row.scope.tenant_slug) return row;
