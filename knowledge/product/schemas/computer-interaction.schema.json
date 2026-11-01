@@ -61,7 +61,7 @@
       "properties": {
         "mode": {
           "type": "string",
-          "enum": ["screen", "dom_snapshot", "console", "network", "mixed"]
+          "enum": ["screen", "dom_snapshot", "ax_tree", "console", "network", "mixed"]
         },
         "include_screenshot": {
           "type": "boolean"
@@ -135,6 +135,50 @@
             "voice_input_toggle",
             "wait",
             "llm_assist",
+            "ax_runtime_status",
+            "ax_snapshot",
+            "ax_find",
+            "ax_list_windows",
+            "ax_list_apps",
+            "ax_list_displays",
+            "ax_list_surfaces",
+            "ax_list_notifications",
+            "ax_click",
+            "ax_type",
+            "ax_press",
+            "ax_scroll",
+            "ax_scroll_to",
+            "ax_set_value",
+            "ax_select",
+            "ax_clear",
+            "ax_focus",
+            "ax_toggle",
+            "ax_check",
+            "ax_uncheck",
+            "ax_expand",
+            "ax_collapse",
+            "ax_right_click",
+            "ax_get",
+            "ax_is",
+            "ax_session_end",
+            "ax_session_gc",
+            "ax_wait",
+            "ax_permissions",
+            "ax_focus_window",
+            "ax_move_window",
+            "ax_resize_window",
+            "ax_minimize_window",
+            "ax_maximize_window",
+            "ax_restore_window",
+            "ax_open_system_surface",
+            "ax_launch",
+            "ax_close_app",
+            "ax_dismiss_notification",
+            "ax_dismiss_all_notifications",
+            "ax_notification_action",
+            "ax_clipboard_get",
+            "ax_clipboard_set",
+            "ax_clipboard_clear",
             "click_ref",
             "fill_ref",
             "fill_secret_ref",
@@ -214,6 +258,15 @@
         "ref": {
           "type": "string"
         },
+        "qualified_ref": {
+          "type": "string",
+          "pattern": "^@[A-Za-z0-9_-]+:e[0-9]+$",
+          "description": "Snapshot-qualified element ref (@<snapshot_id>:e<N>) for AX-style desktop surfaces. Valid only against the live snapshot map that allocated it; a bare or cross-snapshot ref must fail closed, never be reminted against a fresh observation."
+        },
+        "native_id": {
+          "type": "string",
+          "description": "Durable platform element identifier (AXIdentifier, AutomationId, accessible-id) used to corroborate ref resolution or re-identify an element with role/name evidence."
+        },
         "selector": {
           "type": "string"
         },
@@ -240,6 +293,164 @@
         },
         "application": {
           "type": "string"
+        },
+        "window_id": {
+          "type": "string",
+          "description": "AX surface window scoping (agent-desktop --window-id); obtained from ax_list_windows."
+        },
+        "value": {
+          "type": "string",
+          "description": "Value payload for ax_set_value / ax_select."
+        },
+        "direction": {
+          "type": "string",
+          "enum": ["up", "down", "left", "right"],
+          "description": "Scroll direction for ax_scroll."
+        },
+        "property": {
+          "type": "string",
+          "description": "Property/state selector for ax_get (text|value|title|bounds|role|states) and ax_is (visible|enabled|checked|focused|expanded|selected)."
+        },
+        "limit": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Result cap for ax_list_notifications."
+        },
+        "surface": {
+          "type": "string",
+          "description": "AX surface scope for ax_snapshot/ax_find (window, menubar, sheet, popover, alert, notification-center, dock, spotlight, ...)."
+        },
+        "wait_for": {
+          "type": "string",
+          "description": "Server-side poll selector (role:text) — ax_snapshot/ax_find return once a match appears."
+        },
+        "wait_for_gone": {
+          "type": "string",
+          "description": "Server-side poll selector (role:text) — return once no match remains."
+        },
+        "agent_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,64}$",
+          "description": "Harness subagent id within the snapshot session (agent-desktop --agent-id / AGENT_DESKTOP_AGENT_ID); stamped on the upstream trace for per-actor audit."
+        },
+        "x": {
+          "type": "number",
+          "description": "Window X position for ax_move_window (agent-desktop move-window --x)."
+        },
+        "y": {
+          "type": "number",
+          "description": "Window Y position for ax_move_window (agent-desktop move-window --y)."
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Window width for ax_resize_window."
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "description": "Window height for ax_resize_window."
+        },
+        "ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Pause duration in milliseconds for ax_wait (agent-desktop wait <MS>)."
+        },
+        "event": {
+          "type": "string",
+          "enum": [
+            "window-opened",
+            "window-closed",
+            "app-launched",
+            "app-terminated",
+            "focus-changed",
+            "surface-appeared",
+            "surface-dismissed"
+          ],
+          "description": "Desktop lifecycle signal for ax_wait --event."
+        },
+        "predicate": {
+          "type": "string",
+          "enum": ["exists", "enabled", "visible", "actionable", "value"],
+          "description": "Element wait predicate for ax_wait --predicate."
+        },
+        "action": {
+          "type": "string",
+          "description": "Actionable-wait action (click|type|set-value|clear) for ax_wait, or the notification action button name for ax_notification_action."
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Expected match count for ax_wait --text waits."
+        },
+        "menu": {
+          "type": "boolean",
+          "description": "ax_wait: block until a menu surface opens."
+        },
+        "menu_closed": {
+          "type": "boolean",
+          "description": "ax_wait: block until the menu surface is dismissed."
+        },
+        "notification": {
+          "type": "boolean",
+          "description": "ax_wait: block until a new notification arrives."
+        },
+        "index": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "1-based notification index from ax_list_notifications for ax_dismiss_notification / ax_notification_action."
+        },
+        "expected_app": {
+          "type": "string",
+          "description": "Expected app name at the notification index — upstream requires an identity field before dismissing or acting on a notification."
+        },
+        "expected_title": {
+          "type": "string",
+          "description": "Expected title at the notification index — identity check for ax_dismiss_notification / ax_notification_action."
+        },
+        "format": {
+          "type": "string",
+          "enum": ["text", "auto", "image", "file-urls"],
+          "description": "Clipboard read format for ax_clipboard_get."
+        },
+        "image": {
+          "type": "string",
+          "description": "Path to a PNG written to the clipboard by ax_clipboard_set."
+        },
+        "file_urls": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "File paths written to the clipboard as file references by ax_clipboard_set."
+        },
+        "force": {
+          "type": "boolean",
+          "description": "ax_close_app: terminate the process instead of quitting gracefully."
+        },
+        "activate": {
+          "type": "boolean",
+          "description": "ax_launch: bring the app forward and wait for a window."
+        },
+        "cdp": {
+          "oneOf": [{ "type": "boolean" }, { "type": "integer", "minimum": 0 }],
+          "description": "ax_launch: expose the app's DevTools protocol endpoint (true = free port, integer = fixed port)."
+        },
+        "no_attach": {
+          "type": "boolean",
+          "description": "ax_launch: start a fresh instance instead of attaching to a running one."
+        },
+        "app_args": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Command-line arguments passed to the launched app by ax_launch (order preserved)."
+        },
+        "app_env": {
+          "type": "object",
+          "additionalProperties": { "type": "string" },
+          "description": "Environment variables for the process launched by ax_launch."
+        },
+        "cwd": {
+          "type": "string",
+          "description": "Working directory for the process launched by ax_launch."
         },
         "title": {
           "type": "string"
@@ -392,6 +603,64 @@
         "status": {
           "type": "string",
           "enum": ["ok", "error", "blocked"]
+        },
+        "code": {
+          "type": "string",
+          "description": "Machine-readable result or error code (e.g. STALE_REF, AMBIGUOUS_TARGET, SNAPSHOT_NOT_FOUND, ELEMENT_NOT_FOUND)."
+        },
+        "disposition": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "delivery": {
+              "type": "string",
+              "enum": [
+                "unknown",
+                "not_delivered",
+                "delivery_uncertain",
+                "delivered_unverified",
+                "delivered_verified"
+              ]
+            },
+            "retry": {
+              "type": "string",
+              "enum": ["unknown", "safe", "unsafe"],
+              "description": "Derived from delivery: only not_delivered is safe to repeat."
+            }
+          },
+          "description": "Delivery evidence for the attempted action. Retry or substitute only when retry is safe; no unconditional success flags."
+        },
+        "recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "strategy": {
+              "type": "string"
+            },
+            "retryable": {
+              "type": "boolean"
+            },
+            "requires_fresh_observation": {
+              "type": "boolean"
+            }
+          },
+          "description": "Recovery hint carried on errors; select a strategy only when disposition.retry is safe."
+        },
+        "complete": {
+          "type": "boolean",
+          "description": "For observation results: true only when the observation covered the whole target tree. A budget-exhausted observation reports false with the partial tree rather than an error."
+        },
+        "truncated": {
+          "type": "boolean",
+          "description": "true when the returned observation was cut by its observation budget; per-node markers identify cut branches."
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string",
+            "enum": ["known", "absent", "unknown"]
+          },
+          "description": "Per-field read status for observed properties. absent answers 'does not exist' and satisfies completeness checks; unknown is a failed or untrusted read and must not."
         },
         "message": {
           "type": "string"

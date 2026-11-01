@@ -1,3 +1,4 @@
+import { isCredentialMaterialCapability } from './foundation/credential-material-capability.js';
 import {
   isDiscussionRequestCapability,
   DISCUSSION_REQUEST_STORAGE_ROLE,
@@ -738,6 +739,8 @@ interface PreparedExecutionContext {
  * same as a process without a tenant.
  */
 export const TENANT_BOUND_READER_ROLES: ReadonlySet<string> = new Set([
+  'credential_allocation_reader',
+  'credential_material_reader',
   'autonomy_learning_store',
   CUSTOMER_DECISION_CONSUMER_STORE_ROLE,
   CUSTOMER_DECISION_INVITE_STORE_ROLE,
@@ -813,6 +816,12 @@ function prepareExecutionContext(
   }
   assertRoleAssumptionAllowed(normalizedRole);
   assertTenantBoundReaderScope(normalizedRole, tenantSlug);
+  if (
+    normalizedRole === 'credential_material_reader' &&
+    (!isCredentialMaterialCapability(currentResourceAccessScope()) ||
+      currentResourceAccessScope()?.tenantSlug !== tenantSlug)
+  )
+    throw new Error('[CREDENTIAL_CAPABILITY_REQUIRED] Admitted exact credential read required');
   if (normalizedRole === MEMORY_PROVENANCE_READER_ROLE) {
     const capability = currentMemoryProvenanceReadCapability();
     const activeTenant = resolveIdentityContext().tenantSlug;

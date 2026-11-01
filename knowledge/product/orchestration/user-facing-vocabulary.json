@@ -10341,9 +10341,9 @@
         "qps-ploc": "⟦Ïñşṗėƈŧ, ƈȧŀïƀřȧŧė, ȧñḓ şėŧ şėȧɱ ṗřőṽïḓėř şėŀėƈŧïőñ ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
       },
       "cli_cmd_script_reasoning_credentials": {
-        "en": "Register and verify reasoning API credentials",
-        "ja": "推論 API のキー登録と実証",
-        "qps-ploc": "⟦Řėɠïşŧėř ȧñḓ ṽėřïƒẏ řėȧşőñïñɠ ȦṖÏ ƈřėḓėñŧïȧŀş ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+        "en": "Register, allocate, verify and revoke reasoning API credentials",
+        "ja": "推論 API のキー登録・tenant割り当て・実証・取り消し",
+        "qps-ploc": "⟦Řėɠïşŧėř, ȧŀŀőƈȧŧė, ṽėřïƒẏ ȧñḓ řėṽőķė řėȧşőñïñɠ ȦṖÏ ƈřėḓėñŧïȧŀş ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
       },
       "cli_cmd_script_reasoning_setup": {
         "en": "Set up a reasoning backend",

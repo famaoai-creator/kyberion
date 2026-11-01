@@ -6,19 +6,47 @@ import {
   resolveReasoningApiModel,
   resolveReasoningApiKey,
   verifyReasoningApiCredential,
+  matchesReasoningCredentialVersion,
 } from '@agent/core/reasoning/reasoning-api-credentials';
 import { pathResolver } from '@agent/core/path-resolver';
-import { writeJson } from '@agent/core/foundation/json';
+import { withExecutionContextAsync } from '@agent/core/authority';
+import { withSecretResolutionSession } from '@agent/core/foundation/secret-resolution-session';
+import { credentialExecutionIdentity } from '@agent/core/foundation/credential-binding';
+import { readJsonIfPresent, writeJson } from '@agent/core/foundation/json';
 import { hasHelpFlag } from './lib/cli-guard.js';
 import { physicalScopedPath } from '@agent/core/physical-namespace';
 import { currentScope } from '@agent/core/scope-context';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { runSecretCli } from './secret_introduce.js';
 import {
+  ALLOCATION_ACTIONS,
+  runCredentialAllocationCommand,
+} from './reasoning_credential_allocations.js';
+import {
   persistReasoningBackend,
   persistEnvValue,
   readPersistedEnvValue,
 } from './reasoning_backend_selection.js';
+
+function withCredentialAuthority<T>(run: () => T | Promise<T>): Promise<T> {
+  const identity = credentialExecutionIdentity();
+  return withExecutionContextAsync(
+    'secret_introduce',
+    run,
+    undefined,
+    identity.tenantSlug ?? '',
+    undefined,
+    { missionId: identity.missionId ?? null, taskId: identity.taskId ?? null }
+  );
+}
+
+function verificationPath(provider: string): string {
+  return physicalScopedPath(
+    pathResolver.shared('runtime/health/api-verification'),
+    currentScope(),
+    `${requireReasoningApiProvider(provider).mode}.json`
+  );
+}
 
 export function parseCredentialArgs(args: string[]) {
   const argv = args.filter((arg) => !['--', '--json', '--quiet'].includes(arg));
@@ -54,6 +82,34 @@ export async function runCredentialCommand(
   args: string[],
   print: (value: string) => void = console.log
 ): Promise<number> {
+  return withSecretResolutionSession(() => runCredentialCommandImpl(args, print));
+}
+async function runCredentialCommandImpl(
+  rawArgs: string[],
+  print: (value: string) => void
+): Promise<number> {
+  const args = rawArgs.filter((arg) => !['--', '--json', '--quiet'].includes(arg));
+  if (ALLOCATION_ACTIONS.has(args[0] ?? '') && !hasHelpFlag(args)) {
+    try {
+      return await runCredentialAllocationCommand(args, print);
+    } catch (error) {
+      if (error instanceof ScriptExitError) throw error;
+      if (error instanceof Error && error.message.startsWith('[CREDENTIAL_ALLOCATION_DENIED]'))
+        throw new ScriptExitError(
+          1,
+          'No usable allocation. Run allocations/check, complete human approval, or renew an expired/revoked grant.'
+        );
+      if (error instanceof Error && error.message.startsWith('[CREDENTIAL_BINDING_UNAVAILABLE]'))
+        throw new ScriptExitError(
+          1,
+          'Task binding rejected. Check the current claim/scope, approval and stored key. No operator fallback was used.'
+        );
+      throw new ScriptExitError(
+        1,
+        'Allocation command failed. Check the tenant, approval, active mission/project, and --help. No key value is accepted on argv.'
+      );
+    }
+  }
   const options = parseCredentialArgs(args);
   if (options.action === 'help') {
     print(
@@ -67,21 +123,61 @@ export async function runCredentialCommand(
     print(
       'Registration uses the governed secret introduction flow and hidden terminal input. Verification sends one synthetic request (128 output tokens); --allow-paid authorizes possible charges.'
     );
+    print(
+      'Tenant allocation: assign --provider <provider> --tenant <tenant> --purpose <text> [--days 30] [--approval <id>]'
+    );
+    print('Inspect: allocations --tenant <tenant>; check --provider <provider> --tenant <tenant>');
+    print('Revoke: revoke --tenant <tenant> --grant <grant_id> --reason <text>');
+    print(
+      'Task proof: probe --tenant <tenant> --provider <provider> --mission <active_mission> --model <model> --allow-paid'
+    );
     return 0;
   }
   const descriptor = requireReasoningApiProvider(options.provider);
   if (options.action === 'status') {
     let configured = false;
+    let verified = false;
     try {
-      configured = Boolean(resolveReasoningApiKey(options.provider));
+      const key = await withCredentialAuthority(() => resolveReasoningApiKey(options.provider));
+      configured = Boolean(key);
+      const proof = readJsonIfPresent<Record<string, unknown>>(verificationPath(options.provider));
+      const identity = credentialExecutionIdentity();
+      const execution = proof?.execution as Record<string, unknown> | undefined;
+      const proofProvider =
+        typeof proof?.provider === 'string'
+          ? requireReasoningApiProvider(proof.provider).mode
+          : undefined;
+      const age =
+        typeof proof?.checked_at === 'string' ? Date.now() - Date.parse(proof.checked_at) : NaN;
+      verified = Boolean(
+        key &&
+        proof?.status === 'success' &&
+        proofProvider === descriptor.mode &&
+        proof.transport === 'secure-fetch' &&
+        typeof proof.endpoint === 'string' &&
+        proof.endpoint.startsWith(`${descriptor.api_proof!.base_url.replace(/\/+$/u, '')}/`) &&
+        proof.model === resolveReasoningApiModel(options.provider) &&
+        age >= 0 &&
+        age <= 15 * 60_000 &&
+        execution?.kind === (identity.tenantSlug ? 'tenant' : 'operator') &&
+        execution?.tenant === identity.tenantSlug &&
+        execution?.mission === identity.missionId &&
+        execution?.task === identity.taskId &&
+        matchesReasoningCredentialVersion(key, proof.credential_version)
+      );
     } catch {
       /* metadata only */
     }
-    print(JSON.stringify({ provider: options.provider, configured, verified: false }));
+    print(JSON.stringify({ provider: options.provider, configured, verified }));
     return configured ? 0 : 1;
   }
   requireReasoningApiProofAdapter(options.provider);
   if (options.action === 'register') {
+    if (credentialExecutionIdentity().tenantSlug)
+      throw new ScriptExitError(
+        1,
+        'Key registration requires an operator scope; tenant execution cannot mutate personal credentials.'
+      );
     const keys = descriptor.model_env_keys ?? [];
     const model = resolveReasoningApiModel(
       options.provider,
@@ -92,9 +188,8 @@ export async function runCredentialCommand(
     if (options.activate && (!model || !isReasoningApiModel(model)))
       throw new Error('Select a model or configure an existing model before activation.');
     const identity = descriptor.secret_refs![0]!;
-    const result = await runSecretCli(
-      ['introduce', identity.service_id, identity.secret_key, '--json'],
-      { print }
+    const result = await withCredentialAuthority(() =>
+      runSecretCli(['introduce', identity.service_id, identity.secret_key, '--json'], { print })
     );
     if (result.status !== 'applied') return 1;
     if (options.model && keys[0]) persistEnvValue(keys[0], options.model);
@@ -117,19 +212,14 @@ export async function runCredentialCommand(
     );
     return 0;
   }
-  const result = await verifyReasoningApiCredential({
-    provider: options.provider,
-    model: options.model!,
-    allowPaid: options.allowPaid,
-  });
-  writeJson(
-    physicalScopedPath(
-      pathResolver.shared('runtime/health/api-verification'),
-      currentScope(),
-      `${options.provider}.json`
-    ),
-    result
+  const result = await withCredentialAuthority(() =>
+    verifyReasoningApiCredential({
+      provider: options.provider,
+      model: options.model!,
+      allowPaid: options.allowPaid,
+    })
   );
+  writeJson(verificationPath(options.provider), result);
   print(JSON.stringify(result));
   return result.status === 'success' ? 0 : 1;
 }
@@ -139,11 +229,20 @@ export const runReasoningCredentials = defineScript({
   run: async ({ argv, print }) => {
     try {
       const code = await runCredentialCommand(argv, (value) => print(value));
-      if (code)
-        throw new ScriptExitError(
-          code,
-          'API credentials are not verified; inspect the metadata result or complete the secret introduction approval.'
-        );
+      if (code) {
+        const action = argv.find((arg) => !arg.startsWith('--'));
+        const next =
+          action === 'check'
+            ? 'No usable local allocation. Request approval with assign, apply it, then repeat check.'
+            : action === 'probe'
+              ? 'Tenant task proof failed. Inspect proof.code and the WorkItem attempt; no retry or fallback was used.'
+              : action === 'status'
+                ? 'Credential unavailable in this scope. Register in operator scope or use an approved tenant task binding.'
+                : action === 'register'
+                  ? 'Secret introduction is pending or incomplete. Follow the approval instructions before activation.'
+                  : 'API proof failed. Inspect the metadata code and the credential troubleshooting guide.';
+        throw new ScriptExitError(code, next);
+      }
     } catch (error) {
       if (error instanceof ScriptExitError) throw error;
       throw new ScriptExitError(

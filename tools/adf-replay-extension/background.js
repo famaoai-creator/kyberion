@@ -744,6 +744,13 @@ async function preflightDraft() {
   return { state, preflight: response };
 }
 
+function stepDelivery(stepOp, status) {
+  if (status === 'done')
+    return stepOp === 'navigate' ? 'delivered_verified' : 'delivered_unverified';
+  if (status === 'blocked' || status === 'skipped') return 'not_delivered';
+  return 'unknown';
+}
+
 function buildReceipt(session, lease, status, results) {
   const done = results.filter((entry) => entry.status === 'done').length;
   return {
@@ -757,6 +764,7 @@ function buildReceipt(session, lease, status, results) {
     status,
     lease_id: lease.lease_id,
     summary: `${done}/${results.length} 操作を実行しました（${status}）`,
+    step_outcomes: results,
     created_at: new Date().toISOString(),
   };
 }
@@ -810,6 +818,7 @@ async function runApprovedExecution(draft, session, lease, values) {
           action_id: step.action_id,
           op: step.op,
           status: 'blocked',
+          delivery: stepDelivery(step.op, 'blocked'),
           detail: 'lease に承認ハッシュがありません',
         });
         finalStatus = 'blocked';
@@ -858,6 +867,7 @@ async function runApprovedExecution(draft, session, lease, values) {
       action_id: step.action_id,
       op: step.op,
       status: outcome?.status || 'error',
+      delivery: stepDelivery(step.op, outcome?.status || 'error'),
       detail: outcome?.detail,
     });
     if (
@@ -1482,6 +1492,7 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
         step_index: step.step_index,
         op: step.op,
         status: outcome?.status || 'error',
+        delivery: stepDelivery(step.op, outcome?.status || 'error'),
         detail: outcome?.detail,
       });
       if (
@@ -1581,6 +1592,7 @@ async function runCompiledSteps(procedureId, steps, session, lease, values, segm
     status: finalStatus,
     lease_id: lease.lease_id,
     summary: `${results.filter((r) => r.status === 'done').length}/${results.length} 操作を実行 (${finalStatus})`,
+    step_outcomes: results,
     created_at: new Date().toISOString(),
   };
   try {

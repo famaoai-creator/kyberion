@@ -2,6 +2,32 @@
 
 キーはアカウントの権限・請求先、モデル ID は呼び出すモデルを指定します。1つのキーをモデルと1対1で保存する仕組みではありません。
 
+## 登録から利用までの概念
+
+正準定義は[資格情報のライフサイクル・割り当て・実行境界](../../knowledge/product/architecture/api-credential-proof-boundary.md)です。
+登録・割り当て・束縛・モデル選択・実証を別々に管理します。
+
+| 操作・状態 | 意味                                                      | 現状                                                             |
+| ---------- | --------------------------------------------------------- | ---------------------------------------------------------------- |
+| 登録       | 承認のうえ、キーを既存の保管先へ保存する                  | operator向けの `register` が実装済み                             |
+| 割り当て   | キーの参照先を特定tenantが利用できると承認する            | `assign` と人による承認。既存のstanding Grantを利用              |
+| 束縛       | 検証済みtenant・mission・taskの実行に必要なキーだけを渡す | claim後のtrusted dispatchと `SecretResolver.bindTask` が実装済み |
+| 選択       | 使用するbackend・モデル・経路を決める                     | provider定義と既存の選択・routing設定で管理                      |
+| 実証       | その実行経路で、対象API・モデルを実際に呼べたか確認する   | `verify` が実装済み。利用許可を付与する操作ではない              |
+
+personalは保管・データの区分、tenantは実行時の分離境界です。scopeを切り替えても
+利用許可は増えません。今回登録した個人キーはoperator利用の対象であり、登録だけで
+全tenantから使えるようにはなりません。同じキーを複数tenantで利用する設計でも、
+明示的な割り当てを個別に行い、外部アカウントの請求・上限・鍵の更新影響は共有されます。
+
+登録キーが存在しても、tenant側の割り当てや束縛がなく利用できない状態は正常です。
+tenant実行でキーが欠けた場合にpersonalキーへ戻る動作はありません。
+tenant側はローカル割り当てまたは[タスク束縛プロトコル](../../knowledge/product/orchestration/tenant-task-credential-binding.ja.md)の
+外部secret serviceを使います。[登録から割り当て・タスク実証・取り消しまでの手順](./TENANT_CREDENTIALS.ja.md)を参照してください。
+外部task binderが設定されている場合、その空結果からローカル割り当てへはfallbackしません。
+
+## 現在の登録・確認コマンド
+
 ```bash
 # キーだけ登録。既存の承認付き secret introduction と非表示入力を使う
 pnpm kyberion reasoning credentials register --provider openai
@@ -25,6 +51,16 @@ OpenAI API の canonical mode は `openai-api`、CLI の mode は `codex-cli` �
 Nemotron は `--provider nemotron-api` と `KYBERION_NEMOTRON_MODEL` を使います。初回有効化時に URL が未設定なら NVIDIA の公式 URL を保存します。明示済みの自前ホスト URL は保持します。API 実証は descriptor に定義された公式 URL を検証し、runtime の URL override には従いません。
 
 実証は `Reply with exactly OK.` の公開テスト文だけを、最大128出力トークン・20秒・1回で送ります。再試行・リダイレクト・CLI/backend fallback はしません。OpenRouter の配下 provider fallback も無効です。小さい実証でも料金が発生する可能性があり、金額上限は保証しません。結果は physical scope を使った `active/shared/runtime/health/api-verification/` 配下へ provider・モデル・日時・成否・固定結果コード・出力上限だけを保存します。キー・応答本文・provider の生エラーは保存しません。
+
+`status` の `configured` は現在のスコープでキーを解決できたかを示します。`verified` は
+現在のキーのバージョン・選択モデル・endpoint・実行identity・通信経路と一致する15分以内の実証があるかを示します。
+operatorでの成功はtenantでの成功や、別のCLI・プロセス経路での成功を保証しません。
+`ENOTFOUND` は接続先ホストの名前解決の失敗で、認証拒否やtenant権限不足とは別です。
+DNSは `dns_failed`、401/403/404/429やtimeoutも固定コードで区別します。その他の `request_failed` をDNSと断定しません。
+
+鍵のローテーションと利用許可の取り消しは別操作です。ローカル束縛は次の管理されたAPI利用時にも
+Grant・承認・期限・claim・キーのバージョンを再検証します。送信済みのAPIリクエストは取り消しません。
+外部resolverと起動済みCLIプロセスの失効は、それぞれの管理境界に従います。
 
 ## 既存 API 形式の provider を追加する
 

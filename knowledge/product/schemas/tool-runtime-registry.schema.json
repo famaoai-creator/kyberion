@@ -126,6 +126,11 @@
           "type": "string",
           "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$"
         },
+        "archive": {
+          "type": "string",
+          "enum": ["tar.gz"],
+          "description": "Artifact payloads are archives; after checksum verification every entry is validated as a safe relative path and extracted into dirname(relative_path) so the executable lands at relative_path with its siblings beside it."
+        },
         "artifacts": {
           "type": "object",
           "minProperties": 1,
@@ -135,7 +140,12 @@
             "additionalProperties": false,
             "properties": {
               "url": { "type": "string", "pattern": "^https://" },
-              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+              "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+              "relative_path": {
+                "type": "string",
+                "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/-]+$",
+                "description": "Per-platform override for managed_binary.relative_path (e.g. a .exe suffix on win32)."
+              }
             },
             "required": ["url", "sha256"]
           }

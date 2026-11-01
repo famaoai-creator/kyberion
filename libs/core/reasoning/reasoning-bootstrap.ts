@@ -3,9 +3,11 @@ import {
   registerTaskReasoningBackendFactory,
 } from '../workforce/task-execution-port.js';
 import { constructTaskReasoningBackend } from './reasoning-task-backend.js';
+import { installLocalCredentialAllocations } from '../secret/credential-allocations.js';
 
 registerTaskBackendFactory((mode) => buildReasoningBackendForMode(mode)?.backend);
 registerTaskReasoningBackendFactory((options) => buildTaskReasoningBackend(options));
+installLocalCredentialAllocations();
 
 /**
  * Reasoning Bootstrap — installs a real reasoning / intent-extraction /
@@ -567,6 +569,7 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
 /** Prepare a dispatch host without probing providers or borrowing operator credentials. */
 export function prepareReasoningExecutionHost(): void {
   installSecretResolverIfAvailable();
+  installLocalCredentialAllocations();
 }
 
 /** Build a claimed task's private chain without replacing process-global reasoning/voice seams. */
@@ -627,6 +630,7 @@ function _installReasoningBackendsCore(options: InstallReasoningOptions): boolea
   // Selection consults secret references, so install the configured resolver
   // before resolving routes/mode; first and subsequent calls see the same source.
   installSecretResolverIfAvailable();
+  installLocalCredentialAllocations();
   for (const [role, config] of Object.entries(loadReasoningRouteUserConfig().roles || {})) {
     if (config.selection?.mode === 'fixed') {
       resolveReasoningRoute({ role, requestedMode: options.mode, requestedModel: options.model });

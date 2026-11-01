@@ -928,9 +928,17 @@
       "types": "./dist/compaction-copy-recovery.d.ts",
       "default": "./dist/compaction-copy-recovery.js"
     },
+    "./computer-interaction-outcome": {
+      "types": "./dist/computer-interaction-outcome.d.ts",
+      "default": "./dist/computer-interaction-outcome.js"
+    },
     "./computer-surface": {
       "types": "./dist/virtual/computer-surface.d.ts",
       "default": "./dist/virtual/computer-surface.js"
+    },
+    "./desktop-ax-bridge": {
+      "types": "./dist/desktop-ax-bridge.d.ts",
+      "default": "./dist/desktop-ax-bridge.js"
     },
     "./config-change": {
       "types": "./dist/config-change.d.ts",
@@ -5451,6 +5459,14 @@
     "./reasoning/reasoning-api-provider": {
       "types": "./dist/reasoning/reasoning-api-provider.d.ts",
       "default": "./dist/reasoning/reasoning-api-provider.js"
+    },
+    "./foundation/secret-resolution-session": {
+      "types": "./dist/foundation/secret-resolution-session.d.ts",
+      "default": "./dist/foundation/secret-resolution-session.js"
+    },
+    "./secret/credential-allocations": {
+      "types": "./dist/secret/credential-allocations.d.ts",
+      "default": "./dist/secret/credential-allocations.js"
     },
     "./reasoning/reasoning-api-credentials": {
       "types": "./dist/reasoning/reasoning-api-credentials.d.ts",

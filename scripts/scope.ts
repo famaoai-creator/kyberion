@@ -32,6 +32,13 @@ export const main = defineScript({
   run(context) {
     const args = context.positional;
     const command = args[0] || 'show';
+    if (command === 'operator') {
+      writeScopeEnv({ tier: 'personal' });
+      context.print(
+        'Persisted personal operator scope. Shell environment overrides still apply; confirm with pnpm scope show.'
+      );
+      return;
+    }
     if (command === 'clear') {
       clearScopeEnv();
       context.print('Cleared persisted scope.');
@@ -72,7 +79,7 @@ export const main = defineScript({
       return;
     }
     throw new Error(
-      'Usage: pnpm scope show [--json] | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope push | pnpm scope pop | pnpm scope clear'
+      'Usage: pnpm scope show [--json] | pnpm scope operator | pnpm scope use --tier <tier> [--tenant <slug>] [--organization <id>] [--project <id>] [--mission <id>] [--task <id>] | pnpm scope push | pnpm scope pop | pnpm scope clear'
     );
   },
 });
