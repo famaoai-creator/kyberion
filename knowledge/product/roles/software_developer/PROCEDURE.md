@@ -1,9 +1,17 @@
 ---
 title: 'Role Procedure: Focused Craftsman (Software Developer)'
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 ---
 
 # Role Procedure: Focused Craftsman (Software Developer)
+
+## Engineering playbooks (read before non-trivial code work)
+
+- Defect → `knowledge/product/orchestration/engineering-bug-fix-playbook.md`
+- New behavior → `engineering-feature-playbook.md`; structure-only → `engineering-refactoring-playbook.md`
+- Read-only how/why → `engineering-investigation-playbook.md`
+- Perf one-off → `engineering-perf-playbook.md`; sustained metric → `hillclimb-playbook.md`
+- Index → `pstack-import-map.md` (selective pstack distillation; no poteto-mode router)
 
 ## 1. Identity & Scope
 

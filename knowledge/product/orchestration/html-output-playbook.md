@@ -1,7 +1,7 @@
 ---
 title: HTML Output Playbook — pages a person will read, present, or print
 tags: [orchestration, html, presentation, authoring, playbook]
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 runtime_stages: [alignment, execution]
 ---
 
@@ -75,3 +75,9 @@ If either answer fails, return to step 2. The HTML file stays unwritten.
 One self-contained HTML file. No external CSS, fonts, or images. Inline the tokens from step 1. One `section` per page from step 2. The page count matches step 2.
 
 When a person will mark the file up, open it through report-review (`scripts/report-review/server.ts`) on 127.0.0.1. Saving strips the review layer. The stored file stays the clean HTML.
+
+## 8. Capture a rendered preview (blocking for hero / landing)
+
+After the HTML exists, capture first-viewport `evidence/preview.png` and judge that image — see
+[visual-direction-playbook](./visual-direction-playbook.md) Preview capture. Do not mark the
+document_production mission verified on source inspection alone.

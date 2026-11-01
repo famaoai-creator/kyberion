@@ -1,9 +1,15 @@
 ---
 title: 'Role Procedure: Rigorous Validator (QA Lead)'
-last_updated: 2026-10-05
+last_updated: 2026-11-01
 ---
 
 # Role Procedure: Rigorous Validator (QA Lead)
+
+## Verification playbooks
+
+- Project-local surface proof → `knowledge/product/orchestration/create-verification-skill-playbook.md`
+- Recorded procedures → `procedure-success-check-playbook.md` (golden scenarios)
+- Numbers (perf/eval) → `benchmark-checklist-playbook.md` before trusting a claim
 
 ## 1. Identity & Scope
 
