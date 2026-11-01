@@ -13,7 +13,7 @@
       "path": "active/shared/runtime/autonomy-learning",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "Tenant-partitioned execution receipts and learned autonomy overrides. Never delete automatically: removing incident or deduplication evidence could relax authority or replay execution credit. Retire through explicit retention review."
+      "note": "Tenant-partitioned execution receipts and learned autonomy overrides. Never delete automatically: removing incident or deduplication evidence could relax authority or replay execution credit. Retire through explicit retention review. MSN-STORE-BOUNDS-3: tenant autonomy-outcomes.jsonl is windowed at write time like the shared ledger (max(policy window, 30d) + 7d), dropped rows archived to <partition>/compaction-archive/; the tenant store capability admits only that store's rewrite siblings (namePrefixExact: .compacting-, .compact-out-, .compact-restore-) and archive files one level deep. The overrides file is never trimmed; the directory is never rotated."
     },
     {
       "path": "active/shared/runtime/external-operations",
@@ -782,13 +782,23 @@
       "path": "active/shared/runtime/tenant-ledger",
       "artifact_class": "state",
       "action": "review_required",
-      "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions. MSN-STORE-BOUNDS-2: declared unbounded on purpose: rotation must carry the hash chain across segments (new segment genesis = previous last hash, verify spanning segments), which is not built yet. Appends are O(1) (backward tail) and every reader streams, so size never fails a read; growth is watched by the ops-health directory probe."
+      "note": "D9: hash-chained tenant partitions of the hybrid ledger (libs/core/ledger.ts TENANT_LEDGER_ROOT): <tier>/<tenant>/ledger.jsonl holds the metadata entries (MISSION_EVENT:*) of tenant missions and the detailed entries of tenant records without a mission ledger; the system ledger active/audit/system-ledger.jsonl keeps untenanted records only. Append-only audit evidence verified by pnpm audit:verify, so no TTL deletion and never rewritten; personal/confidential subtrees are tenant_scope protected prefixes, read and written as the tenant-bound tenant_ledger_store role; tenant offboarding exports and soft-deletes a tenant's partitions. MSN-STORE-BOUNDS-3: each <tier>/<tenant>/ledger.jsonl rotates itself into <tier>/<tenant>/ledger-YYYYMMDD-HHmmss[-n].jsonl under the tenant_ledger_store role (same chain-continuing design as active/audit/system-ledger.jsonl); verify, scoped reads and tenant backup/restore include the segments. The directory stays review_required: segments are tenant audit evidence, moved only by operator decision or the audited offboarding ceremony."
     },
     {
       "path": "active/audit",
       "artifact_class": "evidence",
       "action": "review_required",
-      "note": "System hash-chained ledger active/audit/system-ledger.jsonl (ledger.ts) and audit evidence. MSN-STORE-BOUNDS-2: declared unbounded on purpose: rotation must carry the hash chain across segments, which is not built yet. Appends are O(1) (backward tail) and every reader streams, so size never fails a read; removal or rotation requires an explicit retention decision."
+      "note": "Audit evidence directory (the system ledger file has its own entry)."
+    },
+    {
+      "path": "active/audit/system-ledger.jsonl",
+      "artifact_class": "evidence",
+      "action": "rotate",
+      "self_managed": true,
+      "ttl_days": 365,
+      "segment_action": "archive",
+      "audit": true,
+      "note": "System hash-chained ledger (ledger.ts; untenanted records). MSN-STORE-BOUNDS-3: the ledger rotates itself (ledger.ts LEDGER_SEGMENT_ROTATE_BYTES, 64 MiB, under the ledger lock): the live file is renamed to <stem>-YYYYMMDD-HHmmss[-n].jsonl and the new live file opens with a chained, signed LEDGER_SEGMENT_OPENED entry naming the previous segment and its last hash, so the chain continues across files. audit:verify streams every segment then live and reports a broken boundary or a missing middle segment by name; after the oldest segments are archived it verifies from the oldest remaining segment (anchoredFrom). self_managed: write-time maintenance and the janitor never rotate or compact the live file (they would not write the opening entry). Segments are never deleted or rewritten by code; the janitor archives them (never deletes) after ttl_days, oldest first by mtime, so verification keeps a contiguous suffix."
     },
     {
       "path": "active/shared/runtime/compaction-archive",
@@ -840,6 +850,15 @@
       "artifact_class": "log",
       "action": "review_required",
       "note": "iMessage bridge event log (libs/core/imessage-bridge.ts IMESSAGE_LOG_PATH). User conversation records — human retention decision."
+    },
+    {
+      "path": "active/shared/runtime/imessage-bridge/events.jsonl",
+      "artifact_class": "log",
+      "action": "rotate",
+      "ttl_days": 90,
+      "segment_action": "archive",
+      "audit": true,
+      "note": "MSN-STORE-BOUNDS-3: iMessage bridge event log (user conversation records). User decision 2026-11-02: keep 90 days, then archive, never auto-delete. The writer rotates at 8 MiB at write time (imessage-bridge.ts IMESSAGE_LOG_ROTATE_MIN_BYTES); the janitor moves events-YYYYMMDD-HHmmss segments older than 90 days into active/archive/active/shared/runtime/imessage-bridge/ (review_required, never auto-deleted). The bridge identity cannot write the retention audit log, so its RETENTION_ROTATE records go to the audit chain. The directory entry stays review_required for thread-history/."
     },
     {
       "path": "active/shared/runtime/video-leases",

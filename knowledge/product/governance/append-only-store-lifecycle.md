@@ -1,7 +1,7 @@
 ---
 title: 'Append-only JSONL store lifecycle: rotate, compact, window, archive'
 tags: [governance, storage, retention, append-only, jsonl, janitor]
-last_updated: 2026-11-01
+last_updated: 2026-11-02
 ---
 
 # Append-only JSONL store lifecycle
@@ -68,10 +68,9 @@ entry.
 
 1. **Does a reader need every record ever written?** Dedupe registries
    (`ingest/content-hash-registry.jsonl`), idempotency stores, hash chains
-   (`active/audit/system-ledger.jsonl`, tenant ledgers), line-position-keyed stores
+   (`active/audit/system-ledger.jsonl`, tenant ledgers — these rotate into chain-continuing segments, see below), line-position-keyed stores
    (`dot-inbox.jsonl`) — no window or rotation; stream the reader and state the
-   reason in the catalog note. Hash-chained ledgers need chain-aware segment rotation,
-   which is not built yet.
+   reason in the catalog note.
 2. **Is the latest record per key enough?** Use `compact`, after checking that no
    reader counts or compares older versions (KR `signal_ratio` reads 720h of dot
    signals, so the signal ledger uses a window instead).
@@ -85,6 +84,28 @@ entry.
 6. **Never embed unbounded history in a versioned record.** `WorkItem.attempts` is
    capped at `MAX_RETAINED_ITEM_ATTEMPTS` (10) at write time; the complete history
    belongs in the event feed, not in the state store.
+
+## Hash-chained ledgers
+
+`ledger.ts` rotates the system and tenant ledgers itself, under the ledger lock, once
+the live file passes `LEDGER_SEGMENT_ROTATE_BYTES`: the live file becomes
+`<stem>-YYYYMMDD-HHmmss[-n].jsonl`, and the new live file starts with a chained, signed
+`LEDGER_SEGMENT_OPENED` entry naming the previous segment and its last hash. Verification
+streams every segment, then live; findings name the segment
+(`segment_boundary:<segment>:parent_hash_mismatch:after:<previous>`,
+`segment_boundary:<segment>:marker_names:<name>`, `chain_start:<file>:parent_hash_mismatch`).
+Archive segments oldest first only — removing one from the middle breaks verification —
+and declare the live file `self_managed` so nothing else rotates it.
+
+## Narrow store capabilities
+
+A store written under an exact-path capability (e.g. tenant autonomy outcomes) cannot
+stage a rewrite. Admit only that store's rewrite siblings with the scope's
+`namePrefixExact` list (`<store>.compacting-`, `.compact-out-`, `.compact-restore-`,
+`<dir>/compaction-archive/` one level deep; never mkdir beyond the declared archive dir);
+take the store lock and write the retention audit outside the capability, under the
+caller's identity. A writer that cannot write the retention audit log passes
+`audit:` to route RETENTION_* records to the audit chain.
 
 ## Reader contract
 
@@ -119,7 +140,8 @@ one open file (inode) even if the store is rotated or compacted mid-read.
   threshold and on any `.jsonl` over 32 MiB inside a `review_required` runtime directory.
 - ops-health `probeStaleCompactionCopies` warns on any `.compacting-*` copy older than an
   hour: a failed parked rewrite keeps it, parked-aware readers re-read it on every call
-  and agent-input-queue compaction stays skipped until it is merged back and removed.
+  and agent-input-queue compaction stays skipped until it is merged back with
+  `pnpm kyberion storage recover-compaction-copies` (dry-run; approval-gated apply).
 - `scripts/check_runtime_store_retention.ts` fails when source introduces an
   undeclared `active/shared/runtime/<name>` store.
 - The janitor report surfaces `uncoveredRuntimeFiles` for top-level ledgers with no

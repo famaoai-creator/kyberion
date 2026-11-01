@@ -3,6 +3,7 @@ import { nowIso } from './foundation/time.js';
 import * as path from 'node:path';
 import { logger } from './core.js';
 import { maintainStoreAfterAppend } from './append-only-store.js';
+import { auditChain } from './governance/audit-chain.js';
 import { pathResolver } from './path-resolver.js';
 import {
   evaluateBlueBubblesConfiguration,
@@ -120,8 +121,24 @@ export function appendIMessageBridgeEvent(event: Record<string, unknown>): void 
   maintainStoreAfterAppend(
     IMESSAGE_LOG_PATH,
     { action: 'rotate', minBytes: logTuning.rotateMinBytes ?? IMESSAGE_LOG_ROTATE_MIN_BYTES },
-    logTuning.lockTimeoutMs !== undefined ? { lockTimeoutMs: logTuning.lockTimeoutMs } : {}
+    {
+      ...(logTuning.lockTimeoutMs !== undefined ? { lockTimeoutMs: logTuning.lockTimeoutMs } : {}),
+      // The bridge identity cannot write the storage-retention audit log, so
+      // the RETENTION_* record goes to the governed audit chain instead.
+      audit: recordRetentionOnAuditChain,
+    }
   );
+}
+
+function recordRetentionOnAuditChain(record: Record<string, unknown>): void {
+  auditChain.record({
+    agentId: 'imessage-bridge',
+    action: 'storage_retention',
+    operation: String(record.event ?? 'RETENTION'),
+    result: 'completed',
+    reason: typeof record.reason === 'string' ? record.reason : undefined,
+    metadata: record,
+  });
 }
 
 /** Derive capability truth from the installed imsg subcommand help text. */
