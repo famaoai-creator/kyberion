@@ -16378,6 +16378,11 @@
         "ja": "ただいまご判断いただく事項はございません。",
         "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓş ẏőůř ḓėƈïşïőñ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ⟧"
       },
+      "queue.review_scope": {
+        "ja": "委任する範囲と根拠をすべて確認",
+        "en": "Review the full delegated scope and evidence",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ƒůŀŀ ḓėŀėɠȧŧėḓ şƈőṗė ȧñḓ ėṽïḓėñƈė ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
       "queue.type.approval": {
         "en": "Approval",
         "ja": "ご承認",

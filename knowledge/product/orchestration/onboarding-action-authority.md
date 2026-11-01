@@ -82,6 +82,10 @@ PR 本文をファイルから渡す場合、実ファイルの知識/runtime pa
 
 ### 開発を初回同意で委任する
 
+VCS grantはPR作成・push・mergeの操作範囲を定める。継続した実装・修復・レビューの起動は、別途承認されたmanaged work planを既存continuous ownerへ渡す。[継続運営の設定手順](continuous-operations-playbook.md)と[実装計画](../../../docs/developer/CONTINUOUS_DEVELOPMENT_IMPLEMENTATION_PLAN_2026-11-02.ja.md)を参照する。新規plan/alignmentの本人承認、providerへの情報送信制約、secret登録・rotationの専用承認は維持する。
+
+reasoning providerのtask credential allocationと、VCSの既存`gh`認証／登録済みtokenは別の接続である。VCSの操作委任だけで、すべてのtokenが新たにTaskCredentialBindingへ移行したとは解釈しない。tokenをplan・PR本文・checkpointへ保存しない。
+
 設定画面の「リポジトリ開発を委任」は、PR作成・専用候補branchへのpush・統合先branchへのmergeを一つのplanにする。準備済み開発ループが対応する候補 `agent/kyberion-development` と統合先 `main` に固定し、統合先への直接pushは含まない。他のbranchを委任する場合は個別のpush / merge設定を使うが、この開発ループの対象にはならない。同意済み範囲内では操作ごとの承認を繰り返さない。
 
 `onboarding apply` とwizardは既存の `onboarding/delegation-input.json` を案内する。grant-modeの同意は、provisioned NHIの有効化も同時に行う。外部権限を付けず有効化だけ行う場合は従来のactivation planを選べる。private repository向けのCLIテンプレートを実際のvisibility照会で生成する場合は `onboarding apply --verify-repository-visibility` を明示する。既に確認用ファイルがある場合は上書きせず、所有者が変更を確認する。

@@ -225,6 +225,23 @@ afterAll(() => {
   outerRemove(root, { recursive: true, force: true });
 });
 describe('canonical prepared WorkItem review admission', () => {
+  it('submits a verified promotion without the flag rejected by merge queues', () =>
+    run(() => {
+      const publication = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));
+      expect(
+        reader.runPreparedVcsDevelopment({ ...input, dryRun: false }, publication, remote).status
+      ).toBe('queued');
+      expect(publication).toHaveBeenCalledWith(
+        expect.objectContaining({
+          operation: 'pr_merge',
+          params: expect.objectContaining({
+            deleteBranch: false,
+            expectedHeadSha: revision.headSha,
+            expectedBaseSha: revision.baseSha,
+          }),
+        })
+      );
+    }));
   it('admits the real default prepared host using canonical typed transport and stored independent review', () =>
     run(() => {
       const publication = vi.fn(() => ({ status: 0, stdout: '', stderr: '' }));

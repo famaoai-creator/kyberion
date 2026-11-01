@@ -39,6 +39,7 @@ Lifecycle Commands:
                                  --github-owner <OWNER> --github-repo <REPO>
                                  --jira-domain <DOMAIN> --jira-project-key <KEY>
   dispatch-workitems <ID>        Execute registered work items via agent/subagent routing
+                                 --dispatch-item-ids ID,ID (narrow to exact WorkItems)
                                  --dispatch-mode auto|agent|subagent
                                  --dispatch-execution-surface cli_subagent|agent_runtime|hybrid
                                  --dispatch-review-execution-surface cli_subagent|agent_runtime|hybrid

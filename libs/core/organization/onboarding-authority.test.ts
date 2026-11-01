@@ -6,6 +6,49 @@ import { useOnboardingAuthorityFixture } from '../../../tests/helpers/onboarding
 const f = useOnboardingAuthorityFixture();
 const person = { kind: 'person' } as const;
 describe('actual-store onboarding authority', () => {
+  it('installs personal approval scope for trusted onboarding only and refuses public agent parents', async () => {
+    const envelopes = await import('../scope-envelope.js');
+    f.run(() => {
+      const raw = f.input();
+      const preview = f.api.previewOnboardingAuthority(f.principal, raw);
+      const request = f.api.requestOnboardingAuthority(f.principal, raw, preview);
+      expect(
+        f.api.onboardingAuthorityRequestStatus(f.principal, person, request.request_id).status
+      ).toBe('pending');
+      expect(
+        f.approvals.loadApprovalRequest(f.api.ONBOARDING_AUTHORITY_CHANNEL, request.request_id)
+      ).toBeNull();
+      const parent = envelopes.mintScopeEnvelope({
+        identity: { tier: 'public', session_id: 'public-agent-parent' },
+        policy: { read_tiers: ['public'], write_tier: 'public', purpose: 'denial fixture' },
+        env: { ...process.env, KYBERION_TIER: 'public' },
+      });
+      expect(() =>
+        envelopes.withScopeEnvelope(parent, () =>
+          f.api.onboardingAuthorityRequestStatus(f.principal, person, request.request_id)
+        )
+      ).toThrow('personal approval scope conflicts');
+      const foreign = envelopes.mintScopeEnvelope({
+        identity: {
+          tier: 'personal',
+          nhi_id: 'kyberion://agent/foreign/owner',
+          session_id: 'foreign-parent',
+        },
+        policy: {
+          read_tiers: ['public', 'personal'],
+          write_tier: 'personal',
+          purpose: 'foreign denial fixture',
+        },
+        env: { ...process.env, KYBERION_TIER: 'personal' },
+      });
+      expect(() =>
+        envelopes.withScopeEnvelope(foreign, () =>
+          f.api.onboardingAuthorityRequestStatus(f.principal, person, request.request_id)
+        )
+      ).toThrow('personal approval scope conflicts');
+    });
+  });
+
   it('presents changed and resulting delegated decision policies before owner consent', () =>
     f.run(() => {
       const raw = { ...f.input(), delegated_decisions: { meeting_scheduling: 'allow' as const } };
@@ -335,7 +378,7 @@ describe('actual-store onboarding authority', () => {
       );
     }));
   it('rejects agent self-decision and applies an actual signed human decision once', () =>
-    f.run(() => {
+    f.personal(() => {
       const request = f.request();
       const record = f.approvals.loadApprovalRequest(
         f.api.ONBOARDING_AUTHORITY_CHANNEL,
@@ -392,7 +435,7 @@ describe('actual-store onboarding authority', () => {
           { kind: 'organization', tenant_slug: 'fixture-b' },
           request.request_id
         )
-      ).toThrow('outside');
+      ).toThrow('request not found');
       expect(() =>
         f.api.readOnboardingAuthority({ ...f.principal, personalOwner: false }, person)
       ).toThrow('owner');

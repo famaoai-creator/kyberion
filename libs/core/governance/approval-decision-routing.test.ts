@@ -255,6 +255,39 @@ describe('routeAutonomousDecision', () => {
     });
     expect(notifications.notifyOperatorSync).toHaveBeenCalledTimes(1);
   });
+  it('reuses a bound initial request only while its human-readable presentation and scope are unchanged', () => {
+    const input = {
+      role: 'mission_controller' as const,
+      gate: gate({ decision: 'approve', allowed: false }),
+      title: 'Review development scope',
+      question: 'Delegate the exact reviewed development scope?',
+      recommendation: 'Review every linked file',
+      requestedBy: 'continuous-owner',
+      dedupeKey: 'bound-development',
+      accountability: { payloadHash: 'a'.repeat(64), effectBinding: 'continuous-work:one' },
+      evidence: [{ label: 'Full exact plan', ref: 'active/shared/runtime/dot/review.json' }],
+    };
+    const first = routeAutonomousDecision(input);
+    expect(routeAutonomousDecision(input)).toMatchObject({
+      requestId: first.requestId,
+      reused: true,
+    });
+    expect(() =>
+      routeAutonomousDecision({ ...input, question: 'Different hidden automatic effects' })
+    ).toThrow('presentation changed');
+    expect(() => routeAutonomousDecision({ ...input, evidence: [] })).toThrow(
+      'presentation changed'
+    );
+    expect(() =>
+      routeAutonomousDecision({
+        ...input,
+        accountability: { ...input.accountability, payloadHash: 'b'.repeat(64) },
+      })
+    ).toThrow('presentation changed');
+    expect(() => routeAutonomousDecision({ ...input, scope: { tier: 'public' } })).toThrow(
+      'presentation changed'
+    );
+  });
 
   it('holds a non-blocking decision for the digest', () => {
     const routed = routeAutonomousDecision({

@@ -104,12 +104,17 @@ export function createOnboardingExternalOperationAuthority(options: {
     if (!(source.tier in ranks)) return authority;
     let effectiveTier = source.tier as keyof typeof ranks;
     let bodyTenant: string | undefined;
-    if (facts.operationId === 'vcs:pr_create') {
-      const bodyTier = effect.body_source_tier;
+    if (facts.operationId === 'vcs:pr_create' || facts.operationId === 'vcs:push') {
+      const push = facts.operationId === 'vcs:push';
+      const bodyTier = push ? effect.publication_source_tier : effect.body_source_tier;
+      const sourceTenant = push ? effect.publication_source_tenant : effect.body_source_tenant;
+      if (push && !['public', 'confidential', 'personal'].includes(String(bodyTier)))
+        return authority;
       if (bodyTier === 'confidential') {
-        if (typeof effect.body_source_tenant !== 'string') return authority;
-        bodyTenant = effect.body_source_tenant;
+        if (typeof sourceTenant !== 'string') return authority;
+        bodyTenant = sourceTenant;
       }
+      if (bodyTier !== 'confidential' && sourceTenant !== undefined) return authority;
       if (bodyTier !== 'inline') {
         if (typeof bodyTier !== 'string' || !(bodyTier in ranks)) return authority;
         if (ranks[bodyTier as keyof typeof ranks] > ranks[effectiveTier])

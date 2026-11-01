@@ -5,6 +5,7 @@ export {
   workItemExpectsFiles,
 } from './mission-subagent-task.js';
 import { writeMissionNextTasks } from './mission-lifecycle-completion.js';
+import { developmentReviewContentLines } from '../vcs/development-review-content.js';
 import { readMissionTeamSelectionDispatch } from './mission-team-selection.js';
 /**
  * libs/core/mission/mission-workitem-dispatch.ts
@@ -133,6 +134,8 @@ export interface WorkItemExecutionOutcome {
 }
 
 export interface MissionWorkItemDispatchOptions {
+  /** Narrow an owner continuation to its canonical task WorkItems. */
+  itemIds?: string[];
   mode?: MissionWorkItemDispatchMode;
   executionSurface?: MissionExecutionSurface;
   reviewExecutionSurface?: MissionExecutionSurface;
@@ -409,6 +412,9 @@ export function resolveWorkItemArtifactReviewContext(input: {
     .map((evidence) => String(evidence.path || '').trim())
     .filter(Boolean);
   const candidates = [
+    ...(targetTask.target_path === `evidence/development/${reviewTarget}/revision.json`
+      ? [targetTask.target_path]
+      : []),
     diffPath,
     ...resultArtifacts,
     ...reconciledArtifacts,
@@ -437,7 +443,10 @@ export function resolveWorkItemArtifactReviewContext(input: {
   }
 
   const artifactPath = pathResolver.toRepoRelative(artifactAbsolutePath);
-  const artifactKind = inferArtifactReviewKind(artifactPath);
+  const artifactKind =
+    targetTask.target_path === `evidence/development/${reviewTarget}/revision.json`
+      ? 'code'
+      : inferArtifactReviewKind(artifactPath);
   const profile = resolveArtifactReviewerProfile({
     artifactKind,
     missionClass: input.missionState.mission_type,
@@ -530,6 +539,7 @@ export function buildArtifactReviewPromptLines(
     '- Try to falsify every acceptance criterion and inspect the artifact itself.',
     '- Put defects in task_result.review_findings using severity=must_fix|should_fix|nit, location, and instruction.',
     '- Use must_fix only for defects that block acceptance. An empty review_findings array means no defect was found.',
+    ...developmentReviewContentLines(context.artifactAbsolutePath, context.artifactSha256),
   ];
 }
 

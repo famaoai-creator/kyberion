@@ -50,6 +50,15 @@ const mint = (overrides: Record<string, string> = {}, input: Record<string, unkn
 beforeEach(() => resetScopeEnvelopeState());
 
 describe('mintScopeEnvelope', () => {
+  it('allows personal person scope without inventing a tenant, while confidential remains tenant-bound', () => {
+    const personal = mint({ KYBERION_TIER: 'personal', KYBERION_TENANT: '' });
+    expect(personal.identity.tier).toBe('personal');
+    expect(personal.identity.tenant_slug).toBeUndefined();
+    expect(() => mint({ KYBERION_TIER: 'confidential', KYBERION_TENANT: '' })).toThrow(
+      'tenant_slug is required'
+    );
+  });
+
   it('derives identity from authenticated env sources and registers the mint', () => {
     const envelope = mint();
     expect(envelope.identity.tenant_slug).toBe('tenant-a');

@@ -9,6 +9,7 @@
  */
 
 import * as path from 'node:path';
+export { configureMissionDevelopmentGates } from './mission-development-gates.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { readTextFile } from '../foundation/text.js';

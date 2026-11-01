@@ -18,6 +18,7 @@ export function useOnboardingAuthorityFixture() {
     'active/shared/tmp',
     'onboarding-authority-test-' + randomUUID()
   );
+  let personalApprovals: typeof import('@agent/core/governance/authenticated-personal-approvals');
   let api: typeof import('@agent/core/organization/onboarding-authority');
   let authority: typeof import('@agent/core/authority');
   let members: typeof import('@agent/core/organization/member-registry');
@@ -65,6 +66,7 @@ export function useOnboardingAuthorityFixture() {
     vi.stubEnv('KYBERION_OIDC_CLIENT_ID', 'fixture');
     vi.resetModules();
     authority = await import('@agent/core/authority');
+    personalApprovals = await import('@agent/core/governance/authenticated-personal-approvals');
     members = await import('@agent/core/organization/member-registry');
     approvals = await import('@agent/core/governance/approval-store');
     charters = await import('@agent/core/governance/accountability-charter-registry');
@@ -145,8 +147,21 @@ export function useOnboardingAuthorityFixture() {
     installedId = record.nhi_id;
     return record;
   }
-  const approve = (id: string, decision: 'approved' | 'rejected' = 'approved') =>
+  // The fixture uses the actual signed browser principal and installed NHI; run()
+  // deliberately stays unscoped so ambient/public denial tests remain meaningful.
+  const personal = <T>(body: () => T): T =>
     run(() => {
+      if (verified.principal.actor.kind !== 'human')
+        throw new Error('fixture human authentication required');
+      const result = personalApprovals.withAuthenticatedPersonalApprovals(
+        { ...principal, requesterId: verified.principal.actor.id },
+        body
+      );
+      if (result === null) throw new Error('fixture authenticated personal scope unavailable');
+      return result;
+    });
+  const approve = (id: string, decision: 'approved' | 'rejected' = 'approved') =>
+    personal(() => {
       const record = approvals.loadApprovalRequest(api.ONBOARDING_AUTHORITY_CHANNEL, id)!;
       return approvals.decideApprovalRequest('mission_controller', {
         channel: record.channel,
@@ -168,6 +183,7 @@ export function useOnboardingAuthorityFixture() {
     principal,
     input,
     run,
+    personal,
     request,
     approve,
     installAgent,

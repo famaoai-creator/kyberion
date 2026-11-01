@@ -30,6 +30,9 @@ export type WorkflowPhaseGateCheckKind =
   | 'command_succeeds'
   | 'reviewer_approved'
   | 'human_override'
+  | 'development_reviews_verified'
+  | 'development_ci_verified'
+  | 'development_publication_verified'
   | 'deliverable_quality'
   | 'llm_review'
   | 'custom';

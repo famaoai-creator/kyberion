@@ -20,6 +20,8 @@ import {
 } from './development-proof.js';
 import type { VcsCommandRunner, VcsCommandResult } from './git.js';
 import type { VcsHostMutation } from './publication-host.js';
+import { developmentReviewDiff } from './development-review-content.js';
+import { runHardenedGitProbe } from '../shell/git-probe-hardening.js';
 
 export interface PreparedDevelopmentInput {
   cwd: string;
@@ -27,6 +29,8 @@ export interface PreparedDevelopmentInput {
   workItemId: string;
   reviewTaskId: string;
   dryRun?: boolean;
+  /** Continuous development requires actual hash-bound source bytes; legacy manual preparation remains compatible. */
+  requireSourceDiff?: boolean;
 }
 export interface DevelopmentLoopPorts {
   snapshot(): VcsDevelopmentPr;
@@ -187,6 +191,9 @@ export function runPreparedVcsDevelopment(
             method: 'squash',
             expectedHeadSha: pr.headSha,
             expectedBaseSha: pr.baseSha,
+            // Merge-queue repositories reject a client-side deletion request.
+            // Branch retirement is a separate repository/owner lifecycle.
+            deleteBranch: false,
           },
         }),
     },
@@ -197,7 +204,8 @@ export function runPreparedVcsDevelopment(
 export function verifyPreparedWorkItemReview(
   input: PreparedDevelopmentInput,
   pr: VcsDevelopmentPr,
-  ci: VcsDevelopmentCiProof
+  ci: VcsDevelopmentCiProof,
+  options: { missionGate?: boolean; run?: VcsCommandRunner } = {}
 ): { ok: boolean; reason?: string; reviewedBaseSha?: string } {
   try {
     const item = getWorkItem(input.workItemId);
@@ -249,10 +257,45 @@ export function verifyPreparedWorkItemReview(
       receipt.findings.some((f) => f.severity === 'blocking')
     )
       throw new Error('Independent reviewer identity and approval are required');
-    const gate = validateMissionArtifactReviewGate({ missionId, missionPath });
-    if (!gate.ok) throw new Error(gate.reason);
+    if (options.missionGate !== false) {
+      const gate = validateMissionArtifactReviewGate({ missionId, missionPath });
+      if (!gate.ok) throw new Error(gate.reason);
+    }
     const artifactPath = assertSafeRepositoryPath(pathResolver.rootResolve(receipt.artifact.path));
     const manifest = readReviewedDevelopmentManifest(artifactPath, receipt.artifact.sha256);
+    const sourceDiff = developmentReviewDiff(manifest);
+    if (input.requireSourceDiff && sourceDiff === undefined)
+      throw new Error('Continuous development requires an independently reviewed source diff');
+    if (sourceDiff !== undefined) {
+      if (
+        typeof manifest.base_sha !== 'string' ||
+        !/^[a-f0-9]{40,64}$/iu.test(manifest.base_sha) ||
+        (pr.state !== 'merged' && manifest.base_sha !== pr.baseSha) ||
+        manifest.head_sha !== pr.headSha ||
+        !/^[a-f0-9]{40,64}$/iu.test(pr.headSha)
+      )
+        throw new Error('Reviewed code diff requires exact immutable revision identities');
+      const actual = runHardenedGitProbe(
+        [
+          'diff',
+          '--binary',
+          '--no-ext-diff',
+          '--no-textconv',
+          String(manifest.base_sha),
+          String(manifest.head_sha),
+          '--',
+        ],
+        { cwd: input.cwd, maxOutputMB: 1, timeoutMs: 30_000 },
+        options.run
+      );
+      if (
+        actual.error ||
+        actual.status !== 0 ||
+        actual.stdout !== sourceDiff ||
+        receipt.artifact.kind !== 'code'
+      )
+        throw new Error('Reviewed code diff does not bind the immutable current revision');
+    }
     const expected = {
       kind: 'vcs-development-revision',
       version: 1,

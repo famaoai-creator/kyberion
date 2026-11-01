@@ -205,6 +205,8 @@ describe('durable partitioned runtime state', () => {
       }) as string
     );
     expect(protectedRuntimeStatePrefixes()).toEqual([
+      'active/shared/runtime/workspaces/personal/',
+      'active/shared/runtime/workspaces/confidential/',
       'active/shared/runtime/dot/personal/',
       'active/shared/runtime/dot/confidential/',
       'active/shared/runtime/pipeline-library-runs/personal/',
@@ -224,6 +226,19 @@ describe('durable partitioned runtime state', () => {
       'active/shared/runtime/browser-bridge-mailbox/personal/',
       'active/shared/runtime/browser-bridge-mailbox/confidential/',
     ]);
+    expect(
+      partitionedRuntimeStateTierInPath(
+        'active/shared/runtime/workspaces/personal/shared/development/code.ts'
+      )
+    ).toBe('personal');
+    expect(
+      partitionedRuntimeStateTierInPath(
+        'active/shared/runtime/workspaces/confidential/acme/development/code.ts'
+      )
+    ).toBe('confidential');
+    expect(
+      partitionedRuntimeStateTierInPath('active/shared/runtime/workspaces/ws-legacy/code.ts')
+    ).toBeUndefined();
     for (const prefix of protectedRuntimeStatePrefixes())
       expect(policy.tenant_scope.protected_prefixes).toContain(prefix);
     expect(
@@ -346,7 +361,7 @@ describe('durable partitioned runtime state', () => {
 });
 
 describe('tenant approval partitions', () => {
-  it('registers the root as a partitioned ledger root (not state) with only its two store roles', () => {
+  it('registers the ledger root for tenant stores and the exact personal owner store', () => {
     expect(PARTITIONED_RUNTIME_LEDGER_ROOTS.tenant_approvals).toBe(
       'active/shared/runtime/tenant-approvals'
     );
@@ -387,8 +402,23 @@ describe('tenant approval partitions', () => {
       allow_write: [],
     });
     for (const [role, grant] of Object.entries(policy.authority_role_permissions))
-      if (role !== 'tenant_approval_store' && role !== 'tenant_approval_partition_index_reader')
+      if (
+        role !== 'tenant_approval_store' &&
+        role !== 'tenant_approval_partition_index_reader' &&
+        role !== 'personal_approval_store'
+      )
         expect(JSON.stringify(grant)).not.toContain('runtime/tenant-approvals');
+    expect(policy.authority_role_permissions.personal_approval_store).toEqual({
+      allow_read: [
+        'knowledge/product/',
+        'active/shared/runtime/tenant-approvals/personal/shared/',
+        'active/shared/runtime/vitest-approvals/',
+      ],
+      allow_write: [
+        'active/shared/runtime/tenant-approvals/personal/shared/',
+        'active/shared/runtime/vitest-approvals/',
+      ],
+    });
   });
 });
 
