@@ -1,7 +1,7 @@
 {
   "actuator_id": "search-actuator",
   "version": "1.0.0",
-  "description": "Query-origin web search stub and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines.",
+  "description": "Query-origin web search (opt-in RustXNG provider) and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines.",
   "contract_schema": "knowledge/product/schemas/search-action.schema.json",
   "resilience_tier": "adaptive_retry",
   "recovery_policy": {
@@ -11,7 +11,7 @@
   "capabilities": [
     {
       "op": "web_search",
-      "description": "Validates a search query and returns a structured offline stub until a service binding is configured",
+      "description": "Validates a search query and dispatches through the web-search-runtime seam (auto/stub offline; opt-in providers e.g. rustxng)",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "read"
     },

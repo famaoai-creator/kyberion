@@ -37,6 +37,7 @@ import '@agent/core/ingress/public-ingress-seam';
 import '@agent/core/reasoning/reasoning-backend';
 import '@agent/core/risky-op-approval-port';
 import '@agent/core/secret/secret-resolver';
+import '@agent/core/search/web-search-runtime-bridge';
 import '@agent/core/voice/audio-playback';
 import '@agent/core/provider/provider-backend-resolver';
 import '@agent/core/voice/speech-to-text-bridge';

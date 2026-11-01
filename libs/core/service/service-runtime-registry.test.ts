@@ -40,7 +40,7 @@ describe('service-runtime-registry', () => {
     _resetServiceRuntimeRegistryCacheForTests();
   });
 
-  it('loads the canonical comfyui registry entry', () => {
+  it('loads the canonical comfyui and rustxng registry entries', () => {
     const registry = getServiceRuntimeRegistry();
     expect(registry.default_service_id).toBe('comfyui');
     expect(getServiceRuntimeRecord('comfyui')).toMatchObject({
@@ -48,6 +48,13 @@ describe('service-runtime-registry', () => {
       display_name: 'ComfyUI Local Service Runtime',
       kind: 'local_service',
       service_preset_path: 'knowledge/product/orchestration/service-presets/comfyui.json',
+    });
+    expect(getServiceRuntimeRecord('rustxng')).toMatchObject({
+      service_id: 'rustxng',
+      display_name: 'RustXNG Local Search Service',
+      kind: 'local_service',
+      default_base_url: 'http://127.0.0.1:8888',
+      service_preset_path: 'knowledge/product/orchestration/service-presets/rustxng.json',
     });
   });
 
@@ -82,8 +89,11 @@ describe('service-runtime-registry', () => {
   it('lists service runtime inventory with lifecycle metadata', async () => {
     const inventory = await listServiceRuntimeInventory('trial', 'darwin');
     expect(inventory.default_service_id).toBe('comfyui');
-    expect(inventory.items).toHaveLength(1);
-    expect(inventory.items[0]).toMatchObject({
+    expect(inventory.items.map((item) => item.service.service_id).sort()).toEqual([
+      'comfyui',
+      'rustxng',
+    ]);
+    expect(inventory.items.find((item) => item.service.service_id === 'comfyui')).toMatchObject({
       service: expect.objectContaining({ service_id: 'comfyui' }),
       lifecycle_stage: 'trial',
       available: true,

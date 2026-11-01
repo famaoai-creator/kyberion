@@ -1,0 +1,51 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "rustxng",
+      "display_name": "RustXNG Local Search Runtime",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "rustxng",
+        "args": ["--version"],
+        "description": "Probe RustXNG availability without starting the HTTP server."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "rustxng",
+        "args": ["--version"],
+        "description": "Re-check the installed RustXNG binary."
+      },
+      "managed_env_subpath": "tool-runtimes/rustxng",
+      "managed_binary": {
+        "version": "0.26.0",
+        "relative_path": "bin/rustxng",
+        "artifacts": {
+          "darwin-arm64": {
+            "url": "https://github.com/sahenjp/RustXNG/releases/download/v0.26.0/rustxng-v0.26.0-aarch64-apple-darwin",
+            "sha256": "80328ce8a280958a98fa13550cce49a0b3632cd99a8053de741023e8bc0b83a2"
+          },
+          "darwin-x64": {
+            "url": "https://github.com/sahenjp/RustXNG/releases/download/v0.26.0/rustxng-v0.26.0-x86_64-apple-darwin",
+            "sha256": "0bc72fe47ae82b91e19b2e9a290de061e487816855e984020921f72996cc9abf"
+          },
+          "linux-x64": {
+            "url": "https://github.com/sahenjp/RustXNG/releases/download/v0.26.0/rustxng-v0.26.0-x86_64-unknown-linux-gnu",
+            "sha256": "83c63f2e02e5ec937c388a4f00b6ba0ca85ad0246cf0b8e301d823b44578404f"
+          },
+          "win32-x64": {
+            "url": "https://github.com/sahenjp/RustXNG/releases/download/v0.26.0/rustxng-v0.26.0-x86_64-pc-windows-msvc.exe",
+            "sha256": "97662d6cbb490d3452bc0690ee7301b2fef85677365e720a700698753a4ea891",
+            "relative_path": "bin/rustxng.exe"
+          }
+        }
+      },
+      "notes": "Self-hosted SearXNG-compatible search and grounding engine for local agents (https://github.com/sahenjp/RustXNG). AGPL-3.0-or-later: invoke as an external binary over HTTP (127.0.0.1), never vendor or link. Upstream NOTICE states that spawning the binary or talking to its HTTP API keeps the caller under its own licence. Preferred install: `pnpm tool:setup -- --tool rustxng --apply` downloads the checksum-pinned release into the managed env (bin/rustxng). No linux-arm64 artifact in v0.26.0. search-actuator provider=rustxng auto-starts a detached loopback sidecar when /healthz is down (RUSTXNG_IDLE_TIMEOUT via KYBERION_RUSTXNG_IDLE_TIMEOUT, default 300s); disable with KYBERION_RUSTXNG_AUTOSTART=0. Override the binary with KYBERION_RUSTXNG_BIN; override the base URL with KYBERION_RUSTXNG_URL."
+    }
+  ]
+}

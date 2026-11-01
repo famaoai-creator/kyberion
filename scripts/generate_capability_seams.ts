@@ -127,6 +127,10 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/browser/browser-automation-runtime-bridge.ts',
     consumers: ['libs/actuators/browser-actuator/src/browser-runtime-helpers.ts'],
   },
+  'web-search-runtime': {
+    declaration: 'libs/core/search/web-search-runtime-bridge.ts',
+    consumers: ['libs/actuators/search-actuator/src/search-helpers.ts'],
+  },
   'audit-forwarder': {
     declaration: 'libs/core/governance/audit-forwarder.ts',
     consumers: ['libs/core/governance/audit-chain.ts'],

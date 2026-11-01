@@ -213,7 +213,7 @@
     {
       "n": "search-actuator",
       "path": "libs/actuators/search-actuator",
-      "d": "Query-origin web search stub and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines.",
+      "d": "Query-origin web search (opt-in RustXNG provider) and plain-text URL reader. Owns the search query starting point; network-actuator owns fetch transport pipelines.",
       "s": "implemented",
       "version": "1.0.0",
       "capability_count": 2
