@@ -50,6 +50,23 @@ const ALLOWED_COMMANDS = new Set([
   'list-displays',
   'list-surfaces',
   'list-notifications',
+  'focus-window',
+  'resize-window',
+  'move-window',
+  'minimize',
+  'maximize',
+  'restore',
+  'launch',
+  'close-app',
+  'wait',
+  'permissions',
+  'dismiss-notification',
+  'dismiss-all-notifications',
+  'notification-action',
+  'clipboard-get',
+  'clipboard-set',
+  'clipboard-clear',
+  'open-system-surface',
   'session',
   'version',
 ]);
@@ -66,11 +83,24 @@ export interface AgentDesktopDisposition {
   retry?: string;
 }
 
+export interface AgentDesktopRecovery {
+  strategy?: string;
+  retryable?: boolean;
+  requires_fresh_snapshot?: boolean;
+  retry_after_ms?: number;
+}
+
 export interface AgentDesktopEnvelope {
   ok: boolean;
   command?: string;
   data?: unknown;
-  error?: { code?: string; message?: string; retryable?: boolean };
+  error?: {
+    code?: string;
+    message?: string;
+    retryable?: boolean;
+    recovery?: AgentDesktopRecovery;
+    disposition?: AgentDesktopDisposition;
+  };
   disposition?: AgentDesktopDisposition;
 }
 
@@ -139,7 +169,7 @@ export function agentDesktopAvailability(): AgentDesktopAvailability {
   return { available: true, bin, version: version ?? probe.stdout.trim() ?? 'unknown' };
 }
 
-function agentDesktopEnv(sessionId?: string): Record<string, string | undefined> {
+function agentDesktopEnv(sessionId?: string, agentId?: string): Record<string, string | undefined> {
   return {
     ...process.env,
     // An external managed binary never inherits Kyberion's role authority —
@@ -147,6 +177,9 @@ function agentDesktopEnv(sessionId?: string): Record<string, string | undefined>
     SYSTEM_ROLE: '',
     AGENT_DESKTOP_HOME: agentDesktopHome(),
     ...(sessionId ? { AGENT_DESKTOP_SESSION: sessionId } : {}),
+    // Harness subagent id inside the session namespace (upstream --agent-id /
+    // AGENT_DESKTOP_AGENT_ID) — stamped on trace rows for per-actor audit.
+    ...(agentId ? { AGENT_DESKTOP_AGENT_ID: agentId } : {}),
   };
 }
 
@@ -338,6 +371,8 @@ export interface AgentDesktopCallOptions {
   timeoutMs?: number;
   /** Skip the automatic session bootstrap (observation commands that do not need one). */
   requireSession?: boolean;
+  /** Harness subagent id stamped on the upstream trace (AGENT_DESKTOP_AGENT_ID). */
+  agentId?: string;
   /** Internal: set by the session-eviction retry so it can fire at most once. */
   _sessionRetried?: boolean;
 }
@@ -375,7 +410,7 @@ export function runAgentDesktopCommand(
     runtimeSessionId = session.runtimeSessionId;
   }
   let result = safeExecResult(bin, args, {
-    env: agentDesktopEnv(runtimeSessionId),
+    env: agentDesktopEnv(runtimeSessionId, options.agentId),
     timeoutMs: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
     maxOutputMB: MAX_ENVELOPE_BYTES / (1024 * 1024),
   });
@@ -409,7 +444,10 @@ export function runAgentDesktopCommand(
       ok: false,
       code,
       message: String(envelope.error?.message ?? `agent-desktop ${command} failed`),
-      disposition: envelope.disposition,
+      // Upstream stamps per-error delivery disposition inside `error`
+      // (a TIMEOUT can still be delivered_unverified + retry:unsafe);
+      // the top-level disposition field exists on some older envelopes.
+      disposition: envelope.error?.disposition ?? envelope.disposition,
       envelope,
     };
   }
