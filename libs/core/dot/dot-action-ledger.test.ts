@@ -11,8 +11,37 @@ import {
   dotProposalHash,
   readDotActionLedgerStrict,
   assertDotActionJudgmentBinding,
+  resetDotActionLedgerGrowthWarnForTests,
   type DotActionRecord,
 } from './dot-action-ledger.js';
+import { readJsonLines } from '../foundation/json.js';
+
+const ledgerWarn = vi.hoisted(() => vi.fn());
+// Size seam for the strict reader: report the ledger as larger than it is.
+const statInflation = vi.hoisted(() => ({ bytes: 0 }));
+vi.mock('../logger.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../logger.js')>();
+  return {
+    ...actual,
+    createLogger: (name: string, options?: Parameters<typeof actual.createLogger>[1]) => {
+      const real = actual.createLogger(name, options);
+      return name === 'dot-action-ledger' ? { ...real, warn: ledgerWarn } : real;
+    },
+  };
+});
+vi.mock('../secure-io.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../secure-io.js')>();
+  return {
+    ...actual,
+    safeLstat: (...args: Parameters<typeof actual.safeLstat>) => {
+      const stat = actual.safeLstat(...args);
+      if (!statInflation.bytes || !String(args[0]).endsWith('dot-action-ledger.jsonl')) return stat;
+      return Object.assign(Object.create(Object.getPrototypeOf(stat)), stat, {
+        size: stat.size + statInflation.bytes,
+      });
+    },
+  };
+});
 import { dotStatePath } from './dot-state-paths.js';
 import { safeReadFile, safeRmSync, safeMkdir, safeExistsSync } from '../secure-io.js';
 import { appendJsonLine, writeJsonLines } from '../foundation/json.js';
@@ -475,5 +504,102 @@ describe('observeDotActions (R07 status observation)', () => {
     expect(unreadable.anomalies).toBeNull();
     expect(unreadable.actions).toEqual([]);
     expect(unreadable.repair.join(' ')).toContain('counts are unknown');
+  });
+  describe('dot action ledger store bounds', () => {
+    const publicScope = { tier: 'public' as const };
+    const privateScope = { tier: 'confidential' as const, tenant_slug: 'acme' };
+    function row(
+      actionRef: string,
+      status: DotActionRecord['status'],
+      scope: DotActionRecord['scope'],
+      dotId = 'bounds-dot'
+    ): DotActionRecord {
+      return {
+        scope,
+        action_ref: actionRef,
+        dot_id: dotId,
+        actor_id: `dot:${dotId}`,
+        action_id: 'repair',
+        title: `title ${actionRef} ${status}`,
+        objective: 'keep the store bounded',
+        work_shape: 'pipeline',
+        status,
+        proposal_hash: `hash-${actionRef}`,
+        at: '2026-11-01T00:00:00.000Z',
+      };
+    }
+    function seed(): void {
+      appendActionRecord(row('a1', 'admitted', publicScope), { rootDir });
+      appendActionRecord(row('p1', 'admitted', privateScope), { rootDir });
+      appendActionRecord(row('a2', 'parked', publicScope, 'other-dot'), { rootDir });
+      appendActionRecord(row('a1', 'dispatched', publicScope), { rootDir });
+      appendActionRecord(row('p1', 'declined', privateScope), { rootDir });
+      appendActionRecord(row('a3', 'shadow', publicScope), { rootDir });
+    }
+    afterEach(() => {
+      statInflation.bytes = 0;
+      ledgerWarn.mockClear();
+      resetDotActionLedgerGrowthWarnForTests();
+    });
+
+    it('stream-folds across many read chunks with results identical to the whole-file read', () => {
+      seed();
+      // A non-record row is skipped by the readers and counted by the observer, like before.
+      appendJsonLine(`${rootDir}/${DOT_ACTION_LEDGER_PATH}`, 'not-a-record');
+      const tiny = { rootDir, readChunkBytes: 5 };
+      const whole = readJsonLines<DotActionRecord>(`${rootDir}/${DOT_ACTION_LEDGER_PATH}`, {
+        onMalformed: 'skip',
+      }).filter((entry) => typeof entry?.action_ref === 'string');
+
+      const index = readDotActionLedger(tiny);
+      expect(index).toEqual(readDotActionLedger({ rootDir }));
+      expect(index.map((entry) => [entry.action_ref, entry.status])).toEqual(
+        whole.map((entry) => [entry.action_ref, entry.status])
+      );
+      const current = currentDotActions('bounds-dot', tiny);
+      expect(current).toEqual(currentDotActions('bounds-dot', { rootDir }));
+      expect(current.map((entry) => [entry.action_ref, entry.status])).toEqual([
+        ['a1', 'dispatched'],
+        ['p1', 'declined'],
+        ['a3', 'shadow'],
+      ]);
+      expect(current[1].title).toBe('title p1 declined'); // hydrated from the scoped ledger
+      expect(latestDotActions(tiny)).toEqual(latestDotActions({ rootDir }));
+      expect(latestDotActions(tiny)).toHaveLength(4);
+      const strict = readDotActionLedgerStrict({ rootDir, dotId: 'bounds-dot', readChunkBytes: 5 });
+      expect(strict).toEqual(readDotActionLedgerStrict({ rootDir, dotId: 'bounds-dot' }));
+      // Full history is kept: both versions of a1 and p1 are still present.
+      expect(strict.map((entry) => [entry.action_ref, entry.status])).toEqual([
+        ['a1', 'admitted'],
+        ['p1', 'admitted'],
+        ['a1', 'dispatched'],
+        ['p1', 'declined'],
+        ['a3', 'shadow'],
+      ]);
+      const observed = observeDotActions('bounds-dot', tiny);
+      expect(observed).toEqual(observeDotActions('bounds-dot', { rootDir }));
+      expect(observed.anomalies?.malformed_rows).toBe(1);
+    });
+
+    it('reads the strict history past the old 16MB cap', () => {
+      seed();
+      statInflation.bytes = 32 * 1024 * 1024;
+      expect(
+        readDotActionLedgerStrict({ rootDir, dotId: 'bounds-dot', indexOnly: true })
+      ).toHaveLength(5);
+    });
+
+    it('warns on growth once per doubling and never fails the append', () => {
+      const deps = { rootDir, growthWarnBytes: 600 };
+      appendActionRecord(row('g1', 'admitted', publicScope), deps);
+      expect(ledgerWarn).not.toHaveBeenCalled();
+      for (let i = 0; i < 3; i++)
+        appendActionRecord(row(`g${i + 2}`, 'admitted', publicScope), deps);
+      expect(ledgerWarn).toHaveBeenCalledTimes(1);
+      expect(String(ledgerWarn.mock.calls[0][0])).toMatch(/ — .* \| next: .* \| evidence: /);
+      appendActionRecord(row('g9', 'admitted', publicScope), deps);
+      expect(ledgerWarn).toHaveBeenCalledTimes(1); // not yet doubled
+      expect(readDotActionLedger({ rootDir })).toHaveLength(5);
+    });
   });
 });

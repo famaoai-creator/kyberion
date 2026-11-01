@@ -190,6 +190,13 @@ export interface RetentionCatalogEntry {
    * move under `active/archive/` instead of being unlinked.
    */
   segment_action?: RetentionSegmentAction;
+  /**
+   * `action: 'rotate' | 'compact'`: the writer owns live-file retention
+   * (inline maintenance under its own lock — e.g. a dedupe window that must
+   * survive rotation). The janitor never rotates or compacts the live file;
+   * for `rotate` it still expires already-rotated segments by `ttl_days`.
+   */
+  self_managed?: boolean;
   /** `action: 'compact'`: record field that identifies the keyed entity. Required. */
   compact_key?: string;
   /**
@@ -414,6 +421,14 @@ function validateEntry(raw: unknown, index: number): string | null {
       entry.compact_min_bytes <= 0
     ) {
       return `entries[${index}] (${String(entry.path)}): "compact_min_bytes" must be a positive number`;
+    }
+  }
+  if (entry.self_managed !== undefined) {
+    if (typeof entry.self_managed !== 'boolean') {
+      return `entries[${index}] (${String(entry.path)}): "self_managed" must be a boolean`;
+    }
+    if (entry.self_managed && entry.action !== 'rotate' && entry.action !== 'compact') {
+      return `entries[${index}] (${String(entry.path)}): "self_managed" applies only to action "rotate" or "compact"`;
     }
   }
   if (entry.action === 'compact' && entry.compact_key === undefined) {

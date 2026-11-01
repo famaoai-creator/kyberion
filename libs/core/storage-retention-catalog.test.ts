@@ -414,6 +414,40 @@ describe('storage-retention-catalog', () => {
         expect(loadRetentionCatalog({ catalogPath: p }).source).toBe('builtin-defaults');
       }
     });
+
+    it('self_managed: loads on rotate/compact, falls back on other actions or non-booleans', () => {
+      const rotate = {
+        path: 'active/shared/runtime/journal.jsonl',
+        artifact_class: 'log',
+        action: 'rotate',
+        ttl_days: 30,
+      };
+      const ok = loadRetentionCatalog({
+        catalogPath: writeCatalog({
+          version: '1.0.0',
+          entries: [{ ...rotate, self_managed: true }],
+        }),
+      });
+      expect(ok.source).toBe('catalog');
+      expect(ok.entries[0]?.self_managed).toBe(true);
+
+      for (const bad of [
+        { ...rotate, self_managed: 'yes' },
+        {
+          path: 'active/shared/tmp',
+          artifact_class: 'tmp',
+          ttl_days: 1,
+          action: 'delete',
+          self_managed: true,
+        },
+      ]) {
+        const loaded = loadRetentionCatalog({
+          catalogPath: writeCatalog({ version: '1.0.0', entries: [bad] }),
+        });
+        expect(loaded.source).toBe('builtin-defaults');
+        expect(loaded.warnings[0]).toContain('self_managed');
+      }
+    });
   });
 
   describe('valid custom catalog', () => {

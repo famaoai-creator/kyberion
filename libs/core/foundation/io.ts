@@ -13,8 +13,30 @@ export interface FoundationIo {
   createExclusiveFile?(filePath: string, content: string): void;
   exists(filePath: string): boolean;
   readFile(filePath: string, options?: FoundationReadOptions): string;
-  stat(filePath: string): { mtimeMs: number; size: number };
+  stat(filePath: string): { mtimeMs: number; size: number; dev?: number; ino?: number };
+  /**
+   * Bounded byte-range read (secure-io `safeReadFileRange`). Lets streaming
+   * readers (`jsonl-read.ts`) scan a store of any size in fixed chunks
+   * without importing secure-io (which would cycle through audit-chain).
+   */
+  readRange?(filePath: string, position: number, length: number): Buffer;
+  /**
+   * Range reader pinned to one inode for a whole scan (secure-io
+   * `openSafeRangeReader`), so rotation or rename-aside compaction of the
+   * path mid-scan cannot tear the scan. Throws `ENOENT` when missing.
+   */
+  openRangeReader?(filePath: string): FoundationRangeReader;
   writeFile(filePath: string, content: string): void;
+}
+
+/** One open file for repeated range reads; the caller must `close()` it. */
+export interface FoundationRangeReader {
+  /** Size when opened. */
+  readonly size: number;
+  readonly dev: number;
+  readonly ino: number;
+  read(position: number, length: number): Buffer;
+  close(): void;
 }
 
 export interface FoundationReadOptions {

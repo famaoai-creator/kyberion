@@ -500,6 +500,10 @@
       "types": "./dist/app-profiles.d.ts",
       "default": "./dist/app-profiles.js"
     },
+    "./append-only-store": {
+      "types": "./dist/append-only-store.d.ts",
+      "default": "./dist/append-only-store.js"
+    },
     "./apple-intelligence-bridge": {
       "types": "./dist/apple-intelligence-bridge.d.ts",
       "default": "./dist/apple-intelligence-bridge.js"
@@ -2363,6 +2367,10 @@
     "./json-repair": {
       "types": "./dist/json-repair.d.ts",
       "default": "./dist/json-repair.js"
+    },
+    "./jsonl-read": {
+      "types": "./dist/jsonl-read.d.ts",
+      "default": "./dist/jsonl-read.js"
     },
     "./judge-route": {
       "types": "./dist/judge-route.d.ts",

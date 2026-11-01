@@ -322,6 +322,11 @@ export * from './nhi-lifecycle-governance.js';
 
 export * from './storage-retention-catalog.js';
 
+// MSN-STORE-BOUNDS-20261101: size-independent JSONL readers + shared store maintenance.
+export * from './jsonl-read.js';
+
+export * from './append-only-store.js';
+
 export * from './surface/surface-steering-authority.js';
 
 export * from './pipeline/adf-guardrails.js';

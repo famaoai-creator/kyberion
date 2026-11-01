@@ -81,7 +81,7 @@ function healthy(overrides: Partial<OpsHealthInput> = {}): OpsHealthInput {
     triggerStore: {
       path: 'runtime/trigger-deliveries.jsonl',
       size_bytes: 1024,
-      cap_bytes: 5 * 1024 * 1024,
+      warn_bytes: 8 * 1024 * 1024,
     },
     ...overrides,
   };
@@ -314,15 +314,15 @@ describe('evaluateOpsHealth', () => {
       expected: 'unit-double-owner:generation-schedule',
     },
     {
-      name: 'trigger delivery store above 80% of its hard cap',
+      name: 'trigger delivery store above 80% of its growth warning level',
       input: healthy({
         triggerStore: {
           path: 'runtime/trigger-deliveries.jsonl',
-          size_bytes: 4.5 * 1024 * 1024,
-          cap_bytes: 5 * 1024 * 1024,
+          size_bytes: 7 * 1024 * 1024,
+          warn_bytes: 8 * 1024 * 1024,
         },
       }),
-      expected: 'trigger-store-near-cap',
+      expected: 'trigger-store-growth',
     },
   ];
 
@@ -441,21 +441,23 @@ describe('evaluateOpsHealth', () => {
     ]);
   });
 
-  it('names the approval-gated rotate command once the trigger store is at its hard cap', () => {
+  it('warns (never errors) on trigger store growth and names the rotate command past the level', () => {
     const at = (size: number) =>
       evaluateOpsHealth(
         healthy({
           triggerStore: {
             path: 'runtime/trigger-deliveries.jsonl',
             size_bytes: size,
-            cap_bytes: 5 * 1024 * 1024,
+            warn_bytes: 8 * 1024 * 1024,
           },
         }),
         NOW
-      ).findings.find((f) => f.id === 'trigger-store-near-cap')!;
-    expect(at(5 * 1024 * 1024).severity).toBe('error');
-    expect(at(5 * 1024 * 1024).next).toContain('pnpm kyberion scheduler trigger-store rotate');
-    expect(at(4.5 * 1024 * 1024).next).not.toContain('trigger-store rotate');
+      ).findings.find((f) => f.id === 'trigger-store-growth')!;
+    expect(at(64 * 1024 * 1024).severity).toBe('warn');
+    expect(at(8 * 1024 * 1024).severity).toBe('warn');
+    expect(at(8 * 1024 * 1024).next).toContain('pnpm kyberion scheduler trigger-store rotate');
+    expect(at(7 * 1024 * 1024).next).not.toContain('trigger-store rotate');
+    expect(at(8 * 1024 * 1024).reason).not.toMatch(/fail closed|refused/);
   });
 
   it('backup hints point at the keychain introduce command, not an env var', () => {
