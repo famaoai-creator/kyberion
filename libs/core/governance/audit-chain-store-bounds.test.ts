@@ -295,25 +295,30 @@ describe('audit-chain — size-independent append and seed', () => {
     expect(fs.readFileSync(auditFile('2026-07-02'), 'utf8')).toBe(junk);
   });
 
-  // Review R2 (3a): a caller whose own access scope denies the seed read
-  // (narrow role, request resource ceiling) must not throw from record().
-  it('does not throw for a caller whose access scope denies the seed read, and never forks', async () => {
+  // A caller whose own access scope denies the seed read cannot append
+  // without forking the chain, and dropping the record silently would hide
+  // it: record() fails closed with [AUDIT_SCOPE_DENIED] and leaves no state.
+  it('refuses with AUDIT_SCOPE_DENIED when the caller scope denies the seed read, and never forks', async () => {
     const io = rangeIo();
     const first = await freshChain(new Date('2026-07-01T10:00:00.000Z'), io);
     first.auditChain.record(event('day-1'));
     first.restore();
     const second = await freshChain(new Date('2026-07-02T10:00:00.000Z'), io);
-    second.auditChain.record(event('day-2'));
+    const tip = second.auditChain.record(event('day-2'));
     second.restore();
     const day2Size = fs.statSync(auditFile('2026-07-02')).size;
 
     io.failRangeFor = 'audit-2026-07-02.jsonl';
     io.failRangeWith = 'SCOPE_DENIED';
     const next = await freshChain(new Date('2026-07-02T11:00:00.000Z'), io);
-    expect(() => next.auditChain.record(event('narrow-caller'))).not.toThrow();
-    next.restore();
-    // Not chained from day 1's older hash: the write was skipped.
+    expect(() => next.auditChain.record(event('narrow-caller'))).toThrow(/AUDIT_SCOPE_DENIED/);
     expect(fs.statSync(auditFile('2026-07-02')).size).toBe(day2Size);
+
+    // The refused record must not advance the in-memory cursor.
+    io.failRangeFor = undefined;
+    const after = next.auditChain.record(event('allowed-caller'));
+    next.restore();
+    expect(after.previousHash).toBe(tip.currentHash);
   });
 
   // Review R2 (3a): the range reader refuses symlinks that appends follow; a

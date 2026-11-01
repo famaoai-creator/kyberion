@@ -301,9 +301,8 @@ function auditScan(io: AuditChainIo): JsonlScanOptions {
  */
 function isAccessDenial(error: unknown): boolean {
   if ((error as NodeJS.ErrnoException | undefined)?.code) return false;
-  return /\[SECURITY\] Read access denied|\[ROLE_VIOLATION\]|_DENIED\]|_REQUIRED\]/u.test(
-    errorMessage(error)
-  );
+  // Only secure-io's own scope denials — any other coded fault must refuse.
+  return /\[SECURITY\] Read access denied|\[ROLE_VIOLATION\]/u.test(errorMessage(error));
 }
 
 /**
@@ -525,7 +524,7 @@ class AuditChainImpl {
   private entryCount: number = 0;
   /** Why the newest daily file could not be read at the last seed (appends refuse). */
   private seedFault: string | undefined;
-  /** Why the caller's own access scope denied the last seed read (the append is skipped). */
+  /** Why the caller's own access scope denied the last seed read (appends refuse). */
   private seedDenied: string | undefined;
   private auditDir: string;
   private static readonly AUDIT_FILE_RE = /^audit-(\d{4}-\d{2}-\d{2})\.jsonl$/;
@@ -658,6 +657,14 @@ class AuditChainImpl {
         `[AUDIT_CHAIN_TAIL_UNREADABLE] audit chain tail cannot be read — appending would fork the chain | next: restore read access to the newest audit file or repair it | evidence: ${this.seedFault}`
       );
     }
+    if (this.seedDenied) {
+      // The caller's scope cannot read the chain tail. Appending would chain
+      // from a stale cursor and fork; dropping the record silently would hide
+      // it. Fail closed — callers that tolerate a lost audit record catch.
+      throw new Error(
+        `[AUDIT_SCOPE_DENIED] audit record not written — the caller's access scope cannot read the chain tail, so appending could fork the chain | next: record this action outside the narrow role / request scope, or grant it read on active/shared/logs/audit/ | evidence: ${this.seedDenied}`
+      );
+    }
     this.entryCount++;
     const id = `AUD-${Date.now().toString(36).toUpperCase()}-${this.entryCount}`;
     const timestamp = nowIso();
@@ -709,16 +716,6 @@ class AuditChainImpl {
     );
     this.lastHash = nextEntry.currentHash;
 
-    if (this.seedDenied) {
-      // The caller's scope cannot read the chain tail. Its append would be
-      // denied by the same scope, or — if only the append were allowed — would
-      // chain from a stale cursor and fork; either way it is not written, the
-      // same outcome as a failed persist below (logged, record() returns).
-      logger.error(
-        `[AUDIT_CHAIN] Failed to persist ${nextEntry.id} — the caller's access scope cannot read the chain tail, so appending could fork the chain | next: record this action outside the narrow role / request scope, or grant it read on active/shared/logs/audit/ | evidence: ${this.seedDenied}`
-      );
-      return nextEntry;
-    }
     this.appendToFile(nextEntry);
     return nextEntry;
   }
@@ -1002,13 +999,17 @@ class AuditChainImpl {
    * one exists but cannot be read — or holds lines but no readable record —
    * would fork the chain, so that fault is logged and {@link appendUnderLock}
    * refuses to append, like `missing_audit_chain_key`. A read the caller's own
-   * access scope denies is not a damaged chain: {@link appendUnderLock} skips
-   * the write (its append would be denied too, or would fork) and logs it.
+   * access scope denies is not a damaged chain, but appending would still fork
+   * it: {@link appendUnderLock} refuses with [AUDIT_SCOPE_DENIED].
    */
   private seedFromDisk(): void {
     this.seedFault = undefined;
     this.seedDenied = undefined;
     if (!auditIo) return;
+    // Disk is the only source of truth for the cursor: with no readable
+    // record the next entry starts the chain, never from a stale in-memory hash.
+    this.lastHash = GENESIS_HASH;
+    this.entryCount = 0;
     const io = auditIo;
     let files: string[];
     try {

@@ -131,6 +131,23 @@ describe('trigger journal inline rotation', () => {
     expect(siblings(store).filter((file) => file.endsWith('.tmp'))).toEqual([]);
   });
 
+  it('removes temp copies orphaned by a crashed rotation', async () => {
+    const store = newStore('orphan');
+    const now = new Date();
+    const ago = (ms: number) => new Date(now.getTime() - ms).toISOString();
+    const original = Array.from({ length: 600 }, (_, i) =>
+      journalLine(`cron:old-${i}:2026-09-01T00:00`, ago(20 * day))
+    );
+    safeWriteFile(store, `${original.join('\n')}\n`);
+    const orphan = `${store}.rotate-live-99999-deadbeef.tmp`;
+    safeWriteFile(orphan, `${original.join('\n')}\n`);
+
+    await runnerAt(store, now).run(wake('wake:after-crash'), async () => 'd');
+
+    expect(segments(store)).toHaveLength(1);
+    expect(safeExistsSync(orphan)).toBe(false);
+  });
+
   it('skips a rotation that would free less than half of a large journal', async () => {
     const store = newStore('half');
     const now = new Date();
