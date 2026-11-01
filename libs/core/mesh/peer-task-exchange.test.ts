@@ -29,7 +29,8 @@ import {
 } from '../workforce/work-coordination.js';
 import { withExecutionContext } from '../authority.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
-import { peerRuntimeLogicalPath } from './peer-messaging.js';
+import { peerRuntimeLogicalPath, setPeerLedgerStoreTuningForTests } from './peer-messaging.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   safeExistsSync,
@@ -156,6 +157,8 @@ beforeEach(() => {
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  setPeerLedgerStoreTuningForTests({});
+  resetAppendOnlyStoreMaintenanceState();
   for (const peer of [PROPOSER, RECIPIENT, STRANGER]) {
     clearPeerRuntime(TENANT, peer);
     clearPeerConversationRuntime(TENANT, peer);
@@ -572,6 +575,61 @@ describe('peer task exchange', () => {
         runner,
       })
     ).rejects.toThrow(/peer_task_already_decided/);
+  });
+
+  it('folds the ledger to the latest row per direction:task_id at write time', async () => {
+    resetAppendOnlyStoreMaintenanceState();
+    setPeerLedgerStoreTuningForTests({ compactMinBytes: 2048, chunkBytes: 61 });
+    wirePeers();
+    const proposed = await propose();
+    const taskId = proposed.request.task_id;
+    const ledger = peerRuntimeLogicalPath(TENANT, RECIPIENT, 'task-exchange.jsonl');
+    const ledgerLines = (): string[] =>
+      String(safeReadFile(pathResolver.resolve(ledger), { encoding: 'utf8' }))
+        .split('\n')
+        .filter((line) => line.trim());
+    const inbound = getPeerTask(TENANT, RECIPIENT, 'inbound', taskId)!;
+    // Same task id, other direction: a distinct composite key that must survive.
+    const outboundTwin = {
+      ...inbound,
+      direction: 'outbound' as const,
+      state: 'completed' as const,
+    };
+    withExecutionContext('infrastructure_sentinel', () => {
+      appendGovernedArtifactJsonl('infrastructure_sentinel', ledger, outboundTwin);
+      for (let i = 0; i < 12; i++) {
+        appendGovernedArtifactJsonl('infrastructure_sentinel', ledger, {
+          ...inbound,
+          summary: `padding ${i} ${'x'.repeat(80)}`,
+        });
+      }
+    });
+    const seeded = ledgerLines().length;
+
+    // The next real append crosses the threshold and folds the ledger.
+    await decidePeerTask({
+      tenantId: TENANT,
+      localPeerId: RECIPIENT,
+      taskId,
+      decision: 'rejected',
+      actorId: 'operator:test',
+      reason: 'busy',
+      taskCatalogPath: TASK_CATALOG,
+      peerCatalogPath: PEER_CATALOG,
+      runner: vi.fn(okRunner),
+    });
+    expect(ledgerLines().length).toBeLessThan(seeded);
+    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', taskId)!.state).toBe('rejected');
+    expect(getPeerTask(TENANT, RECIPIENT, 'outbound', taskId)!.state).toBe('completed');
+
+    // A torn tail line (crash mid-append) never breaks the reader.
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeWriteFile(
+        pathResolver.resolve(ledger),
+        `${ledgerLines().join('\n')}\n{"task_id":"${taskId}","state":"pen`
+      );
+    });
+    expect(getPeerTask(TENANT, RECIPIENT, 'inbound', taskId)!.state).toBe('rejected');
   });
 
   it('refuses a result from a peer that was not asked, and a re-delivered request is recorded once', async () => {
