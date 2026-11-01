@@ -5,6 +5,7 @@ import { defineCatalog, type GovernedCatalog } from '../foundation/governed-cata
 import { pathResolver } from '../path-resolver.js';
 import { fileEndsWithNewline, readJsonLinesSince } from '../jsonl-read.js';
 import { maintainStoreAfterAppend } from '../append-only-store.js';
+import { parkedCompactionCopies } from '../jsonl-parked-read.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from '../secure-io.js';
 
 /**
@@ -128,26 +129,45 @@ export function recordRuntimeHealthSample(input: {
 /**
  * Samples at or after `now - windowMs`, oldest first. A backward scan that
  * stops at the first older sample, so the cost tracks the window, not the
- * file. Malformed, torn and schema-invalid lines are skipped.
+ * file. Malformed, torn and schema-invalid lines are skipped. While a window
+ * rewrite has the file parked (the live file missing, or recreated by an
+ * append with only the newest samples), the parked copies' windows are read
+ * too; samples repeated between a copy and the published file count once.
  */
 export function loadRuntimeHealthSamples(
   windowMs: number,
   now = Date.now()
 ): RuntimeHealthSample[] {
   const filePath = historyPath();
-  if (!safeExistsSync(filePath)) return [];
-  ensureRegularHistoryFile(filePath);
+  const copies = parkedCompactionCopies(filePath);
+  const liveExists = safeExistsSync(filePath);
+  if (!liveExists && copies.length === 0) return [];
+  if (liveExists) ensureRegularHistoryFile(filePath);
   const since = now - windowMs;
   const catalog = healthSampleCatalog(filePath);
-  return readJsonLinesSince<RuntimeHealthSample | null>(filePath, {
-    onMalformed: 'skip',
-    map: (value, lineNumber) => catalog.validate(value, `${filePath}:${lineNumber}`),
-    timeOf: sampleTime,
-    sinceMs: since,
-  }).filter((sample): sample is RuntimeHealthSample => {
-    const at = sampleTime(sample);
-    return at !== undefined && at >= since;
-  });
+  const windowOf = (file: string): RuntimeHealthSample[] =>
+    readJsonLinesSince<RuntimeHealthSample | null>(file, {
+      onMalformed: 'skip',
+      map: (value, lineNumber) => catalog.validate(value, `${file}:${lineNumber}`),
+      timeOf: sampleTime,
+      sinceMs: since,
+    }).filter((sample): sample is RuntimeHealthSample => {
+      const at = sampleTime(sample);
+      return at !== undefined && at >= since;
+    });
+  if (copies.length === 0) return windowOf(filePath);
+  const seen = new Set<string>();
+  const samples: RuntimeHealthSample[] = [];
+  for (const file of [...copies, filePath]) {
+    for (const sample of windowOf(file)) {
+      const key = JSON.stringify(sample);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      samples.push(sample);
+    }
+  }
+  // Stable: equal timestamps keep file order (copies before the live file).
+  return samples.sort((a, b) => (sampleTime(a) ?? 0) - (sampleTime(b) ?? 0));
 }
 
 export interface RuntimeTrendThresholds {

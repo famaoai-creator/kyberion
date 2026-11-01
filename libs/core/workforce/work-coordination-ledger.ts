@@ -2,8 +2,9 @@
 import * as crypto from 'node:crypto';
 import * as path from 'node:path';
 import { appendJsonLine, writeJson } from '../foundation/json.js';
-import { streamJsonLines } from '../jsonl-read.js';
-import { maintainStoreAfterAppend } from '../append-only-store.js';
+import { streamJsonLines, type JsonlReadOptions } from '../jsonl-read.js';
+import { maintainStoreAfterAppend, writeTimeArchiveDir } from '../append-only-store.js';
+import { streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
 import { logger } from '../core.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { nowIso } from '../foundation/time.js';
@@ -87,9 +88,19 @@ export function runtimeRoot(): string {
 }
 
 const heldCoordinationMutations = new Set<string>();
+
+function coordinationFenceKey(): string {
+  return crypto.createHash('sha256').update(runtimeRoot()).digest('hex');
+}
+
+/** True while this process holds the mutation fence for the current store root. */
+function holdsCoordinationMutation(): boolean {
+  return heldCoordinationMutations.has(coordinationFenceKey());
+}
+
 /** All item/lease/event transitions share one synchronous reentrant inter-process fence. */
 export function withCoordinationMutation<T>(fn: () => T): T {
-  const key = crypto.createHash('sha256').update(runtimeRoot()).digest('hex');
+  const key = coordinationFenceKey();
   if (heldCoordinationMutations.has(key)) return fn();
   return withExecutionContext('infrastructure_sentinel', () =>
     withLockSync(`work-coordination:${key}`, () => {
@@ -140,20 +151,33 @@ export function ensureStore(): void {
  * makes a read fail. Strict by default — the item/lease stores fail closed on
  * a torn or malformed record rather than adopting an unverifiable ID.
  * `tolerant` (the observability event feed) skips such lines and warns once.
+ *
+ * Every item/lease compaction runs inside the mutation fence, so a reader
+ * holding the fence never races one and reads the live file alone (exact
+ * history: `createWorkItemIfAbsent` counts creation snapshots, which the
+ * parked-copy + live union could repeat). A reader outside the fence may run
+ * while another process has the store parked mid-compaction, so it streams
+ * the parked copies, then the live file — never an empty view; rows may
+ * repeat, which the latest-per-id folding of those readers absorbs.
  */
 export function* streamJsonl<T>(
   logicalPath: string,
   options: { tolerant?: boolean } = {}
 ): Generator<T> {
   const file = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
-  if (!safeExistsSync(file)) return;
+  const insideFence = holdsCoordinationMutation();
+  if (insideFence && !safeExistsSync(file)) return;
+  const stream = (readOptions: JsonlReadOptions<T>): Generator<T> =>
+    insideFence
+      ? streamJsonLines<T>(file, readOptions)
+      : streamJsonLinesAcrossCompaction<T>(file, readOptions);
   if (!options.tolerant) {
-    yield* streamJsonLines<T>(file, { chunkBytes: storeTuning.chunkBytes });
+    yield* stream({ chunkBytes: storeTuning.chunkBytes });
     return;
   }
   let malformed = 0;
   let firstMalformedLine = 0;
-  yield* streamJsonLines<T>(file, {
+  yield* stream({
     chunkBytes: storeTuning.chunkBytes,
     onMalformed: (_error, lineNumber) => {
       if (malformed === 0) firstMalformedLine = lineNumber;
@@ -300,13 +324,15 @@ export function boundItemAttempts(item: WorkItem): WorkItem {
  * fail; folding only bounds disk. The policy is explicit rather than
  * `'catalog'` because the namespace / root override moves the store off the
  * catalog's exact path. Runs inside the coordination mutation fence, so the
- * store lock is already held (`lockId: null`); the shared append-only-store
- * rewrite is race-safe for lock-free readers. The pre-compaction union is
- * archived under `<coordination base>/active/archive/jsonl-compaction/`.
+ * store lock is already held (`lockId: null`) and fenced readers never see the
+ * store parked; readers outside the fence go through the parked-aware stream
+ * (see {@link streamJsonl}). The fence runs as `infrastructure_sentinel`,
+ * which may write `active/shared/runtime/` but not `active/archive/`, so the
+ * pre-compaction union is archived next to the store
+ * (`<store dir>/compaction-archive/`, {@link coordinationCompactionArchiveDir}).
  */
 export const WORK_ITEMS_COMPACT_MIN_BYTES = 2 * 1024 * 1024;
 export const WORK_LEASES_COMPACT_MIN_BYTES = 1024 * 1024;
-const COMPACTION_ARCHIVE_REPO_SUBPATH = 'active/archive/jsonl-compaction';
 
 interface WorkCoordinationStoreTuning {
   itemsCompactMinBytes?: number;
@@ -333,18 +359,18 @@ export function workItemCompactionKey(record: Record<string, unknown>): string |
   return typeof id === 'string' && id ? id : undefined;
 }
 
+/** Where a write-time compaction of `filePath` archives the pre-compaction union. */
+export function coordinationCompactionArchiveDir(filePath: string): string {
+  return writeTimeArchiveDir(filePath);
+}
+
 function maintainCoordinationStore(
   filePath: string,
   key: 'item_id' | 'lease_id',
   minBytes: number
 ): void {
   withCoordinationMutation(() => {
-    const base = coordinationBase();
-    const archiveDir = path.join(
-      base,
-      COMPACTION_ARCHIVE_REPO_SUBPATH,
-      path.dirname(path.relative(base, filePath))
-    );
+    const archiveDir = coordinationCompactionArchiveDir(filePath);
     maintainStoreAfterAppend(
       filePath,
       {

@@ -3,6 +3,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   AgentInputQueue,
+  agentInputQueueLockId,
   enqueueMissionAgentInput,
   enqueueSurfaceAgentInput,
   registerMissionAgentInputWorker,
@@ -15,6 +16,8 @@ import {
   safeAppendFileSync,
   safeExistsSync,
   safeMkdir,
+  safeMoveSync,
+  safeReadFile,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
@@ -434,5 +437,45 @@ describe('AgentInputQueue', () => {
     await queue.enqueue({ delivery: 'next_run', text: 'kept' });
     safeAppendFileSync(queuePath, '{"kind":"consumed","entry_');
     await expect(queue.consume('next_run')).rejects.toThrow(/AGENT_INPUT_QUEUE_CORRUPT/);
+  });
+
+  it('keys the queue lock by the resolved file, not by how the caller named the tenant', () => {
+    const lockOf = (queue: AgentInputQueue): string =>
+      (queue as unknown as { lockId: string }).lockId;
+    const implicit = new AgentInputQueue({ missionId: 'PI15-LOCK', queuePath });
+    const explicit = new AgentInputQueue({ missionId: 'PI15-LOCK', queuePath, tenantSlug: 'acme' });
+    expect(lockOf(implicit)).toBe(lockOf(explicit));
+    expect(lockOf(implicit)).toBe(agentInputQueueLockId(queuePath));
+    const other = new AgentInputQueue({
+      missionId: 'PI15-LOCK',
+      queuePath: path.join(tempRoot, 'other.jsonl'),
+    });
+    expect(lockOf(other)).not.toBe(lockOf(implicit));
+  });
+
+  it('reads parked copies so a parked queue never reports consumed input as cleared', async () => {
+    const queue = new AgentInputQueue({ missionId: 'PI15-PARKED', queuePath });
+    const consumed = await queue.enqueue({ delivery: 'next_run', text: 'consume me' });
+    expect(await queue.consume('next_run')).toEqual([consumed]);
+    const pending = await queue.enqueue({ delivery: 'next_run', text: 'still pending' });
+    // A window rewrite that failed (or is mid-flight) left the file parked.
+    safeMoveSync(queuePath, `${queuePath}.compacting-999999-0-initial`);
+    expect(await queue.peek('next_run', 10)).toEqual([pending]);
+    expect(await queue.cancelQueued(consumed.id)).toBe('already_consumed');
+    // The cancel appended to a recreated live file; the union stays coherent.
+    expect(await queue.cancelQueued(pending.id)).toBe('cancelled');
+    expect(await queue.cancelQueued(pending.id)).toBe('already_cleared');
+  });
+
+  it('reads a published rewrite beside its leftover parked copy without false duplicates', async () => {
+    const queue = new AgentInputQueue({ missionId: 'PI15-LEFTOVER', queuePath });
+    const entry = await queue.enqueue({ delivery: 'next_run', text: 'once' });
+    // Between publish and cleanup the live file repeats the copy's records.
+    safeWriteFile(
+      `${queuePath}.compacting-999999-0-initial`,
+      String(safeReadFile(queuePath, { encoding: 'utf8' }))
+    );
+    expect(await queue.consume('next_run')).toEqual([entry]);
+    expect(await queue.cancelQueued(entry.id)).toBe('already_consumed');
   });
 });

@@ -3,7 +3,13 @@ import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
 
 import { sharedTmp } from './path-resolver.js';
-import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-io.js';
+import {
+  safeAppendFileSync,
+  safeExistsSync,
+  safeMkdir,
+  safeRmSync,
+  safeWriteFile,
+} from './secure-io.js';
 import { compactStoreByKey, setAppendOnlyStoreTestHooks } from './append-only-store.js';
 import { parkedCompactionCopies, streamJsonLinesAcrossCompaction } from './jsonl-parked-read.js';
 
@@ -75,5 +81,41 @@ describe('jsonl-parked-read', () => {
       { id: 'a', v: 2 },
       { id: 'b', v: 1 },
     ]);
+  });
+
+  it('keeps parked rows visible after a writer recreates the live file mid-compaction', () => {
+    write([
+      { id: 'task', v: 1 },
+      { id: 'task', v: 2 }, // the completed state
+    ]);
+    let seenDuringPark: Row[] | undefined;
+    setAppendOnlyStoreTestHooks({
+      beforeWriteSurvivors: () => {
+        if (seenDuringPark) return; // the merge round re-runs the hook
+        // Appenders do not take the compaction lock: this recreates the live
+        // file holding only the new row while the history is parked.
+        safeAppendFileSync(live, `${JSON.stringify({ id: 'other', v: 1 })}\n`);
+        expect(parkedCompactionCopies(live)).toHaveLength(1);
+        seenDuringPark = [...streamJsonLinesAcrossCompaction<Row>(live)];
+      },
+    });
+    compactStoreByKey(live, { key: 'id', archiveDir: null });
+    // Parked copies first, then the live file: the completed state is still
+    // visible and the newest row per key wins.
+    expect(seenDuringPark).toEqual([
+      { id: 'task', v: 1 },
+      { id: 'task', v: 2 },
+      { id: 'other', v: 1 },
+    ]);
+    const latest = new Map<string, number>();
+    for (const row of streamJsonLinesAcrossCompaction<Row>(live)) latest.set(row.id, row.v);
+    expect(Object.fromEntries(latest)).toEqual({ task: 2, other: 1 });
+  });
+
+  it('reads leftover parked copies before the live file so the live rows win', () => {
+    write([{ id: 'a', v: 3 }]);
+    safeWriteFile(`${live}.compacting-1-0-initial`, `${JSON.stringify({ id: 'a', v: 1 })}\n`);
+    safeWriteFile(`${live}.compacting-1-1-merge-0`, `${JSON.stringify({ id: 'a', v: 2 })}\n`);
+    expect([...streamJsonLinesAcrossCompaction<Row>(live)].map((row) => row.v)).toEqual([1, 2, 3]);
   });
 });
