@@ -1589,15 +1589,51 @@ describe('backup file selection', () => {
       expect(safeExistsSync(result.target)).toBe(false);
     });
 
-    it('never deletes a pre-existing target it did not create', () => {
+    it('never deletes a pre-existing (empty) target it did not create', () => {
       buildDrillArchive(1);
-      safeWriteFile(`${drillTarget}/operator-notes.txt`, 'keep\n');
+      safeMkdir(drillTarget, { recursive: true });
       const { force: _noForce, ...withoutForce } = drillOptions();
       const result = runRestoreDrill(withoutForce);
       expect(result.targetRemoved).toBe(false);
-      expect(String(safeReadFile(`${drillTarget}/operator-notes.txt`))).toBe('keep\n');
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/notes.md`)).toBe(true);
       // Credential roots are still never extracted into it.
       expect(safeExistsSync(`${drillTarget}/knowledge/personal/connections`)).toBe(false);
+    });
+
+    it('refuses a non-empty target without --force and leaves it untouched', () => {
+      buildDrillArchive(1);
+      safeWriteFile(`${drillTarget}/operator-notes.txt`, 'keep\n');
+      const { force: _noForce, ...withoutForce } = drillOptions();
+      expect(() => runRestoreDrill(withoutForce)).toThrow('[BACKUP_DRILL_TARGET_NOT_EMPTY]');
+      expect(String(safeReadFile(`${drillTarget}/operator-notes.txt`))).toBe('keep\n');
+      expect(safeReaddir(drillTarget)).toEqual(['operator-notes.txt']);
+    });
+
+    it('refuses a symlinked target or one under a symlinked scratch directory', () => {
+      buildDrillArchive(1);
+      const linkedTarget = `${root}-drill-link`;
+      const linkedParent = `${root}-drill-parent-link`;
+      const outsideScratch = `${pathResolver.rootDir()}/active/shared/cache/backup-drill-link-${process.pid}`;
+      try {
+        // A scratch link into scratch itself is still refused (the target is a link).
+        safeMkdir(`${root}-drill-real`, { recursive: true });
+        safeSymlinkSync(`${root}-drill-real`, linkedTarget, 'dir');
+        expect(() => runRestoreDrill({ ...drillOptions(), target: linkedTarget })).toThrow(
+          '[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH]'
+        );
+        // A scratch link to a directory outside scratch must not redirect
+        // extraction or cleanup there.
+        safeWriteFile(`${outsideScratch}/live/state.json`, '{}\n');
+        safeSymlinkSync(outsideScratch, linkedParent, 'dir');
+        expect(() =>
+          runRestoreDrill({ ...drillOptions(), target: `${linkedParent}/live` })
+        ).toThrow('[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH]');
+        expect(safeReaddir(`${outsideScratch}/live`)).toEqual(['state.json']);
+      } finally {
+        for (const link of [linkedTarget, linkedParent]) safeRmSync(link, { force: true });
+        safeRmSync(`${root}-drill-real`, { recursive: true, force: true });
+        safeRmSync(outsideScratch, { recursive: true, force: true });
+      }
     });
 
     it.each([

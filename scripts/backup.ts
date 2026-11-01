@@ -25,6 +25,7 @@ import {
   type TenantRuntimePartitionPath,
 } from '@agent/core/storage-layout';
 import {
+  assertDrillTargetConfined,
   assertNoAppendOnlyConflict,
   assertTenantLedgerPartitionsIntact,
   currentAuditChainKeyId,
@@ -1476,14 +1477,7 @@ export function runRestoreDrill(options: BackupCliOptions): {
   const target = path.resolve(
     options.target || path.join(scratchRoot, `backup-restore-drill-${stamp()}`)
   );
-  // A drill restores over its target and then deletes it: confine it to the
-  // scratch floor so it can never land on (or remove) live state.
-  const scratchRel = path.relative(scratchRoot, target);
-  if (!scratchRel || scratchRel.startsWith('..') || path.isAbsolute(scratchRel)) {
-    throw new Error(
-      `[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH] a restore drill target must lie under ${scratchRoot} | next: omit --target, or pass one such as active/shared/tmp/backup-restore-drill | evidence: ${target}`
-    );
-  }
+  assertDrillTargetConfined(target, scratchRoot, Boolean(options.force));
   if (options.force && safeExistsSync(target)) {
     safeRmSync(target, { recursive: true, force: true });
   }
@@ -1508,7 +1502,8 @@ export function runRestoreDrill(options: BackupCliOptions): {
         ...options,
         archive,
         target,
-        force: options.force ?? true,
+        // Its own fresh (or freshly cloned) target is the drill's to fill.
+        force: options.force || createdByDrill,
       },
       {},
       { withholdRoots: repoCredentialRoots(pathResolver.rootDir()).map(({ root }) => root) }

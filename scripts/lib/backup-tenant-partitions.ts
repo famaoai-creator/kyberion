@@ -27,6 +27,7 @@ import {
   safeMoveSync,
   safeReadFile,
   safeReaddir,
+  safeRealpath,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import {
@@ -79,6 +80,44 @@ export function archiveMembers(plainArchive: string): string[] {
     }
   });
   return names.map((member) => member.trim()).map(normalizeArchiveMember);
+}
+
+/**
+ * A restore drill restores over its target and may then delete it: the target
+ * must be a real directory strictly under the scratch floor, judged on its
+ * canonical location too (a symlinked target or ancestor must not redirect
+ * extraction or cleanup into the checkout), and a non-empty existing target
+ * needs --force.
+ */
+export function assertDrillTargetConfined(
+  target: string,
+  scratchRoot: string,
+  force: boolean
+): void {
+  const outside = (candidate: string, root: string): boolean => {
+    const rel = path.relative(root, candidate);
+    return !rel || rel.startsWith('..') || path.isAbsolute(rel);
+  };
+  let canonicalOutside: boolean;
+  try {
+    canonicalOutside = outside(safeRealpath(target), safeRealpath(scratchRoot));
+  } catch {
+    canonicalOutside = true;
+  }
+  if (
+    outside(target, scratchRoot) ||
+    canonicalOutside ||
+    (safeExistsSync(target) && safeLstat(target).isSymbolicLink())
+  ) {
+    throw new Error(
+      `[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH] a restore drill target must be a real directory under ${scratchRoot} (no symlink) | next: omit --target, or pass one such as active/shared/tmp/backup-restore-drill | evidence: ${target}`
+    );
+  }
+  if (!force && safeExistsSync(target) && safeReaddir(target).length > 0) {
+    throw new Error(
+      `[BACKUP_DRILL_TARGET_NOT_EMPTY] the drill target already holds files | next: pass --force to replace it, or choose an empty target | evidence: ${target}`
+    );
+  }
 }
 
 /** `backup-<stamp>-<id>` / `restore-<stamp>-<id>`: the names withPlaintextTempDir callers use. */
