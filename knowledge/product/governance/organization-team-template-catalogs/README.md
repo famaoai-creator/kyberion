@@ -101,6 +101,9 @@ This means a catalog is a specialization layer, not a replacement layer.
 - `templates.product_development.optional_roles`: adds `product_strategist`, `experience_designer`, and `operator`
 - `templates.product_development.lifecycle`: extends the product development run budget
 - `templates.development.optional_roles`: adds `tester`, `product_strategist`, and `devils_advocate`
+  (note: `devils_advocate` is also **obligatory** for `code_change`/`product_delivery` at
+  `approval_required` or `high_stakes` via `team-composition-obligations.json`
+  `code-change-design-divergence` — templates need not repeat that)
 - `templates.operations.optional_roles`: adds `tester`, `surface_liaison`, and `tracker`
 
 ## When to Add a New Catalog

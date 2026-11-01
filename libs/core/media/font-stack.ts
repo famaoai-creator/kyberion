@@ -1,4 +1,4 @@
-export const DEFAULT_LATIN_FONT = 'Inter';
+export const DEFAULT_LATIN_FONT = 'Helvetica Neue';
 export const DEFAULT_EAST_ASIA_FONT = 'Noto Sans JP';
 export const DEFAULT_COMPLEX_SCRIPT_FONT = DEFAULT_EAST_ASIA_FONT;
 
