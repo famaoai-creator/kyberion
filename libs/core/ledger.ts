@@ -558,6 +558,16 @@ function ledgerSegmentsOf(ledgerPath: string): LedgerSegment[] {
   );
 }
 
+/**
+ * Whether `name` is a file of the chain whose live file is `ledgerFileName`
+ * (e.g. `ledger.jsonl`): the live file itself or one of its rotated segments.
+ */
+export function isLedgerChainFileName(ledgerFileName: string, name: string): boolean {
+  if (name === ledgerFileName) return true;
+  const prefix = `${rotatedSegmentStem(ledgerFileName)}-`;
+  return name.startsWith(prefix) && SEGMENT_SUFFIX.test(name.slice(prefix.length));
+}
+
 /** Rotated segment paths of a ledger, oldest first (chain order). */
 export function listLedgerSegments(ledgerPath: string = GLOBAL_LEDGER_PATH): string[] {
   return ledgerSegmentsOf(safeLedgerPath(ledgerPath)).map((segment) => segment.path);
