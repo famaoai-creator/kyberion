@@ -4,7 +4,9 @@ import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { safeMkdir, safeLstat, assertSafeRepositoryPath } from '../secure-io.js';
-import { appendJsonLine, readJsonLines, writeJsonLines } from '../foundation/json.js';
+import { appendJsonLine, writeJsonLines } from '../foundation/json.js';
+import { jsonlFileSize, streamJsonLines } from '../jsonl-read.js';
+import { createLogger } from '../logger.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { resolvePolicyIdentityContext } from '../identity-context-bridge.js';
 import { withFrontDeskDispatchLock } from '../surface/front-desk-dispatch-lock.js';
@@ -31,6 +33,20 @@ import {
   type DotJudgmentBinding,
 } from './dot-judgment-binding.js';
 export const DOT_ACTION_LEDGER_PATH = 'active/shared/runtime/dot-action-ledger.jsonl';
+
+const logger = createLogger('dot-action-ledger');
+
+/**
+ * Retention: none — the ledger stays `review_required`. Dispatch and recovery
+ * replay full history (`readDotActionLedgerStrict` negative proofs such as
+ * "no row of this action_ref was ever dispatched", and the original `parked`
+ * row a recovery receipt hashes), so folding to latest-per-action_ref or
+ * truncating could re-fire consumed actions. Readers stream (no size cap);
+ * growth past this size only warns, once per doubling.
+ */
+export const DOT_ACTION_LEDGER_GROWTH_WARN_BYTES = 64 * 1024 * 1024;
+let lastGrowthWarnBytes = 0;
+
 export interface DotActionLedgerDeps {
   rootDir?: string;
   now?: () => Date;
@@ -38,6 +54,10 @@ export interface DotActionLedgerDeps {
   dotId?: string;
   /** Complete control-index proof without reading private proposal content. */
   indexOnly?: boolean;
+  /** Range-read chunk size for the streaming readers (tests inject small values). */
+  readChunkBytes?: number;
+  /** Growth-warn threshold override (tests inject small values). */
+  growthWarnBytes?: number;
 }
 
 export type DotActionStatus =
@@ -206,12 +226,20 @@ function hydratePrivateAction(record: DotActionRecord, deps: DotActionLedgerDeps
     deps.rootDir ?? pathResolver.rootDir(),
     dotStatePath({ scope: record.scope }, 'action-ledger.jsonl')
   );
-  const full = readJsonLines<DotActionRecord>(file, { onMalformed: 'skip' }).find(
-    (row) =>
+  let full: DotActionRecord | undefined;
+  for (const row of streamJsonLines<DotActionRecord>(file, {
+    onMalformed: 'skip',
+    chunkBytes: deps.readChunkBytes,
+  })) {
+    if (
       row.action_ref === record.action_ref &&
       !row.private_content_hash &&
       dotActionRecordHash(row) === record.private_content_hash
-  );
+    ) {
+      full = row;
+      break;
+    }
+  }
   if (!full || JSON.stringify(full.scope) !== JSON.stringify(record.scope))
     throw new Error(
       '[DOT_ACTION_CONTENT_UNAVAILABLE] scoped action evidence missing or changed; do not execute the shared index'
@@ -220,15 +248,22 @@ function hydratePrivateAction(record: DotActionRecord, deps: DotActionLedgerDeps
   return full;
 }
 
+/** Streaming shared-index rows (constant memory, no size cap). */
+function* iterateDotActionLedger(deps: DotActionLedgerDeps): Generator<DotActionRecord> {
+  for (const row of streamJsonLines<DotActionRecord>(ledgerFile(deps), {
+    onMalformed: 'skip',
+    chunkBytes: deps.readChunkBytes,
+  })) {
+    if (typeof row?.action_ref !== 'string' || typeof row.dot_id !== 'string') continue;
+    assertPrivateIndexHasNoJudgmentBody(row);
+    yield !row.scope || (row.scope.tier !== 'public' && !row.private_content_hash)
+      ? actionIndex(row)
+      : row;
+  }
+}
+
 export function readDotActionLedger(deps: DotActionLedgerDeps = {}): DotActionRecord[] {
-  return readJsonLines<DotActionRecord>(ledgerFile(deps), { onMalformed: 'skip' })
-    .filter((row) => typeof row?.action_ref === 'string' && typeof row.dot_id === 'string')
-    .map((row) => {
-      assertPrivateIndexHasNoJudgmentBody(row);
-      return !row.scope || (row.scope.tier !== 'public' && !row.private_content_hash)
-        ? actionIndex(row)
-        : row;
-    });
+  return [...iterateDotActionLedger(deps)];
 }
 
 function actionIndex(record: DotActionRecord): DotActionRecord {
@@ -266,7 +301,7 @@ export function migrateLegacyDotActions(
     );
   return withLockSync(actionLedgerLock(deps), () => {
     const file = ledgerFile(deps);
-    const rows = readJsonLines<DotActionRecord>(file);
+    const rows = [...streamJsonLines<DotActionRecord>(file, { chunkBytes: deps.readChunkBytes })];
     let migrated = 0;
     const rewritten = rows.map((row) => {
       if (row.dot_id !== charter.dot_id || row.private_content_hash || row.scope?.tier === 'public')
@@ -295,125 +330,126 @@ export function migrateLegacyDotActions(
 export function readDotActionLedgerStrict(deps: DotActionLedgerDeps = {}): DotActionRecord[] {
   const file = assertSafeRepositoryPath(ledgerFile(deps), { allowMissingLeaf: false });
   const stat = safeLstat(file);
-  if (!stat.isFile() || stat.size > 16 * 1024 * 1024) throw new Error('incomplete_action_evidence');
-  const rows = readJsonLines<unknown>(file)
-    .filter(
-      (row) =>
-        !deps.dotId ||
-        (row && typeof row === 'object' && (row as { dot_id?: string }).dot_id === deps.dotId)
+  // No size cap: the proof streams the full retained history, so a large
+  // ledger never turns into a refusal (growth is warned at append time).
+  if (!stat.isFile()) throw new Error('incomplete_action_evidence');
+  const validateRow = (row: unknown): DotActionRecord => {
+    if (!row || typeof row !== 'object' || Array.isArray(row))
+      throw new Error('invalid_action_evidence');
+    const value = row as Record<string, unknown>;
+    assertPrivateIndexHasNoJudgmentBody(row as DotActionRecord);
+    if (
+      value.private_content_hash !== undefined &&
+      (typeof value.private_content_hash !== 'string' ||
+        !/^[a-f0-9]{64}$/.test(value.private_content_hash))
     )
-    .map((row) => {
-      if (!row || typeof row !== 'object' || Array.isArray(row))
-        throw new Error('invalid_action_evidence');
-      const value = row as Record<string, unknown>;
-      assertPrivateIndexHasNoJudgmentBody(row as DotActionRecord);
+      throw new Error('invalid_action_evidence');
+    if (!value.scope && !deps.indexOnly)
+      throw new Error(
+        '[DOT_STATE_MIGRATION_REQUIRED] legacy action evidence has no trustworthy scope'
+      );
+    if (
+      ![
+        'action_ref',
+        'dot_id',
+        'actor_id',
+        'action_id',
+        'title',
+        'objective',
+        'proposal_hash',
+        'at',
+      ].every((key) => typeof value[key] === 'string' && (value[key] as string).trim()) ||
+      !Number.isFinite(Date.parse(value.at as string)) ||
+      !['mission', 'task_session', 'pipeline', 'direct_reply'].includes(String(value.work_shape)) ||
+      ![
+        'admitted',
+        'dispatched',
+        'parked',
+        'waiting_capacity',
+        'refused',
+        'shadow',
+        'declined',
+      ].includes(String(value.status)) ||
+      !['decision', 'gate_decision', 'floor'].every(
+        (key) =>
+          value[key] === undefined || ['auto', 'notify', 'approve'].includes(String(value[key]))
+      ) ||
+      ![
+        'request_id',
+        'work_item_id',
+        'handoff_to',
+        'reason',
+        'pipeline_ref',
+        'target',
+        'intent',
+        'rationale',
+        'disposition_by',
+      ].every((key) => value[key] === undefined || typeof value[key] === 'string') ||
+      (value.admission !== undefined && !isDotAdmissionIdentity(value.admission)) ||
+      (value.admission_only !== undefined && typeof value.admission_only !== 'boolean') ||
+      (value.gate_action_id !== undefined && typeof value.gate_action_id !== 'string') ||
+      (value.front_desk_execution !== undefined &&
+        !parseFrontDeskExecutionBinding(value.front_desk_execution)) ||
+      (value.recovery_receipt !== undefined &&
+        (!parseFrontDeskExecutionRecoveryReceipt(value.recovery_receipt) ||
+          value.status !== 'declined'))
+    )
+      throw new Error('invalid_action_evidence');
+    if (value.mission_admission !== undefined)
+      parseMissionAdmissionRequest(value.mission_admission);
+    const object = (entry: unknown): entry is Record<string, unknown> =>
+      Boolean(entry && typeof entry === 'object' && !Array.isArray(entry));
+    const link = (entry: unknown): boolean =>
+      object(entry) && typeof entry.dot_id === 'string' && typeof entry.action_ref === 'string';
+    if (
+      (value.priority !== undefined &&
+        !['low', 'normal', 'high', 'urgent'].includes(String(value.priority))) ||
+      (value.expected_effect !== undefined &&
+        (!object(value.expected_effect) ||
+          !['increase', 'decrease', 'maintain'].includes(String(value.expected_effect.direction)) ||
+          !['kr_id', 'signal'].every(
+            (key) =>
+              (value.expected_effect &&
+                (value.expected_effect as Record<string, unknown>)[key] === undefined) ||
+              typeof (value.expected_effect as Record<string, unknown>)[key] === 'string'
+          ))) ||
+      (value.superseded_by !== undefined && !link(value.superseded_by)) ||
+      (value.escalation !== undefined &&
+        (!object(value.escalation) ||
+          typeof value.escalation.check_id !== 'string' ||
+          typeof value.escalation.reason !== 'string' ||
+          (value.escalation.link !== undefined && !link(value.escalation.link)) ||
+          (value.escalation.links !== undefined &&
+            (!Array.isArray(value.escalation.links) || !value.escalation.links.every(link)))))
+    )
+      throw new Error('invalid_action_evidence');
+    if (value.recovery_receipt !== undefined) {
+      const receipt = parseFrontDeskExecutionRecoveryReceipt(value.recovery_receipt)!;
       if (
-        value.private_content_hash !== undefined &&
-        (typeof value.private_content_hash !== 'string' ||
-          !/^[a-f0-9]{64}$/.test(value.private_content_hash))
+        receipt.action_ref !== value.action_ref ||
+        receipt.approval_request_id !== value.request_id ||
+        recoveryEvidenceHash(receipt.binding) !== recoveryEvidenceHash(value.front_desk_execution)
       )
-        throw new Error('invalid_action_evidence');
-      if (!value.scope && !deps.indexOnly)
-        throw new Error(
-          '[DOT_STATE_MIGRATION_REQUIRED] legacy action evidence has no trustworthy scope'
-        );
-      if (
-        ![
-          'action_ref',
-          'dot_id',
-          'actor_id',
-          'action_id',
-          'title',
-          'objective',
-          'proposal_hash',
-          'at',
-        ].every((key) => typeof value[key] === 'string' && (value[key] as string).trim()) ||
-        !Number.isFinite(Date.parse(value.at as string)) ||
-        !['mission', 'task_session', 'pipeline', 'direct_reply'].includes(
-          String(value.work_shape)
-        ) ||
-        ![
-          'admitted',
-          'dispatched',
-          'parked',
-          'waiting_capacity',
-          'refused',
-          'shadow',
-          'declined',
-        ].includes(String(value.status)) ||
-        !['decision', 'gate_decision', 'floor'].every(
-          (key) =>
-            value[key] === undefined || ['auto', 'notify', 'approve'].includes(String(value[key]))
-        ) ||
-        ![
-          'request_id',
-          'work_item_id',
-          'handoff_to',
-          'reason',
-          'pipeline_ref',
-          'target',
-          'intent',
-          'rationale',
-          'disposition_by',
-        ].every((key) => value[key] === undefined || typeof value[key] === 'string') ||
-        (value.admission !== undefined && !isDotAdmissionIdentity(value.admission)) ||
-        (value.admission_only !== undefined && typeof value.admission_only !== 'boolean') ||
-        (value.gate_action_id !== undefined && typeof value.gate_action_id !== 'string') ||
-        (value.front_desk_execution !== undefined &&
-          !parseFrontDeskExecutionBinding(value.front_desk_execution)) ||
-        (value.recovery_receipt !== undefined &&
-          (!parseFrontDeskExecutionRecoveryReceipt(value.recovery_receipt) ||
-            value.status !== 'declined'))
-      )
-        throw new Error('invalid_action_evidence');
-      if (value.mission_admission !== undefined)
-        parseMissionAdmissionRequest(value.mission_admission);
-      const object = (entry: unknown): entry is Record<string, unknown> =>
-        Boolean(entry && typeof entry === 'object' && !Array.isArray(entry));
-      const link = (entry: unknown): boolean =>
-        object(entry) && typeof entry.dot_id === 'string' && typeof entry.action_ref === 'string';
-      if (
-        (value.priority !== undefined &&
-          !['low', 'normal', 'high', 'urgent'].includes(String(value.priority))) ||
-        (value.expected_effect !== undefined &&
-          (!object(value.expected_effect) ||
-            !['increase', 'decrease', 'maintain'].includes(
-              String(value.expected_effect.direction)
-            ) ||
-            !['kr_id', 'signal'].every(
-              (key) =>
-                (value.expected_effect &&
-                  (value.expected_effect as Record<string, unknown>)[key] === undefined) ||
-                typeof (value.expected_effect as Record<string, unknown>)[key] === 'string'
-            ))) ||
-        (value.superseded_by !== undefined && !link(value.superseded_by)) ||
-        (value.escalation !== undefined &&
-          (!object(value.escalation) ||
-            typeof value.escalation.check_id !== 'string' ||
-            typeof value.escalation.reason !== 'string' ||
-            (value.escalation.link !== undefined && !link(value.escalation.link)) ||
-            (value.escalation.links !== undefined &&
-              (!Array.isArray(value.escalation.links) || !value.escalation.links.every(link)))))
-      )
-        throw new Error('invalid_action_evidence');
-      if (value.recovery_receipt !== undefined) {
-        const receipt = parseFrontDeskExecutionRecoveryReceipt(value.recovery_receipt)!;
-        if (
-          receipt.action_ref !== value.action_ref ||
-          receipt.approval_request_id !== value.request_id ||
-          recoveryEvidenceHash(receipt.binding) !== recoveryEvidenceHash(value.front_desk_execution)
-        )
-          throw new Error('invalid_recovery_action_evidence');
-      }
-      const record = row as DotActionRecord;
-      if (record.private_content_hash === undefined) assertDotActionJudgmentBinding(record);
-      const index =
-        !record.scope || (record.scope.tier !== 'public' && !record.private_content_hash)
-          ? actionIndex(record)
-          : record;
-      if (deps.indexOnly) return index;
-      return hydratePrivateAction(index, deps);
-    });
+        throw new Error('invalid_recovery_action_evidence');
+    }
+    const record = row as DotActionRecord;
+    if (record.private_content_hash === undefined) assertDotActionJudgmentBinding(record);
+    const index =
+      !record.scope || (record.scope.tier !== 'public' && !record.private_content_hash)
+        ? actionIndex(record)
+        : record;
+    if (deps.indexOnly) return index;
+    return hydratePrivateAction(index, deps);
+  };
+  const rows: DotActionRecord[] = [];
+  for (const row of streamJsonLines<unknown>(file, { chunkBytes: deps.readChunkBytes })) {
+    if (
+      deps.dotId &&
+      !(row && typeof row === 'object' && (row as { dot_id?: string }).dot_id === deps.dotId)
+    )
+      continue;
+    rows.push(validateRow(row));
+  }
   const after = safeLstat(file);
   if (after.ino !== stat.ino || after.size !== stat.size || after.mtimeMs !== stat.mtimeMs)
     throw new Error('action_evidence_changed');
@@ -520,6 +556,7 @@ export function appendActionRecord(
       const index = actionIndex(record);
       appendJsonLine(filePath, index);
     } else appendJsonLine(filePath, record);
+    warnOnLedgerGrowth(filePath, deps);
     return record;
   };
   const lockedWrite = () => withLockSync(actionLedgerLock(deps), write);
@@ -528,13 +565,33 @@ export function appendActionRecord(
     : lockedWrite();
 }
 
+/** Growth warns (P3) — never fails the append; the ledger has no automatic retention. */
+function warnOnLedgerGrowth(filePath: string, deps: DotActionLedgerDeps): void {
+  try {
+    const threshold = deps.growthWarnBytes ?? DOT_ACTION_LEDGER_GROWTH_WARN_BYTES;
+    const size = jsonlFileSize(filePath);
+    if (size < Math.max(threshold, 2 * lastGrowthWarnBytes)) return;
+    lastGrowthWarnBytes = size;
+    logger.warn(
+      `${DOT_ACTION_LEDGER_PATH} is ${size} bytes (warn threshold ${threshold}) — the ledger is replayed history with no automatic retention | next: review retention in storage-retention-catalog.json (entry is review_required) | evidence: ${filePath}`
+    );
+  } catch {
+    // Observability only; the append already succeeded.
+  }
+}
+
+/** Test seam: forget the growth-warn hysteresis. */
+export function resetDotActionLedgerGrowthWarnForTests(): void {
+  lastGrowthWarnBytes = 0;
+}
+
 /** Latest state per action_ref for one dot (insertion order preserved). */
 export function currentDotActions(
   dotId: string,
   deps: DotActionLedgerDeps = {}
 ): DotActionRecord[] {
   const latest = new Map<string, DotActionRecord>();
-  for (const row of readDotActionLedger(deps)) {
+  for (const row of iterateDotActionLedger(deps)) {
     if (row.dot_id === dotId) latest.set(row.action_ref, hydratePrivateAction(row, deps));
   }
   return [...latest.values()];
@@ -546,7 +603,7 @@ export function currentDotActions(
  */
 export function latestDotActions(deps: DotActionLedgerDeps = {}): DotActionRecord[] {
   const latest = new Map<string, DotActionRecord>();
-  for (const row of readDotActionLedger(deps)) {
+  for (const row of iterateDotActionLedger(deps)) {
     try {
       latest.set(row.action_ref, hydratePrivateAction(row, deps));
     } catch {
@@ -633,29 +690,41 @@ export function observeDotActions(
 ): DotActionObservation {
   const file = ledgerFile(deps);
   let malformed = 0;
-  let rows: DotActionRecord[];
+  const unreadable = (): DotActionObservation => ({
+    integrity: 'integrity_error',
+    actions: [],
+    index_only: [],
+    anomalies: null,
+    repair: [
+      "the shared action index could not be read, so even row counts are unknown — check this process's scope, then re-run status under an identity that may read it",
+    ],
+  });
+  let rows: Iterator<DotActionRecord>;
   try {
-    rows = readJsonLines<DotActionRecord>(file, {
+    rows = streamJsonLines<DotActionRecord>(file, {
+      chunkBytes: deps.readChunkBytes,
       onMalformed: () => {
         malformed += 1;
       },
-    });
+    })[Symbol.iterator]();
   } catch {
-    return {
-      integrity: 'integrity_error',
-      actions: [],
-      index_only: [],
-      anomalies: null,
-      repair: [
-        "the shared action index could not be read, so even row counts are unknown — check this process's scope, then re-run status under an identity that may read it",
-      ],
-    };
+    return unreadable();
   }
   const latest = new Map<string, DotActionRecord>();
   const indexOnly = new Map<string, DotActionRecord>();
   let missingEvidence = 0;
   let notVisible = 0;
-  for (const row of rows) {
+  for (;;) {
+    // Only a failure to read the index itself is "unreadable"; per-row
+    // hydrate failures are counted below.
+    let next: IteratorResult<DotActionRecord>;
+    try {
+      next = rows.next();
+    } catch {
+      return unreadable();
+    }
+    if (next.done) break;
+    const row = next.value;
     if (!row || typeof row.action_ref !== 'string' || typeof row.dot_id !== 'string') {
       malformed += 1;
       continue;
