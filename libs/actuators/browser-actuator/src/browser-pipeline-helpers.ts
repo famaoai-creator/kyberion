@@ -32,7 +32,7 @@ import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-fai
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { opControl } from './browser-control-helpers.js';
-import { type CDPSession, type Page } from '@playwright/test';
+import { type Page } from '@playwright/test';
 import * as path from 'node:path';
 import { resolveRegisteredBrowserProfile } from './browser-profile-provider-registry.js';
 import {
@@ -48,43 +48,8 @@ interface PipelineStep {
   params: Record<string, unknown>;
 }
 
-export interface BrowserRuntime {
-  context: any;
-  tabs: Map<string, Page>;
-  pageIds: WeakMap<Page, string>;
-  cdpSessions: WeakMap<Page, CDPSession>;
-  activeTabId: string;
-  consoleEvents: Array<{
-    tab_id: string;
-    type: string;
-    text: string;
-    ts: string;
-  }>;
-  networkEvents: Array<{
-    tab_id: string;
-    method: string;
-    url: string;
-    resourceType: string;
-    ts: string;
-  }>;
-  navigationPolicy?: {
-    allowed_origins?: string[];
-    allow_private_network?: boolean;
-    allow_data_url?: boolean;
-  };
-  webAuthn?: {
-    authenticatorId?: string;
-    enabled: boolean;
-    options?: Record<string, any>;
-    credentials: Array<Record<string, any>>;
-    events: Array<{
-      type: string;
-      credential?: Record<string, any>;
-      credentialId?: string;
-      ts: string;
-    }>;
-  };
-}
+export type { BrowserRuntime } from './browser-runtime-types.js';
+import type { BrowserRuntime } from './browser-runtime-types.js';
 
 export interface BrowserRuntimeLeaseLike {
   userDataDir: string;
