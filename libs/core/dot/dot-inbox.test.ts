@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { readJsonLines } from '../foundation/json.js';
+import { appendJsonLine, readJsonLines } from '../foundation/json.js';
+import { streamJsonLines } from '../jsonl-read.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   appendDotInboxEntry as appendScopedDotInboxEntry,
@@ -14,6 +15,7 @@ import {
   isDotWakeChannel,
   dotInboxPath,
   dotInboxRowWakesCharter,
+  setDotInboxTestHooks,
 } from './dot-inbox.js';
 
 const TEST_ROOT = 'active/shared/tmp/dot-inbox-tests';
@@ -21,6 +23,7 @@ const appendDotInboxEntry = (input: DotInboxEntryInput, deps?: DotInboxAppendDep
   appendScopedDotInboxEntry({ ...input, scope: input.scope ?? { tier: 'public' } }, deps);
 
 afterEach(() => {
+  setDotInboxTestHooks({});
   safeRmSync(TEST_ROOT, { recursive: true, force: true });
 });
 
@@ -277,5 +280,123 @@ describe('compactDotInbox', () => {
     const r = compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 });
     expect(r.tombstoned).toBe(0);
     expect(safeReadFile(inbox(TEST_ROOT)) as string).not.toContain('tombstone');
+  });
+
+  it('streams a chunked compaction with blank, CRLF and torn lines — wake keys unchanged', () => {
+    const row = (text: string): string =>
+      JSON.stringify({
+        channel: 'inbox',
+        dot_id: 'repo-guardian',
+        scope: { tier: 'public' },
+        text,
+        enqueued_at: new Date().toISOString(),
+      });
+    // blank line, CRLF terminator, a malformed line and a torn tail
+    const raw = `${row('a')}\n\n${row('consumed')}\r\n${row('b')}\nnot-json\n${row('c')}\n{"torn":`;
+    safeMkdir(`${TEST_ROOT}/active/shared/runtime`, { recursive: true });
+    safeWriteFile(inbox(TEST_ROOT), raw);
+    // Keys exactly as the old whole-file consumer derived them.
+    const oldLines = raw.split(/\r?\n/);
+    const oldKeys = new Map<number, string>();
+    oldLines.forEach((line, i) => {
+      if (line.trim()) oldKeys.set(i + 1, dotInboxWakeKey(i + 1, line));
+    });
+    // The streamed reader numbers lines identically.
+    const streamed = [
+      ...streamJsonLines<{ text?: string; n: number; line: string }>(inbox(TEST_ROOT), {
+        onMalformed: 'skip',
+        chunkBytes: 11,
+        map: (value, n, line) => ({ ...(value as { text?: string }), n, line }),
+      }),
+    ];
+    expect(streamed.map((r) => r.n)).toEqual([1, 3, 4, 6]);
+    for (const r of streamed) expect(dotInboxWakeKey(r.n, r.line)).toBe(oldKeys.get(r.n));
+
+    safeWriteFile(
+      ledger(TEST_ROOT),
+      JSON.stringify({
+        dot_id: 'repo-guardian',
+        trigger_key: oldKeys.get(3),
+        outcome: 'delivered',
+        fired_at: new Date().toISOString(),
+      }) + '\n'
+    );
+    safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/dots/dot.json`, JSON.stringify(CHARTER) + '\n');
+
+    const r = compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1, chunkBytes: 17 });
+    expect(r.tombstoned).toBe(1);
+    expect(r.scanned).toBe(oldLines.length);
+
+    const after = (safeReadFile(inbox(TEST_ROOT)) as string).split('\n');
+    expect(after[2]).toBe('{"tombstone":true}');
+    // Every surviving line sits at its old index with identical text, so the
+    // keys the consumer re-derives are unchanged.
+    oldLines.forEach((line, i) => {
+      if (i === 2) return;
+      expect(after[i]).toBe(line);
+      if (line.trim()) expect(dotInboxWakeKey(i + 1, after[i]!)).toBe(oldKeys.get(i + 1));
+    });
+  });
+  it('never overwrites a row appended mid-compaction — aborts and keeps it', () => {
+    appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'pending' },
+      { rootDir: TEST_ROOT }
+    );
+    appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'consumed' },
+      { rootDir: TEST_ROOT }
+    );
+    const before = (safeReadFile(inbox(TEST_ROOT)) as string).split('\n');
+    safeWriteFile(
+      ledger(TEST_ROOT),
+      JSON.stringify({
+        dot_id: 'repo-guardian',
+        trigger_key: dotInboxWakeKey(2, before[1]!),
+        outcome: 'delivered',
+        fired_at: new Date().toISOString(),
+      }) + '\n'
+    );
+    safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/dots/dot.json`, JSON.stringify(CHARTER) + '\n');
+    // A writer outside the lock lands a wake after the audit, before the move.
+    setDotInboxTestHooks({
+      beforeCompactMove: (file) =>
+        appendJsonLine(file, {
+          channel: 'inbox',
+          dot_id: 'repo-guardian',
+          text: 'late',
+          scope: { tier: 'public' },
+        }),
+    });
+    expect(() => compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 })).toThrow(
+      /grew during compaction/
+    );
+    const after = readJsonLines<{ text?: string }>(inbox(TEST_ROOT));
+    expect(after.map((r) => r.text)).toEqual(['pending', 'consumed', 'late']);
+
+    // Through the append path (compaction after the locked append): the wake survives too.
+    setDotInboxTestHooks({
+      beforeCompactMove: (file) =>
+        appendJsonLine(file, {
+          channel: 'inbox',
+          dot_id: 'repo-guardian',
+          text: 'late-2',
+          scope: { tier: 'public' },
+        }),
+    });
+    appendDotInboxEntry(
+      { channel: 'inbox', dot_id: 'repo-guardian', text: 'plain' },
+      { rootDir: TEST_ROOT, compactMinBytes: 1 }
+    );
+    expect(readJsonLines<{ text?: string }>(inbox(TEST_ROOT)).map((r) => r.text)).toEqual([
+      'pending',
+      'consumed',
+      'late',
+      'plain',
+      'late-2',
+    ]);
+    setDotInboxTestHooks({});
+    expect(compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 }).tombstoned).toBe(1);
   });
 });

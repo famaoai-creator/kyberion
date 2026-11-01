@@ -1,0 +1,26 @@
+{
+  "record_id": "mem-MSN-STORE-BOUNDS-2-20261101-2026_11_01",
+  "kind": "knowledge_hint",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Bounding the remaining runtime stores: archive permissions, every reader's semantics, parked-rewrite readers",
+  "summary": "Write-time maintenance runs as the writer's role (archive next to the store, test with the production role); choose retention from every reader's semantics; idempotency readers must read parked copies across a compaction; leftover copies need an ops-health owner.",
+  "candidate_id": "mem-MSN-STORE-BOUNDS-2-20261101-2026_11_01",
+  "evidence_refs": [
+    "active/missions/public/MSN-STORE-BOUNDS-2-20261101/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-STORE-BOUNDS-2-20261101/evidence/implementation-report.md",
+    "active/missions/public/MSN-STORE-BOUNDS-2-20261101/evidence/test-report.md"
+  ],
+  "created_at": "2026-11-01T15:15:08.247Z",
+  "hint_scope": "mission",
+  "hint_triggers": [
+    "In MSN-STORE-BOUNDS-2-20261101 the remaining ~20 runtime JSONL stores (dot, mesh, peer, co-session, work-coordination, agent-input-queue, ingest, metrics, health, shadow ledgers) were moved to size-independent readers and write-time retention, following MSN-STORE-BOUNDS-20261101. Two independent reviewers needed three rounds; every blocking finding was a concurrency or permission fact the implementers missed, not a reader-choice mistake.\n\nRules learned:\n\n- Check who writes the archive. Write-time maintenance runs as the store writer's role, which usually cannot write active/archive/ (only the janitor's role can). The failed archive write happens after the publish, so the rewrite keeps a full .compacting-* staging copy beside the store on every size doubling - disk grows faster than with no compaction, and the error is swallowed into 'failed'. Archive next to the store (writeTimeArchiveDir -> <store dir>/compaction-archive/, same tier/tenant) or under observability, give that directory a TTL entry, and test with the production role (validateWritePermission), not a tmp fixture root the test role happens to be allowed to write.\n- Pick the policy from every reader, not the obvious one. Latest-per-key compaction broke two stores whose readers looked latest-per-key: work-item creation identity compares version-1 snapshots (compaction key function keeps version 1 verbatim), and a KR signal_ratio reads 720h of dot signals (window instead). A plain-key catalog compact entry for such a store must become self_managed so the janitor cannot undo the writer's rule.\n- A parked rewrite makes the live file briefly absent or partial. Appenders do not take the compaction lock, so during the O(N) pass a writer recreates the live file with only new rows. Readers that decide idempotency (peer task re-accept, consumed wake keys, leases) must read parked copies then live, re-list copies after reading live, and order copies by a cross-process park stamp; otherwise a finished task re-runs or a consumed wake fires again.\n- Leftover copies need an owner. A failed rewrite keeps its copies on purpose; without an ops-health finding (stale_compaction_copy) they silently make every parked-aware read slow and block queue compaction forever.\n- A grow-only reducer cannot be both bounded and identical (agent-input-queue consumed ids): drop whole finished pairs past a horizon, document the visible effect, and skip compaction while stale copies exist.\n- Window readers must not stop at the first older row: one skewed-clock row would hide in-window rows (daily token cap undercount); stop after K consecutive older rows.\n- Hand-rolled compactions (wake ledger) must reuse the shared parked rewrite: a strict parse of the parked copy plus a finally that unlinks staging deleted the only copy on one torn line.\n- A whole-read ratchet gate must resolve import aliases, and test mocks of foundation IO must provide readRange once readers stream."
+  ],
+  "recommended_refs": [
+    "active/missions/public/MSN-STORE-BOUNDS-2-20261101/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-STORE-BOUNDS-2-20261101/evidence/implementation-report.md",
+    "active/missions/public/MSN-STORE-BOUNDS-2-20261101/evidence/test-report.md"
+  ],
+  "source_branch": "feat/store-bounds-2-20261101",
+  "source_commit": "95e70c65d897fc9d4a8763a38cdb243cb5caf645"
+}

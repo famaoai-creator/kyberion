@@ -28,8 +28,6 @@ import { z } from 'zod';
 
 import { createLogger } from '../logger.js';
 import { withExecutionContextAsync } from '../authority.js';
-import { pathResolver } from '../path-resolver.js';
-import { readJsonLines } from '../foundation/json.js';
 import { isRecord } from '../foundation/text.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { frameUntrustedInput } from '../untrusted-input-framing.js';
@@ -42,7 +40,12 @@ import {
   queryTenantKnowledge,
   type TenantKnowledgeHit,
 } from '../organization/tenant-knowledge-retrieval.js';
-import { peerRuntimeLogicalPath, type PeerMessageEnvelope } from './peer-messaging.js';
+import {
+  compactPeerLedgerAfterAppend,
+  peerRuntimeLogicalPath,
+  streamPeerStoreRecords,
+  type PeerMessageEnvelope,
+} from './peer-messaging.js';
 import {
   loadPeerConversationSession,
   sendPeerConversationMessageToPeer,
@@ -256,27 +259,23 @@ function ledgerLogicalPath(tenantId: string, localPeerId: string): string {
 
 /** Current state of every job (latest ledger row per key). */
 export function listPeerReplyJobs(tenantId: string, localPeerId: string): PeerReplyJob[] {
-  const rows = readJsonLines<PeerReplyJob | null>(
-    pathResolver.resolve(ledgerLogicalPath(tenantId, localPeerId)),
-    {
-      map: (value) =>
-        isRecord(value) && typeof value.key === 'string' && typeof value.status === 'string'
-          ? (value as unknown as PeerReplyJob)
-          : null,
-      onMalformed: 'skip',
-    }
+  const rows = streamPeerStoreRecords<PeerReplyJob>(
+    ledgerLogicalPath(tenantId, localPeerId),
+    (value) =>
+      isRecord(value) && typeof value.key === 'string' && typeof value.status === 'string'
+        ? (value as unknown as PeerReplyJob)
+        : null
   );
   const latest = new Map<string, PeerReplyJob>();
-  for (const row of rows) if (row) latest.set(row.key, row);
+  for (const row of rows) latest.set(row.key, row);
   return Array.from(latest.values());
 }
 
 function appendJobRow(job: PeerReplyJob): void {
-  appendGovernedArtifactJsonl(
-    LEDGER_ROLE,
-    ledgerLogicalPath(job.tenant_id, job.local_peer_id),
-    job
-  );
+  const logicalPath = ledgerLogicalPath(job.tenant_id, job.local_peer_id);
+  appendGovernedArtifactJsonl(LEDGER_ROLE, logicalPath, job);
+  // The latest row per `key` is the job state and the reply dedupe record.
+  compactPeerLedgerAfterAppend(logicalPath, 'key');
 }
 
 // ---------------------------------------------------------------------------

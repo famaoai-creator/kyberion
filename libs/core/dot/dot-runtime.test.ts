@@ -9,9 +9,11 @@ import {
   safeExistsSync,
   safeMkdir,
   safeReadFile,
+  safeReaddir,
   safeRmSync,
   safeWriteFile,
 } from '../secure-io.js';
+import { setAppendOnlyStoreTestHooks } from '../append-only-store.js';
 import type { DotCharter } from './dot-charter.js';
 import { personalDotCharterDir } from './dot-charter.js';
 import {
@@ -1646,7 +1648,137 @@ describe('dot wake usage attribution', () => {
       expect(consumedKeys().has('repo-guardian:wake:k2')).toBe(false);
       expect(consumedKeys().has('repo-guardian:wake:k3')).toBe(false);
       expect(consumedKeys().has('repo-guardian:wake:k4')).toBe(false);
-      expect(result.archive_path).toContain('active/archive/jsonl-compaction/');
+      // Archived next to the ledger (writer-writable), never under active/archive/.
+      expect(result.archive_path).toContain('/compaction-archive/dot-wake-ledger.');
+      expect(result.archive_path).not.toContain('active/archive/');
+    });
+
+    const mixedFixture = [
+      row('a', 'wake:k1', 'failed'),
+      row('a', 'wake:k1', 'delivered'),
+      row('b', 'wake:k1', 'failed'),
+      row('a', 'wake:k2', 'skipped'),
+      row('a', 'wake:k2', 'rejected'),
+      row('a', 'wake:k2', 'failed'),
+      row('a', 'wake:k2', 'delivered'),
+      row('a', 'wake:k3', 'delivered', { trigger_retained: true }),
+      row('a', 'wake:k1', 'failed'),
+      '{"nonconforming":true}',
+      row('b', 'wake:k4', 'rejected'),
+    ];
+
+    // The pre-engine fold, verbatim: last consuming row per (dot_id, trigger_key).
+    function legacyFold(rows: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+      const keyOf = (r: Record<string, unknown>) =>
+        typeof r?.dot_id === 'string' && typeof r?.trigger_key === 'string'
+          ? `${r.dot_id} ${r.trigger_key}`
+          : undefined;
+      const consuming = (r: Record<string, unknown>) =>
+        r.outcome === 'rejected' || (r.outcome === 'delivered' && r.trigger_retained !== true);
+      const last = new Map<string, number>();
+      rows.forEach((r, i) => {
+        const k = keyOf(r);
+        if (k && consuming(r)) last.set(k, i);
+      });
+      return rows.filter((r, i) => {
+        const k = keyOf(r);
+        const at = k === undefined ? undefined : last.get(k);
+        return at === undefined || at === i;
+      });
+    }
+
+    it('folds identically to the legacy whole-array fold on a mixed fixture', () => {
+      safeWriteFile(ledgerPath, mixedFixture.join('\n') + '\n');
+      const expected = legacyFold(mixedFixture.map((l) => JSON.parse(l)));
+      const result = compactDotWakeLedger({
+        rootDir: TEST_ROOT,
+        compactMinBytes: 1,
+        chunkBytes: 7,
+      });
+      expect(result).toMatchObject({ compacted: true, before_lines: 11 });
+      expect(readJsonLines<Record<string, unknown>>(ledgerPath)).toEqual(expected);
+    });
+
+    it('keeps a torn line verbatim and loses no consumed key', () => {
+      const torn = '{"dot_id":"a","trigger_key":"wake:k9","outc';
+      safeWriteFile(
+        ledgerPath,
+        [...mixedFixture.slice(0, 5), torn, ...mixedFixture.slice(5)].join('\n') + '\n'
+      );
+      // The production reader tolerates the torn line; consumption is read through it.
+      const consumed = () =>
+        new Set(
+          readDotWakeLedger({ rootDir: TEST_ROOT })
+            .filter(
+              (r) => r.outcome === 'rejected' || (r.outcome === 'delivered' && !r.trigger_retained)
+            )
+            .map((r) => `${r.dot_id}:${r.trigger_key}`)
+        );
+      const before = consumed();
+      const result = compactDotWakeLedger({ rootDir: TEST_ROOT, compactMinBytes: 1 });
+      expect(result.compacted).toBe(true);
+      const text = safeReadFile(ledgerPath, { encoding: 'utf8' }) as string;
+      expect(text.split('\n')).toContain(torn);
+      expect(consumed()).toEqual(before);
+      expect(before.has('a:wake:k1')).toBe(true);
+    });
+
+    it('restores the raw union when the publish fails (no staging copies left)', () => {
+      const original = mixedFixture.join('\n') + '\n';
+      safeWriteFile(ledgerPath, original);
+      setAppendOnlyStoreTestHooks({
+        beforePublish: () => {
+          throw Object.assign(new Error('no space left on device'), { code: 'ENOSPC' });
+        },
+      });
+      try {
+        expect(() => compactDotWakeLedger({ rootDir: TEST_ROOT, compactMinBytes: 1 })).toThrow(
+          /no space/
+        );
+      } finally {
+        setAppendOnlyStoreTestHooks({});
+      }
+      expect(safeReadFile(ledgerPath, { encoding: 'utf8' })).toBe(original);
+      const dir = ledgerPath.slice(0, ledgerPath.lastIndexOf('/'));
+      expect(safeReaddir(dir).filter((f) => f.includes('.compacting-'))).toEqual([]);
+    });
+
+    it('keeps consumed keys visible to readers while the ledger is parked', () => {
+      safeWriteFile(
+        ledgerPath,
+        [row('repo-guardian', 'wake:k1', 'failed'), row('repo-guardian', 'wake:k1', 'delivered')]
+          .join('\n')
+          .concat('\n')
+      );
+      const consumedNow = () =>
+        readDotWakeLedger({ rootDir: TEST_ROOT })
+          .filter((r) => r.outcome === 'delivered' && r.trigger_retained !== true)
+          .map((r) => `${r.dot_id}:${r.trigger_key}`);
+      expect(consumedNow()).toEqual(['repo-guardian:wake:k1']); // primes the cache
+      const seen: Array<{ consumed: string[]; rows: number }> = [];
+      setAppendOnlyStoreTestHooks({
+        beforeWriteSurvivors: () => {
+          if (seen.length === 0) {
+            // Another process's writer recreates the live ledger mid-compaction.
+            secureIo.safeAppendFileSync(
+              ledgerPath,
+              row('repo-guardian', 'wake:k2', 'failed') + '\n'
+            );
+          }
+          const rows = readDotWakeLedger({ rootDir: TEST_ROOT });
+          seen.push({ consumed: consumedNow(), rows: rows.length });
+        },
+      });
+      try {
+        expect(compactDotWakeLedger({ rootDir: TEST_ROOT, compactMinBytes: 1 }).compacted).toBe(
+          true
+        );
+      } finally {
+        setAppendOnlyStoreTestHooks({});
+      }
+      // The parked history (k1 consumed) plus the recreated live row, no duplicates.
+      expect(seen[0]).toEqual({ consumed: ['repo-guardian:wake:k1'], rows: 3 });
+      expect(consumedNow()).toEqual(['repo-guardian:wake:k1']);
     });
 
     it('skips below the byte threshold and tolerates a missing file', () => {

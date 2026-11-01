@@ -13,7 +13,10 @@ import {
   safeRmSync,
 } from '../secure-io.js';
 import { nowIso } from '../foundation/time.js';
-import { readJsonLines } from '../foundation/json.js';
+import { pathResolver } from '../path-resolver.js';
+import { streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
+import { maintainStoreAfterAppend, type MaintainStoreOutcome } from '../append-only-store.js';
+import { logger } from '../core.js';
 import { isRecord, sanitizeIdSegment } from '../foundation/text.js';
 import { isValidTenantSlug } from '../entity-scope.js';
 import type {
@@ -98,6 +101,36 @@ const DEFAULT_RETRY_POLICY: MeshRetryPolicy = {
 const DEFAULT_WRITER_ROLE: GovernedArtifactRole = 'infrastructure_sentinel';
 const writerRegistry = new Map<string, string>();
 
+/**
+ * deliveries.jsonl / dead-letter.jsonl get one snapshot row per state change
+ * and every reader (including the idempotency lookup on accept/enqueue) wants
+ * only the latest row per `delivery_id` / `dead_letter_id`, so the writer
+ * folds each store to latest-per-key once it passes this size (and again each
+ * time it doubles — see `maintainStoreAfterAppend`). Folding keeps the latest
+ * delivery row, which carries `idempotency_key`, so duplicate detection holds
+ * after compaction. No time window: dropping old deliveries would re-admit a
+ * replayed request. The folded-away history is delivery evidence, so the raw
+ * union is archived — next to the tenant's mesh-hub events under
+ * `observability/mesh-hub[/<ns>]/tenants/<t>/compaction-archive/`, because the
+ * broker writer roles cannot write the shared `active/archive/` tree (an
+ * unwritable archive would leave the parked staging copy behind on every
+ * pass). The policy is explicit because the paths are per namespace and tenant.
+ */
+export const MESH_BROKER_STORE_COMPACT_MIN_BYTES = 4 * 1024 * 1024;
+
+interface MeshBrokerStoreTuning {
+  /** Compaction threshold (tests inject small values). */
+  compactMinBytes?: number;
+  /** Range-read chunk size for the streaming readers (tests inject small values). */
+  chunkBytes?: number;
+}
+let storeTuning: MeshBrokerStoreTuning = {};
+
+/** Test seam: override store thresholds / read chunking; call with `{}` to reset. */
+export function setMeshMessageBrokerStoreTuningForTests(tuning: MeshBrokerStoreTuning): void {
+  storeTuning = { ...tuning };
+}
+
 function nowMs(iso: string): number {
   return new Date(iso).getTime();
 }
@@ -168,26 +201,51 @@ function selectorSummary(selector: MeshTargetSelector): Record<string, string> {
   }
 }
 
-function readJsonl<T>(logicalPath: string, normalize: (value: unknown) => T | undefined): T[] {
+/**
+ * Streams every persisted row (constant memory, no size cap) into `visit`,
+ * reading a compaction's parked copies while the live file is moved aside.
+ * Malformed / torn lines are skipped and counted (one warn per scan).
+ */
+function scanJsonl<T>(
+  logicalPath: string,
+  normalize: (value: unknown) => T | undefined,
+  visit: (row: T) => void
+): void {
   const safePath = assertSafeRepositoryPath(logicalPath, { allowMissingLeaf: true });
-  if (!safeExistsSync(safePath)) return [];
-  if (!safeLstat(safePath).isFile()) {
+  if (safeExistsSync(safePath) && !safeLstat(safePath).isFile()) {
     throw new Error(`mesh-hub persisted JSONL must be a regular file: ${safePath}`);
   }
-  return readJsonLines<T | undefined>(safePath, {
-    onMalformed: 'skip',
+  let malformed = 0;
+  // A write-time compaction in another process may have the file parked.
+  for (const row of streamJsonLinesAcrossCompaction<T | undefined>(safePath, {
+    chunkBytes: storeTuning.chunkBytes,
+    onMalformed: () => {
+      malformed += 1;
+    },
     map: normalize,
-  }).filter((value): value is T => value !== undefined);
+  })) {
+    if (row !== undefined) visit(row);
+  }
+  if (malformed > 0) {
+    logger.warn(
+      `[mesh-hub] skipped ${malformed} malformed line(s) in ${logicalPath} — torn append or corrupted row | next: inspect the store if this repeats | evidence: remaining rows were read`
+    );
+  }
 }
 
-function latestByKey<T>(rows: T[], key: string): T[] {
+/** Latest row per `key` across the given stores (order of first appearance). */
+function latestByKey<T>(
+  paths: string[],
+  key: string,
+  normalize: (value: unknown) => T | undefined
+): T[] {
   const index = new Map<string, T>();
-  for (const row of rows) {
-    if (!isRecord(row)) continue;
-    const value = row[key];
-    if (typeof value === 'string' && value) {
-      index.set(value, row);
-    }
+  for (const logicalPath of paths) {
+    scanJsonl(logicalPath, normalize, (row) => {
+      if (!isRecord(row)) return;
+      const value = row[key];
+      if (typeof value === 'string' && value) index.set(value, row);
+    });
   }
   return Array.from(index.values());
 }
@@ -196,19 +254,64 @@ function asJsonRecord<T>(value: unknown): T | undefined {
   return isRecord(value) ? (value as unknown as T) : undefined;
 }
 
+/** Compaction key per keyed store; other stores (events) are not maintained here. */
+function storeCompactKey(logicalPath: string): string | undefined {
+  if (logicalPath.endsWith('/deliveries.jsonl')) return 'delivery_id';
+  if (logicalPath.endsWith('/dead-letter.jsonl')) return 'dead_letter_id';
+  return undefined;
+}
+
+/** `runtime/mesh-hub[/<ns>]/tenants/<t>/x.jsonl` → `observability/mesh-hub[/<ns>]/tenants/<t>/compaction-archive`. */
+function compactionArchiveDir(logicalPath: string): string {
+  const runtimeRoot = meshHubRoot();
+  if (!logicalPath.startsWith(`${runtimeRoot}/`)) {
+    throw new Error(`mesh-hub store outside the runtime root: ${logicalPath}`);
+  }
+  const relative = logicalPath.slice(runtimeRoot.length);
+  const dir = relative.slice(0, relative.lastIndexOf('/'));
+  return pathResolver.resolve(`active/shared/observability/mesh-hub${dir}/compaction-archive`);
+}
+
 function appendRecord(role: GovernedArtifactRole, logicalPath: string, record: unknown): string {
-  return appendGovernedArtifactJsonl(role, logicalPath, record);
+  const written = appendGovernedArtifactJsonl(role, logicalPath, record);
+  const key = storeCompactKey(logicalPath);
+  if (key) compactBrokerStore(role, written, key, compactionArchiveDir(logicalPath));
+  return written;
+}
+
+/**
+ * Write-time fold of a keyed broker store (see
+ * {@link MESH_BROKER_STORE_COMPACT_MIN_BYTES}). Runs synchronously right after
+ * the append inside the namespace's single-writer command loop, so no
+ * in-process reader observes the store mid-rewrite; the per-path store lock
+ * guards against other processes. Never throws into the broker operation.
+ */
+function compactBrokerStore(
+  role: GovernedArtifactRole,
+  storePath: string,
+  key: string,
+  archiveDir: string
+): MaintainStoreOutcome {
+  return withExecutionContext(role, () =>
+    maintainStoreAfterAppend(
+      storePath,
+      {
+        action: 'compact',
+        key,
+        minBytes: storeTuning.compactMinBytes ?? MESH_BROKER_STORE_COMPACT_MIN_BYTES,
+        archiveDir,
+      },
+      { chunkBytes: storeTuning.chunkBytes }
+    )
+  );
 }
 
 function loadCurrentDeliveries(namespace?: string, tenantId?: string): MeshHubDeliveryRecord[] {
   const tenants = tenantId ? [tenantId] : tenantIds(namespace);
   return latestByKey(
-    tenants.flatMap((id) =>
-      readJsonl<MeshHubDeliveryRecord>(deliveriesPath(namespace, id), (value) =>
-        asJsonRecord<MeshHubDeliveryRecord>(value)
-      )
-    ),
-    'delivery_id'
+    tenants.map((id) => deliveriesPath(namespace, id)),
+    'delivery_id',
+    (value) => asJsonRecord<MeshHubDeliveryRecord>(value)
   );
 }
 
@@ -255,12 +358,9 @@ function findCurrentDeliveryByIdempotency(
 function loadCurrentDeadLetters(namespace?: string, tenantId?: string): MeshDeadLetterRecord[] {
   const tenants = tenantId ? [tenantId] : tenantIds(namespace);
   return latestByKey(
-    tenants.flatMap((id) =>
-      readJsonl<MeshDeadLetterRecord>(deadLettersPath(namespace, id), (value) =>
-        asJsonRecord<MeshDeadLetterRecord>(value)
-      )
-    ),
-    'dead_letter_id'
+    tenants.map((id) => deadLettersPath(namespace, id)),
+    'dead_letter_id',
+    (value) => asJsonRecord<MeshDeadLetterRecord>(value)
   );
 }
 

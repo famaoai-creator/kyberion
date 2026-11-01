@@ -72,6 +72,17 @@ vi.mock('../foundation/io.js', () => ({
     exists: realFsSecureIo.safeExistsSync,
     readFile: (filePath: string) => String(realFsSecureIo.safeReadFile(filePath)),
     stat: (filePath: string) => fs.statSync(filePath),
+    // Streaming JSONL readers (jsonl-read.ts) read bounded byte ranges.
+    readRange: (filePath: string, position: number, length: number) => {
+      const fd = fs.openSync(filePath, 'r');
+      try {
+        const buffer = Buffer.alloc(length);
+        const read = fs.readSync(fd, buffer, 0, length, position);
+        return buffer.subarray(0, read);
+      } finally {
+        fs.closeSync(fd);
+      }
+    },
     writeFile: realFsSecureIo.safeWriteFile,
   }),
   registerFoundationIo: vi.fn(),

@@ -18,6 +18,15 @@
  *
  * Demotion is instant when the governed incident allowance is exceeded
  * (default zero), forcing 'approve' until the configured cooldown lapses.
+ *
+ * Retention (MSN-STORE-BOUNDS-2, P1/P2): every consumer needs only rows inside
+ * the learning window — stats read a backward-scanned window, and an action
+ * with no in-window rows is a no-op for the sweep (zero stats can neither
+ * promote nor demote, and applyAutonomyOverride re-checks window stats before
+ * relaxing). So the writer windows the ledger to the learning window plus a
+ * margin ({@link autonomyOutcomesRetentionPolicy}); dropped rows go to the
+ * compaction archive. Rotation would instead move the whole live window into
+ * a segment no reader sees, erasing the evidence promotion depends on.
  */
 import * as path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
@@ -28,7 +37,14 @@ import {
   safeMkdir,
   safeWriteFile,
 } from '../secure-io.js';
-import { appendJsonLine, readJsonLines, readJsonIfPresent } from '../foundation/json.js';
+import { appendJsonLine, readJsonIfPresent } from '../foundation/json.js';
+import { readJsonLinesSince, streamJsonLines } from '../jsonl-read.js';
+import {
+  writeTimeArchiveDir,
+  maintainStoreAfterAppend,
+  type AppendOnlyStorePolicy,
+  type MaintainStoreOutcome,
+} from '../append-only-store.js';
 import { createLogger } from '../logger.js';
 import { storagePartitionSegments, PARTITIONED_RUNTIME_STATE_ROOTS } from '../storage-layout.js';
 import { withLockSync } from '../foundation/lock-utils.js';
@@ -42,6 +58,74 @@ const logger = createLogger('autonomy-action-state');
 
 export const AUTONOMY_OUTCOMES_PATH = 'active/shared/observability/autonomy-outcomes.jsonl';
 export const AUTONOMY_OVERRIDES_PATH = 'active/shared/runtime/autonomy-action-overrides.json';
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+/** Rows are kept at least this long, even when the policy window is shorter. */
+export const AUTONOMY_OUTCOMES_MIN_RETENTION_MS = 30 * DAY_MS;
+/** Kept beyond the learning window so a widened window or clock skew still finds rows. */
+export const AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS = 7 * DAY_MS;
+/** Ledger size that triggers write-time window retention. */
+export const AUTONOMY_OUTCOMES_RETENTION_MIN_BYTES = 8 * 1024 * 1024;
+
+interface AutonomyOutcomesStoreTuning {
+  /** Retention threshold (tests inject small values). */
+  minBytes?: number;
+  /** Range-read chunk size (tests inject small values). */
+  chunkBytes?: number;
+  /** Archive directory (tests point it at a scratch dir). */
+  archiveDir?: string;
+}
+let storeTuning: AutonomyOutcomesStoreTuning = {};
+
+/** Test seam: override threshold / chunking / archive; call with `{}` to reset. */
+export function setAutonomyOutcomesStoreTuningForTests(tuning: AutonomyOutcomesStoreTuning): void {
+  storeTuning = { ...tuning };
+}
+
+function recordedAtMs(record: unknown): number | undefined {
+  const raw = (record as Record<string, unknown> | null)?.recorded_at;
+  if (typeof raw !== 'string') return undefined;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : undefined;
+}
+
+/**
+ * Explicit write-time policy for the outcomes ledger: keep the learning window
+ * (at least 30d) plus a margin. Rows whose time cannot be read are kept (the
+ * window never drops what it cannot date), so corruption stays visible.
+ */
+export function autonomyOutcomesRetentionPolicy(filePath: string): AppendOnlyStorePolicy {
+  const windowMs =
+    Math.max(loadAutonomyLearningPolicy().window_ms, AUTONOMY_OUTCOMES_MIN_RETENTION_MS) +
+    AUTONOMY_OUTCOMES_RETENTION_MARGIN_MS;
+  return {
+    action: 'window',
+    minBytes: storeTuning.minBytes ?? AUTONOMY_OUTCOMES_RETENTION_MIN_BYTES,
+    windowMs,
+    timeOf: recordedAtMs,
+    archiveDir: storeTuning.archiveDir ?? writeTimeArchiveDir(filePath),
+  };
+}
+
+/**
+ * Write-time retention after an append. Runs for the shared (system) ledger
+ * only: a tenant partition is written under an exact-file capability that
+ * cannot create the rewrite's staging siblings, lock or archive. Tenant
+ * partitions are never rotated either (review_required directory), so no
+ * evidence is erased there; their growth is surfaced by the ops-health probe
+ * and their readers are size-independent. Never throws.
+ */
+function maintainOutcomesAfterAppend(
+  p: string,
+  deps: AutonomyStateDeps,
+  now: Date
+): MaintainStoreOutcome | undefined {
+  if (deps.tenantSlug) return undefined;
+  return maintainStoreAfterAppend(p, autonomyOutcomesRetentionPolicy(p), {
+    now,
+    chunkBytes: storeTuning.chunkBytes,
+  });
+}
 
 export interface AutonomyOutcomeRow {
   /** Stable caller execution identity; retries of one receipt count once. */
@@ -123,7 +207,7 @@ export function recordAutonomyOutcome(
   deps: AutonomyStateDeps = {}
 ): void {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
-  const recordedAt = (deps.now?.() ?? new Date()).toISOString();
+  const now = deps.now?.() ?? new Date();
   withTenantAutonomyStore(deps, () => {
     safeMkdir(path.dirname(p), { recursive: true });
     appendJsonLine(
@@ -131,11 +215,12 @@ export function recordAutonomyOutcome(
       {
         ...row,
         receipt_id: row.receipt_id ?? randomUUID(),
-        recorded_at: recordedAt,
+        recorded_at: now.toISOString(),
       },
       { leadingNewline: true }
     );
   });
+  maintainOutcomesAfterAppend(p, deps, now);
 }
 
 /** Record an execution result without double-counting the decision row
@@ -145,7 +230,7 @@ export function recordAutonomyExecution(
   deps: AutonomyStateDeps = {}
 ): void {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
-  const recordedAt = (deps.now?.() ?? new Date()).toISOString();
+  const now = deps.now?.() ?? new Date();
   withTenantAutonomyStore(deps, () => {
     safeMkdir(path.dirname(p), { recursive: true });
     appendJsonLine(
@@ -157,25 +242,32 @@ export function recordAutonomyExecution(
         executed: true,
         ok: row.ok,
         ...(row.error ? { error: row.error } : {}),
-        recorded_at: recordedAt,
+        recorded_at: now.toISOString(),
       },
       { leadingNewline: true }
     );
   });
+  maintainOutcomesAfterAppend(p, deps, now);
 }
 
 /** Distinct action ids present in the ledger — sweeps must cover every
- *  recorded action, not a hardcoded subset, or most promotions never fire. */
+ *  recorded action, not a hardcoded subset, or most promotions never fire.
+ *  The live ledger holds the window + margin, which covers every action a
+ *  sweep can change (an action with no in-window rows is a sweep no-op). */
 export function listAutonomyActionIds(deps: AutonomyStateDeps = {}): string[] {
   const p = filePath(deps, AUTONOMY_OUTCOMES_PATH);
   if (!withTenantAutonomyStore(deps, () => safeExistsSync(p))) return [];
-  const ids = new Set<string>();
-  for (const row of withTenantAutonomyStore(deps, () =>
-    readJsonLines<Partial<AutonomyOutcomeRow>>(p, { onMalformed: 'skip' })
-  )) {
-    if (typeof row?.action_id === 'string' && row.action_id) ids.add(row.action_id);
-  }
-  return [...ids];
+  // Consume the stream inside the store scope: the generator reads lazily.
+  return withTenantAutonomyStore(deps, () => {
+    const ids = new Set<string>();
+    for (const row of streamJsonLines<Partial<AutonomyOutcomeRow>>(p, {
+      onMalformed: 'skip',
+      chunkBytes: storeTuning.chunkBytes,
+    })) {
+      if (typeof row?.action_id === 'string' && row.action_id) ids.add(row.action_id);
+    }
+    return [...ids];
+  });
 }
 
 export interface AutonomyActionStats {
@@ -204,9 +296,15 @@ export function actionAutonomyStats(
   if (!withTenantAutonomyStore(deps, () => safeExistsSync(p))) return stats;
   const successfulReceipts = new Set<string>();
   // Corruption must not erase a possible failure and leave only successful
-  // evidence. Exceed even the largest validated incident allowance.
+  // evidence. Exceed even the largest validated incident allowance. The
+  // backward scan stops at the first row older than the window (rows are
+  // append-ordered by time); undatable rows never stop it and are flagged
+  // below, so corruption inside the window still fails closed.
   for (const row of withTenantAutonomyStore(deps, () =>
-    readJsonLines<Partial<AutonomyOutcomeRow>>(p, {
+    readJsonLinesSince<Partial<AutonomyOutcomeRow>>(p, {
+      sinceMs: cutoff,
+      timeOf: recordedAtMs,
+      chunkBytes: storeTuning.chunkBytes,
       onMalformed: () => {
         stats.incidents = Number.MAX_SAFE_INTEGER;
       },

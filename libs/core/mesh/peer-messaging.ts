@@ -6,7 +6,12 @@ import { logger } from '../core.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from '../foundation/governed-catalog.js';
-import { readJsonLines } from '../foundation/json.js';
+import { streamJsonLinesAcrossCompaction } from '../jsonl-parked-read.js';
+import {
+  maintainStoreAfterAppend,
+  type MaintainStoreOutcome,
+  type StoreKey,
+} from '../append-only-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { nowIso } from '../foundation/time.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
@@ -688,12 +693,83 @@ function appendObservabilityJsonl(
   );
 }
 
-function readJsonlRecords<T>(logicalPath: string, map: (value: unknown) => T): T[] {
-  const resolved = pathResolver.resolve(logicalPath);
-  ensureRegularPeerStorageFile(resolved);
-  return readJsonLines<T>(resolved, { map, onMalformed: 'skip' });
+/**
+ * Per-peer keyed state ledgers (`task-exchange.jsonl`, `reply-jobs.jsonl`)
+ * get one row per state transition and their readers want only the latest
+ * row per key, so their writers fold them to latest-per-key once they pass
+ * this size (and again each time they double — see
+ * `maintainStoreAfterAppend`). Nothing a reader uses is lost, so the
+ * folded-away transitions are not archived.
+ *
+ * inbox.jsonl / outbox.jsonl are NOT compacted or windowed: rows are message
+ * records (an undelivered or unread message is load-bearing and has no
+ * superseding row), so only their readers stream.
+ */
+export const PEER_LEDGER_COMPACT_MIN_BYTES = 4 * 1024 * 1024;
+
+interface PeerLedgerStoreTuning {
+  /** Ledger compaction threshold (tests inject small values). */
+  compactMinBytes?: number;
+  /** Range-read chunk size for the streaming readers (tests inject small values). */
+  chunkBytes?: number;
+}
+let peerLedgerStoreTuning: PeerLedgerStoreTuning = {};
+
+/** Test seam: override peer ledger thresholds / read chunking; call with `{}` to reset. */
+export function setPeerLedgerStoreTuningForTests(tuning: PeerLedgerStoreTuning): void {
+  peerLedgerStoreTuning = { ...tuning };
 }
 
+/**
+ * Constant-memory forward stream of a per-peer JSONL store (no size cap),
+ * skipping torn / malformed lines and rows `map` rejects (`undefined`/`null`).
+ * While a write-time compaction in another process has the file parked, the
+ * parked copies are read instead.
+ */
+export function* streamPeerStoreRecords<T>(
+  logicalPath: string,
+  map: (value: unknown) => T | null | undefined
+): Generator<T> {
+  const resolved = pathResolver.resolve(logicalPath);
+  ensureRegularPeerStorageFile(resolved);
+  for (const row of streamJsonLinesAcrossCompaction<T | null | undefined>(resolved, {
+    map,
+    onMalformed: 'skip',
+    chunkBytes: peerLedgerStoreTuning.chunkBytes,
+  })) {
+    if (row !== null && row !== undefined) yield row;
+  }
+}
+
+/**
+ * Write-time fold of a per-peer keyed ledger (see
+ * {@link PEER_LEDGER_COMPACT_MIN_BYTES}). Call right after appending; never
+ * throws into the caller — failures and unshrinkable growth only warn.
+ */
+export function compactPeerLedgerAfterAppend(
+  logicalPath: string,
+  key: StoreKey
+): MaintainStoreOutcome {
+  return withExecutionContext('infrastructure_sentinel', () =>
+    maintainStoreAfterAppend(
+      pathResolver.resolve(logicalPath),
+      {
+        action: 'compact',
+        key,
+        minBytes: peerLedgerStoreTuning.compactMinBytes ?? PEER_LEDGER_COMPACT_MIN_BYTES,
+        archiveDir: null,
+      },
+      { chunkBytes: peerLedgerStoreTuning.chunkBytes }
+    )
+  );
+}
+
+function readJsonlRecords<T>(logicalPath: string, map: (value: unknown) => T): T[] {
+  return Array.from(streamPeerStoreRecords<T>(logicalPath, map));
+}
+
+// inbox/outbox: streamed reads, no write-time retention — see
+// PEER_LEDGER_COMPACT_MIN_BYTES for why message rows are never folded.
 export function listPeerInboxRecords(
   tenantId: string,
   peerId: string

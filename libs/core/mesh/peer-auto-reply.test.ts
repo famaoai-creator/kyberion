@@ -52,13 +52,14 @@ import {
   type PeerAutoReplyGenerateInput,
   type PeerReplyJob,
 } from './peer-auto-reply.js';
-import { peerRuntimeLogicalPath } from './peer-messaging.js';
+import { peerRuntimeLogicalPath, setPeerLedgerStoreTuningForTests } from './peer-messaging.js';
+import { resetAppendOnlyStoreMaintenanceState } from '../append-only-store.js';
 import { appendGovernedArtifactJsonl } from '../workforce/artifact-store.js';
 import { CodexIsolatedQueryError } from '../provider/codex-isolated-query.js';
 import { ClaudeAgentQueryError } from '../provider/claude-agent-query.js';
 import { withExecutionContext } from '../authority.js';
 import { pathResolver } from '../path-resolver.js';
-import { safeExistsSync, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { safeExistsSync, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import { readJsonLines } from '../foundation/json.js';
 
 const TENANT = 'tenant-peer-autoreply';
@@ -71,6 +72,8 @@ const CATALOG_PATH = pathResolver.sharedTmp('peer-auto-reply-catalog.test.json')
 
 afterEach(() => {
   vi.restoreAllMocks();
+  setPeerLedgerStoreTuningForTests({});
+  resetAppendOnlyStoreMaintenanceState();
   clearPeerRuntime(TENANT, LOCAL);
   clearPeerRuntime(TENANT, REMOTE);
   clearPeerConversationRuntime(TENANT, LOCAL);
@@ -246,6 +249,45 @@ describe('peer auto-reply', () => {
     expect(listPeerReplyJobs(TENANT, LOCAL)).toHaveLength(1);
     expect(generate).toHaveBeenCalledTimes(1);
     expect(deliver).toHaveBeenCalledTimes(1);
+  });
+
+  it('folds the job ledger to the latest row per key at write time and still dedups', async () => {
+    resetAppendOnlyStoreMaintenanceState();
+    setPeerLedgerStoreTuningForTests({ compactMinBytes: 1024, chunkBytes: 53 });
+    const ledger = pathResolver.resolve(peerRuntimeLogicalPath(TENANT, LOCAL, 'reply-jobs.jsonl'));
+    const ledgerLines = (): string[] =>
+      String(safeReadFile(ledger, { encoding: 'utf8' }))
+        .split('\n')
+        .filter((line) => line.trim());
+    const { autoReply, generate } = setup();
+    const ids = ['M-FOLD-1', 'M-FOLD-2', 'M-FOLD-3', 'M-FOLD-4'];
+    const contexts = ids.map((messageId) => inbound({ messageId }));
+    for (const context of contexts) autoReply.handleInbound(context);
+    await autoReply.runOnce();
+    expect(generate).toHaveBeenCalledTimes(ids.length);
+
+    // Each job appended several transitions; compaction kept one row per key.
+    const jobs = listPeerReplyJobs(TENANT, LOCAL);
+    expect(jobs.map((job) => job.message_id).sort()).toEqual(ids);
+    expect(jobs.every((job) => job.status === 'delivered')).toBe(true);
+    expect(ledgerLines().length).toBeLessThan(ids.length * 2);
+
+    // A fresh instance reads the folded ledger: replays are still deduped.
+    const fresh = setup();
+    for (const context of contexts) {
+      expect(fresh.autoReply.handleInbound(context)?.reply?.metadata).toEqual({
+        ack: true,
+        reply_job: 'delivered',
+      });
+    }
+    await fresh.autoReply.runOnce();
+    expect(fresh.generate).not.toHaveBeenCalled();
+
+    // A torn tail line (crash mid-append) never breaks the reader.
+    withExecutionContext('infrastructure_sentinel', () => {
+      safeWriteFile(ledger, `${ledgerLines().join('\n')}\n{"key":"${ids[0]}","status":"que`);
+    });
+    expect(listPeerReplyJobs(TENANT, LOCAL)).toHaveLength(ids.length);
   });
 
   it('caps the loop via inbound auto_turn and via replies already sent in the session', () => {

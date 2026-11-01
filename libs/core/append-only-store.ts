@@ -11,8 +11,10 @@
  * Rewrites (compact / window) keep the janitor's race-safe park/stage
  * protocol against concurrent appenders:
  *
- *  1. The live file is atomically moved aside to a `.compacting-<pid>-<n>-<tag>`
- *     staging sibling — appends already in flight land on the moved inode,
+ *  1. The live file is atomically moved aside to a
+ *     `.compacting-t<ms>-<seq>-<pid>-<tag>` staging sibling (zero-padded
+ *     wall-clock ms + per-process sequence, so park order sorts across
+ *     processes and runs; a name never overwrites a kept copy) — appends already in flight land on the moved inode,
  *     appends after the move create a fresh live file.
  *  2. The surviving lines are written to a temp sibling and published with an
  *     exclusive hard link (`safeLinkExclusiveSync`; buffered exclusive publish
@@ -141,17 +143,26 @@ export interface StoreScanOptions {
   maxLineBytes?: number;
 }
 
-interface LineFilter {
+/**
+ * Per-line rewrite filter. `index` counts non-blank, line-guard-sized lines
+ * across every parked copy in order, identically in both passes. Malformed
+ * lines reach the filter as raw text; oversized lines and late (in-flight)
+ * bytes never reach it — they are always kept verbatim.
+ */
+export interface StoreLineFilter {
   /** Pass 1, once per parked file as it is parked: `index` is global across files. */
   observe(text: string, index: number): void;
   /** Pass 2: whether the line survives. */
   keep(text: string, index: number): boolean;
 }
+type LineFilter = StoreLineFilter;
 
 /** Test seams for the parked rewrite. */
 export interface AppendOnlyStoreTestHooks {
   /** Runs right before pass 2 streams the parked copies (simulate a late append). */
   beforeWriteSurvivors?: (stagingPaths: readonly string[]) => void;
+  /** Runs right before the exclusive publish (throw to simulate ENOSPC etc.). */
+  beforePublish?: (livePath: string) => void;
 }
 let testHooks: AppendOnlyStoreTestHooks = {};
 
@@ -194,6 +205,23 @@ function uniqueSibling(base: string, suffix: string): string {
     const candidate = `${base}${i > 0 ? `-${i}` : ''}${suffix}`;
     if (!safeExistsSync(candidate)) return candidate;
   }
+}
+
+let lastParkMs = 0;
+let parkSeq = 0;
+
+/**
+ * Base name of a parked copy: `<live>.compacting-t<ms>-<seq>-<pid>-<tag>`.
+ * The zero-padded ms (monotonic within a process) and per-process sequence
+ * make lexical order park order across processes and runs, so a reader
+ * (`parkedCompactionCopies`) streams kept copies of a failed rewrite before
+ * newer ones. Callers still pick a non-existing sibling (`uniqueSibling`).
+ */
+function parkedCopyBase(livePath: string, tag: string): string {
+  lastParkMs = Math.max(Date.now(), lastParkMs);
+  const ms = String(lastParkMs).padStart(15, '0');
+  const seq = String(parkSeq++ % 1_000_000).padStart(6, '0');
+  return `${livePath}.compacting-t${ms}-${seq}-${process.pid}-${tag}`;
 }
 
 function isErrno(err: unknown, code: string): boolean {
@@ -323,7 +351,7 @@ function rewriteParked(
   let liveRestored = false;
 
   const park = (tag: string): boolean => {
-    const staging = `${livePath}.compacting-${process.pid}-${parked.length}-${tag}`;
+    const staging = uniqueSibling(parkedCopyBase(livePath, tag), '');
     try {
       safeMoveSync(livePath, staging);
     } catch (err) {
@@ -404,6 +432,7 @@ function rewriteParked(
         const temp = uniqueSibling(`${livePath}.compact-out-${process.pid}-${i}`, '.tmp');
         try {
           kept = writeSurvivors(temp);
+          testHooks.beforePublish?.(livePath);
           publishExclusive(temp, livePath, chunkBytes);
           published = true;
           liveRestored = true;
@@ -479,11 +508,49 @@ function rewriteParked(
   };
 }
 
+export interface RewriteStoreLinesOptions extends StoreScanOptions {
+  /** Raw-union archive file (made unique if taken); null/undefined = no archive. */
+  archivePath?: string | null;
+  /** Diagnostic label for warns (e.g. `'wake-ledger compaction'`). */
+  label?: string;
+}
+
+/**
+ * Narrow entry to the race-safe parked rewrite for stores whose fold rule is
+ * not expressible as compact-by-key or a time window (e.g. the dot wake
+ * ledger). Same guarantees as {@link compactStoreByKey}: malformed and
+ * oversized lines kept verbatim, raw union restored on any error, re-park
+ * only on EEXIST. Returns null when the live file does not exist.
+ */
+export function rewriteStoreLines(
+  filePath: string,
+  filter: StoreLineFilter,
+  options: RewriteStoreLinesOptions = {}
+): StoreRewriteResult | null {
+  return rewriteParked(filePath, filter, {
+    ...options,
+    archivePath: options.archivePath ?? null,
+    label: options.label ?? 'rewrite',
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Compaction
 // ---------------------------------------------------------------------------
 
-function recordKey(text: string, keyField: string): string | undefined {
+/**
+ * How a compaction identifies the keyed entity: a record field name, or a
+ * function for composite keys (e.g. `${dot_id}:${signal}`). A function that
+ * returns undefined marks the record keyless, so it is kept verbatim.
+ */
+export type StoreKey = string | ((record: Record<string, unknown>) => string | undefined);
+
+/** Printable form of a {@link StoreKey} for audit records and diagnostics. */
+export function describeStoreKey(key: StoreKey): string {
+  return typeof key === 'string' ? key : `fn:${key.name || 'anonymous'}`;
+}
+
+function recordKey(text: string, key: StoreKey): string | undefined {
   let value: unknown;
   try {
     value = parseSafeJsonInput(text, 'JSONL entry');
@@ -491,8 +558,18 @@ function recordKey(text: string, keyField: string): string | undefined {
     return undefined; // malformed lines are kept verbatim like keyless records
   }
   if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
-  const key = (value as Record<string, unknown>)[keyField];
-  return typeof key === 'string' || typeof key === 'number' ? String(key) : undefined;
+  const record = value as Record<string, unknown>;
+  if (typeof key === 'function') {
+    let derived: string | undefined;
+    try {
+      derived = key(record);
+    } catch {
+      return undefined; // a key function that throws leaves the record verbatim
+    }
+    return typeof derived === 'string' && derived !== '' ? derived : undefined;
+  }
+  const field = record[key];
+  return typeof field === 'string' || typeof field === 'number' ? String(field) : undefined;
 }
 
 /**
@@ -501,7 +578,7 @@ function recordKey(text: string, keyField: string): string | undefined {
  */
 export function analyzeStoreKeys(
   filePath: string,
-  key: string,
+  key: StoreKey,
   options: StoreScanOptions = {}
 ): { records: number; distinctKeys: number } {
   const keys = new Set<string>();
@@ -524,9 +601,19 @@ export function defaultCompactionArchiveDir(filePath: string): string {
   );
 }
 
+/**
+ * Archive directory for WRITE-TIME maintenance: `<store dir>/compaction-archive`.
+ * The writer of a store can always write next to it, and the archive keeps the
+ * store's tier / tenant partition — unlike {@link defaultCompactionArchiveDir}
+ * (`active/archive/...`), which only the janitor's role may write.
+ */
+export function writeTimeArchiveDir(filePath: string): string {
+  return nodePath.join(nodePath.dirname(filePath), 'compaction-archive');
+}
+
 export interface CompactStoreOptions extends StoreScanOptions {
-  /** Record field identifying the keyed entity. */
-  key: string;
+  /** Record field (or composite-key function) identifying the keyed entity. */
+  key: StoreKey;
   /**
    * Where the raw-union archive lands. Default {@link defaultCompactionArchiveDir}.
    * `null` = no archive, for ephemeral stores whose readers use only the
@@ -624,7 +711,7 @@ export function retainWindow<T = unknown>(
 
 export type AppendOnlyStorePolicy =
   | { action: 'rotate'; minBytes?: number }
-  | { action: 'compact'; key: string; minBytes?: number; archiveDir?: string | null }
+  | { action: 'compact'; key: StoreKey; minBytes?: number; archiveDir?: string | null }
   | {
       /** Explicit-policy only: the retention catalog has no `window` action. */
       action: 'window';
@@ -632,6 +719,11 @@ export type AppendOnlyStorePolicy =
       windowMs: number;
       timeOf: (record: unknown) => number | undefined;
       keep?: (record: unknown) => boolean;
+      /**
+       * Raw-union archive directory for the dropped window (evidence stores,
+       * e.g. accounting rows). Default: none — the window is lossy by design.
+       */
+      archiveDir?: string | null;
     };
 
 export interface MaintainStoreOptions extends StoreScanOptions {
@@ -754,14 +846,17 @@ function runPolicy(
     const result = compactStoreByKey(filePath, {
       ...options,
       key: policy.key,
-      archiveDir: policy.archiveDir,
+      // Write-time: the store's writer cannot write `active/archive/` (the
+      // janitor's default), so archive next to the store unless overridden.
+      archiveDir:
+        policy.archiveDir === undefined ? writeTimeArchiveDir(filePath) : policy.archiveDir,
       now,
     });
     if (!result) return 'nothing-to-do';
     recordAudit(options, {
       event: 'RETENTION_COMPACT',
       ...base,
-      compact_key: policy.key,
+      compact_key: describeStoreKey(policy.key),
       archive_path: result.archivePath ? repoRelativePosix(result.archivePath) : undefined,
       before_lines: result.before,
       after_lines: result.after,
@@ -769,17 +864,27 @@ function runPolicy(
     });
     return 'compacted';
   }
+  const stamp = now.toISOString().replace(/[-:]/g, '').replace(/\..*$/, '');
+  const archivePath =
+    policy.archiveDir == null
+      ? undefined
+      : nodePath.join(
+          policy.archiveDir,
+          `${rotatedSegmentStem(filePath)}.${stamp}Z-${process.pid}.jsonl`
+        );
   const result = retainWindow(filePath, {
     ...options,
     timeOf: policy.timeOf,
     keep: policy.keep,
     sinceMs: now.getTime() - policy.windowMs,
+    archivePath,
   });
   if (!result) return 'nothing-to-do';
   recordAudit(options, {
     event: 'RETENTION_WINDOW',
     ...base,
     window_ms: policy.windowMs,
+    archive_path: result.archivePath ? repoRelativePosix(result.archivePath) : undefined,
     before_lines: result.before,
     after_lines: result.after,
   });
