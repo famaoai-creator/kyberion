@@ -32,7 +32,7 @@ import { judgedFailureKindFields, saveBrowserFailureBundle } from './browser-fai
 import { preflightAutomationRuntime } from './browser-runtime-capabilities.js';
 import { buildBrowserPipelineSummary, refMapFromSnapshot } from './browser-pipeline-summary.js';
 import { opControl } from './browser-control-helpers.js';
-import { type Page } from '@playwright/test';
+import { type Frame, type Page } from '@playwright/test';
 import * as path from 'node:path';
 import { resolveRegisteredBrowserProfile } from './browser-profile-provider-registry.js';
 import {
@@ -554,54 +554,260 @@ export async function opTransform(op: string, params: any, ctx: any, resolve: Fu
  * Total failure throws an error that lists the visible input candidates so
  * the operator/repair agent can correct the step without reopening the page.
  */
-// AR-07: deterministic DOM distillation — an interactive-element inventory
-// small enough for in-loop LLM decisions. Same DOM, same output; capped.
-export async function distillDomInventory(
+export interface DomStructureRow {
+  selector: string;
+  tag: string;
+  role: string;
+  text: string;
+  depth: number;
+  child_count: number;
+  visible: boolean;
+  frame?: { url: string; name: string; depth: number };
+}
+
+export interface DomStructureInventory {
+  mode: 'structure';
+  total_candidates: number;
+  truncated: boolean;
+  elements: DomStructureRow[];
+  frame_count?: number;
+  frame_errors?: number;
+}
+
+/**
+ * Structural-outline harvest for `structure` mode: landmarks, headings and
+ * container elements with their document depth — the judgment-facing
+ * representation (interactive candidates alone lose the layout a verdict
+ * needs). Self-contained for evaluate serialization.
+ */
+function harvestStructureInPage(max: number) {
+  const nodes = Array.from(
+    document.querySelectorAll(
+      'main, nav, header, footer, aside, section, article, form, fieldset, table, ' +
+        'ul, ol, dl, h1, h2, h3, h4, h5, h6, figure, dialog, ' +
+        '[role="main"], [role="navigation"], [role="form"], [role="search"], ' +
+        '[role="banner"], [role="contentinfo"], [role="complementary"], [role="region"], ' +
+        '[role="dialog"], [role="alertdialog"], [role="list"], [role="table"]'
+    )
+  ) as HTMLElement[];
+  // NOTE: no nested named functions — any named binding inside a serialized
+  // function gets `__name`-wrapped by the toolchain and crashes in the page.
+  // Selector building is inlined into the map callback.
+  return {
+    total_candidates: nodes.length,
+    elements: nodes.slice(0, max).map((el) => {
+      let selector = '';
+      let depthCount = 0;
+      {
+        let walker: HTMLElement | null = el.parentElement;
+        while (walker && walker.tagName !== 'HTML') {
+          depthCount += 1;
+          walker = walker.parentElement;
+        }
+      }
+      if (el.id) {
+        selector = `#${CSS.escape(el.id)}`;
+      } else {
+        const parts: string[] = [];
+        let node: HTMLElement | null = el;
+        let hops = 0;
+        while (node && node.tagName !== 'BODY' && hops < 5) {
+          const parent: HTMLElement | null = node.parentElement;
+          const siblings = parent
+            ? (Array.from(parent.children) as HTMLElement[]).filter(
+                (c) => c.tagName === node!.tagName
+              )
+            : [];
+          const index = siblings.indexOf(node) + 1;
+          parts.unshift(
+            siblings.length > 1
+              ? `${node.tagName.toLowerCase()}:nth-of-type(${index})`
+              : node.tagName.toLowerCase()
+          );
+          node = parent;
+          hops += 1;
+        }
+        selector = parts.join(' > ');
+      }
+      return {
+        selector,
+        tag: el.tagName.toLowerCase(),
+        role: el.getAttribute('role') || '',
+        text: (el.textContent || '').trim().replace(/\s+/g, ' ').slice(0, 120),
+        depth: depthCount,
+        child_count: el.children.length,
+        visible: el.offsetParent !== null,
+      };
+    }),
+  };
+}
+
+/**
+ * Structure-preserving DOM inventory across frames for eval/judgment flows —
+ * the counterpart to `interactive` mode: no refs, wider element set, document
+ * depth kept. Child frames contribute rows stamped with `frame` metadata and
+ * frame-piercing selectors; unreachable frames count toward `frame_errors`.
+ */
+export async function distillDomStructure(
   page: Page,
   options: { maxElements?: number } = {}
-): Promise<
-  Array<{
-    selector: string;
-    tag: string;
-    role: string;
-    text: string;
-    visible: boolean;
-  }>
-> {
-  const maxElements = Math.min(options.maxElements ?? 120, 300);
-  return page.evaluate((cap: number) => {
-    const nodes = Array.from(
-      document.querySelectorAll(
-        'a[href], button, input, textarea, select, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [contenteditable="true"], [onclick]'
-      )
-    ) as HTMLElement[];
-    const cssPath = (el: HTMLElement): string => {
-      if (el.id) return `#${CSS.escape(el.id)}`;
-      const name = (el as HTMLInputElement).name;
-      if (name) return `${el.tagName.toLowerCase()}[name="${name}"]`;
-      const parts: string[] = [];
-      let node: HTMLElement | null = el;
-      let depth = 0;
-      while (node && node.tagName !== 'BODY' && depth < 5) {
-        const parent: HTMLElement | null = node.parentElement;
-        const siblings = parent
-          ? (Array.from(parent.children) as HTMLElement[]).filter(
-              (c) => c.tagName === node!.tagName
-            )
-          : [];
-        const index = siblings.indexOf(node) + 1;
-        parts.unshift(
-          siblings.length > 1
-            ? `${node.tagName.toLowerCase()}:nth-of-type(${index})`
-            : node.tagName.toLowerCase()
-        );
-        node = parent;
-        depth += 1;
+): Promise<DomStructureInventory> {
+  const maxElements = Math.min(options.maxElements ?? 200, 500);
+  const main = typeof page.mainFrame === 'function' ? page.mainFrame() : (page as unknown as Frame);
+  const rows: DomStructureRow[] = [];
+  let totalCandidates = 0;
+  let frameErrors = 0;
+  let frameCount = 0;
+  const harvest = await main.evaluate(harvestStructureInPage, maxElements);
+  totalCandidates += harvest.total_candidates;
+  for (const row of harvest.elements) rows.push(row);
+  const allFrames = typeof page.frames === 'function' ? page.frames() : [];
+  for (const frame of allFrames) {
+    if (frame === main || rows.length >= maxElements) continue;
+    try {
+      const prefix = await frameSelectorPrefixFromHelpers(frame);
+      const evaluated = await frame.evaluate(harvestStructureInPage, maxElements - rows.length);
+      totalCandidates += evaluated.total_candidates;
+      if (evaluated.elements.length) frameCount += 1;
+      for (const row of evaluated.elements) {
+        rows.push({
+          ...row,
+          selector: prefix + row.selector,
+          frame: {
+            url: frame.url(),
+            name: frame.name(),
+            depth: frameDepthFromHelpers(frame),
+          },
+        });
       }
-      return parts.join(' > ');
-    };
-    return nodes.slice(0, cap).map((el) => ({
-      selector: cssPath(el),
+    } catch {
+      frameErrors += 1;
+    }
+  }
+  return {
+    mode: 'structure',
+    total_candidates: totalCandidates,
+    truncated: totalCandidates > rows.length,
+    elements: rows,
+    ...(frameCount ? { frame_count: frameCount } : {}),
+    ...(frameErrors ? { frame_errors: frameErrors } : {}),
+  };
+}
+
+/**
+ * Selector prefix piercing into `frame`'s document. Mirrors
+ * `frameSelectorPrefix` in browser-runtime-helpers.ts — duplicated rather than
+ * imported because that helper is not exported and the helpers module is
+ * dependency-free of the runtime barrel. Keep in sync.
+ */
+async function frameSelectorPrefixFromHelpers(frame: Frame): Promise<string> {
+  const parent = frame.parentFrame();
+  if (!parent) return '';
+  const parentPrefix = await frameSelectorPrefixFromHelpers(parent);
+  const handle = await frame.frameElement();
+  const path = await handle.evaluate((el: Element): string => {
+    const segments: string[] = [];
+    let current: Element | null = el;
+    while (
+      current &&
+      current.nodeType === Node.ELEMENT_NODE &&
+      current.tagName.toLowerCase() !== 'html'
+    ) {
+      const tag = current.tagName.toLowerCase();
+      const htmlEl = current as HTMLElement;
+      if (htmlEl.id) {
+        segments.unshift(`${tag}#${CSS.escape(htmlEl.id)}`);
+        break;
+      }
+      let elementIndex = 1;
+      let sibling = current.previousElementSibling;
+      while (sibling) {
+        if (sibling.tagName === current.tagName) elementIndex += 1;
+        sibling = sibling.previousElementSibling;
+      }
+      segments.unshift(`${tag}:nth-of-type(${elementIndex})`);
+      current = current.parentElement;
+    }
+    return segments.length ? segments.join(' > ') : 'body';
+  });
+  return `${parentPrefix}${path} >> internal:control=enter-frame >> `;
+}
+
+function frameDepthFromHelpers(frame: Frame): number {
+  let depth = 0;
+  let current = frame.parentFrame();
+  while (current) {
+    depth += 1;
+    current = current.parentFrame();
+  }
+  return depth;
+}
+
+/**
+ * In-page interactive inventory for `distill_dom` — a top-level declaration
+ * with no nested named functions, so its serialized source stays clean
+ * (`__name`-wrapped bindings crash once evaluated inside the page).
+ */
+function distillInteractiveInPage(cap: number) {
+  const nodes = Array.from(
+    document.querySelectorAll(
+      'a[href], button, input, textarea, select, [role="button"], [role="link"], [role="tab"], [role="menuitem"], [contenteditable="true"], [onclick]'
+    )
+  ) as HTMLElement[];
+  return nodes.slice(0, cap).map((el) => {
+    // Selector is built inline — a nested named function would serialize
+    // into a `__name` call that does not exist inside the page.
+    let selector = '';
+    if (el.id) {
+      selector = `#${CSS.escape(el.id)}`;
+    } else {
+      const name = (el as HTMLInputElement).name;
+      if (name) {
+        selector = `${el.tagName.toLowerCase()}[name="${name}"]`;
+      } else {
+        const parts: string[] = [];
+        let node: HTMLElement | null = el;
+        let hops = 0;
+        while (node && node.tagName !== 'BODY' && hops < 5) {
+          const parent: HTMLElement | null = node.parentElement;
+          const siblings = parent
+            ? (Array.from(parent.children) as HTMLElement[]).filter(
+                (c) => c.tagName === node!.tagName
+              )
+            : [];
+          const index = siblings.indexOf(node) + 1;
+          parts.unshift(
+            siblings.length > 1
+              ? `${node.tagName.toLowerCase()}:nth-of-type(${index})`
+              : node.tagName.toLowerCase()
+          );
+          node = parent;
+          hops += 1;
+        }
+        selector = parts.join(' > ');
+      }
+    }
+    // Paint-order occlusion via a center-point hit test — a visible element
+    // whose click point paints under another element is not actionable.
+    // Out-of-viewport centers stay unmarked rather than guessed.
+    const rect = el.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    let occluded: boolean | undefined;
+    if (
+      rect.width > 0 &&
+      rect.height > 0 &&
+      cx >= 0 &&
+      cy >= 0 &&
+      cx <= innerWidth &&
+      cy <= innerHeight
+    ) {
+      const top = document.elementFromPoint(cx, cy);
+      if (top && top !== el && !el.contains(top)) occluded = true;
+      else if (top) occluded = false;
+    }
+    return {
+      selector,
       tag: el.tagName.toLowerCase(),
       role: el.getAttribute('role') || (el as HTMLInputElement).type || el.tagName.toLowerCase(),
       text: (
@@ -614,8 +820,29 @@ export async function distillDomInventory(
         .trim()
         .slice(0, 80),
       visible: el.offsetParent !== null,
-    }));
-  }, maxElements);
+      ...(occluded !== undefined ? { occluded } : {}),
+    };
+  });
+}
+
+// AR-07: deterministic DOM distillation — an interactive-element inventory
+// small enough for in-loop LLM decisions. Same DOM, same output; capped.
+export async function distillDomInventory(
+  page: Page,
+  options: { maxElements?: number } = {}
+): Promise<
+  Array<{
+    selector: string;
+    tag: string;
+    role: string;
+    text: string;
+    visible: boolean;
+    /** Center-point hit test outcome — absent when untestable. */
+    occluded?: boolean;
+  }>
+> {
+  const maxElements = Math.min(options.maxElements ?? 120, 300);
+  return page.evaluate(distillInteractiveInPage, maxElements);
 }
 
 export async function fillWithFallback(
@@ -785,6 +1012,7 @@ function browserOpSupport(): BrowserOpSupport {
   return {
     buildRetryOptions,
     distillDomInventory,
+    distillDomStructure,
     fillWithFallback,
     opApply,
     recordedRefTargetFromParams,

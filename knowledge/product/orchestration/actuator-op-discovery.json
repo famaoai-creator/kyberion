@@ -3388,6 +3388,10 @@
               },
               "max_elements": {
                 "type": "number"
+              },
+              "mode": {
+                "type": "string",
+                "enum": ["interactive", "structure"]
               }
             },
             "additionalProperties": false
