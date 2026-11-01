@@ -2,10 +2,14 @@ import * as path from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
+import { compileSchema } from '@agent/core/foundation';
 import {
   buildReachabilityReport,
-  normalizeReachabilityReport,
+  evaluateReachabilityGate,
+  printUnresolvedBaseline,
+  UNRESOLVED_BASELINE_PATH,
   type RoleAssumptionReachabilityReport,
+  type RoleAssumptionViolation,
 } from './analyze_role_assumptions.js';
 
 /**
@@ -643,28 +647,67 @@ describe('RN-02 role assumption reachability analysis', () => {
     ]);
   });
 
-  it('compares reports by content, not by layout', () => {
-    expect(normalizeReachabilityReport('{\n  "a": [1, 2]\n}\n')).toBe(
-      normalizeReachabilityReport('{"a":[\n1,\n2\n]}')
+  it('fails the gate when the analysed code reaches a role the policy does not grant (RN-03)', () => {
+    const policyFile = path.join(
+      FIXTURE_ROOT,
+      'knowledge/product/governance/role-assumption-policy.json'
     );
+    const original = FILES['knowledge/product/governance/role-assumption-policy.json']!;
+    const notGranted = (violations: RoleAssumptionViolation[]) =>
+      violations
+        .filter((violation) => violation.rule === 'reachable-role-not-granted')
+        .filter((violation) => violation.system_role === 'literal_surface')
+        .map((violation) => violation.message);
+    // Granted as committed: literal_surface reaches role_literal and shared_writer.
+    expect(notGranted(evaluateReachabilityGate(FIXTURE_ROOT).violations)).toEqual([]);
+    // Revoke role_literal: the in-memory analysis must now report it.
+    const revoked = JSON.parse(original) as {
+      system_roles: Record<string, { may_assume: string[] }>;
+    };
+    revoked.system_roles.literal_surface!.may_assume = ['role_extra'];
+    safeWriteFile(policyFile, `${JSON.stringify(revoked)}\n`);
+    try {
+      const messages = notGranted(evaluateReachabilityGate(FIXTURE_ROOT).violations);
+      expect(messages).toEqual([
+        expect.stringMatching(
+          /^literal_surface can assume role_literal but the policy does not grant it — via apps\/literal\.ts/
+        ),
+      ]);
+    } finally {
+      safeWriteFile(policyFile, `${original}\n`);
+    }
   });
 
-  it('ignores example paths but not roles in the staleness comparison (S7)', () => {
-    const report = (path: string[], roles: string[]) =>
-      JSON.stringify({
-        system_roles: {
-          x: {
-            reachable_roles: Object.fromEntries(
-              roles.map((role) => [role, { example_path: path }])
-            ),
-          },
-        },
-      });
-    expect(normalizeReachabilityReport(report(['a#f', 'b#g'], ['r1']))).toBe(
-      normalizeReachabilityReport(report(['c#h'], ['r1']))
-    );
-    expect(normalizeReachabilityReport(report(['a#f'], ['r1']))).not.toBe(
-      normalizeReachabilityReport(report(['a#f'], ['r1', 'r2']))
-    );
+  describe('unresolved baseline file', () => {
+    const baselineFile = path.join(FIXTURE_ROOT, UNRESOLVED_BASELINE_PATH);
+    afterAll(() => safeRmSync(baselineFile, { force: true }));
+
+    it('--print-unresolved-baseline works after the redirect truncated the baseline file', () => {
+      // `… --print-unresolved-baseline > <baseline>` empties the file first.
+      safeMkdir(path.dirname(baselineFile), { recursive: true });
+      safeWriteFile(baselineFile, '');
+      const printed = JSON.parse(printUnresolvedBaseline(FIXTURE_ROOT));
+      expect(printed.unresolved_sites.spawn_surface).toBe(1);
+      expect(printed.child_process_entries.spawn_surface).toBe(1);
+      const validate = compileSchema(
+        pathResolver.rootResolve(
+          'knowledge/product/schemas/role-assumption-unresolved-baseline.schema.json'
+        )
+      );
+      expect(validate(printed), JSON.stringify(validate.errors)).toBe(true);
+      expect(validate({ unresolved_sites: {} })).toBe(false);
+    });
+
+    it('fails closed when the baseline file has no child_process_entries map', () => {
+      const generous = Object.fromEntries(
+        Object.keys(report.system_roles).map((role) => [role, 100])
+      );
+      safeMkdir(path.dirname(baselineFile), { recursive: true });
+      safeWriteFile(baselineFile, `${JSON.stringify({ unresolved_sites: generous })}\n`);
+      const violations = evaluateReachabilityGate(FIXTURE_ROOT).violations.filter(
+        (violation) => violation.rule === 'child-process-entries-increased'
+      );
+      expect(violations.map((violation) => violation.system_role)).toContain('spawn_surface');
+    });
   });
 });

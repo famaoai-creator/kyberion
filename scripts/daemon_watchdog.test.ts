@@ -15,7 +15,12 @@ import {
   formatDaemonWatchdogReport,
   DEFAULT_DAEMONS,
   sweepMissionStartCandidates,
+  buildWatchdogRestartHints,
+  daemonRecoveryKey,
+  DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE,
+  resolveWatchdogServiceSpec,
 } from './daemon_watchdog.js';
+import { resolveDaemonInstance } from '@agent/core/daemon/specs';
 import * as workCoordination from '@agent/core/workforce/work-coordination';
 import * as autonomyGate from '@agent/core/governance/autonomous-ops-gate';
 import * as autonomyState from '@agent/core/governance/autonomy-action-state';
@@ -454,5 +459,190 @@ describe('daemon_watchdog', () => {
       title: 'Daemon heartbeat watchdog detected unhealthy daemon(s)',
     });
     expect(formatDaemonWatchdogReport(report).join('\n')).toContain('Ops alert: recorded=');
+  });
+
+  describe('service unit identity (checkout-scoped)', () => {
+    const instance = resolveDaemonInstance(pathResolver.rootDir());
+
+    it('restarts the checkout-scoped label, not the legacy global one', () => {
+      const spec = resolveWatchdogServiceSpec('chronos-daemon', { installedUnits: () => [] });
+      expect(spec?.label).toBe(`com.kyberion.chronos.${instance.id}`);
+      expect(spec?.instanceId).toBe(instance.id);
+    });
+
+    it("ignores another checkout's legacy unit", () => {
+      const spec = resolveWatchdogServiceSpec('chronos-daemon', {
+        installedUnits: () => [
+          {
+            id: 'chronos',
+            label: 'com.kyberion.chronos',
+            scope: 'legacy',
+            repoRoot: '/elsewhere/kyberion',
+            ownedByThisCheckout: false,
+            loaded: true,
+          },
+        ],
+      });
+      expect(spec?.label).toBe(`com.kyberion.chronos.${instance.id}`);
+    });
+
+    it("falls back to this checkout's legacy unit only when no scoped unit exists", () => {
+      const legacy = {
+        id: 'chronos',
+        label: 'com.kyberion.chronos',
+        scope: 'legacy' as const,
+        repoRoot: instance.repoRoot,
+        ownedByThisCheckout: true,
+        loaded: true,
+      };
+      expect(
+        resolveWatchdogServiceSpec('chronos-daemon', { installedUnits: () => [legacy] })?.label
+      ).toBe('com.kyberion.chronos');
+      expect(
+        resolveWatchdogServiceSpec('chronos-daemon', {
+          installedUnits: () => [
+            legacy,
+            { ...legacy, label: `com.kyberion.chronos.${instance.id}`, scope: 'scoped' },
+          ],
+        })?.label
+      ).toBe(`com.kyberion.chronos.${instance.id}`);
+    });
+
+    it('names the scoped label in the operator hint', () => {
+      const hints = buildWatchdogRestartHints([
+        'chronos-daemon',
+        'agent-runtime-supervisor-daemon',
+      ]);
+      expect(hints).toContain('pnpm kyberion scheduler restart --apply');
+      expect(hints).toContain(
+        'pnpm kyberion scheduler restart --apply --daemon agent-runtime-supervisor'
+      );
+      expect(hints.join('\n')).toContain(
+        `launchctl kickstart -k gui/$UID/com.kyberion.chronos.${instance.id}`
+      );
+      expect(hints.join('\n')).not.toMatch(/gui\/\$UID\/com\.kyberion\.<daemon>(?!\.)/);
+    });
+  });
+
+  describe('recovery idempotency key', () => {
+    const stale = {
+      daemon_id: 'chronos-daemon',
+      status: 'stale' as const,
+      heartbeat: {
+        daemon_id: 'chronos-daemon',
+        pid: 1,
+        status: 'running' as const,
+        timestamp: '2026-07-04T00:00:00.000Z',
+      },
+    };
+
+    it('retries a stale episode once per 15-minute bucket, then stops at the attempt cap', () => {
+      const key = (minute: number) =>
+        daemonRecoveryKey(
+          stale,
+          new Date(Date.parse('2026-07-04T00:00:00.000Z') + minute * 60_000)
+        );
+      const base = 'daemon-recovery:chronos-daemon:stale:since-2026-07-04T00:00:00.000Z';
+      expect(key(5)).toBe(`${base}:attempt-1`);
+      expect(key(14)).toBe(key(5));
+      expect(key(15)).toBe(`${base}:attempt-2`);
+      expect(key(30)).toBe(`${base}:attempt-3`);
+      expect(key(45)).toBe(`${base}:attempt-${DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE}`);
+      // Past the cap every run maps to the last attempt: duplicates, no more restarts.
+      expect(new Set([45, 60, 120, 24 * 60].map(key)).size).toBe(1);
+      // A new heartbeat then a new outage is a new episode.
+      expect(
+        daemonRecoveryKey(
+          { ...stale, heartbeat: { ...stale.heartbeat, timestamp: '2026-07-04T03:00:00.000Z' } },
+          new Date('2026-07-04T03:10:00.000Z')
+        )
+      ).toBe('daemon-recovery:chronos-daemon:stale:since-2026-07-04T03:00:00.000Z:attempt-1');
+    });
+
+    it('anchors an overrunning in-progress tick on the tick start, not the refreshed heartbeat', () => {
+      const overrun = {
+        ...stale,
+        heartbeat: {
+          ...stale.heartbeat,
+          timestamp: '2026-07-04T09:00:00.000Z',
+          details: { phase: 'tick_in_progress', tick_started_at: '2026-07-04T00:00:00.000Z' },
+        },
+      };
+      const refreshed = {
+        ...overrun,
+        heartbeat: { ...overrun.heartbeat, timestamp: '2026-07-04T09:01:00.000Z' },
+      };
+      expect(daemonRecoveryKey(overrun, new Date('2026-07-04T09:00:30.000Z'))).toBe(
+        daemonRecoveryKey(refreshed, new Date('2026-07-04T09:01:30.000Z'))
+      );
+      expect(daemonRecoveryKey(overrun, new Date('2026-07-04T09:00:30.000Z'))).toContain(
+        `since-2026-07-04T00:00:00.000Z:attempt-${DAEMON_RECOVERY_MAX_ATTEMPTS_PER_EPISODE}`
+      );
+    });
+
+    it('treats a fresh in-progress heartbeat as alive and flags an overrunning tick', () => {
+      safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
+      const write = (iso: string) =>
+        recordDaemonHeartbeat(
+          'chronos-daemon',
+          {
+            pid: 101,
+            status: 'running',
+            details: { phase: 'tick_in_progress', tick_started_at: '2026-07-04T00:00:00.000Z' },
+          },
+          { rootDir: ROOT, now: new Date(iso) }
+        );
+      const check = (iso: string) =>
+        checkDaemonHeartbeats({
+          daemons: ['chronos-daemon'],
+          rootDir: ROOT,
+          now: new Date(iso),
+          staleAfterMs: 3 * 60 * 1000,
+          alertLogPath: ALERT_LOG,
+          webhookUrl: '',
+        });
+      write('2026-07-04T02:00:00.000Z');
+      expect(check('2026-07-04T02:00:30.000Z').ok).toBe(true);
+      write('2026-07-04T09:00:00.000Z');
+      const overrun = check('2026-07-04T09:00:30.000Z');
+      expect(overrun.ok).toBe(false);
+      expect(overrun.statuses[0]?.reason).toMatch(/tick in progress since/);
+    });
+
+    it('buckets missing heartbeats per 15 minutes and keeps status in the key', () => {
+      const missing = { daemon_id: 'chronos-daemon', status: 'missing' as const };
+      const at = (iso: string) => daemonRecoveryKey(missing, new Date(iso));
+      expect(at('2026-07-04T00:01:00.000Z')).toBe(at('2026-07-04T00:14:59.000Z'));
+      expect(at('2026-07-04T00:15:00.000Z')).not.toBe(at('2026-07-04T00:14:59.000Z'));
+      expect(at('2026-07-04T00:01:00.000Z')).not.toBe(
+        daemonRecoveryKey(stale, new Date('2026-07-04T00:01:00.000Z'))
+      );
+    });
+
+    it('raises one recovery per episode across consecutive watchdog runs', async () => {
+      safeRmSync(pathResolver.sharedTmp('daemon-watchdog-test'), { recursive: true, force: true });
+      recordDaemonHeartbeat(
+        'chronos-daemon',
+        { pid: 101, status: 'running' },
+        { rootDir: ROOT, now: new Date('2026-07-04T00:00:00.000Z') }
+      );
+      const run = (iso: string) =>
+        checkDaemonHeartbeatsWithRecovery({
+          daemons: ['chronos-daemon'],
+          rootDir: ROOT,
+          now: new Date(iso),
+          staleAfterMs: 3 * 60 * 1000,
+          alertLogPath: ALERT_LOG,
+          webhookUrl: '',
+          triggerStorePath: TRIGGER_STORE,
+        });
+      const first = await run('2026-07-04T00:10:00.000Z');
+      const second = await run('2026-07-04T00:11:00.000Z');
+      expect(first.recovery?.[0]?.trigger_status).not.toBe('duplicate');
+      expect(second.recovery?.[0]?.trigger_status).toBe('duplicate');
+      // The restart crash-looped before writing a heartbeat: the next bucket retries.
+      const retry = await run('2026-07-04T00:16:00.000Z');
+      expect(retry.recovery?.[0]?.trigger_status).not.toBe('duplicate');
+    });
   });
 });

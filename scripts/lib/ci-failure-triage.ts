@@ -85,7 +85,6 @@ export const RESOLVE_GENERATED_GATE_IDS: readonly string[] = [
   'subagent-definitions',
   'provider-hooks',
   'env-registry',
-  'role-assumption-reachability',
   'knowledge-index',
   'changelog-fragments',
 ];
@@ -108,6 +107,8 @@ const RATCHET_GATE_IDS = new Set([
   'op-input-contract-coverage',
   'op-preflight-coverage',
   'pipeline-op-schemas',
+  // RN-03: a reachable role must be granted in role-assumption-policy.json.
+  'role-assumption-reachability',
 ]);
 
 const RATCHET_TEST_FILE = /(ratchet|boundar|allowlist|baseline|registration|governance-import)/iu;

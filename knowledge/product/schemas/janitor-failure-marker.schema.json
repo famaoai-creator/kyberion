@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "janitor-failure-marker.schema.json",
+  "title": "Storage janitor failure marker",
+  "description": "Last failed baseline-submitted storage janitor run (active/shared/runtime/state/janitor-last-failure.json).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["failed_at", "exit_code"],
+  "properties": {
+    "failed_at": { "type": "string", "format": "date-time" },
+    "exit_code": { "type": ["integer", "null"] },
+    "log_path": { "type": "string" },
+    "error": { "type": "string", "maxLength": 2048 }
+  }
+}

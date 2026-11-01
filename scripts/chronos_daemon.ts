@@ -21,13 +21,13 @@ import * as path from 'node:path';
 import { logger } from '@agent/core/core';
 import { readConfiguredActorIdentity } from '@agent/core/identity-context-bridge';
 import { pathResolver } from '@agent/core/path-resolver';
-import { recordDaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { recordDaemonHeartbeat, type DaemonHeartbeat } from '@agent/core/daemon-heartbeat';
+import { recordDaemonStart } from '@agent/core/ops-health-state';
 import { recordRuntimeHealthSample } from '@agent/core/tool/runtime-health-history';
 import { safeExistsSync, safeLstat, safeReaddir } from '@agent/core/secure-io';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { sendOpsAlert } from '@agent/core/ops-alert';
 import {
-  reconcileScheduledPipelines,
   resolveScheduledPipelinePath,
   getSchedulesDueNow,
   claimScheduledPipelineRun,
@@ -57,6 +57,10 @@ import type { ChronosDeliveryTarget } from '@agent/core/chronos-delivery';
 import { readValidatedPipelineAdf } from './refactor/adf-input.js';
 import { runSteps } from './run_pipeline.js';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
+import {
+  syncScheduleRegistry,
+  type ScheduleRegistrySyncResult,
+} from './lib/schedule-registry-sync.js';
 import {
   installGracefulShutdown,
   startSerialTickLoop,
@@ -89,23 +93,6 @@ function sovereignPersonaFor(scheduleId: string): 'sovereign' | undefined {
 // ---------------------------------------------------------------------------
 // ADF scan → registry sync
 // ---------------------------------------------------------------------------
-
-function collectPipelineFiles(dir: string): string[] {
-  const found: string[] = [];
-  if (!safeExistsSync(dir)) return found;
-  const entries = safeReaddir(dir);
-  for (const name of entries) {
-    const full = path.join(dir, name);
-    const stat = safeLstat(full);
-    if (stat.isSymbolicLink()) continue;
-    if (stat.isDirectory()) {
-      found.push(...collectPipelineFiles(full));
-    } else if (name.endsWith('.json')) {
-      found.push(full);
-    }
-  }
-  return found;
-}
 
 /** Authority role of the tenant-bound child process (security-policy.json). */
 export const CHRONOS_TENANT_RUNNER_ROLE = 'chronos_tenant_runner';
@@ -515,62 +502,19 @@ function warnOperatorExcludedSchedules(): void {
   );
 }
 
-function syncSchedulesFromAdf(): void {
-  const root = pathResolver.rootDir();
-  const pipelinesDir = path.join(root, 'pipelines');
-  const files = collectPipelineFiles(pipelinesDir);
-  const tenantFiles = collectTenantPipelineFiles(root);
-
-  const desired: Array<Parameters<typeof reconcileScheduledPipelines>[1][number]> = [];
-  for (const fullPath of [...files, ...tenantFiles.map((entry) => entry.file)]) {
-    // `_`-prefixed JSON files are test fixtures / partials — never schedulable.
-    if (path.basename(fullPath).startsWith('_')) continue;
-    try {
-      const { scope, adf } = readScheduledPipelineAdf(fullPath);
-      if (!adf || !adf.schedule?.cron) continue;
-      // Refuse to schedule a tenant pipeline whose runtime needs exceed its
-      // tenant allowlist or the global ceiling (re-checked at run time too).
-      if (scope.kind === 'tenant') resolveTenantRuntimeEnv(scope, adf.runtime);
-
-      const sched = adf.schedule;
-      const baseId = sched.id ?? path.basename(fullPath, '.json');
-      // Tenant schedules are namespaced so a tenant file can never shadow a
-      // repository schedule id (or another tenant's).
-      const id = scope.kind === 'tenant' ? `tenant-${scope.tenant_slug}-${baseId}` : baseId;
-
-      desired.push({
-        id,
-        name: adf.name ?? id,
-        pipelinePath: fullPath,
-        actuator: 'run_pipeline',
-        trigger: {
-          type: 'cron',
-          cron: sched.cron,
-          timezone: sched.timezone,
-        },
-        enabled: sched.enabled !== false,
-        managedBy: 'chronos_adf',
-        // Shipped-disabled schedules run only when the host lists their id in
-        // KYBERION_CHRONOS_SCHEDULES (see scheduleExplicitlyOptedIn).
-        optIn: sched.enabled === false,
-        // Tenant ADF context stays in the confidential file; the child reads it.
-        context: scope.kind === 'tenant' ? {} : (adf.context ?? {}),
-        deliver_to: sched.deliver_to,
-      });
-    } catch (err: any) {
-      logger.warn(
-        `[CHRONOS] Skipped ${path.relative(pathResolver.rootDir(), fullPath)}: ${err.message}`
-      );
-    }
-  }
-
-  const result = reconcileScheduledPipelines('chronos_adf', desired);
-  const changed = result.added + result.updated + result.removed;
-  if (changed > 0) {
-    logger.info(
-      `[CHRONOS] Reconciled schedules: ${result.added} added, ${result.updated} updated, ${result.removed} removed`
-    );
-  }
+/**
+ * ADF `schedule` fields → schedule registry, with this daemon's tenant gates.
+ * Exported so `pnpm kyberion scheduler reconcile` can sync without the daemon.
+ */
+export function syncSchedulesFromAdf(
+  options: { dryRun?: boolean } = {}
+): ScheduleRegistrySyncResult {
+  return syncScheduleRegistry({
+    collectTenantPipelineFiles,
+    readScheduledPipelineAdf,
+    assertTenantRuntime: (scope, runtime) => void resolveTenantRuntimeEnv(scope, runtime),
+    dryRun: options.dryRun,
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -606,12 +550,93 @@ function reportAwaitScanError(runId: string, reason: string | undefined): void {
   logger.warn(`[CHRONOS] await-state scan error for ${runId}: ${reason}${suffix}`);
 }
 
+// ---------------------------------------------------------------------------
+// Heartbeat: liveness that a crash loop cannot fake. Every write carries the
+// process start time, rolling restart counters (ops-health crash-loop
+// finding) and the last tick outcome. `last_tick_ok_at` moves only AFTER a
+// tick completes; a long tick refreshes the heartbeat as `tick_in_progress`.
+// ---------------------------------------------------------------------------
+
+const chronosLiveness: Record<string, unknown> = {};
+
+function writeChronosHeartbeat(
+  status: DaemonHeartbeat['status'],
+  details: Record<string, unknown> = {}
+): void {
+  recordDaemonHeartbeat('chronos-daemon', { status, details: { ...chronosLiveness, ...details } });
+}
+
+/**
+ * How often a running tick refreshes the heartbeat. A scheduled run can last
+ * hours (a backup archive is allowed up to 6h), and a heartbeat written only
+ * after the tick would go stale mid-run: baseline L10 would raise a false
+ * alarm and the watchdog could kickstart chronos in the middle of the run.
+ */
+export const TICK_HEARTBEAT_REFRESH_MS = 60_000;
+
+function lastTickFailed(liveness: Record<string, unknown>): boolean {
+  const errorAt =
+    typeof liveness.last_tick_error_at === 'string' ? Date.parse(liveness.last_tick_error_at) : NaN;
+  if (!Number.isFinite(errorAt)) return false;
+  const okAt =
+    typeof liveness.last_tick_ok_at === 'string' ? Date.parse(liveness.last_tick_ok_at) : NaN;
+  return !Number.isFinite(okAt) || errorAt > okAt;
+}
+
+/**
+ * Run one leader tick and record its outcome in the heartbeat. While the tick
+ * runs, the heartbeat is refreshed every `refreshMs` with phase
+ * `tick_in_progress` and the tick start (readDaemonHeartbeat flags a tick in
+ * progress past DAEMON_TICK_IN_PROGRESS_MAX_MS); `last_tick_ok_at` still moves
+ * only when a tick completes. A tick shorter than `refreshMs` writes nothing
+ * until it settles, so a tick that throws every minute cannot keep the
+ * heartbeat fresh. The lease attempt is a single try, so a standby process
+ * settles long before the first refresh.
+ */
+export async function runTickWithHeartbeat(
+  run: () => Promise<boolean>,
+  write: (
+    status: DaemonHeartbeat['status'],
+    details: Record<string, unknown>
+  ) => void = writeChronosHeartbeat,
+  liveness: Record<string, unknown> = chronosLiveness,
+  now: () => Date = () => new Date(),
+  refreshMs: number = TICK_HEARTBEAT_REFRESH_MS
+): Promise<void> {
+  const tickStartedAt = now().toISOString();
+  const refresh = setInterval(() => {
+    try {
+      write(lastTickFailed(liveness) ? 'error' : 'running', {
+        phase: 'tick_in_progress',
+        tick_started_at: tickStartedAt,
+      });
+    } catch (error) {
+      logger.warn(
+        `[CHRONOS] in-progress heartbeat write failed — ${
+          error instanceof Error ? error.message : String(error)
+        } | next: the tick continues; check active/shared/runtime/heartbeats is writable`
+      );
+    }
+  }, refreshMs);
+  refresh.unref?.();
+  try {
+    const led = await run();
+    if (!led) return;
+    liveness.last_tick_ok_at = now().toISOString();
+    write('running', { phase: 'tick' });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    liveness.last_tick_error = message.slice(0, 500);
+    liveness.last_tick_error_at = now().toISOString();
+    write('error', { phase: 'tick' });
+    throw error;
+  } finally {
+    clearInterval(refresh);
+  }
+}
+
 async function tickAsLeader(): Promise<void> {
   const now = new Date();
-  recordDaemonHeartbeat('chronos-daemon', {
-    status: 'running',
-    details: { phase: 'tick' },
-  });
   // Await-state resume scan runs on every tick — a suspended pipeline has no
   // writer event to hook, so this sweep is its alarm clock. A scanner failure
   // warns but never stops the schedule work below.
@@ -639,7 +664,7 @@ async function tickAsLeader(): Promise<void> {
 
   for (const scheduled of due) {
     const minuteKey = now.toISOString().slice(0, 16);
-    const receipt = await triggerRunner.run(
+    const pendingReceipt = triggerRunner.run(
       {
         idempotencyKey: `cron:${scheduled.id}:${minuteKey}`,
         source: 'cron',
@@ -782,6 +807,17 @@ async function tickAsLeader(): Promise<void> {
         }
       }
     );
+    // One failing trigger (e.g. an unreadable delivery journal) must not abort
+    // the remaining schedules or escape the tick and crash the daemon.
+    const receipt = await pendingReceipt.catch((error: unknown) => {
+      logger.warn(
+        `[CHRONOS] trigger ${scheduled.id} could not run — ${
+          error instanceof Error ? error.message : String(error)
+        } | next: the remaining schedules continue; this one retries next tick | evidence: cron:${scheduled.id}:${minuteKey}`
+      );
+      return null;
+    });
+    if (!receipt) continue;
     if (receipt.status === 'failed' || receipt.status === 'rejected') {
       logger.warn(
         `[CHRONOS] Trigger ${scheduled.id} ${receipt.status}: ${receipt.reason || 'unknown'}`
@@ -793,13 +829,17 @@ async function tickAsLeader(): Promise<void> {
 async function tick(): Promise<void> {
   // tickAsLeader resolves to void, so the lease result cannot signal "lost the
   // lease" by itself — that logged a false "another leader" line on every tick.
-  const result = await withTriggerLeaderLease('chronos-daemon', async () => {
-    await withExecutionContextAsync('chronos_gateway', tickAsLeader);
-    return 'led' as const;
+  await runTickWithHeartbeat(async () => {
+    const result = await withTriggerLeaderLease('chronos-daemon', async () => {
+      await withExecutionContextAsync('chronos_gateway', tickAsLeader);
+      return 'led' as const;
+    });
+    if (result === undefined) {
+      logger.info('[CHRONOS] Another scheduler leader owns this tick; skipping.');
+      return false;
+    }
+    return true;
   });
-  if (result === undefined) {
-    logger.info('[CHRONOS] Another scheduler leader owns this tick; skipping.');
-  }
 }
 
 export interface ChronosShutdownDeps {
@@ -847,10 +887,8 @@ async function main(_args: string[] = []): Promise<void> {
   );
   runtimeHealthSampler.unref?.();
   logger.info('[CHRONOS] Kyberion Pipeline Scheduler starting...');
-  recordDaemonHeartbeat('chronos-daemon', {
-    status: 'starting',
-    details: { tick_interval_ms: TICK_INTERVAL_MS },
-  });
+  Object.assign(chronosLiveness, recordDaemonStart('chronos-daemon'));
+  writeChronosHeartbeat('starting', { tick_interval_ms: TICK_INTERVAL_MS });
 
   syncSchedulesFromAdf();
   warnOperatorExcludedSchedules();
@@ -876,17 +914,15 @@ async function main(_args: string[] = []): Promise<void> {
       stopLoop: (graceMs) => loop.stop(graceMs),
       stopSampler: () => clearInterval(runtimeHealthSampler),
       releaseLease: () => releaseTriggerLeaderLease('chronos-daemon'),
-      recordHeartbeat: (details) =>
-        void recordDaemonHeartbeat('chronos-daemon', { status: 'stopping', details }),
+      recordHeartbeat: (details) => void writeChronosHeartbeat('stopping', details),
     }),
   });
 
   await loop.firstTick;
 
-  recordDaemonHeartbeat('chronos-daemon', {
-    status: 'running',
-    details: { tick_interval_ms: TICK_INTERVAL_MS },
-  });
+  if (!chronosLiveness.last_tick_error_at) {
+    writeChronosHeartbeat('running', { tick_interval_ms: TICK_INTERVAL_MS });
+  }
   logger.info(`[CHRONOS] Running. Tick interval: ${TICK_INTERVAL_MS / 1000}s`);
 }
 
@@ -913,10 +949,7 @@ const runChronosDaemon = defineScript({
       await main(argv);
     } catch (err: any) {
       const message = `[CHRONOS] Fatal: ${err?.message ?? String(err)}`;
-      recordDaemonHeartbeat('chronos-daemon', {
-        status: 'error',
-        details: { error: err?.message ?? String(err) },
-      });
+      writeChronosHeartbeat('error', { error: err?.message ?? String(err) });
       sendOpsAlert({
         severity: 'critical',
         title: 'Chronos daemon fatal error',

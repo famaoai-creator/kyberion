@@ -33,6 +33,27 @@ export interface HeartbeatOptions {
 }
 
 const DEFAULT_STALE_AFTER_MS = 3 * 60 * 1000;
+/**
+ * A daemon that refreshes its heartbeat during a long tick (phase
+ * `tick_in_progress` + `tick_started_at`, see chronos runTickWithHeartbeat)
+ * is alive while the heartbeat is fresh — but a tick running longer than this
+ * is hung or runaway and counts as unhealthy. Generous: a backup archive alone
+ * may take up to 6h.
+ */
+export const DAEMON_TICK_IN_PROGRESS_MAX_MS = 8 * 60 * 60 * 1000;
+
+/** Milliseconds a tick has been in progress, or null when no tick is in progress. */
+export function tickInProgressAgeMs(
+  heartbeat: Pick<DaemonHeartbeat, 'details'> | undefined,
+  nowMs: number
+): number | null {
+  const details = heartbeat?.details;
+  if (details?.phase !== 'tick_in_progress' || typeof details.tick_started_at !== 'string') {
+    return null;
+  }
+  const startedMs = Date.parse(details.tick_started_at);
+  return Number.isFinite(startedMs) ? Math.max(0, nowMs - startedMs) : null;
+}
 const DAEMON_HEARTBEAT_SCHEMA_PATH = pathResolver.knowledge(
   'product/schemas/daemon-heartbeat.schema.json'
 );
@@ -121,7 +142,9 @@ export function readDaemonHeartbeat(
     // the current dist — heartbeats may still be fresh, but the process must
     // be recycled onto the new build, so it counts as unhealthy.
     const staleCode = heartbeat.details?.stale_code === true;
-    const stale = ageMs > staleAfterMs || staleCode;
+    const tickAgeMs = tickInProgressAgeMs(heartbeat, now);
+    const tickOverrun = tickAgeMs !== null && tickAgeMs > DAEMON_TICK_IN_PROGRESS_MAX_MS;
+    const stale = ageMs > staleAfterMs || staleCode || tickOverrun;
     return {
       daemon_id: daemonId,
       status: stale ? 'stale' : 'healthy',
@@ -129,9 +152,13 @@ export function readDaemonHeartbeat(
       heartbeat,
       ...(staleCode
         ? { reason: 'daemon reports stale_code (running build older than dist)' }
-        : stale
+        : ageMs > staleAfterMs
           ? { reason: `heartbeat is older than ${staleAfterMs}ms` }
-          : {}),
+          : tickOverrun
+            ? {
+                reason: `tick in progress since ${String(heartbeat.details?.tick_started_at)} — longer than ${DAEMON_TICK_IN_PROGRESS_MAX_MS}ms`,
+              }
+            : {}),
     };
   } catch (error) {
     return {

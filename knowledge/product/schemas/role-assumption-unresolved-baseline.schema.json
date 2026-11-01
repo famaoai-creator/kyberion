@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "role-assumption-unresolved-baseline.schema.json",
+  "title": "Role assumption unresolved-site baseline",
+  "description": "Per-system-role counts of reachable unresolved (any role) role-assumption sites and of child-process entries inheriting SYSTEM_ROLE, ratcheted by the role-assumption-reachability gate (scripts/analyze_role_assumptions.ts). Counts only, never site paths.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["unresolved_sites", "child_process_entries"],
+  "properties": {
+    "$schema": { "type": "string" },
+    "description": { "type": "string" },
+    "unresolved_sites": {
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9_]+$" },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "child_process_entries": {
+      "description": "Per-system-role count of child-process entries that inherit SYSTEM_ROLE. A role missing from the map allows 0.",
+      "type": "object",
+      "propertyNames": { "pattern": "^[a-z0-9_]+$" },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    }
+  }
+}

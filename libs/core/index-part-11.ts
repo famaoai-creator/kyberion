@@ -193,3 +193,17 @@ export {
   type LearningSourceReport,
 } from './knowledge/learning-signal-adapter.js';
 export * from './surface/verified-human-request-identity.js';
+// Resident ops verdicts shared by baseline (L10/L12) and doctor.
+export {
+  evaluateOpsHealth,
+  formatOpsHealthFinding,
+  isSchedulerOpsFinding,
+  type OpsHealthFinding,
+  type OpsHealthInput,
+  type OpsHealthReport,
+} from './ops-health.js';
+export {
+  readBackupDrillReceipt,
+  writeBackupDrillReceipt,
+  recordDaemonStart,
+} from './ops-health-state.js';

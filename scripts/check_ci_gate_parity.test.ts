@@ -6,6 +6,7 @@ import {
   checkWorkflowSetupOrder,
   collectCheckScopeReferences,
   collectPnpmScriptReferences,
+  FULL_SCOPE_SELECTOR,
   readCiGateParityTextFile,
 } from './check_ci_gate_parity.js';
 
@@ -30,6 +31,18 @@ describe('ci gate parity', () => {
 
   it('keeps the checked-in workflows and baseline declarations aligned', () => {
     expect(checkCiGateParity()).toEqual([]);
+  });
+
+  it('keeps ci.yml on full-only for pull requests and on full for push and schedule', () => {
+    // pr-validation.yml runs `--scope pr` on pull_request and merge_group, so
+    // ci.yml must not repeat the pr gates there; push/schedule run all of full.
+    const read = (file: string) =>
+      String(safeReadFile(pathResolver.rootResolve(file), { encoding: 'utf8' }));
+    const ci = read('.github/workflows/ci.yml');
+    expect(read('.github/workflows/pr-validation.yml')).toContain('pnpm run check -- --scope pr');
+    expect(ci).toContain(FULL_SCOPE_SELECTOR);
+    expect(ci).toContain('pnpm run check -- --scope "$CHECK_SCOPE"');
+    expect(ci).not.toContain('run: pnpm run check -- --scope full 2>&1');
   });
 
   it('extracts package-script references from manifest command arguments', () => {

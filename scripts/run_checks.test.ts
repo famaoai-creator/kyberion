@@ -51,6 +51,32 @@ describe('manifest-driven check runner', () => {
     );
   });
 
+  it('selects full-only as full minus the pr gates, so pr + full-only = full', () => {
+    const manifest = {
+      version: 1,
+      gates: [gate('pr-gate', 'pr'), gate('full-gate', 'full'), gate('release-gate', 'release')],
+    };
+    const ids = (scope: Parameters<typeof selectGates>[1]) =>
+      selectGates(manifest, scope).map((entry) => entry.id);
+    expect(ids('pr')).toEqual(['pr-gate']);
+    expect(ids('full')).toEqual(['pr-gate', 'full-gate']);
+    expect(ids('full-only')).toEqual(['full-gate']);
+    expect(ids('release')).toEqual(['pr-gate', 'full-gate', 'release-gate']);
+    expect(() => selectGates(manifest, 'full-only', 'pr-gate')).toThrow(
+      'not registered for scope full-only'
+    );
+    // Same partition on the real manifest: no gate lost, none run twice.
+    const real = loadGateManifest();
+    const pr = selectGates(real, 'pr').map((entry) => entry.id);
+    const fullOnly = selectGates(real, 'full-only').map((entry) => entry.id);
+    expect(pr.filter((id) => fullOnly.includes(id))).toEqual([]);
+    expect([...pr, ...fullOnly].sort()).toEqual(
+      selectGates(real, 'full')
+        .map((entry) => entry.id)
+        .sort()
+    );
+  });
+
   it('rejects duplicate and recursive gate definitions', () => {
     expect(() =>
       validateGateManifest({ version: 1, gates: [gate('same', 'pr'), gate('same', 'full')] })

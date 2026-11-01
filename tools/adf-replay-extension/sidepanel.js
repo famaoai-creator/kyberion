@@ -100,7 +100,8 @@ const elements = {
   aiObservationSummary: document.querySelector('#ai-observation-summary'),
   inspectPageButton: document.querySelector('#inspect-page-button'),
   inspectSendCliButton: document.querySelector('#inspect-send-cli-button'),
-  inspectPortInput: document.querySelector('#inspect-port-input'),
+  inspectPairingRow: document.querySelector('#inspect-pairing-row'),
+  inspectPairingInput: document.querySelector('#inspect-pairing-input'),
   inspectPageStatus: document.querySelector('#inspect-page-status'),
   inspectPageResult: document.querySelector('#inspect-page-result'),
   intentResult: document.querySelector('#intent-result'),
@@ -576,14 +577,6 @@ refresh();
 void refreshBuiltInAiStatus();
 
 async function refresh() {
-  try {
-    const saved = await chrome.storage?.local?.get(['inspectCliPort']);
-    if (saved?.inspectCliPort && elements.inspectPortInput) {
-      elements.inspectPortInput.value = String(saved.inspectCliPort);
-    }
-  } catch (_) {
-    // optional storage cache
-  }
   const response = await chrome.runtime.sendMessage({ type: 'bridge:get-state' });
   if (!response?.ok)
     return showNotice(response?.error || 'Browser Bridge の状態を取得できません。', 'error');
@@ -797,34 +790,41 @@ async function inspectCurrentPageDOM() {
   lastInspectionData = response.inspection;
   elements.inspectPageResult.hidden = false;
   elements.inspectSendCliButton.hidden = false;
+  elements.inspectPairingRow.hidden = false;
   elements.inspectPageStatus.textContent = `解析完了: 入力欄 ${lastInspectionData.inputs.length} 件 / ボタン ${lastInspectionData.buttons.length} 件 / 見出し ${lastInspectionData.headings.length} 件 / リンク ${lastInspectionData.links.length} 件`;
   elements.inspectPageResult.textContent = JSON.stringify(lastInspectionData, null, 2);
 }
 
+// Hand-off goes through the native host (submit_inspection), never a loopback
+// HTTP port (spec §4.2). The service worker re-inspects the connected tab and
+// scrubs the result; the host re-validates and gives it to the waiting CLI.
 async function sendInspectionToCli() {
   if (!lastInspectionData) {
     throw new Error('解析結果がありません。先に「ページ構造を解析」を実行してください。');
   }
-  const portVal = elements.inspectPortInput ? Number(elements.inspectPortInput.value) : 8788;
-  const port = Number.isInteger(portVal) && portVal > 0 && portVal < 65536 ? portVal : 8788;
-  try {
-    await chrome.storage?.local?.set({ inspectCliPort: port });
-  } catch (_) {
-    // optional storage cache
+  const pairingCode = InboxModel.normalizePairingCode(elements.inspectPairingInput.value);
+  if (!pairingCode) {
+    elements.inspectPageStatus.textContent =
+      'CLI が表示したペアリングコード（6 文字）を入力してください。';
+    elements.inspectPairingInput.focus();
+    return;
   }
-
-  elements.inspectPageStatus.textContent = `Kyberion CLI (127.0.0.1:${port}) へ送信中…`;
-  try {
-    const res = await fetch(`http://127.0.0.1:${port}/inspection`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(lastInspectionData),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-    elements.inspectPageStatus.textContent = `✓ Kyberion CLI (ポート ${port}) へ解析データを送信しました。`;
-  } catch (error) {
-    elements.inspectPageStatus.textContent = `送信エラー: ${error instanceof Error ? error.message : String(error)} (pnpm kyberion browser inspect --mode extension --extension-port ${port} が待機しているか確認してください)`;
+  elements.inspectPageStatus.textContent = 'Native Bridge 経由で Kyberion CLI へ送信中…';
+  const response = await invoke('bridge:submit-inspection', { pairingCode });
+  if (!response?.submitResult) {
+    elements.inspectPageStatus.textContent = `送信エラー: ${lastError || '送信に失敗しました。'}`;
+    return;
   }
+  const result = response.submitResult;
+  if (result.inspection) {
+    lastInspectionData = result.inspection;
+    elements.inspectPageResult.textContent = JSON.stringify(result.inspection, null, 2);
+  }
+  const scope = result.scope
+    ? `${result.scope.tier}${result.scope.tenant_slug ? `/${result.scope.tenant_slug}` : ''}`
+    : '';
+  elements.inspectPairingInput.value = '';
+  elements.inspectPageStatus.textContent = `✓ 待機中の Kyberion CLI へ解析データを送信しました${scope ? `（保存先: ${scope}）` : ''}。`;
 }
 
 function render(nextState) {
