@@ -1643,10 +1643,13 @@ describe('backup file selection', () => {
     ])('refuses a drill target at %s before touching it', (_case, resolveTarget) => {
       buildDrillArchive(1);
       const target = resolveTarget();
+      // A fresh checkout (CI) may not have the target yet: assert it is
+      // untouched — same existence before and after — not that it exists.
+      const existedBefore = safeExistsSync(target);
       expect(() => runRestoreDrill({ ...drillOptions(), target })).toThrow(
         '[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH]'
       );
-      expect(safeExistsSync(target)).toBe(true);
+      expect(safeExistsSync(target)).toBe(existedBefore);
     });
 
     it('fails a drill whose archive lacks the credential documents its manifest recorded', () => {
