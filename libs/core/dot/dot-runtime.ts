@@ -418,7 +418,6 @@ export function compactDotWakeLedger(
       const staging = `${src}.compacting-${process.pid}-${stagingPaths.length}-${tag}`;
       safeMoveSync(src, staging);
       stagingPaths.push(staging);
-      // Streamed: no whole-file cap on the parked segment (same throw-on-malformed contract).
       for (const row of streamJsonLines<Record<string, unknown>>(staging)) allRows.push(row);
     };
     const fold = (rows: Array<Record<string, unknown>>): Array<Record<string, unknown>> => {
@@ -615,7 +614,6 @@ export function recordDotTokenUsage(
     } satisfies DotTokenUsageEntry,
     deps
   );
-  // Write-time retention (3-day window, archived): never drops today's rows.
   maintainDotTokenUsageAfterAppend(runtimePath(deps.rootDir, DOT_TOKEN_USAGE_PATH), now);
 }
 
@@ -744,8 +742,7 @@ function wakeTriggerKeys(
 ): Array<{ key: string; detail: string }> {
   // Match + key derivation live in dot-inbox.ts so this consumer and the
   // tombstone compactor can never drift apart.
-  // Streamed (constant memory, no size cap): forward line numbers match the
-  // old whole-file `split(/\r?\n/)` index + 1, so wake keys are unchanged.
+  // Streamed, no size cap; line numbers match split(/\r?\n/) index + 1 (keys unchanged).
   const rows = streamJsonLines<DotInboxEntry & { __line?: string; __index?: number }>(
     runtimePath(deps.rootDir, dotInboxPath(charter.scope)),
     {
