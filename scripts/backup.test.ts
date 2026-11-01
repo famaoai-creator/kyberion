@@ -1580,6 +1580,39 @@ describe('backup file selection', () => {
       expect(safeExistsSync(drillTarget)).toBe(false);
     });
 
+    it('removes the default drill target it created', () => {
+      buildDrillArchive(1);
+      const { target: _unused, ...withoutTarget } = drillOptions();
+      const result = runRestoreDrill(withoutTarget);
+      expect(result.target.startsWith(pathResolver.sharedTmp())).toBe(true);
+      expect(result.targetRemoved).toBe(true);
+      expect(safeExistsSync(result.target)).toBe(false);
+    });
+
+    it('never deletes a pre-existing target it did not create', () => {
+      buildDrillArchive(1);
+      safeWriteFile(`${drillTarget}/operator-notes.txt`, 'keep\n');
+      const { force: _noForce, ...withoutForce } = drillOptions();
+      const result = runRestoreDrill(withoutForce);
+      expect(result.targetRemoved).toBe(false);
+      expect(String(safeReadFile(`${drillTarget}/operator-notes.txt`))).toBe('keep\n');
+      // Credential roots are still never extracted into it.
+      expect(safeExistsSync(`${drillTarget}/knowledge/personal/connections`)).toBe(false);
+    });
+
+    it.each([
+      ['the repository root', () => pathResolver.rootDir()],
+      ['live runtime state', () => `${pathResolver.rootDir()}/active/shared/runtime`],
+      ['the scratch floor itself', () => pathResolver.sharedTmp()],
+    ])('refuses a drill target at %s before touching it', (_case, resolveTarget) => {
+      buildDrillArchive(1);
+      const target = resolveTarget();
+      expect(() => runRestoreDrill({ ...drillOptions(), target })).toThrow(
+        '[BACKUP_DRILL_TARGET_OUTSIDE_SCRATCH]'
+      );
+      expect(safeExistsSync(target)).toBe(true);
+    });
+
     it('fails a drill whose archive lacks the credential documents its manifest recorded', () => {
       buildDrillArchive(2);
       expect(() => runRestoreDrill(drillOptions())).toThrow(

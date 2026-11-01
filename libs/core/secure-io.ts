@@ -1125,6 +1125,8 @@ export function safeExistsSync(filePath: string): boolean {
   if (!filePath) return false;
   assertSensitiveMetadataAllowed(filePath, isSensitivePathMediated());
   const resolved = pathResolver.resolve(filePath);
+  // A relative path resolves against the project root, not the cwd: judge that too.
+  assertSensitiveMetadataAllowed(resolved, isSensitivePathMediated());
   assertScopedMetadataReadable(resolved, filePath);
   return fs.existsSync(resolved);
 }
@@ -1637,6 +1639,9 @@ export const safeUnlink = safeUnlinkSync;
 export function safeReaddir(dirPath: string): string[] {
   assertSensitiveMetadataAllowed(dirPath, isSensitivePathMediated());
   const resolved = pathResolver.resolve(dirPath);
+  // A relative path resolves against the project root, not the cwd: judge that
+  // too, since the descriptor opened at the authorized canonical is not re-judged.
+  assertSensitiveMetadataAllowed(resolved, isSensitivePathMediated());
   const check = validateReadPermission(resolved);
   if (!check.allowed) {
     throw new Error(
