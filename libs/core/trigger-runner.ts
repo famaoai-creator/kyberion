@@ -19,6 +19,7 @@ import {
   safeMkdir,
   safeLstat,
   safeMoveSync,
+  safeReaddir,
   safeStat,
   safeUnlinkSync,
 } from './secure-io.js';
@@ -614,6 +615,7 @@ function splitJournal(
   now: Date,
   chunkBytes?: number
 ): string {
+  removeStaleRotationTemps(storePath);
   const tag = `${process.pid}-${randomUUID().slice(0, 8)}`;
   const liveTemp = `${storePath}.rotate-live-${tag}.tmp`;
   const segmentTemp = `${storePath}.rotate-segment-${tag}.tmp`;
@@ -639,6 +641,25 @@ function splitJournal(
   } finally {
     tryUnlink(liveTemp);
     tryUnlink(segmentTemp);
+  }
+}
+
+/**
+ * Temps left by a rotation that crashed between writing and publishing are
+ * full copies of the journal; the janitor's segment pattern never matches
+ * them. The caller holds the store lock, so any present now are orphans.
+ */
+function removeStaleRotationTemps(storePath: string): void {
+  const dir = path.dirname(storePath);
+  const prefix = `${path.basename(storePath)}.rotate-`;
+  let names: string[];
+  try {
+    names = safeReaddir(dir);
+  } catch {
+    return;
+  }
+  for (const name of names) {
+    if (name.startsWith(prefix) && name.endsWith('.tmp')) tryUnlink(path.join(dir, name));
   }
 }
 
