@@ -3987,6 +3987,60 @@
       "documented": true
     },
     {
+      "name": "KYBERION_SPEECH_CPP_ASR_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "speech.cpp ASR catalog name for CLI/HTTP transcription (default qwen3-asr-0.6b).",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_SPEECH_CPP_AUTOSTART",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "When true, spawn a detached `speech serve` on loopback if KYBERION_SPEECH_CPP_URL /health is down (default off — model fetch can be large).",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_SPEECH_CPP_BIN",
+      "category": "path",
+      "type": "path",
+      "required": false,
+      "description": "Optional executable path override for the speech.cpp CLI; when unset, the managed tool-runtime binary or PATH `speech` is used.",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_SPEECH_CPP_SERVE_MODELS",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Space-separated catalog models passed to an auto-started `speech serve` (default: TTS then ASR model envs). Use `-` or `none` for an empty serve.",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_SPEECH_CPP_TTS_MODEL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "speech.cpp TTS catalog name for CLI/HTTP synthesis (default qwen3-tts-0.6b).",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
+      "name": "KYBERION_SPEECH_CPP_URL",
+      "category": "provider",
+      "type": "string",
+      "required": false,
+      "description": "Optional base URL for speech.cpp `speech serve` OpenAI-compatible HTTP API (default http://127.0.0.1:8095). Also accepted as a voice-hub STT server base when VOICE_HUB_STT_BASE_URL is unset.",
+      "documented": true,
+      "subsystem": "voice"
+    },
+    {
       "name": "KYBERION_SPEND_GUARD_TEST",
       "category": "flag",
       "type": "boolean",
