@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "default_service_id": "comfyui",
+  "services": [
+    {
+      "service_id": "rustxng",
+      "display_name": "RustXNG Local Search Service",
+      "kind": "local_service",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "default_base_url": "http://127.0.0.1:8888",
+      "trial_probe": {
+        "kind": "http",
+        "method": "GET",
+        "path": "healthz",
+        "description": "Probe the local RustXNG health endpoint."
+      },
+      "install_plan": {
+        "kind": "service_preset",
+        "preset_path": "knowledge/product/orchestration/service-presets/rustxng.json",
+        "description": "Use the RustXNG service preset after installing the managed tool-runtime binary."
+      },
+      "installed_probe": {
+        "kind": "http",
+        "method": "GET",
+        "path": "healthz",
+        "description": "Re-check RustXNG after provisioning."
+      },
+      "managed_service_subpath": "service-runtimes/rustxng",
+      "service_endpoint_path": "knowledge/product/orchestration/service-endpoints/rustxng.json",
+      "service_preset_path": "knowledge/product/orchestration/service-presets/rustxng.json",
+      "notes": "RustXNG is managed as a service runtime so local HTTP availability is tracked separately from the managed binary install (tool-runtime rustxng). AGPL-3.0-or-later: process-boundary / HTTP only. Default bind is 127.0.0.1:8888; probe GET /healthz. search-actuator provider=rustxng calls /search?format=json and may auto-start a detached loopback sidecar when this probe is down."
+    }
+  ]
+}

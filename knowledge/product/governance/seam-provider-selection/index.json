@@ -15,6 +15,7 @@
     "video-generation-provider",
     "compute-execution-provider",
     "authn-principal-resolver",
-    "authz-policy-engine"
+    "authz-policy-engine",
+    "web-search-runtime"
   ]
 }

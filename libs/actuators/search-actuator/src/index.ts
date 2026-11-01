@@ -7,6 +7,8 @@ import {
 } from '@agent/core/cli-utils';
 import { defineCatalogBackedActuator } from '@agent/core/actuator/actuator-sdk';
 import { describeOps } from './op-catalog.js';
+import './web-search-runtime-stub.js';
+import './web-search-runtime-rustxng.js';
 
 export const actuator = defineCatalogBackedActuator({
   id: 'search-actuator',
@@ -28,4 +30,9 @@ if (isDirectEntry(import.meta.url, 'libs/actuators/search-actuator/src/index.ts'
 }
 
 export { handleAction, webSearch, fetchReader } from './search-helpers.js';
-export type { SearchAction, WebSearchStub, FetchReaderResult } from './search-helpers.js';
+export type {
+  SearchAction,
+  WebSearchStub,
+  WebSearchResult,
+  FetchReaderResult,
+} from './search-helpers.js';

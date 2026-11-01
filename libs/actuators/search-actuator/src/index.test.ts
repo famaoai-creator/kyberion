@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { actuator, handleAction } from './index.js';
 import { describeOps } from './op-catalog.js';
 
@@ -33,23 +33,54 @@ describe('search-actuator: web_search', () => {
   });
 
   it('returns offline stub by default', async () => {
-    await expect(
-      handleAction({ op: 'web_search', params: { query: 'kyberion' } })
-    ).resolves.toMatchObject({
+    const result = await handleAction({ op: 'web_search', params: { query: 'kyberion' } });
+    expect(result).toMatchObject({
       provider: 'unconfigured',
       query: 'kyberion',
-      hint: 'configure service binding',
+      results: [],
     });
+    expect(String((result as { hint?: string }).hint)).toMatch(/configure service binding/i);
   });
 
-  it('echoes an explicitly configured provider', async () => {
+  it('rejects an unregistered search provider', async () => {
     await expect(
       handleAction({
         op: 'web_search',
         params: { query: 'kyberion', provider: 'example-provider' },
       })
-    ).resolves.toMatchObject({ provider: 'example-provider', query: 'kyberion' });
+    ).rejects.toThrow(/web-search-runtime.*not registered/i);
   });
+
+  it('routes provider=rustxng through the web-search-runtime seam', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.endsWith('/healthz')) return new Response('OK', { status: 200 });
+      return Response.json({
+        query: 'kyberion',
+        results: [{ title: 'Kyberion', url: 'https://example.com/kyberion', content: 'ops' }],
+        unresponsive_engines: [],
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    try {
+      await expect(
+        handleAction({
+          op: 'web_search',
+          params: { query: 'kyberion', provider: 'rustxng', top_k: 1 },
+        })
+      ).resolves.toMatchObject({
+        provider: 'rustxng',
+        query: 'kyberion',
+        results: [{ title: 'Kyberion', url: 'https://example.com/kyberion' }],
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe('search-actuator: fetch_reader', () => {

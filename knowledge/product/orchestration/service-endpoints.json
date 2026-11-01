@@ -138,6 +138,11 @@
       },
       "auth_strategy": "none"
     },
+    "rustxng": {
+      "base_url": "http://127.0.0.1:8888",
+      "preset_path": "knowledge/product/orchestration/service-presets/rustxng.json",
+      "auth_strategy": "none"
+    },
     "slack": {
       "base_url": "https://slack.com/api",
       "preset_path": "knowledge/product/orchestration/service-presets/slack.json",
