@@ -8,6 +8,8 @@ const platform = resolveOsAutomationPlatform();
 
 export const launchApplication = platform.launchApplication;
 export const activateApplication = platform.activateApplication;
+export const getFrontmostApplicationName = (): string =>
+  platform.getFrontmostApplicationName?.() ?? '';
 export const detectFocusedInput = platform.detectFocusedInput;
 export const keystrokeText = platform.keystrokeText;
 export const pasteText = platform.pasteText;
@@ -43,6 +45,7 @@ export {
   listKnownAppCapabilities,
   listTerminalTargets,
   listChromeTabs,
+  getActiveChromeTab,
   activateChromeTabByTitle,
   activateChromeTabByUrl,
   closeChromeTabByTitle,

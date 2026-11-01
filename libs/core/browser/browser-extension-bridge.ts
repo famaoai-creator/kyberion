@@ -182,7 +182,22 @@ export interface BrowserExtensionReceipt {
   lease_id?: string;
   evidence_refs?: string[];
   summary?: string;
+  step_outcomes?: BrowserExtensionStepOutcome[];
   created_at: string;
+}
+
+export interface BrowserExtensionStepOutcome {
+  action_id?: string;
+  step_index?: number;
+  op: string;
+  status: 'done' | 'error' | 'blocked' | 'skipped';
+  delivery?:
+    | 'unknown'
+    | 'not_delivered'
+    | 'delivery_uncertain'
+    | 'delivered_unverified'
+    | 'delivered_verified';
+  detail?: string;
 }
 
 export interface BrowserExtensionValidationResult<T> {
@@ -984,6 +999,7 @@ export function buildBrowserExtensionReceipt(input: {
   approvalRuleId?: string;
   evidenceRefs?: string[];
   summary?: string;
+  stepOutcomes?: BrowserExtensionStepOutcome[];
   now?: Date;
 }): BrowserExtensionReceipt {
   const receipt: BrowserExtensionReceipt = {
@@ -1001,6 +1017,7 @@ export function buildBrowserExtensionReceipt(input: {
   if (input.approvalRuleId) receipt.approval_rule_id = input.approvalRuleId;
   if (input.evidenceRefs?.length) receipt.evidence_refs = input.evidenceRefs;
   if (input.summary) receipt.summary = input.summary;
+  if (input.stepOutcomes?.length) receipt.step_outcomes = input.stepOutcomes;
   return receipt;
 }
 

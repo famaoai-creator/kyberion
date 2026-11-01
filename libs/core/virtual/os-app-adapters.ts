@@ -318,6 +318,32 @@ ConvertTo-Json -InputObject @($tabs) -Compress | ForEach-Object { [Console]::Out
   }
 }
 
+/**
+ * Postcondition read for tab ops: the front window's active tab. Returns null
+ * when the app has no window or the read fails — callers treat null as
+ * "verification unavailable", never as failure.
+ */
+export function getActiveChromeTab(
+  application = 'Google Chrome'
+): { title: string; url: string } | null {
+  if (!isDarwin()) return null;
+  const script = [
+    `tell application "${toAppleScriptString(application)}"`,
+    'if (count of windows) is 0 then return ""',
+    'set t to active tab of front window',
+    'return (title of t as string) & linefeed & (URL of t as string)',
+    'end tell',
+  ].join('\n');
+  try {
+    const output = String(safeExec('osascript', ['-e', script])).trim();
+    if (!output) return null;
+    const [title = '', url = ''] = output.split('\n');
+    return { title: title.trim(), url: url.trim() };
+  } catch {
+    return null;
+  }
+}
+
 export function activateChromeTabByTitle(title: string, application = 'Google Chrome') {
   if (process.platform === 'win32') {
     if (!isWindowsChrome(application)) return { matched: false };

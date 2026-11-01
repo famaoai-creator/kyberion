@@ -35,7 +35,9 @@ import {
   safeChmodSync,
   safeExecResult,
   safeExistsSync,
+  safeMkdir,
   safeMoveSync,
+  safeUnlinkSync,
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { resetLocalSttDiscoveryCache } from '@agent/core/local-stt-discovery';
@@ -205,6 +207,64 @@ export function assertPinnedSha256(toolId: string, version: string, sha256: unkn
   return digest;
 }
 
+/**
+ * Validate raw `tar -tzf` output and return the normalized entry names.
+ * Exported for tests; rejects absolute paths, drive-letter prefixes and `..`
+ * components before the archive is ever extracted.
+ */
+export function validateManagedBinaryArchiveEntries(
+  toolId: string,
+  listingStdout: string
+): string[] {
+  const entries = listingStdout
+    .split('\n')
+    .map((entry) => entry.trim().replace(/^\.\//, ''))
+    .filter(Boolean);
+  if (!entries.length) {
+    throw new Error(`managed_binary archive for ${toolId} is empty`);
+  }
+  for (const entry of entries) {
+    if (entry.startsWith('/') || /^[A-Za-z]:/.test(entry) || entry.split('/').includes('..')) {
+      throw new Error(
+        `managed_binary archive for ${toolId} contains an unsafe entry path: ${entry}`
+      );
+    }
+  }
+  return entries;
+}
+
+/**
+ * Extract a checksum-verified `tar.gz` managed_binary payload into `destDir`.
+ * Every archive entry is listed first and validated as a safe relative path;
+ * only then is the archive extracted via the system tar — never through a shell.
+ */
+function extractManagedBinaryTarball(toolId: string, tarballPath: string, destDir: string): void {
+  const listing = safeExecResult('tar', ['-tzf', tarballPath], {
+    timeoutMs: 60_000,
+    maxOutputMB: 4,
+  });
+  if (listing.status !== 0) {
+    throw new Error(`managed_binary archive listing failed for ${toolId}: ${listing.stderr}`);
+  }
+  const entries = validateManagedBinaryArchiveEntries(toolId, listing.stdout);
+  safeMkdir(destDir, { recursive: true });
+  const extract = safeExecResult('tar', ['-xzf', tarballPath, '-C', destDir], {
+    timeoutMs: 120_000,
+    maxOutputMB: 4,
+  });
+  if (extract.status !== 0) {
+    throw new Error(`managed_binary archive extraction failed for ${toolId}: ${extract.stderr}`);
+  }
+  for (const entry of entries) {
+    const extracted = path.join(destDir, entry);
+    try {
+      if (safeExistsSync(extracted)) safeChmodSync(extracted, 0o755);
+    } catch {
+      // chmod is best-effort on non-executable entries (e.g. directories).
+    }
+  }
+}
+
 export async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
   const artifact = resolveManagedBinaryArtifact(toolId);
   const target = resolveManagedBinaryPath(toolId);
@@ -250,8 +310,13 @@ export async function installManagedBinary(toolId: string): Promise<SetupRow | n
   }
   const staging = `${target}.download`;
   safeWriteFile(staging, data);
-  safeChmodSync(staging, 0o755);
-  safeMoveSync(staging, target);
+  if (record.managed_binary?.archive === 'tar.gz') {
+    extractManagedBinaryTarball(toolId, staging, path.dirname(target));
+    safeUnlinkSync(staging);
+  } else {
+    safeChmodSync(staging, 0o755);
+    safeMoveSync(staging, target);
+  }
 
   const healthy = isBinaryHealthy(toolId);
   if (healthy)
