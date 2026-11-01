@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 
 import { readJsonLines } from '../foundation/json.js';
+import { streamJsonLines } from '../jsonl-read.js';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '../secure-io.js';
 import {
   appendDotInboxEntry as appendScopedDotInboxEntry,
@@ -277,5 +278,62 @@ describe('compactDotInbox', () => {
     const r = compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1 });
     expect(r.tombstoned).toBe(0);
     expect(safeReadFile(inbox(TEST_ROOT)) as string).not.toContain('tombstone');
+  });
+
+  it('streams a chunked compaction with blank, CRLF and torn lines — wake keys unchanged', () => {
+    const row = (text: string): string =>
+      JSON.stringify({
+        channel: 'inbox',
+        dot_id: 'repo-guardian',
+        scope: { tier: 'public' },
+        text,
+        enqueued_at: new Date().toISOString(),
+      });
+    // blank line, CRLF terminator, a malformed line and a torn tail
+    const raw = `${row('a')}\n\n${row('consumed')}\r\n${row('b')}\nnot-json\n${row('c')}\n{"torn":`;
+    safeMkdir(`${TEST_ROOT}/active/shared/runtime`, { recursive: true });
+    safeWriteFile(inbox(TEST_ROOT), raw);
+    // Keys exactly as the old whole-file consumer derived them.
+    const oldLines = raw.split(/\r?\n/);
+    const oldKeys = new Map<number, string>();
+    oldLines.forEach((line, i) => {
+      if (line.trim()) oldKeys.set(i + 1, dotInboxWakeKey(i + 1, line));
+    });
+    // The streamed reader numbers lines identically.
+    const streamed = [
+      ...streamJsonLines<{ text?: string; n: number; line: string }>(inbox(TEST_ROOT), {
+        onMalformed: 'skip',
+        chunkBytes: 11,
+        map: (value, n, line) => ({ ...(value as { text?: string }), n, line }),
+      }),
+    ];
+    expect(streamed.map((r) => r.n)).toEqual([1, 3, 4, 6]);
+    for (const r of streamed) expect(dotInboxWakeKey(r.n, r.line)).toBe(oldKeys.get(r.n));
+
+    safeWriteFile(
+      ledger(TEST_ROOT),
+      JSON.stringify({
+        dot_id: 'repo-guardian',
+        trigger_key: oldKeys.get(3),
+        outcome: 'delivered',
+        fired_at: new Date().toISOString(),
+      }) + '\n'
+    );
+    safeMkdir(`${TEST_ROOT}/dots`, { recursive: true });
+    safeWriteFile(`${TEST_ROOT}/dots/dot.json`, JSON.stringify(CHARTER) + '\n');
+
+    const r = compactDotInbox({ rootDir: TEST_ROOT, compactMinBytes: 1, chunkBytes: 17 });
+    expect(r.tombstoned).toBe(1);
+    expect(r.scanned).toBe(oldLines.length);
+
+    const after = (safeReadFile(inbox(TEST_ROOT)) as string).split('\n');
+    expect(after[2]).toBe('{"tombstone":true}');
+    // Every surviving line sits at its old index with identical text, so the
+    // keys the consumer re-derives are unchanged.
+    oldLines.forEach((line, i) => {
+      if (i === 2) return;
+      expect(after[i]).toBe(line);
+      if (line.trim()) expect(dotInboxWakeKey(i + 1, after[i]!)).toBe(oldKeys.get(i + 1));
+    });
   });
 });
