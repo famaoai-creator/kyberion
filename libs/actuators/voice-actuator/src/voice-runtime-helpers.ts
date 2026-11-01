@@ -994,6 +994,13 @@ function renderWithSay(
   return artifactPath;
 }
 
+function isSecureIoAccessDenial(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    /\[SECURITY\] Read access denied|\[ROLE_VIOLATION\]/.test(error.message)
+  );
+}
+
 async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean> {
   if (!artifactPath || !safeExistsSync(artifactPath)) {
     return false;
@@ -1003,7 +1010,11 @@ async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean>
     if (!safeLstat(artifactPath).isFile() || safeStat(artifactPath).size < 1024) {
       return false;
     }
-  } catch {
+  } catch (error) {
+    // Do not mask tier-guard denials as "invalid audio" — callers on a
+    // protected floor must assume perception_media_worker (CLI) or an
+    // equivalent work-item role before validating the artifact they wrote.
+    if (isSecureIoAccessDenial(error)) throw error;
     return false;
   }
 
@@ -1019,7 +1030,8 @@ async function isRenderableAudioArtifact(artifactPath: string): Promise<boolean>
     ]).trim();
     const duration = Number(durationText);
     return Number.isFinite(duration) && duration > 0;
-  } catch {
+  } catch (error) {
+    if (isSecureIoAccessDenial(error)) throw error;
     return false;
   }
 }
