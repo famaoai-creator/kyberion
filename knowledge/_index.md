@@ -31,6 +31,7 @@
 
 ## 📁 product/architecture
 - [AI-Run Meetings Use Case](./product/architecture/meeting-facilitator-use-case.md) (public | Unknown)
+- [API credential registration and proof boundaries](./product/architecture/api-credential-proof-boundary.md) (public | Unknown)
 - [Actuator Contract Map](./product/architecture/actuator-contract-map.md) (public | Ecosystem Architect)
 - [Actuator Operation Taxonomy](./product/architecture/actuator-op-taxonomy.md) (public | Ecosystem Architect)
 - [Agent Collaboration View](./product/architecture/agent-collaboration-view.md) (public | Ecosystem Architect)
