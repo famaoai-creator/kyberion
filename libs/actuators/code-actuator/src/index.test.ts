@@ -539,7 +539,7 @@ describe('code-actuator', () => {
             ],
           });
           expect(result.status).toBe('succeeded');
-          const analysis = result.context.impact_analysis as any;
+          const analysis = result.context.impact_analysis as Record<string, unknown>;
           expect(analysis.confidence).toBe('inferred');
           expect(analysis.authority).toBe('analyst-inference');
           expect(analysis.limitations).toEqual(
@@ -577,7 +577,7 @@ describe('code-actuator', () => {
           ],
         });
         expect(result.status).toBe('succeeded');
-        const findings = result.context.semgrep_findings as any;
+        const findings = result.context.semgrep_findings as Record<string, unknown>;
         expect(findings.confidence).toBe('observed');
         expect(findings.authority).toBe('shipped-artifact');
         expect(findings.results).toEqual([{ check_id: 'rule-1', path: 'src/a.ts' }]);
@@ -600,7 +600,7 @@ describe('code-actuator', () => {
           steps: [{ type: 'capture', op: 'run_tests', params: { test_path: 'src/a.test.ts' } }],
         });
         expect(result.status).toBe('succeeded');
-        const execution = result.context.test_execution as any;
+        const execution = result.context.test_execution as Record<string, unknown>;
         expect(execution.status).toBe('passed');
         expect(execution.confidence).toBe('observed');
         expect(execution.authority).toBe('controlled-replay');
@@ -623,7 +623,7 @@ describe('code-actuator', () => {
             steps: [{ type: 'capture', op: 'glob_files', params: { dir: 'src' } }],
           });
           expect(result.status).toBe('succeeded');
-          const listing = result.context.file_list as any;
+          const listing = result.context.file_list as Record<string, unknown>;
           expect(listing.retained).toBe(true);
           expect(listing.item_count).toBe(2000);
           expect(listing.preview).toHaveLength(50);

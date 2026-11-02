@@ -39,14 +39,9 @@ import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { TraceContext } from '@agent/core/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
 import type { EvidenceMeta } from '@agent/core/evidence';
-import {
-  resolveStorageFloor,
-  storageFloorRelativePath,
-  SYSTEM_PARTITION,
-} from '@agent/core/storage-layout';
+import { retainOversizedResult } from './retained-result.js';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
-import { randomUUID } from 'node:crypto';
 
 const DEFAULT_CODE_RETRY = getRetryDefaults('code-actuator:defaults');
 
@@ -72,59 +67,6 @@ function readCodeJson(filePath: string, label: string): unknown {
     throw new Error(`${label} must be an existing regular file: ${filePath}`);
   }
   return readJson(filePath);
-}
-
-// Results above the inline budget are persisted to the cache floor and
-// replaced by a retained reference + preview (REA retained-evidence shape),
-// so oversized captures cannot bloat pipeline context. Consumers page the
-// full payload back with read_file on result_ref.
-const RETAINED_RESULT_INLINE_LIMIT = 64 * 1024;
-const RETAINED_PREVIEW_ITEMS = 50;
-
-function retainOversizedResult(value: unknown, domain: string): unknown {
-  const serialized = JSON.stringify(value);
-  if (!serialized || serialized.length <= RETAINED_RESULT_INLINE_LIMIT) return value;
-  const fileName = `${randomUUID()}.json`;
-  try {
-    safeWriteFile(resolveStorageFloor('cache', SYSTEM_PARTITION, domain, fileName), serialized);
-  } catch (error) {
-    // A retention failure must not fail the capture — return the payload
-    // inline with the limitation noted rather than losing the result.
-    logger.warn(
-      `[CODE_RETAIN_FAILED] could not persist oversized result — returning inline: ${
-        error instanceof Error ? error.message : String(error)
-      }`
-    );
-    return value;
-  }
-  const preview = Array.isArray(value)
-    ? value.slice(0, RETAINED_PREVIEW_ITEMS)
-    : typeof value === 'object' && value !== null && Array.isArray((value as any).results)
-      ? {
-          ...(value as Record<string, unknown>),
-          results: (value as any).results.slice(0, RETAINED_PREVIEW_ITEMS),
-          ...(Array.isArray((value as any).errors)
-            ? { errors: (value as any).errors.slice(0, RETAINED_PREVIEW_ITEMS) }
-            : {}),
-          ...(typeof (value as any).paths === 'object' && (value as any).paths !== null
-            ? {
-                paths: {
-                  scanned: Array.isArray((value as any).paths.scanned)
-                    ? (value as any).paths.scanned.length
-                    : (value as any).paths.scanned,
-                },
-              }
-            : {}),
-        }
-      : serialized.slice(0, 4096);
-  return {
-    retained: true,
-    result_ref: storageFloorRelativePath('cache', SYSTEM_PARTITION, domain, fileName),
-    total_bytes: serialized.length,
-    ...(Array.isArray(value) ? { item_count: value.length } : {}),
-    preview,
-    next_step: 'read the result_ref file for the full payload',
-  };
 }
 
 const {
