@@ -223,6 +223,10 @@
     {
       "id": "pipelines/apple-shortcut-approved-run.json",
       "reason": "Human-approved named Shortcuts example in pipelines/README.md; intentionally unscheduled and requires tenant-bound exact input approval before launch."
+    },
+    {
+      "id": "pipelines/vcs-development-preflight.json",
+      "reason": "Manual read-only preflight entry point documented in pipelines/README.md for a prepared mission WorkItem PR. Operator supplies exact PR, WorkItem and independent review task IDs; scheduling absent evidence would fabricate autonomous author execution. Reachability is enforced by orphan_op_reachability.test.ts."
     }
   ],
   "actuator_ops": [

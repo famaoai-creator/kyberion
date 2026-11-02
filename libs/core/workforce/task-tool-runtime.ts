@@ -29,6 +29,7 @@ import { executeTaskGoalLoop } from './task-execution-port.js';
 import {
   createTaskSourceEditTool,
   validateTaskSourcePaths,
+  readTaskSourceFile,
   type TaskSourceEditOptions,
 } from './task-source-edit.js';
 import {
@@ -81,6 +82,8 @@ export interface TaskToolRuntimeOptions {
   writeDeliverable?: (file: string, content: string) => void;
   inspectDeliverable?: (file: string) => string | undefined;
   sourceEditApproval?: TaskSourceEditOptions['approve'];
+  /** Trusted composition/test seam; never populated from model arguments. */
+  sourceEditOptions?: Pick<TaskSourceEditOptions, 'workspaces' | 'ownerScope' | 'lock'>;
   pipelineExecutor?: TaskPipelineExecutor;
   now?: () => number;
 }
@@ -231,6 +234,10 @@ export function createRuntimeForTask(
         ? task.target_path
         : undefined;
   const deliverablePath = declaredOutput ? path.resolve(missionDir, declaredOutput) : undefined;
+  if (deliverablePath === path.resolve(missionDir, 'evidence/continuous-owner.json'))
+    throw new Error(
+      '[TASK_TOOL_SCOPE_DENIED] Continuous owner authority evidence is not a task deliverable'
+    );
   const insideMissionOutput = (file: string) =>
     ['evidence', 'artifacts'].some((name) =>
       file.startsWith(path.resolve(missionDir, name) + path.sep)
@@ -330,12 +337,34 @@ export function createRuntimeForTask(
   };
   assertCurrent();
   const read =
-    options.read ?? ((file: string) => safeReadFileSnapshot(file, 1_048_576).toString('utf8'));
+    options.read ??
+    ((file: string) => {
+      const relative = path.relative(root, file).split(path.sep).join('/');
+      if (scope.tier !== 'public' && sourcePaths.includes(relative))
+        return (
+          readTaskSourceFile(binding, relative, {
+            ...options.sourceEditOptions,
+            rootDir: root,
+            assertCurrent,
+          }) ?? ''
+        );
+      return safeReadFileSnapshot(file, 1_048_576).toString('utf8');
+    });
   const artifact = options.writeArtifact ?? writeScopedArtifact;
   const inspectOutput =
     options.inspectDeliverable ??
-    ((file: string) =>
-      safeExistsSync(file) ? safeReadFileSnapshot(file, 1_048_576).toString('utf8') : undefined);
+    ((file: string) => {
+      const relative = path.relative(root, file).split(path.sep).join('/');
+      if (scope.tier !== 'public' && sourcePaths.includes(relative))
+        return readTaskSourceFile(binding, relative, {
+          ...options.sourceEditOptions,
+          rootDir: root,
+          assertCurrent,
+        });
+      return safeExistsSync(file)
+        ? safeReadFileSnapshot(file, 1_048_576).toString('utf8')
+        : undefined;
+    });
   const digest = (content: string) => createHash('sha256').update(content).digest('hex');
   let outputDigest: string | undefined;
   let evidenceRecorded = false;
@@ -578,6 +607,7 @@ export function createRuntimeForTask(
     sourcePaths.length && profileName === 'implementer'
       ? [
           createTaskSourceEditTool(binding, sourcePaths, {
+            ...options.sourceEditOptions,
             rootDir: root,
             assertCurrent,
             approve: options.sourceEditApproval,

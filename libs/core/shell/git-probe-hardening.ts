@@ -30,6 +30,7 @@ export function hardenedGitProbeArgs(args: readonly string[]): string[] {
     args.length === expected.length && expected.every((value, index) => args[index] === value);
   const revisionProbe =
     exact('rev-parse', '--is-inside-work-tree') ||
+    exact('rev-parse', '--is-shallow-repository') ||
     exact('rev-parse', '--show-toplevel') ||
     exact('rev-parse', '--git-path', 'index') ||
     exact('rev-parse', '--verify', '--quiet', 'HEAD');
@@ -48,10 +49,27 @@ export function hardenedGitProbeArgs(args: readonly string[]): string[] {
     args[3] === '--no-renames' &&
     sha(args[4]) &&
     sha(args[5]);
+  const historyProbe =
+    (args.length === 8 || (args.length === 10 && args[8] === '--not' && sha(args[9]))) &&
+    ['log', '--format=', '--name-only', '-z', '--full-history', '--root', '--no-renames'].every(
+      (value, index) => args[index] === value
+    ) &&
+    sha(args[7]);
+  const publicationDiff =
+    args.length === 7 &&
+    ['diff', '--binary', '--no-ext-diff', '--no-textconv'].every(
+      (value, index) => args[index] === value
+    ) &&
+    sha(args[4]) &&
+    sha(args[5]) &&
+    args[6] === '--';
   // Deliberately no generic status/worktree diff: filter discovery in a prior
   // process cannot fence concurrent changes or submodule configurations.
-  if (!revisionProbe && !indexProbe && !treeProbe && !treeDiff)
+  if (!revisionProbe && !indexProbe && !treeProbe && !treeDiff && !historyProbe && !publicationDiff)
     throw new GitProbeUnavailableError('unsupported object/index probe grammar');
+  if (historyProbe)
+    return ['--no-replace-objects', args[0], '--no-ext-diff', '--no-textconv', ...args.slice(1)];
+  if (publicationDiff) return ['--no-replace-objects', ...args];
   return treeDiff ? [args[0], '--no-ext-diff', '--no-textconv', ...args.slice(1)] : [...args];
 }
 
@@ -81,12 +99,34 @@ function probeEnv(
   };
 }
 
+/** Environment-only mechanism for the closed, owner-only local workspace
+ * mutation adapter. This grants no command or execution authority. */
+export function hardenedLocalWorkspaceGitOptions(options: SafeExecOptions = {}): SafeExecOptions {
+  return {
+    ...options,
+    env: probeEnv([...CONFIG, ['protocol.file.allow', 'always']], {
+      ...options.env,
+      GIT_DIR: undefined,
+      GIT_COMMON_DIR: undefined,
+      GIT_WORK_TREE: undefined,
+      GIT_INDEX_FILE: undefined,
+      GIT_OBJECT_DIRECTORY: undefined,
+      GIT_ALTERNATE_OBJECT_DIRECTORIES: undefined,
+      GIT_TEMPLATE_DIR: undefined,
+    }),
+  };
+}
+
 /** Bounded filter discovery plus a closed object/index-only execution grammar.
  * Discovery is not an authorization or TOCTOU fence; unsupported worktree
  * operations remain unavailable even when no filters were discovered. */
-export function runHardenedGitProbe(args: readonly string[], options: SafeExecOptions = {}) {
+export function runHardenedGitProbe(
+  args: readonly string[],
+  options: SafeExecOptions = {},
+  run: typeof safeExecResult = safeExecResult
+) {
   const hardened = hardenedGitProbeArgs(args);
-  const discovered = safeExecResult(
+  const discovered = run(
     'git',
     ['config', '--includes', '--null', '--get-regexp', '^filter\\..*\\.(clean|smudge|process)$'],
     {
@@ -108,5 +148,5 @@ export function runHardenedGitProbe(args: readonly string[], options: SafeExecOp
       throw new GitProbeUnavailableError('invalid filter discovery record');
     config.push([key, ''], [key.replace(/\.(?:clean|smudge|process)$/i, '.required'), 'false']);
   }
-  return safeExecResult('git', hardened, { ...options, env: probeEnv(config, options.env) });
+  return run('git', hardened, { ...options, env: probeEnv(config, options.env) });
 }

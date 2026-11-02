@@ -1,4 +1,8 @@
-import { appendActionRecord, readDotActionLedger } from './dot-action-ledger.js';
+import {
+  appendActionRecord,
+  readDotActionLedger,
+  readDotActionLedgerStrict,
+} from './dot-action-ledger.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../customer-resolver.js', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../customer-resolver.js')>();
@@ -55,6 +59,7 @@ import { appendDotInboxEntry } from './dot-inbox.js';
 import { setDotBudgetThrottleForTests } from './dot-budget.js';
 import { evaluateDotTriggersDue } from './dot-runtime.js';
 import { DOT_TASK_SESSION_UNAVAILABLE_GUIDANCE } from './dot-proposals.js';
+import { dotStatePath } from './dot-state-paths.js';
 import type { DotProposal } from './dot-proposals.js';
 
 const TEST_ROOT = `active/shared/tmp/dot-dispatch-tests-${randomUUID()}`;
@@ -212,6 +217,81 @@ useSeparationOfDutiesOverlay(
 );
 
 describe('dispatchDotProposals — decision and delegation', () => {
+  it('shows development autoeffects and links all64 exact files to the same scoped admission hash', () => {
+    const pipeline = 'pipelines/continuous-managed-work.json';
+    const charter = {
+      ...CHARTER,
+      authority: { ...CHARTER.authority, allowed_pipelines: [pipeline] },
+    };
+    const paths = Array.from({ length: 64 }, (_, index) => `libs/core/approved-file-${index}.ts`);
+    const development = {
+      cwd: '.',
+      repository_url: 'https://github.com/owner/repository',
+      source_edit_paths: paths,
+      implementation_task_id: 'execution-implement',
+      review_task_id: 'self_review-code-review',
+      title: 'fix: improve',
+      body_file: 'evidence/pr-body.md',
+      max_repairs: 2,
+    };
+    const proposal: DotProposal = {
+      ...PROPOSAL,
+      work_shape: 'pipeline',
+      pipeline_ref: pipeline,
+      objective: 'Noncritical objective '.repeat(80),
+      continuous_work: {
+        kind: 'mission',
+        missions: [
+          {
+            key: 'improve',
+            title: 'Improve',
+            goal: 'Implement approved change',
+            success_condition: 'Verified merge',
+            development,
+          },
+        ],
+      },
+    };
+    const h = harness();
+    const first = dispatchDotProposals(charter, [proposal], h.deps).records[0]!;
+    expect(first.status).toBe('parked');
+    const question = h.routed[0]!.question;
+    expect(question.startsWith('Delegate development: https://github.com/owner/repository')).toBe(
+      true
+    );
+    expect(question).toContain('Exact source files: 64; maximum code repairs: 2');
+    expect(question).toContain('push, create PR, independent review, merge');
+    expect(question).toContain('instead of another per-step human confirmation');
+    expect(question.length).toBeLessThanOrEqual(1000);
+    const rows = readDotActionLedgerStrict({ rootDir: TEST_ROOT, dotId: charter.dot_id });
+    const stored = rows.find((row) => row.action_ref === first.action_ref)!;
+    expect(stored.continuous_work?.missions[0]?.development?.source_edit_paths).toEqual(paths);
+    expect(h.routed[0]?.accountability?.payloadHash).toBe(stored.admission?.semantic_hash);
+    expect(h.routed[0]?.evidence?.[0]).toEqual({
+      label: `Full development plan; action ${first.action_ref}; admission SHA-256 ${stored.admission?.semantic_hash}`,
+      ref: pathResolver.toRepoRelative(
+        pathResolver.rootResolve(`${TEST_ROOT}/${dotStatePath(charter, 'action-ledger.jsonl')}`)
+      ),
+    });
+    const changed: DotProposal = {
+      ...proposal,
+      continuous_work: {
+        ...proposal.continuous_work!,
+        missions: [
+          {
+            ...proposal.continuous_work!.missions[0]!,
+            development: {
+              ...development,
+              source_edit_paths: [...paths.slice(0, 63), 'libs/core/different-last-file.ts'],
+            },
+          },
+        ],
+      },
+    };
+    const second = dispatchDotProposals(charter, [changed], h.deps).records[0]!;
+    expect(second.admission?.semantic_hash).not.toBe(first.admission?.semantic_hash);
+    expect(h.routed[1]?.evidence?.[0]?.label).toContain(second.admission!.semantic_hash);
+  });
   it('admits tenant planning into WorkItems without granting planned external effects', () => {
     const h = harness();
     const { records } = dispatchDotProposals(

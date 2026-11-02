@@ -1,9 +1,12 @@
 import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-learning-approval-visibility';
 import { onboardingApprovalMember } from '../../../../lib/onboarding-authority-server';
+import {
+  loadConciergeApproval,
+  withConciergeApproval,
+} from '../../../../lib/personal-approval-server';
 import { NextRequest, NextResponse } from 'next/server';
 import {
   decideApprovalRequest,
-  loadApprovalRequest,
   surfaceDecisionAuthMethod,
   surfaceDecisionBinding,
 } from '@agent/core/governance/approval-store';
@@ -57,7 +60,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         { status: 400 }
       );
     }
-    const record = loadApprovalRequest(storageChannel, id);
+    const record = loadConciergeApproval(resolved.context, storageChannel, id);
     if (!record) {
       return NextResponse.json(
         { ok: false, error: `approval request not found: ${id}` },
@@ -85,23 +88,27 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     if (decisionDenied) return decisionDenied;
     const decidedBy =
       onboardingMember ?? resolveConciergeDecidedBy(resolved.context, resourceTenant);
-    const updated = decideApprovalRequest('sovereign_concierge', {
-      channel,
-      storageChannel,
-      requestId: id,
-      decision,
-      decidedBy: decidedBy?.id ?? 'concierge',
-      decidedByRole: decidedBy?.role ?? 'sovereign',
-      authMethod: surfaceDecisionAuthMethod(resolved.context.principal, Boolean(decidedBy)),
-      decidedByType: 'human',
-      authenticated: true,
-      deciderPrincipal: resolved.context.principal,
-      ...surfaceDecisionBinding(record, body?.presentedDigest),
-      note:
-        typeof body?.reason === 'string' && body.reason.trim()
-          ? body.reason.trim()
-          : 'Decision captured from the concierge (秘書室) approval queue.',
-    });
+    const updated = withConciergeApproval(resolved.context, record, () =>
+      decideApprovalRequest('sovereign_concierge', {
+        channel,
+        storageChannel,
+        requestId: id,
+        decision,
+        decidedBy: decidedBy?.id ?? 'concierge',
+        decidedByRole: decidedBy?.role ?? 'sovereign',
+        authMethod: surfaceDecisionAuthMethod(resolved.context.principal, Boolean(decidedBy)),
+        decidedByType: 'human',
+        authenticated: true,
+        deciderPrincipal: resolved.context.principal,
+        ...surfaceDecisionBinding(record, body?.presentedDigest),
+        note:
+          typeof body?.reason === 'string' && body.reason.trim()
+            ? body.reason.trim()
+            : 'Decision captured from the concierge (秘書室) approval queue.',
+      })
+    );
+    if (!updated)
+      return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     return NextResponse.json({ ok: true, approval: updated });
   } catch (error) {
     return conciergeErrorResponse(error, 500);

@@ -7,6 +7,7 @@ import { pathResolver, safeReaddir, safeReadFile } from '@agent/core';
  * each now has a minimal example pipeline under pipelines/.
  */
 const EXAMPLE_PIPELINE_OPS: Record<string, string> = {
+  'vcs:development_loop': 'vcs-development-preflight',
   'system:list_shortcuts': 'apple-shortcuts-readiness',
   'system:run_shortcut': 'apple-shortcut-approved-run',
   'system:apple_capabilities': 'apple-native-capabilities',

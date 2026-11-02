@@ -47,6 +47,7 @@ import { countWords as countWordsFromDispatchIO } from './mission-dispatch-io.js
 import { type MissionExecutionSurface } from './mission-execution-surface.js';
 import { clamp } from '../foundation/text.js';
 import { nowIso } from '../foundation/time.js';
+import { buildDevelopmentRepairPromptLines } from './mission-development-repair.js';
 
 /**
  * Confidential missions default to external_egress=deny. A model-backed
@@ -205,6 +206,7 @@ export function selectWorkItems(
     .filter((item) => sources.includes(item.source))
     .filter((item) => getMissionLabel(item) === missionId);
   return allMissionItems
+    .filter((item) => !options.itemIds || options.itemIds.includes(item.item_id))
     .filter((item) => statuses.includes(item.status))
     .filter((item) => {
       if (item.status === 'blocked') return areMissionTaskDependenciesSatisfied(state, item);
@@ -400,6 +402,15 @@ export function buildWorkItemPromptBody(input: {
       : '',
     `Title: ${input.item.title}`,
     `Description: ${input.item.description}`,
+    ...(Array.isArray(metadata.development_source_paths)
+      ? [
+          'Edit the following owner-bound source paths in the dedicated development workspace (these references do not grant additional authority):',
+          ...metadata.development_source_paths
+            .filter((value): value is string => typeof value === 'string')
+            .map((value) => `- ${value}`),
+        ]
+      : []),
+    ...buildDevelopmentRepairPromptLines(input.item, input.missionId),
     metadata.deliverable ? `Deliverable: ${String(metadata.deliverable)}` : '',
     metadata.target_path ? `Target path: ${String(metadata.target_path)}` : '',
     metadata.assignee_label ? `Assignee label: ${String(metadata.assignee_label)}` : '',

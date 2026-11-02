@@ -26,7 +26,7 @@ import {
 import { isOperationsHalted } from './operations-halt.js';
 import { getAutonomousOpsPolicy, type AutonomousOpsGateResult } from './autonomous-ops-gate.js';
 import { buildDecisionCard, type DecisionCardEvidence } from './decision-card.js';
-import type { EventScopeInput } from '../event-scope.js';
+import { normalizeEventScope, type EventScopeInput } from '../event-scope.js';
 import type { SupportedLocale } from '../locale-normalize.js';
 import {
   loadNotificationPreferences,
@@ -169,6 +169,26 @@ export function routeAutonomousDecision(input: RouteAutonomousDecisionInput): Ro
   if (input.dedupeKey) {
     const pending = findPendingDedupedRequest(input.gate.actionId, input.dedupeKey);
     if (pending) {
+      if (input.accountability) {
+        const expected = buildDecisionCard({
+          question: input.question,
+          recommendation: input.recommendation,
+          gate: input.gate,
+          evidence: input.evidence,
+        });
+        if (
+          pending.accountability?.payloadHash !== input.accountability.payloadHash ||
+          pending.accountability?.effectBinding !== input.accountability.effectBinding ||
+          pending.decisionCard?.question !== expected.question ||
+          pending.decisionCard?.recommendation !== expected.recommendation ||
+          JSON.stringify(pending.decisionCard?.evidence) !== JSON.stringify(expected.evidence) ||
+          JSON.stringify(pending.scope) !==
+            JSON.stringify(input.scope ? normalizeEventScope(input.scope) : undefined)
+        )
+          throw new Error(
+            'Bound approval presentation changed; resolve the existing initial request before reviewing its replacement'
+          );
+      }
       return {
         level,
         timing,

@@ -446,6 +446,9 @@ export const TENANT_RUNTIME_PARTITION_TARGET_KINDS = {
   // Resident-dot state: load-bearing append-only state; the retention catalog
   // requires audited review before tenant offboarding deletes it.
   dot: 'not_offboarded',
+  // Registered source workspaces are removed through their owning ledger,
+  // never by a tenant tree deletion that leaves live workspace records behind.
+  task_workspaces: 'not_offboarded',
   resource_usage: 'tenant_usage_ledger',
   execution_metrics: 'tenant_execution_metrics',
   tenant_ledger: 'tenant_ledger',
