@@ -9,6 +9,10 @@ import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core
 import * as pathResolver from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { spawnManagedProcess, stopManagedProcess } from '@agent/core/managed-process';
+import {
+  isRecordedProcessAlive,
+  processStartMarker,
+} from '@agent/core/workforce/workspace-process-identity';
 import { stripAuthorityEnvOverrides } from '@agent/core/authority';
 import { loadSurfaceManifest, loadSurfaceState } from '@agent/core/surface/surface-runtime';
 
@@ -104,7 +108,9 @@ export async function handleAction(input: ProcessAction) {
         !params.ownerId ||
         !params.ownerType
       ) {
-        throw new Error('resourceId, command, kind, ownerId, and ownerType are required for spawn');
+        throw new Error(
+          '[PROCESS_INVALID_REQUEST] resourceId, command, kind, ownerId, and ownerType are required for spawn'
+        );
       }
       return await retry(async () => {
         const managed = spawnManagedProcess({
@@ -128,25 +134,74 @@ export async function handleAction(input: ProcessAction) {
           status: 'spawned',
           resourceId: managed.resourceId,
           pid: managed.child.pid,
+          pidStartMarker: managed.child.pid ? processStartMarker(managed.child.pid) : undefined,
         };
       }, buildRetryOptions());
     }
 
     case 'stop': {
-      if (!params.resourceId) throw new Error('resourceId is required for stop');
+      if (!params.resourceId)
+        throw new Error('[PROCESS_INVALID_REQUEST] resourceId is required for stop');
       return await retry(async () => {
         const record = runtimeSupervisor.get(params.resourceId);
+        if (!record) {
+          // A valid selection the supervisor cannot resolve: report it as
+          // unknown rather than claiming a stop that never happened.
+          return {
+            status: 'not_found',
+            resourceId: params.resourceId,
+            reason: 'resource_not_registered',
+            next_step:
+              'process:list shows registered resources; a resource is absent after its owning process exits',
+          };
+        }
+        const gone =
+          record.pid !== undefined && !isRecordedProcessAlive(record.pid, record.pidStartMarker);
+        // Route through the record's own cleanup so the registered process is
+        // actually terminated; a failed cleanup retains ownership for retry.
+        const outcome = await runtimeSupervisor.cleanup(params.resourceId, 'process:stop');
+        if (outcome === 'retained') {
+          return {
+            status: 'cleanup_failed',
+            resourceId: params.resourceId,
+            reason: record.lastCleanupError?.error ?? 'cleanup_failed',
+            next_step:
+              'the record is still owned; retry process:stop or inspect with process:status',
+          };
+        }
         stopManagedProcess(params.resourceId, null);
-        return { status: 'stopped', resourceId: params.resourceId, pid: record?.pid };
+        if (gone) {
+          return {
+            status: 'already_exited',
+            resourceId: params.resourceId,
+            pid: record.pid,
+            reason: record.pidStartMarker ? 'pid_recycled_or_exited' : 'not_running',
+          };
+        }
+        return { status: 'stopped', resourceId: params.resourceId, pid: record.pid };
       }, buildRetryOptions());
     }
 
     case 'status': {
-      if (!params.resourceId) throw new Error('resourceId is required for status');
-      return await retry(
-        async () => ({ status: 'ok', resource: runtimeSupervisor.get(params.resourceId) || null }),
-        buildRetryOptions()
-      );
+      if (!params.resourceId)
+        throw new Error('[PROCESS_INVALID_REQUEST] resourceId is required for status');
+      return await retry(async () => {
+        const record = runtimeSupervisor.get(params.resourceId) || null;
+        return {
+          status: 'ok',
+          resource: record
+            ? {
+                ...record,
+                ...(record.pid !== undefined
+                  ? {
+                      alive: isRecordedProcessAlive(record.pid, record.pidStartMarker),
+                      identity: record.pidStartMarker ? 'pid+start_marker' : 'pid_only',
+                    }
+                  : {}),
+              }
+            : null,
+        };
+      }, buildRetryOptions());
     }
 
     case 'list':
@@ -162,7 +217,7 @@ export async function handleAction(input: ProcessAction) {
 
         const results = manifest.surfaces.map((s) => {
           const record = state.surfaces[s.id];
-          const running = record && isProcessRunning(record.pid);
+          const running = record && isRecordedProcessAlive(record.pid, record.pidStartMarker);
           return {
             id: s.id,
             kind: s.kind,
@@ -182,16 +237,6 @@ export async function handleAction(input: ProcessAction) {
 
     default:
       throw new Error(`Unsupported process action: ${action}`);
-  }
-}
-
-function isProcessRunning(pid: number): boolean {
-  if (!pid || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (_) {
-    return false;
   }
 }
 

@@ -5,6 +5,7 @@ import {
   type RuntimeResourceKind,
   type RuntimeShutdownPolicy,
 } from './tool/runtime-supervisor.js';
+import { processStartMarker } from './workforce/workspace-process-identity.js';
 import { createLogger } from './logger.js';
 import { clamp } from './foundation/text.js';
 
@@ -67,6 +68,7 @@ export function spawnManagedProcess(spec: ManagedProcessSpec): ManagedProcessHan
     ownerId: spec.ownerId,
     ownerType: spec.ownerType,
     pid: child.pid,
+    pidStartMarker: child.pid ? processStartMarker(child.pid) : undefined,
     idleTimeoutMs: spec.idleTimeoutMs,
     shutdownPolicy: spec.shutdownPolicy || 'manual',
     metadata: {
@@ -84,6 +86,9 @@ export function spawnManagedProcess(spec: ManagedProcessSpec): ManagedProcessHan
   child.on('spawn', () => {
     runtimeSupervisor.update(spec.resourceId, {
       pid: child.pid,
+      // Refresh the marker now that the OS reports the spawn: the pid read
+      // before this event may not yet have been queryable.
+      pidStartMarker: child.pid ? processStartMarker(child.pid) : undefined,
       state: 'running',
       lastActiveAt: Date.now(),
     });
@@ -206,6 +211,12 @@ export function touchManagedProcess(resourceId: string): void {
   runtimeSupervisor.touch(resourceId);
 }
 
+/**
+ * Stop a managed process: kill the caller's handle (when given), drop the
+ * supervisor record and the local handle. Synchronous by contract — callers
+ * that need cleanup-failure retention use `runtimeSupervisor.cleanup()`,
+ * which keeps the record owned for retry.
+ */
 export function stopManagedProcess(resourceId: string, child: ChildProcess | null): void {
   if (child && !child.killed) {
     child.kill();
