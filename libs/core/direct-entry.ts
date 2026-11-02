@@ -1,6 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { isWindows } from './platform.js';
+import { isWindows } from './platform-facts.js';
 
 /** Return whether a module was invoked directly as the expected source or build entrypoint. */
 export function isDirectEntry(

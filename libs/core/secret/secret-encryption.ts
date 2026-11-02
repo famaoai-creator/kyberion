@@ -16,7 +16,7 @@
 
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { safeExecResult } from '../secure-io.js';
-import { isMacOS } from '../platform.js';
+import { isMacOS } from '../platform-facts.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { memoizedKeychainRead } from '../foundation/secret-resolution-session.js';
 import { keychainReaderAccessSwiftLines, keychainSwiftArgs } from './keychain-access.js';
