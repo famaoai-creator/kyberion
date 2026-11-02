@@ -28,10 +28,11 @@ import { logger } from '@agent/core/core';
 import { isLinux, isMacOS } from '@agent/core/platform';
 import { pathResolver } from '@agent/core/path-resolver';
 import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
-import { safeOpenAppendFile } from '@agent/core/secure-io';
+import { safeCloseFd, safeOpenAppendFile } from '@agent/core/secure-io';
 import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { spawnManagedProcess } from '@agent/core/managed-process';
 import {
+  isPidAlive,
   isRecordedProcessAlive,
   processStartMarker,
 } from '@agent/core/workforce/workspace-process-identity';
@@ -135,15 +136,20 @@ function isRunning(record: SurfacePidRecord): boolean {
 }
 
 /**
- * SIGTERM the process a record names, but only while its identity still
- * matches: when a start marker exists and the live pid no longer carries it,
- * the recorded surface is already gone and the pid belongs to an unrelated
- * process we must not signal.
+ * SIGTERM the process a record names, but only while its identity is
+ * positively proven: a recorded start marker must be re-readable AND equal.
+ * An unreadable marker is 'identity_unknown' — never signal a pid whose
+ * identity cannot be proven. A live pid with a different marker is
+ * 'pid_recycled' — the recorded surface is gone and the pid is unrelated.
  */
-function stopRecordedProcess(record: SurfacePidRecord): 'stopped' | 'pid_recycled' | 'not_running' {
+function stopRecordedProcess(
+  record: SurfacePidRecord
+): 'stopped' | 'pid_recycled' | 'not_running' | 'identity_unknown' {
   if (!isPidAlive(record.pid)) return 'not_running';
-  if (record.pidStartMarker && !isRecordedProcessAlive(record.pid, record.pidStartMarker)) {
-    return 'pid_recycled';
+  if (record.pidStartMarker) {
+    const current = processStartMarker(record.pid);
+    if (current === undefined) return 'identity_unknown';
+    if (current !== record.pidStartMarker) return 'pid_recycled';
   }
   try {
     process.kill(record.pid, 'SIGTERM');
@@ -151,16 +157,6 @@ function stopRecordedProcess(record: SurfacePidRecord): 'stopped' | 'pid_recycle
     /* best-effort cleanup */
   }
   return 'stopped';
-}
-
-function isPidAlive(pid: number): boolean {
-  if (!pid || pid <= 0) return false;
-  try {
-    process.kill(pid, 0);
-    return true;
-  } catch (_) {
-    return false;
-  }
 }
 
 function registerRunningSurfaceFromState(record: any) {
@@ -433,11 +429,13 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
   }
 
   // 'spawn'/'error' settle a tick after spawn(); a binary that never starts
-  // must not be recorded as running.
+  // must not be recorded as running. The child holds a dup of `out` once
+  // spawned, so the parent's copy closes on both outcomes.
   const spawnError = await new Promise<Error | null>((resolve) => {
     managed.child.once('error', resolve);
     managed.child.once('spawn', () => resolve(null));
   });
+  safeCloseFd(out);
   if (spawnError || managed.child.pid === undefined) {
     return {
       status: 'spawn_failed',

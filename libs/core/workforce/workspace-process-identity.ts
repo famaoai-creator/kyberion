@@ -8,6 +8,10 @@
  * parsing it would depend on the locale and time zone of whichever process
  * reads it. Where no marker can be read (a busybox `ps` without `lstart`, no
  * PowerShell), liveness falls back to plain pid existence.
+ *
+ * Known limitation: both markers carry ~1s granularity, so a pid recycled
+ * within the same second escapes detection — the guard shrinks the reuse
+ * window, it does not eliminate it.
  */
 
 import { safeExecResult } from '../secure-io.js';

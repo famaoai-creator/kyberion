@@ -44,6 +44,30 @@ describe('Runtime surface state helpers', () => {
     expect(loadSurfaceState(testStatePath)).toEqual(state);
   });
 
+  it('round-trips a record carrying pidStartMarker', () => {
+    const state = {
+      version: 1 as const,
+      surfaces: {
+        'slack-bridge': {
+          id: 'slack-bridge',
+          pid: 1234,
+          pidStartMarker: 'Mon Nov  2 21:39:14 2026',
+          resourceId: 'surface:slack-bridge',
+          kind: 'gateway' as const,
+          command: 'node',
+          args: ['dist/satellites/slack-bridge/src/index.js'],
+          cwd: process.cwd(),
+          logPath: pathResolver.shared('logs/surfaces/slack-bridge.log'),
+          startedAt: new Date().toISOString(),
+          shutdownPolicy: 'detached' as const,
+        },
+      },
+    };
+
+    saveSurfaceState(state, testStatePath);
+    expect(loadSurfaceState(testStatePath)).toEqual(state);
+  });
+
   it('rejects malformed persisted surface state before it reaches runtime consumers', () => {
     fs.mkdirSync(path.dirname(testStatePath), { recursive: true });
     fs.writeFileSync(

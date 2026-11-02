@@ -993,6 +993,11 @@ export function safeOpenAppendFile(filePath: string): number {
   return openInPlace(resolved, filePath, 'a', 'write', undefined, false, canonical);
 }
 
+/** Close a descriptor borrowed from a governed open (safeOpenAppendFile & kin). */
+export function safeCloseFd(fd: number): void {
+  fs.closeSync(fd);
+}
+
 /** Borrow a governed append descriptor and close it even if the callback throws. */
 export function withSafeAppendFile<T>(filePath: string, use: (fd: number) => T): T {
   const fd = safeOpenAppendFile(filePath);
