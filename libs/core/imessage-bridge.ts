@@ -10,6 +10,7 @@ import {
   type BlueBubblesConfigurationReport,
 } from './integrations/bluebubbles-adapter.js';
 import { safeExistsSync, safeExec, safeMkdir, validateFileSize } from './secure-io.js';
+import { isMacOS } from './platform.js';
 
 export interface IMessageSendRequest {
   recipient: string; // Identifier (phone, email) or Chat ID
@@ -75,7 +76,7 @@ const MAX_IMESSAGE_ATTACHMENTS = 8;
 const MAX_IMESSAGE_ATTACHMENT_SIZE_MB = 100;
 
 function isDarwin(): boolean {
-  return process.platform === 'darwin';
+  return isMacOS();
 }
 
 function ensureLogDir(): void {

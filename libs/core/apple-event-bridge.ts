@@ -1,4 +1,5 @@
 import { safeExec, safeExecResult } from './secure-io.js';
+import { isMacOS } from './platform.js';
 import {
   getMacOSFocusedInput,
   getMacOSScreenSize,
@@ -15,21 +16,17 @@ export interface FocusedInputState {
   editable: boolean;
 }
 
-function isDarwin() {
-  return process.platform === 'darwin';
-}
-
 export function toAppleScriptString(value: string) {
   return value.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
 }
 
 export function launchApplication(application: string): boolean {
-  if (!isDarwin() || !application.trim()) return false;
+  if (!isMacOS() || !application.trim()) return false;
   return safeExecResult('open', ['-a', application.trim()], { timeoutMs: 10_000 }).status === 0;
 }
 
 export function activateApplication(application: string) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   safeExec('osascript', [
@@ -40,7 +37,7 @@ export function activateApplication(application: string) {
 
 /** Postcondition read: which app is frontmost after an activate dispatch. */
 export function getFrontmostApplicationName(): string {
-  if (!isDarwin()) return '';
+  if (!isMacOS()) return '';
   try {
     return runAppleScript(
       'tell application "System Events" to get name of first application process whose frontmost is true'
@@ -61,7 +58,7 @@ export function isUIAutomationAvailable(): boolean {
 }
 
 export function keystrokeText(text: string) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   safeExec('osascript', [
@@ -71,7 +68,7 @@ export function keystrokeText(text: string) {
 }
 
 export function pasteText(text: string) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   const script = [
@@ -85,7 +82,7 @@ export function pasteText(text: string) {
 }
 
 export function pressKey(key: string) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   const normalizedKey = key.trim().toLowerCase();
@@ -126,7 +123,7 @@ const NAMED_KEY_CODES: Record<string, number> = {
 };
 
 export function pressKeyChord(key: string, modifiers: string[] = []) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   const normalizedKey = key.trim().toLowerCase();
@@ -147,7 +144,7 @@ export function pressKeyChord(key: string, modifiers: string[] = []) {
 }
 
 export function pressKeyCode(keyCode: number) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   const normalizedKeyCode = Number(keyCode);
@@ -161,7 +158,7 @@ export function pressKeyCode(keyCode: number) {
 }
 
 export function toggleDictation(keyCode = 176) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   pressKeyCode(keyCode);
@@ -193,7 +190,7 @@ export function dragFrom(x1: number, y1: number, x2: number, y2: number) {
 }
 
 export function runAppleScript(script: string): string {
-  if (!isDarwin()) return '';
+  if (!isMacOS()) return '';
   return String(safeExec('osascript', ['-e', script])).trim();
 }
 
@@ -210,7 +207,7 @@ export function activateWindowByTitle(
   windowTitle: string,
   matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains'
 ) {
-  if (!isDarwin()) return false;
+  if (!isMacOS()) return false;
   const script = [
     'tell application "System Events"',
     `tell process "${toAppleScriptString(appName)}"`,
@@ -259,7 +256,7 @@ export function setWindowState(
   state: 'maximize' | 'minimize' | 'restore',
   matchPolicy: 'strict' | 'prefix' | 'contains' = 'contains'
 ): boolean {
-  if (!isDarwin() || !appName.trim() || !windowTitle.trim()) return false;
+  if (!isMacOS() || !appName.trim() || !windowTitle.trim()) return false;
   const condition =
     matchPolicy === 'strict'
       ? `name of w is "${toAppleScriptString(windowTitle)}"`
@@ -294,14 +291,14 @@ export function setWindowState(
 }
 
 export function quitApplication(appName: string) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   safeExec('osascript', ['-e', `tell application "${toAppleScriptString(appName)}" to quit`]);
 }
 
 export function systemNotify(title: string, message: string, subtitle?: string) {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   const sub = subtitle ? ` subtitle "${toAppleScriptString(subtitle)}"` : '';
@@ -316,12 +313,12 @@ export function systemNotify(title: string, message: string, subtitle?: string) 
 }
 
 export function clipboardRead(): string {
-  if (!isDarwin()) return '';
+  if (!isMacOS()) return '';
   return runAppleScript('return the clipboard');
 }
 
 export function clipboardWrite(text: string): void {
-  if (!isDarwin()) {
+  if (!isMacOS()) {
     return;
   }
   safeExec('osascript', ['-e', `set the clipboard to "${toAppleScriptString(text)}"`]);
@@ -331,7 +328,7 @@ export function takeScreenshot(
   outputPath: string,
   options?: { silent?: boolean; displayIndex?: number }
 ): string {
-  if (!isDarwin()) return '';
+  if (!isMacOS()) return '';
   const args = ['-x'];
   if (options?.displayIndex !== undefined) {
     args.push('-D', String(options.displayIndex + 1));
