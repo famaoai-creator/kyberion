@@ -2,7 +2,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { secureFetch } from './network.js';
 import { recognizeImageLocallyWithAppleVision } from './apple-intelligence-bridge.js';
-import { isMacOS } from './platform.js';
+import { isMacOS } from './platform-facts.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
