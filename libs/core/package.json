@@ -1640,6 +1640,10 @@
       "types": "./dist/foundation/authorization-registry.d.ts",
       "default": "./dist/foundation/authorization-registry.js"
     },
+    "./foundation/authorization-policy-document": {
+      "types": "./dist/foundation/authorization-policy-document.d.ts",
+      "default": "./dist/foundation/authorization-policy-document.js"
+    },
     "./foundation/command-credential-policy": {
       "types": "./dist/foundation/command-credential-policy.d.ts",
       "default": "./dist/foundation/command-credential-policy.js"
