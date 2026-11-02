@@ -55,6 +55,7 @@ import {
 } from './plugin-contributions.js';
 import type { PluginPermissionGrant } from './plugin-permissions.js';
 import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
+import './plugin-authorization-overlay.js';
 import { resolvePluginExecutionGrant, runWithPluginGrant } from './plugin-grant-runtime.js';
 
 export const SKILL_PLUGINS_CONFIG_FILENAME = '.kyberion-plugins.json';

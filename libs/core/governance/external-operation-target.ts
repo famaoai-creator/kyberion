@@ -1,3 +1,6 @@
+import { operationAuthorization } from '../foundation/authorization-registry.js';
+import './authorization-overlay.js';
+
 /** Explicit targets signed by the accountable human; no wildcard matching. */
 export type ExternalOperationGrant =
   | {
@@ -209,9 +212,11 @@ function buildBrowserNavigationTarget(
   }
 }
 
-/** True when the operation may consult an exact charter grant. */
+/** True when the operation may consult an exact charter grant. The
+ * authorization registry is the single source for delegability; this table
+ * supplies the effect→target builders. */
 export function isDelegableExternalOperation(operationId: string): boolean {
-  return operationId in EXTERNAL_OPERATION_DELEGATION;
+  return operationAuthorization(operationId).delegable !== undefined;
 }
 
 /** Effect → raw grant target for the resolver (undefined = not delegable here). */
