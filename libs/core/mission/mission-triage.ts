@@ -15,7 +15,7 @@
 
 import * as path from 'node:path';
 import { archivedMissionDir, findArchivedMissionDir, findMissionPath } from '../path-resolver.js';
-import { safeExistsSync, safeReaddir } from '../secure-io.js';
+import { loadJsonIfPresent, safeExistsSync, safeReaddir } from '../secure-io.js';
 import { loadMissionStateIncludingArchive, loadState } from './mission-state.js';
 import {
   readMissionNextTasks,
@@ -27,6 +27,11 @@ import {
   collectMissionFlowProjection,
   type MissionFlowProjection,
 } from './mission-flow-projection.js';
+import {
+  validateMissionBlueprint,
+  type MissionValidationMessage,
+} from './mission-blueprint-validation.js';
+import { detectMissionStalls, type MissionStallReport } from './mission-stall-detection.js';
 
 export type MissionTriageClassification =
   | 'not_found'
@@ -79,6 +84,10 @@ export interface MissionTriageReport {
   };
   current_goal?: string;
   intent_drift_gate_failures?: number;
+  /** Advisory blueprint validation (Tandem-style); not evidence of readiness. */
+  blueprint_validation?: { messages: MissionValidationMessage[] };
+  /** Advisory stall detection (MSAF-magentic-style); triage stays human-mediated. */
+  stalls?: MissionStallReport;
   recommendation: MissionTriageRecommendation;
 }
 
@@ -96,6 +105,32 @@ function pendingTaskIds(missionDir: string): {
     )
     .map((task) => String(task.task_id || task.description || 'unknown-task'));
   return { total: tasks.length, completed: tasks.length - pending.length, pending };
+}
+
+/**
+ * Validate the raw NEXT_TASKS payload rather than the sanitized board:
+ * readMissionNextTasks swallows parse/schema failures into [], which would
+ * make a malformed board look clean. Missing file = no messages.
+ */
+function collectBlueprintValidation(missionDir: string): MissionValidationMessage[] {
+  const tasksPath = path.join(missionDir, 'NEXT_TASKS.json');
+  if (!safeExistsSync(tasksPath)) return [];
+  let raw: unknown;
+  try {
+    raw = loadJsonIfPresent(tasksPath);
+  } catch {
+    raw = undefined;
+  }
+  if (raw === undefined || raw === null) {
+    return [
+      {
+        severity: 'error',
+        code: 'MISSION_TASKS_UNREADABLE',
+        message: 'NEXT_TASKS.json exists but could not be parsed',
+      },
+    ];
+  }
+  return validateMissionBlueprint(raw);
 }
 
 function driftBlockedByState(state: MissionState): boolean {
@@ -343,6 +378,14 @@ export function collectMissionTriageReport(missionId: string): MissionTriageRepo
     ...(state?.intent?.goal_summary ? { current_goal: String(state.intent.goal_summary) } : {}),
     ...(context.intent_drift_gate_failure_count
       ? { intent_drift_gate_failures: Number(context.intent_drift_gate_failure_count) }
+      : {}),
+    ...(missionDir
+      ? {
+          blueprint_validation: {
+            messages: collectBlueprintValidation(missionDir),
+          },
+          stalls: detectMissionStalls(missionDir),
+        }
       : {}),
     recommendation: effectiveRecommendation,
   };
