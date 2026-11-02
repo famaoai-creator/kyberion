@@ -74,6 +74,53 @@ describe('process-actuator schema', () => {
 });
 
 describe('process-actuator lifecycle identity', () => {
+  it('reports spawn_failed and records the resource as exited when the binary is missing', async () => {
+    const resourceId = `spawn-fail-${process.pid}`;
+    try {
+      const result = await handleAction({
+        action: 'spawn',
+        params: {
+          resourceId,
+          command: `definitely-not-a-binary-${process.pid}`,
+          kind: 'pty',
+          ownerId: 'test',
+          ownerType: 'test',
+        },
+      } as any);
+      expect(result).toMatchObject({ status: 'spawn_failed', resourceId });
+      expect((result as any).reason).toBeTruthy();
+      expect(runtimeSupervisor.get(resourceId)?.state).toBe('exited');
+    } finally {
+      runtimeSupervisor.unregister(resourceId);
+    }
+  });
+
+  it('reports spawned with identity fields for a real process and stops it', async () => {
+    const resourceId = `spawn-ok-${process.pid}`;
+    const result = await handleAction({
+      action: 'spawn',
+      params: {
+        resourceId,
+        command: 'sleep',
+        args: ['60'],
+        kind: 'pty',
+        ownerId: 'test',
+        ownerType: 'test',
+      },
+    } as any);
+    try {
+      expect(result).toMatchObject({ status: 'spawned', resourceId });
+      expect((result as any).pid).toBeGreaterThan(0);
+      expect(
+        (result as any).pidStartMarker === undefined ||
+          typeof (result as any).pidStartMarker === 'string'
+      ).toBe(true);
+    } finally {
+      await handleAction({ action: 'stop', params: { resourceId } } as any);
+      runtimeSupervisor.unregister(resourceId);
+    }
+  });
+
   it('reports not_found instead of claiming a stop for an unknown resource', async () => {
     const result = await handleAction({
       action: 'stop',
