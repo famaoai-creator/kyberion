@@ -113,3 +113,11 @@ merge queueとの互換のため、prepared promotionはbranch削除を同時要
 初版の上限は一つのwork planにつき開発mission一件、正確なsource file 1〜64件、review diff 64KiB、code repair最大3回。root package設定変更や任意の将来mission作成まで無制限に委任するものではない。範囲外、追加品質reviewの否認、未知の外部効果、認証・scope不整合は明示的な停止・owner復旧とする。remote候補branchが残るrepositoryでは次run前の正規retirementを要する。
 
 レビュー可能なローカル実装として引き渡す。PR公開・merge、本番の自律実行を完了したという扱いにはしない。
+
+# PR公開準備の追加検証
+
+続くPR依頼に対し、最新の `origin/main=06f9212bb914e463d2f72749557517899732989a`（17コミットの追加）へ3件のfeature commitをrebaseした。機能sourceの競合はなく、`CAPABILITIES_GUIDE.md` の生成物競合は正規generatorで再生成した。main側のvoice／search追加のexportsと、secure-ioのbackup向けmetadata制約を保持している。rebase後の実装commitは `99f614ff1`。
+
+このbaseで `pnpm install --frozen-lockfile`、`pnpm build`、Conciergeの `tsc --noEmit` が成功した。既存65テストファイルにupstreamの `security-boundary.contract.test.ts` と `sensitive-path-policy.test.ts` を加えた67ファイルの一括再検証は、1,015成功・2skip・失敗0。独立review agentも新base上の権限境界とexportsを読取レビューし、具体的な統合阻害を認めなかった。
+
+missionの `verify → distill → memory-approve --knowledge-domain product --approval-channel pr_review → memory-promote` を実行し、検証済みの境界・完了条件の学びをpublicなproduct recordとして同じPRへ同梱する。raw distillationは構造抽出（LLMなし）と明記し、元の実装・検証・レビュー証跡から明示的に選択してcurationした。PR reviewによるratificationはmainへの反映後に確定する。本番canary・scheduler有効化・既存personal記録の物理移行は引き続き未実施。
