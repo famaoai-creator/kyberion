@@ -1,0 +1,22 @@
+{
+  "record_id": "mem-MSN-DEVELOPMENT-CYCLE-20261102-2026_11_02",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "承認済み開発ループの完了条件と実行境界",
+  "summary": "既存ownerに開発を接続するときは、承認・品質task・実CI・公開証明を別々の正本として束縛し、完了表示だけでmergeを許可しない。",
+  "candidate_id": "mem-MSN-DEVELOPMENT-CYCLE-20261102-2026_11_02",
+  "evidence_refs": [
+    "active/missions/public/MSN-DEVELOPMENT-CYCLE-20261102/evidence/implementation-report.md",
+    "active/missions/public/MSN-DEVELOPMENT-CYCLE-20261102/evidence/test-report.md",
+    "active/missions/public/MSN-DEVELOPMENT-CYCLE-20261102/evidence/REVIEW-execution-implement.md"
+  ],
+  "created_at": "2026-11-02T03:38:39.697Z",
+  "applicability": ["mission", "mission:MSN-DEVELOPMENT-CYCLE-20261102"],
+  "reusable_steps": [
+    "既存ownerに開発を接続するときは、承認・品質task・実CI・公開証明を別々の正本として束縛し、完了表示だけでmergeを許可しない"
+  ],
+  "expected_outcome": "適用: 既存continuous ownerから限定された開発missionを継続実行する場合。\n\n1. 初回の計画・alignment承認を、実装・push・PR・mergeのscope付き権限と分離する。承認はtierやtenantの禁止を解除しない。\n2. merge前に、対象revisionの実diffを見た独立receiptと、head/policyに束縛された必須CI証跡を要求する。追加品質taskはboardとcanonical WorkItemの両方で完了を確認する。未完了taskを無視する既存artifact gateだけに依存しない。\n3. 全tierの提案sourceを稼働中のgovernance rootから隔離する。Git objectsやrefsも共有せず、新規cloneはローカルmainではなく承認済みremoteの現在mainから開始する。\n4. CI待機・承認待機・稼働中attemptは修復予算を消費しない。既知のcode/CI失敗は有限回修復し、未知の外部効果や設計品質の否認は停止して復旧する。\n5. 既存cadence/dispatcher/VCS hostを再利用する。merge queueで拒否されるbranch削除をpromotionに同梱せず、branch retirementを別のowner責務とする。\n\n検証根拠: 実Git、実WorkItem、保存済みgate、独立receipt、認証済みrouteのlocal fixtureによる検証。実GitHub/modelの一連canaryや本番起動の成功を意味しない。複数componentを同時変更したため、個々の変更の独立した性能改善は主張しない。",
+  "source_branch": "feat/continuous-delegation-current-20261102",
+  "source_commit": "99f614ff13e70b70f2c5bd47549687bece4ba6a4"
+}

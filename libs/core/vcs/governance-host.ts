@@ -2,12 +2,7 @@
 import * as path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { pathResolver } from '../path-resolver.js';
-import {
-  safeExecResult,
-  safeReadFile,
-  safeExistsSync,
-  assertSafeRepositoryPath,
-} from '../secure-io.js';
+import { safeExecResult, safeReadFile, safeExistsSync } from '../secure-io.js';
 import { isVitestProcess, getRegisteredEnvText } from '../foundation/env.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { resolvePromotionTargetRoot, type GitRunner } from '../knowledge/memory-promotion-git.js';
@@ -19,8 +14,12 @@ import { hasHumanExecutionContext } from '../governance/human-execution.js';
 import { currentExecutionScope } from '../foundation/execution-scope.js';
 import { currentResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
-import { storageFloorTier } from '../storage-layout.js';
-import { sanitizeGhOutput, withPrPublicationBodySource, type PrBodySourceTier } from './github.js';
+import {
+  sanitizeGhOutput,
+  withPrPublicationBodySource,
+  prPublicationBodySourceForPath,
+  type PrBodySourceTier,
+} from './github.js';
 import { runVcsMutationWithApproval, type VcsHostMutation } from './publication-host.js';
 import type { VcsCommandResult } from './git.js';
 
@@ -39,11 +38,7 @@ export function resolveInstallationGovernanceRoot(
 export const resolvePrGovernanceRoot = resolveInstallationGovernanceRoot;
 
 export function publicationBodySourceTier(bodyFile: string | undefined): PrBodySourceTier {
-  if (!bodyFile) return 'inline';
-  const relative = pathResolver.toRepoRelative(assertSafeRepositoryPath(bodyFile));
-  return relative.startsWith('knowledge/public/') || storageFloorTier(relative) === 'public'
-    ? 'public'
-    : 'protected_or_unknown';
+  return prPublicationBodySourceForPath(bodyFile);
 }
 
 const RESULT_PREFIX = 'KYBERION_PR_GOVERNANCE_RESULT:';
@@ -104,9 +99,13 @@ export function runVcsMutationWithWorktreeGovernance(
   print: (value: unknown) => void,
   options: VcsGovernanceHostOptions = {}
 ): VcsCommandResult {
+  const source =
+    mutation.operation === 'pr_create' && mutation.params.bodyFile
+      ? publicationBodySourceTier(mutation.params.bodyFile)
+      : options.bodySourceTier;
   const local = () =>
-    options.bodySourceTier
-      ? withPrPublicationBodySource(options.bodySourceTier, () =>
+    source
+      ? withPrPublicationBodySource(source, () =>
           runVcsMutationWithApproval(mutation, invocationId, print)
         )
       : runVcsMutationWithApproval(mutation, invocationId, print);
@@ -131,7 +130,7 @@ export function runVcsMutationWithWorktreeGovernance(
   if (!safeExistsSync(pathResolver.rootResolve('libs/core/dist/vcs/publication-host.js')))
     throw new Error('[PR_GOVERNANCE_ROOT] Built publication host missing; run pnpm build:packages');
   const bodySourceTier =
-    options.bodySourceTier ??
+    source ??
     (mutation.operation === 'pr_create'
       ? publicationBodySourceTier(mutation.params.bodyFile)
       : 'protected_or_unknown');
