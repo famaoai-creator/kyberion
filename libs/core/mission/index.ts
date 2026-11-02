@@ -31,6 +31,7 @@ export * from './mission-artifact-closure.js';
 export * from './mission-assessment.js';
 export * from './mission-classification.js';
 export * from './mission-context-pack-knowledge.js';
+export * from './mission-context-condenser.js';
 export type {
   MissionTier,
   MissionStatus,
@@ -51,6 +52,7 @@ export type {
   MissionContextPackTaskSessionSummary,
   MissionContextPackWorkItemSummary,
   MissionContextPack,
+  MissionContextPackSourceCondenser,
   BuildMissionContextPackInput,
   ResolveMissionContextPackInput,
 } from './mission-context-pack-types.js';
@@ -77,6 +79,7 @@ export * from './mission-hygiene.js';
 export * from './mission-intent-delta.js';
 export * from './mission-journal-policy.js';
 export * from './mission-ledger-policy.js';
+export * from './mission-lease.js';
 export * from './mission-lifecycle-completion.js';
 export * from './mission-lifecycle-operator-actions.js';
 export * from './mission-lifecycle-service.js';
