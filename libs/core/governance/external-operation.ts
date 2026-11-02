@@ -9,6 +9,8 @@ import type { ApprovalGateCharterInput } from './approval-gate-charter.js';
 import { computeApprovalPayloadHash } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
 import { createLogger } from '../logger.js';
+import { operationAuthorization } from '../foundation/authorization-registry.js';
+import './authorization-overlay.js';
 import {
   recordCharterExecutionOutcome,
   recordCharterExecutionStarted,
@@ -461,6 +463,12 @@ function currentServiceExecutionProof(input: ExternalOperation) {
 export function admitExternalOperation(input: ExternalOperation): ApprovalGateResult {
   admissions.delete(input);
   admittedOperations.delete(input);
+  const declaredAuth = operationAuthorization(input.operationId);
+  if (!declaredAuth.declared) {
+    logger.warn(
+      `[external-operation] undeclared operationId '${input.operationId}' admitted — declare it in libs/core/foundation/authorization-registry.ts | next: add a registry entry`
+    );
+  }
   let protection: ReturnType<typeof protectionFor>;
   try {
     protection = protectionFor(input);
