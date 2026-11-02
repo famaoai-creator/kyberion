@@ -1,7 +1,7 @@
 import { withLockSync } from '../lock-utils.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import type { ValidateFunction } from 'ajv';
-import { getRegisteredEnvText } from '../foundation/env.js';
+import { getRegisteredEnvBool, getRegisteredEnvText, isVitestProcess } from '../foundation/env.js';
 import { randomUUID } from 'node:crypto';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
@@ -35,6 +35,7 @@ import {
   type ScopedLearningApproval,
   type ScopedLearningPublicationIdentity,
 } from './scoped-learning-domain.js';
+import { assertMemoryWriteCapability } from './memory-capability-token.js';
 import type { HumanDecidedBy } from '../mission/mission-types.js';
 
 export type MemoryCandidateSourceType =
@@ -391,6 +392,69 @@ function normalizeOccurrenceCount(value: unknown): number {
   return Math.max(1, count);
 }
 
+/**
+ * W3: opt-in run-scoped capability check for governed memory writes.
+ *
+ * When `KYBERION_MEMORY_CAPABILITY_REQUIRED` is set, every durable queue
+ * mutation (enqueue, status transition) must carry a valid
+ * `MemoryCapabilityToken` granting 'write' on the write's partition; a
+ * missing or invalid token fails closed with `[MEMORY_CAPABILITY_DENIED]`
+ * before any bytes commit. The flag unset is today's behavior — the token
+ * is never consulted. Callers thread the token explicitly
+ * (`capability` option); the secret defaults to the audit-chain key.
+ */
+export interface MemoryWriteCapability {
+  /** Capability token (as issued by `issueMemoryCapabilityToken`). */
+  token: unknown;
+  /**
+   * TEST-ONLY injected HMAC secret — honored only under `isVitestProcess()`;
+   * production verification always resolves the audit-chain key. A caller
+   * must never be able to supply the verification key or the clock, or it
+   * could self-sign tokens and replay expired ones.
+   */
+  secret?: string;
+  /** TEST-ONLY verification instant; honored only under `isVitestProcess()`. */
+  now?: Date | number | string;
+}
+
+/** Whether the capability gate is armed for memory writes. */
+export function memoryWriteCapabilityRequired(): boolean {
+  return getRegisteredEnvBool('KYBERION_MEMORY_CAPABILITY_REQUIRED') === true;
+}
+
+/**
+ * Partition a queue write binds to: the tenant partition for a scoped
+ * confidential candidate (`confidential/<tenant>`), else the candidate's
+ * tier partition (`tier:<tier>`) — the same partition vocabulary
+ * `issueMemoryCapabilityToken` normalizes.
+ */
+export function memoryWritePartition(
+  candidate: Pick<MemoryCandidate, 'scope' | 'sensitivity_tier'>
+): string {
+  const scope = candidate.scope;
+  const tenant = scope?.tier === 'confidential' ? String(scope.tenant_slug || '').trim() : '';
+  if (tenant) return `confidential/${tenant}`;
+  // Personal queues are physically partitioned by owner_nhi — a capability
+  // must bind that owner partition, not the whole personal tier, or one
+  // owner's token would write into every owner's queue.
+  const owner = scope?.tier === 'personal' ? String(scope.owner_nhi || '').trim() : '';
+  return owner ? `personal/${owner}` : `tier:${candidate.sensitivity_tier}`;
+}
+
+export function assertQueueWriteCapability(
+  capability: MemoryWriteCapability | undefined,
+  candidate: Pick<MemoryCandidate, 'scope' | 'sensitivity_tier'>
+): void {
+  if (!memoryWriteCapabilityRequired()) return;
+  // The verification key and clock come from trusted configuration — caller
+  // overrides are honored only in tests, never in production requests.
+  const testOverride = isVitestProcess() ? capability : undefined;
+  assertMemoryWriteCapability(capability?.token, memoryWritePartition(candidate), {
+    ...(testOverride?.secret !== undefined ? { secret: testOverride.secret } : {}),
+    ...(testOverride?.now !== undefined ? { now: testOverride.now } : {}),
+  });
+}
+
 function assertPublicTierReferencesSafe(candidate: MemoryCandidate): void {
   // `sensitivity_tier` is the candidate's destination tier.  The envelope is
   // the source scope and must be validated against its own tier so a
@@ -532,12 +596,18 @@ export function validateMemoryPromotionCandidate(value: unknown): {
   return { valid: Boolean(valid), errors };
 }
 
-export function enqueueMemoryPromotionCandidate(candidate: MemoryCandidate): string {
+export function enqueueMemoryPromotionCandidate(
+  candidate: MemoryCandidate,
+  options?: { capability?: MemoryWriteCapability }
+): string {
   return withLockSync('memory-promotion-queue-mutations', () =>
-    enqueueMemoryPromotionCandidateUnlocked(candidate)
+    enqueueMemoryPromotionCandidateUnlocked(candidate, options)
   );
 }
-function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): string {
+function enqueueMemoryPromotionCandidateUnlocked(
+  candidate: MemoryCandidate,
+  options?: { capability?: MemoryWriteCapability }
+): string {
   if ((candidate.evidence_refs || []).length === 0) {
     throw new Error('Memory promotion candidate requires at least one evidence_ref.');
   }
@@ -547,6 +617,9 @@ function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): st
   };
   assertPublicTierReferencesSafe(normalizedCandidate);
   assertBoundTenantScopePresent(normalizedCandidate);
+  // W3: capability gate — asserted once here so both the merge-rewrite and
+  // the append commits below are covered; a no-op unless the env flag is on.
+  assertQueueWriteCapability(options?.capability, normalizedCandidate);
   const validation = validateMemoryPromotionCandidate(normalizedCandidate);
   if (!validation.valid) {
     throw new Error(`Invalid memory promotion candidate: ${validation.errors.join('; ')}`);
@@ -655,6 +728,10 @@ function enqueueMemoryPromotionCandidateUnlocked(candidate: MemoryCandidate): st
         `Invalid memory promotion candidate update: ${updatedValidation.errors.join('; ')}`
       );
     }
+    // W3: capability gate on the retained row — content matching ignores
+    // sensitivity_tier, so the incoming candidate's partition (asserted
+    // above) may differ from the partition of the row this merge mutates.
+    assertQueueWriteCapability(options?.capability, current);
     rows[existingIndex] = next;
     safeWriteFile(queuePath, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
     return queuePath;
@@ -757,6 +834,8 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
   approvalChannel?: MemoryApprovalChannel;
   /** KL-04: merge ratification observed at mission finish (pr_review channel). */
   ratification?: { ratifiedAt: string; ratifiedCommit: string; ratificationTarget: string };
+  /** W3: capability token asserted (only when required) before the write commits. */
+  capability?: MemoryWriteCapability;
 }): MemoryCandidate | null {
   if (
     input.approvalChannel !== undefined &&
@@ -797,6 +876,12 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
 
   let firstUpdated: MemoryCandidate | null = null;
   const ratifiedAt = nowIso();
+  // Two-phase authorize-then-commit: mutations are staged in memory first so
+  // capability checks can cover every changed row across every queue file
+  // before any byte commits. An allMatching write spanning partitions can
+  // therefore never partially apply.
+  const pendingWrites: Array<{ queuePath: string; rows: MemoryCandidate[] }> = [];
+  const changedPairs: Array<{ current: MemoryCandidate; next: MemoryCandidate }> = [];
   for (const queuePath of matchingQueuePaths) {
     const rows = readQueueRows(queuePath);
     let changed = false;
@@ -986,10 +1071,24 @@ function updateMemoryPromotionCandidateStatusUnlocked(input: {
       }
       rows[index] = next;
       firstUpdated ||= next;
+      changedPairs.push({ current, next });
       changed = true;
       if (!input.allMatching) break;
     }
-    if (changed) {
+    if (changed) pendingWrites.push({ queuePath, rows });
+  }
+  if (pendingWrites.length > 0) {
+    // W3: capability gate — authorize every committed row on BOTH its current
+    // and its resulting partition, across ALL queue files, before any write.
+    // Covering `current` prevents a scopeUpdate from mutating a partition the
+    // token does not grant; covering `next` covers the destination. Doing it
+    // before the writes means a denial can never leave a partially applied
+    // multi-file update behind.
+    for (const { current, next } of changedPairs) {
+      assertQueueWriteCapability(input.capability, current);
+      assertQueueWriteCapability(input.capability, next);
+    }
+    for (const { queuePath, rows } of pendingWrites) {
       ensureQueueDir(queuePath);
       safeWriteFile(queuePath, `${rows.map((row) => JSON.stringify(row)).join('\n')}\n`);
     }

@@ -1,5 +1,10 @@
 import type { KnowledgeVerification } from '../knowledge/knowledge-verification.js';
 import type { ArtifactKind, ArtifactOwnershipRecord } from '../workforce/artifact-registry.js';
+import type {
+  CondensationSummary,
+  CondenserBudget,
+  ContextCondenser,
+} from './mission-context-condenser.js';
 import type { ContextFragmentRejection, ContextSecurityScope } from '../context-security-scope.js';
 import type { FacetRequest } from '../facet-registry.js';
 import type { MissionTeamAssignment } from './mission-team-plan-composer.js';
@@ -97,6 +102,11 @@ export interface MissionContextPackSource {
   captured_at?: string;
   tier?: MissionTier;
   tenant_slug?: string;
+  /**
+   * Dropped-entry accounting carried by the synthetic `other` source a
+   * condenser summary entry becomes (see `condenseMissionContextPackSources`).
+   */
+  condensation?: CondensationSummary;
 }
 
 export interface MissionContextPackRecipient {
@@ -315,6 +325,19 @@ export interface MissionContextPack {
   context_pack_path?: string;
 }
 
+/**
+ * Opt-in source condensation controls for pack builds (OpenHands-condenser
+ * port). When supplied, the pack's `sources` list is condensed through
+ * `condenseMissionContextPackSources` to the byte/token budget before the
+ * pack is rendered and pruned. Omitted = pre-existing behavior.
+ */
+export interface MissionContextPackSourceCondenser {
+  /** Byte/token ceiling passed to the condenser; at least one bound required. */
+  budget: CondenserBudget;
+  /** Registered strategy name or a custom condenser; defaults to `drop_oldest`. */
+  strategy?: string | ContextCondenser;
+}
+
 export interface BuildMissionContextPackInput {
   missionState: MissionStateSummary;
   missionPath?: string;
@@ -342,6 +365,8 @@ export interface BuildMissionContextPackInput {
    */
   estimatedScope?: 'S' | 'M' | 'L';
   facets?: FacetRequest;
+  /** Opt-in: condense `sources` to this budget before render/prune. */
+  sourceCondenser?: MissionContextPackSourceCondenser;
   /** DA-07 test seam: repo root holding fixture tenant profiles for the common-prefix grant. */
   tenantKnowledgeRootDir?: string;
 }
@@ -378,6 +403,8 @@ export interface ResolveMissionContextPackInput {
    */
   estimatedScope?: 'S' | 'M' | 'L';
   facets?: FacetRequest;
+  /** Opt-in, forwarded to `buildMissionContextPack`. */
+  sourceCondenser?: MissionContextPackSourceCondenser;
   /**
    * DA-07 test seam, forwarded to `loadKnowledgeHintsIfPossible`: repo root
    * containing fixture `knowledge/`, `customer/`, and tenant profile
