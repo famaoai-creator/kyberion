@@ -7,6 +7,7 @@ import {
 } from '@agent/core/actuator-manifest-index';
 import { getRegisteredEnvBool, getRegisteredEnvText } from '@agent/core/foundation';
 import { createBinaryAvailability } from '#binary-availability';
+import { hostNodePlatform } from '@agent/core/platform-facts';
 import { evaluateCapabilityContract } from '#capability-discovery-contract';
 import { scanActuatorManifests } from '#capability-discovery-manifest-scan';
 import {
@@ -68,7 +69,7 @@ export function evaluateCapability(
 }
 
 const checkBinary = createBinaryAvailability({
-  platform: process.platform,
+  platform: hostNodePlatform(),
   pathValue: process.env.PATH,
   pathDelimiter: path.delimiter,
   pathExt: process.env.PATHEXT,

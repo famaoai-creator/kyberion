@@ -16,8 +16,12 @@ vi.mock('./secure-io.js', () => ({
       ? { status: 0, stdout: 'Swift version 6.0', stderr: '' }
       : io.safeExecResult(...args),
 }));
-vi.mock('./path-resolver.js', () => ({ rootResolve: (p: string) => '/test/' + p }));
-vi.mock('./storage-layout.js', () => ({
+vi.mock(import('./path-resolver.js'), async (importOriginal) => ({
+  ...(await importOriginal()),
+  rootResolve: (p: string) => '/test/' + p,
+}));
+vi.mock(import('./storage-layout.js'), async (importOriginal) => ({
+  ...(await importOriginal()),
   SYSTEM_PARTITION: { kind: 'system' },
   resolveStorageFloor: (_floor: string, _partition: unknown, domain: string, ...parts: string[]) =>
     ['/test/active/shared/cache/system', domain, ...parts].join('/'),
