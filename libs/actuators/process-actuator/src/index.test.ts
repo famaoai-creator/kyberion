@@ -86,9 +86,9 @@ describe('process-actuator lifecycle identity', () => {
           ownerId: 'test',
           ownerType: 'test',
         },
-      } as any);
+      });
       expect(result).toMatchObject({ status: 'spawn_failed', resourceId });
-      expect((result as any).reason).toBeTruthy();
+      expect((result as Record<string, unknown>).reason).toBeTruthy();
       expect(runtimeSupervisor.get(resourceId)?.state).toBe('exited');
     } finally {
       runtimeSupervisor.unregister(resourceId);
@@ -107,16 +107,16 @@ describe('process-actuator lifecycle identity', () => {
         ownerId: 'test',
         ownerType: 'test',
       },
-    } as any);
+    });
     try {
       expect(result).toMatchObject({ status: 'spawned', resourceId });
-      expect((result as any).pid).toBeGreaterThan(0);
+      expect((result as Record<string, unknown>).pid).toBeGreaterThan(0);
       expect(
-        (result as any).pidStartMarker === undefined ||
-          typeof (result as any).pidStartMarker === 'string'
+        (result as Record<string, unknown>).pidStartMarker === undefined ||
+          typeof (result as Record<string, unknown>).pidStartMarker === 'string'
       ).toBe(true);
     } finally {
-      await handleAction({ action: 'stop', params: { resourceId } } as any);
+      await handleAction({ action: 'stop', params: { resourceId } });
       runtimeSupervisor.unregister(resourceId);
     }
   });
@@ -125,12 +125,12 @@ describe('process-actuator lifecycle identity', () => {
     const result = await handleAction({
       action: 'stop',
       params: { resourceId: `never-registered-${process.pid}` },
-    } as any);
+    });
     expect(result).toMatchObject({
       status: 'not_found',
       reason: 'resource_not_registered',
     });
-    expect((result as any).next_step).toBeTruthy();
+    expect((result as Record<string, unknown>).next_step).toBeTruthy();
   });
 
   it('reports already_exited for a record whose pid is gone', async () => {
@@ -146,7 +146,7 @@ describe('process-actuator lifecycle identity', () => {
       const result = await handleAction({
         action: 'stop',
         params: { resourceId },
-      } as any);
+      });
       expect(result).toMatchObject({ status: 'already_exited', pid: 999999 });
       expect(runtimeSupervisor.get(resourceId)).toBeUndefined();
     } finally {
@@ -175,7 +175,7 @@ describe('process-actuator lifecycle identity', () => {
       const result = await handleAction({
         action: 'stop',
         params: { resourceId },
-      } as any);
+      });
       if (markerReadable) {
         expect(result).toMatchObject({ status: 'already_exited' });
       }
@@ -203,7 +203,7 @@ describe('process-actuator lifecycle identity', () => {
       const result = await handleAction({
         action: 'stop',
         params: { resourceId },
-      } as any);
+      });
       expect(result).toMatchObject({ status: 'cleanup_failed' });
       expect(runtimeSupervisor.get(resourceId)?.lastCleanupError?.error).toBe(
         'simulated cleanup failure'
@@ -227,9 +227,9 @@ describe('process-actuator lifecycle identity', () => {
       const result = await handleAction({
         action: 'status',
         params: { resourceId },
-      } as any);
+      });
       expect(result).toMatchObject({ status: 'ok' });
-      const resource = (result as any).resource;
+      const resource = (result as Record<string, unknown>).resource;
       expect(resource.pid).toBe(process.pid);
       expect(resource.alive).toBe(true);
       expect(['pid+start_marker', 'pid_only']).toContain(resource.identity);
@@ -252,7 +252,7 @@ describe('process-actuator path boundaries', () => {
           command: 'node',
           cwd: '/tmp/external-process-cwd',
         },
-      } as any)
+      })
     ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
   });
 
