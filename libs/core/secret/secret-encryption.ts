@@ -16,6 +16,7 @@
 
 import { randomBytes, createCipheriv, createDecipheriv } from 'node:crypto';
 import { safeExecResult } from '../secure-io.js';
+import { isMacOS } from '../platform.js';
 import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { memoizedKeychainRead } from '../foundation/secret-resolution-session.js';
 import { keychainReaderAccessSwiftLines, keychainSwiftArgs } from './keychain-access.js';
@@ -120,7 +121,7 @@ function keychainCreate(): Buffer {
 function getEncryptionKey(createIfMissing = false): Buffer {
   if (testKeyOverride) return testKeyOverride;
   if (cachedKey) return cachedKey;
-  if (process.platform !== 'darwin') {
+  if (!isMacOS()) {
     throw new Error(
       "[secret-encryption] mode 'keychain' requires macOS (the `security` CLI); " +
         'use none on this host or wait for the age-based mode'
