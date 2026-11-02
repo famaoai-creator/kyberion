@@ -51,6 +51,30 @@ function toSpec(op: string, kind: PipelineStepType) {
 
 export function describeOps(): ActuatorOpDescription[] {
   return [
+    {
+      op: 'information_asset_work',
+      kind: 'apply',
+      input_schema: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['work_item_id', 'attempt_id', 'lease_id', 'dot_id', 'actor_id'],
+        properties: Object.fromEntries(
+          ['work_item_id', 'attempt_id', 'lease_id', 'dot_id', 'actor_id'].map((key) => [
+            key,
+            { type: 'string', minLength: 1 },
+          ])
+        ),
+      },
+      examples: [
+        {
+          work_item_id: 'work-example',
+          attempt_id: 'attempt-example',
+          lease_id: 'lease-example',
+          dot_id: 'inbox-dot',
+          actor_id: 'dot:inbox-dot',
+        },
+      ],
+    },
     ...SERVICE_ACTUATOR_CAPTURE_OPS.map((op) => toSpec(op, 'capture')),
     ...SERVICE_ACTUATOR_TRANSFORM_OPS.map((op) => toSpec(op, 'transform')),
     ...SERVICE_ACTUATOR_APPLY_OPS.map((op) => toSpec(op, 'apply')),

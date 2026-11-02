@@ -1,0 +1,77 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "recipes"],
+  "properties": {
+    "version": {
+      "const": 1
+    },
+    "recipes": {
+      "type": "array",
+      "minItems": 12,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "recipe_id",
+          "version",
+          "title",
+          "asset_type",
+          "event_types",
+          "action",
+          "completion",
+          "requires_approval"
+        ],
+        "properties": {
+          "recipe_id": {
+            "type": "string",
+            "pattern": "^[a-z]+[.][a-z_]+$"
+          },
+          "version": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "asset_type": {
+            "enum": ["customer.request", "code.review_request", "workflow.approval_request"]
+          },
+          "event_types": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "action": {
+            "enum": [
+              "classify",
+              "prepare_reply",
+              "extract_actions",
+              "follow_up",
+              "review",
+              "review_update",
+              "resolve_review",
+              "investigate_ci",
+              "triage_issue",
+              "approve_issue",
+              "resolve_overdue",
+              "request_information"
+            ]
+          },
+          "completion": {
+            "enum": ["artifact_hash", "external_readback"]
+          },
+          "requires_approval": {
+            "type": "boolean"
+          }
+        }
+      }
+    }
+  }
+}

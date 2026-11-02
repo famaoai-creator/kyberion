@@ -231,8 +231,8 @@
       "path": "libs/actuators/service-actuator",
       "d": "Unified External SaaS/API/MCP Reachability Layer",
       "s": "implemented",
-      "version": "1.3.0",
-      "capability_count": 7
+      "version": "1.4.0",
+      "capability_count": 8
     },
     {
       "n": "system-actuator",

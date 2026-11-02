@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["version", "scope", "locations"],
+  "properties": {
+    "version": { "type": "integer", "minimum": 0 },
+    "scope": { "$ref": "#/definitions/scope" },
+    "locations": { "type": "array", "items": { "$ref": "#/definitions/location" } }
+  },
+  "definitions": {
+    "id": { "type": "string", "pattern": "^[a-zA-Z0-9][a-zA-Z0-9_-]*$" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tenant_slug", "organization_id"],
+      "properties": {
+        "tenant_slug": { "$ref": "#/definitions/id" },
+        "organization_id": { "$ref": "#/definitions/id" },
+        "project_id": { "$ref": "#/definitions/id" }
+      }
+    },
+    "location": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "location_id",
+        "asset_type",
+        "scope",
+        "binding_id",
+        "service_id",
+        "collector_id",
+        "selectors",
+        "tier",
+        "authoritative",
+        "freshness_seconds",
+        "enabled",
+        "version",
+        "updated_at"
+      ],
+      "properties": {
+        "location_id": { "$ref": "#/definitions/id" },
+        "asset_type": { "type": "string", "minLength": 1 },
+        "scope": { "$ref": "#/definitions/scope" },
+        "binding_id": { "$ref": "#/definitions/id" },
+        "service_id": { "$ref": "#/definitions/id" },
+        "collector_id": { "$ref": "#/definitions/id" },
+        "selectors": { "type": "object" },
+        "tier": { "enum": ["confidential", "personal"] },
+        "authoritative": { "type": "boolean" },
+        "freshness_seconds": { "type": "integer", "minimum": 1 },
+        "enabled": { "type": "boolean" },
+        "version": { "type": "integer", "minimum": 1 },
+        "updated_at": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

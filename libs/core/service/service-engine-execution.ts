@@ -189,6 +189,9 @@ export interface ServicePresetAlternativeExecutionContext {
   binding: ReturnType<typeof resolveServiceBinding>;
   /** Set only by the admitted, fixed authentication probe. */
   operatorProbe?: boolean;
+  /** Broker-issued isolated environment for a scoped session capture. */
+  captureProviderEnvironment?: Record<string, string>;
+  captureAuthority?: () => void;
   /** Trusted service-engine selector, never taken from the request body. */
   authSelector?: string;
   /** Digest of the actual loaded transport config, supplied only by service-engine. */
@@ -196,6 +199,7 @@ export interface ServicePresetAlternativeExecutionContext {
 }
 
 function assertTransportAuthority(input: ServicePresetAlternativeExecutionContext): void {
+  input.captureAuthority?.();
   const operationId = `service:preset:${input.serviceId}:${input.action}`;
   const params = { request: input.params, auth: input.authSelector ?? 'none' };
   const active =
@@ -308,11 +312,13 @@ async function executeServicePresetAlternativeOnce(
         const resolved = resolveTemplateValue(a, runtimeVars);
         return typeof resolved === 'string' ? resolved : JSON.stringify(resolved);
       });
-      const execEnv = buildPresetProcessEnv(
-        stripUnresolvedTemplateValues(
-          resolveTemplateValue(input.alt.env || {}, runtimeVars)
-        ) as Record<string, unknown>
-      );
+      const execEnv =
+        input.captureProviderEnvironment ??
+        buildPresetProcessEnv(
+          stripUnresolvedTemplateValues(
+            resolveTemplateValue(input.alt.env || {}, runtimeVars)
+          ) as Record<string, unknown>
+        );
       logger.info(`🚀 [ENGINE:CLI] Executing ${bin}`);
       assertTransportAuthority(input);
       markAttempted();
