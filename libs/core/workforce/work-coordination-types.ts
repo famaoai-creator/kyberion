@@ -252,6 +252,29 @@ export interface AppendCoordinationEventInput {
   payload?: Record<string, unknown>;
 }
 
+/**
+ * W4: opt-in advisory consult on the claim path. When supplied, the claim
+ * evaluation additionally asks this injected lease manager whether the
+ * claimant is a *suspended contender* on the resource — Mastra-style
+ * follower suspension (`MissionLeaseManager.isSuspended`). Purely advisory:
+ * it never blocks the claim and never replaces the WorkLease fence/lease
+ * mechanics; the verdict travels back on `advisory` in the claim result.
+ *
+ * The manager is declared structurally so this types module keeps zero
+ * runtime imports; `MissionLeaseManager` satisfies it.
+ */
+export interface ClaimWorkItemLeaseAdvisory {
+  /** Injected lease namespace (e.g. a `MissionLeaseManager` instance). */
+  manager: {
+    isSuspended(resource: string, holder: string, now: number): boolean;
+    getHolder(resource: string, now: number): string | undefined;
+  };
+  /** Lease resource consulted; defaults to the claimed work item id. */
+  resource?: string;
+  /** Evaluation instant (epoch ms); defaults to `Date.now()`. */
+  now?: number;
+}
+
 export interface ClaimWorkItemInput {
   /** Executors require fresh ownership; an idempotent retry must never execute twice. */
   requireNewLease?: boolean;
@@ -264,6 +287,8 @@ export interface ClaimWorkItemInput {
   idempotencyKey?: string;
   traceId?: string;
   metadata?: Record<string, unknown>;
+  /** W4 opt-in: consult an injected lease manager for contender suspension. */
+  leaseAdvisory?: ClaimWorkItemLeaseAdvisory;
 }
 
 export interface ReleaseWorkItemInput {

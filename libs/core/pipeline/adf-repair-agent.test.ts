@@ -484,6 +484,33 @@ describe('validateAndRepairAdf', () => {
     expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
   });
 
+  it('repairs truncated JSON via the dirty-json last-resort stage without delegating', async () => {
+    const delegateTask = vi.fn(stubReasoningBackend.delegateTask);
+    registerFakeRepairBackend(delegateTask);
+    const filePath = writeFixture('truncated.json', '{ capability: "demo", "action": "run"');
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input');
+
+    expect(result).toMatchObject({
+      repaired: true,
+      assurance: { recoverability_class: 'saved_file' },
+    });
+    expect(delegateTask).not.toHaveBeenCalled();
+    expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
+  });
+
+  it('repairs a dirty delegated report that lightweight repair cannot parse', async () => {
+    const delegateTask = vi.fn(async () => '{capability: "demo", action: "run"');
+    registerFakeRepairBackend(delegateTask);
+    const filePath = writeFixture('unparseable-dirty-report.json', 'this is not json');
+
+    const result = await validateAndRepairAdf(filePath, 'capability-input');
+
+    expect(result.repaired).toBe(true);
+    expect(delegateTask).toHaveBeenCalledTimes(1);
+    expect(JSON.parse(readFixture(filePath))).toEqual({ capability: 'demo', action: 'run' });
+  });
+
   it('calibrates the real pipeline schema and shell guardrails before deterministic unattended repair', async () => {
     const delegateTask = vi.fn(stubReasoningBackend.delegateTask);
     registerFakeRepairBackend(delegateTask);
