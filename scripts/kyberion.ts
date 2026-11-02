@@ -12,6 +12,7 @@ import { assertGovernedExec, buildSafeExecEnv, safeExecResultAsync } from '@agen
 import { constants as osConstants } from 'node:os';
 import { pathToFileURL } from 'node:url';
 import { spawnManagedProcess } from '@agent/core/managed-process';
+import { executableName, getPlatformFacts } from '@agent/core/platform-facts';
 import { pathResolver } from '@agent/core/path-resolver';
 import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { resolveLocale, type SupportedLocale } from '@agent/core/locale';
@@ -233,7 +234,7 @@ function formatGuardedScriptHelp(scriptCommand: CliScriptCommand): string {
 
 /** The pnpm launcher for this platform (use the native Windows executable, not a .cmd shim). */
 export function pnpmExecutable(platform: NodeJS.Platform = process.platform): string {
-  return platform === 'win32' ? 'pnpm.exe' : 'pnpm';
+  return executableName('pnpm', getPlatformFacts(platform));
 }
 
 /**

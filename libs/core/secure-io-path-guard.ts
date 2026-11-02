@@ -13,6 +13,7 @@ import {
   type WriteContent,
 } from './tier-guard.js';
 import { currentResourceAccessScope } from './foundation/resource-access-scope.js';
+import { isLinux, isMacOS } from './platform-facts.js';
 import { vaultTargetIdentity } from './secret/vault-mount.js';
 
 /**
@@ -568,7 +569,7 @@ function createInVettedDir(
     assertAuthorizedAt(path.join(dirAt, name), displayPath, operation);
     // /proc may be missing even on Linux (a sandbox): fall back to the by-path create.
     const viaFd = procFdResolves(dirFd);
-    const noFollowAny = process.platform === 'darwin';
+    const noFollowAny = isMacOS();
     if (!viaFd && !noFollowAny && path.resolve(parent) !== dirAt) {
       throw new Error(
         `[SECURITY] Refusing to ${operation} ${displayPath}: creating a file through a linked parent directory cannot be pinned on this platform`
@@ -907,7 +908,7 @@ function procFdResolves(fd: number): boolean {
 
 /** Whether /proc/self/fd may be used (Linux); tests force the portable fallback. */
 function procFdAvailable(): boolean {
-  return process.platform === 'linux' && procFdDisabled !== true;
+  return isLinux() && procFdDisabled !== true;
 }
 
 /**

@@ -13,6 +13,7 @@ import {
   type LifecycleHookEvent,
   type LifecycleHookRegistration,
 } from './lifecycle-hook-engine.js';
+import { commandStringInvocation } from './platform-facts.js';
 
 export type ExternalHookSource = 'claude-code' | 'codex';
 
@@ -167,9 +168,7 @@ function toArgv(command: string | string[]): string[] {
   if (Array.isArray(command)) return command;
   // Claude's command hook is a shell command by contract. Keep the shell
   // explicit so the engine still owns process creation and timeout policy.
-  return process.platform === 'win32'
-    ? ['cmd.exe', '/d', '/s', '/c', command]
-    : ['/bin/sh', '-c', command];
+  return commandStringInvocation(command);
 }
 
 export interface ExternalHookCommandSummary {

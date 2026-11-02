@@ -1,6 +1,7 @@
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '@agent/core/secure-io';
 import { parsePersistedPipelineStrategy, readJson } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { platformFacts } from '@agent/core/platform-facts';
 import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defaults';
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import { randomUUID } from 'node:crypto';
@@ -792,7 +793,7 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       throw new Error('Path is required for reveal_path');
     }
     revealFinderPath(targetPath);
-    const fileManager = process.platform === 'win32' ? 'File Explorer' : 'Finder';
+    const fileManager = platformFacts.commands.fileManagerApp;
     emitPatch('succeeded', interaction.type, targetPath, fileManager, { path: targetPath });
     return {
       status: 'succeeded',
@@ -814,7 +815,7 @@ async function handleComputerInteraction(input: ComputerInteractionAction) {
       throw new Error('Path is required for open_path');
     }
     openFinderPath(targetPath);
-    const fileManager = process.platform === 'win32' ? 'File Explorer' : 'Finder';
+    const fileManager = platformFacts.commands.fileManagerApp;
     emitPatch('succeeded', interaction.type, targetPath, fileManager, { path: targetPath });
     return {
       status: 'succeeded',

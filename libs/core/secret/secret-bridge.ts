@@ -5,6 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvBool, getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
+import { isMacOS, isWindows } from '../platform.js';
 import {
   safeChmodSync,
   safeExistsSync,
@@ -150,7 +151,7 @@ export class MacKeychainSecretProvider implements SecretProvider {
   readonly id = 'mac_keychain';
 
   async isAvailable(): Promise<boolean> {
-    return process.platform === 'darwin';
+    return isMacOS();
   }
 
   async get(service: string, account: string): Promise<string | null> {
@@ -314,7 +315,7 @@ export class WindowsCredentialManagerSecretProvider implements SecretProvider {
   readonly id = 'windows_credential_manager';
 
   async isAvailable(): Promise<boolean> {
-    return process.platform === 'win32';
+    return isWindows();
   }
 
   private run(
@@ -601,7 +602,7 @@ export async function fetchSecret(service: string, account: string): Promise<str
  * that a value lives outside the repository. Never logs the value.
  */
 export function fetchOsKeychainSecretSync(service: string, account: string): string | null {
-  if (process.platform !== 'darwin') return null;
+  if (!isMacOS()) return null;
   return memoizedKeychainRead(service, account, () => {
     const result = safeExecResult(
       'security',

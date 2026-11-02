@@ -12,6 +12,7 @@ import {
 } from './secure-io.js';
 import { getRegisteredEnvText } from './foundation/env.js';
 import { withLockSync } from './foundation/lock-utils.js';
+import { hostNodePlatform, isMacOS } from './platform-facts.js';
 import type { FocusedInputState } from './apple-event-bridge.js';
 import type { MouseOperation } from './virtual/os-automation-platform.js';
 
@@ -76,7 +77,7 @@ export function ensureMacOSSwiftBinary(sourceRelativePath: string, binaryPrefix:
   const sourceBytes = safeReadFile(source);
   const digest = createHash('sha256')
     .update(sourceBytes)
-    .update(process.platform)
+    .update(hostNodePlatform())
     .update(process.arch)
     .update('bridge-v1')
     .update(compilerVersion)
@@ -152,7 +153,7 @@ function run(
   return runMacOSNativeBinary(ensureBinary(), [command, JSON.stringify(payload)], 5000);
 }
 export function probeMacOSNativeAutomation(): MacOSNativeAutomationAvailability {
-  if (process.platform !== 'darwin')
+  if (!isMacOS())
     return {
       available: false,
       automation: 'unsupported',
@@ -251,7 +252,7 @@ export function performMacOSMouseOperation(operation: MouseOperation): void {
     default:
       throw new Error('invalid_mouse_operation');
   }
-  if (process.platform !== 'darwin') return;
+  if (!isMacOS()) return;
   const permission = probeMacOSNativeAutomation();
   if (permission.accessibility !== 'granted')
     throw new Error(
@@ -266,13 +267,7 @@ export function performMacOSMouseOperation(operation: MouseOperation): void {
   }
 }
 export function listMacOSAXWindows(appName: string): string[] {
-  if (
-    process.platform !== 'darwin' ||
-    !appName.trim() ||
-    appName.length > 256 ||
-    appName.includes('\0')
-  )
-    return [];
+  if (!isMacOS() || !appName.trim() || appName.length > 256 || appName.includes('\0')) return [];
   try {
     const value = run('windows', { application: appName }).windows;
     if (
@@ -287,7 +282,7 @@ export function listMacOSAXWindows(appName: string): string[] {
   }
 }
 export function getMacOSFocusedInput(): FocusedInputState {
-  if (process.platform !== 'darwin') return emptyInput();
+  if (!isMacOS()) return emptyInput();
   try {
     const value = run('focused');
     if (
@@ -309,7 +304,7 @@ export function getMacOSFocusedInput(): FocusedInputState {
   }
 }
 export function getMacOSScreenSize(): { width: number; height: number } {
-  if (process.platform !== 'darwin') return { width: 0, height: 0 };
+  if (!isMacOS()) return { width: 0, height: 0 };
   try {
     const value = run('screen');
     if (

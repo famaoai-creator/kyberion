@@ -7,6 +7,7 @@ import { spawn } from 'node:child_process';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 import { getRegisteredEnvText } from '@agent/core/foundation';
 import { pathResolver } from '@agent/core/path-resolver';
+import { homeEnvVars, platformFacts } from '@agent/core/platform-facts';
 
 type Print = (value: unknown) => void;
 
@@ -136,8 +137,7 @@ export function addProfile(name: string, print: Print = console.log): string {
         const stat = fs.statSync(src);
         if (stat.isDirectory()) {
           // On Windows, use 'junction' for directories to avoid requiring elevated privileges
-          const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
-          fs.symlinkSync(src, dest, symlinkType);
+          fs.symlinkSync(src, dest, platformFacts.filesystem.dirSymlinkType);
         } else {
           fs.symlinkSync(src, dest, 'file');
         }
@@ -158,8 +158,7 @@ export function addProfile(name: string, print: Print = console.log): string {
     const dest = path.join(profGeminiDir, dir);
     if (fs.existsSync(src) && !fs.existsSync(dest)) {
       try {
-        const symlinkType = process.platform === 'win32' ? 'junction' : 'dir';
-        fs.symlinkSync(src, dest, symlinkType);
+        fs.symlinkSync(src, dest, platformFacts.filesystem.dirSymlinkType);
       } catch {
         /* best-effort symlink/junction */
       }
@@ -372,7 +371,7 @@ export async function runAgyCommand(
   const childEnv: Record<string, string | undefined> = {
     ...process.env,
     HOME: envHome,
-    ...(process.platform === 'win32' ? { USERPROFILE: envHome } : {}),
+    ...Object.fromEntries(homeEnvVars().map((name) => [name, envHome])),
     ...(profileName !== 'default' ? { AGY_PROFILE: profileName } : {}),
   };
 

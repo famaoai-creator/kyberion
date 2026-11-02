@@ -4,6 +4,7 @@ import { readJson, writeJson } from '../foundation/json.js';
 import { withLockSync } from '../foundation/lock-utils.js';
 import { logger } from '../core.js';
 import { safeExistsSync, safeMkdir, safeMoveSync, safeRmSync, safeRealpath } from '../secure-io.js';
+import { normalizePathForPlatformCompare } from '../platform-facts.js';
 
 export const PLUGIN_PUBLICATION_DIRECTORY = '.kyberion-publications';
 interface PublicationJournal {
@@ -16,9 +17,7 @@ function publicationKey(target: string): string {
   const resolved = path.join(safeRealpath(path.dirname(target)), path.basename(target));
   // Conservatively serialize case aliases on platforms commonly using a
   // case-insensitive volume; distinct case-sensitive names may share a lock.
-  return process.platform === 'darwin' || process.platform === 'win32'
-    ? resolved.toLowerCase()
-    : resolved;
+  return normalizePathForPlatformCompare(resolved);
 }
 function publicationPaths(target: string) {
   const canonicalTarget = path.join(safeRealpath(path.dirname(target)), path.basename(target));
