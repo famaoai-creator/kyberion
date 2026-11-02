@@ -24,7 +24,10 @@ let sourceSha = 'a'.repeat(40);
 const run = (_command, args) => {
   let stdout;
   if (args[0] === 'repo') stdout = JSON.stringify({ nameWithOwner: 'fixture/repo', url: 'https://github.com/fixture/repo' });
+  else if (args[0] === 'rev-parse' && args[1] === '--is-shallow-repository') stdout = 'false';
   else if (args[0] === 'rev-parse') stdout = sourceSha;
+  else if (args[0] === 'ls-remote') stdout = sourceSha + '\tHEAD';
+  else if (args[0] === '--no-replace-objects' && args[1] === 'log') stdout = '';
   else if (args[0] === 'remote') stdout = 'https://github.com/fixture/repo.git';
   else if (args[0] === 'symbolic-ref') stdout = 'feature';
   else if (args[0] === 'api') stdout = JSON.stringify({ sha: 'a'.repeat(40) });

@@ -66,6 +66,9 @@ vi.mock('../../lib/headless-projections', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../../lib/headless-projections')>()),
   conciergeAvailableOperations: () => [],
 }));
+vi.mock('../../lib/personal-approval-server', () => ({
+  conciergeApprovalSnapshot: () => [],
+}));
 vi.mock('@agent/core/delegated-task-observability', () => ({
   listActiveDelegatedTaskRecords: () =>
     ['MSN-ACME', 'MSN-BETA', 'MSN-SYSTEM', undefined].map((missionId, index) => ({
