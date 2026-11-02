@@ -28,6 +28,43 @@ const profile = () =>
     nhi_id: string;
   };
 describe('CLI identity provisioning with actual NHI and signed authority stores', () => {
+  it('activates development identity and exact push/create/merge grants with one owner decision', async () => {
+    await onboarding.applyIdentity(
+      onboarding.parseApplyInput(input('Combined_Development_Agent')),
+      new Date().toISOString()
+    );
+    const installed = f.run(profile).nhi_id;
+    vi.stubEnv('KYBERION_AGENT_ID', installed);
+    const source = path.join(f.root, 'knowledge/personal/onboarding/development-combined.json');
+    const reviewed = path.join(
+      f.root,
+      'knowledge/personal/onboarding/development-combined-reviewed.json'
+    );
+    const plan = onboarding.buildDelegationInput(new Date(), {
+      remote: 'https://github.com/fixture/repo',
+    });
+    f.run(() => safeWriteFile(source, JSON.stringify(plan)));
+    const printed: unknown[] = [];
+    await cli.main(['preview', '--file', source, '--out', reviewed, '--json'], (value) =>
+      printed.push(value)
+    );
+    await cli.main(['request', '--file', reviewed, '--json'], (value) => printed.push(value));
+    const request = printed.pop() as { request_id: string };
+    expect(f.identities.getAgentIdentity(installed)?.lifecycle_status).toBe('provisioned');
+    f.approve(request.request_id);
+    await cli.main(['apply', '--request-id', request.request_id, '--json'], (value) =>
+      printed.push(value)
+    );
+    expect(f.identities.getAgentIdentity(installed)?.lifecycle_status).toBe('active');
+    const charter = f.run(() => f.charters.findActiveCharter({ kind: 'person' }, new Date()))!;
+    expect(charter.envelope.external_operations).toEqual(expect.arrayContaining(plan.grants));
+    expect(charter.envelope.external_operations).not.toContainEqual({
+      operation_id: 'vcs:push',
+      repository: 'https://github.com/fixture/repo',
+      branch: 'main',
+    });
+    expect(charter.envelope.data_tier).toEqual({ read: ['public'], write: ['public'] });
+  }, 60000);
   it('runs fresh onboarding through the generated activation plan without standing external rights', async () => {
     vi.stubEnv('KYBERION_REASONING_BACKEND', 'stub');
     await onboarding.applyOnboardingInput(

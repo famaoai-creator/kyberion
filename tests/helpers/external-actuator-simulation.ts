@@ -96,7 +96,9 @@ export function cleanupSimulationApprovals({
       for (const root of [roots.coordination, roots.observability])
         safeRmSync(rootResolve(`${root}/${channel}`), { recursive: true, force: true });
   });
-  for (const partition of listApprovalPartitions())
+  // This simulation fixture owns tenant effects only. Personal fixtures clean
+  // their own owner-bound partitions, without borrowing a tenant writer.
+  for (const partition of listApprovalPartitions().filter((part) => part.kind === 'tenant'))
     asTenantApprovalStore(partition.tenant_slug, () => {
       for (const channel of normalized)
         safeRmSync(rootResolve(`${tenantApprovalPartitionLogicalRoot(partition)}/${channel}`), {

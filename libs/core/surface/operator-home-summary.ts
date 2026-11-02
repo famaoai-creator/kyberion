@@ -182,6 +182,8 @@ export interface OperatorHomeScopeFilter {
    * selects only company-less (system-scope) records.
    */
   includeUntenanted?: boolean;
+  /** Personal workspace only: admit already owner-authenticated personal approval rows. */
+  includePersonalApprovals?: boolean;
 }
 
 function scopeAllows(allowed: string[] | 'all' | undefined, value: string | undefined): boolean {
@@ -610,6 +612,8 @@ export function collectOperatorHomeSummary(
     since?: string;
     limit?: number;
     scope?: OperatorHomeScopeFilter;
+    /** Trusted surface composition may add authenticated personal-owner records. */
+    approvalSnapshot?: OperatorHomeApprovalItem[];
   } = {}
 ): OperatorHomeSummary {
   const missionItems = collectMissionStates(input.scope);
@@ -657,7 +661,11 @@ export function collectOperatorHomeSummary(
         return false;
       }
       return (
-        tenantScopeAllows(input.scope, tenantSlug, legacyTenant) &&
+        (tenantScopeAllows(input.scope, tenantSlug, legacyTenant) ||
+          (input.scope.includePersonalApprovals === true &&
+            tier === 'personal' &&
+            !tenantSlug &&
+            !legacyTenant)) &&
         scopeAllows(input.scope.organizationIds, organizationId) &&
         scopeAllows(input.scope.projectIds, projectId)
       );
@@ -686,7 +694,8 @@ export function collectOperatorHomeSummary(
   // reports) vs the 'actionable' top-N actually displayed vs 'other kinds'
   // the summary cannot attribute. Two different buckets never share a label,
   // and the same bucket never shows two different counts on one screen.
-  const pendingApprovalSnapshot = listApprovalRequests({ status: 'pending' });
+  const pendingApprovalSnapshot =
+    input.approvalSnapshot ?? listApprovalRequests({ status: 'pending' });
   const visiblePendingApprovals = pendingApprovalSnapshot.filter(approvalMatchesScope);
   const pendingApprovals = visiblePendingApprovals.slice(0, input.limit || 8);
   // 'Other kinds': only nameable without leaking hidden work — an unscoped
