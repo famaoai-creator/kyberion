@@ -21,6 +21,7 @@ import { inspectMissionPrerequisiteIdentity } from './lib/installed-identity.js'
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { getRegisteredEnvText, setRegisteredEnv } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
+import { missionActionCredentialRequirement } from '@agent/core/foundation/command-credential-policy';
 import { logger } from '@agent/core/core';
 import { pathResolver, missionEvidenceDir } from '@agent/core/path-resolver';
 import { safeExec, safeExistsSync, safeReaddir } from '@agent/core/secure-io';
@@ -1384,65 +1385,24 @@ async function approveScopeChange(
 }
 
 /**
- * Deterministic lifecycle, journal, and view actions that never invoke a model.
- * Skipping the reasoning bootstrap (~3s of CLI availability probes per
- * spawn) keeps high-frequency per-task `record-task`/`record-evidence`
- * spawns cheap. Unknown actions fail safe toward installing: delegation
- * must never silently fall back to the stub.
+ * Per-action bootstrap behavior is declared in the credential-requirement
+ * registry (`@agent/core/foundation/command-credential-policy`): 'none' verbs
+ * skip the bootstrap (~3s of provider probes per spawn), 'degrading' verbs run
+ * on the stub chain when no binding exists, and unclassified actions fail safe
+ * toward 'required' — delegation must never silently fall back to the stub.
+ * Dispatch prepares factories/resolver only ('host'); credentials are bound
+ * after claim and task-local providers must be constructed inside that binding,
+ * never here.
  */
-const REASONING_FREE_ACTIONS: ReadonlySet<string> = new Set([
-  'help',
-  // These persist/activate agreed intent; execution and delegation occur later.
-  'create',
-  'start',
-  'kickoff',
-  'record-task',
-  'record-evidence',
-  // Registers an already performed review; it does not run model inference.
-  'review-task',
-  // Journal/state-only verbs: they never delegate to a reasoning backend, so
-  // skipping the ~3s backend bootstrap keeps the triage loop cheap.
-  'triage',
-  'scope-approve',
-  // R03c — owner lifecycle verbs: deterministic state transitions + governed
-  // audit/gate writes only. verify writes the verification record; finish runs
-  // deterministic gates (intent-drift evaluation, memory ratification via git)
-  // and the retrospective, which degrades to the stub backend by design;
-  // distill's LLM path shells out to egress-attested provider profiles
-  // (runAdaptiveStructuredLlmProfile → mission-llm.ts, gated by
-  // provider-egress-policy.json), never the in-process backend chain. None of
-  // them consume tenant task credentials, so installing reasoning backends —
-  // which fails closed under a persisted tenant scope without a claim — is
-  // neither needed nor wanted. Tenant credential work still requires the
-  // claimed WorkItem dispatch; nothing here relaxes that.
-  'verify',
-  'distill',
-  'finish',
-  // Thin alias of verify for operator review flows — same code path.
-  'review-worker-output',
-  // Read-only views: they read mission/organization/outbox/memory state from disk and
-  // never delegate. (`status` only reports the backend; it does not need it installed.)
-  'list',
-  'status',
-  'outbox',
-  'suggestions',
-  'hygiene',
-  'organization-catalogs',
-  'organization-profiles',
-  'organization-profile',
-  'organization-discovery',
-  'memory-queue',
-  'memory-review',
-]);
-
-/** Whether this action may skip the reasoning-backend bootstrap. Exported for tests. */
 export function missionReasoningInitialization(
   action: string | undefined
-): 'none' | 'host' | 'execution' {
-  if (action && REASONING_FREE_ACTIONS.has(action)) return 'none';
+): 'none' | 'host' | 'degrading' | 'execution' {
   // Dispatch prepares factories/resolver only. Credentials are bound after claim;
   // task-local providers must be constructed inside that binding, never here.
   if (action === 'dispatch-workitems' || action === 'dispatch-tickets') return 'host';
+  const requirement = missionActionCredentialRequirement(action);
+  if (requirement === 'none') return 'none';
+  if (requirement === 'degrading') return 'degrading';
   return 'execution';
 }
 
@@ -1493,6 +1453,13 @@ async function mainImpl(
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'mission_controller');
   }
+  if (earlyPositionalArgs[0] === 'gate-pass') {
+    const { installMissionDevelopmentProofVerifier } =
+      await import('@agent/core/mission/mission-development-gates');
+    const { verifyMissionDevelopmentPublication } =
+      await import('@agent/core/mission/mission-development-proof');
+    installMissionDevelopmentProofVerifier(verifyMissionDevelopmentPublication);
+  }
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.
   // Journal-only actions never delegate; skip their probe cost.
@@ -1500,7 +1467,10 @@ async function mainImpl(
   if (initialization !== 'none') {
     const bootstrap = await import('@agent/core/reasoning/reasoning-bootstrap');
     if (initialization === 'host') bootstrap.prepareReasoningExecutionHost();
-    else bootstrap.installReasoningBackends();
+    else
+      bootstrap.installReasoningBackends({
+        credentialRequirement: initialization === 'degrading' ? 'degrading' : 'required',
+      });
     // Import side effects: the canonical A2A route (without it every
     // agent_runtime dispatch fails with "has no A2A/runtime route") and pane
     // prompt escalation into approval requests. Journal-only verbs never

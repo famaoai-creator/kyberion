@@ -88,6 +88,23 @@ describe('reasoning-bootstrap', () => {
     expect(installReasoningBackends({ mode: 'stub' })).toBe(false);
   });
 
+  it('lets degrading verbs run on the stub chain under an unbound tenant scope', () => {
+    runInExecutionScope({ tenantBound: true, tenantSlug: 'alpha' }, () => {
+      expect(
+        installReasoningBackends({ refreshProviders: true, credentialRequirement: 'degrading' })
+      ).toBe(false);
+      // Nothing is installed; getReasoningBackend() serves the stub seam-less.
+      expect(getInstalledReasoningMode()).toBeNull();
+      // 'required' (and the default) still fails closed.
+      expect(() =>
+        installReasoningBackends({ refreshProviders: true, credentialRequirement: 'required' })
+      ).toThrow('[CREDENTIAL_BINDING_REQUIRED]');
+      expect(() => installReasoningBackends({ refreshProviders: true })).toThrow(
+        '[CREDENTIAL_BINDING_REQUIRED]'
+      );
+    });
+  });
+
   it('requires a validated refresh instead of reusing another execution identity', () => {
     vi.stubEnv('MISSION_ID', '');
     vi.stubEnv('KYBERION_TASK_ID', '');

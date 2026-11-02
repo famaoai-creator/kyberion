@@ -82,6 +82,18 @@
     {
       "id": "libs/core/intent/intent-resolution-eval.ts",
       "reason": "Intent-resolution evaluation harness (evaluateIntentResolutionCorpus / formatIntentResolutionEvalReport): scores utterance → selected intent against knowledge/product/governance/intent-resolution-eval-corpus.json, including negative cases for ordinary requests. Its consumers are intent-resolution-eval.test.ts (the CI quality floor) and by-hand keyword-review runs documented in mission-class-operating-guide.md §4.3; no production module calls it."
+    },
+    {
+      "id": "libs/core/agent/agent-declaration-factory.ts",
+      "reason": "Bounded PoC imported from Microsoft Agent Framework AgentFactory/WorkflowFactory (mission MSN-HARNESS-IMPORT-20261102): declaration -> collect-all validation -> normalized agent/workflow spec. Construct-only by design; production wiring (dispatch/registry consumers) is an explicit follow-up recorded in the mission retrospective."
+    },
+    {
+      "id": "libs/core/mission/mission-lease.ts",
+      "reason": "Mastra-style lease manager (mission MSN-MEDIUM-IMPORTS-20261102), wired into claimWorkItemInternal (MSN-WIRING-20261102) through a structural leaseAdvisory interface that deliberately avoids a runtime import of this module — keeping the workforce -> mission direction dependency-free. Consumers inject a MissionLeaseManager instance; unit tests exercise the manager directly."
+    },
+    {
+      "id": "libs/core/foundation/authorization-policy-document.ts",
+      "reason": "Published serialization contract @agent/core/foundation/authorization-policy-document (P4 of docs/UNIFIED_AUTHORIZATION_POLICY_DESIGN.ja.md): the Cedar-compatible policy document, normalized request and 3-value decision are the fixed engine-facing API. Read-only by design (no runtime caller is intended); consumed by tests/authorization-policy-document.test.ts meaning-preservation gate and by future external policy engines."
     }
   ],
   "scripts": [
@@ -211,6 +223,10 @@
     {
       "id": "pipelines/apple-shortcut-approved-run.json",
       "reason": "Human-approved named Shortcuts example in pipelines/README.md; intentionally unscheduled and requires tenant-bound exact input approval before launch."
+    },
+    {
+      "id": "pipelines/vcs-development-preflight.json",
+      "reason": "Manual read-only preflight entry point documented in pipelines/README.md for a prepared mission WorkItem PR. Operator supplies exact PR, WorkItem and independent review task IDs; scheduling absent evidence would fabricate autonomous author execution. Reachability is enforced by orphan_op_reachability.test.ts."
     }
   ],
   "actuator_ops": [

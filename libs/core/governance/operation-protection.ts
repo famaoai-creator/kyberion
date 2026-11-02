@@ -8,6 +8,7 @@ import { parseSafeJsonInput } from '../foundation/safe-json.js';
 import { pathResolver } from '../path-resolver.js';
 import { verifyMemoryOrigin } from '../knowledge/memory-provenance.js';
 import type { MemoryScopeEnvelope } from '../knowledge/memory-scope.js';
+import { operationAuthorization } from '../foundation/authorization-registry.js';
 
 export interface OperationInterfaceBinding {
   tool: string;
@@ -163,8 +164,10 @@ export function withOperationArgumentOrigins<T>(
 }
 
 /** Reviewed EFFECT paths, not guesses from argument names or model metadata.
- * An unmapped operation protects its whole effect until a narrower schema is reviewed. */
-const PROTECTED_ARGUMENTS: Readonly<Record<string, readonly string[][]>> = {
+ * An unmapped operation protects its whole effect until a narrower schema is reviewed.
+ * Exported read-only for the parity boundary test — the registry's
+ * `protectedPaths` is the unified declaration surface. */
+export const PROTECTED_ARGUMENTS: Readonly<Record<string, readonly string[][]>> = {
   'browser:goto': [['params', 'url']],
   'browser:open_tab': [['params', 'url']],
   'vcs:pr_create': [['repository']],
@@ -207,7 +210,10 @@ export function evaluateOperationArguments(
     if (entry.source && !verifyMemoryOrigin(entry.source))
       throw new Error('[OP_ARGUMENT_SOURCE_REVOKED] Argument source is absent, changed or revoked');
   }
+  // The registry is the unified declaration surface; the local table remains
+  // as a fallback while migrated entries converge (parity is gate-tested).
   const reviewed =
+    operationAuthorization(operationId).protectedPaths ??
     PROTECTED_ARGUMENTS[operationId] ??
     (operationId.startsWith('service:') ? [['params']] : undefined);
   // A known schema whose required target is absent is not an unprotected call.

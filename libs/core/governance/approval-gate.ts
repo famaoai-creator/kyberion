@@ -717,7 +717,13 @@ export function enforceApprovalGate(
     };
   }
 
+  // Internal-admission shape: the gate's request carries its authorization
+  // subject (`intent:` axis when an intent id drives the decision, the
+  // operation id otherwise), so routing/measurement resolve through the
+  // unified registry. Storage domain still comes from the caller's channel —
+  // declared `approvalDomain` values engage once subjects declare one.
   const record = createApprovalRequest(role, {
+    subject: intentId ? `intent:${intentId}` : operationId,
     channel,
     threadTs: nowIso(),
     correlationId,

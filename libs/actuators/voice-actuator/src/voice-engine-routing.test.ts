@@ -141,7 +141,12 @@ describe('voice-tts-engine routing', () => {
         strategy: 'purpose',
         purpose: 'privacy',
       });
-      expect(routing.candidateEngineIds).toEqual(['kokoro', 'local_say', 'espeak_ng']);
+      expect(routing.candidateEngineIds).toEqual([
+        'kokoro',
+        'speech_cpp',
+        'local_say',
+        'espeak_ng',
+      ]);
       expect(routing.warnings[0]).toMatch(/'pocket_tts' cannot run this request \(language ja\)/);
     });
 
@@ -240,7 +245,7 @@ describe('voice-tts-engine routing', () => {
         expect.any(String),
         expect.objectContaining({
           engineId: 'kokoro',
-          candidateEngineIds: ['kokoro', 'local_say', 'espeak_ng'],
+          candidateEngineIds: ['kokoro', 'speech_cpp', 'local_say', 'espeak_ng'],
         })
       );
       expect(mocks.pinWrites).not.toHaveBeenCalled();
@@ -307,12 +312,12 @@ describe('voice-tts-engine routing', () => {
       setPlatform('linux');
       const result = await speak({ text: 'こんにちは', purpose: 'naturalness' });
       expect(result.status).toBe('succeeded');
-      expect(result.resolved_engine_id).toBe('kokoro');
+      expect(result.resolved_engine_id).toBe('speech_cpp');
       expect(result.language).toBe('ja');
       expect(result.engine_selection).toMatchObject({ strategy: 'purpose' });
       expect(mocks.performPlayback).toHaveBeenCalledWith(
         'こんにちは',
-        expect.objectContaining({ engineId: 'kokoro', language: 'ja' })
+        expect.objectContaining({ engineId: 'speech_cpp', language: 'ja' })
       );
     });
   });

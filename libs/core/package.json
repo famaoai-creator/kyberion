@@ -1632,6 +1632,22 @@
       "types": "./dist/format.d.ts",
       "default": "./dist/format.js"
     },
+    "./foundation/approval-domains": {
+      "types": "./dist/foundation/approval-domains.d.ts",
+      "default": "./dist/foundation/approval-domains.js"
+    },
+    "./foundation/authorization-registry": {
+      "types": "./dist/foundation/authorization-registry.d.ts",
+      "default": "./dist/foundation/authorization-registry.js"
+    },
+    "./foundation/authorization-policy-document": {
+      "types": "./dist/foundation/authorization-policy-document.d.ts",
+      "default": "./dist/foundation/authorization-policy-document.js"
+    },
+    "./foundation/command-credential-policy": {
+      "types": "./dist/foundation/command-credential-policy.d.ts",
+      "default": "./dist/foundation/command-credential-policy.js"
+    },
     "./foundation/credential-binding": {
       "types": "./dist/foundation/credential-binding.d.ts",
       "default": "./dist/foundation/credential-binding.js"
@@ -1948,9 +1964,17 @@
       "types": "./dist/governance/mandate-shadow.d.ts",
       "default": "./dist/governance/mandate-shadow.js"
     },
+    "./governance/authorization-overlay": {
+      "types": "./dist/governance/authorization-overlay.d.ts",
+      "default": "./dist/governance/authorization-overlay.js"
+    },
     "./governance/operations-halt": {
       "types": "./dist/governance/operations-halt.d.ts",
       "default": "./dist/governance/operations-halt.js"
+    },
+    "./governance/operation-protection": {
+      "types": "./dist/governance/operation-protection.d.ts",
+      "default": "./dist/governance/operation-protection.js"
     },
     "./governance/org-budget-governor": {
       "types": "./dist/governance/org-budget-governor.d.ts",
@@ -4667,6 +4691,10 @@
     "./platform-command-adapters": {
       "types": "./dist/platform-command-adapters.d.ts",
       "default": "./dist/platform-command-adapters.js"
+    },
+    "./platform-facts": {
+      "types": "./dist/platform-facts.d.ts",
+      "default": "./dist/platform-facts.js"
     },
     "./plugin": {
       "types": "./dist/plugin/index.d.ts",
@@ -7596,6 +7624,10 @@
       "types": "./dist/voice/speech-languages.d.ts",
       "default": "./dist/voice/speech-languages.js"
     },
+    "./voice/speech-cpp-client": {
+      "types": "./dist/voice/speech-cpp-client.d.ts",
+      "default": "./dist/voice/speech-cpp-client.js"
+    },
     "./voice/speech-to-text-bridge": {
       "types": "./dist/voice/speech-to-text-bridge.d.ts",
       "default": "./dist/voice/speech-to-text-bridge.js"
@@ -8051,6 +8083,34 @@
     "./organization/continuous-work-owner": {
       "types": "./dist/organization/continuous-work-owner.d.ts",
       "default": "./dist/organization/continuous-work-owner.js"
+    },
+    "./organization/continuous-development-consent": {
+      "types": "./dist/organization/continuous-development-consent.d.ts",
+      "default": "./dist/organization/continuous-development-consent.js"
+    },
+    "./organization/continuous-mission-scope": {
+      "types": "./dist/organization/continuous-mission-scope.d.ts",
+      "default": "./dist/organization/continuous-mission-scope.js"
+    },
+    "./mission/mission-development-continuation": {
+      "types": "./dist/mission/mission-development-continuation.d.ts",
+      "default": "./dist/mission/mission-development-continuation.js"
+    },
+    "./mission/mission-development-proof": {
+      "types": "./dist/mission/mission-development-proof.d.ts",
+      "default": "./dist/mission/mission-development-proof.js"
+    },
+    "./mission/mission-development-gates": {
+      "types": "./dist/mission/mission-development-gates.d.ts",
+      "default": "./dist/mission/mission-development-gates.js"
+    },
+    "./vcs/cwd-scope": {
+      "types": "./dist/vcs/cwd-scope.d.ts",
+      "default": "./dist/vcs/cwd-scope.js"
+    },
+    "./governance/authenticated-personal-approvals": {
+      "types": "./dist/governance/authenticated-personal-approvals.d.ts",
+      "default": "./dist/governance/authenticated-personal-approvals.js"
     },
     "./discussion/discussion-create-request": {
       "types": "./dist/discussion/discussion-create-request.d.ts",

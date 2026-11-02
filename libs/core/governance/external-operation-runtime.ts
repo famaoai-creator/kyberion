@@ -87,8 +87,8 @@ export function createOnboardingExternalOperationAuthority(options: {
       standingScope: scope,
       ...(scope.kind === 'organization' ? { tenantSlug: scope.tenant_slug } : {}),
     };
-    // A destination grant never declassifies source content. Only a trusted
-    // public execution scope may use these first, narrowly supported grants.
+    // A destination grant never declassifies source content. Resolve source
+    // provenance independently from the exact destination grant.
     const envelope = currentScopeEnvelope();
     const source = envelope?.identity ?? resolveScopeContext();
     if (source.nhi_id && source.nhi_id !== options.agentId)
@@ -98,20 +98,63 @@ export function createOnboardingExternalOperationAuthority(options: {
     const effect = facts.effect as Record<string, unknown>;
     const raw = buildExternalOperationTarget(facts.operationId, effect);
     const target = parseExternalOperationGrant(raw);
-    // Confidential-tier runs may consume a grant only when the grant itself
-    // is scoped 'private' and the live-verified target repository is private —
-    // contracted development into the org's own private GitHub stays within
-    // the tenant trust boundary; anything else needs the human.
-    const privateRepoScoped =
-      (target as { visibility?: string } | undefined)?.visibility === 'private';
-    if (
-      (source.tier !== 'public' && !(source.tier === 'confidential' && privateRepoScoped)) ||
-      envelope?.policy.external_egress === 'deny' ||
-      (envelope && !envelope.policy.read_tiers.includes('public'))
-    )
-      return authority;
     const charter = findActiveCharter(scope, new Date());
     if (!charter || !facts.delegable) return authority;
+    const ranks = { public: 1, confidential: 2, personal: 3 } as const;
+    if (!(source.tier in ranks)) return authority;
+    let effectiveTier = source.tier as keyof typeof ranks;
+    let bodyTenant: string | undefined;
+    if (facts.operationId === 'vcs:pr_create' || facts.operationId === 'vcs:push') {
+      const push = facts.operationId === 'vcs:push';
+      const bodyTier = push ? effect.publication_source_tier : effect.body_source_tier;
+      const sourceTenant = push ? effect.publication_source_tenant : effect.body_source_tenant;
+      if (push && !['public', 'confidential', 'personal'].includes(String(bodyTier)))
+        return authority;
+      if (bodyTier === 'confidential') {
+        if (typeof sourceTenant !== 'string') return authority;
+        bodyTenant = sourceTenant;
+      }
+      if (bodyTier !== 'confidential' && sourceTenant !== undefined) return authority;
+      if (bodyTier !== 'inline') {
+        if (typeof bodyTier !== 'string' || !(bodyTier in ranks)) return authority;
+        if (ranks[bodyTier as keyof typeof ranks] > ranks[effectiveTier])
+          effectiveTier = bodyTier as keyof typeof ranks;
+      }
+    }
+    if (
+      envelope?.policy.external_egress === 'deny' ||
+      (envelope && !envelope.policy.read_tiers.includes(effectiveTier)) ||
+      ranks[effectiveTier] > ranks[source.tier as keyof typeof ranks]
+    )
+      return authority;
+    const isVcs = ['vcs:pr_create', 'vcs:pr_merge', 'vcs:push'].includes(facts.operationId);
+    if (effectiveTier !== 'public') {
+      if (
+        !isVcs ||
+        !target ||
+        !('visibility' in target) ||
+        target.visibility !== 'private' ||
+        effect.repository_visibility !== 'private'
+      )
+        return authority;
+      if (effectiveTier === 'personal') {
+        if (scope.kind !== 'person' || source.tenant_slug || bodyTenant) return authority;
+      } else {
+        if (
+          scope.kind !== 'organization' ||
+          source.tenant_slug !== scope.tenant_slug ||
+          (bodyTenant && bodyTenant !== scope.tenant_slug)
+        )
+          return authority;
+      }
+    }
+    // Public bodies in a tenant runtime do not erase that runtime's tenant.
+    if (scope.kind === 'organization' && source.tenant_slug !== scope.tenant_slug) return authority;
+    if (bodyTenant && (scope.kind !== 'organization' || bodyTenant !== scope.tenant_slug))
+      return authority;
+    const token =
+      effectiveTier === 'confidential' ? `confidential:${source.tenant_slug}` : effectiveTier;
+    if (!charter.envelope.data_tier.read.includes(token)) return authority;
     if (
       !target ||
       !(charter.envelope.external_operations ?? []).some((grant) =>
@@ -127,6 +170,11 @@ export function createOnboardingExternalOperationAuthority(options: {
           actor: agentActor(options.agentId, options.ownerActor),
           action_class: 'target_scoped_external_operation',
           external_operation: target,
+          data: {
+            tier: effectiveTier,
+            ...(effectiveTier === 'confidential' ? { tenant_slug: source.tenant_slug } : {}),
+            mode: 'read',
+          },
           reversible: false,
           irreversible_action_name: target.operation_id,
           estimated_loss: 0,

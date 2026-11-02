@@ -10,6 +10,7 @@
  */
 
 import { safeExecResult } from '../secure-io.js';
+import { platformFacts } from '../platform-facts.js';
 
 export interface ProcessIdentityProbe {
   /** Whether `pid` exists (EPERM counts as alive). */
@@ -30,7 +31,8 @@ export function isPidAlive(pid: number): boolean {
 
 /** Whether a process group led by `pgid` still has members. */
 export function isProcessGroupAlive(pgid: number): boolean {
-  if (!Number.isInteger(pgid) || pgid <= 1 || process.platform === 'win32') return false;
+  if (!Number.isInteger(pgid) || pgid <= 1 || !platformFacts.processModel.hasProcessGroups)
+    return false;
   try {
     process.kill(-pgid, 0);
     return true;
@@ -40,7 +42,8 @@ export function isProcessGroupAlive(pgid: number): boolean {
 }
 
 export function processStartMarker(pid: number): string | undefined {
-  if (!Number.isInteger(pid) || pid <= 0 || process.platform === 'win32') return undefined;
+  if (!Number.isInteger(pid) || pid <= 0 || !platformFacts.processModel.hasPosixSignals)
+    return undefined;
   try {
     const result = safeExecResult('ps', ['-p', String(pid), '-o', 'lstart='], {
       timeoutMs: 1000,

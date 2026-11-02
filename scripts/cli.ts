@@ -29,6 +29,10 @@ import { getRegisteredEnvText } from '@agent/core/foundation/env';
 import { nowIso } from '@agent/core/foundation/time';
 import { parseSafeJsonInput } from '@agent/core/foundation/safe-json';
 import { readTextFile } from '@agent/core/foundation/text';
+import {
+  cliCommandCredentialRequirement,
+  type CredentialRequirement,
+} from '@agent/core/foundation/command-credential-policy';
 import { DiagnosticError } from '@agent/core/logger';
 import { defineScript, isDirectScript } from './lib/harness.js';
 import { createCliCommandHandlers, type CliCommandHandler } from './cli-command-handlers.js';
@@ -1264,31 +1268,22 @@ const READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP = new Set([
  *
  * R03a: readiness observations never need the reasoning bootstrap — it would
  * die on CREDENTIAL_BINDING_REQUIRED under a persisted tenant scope before
- * the probe even runs. `list` (including `--check`, whose capability probes
- * only observe host binaries/devices, never installed reasoning backends)
- * and the pure status subcommands of `calendar`/`email` skip it. Their real
- * connection verbs (list-calendars, agenda, deliver, draft…) keep the
- * bootstrap — and with it the deny-without-claim requirement — unchanged.
+ * the probe even runs. The per-verb credential requirement is declared in
+ * `@agent/core/foundation/command-credential-policy`: 'none' verbs skip the
+ * bootstrap, 'degrading' verbs run on the stub chain when unbound, and real
+ * connection verbs keep 'required' — deny-without-claim unchanged.
  */
-const PURE_READINESS_SUBCOMMANDS: Record<string, ReadonlySet<string>> = {
-  calendar: new Set(['status']),
-  email: new Set(['status', 'latest-draft']),
-};
-
-export function shouldBootstrapRuntime(args: string[]): boolean {
+export function cliCredentialRequirement(args: string[]): CredentialRequirement {
   const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const command = normalizedArgs[0] || 'help';
   // Command-level help is discovery, including model-backed command nouns.
-  if (normalizedArgs.slice(0, 2).some((arg) => arg === '--help' || arg === '-h')) return false;
-  if (command === 'list') return false;
-  const readiness = PURE_READINESS_SUBCOMMANDS[command];
-  if (readiness) {
-    const subcommand = normalizedArgs[1];
-    if (subcommand === undefined || subcommand === 'help' || readiness.has(subcommand))
-      return false;
-  }
-  if (command === 'task' && normalizedArgs[1] === 'scenario') return false;
-  return !READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command);
+  if (normalizedArgs.slice(0, 2).some((arg) => arg === '--help' || arg === '-h')) return 'none';
+  if (READ_ONLY_COMMANDS_WITHOUT_RUNTIME_BOOTSTRAP.has(command)) return 'none';
+  return cliCommandCredentialRequirement({ command, subcommand: normalizedArgs[1] });
+}
+
+export function shouldBootstrapRuntime(args: string[]): boolean {
+  return cliCredentialRequirement(args) !== 'none';
 }
 
 const CLI_COMMAND_HANDLERS: Record<string, CliCommandHandler> = createCliCommandHandlers({
@@ -1325,11 +1320,12 @@ async function mainImpl(args: string[] = [], print: Print = () => undefined) {
   const normalizedArgs = stripNpmSeparatorArg(stripLocaleArg(args));
   const [command = 'help', firstArg, ...restArgs] = normalizedArgs;
 
-  if (shouldBootstrapRuntime(normalizedArgs)) {
+  const credentialRequirement = cliCredentialRequirement(normalizedArgs);
+  if (credentialRequirement !== 'none') {
     // installReasoningBackends already installs the voice bridge; load both
     // modules only for commands that reach a backend.
     const { installReasoningBackends } = await import('@agent/core/reasoning/reasoning-bootstrap');
-    installReasoningBackends();
+    installReasoningBackends({ credentialRequirement });
   }
 
   // Legacy model/effect handlers do not all parse help themselves. Terminate

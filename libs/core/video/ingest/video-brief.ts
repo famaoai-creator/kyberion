@@ -19,6 +19,7 @@ import {
 } from '../../secure-io.js';
 import { selectSpeechToTextBridges } from '../../voice/speech-to-text-bridge.js';
 import { withLock } from '../../foundation/lock-utils.js';
+import { getPlatformFacts, normalizePathForPlatformCompare } from '../../platform-facts.js';
 import { resolveTenant } from '../../organization/tenant-registry.js';
 import {
   resolveFfmpegBin,
@@ -517,7 +518,7 @@ export function videoEntryLockResource(
   platform: NodeJS.Platform = process.platform
 ): string {
   const canonical = canonicalPath(entryDir);
-  const key = platform === 'darwin' || platform === 'win32' ? canonical.toLowerCase() : canonical;
+  const key = normalizePathForPlatformCompare(canonical, getPlatformFacts(platform));
   return `video-ingest-${sha256Hex(key).slice(0, 32)}`;
 }
 
