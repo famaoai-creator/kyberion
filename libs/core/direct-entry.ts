@@ -1,5 +1,6 @@
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isWindows } from './platform-facts.js';
 
 /** Return whether a module was invoked directly as the expected source or build entrypoint. */
 export function isDirectEntry(
@@ -11,7 +12,7 @@ export function isDirectEntry(
 
   const normalizePath = (value: string): string => {
     const normalized = path.resolve(value).replaceAll('\\', '/');
-    return process.platform === 'win32' ? normalized.toLowerCase() : normalized;
+    return isWindows() ? normalized.toLowerCase() : normalized;
   };
   const actual = normalizePath(entryPath);
   const modulePath = normalizePath(fileURLToPath(importMetaUrl));

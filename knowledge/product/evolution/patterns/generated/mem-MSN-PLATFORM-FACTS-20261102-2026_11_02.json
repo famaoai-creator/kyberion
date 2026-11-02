@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-PLATFORM-FACTS-20261102-2026_11_02",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Centralize platform facts in a leaf layer and gate raw platform reads",
+  "summary": "OS-specific facts (command locators, venv layout, IPC kind, env vars, shells) were re-invented inline at ~900 sites because the OS abstraction covered only actions, not facts. A frozen platform-facts descriptor layer plus a boundary test now centralizes nouns while the driver layer keeps verbs.",
+  "candidate_id": "mem-MSN-PLATFORM-FACTS-20261102-2026_11_02",
+  "evidence_refs": [
+    "active/missions/public/MSN-PLATFORM-FACTS-20261102/evidence/implementation-report.md",
+    "active/missions/public/MSN-PLATFORM-FACTS-20261102/evidence/design-spec.json",
+    "active/missions/public/MSN-PLATFORM-FACTS-20261102/evidence/retrospective.md"
+  ],
+  "created_at": "2026-11-02T16:27:37.590Z",
+  "applicability": ["mission", "mission:MSN-PLATFORM-FACTS-20261102"],
+  "reusable_steps": [
+    "OS-specific facts (command locators, venv layout, IPC kind, env vars, shells) were re-invented inline at ~900 sites because the OS abstraction covered only actions, not facts",
+    "A frozen platform-facts descriptor layer plus a boundary test now centralizes nouns while the driver layer keeps verbs"
+  ],
+  "expected_outcome": "Rule: platform facts (command locators, executable suffixes, venv layout, home env vars, shells, IPC transport, filesystem/symlink/process/media semantics) live in a frozen descriptor module (libs/core/platform-facts.ts) reached via injectable getPlatformFacts(p); OS actions stay in the OSDriver layer. New code must not read process.platform/os.platform() directly — a boundary test holds an explicit shrinking allowlist. Platform predicates must resolve the platform at call time so tests can stub process.platform via defineProperty. Prefer declarative seam/provider matching against facts over inline platform branches; keep name-based platforms matching for genuinely OS-bound implementations.",
+  "source_branch": "feat/platform-facts-20261102",
+  "source_commit": "f21dc1322dd3b5c98f633db081ccb0c010adc842"
+}

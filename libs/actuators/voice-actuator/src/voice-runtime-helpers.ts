@@ -14,6 +14,7 @@ import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
 import { resolveFfmpegBin, resolveFfprobeBin } from '@agent/core/tool/tool-binary-resolvers';
+import { hostNodePlatform, locateCommandInvocation } from '@agent/core/platform-facts';
 import {
   assertSafeRepositoryPath,
   safeExec,
@@ -150,8 +151,8 @@ function resolvePythonBin(preferredTool: VoicePythonTool = 'mlx_audio'): string 
 }
 
 function hasEspeakNg(): boolean {
-  const resolver = process.platform === 'win32' ? 'where' : 'which';
-  const result = safeExecResult(resolver, ['espeak-ng'], { timeoutMs: 3000 });
+  const [resolver, ...resolverArgs] = locateCommandInvocation('espeak-ng');
+  const result = safeExecResult(resolver, resolverArgs, { timeoutMs: 3000 });
   return result.status === 0 && Boolean(result.stdout.trim());
 }
 
@@ -897,7 +898,7 @@ export function voiceRenderingNeedsAdmission(
   return candidates.some((candidate) =>
     candidate.bridge_script
       ? !LOCAL_TTS_BRIDGES.has(pathResolver.rootResolve(candidate.bridge_script))
-      : !builtinPlaybackAdapters.has(resolveVoicePlaybackPlatformAdapter(process.platform))
+      : !builtinPlaybackAdapters.has(resolveVoicePlaybackPlatformAdapter(hostNodePlatform()))
   );
 }
 
@@ -908,10 +909,10 @@ async function openPlaybackArtifact(artifactPath: string): Promise<void> {
   if (!safeExistsSync(safeArtifactPath) || !safeLstat(safeArtifactPath).isFile()) {
     throw new Error(`Voice playback artifact must be an existing regular file: ${artifactPath}`);
   }
-  const adapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  const adapter = resolveVoicePlaybackPlatformAdapter(hostNodePlatform());
   if (!adapter.openArtifact) {
     throw new Error(
-      `Voice playback platform ${process.platform} does not support artifact playback`
+      `Voice playback platform ${hostNodePlatform()} does not support artifact playback`
     );
   }
   await adapter.openArtifact(safeArtifactPath);
@@ -1054,7 +1055,7 @@ function resolveVoiceArtifactCandidates(
     if (!engine || visited.has(engine.engine_id)) return;
     visited.add(engine.engine_id);
     if (engine.status !== 'active') return;
-    if (!engine.platforms.includes('any') && !engine.platforms.includes(process.platform as any))
+    if (!engine.platforms.includes('any') && !engine.platforms.includes(hostNodePlatform() as any))
       return;
     if (!engine.supports.artifact_formats.includes(format)) return;
     if (
@@ -1157,10 +1158,10 @@ registerVoiceArtifactRenderer('python_bridge', async ({ text, artifactPath, opti
 });
 
 registerVoiceArtifactRenderer('native_tts', async ({ text, options }) => {
-  const nativeAdapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  const nativeAdapter = resolveVoicePlaybackPlatformAdapter(hostNodePlatform());
   if (!nativeAdapter.renderNativeArtifact) {
     throw new Error(
-      `Voice playback platform ${process.platform} does not support native artifact rendering`
+      `Voice playback platform ${hostNodePlatform()} does not support native artifact rendering`
     );
   }
   const rendered = await nativeAdapter.renderNativeArtifact(text, options);
@@ -1222,7 +1223,7 @@ async function renderNativeArtifact(
   if (candidates.length === 0) {
     const cloneRequirement = options.requireVoiceClone ? ' with learned-voice support' : '';
     throw new Error(
-      `No configured voice engine${cloneRequirement} can render artifact format ${options.format} on ${process.platform}`
+      `No configured voice engine${cloneRequirement} can render artifact format ${options.format} on ${hostNodePlatform()}`
     );
   }
 
@@ -1279,7 +1280,7 @@ async function performPlayback(
     throw new Error(`Voice engine ${engine.engine_id} does not support playback`);
   }
 
-  const platformAdapter = resolveVoicePlaybackPlatformAdapter(process.platform);
+  const platformAdapter = resolveVoicePlaybackPlatformAdapter(hostNodePlatform());
   if (!playbackSourcePath)
     assertExternalOperationBatchResumable(
       voiceRenderingNeedsAdmission(options.engineId, {
@@ -1321,7 +1322,7 @@ async function performPlayback(
   const speechAdapter = platformAdapter;
   if (!speechAdapter.speak) {
     throw new Error(
-      `Voice playback platform ${process.platform} does not support local speech playback`
+      `Voice playback platform ${hostNodePlatform()} does not support local speech playback`
     );
   }
   await speechAdapter.speak(text, options.rate);

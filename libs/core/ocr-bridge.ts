@@ -2,6 +2,7 @@ import * as path from 'node:path';
 import { logger } from './core.js';
 import { secureFetch } from './network.js';
 import { recognizeImageLocallyWithAppleVision } from './apple-intelligence-bridge.js';
+import { isMacOS } from './platform-facts.js';
 import { pathResolver } from './path-resolver.js';
 import {
   assertSafeRepositoryPath,
@@ -318,7 +319,7 @@ export class AppleVisionOcrProvider implements OcrProvider {
   readonly dataEgress = 'none' as const; // macOS Vision framework, on-device
 
   async isAvailable(): Promise<boolean> {
-    return process.platform === 'darwin';
+    return isMacOS();
   }
 
   async recognize(request: OcrRequest): Promise<OcrResult> {

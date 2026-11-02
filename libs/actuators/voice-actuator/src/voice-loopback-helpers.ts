@@ -4,6 +4,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { resolveVoiceEngineForPlatform } from '@agent/core/voice/voice-engine-registry';
 import { safeExec, safeMkdir, safeReadFile, safeRmSync } from '@agent/core/secure-io';
 import { resolveFfmpegBin } from '@agent/core/tool/tool-binary-resolvers';
+import { platformFacts } from '@agent/core/platform-facts';
 import type { AudioChunk, AudioFormat } from '@agent/core/meeting/meeting-session-types';
 import type {
   TtsLoopbackVerificationRequest,
@@ -134,7 +135,7 @@ export function createNativeArtifactTtsSource(options: {
       const engine = resolveVoiceEngineForPlatform(profile.default_engine_id);
       const artifactFormats = engine.supports.artifact_formats;
       // Prefer the platform-native container when the selected engine declares it.
-      const preferredFormat = process.platform === 'darwin' ? 'aiff' : 'wav';
+      const preferredFormat = platformFacts.media.losslessAudioContainer;
       const artifactFormat = artifactFormats.includes(preferredFormat)
         ? preferredFormat
         : artifactFormats.includes('wav')

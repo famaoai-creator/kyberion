@@ -4672,6 +4672,10 @@
       "types": "./dist/platform-command-adapters.d.ts",
       "default": "./dist/platform-command-adapters.js"
     },
+    "./platform-facts": {
+      "types": "./dist/platform-facts.d.ts",
+      "default": "./dist/platform-facts.js"
+    },
     "./plugin": {
       "types": "./dist/plugin/index.d.ts",
       "default": "./dist/plugin/index.js"
