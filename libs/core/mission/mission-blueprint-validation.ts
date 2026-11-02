@@ -15,13 +15,27 @@ export interface MissionValidationMessage {
   subject_id?: string;
 }
 
+/**
+ * Statuses a NEXT_TASKS board may legitimately carry: the Tandem port's core
+ * vocabulary plus Kyberion's own lifecycle statuses
+ * (`requested`/`rework`/`reviewed`/`accepted`/`done`/`dispatched` — see
+ * PLANNED_NEXT_TASK_STATUS_PRIORITY and the dispatch/recovery writers).
+ * Unknown statuses still report MISSION_TASK_STATUS_INVALID; a blocking
+ * preflight consumer must not false-positive on a real board.
+ */
 const KNOWN_TASK_STATUSES: ReadonlySet<string> = new Set([
   'planned',
   'ready',
+  'requested',
+  'dispatched',
   'in_progress',
   'blocked',
   'waiting_review',
+  'reviewed',
+  'accepted',
+  'rework',
   'completed',
+  'done',
   'satisfied',
   'recorded',
   'skipped',

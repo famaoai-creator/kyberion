@@ -21,9 +21,11 @@ import {
   renderMissionContextPack,
   saveMissionContextPack,
   SCOPE_KNOWLEDGE_BUDGETS,
+  type BuildMissionContextPackInput,
   type MissionContextPack,
   type MissionStateSummary,
 } from './mission-context-pack.js';
+import { entriesFromMissionContextPackSources, entryCost } from './mission-context-condenser.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import { _resetKnowledgeSlicesCacheForTests } from '../knowledge/knowledge-slices.js';
 import { findRelevantDistilledKnowledge } from '../knowledge/distill-knowledge-injector.js';
@@ -657,6 +659,58 @@ function makePrunablePack(): MissionContextPack {
       last_updated: '2026-06-01T00:00:00.000Z',
     })),
   });
+}
+
+/**
+ * Minimal build input whose `sources` list is mission_state + several
+ * knowledge hints — enough droppable entries for the source-condenser seam.
+ */
+function condensablePackInput(): BuildMissionContextPackInput {
+  return {
+    contextPackId: 'CPK-MSN-CONTEXT-PACK-TEST-CONDENSED-ABC12345',
+    missionPath,
+    missionState: {
+      mission_id: `${missionId}-CONDENSED`,
+      mission_type: 'product_development',
+      tier: 'public',
+      status: 'active',
+      assigned_persona: 'worker',
+      tenant_slug: 'acme',
+      execution_mode: 'delegated',
+      priority: 3,
+      confidence_score: 1,
+      git: {
+        branch: 'mission/context-pack-condensed',
+        start_commit: 'start-commit',
+        latest_commit: 'latest-commit',
+        checkpoints: [],
+      },
+      history: [],
+      relationships: {},
+      outcome_contract: {
+        outcome_id: 'outcome-context-pack-condensed',
+        requested_result: 'mission context pack',
+        deliverable_kind: 'artifact',
+        success_criteria: ['context pack is scoped'],
+        evidence_required: true,
+        expected_artifacts: [{ kind: 'markdown', storage_class: 'mission' }],
+        verification_method: 'self_check',
+      },
+    },
+    teamRole: 'implementer',
+    recipientKind: 'agent',
+    knowledgeHints: Array.from({ length: 6 }, (_, index) => ({
+      path: `knowledge/product/architecture/condenser-hint-${index}.md`,
+      // Padded so one hint exceeds the summary-marker slack in the budget.
+      title: `Condenser Hint ${index} ${'h'.repeat(300)}`,
+      excerpt: 'Condensed-source fixture hint.',
+      tags: ['context'],
+      score: 0.9 - index * 0.01,
+      category: 'architecture',
+      source_mission: 'MSN-REFERENCE-001',
+      last_updated: '2026-06-01T00:00:00.000Z',
+    })),
+  };
 }
 
 describe('mission-context-pack', () => {
@@ -1312,6 +1366,62 @@ describe('mission-context-pack', () => {
     const rendered = renderMissionContextPack(pack);
     expect(rendered).toContain('Context pruning:');
     expect(rendered).toContain('Rollup:');
+  });
+
+  it('condenses over-budget sources and records dropped-entry accounting', () => {
+    const input = condensablePackInput();
+    const baseline = buildMissionContextPack(input);
+    const missionStateBytes = entryCost(
+      entriesFromMissionContextPackSources(baseline.sources)[0]
+    ).bytes;
+
+    const condensed = buildMissionContextPack({
+      ...input,
+      sourceCondenser: {
+        // Fits mission_state + the summary marker, never a padded hint.
+        budget: { bytes: missionStateBytes + 800 },
+        strategy: 'summarize_passthrough',
+      },
+    });
+
+    expect(condensed.sources.length).toBeLessThan(baseline.sources.length);
+    const marker = condensed.sources.find((source) =>
+      source.ref.startsWith('condenser-summary://')
+    );
+    expect(marker?.kind).toBe('other');
+    expect(marker?.condensation?.strategy).toBe('summarize_passthrough');
+    expect(marker?.condensation?.dropped_count).toBeGreaterThanOrEqual(1);
+    expect(
+      marker?.condensation?.dropped_refs.every((ref) =>
+        baseline.sources.some((source) => source.ref === ref)
+      )
+    ).toBe(true);
+    // The mission-state source tops the retention ladder and survives.
+    expect(
+      condensed.sources.some((source) => source.ref === `mission:${missionId}-CONDENSED`)
+    ).toBe(true);
+  });
+
+  it('leaves the sources list untouched when the condenser budget is not exceeded', () => {
+    const input = condensablePackInput();
+    const baseline = buildMissionContextPack(input);
+
+    const underBudget = buildMissionContextPack({
+      ...input,
+      sourceCondenser: {
+        budget: { bytes: 10_000_000 },
+        strategy: 'summarize_passthrough',
+      },
+    });
+
+    expect(underBudget.sources.map((source) => [source.kind, source.ref])).toEqual(
+      baseline.sources.map((source) => [source.kind, source.ref])
+    );
+    expect(
+      [...baseline.sources, ...underBudget.sources].every(
+        (source) => source.condensation === undefined
+      )
+    ).toBe(true);
   });
 });
 
