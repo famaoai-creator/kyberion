@@ -90,6 +90,10 @@
     {
       "id": "libs/core/mission/mission-lease.ts",
       "reason": "Mastra-style lease manager (mission MSN-MEDIUM-IMPORTS-20261102), wired into claimWorkItemInternal (MSN-WIRING-20261102) through a structural leaseAdvisory interface that deliberately avoids a runtime import of this module — keeping the workforce -> mission direction dependency-free. Consumers inject a MissionLeaseManager instance; unit tests exercise the manager directly."
+    },
+    {
+      "id": "libs/core/foundation/authorization-policy-document.ts",
+      "reason": "Published serialization contract @agent/core/foundation/authorization-policy-document (P4 of docs/UNIFIED_AUTHORIZATION_POLICY_DESIGN.ja.md): the Cedar-compatible policy document, normalized request and 3-value decision are the fixed engine-facing API. Read-only by design (no runtime caller is intended); consumed by tests/authorization-policy-document.test.ts meaning-preservation gate and by future external policy engines."
     }
   ],
   "scripts": [
