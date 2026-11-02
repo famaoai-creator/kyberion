@@ -15,6 +15,7 @@ export type VoiceSttBackend =
   | 'faster_whisper'
   | 'mlx_whisper'
   | 'whisper_cpp'
+  | 'speech_cpp'
   | 'native_speech'
   | (string & {});
 
@@ -24,6 +25,7 @@ export interface VoiceSttAvailability {
   fasterWhisper?: boolean;
   mlxWhisper?: boolean;
   whisperCpp: boolean;
+  speechCpp?: boolean;
   nativeSpeech: boolean;
 }
 
@@ -57,6 +59,7 @@ export function parseVoiceSttBackend(value: unknown): VoiceSttBackend {
   if (normalized === 'faster_whisper' || normalized === 'faster-whisper') return 'faster_whisper';
   if (normalized === 'mlx_whisper' || normalized === 'mlx-whisper') return 'mlx_whisper';
   if (normalized === 'whisper_cpp' || normalized === 'whisper.cpp') return 'whisper_cpp';
+  if (normalized === 'speech_cpp' || normalized === 'speech.cpp') return 'speech_cpp';
   if (normalized === 'native_speech' || normalized === 'native' || normalized === 'apple_speech')
     return 'native_speech';
   return resolveVoiceSttAdapter(raw).adapter_id === 'speech_to_text_bridge' ? raw : 'auto';
@@ -68,17 +71,22 @@ export function resolveVoiceSttServerConfig(
   const explicitBaseUrl = getRegisteredEnvText('VOICE_HUB_STT_BASE_URL', { env })?.trim();
   const whisperKitBaseUrl = getRegisteredEnvText('WHISPERKIT_BASE_URL', { env })?.trim();
   const mlxAudioBaseUrl = getRegisteredEnvText('MLX_AUDIO_BASE_URL', { env })?.trim();
-  const baseUrl = explicitBaseUrl || whisperKitBaseUrl || mlxAudioBaseUrl;
+  const speechCppBaseUrl = getRegisteredEnvText('KYBERION_SPEECH_CPP_URL', { env })?.trim();
+  const baseUrl = explicitBaseUrl || whisperKitBaseUrl || mlxAudioBaseUrl || speechCppBaseUrl;
   if (!baseUrl) return null;
 
   let provider: VoiceSttServerConfig['provider'] = 'openai_compatible_server';
   if (!explicitBaseUrl && whisperKitBaseUrl) provider = 'whisperkit_server';
   if (!explicitBaseUrl && !whisperKitBaseUrl && mlxAudioBaseUrl) provider = 'mlx_audio_server';
+  if (!explicitBaseUrl && !whisperKitBaseUrl && !mlxAudioBaseUrl && speechCppBaseUrl) {
+    provider = 'openai_compatible_server';
+  }
 
   const model =
     getRegisteredEnvText('VOICE_HUB_STT_MODEL', { env })?.trim() ||
     getRegisteredEnvText('WHISPERKIT_MODEL', { env })?.trim() ||
     getRegisteredEnvText('MLX_AUDIO_STT_MODEL', { env })?.trim() ||
+    getRegisteredEnvText('KYBERION_SPEECH_CPP_ASR_MODEL', { env })?.trim() ||
     'openai_whisper-large-v3';
   const apiKey =
     getRegisteredEnvText('VOICE_HUB_STT_API_KEY', { env })?.trim() ||
@@ -116,9 +124,12 @@ export function isVoiceSttBackendAvailable(
 ): boolean {
   if (backend === 'auto') return true;
   const adapter = resolveVoiceSttAdapter(backend);
-  if (adapter.adapter_id === 'speech_to_text_bridge') return true;
+  // Declared availability probes win over the generic speech-to-text-bridge
+  // catch-all so managed binaries (e.g. speech_cpp) stay needs_setup until installed.
   const availabilityKey = adapter.availability_key;
-  return availabilityKey ? availability[availabilityKey] === true : false;
+  if (availabilityKey) return availability[availabilityKey] === true;
+  if (adapter.adapter_id === 'speech_to_text_bridge') return true;
+  return false;
 }
 
 /**
@@ -201,8 +212,8 @@ export function resolveVoiceSttBackendOrder(
   const preference = (
     explicitPreference ||
     (process.platform === 'win32'
-      ? 'server,faster_whisper,whisper_cpp,native_speech'
-      : 'server,fluid_audio,mlx_whisper,whisper_cpp,native_speech')
+      ? 'server,faster_whisper,speech_cpp,whisper_cpp,native_speech'
+      : 'server,fluid_audio,mlx_whisper,speech_cpp,whisper_cpp,native_speech')
   )
     .split(',')
     .map((item) => parseVoiceSttBackend(item))

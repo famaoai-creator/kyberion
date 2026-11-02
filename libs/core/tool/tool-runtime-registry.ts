@@ -80,7 +80,7 @@ export interface ToolRuntimeManagedBinaryArtifact {
 export interface ToolRuntimeManagedBinary {
   version: string;
   relative_path: string;
-  archive?: 'tar.gz';
+  archive?: 'tar.gz' | 'zip';
   artifacts: Record<string, ToolRuntimeManagedBinaryArtifact>;
 }
 

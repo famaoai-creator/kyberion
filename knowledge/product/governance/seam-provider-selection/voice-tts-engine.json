@@ -75,6 +75,22 @@
             "knowledge/product/governance/voice-engines/mlx_audio_qwen3.json (1.7B 8-bit Qwen3-TTS on Apple Silicon, ICL voice clone, languages ja/en)"
           ]
         },
+        "speech_cpp": {
+          "traits": {
+            "naturalness": 0.85,
+            "latency": 0.55,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "naturalness": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "knowledge/product/governance/voice-engines/speech_cpp.json (speech.cpp Qwen3-TTS GGUF on Metal/Vulkan/CPU; first-call model fetch)",
+            "knowledge/product/architecture/speech-cpp-voice-runtime.md"
+          ]
+        },
         "pocket_tts": {
           "traits": {
             "naturalness": 0.6,

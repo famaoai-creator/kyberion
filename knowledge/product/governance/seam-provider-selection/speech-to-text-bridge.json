@@ -90,6 +90,22 @@
             "libs/core/apple-speech-file-stt-bridge.ts (SFSpeechRecognizer with on-device recognition enforced)"
           ]
         },
+        "speech_cpp": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.55,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/voice/speech-to-text-bridge.ts (installSpeechCppSpeechToTextBridgeIfAvailable: speech asr CLI, local_only)",
+            "knowledge/product/architecture/speech-cpp-voice-runtime.md"
+          ]
+        },
         "shell": {
           "traits": {
             "accuracy": 0.5,

@@ -139,6 +139,11 @@ export function resolveRustxngBin(): string {
   return resolveExternalToolBin('rustxng', ['KYBERION_RUSTXNG_BIN'], 'rustxng');
 }
 
+/** speech.cpp local TTS/ASR runtime (MIT; Metal / Vulkan / CPU). */
+export function resolveSpeechCppBin(): string {
+  return resolveExternalToolBin('speech_cpp', ['KYBERION_SPEECH_CPP_BIN'], 'speech');
+}
+
 /**
  * macOS locations of the Tailscale CLI, most specific first: the symlink the
  * app's "Install CLI" creates, a Homebrew formula, then the binary inside the
