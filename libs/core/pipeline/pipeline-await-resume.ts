@@ -221,6 +221,9 @@ export async function sweepAwaitStateRuns(
         settledRuns.set(runId, signature);
         continue;
       }
+      // Never memoised: a state await is re-probed (and its timeout checked)
+      // every sweep. Load errors are not memoised either — a transient read
+      // failure must not hide a suspended run until its file next changes.
       settledRuns.delete(runId);
       const suspended = state.suspended;
       const decision = await shouldResume(suspended, deps);
