@@ -302,6 +302,110 @@ function approveReview() {
   });
 }
 describe('continuous owner development stage', () => {
+  function preparePrerequisiteWait(awaitingApproval = true) {
+    run(() => {
+      io.safeWriteFile(
+        path.join(dir, 'NEXT_TASKS.json'),
+        JSON.stringify([
+          { task_id: 'planning', status: 'planned' },
+          ...tasks().map((task) =>
+            task.task_id === spec.implementation_task_id
+              ? {
+                  ...task,
+                  status: 'planned',
+                  dependencies: ['planning'],
+                  source_edit_paths: spec.source_edit_paths,
+                  source_edit_requires_approval: false,
+                }
+              : task
+          ),
+        ])
+      );
+      coordination.updateWorkItem({ itemId: 'implementation', status: 'ready' });
+      coordination.createWorkItem({
+        itemId: 'planning',
+        title: 'Planning prerequisite',
+        description: 'Synthetic prerequisite waiting for an operator',
+        projectId: 'PRJ-DEVELOPMENT-FIXTURE',
+        status: 'blocked',
+        context: {
+          mission_id: missionId,
+          project_id: 'PRJ-DEVELOPMENT-FIXTURE',
+          task_id: 'planning',
+        },
+        metadata: awaitingApproval
+          ? { awaiting_approval: true, approval_request_id: 'planning-approval' }
+          : {},
+      });
+    });
+  }
+  it.each([true, false])(
+    'surfaces prerequisite waits after canonical dispatch (approval=%s)',
+    async (approvalWait) => {
+      preparePrerequisiteWait(approvalWait);
+      const result = await tick();
+      expect(result, result.reason).toMatchObject({
+        status: approvalWait ? 'pending_approval' : 'blocked',
+        ...(approvalWait ? { approval_request_id: 'planning-approval' } : {}),
+        evidence_refs: expect.arrayContaining(['workitem:planning']),
+      });
+      expect(model).toHaveBeenCalledOnce();
+      expect(publish).not.toHaveBeenCalled();
+      expect(
+        run(() => coordination.getWorkItem('implementation')!.metadata?.mission_development)
+      ).toBeUndefined();
+    }
+  );
+  it('uses refreshed prerequisite state after canonical dispatch resolves an approval', async () => {
+    preparePrerequisiteWait();
+    model.mockImplementation(async () => {
+      coordination.updateWorkItem({ itemId: 'planning', status: 'done', metadata: {} });
+      return { mission_id: missionId, records: [] };
+    });
+    const result = await tick();
+    expect(result, result.reason).toMatchObject({ status: 'running' });
+    expect(model).toHaveBeenCalledOnce();
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it('surfaces an approval first encountered during the bounded prerequisite dispatch', async () => {
+    preparePrerequisiteWait();
+    run(() => coordination.updateWorkItem({ itemId: 'planning', status: 'ready', metadata: {} }));
+    model.mockImplementation(async () => {
+      coordination.updateWorkItem({
+        itemId: 'planning',
+        status: 'blocked',
+        metadata: { awaiting_approval: true, approval_request_id: 'new-planning-approval' },
+      });
+      return { mission_id: missionId, records: [] };
+    });
+    expect(await tick()).toMatchObject({
+      status: 'pending_approval',
+      approval_request_id: 'new-planning-approval',
+      evidence_refs: expect.arrayContaining(['workitem:planning']),
+    });
+    expect(model).toHaveBeenCalledOnce();
+    expect(publish).not.toHaveBeenCalled();
+  });
+  it.each(['mission_id', 'tenant_slug', 'organization_id', 'project_id', 'task_id'] as const)(
+    'does not report a prerequisite wait from another %s',
+    async (key) => {
+      preparePrerequisiteWait();
+      const realItems = coordination.listWorkItems;
+      deps.items = (...args) =>
+        realItems(...args).map((item) =>
+          item.item_id === 'planning'
+            ? { ...item, context: { ...item.context, [key]: 'other-scope' } }
+            : item
+        );
+      const result = await tick();
+      expect(result, result.reason).toMatchObject({ status: 'running' });
+      expect(model).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({ itemIds: ['implementation'] })
+      );
+      expect(publish).not.toHaveBeenCalled();
+    }
+  );
   it('repairs canonically refuted implementation output before committing or publishing', async () => {
     run(() => {
       coordination.updateWorkItem({

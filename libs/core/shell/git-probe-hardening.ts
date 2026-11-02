@@ -50,11 +50,18 @@ export function hardenedGitProbeArgs(args: readonly string[]): string[] {
     sha(args[4]) &&
     sha(args[5]);
   const historyProbe =
-    (args.length === 8 || (args.length === 10 && args[8] === '--not' && sha(args[9]))) &&
-    ['log', '--format=', '--name-only', '-z', '--full-history', '--root', '--no-renames'].every(
-      (value, index) => args[index] === value
-    ) &&
-    sha(args[7]);
+    (args.length === 9 || (args.length === 11 && args[9] === '--not' && sha(args[10]))) &&
+    [
+      'log',
+      '--format=',
+      '--name-only',
+      '-z',
+      '--full-history',
+      '--root',
+      '--no-renames',
+      '--diff-merges=separate',
+    ].every((value, index) => args[index] === value) &&
+    sha(args[8]);
   const publicationDiff =
     args.length === 7 &&
     ['diff', '--binary', '--no-ext-diff', '--no-textconv'].every(
