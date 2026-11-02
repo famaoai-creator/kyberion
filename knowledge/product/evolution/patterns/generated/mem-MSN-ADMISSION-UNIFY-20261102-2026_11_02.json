@@ -1,0 +1,23 @@
+{
+  "record_id": "mem-MSN-ADMISSION-UNIFY-20261102-2026_11_02",
+  "kind": "pattern",
+  "tier": "public",
+  "knowledge_domain": "product",
+  "title": "Unified declaration surfaces need declared-only derivation and data-layer family defaults",
+  "summary": "Two review findings: (1) fail-safe/undeclared resolutions are authority signals only — gate every routing derivation on declared. (2) A code prefix shadows ALL data-layer declarations for its family — family defaults belong in the governed overlay when plugins own the family (service:<provider> ops).",
+  "candidate_id": "mem-MSN-ADMISSION-UNIFY-20261102-2026_11_02",
+  "evidence_refs": [
+    "active/missions/public/MSN-ADMISSION-UNIFY-20261102/evidence/REVIEW-execution-implement.md",
+    "active/missions/public/MSN-ADMISSION-UNIFY-20261102/evidence/retrospective.md",
+    "active/missions/public/MSN-ADMISSION-UNIFY-20261102/evidence/implementation-report.md"
+  ],
+  "created_at": "2026-11-02T20:50:30.899Z",
+  "applicability": ["mission", "mission:MSN-ADMISSION-UNIFY-20261102"],
+  "reusable_steps": [
+    "Two review findings: (1) fail-safe/undeclared resolutions are authority signals only — gate every routing derivation on declared",
+    "(2) A code prefix shadows ALL data-layer declarations for its family — family defaults belong in the governed overlay when plugins own the family (service:<provider> ops)"
+  ],
+  "expected_outcome": "Lessons from MSN-ADMISSION-UNIFY-20261102 review: (1) Declared-only derivation — a fail-safe entry resolved for AUTHORITY must never drive ROUTING; deriving storageChannel from an undeclared external-admission fail-safe silently repartitioned approval storage. Gate: resolved.declared ? derive : undefined. (2) Data-layer family defaults — code prefixes beat every overlay/plugin declaration for their family including exact entries; a code service: prefix would have killed the plugin extension path for service:<provider>:* ops. Family defaults for plugin-owned namespaces belong in the governed overlay where data exact entries still win; the overlay schema grows the same entry fields (protectedPaths, approvalDomain). (3) Bridge-over-flatten — policy systems stay authoritative detail layers behind registered bridges; the registry adds unified lookup, per-axis fail-safes matching each systems own default, and provenance. (4) Pilot via parameter not wrapper — a subject param through the existing creation function migrated all gate callers without touching mocked module surfaces.",
+  "source_branch": "feat/admission-unify-20261102",
+  "source_commit": "49d6940099a53e9108b88bfae94b274b53c9adf2"
+}
