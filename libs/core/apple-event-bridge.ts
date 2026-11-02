@@ -1,5 +1,5 @@
 import { safeExec, safeExecResult } from './secure-io.js';
-import { isMacOS } from './platform.js';
+import { isMacOS } from './platform-facts.js';
 import {
   getMacOSFocusedInput,
   getMacOSScreenSize,

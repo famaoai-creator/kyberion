@@ -5,7 +5,7 @@ import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { nowIso } from '../foundation/time.js';
 import { getRegisteredEnvBool, getRegisteredEnvText, setRegisteredEnv } from '../foundation/env.js';
-import { isMacOS, isWindows } from '../platform.js';
+import { isMacOS, isWindows } from '../platform-facts.js';
 import {
   safeChmodSync,
   safeExistsSync,
