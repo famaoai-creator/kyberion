@@ -206,9 +206,11 @@ Layer 2 plugin manifest  managed plugin の manifest `authorizations` ブロッ�
 ### マージ規則（緩和不能性）
 
 - **コード常勝**: コード宣言にマッチする id は overlay/plugin の宣言を一切見ない — データは「カバレッジの追加」だけでき「レビュー済み宣言の緩和」はできない（より長い影 prefix での覆いも不可）
+- **データ層は admission 未満を宣言できない**: schema が `local_only` と `authority.kind:'free'` を全データ層で禁止 — 境界回避は必ずコードレビュー済み宣言を要する（ゲートが拾えない非リテラル call site があっても、データで `free` 化する経路を塞ぐ）。`local_only` のデータ宣言が本当に必要になったら「局所性の証明方法」と共に別途設計する
 - **衝突は除去+警告**: overlay/plugin がコード所有キーを宣言したらロード時に drop して warn（作者に不活性であることを通知）
-- **exact > prefix、先勝ち**: 各層内では exact が prefix に勝ち、最長 prefix が勝つ。層間ではファイル overlay → プラグインの順
+- **exact > prefix、先勝ち**: 層を跨いで exact は全 prefix に勝ち（overlay 順に非依存）、prefix 同士は最長が勝ち、同長は先に供給された層が勝つ
 - **provenance 記録**: 解決結果は `source: 'code' | 'overlay' | 'plugin:<id>'` を持ち、監査で宣言の出自を追える
+- **残留リスク（文書化）**: 境界ゲートはリテラル `operationId` のみ抽出するため、変数経由の call site は検出不能 — ただし上記の `free`/`local_only` 禁止により、検出漏れの op は最悪でも「admission 必須」側にしか倒れない
 
 ### 適用基準
 
