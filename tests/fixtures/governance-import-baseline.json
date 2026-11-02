@@ -149,6 +149,7 @@
     "scripts/bundle_entrypoints.mjs",
     "scripts/capability_discovery.test.ts",
     "scripts/capability_discovery_entry.mjs",
+    "scripts/check_chronos_perf_baseline.test.ts",
     "scripts/check_stale_dist.test.ts",
     "scripts/check_tenant_registry_consistency.test.ts",
     "scripts/check_tier_hygiene.test.ts",

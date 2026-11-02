@@ -391,6 +391,20 @@ supervisor and PTC IPC tests when changing a listener.
 - **Never hand a lease over while work still runs.** If the in-flight tick did not drain in time,
   release the leader lease only immediately before exiting, never while the abandoned tick can
   still act (a second leader would double-run schedules).
+- **A tick's cost must not grow with history.** Work a daemon repeats every tick (scans of run
+  journals, mission dirs, ledgers) must skip records that cannot have changed — memoise settled
+  records by file size + mtime, as `sweepAwaitStateRuns` does — and yield to the event loop
+  (`setImmediate`) during long synchronous passes so the heartbeat refresh timer still fires. A
+  sweep that re-parsed every pipeline run journal each tick reached 180 s on a long-lived checkout
+  and kept the chronos heartbeat stale. Regression gate: `pipeline-await-resume.test.ts`.
+- **A scheduled script needs its own write grant.** Register a role for it
+  (`authority-roles/<name>.json`, the role index and `security-policy.json`) with a write scope
+  narrowed to the files it produces, and assume that role around the write with
+  `withExecutionContext`. Do not rely on the role derived from the script's file name: run as a
+  pipeline `system:shell` step, the child inherits the runner's role (`run_pipeline.bundle`).
+  Prove it with a hermetic tier-guard test (copy of the governance policies under a temp
+  `KYBERION_ROOT`; under the repo root Vitest does not load the policy) and by running the
+  schedule's pipeline once. Reference: `scripts/check_chronos_perf_baseline.test.ts`.
 - **Give every child a deadline.** Kill the child when it expires, raise an ops alert via
   `sendOpsAlert`, and forward signals to the child on shutdown.
 

@@ -5,6 +5,7 @@
 /* eslint-disable no-restricted-imports -- The perf gate needs a long-lived local Next server; safeExec is synchronous and cannot provide a lifecycle handle. */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { chromium, type Page } from 'playwright';
+import { withExecutionContext } from '@agent/core/authority';
 import { pathResolver } from '@agent/core/path-resolver';
 import { safeWriteFile } from '@agent/core/secure-io';
 import { nowIso } from '@agent/core/foundation';
@@ -119,8 +120,15 @@ export async function runChronosPerfBaseline(argv: string[] = []): Promise<Chron
         ),
         generated_at: nowIso(),
       };
-      const output = pathResolver.shared('observability/chronos/ce-08-perf-baseline.json');
-      safeWriteFile(output, `${JSON.stringify(report, null, 2)}\n`);
+      // Assume the script's own role for its one write: run as a pipeline step
+      // (schedule ce-chronos-perf) the child inherits the runner's role
+      // instead of deriving it from this file name.
+      withExecutionContext(CHRONOS_PERF_ROLE, () =>
+        safeWriteFile(
+          pathResolver.shared(CHRONOS_PERF_REPORT),
+          `${JSON.stringify(report, null, 2)}\n`
+        )
+      );
       return report;
     } finally {
       await browser.close();
@@ -129,6 +137,10 @@ export async function runChronosPerfBaseline(argv: string[] = []): Promise<Chron
     if (ownedServer) server?.kill('SIGTERM');
   }
 }
+
+/** Authority role whose only write scope is the report below. */
+export const CHRONOS_PERF_ROLE = 'check_chronos_perf_baseline';
+export const CHRONOS_PERF_REPORT = 'observability/chronos/ce-08-perf-baseline.json';
 
 export const runCheckChronosPerf = defineScript({
   name: 'check:chronos-perf',
