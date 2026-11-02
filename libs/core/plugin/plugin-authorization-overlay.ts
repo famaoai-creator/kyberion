@@ -37,10 +37,12 @@ import { PLUGIN_MANIFEST_CANDIDATES } from './plugin-manifest-candidates.js';
 
 const logger = createLogger('plugin-authorization-overlay');
 
-function manifestAuthorizations(
-  managedPath: string,
-  pluginId: string
-): AuthorizationOverlay | undefined {
+type ManifestScan =
+  | { kind: 'none' } // plugin has no authorizations block
+  | { kind: 'ok'; overlay: AuthorizationOverlay }
+  | { kind: 'error' }; // unreadable/invalid — must not be cached as "no declarations"
+
+function manifestAuthorizations(managedPath: string, pluginId: string): ManifestScan {
   for (const candidate of PLUGIN_MANIFEST_CANDIDATES) {
     const manifestPath = path.join(managedPath, candidate);
     if (!safeExistsSync(manifestPath) || !safeLstat(manifestPath).isFile()) continue;
@@ -51,35 +53,40 @@ function manifestAuthorizations(
       logger.warn(
         `[AUTHZ_PLUGIN_MANIFEST_INVALID] ${pluginId}: unreadable manifest — ${error instanceof Error ? error.message : String(error)} | next: fix the manifest`
       );
-      return undefined;
+      return { kind: 'error' };
     }
     const block =
       parsed && typeof parsed === 'object' && !Array.isArray(parsed)
         ? (parsed as Record<string, unknown>).authorizations
         : undefined;
-    if (block === undefined) return undefined;
+    if (block === undefined) return { kind: 'none' };
     const source: AuthorizationSource = `plugin:${pluginId}`;
     try {
       const validated = authorizationOverlayCatalog.validate(block, manifestPath);
       const code = codeOperationPatterns();
       return {
-        source,
-        operations: dropCodeCollisions(validated.operations, new Set(code.operations), source),
-        prefixes: dropCodeCollisions(validated.prefixes, new Set(code.prefixes), source),
+        kind: 'ok',
+        overlay: {
+          source,
+          operations: dropCodeCollisions(validated.operations, new Set(code.operations), source),
+          prefixes: dropCodeCollisions(validated.prefixes, new Set(code.prefixes), source),
+        },
       };
     } catch (error) {
       logger.warn(
         `[AUTHZ_PLUGIN_AUTHORIZATIONS_INVALID] ${pluginId}: authorizations block rejected — ${error instanceof Error ? error.message : String(error)} | next: fix the manifest block`
       );
-      return undefined;
+      return { kind: 'error' };
     }
   }
-  return undefined;
+  return { kind: 'none' };
 }
 
-/** Manifest parses cached by the managed copy's content digest — a reinstall
- * or approval state change produces a different digest, so stale entries can
- * never outlive the managed copy they describe. */
+/** Manifest parses cached by the managed copy's content digest AND activation
+ * status — a reinstall or approval-state change produces a different key, so
+ * stale entries can never outlive the managed copy they describe. Error
+ * results are deliberately not cached: a transient read failure must not
+ * masquerade as "no declarations" until the next digest bump. */
 const pluginOverlayCache = new Map<
   string,
   { digest: string; overlay: AuthorizationOverlay | undefined }
@@ -100,13 +107,15 @@ export function scanPluginAuthorizations(): AuthorizationOverlay[] {
   for (const record of records) {
     if (!isManagedPluginActivationAllowed(record)) continue;
     seen.add(record.pluginId);
-    const digest = record.contentDigest ?? `${record.managedPath}:${record.activationStatus}`;
+    const digest = `${record.contentDigest ?? record.managedPath}:${record.activationStatus}`;
     const cached = pluginOverlayCache.get(record.pluginId);
     if (cached?.digest === digest) {
       if (cached.overlay) overlays.push(cached.overlay);
       continue;
     }
-    const overlay = manifestAuthorizations(record.managedPath, record.pluginId);
+    const scan = manifestAuthorizations(record.managedPath, record.pluginId);
+    if (scan.kind === 'error') continue; // never persist an error as "no declarations"
+    const overlay = scan.kind === 'ok' ? scan.overlay : undefined;
     pluginOverlayCache.set(record.pluginId, { digest, overlay });
     if (overlay) overlays.push(overlay);
   }
