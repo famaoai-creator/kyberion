@@ -1,3 +1,4 @@
+import { informationWorkProposalRefusal } from './dot-information-work.js';
 import { dotDigestActionEvidence } from './dot-digest-evidence.js';
 import { dotDelegationCapacity, resumeDotCapacityActions } from './dot-admission-capacity.js';
 import { composeDotBoundsPrompt, sameDotHandoffScope } from './dot-bounds-prompt.js';
@@ -202,6 +203,7 @@ export interface DotDispatchDeps {
         | 'pipeline_ref'
         | 'front_desk_execution'
         | 'continuous_work'
+        | 'information_asset_work'
       >;
     }
   ) => void;
@@ -332,6 +334,7 @@ function checkDotProposalScope(
     | 'pipeline_ref'
     | 'front_desk_execution'
     | 'continuous_work'
+    | 'information_asset_work'
     | 'mission_admission'
   >,
   deps: DotDispatchDeps
@@ -343,6 +346,8 @@ function checkDotProposalScope(
   }
   const missionRefusal = dotMissionAdmissionRefusal(charter, proposal, deps.now?.());
   if (missionRefusal) return { ok: false, reason: missionRefusal };
+  const informationRefusal = informationWorkProposalRefusal(charter, proposal);
+  if (informationRefusal) return informationRefusal;
   if (proposal.continuous_work) {
     try {
       parseContinuousWorkPlan(proposal.continuous_work);
@@ -1066,6 +1071,9 @@ function dispatchDotProposalsUnlocked(
       ...(proposal.rationale ? { rationale: proposal.rationale } : {}),
       ...(proposal.pipeline_ref ? { pipeline_ref: proposal.pipeline_ref } : {}),
       ...(proposal.continuous_work ? { continuous_work: proposal.continuous_work } : {}),
+      ...(proposal.information_asset_work
+        ? { information_asset_work: proposal.information_asset_work }
+        : {}),
       ...(proposal.mission_admission ? { mission_admission: proposal.mission_admission } : {}),
       ...(proposal.expected_effect ? { expected_effect: proposal.expected_effect } : {}),
       ...(proposal.target ? { target: proposal.target } : {}),

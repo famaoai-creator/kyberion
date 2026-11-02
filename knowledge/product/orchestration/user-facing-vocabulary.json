@@ -8397,6 +8397,56 @@
         "en": "This proposal is awaiting human review and has not been published.",
         "ja": "この提案は人間による確認待ちです。まだ知識として公開されていません。",
         "qps-ploc": "⟦Ŧħïş ṗřőṗőşȧŀ ïş ȧẇȧïŧïñɠ ħůɱȧñ řėṽïėẇ ȧñḓ ħȧş ñőŧ ƀėėñ ṗůƀŀïşħėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "chronos_information_assets_title": {
+        "en": "Information sources",
+        "ja": "情報の取得先",
+        "qps-ploc": "⟦Ïñƒőřɱȧŧïőñ şőůřƈėş ŀőřėɱ ⟧"
+      },
+      "chronos_information_assets_description": {
+        "en": "Find the registered sources within the selected organization or project.",
+        "ja": "選択した組織・プロジェクトに登録された情報の取得先を確認します。",
+        "qps-ploc": "⟦Ƒïñḓ ŧħė řėɠïşŧėřėḓ şőůřƈėş ẇïŧħïñ ŧħė şėŀėƈŧėḓ őřɠȧñïẑȧŧïőñ őř ṗřőĵėƈŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "chronos_information_assets_unavailable": {
+        "en": "Select an authorized confidential organization or project to view its sources.",
+        "ja": "閲覧できる組織・プロジェクトを confidential 範囲で選択してください。",
+        "qps-ploc": "⟦Şėŀėƈŧ ȧñ ȧůŧħőřïẑėḓ ƈőñƒïḓėñŧïȧŀ őřɠȧñïẑȧŧïőñ őř ṗřőĵėƈŧ ŧő ṽïėẇ ïŧş şőůřƈėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "chronos_information_assets_loading": {
+        "en": "Loading sources…",
+        "ja": "取得先を読み込んでいます…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ şőůřƈėş… ŀőřėɱ⟧"
+      },
+      "chronos_information_assets_empty": {
+        "en": "No sources are registered in this scope.",
+        "ja": "この範囲には取得先が登録されていません。",
+        "qps-ploc": "⟦Ñő şőůřƈėş ȧřė řėɠïşŧėřėḓ ïñ ŧħïş şƈőṗė. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "chronos_information_assets_enabled": {
+        "en": "Enabled",
+        "ja": "有効",
+        "qps-ploc": "⟦Ėñȧƀŀėḓ ŀőř⟧"
+      },
+      "chronos_information_assets_disabled": {
+        "en": "Disabled",
+        "ja": "無効",
+        "qps-ploc": "⟦Ḓïşȧƀŀėḓ ŀőř⟧"
+      },
+      "chronos_information_assets_authoritative": {
+        "en": "Authoritative source",
+        "ja": "正本",
+        "qps-ploc": "⟦Ȧůŧħőřïŧȧŧïṽė şőůřƈė ŀőřėɱ ⟧"
+      },
+      "chronos_information_assets_secondary": {
+        "en": "Additional source",
+        "ja": "補助の取得先",
+        "qps-ploc": "⟦Ȧḓḓïŧïőñȧŀ şőůřƈė ŀőřėɱ⟧"
+      },
+      "chronos_information_assets_freshness": {
+        "en": "Freshness target",
+        "ja": "鮮度の目標",
+        "qps-ploc": "⟦Ƒřėşħñėşş ŧȧřɠėŧ ŀőřėɱ⟧"
       }
     },
     "cli": {
