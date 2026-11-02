@@ -9,9 +9,60 @@
  * the store role's own grant (resolved through its bound tenant) apply. The
  * tenant scope check runs before this in tier-guard.validateWritePermission.
  */
-import { tenantStoreLedgerPartitionOf } from './storage-layout.js';
+import {
+  tenantStoreLedgerPartitionOf,
+  PARTITIONED_RUNTIME_LEDGER_ROOTS,
+  PARTITIONED_RUNTIME_STATE_ROOTS,
+  classifyStorageFloorPath,
+  STORAGE_FLOOR_ROOTS,
+} from './storage-layout.js';
+import type { TierLevel } from './types.js';
 import { isRecord } from './foundation/primitives.js';
 import { isValidTenantSlug } from './entity-scope.js';
+
+function trimTrailingSlashes(value: string): string {
+  // A linear scan avoids quadratic regexp backtracking on long slash runs.
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+  return value.slice(0, end);
+}
+
+/** Security policy paths use POSIX separators, including on Windows. */
+export function normalizeTenantPolicyPath(value: string): string {
+  return trimTrailingSlashes(value.replace(/\\/g, '/'));
+}
+
+/** Exact directory-boundary match; similarly named tenants never collide. */
+export function tenantPolicyPathStartsWith(targetPath: string, patternPath: string): boolean {
+  const target = normalizeTenantPolicyPath(targetPath);
+  const prefix = normalizeTenantPolicyPath(patternPath);
+  return target === prefix || target.startsWith(prefix + '/');
+}
+
+export function isProtectedStorageFloorTier(tier: TierLevel | undefined): boolean {
+  return tier === 'personal' || tier === 'confidential';
+}
+
+export function protectedFloorPartitionPrefix(relativePath: string): string | undefined {
+  const floor = classifyStorageFloorPath(relativePath);
+  if (floor?.partition.kind !== 'tier') return undefined;
+  const { tier } = floor.partition;
+  if (!isProtectedStorageFloorTier(tier)) return undefined;
+  return `${STORAGE_FLOOR_ROOTS[floor.floor]}/${tier}/`;
+}
+
+export function partitionedRuntimeTier(prefix: string): 'personal' | 'confidential' | undefined {
+  const normalized = normalizeTenantPolicyPath(prefix);
+  for (const root of [
+    ...Object.values(PARTITIONED_RUNTIME_LEDGER_ROOTS),
+    ...Object.values(PARTITIONED_RUNTIME_STATE_ROOTS),
+  ]) {
+    for (const tier of ['personal', 'confidential'] as const) {
+      if (normalized === `${root}/${tier}`) return tier;
+    }
+  }
+  return undefined;
+}
 
 interface TenantScopePolicy {
   tenant_scope?: {

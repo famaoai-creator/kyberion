@@ -44,6 +44,8 @@
     "slug_pattern": "^[a-z][a-z0-9-]{1,30}$",
     "require_tenant_binding": false,
     "protected_prefixes": [
+      "active/shared/runtime/workspaces/personal/",
+      "active/shared/runtime/workspaces/confidential/",
       "knowledge/confidential/",
       "active/organizations/personal/",
       "active/organizations/confidential/",
@@ -270,6 +272,21 @@
     }
   },
   "authority_role_permissions": {
+    "personal_approval_store": {
+      "allow_read": [
+        "knowledge/product/",
+        "active/shared/runtime/tenant-approvals/personal/shared/",
+        "active/shared/runtime/vitest-approvals/"
+      ],
+      "allow_write": [
+        "active/shared/runtime/tenant-approvals/personal/shared/",
+        "active/shared/runtime/vitest-approvals/"
+      ]
+    },
+    "task_source_workspace": {
+      "allow_read": ["knowledge/product/", "active/shared/runtime/workspaces/"],
+      "allow_write": ["active/shared/runtime/workspaces/"]
+    },
     "mission_controller": {
       "allow_read": [
         "active/missions/",

@@ -1,7 +1,7 @@
 ---
 title: 'Continuous Operations Loop Playbook'
 tags: [orchestration, organization, autonomy, continuous-operations]
-last_updated: 2026-10-18
+last_updated: 2026-11-02
 runtime_stages: [planning, execution, review]
 ---
 
@@ -96,3 +96,48 @@ heartbeat の stale_code、healthy、PID と continuous cadence checkpoint を�
 分配枠が満杯の場合は inventory の limited として待機し、admission identity を増やさない。枠が空き、cooldown を満たした周期で分配する。既に確定拒否された試行は上記 recover-admissions を明示的に使い、元の cooldown を保持する。指標が回復しても同じ episode の既存 action / WorkItem 参照は保持し、進行中の仕事と成果を追跡する。
 
 managed lifecycle の controller runner は POSIX の専用 process group、Windows の kill-on-close Job Object で controller と子孫を監督する。期限・中断・出力超過に加え、controller の正常終了後に残った worker も終了する。Job Object を設定できない Windows 環境では未監督の実行をせず、エラーで停止する。snapshot の分析・dry-run と lifecycle 実行の対応環境を混同しない。
+
+## 承認済み開発の継続実行
+
+開発の継続実行も上の resident cadence と continuous owner を使う。`work_plan.missions[]` に次の `development` を含めてレビューする。省略した既存の運営missionの挙動は維持する。`mission_type` を省略した開発missionには `development` のprocess templateを使う。
+
+```json
+{
+  "key": "improve",
+  "title": "Improve the approved repository",
+  "goal": "Implement the reviewed requirement and validate the result",
+  "success_condition": "Independent review and required CI pass on the merged revision",
+  "development": {
+    "cwd": ".",
+    "repository_url": "https://github.com/owner/repository",
+    "source_edit_paths": ["libs/core/example.ts", "tests/example.test.ts"],
+    "implementation_task_id": "execution-implement",
+    "review_task_id": "self_review-code-review",
+    "title": "feat: implement the reviewed requirement",
+    "body_file": "evidence/pr-body.md",
+    "max_repairs": 2
+  }
+}
+```
+
+ownerは専用checkoutから起動し、`cwd` はそのrootを表す `.` に固定する。`body_file` は対象mission内の `evidence/` 相対path。`source_edit_paths` は既存task tool grantと同じpublic code root内の正確なfileを1..64件列挙する。directory prefix・wildcard・重複・親directoryへの移動・`.git`・private/runtime storageは許可しない。実装とreviewを同じtaskにしたり、未定義の権限fieldや3を超える修復上限を追加したりできない。設定はsource-boundなadmission identityへ含まれ、mission作成後のdescriptor変更では再開しない。変更が必要なら既存の承認経路で新しい計画を確認する。
+
+`repository_url` は承認対象の正確なHTTPS repositoryを固定する。実行時にoriginやPRのrepositoryが異なれば停止する。URLに資格情報・query・fragmentを埋め込まない。
+
+開発descriptorに `mission_type` を明示する場合は `development` に限定する。レポート・文書制作など、別のprocess templateへ開発用の完了gateを適用しない。
+
+初回の計画承認cardでは、repository・tier/tenant/organization・固定branch・正確な編集file件数・修復上限・自動のpush/PR/merge・専用完了gateの意味を先頭に表示する。security summary自体がcard上限を超える設定は拒否し、補足の目標文だけを短縮する。全編集fileと完全なdescriptorは同じactionの既存scoped ledgerへ記録され、cardの根拠にaction refとadmission SHA-256を示す。非公開の計画はshared indexではなく、そのtier/ownerの本文ledgerへリンクする。alignment briefにも全file・同じsummary・owner-bound descriptor参照を含め、変更された説明で古い同意を再利用しない。
+
+一つのwork planに含める開発missionは一件までとし、開発runごとに専用checkoutを用意する。候補branchはrunの所有者へ束縛するため、前runのbranchを自動reset・転用しない。通常の運営missionだけのgroupや、一件の開発と運営missionを組み合わせたgroupは引き続き使える。次の開発runは新しいclean checkoutと確認済み計画で開始する。
+
+設定には秘密情報や非公開の要求本文を埋め込まない。内容は対象tierのmission evidenceに置き、private repository・同一tenant/person・charter・provider egress・credentialの各境界を維持する。設定したtierは許可を作らない。public、confidential、personalのいずれでも実行scopeと個別操作の許可を満たす必要がある。
+
+ownerは準備・実装の既存WorkItemを進め、開発continuationが指定WorkItemの修復・独立reviewと正規VCS公開経路を接続する。候補branchは `agent/kyberion-development`、統合先は `main`。CI待機・merge queue・承認待ちは次の既存cadenceで確認し、sourceが回復した周期や新しい提案がない周期も同じownerを再開する。未知の実行結果では再送せず既存証跡を照合する。
+
+完了したtaskや成果物fileが存在するだけでは開発成功としない。実際のmerge revisionとCIが確認できるまではdeliveryの進行とmissionの成功確認を保留する。修復上限、予算、期限、権限取消し、scope不一致は停止理由として扱い、人間承認を作成・承認したことにしない。
+
+承認済みdevelopment descriptorを持つowner missionでは、正規process plannerが三つの完了gateを専用の機械検証へ接続する。TESTS_PASSEDは既存evidence_existsを維持し、現在PR/head・必須CI policy・同じrevisionの正規QA証跡を再照合する。code reviewは現在revisionの独立receipt、deliveryは実merge commitと必須CIを再照会する。一般missionの `human_override` / `reviewer_approved`、alignmentの本人承認、machine-only gateの拒否条件は変更しない。merge確認後のdelivery／retrospective taskには、既存PR・mergeの根拠と報告のみ行う指示を渡し、公開を繰り返させない。
+
+独立reviewとCIの実確認はmerge前に正規VCS境界で行う。ownerのself_review／delivery／retrospectiveのphase完了表示は、継続処理がmerge後の確認まで完了してから反映する。これにより通常のCI待機やbase更新を、先行するphase gateの失敗として隔離せず、次周期の再確認へ戻す。TESTS_PASSEDは継続処理が実CIの成功と正規QA証跡の作成を確認した後に評価する。修正前の古いreportだけでは通過できず、評価中にCIが変わった場合も、専用CI待機判定だけを次周期へ戻す。scope不整合・不正定義・timeoutは通常の失敗処理を維持する。
+
+有効化は既存手順の同一scopeでのdry-run、計画と必要権限の確認、apply、`schedule.every_seconds` の設定で行う。初期化だけで常駐schedulerを有効にしたり、同じ仕事をChronosとresident cadenceへ二重登録したりしない。`continuous-managed-work.json` はowner専用markerのままであり、dot workerのmission禁止を解除する入口ではない。

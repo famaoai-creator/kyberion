@@ -1,3 +1,4 @@
+import { conciergeApprovalReviewScope } from './approval-review-scope';
 import {
   availableHeadlessOperationIds,
   createHeadlessEnvelope,
@@ -7,6 +8,7 @@ import {
   type HeadlessResourceDescriptor,
 } from '@agent/core/headless-surface-contract';
 import { buildCeoSurfaceSummary, type CeoSurfaceSummary } from '@agent/core/ceo-surface-summary';
+import { conciergeApprovalSnapshot } from './personal-approval-server';
 import type { OperatorHomeScopeFilter } from '@agent/core/surface/operator-home-summary';
 import type { A2UIMessage } from '@agent/core/a2ui';
 import {
@@ -131,14 +133,32 @@ export function readConciergeHome(
   const narrowed = narrowConciergeScope(viewer, query);
   const scope: OperatorHomeScopeFilter = {
     tiers: viewer.tierAccess,
+    includePersonalApprovals:
+      Array.isArray(narrowed.tenantSlugs) &&
+      narrowed.tenantSlugs.length === 0 &&
+      !viewer.includeUntenanted,
     tenantSlugs: narrowed.tenantSlugs,
     organizationIds: narrowed.organizationIds,
     projectIds: narrowed.projectIds,
     ...(viewer.includeUntenanted ? { includeUntenanted: true } : {}),
   };
-  return withConciergeViewerContext(viewer, () =>
-    buildCeoSurfaceSummary({ scope, limit: query.limit || 20 })
-  );
+  return withConciergeViewerContext(viewer, () => {
+    const snapshot = conciergeApprovalSnapshot(viewer);
+    const summary = buildCeoSurfaceSummary({
+      scope,
+      limit: query.limit || 20,
+      approvalSnapshot: snapshot,
+    });
+    for (const item of summary.approval_queue) {
+      const record = snapshot.find(
+        (record) =>
+          record.id === item.id &&
+          (record.storageChannel ?? record.channel) === item.storage_channel
+      );
+      if (record) item.review_scope = conciergeApprovalReviewScope(viewer, record);
+    }
+    return summary;
+  });
 }
 
 export function conciergeEnvelope<T>(resource: string, data: T, viewer: ConciergeViewerContext) {

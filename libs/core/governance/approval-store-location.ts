@@ -57,6 +57,12 @@ import {
   normalizeApprovalRequestId,
 } from './approval-store-paths.js';
 import type { ApprovalRequestRecord } from './approval-store.js';
+import {
+  PERSONAL_APPROVAL_STORE_ROLE,
+  currentPersonalApprovalOwnerHash,
+  personalApprovalOwnerHash,
+  withPersonalApprovalIo,
+} from './personal-approval-runtime.js';
 
 const logger = createLogger('approval-store-location');
 
@@ -80,7 +86,13 @@ export interface ApprovalTenantPartition {
   tenant_slug: string;
 }
 
-export type ApprovalPartition = { kind: 'system' } | ApprovalTenantPartition;
+export interface ApprovalPersonalPartition {
+  kind: 'personal';
+  tier: 'personal';
+  owner_hash: string;
+}
+export type PrivateApprovalPartition = ApprovalTenantPartition | ApprovalPersonalPartition;
+export type ApprovalPartition = { kind: 'system' } | PrivateApprovalPartition;
 
 export const SYSTEM_APPROVAL_PARTITION: ApprovalPartition = Object.freeze({ kind: 'system' });
 
@@ -121,7 +133,16 @@ export function approvalPartitionForScope(
   options: { storageChannel?: string; kind?: string; tenantActive?: boolean } = {}
 ): ApprovalPartition {
   const tenant = normalizedTenant(scope?.tenant_slug);
-  if (!tenant) return SYSTEM_APPROVAL_PARTITION;
+  if (!tenant)
+    return scope?.tier === 'personal'
+      ? {
+          kind: 'personal',
+          tier: 'personal',
+          owner_hash: scope.nhi_id
+            ? personalApprovalOwnerHash(scope.nhi_id)
+            : (currentPersonalApprovalOwnerHash() ?? 'unbound'),
+        }
+      : SYSTEM_APPROVAL_PARTITION;
   if (
     options.storageChannel !== undefined &&
     normalizeApprovalChannel(options.storageChannel) === TENANT_ACTIVATION_STORAGE_CHANNEL &&
@@ -138,7 +159,12 @@ export function approvalPartitionForScope(
 // ---------------------------------------------------------------------------
 
 /** Repo-relative root of one tenant partition (`<root>/<tier>/<tenant>`). */
-export function tenantApprovalPartitionLogicalRoot(partition: ApprovalTenantPartition): string {
+export function tenantApprovalPartitionLogicalRoot(partition: PrivateApprovalPartition): string {
+  if (partition.kind === 'personal') {
+    if (!/^(?:[a-f0-9]{64}|unbound)$/u.test(partition.owner_hash))
+      throw new Error('[PERSONAL_APPROVAL_SCOPE_REQUIRED] Invalid owner pin');
+    return `${approvalStoreRoots().tenantApprovals}/personal/shared/owners/${partition.owner_hash}`;
+  }
   return path.posix.join(
     approvalStoreRoots().tenantApprovals,
     ...storagePartitionSegments({
@@ -151,7 +177,7 @@ export function tenantApprovalPartitionLogicalRoot(partition: ApprovalTenantPart
 
 /** Tenant partition: `<root>/<tier>/<tenant>/<channel>/requests`. */
 export function tenantApprovalRequestsLogicalDir(
-  partition: ApprovalTenantPartition,
+  partition: PrivateApprovalPartition,
   storageChannel: string
 ): string {
   return `${tenantApprovalPartitionLogicalRoot(partition)}/${normalizeApprovalChannel(storageChannel)}/requests`;
@@ -159,7 +185,7 @@ export function tenantApprovalRequestsLogicalDir(
 
 /** Tenant partition: `<root>/<tier>/<tenant>/<channel>/requests/<id>.json`. */
 export function tenantApprovalRequestLogicalPath(
-  partition: ApprovalTenantPartition,
+  partition: PrivateApprovalPartition,
   storageChannel: string,
   id: string
 ): string {
@@ -168,7 +194,7 @@ export function tenantApprovalRequestLogicalPath(
 
 /** Tenant partition: `<root>/<tier>/<tenant>/<channel>/approvals.jsonl`. */
 export function tenantApprovalEventLogicalPath(
-  partition: ApprovalTenantPartition,
+  partition: PrivateApprovalPartition,
   storageChannel: string
 ): string {
   return `${tenantApprovalPartitionLogicalRoot(partition)}/${normalizeApprovalChannel(storageChannel)}/approvals.jsonl`;
@@ -176,7 +202,7 @@ export function tenantApprovalEventLogicalPath(
 
 /** Tenant partition: `<root>/<tier>/<tenant>/<channel>/passkey-challenges`. */
 export function tenantApprovalPasskeyChallengesLogicalDir(
-  partition: ApprovalTenantPartition,
+  partition: PrivateApprovalPartition,
   storageChannel: string
 ): string {
   return `${tenantApprovalPartitionLogicalRoot(partition)}/${normalizeApprovalChannel(storageChannel)}/passkey-challenges`;
@@ -255,6 +281,19 @@ function assertMayBindApprovalTenant(tenantSlug: string): void {
 export function asTenantApprovalStore<T>(tenantSlug: string, fn: () => T): T {
   return withExecutionContext(TENANT_APPROVAL_STORE_ROLE, fn, undefined, tenantSlug);
 }
+function mayBindPersonal(partition: ApprovalPersonalPartition): boolean {
+  return currentPersonalApprovalOwnerHash() === partition.owner_hash;
+}
+function asPersonalApprovalStore<T>(
+  partition: ApprovalPersonalPartition,
+  logicalPath: string,
+  writing: boolean,
+  fn: () => T
+): T {
+  return withPersonalApprovalIo(partition.owner_hash, logicalPath, writing, () =>
+    withExecutionContext(PERSONAL_APPROVAL_STORE_ROLE, fn, 'worker')
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Partition I/O (system → the caller's role; tenant → the tenant-bound store role).
@@ -275,7 +314,7 @@ const LIVE_SYSTEM_OBSERVABILITY_ROOT = 'active/shared/observability/channels';
  * Absolute (under the project root), so tier-guard judges the real grant even
  * under Vitest, where the store itself lives in the isolated root.
  */
-function liveSystemPathFor(partition: ApprovalTenantPartition, logicalPath: string): string {
+function liveSystemPathFor(partition: PrivateApprovalPartition, logicalPath: string): string {
   const root = tenantApprovalPartitionLogicalRoot(partition);
   if (logicalPath !== root && !logicalPath.startsWith(root + '/')) {
     throw new Error(
@@ -314,7 +353,7 @@ function liveSystemPathFor(partition: ApprovalTenantPartition, logicalPath: stri
  */
 function assertCallerChannelWrite(
   access: 'write' | 'mkdir',
-  partition: ApprovalTenantPartition,
+  partition: PrivateApprovalPartition,
   logicalPath: string,
   role: ApprovalStoreRole
 ): void {
@@ -341,6 +380,12 @@ function asPartitionWriter<T>(
   fn: () => T
 ): T {
   if (partition.kind === 'system') return withExecutionContext(role, fn);
+  if (partition.kind === 'personal') {
+    if (!mayBindPersonal(partition))
+      throw new Error('[PERSONAL_APPROVAL_SCOPE_REQUIRED] Actual personal owner required');
+    assertCallerChannelWrite(access, partition, logicalPath, role);
+    return asPersonalApprovalStore(partition, logicalPath, true, fn);
+  }
   assertMayBindApprovalTenant(partition.tenant_slug);
   assertCallerChannelWrite(access, partition, logicalPath, role);
   return asTenantApprovalStore(partition.tenant_slug, fn);
@@ -358,6 +403,12 @@ function prepareGovernedFile(logicalPath: string): string {
 /** Read a JSON file in a location; null when absent. */
 export function readApprovalJsonAt<T>(partition: ApprovalPartition, logicalPath: string): T | null {
   if (partition.kind === 'system') return readGovernedArtifactJson<T>(logicalPath);
+  if (partition.kind === 'personal')
+    return mayBindPersonal(partition)
+      ? asPersonalApprovalStore(partition, logicalPath, false, () =>
+          readGovernedArtifactJson<T>(logicalPath)
+        )
+      : null;
   if (!mayBindApprovalTenant(partition.tenant_slug)) return null;
   return asTenantApprovalStore(partition.tenant_slug, () =>
     readGovernedArtifactJson<T>(logicalPath)
@@ -371,6 +422,10 @@ export function listApprovalDirAt(partition: ApprovalPartition, logicalDir: stri
     return safeExistsSync(resolved) ? safeReaddir(resolved).sort() : [];
   };
   if (partition.kind === 'system') return list();
+  if (partition.kind === 'personal')
+    return mayBindPersonal(partition)
+      ? asPersonalApprovalStore(partition, logicalDir, false, list)
+      : [];
   if (!mayBindApprovalTenant(partition.tenant_slug)) return [];
   return asTenantApprovalStore(partition.tenant_slug, list);
 }
@@ -429,8 +484,24 @@ export function approvalFileExistsAt(
   partition: ApprovalPartition,
   logicalPath: string
 ): boolean {
+  if (partition.kind === 'system' && role)
+    return withExecutionContext(role, () =>
+      safeExistsSync(resolveGovernedArtifactPath(logicalPath))
+    );
+  return approvalFileExistsAtCurrentIdentity(partition, logicalPath);
+}
+
+/** Read existence without assuming a caller-supplied role; private partition fences still apply. */
+export function approvalFileExistsAtCurrentIdentity(
+  partition: ApprovalPartition,
+  logicalPath: string
+): boolean {
   const exists = (): boolean => safeExistsSync(resolveGovernedArtifactPath(logicalPath));
-  if (partition.kind === 'system') return role ? withExecutionContext(role, exists) : exists();
+  if (partition.kind === 'system') return exists();
+  if (partition.kind === 'personal')
+    return (
+      mayBindPersonal(partition) && asPersonalApprovalStore(partition, logicalPath, false, exists)
+    );
   if (!mayBindApprovalTenant(partition.tenant_slug)) return false;
   return asTenantApprovalStore(partition.tenant_slug, exists);
 }
@@ -472,6 +543,10 @@ export function readApprovalJsonlAt<T = Record<string, unknown>>(
     return readJsonLines<T>(resolved, { onMalformed: 'skip' });
   };
   if (partition.kind === 'system') return role ? withExecutionContext(role, read) : read();
+  if (partition.kind === 'personal')
+    return mayBindPersonal(partition)
+      ? asPersonalApprovalStore(partition, logicalPath, false, read)
+      : [];
   if (!mayBindApprovalTenant(partition.tenant_slug)) return [];
   return asTenantApprovalStore(partition.tenant_slug, read);
 }
@@ -504,9 +579,12 @@ function listTierTenants(tier: ApprovalPartitionTier): string[] {
  * (both tiers) when it has an active tenant, otherwise every tenant directory
  * the index reader lists. Only partitions that exist are returned.
  */
-export function listApprovalPartitions(): ApprovalTenantPartition[] {
+export function listApprovalPartitions(): PrivateApprovalPartition[] {
   const active = activeTenant();
-  const partitions: ApprovalTenantPartition[] = [];
+  const owner = currentPersonalApprovalOwnerHash();
+  const partitions: PrivateApprovalPartition[] = owner
+    ? [{ kind: 'personal', tier: 'personal', owner_hash: owner }]
+    : [];
   for (const tier of PARTITION_TIERS) {
     const tenants = active ? [active] : listTierTenants(tier);
     for (const tenant of tenants) {
@@ -550,6 +628,10 @@ export function listApprovalChannelsAt(partition: ApprovalPartition): string[] {
 function approvalDirExistsAt(partition: ApprovalPartition, logicalDir: string): boolean {
   const exists = (): boolean => safeExistsSync(resolveGovernedArtifactPath(logicalDir));
   if (partition.kind === 'system') return exists();
+  if (partition.kind === 'personal')
+    return (
+      mayBindPersonal(partition) && asPersonalApprovalStore(partition, logicalDir, false, exists)
+    );
   return asTenantApprovalStore(partition.tenant_slug, exists);
 }
 
@@ -563,11 +645,17 @@ export function systemRecordVisibleToThisProcess(
   record: Pick<ApprovalRequestRecord, 'scope'>
 ): boolean {
   const tenant = normalizedTenant(record.scope?.tenant_slug);
+  if (!tenant && record.scope?.tier === 'personal')
+    return currentPersonalApprovalOwnerHash() === personalApprovalOwnerHash(record.scope.nhi_id);
   return !tenant || mayBindApprovalTenant(tenant);
 }
 
 function describePartition(partition: ApprovalPartition): string {
-  return partition.kind === 'system' ? 'system' : `${partition.tier} tenant partition`;
+  return partition.kind === 'system'
+    ? 'system'
+    : partition.kind === 'personal'
+      ? 'personal owner partition'
+      : `${partition.tier} tenant partition`;
 }
 
 /**
@@ -624,6 +712,13 @@ export function assertApprovalLocationAgrees(
 ): void {
   if (partition.kind === 'system') return;
   const expected = approvalPartitionForScope(record.scope, { tenantActive: true });
+  if (partition.kind === 'personal') {
+    if (expected.kind !== 'personal' || expected.owner_hash !== partition.owner_hash)
+      throw new Error(
+        '[APPROVAL_LOCATION_MISMATCH] Personal owner partition differs from recorded scope'
+      );
+    return;
+  }
   if (
     expected.kind !== 'tenant' ||
     expected.tenant_slug !== partition.tenant_slug ||

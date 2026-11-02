@@ -329,6 +329,7 @@ export async function runContinuousWorkOwner(
                 scope,
                 operation_key: `${actionRef}:advance:${m.key}:${state!.step}`,
                 creation_key: `${actionRef}:mission:${m.key}`,
+                ...(m.development ? { development: m.development } : {}),
                 signal: abort.signal,
               })
             );

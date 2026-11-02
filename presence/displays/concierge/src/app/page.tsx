@@ -714,6 +714,23 @@ export default function ConciergePage() {
         fields={fields}
         locale={locale}
       >
+        {item.review_scope || item.evidence?.length ? (
+          <details className="approval-review-scope">
+            <summary>{t('queue.review_scope')}</summary>
+            {item.evidence?.map((evidence) => (
+              <p key={`${evidence.label}:${evidence.ref}`}>
+                {evidence.label}
+                <br />
+                <code>{evidence.ref}</code>
+              </p>
+            ))}
+            {item.review_scope ? (
+              <pre style={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere' }}>
+                {item.review_scope}
+              </pre>
+            ) : null}
+          </details>
+        ) : null}
         <div className="decide-actions">
           <Button
             label={
