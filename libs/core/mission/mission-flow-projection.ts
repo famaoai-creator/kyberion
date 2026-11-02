@@ -28,6 +28,7 @@ import {
 } from './mission-lifecycle-completion.js';
 import type { MissionState } from './mission-types.js';
 import { validatePlannedNextTasks } from './mission-next-task-validation.js';
+import { detectMissionStalls } from './mission-stall-detection.js';
 
 export interface MissionFlowBlocker {
   code:
@@ -472,6 +473,25 @@ export function collectMissionFlowProjection(input: {
           : recommendation.reason,
       evidence_refs: [...(stateRef ? [stateRef] : []), ...flow.completion.evidence_refs],
     });
+  // Stall wording is advisory only: it annotates an existing continue_task
+  // reason and never changes a candidate's kind, action, or membership. The
+  // ledger is only read when such a candidate exists and a mission dir does.
+  if (missionDir && flow.candidates.some((c) => c.kind === 'continue_task' && c.task_id)) {
+    try {
+      const stalls = new Map(
+        detectMissionStalls(missionDir).candidates.map((stall) => [stall.task_id, stall])
+      );
+      for (const candidate of flow.candidates) {
+        if (candidate.kind !== 'continue_task' || !candidate.task_id) continue;
+        const stall = stalls.get(candidate.task_id);
+        if (!stall) continue;
+        const hours = Math.max(1, Math.round(stall.stall_age_ms / (60 * 60 * 1000)));
+        candidate.reason += ` No ledger progress for ~${hours}h; consider triage.`;
+      }
+    } catch {
+      // A failed stall observation changes nothing; the projection stands.
+    }
+  }
   flow.disposition = flow.blockers.some((item) =>
     ['observation_missing', 'observation_unreadable'].includes(item.code)
   )

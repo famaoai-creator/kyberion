@@ -31,6 +31,10 @@ import {
   writerLeaseResourceId,
 } from '../writer-lease.js';
 import { resolveMissionDir, tryResolveOwnerScope, type OwnerScopeHint } from '../owner-scope.js';
+import { createLogger, formatDiagnostic } from '../logger.js';
+import { validateMissionBlueprint } from './mission-blueprint-validation.js';
+
+const logger = createLogger('mission-next-tasks');
 
 export type MissionOrchestrationJournalStatus = 'enqueued' | 'completed' | 'failed';
 
@@ -526,6 +530,38 @@ export function writeProvisionedJson<TContent>(input: {
 }
 
 /**
+ * Advisory blueprint check at the NEXT_TASKS write boundary: error-severity
+ * findings surface as diagnostics, warnings stay at debug. The write itself
+ * is never blocked — kickoff and rebuilds legitimately write boards in
+ * stages, and readers keep their own graph checks.
+ */
+function reportNextTasksBlueprint(missionId: string, board: unknown): void {
+  for (const message of validateMissionBlueprint(board)) {
+    const why = `${message.code}: ${message.message}${message.subject_id ? ` [${message.subject_id}]` : ''}`;
+    if (message.severity === 'error') {
+      logger.warn(
+        formatDiagnostic({
+          component: 'mission-next-tasks',
+          what: `NEXT_TASKS.json blueprint violation in ${missionId}`,
+          why,
+          next: 'repair the task board or re-plan (the write was advisory-recorded, not blocked)',
+          evidence: 'NEXT_TASKS.json',
+        })
+      );
+    } else {
+      logger.debug(
+        formatDiagnostic({
+          component: 'mission-next-tasks',
+          what: `NEXT_TASKS.json blueprint note in ${missionId}`,
+          why,
+          evidence: 'NEXT_TASKS.json',
+        })
+      );
+    }
+  }
+}
+
+/**
  * {@link writeProvisionedJson} whose entry is built under the writer lease, so
  * a read-modify-write of the artifact sees no other writer between its read
  * and its write. `build` runs inside the lease and must not take it again;
@@ -549,6 +585,9 @@ export function writeProvisionedJsonFrom<TContent>(input: {
     fn: () => {
       const provisioned = input.build();
       if (!provisioned) return undefined;
+      if (input.targetPath === 'NEXT_TASKS.json') {
+        reportNextTasksBlueprint(input.missionId, provisioned.content);
+      }
       writeProvisionedEntryRecord(recordPath, {
         missionId: input.missionId,
         entry: provisioned,
