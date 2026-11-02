@@ -254,20 +254,21 @@ export function setAuthorizationOverlayProvider(
 
 /** Collision rule enforced at lookup: a code declaration always wins over any
  * overlay/plugin declaration, so data files can add coverage but can never
- * weaken a reviewed entry — including via a longer shadowing prefix. */
+ * weaken a reviewed entry — including via a longer shadowing prefix.
+ * Within the data layers an exact id always beats every prefix regardless of
+ * overlay order; among prefixes the longest wins, ties go to the earlier
+ * overlay. */
 function lookupOverlay(
   operationId: string
 ): { entry: RegistryEntry; source: AuthorizationSource } | undefined {
   const overlays = overlayProvider?.() ?? [];
+  for (const overlay of overlays) {
+    const exact = overlay.operations[operationId];
+    if (exact) return { entry: exact, source: overlay.source };
+  }
   let best: { entry: RegistryEntry; source: AuthorizationSource } | undefined;
   let bestLen = -1;
   for (const overlay of overlays) {
-    const exact = overlay.operations[operationId];
-    if (exact && 0 > bestLen) {
-      best = { entry: exact, source: overlay.source };
-      bestLen = Number.MAX_SAFE_INTEGER;
-      continue;
-    }
     for (const [prefix, entry] of Object.entries(overlay.prefixes)) {
       if (operationId.startsWith(prefix) && prefix.length > bestLen) {
         best = { entry, source: overlay.source };

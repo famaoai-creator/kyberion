@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://kyberion.dev/schemas/authorization-registry.schema.json",
   "title": "Authorization Registry Overlay",
-  "description": "Non-code operation authorization declarations. Keys in `operations` are exact operation ids; keys in `prefixes` are operation-id prefixes ending in ':'. Data entries may add coverage but can never weaken a code declaration — the code table always wins at lookup.",
+  "description": "Non-code operation authorization declarations. Keys in `operations` are exact operation ids; keys in `prefixes` are operation-id prefixes ending in ':'. Two hardening rules apply to every data entry: (1) the code table always wins at lookup, so data can add coverage but never weaken a reviewed declaration; (2) data layers may not declare `local_only` or `authority.kind === 'free'` at all — bypassing admission requires a reviewed code entry, never a data file.",
   "type": "object",
   "additionalProperties": false,
   "properties": {
@@ -10,9 +10,9 @@
     "operations": {
       "type": "object",
       "additionalProperties": false,
-      "propertyNames": { "pattern": "^[a-z0-9_]+(:[a-z0-9_*.-]+)+$" },
+      "propertyNames": { "pattern": "^[a-z0-9_]+(:[a-z0-9_.-]+)+$" },
       "patternProperties": {
-        "^[a-z0-9_]+(:[a-z0-9_*.-]+)+$": { "$ref": "#/definitions/entry" }
+        "^[a-z0-9_]+(:[a-z0-9_.-]+)+$": { "$ref": "#/definitions/entry" }
       }
     },
     "prefixes": {
@@ -32,26 +32,20 @@
       "properties": {
         "effectClass": {
           "type": "string",
+          "description": "Closed taxonomy. 'local_only' is deliberately absent: a data declaration that lets an operation bypass every boundary would weaken the deny-by-default posture, so local-ness may only come from a reviewed code entry.",
           "enum": [
             "external_mutation",
             "external_read",
             "internal_decision",
             "knowledge_write",
             "credential_use",
-            "system_control",
-            "local_only"
+            "system_control"
           ]
         },
         "authority": {
           "type": "object",
+          "description": "'free' is deliberately absent — see effectClass description.",
           "oneOf": [
-            {
-              "required": ["kind"],
-              "properties": {
-                "kind": { "const": "free" }
-              },
-              "additionalProperties": false
-            },
             {
               "required": ["kind", "boundary"],
               "properties": {

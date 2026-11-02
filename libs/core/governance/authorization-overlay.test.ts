@@ -42,6 +42,38 @@ describe('authorization-overlay catalog', () => {
       })
     ).toThrow(/Invalid catalog/);
   });
+
+  it('data layers cannot declare free authority or local_only class', () => {
+    // A data declaration that bypasses admission would let an unreviewed file
+    // weaken the deny-by-default posture — both forms must be rejected.
+    expect(() =>
+      authorizationOverlayCatalog.validate({
+        operations: {
+          'acme:local': { effectClass: 'local_only', authority: { kind: 'free' } },
+        },
+      })
+    ).toThrow(/Invalid catalog/);
+    expect(() =>
+      authorizationOverlayCatalog.validate({
+        operations: {
+          'acme:quiet': {
+            effectClass: 'external_read',
+            authority: { kind: 'free' },
+          },
+        },
+      })
+    ).toThrow(/Invalid catalog/);
+    expect(() =>
+      authorizationOverlayCatalog.validate({
+        prefixes: {
+          'acme:': {
+            effectClass: 'local_only',
+            authority: { kind: 'admission', boundary: 'internal' },
+          },
+        },
+      })
+    ).toThrow(/Invalid catalog/);
+  });
 });
 
 describe('authorization-overlay provider (registered at import)', () => {

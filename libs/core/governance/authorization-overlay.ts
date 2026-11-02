@@ -15,11 +15,14 @@
  * every `operationAuthorization` consumer — free of the managed-plugin
  * dependency graph.
  *
- * Ordering: the file overlay is supplied before plugin overlays; within each
- * overlay an exact id beats its own prefixes; across sources the first
- * provider wins. Independently, `operationAuthorization` always prefers a
- * code declaration over every data declaration — data can add coverage but
- * can never weaken a reviewed entry.
+ * Ordering: the file overlay is supplied before plugin overlays; an exact id
+ * always beats every prefix regardless of source order; among prefixes the
+ * longest wins, ties go to the earlier overlay. Independently,
+ * `operationAuthorization` always prefers a code declaration over every data
+ * declaration — data can add coverage but can never weaken a reviewed entry.
+ * The schema additionally forbids `local_only` and `authority.kind:'free'` in
+ * every data entry, so bypassing admission always requires a reviewed code
+ * declaration.
  *
  * Import this module once for its registration side effect (external-operation
  * boundary and target builder already do). Callers that skip it simply see

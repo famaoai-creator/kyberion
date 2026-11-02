@@ -111,6 +111,27 @@ describe('authorization-registry overlays', () => {
     });
   });
 
+  it('an overlay exact beats every overlay prefix regardless of order', () => {
+    // Regression: a prefix from an earlier overlay must never shadow a later
+    // overlay's exact declaration.
+    restore = setAuthorizationOverlayProvider(() => [
+      overlay({
+        prefixes: { 'acme:': { effectClass: 'external_read', authority: admission } },
+      }),
+      overlay({
+        operations: {
+          'acme:report:x': { effectClass: 'external_mutation', authority: admission },
+        },
+        prefixes: {},
+      }),
+    ]);
+    const auth = operationAuthorization('acme:report:x');
+    expect({ effectClass: auth.effectClass, source: auth.source }).toEqual({
+      effectClass: 'external_mutation',
+      source: 'overlay',
+    });
+  });
+
   it('longest prefix wins across overlays; first overlay wins ties', () => {
     restore = setAuthorizationOverlayProvider(() => [
       overlay({
