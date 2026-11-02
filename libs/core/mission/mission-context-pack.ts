@@ -58,6 +58,7 @@ import {
   workItemProjectId,
 } from './mission-context-pack-knowledge.js';
 import { loadMissionStateAtPath } from './mission-state-reader.js';
+import { condenseMissionContextPackSources } from './mission-context-condenser.js';
 import { loadMissionWorkItemDispatchManifestAtPath } from './mission-workitem-dispatch-manifest.js';
 import { loadMissionWorkItemDispatchResponseSeedAtPath } from './mission-workitem-dispatch-response.js';
 import type {
@@ -1256,6 +1257,13 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
       captured_at: nowIso(),
     });
   }
+  // Opt-in source condensation (PoC): when the caller supplies a budget +
+  // strategy, shrink the sources list through the condenser adapter before
+  // render/prune. No budget = `sources` passes through untouched.
+  const packSources = input.sourceCondenser
+    ? condenseMissionContextPackSources(sources, input.sourceCondenser).sources
+    : sources;
+
   const summary = missionContextSummary({
     missionId: input.missionState.mission_id,
     teamRole: input.teamRole,
@@ -1325,7 +1333,7 @@ export function buildMissionContextPack(input: BuildMissionContextPackInput): Mi
     ...(artifactHints.length > 0 ? { artifact_hints: artifactHints } : {}),
     ...(taskGuidance ? { task_guidance: taskGuidance } : {}),
     ...(facets ? { facets } : {}),
-    sources,
+    sources: packSources,
     redactions: defaultRedactions(),
     delivery: {
       mode: 'prompt',
@@ -1431,6 +1439,7 @@ export async function resolveMissionContextPack(
     ...(input.contextBudgetChars ? { contextBudgetChars: input.contextBudgetChars } : {}),
     ...(input.contextPackId ? { contextPackId: input.contextPackId } : {}),
     ...(input.estimatedScope ? { estimatedScope: input.estimatedScope } : {}),
+    ...(input.sourceCondenser ? { sourceCondenser: input.sourceCondenser } : {}),
     ...(input.tenantKnowledgeRootDir
       ? { tenantKnowledgeRootDir: input.tenantKnowledgeRootDir }
       : {}),

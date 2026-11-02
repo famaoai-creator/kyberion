@@ -1,5 +1,6 @@
 import { discoverProviders, type ProviderInfo } from '../provider/provider-discovery.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
+import type { ExternalHarnessRegistry, HarnessDescriptor } from './external-harness-registry.js';
 import { isObsoleteAgentRuntimeProvider, loadProviderConfig } from '../provider/provider-config.js';
 import { listDemotedProviders } from '../provider/provider-health-view.js';
 import { loadOperatorProviderPreferences } from '../surface/operator-provider-preferences.js';
@@ -413,6 +414,14 @@ export interface CapabilityResolveOptions {
   fallbackProviders?: string[];
   excludeProviders?: string[];
   orchestration?: OrchestrationTier;
+  /**
+   * Opt-in consult with the external-harness registry (PoC). When a caller
+   * injects a registry, 'available' external harnesses covering every
+   * required capability are surfaced on the resolution as advisory
+   * metadata — naming possible out-of-process dispatch targets, never
+   * dispatching or spawning one. Omitted = pre-existing behavior.
+   */
+  externalHarnessRegistry?: ExternalHarnessRegistry;
 }
 
 export interface CapabilityResolution {
@@ -424,6 +433,13 @@ export interface CapabilityResolution {
   unmetCapabilities: string[];
   orchestration: OrchestrationTier;
   rationale: string;
+  /**
+   * Advisory only: external harnesses matching the request when
+   * {@link CapabilityResolveOptions.externalHarnessRegistry} was supplied.
+   * Present only when at least one 'available' harness covers all required
+   * capabilities; the dispatcher is never invoked.
+   */
+  externalHarnesses?: HarnessDescriptor[];
 }
 
 function combinedCapabilities(info: ProviderInfo | undefined, modelId: string): string[] {
@@ -443,6 +459,26 @@ function computeUnmet(
   return required.filter((capability) => !have.has(capability.trim().toLowerCase()));
 }
 
+/**
+ * Advisory consult with an injected external-harness registry. Returns the
+ * 'available' harnesses that cover every required capability (registration
+ * order) — a harness that only partially covers the request is not a viable
+ * dispatch target and is not surfaced. Advisory metadata only; nothing here
+ * spawns, routes, or holds dispatch authority.
+ */
+function consultExternalHarnesses(
+  registry: ExternalHarnessRegistry | undefined,
+  requiredCapabilities: string[]
+): HarnessDescriptor[] | undefined {
+  if (!registry || requiredCapabilities.length === 0) return undefined;
+  const required = [...normalizeSet(requiredCapabilities)];
+  const matches = registry.listHarnesses({ status: 'available' }).filter((harness) => {
+    const offered = normalizeSet(harness.capabilities);
+    return required.every((capability) => offered.has(capability));
+  });
+  return matches.length > 0 ? matches : undefined;
+}
+
 export function resolveCapabilityTarget(
   options: CapabilityResolveOptions,
   discoveredProviders = discoverProviders()
@@ -456,6 +492,10 @@ export function resolveCapabilityTarget(
     orchestration === 'managed_workflow'
       ? Array.from(new Set([...baseRequired, 'managed_workflow']))
       : baseRequired;
+  const externalHarnesses = consultExternalHarnesses(
+    options.externalHarnessRegistry,
+    requiredCapabilities
+  );
   const installed = discoveredProviders.filter((entry) => entry.installed && entry.healthy);
   const availableProviders = installed.map((entry) => entry.provider);
 
@@ -470,6 +510,7 @@ export function resolveCapabilityTarget(
     unmetCapabilities: requiredCapabilities,
     orchestration,
     rationale,
+    ...(externalHarnesses ? { externalHarnesses } : {}),
   });
 
   if (installed.length === 0) {
@@ -557,5 +598,6 @@ export function resolveCapabilityTarget(
     unmetCapabilities,
     orchestration,
     rationale,
+    ...(externalHarnesses ? { externalHarnesses } : {}),
   };
 }

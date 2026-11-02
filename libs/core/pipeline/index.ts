@@ -4,6 +4,7 @@ export * from './adf-guardrails.js';
 export * from './adf-lifecycle.js';
 export * from './adf-repair-agent.js';
 export * from './cron-utils.js';
+export * from './dirty-json.js';
 export * from './logic-utils.js';
 export * from './op-input-contracts.js';
 export * from './op-preflight-defaults.js';

@@ -88,12 +88,8 @@
       "reason": "Bounded PoC imported from Microsoft Agent Framework AgentFactory/WorkflowFactory (mission MSN-HARNESS-IMPORT-20261102): declaration -> collect-all validation -> normalized agent/workflow spec. Construct-only by design; production wiring (dispatch/registry consumers) is an explicit follow-up recorded in the mission retrospective."
     },
     {
-      "id": "libs/core/agent/external-harness-registry.ts",
-      "reason": "Bounded PoC imported from OpenHands ACP router / Preloop agent factory (mission MSN-HARNESS-IMPORT-20261102): describing registry for external harnesses (acp/cli/process kinds, capability resolution, trust tiers). No live dispatch is wired intentionally; connecting to agent-dispatch is a follow-up pending an external adapter."
-    },
-    {
-      "id": "libs/core/knowledge/memory-capability-token.ts",
-      "reason": "Bounded PoC imported from Tandem MemoryCapabilityToken (mission MSN-HARNESS-IMPORT-20261102): HMAC-scoped capability tokens layered on tier-guard. Enforcement into memory write paths (memory-promotion candidate) is a follow-up; wiring a dummy caller now would misrepresent the PoC boundary."
+      "id": "libs/core/mission/mission-lease.ts",
+      "reason": "Mastra-style lease manager (mission MSN-MEDIUM-IMPORTS-20261102), wired into claimWorkItemInternal (MSN-WIRING-20261102) through a structural leaseAdvisory interface that deliberately avoids a runtime import of this module — keeping the workforce -> mission direction dependency-free. Consumers inject a MissionLeaseManager instance; unit tests exercise the manager directly."
     }
   ],
   "scripts": [
