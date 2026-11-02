@@ -15,6 +15,29 @@ export interface VoiceLoopbackSttAdapterOptions {
   language: string;
 }
 
+type VoiceLoopbackSttFactory = (
+  options: VoiceLoopbackSttAdapterOptions
+) => StreamingSpeechToTextBridge;
+
+/** Named factories for loopback STT — register instead of growing an if-chain. */
+const loopbackSttFactories = new Map<string, VoiceLoopbackSttFactory>();
+
+export function registerVoiceLoopbackSttFactory(
+  bridgeId: string,
+  factory: VoiceLoopbackSttFactory
+): () => void {
+  const id = String(bridgeId || '').trim();
+  if (!id) throw new Error('voice loopback STT factory id is required');
+  loopbackSttFactories.set(id, factory);
+  return () => {
+    if (loopbackSttFactories.get(id) === factory) loopbackSttFactories.delete(id);
+  };
+}
+
+export function listVoiceLoopbackSttFactoryIds(): string[] {
+  return [...loopbackSttFactories.keys()].sort();
+}
+
 /**
  * Installs only the requested backend adapter. The loopback verifier remains
  * backend-agnostic and resolves the resulting bridge through the core
@@ -24,12 +47,17 @@ export function registerVoiceLoopbackSttAdapter(
   bridgeId: string | undefined,
   options: VoiceLoopbackSttAdapterOptions
 ): void {
-  if (bridgeId === 'mlx_whisper') {
-    registerStreamingSttBridge(bridgeId, () => createMlxWhisperBridge(options));
+  const id = String(bridgeId || '').trim();
+  if (!id) return;
+  const factory = loopbackSttFactories.get(id);
+  if (!factory) {
+    throw new Error(
+      `voice loopback STT adapter '${id}' is not registered (have: ${
+        listVoiceLoopbackSttFactoryIds().join(', ') || 'none'
+      })`
+    );
   }
-  if (bridgeId === 'faster_whisper') {
-    registerStreamingSttBridge(bridgeId, () => createFasterWhisperBridge(options));
-  }
+  registerStreamingSttBridge(id, () => factory(options));
 }
 
 function createFasterWhisperBridge(
@@ -77,6 +105,46 @@ function createFasterWhisperBridge(
           );
         }
         const text = response.text.trim();
+        if (text) {
+          yield {
+            utterance_id: `${options.request_id}-final`,
+            is_final: true,
+            text,
+            emitted_at: nowIso(),
+          };
+        }
+      } finally {
+        safeRmSync(audioPath, { force: true });
+      }
+    },
+  };
+}
+
+function createSpeechCppBridge(
+  options: VoiceLoopbackSttAdapterOptions
+): StreamingSpeechToTextBridge {
+  return {
+    bridge_id: 'speech_cpp',
+    async *transcribeStream(audio) {
+      const chunks: Buffer[] = [];
+      for await (const chunk of audio) {
+        assertLoopbackFormat(chunk);
+        chunks.push(Buffer.from(chunk.payload));
+      }
+      if (chunks.length === 0) return;
+
+      const audioPath = pathResolver.sharedTmp(
+        `voice-loopback/${options.request_id}.speech-cpp.wav`
+      );
+      safeMkdir(path.dirname(audioPath), { recursive: true });
+      try {
+        safeWriteFile(audioPath, pcmToWav(Buffer.concat(chunks), 16_000));
+        const { transcribeSpeechCppCli } = await import('@agent/core/voice/speech-cpp-client');
+        const result = transcribeSpeechCppCli({
+          audioPath,
+          language: options.language,
+        });
+        const text = result.text.trim();
         if (text) {
           yield {
             utterance_id: `${options.request_id}-final`,
@@ -161,3 +229,7 @@ function assertLoopbackFormat(chunk: AudioChunk): void {
     throw new Error('voice STT backend requires 16kHz mono pcm_s16le');
   }
 }
+
+registerVoiceLoopbackSttFactory('mlx_whisper', createMlxWhisperBridge);
+registerVoiceLoopbackSttFactory('faster_whisper', createFasterWhisperBridge);
+registerVoiceLoopbackSttFactory('speech_cpp', createSpeechCppBridge);
