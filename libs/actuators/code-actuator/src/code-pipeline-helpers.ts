@@ -85,7 +85,18 @@ function retainOversizedResult(value: unknown, domain: string): unknown {
   const serialized = JSON.stringify(value);
   if (!serialized || serialized.length <= RETAINED_RESULT_INLINE_LIMIT) return value;
   const fileName = `${randomUUID()}.json`;
-  safeWriteFile(resolveStorageFloor('cache', SYSTEM_PARTITION, domain, fileName), serialized);
+  try {
+    safeWriteFile(resolveStorageFloor('cache', SYSTEM_PARTITION, domain, fileName), serialized);
+  } catch (error) {
+    // A retention failure must not fail the capture — return the payload
+    // inline with the limitation noted rather than losing the result.
+    logger.warn(
+      `[CODE_RETAIN_FAILED] could not persist oversized result — returning inline: ${
+        error instanceof Error ? error.message : String(error)
+      }`
+    );
+    return value;
+  }
   const preview = Array.isArray(value)
     ? value.slice(0, RETAINED_PREVIEW_ITEMS)
     : typeof value === 'object' && value !== null && Array.isArray((value as any).results)

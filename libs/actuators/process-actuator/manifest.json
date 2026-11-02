@@ -30,6 +30,11 @@
       "op": "status",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "read"
+    },
+    {
+      "op": "list-surfaces",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
     }
   ]
 }

@@ -432,6 +432,21 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
     managed.child.unref();
   }
 
+  // 'spawn'/'error' settle a tick after spawn(); a binary that never starts
+  // must not be recorded as running.
+  const spawnError = await new Promise<Error | null>((resolve) => {
+    managed.child.once('error', resolve);
+    managed.child.once('spawn', () => resolve(null));
+  });
+  if (spawnError || managed.child.pid === undefined) {
+    return {
+      status: 'spawn_failed',
+      id: surfaceId,
+      reason: spawnError?.message || 'surface process did not start',
+      logPath,
+    };
+  }
+
   state.surfaces[surfaceId] = {
     id: surfaceId,
     pid: managed.child.pid || -1,
