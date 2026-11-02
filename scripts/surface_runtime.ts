@@ -31,6 +31,10 @@ import { runtimeSupervisor } from '@agent/core/tool/runtime-supervisor';
 import { safeOpenAppendFile } from '@agent/core/secure-io';
 import { buildSystemRoleLaunchEnv } from '@agent/core/authority';
 import { spawnManagedProcess } from '@agent/core/managed-process';
+import {
+  isRecordedProcessAlive,
+  processStartMarker,
+} from '@agent/core/workforce/workspace-process-identity';
 import { inspectServiceAuth } from '@agent/core/service/service-validator';
 import { auditChain } from '@agent/core/governance/audit-chain';
 import { buildNextAction, formatNextAction } from '@agent/core/next-action';
@@ -119,7 +123,38 @@ async function describePortHolder(
   }
 }
 
-function isRunning(pid: number): boolean {
+type SurfacePidRecord = { pid: number; pidStartMarker?: string };
+
+/**
+ * Liveness of the process named by a state record: pid existence AND its
+ * start marker, so a recycled pid is never treated as the recorded surface.
+ * Records predating markers fall back to pid-only liveness.
+ */
+function isRunning(record: SurfacePidRecord): boolean {
+  return isRecordedProcessAlive(record.pid, record.pidStartMarker);
+}
+
+/**
+ * SIGTERM the process a record names, but only while its identity still
+ * matches: when a start marker exists and the live pid no longer carries it,
+ * the recorded surface is already gone and the pid belongs to an unrelated
+ * process we must not signal.
+ */
+function stopRecordedProcess(record: SurfacePidRecord): 'stopped' | 'pid_recycled' | 'not_running' {
+  if (!isPidAlive(record.pid)) return 'not_running';
+  if (record.pidStartMarker && !isRecordedProcessAlive(record.pid, record.pidStartMarker)) {
+    return 'pid_recycled';
+  }
+  try {
+    process.kill(record.pid, 'SIGTERM');
+  } catch (_) {
+    /* best-effort cleanup */
+  }
+  return 'stopped';
+}
+
+function isPidAlive(pid: number): boolean {
+  if (!pid || pid <= 0) return false;
   try {
     process.kill(pid, 0);
     return true;
@@ -132,6 +167,7 @@ function registerRunningSurfaceFromState(record: any) {
   if (
     !runtimeSupervisor.update(record.resourceId, {
       pid: record.pid,
+      pidStartMarker: record.pidStartMarker,
       state: 'running',
       metadata: {
         ...record.metadata,
@@ -148,6 +184,7 @@ function registerRunningSurfaceFromState(record: any) {
       ownerId: record.id,
       ownerType: 'surface-runtime-manifest',
       pid: record.pid,
+      pidStartMarker: record.pidStartMarker,
       shutdownPolicy: record.shutdownPolicy,
       metadata: {
         ...record.metadata,
@@ -156,23 +193,15 @@ function registerRunningSurfaceFromState(record: any) {
         logPath: record.logPath,
       },
       cleanup: () => {
-        try {
-          process.kill(record.pid, 'SIGTERM');
-        } catch (_) {
-          /* best-effort cleanup */
-        }
+        stopRecordedProcess(record);
       },
     });
   }
 }
 
-function stopByPid(pid: number | undefined): void {
-  if (!pid) return;
-  try {
-    process.kill(pid, 'SIGTERM');
-  } catch (_) {
-    /* best-effort cleanup */
-  }
+function stopSurfaceRecord(record: SurfacePidRecord | undefined): void {
+  if (!record) return;
+  stopRecordedProcess(record);
 }
 
 function recordProtocolSurfaceLifecycle(
@@ -219,7 +248,7 @@ function buildSurfaceRepairHint(
   if (definition.startupMode === 'on-demand') {
     return 'client-spawned surface (on-demand): its client starts it; not supervised';
   }
-  if (record && !isRunning(record.pid)) {
+  if (record && !isRunning(record)) {
     return 'stale state record: run pnpm surfaces repair -- --surface <surface-id>';
   }
   if (health.status === 'healthy') {
@@ -334,7 +363,7 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
 
   const state = loadSurfaceState();
   const existing = state.surfaces[surfaceId];
-  if (existing && isRunning(existing.pid)) {
+  if (existing && isRunning(existing)) {
     registerRunningSurfaceFromState(existing);
     return {
       status: 'running',
@@ -406,6 +435,7 @@ export async function startSurfaceById(surfaceId: string, manifestPath: string) 
   state.surfaces[surfaceId] = {
     id: surfaceId,
     pid: managed.child.pid || -1,
+    pidStartMarker: managed.child.pid ? processStartMarker(managed.child.pid) : undefined,
     resourceId: surfaceResourceId(surfaceId),
     kind: normalized.kind,
     command: normalized.command,
@@ -444,7 +474,7 @@ function stopSurfaceById(surfaceId: string) {
     return { status: 'not_found', id: surfaceId };
   }
 
-  stopByPid(record.pid);
+  stopSurfaceRecord(record);
   runtimeSupervisor.unregister(record.resourceId);
   delete state.surfaces[surfaceId];
   saveSurfaceState(state);
@@ -496,7 +526,7 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
   const state = loadSurfaceState();
 
   for (const [surfaceId, record] of Object.entries(state.surfaces)) {
-    if (!isRunning(record.pid)) {
+    if (!isRunning(record)) {
       runtimeSupervisor.unregister(record.resourceId);
       delete state.surfaces[surfaceId];
     } else {
@@ -518,7 +548,7 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
       continue;
     }
     const existing = state.surfaces[definition.id];
-    if (existing && isRunning(existing.pid)) {
+    if (existing && isRunning(existing)) {
       results.push({ id: definition.id, status: 'running', pid: existing.pid });
       continue;
     }
@@ -558,7 +588,7 @@ async function statusSurfaces() {
   const state = loadSurfaceState();
   const manifest = loadSurfaceManifest();
   for (const [_surfaceId, record] of Object.entries(state.surfaces)) {
-    if (isRunning(record.pid)) {
+    if (isRunning(record)) {
       registerRunningSurfaceFromState(record);
     }
   }
@@ -570,7 +600,7 @@ async function statusSurfaces() {
     const surfaceHealth = await probeSurfaceHealth(definition);
     health[definition.id] = surfaceHealth;
     const stateHealth =
-      record && isRunning(record.pid)
+      record && isRunning(record)
         ? // 'unknown' = no probe configured: a live supervised pid is the only
           // signal we have — calling that "degraded" is a false positive that
           // nags repair forever.
@@ -621,7 +651,7 @@ async function listUnits() {
     manifest.surfaces.map(async (d) => {
       const normalized = normalizeSurfaceDefinition(d);
       const record = state.surfaces[d.id];
-      const running = record && isRunning(record.pid);
+      const running = record && isRunning(record);
       const health = await probeSurfaceHealth(normalized);
       const auth = (d as any).preset_path
         ? inspectServiceAuth((d as any).service_id || d.id, (d as any).preset_path)
@@ -801,7 +831,7 @@ async function repairSurfaceById(surfaceId: string, manifestPath: string) {
   const record = state.surfaces[surfaceId];
   const health = await probeSurfaceHealth(normalized);
 
-  if (!record || !isRunning(record.pid)) {
+  if (!record || !isRunning(record)) {
     if (record) {
       stopSurfaceById(surfaceId);
     }
@@ -860,7 +890,7 @@ async function repairSurfaces(manifestPath: string, surfaceId?: string) {
   for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
     const record = state.surfaces[definition.id];
     if (!record) continue;
-    if (!isRunning(record.pid)) {
+    if (!isRunning(record)) {
       results.push(await repairSurfaceById(definition.id, manifestPath));
       continue;
     }
@@ -1000,7 +1030,7 @@ async function reconcileHealth(manifestPath: string) {
   for (const definition of manifest.surfaces.map(normalizeSurfaceDefinition)) {
     const state = loadSurfaceState();
     const record = state.surfaces[definition.id];
-    if (!record || !isRunning(record.pid)) continue;
+    if (!record || !isRunning(record)) continue;
 
     const health = await probeSurfaceHealth(definition);
     if (health.status === 'unhealthy') {

@@ -4,7 +4,18 @@
   "description": "E2E-06 Task 6: explicit statement of how a change request affects existing assets. Produced by code-actuator impact_analysis; the size feeds price-book estimate_rules.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["kind", "generated_at", "repo_path", "summary", "files", "risks", "size"],
+  "required": [
+    "kind",
+    "generated_at",
+    "repo_path",
+    "summary",
+    "files",
+    "risks",
+    "size",
+    "confidence",
+    "limitations",
+    "unknowns"
+  ],
   "properties": {
     "kind": { "const": "impact-analysis" },
     "generated_at": { "type": "string" },
@@ -23,6 +34,20 @@
       }
     },
     "risks": { "type": "array", "items": { "type": "string" } },
-    "size": { "enum": ["S", "M", "L"] }
+    "size": { "enum": ["S", "M", "L"] },
+    "confidence": {
+      "enum": ["observed", "derived", "inferred"],
+      "description": "Basis of the claims: 'observed' = direct measurement, 'derived' = computed from observed facts, 'inferred' = model or heuristic judgment."
+    },
+    "limitations": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Coverage limits a consumer must weigh before relying on the result."
+    },
+    "unknowns": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Aspects that remain unresolved rather than absent."
+    }
   }
 }
