@@ -15,11 +15,15 @@ import { createServer, type Server } from 'node:net';
 import * as path from 'node:path';
 import {
   backupArchiveTimeoutMs,
+  credentialReadsFor,
   interpretTarResult,
+  manifestCredentialCount,
+  parseManifestCredentialReads,
   resolveBackupExclusions,
   selectBackupFiles,
   selectionWarnings,
   tarExcludesFor,
+  verifyWithheldCredentialMembers,
 } from './lib/backup-file-selection.js';
 import {
   buildBackupManifest,
@@ -1752,5 +1756,86 @@ describe('backup file selection', () => {
         /^\[BACKUP_MISSION_BUNDLE_FAILED\] git bundle for active\/missions\/public\/MSN-X failed — .*\| next: .*\| evidence: /
       ),
     ]);
+  });
+});
+
+describe('credential reads tar archived under an unlisted ancestor', () => {
+  const root = 'knowledge/personal/connections';
+  it('parses an uncounted credential read and rejects a malformed flag', () => {
+    expect(
+      parseManifestCredentialReads(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true }],
+        (r) => r
+      )
+    ).toEqual([
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true },
+    ]);
+    expect(() =>
+      parseManifestCredentialReads(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: 'yes' }],
+        (r) => r
+      )
+    ).toThrow('Backup manifest credential read is invalid.');
+  });
+
+  it('treats an uncounted root as no recorded count, so the drill checks presence instead', () => {
+    const reads = [
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true as const },
+    ];
+    expect(manifestCredentialCount(reads, root)).toBeNull();
+    expect(
+      manifestCredentialCount(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 4 }],
+        root
+      )
+    ).toBe(4);
+    // Observed on a real Mac: tar archived 4 connection files under the unlisted
+    // personal tier; the manifest could not count them. The drill must pass.
+    expect(() =>
+      verifyWithheldCredentialMembers([
+        { root, archived_members: 4, manifest_file_count: manifestCredentialCount(reads, root) },
+      ])
+    ).not.toThrow();
+    // A counted root that disagrees with the archive still fails.
+    expect(() =>
+      verifyWithheldCredentialMembers([{ root, archived_members: 4, manifest_file_count: 0 }])
+    ).toThrow('[BACKUP_DRILL_CREDENTIAL_COUNT_MISMATCH]');
+  });
+
+  it('records a root under an unlisted ancestor as uncounted, and counts a listed root strictly inside', () => {
+    const roots = [{ ruleId: 'credential.kyberion-connections', root }];
+    expect(
+      credentialReadsFor(roots, { paths: ['knowledge/personal'], unlisted: ['knowledge/personal'] })
+    ).toEqual([
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0, uncounted: true },
+    ]);
+    expect(
+      credentialReadsFor(roots, {
+        paths: [`${root}/a.json`, `${root}/b.json`, 'knowledge/personal/other.md'],
+        unlisted: [],
+      })
+    ).toEqual([{ rule_id: 'credential.kyberion-connections', root, file_count: 2 }]);
+    // An empty credential root (pushed as the directory itself) counts 0, like the drill.
+    expect(credentialReadsFor(roots, { paths: [root], unlisted: [] })).toEqual([
+      { rule_id: 'credential.kyberion-connections', root, file_count: 0 },
+    ]);
+    // An unlisted directory BELOW the root keeps the root counted (drill then fails safe).
+    expect(
+      credentialReadsFor(roots, { paths: [`${root}/sub`], unlisted: [`${root}/sub`] })[0]
+    ).not.toHaveProperty('uncounted');
+  });
+
+  it('requires file_count 0 on an uncounted read and keeps uncounted roots in the drill report', () => {
+    expect(() =>
+      parseManifestCredentialReads(
+        [{ rule_id: 'credential.kyberion-connections', root, file_count: 7, uncounted: true }],
+        (r) => r
+      )
+    ).toThrow('Backup manifest credential read is invalid.');
+    expect(
+      verifyWithheldCredentialMembers([
+        { root, archived_members: 0, manifest_file_count: null, uncounted: true },
+      ])
+    ).toEqual([{ root, archived_members: 0, manifest_file_count: null, uncounted: true }]);
   });
 });
