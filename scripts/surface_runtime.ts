@@ -596,8 +596,11 @@ async function reconcileSurfaces(manifestPath: string, cleanup = false) {
     const manifestIds = new Set(manifest.surfaces.map((entry) => entry.id));
     for (const surfaceId of Object.keys(state.surfaces)) {
       if (!manifestIds.has(surfaceId)) {
-        stopSurfaceById(surfaceId);
-        results.push({ id: surfaceId, status: 'stopped_removed' });
+        const stopResult = stopSurfaceById(surfaceId);
+        results.push({
+          id: surfaceId,
+          status: stopResult.status === 'stopped' ? 'stopped_removed' : stopResult.status,
+        });
       }
     }
   }
@@ -861,7 +864,15 @@ async function repairSurfaceById(surfaceId: string, manifestPath: string) {
 
   if (!record || !isRunning(record)) {
     if (record) {
-      stopSurfaceById(surfaceId);
+      const stopResult = stopSurfaceById(surfaceId);
+      if (stopResult.status === 'identity_unknown') {
+        return {
+          status: 'identity_unknown',
+          id: surfaceId,
+          repairHint: 'stop inconclusive — record kept, not restarted',
+          health,
+        };
+      }
     }
     if (definition.enabled === false) {
       return {
@@ -899,7 +910,15 @@ async function repairSurfaceById(surfaceId: string, manifestPath: string) {
     };
   }
 
-  stopSurfaceById(surfaceId);
+  const stopResult = stopSurfaceById(surfaceId);
+  if (stopResult.status === 'identity_unknown') {
+    return {
+      status: 'identity_unknown',
+      id: surfaceId,
+      repairHint: `stop inconclusive after ${health.detail} — record kept, not restarted`,
+      health,
+    };
+  }
   const restarted = await startSurfaceById(surfaceId, manifestPath);
   return {
     ...restarted,
@@ -1062,7 +1081,10 @@ async function reconcileHealth(manifestPath: string) {
 
     const health = await probeSurfaceHealth(definition);
     if (health.status === 'unhealthy') {
-      stopSurfaceById(definition.id);
+      const stopResult = stopSurfaceById(definition.id);
+      // An inconclusive stop kept the record and possibly the process —
+      // restarting here would spawn a duplicate; the next pass re-evaluates.
+      if (stopResult.status === 'identity_unknown') continue;
       await startSurfaceById(definition.id, manifestPath);
       recordProtocolSurfaceLifecycle(definition.id, 'reconnect', 'reconnected', {
         reason: 'health_probe_unhealthy',
