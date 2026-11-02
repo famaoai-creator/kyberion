@@ -20,12 +20,27 @@
       "method": "POST",
       "description": "Creates a new issue in a repository.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "title": { "required": true, "type": "string" },
-        "body": { "required": false, "type": "string" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "title": {
+          "required": true,
+          "type": "string"
+        },
+        "body": {
+          "required": false,
+          "type": "string"
+        }
       },
-      "output_mapping": { "id": "number", "url": "html_url" }
+      "output_mapping": {
+        "id": "number",
+        "url": "html_url"
+      }
     },
     "update_issue": {
       "type": "api",
@@ -33,12 +48,30 @@
       "method": "PATCH",
       "description": "Updates a GitHub issue.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "issue_number": { "required": true, "type": "number" },
-        "title": { "required": false, "type": "string" },
-        "body": { "required": false, "type": "string" },
-        "state": { "required": false, "type": "string" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "issue_number": {
+          "required": true,
+          "type": "number"
+        },
+        "title": {
+          "required": false,
+          "type": "string"
+        },
+        "body": {
+          "required": false,
+          "type": "string"
+        },
+        "state": {
+          "required": false,
+          "type": "string"
+        }
       }
     },
     "add_comment": {
@@ -47,10 +80,22 @@
       "method": "POST",
       "description": "Adds a comment to a GitHub issue.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "issue_number": { "required": true, "type": "number" },
-        "body": { "required": true, "type": "string" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "issue_number": {
+          "required": true,
+          "type": "number"
+        },
+        "body": {
+          "required": true,
+          "type": "string"
+        }
       }
     },
     "close_issue": {
@@ -59,9 +104,18 @@
       "method": "PATCH",
       "description": "Closes a GitHub issue.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "issue_number": { "required": true, "type": "number" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "issue_number": {
+          "required": true,
+          "type": "number"
+        }
       },
       "payload_template": {
         "state": "closed"
@@ -73,8 +127,12 @@
       "method": "GET",
       "description": "Lists repositories for the authenticated user.",
       "parameters": {
-        "sort": { "default": "updated" },
-        "per_page": { "default": 30 }
+        "sort": {
+          "default": "updated"
+        },
+        "per_page": {
+          "default": 30
+        }
       }
     },
     "actions_list_runs": {
@@ -83,12 +141,30 @@
       "method": "GET",
       "description": "Lists workflow runs for a repository.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "branch": { "required": false, "type": "string" },
-        "event": { "required": false, "type": "string" },
-        "status": { "required": false, "type": "string" },
-        "per_page": { "required": false, "type": "number" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "branch": {
+          "required": false,
+          "type": "string"
+        },
+        "event": {
+          "required": false,
+          "type": "string"
+        },
+        "status": {
+          "required": false,
+          "type": "string"
+        },
+        "per_page": {
+          "required": false,
+          "type": "number"
+        }
       }
     },
     "actions_get_run": {
@@ -97,9 +173,18 @@
       "method": "GET",
       "description": "Gets a single workflow run and its status metadata.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "run_id": { "required": true, "type": "number" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "run_id": {
+          "required": true,
+          "type": "number"
+        }
       },
       "output_mapping": {
         "run_id": "id",
@@ -117,11 +202,26 @@
       "method": "POST",
       "description": "Dispatches a GitHub Actions workflow run.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "workflow_id": { "required": true, "type": "string" },
-        "ref": { "required": true, "type": "string" },
-        "inputs": { "required": false, "type": "object" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "workflow_id": {
+          "required": true,
+          "type": "string"
+        },
+        "ref": {
+          "required": true,
+          "type": "string"
+        },
+        "inputs": {
+          "required": false,
+          "type": "object"
+        }
       },
       "payload_template": {
         "ref": "{{ref}}",
@@ -134,13 +234,31 @@
       "method": "POST",
       "description": "Creates a pull request.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "title": { "required": true, "type": "string" },
-        "head": { "required": true, "type": "string" },
-        "base": { "required": true, "type": "string" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "title": {
+          "required": true,
+          "type": "string"
+        },
+        "head": {
+          "required": true,
+          "type": "string"
+        },
+        "base": {
+          "required": true,
+          "type": "string"
+        }
       },
-      "output_mapping": { "number": "number", "url": "html_url" }
+      "output_mapping": {
+        "number": "number",
+        "url": "html_url"
+      }
     },
     "merge_pull_request": {
       "type": "api",
@@ -148,9 +266,18 @@
       "method": "PUT",
       "description": "Merges a pull request.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "pull_number": { "required": true, "type": "number" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "pull_number": {
+          "required": true,
+          "type": "number"
+        }
       }
     },
     "list_issues": {
@@ -161,12 +288,32 @@
       "risk": "read",
       "description": "Lists issues in a repository. GitHub also includes pull requests in this collection; use list_pulls for PR-only results.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "state": { "required": false, "type": "string", "description": "open, closed, or all" },
-        "labels": { "required": false, "type": "string" },
-        "assignee": { "required": false, "type": "string" },
-        "per_page": { "required": false, "type": "number", "default": 30 }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "state": {
+          "required": false,
+          "type": "string",
+          "description": "open, closed, or all"
+        },
+        "labels": {
+          "required": false,
+          "type": "string"
+        },
+        "assignee": {
+          "required": false,
+          "type": "string"
+        },
+        "per_page": {
+          "required": false,
+          "type": "number",
+          "default": 30
+        }
       }
     },
     "get_issue": {
@@ -177,11 +324,25 @@
       "risk": "read",
       "description": "Gets a single issue (or a pull request presented as an issue).",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "issue_number": { "required": true, "type": "number" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "issue_number": {
+          "required": true,
+          "type": "number"
+        }
       },
-      "output_mapping": { "id": "number", "url": "html_url", "state": "state", "title": "title" }
+      "output_mapping": {
+        "id": "number",
+        "url": "html_url",
+        "state": "state",
+        "title": "title"
+      }
     },
     "list_pulls": {
       "type": "api",
@@ -191,13 +352,46 @@
       "risk": "read",
       "description": "Lists pull requests in a repository.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "state": { "required": false, "type": "string", "description": "open, closed, or all" },
-        "head": { "required": false, "type": "string" },
-        "base": { "required": false, "type": "string" },
-        "per_page": { "required": false, "type": "number", "default": 30 }
-      }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "state": {
+          "required": false,
+          "type": "string",
+          "description": "open, closed, or all"
+        },
+        "head": {
+          "required": false,
+          "type": "string"
+        },
+        "base": {
+          "required": false,
+          "type": "string"
+        },
+        "per_page": {
+          "required": false,
+          "type": "number",
+          "default": 30
+        },
+        "page": {
+          "type": "number",
+          "default": 1
+        },
+        "sort": {
+          "type": "string",
+          "default": "updated"
+        },
+        "direction": {
+          "type": "string",
+          "default": "asc"
+        }
+      },
+      "approval_required": false
     },
     "get_pull": {
       "type": "api",
@@ -207,9 +401,18 @@
       "risk": "read",
       "description": "Gets a single pull request, including mergeability metadata.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "pull_number": { "required": true, "type": "number" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "pull_number": {
+          "required": true,
+          "type": "number"
+        }
       },
       "output_mapping": {
         "number": "number",
@@ -227,10 +430,27 @@
       "risk": "read",
       "description": "Lists submitted reviews on a pull request.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "pull_number": { "required": true, "type": "number" },
-        "per_page": { "required": false, "type": "number", "default": 30 }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "pull_number": {
+          "required": true,
+          "type": "number"
+        },
+        "per_page": {
+          "required": false,
+          "type": "number",
+          "default": 30
+        },
+        "page": {
+          "type": "number",
+          "default": 1
+        }
       }
     },
     "list_review_comments": {
@@ -241,10 +461,23 @@
       "risk": "read",
       "description": "Lists review comments (line comments) on a pull request.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "pull_number": { "required": true, "type": "number" },
-        "per_page": { "required": false, "type": "number", "default": 30 }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "pull_number": {
+          "required": true,
+          "type": "number"
+        },
+        "per_page": {
+          "required": false,
+          "type": "number",
+          "default": 30
+        }
       }
     },
     "list_pr_files": {
@@ -255,10 +488,23 @@
       "risk": "read",
       "description": "Lists files changed in a pull request.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "pull_number": { "required": true, "type": "number" },
-        "per_page": { "required": false, "type": "number", "default": 30 }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "pull_number": {
+          "required": true,
+          "type": "number"
+        },
+        "per_page": {
+          "required": false,
+          "type": "number",
+          "default": 30
+        }
       }
     },
     "create_review": {
@@ -269,23 +515,42 @@
       "risk": "write",
       "description": "Submits a pull request review (COMMENT, APPROVE, or REQUEST_CHANGES). Write-gated; approval is required.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "pull_number": { "required": true, "type": "number" },
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "pull_number": {
+          "required": true,
+          "type": "number"
+        },
         "event": {
           "required": true,
           "type": "string",
           "description": "COMMENT, APPROVE, or REQUEST_CHANGES"
         },
-        "body": { "required": false, "type": "string" },
-        "commit_id": { "required": false, "type": "string" }
+        "body": {
+          "required": false,
+          "type": "string"
+        },
+        "commit_id": {
+          "required": false,
+          "type": "string"
+        }
       },
       "payload_template": {
         "event": "{{event}}",
         "body": "{{body}}",
         "commit_id": "{{commit_id}}"
       },
-      "output_mapping": { "id": "id", "url": "html_url", "state": "state" }
+      "output_mapping": {
+        "id": "id",
+        "url": "html_url",
+        "state": "state"
+      }
     },
     "create_review_comment": {
       "type": "api",
@@ -295,14 +560,39 @@
       "risk": "write",
       "description": "Creates a line-level review comment on a pull request. Write-gated; approval is required.",
       "parameters": {
-        "owner": { "required": true, "type": "string" },
-        "repo": { "required": true, "type": "string" },
-        "pull_number": { "required": true, "type": "number" },
-        "body": { "required": true, "type": "string" },
-        "commit_id": { "required": true, "type": "string" },
-        "path": { "required": true, "type": "string" },
-        "line": { "required": false, "type": "number" },
-        "side": { "required": false, "type": "string", "description": "LEFT or RIGHT" }
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "pull_number": {
+          "required": true,
+          "type": "number"
+        },
+        "body": {
+          "required": true,
+          "type": "string"
+        },
+        "commit_id": {
+          "required": true,
+          "type": "string"
+        },
+        "path": {
+          "required": true,
+          "type": "string"
+        },
+        "line": {
+          "required": false,
+          "type": "number"
+        },
+        "side": {
+          "required": false,
+          "type": "string",
+          "description": "LEFT or RIGHT"
+        }
       },
       "payload_template": {
         "body": "{{body}}",
@@ -311,7 +601,75 @@
         "line": "{{line}}",
         "side": "{{side}}"
       },
-      "output_mapping": { "id": "id", "url": "html_url" }
+      "output_mapping": {
+        "id": "id",
+        "url": "html_url"
+      }
+    },
+    "get_commit_check_runs": {
+      "type": "api",
+      "path": "repos/{{owner}}/{{repo}}/commits/{{ref}}/check-runs",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read latest check runs for an exact commit.",
+      "parameters": {
+        "owner": {
+          "required": true,
+          "type": "string"
+        },
+        "repo": {
+          "required": true,
+          "type": "string"
+        },
+        "ref": {
+          "required": true,
+          "type": "string"
+        },
+        "page": {
+          "type": "number",
+          "default": 1
+        },
+        "per_page": {
+          "type": "number",
+          "default": 100
+        },
+        "filter": {
+          "type": "string",
+          "default": "latest"
+        }
+      }
+    },
+    "get_review_threads": {
+      "type": "api",
+      "path": "graphql",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read scoped review-thread state via a fixed GraphQL query."
+    },
+    "resolve_review_thread": {
+      "type": "api",
+      "path": "graphql",
+      "method": "POST",
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true,
+      "description": "Resolve the exact verified pull-request review thread.",
+      "parameters": {
+        "thread_id": {
+          "type": "string",
+          "required": true
+        }
+      },
+      "payload_template": {
+        "query": "mutation($threadId:ID!){resolveReviewThread(input:{threadId:$threadId}){thread{id isResolved}}}",
+        "variables": {
+          "threadId": "{{thread_id}}"
+        }
+      }
     }
   }
 }

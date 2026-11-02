@@ -1,4 +1,5 @@
 'use client';
+import { InformationAssetsPanel } from './InformationAssetsPanel';
 
 import * as React from 'react';
 import { useSearchParams } from 'next/navigation';
@@ -183,6 +184,7 @@ export function OrganizationDashboard() {
           )}
         </div>
       ) : null}
+      <InformationAssetsPanel />
     </Section>
   );
 }
