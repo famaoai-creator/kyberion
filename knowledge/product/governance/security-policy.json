@@ -841,6 +841,10 @@
         "active/shared/tmp/workflow-registration-proposals"
       ]
     },
+    "check_chronos_perf_baseline": {
+      "allow_read": ["active/shared/observability/chronos/ce-08-perf-baseline.json"],
+      "allow_write": ["active/shared/observability/chronos/ce-08-perf-baseline.json"]
+    },
     "evaluate_model_role_fitness": {
       "allow_read": [
         "knowledge/product/governance/",
