@@ -358,7 +358,8 @@ export function declaredOperationPatterns(): readonly string[] {
 
 // ─── Subject axes ────────────────────────────────────────────────────────────
 // The unified lookup surface covers four authorization subject axes. Bare ids
-// (or the explicit `op:` prefix) name operations; `intent:`, `capability:` and
+// name operations (an `op:`-shaped id is just an operation id — no namespace
+// is stripped); `intent:`, `capability:` and
 // `verb:` are reserved namespaces bridged to their detail-layer policy
 // systems — approval-policy.json intent rules, grant-capability-policy.json
 // capabilities, and command-credential-policy.ts verb requirements. Each axis
@@ -477,4 +478,117 @@ export function subjectAuthorization(subject: string): SubjectAuthorization {
  * the coverage surface boundary gates consume. */
 export function declaredSubjectKeys(axis: Exclude<SubjectAxis, 'operation'>): readonly string[] {
   return subjectAxisBridges.get(axis)?.keys() ?? [];
+}
+
+// ─── Declaration enumeration ─────────────────────────────────────────────────
+// Serialization (authorization-policy-document.ts) needs every declaration —
+// including shadowed ones — with enough provenance to reproduce precedence
+// without registry internals: layer_rank orders layers (code first), the
+// overlay_index preserves each data layer's source order for prefix ties.
+
+/** One declared authorization entry as enumerated for serialization. */
+export interface DeclaredAuthorization {
+  readonly axis: SubjectAxis;
+  /** Operation ids/prefixes verbatim; non-operation axes carry the axis
+   * prefix (`intent:<id>`) so the subject string is directly usable. */
+  readonly subject: string;
+  readonly match: 'exact' | 'prefix';
+  readonly entry: SubjectAxisEntry;
+  readonly source: AuthorizationSource;
+  /** 0 = code, 1 = file overlay, 2 = plugin manifest. Code declarations
+   * always outrank data declarations regardless of pattern shape. */
+  readonly layerRank: 0 | 1 | 2;
+  /** Position of the declaring overlay in provider order — tie-break for
+   * equal-length data prefixes; 0 for code entries. */
+  readonly overlayIndex: number;
+}
+
+function sourceLayerRank(source: AuthorizationSource): 0 | 1 | 2 {
+  if (source === 'code') return 0;
+  return source === 'overlay' ? 1 : 2;
+}
+
+/** Every declaration across all axes and layers, shadowed entries included.
+ * Order is deterministic: code first, then overlays in provider order, then
+ * subject axes in a fixed axis order. */
+export function declaredAuthorizationEntries(): readonly DeclaredAuthorization[] {
+  const out: DeclaredAuthorization[] = [];
+  for (const [id, entry] of Object.entries(OPERATIONS)) {
+    out.push({
+      axis: 'operation',
+      subject: id,
+      match: 'exact',
+      entry,
+      source: 'code',
+      layerRank: 0,
+      overlayIndex: 0,
+    });
+  }
+  for (const [prefix, entry] of Object.entries(OPERATION_PREFIXES)) {
+    out.push({
+      axis: 'operation',
+      subject: prefix,
+      match: 'prefix',
+      entry,
+      source: 'code',
+      layerRank: 0,
+      overlayIndex: 0,
+    });
+  }
+  const overlays = overlayProvider?.() ?? [];
+  overlays.forEach((overlay, overlayIndex) => {
+    const layerRank = sourceLayerRank(overlay.source);
+    for (const [id, entry] of Object.entries(overlay.operations)) {
+      out.push({
+        axis: 'operation',
+        subject: id,
+        match: 'exact',
+        entry,
+        source: overlay.source,
+        layerRank,
+        overlayIndex,
+      });
+    }
+    for (const [prefix, entry] of Object.entries(overlay.prefixes)) {
+      out.push({
+        axis: 'operation',
+        subject: prefix,
+        match: 'prefix',
+        entry,
+        source: overlay.source,
+        layerRank,
+        overlayIndex,
+      });
+    }
+  });
+  const subjectAxes: readonly Exclude<SubjectAxis, 'operation'>[] = [
+    'intent',
+    'capability',
+    'verb',
+  ];
+  for (const axis of subjectAxes) {
+    const bridge = subjectAxisBridges.get(axis);
+    if (!bridge) continue;
+    const layerRank = sourceLayerRank(bridge.source);
+    for (const key of bridge.keys()) {
+      const entry = bridge.resolve(key);
+      if (!entry) continue;
+      out.push({
+        axis,
+        subject: `${axis}:${key}`,
+        match: 'exact',
+        entry,
+        source: bridge.source,
+        layerRank,
+        overlayIndex: 0,
+      });
+    }
+  }
+  return out;
+}
+
+/** The per-axis undeclared posture, exposed so serializers can emit explicit
+ * default policies instead of leaving fail-safes implicit. */
+export function subjectAxisFailSafe(axis: SubjectAxis): SubjectAxisEntry {
+  return SUBJECT_FAILSAFE[axis];
 }
