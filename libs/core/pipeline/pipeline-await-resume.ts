@@ -36,19 +36,41 @@ export interface AwaitResumeScanDeps {
 
 const pendingResumes = new Set<string>();
 
+/**
+ * Runs whose journal, at the recorded file signature, was finished or not
+ * suspended on a state probe. The sweep runs every chronos tick over every
+ * run journal ever written (thousands, tens of MB); re-reading and
+ * schema-validating all of them each tick took minutes on a long-lived
+ * checkout and starved the daemon heartbeat. A run is re-read only when one
+ * of its journal files changes size or mtime — every journal event is an
+ * append, so a resume, a new suspension or completion always changes it.
+ */
+const settledRuns = new Map<string, string>();
+
+/** Yield to the event loop at least this often so timers (heartbeat refresh) fire. */
+export const AWAIT_SWEEP_YIELD_MS = 25;
+
 /** Test seam: clear in-flight resume state between cases. */
 export function resetAwaitResumeState(): void {
   pendingResumes.clear();
+  settledRuns.clear();
 }
 
-function journalFiles(): string[] {
-  const files: string[] = [];
+interface JournalFile {
+  path: string;
+  signature: string;
+}
+
+function journalFiles(): JournalFile[] {
+  const files: JournalFile[] = [];
   const collect = (dir: string) => {
     if (!safeExistsSync(dir)) return;
     for (const name of safeReaddir(dir)) {
       const full = path.join(dir, name);
       try {
-        if (safeLstat(full).isFile() && name.endsWith('.jsonl')) files.push(full);
+        const stat = safeLstat(full);
+        if (stat.isFile() && name.endsWith('.jsonl'))
+          files.push({ path: full, signature: `${full}:${stat.size}:${stat.mtimeMs}` });
       } catch {
         continue;
       }
@@ -164,11 +186,26 @@ export async function sweepAwaitStateRuns(
   deps: AwaitResumeScanDeps = {}
 ): Promise<AwaitResumeOutcome[]> {
   const outcomes: AwaitResumeOutcome[] = [];
-  const seen = new Set<string>();
-  for (const filePath of journalFiles()) {
-    const runId = runIdFromJournal(filePath);
-    if (!runId || seen.has(runId)) continue;
-    seen.add(runId);
+  // A run id may have journals in several places (shared + mission); the
+  // loader resolves which one is authoritative, so the signature covers all.
+  const runs = new Map<string, string[]>();
+  for (const file of journalFiles()) {
+    const runId = runIdFromJournal(file.path);
+    if (!runId) continue;
+    const signatures = runs.get(runId);
+    if (signatures) signatures.push(file.signature);
+    else runs.set(runId, [file.signature]);
+  }
+  for (const runId of settledRuns.keys()) if (!runs.has(runId)) settledRuns.delete(runId);
+
+  let lastYield = Date.now();
+  for (const [runId, signatures] of runs) {
+    if (Date.now() - lastYield >= AWAIT_SWEEP_YIELD_MS) {
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      lastYield = Date.now();
+    }
+    const signature = signatures.join('|');
+    if (settledRuns.get(runId) === signature) continue;
     const resourceId = `pipeline-await-resume:${runId}`;
     if (pendingResumes.has(resourceId)) {
       outcomes.push({ runId, status: 'waiting', reason: 'resume already in flight' });
@@ -176,9 +213,16 @@ export async function sweepAwaitStateRuns(
     }
     try {
       const state = loadPipelineRunJournal(runId);
-      if (state.finished || !state.suspended) continue;
+      if (
+        state.finished ||
+        !state.suspended ||
+        (state.suspended.await_kind ?? 'approval') !== 'state'
+      ) {
+        settledRuns.set(runId, signature);
+        continue;
+      }
+      settledRuns.delete(runId);
       const suspended = state.suspended;
-      if ((suspended.await_kind ?? 'approval') !== 'state') continue;
       const decision = await shouldResume(suspended, deps);
       if (!decision.resume) {
         outcomes.push({ runId, status: 'waiting', reason: decision.reason });

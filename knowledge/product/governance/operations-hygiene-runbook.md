@@ -352,6 +352,16 @@ supervisor and PTC IPC tests when changing a listener.
 - **Never hand a lease over while work still runs.** If the in-flight tick did not drain in time,
   release the leader lease only immediately before exiting, never while the abandoned tick can
   still act (a second leader would double-run schedules).
+- **A tick's cost must not grow with history.** Work a daemon repeats every tick (scans of run
+  journals, mission dirs, ledgers) must skip records that cannot have changed — memoise settled
+  records by file size + mtime, as `sweepAwaitStateRuns` does — and yield to the event loop
+  (`setImmediate`) during long synchronous passes so the heartbeat refresh timer still fires. A
+  sweep that re-parsed every pipeline run journal each tick reached 180 s on a long-lived checkout
+  and kept the chronos heartbeat stale. Regression gate: `pipeline-await-resume.test.ts`.
+- **A scheduled script needs its own write grant.** A script run by a schedule gets its
+  authority role from its file name; register that role (`authority-roles/<name>.json`, the role
+  index and `security-policy.json`) with a write scope narrowed to the files it produces, and run
+  the schedule's command once before enabling it.
 - **Give every child a deadline.** Kill the child when it expires, raise an ops alert via
   `sendOpsAlert`, and forward signals to the child on shutdown.
 
