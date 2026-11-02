@@ -103,6 +103,18 @@ function retainOversizedResult(value: unknown, domain: string): unknown {
       ? {
           ...(value as Record<string, unknown>),
           results: (value as any).results.slice(0, RETAINED_PREVIEW_ITEMS),
+          ...(Array.isArray((value as any).errors)
+            ? { errors: (value as any).errors.slice(0, RETAINED_PREVIEW_ITEMS) }
+            : {}),
+          ...(typeof (value as any).paths === 'object' && (value as any).paths !== null
+            ? {
+                paths: {
+                  scanned: Array.isArray((value as any).paths.scanned)
+                    ? (value as any).paths.scanned.length
+                    : (value as any).paths.scanned,
+                },
+              }
+            : {}),
         }
       : serialized.slice(0, 4096);
   return {
