@@ -82,6 +82,18 @@
     {
       "id": "libs/core/intent/intent-resolution-eval.ts",
       "reason": "Intent-resolution evaluation harness (evaluateIntentResolutionCorpus / formatIntentResolutionEvalReport): scores utterance → selected intent against knowledge/product/governance/intent-resolution-eval-corpus.json, including negative cases for ordinary requests. Its consumers are intent-resolution-eval.test.ts (the CI quality floor) and by-hand keyword-review runs documented in mission-class-operating-guide.md §4.3; no production module calls it."
+    },
+    {
+      "id": "libs/core/agent/agent-declaration-factory.ts",
+      "reason": "Bounded PoC imported from Microsoft Agent Framework AgentFactory/WorkflowFactory (mission MSN-HARNESS-IMPORT-20261102): declaration -> collect-all validation -> normalized agent/workflow spec. Construct-only by design; production wiring (dispatch/registry consumers) is an explicit follow-up recorded in the mission retrospective."
+    },
+    {
+      "id": "libs/core/agent/external-harness-registry.ts",
+      "reason": "Bounded PoC imported from OpenHands ACP router / Preloop agent factory (mission MSN-HARNESS-IMPORT-20261102): describing registry for external harnesses (acp/cli/process kinds, capability resolution, trust tiers). No live dispatch is wired intentionally; connecting to agent-dispatch is a follow-up pending an external adapter."
+    },
+    {
+      "id": "libs/core/knowledge/memory-capability-token.ts",
+      "reason": "Bounded PoC imported from Tandem MemoryCapabilityToken (mission MSN-HARNESS-IMPORT-20261102): HMAC-scoped capability tokens layered on tier-guard. Enforcement into memory write paths (memory-promotion candidate) is a follow-up; wiring a dummy caller now would misrepresent the PoC boundary."
     }
   ],
   "scripts": [
