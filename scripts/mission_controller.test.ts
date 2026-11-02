@@ -227,6 +227,12 @@ describe('mission_controller argument parsing', () => {
       expect(missionReasoningInitialization(dispatch)).toBe('host');
     expect(missionReasoningInitialization('create')).toBe('none');
     expect(missionReasoningInitialization('finish')).toBe('none');
+    // Deterministic memory mutations never need a model; promote keeps an
+    // optional LLM contradiction check and degrades to the stub chain unbound.
+    for (const memory of ['memory-approve', 'memory-reject'])
+      expect(missionReasoningInitialization(memory)).toBe('none');
+    for (const memory of ['memory-promote', 'memory-promote-pending'])
+      expect(missionReasoningInitialization(memory)).toBe('degrading');
     for (const readOnly of [
       'status',
       'outbox',
