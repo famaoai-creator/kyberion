@@ -119,6 +119,18 @@ a mock provider must not make a nonexistent file a valid authorized input.
 
 Every one of these took a red CI round to learn (PR #475):
 
+- **Platform facts come from `libs/core/platform-facts.ts`, not inline
+  checks.** Executable suffixes, `where`/`which`, venv layout
+  (`Scripts`/`Lib` vs `bin`/`lib`), home env vars, shell invocation, IPC
+  transport, path case semantics, symlink types, process-model and media
+  capabilities all live in the frozen `PlatformFacts` descriptors —
+  `getPlatformFacts(platform)` (injectable) or `platformFacts` (host).
+  OS capability _actions_ stay in `libs/core/platform.ts` `OSDriver`; raw
+  `process.platform`/`os.platform()` reads outside the platform layer,
+  adapter/factory boundaries, and injectable defaults are gate-checked by
+  `tests/platform-read-boundary.test.ts` — new reads must be justified in
+  that file's allowlist or moved into the facts layer. Probe real
+  binaries/capabilities rather than inferring them from the OS token.
 - **Never `localeCompare` in generators.** ICU collation differs between
   macOS and Linux; generated files (indexes, catalogs) become
   non-reproducible. Sort by codepoint.

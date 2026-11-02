@@ -1,4 +1,5 @@
 import { probeMacOSNativeAutomation } from './macos-native-automation.js';
+import { hostNodePlatform, isMacOS } from './platform-facts.js';
 import { activateApplication } from './apple-event-bridge.js';
 import { listKnownAppCapabilities, type KnownAppCapability } from './virtual/os-app-adapters.js';
 
@@ -48,7 +49,7 @@ const UNSUPPORTED_PERMISSIONS: MacOSAutomationPermissions = {
 };
 
 function isDarwin(): boolean {
-  return process.platform === 'darwin';
+  return isMacOS();
 }
 
 function probe(): MacOSAutomationProbe {
@@ -56,7 +57,7 @@ function probe(): MacOSAutomationProbe {
   if (!isDarwin()) {
     return {
       bridge_id: MACOS_AUTOMATION_BRIDGE_ID,
-      platform: process.platform,
+      platform: hostNodePlatform(),
       available: false,
       permissions: { ...UNSUPPORTED_PERMISSIONS },
       known_applications: knownApplications,
@@ -81,7 +82,7 @@ function probe(): MacOSAutomationProbe {
   };
   return {
     bridge_id: MACOS_AUTOMATION_BRIDGE_ID,
-    platform: process.platform,
+    platform: hostNodePlatform(),
     available: uiAvailable,
     permissions: { ...permissions, ...capturePermissions },
     ...(native.host_app ? { host_app: native.host_app } : {}),

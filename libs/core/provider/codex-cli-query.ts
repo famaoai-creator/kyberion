@@ -10,6 +10,7 @@ import { resolveManagedProviderCliBinary } from './provider-managed-env.js';
 import { readTextFile } from '../foundation/text.js';
 import * as pathResolver from '../path-resolver.js';
 import { safeExecResult, safeLstat, safeRmSync, safeWriteFile } from '../secure-io.js';
+import { locateCommandInvocation, platformFacts } from '../platform-facts.js';
 import {
   buildDelegationSpawnEnv,
   newDelegationSessionId,
@@ -496,8 +497,9 @@ export function resolveCodexBinary(env: NodeJS.ProcessEnv = process.env): string
   // `which` is not a stock Windows command.  Using it on Git Bash can also
   // return POSIX-style `/c/...` paths which Node resolves incorrectly as
   // `C:\\c\\...`; ask the native resolver on Windows instead.
-  const resolver = process.platform === 'win32' ? 'where' : 'which';
-  const resolverArgs = process.platform === 'win32' ? ['codex'] : ['-a', 'codex'];
+  const [resolver, ...resolverArgs] = locateCommandInvocation('codex', platformFacts, {
+    all: true,
+  });
   const whichResult = safeExecResult(resolver, resolverArgs, {
     env,
     cwd: repoRoot,

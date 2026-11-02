@@ -13,6 +13,7 @@ import { readJsonIfPresent } from '../libs/core/foundation/json.js';
 import { nowIso } from '../libs/core/foundation/time.js';
 import { PfcController, type RecoveryAttempt } from '../libs/core/pfc/PfcController.js';
 import { pathResolver } from '../libs/core/path-resolver.js';
+import { isWindows } from '../libs/core/platform.js';
 import { assertGovernedExec, buildSafeExecEnv, safeSpawn } from '../libs/core/secure-io.js';
 import { defineScript, isDirectScript } from '../libs/core/script-harness.js';
 import { runClean } from './clean.js';
@@ -106,7 +107,7 @@ export async function runBuildStage(
     signalGroup: (pid, signal) => {
       process.kill(-pid, signal);
     },
-    windows: process.platform === 'win32',
+    windows: isWindows(),
     packageManagerEntrypoint: process.env.npm_execpath,
     ...overrides,
   };

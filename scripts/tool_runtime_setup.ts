@@ -17,6 +17,13 @@
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '@agent/core/foundation';
+import { isWindows } from '@agent/core/platform';
+import {
+  executableName,
+  hostNodePlatform,
+  locateCommandInvocation,
+  venvPythonCandidates,
+} from '@agent/core/platform-facts';
 import { createStandardYargs } from '@agent/core/cli-utils';
 import { logger } from '@agent/core/core';
 import { secureFetch } from '@agent/core/network';
@@ -93,11 +100,7 @@ function isBinaryHealthy(toolId: string): boolean {
   if (trial.install_backend?.command === 'uv' && trial.install_backend.args[0] === 'tool') {
     const entry = trial.tool.installed_backend?.args.at(-1);
     if (!entry || entry.includes('/') || entry.includes('\\')) return false;
-    const binary = path.join(
-      trial.managed_env_path,
-      'bin',
-      process.platform === 'win32' ? `${entry}.exe` : entry
-    );
+    const binary = path.join(trial.managed_env_path, 'bin', executableName(entry));
     return (
       safeExistsSync(binary) &&
       safeExecResult(binary, ['--help'], {
@@ -141,9 +144,9 @@ function isBinaryHealthy(toolId: string): boolean {
 }
 
 function isCommandAvailable(command: string): boolean {
-  const resolver = process.platform === 'win32' ? 'where.exe' : 'which';
+  const [resolver, ...resolverArgs] = locateCommandInvocation(command);
   return (
-    safeExecResult(resolver, [command], {
+    safeExecResult(resolver, resolverArgs, {
       cwd: pathResolver.rootDir(),
       timeoutMs: 5_000,
       maxOutputMB: 1,
@@ -176,8 +179,8 @@ export function inspectTool(toolId: string): SetupRow {
       installed: false,
       requires_install: true,
       detail: resolution.install_backend
-        ? `Install command '${resolution.install_backend.command}' is unavailable on ${process.platform}.`
-        : `No install backend registered for ${toolId} on ${process.platform}.`,
+        ? `Install command '${resolution.install_backend.command}' is unavailable on ${hostNodePlatform()}.`
+        : `No install backend registered for ${toolId} on ${hostNodePlatform()}.`,
     };
   }
   return {
@@ -271,7 +274,7 @@ function extractManagedBinaryTarball(toolId: string, tarballPath: string, destDi
  */
 function extractManagedBinaryZip(toolId: string, zipPath: string, destDir: string): void {
   safeMkdir(destDir, { recursive: true });
-  if (process.platform === 'win32') {
+  if (isWindows()) {
     const listing = safeExecResult(
       'powershell.exe',
       [
@@ -415,7 +418,7 @@ function supportsHost(toolId: string): boolean {
   const { platforms, status } = getToolRuntimeRecord(toolId);
   return (
     status !== 'disabled' &&
-    platforms.some((platform) => platform === 'any' || platform === process.platform)
+    platforms.some((platform) => platform === 'any' || platform === hostNodePlatform())
   );
 }
 
@@ -427,7 +430,7 @@ function unsupportedHost(toolId: string): SetupRow {
     selected_action: 'install',
     installed: false,
     requires_install: true,
-    detail: `${toolId} is disabled or unsupported on ${process.platform}.`,
+    detail: `${toolId} is disabled or unsupported on ${hostNodePlatform()}.`,
   };
 }
 
@@ -471,7 +474,7 @@ export function installTool(toolId: string): SetupRow {
       installed: false,
       requires_install: true,
       command: `${backend.command} ${(backend.args || []).join(' ')}`.trim(),
-      detail: `Install command '${backend.command}' is unavailable on ${process.platform}.`,
+      detail: `Install command '${backend.command}' is unavailable on ${hostNodePlatform()}.`,
     };
   }
 
@@ -482,10 +485,7 @@ export function installTool(toolId: string): SetupRow {
     backend.args[0] === 'pip' &&
     backend.args[1] === 'install'
   ) {
-    const pythonBin = path.join(
-      resolution.managed_env_path,
-      process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python'
-    );
+    const pythonBin = venvPythonCandidates(resolution.managed_env_path)[0];
     const created = resolveManagedToolPythonBin(toolId)
       ? null
       : safeExecResult(
@@ -626,7 +626,7 @@ export const runToolRuntimeSetup = defineScript({
 
     const report = {
       apply: Boolean(argv.apply),
-      platform: process.platform,
+      platform: hostNodePlatform(),
       rows,
       needs_install: rows.filter((row) => row.status === 'needs_install').map((row) => row.tool_id),
       unsupported: rows.filter((row) => row.status === 'unsupported').map((row) => row.tool_id),
