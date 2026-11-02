@@ -17,6 +17,55 @@ function git(cwd: string, args: string[]) {
 }
 
 describe('automatic Git probe hardening', () => {
+  it('admits immutable publication patches without permitting option or worktree injection', () => {
+    const args = [
+      'diff',
+      '--binary',
+      '--no-ext-diff',
+      '--no-textconv',
+      'a'.repeat(40),
+      'b'.repeat(40),
+      '--',
+    ];
+    expect(hardenedGitProbeArgs(args)).toEqual(['--no-replace-objects', ...args]);
+    expect(() =>
+      hardenedGitProbeArgs([...args.slice(0, 4), '--output=artifact', args[5], '--'])
+    ).toThrow('unsupported object/index probe grammar');
+    expect(() => hardenedGitProbeArgs([...args, 'libs/core/index.ts'])).toThrow(
+      'unsupported object/index probe grammar'
+    );
+  });
+  it('admits only the fixed bounded history grammar and immutable optional baseline', () => {
+    const args = [
+      'log',
+      '--format=',
+      '--name-only',
+      '-z',
+      '--full-history',
+      '--root',
+      '--no-renames',
+      'a'.repeat(40),
+      '--not',
+      'b'.repeat(40),
+    ];
+    expect(hardenedGitProbeArgs(args)).toEqual([
+      '--no-replace-objects',
+      'log',
+      '--no-ext-diff',
+      '--no-textconv',
+      ...args.slice(1),
+    ]);
+    expect(hardenedGitProbeArgs(['rev-parse', '--is-shallow-repository'])).toEqual([
+      'rev-parse',
+      '--is-shallow-repository',
+    ]);
+    expect(() => hardenedGitProbeArgs([...args.slice(0, -1), 'main'])).toThrow(
+      'unsupported object/index probe grammar'
+    );
+    expect(() => hardenedGitProbeArgs([...args, '--output=leak.txt'])).toThrow(
+      'unsupported object/index probe grammar'
+    );
+  });
   it('hardens only closed object/index probe forms and rejects worktree/submodule/executable options', () => {
     const sha = 'a'.repeat(40);
     expect(hardenedGitProbeArgs(['diff-tree', '-r', '-z', '--no-renames', sha, sha])).toEqual([
