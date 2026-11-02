@@ -5,6 +5,10 @@ import {
   setApprovalChannelWarner,
   warnUndeclaredApprovalChannel,
 } from '../foundation/approval-domains.js';
+import {
+  subjectAuthorization,
+  type SubjectAuthorization,
+} from '../foundation/authorization-registry.js';
 import { createLogger } from '../logger.js';
 import {
   appendLocatedApprovalEvent,
@@ -54,6 +58,17 @@ export function createApprovalRequest(
   params: {
     channel: string;
     storageChannel?: string;
+    /**
+     * Unified authorization subject for this approval
+     * (`op`-shaped ids or `intent:`/`capability:`/`verb:`-prefixed subjects).
+     * When the subject's declaration carries `approvalDomain` — or its
+     * authority is external admission (whose approvals land in the
+     * `external-operation` domain) — it supplies `storageChannel` when the
+     * caller did not pass one, and warns on a mismatch (measurement-first:
+     * the caller's value is kept). Bridges register with the owning policy
+     * module (approval-policy.ts for `intent:` subjects, …).
+     */
+    subject?: string;
     threadTs: string;
     correlationId: string;
     requestedBy: string;
@@ -105,7 +120,39 @@ export function createApprovalRequest(
   if (typeof params.storageChannel === 'string') {
     warnUndeclaredApprovalChannel('storageChannel', params.storageChannel);
   }
-  const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
+  // Subject-derived routing: the declaration supplies the storage domain when
+  // the call site did not pick one; a conflicting explicit value is kept but
+  // measured (rollout is warn-only, never silently rewired). Only DECLARED
+  // subjects derive — an undeclared subject resolves to the external fail-safe
+  // for authority purposes, but it must not repartition storage into a domain
+  // it never proved it belongs to.
+  let declaredDomain: string | undefined;
+  if (typeof params.subject === 'string' && params.subject) {
+    const resolved = subjectAuthorization(params.subject);
+    declaredDomain = resolved.declared
+      ? (resolved.approvalDomain ??
+        (resolved.authority.kind === 'admission' && resolved.authority.boundary === 'external'
+          ? 'external-operation'
+          : undefined))
+      : undefined;
+    if (!resolved.declared) {
+      approvalChannelLogger.warn(
+        `undeclared approval subject '${params.subject}' — declare it in the authorization registry or its detail layer (intent/capability/verb)`
+      );
+    }
+    if (
+      declaredDomain &&
+      typeof params.storageChannel === 'string' &&
+      params.storageChannel !== declaredDomain
+    ) {
+      approvalChannelLogger.warn(
+        `approval subject '${params.subject}' declares domain '${declaredDomain}' but call site passed storageChannel '${params.storageChannel}' — keeping caller value`
+      );
+    }
+  }
+  const storageChannel = normalizeApprovalChannel(
+    params.storageChannel || declaredDomain || params.channel
+  );
   const scope = params.scope ? normalizeEventScope(params.scope) : undefined;
   const located = {
     partition: approvalPartitionForScope(scope, {
@@ -127,6 +174,7 @@ export function createApprovalRequest(
     kind: params.kind || 'channel-approval',
     storageChannel,
     channel: params.channel,
+    ...(params.subject ? { subject: params.subject } : {}),
     threadTs: params.threadTs,
     correlationId: params.correlationId,
     requestedBy: params.requestedBy,
@@ -193,6 +241,24 @@ export function createApprovalRequest(
     approvalWorkerEventSource(record)
   );
   return record;
+}
+
+/**
+ * Internal-admission twin of `admitExternalOperation` (external-operation.ts):
+ * the typed entry point for approval-producing internal decisions. The subject
+ * is resolved once through the unified authorization registry and threaded to
+ * `createApprovalRequest`, which derives the storage domain from the
+ * declaration instead of a call-site literal. Returns the resolved
+ * authorization so callers can branch on the declared authority
+ * (assurance floor, dual-key) without a second lookup.
+ */
+export function admitInternalDecision(
+  role: GovernedArtifactRole,
+  params: Parameters<typeof createApprovalRequest>[1] & { subject: string }
+): { record: ApprovalRequestRecord; authorization: SubjectAuthorization } {
+  const authorization = subjectAuthorization(params.subject);
+  const record = createApprovalRequest(role, params);
+  return { record, authorization };
 }
 
 /**
