@@ -86,6 +86,10 @@
     {
       "id": "libs/core/agent/agent-declaration-factory.ts",
       "reason": "Bounded PoC imported from Microsoft Agent Framework AgentFactory/WorkflowFactory (mission MSN-HARNESS-IMPORT-20261102): declaration -> collect-all validation -> normalized agent/workflow spec. Construct-only by design; production wiring (dispatch/registry consumers) is an explicit follow-up recorded in the mission retrospective."
+    },
+    {
+      "id": "libs/core/mission/mission-lease.ts",
+      "reason": "Mastra-style lease manager (mission MSN-MEDIUM-IMPORTS-20261102), wired into claimWorkItemInternal (MSN-WIRING-20261102) through a structural leaseAdvisory interface that deliberately avoids a runtime import of this module — keeping the workforce -> mission direction dependency-free. Consumers inject a MissionLeaseManager instance; unit tests exercise the manager directly."
     }
   ],
   "scripts": [
