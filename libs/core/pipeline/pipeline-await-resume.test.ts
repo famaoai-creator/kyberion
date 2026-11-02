@@ -33,7 +33,11 @@ vi.mock('../owner-scope.js', () => ({
   missionTierScanDirs: vi.fn((root: string) => [root]),
 }));
 
-import { resetAwaitResumeState, sweepAwaitStateRuns } from './pipeline-await-resume.js';
+import {
+  AWAIT_SWEEP_YIELD_MS,
+  resetAwaitResumeState,
+  sweepAwaitStateRuns,
+} from './pipeline-await-resume.js';
 
 function suspendedState(overrides: Record<string, unknown> = {}) {
   return {
@@ -61,7 +65,12 @@ describe('sweepAwaitStateRuns', () => {
     mocks.readdir.mockImplementation((dir: string) =>
       dir === '/repo/active/shared/runtime/pipeline-runs' ? ['run-1.jsonl'] : []
     );
-    mocks.lstat.mockReturnValue({ isFile: () => true });
+    mocks.lstat.mockReset();
+    mocks.lstat.mockReturnValue({ isFile: () => true, size: 1, mtimeMs: 1 });
+    mocks.existsSync.mockReset();
+    mocks.existsSync.mockReturnValue(true);
+    mocks.loadPipelineRunJournal.mockReset();
+    vi.restoreAllMocks();
     mocks.spawnManagedProcess.mockReturnValue({ child: { once: vi.fn() } });
   });
 
@@ -197,15 +206,14 @@ describe('sweepAwaitStateRuns', () => {
         ? ['run-1.jsonl', 'run-2.jsonl', 'run-3.jsonl']
         : []
     );
-    mocks.lstat.mockReturnValue({ isFile: () => true, size: 1, mtimeMs: 1 });
+    // Each synchronous journal read advances the clock past the yield budget.
+    let clock = 0;
+    vi.spyOn(Date, 'now').mockImplementation(() => clock);
     let timerFired = false;
     const firedBeforeLoad: boolean[] = [];
     mocks.loadPipelineRunJournal.mockImplementation(() => {
       firedBeforeLoad.push(timerFired);
-      const until = Date.now() + 40; // each synchronous read outlasts the yield budget
-      while (Date.now() < until) {
-        /* busy */
-      }
+      clock += AWAIT_SWEEP_YIELD_MS;
       return { ...suspendedState(), finished: { status: 'succeeded' } };
     });
     setImmediate(() => {
@@ -213,5 +221,46 @@ describe('sweepAwaitStateRuns', () => {
     });
     await sweepAwaitStateRuns({});
     expect(firedBeforeLoad).toEqual([false, true, true]);
+  });
+
+  it('re-reads a settled run whose journal changed only its mtime', async () => {
+    let mtimeMs = 1;
+    mocks.lstat.mockImplementation(() => ({ isFile: () => true, size: 1, mtimeMs }));
+    mocks.loadPipelineRunJournal.mockReturnValue({
+      ...suspendedState(),
+      finished: { status: 'succeeded' },
+    });
+    await sweepAwaitStateRuns({});
+    mtimeMs = 2;
+    await sweepAwaitStateRuns({});
+    expect(mocks.loadPipelineRunJournal).toHaveBeenCalledTimes(2);
+  });
+
+  it('picks up an approval-suspended run that later suspends on a state probe', async () => {
+    let size = 1;
+    mocks.lstat.mockImplementation(() => ({ isFile: () => true, size, mtimeMs: 1 }));
+    mocks.loadPipelineRunJournal.mockReturnValue(suspendedState({ await_kind: 'approval' }));
+    expect(await sweepAwaitStateRuns({})).toHaveLength(0);
+    expect(await sweepAwaitStateRuns({})).toHaveLength(0);
+    expect(mocks.loadPipelineRunJournal).toHaveBeenCalledTimes(1);
+    size = 2; // the approval resumed and the run appended a new state suspension
+    mocks.loadPipelineRunJournal.mockReturnValue(suspendedState());
+    expect((await sweepAwaitStateRuns({}))[0].status).toBe('resumed');
+  });
+
+  it('forgets settled runs whose journals were removed', async () => {
+    mocks.loadPipelineRunJournal.mockReturnValue({
+      ...suspendedState(),
+      finished: { status: 'succeeded' },
+    });
+    await sweepAwaitStateRuns({});
+    mocks.readdir.mockImplementation(() => []);
+    await sweepAwaitStateRuns({});
+    // The journal reappears with the same signature: it must be read again.
+    mocks.readdir.mockImplementation((dir: string) =>
+      dir === '/repo/active/shared/runtime/pipeline-runs' ? ['run-1.jsonl'] : []
+    );
+    await sweepAwaitStateRuns({});
+    expect(mocks.loadPipelineRunJournal).toHaveBeenCalledTimes(2);
   });
 });
