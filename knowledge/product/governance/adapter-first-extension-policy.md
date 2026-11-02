@@ -95,6 +95,12 @@ Callers must not:
 - silently fall back to a different provider without exposing the selected
   route and reason.
 
+The same rule applies to the host-platform axis: OS differences are a
+capability axis, so callers branch on adapter/factory selection and on
+declarative platform facts (`libs/core/platform-facts.ts`), never on inline
+`process.platform` comparisons. Platform-specific execution stays at the
+adapter boundary exactly like provider-specific execution.
+
 ### 4.2 Keep descriptors declarative
 
 Descriptors may declare:

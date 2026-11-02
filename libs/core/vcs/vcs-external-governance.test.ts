@@ -1,5 +1,6 @@
 import { externalApprovalFixture } from '../../../tests/helpers/external-approval-fixture.js';
 import { beforeAll, afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+vi.mock('./cwd-scope.js', () => ({ assertVcsCwdScope: vi.fn() }));
 import { randomUUID } from 'node:crypto';
 import { sharedTmp } from '../path-resolver.js';
 import { safeWriteFile, safeRmSync } from '../secure-io.js';
@@ -11,6 +12,11 @@ const mocks = vi.hoisted(() => ({
   audit: vi.fn(),
   reserve: vi.fn(),
   body: 'reviewed body',
+  runtimeTier: 'public',
+  runtimeTenant: undefined as string | undefined,
+}));
+vi.mock('../scope-context.js', () => ({
+  resolveScopeContext: () => ({ tier: mocks.runtimeTier, tenant_slug: mocks.runtimeTenant }),
 }));
 vi.mock('../governance/approval-gate.js', () => ({ enforceApprovalGate: mocks.gate }));
 vi.mock('../governance/audit-chain.js', () => ({ auditChain: { record: mocks.audit } }));
@@ -42,12 +48,18 @@ describe('canonical VCS external governance', () => {
   let prSha = 'a'.repeat(40);
   let calls: Array<{ bin: string; args: string[] }>;
   let mutationStatus: number;
+  let history: string;
+  let privateRepository: boolean;
+  let advertisedHead: string;
   const run: VcsCommandRunner = (bin, args) => {
     calls.push({ bin, args });
     let stdout = '';
     if (bin === 'git') {
       if (args[0] === 'remote') stdout = remote;
-      else if (args[0] === 'rev-parse') stdout = sha;
+      else if (args[0] === 'rev-parse')
+        stdout = args[1] === '--is-shallow-repository' ? 'false' : sha;
+      else if (args[0] === '--no-replace-objects') stdout = history;
+      else if (args[0] === 'ls-remote') stdout = `${advertisedHead}\tHEAD`;
       else if (args[0] === 'symbolic-ref') stdout = 'feature';
       else if (args[0] === 'push')
         return { status: mutationStatus, stdout: '', stderr: 'connection lost after send' };
@@ -56,7 +68,7 @@ describe('canonical VCS external governance', () => {
         nameWithOwner: 'owner/repo',
         url: 'https://github.com/owner/repo',
       });
-    else if (args[0] === 'api') stdout = JSON.stringify({ sha });
+    else if (args[0] === 'api') stdout = JSON.stringify({ sha, private: privateRepository });
     else if (args[0] === 'pr' && args[1] === 'view')
       stdout = JSON.stringify({
         number: 7,
@@ -82,6 +94,11 @@ describe('canonical VCS external governance', () => {
     prSha = sha;
     remote = 'https://github.com/owner/repo.git';
     mutationStatus = 0;
+    history = 'src/index.ts\0';
+    privateRepository = false;
+    advertisedHead = 'd'.repeat(40);
+    mocks.runtimeTier = 'public';
+    mocks.runtimeTenant = undefined;
     mocks.body = 'reviewed body';
     mocks.gate.mockReturnValue({ allowed: false, status: 'human_required' });
   });
@@ -117,6 +134,76 @@ describe('canonical VCS external governance', () => {
       if (field === 'sha') sha = 'b'.repeat(40);
       else remote = 'https://github.com/evil/repo.git';
       return { allowed: true, status: 'approved', requestId: 'exact-fixture-approval' };
+    });
+    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+      'VCS_SNAPSHOT_CHANGED'
+    );
+    expect(sent()).toEqual([]);
+  });
+  it('binds deleted personal history and verified privacy into the real push effect', () => {
+    history = 'src/index.ts\0\nknowledge/personal/deleted.md\0';
+    privateRepository = true;
+    mocks.runtimeTier = 'personal';
+    mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
+    const resolver = vi.fn(() => ({ agentId: 'owner', invocationId: 'private-history' }));
+    withExternalOperationAuthority(resolver, () => gitPush('/fixture', { ref: 'feature' }, run));
+    expect(resolver).toHaveBeenCalledWith(
+      expect.objectContaining({
+        operationId: 'vcs:push',
+        effect: expect.objectContaining({
+          publication_source_tier: 'personal',
+          repository_visibility: 'private',
+          publication_history_sha256: expect.stringMatching(/^[a-f0-9]{64}$/u),
+        }),
+      })
+    );
+    expect(sent()).toHaveLength(1);
+  });
+  it('rejects changed private repository visibility before sending an approved push', () => {
+    history = 'knowledge/personal/deleted.md\0';
+    privateRepository = true;
+    mocks.runtimeTier = 'personal';
+    mocks.gate.mockImplementation(() => {
+      privateRepository = false;
+      return { allowed: true, status: 'approved', requestId: 'exact' };
+    });
+    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+      'VCS_SNAPSHOT_CHANGED'
+    );
+    expect(sent()).toEqual([]);
+  });
+  it('does not need GitHub CLI access for a public source in a public runtime', () => {
+    mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
+    const gitOnly: VcsCommandRunner = (command, args, options) => {
+      if (command === 'gh') throw new Error('gh not installed');
+      return run(command, args, options);
+    };
+    trusted(() => gitPush('/fixture', { ref: 'feature' }, gitOnly));
+    expect(sent()).toHaveLength(1);
+  });
+  it('does not let exact approval override a public runtime reading personal history', () => {
+    history = 'knowledge/personal/deleted.md\0';
+    privateRepository = true;
+    mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
+    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+      'VCS_SOURCE_SCOPE_DENIED'
+    );
+    expect(mocks.gate).not.toHaveBeenCalled();
+    expect(sent()).toEqual([]);
+  });
+  it('does not let exact approval publish a personal runtime to a public repository', () => {
+    mocks.runtimeTier = 'personal';
+    mocks.gate.mockReturnValue({ allowed: true, status: 'approved', requestId: 'exact' });
+    expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
+      'VCS_SOURCE_SCOPE_DENIED'
+    );
+    expect(mocks.gate).not.toHaveBeenCalled();
+    expect(sent()).toEqual([]);
+  });
+  it('rechecks the actual remote baseline after approval instead of trusting tracking refs', () => {
+    mocks.gate.mockImplementation(() => {
+      advertisedHead = 'e'.repeat(40);
+      return { allowed: true, status: 'approved', requestId: 'exact' };
     });
     expect(() => trusted(() => gitPush('/fixture', { ref: 'feature' }, run))).toThrow(
       'VCS_SNAPSHOT_CHANGED'

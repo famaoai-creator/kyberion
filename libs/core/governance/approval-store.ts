@@ -1,3 +1,7 @@
+import {
+  currentPersonalApprovalOwnerHash,
+  personalApprovalOwnerHash,
+} from './personal-approval-runtime.js';
 import { withApprovalRecordLock } from './approval-apply-claim.js';
 import { registerPipelineApprovalStatus } from '../agent/agent-prompt-approval-port.js';
 
@@ -212,6 +216,10 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   kind: 'channel-approval' | 'secret_mutation' | 'mission_gate';
   storageChannel: string;
   channel: string;
+  /** Unified authorization subject this approval was created for, when the
+   * caller supplied one (registry key — `intent:`/`capability:`/`verb:`
+   * prefixed or a bare operation id). */
+  subject?: string;
   threadTs: string;
   correlationId: string;
   requestedBy: string;
@@ -345,6 +353,8 @@ export interface SessionApprovalCacheEntry {
   seedPartition?: ApprovalPartition;
   /** The seed's tenant: the grant is usable only by a process that may bind it. */
   tenantSlug?: string;
+  /** Owner fence retained even when a personal seed still lives in the legacy system tree. */
+  personalOwnerHash?: string;
 }
 
 export interface SessionApprovalCacheLookupContext {
@@ -392,6 +402,8 @@ export function lookupSessionApprovalCache(
   ) {
     return null;
   }
+  if (entry.personalOwnerHash && entry.personalOwnerHash !== currentPersonalApprovalOwnerHash())
+    return null;
   // A tenant's grant never serves a process bound to another tenant.
   if (entry.tenantSlug && !mayBindApprovalTenant(entry.tenantSlug)) return null;
   // A scoped request must never consume an unscoped cache entry, and a
@@ -424,11 +436,13 @@ export type SessionCacheSeedResolution =
 export function resolveSessionCacheSeed(
   entry: SessionApprovalCacheEntry
 ): SessionCacheSeedResolution {
+  if (entry.personalOwnerHash && entry.personalOwnerHash !== currentPersonalApprovalOwnerHash())
+    return { status: 'unusable', reason: 'the personal seed belongs to another owner scope' };
   if (entry.tenantSlug && !mayBindApprovalTenant(entry.tenantSlug)) {
     return { status: 'unusable', reason: 'the seed belongs to a tenant this process may not bind' };
   }
   try {
-    if (entry.seedPartition?.kind === 'tenant') {
+    if (entry.seedPartition && entry.seedPartition.kind !== 'system') {
       const record = readApprovalJsonAt<ApprovalRequestRecord>(
         entry.seedPartition,
         approvalRequestLogicalPathAt(
@@ -452,6 +466,8 @@ export function resolveSessionCacheSeed(
         ? { status: 'unusable', reason: 'the tenant seed request cannot be found' }
         : { status: 'missing' };
     }
+    if (located.partition.kind === 'personal')
+      return { status: 'unusable', reason: 'the seed moved to a personal owner partition' };
     if (located.partition.kind === 'tenant' || located.record.scope?.tenant_slug) {
       // Stored as untenanted but now found tenant-scoped: never trust it silently.
       if (!entry.tenantSlug)
@@ -614,6 +630,8 @@ export {
   type ApprovalPartition,
   type ApprovalPartitionTier,
   type ApprovalTenantPartition,
+  type ApprovalPersonalPartition,
+  type PrivateApprovalPartition,
   type LocatedApprovalRequest,
 } from './approval-store-location.js';
 
@@ -623,6 +641,7 @@ import {
 } from './approval-request-create.js';
 export {
   createApprovalRequest,
+  admitInternalDecision,
   approvalEventLogicalPath,
   projectApprovalWorkerEvent,
   approvalWorkerEventSource,
@@ -1152,6 +1171,9 @@ function decideApprovalRequestUnlocked(
       effectBinding: updated.accountability!.effectBinding!,
       ...(updated.source ? { source: updated.source } : {}),
       seedPartition: located.partition,
+      ...(updated.scope?.tier === 'personal' && !updated.scope.tenant_slug
+        ? { personalOwnerHash: personalApprovalOwnerHash(updated.scope.nhi_id) }
+        : {}),
       ...(located.partition.kind === 'tenant'
         ? { tenantSlug: located.partition.tenant_slug }
         : updated.scope?.tenant_slug

@@ -427,6 +427,33 @@ describe('mission flow read-only observations', () => {
       expect(observe({ status: 'completed' }).candidates[0].reason).toContain('review-task');
     }
   );
+  it('annotates a stalled continue_task candidate without changing kind or action', () => {
+    write('NEXT_TASKS.json', [
+      { task_id: 'stalled', status: 'in_progress' },
+      { task_id: 'fresh', status: 'in_progress' },
+    ]);
+    const now = Date.now();
+    write(
+      'execution-ledger.jsonl',
+      [
+        JSON.stringify({ ts: new Date(now - 10 * 3600_000).toISOString(), task_id: 'stalled' }),
+        JSON.stringify({ ts: new Date(now - 30 * 60_000).toISOString(), task_id: 'fresh' }),
+      ].join('\n') + '\n'
+    );
+    const flow = observe();
+    const stalled = flow.candidates.find((c) => c.task_id === 'stalled');
+    const fresh = flow.candidates.find((c) => c.task_id === 'fresh');
+    expect(stalled).toMatchObject({ action: 'continue_task', kind: 'continue_task' });
+    expect(stalled?.reason).toContain('No ledger progress for ~10h; consider triage');
+    expect(fresh).toMatchObject({ action: 'continue_task', kind: 'continue_task' });
+    expect(fresh?.reason).not.toContain('No ledger progress');
+  });
+  it('leaves continue_task candidates unchanged when no ledger exists', () => {
+    write('NEXT_TASKS.json', [{ task_id: 'a', status: 'planned' }]);
+    const flow = observe();
+    expect(flow.candidates[0]).toMatchObject({ action: 'continue_task', kind: 'continue_task' });
+    expect(flow.candidates[0].reason).not.toContain('No ledger progress');
+  });
 });
 
 describe('approval observation projection (in-memory, no approval store writes)', () => {

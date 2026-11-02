@@ -288,7 +288,7 @@ async function withCaptureBrokerCredentials<T>(
       throw new Error('information_asset_capture_gws_token_required');
     const root = resolveStorageFloor(
       'scratch',
-      { kind: 'tenant', tenant_slug: location.scope.tenant_slug, tier: 'confidential' },
+      { kind: 'tier', tenant: location.scope.tenant_slug, tier: location.tier },
       'information-asset-capture'
     );
     workspaceOptions = {

@@ -87,6 +87,22 @@
             "libs/core/voice/voice-selection-preferences.ts (whisper.cpp CLI with the ggml-small model under active/shared/tmp/whisper.cpp)"
           ]
         },
+        "speech_cpp": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.55,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/core/voice/speech-to-text-bridge.ts (installSpeechCppSpeechToTextBridgeIfAvailable → speech asr)",
+            "knowledge/product/architecture/speech-cpp-voice-runtime.md"
+          ]
+        },
         "native_speech": {
           "traits": {
             "accuracy": 0.6,

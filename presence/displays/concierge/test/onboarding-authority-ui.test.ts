@@ -91,9 +91,116 @@ async function mount(respond: (body?: Record<string, unknown>, url?: string) => 
       fireEvent(node, node.localName === 'select' ? 'change' : 'input');
     });
   };
-  return { container, posts, click, change };
+  const check = async (text: string, checked: boolean, index = 0) => {
+    const label = [...container.querySelectorAll('label')].filter(
+      (item) => item.textContent === text
+    )[index];
+    expect(label).toBeDefined();
+    const input = label.querySelector('input')!;
+    await act(async () => {
+      Object.assign(input, { checked });
+      fireEvent(input, 'click');
+    });
+  };
+  return { container, posts, click, change, check };
 }
 describe('onboarding authority review and resumption', () => {
+  it('reviews one private development bundle and personal tiers without granting base pushes', async () => {
+    const m = await mount(async (body) =>
+      !body
+        ? json(receipt())
+        : json({
+            ok: true,
+            statement: 'Reviewed development bundle',
+            digest: 'digest',
+            base_hash: 'base',
+          })
+    );
+    await m.change('select', 'vcs:pr_merge', 1);
+    await m.change('input[type="text"]', 'release/custom');
+    const genericBranch = m.container.querySelector('input[type="text"]')!;
+    expect(Reflect.get(genericBranch, 'value')).toBe('release/custom');
+    expect(genericBranch.hasAttribute('readOnly')).toBe(false);
+    await m.change('select', 'vcs:development', 1);
+    const fixedBranches = [...m.container.querySelectorAll('input[type="text"]')];
+    expect(fixedBranches.map((input) => Reflect.get(input, 'value'))).toEqual([
+      'agent/kyberion-development',
+      'main',
+    ]);
+    expect(fixedBranches.every((input) => input.hasAttribute('readOnly'))).toBe(true);
+    await m.change('input[type="url"]', 'https://github.com/owner/repo');
+    await m.change('input[type="datetime-local"]', '2099-10-21T12:00');
+    await m.check('Require a verified private repository', true);
+    await m.check('Set delegated data tiers', true);
+    await m.check('Personal', true);
+    await m.click('Preview exact authority');
+    expect(m.posts[0]).toMatchObject({
+      data_tier: { read: ['public', 'personal'], write: [] },
+      grants: [
+        {
+          operation_id: 'vcs:pr_create',
+          repository: 'https://github.com/owner/repo',
+          visibility: 'private',
+        },
+        {
+          operation_id: 'vcs:push',
+          repository: 'https://github.com/owner/repo',
+          branch: 'agent/kyberion-development',
+          visibility: 'private',
+        },
+        {
+          operation_id: 'vcs:pr_merge',
+          repository: 'https://github.com/owner/repo',
+          branch: 'main',
+          visibility: 'private',
+        },
+      ],
+    });
+    await m.check('Personal', false);
+    expect(m.container.textContent).not.toContain('Reviewed development bundle');
+    expect(m.posts).toHaveLength(1);
+  });
+  it('retains the exact branch and private marker when revoking an existing grant', async () => {
+    const granted = {
+      ...receipt(),
+      charter: {
+        id: 'charter',
+        expires_at: '2099-10-21T12:00:00.000Z',
+        stopped: false,
+        delegated_decisions: {meeting_scheduling:'allow_with_review'},
+        data_tier: { read: ['public', 'personal'], write: [] },
+        grants: [
+          {
+            operation_id: 'vcs:pr_merge',
+            repository: 'https://github.com/owner/repo',
+            branch: 'release',
+            visibility: 'private',
+          },
+        ],
+      },
+    };
+    const m = await mount(async (body) =>
+      !body
+        ? json({...granted,delegable_decisions:[{decision_type:'meeting_scheduling',label:{en:'Meeting scheduling',ja:'会議調整'}}]})
+        : json({ ok: true, statement: 'Reviewed revocation', digest: 'digest', base_hash: 'base' })
+    );
+    await m.change('select','allow',2);
+    await m.click('Review revocation');
+    await m.click('Preview exact authority');
+    expect(m.posts[0]).toMatchObject({
+      mode: 'revoke',
+      grants: [
+        {
+          operation_id: 'vcs:pr_merge',
+          repository: 'https://github.com/owner/repo',
+          branch: 'release',
+          visibility: 'private',
+        },
+      ],
+    });
+    expect(m.posts[0]).not.toHaveProperty('data_tier');
+    expect(m.posts[0]).not.toHaveProperty('delegated_decisions');
+  });
   it('requires explicit renewal consent for the displayed existing limits and withdraws stale preview', async () => {
     const renewal = {
       id: 'expired-existing',

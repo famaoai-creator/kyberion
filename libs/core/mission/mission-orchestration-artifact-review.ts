@@ -12,6 +12,7 @@ import { missionClassOf, missionRiskProfileOf } from './mission-orchestration-ph
 import { safeExistsSync } from '../secure-io.js';
 import type { PlannedNextTask } from './mission-orchestration-worker-contracts.js';
 import { writeDispatchArtifact } from './mission-dispatch-lifecycle.js';
+import { developmentReviewContentLines } from '../vcs/development-review-content.js';
 
 export function resolveReviewTargetForTask(task: PlannedNextTask): string | undefined {
   if (typeof task.review_target === 'string' && task.review_target.trim()) {
@@ -60,6 +61,9 @@ export function resolveReviewArtifact(input: {
     .map((evidence) => String(evidence.path || '').trim())
     .filter(Boolean);
   const candidates = [
+    ...(targetTask.target_path === `evidence/development/${reviewTarget}/revision.json`
+      ? [targetTask.target_path]
+      : []),
     diffPath,
     ...resultArtifacts,
     ...reconciledArtifacts,
@@ -77,9 +81,12 @@ export function resolveReviewArtifact(input: {
     absolutePath = possiblePaths.find((possible) => safeExistsSync(possible));
     if (absolutePath) break;
   }
-  const kind = inferArtifactReviewKind(
-    String(targetTask.target_path || absolutePath || targetTask.deliverable || '')
-  );
+  const kind =
+    targetTask.target_path === `evidence/development/${reviewTarget}/revision.json`
+      ? 'code'
+      : inferArtifactReviewKind(
+          String(targetTask.target_path || absolutePath || targetTask.deliverable || '')
+        );
   const targetRole = String(targetTask.assigned_to?.role || '').trim();
   const resolvedAgent =
     targetRole && !targetTask.assigned_to?.agent_id
@@ -141,6 +148,12 @@ export function buildArtifactReviewLines(task: PlannedNextTask): string[] {
     profile.artifact_sha256 ? `- Artifact SHA-256: ${profile.artifact_sha256}` : '',
     `- ${profile.rationale}`,
     '- Try to falsify every acceptance criterion. Report concrete defects rather than affirming the author.',
+    ...(profile.artifact_path
+      ? developmentReviewContentLines(
+          pathResolver.rootResolve(profile.artifact_path),
+          profile.artifact_sha256
+        )
+      : []),
     '- Use must_fix only for defects that block acceptance; should_fix and nit do not block completion.',
     '',
   ].filter(Boolean);

@@ -100,6 +100,12 @@ export interface ManifestCredentialRead {
   rule_id: string;
   root: string;
   file_count: number;
+  /**
+   * True when the walk could not count the root's files: an ancestor was not
+   * listable by secure-io (e.g. the personal tier), so tar archived that
+   * subtree itself. `file_count` is then 0 and carries no information.
+   */
+  uncounted?: true;
 }
 
 /** Validate a restored manifest's `credential_reads` (roots via the archive member normalizer). */
@@ -115,7 +121,9 @@ export function parseManifestCredentialReads(
       typeof entry.root !== 'string' ||
       typeof entry.file_count !== 'number' ||
       !Number.isInteger(entry.file_count) ||
-      entry.file_count < 0
+      entry.file_count < 0 ||
+      (entry.uncounted !== undefined && entry.uncounted !== true) ||
+      (entry.uncounted === true && entry.file_count !== 0)
     ) {
       throw new Error('Backup manifest credential read is invalid.');
     }
@@ -123,6 +131,42 @@ export function parseManifestCredentialReads(
       rule_id: entry.rule_id,
       root: normalizeRoot(entry.root),
       file_count: entry.file_count,
+      ...(entry.uncounted === true ? { uncounted: true as const } : {}),
+    };
+  });
+}
+
+/**
+ * The file count a manifest recorded for `root`, or null when it recorded
+ * none or could not count it (`uncounted`: tar archived an unlisted ancestor).
+ */
+export function manifestCredentialCount(
+  reads: ManifestCredentialRead[] | undefined,
+  root: string
+): number | null {
+  const entry = reads?.find((read) => read.root === root);
+  if (!entry || entry.uncounted) return null;
+  return entry.file_count;
+}
+
+/**
+ * Manifest `credential_reads` for a finished walk. A root under an unlisted
+ * ancestor (e.g. the personal tier the backup role may not list) is archived
+ * by tar itself, so the walk never saw its files: it is recorded `uncounted`.
+ * Otherwise the count is the selected paths strictly inside the root — the
+ * same rule the drill uses for archive members (an empty root counts 0).
+ */
+export function credentialReadsFor(
+  roots: Array<{ ruleId: string; root: string }>,
+  selection: { paths: string[]; unlisted: string[] }
+): ManifestCredentialRead[] {
+  return roots.map(({ ruleId, root }) => {
+    const archivedByTar = selection.unlisted.some((rel) => isWithin(root, rel));
+    if (archivedByTar) return { rule_id: ruleId, root, file_count: 0, uncounted: true as const };
+    return {
+      rule_id: ruleId,
+      root,
+      file_count: selection.paths.filter((rel) => rel !== root && isWithin(rel, root)).length,
     };
   });
 }
@@ -134,6 +178,8 @@ export interface WithheldRestoreRoot {
   archived_members: number;
   /** `credential_reads[].file_count` the manifest recorded for `root`, if any. */
   manifest_file_count: number | null;
+  /** The manifest recorded the root as `uncounted` (tar archived an unlisted ancestor). */
+  uncounted?: boolean;
 }
 
 /**
@@ -144,8 +190,11 @@ export interface WithheldRestoreRoot {
 export function verifyWithheldCredentialMembers(
   withheld: WithheldRestoreRoot[]
 ): WithheldRestoreRoot[] {
+  // Uncounted roots stay in the report (presence only), so "uncounted, 0
+  // archived" is visible in the drill result instead of disappearing.
   const present = withheld.filter(
-    (entry) => entry.archived_members > 0 || entry.manifest_file_count !== null
+    (entry) =>
+      entry.archived_members > 0 || entry.manifest_file_count !== null || entry.uncounted === true
   );
   const mismatched = present.filter(
     (entry) =>
@@ -283,7 +332,7 @@ export interface BackupFileSelection {
   unlisted: string[];
   totalBytes: number;
   /** What the walk read under the backup credential admission: roots and counts, never contents. */
-  credentialReads: Array<{ rule_id: string; root: string; file_count: number }>;
+  credentialReads: ManifestCredentialRead[];
   skipped: {
     excluded: number;
     nonRegular: string[];
@@ -313,11 +362,7 @@ export function selectBackupFiles(input: {
   // and only for this walk; the counts land in the manifest.
   return withBackupCredentialReadAdmission({ encrypted: input.encrypted === true }, () => {
     const selection = walkBackupFiles(input);
-    selection.credentialReads = exclusions.credentialReadRoots.map(({ ruleId, root }) => ({
-      rule_id: ruleId,
-      root,
-      file_count: selection.paths.filter((rel) => isWithin(rel, root)).length,
-    }));
+    selection.credentialReads = credentialReadsFor(exclusions.credentialReadRoots, selection);
     return selection;
   });
 }

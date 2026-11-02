@@ -94,6 +94,7 @@ describe('voice-tts-engine selection', () => {
     });
     expect(ids(engines)).toEqual([
       'mlx_audio_qwen3',
+      'speech_cpp',
       'kokoro',
       'local_say',
       'espeak_ng',
@@ -114,6 +115,7 @@ describe('voice-tts-engine selection', () => {
       requires: { language: 'ja', platform: 'darwin', identity: 'stock' },
     });
     expect(ids(engines)).toEqual([
+      'speech_cpp',
       'kokoro',
       'local_say',
       'espeak_ng',

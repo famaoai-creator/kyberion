@@ -1,0 +1,28 @@
+{
+  "version": "1.0.0",
+  "default_engine_id": "local_say",
+  "engines": [
+    {
+      "engine_id": "speech_cpp",
+      "display_name": "speech.cpp (Qwen3-TTS GGUF)",
+      "kind": "native_local",
+      "provider": "speech_cpp",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "languages": ["de", "en", "es", "fr", "it", "ja", "ko", "pt", "ru", "zh"],
+      "language_notes": "Default synthesis model is qwen3-tts-0.6b (nine named speakers). Override with KYBERION_SPEECH_CPP_TTS_MODEL; Irodori models need a reference voice via serve/CLI separately.",
+      "model_id": "qwen3-tts-0.6b",
+      "tts_adapter_id": "speech_cpp",
+      "runtime_id": "speech_cpp",
+      "live_presence": true,
+      "supports": {
+        "list_voices": false,
+        "playback": true,
+        "artifact_formats": ["wav"],
+        "streaming": false
+      },
+      "fallback_engine_id": "local_say",
+      "notes": "Local speech.cpp CLI via the managed tool-runtime (`pnpm tool:setup -- --tool speech_cpp --apply`). First use downloads the GGUF into the OS speech.cpp cache. Default voice ryan (en) / ono_anna (ja). Cross-platform alternative to the MLX Qwen3/Irodori Python bridges."
+    }
+  ]
+}

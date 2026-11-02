@@ -1,0 +1,31 @@
+{
+  "service_id": "speech_cpp",
+  "name": "speech.cpp Local Speech Presets",
+  "description": "MIT local speech runtime (OpenAI-compatible audio API on 127.0.0.1). Install with `pnpm tool:setup -- --tool speech_cpp --apply`. Start `speech serve [models...] --host 127.0.0.1 --port 8095`. Batch TTS/ASR prefer the CLI; HTTP is for voice-hub / OpenAI clients.",
+  "recovery_policy": {
+    "retry": { "maxRetries": 1 }
+  },
+  "operations": {
+    "health": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "health",
+      "method": "GET",
+      "description": "speech.cpp liveness probe"
+    },
+    "speech": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "v1/audio/speech",
+      "method": "POST",
+      "description": "OpenAI-compatible TTS; JSON body with input and voice"
+    },
+    "transcriptions": {
+      "type": "api",
+      "allow_local_network": true,
+      "path": "v1/audio/transcriptions",
+      "method": "POST",
+      "description": "OpenAI-compatible ASR; multipart file upload"
+    }
+  }
+}

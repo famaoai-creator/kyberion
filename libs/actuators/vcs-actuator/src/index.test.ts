@@ -14,7 +14,7 @@ import { handleAction, type VcsParams } from './vcs-helpers.js';
 describe('vcs-actuator op catalog', () => {
   it('lists the full op set with capture/apply kinds', () => {
     const ops = describeOps();
-    expect(ops).toHaveLength(17);
+    expect(ops).toHaveLength(18);
     const byOp = Object.fromEntries(ops.map((spec) => [spec.op, spec.kind]));
     expect(byOp).toEqual({
       status: 'capture',
@@ -34,6 +34,7 @@ describe('vcs-actuator op catalog', () => {
       checkout: 'apply',
       worktree: 'apply',
       pr_merge: 'apply',
+      development_loop: 'apply',
     });
   });
 

@@ -45,8 +45,10 @@ export {
   buildWhisperKitTranscribeArgs,
   installWhisperKitSpeechToTextBridgeIfAvailable,
   installManagedMlxWhisperSpeechToTextBridgeIfAvailable,
+  installSpeechCppSpeechToTextBridgeIfAvailable,
   installAvailableSpeechToTextBridges,
 } from './speech-to-text-bridge.js';
+export * from './speech-cpp-client.js';
 export * from './streaming-stt-bridge.js';
 export * from './streaming-tts-bridge.js';
 export * from './tts-loopback-verifier.js';

@@ -10,36 +10,16 @@ const logger = createLogger('platform');
  * [SECURE-IO COMPLIANT VERSION]
  */
 
-export type Platform = 'darwin' | 'win32' | 'linux' | 'unknown';
-
-/**
- * Normalize a raw `process.platform` / `os.platform()` value to the
- * closed Platform union. Unknown values collapse to 'unknown'.
- */
-export function normalizePlatform(value: string): Platform {
-  if (value === 'darwin' || value === 'win32' || value === 'linux') return value;
-  return 'unknown';
-}
-
-/** Pure, injectable OS predicates — prefer these over raw platform checks. */
-export function isMacOS(platform: string = os.platform()): boolean {
-  return normalizePlatform(platform) === 'darwin';
-}
-
-export function isWindows(platform: string = os.platform()): boolean {
-  return normalizePlatform(platform) === 'win32';
-}
-
-export function isLinux(platform: string = os.platform()): boolean {
-  return normalizePlatform(platform) === 'linux';
-}
-
-export function isAppleSilicon(
-  platform: string = os.platform(),
-  arch: string = os.arch()
-): boolean {
-  return isMacOS(platform) && arch === 'arm64';
-}
+export {
+  isAppleSilicon,
+  isLinux,
+  isMacOS,
+  isWindows,
+  normalizePlatform,
+} from './platform-facts.js';
+export type { Platform } from './platform-facts.js';
+import { isLinux, isMacOS, isWindows, normalizePlatform, type Platform } from './platform-facts.js';
+import { locateCommandInvocation } from './platform-facts.js';
 
 export interface PlatformCapabilities {
   hasSpeech: boolean;
@@ -54,8 +34,8 @@ export interface PlatformCapabilities {
  */
 async function commandExists(cmd: string): Promise<boolean> {
   try {
-    const checkCmd = isWindows() ? 'where' : 'which';
-    await safeExec(checkCmd, [cmd]);
+    const [locator, ...locatorArgs] = locateCommandInvocation(cmd);
+    await safeExec(locator, locatorArgs);
     return true;
   } catch (_) {
     return false;
@@ -427,5 +407,7 @@ export function getPlatformDriver(): OSDriver {
 }
 
 export const platform = getPlatformDriver();
-export const currentPlatform: Platform = os.platform() as Platform;
+export const currentPlatform: Platform = normalizePlatform(process.platform);
+/** Raw Node platform token for consumers whose fields are typed `NodeJS.Platform`. */
+export const nodePlatform: NodeJS.Platform = process.platform;
 export const __test__ = { buildMacSpeakArgs, LinuxDriver };

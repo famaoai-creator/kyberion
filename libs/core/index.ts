@@ -98,6 +98,13 @@ export * from './organization/continuous-operations-sources.js';
 export * from './organization/continuous-work-plan.js';
 
 export * from './organization/continuous-work-owner.js';
+export * from './organization/continuous-development-consent.js';
+export * from './organization/continuous-mission-scope.js';
+export * from './mission/mission-development-continuation.js';
+export * from './mission/mission-development-proof.js';
+export * from './mission/mission-development-gates.js';
+export * from './vcs/cwd-scope.js';
+export * from './governance/authenticated-personal-approvals.js';
 
 export * from './discussion/discussion-readiness.js';
 export * from './governance/charter-payment-settlement.js';

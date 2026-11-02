@@ -130,6 +130,18 @@ export async function runMissionTriage(
     `  tasks: ${report.tasks.completed}/${report.tasks.total} closed` +
       (report.tasks.pending.length ? `  pending: ${report.tasks.pending.join(', ')}` : '')
   );
+  const blueprintErrors = (report.blueprint_validation?.messages || []).filter(
+    (m) => m.severity === 'error'
+  );
+  for (const m of blueprintErrors) {
+    print(`  blueprint ${m.code}: ${m.message}`);
+  }
+  for (const candidate of report.stalls?.candidates || []) {
+    const ageHours = Math.round(candidate.stall_age_ms / 3_600_000);
+    print(
+      `  stall candidate: ${candidate.task_id} (${candidate.status}) — no progress for ~${ageHours}h, ${candidate.stall_count} ledger events since`
+    );
+  }
   if (
     report.flow.candidates[0]?.kind === 'lifecycle' ||
     report.flow.candidates[0]?.action === 'scope_rebaseline'

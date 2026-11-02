@@ -369,7 +369,7 @@ export function mintScopeEnvelope(input: ScopeMintInput): ScopeEnvelope {
   }
 
   const scopeErrors = validateScopeContext(identity, {
-    requireTenant: identity.tier !== 'public',
+    requireTenant: identity.tier === 'confidential',
     requireMission: false,
     allowShared: true,
     allowSessionRoot: missionless,

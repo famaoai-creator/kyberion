@@ -1,0 +1,10 @@
+{
+  "default_pattern": "https://api.{service_id}.com/v1",
+  "services": {
+    "speech_cpp": {
+      "preset_path": "knowledge/product/orchestration/service-presets/speech_cpp.json",
+      "auth_strategy": "none",
+      "base_url": "http://127.0.0.1:8095"
+    }
+  }
+}

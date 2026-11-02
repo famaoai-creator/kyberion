@@ -1,6 +1,7 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { safeExistsSync } from '../secure-io.js';
+import { executableName, isMacOS } from '../platform-facts.js';
 import {
   engineRuntimePreferencesReadiness,
   type EngineRuntimePreferences,
@@ -81,11 +82,7 @@ export function resolveAdbBin(): string {
   const androidSdkRoot = firstConfiguredEnv('ANDROID_SDK_ROOT');
   for (const sdkRoot of [androidHome, androidSdkRoot]) {
     if (!sdkRoot) continue;
-    const candidate = path.join(
-      sdkRoot,
-      'platform-tools',
-      process.platform === 'win32' ? 'adb.exe' : 'adb'
-    );
+    const candidate = path.join(sdkRoot, 'platform-tools', executableName('adb'));
     try {
       if (safeExistsSync(candidate)) return candidate;
     } catch {
@@ -139,6 +136,11 @@ export function resolveRustxngBin(): string {
   return resolveExternalToolBin('rustxng', ['KYBERION_RUSTXNG_BIN'], 'rustxng');
 }
 
+/** speech.cpp local TTS/ASR runtime (MIT; Metal / Vulkan / CPU). */
+export function resolveSpeechCppBin(): string {
+  return resolveExternalToolBin('speech_cpp', ['KYBERION_SPEECH_CPP_BIN'], 'speech');
+}
+
 /**
  * macOS locations of the Tailscale CLI, most specific first: the symlink the
  * app's "Install CLI" creates, a Homebrew formula, then the binary inside the
@@ -159,7 +161,7 @@ export function resolveTailscaleBin(
   if (override) return override;
   const managed = managedBinary('tailscale');
   if (managed) return managed;
-  if ((deps.platform ?? process.platform) === 'darwin') {
+  if (isMacOS(deps.platform)) {
     const exists =
       deps.exists ??
       ((candidate: string) => {

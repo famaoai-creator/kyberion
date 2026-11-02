@@ -98,6 +98,26 @@ function harness(profile = 'implementer', canonicalRole = 'implementer') {
 }
 
 describe('claimed task tool runtime', () => {
+  it.each([
+    'evidence/continuous-owner.json',
+    'artifacts/../evidence/continuous-owner.json',
+    'gates/definitions/TESTS_PASSED.json',
+  ])('denies owner authority target %s even if the task declares it', (deliverable) => {
+    const h = harness();
+    h.options.tasks = () => [
+      {
+        task_id: scope.task_id,
+        deliverable,
+        status: 'planned',
+        assigned_to: { role: 'implementer' },
+      },
+    ];
+    expect(() => createRuntimeForTask(h.metadata, scope, h.options)).toThrow(
+      /TASK_TOOL_SCOPE_DENIED|TASK_TOOL_CAPABILITY_UNAVAILABLE/
+    );
+    expect(h.writeDeliverable).not.toHaveBeenCalled();
+    expect(h.writeArtifact).not.toHaveBeenCalled();
+  });
   it('lets a planner read back only its current-lease fixed declared deliverable', async () => {
     const h = harness('planner', 'planner');
     const names = h.runtime.definitions.map((entry) => entry.name);

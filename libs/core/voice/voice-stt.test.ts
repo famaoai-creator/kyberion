@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { pathResolver } from '../path-resolver.js';
 import { safeReadFile } from '../secure-io.js';
 import {
+  isVoiceSttBackendAvailable,
   parseVoiceSttBackend,
   resolveVoiceSttBackendOrder,
   resolveVoiceSttServerConfig,
@@ -13,12 +14,13 @@ describe('voice STT helpers', () => {
     const source = String(
       safeReadFile(pathResolver.rootResolve('libs/core/voice/voice-stt.ts'), { encoding: 'utf8' })
     );
-    expect(source).not.toMatch(/env\.(VOICE_HUB_STT|WHISPERKIT|MLX_AUDIO)/u);
+    expect(source).not.toMatch(/env\.(VOICE_HUB_STT|WHISPERKIT|MLX_AUDIO|KYBERION_SPEECH_CPP)/u);
     expect(source).toContain('getRegisteredEnvText');
   });
 
   it('parses backend aliases into canonical values', () => {
     expect(parseVoiceSttBackend('whisper.cpp')).toBe('whisper_cpp');
+    expect(parseVoiceSttBackend('speech.cpp')).toBe('speech_cpp');
     expect(parseVoiceSttBackend('mlx-whisper')).toBe('mlx_whisper');
     expect(parseVoiceSttBackend('apple_speech')).toBe('native_speech');
     expect(parseVoiceSttBackend('server')).toBe('server');
@@ -59,6 +61,56 @@ describe('voice STT helpers', () => {
   it('rejects non-http STT endpoints before any audio egress', () => {
     expect(resolveVoiceSttServerConfig({ VOICE_HUB_STT_BASE_URL: 'file:///tmp/stt' })).toBeNull();
     expect(resolveVoiceSttServerConfig({ VOICE_HUB_STT_BASE_URL: 'not-a-url' })).toBeNull();
+  });
+
+  it('accepts KYBERION_SPEECH_CPP_URL as an OpenAI-compatible STT server', () => {
+    const config = resolveVoiceSttServerConfig({
+      KYBERION_SPEECH_CPP_URL: 'http://127.0.0.1:8095/',
+      KYBERION_SPEECH_CPP_ASR_MODEL: 'qwen3-asr-0.6b',
+    });
+    expect(config).toEqual({
+      baseUrl: 'http://127.0.0.1:8095',
+      model: 'qwen3-asr-0.6b',
+      apiKey: undefined,
+      provider: 'openai_compatible_server',
+    });
+  });
+
+  it('treats speech_cpp as unavailable until its managed binary probe is true', () => {
+    expect(
+      isVoiceSttBackendAvailable('speech_cpp', {
+        server: false,
+        whisperCpp: false,
+        speechCpp: false,
+        nativeSpeech: false,
+      })
+    ).toBe(false);
+    expect(
+      isVoiceSttBackendAvailable('speech_cpp', {
+        server: false,
+        whisperCpp: false,
+        speechCpp: true,
+        nativeSpeech: false,
+      })
+    ).toBe(true);
+  });
+
+  it('includes speech_cpp in auto order when preference and availability allow', () => {
+    const order = resolveVoiceSttBackendOrder(
+      'auto',
+      {
+        server: false,
+        mlxWhisper: false,
+        speechCpp: true,
+        whisperCpp: true,
+        nativeSpeech: false,
+      },
+      {
+        VOICE_HUB_STT_PREFERENCE: 'speech_cpp,whisper_cpp',
+      }
+    );
+    expect(order).toEqual(['speech_cpp', 'whisper_cpp']);
+    expect(resolveVoiceSttAdapter('speech_cpp').availability_key).toBe('speechCpp');
   });
 
   it('builds an automatic backend order from availability and preference', () => {

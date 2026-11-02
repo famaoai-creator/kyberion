@@ -1,3 +1,4 @@
+import { hasCliFlag } from './lib/cli-guard.js';
 /** Governed controller adapters for the continuous mission-owner execution surface. */
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -10,6 +11,13 @@ import { isSupersedeProvenForGate } from '@agent/core/mission/mission-task-super
 import { loadState } from '@agent/core/mission/mission-state';
 import { DISTILL_MEMORY_OUTBOX_FILE } from '@agent/core/mission/mission-distill';
 import { loadProjectRecord } from '@agent/core/project/project-registry';
+import { advanceMissionDevelopment } from '@agent/core/mission/mission-development-continuation';
+import { verifyMissionDevelopmentPublication } from '@agent/core/mission/mission-development-proof';
+import { installMissionDevelopmentProofVerifier } from '@agent/core/mission/mission-development-gates';
+import { writeMissionNextTasks } from '@agent/core/mission/mission-lifecycle-completion';
+import { configureMissionDevelopmentGates } from '@agent/core/mission/mission-process-planning';
+import { withContinuousMissionScope } from '@agent/core/organization/continuous-mission-scope';
+import { continuousDevelopmentAlignmentScope } from '@agent/core/organization/continuous-development-consent';
 import { listWorkItems, updateWorkItem } from '@agent/core/workforce/work-coordination';
 import {
   runContinuousWorkOwner,
@@ -51,6 +59,11 @@ export interface ContinuousOwnerAdapterDeps {
   supersedeProven?: (missionId: string, taskId: string) => boolean;
   workItems?: typeof listWorkItems;
   updateItem?: typeof updateWorkItem;
+  development?: typeof advanceMissionDevelopment;
+  board?: typeof writeMissionNextTasks;
+  configureDevelopmentGates?: typeof configureMissionDevelopmentGates;
+  missionScope?: typeof withContinuousMissionScope;
+  developmentProof?: typeof verifyMissionDevelopmentPublication;
 }
 const fingerprint = (value: unknown): string =>
   createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -84,8 +97,17 @@ export function createContinuousOwnerPorts(
   const command = async (
     script: string,
     args: string[],
-    input: { scope: ContinuousWorkOwnerScope; signal?: AbortSignal; assertCurrent: () => void }
-  ): Promise<void> => {
+    input: { scope: ContinuousWorkOwnerScope; signal?: AbortSignal; assertCurrent: () => void },
+    expectedRefusal?: 'TESTS_PASSED'
+  ): Promise<boolean> => {
+    if (
+      expectedRefusal &&
+      (script !== 'mission_controller.bundle.js' ||
+        args[0] !== 'gate-pass' ||
+        args[2] !== expectedRefusal ||
+        !hasCliFlag(args, '--machine-only'))
+    )
+      throw new Error('Known gate refusal handling is limited to the typed development CI gate');
     const { scope, signal } = input;
     if (signal?.aborted) throw new Error('Continuous owner effect aborted before controller');
     const scriptPath = path.join(root, 'dist/scripts', script);
@@ -97,6 +119,7 @@ export function createContinuousOwnerPorts(
     delete env.KYBERION_CUSTOMER;
     delete env.KYBERION_PROJECT_ID;
     env.KYBERION_ORGANIZATION_ID = scope.organization_id;
+    env.KYBERION_TIER = scope.tier;
     if (scope.tenant_slug) env.KYBERION_TENANT = scope.tenant_slug;
     else delete env.KYBERION_TENANT;
     input.assertCurrent();
@@ -110,6 +133,15 @@ export function createContinuousOwnerPorts(
     input.assertCurrent();
     if (signal?.aborted)
       throw new Error('Continuous owner effect expired; verify controller effects before recovery');
+    if (
+      expectedRefusal &&
+      result.status === 1 &&
+      !result.error &&
+      `${result.stdout}\n${result.stderr}`.includes(
+        `[DEVELOPMENT_CI_WAITING] Machine-only gate checks failed: ${args[1]}/${expectedRefusal}`
+      )
+    )
+      return false;
     if (result.status !== 0 || result.error)
       throw new Error(
         'Governed controller failed or timed out; verify effects before recovery: ' +
@@ -120,6 +152,7 @@ export function createContinuousOwnerPorts(
           String(result.status) +
           ')'
       );
+    return true;
   };
   const readMarker = (dir: string, operationKey: string) => {
     const marker = read(path.join(dir, 'evidence/continuous-owner.json')) as {
@@ -205,7 +238,7 @@ export function createContinuousOwnerPorts(
             '--success-condition',
             input.success_condition,
             '--mission-type',
-            input.mission_type ?? 'operations_report',
+            input.mission_type ?? (input.development ? 'development' : 'operations_report'),
             ...(input.prerequisites.length
               ? ['--prerequisites', input.prerequisites.join(',')]
               : []),
@@ -222,6 +255,9 @@ export function createContinuousOwnerPorts(
           project_id: input.project_id,
           scope: input.scope,
           request_hash: fingerprint({ ...input, signal: undefined }),
+          ...(input.development
+            ? { development: input.development, development_hash: fingerprint(input.development) }
+            : {}),
         });
       } else {
         assertMissionScope(input);
@@ -242,7 +278,15 @@ export function createContinuousOwnerPorts(
           tier: input.scope.tier,
           projectId: input.project_id,
           victoryConditions: [input.success_condition],
-          scope: { in: [input.goal], out: ['Unapproved external effects', 'Cross-tenant access'] },
+          scope: {
+            in: [
+              input.goal,
+              ...(input.development
+                ? continuousDevelopmentAlignmentScope(input.development, input.scope)
+                : []),
+            ],
+            out: ['Unapproved external effects', 'Cross-tenant access'],
+          },
           flow: [
             {
               step: 1,
@@ -271,6 +315,12 @@ export function createContinuousOwnerPorts(
         brief.tier !== input.scope.tier ||
         brief.victoryConditions.length !== 1 ||
         brief.victoryConditions[0] !== input.success_condition ||
+        (input.development &&
+          fingerprint(brief.scope?.in) !==
+            fingerprint([
+              input.goal,
+              ...continuousDevelopmentAlignmentScope(input.development, input.scope),
+            ])) ||
         (brief.source.tenantSlug ?? '') !== (input.scope.tenant_slug ?? '')
       )
         throw new Error('Continuous alignment brief identity mismatch');
@@ -285,6 +335,18 @@ export function createContinuousOwnerPorts(
           brief_hash: briefHash,
         });
       }
+      if (input.development) {
+        input.assertCurrent();
+        (deps.missionScope ?? withContinuousMissionScope)(
+          { mission_id: input.mission_id, scope: input.scope, assertCurrent: input.assertCurrent },
+          () =>
+            (deps.configureDevelopmentGates ?? configureMissionDevelopmentGates)({
+              missionId: input.mission_id,
+              development: input.development!,
+              assertCurrent: input.assertCurrent,
+            })
+        );
+      }
       input.assertCurrent();
       const approval = (deps.openApproval ?? openAlignmentApproval)(input.mission_id, {
         requestedBy: 'continuous-owner',
@@ -295,9 +357,16 @@ export function createContinuousOwnerPorts(
     },
     async advanceMission(input) {
       let state = assertMissionScope(input);
+      if (input.development)
+        installMissionDevelopmentProofVerifier(verifyMissionDevelopmentPublication);
       const dir = missionPath(input.mission_id);
       if (!dir) throw new Error('Continuous mission evidence missing');
       const marker = readMarker(dir, input.creation_key);
+      if (
+        (marker.development_hash ?? null) !==
+        (input.development ? fingerprint(input.development) : null)
+      )
+        throw new Error('Continuous development specification drift or missing reviewed pin');
       const brief = (deps.brief ?? loadMissionBriefAtPath)(
         path.join(dir, 'evidence/mission-brief.json')
       );
@@ -312,7 +381,13 @@ export function createContinuousOwnerPorts(
         (brief.source.tenantSlug ?? '') !== (input.scope.tenant_slug ?? '') ||
         !brief.intent?.trim() ||
         brief.victoryConditions.length !== 1 ||
-        !brief.victoryConditions[0]?.trim()
+        !brief.victoryConditions[0]?.trim() ||
+        (input.development &&
+          fingerprint(brief.scope?.in) !==
+            fingerprint([
+              brief.intent,
+              ...continuousDevelopmentAlignmentScope(input.development, input.scope),
+            ]))
       )
         throw new Error('Continuous alignment brief drift or missing immutable pin');
       const refs = ['mission:' + input.mission_id];
@@ -364,6 +439,51 @@ export function createContinuousOwnerPorts(
             );
         }
       };
+      const developmentProgress = async () => {
+        if (!input.development) return undefined;
+        input.assertCurrent();
+        const result = await (deps.development ?? advanceMissionDevelopment)(
+          {
+            missionId: input.mission_id,
+            development: input.development,
+            assertCurrent: input.assertCurrent,
+            ...(input.signal ? { signal: input.signal } : {}),
+          },
+          {
+            dispatch: async (mission, options) => {
+              const itemIds = options?.itemIds;
+              if (
+                mission.mission_id !== input.mission_id ||
+                !Array.isArray(itemIds) ||
+                !itemIds.length ||
+                itemIds.length > 64 ||
+                itemIds.some((id) => !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(id))
+              )
+                throw new Error('Continuous development dispatch requires exact mission WorkItems');
+              await command(
+                'mission_controller.bundle.js',
+                [
+                  'dispatch-workitems',
+                  input.mission_id,
+                  '--dispatch-item-ids',
+                  itemIds.join(','),
+                  '--dispatch-limit',
+                  '1',
+                  '--dispatch-rounds',
+                  '1',
+                  '--dispatch-statuses',
+                  'ready,backlog',
+                  '--dispatch-final-status',
+                  'done',
+                ],
+                input
+              );
+            },
+          }
+        );
+        input.assertCurrent();
+        return result;
+      };
       if (['completed', 'archived'].includes(state.status)) {
         if (!complete() || state.verification?.status !== 'verified')
           return {
@@ -371,6 +491,8 @@ export function createContinuousOwnerPorts(
             evidence_refs: refs,
             reason: 'Mission has unfinished contracts or lacks verified outcome evidence',
           };
+        const development = await developmentProgress();
+        if (development && development.status !== 'completed') return development;
         await reconcileLearning();
         return { status: 'completed', evidence_refs: refs };
       }
@@ -423,6 +545,11 @@ export function createContinuousOwnerPorts(
         );
       const rowsBefore = tasks();
       for (const phase of state.process_template?.phase_specs ?? []) {
+        if (
+          input.development &&
+          ['test', 'self_review', 'delivery', 'retrospective'].includes(phase.id)
+        )
+          continue;
         if (phase.exit_gate && closedRows(rowsBefore.filter((row) => row.phase === phase.id))) {
           await command(
             'mission_controller.bundle.js',
@@ -431,6 +558,125 @@ export function createContinuousOwnerPorts(
           );
         }
       }
+      const developmentBefore = await developmentProgress();
+      if (
+        input.development &&
+        (developmentBefore?.ci_verified || developmentBefore?.status === 'completed')
+      ) {
+        const currentTasks = tasks();
+        for (const phase of state.process_template?.phase_specs ?? []) {
+          if (
+            phase.id !== 'test' ||
+            phase.exit_gate?.id !== 'TESTS_PASSED' ||
+            !closedRows(currentTasks.filter((row) => row.phase === phase.id))
+          )
+            continue;
+          const ci = await (deps.developmentProof ?? verifyMissionDevelopmentPublication)(
+            input.mission_id,
+            input.development,
+            'ci'
+          );
+          input.assertCurrent();
+          if (!ci.ok)
+            return {
+              status: ci.waiting ? 'running' : 'blocked',
+              evidence_refs: developmentBefore.evidence_refs,
+              reason:
+                ci.reason ?? 'Current CI evidence is not ready; reconcile on the next owner wake',
+            };
+          const passed = await command(
+            'mission_controller.bundle.js',
+            ['gate-pass', input.mission_id, 'TESTS_PASSED', '--machine-only'],
+            input,
+            'TESTS_PASSED'
+          );
+          if (!passed)
+            return {
+              status: 'running',
+              evidence_refs: developmentBefore.evidence_refs,
+              reason:
+                'CI evidence changed during gate evaluation; reconcile on the next owner wake',
+            };
+        }
+      }
+      if (
+        developmentBefore &&
+        developmentBefore.status !== 'completed' &&
+        !developmentBefore.allow_task_dispatch
+      )
+        return developmentBefore;
+      if (developmentBefore?.status === 'completed') {
+        const refs = developmentBefore.evidence_refs;
+        if (
+          !Array.isArray(refs) ||
+          !refs.length ||
+          refs.length > 16 ||
+          refs.some(
+            (ref) => typeof ref !== 'string' || ref.length > 2048 || /[\u0000-\u001f]/u.test(ref)
+          )
+        )
+          throw new Error('Invalid verified development publication references');
+        const receipt = fingerprint(refs);
+        const marker = '\n\n[VERIFIED_DEVELOPMENT_PUBLICATION]\n';
+        const note = [
+          'The continuous owner has already verified publication, the immutable merge commit and required CI.',
+          'This delivery or retrospective task reports the existing outcome. Do not create another PR, push, merge, or repeat publication.',
+          'Use these existing references as evidence for the original acceptance criteria; do not claim unperformed work:',
+          ...refs.map((ref) => `- ${ref}`),
+        ].join('\n');
+        const description = (value: unknown) =>
+          `${String(value ?? '').split(marker)[0]}${marker}${note}`;
+        const targets = rowsBefore.filter((row) =>
+          ['delivery', 'retrospective'].includes(String(row.phase))
+        );
+        const items = (deps.workItems ?? listWorkItems)({}, { rootDir: root }).filter(
+          (item) =>
+            item.context?.mission_id === input.mission_id &&
+            item.context.organization_id === input.scope.organization_id &&
+            (item.context.tenant_slug ?? '') === (input.scope.tenant_slug ?? '') &&
+            item.context.project_id === input.project_id &&
+            targets.some((task) => task.task_id === item.context?.task_id) &&
+            ['ready', 'backlog'].includes(item.status)
+        );
+        if (targets.some((row) => row.description !== description(row.description))) {
+          input.assertCurrent();
+          (deps.board ?? writeMissionNextTasks)(dir, (rows) =>
+            rows.map((row) =>
+              targets.some((task) => task.task_id === row.task_id)
+                ? { ...row, description: description(row.description) }
+                : row
+            )
+          );
+        }
+        for (const item of items) {
+          if (
+            item.metadata?.development_publication_receipt === receipt &&
+            item.description === description(item.description)
+          )
+            continue;
+          input.assertCurrent();
+          (deps.updateItem ?? updateWorkItem)({
+            itemId: item.item_id,
+            expectedVersion: item.version,
+            rootDir: root,
+            description: description(item.description),
+            metadata: { ...item.metadata, development_publication_receipt: receipt },
+          });
+        }
+      }
+      if (developmentBefore?.status === 'completed')
+        for (const phase of state.process_template?.phase_specs ?? []) {
+          if (
+            ['self_review', 'delivery', 'retrospective'].includes(phase.id) &&
+            phase.exit_gate &&
+            closedRows(rowsBefore.filter((row) => row.phase === phase.id))
+          )
+            await command(
+              'mission_controller.bundle.js',
+              ['gate-pass', input.mission_id, phase.exit_gate.id, '--machine-only'],
+              input
+            );
+        }
       // One bounded dispatch round; native mission gates and independent review remain authoritative.
       await command(
         'mission_controller.bundle.js',
@@ -518,6 +764,8 @@ export function createContinuousOwnerPorts(
         };
       state = assertMissionScope(input);
       if (complete()) {
+        const development = await developmentProgress();
+        if (development && development.status !== 'completed') return development;
         await command(
           'mission_controller.bundle.js',
           [
@@ -568,7 +816,15 @@ export function createContinuousOwnerPorts(
     advanceMission: (input) =>
       withExecutionContextAsync(
         'mission_controller',
-        () => ports.advanceMission(input),
+        () =>
+          (deps.missionScope ?? withContinuousMissionScope)(
+            {
+              mission_id: input.mission_id,
+              scope: input.scope,
+              assertCurrent: input.assertCurrent,
+            },
+            () => ports.advanceMission(input)
+          ),
         undefined,
         input.scope.tenant_slug,
         input.scope.organization_id

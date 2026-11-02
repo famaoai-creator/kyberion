@@ -1,0 +1,36 @@
+{
+  "version": "1.0.0",
+  "default_service_id": "comfyui",
+  "services": [
+    {
+      "service_id": "speech_cpp",
+      "display_name": "speech.cpp Local Speech Service",
+      "kind": "local_service",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "default_base_url": "http://127.0.0.1:8095",
+      "trial_probe": {
+        "kind": "http",
+        "method": "GET",
+        "path": "health",
+        "description": "Probe the local speech.cpp /health endpoint."
+      },
+      "install_plan": {
+        "kind": "service_preset",
+        "preset_path": "knowledge/product/orchestration/service-presets/speech_cpp.json",
+        "description": "Use the speech.cpp service preset after installing the managed tool-runtime binary."
+      },
+      "installed_probe": {
+        "kind": "http",
+        "method": "GET",
+        "path": "health",
+        "description": "Re-check speech.cpp after provisioning."
+      },
+      "managed_service_subpath": "service-runtimes/speech_cpp",
+      "service_endpoint_path": "knowledge/product/orchestration/service-endpoints/speech_cpp.json",
+      "service_preset_path": "knowledge/product/orchestration/service-presets/speech_cpp.json",
+      "notes": "speech.cpp is managed as a service runtime so OpenAI-compatible HTTP availability is tracked separately from the managed binary (tool-runtime speech_cpp). Default bind is 127.0.0.1:8095; probe GET /health. Start with `speech serve [tts-model] [asr-model] --host 127.0.0.1 --port 8095` (models optional until a client needs them). voice-hub STT can point VOICE_HUB_STT_BASE_URL or KYBERION_SPEECH_CPP_URL at this server."
+    }
+  ]
+}

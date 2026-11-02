@@ -34758,6 +34758,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -34863,6 +34872,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -34968,6 +34986,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35074,6 +35101,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35181,6 +35217,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35287,6 +35332,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35396,6 +35450,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35497,6 +35560,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35598,6 +35670,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35704,6 +35785,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35811,6 +35901,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -35918,6 +36017,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -36025,6 +36133,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -36130,6 +36247,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -36236,6 +36362,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -36343,6 +36478,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -36451,6 +36595,15 @@
           "input_schema": {
             "type": "object",
             "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
               "cwd": {
                 "type": "string"
               },
@@ -36550,6 +36703,124 @@
               "ref": "123",
               "method": "merge",
               "delete_branch": true
+            }
+          ]
+        },
+        {
+          "op": "development_loop",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "work_item_id": {
+                "type": "string"
+              },
+              "review_task_id": {
+                "type": "string"
+              },
+              "dry_run": {
+                "type": "boolean"
+              },
+              "cwd": {
+                "type": "string"
+              },
+              "short": {
+                "type": "boolean"
+              },
+              "ref": {
+                "type": "string"
+              },
+              "stat": {
+                "type": "boolean"
+              },
+              "limit": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "oneline": {
+                "type": "boolean"
+              },
+              "action": {
+                "type": "string",
+                "enum": ["list", "create", "delete", "add", "remove", "prune"]
+              },
+              "name": {
+                "type": "string"
+              },
+              "message": {
+                "type": "string"
+              },
+              "add": {
+                "type": "boolean"
+              },
+              "title": {
+                "type": "string"
+              },
+              "body": {
+                "type": "string"
+              },
+              "base": {
+                "type": "string"
+              },
+              "remote": {
+                "type": "string"
+              },
+              "set_upstream": {
+                "type": "boolean"
+              },
+              "create_branch": {
+                "type": "boolean"
+              },
+              "path": {
+                "type": "string"
+              },
+              "state": {
+                "type": "string",
+                "enum": ["open", "closed", "merged", "all"]
+              },
+              "fields": {
+                "type": "string"
+              },
+              "method": {
+                "type": "string",
+                "enum": ["merge", "squash", "rebase"]
+              },
+              "delete_branch": {
+                "type": "boolean"
+              },
+              "watch": {
+                "type": "boolean"
+              },
+              "interval_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1000
+              },
+              "ignore_checks": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "draft": {
+                "type": "boolean"
+              },
+              "head": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false,
+            "required": ["ref", "work_item_id", "review_task_id"]
+          },
+          "examples": [
+            {
+              "ref": "123",
+              "work_item_id": "work-item",
+              "review_task_id": "review-task",
+              "dry_run": true
             }
           ]
         }

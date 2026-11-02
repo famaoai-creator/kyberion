@@ -128,7 +128,7 @@
         },
         "archive": {
           "type": "string",
-          "enum": ["tar.gz"],
+          "enum": ["tar.gz", "zip"],
           "description": "Artifact payloads are archives; after checksum verification every entry is validated as a safe relative path and extracted into dirname(relative_path) so the executable lands at relative_path with its siblings beside it."
         },
         "artifacts": {

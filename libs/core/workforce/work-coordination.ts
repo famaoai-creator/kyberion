@@ -17,6 +17,7 @@ import { auditChain } from '../governance/audit-chain.js';
 import { pathResolver } from '../path-resolver.js';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { WorkCoordinationError, assertWorkClaimsAllowed } from './work-coordination-error.js';
+import { logger } from '../core.js';
 import {
   declaredWorkTarget,
   settledWorkEffect,
@@ -55,6 +56,7 @@ export { WorkCoordinationError } from './work-coordination-error.js';
 import type {
   AppendCoordinationEventInput,
   ClaimWorkItemInput,
+  ClaimWorkItemLeaseAdvisory,
   CoordinationEvent,
   CreateBoardInput,
   CreateWorkItemInput,
@@ -81,6 +83,7 @@ import type {
 export type {
   AppendCoordinationEventInput,
   ClaimWorkItemInput,
+  ClaimWorkItemLeaseAdvisory,
   CoordinationEvent,
   CreateBoardInput,
   CreateWorkItemInput,
@@ -714,7 +717,52 @@ function appendLeaseEvent(
   });
 }
 
-export function claimWorkItem(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
+/**
+ * W4: result of the advisory lease consult on the claim path. `suspended`
+ * mirrors the lease manager's follower vocabulary: the claimant is a
+ * registered contender parked under another holder's live lease. Advisory
+ * only — the claim outcome itself is unchanged.
+ */
+export interface WorkItemClaimLeaseAdvisory {
+  /** Always true when present — the consult happened because a manager was injected. */
+  consulted: true;
+  resource: string;
+  holder: string;
+  status: 'suspended' | 'clear';
+  suspended: boolean;
+  /** Live holder blocking this contender, per the consulted manager. */
+  blocking_holder?: string;
+}
+
+/**
+ * Ask an injected lease manager (a `MissionLeaseManager`, or anything with
+ * its `isSuspended`/`getHolder` surface) whether `holder` is a suspended
+ * contender on `resource`. Pure read — never mutates the manager.
+ */
+export function adviseWorkItemClaim(input: {
+  manager: ClaimWorkItemLeaseAdvisory['manager'];
+  resource: string;
+  holder: string;
+  now?: number;
+}): WorkItemClaimLeaseAdvisory {
+  const now = input.now ?? Date.now();
+  const suspended = input.manager.isSuspended(input.resource, input.holder, now);
+  const blocking = suspended ? input.manager.getHolder(input.resource, now) : undefined;
+  return {
+    consulted: true,
+    resource: input.resource,
+    holder: input.holder,
+    suspended,
+    status: suspended ? 'suspended' : 'clear',
+    ...(blocking ? { blocking_holder: blocking } : {}),
+  };
+}
+
+export function claimWorkItem(input: ClaimWorkItemInput): {
+  item: WorkItem;
+  lease: WorkLease;
+  advisory?: WorkItemClaimLeaseAdvisory;
+} {
   return withCoordinationMutation(() => claimWorkItemInternal(input));
 }
 
@@ -748,7 +796,11 @@ export async function finalizeDeniedSuspendedPipelineWorkItem(
   return (await continueSuspendedPipelineWorkItem(input, 'deny', pipelineContinuationStore)).item;
 }
 
-function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lease: WorkLease } {
+function claimWorkItemInternal(input: ClaimWorkItemInput): {
+  item: WorkItem;
+  lease: WorkLease;
+  advisory?: WorkItemClaimLeaseAdvisory;
+} {
   assertWorkClaimsAllowed(input.itemId);
   // NI-02: the claimant actor is no longer an unverified free string. warn
   // (default) audits unregistered/inactive actors and allows; enforce rejects.
@@ -758,10 +810,28 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lea
     throw new WorkCoordinationError('item_not_found', `item not found: ${input.itemId}`);
   }
   assertVersion(current, input.expectedVersion);
+  // W4: opt-in advisory consult — an injected lease manager answers whether
+  // this claimant is a suspended contender on the resource. It never blocks:
+  // the WorkLease fence/lease mechanics below decide the claim exactly as
+  // before; the verdict is attached to the result for the caller.
+  const advisory = input.leaseAdvisory
+    ? adviseWorkItemClaim({
+        manager: input.leaseAdvisory.manager,
+        resource: input.leaseAdvisory.resource ?? current.item_id,
+        holder: input.actorPeerId,
+        ...(input.leaseAdvisory.now !== undefined ? { now: input.leaseAdvisory.now } : {}),
+      })
+    : undefined;
+  if (advisory?.suspended) {
+    logger.warn(
+      `[work-coordination] claimant '${input.actorPeerId}' is a suspended contender on '${advisory.resource}'` +
+        `${advisory.blocking_holder ? ` under holder '${advisory.blocking_holder}'` : ''} — claim proceeds; the advisory is informational only`
+    );
+  }
   const existingLease = activeLeaseForItem(current.item_id);
   const idempotencyKey = input.idempotencyKey?.trim();
   if (existingLease && canReplayWorkItemClaim(current, existingLease, input)) {
-    return { item: current, lease: existingLease };
+    return { item: current, lease: existingLease, ...(advisory ? { advisory } : {}) };
   }
   if (existingLease) {
     throw new WorkCoordinationError(
@@ -849,7 +919,7 @@ function claimWorkItemInternal(input: ClaimWorkItemInput): { item: WorkItem; lea
     input.actorUserId,
     input.expectedVersion
   );
-  return { item: next, lease };
+  return { item: next, lease, ...(advisory ? { advisory } : {}) };
 }
 
 export function releaseWorkItem(input: ReleaseWorkItemInput): { item: WorkItem; lease: WorkLease } {

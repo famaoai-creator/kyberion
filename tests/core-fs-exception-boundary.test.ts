@@ -15,6 +15,8 @@ const allowedCoreFsImports = [
   'libs/core/review-reentry.test.ts',
   'libs/core/governance/audit-chain-store-bounds.test.ts',
   'libs/core/governance/audit-chain-tenant.test.ts',
+  // Manifest gate: validates plugin manifests' authorizations blocks against the schema.
+  'libs/core/governance/authorization-overlay.test.ts',
   // Mock-loader fixtures that read tmp-dir JSON outside the project root (secure-io denies it).
   'libs/core/governance/policy-engine.test.ts',
   'libs/core/recovery-policy.test.ts',
@@ -39,6 +41,8 @@ const allowedCoreFsImports = [
   'libs/core/mission/mission-lifecycle-service.test.ts',
   'libs/core/pipeline/pipeline-scheduler.test.ts',
   'libs/core/environment-capability.test.ts',
+  // Source-scanning gate: enumerates admission call sites across libs/core+scripts.
+  'libs/core/foundation/authorization-registry.test.ts',
   'libs/core/fs-primitives.ts',
   // Private host caches (ts-loader transpile cache, STT discovery): they decide what
   // gets executed, so they live in node_modules/.cache/, which secure-io refuses to

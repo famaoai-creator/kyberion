@@ -8,6 +8,7 @@ import { getRegisteredEnvText } from '../foundation/env.js';
 import { runExternalOperation } from '../governance/external-operation.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
+import { hostNodePlatform, isMacOS } from '../platform-facts.js';
 
 export type EmailBackendOperation = 'create_draft' | 'send';
 
@@ -95,7 +96,7 @@ export class MacMailAppEmailProvider implements EmailProvider {
   readonly platforms = ['darwin'];
 
   isAvailable(): boolean {
-    return process.platform === 'darwin';
+    return isMacOS();
   }
 
   supportsOperation(): boolean {
@@ -492,7 +493,7 @@ export function listEmailBackends(
     const supported =
       !adapter.platforms ||
       adapter.platforms.includes('any') ||
-      adapter.platforms.includes(process.platform);
+      adapter.platforms.includes(hostNodePlatform());
     const availability = adapter.isAvailable();
     const selectable = supported && (typeof availability === 'boolean' ? availability : false);
     return {
@@ -502,7 +503,7 @@ export function listEmailBackends(
       status: !supported ? 'unsupported' : selectable ? 'ready' : 'needs_setup',
       selectable,
       reason: !supported
-        ? `Email backend ${id} is not supported on platform ${process.platform}.`
+        ? `Email backend ${id} is not supported on platform ${hostNodePlatform()}.`
         : selectable
           ? `Email backend ${id} is registered and available for sending.`
           : unavailableMessage(adapter, 'send'),

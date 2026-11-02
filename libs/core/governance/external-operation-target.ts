@@ -1,9 +1,12 @@
+import { operationAuthorization } from '../foundation/authorization-registry.js';
+import './authorization-overlay.js';
+
 /** Explicit targets signed by the accountable human; no wildcard matching. */
 export type ExternalOperationGrant =
   | {
       operation_id: 'vcs:pr_create';
       repository: string;
-      /** When 'private', confidential-tier runs may delegate to this verified-private repo. */
+      /** Nonpublic runs additionally need exact charter data scope and a verified-private repo. */
       visibility?: 'private';
     }
   | {
@@ -73,7 +76,16 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     fields: ['repository'],
     optionalFields: ['visibility'],
     buildTarget: (effect) => {
-      if (effect.body_source_tier !== 'public' && effect.body_source_tier !== 'inline')
+      if (
+        !['public', 'inline', 'personal', 'confidential'].includes(String(effect.body_source_tier))
+      )
+        return undefined;
+      if (
+        effect.body_source_tier === 'confidential' &&
+        (typeof effect.body_source_tenant !== 'string' || !effect.body_source_tenant)
+      )
+        return undefined;
+      if (effect.body_source_tier !== 'confidential' && effect.body_source_tenant !== undefined)
         return undefined;
       const repository = effect.repository as
         { url?: unknown; host?: unknown; slug?: unknown } | undefined;
@@ -200,9 +212,11 @@ function buildBrowserNavigationTarget(
   }
 }
 
-/** True when the operation may consult an exact charter grant. */
+/** True when the operation may consult an exact charter grant. The
+ * authorization registry is the single source for delegability; this table
+ * supplies the effect→target builders. */
 export function isDelegableExternalOperation(operationId: string): boolean {
-  return operationId in EXTERNAL_OPERATION_DELEGATION;
+  return operationAuthorization(operationId).delegable !== undefined;
 }
 
 /** Effect → raw grant target for the resolver (undefined = not delegable here). */

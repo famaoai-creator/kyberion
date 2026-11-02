@@ -86,6 +86,21 @@
           "evidence": [
             "libs/actuators/voice-actuator/src/voice-stt-backend-adapters.ts (loopback adapter: buffers the whole stream, then one faster-whisper transcription)"
           ]
+        },
+        "speech_cpp": {
+          "traits": {
+            "accuracy": 0.85,
+            "latency": 0.3,
+            "privacy": 1
+          },
+          "trait_basis": {
+            "accuracy": "declared",
+            "latency": "declared",
+            "privacy": "declared"
+          },
+          "evidence": [
+            "libs/actuators/voice-actuator/src/voice-stt-backend-adapters.ts (loopback adapter: buffers the stream, then speech asr via speech-cpp-client)"
+          ]
         }
       },
       "purposes": {

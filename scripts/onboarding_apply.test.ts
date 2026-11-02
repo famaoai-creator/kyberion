@@ -4,6 +4,7 @@ import { pathResolver, safeReadFile } from '@agent/core';
 import {
   buildApplySummary,
   buildActivationInput,
+  buildDelegationInput,
   buildState,
   buildSummary,
   parseApplyInput,
@@ -51,6 +52,43 @@ const FIXTURE_REASONING = {
 };
 
 describe('onboarding_apply', () => {
+  it('offers one reviewed development grant with a reusable candidate branch and no direct main push', () => {
+    const input = buildDelegationInput(new Date('2026-10-22T00:00:00.000Z'), {
+      remote: 'git@github.com:fixture/repo.git',
+    });
+    expect(input.mode).toBe('grant');
+    expect(input.grants).toEqual([
+      { operation_id: 'vcs:pr_create', repository: 'https://github.com/fixture/repo' },
+      {
+        operation_id: 'vcs:pr_merge',
+        repository: 'https://github.com/fixture/repo',
+        branch: 'main',
+      },
+      {
+        operation_id: 'vcs:push',
+        repository: 'https://github.com/fixture/repo',
+        branch: 'agent/kyberion-development',
+      },
+    ]);
+    expect(input.data_tier).toEqual({ read: ['public'], write: ['public'] });
+  });
+  it('marks private development only after the read-only repository visibility probe proves private', () => {
+    const now = new Date('2026-10-22T00:00:00.000Z');
+    const options = { remote: 'https://github.com/fixture/repo', verifyVisibility: true };
+    const privateInput = buildDelegationInput(now, {
+      ...options,
+      run: () => ({ status: 0, stdout: JSON.stringify({ private: true }), stderr: '' }),
+    });
+    expect(privateInput.grants.every((grant) => grant.visibility === 'private')).toBe(true);
+    expect(privateInput.data_tier.read).toContain('personal');
+    const unknown = buildDelegationInput(now, {
+      ...options,
+      run: () => ({ status: 1, stdout: '', stderr: 'unavailable' }),
+    });
+    expect(unknown.grants.every((grant) => !('visibility' in grant))).toBe(true);
+    expect(unknown.data_tier.read).toEqual(['public']);
+    expect(buildDelegationInput(now, { remote: '/local/repo' }).grants).toEqual([]);
+  });
   it('prepares reviewed activation-only consent without any standing external grant', () => {
     expect(buildActivationInput(new Date('2026-10-22T00:00:00.000Z'))).toEqual({
       scope_kind: 'person',

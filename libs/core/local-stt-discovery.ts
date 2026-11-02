@@ -2,6 +2,12 @@ import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { defineCatalog } from './foundation/governed-catalog.js';
 import { getProcessEnv } from './foundation/process-env.js';
+import {
+  getPlatformFacts,
+  hostPlatform,
+  locateCommandInvocation,
+  platformFacts,
+} from './platform-facts.js';
 import { pathResolver } from './path-resolver.js';
 import {
   safeExecResult,
@@ -112,11 +118,7 @@ function firstLine(value: string): string {
   );
 }
 
-function commandResolver(platform: NodeJS.Platform): string {
-  return platform === 'win32' ? 'where' : 'which';
-}
-
-function supportsPlatform(record: LocalSttBackendRecord, platform: NodeJS.Platform): boolean {
+function supportsPlatform(record: LocalSttBackendRecord, platform: string): boolean {
   return (
     record.platforms.includes('any') || record.platforms.includes(platform as LocalSttPlatform)
   );
@@ -124,11 +126,12 @@ function supportsPlatform(record: LocalSttBackendRecord, platform: NodeJS.Platfo
 
 function locateExecutable(
   command: string,
-  platform: NodeJS.Platform,
+  platform: string,
   versionArgs: string[],
   exec: NonNullable<LocalSttDiscoveryOptions['exec']>
 ): { path: string; version?: string } | null {
-  const located = exec(commandResolver(platform), [command]);
+  const [resolver, ...resolverArgs] = locateCommandInvocation(command, getPlatformFacts(platform));
+  const located = exec(resolver, resolverArgs);
   if (located.status !== 0) return null;
   const executable = firstLine(located.stdout);
   if (!executable || !path.isAbsolute(executable)) return null;
@@ -144,7 +147,7 @@ function locateExecutable(
 
 function probeExecutable(
   record: LocalSttBackendRecord,
-  platform: NodeJS.Platform,
+  platform: string,
   exec: NonNullable<LocalSttDiscoveryOptions['exec']>
 ): { executable: string; version?: string } | null {
   const versionArgs = record.probe.version_args || ['--version'];
@@ -158,7 +161,7 @@ function probeExecutable(
 
 function probePythonModule(
   record: LocalSttBackendRecord,
-  platform: NodeJS.Platform,
+  platform: string,
   exec: NonNullable<LocalSttDiscoveryOptions['exec']>
 ): { pythonBin: string; version?: string } | null {
   const moduleName = record.probe.module;
@@ -278,7 +281,7 @@ export function discoverLocalSttBackends(
     !options.exec &&
     !options.registry &&
     options.scriptAvailable === undefined &&
-    (options.platform === undefined || options.platform === process.platform);
+    (options.platform === undefined || options.platform === hostPlatform());
   if (!hostProbe) return runLocalSttDiscovery(options);
   const key = hostDiscoveryKey();
   const memoTtl = processMemoTtlMs();
@@ -367,7 +370,7 @@ function hostDiscoveryKey(): string {
     registryText = 'unreadable';
   }
   return createHash('sha256')
-    .update(`v${DISK_CACHE_VERSION}\0${process.platform}\0${process.arch}\0`)
+    .update(`v${DISK_CACHE_VERSION}\0${hostPlatform()}\0${process.arch}\0`)
     .update(`${getProcessEnv('PATH') ?? ''}\0`)
     .update(registryText)
     .update(`\0${managedRuntimeFingerprint()}`)
@@ -412,7 +415,7 @@ function managedRuntimeStamp(bin: string): string {
   const parts = [String(safeLstat(bin).mtimeMs)];
   const envDir = path.dirname(path.dirname(bin));
   const libDirs =
-    process.platform === 'win32'
+    platformFacts.layout.venvLibDir === 'Lib'
       ? [path.join(envDir, 'Lib')]
       : (() => {
           const lib = path.join(envDir, 'lib');
@@ -517,7 +520,7 @@ function rebuildCachedCandidates(entries: unknown): LocalSttCandidate[] | null {
         entry.backend_id === raw.backend &&
         entry.source === raw.source &&
         entry.status === 'active' &&
-        supportsPlatform(entry, process.platform)
+        supportsPlatform(entry, hostPlatform())
     );
     if (!record) return null;
     const pythonKind =
@@ -583,7 +586,7 @@ export function resetLocalSttDiscoveryCache(options: { disk?: boolean } = {}): v
 }
 
 function runLocalSttDiscovery(options: LocalSttDiscoveryOptions): LocalSttCandidate[] {
-  const platform = options.platform ?? process.platform;
+  const platform = options.platform ?? hostPlatform();
   const exec = options.exec ?? DEFAULT_EXEC;
   const registry = options.registry ?? loadLocalSttDiscoveryRegistry();
   const candidates: LocalSttCandidate[] = [];
