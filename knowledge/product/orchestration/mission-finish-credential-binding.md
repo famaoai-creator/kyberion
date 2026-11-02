@@ -31,6 +31,19 @@ dispatch ホストが保持している時だけ**呼ばれる。CLI 直打ち�
 binding は決して生成されない — フラグでも env でも代替できない。これは
 意図された境界である(スコープ外の credential を拾わせない)。
 
+## 更新 (2026-11-02, MSN-CREDENTIAL-REQ-20261102)
+
+- 動詞ごとの credential 要件が `libs/core/foundation/command-credential-policy.ts`
+  に宣言化された(`none|degrading|required`、未分類は `required` で fail-safe)。
+  `none` 動詞は bootstrap 自体をスキップ、`degrading` 動詞は unbound 時に
+  stub チェーンで縮退実行、`required` 動詞は従来通り install 時に拒否。
+  `memory-approve`/`memory-reject` は `none`、`memory-promote` 系は `degrading`。
+- dispatch 側では、claim 済み WorkItem の実行中に `bindTask` resolver が
+  未設定/未応答でも **lineage-only binding(secrets 空)** が鋳造される
+  (`withConfiguredTaskCredentials`)。credential 消費は消費点で fail-closed のまま。
+- したがって本エラーが出るのは「`required` 動詞を tenant scope 下で
+  非 dispatch 実行した」場合に限定される。
+
 ## 対処(優先順)
 
 1. **委任(正規経路)** — finish 相当の作業を WorkItem として dispatch する

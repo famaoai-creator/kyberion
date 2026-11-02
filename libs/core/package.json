@@ -1632,6 +1632,10 @@
       "types": "./dist/format.d.ts",
       "default": "./dist/format.js"
     },
+    "./foundation/command-credential-policy": {
+      "types": "./dist/foundation/command-credential-policy.d.ts",
+      "default": "./dist/foundation/command-credential-policy.js"
+    },
     "./foundation/credential-binding": {
       "types": "./dist/foundation/credential-binding.d.ts",
       "default": "./dist/foundation/credential-binding.js"
