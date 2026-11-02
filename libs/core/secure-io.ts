@@ -67,6 +67,7 @@ import {
   registerSensitivePathMediationProbe,
 } from './secure-io-path-guard.js';
 export { safeRealpath } from './secure-io-path-guard.js';
+import { platformFacts } from './platform-facts.js';
 
 const logger = createLogger('secure-io');
 const auditChain = auditChainModule.auditChain;
@@ -567,6 +568,27 @@ function boundedTemporarySibling(
     : path.join(path.dirname(target), `@${purpose}-${randomUUID()}${suffix}`);
 }
 
+// Durability of the rename itself: a file fsync without a directory fsync can
+// still lose the entry on crash. POSIX-only; unsupported filesystems are a
+// best-effort miss rather than a write failure.
+function fsyncParentDir(dir: string): void {
+  if (platformFacts.family !== 'posix') return;
+  let dirFd: number | null = null;
+  try {
+    dirFd = fs.openSync(dir, 'r');
+    fs.fsyncSync(dirFd);
+  } catch (_) {
+    /* best-effort durability */
+  } finally {
+    if (dirFd !== null)
+      try {
+        fs.closeSync(dirFd);
+      } catch (_) {
+        /* best-effort cleanup */
+      }
+  }
+}
+
 export function safeWriteFile(
   filePath: string,
   data: string | Buffer,
@@ -690,6 +712,7 @@ export function safeWriteFile(
         fs.linkSync(tempPath, target);
         fs.unlinkSync(tempPath);
       } else fs.renameSync(tempPath, target);
+      fsyncParentDir(path.dirname(target));
     } catch (atomicErr) {
       if (fd !== null)
         try {

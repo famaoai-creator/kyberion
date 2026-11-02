@@ -541,6 +541,7 @@ describe('code-actuator', () => {
           expect(result.status).toBe('succeeded');
           const analysis = result.context.impact_analysis as any;
           expect(analysis.confidence).toBe('inferred');
+          expect(analysis.authority).toBe('analyst-inference');
           expect(analysis.limitations).toEqual(
             expect.arrayContaining([
               expect.stringContaining('truncated to 400 of 405'),
@@ -578,11 +579,62 @@ describe('code-actuator', () => {
         expect(result.status).toBe('succeeded');
         const findings = result.context.semgrep_findings as any;
         expect(findings.confidence).toBe('observed');
+        expect(findings.authority).toBe('shipped-artifact');
         expect(findings.results).toEqual([{ check_id: 'rule-1', path: 'src/a.ts' }]);
         expect(findings.limitations).toEqual(
           expect.arrayContaining([expect.stringContaining('partial parse failure')])
         );
         expect(findings.unknowns).toEqual([]);
+      });
+
+      it('run_tests reports observed evidence with exit-code-derived status as an unknown', async () => {
+        const { safeExistsSync } = await import('@agent/core/secure-io');
+        vi.mocked(safeExistsSync).mockReturnValue(true);
+        mocks.runGovernedCommand.mockReturnValue({
+          status: 0,
+          stdout: '1 test passed',
+          stderr: '',
+        });
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'run_tests', params: { test_path: 'src/a.test.ts' } }],
+        });
+        expect(result.status).toBe('succeeded');
+        const execution = result.context.test_execution as any;
+        expect(execution.status).toBe('passed');
+        expect(execution.confidence).toBe('observed');
+        expect(execution.authority).toBe('controlled-replay');
+        expect(execution.unknowns).toEqual(
+          expect.arrayContaining([expect.stringContaining('exit code')])
+        );
+      });
+
+      it('glob_files retains oversized results and returns a reference + preview', async () => {
+        const { getAllFiles } = await import('@agent/core/fs-utils');
+        vi.mocked(getAllFiles).mockReturnValue(
+          Array.from(
+            { length: 2000 },
+            (_, i) => `/mock/root/src/dir-with-a-long-name/file-${String(i).padStart(5, '0')}.ts`
+          )
+        );
+        try {
+          const result = await handleAction({
+            action: 'pipeline',
+            steps: [{ type: 'capture', op: 'glob_files', params: { dir: 'src' } }],
+          });
+          expect(result.status).toBe('succeeded');
+          const listing = result.context.file_list as any;
+          expect(listing.retained).toBe(true);
+          expect(listing.item_count).toBe(2000);
+          expect(listing.preview).toHaveLength(50);
+          expect(listing.result_ref).toContain('code-op-results');
+          expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+            expect.stringContaining('code-op-results'),
+            expect.any(String)
+          );
+        } finally {
+          vi.mocked(getAllFiles).mockReturnValue([]);
+        }
       });
     });
 

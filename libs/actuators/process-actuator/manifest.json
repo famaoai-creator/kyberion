@@ -12,12 +12,14 @@
     {
       "op": "spawn",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "write"
+      "effect": "write",
+      "target_authority": "execute"
     },
     {
       "op": "stop",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "write"
+      "effect": "write",
+      "target_authority": "mutate"
     },
     {
       "op": "list",

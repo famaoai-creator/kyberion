@@ -458,8 +458,34 @@ the request lifetime. Exercise delayed fetch/body/error permutations, same-entry
 revision changes, unchanged summary refreshes and timeout recovery in
 `presence/displays/concierge/test/outcome-preview-ui.test.ts`; history must stay untouched.
 
+**Process lifecycle regression classes** (adapted from REA `docs/testing.md`; select the classes
+that exist in the touched stage, one test each — active-execution cancellation alone does not
+cover finalization):
+
+- **Identity after exit / pid reuse.** A pid alone never proves liveness or ownership. Records
+  carry `pidStartMarker` (`libs/core/workforce/workspace-process-identity.ts`); status/stop paths
+  must distinguish `not_registered`, `already_exited`, `pid_recycled` and `stopped`, and never
+  signal a live pid whose marker does not match. Gates: `runtime-supervisor.test.ts`,
+  `process-actuator/src/index.test.ts` marker-mismatch cases.
+- **Late handshake / readiness.** A spawned child is not ready until its readiness receipt
+  arrives; exercise the window between spawn and handshake completion (kill, output, timeout)
+  rather than only the settled state.
+- **Cancellation during final cleanup.** Cancellation while the cleanup callback is running is a
+  distinct class from cancellation during execution; the record must survive a failed cleanup as
+  `retained` with `lastCleanupError`, not vanish as if removed.
+- **Cleanup retry.** A `retained` record must be cleanly removable on a subsequent `cleanup()`
+  (or the surface `repair`/stop path); assert the retry actually removes it and that
+  `reapIdle`/`cleanupAll` never report a failed cleanup as reaped.
+- **Mixed child outcomes.** When a launch manages several children, one child's failure must not
+  lose the records or cleanup of the survivors; assert per-child outcomes rather than an
+  aggregate status.
+- **Recorded state vs. live state.** A persisted record (surface state, supervisor registry) is
+  not proof the process lives; reconcile paths re-derive liveness through the identity marker
+  and prune only stale-_records_, never signal by pid alone.
+
 **Review checklist** (when a PR adds a loop or a spawn): in-flight guard, signal handlers, stopped
-heartbeat, child deadline, `'error'` listener, test with a mocked child.
+heartbeat, child deadline, `'error'` listener, pid+start-marker identity on status/stop, cleanup
+failure retains an inspectable record, test with a mocked child.
 
 ## §4 stdout and logging in library code
 

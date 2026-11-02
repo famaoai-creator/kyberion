@@ -38,8 +38,15 @@ import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defa
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { TraceContext } from '@agent/core/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
+import type { EvidenceMeta } from '@agent/core/evidence';
+import {
+  resolveStorageFloor,
+  storageFloorRelativePath,
+  SYSTEM_PARTITION,
+} from '@agent/core/storage-layout';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
+import { randomUUID } from 'node:crypto';
 
 const DEFAULT_CODE_RETRY = getRetryDefaults('code-actuator:defaults');
 
@@ -65,6 +72,36 @@ function readCodeJson(filePath: string, label: string): unknown {
     throw new Error(`${label} must be an existing regular file: ${filePath}`);
   }
   return readJson(filePath);
+}
+
+// Results above the inline budget are persisted to the cache floor and
+// replaced by a retained reference + preview (REA retained-evidence shape),
+// so oversized captures cannot bloat pipeline context. Consumers page the
+// full payload back with read_file on result_ref.
+const RETAINED_RESULT_INLINE_LIMIT = 64 * 1024;
+const RETAINED_PREVIEW_ITEMS = 50;
+
+function retainOversizedResult(value: unknown, domain: string): unknown {
+  const serialized = JSON.stringify(value);
+  if (!serialized || serialized.length <= RETAINED_RESULT_INLINE_LIMIT) return value;
+  const fileName = `${randomUUID()}.json`;
+  safeWriteFile(resolveStorageFloor('cache', SYSTEM_PARTITION, domain, fileName), serialized);
+  const preview = Array.isArray(value)
+    ? value.slice(0, RETAINED_PREVIEW_ITEMS)
+    : typeof value === 'object' && value !== null && Array.isArray((value as any).results)
+      ? {
+          ...(value as Record<string, unknown>),
+          results: (value as any).results.slice(0, RETAINED_PREVIEW_ITEMS),
+        }
+      : serialized.slice(0, 4096);
+  return {
+    retained: true,
+    result_ref: storageFloorRelativePath('cache', SYSTEM_PARTITION, domain, fileName),
+    total_bytes: serialized.length,
+    ...(Array.isArray(value) ? { item_count: value.length } : {}),
+    preview,
+    next_step: 'read the result_ref file for the full payload',
+  };
 }
 
 const {
@@ -311,12 +348,15 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'glob_files':
       return {
         ...ctx,
-        [params.export_as || 'file_list']: await retry(
-          async () =>
-            getAllFiles(resolveCodeRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
-              .filter((f) => !params.ext || f.endsWith(params.ext))
-              .map((f) => path.relative(rootDir, f)),
-          buildRetryOptions()
+        [params.export_as || 'file_list']: retainOversizedResult(
+          await retry(
+            async () =>
+              getAllFiles(resolveCodeRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
+                .filter((f) => !params.ext || f.endsWith(params.ext))
+                .map((f) => path.relative(rootDir, f)),
+            buildRetryOptions()
+          ),
+          'code-op-results'
         ),
       };
     case 'shell':
@@ -358,63 +398,67 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'semgrep_scan':
       return {
         ...ctx,
-        [params.export_as || 'semgrep_findings']: await retry(async () => {
-          const target = resolveCodeRepositoryPath(
-            rootDir,
-            resolve(params.target_dir),
-            'semgrep_scan'
-          );
-          const config = String(resolve(params.config) || 'auto');
-          const args = ['--config', config, target, '--json'];
-          const result = runGovernedCommand('semgrep', args, { maxOutputMB: 10 });
-          if (result.error) {
-            throw result.error;
-          }
-          const stdout = String(result.stdout || '');
-          if (result.status !== 0 && !stdout) {
-            throw new Error(
-              `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
+        [params.export_as || 'semgrep_findings']: retainOversizedResult(
+          await retry(async () => {
+            const target = resolveCodeRepositoryPath(
+              rootDir,
+              resolve(params.target_dir),
+              'semgrep_scan'
             );
-          }
-          try {
-            const parsed = parseSafeJsonInput(stdout, 'semgrep response') as Record<
-              string,
-              unknown
-            >;
-            // semgrep reports partial-scan problems in `errors`; surface them
-            // as limitations instead of letting a degraded scan read as clean.
-            const errors = Array.isArray(parsed.errors) ? parsed.errors : [];
-            const limitations = errors
-              .slice(0, 10)
-              .map((entry) =>
-                String(
-                  (entry as Record<string, unknown>)?.message ??
-                    (entry as Record<string, unknown>)?.type ??
-                    entry
-                )
-              );
-            if (errors.length > limitations.length) {
-              limitations.push(`and ${errors.length - limitations.length} more semgrep errors`);
+            const config = String(resolve(params.config) || 'auto');
+            const args = ['--config', config, target, '--json'];
+            const result = runGovernedCommand('semgrep', args, { maxOutputMB: 10 });
+            if (result.error) {
+              throw result.error;
             }
-            return {
-              ...parsed,
-              confidence: 'observed',
-              limitations,
-              unknowns: [],
-            };
-          } catch {
-            if (result.status === 0) {
-              throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
-            }
-            try {
-              return parseSafeJsonInput(String(result.stderr || ''), 'semgrep error response');
-            } catch {
+            const stdout = String(result.stdout || '');
+            if (result.status !== 0 && !stdout) {
               throw new Error(
                 `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
               );
             }
-          }
-        }, buildRetryOptions()),
+            try {
+              const parsed = parseSafeJsonInput(stdout, 'semgrep response') as Record<
+                string,
+                unknown
+              >;
+              // semgrep reports partial-scan problems in `errors`; surface them
+              // as limitations instead of letting a degraded scan read as clean.
+              const errors = Array.isArray(parsed.errors) ? parsed.errors : [];
+              const limitations = errors
+                .slice(0, 10)
+                .map((entry) =>
+                  String(
+                    (entry as Record<string, unknown>)?.message ??
+                      (entry as Record<string, unknown>)?.type ??
+                      entry
+                  )
+                );
+              if (errors.length > limitations.length) {
+                limitations.push(`and ${errors.length - limitations.length} more semgrep errors`);
+              }
+              return {
+                ...parsed,
+                confidence: 'observed',
+                authority: 'shipped-artifact',
+                limitations,
+                unknowns: [],
+              };
+            } catch {
+              if (result.status === 0) {
+                throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
+              }
+              try {
+                return parseSafeJsonInput(String(result.stderr || ''), 'semgrep error response');
+              } catch {
+                throw new Error(
+                  `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
+                );
+              }
+            }
+          }, buildRetryOptions()),
+          'code-op-results'
+        ),
       };
     case 'run_tests': {
       const testPath = String(resolve(params.test_path || '')).trim();
@@ -448,14 +492,23 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       );
       return {
         ...ctx,
-        [params.export_as || 'test_execution']: {
-          test_path: relativeTestPath.replaceAll(path.sep, '/'),
-          framework: framework || 'vitest',
-          status: result.status === 0 ? 'passed' : 'failed',
-          exit_code: result.status,
-          stdout: String(result.stdout || '').trim(),
-          stderr: String(result.stderr || '').trim(),
-        },
+        [params.export_as || 'test_execution']: retainOversizedResult(
+          {
+            test_path: relativeTestPath.replaceAll(path.sep, '/'),
+            framework: framework || 'vitest',
+            status: result.status === 0 ? 'passed' : 'failed',
+            exit_code: result.status,
+            stdout: String(result.stdout || '').trim(),
+            stderr: String(result.stderr || '').trim(),
+            confidence: 'observed',
+            authority: 'controlled-replay',
+            limitations: [],
+            unknowns: [
+              'pass/fail status is derived from the exit code; the test framework did not emit machine-readable results',
+            ],
+          },
+          'code-op-results'
+        ),
       };
     }
     case 'discover_skills':
@@ -588,7 +641,7 @@ const IMPACT_CODE_EXTENSIONS = new Set([
   '.gradle',
 ]);
 
-export interface ImpactAnalysisResult {
+export interface ImpactAnalysisResult extends EvidenceMeta {
   kind: 'impact-analysis';
   generated_at: string;
   repo_path: string;
@@ -596,16 +649,6 @@ export interface ImpactAnalysisResult {
   files: Array<{ path: string; change: string }>;
   risks: string[];
   size: 'S' | 'M' | 'L';
-  /**
-   * Basis of the claims above: the file inventory is observed, but summary,
-   * files, risks and size are reasoning-backend judgment — `inferred`, not
-   * runtime-observed fact.
-   */
-  confidence: 'observed' | 'derived' | 'inferred';
-  /** Coverage limits a consumer must weigh before relying on the result. */
-  limitations: string[];
-  /** Aspects that remain unresolved rather than absent. */
-  unknowns: string[];
 }
 
 export async function impactAnalysisOp(input: {
@@ -691,6 +734,7 @@ export async function impactAnalysisOp(input: {
     risks: Array.isArray(parsed.risks) ? parsed.risks.map(String) : [],
     size,
     confidence: 'inferred',
+    authority: 'analyst-inference',
     limitations,
     unknowns,
   };
