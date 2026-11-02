@@ -15,7 +15,18 @@ describe('authorization-overlay catalog', () => {
     const loaded = authorizationOverlayCatalog.load();
     expect(loaded).toEqual(expect.objectContaining({}));
     expect(loaded.operations ?? {}).toEqual({});
-    expect(loaded.prefixes ?? {}).toEqual({});
+    // The data layer deliberately ships one governed fallback: `service:*`
+    // operations are external mutations requiring external admission with
+    // `params` protected — kept out of the code plane so plugin/overlay
+    // providers can still declare exact `service:<provider>` subjects that
+    // outrank this prefix (flat data-plane precedence).
+    expect(loaded.prefixes ?? {}).toEqual({
+      'service:': {
+        effectClass: 'external_mutation',
+        authority: { kind: 'admission', boundary: 'external' },
+        protectedPaths: [['params']],
+      },
+    });
   });
 
   it('rejects malformed entries (closed taxonomy enforced by schema)', () => {
