@@ -6,7 +6,10 @@ import {
 } from '../scope-envelope.js';
 import { registerSecretResolver, resetSecretResolver } from './secret-resolver.js';
 import {
+  hasTaskCredentialBinding,
+  resolveProviderApiCredential,
   resolveTaskCredential,
+  resolveTaskProviderEnvironment,
   withTaskCredentialBinding,
 } from '../foundation/credential-binding.js';
 import { withConfiguredTaskCredentials } from './task-credential-dispatch.js';
@@ -75,5 +78,68 @@ describe('configured task credential dispatch', () => {
       withConfiguredTaskCredentials('WI-operator', async () => 'operator')
     );
     expect(bindTask).toHaveBeenCalledTimes(1);
+  });
+
+  it('mints a lineage-only binding when no resolver or binder is configured', async () => {
+    // No resolver registered at all: a fresh tenant still executes claimed
+    // WorkItems inside a binding that grants zero credentials.
+    await withScopeEnvelope(envelope('alpha'), () =>
+      withConfiguredTaskCredentials('WI-alpha', async () => {
+        expect(hasTaskCredentialBinding()).toBe(true);
+        expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeNull();
+      })
+    );
+    // A resolver without bindTask behaves the same way.
+    registerSecretResolver({ name: 'resolve-only', resolve: () => null });
+    await withScopeEnvelope(envelope('alpha'), () =>
+      withConfiguredTaskCredentials('WI-alpha', async () => {
+        expect(hasTaskCredentialBinding()).toBe(true);
+        expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeNull();
+      })
+    );
+    // A binder that declines (null) also falls back to lineage-only.
+    resetSecretResolver();
+    registerSecretResolver({
+      name: 'declining-resolver',
+      resolve: () => null,
+      bindTask: () => null,
+    });
+    await withScopeEnvelope(envelope('alpha'), () =>
+      withConfiguredTaskCredentials('WI-alpha', async () => {
+        expect(hasTaskCredentialBinding()).toBe(true);
+        expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeNull();
+      })
+    );
+  });
+
+  it('keeps every credential consumption fail-closed inside the lineage binding', async () => {
+    vi.stubEnv('TEST_BOUND_KEY', 'operator-key');
+    await withScopeEnvelope(envelope('alpha'), () =>
+      withConfiguredTaskCredentials('WI-alpha', async () => {
+        // Scoped miss, never an operator-env fallback.
+        expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeNull();
+        // Provider env access is denied outright — no isolated env is bound.
+        expect(() => resolveTaskProviderEnvironment('claude-cli')).toThrow(
+          '[CREDENTIAL_PROVIDER_DENIED]'
+        );
+        // API key selection finds nothing bound and refuses the operator value.
+        expect(() => resolveProviderApiCredential(['TEST_BOUND_KEY'], 'operator-key')).toThrow(
+          '[CREDENTIAL_KEY_UNAVAILABLE]'
+        );
+      })
+    );
+  });
+
+  it('leaves operator dispatch and missing envelopes unbound', async () => {
+    await withScopeEnvelope(envelope(), () =>
+      withConfiguredTaskCredentials('WI-operator', async () => {
+        expect(hasTaskCredentialBinding()).toBe(false);
+        expect(resolveTaskCredential('TEST_BOUND_KEY')).toBeUndefined();
+      })
+    );
+    // Outside any scope envelope there is no claimed-task context.
+    await expect(
+      withConfiguredTaskCredentials('WI-no-envelope', async () => hasTaskCredentialBinding())
+    ).resolves.toBe(false);
   });
 });

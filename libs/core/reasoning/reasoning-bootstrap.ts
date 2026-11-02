@@ -176,6 +176,15 @@ export interface InstallReasoningOptions {
   force?: boolean;
   /** Re-scan provider availability instead of using the cached discovery snapshot. */
   refreshProviders?: boolean;
+  /**
+   * Declared credential need of the calling verb
+   * (`libs/core/foundation/command-credential-policy.ts`). 'required' (default)
+   * throws CREDENTIAL_BINDING_REQUIRED under a tenant scope without a binding.
+   * 'degrading' instead leaves the deterministic stub chain in place and
+   * returns false — the verb is responsible for tolerating credential absence
+   * at point of use.
+   */
+  credentialRequirement?: import('../foundation/command-credential-policy.js').CredentialRequirement;
 }
 
 /** @deprecated Use InstallReasoningOptions */
@@ -532,6 +541,27 @@ export function installReasoningBackends(options: InstallReasoningOptions = {}):
   // provider probes and cache reuse; a blocked refresh must not reset a live chain.
   const readiness = credentialBindingReadiness();
   if (readiness.status === 'binding_required') {
+    if (options.credentialRequirement === 'degrading') {
+      // A degrading verb completes without a model: keep the seam-less stub
+      // chain (getReasoningBackend falls back to stubReasoningBackend) rather
+      // than probing providers that would need tenant credentials.
+      logger.info(
+        '[reasoning-bootstrap] no trusted task binding — degrading verb continues on the stub backend chain'
+      );
+      // A chain installed under another identity is left untouched (never
+      // destroyed) — it denies every use by owner check, which is equivalent
+      // to the stub for a degrading verb.
+      if (installed && installedIdentity) {
+        try {
+          assertCredentialOwner(installedIdentity);
+        } catch {
+          logger.warn(
+            '[reasoning-bootstrap] installed backend chain belongs to another execution identity — it remains unreachable (denied at point of use)'
+          );
+        }
+      }
+      return false;
+    }
     throw new Error(
       '[CREDENTIAL_BINDING_REQUIRED] Tenant reasoning requires a trusted task binding; dispatch through a claimed WorkItem.'
     );
