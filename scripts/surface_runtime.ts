@@ -189,7 +189,7 @@ function registerRunningSurfaceFromState(record: any) {
         logPath: record.logPath,
       },
       cleanup: () => {
-        stopRecordedProcess(record);
+        stopSurfaceRecord(record);
       },
     });
   }
@@ -197,7 +197,13 @@ function registerRunningSurfaceFromState(record: any) {
 
 function stopSurfaceRecord(record: SurfacePidRecord | undefined): void {
   if (!record) return;
-  stopRecordedProcess(record);
+  const outcome = stopRecordedProcess(record);
+  // A cleanup that could not prove the process died has not completed —
+  // throwing lets runtimeSupervisor.cleanup() retain the record instead of
+  // reporting 'removed' for a possibly-running process.
+  if (outcome === 'identity_unknown') {
+    throw new Error(`process identity unresolved for pid ${record.pid} — not signaled`);
+  }
 }
 
 function recordProtocolSurfaceLifecycle(
@@ -487,12 +493,21 @@ function stopSurfaceById(surfaceId: string) {
     return { status: 'not_found', id: surfaceId };
   }
 
-  stopSurfaceRecord(record);
+  const outcome = stopRecordedProcess(record);
+  if (outcome === 'identity_unknown') {
+    // Keep the record — the process may still be running and a delete here
+    // would orphan it for the next reconcile to respawn a duplicate.
+    return { status: 'identity_unknown', id: surfaceId, pid: record.pid };
+  }
   runtimeSupervisor.unregister(record.resourceId);
   delete state.surfaces[surfaceId];
   saveSurfaceState(state);
   recordProtocolSurfaceLifecycle(surfaceId, 'stop', 'stopped', { pid: record.pid });
-  return { status: 'stopped', id: surfaceId, pid: record.pid };
+  return {
+    status: outcome === 'stopped' ? 'stopped' : outcome,
+    id: surfaceId,
+    pid: record.pid,
+  };
 }
 
 /**
