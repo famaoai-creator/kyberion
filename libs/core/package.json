@@ -1632,6 +1632,10 @@
       "types": "./dist/format.d.ts",
       "default": "./dist/format.js"
     },
+    "./foundation/approval-domains": {
+      "types": "./dist/foundation/approval-domains.d.ts",
+      "default": "./dist/foundation/approval-domains.js"
+    },
     "./foundation/command-credential-policy": {
       "types": "./dist/foundation/command-credential-policy.d.ts",
       "default": "./dist/foundation/command-credential-policy.js"

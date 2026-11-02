@@ -2,6 +2,11 @@
 import { randomUUID } from 'node:crypto';
 import { normalizeApprovalChannel } from './approval-store-paths.js';
 import {
+  setApprovalChannelWarner,
+  warnUndeclaredApprovalChannel,
+} from '../foundation/approval-domains.js';
+import { createLogger } from '../logger.js';
+import {
   appendLocatedApprovalEvent,
   approvalPartitionForScope,
   approvalRequestsLogicalDirAt,
@@ -38,6 +43,11 @@ import type {
 
 /** System-tree event log of a channel (tenant partitions: approval-store-location.ts). */
 export { approvalEventLogicalPath } from './approval-store-paths.js';
+
+// P2 measurement: route undeclared-channel diagnostics through the shared
+// logger. Registered once here; the dedupe set lives in approval-domains.
+const approvalChannelLogger = createLogger('approval-request-create');
+setApprovalChannelWarner((message) => approvalChannelLogger.warn(message));
 
 export function createApprovalRequest(
   role: GovernedArtifactRole,
@@ -83,6 +93,17 @@ export function createApprovalRequest(
     throw new Error(
       '[POLICY_VIOLATION] A veto-window request cannot also require a human-only final decision'
     );
+  }
+  // Measurement-only (P2): undeclared channel vocabulary is logged, never
+  // blocked. Emitted before normalizeApprovalChannel so values that would
+  // fail syntax validation are still measured. `channel` in the surface
+  // position may legitimately hold a declared domain (the historical
+  // domain-as-channel pattern), so only truly undeclared values warn.
+  if (typeof params.channel === 'string') {
+    warnUndeclaredApprovalChannel('channel', params.channel);
+  }
+  if (typeof params.storageChannel === 'string') {
+    warnUndeclaredApprovalChannel('storageChannel', params.storageChannel);
   }
   const storageChannel = normalizeApprovalChannel(params.storageChannel || params.channel);
   const scope = params.scope ? normalizeEventScope(params.scope) : undefined;
