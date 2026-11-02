@@ -1,7 +1,12 @@
 import * as path from 'node:path';
 import { writeJson as writeGovernedJson } from '@agent/core/foundation/json';
 import { safeExec } from '@agent/core/secure-io';
-import { normalizeRepositoryTarget } from '@agent/core/governance/external-operation-target';
+import {
+  normalizeRepositoryTarget,
+  parseExternalOperationGrant,
+} from '@agent/core/governance/external-operation-target';
+import { ghRepositoryVisibility } from '@agent/core/vcs/github';
+import type { VcsCommandRunner } from '@agent/core/vcs/git';
 import yargs from 'yargs';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveActiveProfileRoot } from '@agent/core/profile-root';
@@ -142,16 +147,51 @@ function delegationInputPath(): string {
 /** Human-editable template for the grant-mode authority request: prefilled
  * with this repository's own vcs targets so the operator can pick which exact
  * operations the charter delegates after activation. */
-export function buildDelegationInput(now: Date) {
-  const remote = safeExec('git', ['remote', 'get-url', '--push', 'origin'], {
-    cwd: pathResolver.rootDir(),
-  }).trim();
-  const repository = remote ? normalizeRepositoryTarget(remote) : undefined;
+export function buildDelegationInput(
+  now: Date,
+  options: { verifyVisibility?: boolean; run?: VcsCommandRunner; remote?: string } = {}
+) {
+  const remote =
+    options.remote ??
+    (() => {
+      try {
+        return safeExec('git', ['remote', 'get-url', '--push', 'origin'], {
+          cwd: pathResolver.rootDir(),
+        }).trim();
+      } catch {
+        return '';
+      }
+    })();
+  const normalized = remote ? normalizeRepositoryTarget(remote) : undefined;
+  const verifiedShape = parseExternalOperationGrant({
+    operation_id: 'vcs:pr_create',
+    repository: normalized,
+  });
+  const repository =
+    verifiedShape && 'repository' in verifiedShape ? verifiedShape.repository : undefined;
+  const target = repository ? new URL(repository) : undefined;
+  const privateRepository = Boolean(
+    options.verifyVisibility &&
+    target &&
+    ghRepositoryVisibility(
+      {
+        cwd: pathResolver.rootDir(),
+        repository: { host: target.host, slug: target.pathname.replace(/^\//, '') },
+      },
+      options.run
+    ) === 'private'
+  );
+  const visibility = privateRepository ? { visibility: 'private' as const } : {};
   const grants = repository
     ? [
-        { operation_id: 'vcs:pr_create' as const, repository },
-        { operation_id: 'vcs:pr_merge' as const, repository, branch: 'main' },
-        { operation_id: 'vcs:push' as const, repository, branch: 'main' },
+        { operation_id: 'vcs:pr_create' as const, repository, ...visibility },
+        { operation_id: 'vcs:pr_merge' as const, repository, branch: 'main', ...visibility },
+        {
+          operation_id: 'vcs:push' as const,
+          repository,
+          branch: 'agent/kyberion-development',
+          ...visibility,
+        },
       ]
     : [];
   return {
@@ -159,12 +199,9 @@ export function buildDelegationInput(now: Date) {
     mode: 'grant' as const,
     renew_existing: true,
     grants,
-    // Delegable business decision types (charter-decision-vocabulary.json):
-    // each maps to forbid | allow_with_review | allow. Remove rows to keep
-    // them undelegated; the human reviews this file before preview/request.
-    delegated_decisions: {
-      meeting_scheduling: 'allow_with_review' as const,
-      internal_document_approval: 'allow_with_review' as const,
+    data_tier: {
+      read: privateRepository ? ['public', 'personal'] : ['public'],
+      write: privateRepository ? ['public', 'personal'] : ['public'],
     },
     expires_at: new Date(now.getTime() + 90 * 86_400_000).toISOString(),
   };
@@ -175,9 +212,21 @@ export interface ActivationSetup {
   input_path?: string;
 }
 
-export async function prepareActivationSetup(now: Date): Promise<ActivationSetup> {
+export async function prepareActivationSetup(
+  now: Date,
+  options: { verifyVisibility?: boolean } = {}
+): Promise<ActivationSetup> {
   const runtime = inspectInstalledOnboardingRuntime({ kind: 'person' });
   if (!runtime.ready) return { status: 'unavailable' };
+  await withLock('onboarding-development-input', async () => {
+    withExecutionContext('sovereign_concierge', () => {
+      const delegation = delegationInputPath();
+      if (!safeExistsSync(delegation)) {
+        ensureDir(path.dirname(delegation));
+        writeGovernedJson(delegation, buildDelegationInput(now, options), { createOnly: true });
+      }
+    });
+  });
   if (runtime.agentActive) return { status: 'identity_active' };
   const existing = withExecutionContext(
     'sovereign_concierge',
@@ -192,20 +241,21 @@ export async function prepareActivationSetup(now: Date): Promise<ActivationSetup
       if (safeExistsSync(file)) return;
       ensureDir(path.dirname(file));
       writeGovernedJson(file, buildActivationInput(now), { createOnly: true });
-      const delegation = delegationInputPath();
-      if (!safeExistsSync(delegation))
-        writeGovernedJson(delegation, buildDelegationInput(now), { createOnly: true });
     });
   });
   return { status: 'activation_available', input_path: activationInputPath() };
 }
 
-function activationNextStep(setup?: ActivationSetup): string {
+export function activationNextStep(setup?: ActivationSetup): string {
   if (setup?.status !== 'activation_available' || !setup.input_path)
     return 'Inspect existing activation, pending requests and charter limits with `pnpm kyberion onboarding authority show --scope person --json`; resume the listed request with status/apply. Already active identities need no new activation consent.';
   const reviewed = path.join(path.dirname(setup.input_path), 'activation-reviewed.json');
   const delegation = delegationInputPath();
-  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. Otherwise review the expiry in ${setup.input_path}, then run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\`, inspect the saved preview, and request it with \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(reviewed)} --json\`. After human approval, apply the displayed request ID. This grants no standing outbound operations. To delegate exact operations (e.g. creating or merging PRs in a named repository) to this identity, review ${delegation} — it is prefilled with this repository — then run the same preview/request/approve/apply flow for it. Existing reviewed files are retained; choose a new output name when changing the plan.`;
+  const developmentReviewed = path.join(
+    path.dirname(setup.input_path),
+    'development-reviewed.json'
+  );
+  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. For Kyberion development, review ${delegation}, including its expiry, repository, read/write tiers, candidate branch agent/kyberion-development and merge target main. Run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(delegation)} --out ${shellQuoteArg(developmentReviewed)} --json\`, inspect the saved preview, then \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(developmentReviewed)} --json\`. One human approval activates the provisioned identity and grants the displayed development operations together; apply the displayed request ID. If activation without outbound delegation is intended, review ${setup.input_path} and use \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\` with the same request/approval/apply flow instead. Existing reviewed files are retained; choose a new output name when changing the plan.`;
 }
 
 export function ensureDir(p: string) {
@@ -593,7 +643,11 @@ export function buildApplySummary(
 }
 
 /** Library entry used by governed pipelines; the CLI below remains a facade. */
-export async function applyOnboardingInput(input: ApplyInput, print: Print = () => undefined) {
+export async function applyOnboardingInput(
+  input: ApplyInput,
+  print: Print = () => undefined,
+  options: { verifyRepositoryVisibility?: boolean } = {}
+) {
   const validatedInput = parseApplyInput(input);
   const validateState = compileSchema(
     pathResolver.rootResolve('knowledge/product/schemas/onboarding-state.schema.json')
@@ -629,7 +683,9 @@ export async function applyOnboardingInput(input: ApplyInput, print: Print = () 
     throw new Error(`onboarding-state schema invalid: ${JSON.stringify(validateState.errors)}`);
   }
   await writeJson(statePath(), state, 'onboarding-state');
-  const activation = await prepareActivationSetup(new Date(now));
+  const activation = await prepareActivationSetup(new Date(now), {
+    verifyVisibility: options.verifyRepositoryVisibility,
+  });
   await writeText(
     summaryPath(),
     buildSummary(validatedInput, tenantEntries, tutorial, reasoning, activation),
@@ -656,6 +712,12 @@ export async function main(argv: string[] = [], print: Print = () => undefined) 
       describe: 'Path to identity JSON (or pipe JSON via stdin)',
     })
     .option('dry-run', { type: 'boolean', default: false })
+    .option('verify-repository-visibility', {
+      type: 'boolean',
+      default: false,
+      describe:
+        'Opt in to a read-only GitHub visibility probe for a new development delegation template; preserves any existing reviewed template',
+    })
     .option('json', {
       type: 'boolean',
       default: false,
@@ -675,7 +737,9 @@ export async function main(argv: string[] = [], print: Print = () => undefined) 
     return;
   }
 
-  const result = await applyOnboardingInput(input, print);
+  const result = await applyOnboardingInput(input, print, {
+    verifyRepositoryVisibility: parsed['verify-repository-visibility'],
+  });
   if (parsed.json) {
     print(JSON.stringify(result, null, 2));
     return;

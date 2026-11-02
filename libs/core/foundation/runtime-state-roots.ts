@@ -7,6 +7,8 @@ import { isValidTenantSlug } from './scope.js';
  * are never added to metrics offboarding/compaction merely by registration.
  */
 export const PARTITIONED_RUNTIME_STATE_ROOTS = {
+  /** Private source workspaces retain the owning task's tier on disk. */
+  task_workspaces: 'active/shared/runtime/workspaces',
   dot: 'active/shared/runtime/dot',
   pipeline_library_runs: 'active/shared/runtime/pipeline-library-runs',
   /** Evidence and per-action autonomy overrides; never shared across tenants. */

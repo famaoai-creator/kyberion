@@ -37,7 +37,13 @@ describe('scope governance invariants', () => {
           // Approval-driven resume is the same boundary in a child process: it
           // mints from the journal's original execution authority with an empty
           // env, never from the approver's process.
-          !line.startsWith('libs/core/pipeline/pipeline-approval-resume.ts:')
+          !line.startsWith('libs/core/pipeline/pipeline-approval-resume.ts:') &&
+          // These are owner-authenticated composition boundaries. They validate
+          // canonical owner/mission identity before minting a scope for the
+          // enclosed operation; callers cannot provide an arbitrary envelope.
+          !line.startsWith('libs/core/dot/resident-dot-scope.ts:') &&
+          !line.startsWith('libs/core/governance/authenticated-personal-approvals.ts:') &&
+          !line.startsWith('libs/core/organization/continuous-mission-scope.ts:')
       );
     expect(offenders).toEqual([]);
   });

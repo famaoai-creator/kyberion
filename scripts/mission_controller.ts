@@ -1493,6 +1493,13 @@ async function mainImpl(
   if (!getRegisteredEnvText('MISSION_ROLE')) {
     setRegisteredEnv('MISSION_ROLE', 'mission_controller');
   }
+  if (earlyPositionalArgs[0] === 'gate-pass') {
+    const { installMissionDevelopmentProofVerifier } =
+      await import('@agent/core/mission/mission-development-gates');
+    const { verifyMissionDevelopmentPublication } =
+      await import('@agent/core/mission/mission-development-proof');
+    installMissionDevelopmentProofVerifier(verifyMissionDevelopmentPublication);
+  }
   // Register reasoning backends so dispatch-workitems delegation reaches a
   // real backend (claude-cli/anthropic) instead of silently using the stub.
   // Journal-only actions never delegate; skip their probe cost.

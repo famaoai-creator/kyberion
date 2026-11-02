@@ -61,6 +61,37 @@ describe('machine-only mission gate', () => {
     expect(h.events).toEqual(['evaluate', 'record', 'advance', 'mark', 'activate']);
     expect(h.ports.advance).toHaveBeenCalledWith('MSN-MACHINE-TEST', 'execution');
   });
+  it.each(['ci', 'scope', 'mixed'] as const)(
+    'labels only a sole typed CI waiting refusal (%s)',
+    async (mode) => {
+      const h = harness({
+        found: true,
+        phase: 'test',
+        position: 'exit',
+        evaluation: {
+          gate_id: 'TESTS_PASSED',
+          verdict: 'fail',
+          checked_at: '2026-11-02T00:00:00Z',
+          reasons: [
+            mode === 'scope' ? 'Scope mismatch' : '[DEVELOPMENT_CI_WAITING] Current checks pending',
+          ],
+          checks: [
+            { kind: 'development_ci_verified', passed: false },
+            ...(mode === 'mixed' ? [{ kind: 'evidence_exists' as const, passed: false }] : []),
+          ],
+        },
+      });
+      let message = '';
+      try {
+        await runMachineOnlyMissionGate({ ...input, gateId: 'TESTS_PASSED' }, h.ports);
+      } catch (error) {
+        message = String(error);
+      }
+      expect(message.includes('[DEVELOPMENT_CI_WAITING]')).toBe(mode === 'ci');
+      expect(h.ports.advance).not.toHaveBeenCalled();
+      expect(h.ports.markCompleted).not.toHaveBeenCalled();
+    }
+  );
   it.each([
     undefined,
     'gate.json',

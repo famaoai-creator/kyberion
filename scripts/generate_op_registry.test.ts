@@ -107,10 +107,18 @@ describe('generate_op_registry discovery output', () => {
     const operations = discovery.actuators.flatMap((entry) => entry.ops || []);
     // Ratchet count regenerated via `pnpm generate:op-registry` against the
     // ops actually registered on disk; update this when an actuator contract
-    // intentionally adds or removes operations. 657 combines the thirteen
+    // intentionally adds or removes operations. 658 combines the thirteen
     // mobile interactive/mirror ops with the four Apple Intelligence ops and
-    // the three browser watchdog/cdp ops.
-    expect(operations).toHaveLength(657);
+    // the three browser watchdog/cdp ops and VCS development reconciliation.
+    expect(operations).toHaveLength(658);
+    expect(
+      discovery.actuators
+        .find((entry) => entry.n === 'vcs-actuator')
+        ?.ops?.find((item) => item.op === 'development_loop')
+    ).toMatchObject({
+      kind: 'apply',
+      input_schema: { required: ['ref', 'work_item_id', 'review_task_id'] },
+    });
     expect(operations.every((item) => item.input_schema)).toBe(true);
     expect(operations.every((item) => Array.isArray(item.examples))).toBe(true);
     expect(

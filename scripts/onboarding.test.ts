@@ -47,7 +47,7 @@ describe('onboarding facade', () => {
     ).rejects.toThrow('identity file not found');
   });
 
-  it('forwards apply output to the facade printer', async () => {
+  it('forwards apply output and the explicit repository visibility option through the facade', async () => {
     const print = vi.fn();
 
     await main(
@@ -56,6 +56,7 @@ describe('onboarding facade', () => {
         '--identity',
         'knowledge/public/templates/onboarding/identity.example.json',
         '--dry-run',
+        '--verify-repository-visibility',
       ],
       print
     );

@@ -65,7 +65,16 @@ export async function runMachineOnlyMissionGate(
     logger.warn(
       `machine gate rejected — stored checks did not pass | next: satisfy the gate checks through their governed evidence | evidence: ${missionId}/${gateId}`
     );
-    throw new Error(`Machine-only gate checks failed: ${missionId}/${gateId}`);
+    const failed = stored.evaluation.checks.filter((check) => !check.passed);
+    const ciWaiting =
+      gateId === 'TESTS_PASSED' &&
+      failed.length > 0 &&
+      failed.every((check) => check.kind === 'development_ci_verified') &&
+      stored.evaluation.reasons.every((reason) => reason.startsWith('[DEVELOPMENT_CI_WAITING]')) &&
+      stored.evaluation.reasons.length > 0;
+    throw new Error(
+      `${ciWaiting ? '[DEVELOPMENT_CI_WAITING] ' : ''}Machine-only gate checks failed: ${missionId}/${gateId}`
+    );
   }
   let completed = 0;
   if (stored.position === 'exit' && stored.phase) {

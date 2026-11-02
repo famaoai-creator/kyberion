@@ -8056,6 +8056,34 @@
       "types": "./dist/organization/continuous-work-owner.d.ts",
       "default": "./dist/organization/continuous-work-owner.js"
     },
+    "./organization/continuous-development-consent": {
+      "types": "./dist/organization/continuous-development-consent.d.ts",
+      "default": "./dist/organization/continuous-development-consent.js"
+    },
+    "./organization/continuous-mission-scope": {
+      "types": "./dist/organization/continuous-mission-scope.d.ts",
+      "default": "./dist/organization/continuous-mission-scope.js"
+    },
+    "./mission/mission-development-continuation": {
+      "types": "./dist/mission/mission-development-continuation.d.ts",
+      "default": "./dist/mission/mission-development-continuation.js"
+    },
+    "./mission/mission-development-proof": {
+      "types": "./dist/mission/mission-development-proof.d.ts",
+      "default": "./dist/mission/mission-development-proof.js"
+    },
+    "./mission/mission-development-gates": {
+      "types": "./dist/mission/mission-development-gates.d.ts",
+      "default": "./dist/mission/mission-development-gates.js"
+    },
+    "./vcs/cwd-scope": {
+      "types": "./dist/vcs/cwd-scope.d.ts",
+      "default": "./dist/vcs/cwd-scope.js"
+    },
+    "./governance/authenticated-personal-approvals": {
+      "types": "./dist/governance/authenticated-personal-approvals.d.ts",
+      "default": "./dist/governance/authenticated-personal-approvals.js"
+    },
     "./discussion/discussion-create-request": {
       "types": "./dist/discussion/discussion-create-request.d.ts",
       "default": "./dist/discussion/discussion-create-request.js"

@@ -6,6 +6,194 @@ import { useOnboardingAuthorityFixture } from '../../../tests/helpers/onboarding
 const f = useOnboardingAuthorityFixture();
 const person = { kind: 'person' } as const;
 describe('actual-store onboarding authority', () => {
+  it('installs personal approval scope for trusted onboarding only and refuses public agent parents', async () => {
+    const envelopes = await import('../scope-envelope.js');
+    f.run(() => {
+      const raw = f.input();
+      const preview = f.api.previewOnboardingAuthority(f.principal, raw);
+      const request = f.api.requestOnboardingAuthority(f.principal, raw, preview);
+      expect(
+        f.api.onboardingAuthorityRequestStatus(f.principal, person, request.request_id).status
+      ).toBe('pending');
+      expect(
+        f.approvals.loadApprovalRequest(f.api.ONBOARDING_AUTHORITY_CHANNEL, request.request_id)
+      ).toBeNull();
+      const parent = envelopes.mintScopeEnvelope({
+        identity: { tier: 'public', session_id: 'public-agent-parent' },
+        policy: { read_tiers: ['public'], write_tier: 'public', purpose: 'denial fixture' },
+        env: { ...process.env, KYBERION_TIER: 'public' },
+      });
+      expect(() =>
+        envelopes.withScopeEnvelope(parent, () =>
+          f.api.onboardingAuthorityRequestStatus(f.principal, person, request.request_id)
+        )
+      ).toThrow('personal approval scope conflicts');
+      const foreign = envelopes.mintScopeEnvelope({
+        identity: {
+          tier: 'personal',
+          nhi_id: 'kyberion://agent/foreign/owner',
+          session_id: 'foreign-parent',
+        },
+        policy: {
+          read_tiers: ['public', 'personal'],
+          write_tier: 'personal',
+          purpose: 'foreign denial fixture',
+        },
+        env: { ...process.env, KYBERION_TIER: 'personal' },
+      });
+      expect(() =>
+        envelopes.withScopeEnvelope(foreign, () =>
+          f.api.onboardingAuthorityRequestStatus(f.principal, person, request.request_id)
+        )
+      ).toThrow('personal approval scope conflicts');
+    });
+  });
+
+  it('presents changed and resulting delegated decision policies before owner consent', () =>
+    f.run(() => {
+      const raw = { ...f.input(), delegated_decisions: { meeting_scheduling: 'allow' as const } };
+      const preview = f.api.previewOnboardingAuthority(f.principal, raw);
+      expect(preview.statement).toContain(
+        'Requested grant delegated decision meeting_scheduling: allow'
+      );
+      expect(preview.statement).toContain(
+        'Resulting delegated decisions: {"meeting_scheduling":"allow"}'
+      );
+      const request = f.api.requestOnboardingAuthority(f.principal, raw, preview);
+      f.approve(request.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, request.request_id);
+      const revoke = {
+        ...f.input(),
+        grants: [],
+        mode: 'revoke' as const,
+        delegated_decisions: { meeting_scheduling: 'forbid' as const },
+      };
+      const next = f.api.previewOnboardingAuthority(f.principal, revoke);
+      expect(next.statement).toContain(
+        'Requested revoke delegated decision meeting_scheduling: forbid'
+      );
+      expect(next.statement).toContain('Resulting delegated decisions: {}');
+    }));
+  it('binds personal-tier delegation and initial identity activation to one exact owner consent', () =>
+    f.run(() => {
+      const identity = f.installAgent(false, 'combined-development');
+      const raw = {
+        ...f.input(),
+        data_tier: { read: ['public', 'personal'], write: ['personal'] },
+      };
+      const preview = f.api.previewOnboardingAuthority(f.principal, raw);
+      expect(preview.statement).toContain('personal');
+      expect(preview.statement).toContain('also activates');
+      expect(preview.statement).not.toContain('GitHub merge are not delegated');
+      const request = f.api.requestOnboardingAuthority(f.principal, raw, preview);
+      expect(() =>
+        f.api.requestOnboardingAuthority(
+          f.principal,
+          { ...raw, data_tier: { read: ['public'], write: [] } },
+          preview
+        )
+      ).toThrow();
+      expect(f.identities.getAgentIdentity(identity.nhi_id)?.lifecycle_status).toBe('provisioned');
+      f.approve(request.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, request.request_id);
+      expect(f.identities.getAgentIdentity(identity.nhi_id)?.lifecycle_status).toBe('active');
+      expect(f.charters.findActiveCharter(person, new Date())!.envelope.data_tier).toEqual({
+        read: ['personal', 'public'],
+        write: ['personal'],
+      });
+      expect(f.api.readOnboardingAuthority(f.principal, person).charter?.data_tier).toEqual({
+        read: ['personal', 'public'],
+        write: ['personal'],
+      });
+    }));
+  it('preserves tier delegation on omission and only narrows it during revoke', () =>
+    f.run(() => {
+      const raw = {
+        ...f.input(),
+        data_tier: { read: ['public', 'personal'], write: ['personal'] },
+      };
+      const request = f.api.requestOnboardingAuthority(
+        f.principal,
+        raw,
+        f.api.previewOnboardingAuthority(f.principal, raw)
+      );
+      f.approve(request.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, request.request_id);
+      const amendment = {
+        ...f.input(),
+        grants: [{ operation_id: 'browser:goto' as const, origin: 'https://retained.test' }],
+      };
+      const next = f.api.requestOnboardingAuthority(
+        f.principal,
+        amendment,
+        f.api.previewOnboardingAuthority(f.principal, amendment)
+      );
+      f.approve(next.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, next.request_id);
+      expect(f.charters.findActiveCharter(person, new Date())!.envelope.data_tier.read).toContain(
+        'personal'
+      );
+      const revoke = {
+        ...f.input(),
+        mode: 'revoke' as const,
+        grants: [],
+        data_tier: { read: ['public'], write: [] },
+      };
+      const narrowing = f.api.requestOnboardingAuthority(
+        f.principal,
+        revoke,
+        f.api.previewOnboardingAuthority(f.principal, revoke)
+      );
+      f.approve(narrowing.request_id);
+      f.api.applyOnboardingAuthority(f.principal, person, narrowing.request_id);
+      expect(f.charters.findActiveCharter(person, new Date())!.envelope.data_tier).toEqual({
+        read: ['public'],
+        write: [],
+      });
+      expect(() =>
+        f.api.previewOnboardingAuthority(f.principal, {
+          ...revoke,
+          data_tier: { read: ['personal', 'public'], write: [] },
+        })
+      ).toThrow('cannot expand');
+    }));
+  it('permits only the actual scope tier and rejects activation-only tier widening', () =>
+    f.run(() => {
+      const preview = (
+        scope_kind: 'person' | 'organization',
+        data_tier: { read: string[]; write: string[] },
+        tenant_slug?: string
+      ) =>
+        f.api.previewOnboardingAuthority(f.principal, {
+          ...f.input(),
+          scope_kind,
+          ...(tenant_slug ? { tenant_slug } : {}),
+          data_tier,
+        });
+      expect(() =>
+        preview(
+          'organization',
+          { read: ['public', 'confidential:fixture-a'], write: ['confidential:fixture-a'] },
+          'fixture-a'
+        )
+      ).not.toThrow();
+      for (const tier of ['personal', 'confidential:fixture-b', 'confidential'])
+        expect(() => preview('organization', { read: [tier], write: [] }, 'fixture-a')).toThrow(
+          'actual scope'
+        );
+      expect(() => preview('person', { read: ['confidential:fixture-a'], write: [] })).toThrow(
+        'actual scope'
+      );
+      f.installAgent(false, 'activation-tiers');
+      expect(() =>
+        f.api.previewOnboardingAuthority(f.principal, {
+          ...f.input(),
+          mode: 'activate',
+          grants: [],
+          data_tier: { read: ['public'], write: [] },
+        })
+      ).toThrow('must not include');
+    }));
   it('activates a fresh installed identity after signed consent without standing outbound grants', () =>
     f.run(() => {
       const installed = f.installAgent(false, 'activation-only');
@@ -190,7 +378,7 @@ describe('actual-store onboarding authority', () => {
       );
     }));
   it('rejects agent self-decision and applies an actual signed human decision once', () =>
-    f.run(() => {
+    f.personal(() => {
       const request = f.request();
       const record = f.approvals.loadApprovalRequest(
         f.api.ONBOARDING_AUTHORITY_CHANNEL,
@@ -247,7 +435,7 @@ describe('actual-store onboarding authority', () => {
           { kind: 'organization', tenant_slug: 'fixture-b' },
           request.request_id
         )
-      ).toThrow('outside');
+      ).toThrow('request not found');
       expect(() =>
         f.api.readOnboardingAuthority({ ...f.principal, personalOwner: false }, person)
       ).toThrow('owner');

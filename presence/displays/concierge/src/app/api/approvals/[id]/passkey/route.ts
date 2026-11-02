@@ -1,8 +1,12 @@
 import { scopedLearningApprovalVisibleToViewer } from '../../../../../lib/scoped-learning-approval-visibility';
 import { onboardingApprovalMember } from '../../../../../lib/onboarding-authority-server';
+import {
+  loadConciergeApproval,
+  withConciergeApproval,
+} from '../../../../../lib/personal-approval-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { withExecutionContextAsync } from '@agent/core/authority';
-import { decideApprovalRequest, loadApprovalRequest } from '@agent/core/governance/approval-store';
+import { decideApprovalRequest } from '@agent/core/governance/approval-store';
 import {
   createApprovalPasskeyOptions,
   verifyApprovalPasskeyAssertion,
@@ -71,7 +75,7 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       typeof body.storageChannel === 'string' && body.storageChannel
         ? body.storageChannel
         : channel;
-    const record = loadApprovalRequest(storageChannel, id);
+    const record = loadConciergeApproval(resolved.context, storageChannel, id);
     if (!record) {
       return NextResponse.json(
         { ok: false, error: `approval request not found: ${id}` },
@@ -101,16 +105,23 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
         );
       }
       const presentedDigest = body.presentedDigest;
-      const issued = await withExecutionContextAsync(ROLE, () =>
-        createApprovalPasskeyOptions(ROLE, {
-          record,
-          storageChannel,
-          decision,
-          memberId: member.memberId,
-          presentedDigest,
-          rp,
-        })
+      const issued = await withConciergeApproval(resolved.context, record, () =>
+        withExecutionContextAsync(ROLE, () =>
+          createApprovalPasskeyOptions(ROLE, {
+            record,
+            storageChannel,
+            decision,
+            memberId: member.memberId,
+            presentedDigest,
+            rp,
+          })
+        )
       );
+      if (!issued)
+        return NextResponse.json(
+          { ok: false, error: 'approval request not found' },
+          { status: 404 }
+        );
       return NextResponse.json(
         { ok: true, challenge_id: issued.challengeId, options: issued.options },
         { headers: { 'Cache-Control': 'no-store' } }
@@ -128,36 +139,46 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
       );
     }
     const challengeId = body.challengeId;
-    const verified = await withExecutionContextAsync(ROLE, () =>
-      verifyApprovalPasskeyAssertion(ROLE, {
-        challengeId,
+    const verified = await withConciergeApproval(resolved.context, record, () =>
+      withExecutionContextAsync(ROLE, () =>
+        verifyApprovalPasskeyAssertion(ROLE, {
+          challengeId,
+          storageChannel,
+          requestId: id,
+          decision,
+          memberId: member.memberId,
+          rp,
+          response: body.response as Parameters<
+            typeof verifyApprovalPasskeyAssertion
+          >[1]['response'],
+        })
+      )
+    );
+    if (!verified)
+      return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
+    const updated = withConciergeApproval(resolved.context, record, () =>
+      decideApprovalRequest(ROLE, {
+        channel,
         storageChannel,
         requestId: id,
         decision,
-        memberId: member.memberId,
-        rp,
-        response: body.response as Parameters<typeof verifyApprovalPasskeyAssertion>[1]['response'],
+        decidedBy: member.decidedBy,
+        decidedByDisplayName: member.displayName,
+        decidedByRole: member.role ?? 'sovereign',
+        authMethod: 'passkey',
+        decidedByType: 'human',
+        authenticated: true,
+        deciderPrincipal: resolved.context.principal,
+        presentedDigest: verified.presentedDigest,
+        passkeyChallengeId: verified.challengeId,
+        note:
+          typeof body.reason === 'string' && body.reason.trim()
+            ? body.reason.trim()
+            : 'Decision signed with a passkey from the concierge (秘書室) approval queue.',
       })
     );
-    const updated = decideApprovalRequest(ROLE, {
-      channel,
-      storageChannel,
-      requestId: id,
-      decision,
-      decidedBy: member.decidedBy,
-      decidedByDisplayName: member.displayName,
-      decidedByRole: member.role ?? 'sovereign',
-      authMethod: 'passkey',
-      decidedByType: 'human',
-      authenticated: true,
-      deciderPrincipal: resolved.context.principal,
-      presentedDigest: verified.presentedDigest,
-      passkeyChallengeId: verified.challengeId,
-      note:
-        typeof body.reason === 'string' && body.reason.trim()
-          ? body.reason.trim()
-          : 'Decision signed with a passkey from the concierge (秘書室) approval queue.',
-    });
+    if (!updated)
+      return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
     return NextResponse.json({ ok: true, approval: updated });
   } catch (error) {
     return conciergeErrorResponse(error, passkeyErrorStatus(error));

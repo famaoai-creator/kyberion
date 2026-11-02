@@ -55,7 +55,7 @@ function fixture(kind = 'mission') {
         ...(kind === 'project'
           ? { project: { name: 'New project', summary: 'Improve quality' } }
           : {}),
-        missions: [mission],
+        missions: [structuredClone(mission)],
       },
     },
   } as unknown as WorkItem;
@@ -111,6 +111,23 @@ function fixture(kind = 'mission') {
   };
 }
 describe('continuous managed owner', () => {
+  it('threads only the admitted development descriptor to creation and each owner advancement', async () => {
+    const h = fixture();
+    const development = {
+      cwd: '.',
+      repository_url: 'https://github.com/owner/repository',
+      source_edit_paths: ['libs/core/example.ts'],
+      implementation_task_id: 'execution-implement',
+      review_task_id: 'self_review-code-review',
+      title: 'fix: restore reliability',
+      body_file: 'evidence/pr-body.md',
+    };
+    const plan = h.item().metadata!.continuous_work as { missions: Array<Record<string, unknown>> };
+    plan.missions[0]!.development = development;
+    await h.run();
+    expect(h.ports.ensureMission).toHaveBeenCalledWith(expect.objectContaining({ development }));
+    expect(h.ports.advanceMission).toHaveBeenCalledWith(expect.objectContaining({ development }));
+  });
   it('reads the exact halt flag file under a scratch checkout and stands down only when halted', async () => {
     const scratchName = `vitest-continuous-owner-halt-${randomUUID()}`;
     const root = pathResolver.rootResolve(`active/shared/tmp/${scratchName}`);

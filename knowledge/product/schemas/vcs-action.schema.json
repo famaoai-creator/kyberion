@@ -22,6 +22,7 @@
         "pr_list",
         "pr_checks",
         "pr_merge",
+        "development_loop",
         "repo_view",
         "gh_status"
       ]
@@ -30,6 +31,9 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "work_item_id": { "type": "string" },
+        "review_task_id": { "type": "string" },
+        "dry_run": { "type": "boolean" },
         "cwd": {
           "type": "string"
         },

@@ -9,7 +9,7 @@ import {
   listApprovalChannelsAt,
   listApprovalPartitions,
   tenantApprovalEventLogicalPath,
-  type ApprovalTenantPartition,
+  type PrivateApprovalPartition,
 } from '../governance/approval-store-location.js';
 import { readWorkerEventStreamJsonl } from '../workforce/worker-event-stream.js';
 import { reasoningFailoverEventsPath } from '../reasoning/reasoning-failover.js';
@@ -153,7 +153,7 @@ export const approvalRejectionSource: LearningSignalSource = {
   },
 };
 
-function safeApprovalChannels(partition: ApprovalTenantPartition): string[] {
+function safeApprovalChannels(partition: PrivateApprovalPartition): string[] {
   try {
     return listApprovalChannelsAt(partition);
   } catch {
@@ -166,7 +166,7 @@ function approvalRejectionObservations(
   events: Row[],
   channel: string,
   window: LearningSignalWindow,
-  partition?: ApprovalTenantPartition
+  partition?: PrivateApprovalPartition
 ): LearningObservation[] {
   const observations: LearningObservation[] = [];
   for (const event of events) {
@@ -180,7 +180,7 @@ function approvalRejectionObservations(
         ? loadApprovalRequest(
             channel,
             requestId,
-            partition ? { scope: { tenant_slug: partition.tenant_slug } } : {}
+            partition?.kind === 'tenant' ? { scope: { tenant_slug: partition.tenant_slug } } : {}
           )
         : null;
     } catch {
@@ -193,7 +193,9 @@ function approvalRejectionObservations(
       stringField(event, 'reason_category') || annotated || 'uncategorized'
     );
     const kind = closedToken(String(record?.kind || 'unknown'));
-    const tenantSlug = record?.scope?.tenant_slug?.trim() || partition?.tenant_slug || undefined;
+    const tenantSlug =
+      record?.scope?.tenant_slug?.trim() ||
+      (partition?.kind === 'tenant' ? partition.tenant_slug : undefined);
     observations.push({
       key: `${kind}:${reason}`,
       title: `${kind} approval rejected (${reason})`,

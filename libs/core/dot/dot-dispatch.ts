@@ -1,4 +1,5 @@
 import { dotDigestActionEvidence } from './dot-digest-evidence.js';
+import { continuousDevelopmentDecisionPresentation } from '../organization/continuous-development-consent.js';
 import { dotDelegationCapacity, resumeDotCapacityActions } from './dot-admission-capacity.js';
 import { composeDotBoundsPrompt, sameDotHandoffScope } from './dot-bounds-prompt.js';
 export { dotDelegationCapacity } from './dot-admission-capacity.js';
@@ -1219,6 +1220,7 @@ function dispatchDotProposalsUnlocked(
           : {}),
         ...(admissionScope ? { scope: admissionScope } : {}),
         ...judgedRoute,
+        ...continuousDevelopmentDecisionPresentation(charter, base, deps.rootDir),
         now: now.getTime(),
       });
       const decided: DotActionRecord = {

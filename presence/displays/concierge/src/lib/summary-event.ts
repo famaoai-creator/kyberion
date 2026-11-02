@@ -33,6 +33,8 @@ export type ConciergeSummary = {
     organization_id?: string;
     presented_digest?: string;
     min_assurance?: string;
+    review_scope?: string;
+    evidence?: Array<{ label: string; ref: string }>;
   }>;
   outcome_feed: Array<{
     entry_id: string;
@@ -134,7 +136,18 @@ export function parseConciergeSummaryValue(value: unknown): ConciergeSummary | n
         'organization_id',
         'presented_digest',
         'min_assurance',
+        'review_scope',
       ]
+    ) ||
+    !Array.isArray(value.approval_queue) ||
+    value.approval_queue.some(
+      (candidate) =>
+        !isRecord(candidate) ||
+        (candidate.evidence !== undefined &&
+          (!Array.isArray(candidate.evidence) ||
+            candidate.evidence.some(
+              (entry) => !isRecord(entry) || !hasStringFields(entry, ['label', 'ref'])
+            )))
     ) ||
     !isSummaryItemArray(
       value.outcome_feed,

@@ -13,6 +13,7 @@ import {
 import type { ContinuousOwnerProcessOptions } from './continuous_owner_process.js';
 import type { AlignmentDecisionReport } from './mission_alignment_decision.js';
 import type { WorkItem } from '@agent/core/workforce/work-coordination-types';
+import { continuousDevelopmentAlignmentScope } from '@agent/core/organization/continuous-development-consent';
 
 const managed = vi.hoisted(() => ({ run: vi.fn() }));
 vi.mock('./continuous_owner_process.js', () => ({ runContinuousOwnerProcess: managed.run }));
@@ -54,6 +55,15 @@ const advanceInput: AdvanceContinuousMissionInput = {
 };
 const root = '/workspace/kyberion';
 const directory = path.join(root, 'active/missions/public', missionInput.mission_id);
+const developmentSpec = {
+  cwd: '.',
+  repository_url: 'https://github.com/owner/repository',
+  source_edit_paths: ['libs/core/example.ts'],
+  implementation_task_id: 'execution-implement',
+  review_task_id: 'self_review-code-review',
+  title: 'fix: restore reliability',
+  body_file: 'evidence/pr-body.md',
+};
 
 function harness(options: { present?: boolean; status?: string; gated?: boolean } = {}) {
   let present = options.present ?? true;
@@ -137,6 +147,13 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
     brief: (file) =>
       files.get(file) as ReturnType<NonNullable<ContinuousOwnerAdapterDeps['brief']>>,
     tasks: () => tasks,
+    missionScope: (_input, run) => run(),
+    configureDevelopmentGates: vi.fn(),
+    board: (_dir, update) => {
+      const next = typeof update === 'function' ? update(tasks) : update;
+      if (next) tasks = next;
+      return next !== undefined;
+    },
     // A superseded row with task_id 'proven' carries the mission-side proof.
     supersedeProven: (_missionId, taskId) => taskId === 'proven',
     workItems,
@@ -168,6 +185,26 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
     workItems,
     updateItem,
     ports: createContinuousOwnerPorts(deps),
+    bindDevelopment() {
+      const file = path.join(directory, 'evidence/continuous-owner.json');
+      const briefFile = path.join(directory, 'evidence/mission-brief.json');
+      const brief = {
+        ...(files.get(briefFile) as Record<string, unknown>),
+        scope: {
+          in: [missionInput.goal, ...continuousDevelopmentAlignmentScope(developmentSpec, scope)],
+          out: ['Unapproved external effects', 'Cross-tenant access'],
+        },
+      };
+      files.set(briefFile, brief);
+      files.set(file, {
+        ...(files.get(file) as Record<string, unknown>),
+        development: developmentSpec,
+        brief_hash: createHash('sha256').update(JSON.stringify(brief)).digest('hex'),
+        development_hash: createHash('sha256')
+          .update(JSON.stringify(developmentSpec))
+          .digest('hex'),
+      });
+    },
     setProjectPresent(value: boolean) {
       projectPresent = value;
     },
@@ -181,6 +218,356 @@ function harness(options: { present?: boolean; status?: string; gated?: boolean 
 }
 
 describe('continuous work production owner ports', () => {
+  it.each(['public', 'confidential', 'personal'] as const)(
+    'binds the canonical mission handoff before advancing %s work',
+    async (tier) => {
+      const h = harness();
+      const selected = {
+        tier,
+        organization_id: scope.organization_id,
+        ...(tier === 'confidential' ? { tenant_slug: 'acme' } : {}),
+      };
+      const observed: unknown[] = [];
+      h.deps.missionScope = (input) => {
+        observed.push(input);
+        throw new Error('scope handoff refused');
+      };
+      await expect(h.ports.advanceMission({ ...advanceInput, scope: selected })).rejects.toThrow(
+        'scope handoff refused'
+      );
+      expect(observed).toEqual([
+        {
+          mission_id: advanceInput.mission_id,
+          scope: selected,
+          assertCurrent: advanceInput.assertCurrent,
+        },
+      ]);
+      expect(h.exec).not.toHaveBeenCalled();
+    }
+  );
+  it('configures typed development gates from the pinned descriptor before alignment is requested', async () => {
+    const h = harness({ present: false });
+    await h.ports.ensureMission({ ...missionInput, development: developmentSpec });
+    expect(h.files.get(path.join(directory, 'evidence/continuous-owner.json'))).toMatchObject({
+      development: developmentSpec,
+    });
+    const brief = h.files.get(path.join(directory, 'evidence/mission-brief.json')) as {
+      scope: { in: string[] };
+    };
+    expect(brief.scope.in).toContain(
+      `Exact approved source file: ${developmentSpec.source_edit_paths[0]}`
+    );
+    expect(
+      brief.scope.in.some((line) =>
+        line.includes(
+          'Automatic effects: implement, test, repair, push, create PR, independent review, merge'
+        )
+      )
+    ).toBe(true);
+    expect(brief.scope.in.some((line) => line.includes('evidence/continuous-owner.json'))).toBe(
+      true
+    );
+    expect(h.deps.configureDevelopmentGates).toHaveBeenCalledWith({
+      missionId: missionInput.mission_id,
+      development: developmentSpec,
+      assertCurrent: missionInput.assertCurrent,
+    });
+    expect(vi.mocked(h.deps.configureDevelopmentGates!).mock.invocationCallOrder[0]).toBeLessThan(
+      h.openApproval.mock.invocationCallOrder[0]!
+    );
+  });
+  it('passes existing verified publication references to the actual delivery prompt without changing acceptance criteria', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.setTasks([
+      {
+        task_id: 'delivery-deliver',
+        phase: 'delivery',
+        description: 'Submit the reviewed PR',
+        status: 'requested',
+      },
+    ]);
+    const delivery = {
+      item_id: 'WI-DELIVERY',
+      version: 1,
+      status: 'ready',
+      description: 'Submit the reviewed PR',
+      context: {
+        mission_id: missionInput.mission_id,
+        task_id: 'delivery-deliver',
+        project_id: missionInput.project_id,
+        organization_id: scope.organization_id,
+      },
+      metadata: { acceptance_criteria: ['PR already exists'] },
+    } as unknown as WorkItem;
+    const foreign = {
+      ...delivery,
+      item_id: 'WI-FOREIGN',
+      context: { ...delivery.context!, tenant_slug: 'other' },
+    };
+    h.workItems.mockReturnValue([delivery, foreign]);
+    const evidence = ['https://github.com/owner/repository/pull/1', `commit:${'a'.repeat(40)}`];
+    h.deps.development = vi.fn(async () => ({
+      status: 'completed' as const,
+      reason: 'Immutable merge verified',
+      evidence_refs: evidence,
+    }));
+    await h.ports.advanceMission({ ...advanceInput, development: developmentSpec });
+    const update = h.updateItem.mock.calls.find(
+      ([value]) => value.itemId === delivery.item_id
+    )?.[0];
+    expect(update).toMatchObject({
+      expectedVersion: 1,
+      metadata: { acceptance_criteria: ['PR already exists'] },
+    });
+    expect(h.updateItem.mock.calls.some(([value]) => value.itemId === foreign.item_id)).toBe(false);
+    const { buildWorkItemPromptBody } =
+      await import('@agent/core/mission/mission-workitem-dispatch-execution');
+    const prompt = buildWorkItemPromptBody({
+      missionId: missionInput.mission_id,
+      item: { ...delivery, description: update!.description!, metadata: update!.metadata },
+    });
+    expect(prompt).toContain('Do not create another PR, push, merge, or repeat publication');
+    expect(prompt).toContain(evidence[0]);
+    expect(prompt).toContain(evidence[1]);
+    expect(h.deps.tasks!('unused', missionInput.mission_id)?.[0]?.description).toContain(
+      'VERIFIED_DEVELOPMENT_PUBLICATION'
+    );
+  });
+  it('routes development execution through the supervised controller with exact WorkItem ids', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.setTasks([{ task_id: 'execution-implement', phase: 'execution', status: 'requested' }]);
+    managed.run.mockResolvedValue({ stdout: '', stderr: '', status: 0 });
+    const module = await import('@agent/core/mission/mission-development-continuation');
+    vi.spyOn(module, 'advanceMissionDevelopment').mockImplementation(async (_input, ports) => {
+      await ports!.dispatch!(h.deps.mission!(advanceInput.mission_id)!, {
+        itemIds: ['WI-IMPLEMENTATION'],
+        limit: 1,
+      });
+      return {
+        status: 'running',
+        reason: 'Reconcile the actual child result next turn',
+        evidence_refs: [],
+      };
+    });
+    const ports = createContinuousOwnerPorts({ ...h.deps, exec: undefined });
+    const abort = new AbortController();
+    expect(
+      await ports.advanceMission({
+        ...advanceInput,
+        development: developmentSpec,
+        signal: abort.signal,
+      })
+    ).toMatchObject({ status: 'running' });
+    expect(managed.run).toHaveBeenCalledOnce();
+    expect(managed.run).toHaveBeenCalledWith(
+      process.execPath,
+      [
+        path.join(root, 'dist/scripts/mission_controller.bundle.js'),
+        'dispatch-workitems',
+        advanceInput.mission_id,
+        '--dispatch-item-ids',
+        'WI-IMPLEMENTATION',
+        '--dispatch-limit',
+        '1',
+        '--dispatch-rounds',
+        '1',
+        '--dispatch-statuses',
+        'ready,backlog',
+        '--dispatch-final-status',
+        'done',
+      ],
+      expect.objectContaining({
+        cwd: root,
+        signal: abort.signal,
+        timeoutMs: 120_000,
+        maxOutputMB: 2,
+      })
+    );
+  });
+  it('refuses a development controller dispatch without exact WorkItem narrowing', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    const module = await import('@agent/core/mission/mission-development-continuation');
+    vi.spyOn(module, 'advanceMissionDevelopment').mockImplementation(async (_input, ports) => {
+      await ports!.dispatch!(h.deps.mission!(advanceInput.mission_id)!, {});
+      return { status: 'running', reason: 'unreachable', evidence_refs: [] };
+    });
+    await expect(
+      h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+    ).rejects.toThrow('exact mission WorkItems');
+    expect(h.exec.mock.calls.some((call) => call[1][1] === 'dispatch-workitems')).toBe(false);
+  });
+  it('requires the exact pinned development spec before any continuation effect', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.deps.development = vi.fn();
+    await expect(
+      h.ports.advanceMission({
+        ...advanceInput,
+        development: { ...developmentSpec, title: 'Unreviewed title' },
+      })
+    ).rejects.toThrow('development specification drift');
+    expect(h.deps.development).not.toHaveBeenCalled();
+    expect(h.exec).not.toHaveBeenCalled();
+  });
+  it.each(['active', 'completed', 'archived'])(
+    'does not accept completed task files as merged development proof in %s missions',
+    async (status) => {
+      const h = harness({ status });
+      h.bindDevelopment();
+      h.setTasks([{ task_id: 'delivery', phase: 'delivery', status: 'completed' }]);
+      h.setState({ verification: { status: 'verified' } });
+      h.deps.development = vi.fn(async () => ({
+        status: 'running' as const,
+        reason: 'Awaiting immutable merged commit CI',
+        evidence_refs: ['pr:1'],
+      }));
+      expect(
+        await h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+      ).toMatchObject({ status: 'running' });
+      expect(
+        h.exec.mock.calls.some((call) =>
+          ['verify', 'distill', 'dispatch-workitems'].includes(call[1][1]!)
+        )
+      ).toBe(false);
+    }
+  );
+  it('keeps existing prerequisite dispatch reachable before implementation exists', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.deps.development = vi.fn(async () => ({
+      status: 'running' as const,
+      reason: 'Prepare canonical implementation WorkItem',
+      evidence_refs: [],
+      allow_task_dispatch: true,
+    }));
+    expect(
+      await h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+    ).toMatchObject({ status: 'running' });
+    expect(h.exec.mock.calls.some((call) => call[1][1] === 'dispatch-workitems')).toBe(true);
+  });
+  it('retains exact runtime approval waiting without dispatching delivery', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.deps.development = vi.fn(async () => ({
+      status: 'pending_approval' as const,
+      reason: 'Publication needs owner approval',
+      evidence_refs: [],
+      approval_request_id: 'publication-approval',
+    }));
+    expect(
+      await h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+    ).toMatchObject({ status: 'pending_approval', approval_request_id: 'publication-approval' });
+    expect(h.exec.mock.calls.some((call) => call[1][1] === 'dispatch-workitems')).toBe(false);
+  });
+  it('withholds the delivery phase gate until immutable development proof is complete', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.setTasks([{ task_id: 'delivery', phase: 'delivery', status: 'completed' }]);
+    h.setState({
+      process_template: { phase_specs: [{ id: 'delivery', exit_gate: { id: 'DELIVERED' } }] },
+    });
+    h.deps.development = vi.fn(async () => ({
+      status: 'running' as const,
+      reason: 'CI pending',
+      evidence_refs: [],
+    }));
+    await h.ports.advanceMission({ ...advanceInput, development: developmentSpec });
+    expect(h.exec.mock.calls.some((call) => call[1][1] === 'gate-pass')).toBe(false);
+    h.deps.development = vi.fn(async () => ({
+      status: 'completed' as const,
+      reason: 'Immutable merge proof verified',
+      evidence_refs: ['merge:verified'],
+    }));
+    await h.ports.advanceMission({ ...advanceInput, development: developmentSpec });
+    expect(
+      h.exec.mock.calls.some((call) => call[1][1] === 'gate-pass' && call[1][3] === 'DELIVERED')
+    ).toBe(true);
+  });
+  it('keeps merged development with pending postmerge CI in the continuation instead of invoking its review phase gate', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.setTasks([{ task_id: 'self_review-code-review', phase: 'self_review', status: 'completed' }]);
+    h.setState({
+      process_template: {
+        phase_specs: [{ id: 'self_review', exit_gate: { id: 'CODE_REVIEW_PASSED' } }],
+      },
+    });
+    h.deps.development = vi.fn(async () => ({
+      status: 'running' as const,
+      reason: 'Known merge is waiting for required postmerge CI',
+      evidence_refs: [`commit:${'a'.repeat(40)}`],
+    }));
+    expect(
+      await h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+    ).toMatchObject({ status: 'running' });
+    expect(h.exec).not.toHaveBeenCalled();
+    expect(h.deps.development).toHaveBeenCalledOnce();
+  });
+  it.each(['pending', 'waiting', 'green', 'raced', 'invalid'] as const)(
+    'keeps TESTS bound to current CI (%s), never a stale closed report',
+    async (mode) => {
+      const h = harness();
+      h.bindDevelopment();
+      h.setTasks([{ task_id: 'test-test-run', phase: 'test', status: 'completed' }]);
+      h.setState({
+        process_template: { phase_specs: [{ id: 'test', exit_gate: { id: 'TESTS_PASSED' } }] },
+      });
+      h.deps.development = vi.fn(async () => ({
+        status: 'running' as const,
+        reason: 'CI reconciliation',
+        evidence_refs: [],
+        ci_verified: mode !== 'pending',
+      }));
+      h.deps.developmentProof = vi.fn(async () =>
+        mode === 'waiting'
+          ? { ok: false, waiting: true, reason: 'Required CI changed' }
+          : { ok: true }
+      );
+      if (mode === 'raced' || mode === 'invalid')
+        h.exec.mockImplementation(async () => ({
+          stdout: '',
+          stderr: `${mode === 'raced' ? '[DEVELOPMENT_CI_WAITING] ' : ''}Machine-only gate checks failed: ${missionInput.mission_id}/TESTS_PASSED`,
+          status: 1,
+        }));
+      if (mode === 'invalid')
+        await expect(
+          h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+        ).rejects.toThrow();
+      else
+        expect(
+          await h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+        ).toMatchObject({ status: 'running' });
+      expect(h.exec.mock.calls.filter((call) => call[1][1] === 'gate-pass')).toHaveLength(
+        mode === 'pending' || mode === 'waiting' ? 0 : 1
+      );
+      expect(h.exec.mock.calls.some((call) => call[1][1] === 'dispatch-workitems')).toBe(false);
+    }
+  );
+  it('does not classify invalid CI proof as ordinary waiting', async () => {
+    const h = harness();
+    h.bindDevelopment();
+    h.setTasks([{ task_id: 'test-test-run', phase: 'test', status: 'completed' }]);
+    h.setState({
+      process_template: { phase_specs: [{ id: 'test', exit_gate: { id: 'TESTS_PASSED' } }] },
+    });
+    h.deps.development = vi.fn(async () => ({
+      status: 'running' as const,
+      reason: 'CI evidence',
+      evidence_refs: [],
+      ci_verified: true,
+    }));
+    h.deps.developmentProof = vi.fn(async () => ({
+      ok: false,
+      reason: 'Development gate scope drift',
+    }));
+    expect(
+      await h.ports.advanceMission({ ...advanceInput, development: developmentSpec })
+    ).toMatchObject({ status: 'blocked' });
+    expect(h.exec).not.toHaveBeenCalled();
+  });
   it('rechecks original authority after a completed child before writing evidence or opening approval', async () => {
     const h = harness({ present: false });
     let revoked = false;

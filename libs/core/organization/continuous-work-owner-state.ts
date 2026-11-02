@@ -1,5 +1,6 @@
 /** Mission-owner execution surface. The dot worker executor cannot run these bindings. */
 import { currentExecutionScope } from '../foundation/execution-scope.js';
+import { assertContinuousDevelopmentApprovalPresentation } from './continuous-development-consent.js';
 import type { DotCharter } from '../dot/dot-charter.js';
 import { assertDotAccountabilityCharter } from '../dot/dot-authority.js';
 import { readDotActionLedgerStrict } from '../dot/dot-action-ledger.js';
@@ -17,7 +18,11 @@ import {
 } from '../workforce/work-coordination.js';
 import type { WorkItem } from '../workforce/work-coordination-types.js';
 import { assertScopedCadenceExecution } from './organization-cadence.js';
-import { parseContinuousWorkPlan, type ContinuousWorkPlan } from './continuous-work-plan.js';
+import {
+  parseContinuousWorkPlan,
+  type ContinuousWorkPlan,
+  type ContinuousWorkMission,
+} from './continuous-work-plan.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFileSnapshot } from '../secure-io.js';
 import { writeJson } from '../foundation/json.js';
@@ -50,6 +55,7 @@ export interface EnsureContinuousMissionInput {
   goal: string;
   success_condition: string;
   mission_type?: string;
+  development?: ContinuousWorkMission['development'];
   prerequisites: string[];
   scope: ContinuousWorkOwnerScope;
   operation_key: string;
@@ -62,6 +68,7 @@ export interface AdvanceContinuousMissionInput {
   scope: ContinuousWorkOwnerScope;
   operation_key: string;
   creation_key: string;
+  development?: ContinuousWorkMission['development'];
   signal?: AbortSignal;
 }
 export interface ContinuousMissionProgress {
@@ -200,6 +207,7 @@ export function authorizeItem(
     approvalUsabilityRefusal(approval, 'dot_dispatch')
   )
     throw new Error('Managed owner requires a current human approval');
+  assertContinuousDevelopmentApprovalPresentation(charter, record, approval, rootDir);
 }
 export function continuousWorkCheckpoint(
   charter: DotCharter,

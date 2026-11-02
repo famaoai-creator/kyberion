@@ -1,0 +1,21 @@
+{
+  "action": "pipeline",
+  "pipeline_id": "vcs-development-preflight",
+  "name": "Prepared WorkItem development preflight",
+  "version": "1.0.0",
+  "description": "Read-only reconciliation of a prepared mission WorkItem PR, its independent review receipt and server CI provenance. Implementation and repairs run through the existing WorkItem executor.",
+  "steps": [
+    {
+      "id": "development-preflight",
+      "role": "sink",
+      "op": "vcs:development_loop",
+      "params": {
+        "cwd": "{{context.cwd}}",
+        "ref": "{{context.pr_ref}}",
+        "work_item_id": "{{context.work_item_id}}",
+        "review_task_id": "{{context.review_task_id}}",
+        "dry_run": true
+      }
+    }
+  ]
+}
