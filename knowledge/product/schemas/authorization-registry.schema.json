@@ -1,0 +1,103 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://kyberion.dev/schemas/authorization-registry.schema.json",
+  "title": "Authorization Registry Overlay",
+  "description": "Non-code operation authorization declarations. Keys in `operations` are exact operation ids; keys in `prefixes` are operation-id prefixes ending in ':'. Data entries may add coverage but can never weaken a code declaration — the code table always wins at lookup.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "operations": {
+      "type": "object",
+      "additionalProperties": false,
+      "propertyNames": { "pattern": "^[a-z0-9_]+(:[a-z0-9_*.-]+)+$" },
+      "patternProperties": {
+        "^[a-z0-9_]+(:[a-z0-9_*.-]+)+$": { "$ref": "#/definitions/entry" }
+      }
+    },
+    "prefixes": {
+      "type": "object",
+      "additionalProperties": false,
+      "propertyNames": { "pattern": "^[a-z0-9_]+(:[a-z0-9_*.-]+)*:$" },
+      "patternProperties": {
+        "^[a-z0-9_]+(:[a-z0-9_*.-]+)*:$": { "$ref": "#/definitions/entry" }
+      }
+    }
+  },
+  "definitions": {
+    "entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["effectClass", "authority"],
+      "properties": {
+        "effectClass": {
+          "type": "string",
+          "enum": [
+            "external_mutation",
+            "external_read",
+            "internal_decision",
+            "knowledge_write",
+            "credential_use",
+            "system_control",
+            "local_only"
+          ]
+        },
+        "authority": {
+          "type": "object",
+          "oneOf": [
+            {
+              "required": ["kind"],
+              "properties": {
+                "kind": { "const": "free" }
+              },
+              "additionalProperties": false
+            },
+            {
+              "required": ["kind", "boundary"],
+              "properties": {
+                "kind": { "const": "admission" },
+                "boundary": { "type": "string", "enum": ["external", "internal"] }
+              },
+              "additionalProperties": false
+            },
+            {
+              "required": ["kind"],
+              "properties": {
+                "kind": { "const": "approval" },
+                "assurance": { "type": "string", "enum": ["A1", "A2", "A3"] },
+                "dualKey": { "type": "boolean" }
+              },
+              "additionalProperties": false
+            },
+            {
+              "required": ["kind", "scope"],
+              "properties": {
+                "kind": { "const": "binding" },
+                "scope": { "type": "string", "enum": ["tenant", "task"] }
+              },
+              "additionalProperties": false
+            }
+          ]
+        },
+        "delegable": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["fields", "reputational_class"],
+          "properties": {
+            "fields": {
+              "type": "array",
+              "minItems": 1,
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "optionalFields": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            },
+            "reputational_class": { "type": "string", "enum": ["A", "B"] }
+          }
+        },
+        "actionClass": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}
