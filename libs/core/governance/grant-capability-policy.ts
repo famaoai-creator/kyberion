@@ -11,6 +11,10 @@
  */
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { pathResolver } from '../path-resolver.js';
+import {
+  setSubjectAxisBridge,
+  type SubjectAxisEntry,
+} from '../foundation/authorization-registry.js';
 
 export interface StandingGrantCapabilityPolicy {
   kind: 'standing_grant';
@@ -97,3 +101,39 @@ export function listGrantReadinessProfiles(): string[] {
 export function resetGrantCapabilityPolicyCache(): void {
   grantCapabilityPolicyCatalog.reset();
 }
+
+// ─── Unified authorization surface (capability axis) ─────────────────────────
+// Registers the capability axis of authorization-registry.ts: every key in
+// grant-capability-policy.json `capabilities` becomes a declared
+// `capability:<id>` subject. Standing grants bind at tenant scope; per-mission
+// and OS-permission capabilities bind at task scope. The entry's grant shape
+// stays in the policy file — the bridge only carries the capability key in
+// `detail`; `getGrantCapabilityPolicy` remains the decision point.
+
+setSubjectAxisBridge('capability', {
+  source: 'overlay',
+  resolve(id) {
+    try {
+      const entry = getGrantCapabilityPolicy(id);
+      if (!entry) return undefined;
+      return {
+        effectClass: 'credential_use',
+        authority: {
+          kind: 'binding',
+          scope: entry.kind === 'standing_grant' ? 'tenant' : 'task',
+        },
+        detail: { kind: 'grant-capability', capability: id },
+      } satisfies SubjectAxisEntry;
+    } catch {
+      // An unreadable policy resolves as undeclared → the tenant-binding fail-safe.
+      return undefined;
+    }
+  },
+  keys() {
+    try {
+      return listGrantCapabilities();
+    } catch {
+      return [];
+    }
+  },
+});

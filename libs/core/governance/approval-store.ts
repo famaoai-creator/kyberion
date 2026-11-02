@@ -216,6 +216,10 @@ export interface ApprovalRequestRecord extends ApprovalRequestDraft {
   kind: 'channel-approval' | 'secret_mutation' | 'mission_gate';
   storageChannel: string;
   channel: string;
+  /** Unified authorization subject this approval was created for, when the
+   * caller supplied one (registry key — `intent:`/`capability:`/`verb:`
+   * prefixed or a bare operation id). */
+  subject?: string;
   threadTs: string;
   correlationId: string;
   requestedBy: string;
@@ -637,6 +641,7 @@ import {
 } from './approval-request-create.js';
 export {
   createApprovalRequest,
+  admitInternalDecision,
   approvalEventLogicalPath,
   projectApprovalWorkerEvent,
   approvalWorkerEventSource,

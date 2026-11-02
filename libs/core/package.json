@@ -1636,6 +1636,10 @@
       "types": "./dist/foundation/approval-domains.d.ts",
       "default": "./dist/foundation/approval-domains.js"
     },
+    "./foundation/authorization-registry": {
+      "types": "./dist/foundation/authorization-registry.d.ts",
+      "default": "./dist/foundation/authorization-registry.js"
+    },
     "./foundation/command-credential-policy": {
       "types": "./dist/foundation/command-credential-policy.d.ts",
       "default": "./dist/foundation/command-credential-policy.js"
@@ -1956,9 +1960,17 @@
       "types": "./dist/governance/mandate-shadow.d.ts",
       "default": "./dist/governance/mandate-shadow.js"
     },
+    "./governance/authorization-overlay": {
+      "types": "./dist/governance/authorization-overlay.d.ts",
+      "default": "./dist/governance/authorization-overlay.js"
+    },
     "./governance/operations-halt": {
       "types": "./dist/governance/operations-halt.d.ts",
       "default": "./dist/governance/operations-halt.js"
+    },
+    "./governance/operation-protection": {
+      "types": "./dist/governance/operation-protection.d.ts",
+      "default": "./dist/governance/operation-protection.js"
     },
     "./governance/org-budget-governor": {
       "types": "./dist/governance/org-budget-governor.d.ts",
