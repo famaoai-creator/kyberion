@@ -234,6 +234,26 @@ A gate that times out on busy runs:
 
 ### VCS publication across Git worktrees
 
+Publication provenance must inspect every new reachable commit, including each
+parent diff of merge commits. Use the closed hardened history query with explicit
+`--diff-merges=separate`; a current-tree scan or Git's default merge display can
+miss a private artifact introduced only during merge resolution, even if a later
+commit deletes it. Keep the verified destination baseline, bounded output,
+replacement-object suppression and fail-closed classification. Enforce this with
+real divergent-parent merge fixtures for personal, confidential and public paths
+in `libs/core/vcs/git-publication-source.integration.test.ts`, plus the closed
+probe grammar tests in `libs/core/shell/git-probe-hardening.test.ts`.
+
+Development continuation must surface blocked or approval-waiting prerequisites
+instead of reporting an idle turn as progress. Let the canonical dispatcher
+reconcile approvals first, then inspect freshly read WorkItems in the same scope
+and implementation dependency chain. Return the exact approval request or blocked
+item evidence without consuming a repair attempt or publishing. Keep unrelated
+missions and scopes out of this result. Regression tests in
+`libs/core/mission/mission-development-continuation.test.ts` must cover pending,
+blocked and dispatch-resolved waits so that the diagnostic fix does not prevent
+approved work from resuming.
+
 PR readiness and Knowledge checks use the source worktree. Standalone publication
 uses the primary checkout's current approval store, installed identity, charters
 and consumption ledger only after checking Git common-directory equality. Keep
