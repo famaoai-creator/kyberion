@@ -130,11 +130,24 @@ export async function handleAction(input: ProcessAction) {
             stdio: ['pipe', 'pipe', 'pipe'],
           },
         });
+        // 'spawn'/'error' settle on the next tick; report the real outcome
+        // rather than claiming 'spawned' for a process that never started.
+        const spawnError = await new Promise<Error | null>((resolve) => {
+          managed.child.once('error', resolve);
+          managed.child.once('spawn', () => resolve(null));
+        });
+        if (spawnError || managed.child.pid === undefined) {
+          return {
+            status: 'spawn_failed',
+            resourceId: params.resourceId,
+            reason: spawnError?.message || 'process did not start',
+          };
+        }
         return {
           status: 'spawned',
           resourceId: managed.resourceId,
           pid: managed.child.pid,
-          pidStartMarker: managed.child.pid ? processStartMarker(managed.child.pid) : undefined,
+          pidStartMarker: processStartMarker(managed.child.pid),
         };
       }, buildRetryOptions());
     }
