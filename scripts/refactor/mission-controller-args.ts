@@ -322,6 +322,7 @@ export function resolveMissionTicketDispatchOptionsFromArgv(
 export function resolveMissionWorkItemDispatchOptionsFromArgv(
   argv: string[] = currentProcessArgv()
 ): {
+  itemIds?: string[];
   mode: 'auto' | 'agent' | 'subagent';
   executionSurface?: MissionExecutionSurface;
   reviewExecutionSurface?: MissionExecutionSurface;
@@ -345,8 +346,19 @@ export function resolveMissionWorkItemDispatchOptionsFromArgv(
   const sources = getAllowedCsvOption('--dispatch-sources', argv, WORK_ITEM_SOURCES, ['local']);
   const finalStatus = getAllowedOption('--dispatch-final-status', argv, FINAL_STATUSES) || 'review';
   const rounds = getOptionalInteger('--dispatch-rounds', argv);
+  const itemIdsRaw = getOptionValue('--dispatch-item-ids', argv);
+  const itemIds = itemIdsRaw?.split(',');
+  if (
+    itemIds &&
+    (!itemIds.length ||
+      itemIds.length > 64 ||
+      itemIds.some((id) => !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(id)) ||
+      new Set(itemIds).size !== itemIds.length)
+  )
+    throw new Error('--dispatch-item-ids requires 1..64 distinct canonical WorkItem IDs');
 
   return {
+    ...(itemIds ? { itemIds } : {}),
     mode,
     ...(executionSurface ? { executionSurface } : {}),
     ...(reviewExecutionSurface ? { reviewExecutionSurface } : {}),

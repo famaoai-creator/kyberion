@@ -1,7 +1,7 @@
 ---
 title: 外部操作の接続と権限委任オンボーディング
 tags: [onboarding, approval, delegation, github, browser]
-last_updated: 2026-10-22
+last_updated: 2026-11-02
 kind: runbook
 scope: repository
 authority: reference
@@ -76,9 +76,23 @@ suspended / retired identity の復活には使えない。個別の外部送信
 
 ## 実行と制限
 
-委任は承認された対象・操作・期限と現在の Charter、停止状態、実行用 ID を毎回確認する。現在の対象は PR 作成と限定したブラウザ移動であり、任意の GitHub 更新やクリック・送信・evaluate の包括委任ではない。元からある金額・データ・リスク制限を引き上げない。取消しは実行中の外部要求を巻き戻さず、次の admission から効く。
+委任は承認された対象・操作・期限と現在の Charter、停止状態、実行用 ID を毎回確認する。対象は repository に限定した PR 作成、branch に限定した push / merge、および限定したブラウザ移動。クリック・送信・evaluate の包括委任にはしない。元からある金額・データ・リスク制限を暗黙に引き上げない。取消しは実行中の外部要求を巻き戻さず、次の admission から効く。
 
-PR 本文をファイルから渡す場合、public と明示された知識または runtime partition に置いたものだけが自律委任の対象となる。例: `active/shared/tmp/public/shared/<job>/pr-body.md`。個人・機密データや、分類不明の scratch ファイルは個別承認を必要とする。本文ファイルを移動するだけで公開可と判断せず、内容の公開可否を確認する。
+PR 本文をファイルから渡す場合、実ファイルの知識/runtime partition と実行scopeの両方を照合する。公開本文の例は `active/shared/tmp/public/shared/<job>/pr-body.md`。personal は本人のperson scope、confidential は実tenantのorganization scopeとし、いずれも明示したcharterのread token、実行時のread ceiling、完全一致の `visibility: "private"` grant、実際に非公開と確認したrepositoryが必要。shared/group/system領域と分類不明のscratchは自律委任の対象にしない。本文ファイルの移動やpublicラベルで実行scopeを格下げできない。
+
+### 開発を初回同意で委任する
+
+VCS grantはPR作成・push・mergeの操作範囲を定める。継続した実装・修復・レビューの起動は、別途承認されたmanaged work planを既存continuous ownerへ渡す。[継続運営の設定手順](continuous-operations-playbook.md)と[実装計画](../../../docs/developer/CONTINUOUS_DEVELOPMENT_IMPLEMENTATION_PLAN_2026-11-02.ja.md)を参照する。新規plan/alignmentの本人承認、providerへの情報送信制約、secret登録・rotationの専用承認は維持する。
+
+reasoning providerのtask credential allocationと、VCSの既存`gh`認証／登録済みtokenは別の接続である。VCSの操作委任だけで、すべてのtokenが新たにTaskCredentialBindingへ移行したとは解釈しない。tokenをplan・PR本文・checkpointへ保存しない。
+
+設定画面の「リポジトリ開発を委任」は、PR作成・専用候補branchへのpush・統合先branchへのmergeを一つのplanにする。準備済み開発ループが対応する候補 `agent/kyberion-development` と統合先 `main` に固定し、統合先への直接pushは含まない。他のbranchを委任する場合は個別のpush / merge設定を使うが、この開発ループの対象にはならない。同意済み範囲内では操作ごとの承認を繰り返さない。
+
+`onboarding apply` とwizardは既存の `onboarding/delegation-input.json` を案内する。grant-modeの同意は、provisioned NHIの有効化も同時に行う。外部権限を付けず有効化だけ行う場合は従来のactivation planを選べる。private repository向けのCLIテンプレートを実際のvisibility照会で生成する場合は `onboarding apply --verify-repository-visibility` を明示する。既に確認用ファイルがある場合は上書きせず、所有者が変更を確認する。
+
+`data_tier` は省略時に既存の設定を維持する。明示する場合は `{"read":["public","personal"],"write":[]}`（person）または `confidential:<tenant_slug>`（organization）のように対象を指定する。取消しで権限を拡大できず、未知token・他tenant・個人と組織の取り違えは拒否する。readは情報を使う権限、writeは知識への書込み権限であり、VCSのpush/merge権限は別のgrantで確認する。
+
+準備済みWorkItemの公開確認は `vcs:development_loop` が担当する。独立review receiptのmanifestにはrepository・head/base・branch・WorkItem・CI policy digestを固定する。既定はdry-run。CI待機、修復要求、review不足、merge queue、merge後CIを別の結果として返し、実装と修復は既存のmission executorへ戻す。実行用モデルや別の承認storeを新設する入口ではない。
 
 ブラウザの origin 制限は遷移先だけでなく redirect とネットワーク要求にも適用する。既存の CDP 接続や制約のない再利用セッションを、この限定委任で自律操作してはならない。接続設定と実行準備状態は画面で別々に確認する。
 

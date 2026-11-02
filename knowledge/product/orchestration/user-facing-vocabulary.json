@@ -13589,9 +13589,79 @@
         "qps-ploc": "⟦Ƈőññėƈŧïñɠ ȧñ ȧƈƈőůñŧ ḓőėş ñőŧ ȧůŧħőřïẑė ȧƈŧïőñş. Řėṽïėẇ ȧůŧħőřïŧẏ şėṗȧřȧŧėŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
       },
       "authority.bounds": {
-        "en": "Only public data and the exact reviewed repository or origin are delegated. Clicking, evaluating scripts and merging require individual review.",
-        "ja": "委任するのは公開データと確認済みのリポジトリまたはオリジンに限ります。クリック、スクリプト評価、マージは個別の確認が必要です。",
-        "qps-ploc": "⟦Őñŀẏ ṗůƀŀïƈ ḓȧŧȧ ȧñḓ ŧħė ėẋȧƈŧ řėṽïėẇėḓ řėṗőşïŧőřẏ őř őřïɠïñ ȧřė ḓėŀėɠȧŧėḓ. Ƈŀïƈķïñɠ, ėṽȧŀůȧŧïñɠ şƈřïṗŧş ȧñḓ ɱėřɠïñɠ řėɋůïřė ïñḓïṽïḓůȧŀ řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ⟧"
+        "en": "Delegate exact targets, branches and data tiers. Merging can be delegated within those limits. Browser clicks and script evaluation still require separate review.",
+        "ja": "対象・ブランチ・データ階層を指定して委任します。条件内のマージも委任できます。ブラウザのクリックやスクリプト評価は別の確認が必要です。",
+        "qps-ploc": "⟦Ḓėŀėɠȧŧė ėẋȧƈŧ ŧȧřɠėŧş, ƀřȧñƈħėş ȧñḓ ḓȧŧȧ ŧïėřş. Ɱėřɠïñɠ ƈȧñ ƀė ḓėŀėɠȧŧėḓ ẇïŧħïñ ŧħőşė ŀïɱïŧş. Ƀřőẇşėř ƈŀïƈķş ȧñḓ şƈřïṗŧ ėṽȧŀůȧŧïőñ şŧïŀŀ řėɋůïřė şėṗȧřȧŧė řėṽïėẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ⟧"
+      },
+      "authority.development": {
+        "en": "Delegate repository development",
+        "ja": "リポジトリ開発を委任",
+        "qps-ploc": "⟦Ḓėŀėɠȧŧė řėṗőşïŧőřẏ ḓėṽėŀőṗɱėñŧ ŀőřėɱ ïṗşů⟧"
+      },
+      "authority.development_bounds": {
+        "en": "Review one consent for pull requests, pushing to the candidate branch and merging into the base branch. Direct pushes to the base are not included.",
+        "ja": "PR作成・候補ブランチへのpush・統合先へのマージを一度に確認します。統合先への直接pushは含みません。",
+        "qps-ploc": "⟦Řėṽïėẇ őñė ƈőñşėñŧ ƒőř ṗůŀŀ řėɋůėşŧş, ṗůşħïñɠ ŧő ŧħė ƈȧñḓïḓȧŧė ƀřȧñƈħ ȧñḓ ɱėřɠïñɠ ïñŧő ŧħė ƀȧşė ƀřȧñƈħ. Ḓïřėƈŧ ṗůşħėş ŧő ŧħė ƀȧşė ȧřė ñőŧ ïñƈŀůḓėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "authority.candidate_branch": {
+        "en": "Candidate branch",
+        "ja": "候補ブランチ",
+        "qps-ploc": "⟦Ƈȧñḓïḓȧŧė ƀřȧñƈħ ŀőřėɱ⟧"
+      },
+      "authority.merge_base": {
+        "en": "Merge destination branch",
+        "ja": "マージ先ブランチ",
+        "qps-ploc": "⟦Ɱėřɠė ḓėşŧïñȧŧïőñ ƀřȧñƈħ ŀőřėɱ ï⟧"
+      },
+      "authority.private_repository": {
+        "en": "Require a verified private repository",
+        "ja": "非公開と確認できるリポジトリに限定",
+        "qps-ploc": "⟦Řėɋůïřė ȧ ṽėřïƒïėḓ ṗřïṽȧŧė řėṗőşïŧőřẏ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "authority.tier_edit": {
+        "en": "Set delegated data tiers",
+        "ja": "委任するデータ階層を設定",
+        "qps-ploc": "⟦Şėŧ ḓėŀėɠȧŧėḓ ḓȧŧȧ ŧïėřş ŀőřėɱ ï⟧"
+      },
+      "authority.tier_scope": {
+        "en": "Delegated data",
+        "ja": "委任するデータ",
+        "qps-ploc": "⟦Ḓėŀėɠȧŧėḓ ḓȧŧȧ ŀőřė⟧"
+      },
+      "authority.tier_read": {
+        "en": "Read",
+        "ja": "読み取り",
+        "qps-ploc": "⟦Řėȧḓ ŀőř⟧"
+      },
+      "authority.tier_write": {
+        "en": "Write",
+        "ja": "書き込み",
+        "qps-ploc": "⟦Ẇřïŧė ŀőř⟧"
+      },
+      "authority.tier_none": {
+        "en": "None",
+        "ja": "なし",
+        "qps-ploc": "⟦Ñőñė ŀőř⟧"
+      },
+      "authority.tier_public": {
+        "en": "Public",
+        "ja": "公開情報",
+        "qps-ploc": "⟦Ṗůƀŀïƈ ŀőř⟧"
+      },
+      "authority.tier_personal": {
+        "en": "Personal",
+        "ja": "本人の個人情報",
+        "qps-ploc": "⟦Ṗėřşőñȧŀ ŀőř⟧"
+      },
+      "authority.tier_confidential": {
+        "en": "This tenant's confidential data",
+        "ja": "このテナントの機密情報",
+        "qps-ploc": "⟦Ŧħïş ŧėñȧñŧ'ş ƈőñƒïḓėñŧïȧŀ ḓȧŧȧ ŀőřėɱ ïṗşů⟧"
+      },
+      "authority.tier_bounds": {
+        "en": "Nonpublic data requires a verified private repository in the approved accountable scope. Browser navigation remains public-only.",
+        "ja": "非公開データには、承認した責任範囲内の非公開リポジトリが必要です。ブラウザの閲覧は公開情報に限ります。",
+        "qps-ploc": "⟦Ñőñṗůƀŀïƈ ḓȧŧȧ řėɋůïřėş ȧ ṽėřïƒïėḓ ṗřïṽȧŧė řėṗőşïŧőřẏ ïñ ŧħė ȧṗṗřőṽėḓ ȧƈƈőůñŧȧƀŀė şƈőṗė. Ƀřőẇşėř ñȧṽïɠȧŧïőñ řėɱȧïñş ṗůƀŀïƈ-őñŀẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗï⟧"
       },
       "authority.scope": {
         "en": "Accountable scope",
@@ -16307,6 +16377,11 @@
         "en": "Nothing needs your decision right now.",
         "ja": "ただいまご判断いただく事項はございません。",
         "qps-ploc": "⟦Ñőŧħïñɠ ñėėḓş ẏőůř ḓėƈïşïőñ řïɠħŧ ñőẇ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "queue.review_scope": {
+        "ja": "委任する範囲と根拠をすべて確認",
+        "en": "Review the full delegated scope and evidence",
+        "qps-ploc": "⟦Řėṽïėẇ ŧħė ƒůŀŀ ḓėŀėɠȧŧėḓ şƈőṗė ȧñḓ ėṽïḓėñƈė ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
       "queue.type.approval": {
         "en": "Approval",

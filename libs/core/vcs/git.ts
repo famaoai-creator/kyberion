@@ -1,6 +1,18 @@
 import { safeExecResult, type SafeExecOptions } from '../secure-io.js';
 import { governVcsCommand } from './external-vcs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { assertNotFlagLike } from './git-arguments.js';
+export { assertNotFlagLike } from './git-arguments.js';
+import {
+  readGitPublicationSource,
+  readGitRemotePublicationHead,
+  type GitPublicationSource,
+} from './git-publication-source.js';
+import { ghRepositoryVisibility } from './github.js';
+import { normalizeRepositoryTarget } from '../governance/external-operation-target.js';
+import { currentScopeEnvelope } from '../scope-envelope.js';
+import { resolveScopeContext } from '../scope-context.js';
+import { assertVcsCwdScope } from './cwd-scope.js';
 
 /**
  * Typed git verbs over the governed safeExecResult boundary — the single
@@ -33,6 +45,7 @@ export function gitRun(
   cwd: string,
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(cwd);
   // Generic execution is local-only. Git global flags, aliases and additional
   // network verbs must not smuggle publication around the canonical boundary.
   const localVerbs = new Set([
@@ -55,13 +68,6 @@ export function gitRun(
     throw new Error('[VCS_TYPED_VERB_REQUIRED] Use the typed external git verb');
   }
   return run('git', args, { cwd });
-}
-
-/** Reject a value that would land in an argv position but parses as a flag. */
-export function assertNotFlagLike(value: string, label: string): void {
-  if (!value.trim() || value.trim().startsWith('-') || /\s/u.test(value.trim())) {
-    throw new Error(`[VCS_GIT_INVALID] ${label} must be a non-empty, non-flag value`);
-  }
 }
 
 export function gitStatus(
@@ -91,7 +97,10 @@ export function gitDiff(
   if (options.cached) args.push('--cached');
   if (options.nameOnly) args.push('--name-only');
   if (options.diffFilter) args.push(`--diff-filter=${options.diffFilter}`);
-  if (options.ref?.trim()) args.push(options.ref.trim());
+  if (options.ref?.trim()) {
+    assertNotFlagLike(options.ref, 'diff ref');
+    args.push(options.ref.trim());
+  }
   return gitRun(args, cwd, run);
 }
 
@@ -185,6 +194,7 @@ export function gitPush(
   } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(cwd);
   if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
   if (options.ref !== undefined) assertNotFlagLike(options.ref, 'ref');
   const remote = options.remote?.trim() || 'origin';
@@ -219,12 +229,56 @@ export function gitPush(
   const bound = snapshot();
   if (!/^[a-f0-9]{40,64}$/i.test(bound.head))
     throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] Invalid source commit');
+  const remoteHead = readGitRemotePublicationHead(cwd, bound.url, run);
+  const sourceFacts: GitPublicationSource = remoteHead.verified
+    ? readGitPublicationSource(cwd, bound.head, run, remoteHead.head)
+    : { publication_source_tier: 'protected_or_unknown' as const };
+  const scope = currentScopeEnvelope()?.identity ?? resolveScopeContext();
+  const visibility = () => {
+    if (scope.tier === 'public' && sourceFacts.publication_source_tier === 'public')
+      return 'unknown';
+    const normalized = normalizeRepositoryTarget(bound.url);
+    if (!normalized) return 'unknown';
+    const url = new URL(normalized);
+    const slug = url.pathname.replace(/^\//u, '');
+    if (!/^[\w.-]+\/[\w.-]+$/u.test(slug)) return 'unknown';
+    return ghRepositoryVisibility({ cwd, repository: { host: url.host, slug } }, run);
+  };
+  const repositoryVisibility = visibility();
+  const envelope = currentScopeEnvelope();
+  const sourceTier = sourceFacts.publication_source_tier;
+  const ranks = { public: 1, confidential: 2, personal: 3 } as const;
+  if (
+    sourceFacts.publication_source_scope_conflict ||
+    (sourceFacts.publication_source_tenant &&
+      sourceFacts.publication_source_tenant !== scope.tenant_slug) ||
+    (sourceTier !== 'protected_or_unknown' &&
+      (ranks[sourceTier] > ranks[scope.tier] ||
+        (envelope && !envelope.policy.read_tiers.includes(sourceTier)))) ||
+    ((scope.tier !== 'public' || sourceTier === 'personal' || sourceTier === 'confidential') &&
+      repositoryVisibility !== 'private')
+  )
+    throw new Error(
+      '[VCS_SOURCE_SCOPE_DENIED] Push source and destination violate the active scope'
+    );
   return governVcsCommand(
     'vcs:push',
-    bound,
+    {
+      ...bound,
+      ...sourceFacts,
+      remote_history: remoteHead,
+      repository_visibility: repositoryVisibility,
+    },
     () => {
       if (computeApprovalPayloadHash(snapshot()) !== computeApprovalPayloadHash(bound))
         throw new Error('[VCS_SNAPSHOT_CHANGED] Publication target or source changed before send');
+      if (
+        computeApprovalPayloadHash(readGitRemotePublicationHead(cwd, bound.url, run)) !==
+        computeApprovalPayloadHash(remoteHead)
+      )
+        throw new Error('[VCS_SNAPSHOT_CHANGED] Remote history changed before send');
+      if (visibility() !== repositoryVisibility)
+        throw new Error('[VCS_SNAPSHOT_CHANGED] Repository visibility changed before send');
       const result = run('git', ['push', '--', bound.url, `${bound.head}:${destination}`], { cwd });
       if (result.status === 0 && !result.error && options.setUpstream) {
         for (const args of [
@@ -246,6 +300,7 @@ export function gitFetch(
   options: { remote?: string; ref?: string } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(cwd);
   const remote = options.remote?.trim() || 'origin';
   const ref = options.ref?.trim();
   if (remote.startsWith('--')) {
@@ -273,6 +328,7 @@ export function gitPull(
   options: { remote?: string; ref?: string; ffOnly?: boolean } = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(cwd);
   const remote = options.remote?.trim() || 'origin';
   const ref = options.ref?.trim();
   if (remote.startsWith('--')) {

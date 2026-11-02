@@ -60,7 +60,7 @@ describe('onboarding authority HTTP owner contract with actual stores', () => {
     );
     try {
       const id = await create();
-      const record = f.run(() => f.approvals.loadApprovalRequest('onboarding-authority', id)!);
+      const record = f.personal(() => f.approvals.loadApprovalRequest('onboarding-authority', id)!);
       expect(record.requestedBy).toBe(f.installedId);
       expect(JSON.parse(record.sourceText!).initiated_by).toBe(viewer.principal!.actor.id);
       const status = await posted({ action: 'status', scope_kind: 'person', request_id: id });

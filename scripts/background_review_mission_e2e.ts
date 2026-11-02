@@ -22,7 +22,7 @@ import { resolveSurfaceApprovalReply } from '@agent/core/surface/surface-approva
 import { runSurfaceMessageConversation } from '@agent/core/surface/surface-runtime-orchestrator';
 import {
   approvalRequestLogicalPathAt,
-  asTenantApprovalStore,
+  removeApprovalFileAt,
   listApprovalRequests,
   locateApprovalRequest,
   type ApprovalRequestRecord,
@@ -264,15 +264,11 @@ async function main(argv: string[]): Promise<void> {
       withExecutionContext('mission_controller', () => {
         const located = locateApprovalRequest('background-review', id);
         if (!located) return;
-        const remove = () =>
-          safeRmSync(
-            pathResolver.rootResolve(
-              approvalRequestLogicalPathAt(located.partition, located.storageChannel, id)
-            ),
-            { force: true }
-          );
-        if (located.partition.kind === 'system') remove();
-        else asTenantApprovalStore(located.partition.tenant_slug, remove);
+        removeApprovalFileAt(
+          'mission_controller',
+          located.partition,
+          approvalRequestLogicalPathAt(located.partition, located.storageChannel, id)
+        );
       });
     }
     if (notificationId) {

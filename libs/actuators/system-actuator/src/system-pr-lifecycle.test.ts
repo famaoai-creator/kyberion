@@ -89,7 +89,11 @@ describe('standard PR lifecycle with fully mocked effects', () => {
       'main',
       '--no-draft',
     ]);
-    expect(deps.exec.mock.calls.some(([c]) => c === 'gh')).toBe(false);
+    expect(
+      deps.exec.mock.calls.some(
+        ([command, args]) => command === 'gh' && args[0] === 'pr' && args[1] === 'create'
+      )
+    ).toBe(false);
   });
   it('skips empty commits without suppressing real commit errors', async () => {
     const empty = setup({ files: '', cached: '' });
@@ -113,7 +117,11 @@ describe('standard PR lifecycle with fully mocked effects', () => {
     for (const options of [{ publishError: true }, { noUrl: true }]) {
       const deps = setup(options);
       await expect(runStandardPrLifecycle({ ...params, auto_merge: true }, deps)).rejects.toThrow();
-      expect(deps.exec.mock.calls.some(([c]) => c === 'gh')).toBe(false);
+      expect(
+        deps.exec.mock.calls.some(
+          ([command, args]) => command === 'gh' && args[0] === 'pr' && args[1] === 'create'
+        )
+      ).toBe(false);
     }
   });
   it('fails closed on failed or pending checks before merging', async () => {

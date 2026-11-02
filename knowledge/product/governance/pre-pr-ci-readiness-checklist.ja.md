@@ -19,7 +19,7 @@ tags:
   ]
 importance: 9
 author: Codex
-last_updated: 2026-10-22
+last_updated: 2026-11-02
 role_affinity: [ecosystem_architect, solution_architect]
 applies_to: [pull_request, github_actions, origin/main]
 status: active
@@ -81,8 +81,8 @@ gh pr checks <number> --watch
 - **`--body-file` を必ず渡す**。省略すると `gh --fill` で commit 一覧が本文になり、テンプレートの
   Test plan やチェック欄が抜ける。**パスは checkout 内で、かつ `public` と明示された partition に置く**
   — `active/shared/tmp/public/shared/<job>/pr-body.md`（推奨）または `active/shared/artifacts/public/…`
-  / `knowledge/public/…`。`body_source_tier` はファイルの置き場所で判定され、plain な
-  `active/shared/tmp/` やその他の floor では `protected_or_unknown` となり、charter の
+  / `knowledge/public/…`。`body_source_tier` はファイルの置き場所で判定され、
+  分類不明の `active/shared/tmp/` やその他の floor では `protected_or_unknown` となり、charter の
   `vcs:pr_create` grant への委任が不可能になって必ず人間承認が要る（
   [onboarding-action-authority.md](../orchestration/onboarding-action-authority.md) 参照）。内容が
   公開可能であることの確認は置き場所とは別に必ず行う。`/tmp/body.md` のような checkout 外の
@@ -107,7 +107,7 @@ gh pr checks <number> --watch
   （その時点で `gh pr create` が走る）。
   **charter の `vcs:pr_create` grant に委任して人間承認を省略するには3条件が必要**:
   (a) grant が charter の `external_operations` に admission 済みであること、
-  (b) `--body-file` が public partition 上にあり `body_source_tier: "public"` であること、
+  (b) `--body-file` が public partition 上にあること。非公開本文の場合は、本人person／同一tenant organization、明示したsource-tier read grant・runtime ceiling、完全一致のprivate destination grant、実repositoryのprivate検証が必要（[tier条件](../orchestration/onboarding-action-authority.md#実行と制限)）、
   (c) 呼び出しセッションが委任先 NHI として admission されていること — `pnpm onboarding nhi-session`
   系の承認で発行される env pair（`KYBERION_NHI_ACTOR` 等）を付けて実行する。slug を env に書くだけでは
   委任されない（セッション証明が要る）。

@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
       'tenant_slug',
       'grants',
       'delegated_decisions',
+      'data_tier',
       'expires_at',
       'mode',
       'renew_existing',

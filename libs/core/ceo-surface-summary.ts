@@ -43,6 +43,8 @@ export interface CeoApprovalItem {
   /** HA-06: digest of what this item shows; the decision sends it back. */
   presented_digest?: string;
   /** HA-07: the weakest decider proof a human-only request accepts (A3 = passkey). */
+  review_scope?: string;
+  evidence?: Array<{ label: string; ref: string }>;
   min_assurance?: 'A0' | 'A1' | 'A2' | 'A3';
 }
 
@@ -210,6 +212,9 @@ function toApprovalItem(
 ): CeoApprovalItem {
   const record = approval as Record<string, any>;
   return {
+    ...(approval.decisionCard?.evidence?.length
+      ? { evidence: approval.decisionCard.evidence.map(({ label, ref }) => ({ label, ref })) }
+      : {}),
     id: String(record.id || ''),
     channel: String(record.channel || 'chronos'),
     storage_channel: String(record.storageChannel || record.channel || 'chronos'),
@@ -345,9 +350,14 @@ export function buildCeoSurfaceSummary(
   input: {
     scope?: OperatorHomeScopeFilter;
     limit?: number;
+    approvalSnapshot?: OperatorHomeSummary['pendingApprovals'];
   } = {}
 ): CeoSurfaceSummary {
-  const home = collectOperatorHomeSummary({ limit: input.limit || 20, scope: input.scope });
+  const home = collectOperatorHomeSummary({
+    limit: input.limit || 20,
+    scope: input.scope,
+    approvalSnapshot: input.approvalSnapshot,
+  });
   let notifications: Array<Record<string, any>> = [];
   try {
     notifications = listSurfaceNotificationsAcrossChannels().filter((notification) =>

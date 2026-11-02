@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+// Transport/argument unit fixtures use synthetic cwd values; real cwd fences
+// are exercised by cwd-scope tests and the private source integration fixture.
+vi.mock('./cwd-scope.js', () => ({ assertVcsCwdScope: vi.fn() }));
 import { randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { safeMkdir, safeWriteFile, safeRmSync } from '../secure-io.js';
@@ -29,6 +32,7 @@ import {
 import {
   gitCheckout,
   gitDiffChangedPaths,
+  gitDiff,
   gitPull,
   gitPush,
   gitWorktree,
@@ -51,6 +55,13 @@ function stubRunner(
 const checksJson = (checks: PrCheckEntry[]) => JSON.stringify(checks);
 
 describe('libs/core/vcs', () => {
+  it('does not turn a read-only diff ref into an output-file write flag', () => {
+    const run = vi.fn(() => ({ stdout: '', stderr: '', status: 0 }));
+    expect(() => gitDiff('/fixture', { ref: '--output=private-file' }, run)).toThrow(
+      'VCS_GIT_INVALID'
+    );
+    expect(run).not.toHaveBeenCalled();
+  });
   it('ghPrChecks maps buckets to a verdict (pending wins over pass)', () => {
     const { run } = stubRunner([
       {

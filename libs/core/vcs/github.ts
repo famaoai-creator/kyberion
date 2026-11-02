@@ -6,21 +6,77 @@ import {
   type SafeExecOptions,
 } from '../secure-io.js';
 import { toRepoRelative } from '../path-resolver.js';
-import { storageFloorTier } from '../storage-layout.js';
+import { classifyStorageFloorPath } from '../storage-layout.js';
+import { isValidTenantSlug } from '../entity-scope.js';
+import { isTenantOwnedPolicyPath } from '../tier-guard.js';
 import { governVcsCommand } from './external-vcs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { assertNotFlagLike, type VcsCommandResult, type VcsCommandRunner } from './git.js';
+import type { VcsCommandResult, VcsCommandRunner } from './git.js';
+import { assertNotFlagLike } from './git-arguments.js';
 import { redactActiveSecretsForHostLog } from '../secret/secret-guard.js';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { assertVcsCwdScope } from './cwd-scope.js';
 
-export type PrBodySourceTier = 'public' | 'protected_or_unknown' | 'inline';
+export type PrBodySourceTier =
+  | 'public'
+  | 'protected_or_unknown'
+  | 'inline'
+  | { tier: 'personal' }
+  | { tier: 'confidential'; tenantSlug: string };
 const publicationBodySource = new AsyncLocalStorage<PrBodySourceTier>();
+
+/** Classify only provable canonical sources. Arbitrary repo files are not public evidence. */
+export function prPublicationBodySourceForPath(bodyFile: string | undefined): PrBodySourceTier {
+  if (!bodyFile) return 'inline';
+  const relative = toRepoRelative(assertSafeRepositoryPath(bodyFile)).replace(/\\/gu, '/');
+  return prPublicationSourceForRelativePath(relative);
+}
+
+/** Classify names in immutable git history, whose files may have been deleted.
+ * This resolves scope metadata only; it never grants access to file contents. */
+export function prPublicationSourceForRelativePath(relative: string): PrBodySourceTier {
+  if (
+    relative.startsWith('/') ||
+    relative.includes('\\') ||
+    relative.split('/').some((part) => part === '..' || part === '.')
+  )
+    return 'protected_or_unknown';
+  if (relative.startsWith('knowledge/public/')) return 'public';
+  if (relative.startsWith('knowledge/personal/')) return { tier: 'personal' };
+  const confidential = relative.match(/^knowledge\/confidential\/([^/]+)\/.+/u);
+  if (confidential && isTenantOwnedPolicyPath(relative, confidential[1]))
+    return { tier: 'confidential', tenantSlug: confidential[1] };
+  const partition = classifyStorageFloorPath(relative)?.partition;
+  if (partition?.kind !== 'tier') return 'protected_or_unknown';
+  if (partition.tier === 'public' && !partition.tenant) return 'public';
+  if (partition.tier === 'personal' && !partition.tenant) return { tier: 'personal' };
+  if (
+    partition.tier === 'confidential' &&
+    partition.tenant &&
+    isTenantOwnedPolicyPath(relative, partition.tenant)
+  )
+    return { tier: 'confidential', tenantSlug: partition.tenant };
+  return 'protected_or_unknown';
+}
 
 /** Trusted worktree host preserves the provenance of a frozen inline body.
  * Moving bytes over stdin must never turn a protected file into public text. */
 export function withPrPublicationBodySource<T>(tier: PrBodySourceTier, action: () => T): T {
-  return publicationBodySource.run(tier, action);
+  const valid =
+    typeof tier === 'string'
+      ? ['public', 'inline', 'protected_or_unknown'].includes(tier)
+      : tier &&
+        ((tier.tier === 'personal' && Object.keys(tier).length === 1) ||
+          (tier.tier === 'confidential' &&
+            Object.keys(tier).length === 2 &&
+            isValidTenantSlug(tier.tenantSlug)));
+  if (!valid)
+    throw new Error('[PR_BODY_PROVENANCE_INVALID] Trusted source classification required');
+  return publicationBodySource.run(
+    typeof tier === 'object' ? Object.freeze({ ...tier }) : tier,
+    action
+  );
 }
 
 export interface GhDiagnostic {
@@ -172,6 +228,7 @@ export interface GhCallOptions {
 }
 
 function ghExecOptions(options: GhCallOptions): SafeExecOptions {
+  assertVcsCwdScope(options.cwd);
   const registeredTokens = {
     GH_TOKEN: getRegisteredEnvText('GH_TOKEN'),
     GITHUB_TOKEN: getRegisteredEnvText('GITHUB_TOKEN'),
@@ -188,6 +245,7 @@ export function ghRun(
   options: GhCallOptions = {},
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(options.cwd);
   // GH_TOKEN/GITHUB_TOKEN are excluded from the ambient exec allowlist, so
   // attach the *registered* values explicitly — the same explicit-override
   // channel publish_pull_request/pr_shadow use. Without this, the gh ops
@@ -201,7 +259,53 @@ export function ghRun(
   );
 }
 
+const PR_QUEUE_QUERY =
+  'query($owner:String!,$name:String!,$number:Int!){repository(owner:$owner,name:$name){pullRequest(number:$number){mergeQueueEntry{id}}}}';
+export function ghPrQueued(
+  params: GhCallOptions & { owner: string; name: string; number: number; hostname: string },
+  run?: VcsCommandRunner
+): boolean {
+  const row = JSON.parse(
+    ghMust(
+      [
+        'api',
+        'graphql',
+        '--hostname',
+        params.hostname,
+        '-f',
+        `query=${PR_QUEUE_QUERY}`,
+        '-f',
+        `owner=${params.owner}`,
+        '-f',
+        `name=${params.name}`,
+        '-F',
+        `number=${params.number}`,
+      ],
+      params,
+      run
+    )
+  ) as { errors?: unknown; data?: { repository?: { pullRequest?: { mergeQueueEntry: unknown } } } };
+  if (row.errors || !row.data?.repository?.pullRequest)
+    throw new Error('[VCS_QUEUE_UNVERIFIED] Cannot verify server merge queue');
+  return Boolean(row.data.repository.pullRequest.mergeQueueEntry);
+}
 function assertGhRead(args: string[]): void {
+  if (
+    args.length === 12 &&
+    args[0] === 'api' &&
+    args[1] === 'graphql' &&
+    args[2] === '--hostname' &&
+    args[4] === '-f' &&
+    args[5] === `query=${PR_QUEUE_QUERY}` &&
+    args[6] === '-f' &&
+    /^owner=[\w.-]+$/.test(args[7]) &&
+    args[8] === '-f' &&
+    /^name=[\w.-]+$/.test(args[9]) &&
+    args[10] === '-F' &&
+    /^number=[1-9][0-9]*$/.test(args[11])
+  )
+    return;
+
   if (
     args[0] === '--version' ||
     ['auth status', 'pr view', 'pr list', 'pr checks', 'repo view'].includes(
@@ -214,7 +318,21 @@ function assertGhRead(args: string[]): void {
     args.length === 4 &&
     args[2] === '--hostname' &&
     (/^repos\/[\w.-]+\/[\w.-]+\/commits\/[^\s]+$/.test(args[1]) ||
-      /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]))
+      /^repos\/[\w.-]+\/[\w.-]+$/.test(args[1]) ||
+      /^repos\/[\w.-]+\/[\w.-]+\/git\/trees\/[a-f0-9]{40,64}$/.test(args[1]) ||
+      /^repos\/[\w.-]+\/[\w.-]+\/branches\/[^\s/?]+\/protection\/required_status_checks$/.test(
+        args[1]
+      ) ||
+      /^repos\/[\w.-]+\/[\w.-]+\/rules\/branches\/[^\s/?]+$/.test(args[1]) ||
+      /^repos\/[\w.-]+\/[\w.-]+\/commits\/[a-f0-9]{40,64}\/check-runs\?per_page=100&filter=latest$/.test(
+        args[1]
+      ) ||
+      /^repos\/[\w.-]+\/[\w.-]+\/actions\/runs\?head_sha=[a-f0-9]{40,64}&per_page=100$/.test(
+        args[1]
+      ) ||
+      /^repos\/[\w.-]+\/[\w.-]+\/contents\/\.github\/workflows\/[^\s/?]+\?ref=[a-f0-9]{40,64}$/.test(
+        args[1]
+      ))
   )
     return;
   throw new Error(
@@ -227,6 +345,7 @@ export function ghMust(
   options: GhCallOptions = {},
   run?: VcsCommandRunner
 ): string {
+  assertVcsCwdScope(options.cwd);
   const authProbe = args[0] === 'auth' && args[1] === 'status';
   // Only fixed operation names are safe in errors; resource refs and flags may contain secrets.
   const knownOperations = new Set([
@@ -342,9 +461,14 @@ export interface PrListEntry {
 }
 
 export function ghPrList(
-  params: { state?: 'open' | 'closed' | 'merged' | 'all'; limit?: number } & GhCallOptions = {},
+  params: {
+    state?: 'open' | 'closed' | 'merged' | 'all';
+    limit?: number;
+    head?: string;
+  } & GhCallOptions = {},
   run: VcsCommandRunner = safeExecResult
 ): PrListEntry[] {
+  if (params.head) assertNotFlagLike(params.head, 'head branch');
   const stdout = ghMust(
     [
       'pr',
@@ -355,6 +479,7 @@ export function ghPrList(
       String(params.limit || 100),
       '--json',
       'number,title,headRefOid,headRefName,isDraft,author,state',
+      ...(params.head ? ['--head', params.head] : []),
     ],
     params,
     run
@@ -482,9 +607,13 @@ export function ghPrMerge(
     ref: string;
     method?: 'merge' | 'squash' | 'rebase';
     deleteBranch?: boolean;
+    /** Narrows the already governed merge to independently reviewed commits. */
+    expectedHeadSha?: string;
+    expectedBaseSha?: string;
   } & GhCallOptions,
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(params.cwd);
   assertNotFlagLike(params.ref, 'pr ref');
   const repository = ghPrRepository(params, run);
   const snapshot = () =>
@@ -502,6 +631,11 @@ export function ghPrMerge(
       run
     );
   const bound = snapshot();
+  if (
+    (params.expectedHeadSha !== undefined && params.expectedHeadSha !== bound.headRefOid) ||
+    (params.expectedBaseSha !== undefined && params.expectedBaseSha !== bound.baseRefOid)
+  )
+    throw new Error('[VCS_REVIEW_STALE] PR differs from the verified promotion revision');
   if (!Number.isInteger(bound.number) || !/^[a-f0-9]{40,64}$/i.test(String(bound.headRefOid)))
     throw new Error('[VCS_SNAPSHOT_UNAVAILABLE] PR identity and head commit required');
   if (bound.url !== `${repository.url.replace(/\/$/, '')}/pull/${bound.number}`) {
@@ -547,6 +681,7 @@ export function ghPrCreate(
   } & GhCallOptions,
   run: VcsCommandRunner = safeExecResult
 ): VcsCommandResult {
+  assertVcsCwdScope(params.cwd);
   if (!params.title?.trim()) throw new Error('[VCS_GH_INVALID] pr create requires a title');
   if (params.head !== undefined) assertNotFlagLike(params.head, 'head');
   if (params.base !== undefined) assertNotFlagLike(params.base, 'base');
@@ -566,14 +701,10 @@ export function ghPrCreate(
     : publicationBodySource.getStore()
       ? (params.body ?? '')
       : params.body?.trim() || '';
-  const bodyPath = params.bodyFile
-    ? toRepoRelative(assertSafeRepositoryPath(params.bodyFile))
-    : undefined;
-  const bodySourceTier = bodyPath
-    ? bodyPath.startsWith('knowledge/public/') || storageFloorTier(bodyPath) === 'public'
-      ? 'public'
-      : 'protected_or_unknown'
+  const bodyProvenance = params.bodyFile
+    ? prPublicationBodySourceForPath(params.bodyFile)
     : (publicationBodySource.getStore() ?? 'inline');
+  const bodySourceTier = typeof bodyProvenance === 'object' ? bodyProvenance.tier : bodyProvenance;
   const snapshot = () => ({
     head,
     base,
@@ -632,6 +763,9 @@ export function ghPrCreate(
       title: params.title.trim(),
       body,
       body_source_tier: bodySourceTier,
+      ...(typeof bodyProvenance === 'object' && bodyProvenance.tier === 'confidential'
+        ? { body_source_tenant: bodyProvenance.tenantSlug }
+        : {}),
       draft: params.draft === true,
     },
     () => {

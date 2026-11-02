@@ -2,10 +2,29 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-26
+last_updated: 2026-11-02
 ---
 
 # Operations Hygiene Runbook
+
+## Checkout and canonical implementation drift
+
+Before changing a shared capability, record the checkout root, HEAD SHA/date,
+reviewed `origin/main` SHA and relevant existing module paths in mission evidence.
+Fetch remote references when available. If the checkout is substantially behind,
+compare the current implementation before editing; do not infer absence from an
+old tree. Preserve tracked and untracked mixed changes, then work in a dedicated
+worktree from the reviewed current base. Never reset the original checkout or
+copy its private runtime identity into the new worktree.
+
+Reconcile by capability: reuse the current charter, credential, audit and VCS
+boundaries and move only missing behavior. Test the actual default integration,
+not just injected success ports. Recheck upstream changes before review and
+regenerate derived catalogs after rebuilding the rebased source. Existing
+`pnpm check -- --changed`, registration and catalog gates validate the resulting
+diff; they do not prove that an arbitrary starting checkout was current. This
+checkout comparison is a required operational preflight, not a new claim made
+by those automated checks.
 
 ## Managed tool registration and readiness
 

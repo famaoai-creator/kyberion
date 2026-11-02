@@ -11,6 +11,7 @@
 
 import * as path from 'node:path';
 import { withExecutionContextAsync } from '../authority.js';
+import { withResidentDotScope } from './resident-dot-scope.js';
 import { appendJsonLine, readJsonLines } from '../foundation/json.js';
 import { createLogger } from '../logger.js';
 import { pathResolver } from '../path-resolver.js';
@@ -93,7 +94,7 @@ export interface DotKeyResultDeps {
 export function runAsDotCharter<T>(c: DotCharter, fn: () => Promise<T>): Promise<T> {
   return withExecutionContextAsync(
     c.authority.authority_role,
-    fn,
+    () => withResidentDotScope(c, fn),
     undefined,
     c.scope.tenant_slug ?? '',
     c.scope.organization_id,
