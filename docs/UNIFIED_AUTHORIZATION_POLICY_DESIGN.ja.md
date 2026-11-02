@@ -134,6 +134,8 @@ interface OperationAuthorization {
 
 各 phase は独立してマージ可能。P0/P1 が「袋小路対策として最も効く」部分（外部効果の検知と fail-safe）。
 
+**実装状況（2026-11-02 時点、すべて main 着地）**: P0–P1 → #1345–#1347、P2 → #1348（approval domain 語彙）+ #1349（subject 軸統一・`admitInternalDecision`）、P3 → #1349（4系統 → 1 レジストリ + 詳細層ブリッジ）、P4 → #1350（`authorization-policy-document.ts` — 形式固定のみ、評価エンジンは未導入・§7 の方針どおり）。運用面は `knowledge/product/governance/declarative-authorization-registry.md` を正本とする。
+
 ## 5. Accountability Charter との関係
 
 charter は「**要件を満たす権威の供給側**」であり、本設計のレジストリ（要件の宣言側）と直交する。この2軸を分離するのが設計の要点。
