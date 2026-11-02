@@ -70,6 +70,14 @@ export interface OperationAuthorization {
   /** Optional charter decision-vocabulary class (payment, sign_contract, …)
    * used for envelope pricing — separate axis from effectClass. */
   readonly actionClass?: string;
+  /** When this subject's authority path produces a human approval request,
+   * the declared approval domain (storage partition) it belongs to — see
+   * foundation/approval-domains.ts. Derived by request creation, so the
+   * partition comes from the declaration, not a call-site literal. */
+  readonly approvalDomain?: string;
+  /** Reviewed effect paths whose values must carry host-attested origins
+   * (folded from operation-protection.ts PROTECTED_ARGUMENTS). */
+  readonly protectedPaths?: readonly (readonly string[])[];
   /** False when resolved via the fail-safe default (operation not declared). */
   readonly declared: boolean;
   /** Declaration provenance — see {@link AuthorizationSource}. */
@@ -91,6 +99,7 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       optionalFields: ['visibility'],
       reputational_class: 'B',
     },
+    protectedPaths: [['repository']],
   },
   'vcs:pr_merge': {
     effectClass: 'external_mutation',
@@ -100,6 +109,7 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       optionalFields: ['visibility'],
       reputational_class: 'A',
     },
+    protectedPaths: [['repository'], ['baseRefName']],
   },
   'vcs:push': {
     effectClass: 'external_mutation',
@@ -109,6 +119,7 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       optionalFields: ['visibility'],
       reputational_class: 'A',
     },
+    protectedPaths: [['url'], ['destination']],
   },
   'vcs:fetch': {
     effectClass: 'external_read',
@@ -131,27 +142,49 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_read',
     authority: { kind: 'admission', boundary: 'external' },
     delegable: { fields: ['origin'], reputational_class: 'B' },
+    protectedPaths: [['params', 'url']],
   },
   'browser:open_tab': {
     effectClass: 'external_read',
     authority: { kind: 'admission', boundary: 'external' },
     delegable: { fields: ['origin'], reputational_class: 'B' },
+    protectedPaths: [['params', 'url']],
   },
   // --- External messaging / meetings ---
   'service:slack:preset:post_message': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
+    protectedPaths: [['params', 'channel']],
   },
   'meeting:chat': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
+    protectedPaths: [['params', 'meeting_id']],
   },
   'meeting:speak': {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
+    protectedPaths: [['params', 'meeting_id']],
+  },
+  // --- Email ops with reviewed protected paths (narrower than the email: prefix union) ---
+  'email:send': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    actionClass: 'send_message_external',
+    protectedPaths: [['params', 'to'], ['params', 'cc'], ['params', 'from'], ['account']],
+  },
+  'email:create_draft': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    actionClass: 'send_message_external',
+    protectedPaths: [
+      ['params', 'to'],
+      ['params', 'cc'],
+      ['params', 'from'],
+    ],
   },
   // --- Service execution ---
   'service:mcp': {
@@ -206,7 +239,13 @@ const OPERATION_PREFIXES: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     actionClass: 'send_message_external',
+    // Union of PROTECTED_ARGUMENTS email:send / email:create_draft — the extra
+    // ['account'] path only binds when the field is present (fail-secure).
+    protectedPaths: [['params', 'to'], ['params', 'cc'], ['params', 'from'], ['account']],
   },
+  // service:${provider}:… lives in the governed overlay, not here: a code
+  // prefix would shadow every data-layer (overlay/plugin) `service:*`
+  // declaration — provider plugins are exactly who declares those ops.
   // calendar:${kind} — external calendar writes.
   'calendar:': {
     effectClass: 'external_mutation',
@@ -315,4 +354,127 @@ export function declaredOperationPatterns(): readonly string[] {
     ...Object.keys(o.prefixes).map((p) => `${p}*`),
   ]);
   return [...code, ...overlaid];
+}
+
+// ─── Subject axes ────────────────────────────────────────────────────────────
+// The unified lookup surface covers four authorization subject axes. Bare ids
+// (or the explicit `op:` prefix) name operations; `intent:`, `capability:` and
+// `verb:` are reserved namespaces bridged to their detail-layer policy
+// systems — approval-policy.json intent rules, grant-capability-policy.json
+// capabilities, and command-credential-policy.ts verb requirements. Each axis
+// keeps its detail semantics in `detail`; the shared envelope (effectClass,
+// authority, approvalDomain, declared, source) is what boundaries consume.
+
+export type SubjectAxis = 'operation' | 'intent' | 'capability' | 'verb';
+
+/** Axis-specific detail carried alongside the shared authorization envelope. */
+export type AuthorizationDetail =
+  /** intent axis: the approval-policy.json rule that declares this intent.
+   * Payload-conditional `when` clauses are not evaluated here — the declared
+   * authority is the strongest the intent can attract. */
+  | { kind: 'approval-policy-rule'; ruleId: string }
+  /** capability axis: the grant-capability-policy.json capability key. */
+  | { kind: 'grant-capability'; capability: string }
+  /** verb axis: the command-credential-policy requirement. */
+  | { kind: 'credential-requirement'; requirement: 'none' | 'degrading' | 'required' };
+
+/** A declaration for a non-operation axis (detail layers register these). */
+export interface SubjectAxisEntry extends AuthorizationRegistryEntry {
+  readonly detail?: AuthorizationDetail;
+}
+
+export interface SubjectAuthorization extends OperationAuthorization {
+  readonly axis: SubjectAxis;
+  /** The full subject string as queried (including the axis prefix). */
+  readonly subject: string;
+  readonly detail?: AuthorizationDetail;
+}
+
+/** A detail layer's view of one axis. Registered once per axis by the module
+ * owning that policy system; `resolve` answers axis-local ids and `keys`
+ * enumerates declarations for coverage checks. */
+export interface SubjectAxisBridge {
+  readonly source: AuthorizationSource;
+  resolve(id: string): SubjectAxisEntry | undefined;
+  keys(): readonly string[];
+}
+
+const SUBJECT_AXIS_PREFIXES: Readonly<Record<string, SubjectAxis>> = {
+  'intent:': 'intent',
+  'capability:': 'capability',
+  'verb:': 'verb',
+};
+
+const subjectAxisBridges = new Map<SubjectAxis, SubjectAxisBridge>();
+
+/** Registered by each detail layer at import time (approval-policy.ts,
+ * grant-capability-policy.ts, command-credential-policy.ts). Without a bridge
+ * the axis resolves to its fail-safe, never to a weaker authority. Returns the
+ * previous bridge so tests can restore state; pass `undefined` to clear. */
+export function setSubjectAxisBridge(
+  axis: Exclude<SubjectAxis, 'operation'>,
+  bridge: SubjectAxisBridge | undefined
+): SubjectAxisBridge | undefined {
+  const previous = subjectAxisBridges.get(axis);
+  if (bridge) subjectAxisBridges.set(axis, bridge);
+  else subjectAxisBridges.delete(axis);
+  return previous;
+}
+
+/** Per-axis undeclared postures — every axis fails toward more authority, not
+ * less. Undeclared intents need a human approval, undeclared capabilities a
+ * tenant binding, undeclared verbs a task binding (the same 'required'
+ * default command-credential-policy applies). */
+const SUBJECT_FAILSAFE: Readonly<Record<SubjectAxis, SubjectAxisEntry>> = {
+  operation: FAILSAFE_UNDECLARED,
+  intent: { effectClass: 'internal_decision', authority: { kind: 'approval' } },
+  capability: {
+    effectClass: 'credential_use',
+    authority: { kind: 'binding', scope: 'tenant' },
+  },
+  verb: {
+    effectClass: 'credential_use',
+    authority: { kind: 'binding', scope: 'task' },
+    detail: { kind: 'credential-requirement', requirement: 'required' },
+  },
+};
+
+function parseSubject(subject: string): { axis: SubjectAxis; id: string } {
+  for (const [prefix, axis] of Object.entries(SUBJECT_AXIS_PREFIXES)) {
+    if (subject.startsWith(prefix)) {
+      const id = subject.slice(prefix.length);
+      // An empty axis-local id is not a declared subject — it resolves as an
+      // operation-shaped fail-safe rather than matching anything.
+      if (id) return { axis, id };
+      return { axis, id: '' };
+    }
+  }
+  return { axis: 'operation', id: subject };
+}
+
+export function subjectAuthorization(subject: string): SubjectAuthorization {
+  const { axis, id } = parseSubject(subject);
+  if (axis === 'operation') {
+    return { ...operationAuthorization(subject), axis, subject };
+  }
+  const bridge = subjectAxisBridges.get(axis);
+  const entry = id ? bridge?.resolve(id) : undefined;
+  if (entry) {
+    return { ...entry, declared: true, source: bridge!.source, axis, subject };
+  }
+  const failSafe = SUBJECT_FAILSAFE[axis];
+  return {
+    ...failSafe,
+    declared: false,
+    source: 'code',
+    axis,
+    subject,
+    ...(failSafe.detail ? { detail: failSafe.detail } : {}),
+  };
+}
+
+/** Declared subject ids for one axis (axis-local, without the prefix) —
+ * the coverage surface boundary gates consume. */
+export function declaredSubjectKeys(axis: Exclude<SubjectAxis, 'operation'>): readonly string[] {
+  return subjectAxisBridges.get(axis)?.keys() ?? [];
 }

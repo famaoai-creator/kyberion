@@ -6,6 +6,12 @@ import { isInjectionSuspected } from '../injection-signal.js';
 import { resolveConfiguredPosture } from '../security-screen.js';
 import { createLogger } from '../logger.js';
 import type { ApprovalAssuranceLevel, ApprovalAssuranceMode } from './approval-assurance.js';
+import {
+  setSubjectAxisBridge,
+  type AssuranceClass,
+  type AuthorityRequirement,
+  type SubjectAxisEntry,
+} from '../foundation/authorization-registry.js';
 
 const logger = createLogger('approval-policy');
 
@@ -394,3 +400,70 @@ function resolveBaseApprovalPolicy(input: {
     missingRequirements: [],
   };
 }
+
+// ─── Unified authorization surface (intent axis) ─────────────────────────────
+// Registers the intent axis of authorization-registry.ts: every `intent_ids`
+// entry of an approval-policy.json rule becomes a declared `intent:<id>`
+// subject. `requires_approval` maps to approval vs internal admission
+// authority; `min_assurance` (A0 is no human floor → omitted) and
+// `dual_key_confirmation` carry over. Payload `when` clauses are NOT evaluated
+// — the declared authority is the strongest the intent can attract, and
+// resolveApprovalPolicy remains the payload-aware decision point.
+// Payload-only rules (no intent_ids) and the hardcoded dangerous-pattern
+// fallbacks have no subject key by construction.
+
+function intentAxisEntry(rule: ApprovalPolicyRule): SubjectAxisEntry {
+  const authority: AuthorityRequirement = rule.requires_approval
+    ? {
+        kind: 'approval',
+        ...(rule.min_assurance && rule.min_assurance !== 'A0'
+          ? { assurance: rule.min_assurance as AssuranceClass }
+          : {}),
+        ...(rule.missing_requirements?.includes('dual_key_confirmation') ? { dualKey: true } : {}),
+      }
+    : { kind: 'admission', boundary: 'internal' };
+  return {
+    effectClass: 'internal_decision',
+    authority,
+    detail: { kind: 'approval-policy-rule', ruleId: rule.id },
+  };
+}
+
+/** Strongest rule naming an intent wins: an intent listed by several rules
+ * (e.g. a payload-conditional approval plus an unconditional pass-through)
+ * resolves to the strongest authority any of them can attract — authority
+ * kind first, then assurance floor, then dual-key. */
+function intentAuthorityScore(authority: AuthorityRequirement): number {
+  const kindRank = { free: 0, admission: 1, binding: 2, approval: 3 }[authority.kind];
+  if (authority.kind !== 'approval') return kindRank * 100;
+  const assuranceRank = { A1: 1, A2: 2, A3: 3 }[authority.assurance ?? 'A1'];
+  return kindRank * 100 + (authority.dualKey ? 10 : 0) + assuranceRank;
+}
+
+setSubjectAxisBridge('intent', {
+  source: 'overlay',
+  resolve(id) {
+    try {
+      const rules = (loadApprovalPolicy().rules ?? []).filter((r) => r.intent_ids?.includes(id));
+      if (!rules.length) return undefined;
+      return intentAxisEntry(
+        rules.reduce((strongest, rule) =>
+          intentAuthorityScore(intentAxisEntry(rule).authority) >
+          intentAuthorityScore(intentAxisEntry(strongest).authority)
+            ? rule
+            : strongest
+        )
+      );
+    } catch {
+      // An unreadable policy resolves as undeclared → the approval fail-safe.
+      return undefined;
+    }
+  },
+  keys() {
+    try {
+      return (loadApprovalPolicy().rules ?? []).flatMap((r) => r.intent_ids ?? []);
+    } catch {
+      return [];
+    }
+  },
+});

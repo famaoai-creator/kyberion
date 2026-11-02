@@ -18,6 +18,12 @@
  * Unclassified verbs default to `'required'`: unknown actions fail safe toward
  * binding — delegation must never silently fall back to the stub.
  */
+import {
+  setSubjectAxisBridge,
+  type AuthorizationDetail,
+  type SubjectAxisEntry,
+} from './authorization-registry.js';
+
 export type CredentialRequirement = 'none' | 'degrading' | 'required';
 
 /**
@@ -105,3 +111,50 @@ export function cliCommandCredentialRequirement(input: {
   }
   return 'required';
 }
+
+// ─── Unified authorization surface (verb axis) ───────────────────────────────
+// Registers the verb axis of authorization-registry.ts so `verb:mission:<a>`
+// and `verb:cli:<cmd>[:<sub>]` resolve through the same subjectAuthorization
+// lookup as operation/intent/capability subjects. `'none'` verbs are local
+// and free; `degrading`/`required` need a task credential binding — the
+// requirement itself stays available in `detail`.
+
+function verbAxisEntry(requirement: CredentialRequirement): SubjectAxisEntry {
+  const detail: AuthorizationDetail = { kind: 'credential-requirement', requirement };
+  return requirement === 'none'
+    ? { effectClass: 'local_only', authority: { kind: 'free' }, detail }
+    : {
+        effectClass: 'credential_use',
+        authority: { kind: 'binding', scope: 'task' },
+        detail,
+      };
+}
+
+setSubjectAxisBridge('verb', {
+  source: 'code',
+  resolve(id) {
+    if (id.startsWith('mission:')) {
+      const requirement = MISSION_ACTION_REQUIREMENTS[id.slice('mission:'.length)];
+      return requirement ? verbAxisEntry(requirement) : undefined;
+    }
+    if (id.startsWith('cli:')) {
+      const [command, subcommand] = id.slice('cli:'.length).split(':');
+      if (!command) return undefined;
+      // The resolver's 'required' default is itself the reviewed posture, so
+      // every cli subject resolves declared.
+      return verbAxisEntry(cliCommandCredentialRequirement({ command, subcommand }));
+    }
+    return undefined;
+  },
+  keys() {
+    return [
+      ...Object.keys(MISSION_ACTION_REQUIREMENTS).map((a) => `mission:${a}`),
+      ...[...CLI_NONE_COMMANDS].map((c) => `cli:${c}`),
+      ...Object.entries(CLI_READINESS_SUBCOMMANDS).flatMap(([command, subs]) => [
+        `cli:${command}`,
+        ...[...subs].map((sub) => `cli:${command}:${sub}`),
+      ]),
+      'cli:task:scenario',
+    ];
+  },
+});
