@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveCapabilityTarget } from './agent-provider-resolution.js';
+import { createExternalHarnessRegistry } from './external-harness-registry.js';
 import type { ProviderInfo } from '../provider/provider-discovery.js';
 
 function provider(
@@ -104,5 +105,81 @@ describe('resolveCapabilityTarget (requirement-first)', () => {
       []
     );
     expect(resolved).toMatchObject({ provider: 'codex', modelId: 'codex', strategy: 'unresolved' });
+  });
+
+  it('never surfaces external harnesses without an injected registry', () => {
+    const resolved = resolveCapabilityTarget({ requiredCapabilities: ['code'] }, [codex]);
+    expect(resolved.provider).toBe('codex');
+    expect(resolved.externalHarnesses).toBeUndefined();
+  });
+
+  it('surfaces an available external harness covering the required capabilities as advisory', () => {
+    const registry = createExternalHarnessRegistry();
+    registry.registerHarness({
+      harness_id: 'openhands-acp',
+      kind: 'acp',
+      adapter_ref: 'acp-adapter',
+      endpoint_or_command: 'https://acp.example.test/rpc',
+      capabilities: ['code', 'terminal'],
+      trust_tier: 'confidential',
+      status: 'available',
+      provider: 'openhands',
+    });
+    registry.registerHarness({
+      harness_id: 'partial-cli',
+      kind: 'cli',
+      endpoint_or_command: 'partial exec',
+      capabilities: ['code'],
+      trust_tier: 'public',
+      status: 'available',
+    });
+    registry.registerHarness({
+      harness_id: 'down-cli',
+      kind: 'cli',
+      endpoint_or_command: 'down exec',
+      capabilities: ['code', 'terminal'],
+      trust_tier: 'public',
+      status: 'unavailable',
+    });
+
+    const resolved = resolveCapabilityTarget(
+      {
+        requiredCapabilities: ['code', 'terminal'],
+        externalHarnessRegistry: registry,
+      },
+      [codex]
+    );
+
+    // The provider/model decision is unchanged; the harness is advisory only.
+    expect(resolved.provider).toBe('codex');
+    expect(resolved.strategy).toBe('sole');
+    // Only the fully-covering 'available' harness is surfaced — partial
+    // coverage and non-available harnesses stay out of the advisory field.
+    expect(resolved.externalHarnesses?.map((harness) => harness.harness_id)).toEqual([
+      'openhands-acp',
+    ]);
+  });
+
+  it('surfaces harnesses even when provider resolution is unresolved', () => {
+    const registry = createExternalHarnessRegistry();
+    registry.registerHarness({
+      harness_id: 'openhands-acp',
+      kind: 'acp',
+      endpoint_or_command: 'https://acp.example.test/rpc',
+      capabilities: ['patch', 'terminal'],
+      trust_tier: 'confidential',
+      status: 'available',
+    });
+
+    const resolved = resolveCapabilityTarget(
+      {
+        requiredCapabilities: ['patch', 'terminal'],
+        externalHarnessRegistry: registry,
+      },
+      [gemini, claude]
+    );
+
+    expect(resolved.strategy).toBe('degraded');
+    expect(resolved.externalHarnesses?.[0]?.harness_id).toBe('openhands-acp');
   });
 });

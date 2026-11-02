@@ -3,7 +3,8 @@
  *
  * Repair cascade (cheapest first):
  *   1. Lightweight structural JSON repair (json-repair.ts) — no LLM, instant
- *   2. Targeted schema-aware repair hint — LLM sub-agent with full schema + classified error hints
+ *   2. Last-resort dirty-JSON repair (dirty-json.ts) — no LLM, bounded
+ *   3. Targeted schema-aware repair hint — LLM sub-agent with full schema + classified error hints
  */
 
 import { getReasoningBackend, type ReasoningCallOptions } from '../reasoning/reasoning-backend.js';
@@ -13,6 +14,7 @@ import { logger } from '../core.js';
 import { validate, loadSchema } from '../validate.js';
 import { pathResolver } from '../path-resolver.js';
 import { tryRepairJson, repairJsonString } from '../json-repair.js';
+import { parseDirtyJson } from './dirty-json.js';
 import { validatePipelineGuardrails } from './adf-guardrails.js';
 import { validatePipelineAdf } from './pipeline-contract.js';
 import {
@@ -149,15 +151,29 @@ async function validateAndRepairAdfCore(
       parsed = lightweight;
       lightweightRepaired = true;
     } else {
-      const message = err instanceof Error ? err.message : String(err);
-      logger.error(`[adf-repair] Failed to parse JSON at ${repairPath}: ${message}`);
-      return attemptSubagentRepair(
-        repairPath,
-        schemaName,
-        `JSON parse error: ${message}`,
-        [],
-        options
-      );
+      // 2. Last-resort tolerant repair (dirty-json) before the LLM subagent.
+      //    More permissive than json-repair but still deterministic and
+      //    bounded — the committed text is the normalized repaired value.
+      const dirty = parseDirtyJson(content);
+      if (dirty.ok) {
+        logger.info(
+          `[adf-repair] dirty-json repair succeeded for ${repairPath} — skipping subagent delegation`
+        );
+        assertAdfRepairFile(repairPath);
+        options.commitCandidate(JSON.stringify(dirty.value, null, 2));
+        parsed = dirty.value;
+        lightweightRepaired = true;
+      } else {
+        const message = err instanceof Error ? err.message : String(err);
+        logger.error(`[adf-repair] Failed to parse JSON at ${repairPath}: ${message}`);
+        return attemptSubagentRepair(
+          repairPath,
+          schemaName,
+          `JSON parse error: ${message}`,
+          [],
+          options
+        );
+      }
     }
   }
 
@@ -480,12 +496,19 @@ Output constraints: pure JSON, no markdown fences, no comments, no trailing comm
     assertAdfRepairFile(adfPath);
     if (readTextFile(adfPath) !== originalContent)
       throw new Error('[REPAIR_ASSURANCE] target changed during advisory delegation');
-    const updatedParsed = tryRepairJson(report);
+    let updatedParsed = tryRepairJson(report);
+    if (updatedParsed === null) {
+      // Same last-resort stage as the file parse: the candidate the subagent
+      // returned is also untrusted model output, so dirty-json may still
+      // recover it deterministically before giving up.
+      const dirty = parseDirtyJson(report);
+      if (dirty.ok) updatedParsed = dirty.value;
+    }
     const finalValidation = validateRepairTarget(updatedParsed, schemaName, adfPath);
     if (finalValidation.valid) {
       if (schemaName === 'pipeline-adf') assertPipelineRepairTrust(adfPath, options);
       assertAdfRepairFile(adfPath);
-      const committed = repairJsonString(report)!;
+      const committed = repairJsonString(report) ?? JSON.stringify(updatedParsed, null, 2);
       options.commitCandidate(committed);
       const persisted = readTextFile(adfPath);
       if (
