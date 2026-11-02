@@ -185,16 +185,17 @@ export async function advanceMissionDevelopment(
         const reviewTask = tasks.find((task) => task.task_id === spec.review_task_id);
         if (!implTask || !reviewTask || reviewTask.review_target !== spec.implementation_task_id)
           throw new Error('Development task and independent review contract mismatch');
-        const items = (deps.items ?? listWorkItems)({
-          ...(state.tenant_slug ? { tenantSlugs: [state.tenant_slug] } : {}),
-          ...(state.organization_id ? { organizationIds: [state.organization_id] } : {}),
-        });
-        const scoped = items.filter(
-          (item) =>
-            item.context?.mission_id === state.mission_id &&
-            (item.context.tenant_slug ?? '') === (state.tenant_slug ?? '') &&
-            (item.context.organization_id ?? '') === (state.organization_id ?? '')
-        );
+        const scopedItems = () =>
+          (deps.items ?? listWorkItems)({
+            ...(state.tenant_slug ? { tenantSlugs: [state.tenant_slug] } : {}),
+            ...(state.organization_id ? { organizationIds: [state.organization_id] } : {}),
+          }).filter(
+            (item) =>
+              item.context?.mission_id === state.mission_id &&
+              (item.context.tenant_slug ?? '') === (state.tenant_slug ?? '') &&
+              (item.context.organization_id ?? '') === (state.organization_id ?? '')
+          );
+        const scoped = scopedItems();
         const matches = scoped.filter(
           (item) => item.context?.task_id === spec.implementation_task_id
         );
@@ -361,6 +362,9 @@ export async function advanceMissionDevelopment(
           if (item.status === 'in_progress')
             return result('running', 'Existing implementation attempt is still active');
           const ancestors = implementationAncestors(tasks, spec.implementation_task_id);
+          const isPrerequisite = (candidate: WorkItem) =>
+            candidate.context?.project_id === item.context?.project_id &&
+            ancestors.has(String(candidate.context?.task_id));
           if (
             digest(implTask.source_edit_paths) !== digest(taskSourcePaths) ||
             implTask.source_edit_requires_approval !== false
@@ -384,11 +388,23 @@ export async function advanceMissionDevelopment(
               metadata: { ...current.metadata, development_source_paths: taskSourcePaths },
             });
           }
-          await dispatch(
-            scoped
-              .filter((candidate) => ancestors.has(String(candidate.context?.task_id)))
-              .map((candidate) => candidate.item_id)
-          );
+          await dispatch(scoped.filter(isPrerequisite).map((candidate) => candidate.item_id));
+          // Dispatch reconciles exact approval decisions before execution. Read
+          // back its scoped outcome: returning early on the old blocked snapshot
+          // would prevent approved prerequisites from ever resuming here.
+          const waiting = scopedItems()
+            .filter(isPrerequisite)
+            .find(
+              (candidate) =>
+                candidate.status === 'blocked' || candidate.metadata?.awaiting_approval === true
+            );
+          if (waiting) {
+            const pending = pendingWorkItem(waiting, result);
+            return {
+              ...pending,
+              evidence_refs: [...pending.evidence_refs, `workitem:${waiting.item_id}`],
+            };
+          }
           return result(
             'running',
             'One canonical prerequisite or implementation WorkItem advanced'
