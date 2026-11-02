@@ -14,7 +14,7 @@ export interface GitPublicationSource {
   publication_history_sha256?: string;
 }
 
-/** Inspect new reachable history, including deleted files. A verified remote
+/** Inspect new reachable history, including deleted and merge-only files. A verified remote
  * baseline may exclude ancestry already delivered to that exact destination.
  * The runtime scope remains the taint floor for content copied into code. */
 export function readGitPublicationSource(
@@ -37,6 +37,9 @@ export function readGitPublicationSource(
         '--full-history',
         '--root',
         '--no-renames',
+        // Compare each merge parent explicitly: the default log omits merge
+        // diffs, while combined/first-parent modes can hide published paths.
+        '--diff-merges=separate',
         head,
         ...(remoteHead ? ['--not', remoteHead] : []),
       ],

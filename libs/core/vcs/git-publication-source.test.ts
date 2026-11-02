@@ -45,6 +45,7 @@ describe('push reachable-history provenance', () => {
         '--full-history',
         '--root',
         '--no-renames',
+        '--diff-merges=separate',
         'a'.repeat(40),
       ],
       expect.objectContaining({ cwd: '/fixture', timeoutMs: 30_000, maxOutputMB: 4 }),

@@ -44,6 +44,7 @@ describe('automatic Git probe hardening', () => {
       '--full-history',
       '--root',
       '--no-renames',
+      '--diff-merges=separate',
       'a'.repeat(40),
       '--not',
       'b'.repeat(40),
@@ -65,6 +66,18 @@ describe('automatic Git probe hardening', () => {
     expect(() => hardenedGitProbeArgs([...args, '--output=leak.txt'])).toThrow(
       'unsupported object/index probe grammar'
     );
+    expect(() =>
+      hardenedGitProbeArgs(args.filter((arg) => arg !== '--diff-merges=separate'))
+    ).toThrow('unsupported object/index probe grammar');
+    for (const flag of [
+      '--diff-merges=off',
+      '--diff-merges=first-parent',
+      '--diff-merges=combined',
+      '-m',
+    ])
+      expect(() =>
+        hardenedGitProbeArgs(args.map((arg) => (arg === '--diff-merges=separate' ? flag : arg)))
+      ).toThrow('unsupported object/index probe grammar');
   });
   it('hardens only closed object/index probe forms and rejects worktree/submodule/executable options', () => {
     const sha = 'a'.repeat(40);
