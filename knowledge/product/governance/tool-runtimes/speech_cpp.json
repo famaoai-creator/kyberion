@@ -1,0 +1,48 @@
+{
+  "version": "1.0.0",
+  "default_tool_id": "mflux",
+  "tools": [
+    {
+      "tool_id": "speech_cpp",
+      "display_name": "speech.cpp Local Speech Runtime",
+      "ecosystem": "system",
+      "status": "active",
+      "platforms": ["darwin", "linux", "win32"],
+      "supported_modes": ["trial", "approved_install", "installed", "pinned"],
+      "trial_backend": {
+        "kind": "system",
+        "command": "speech",
+        "args": ["--help"],
+        "description": "Probe speech.cpp availability without loading models."
+      },
+      "installed_backend": {
+        "kind": "system",
+        "command": "speech",
+        "args": ["--help"],
+        "description": "Re-check the installed speech.cpp binary."
+      },
+      "managed_env_subpath": "tool-runtimes/speech_cpp",
+      "managed_binary": {
+        "version": "0.10.1",
+        "relative_path": "bin/speech",
+        "archive": "zip",
+        "artifacts": {
+          "darwin-arm64": {
+            "url": "https://github.com/nyosegawa/speech.cpp/releases/download/v0.10.1/speech-0.10.1-macos-arm64-metal.zip",
+            "sha256": "ff24f6f58c9d2dedb01caa88ba043ae845c76eff228e4cbfae5de749174404c1"
+          },
+          "linux-x64": {
+            "url": "https://github.com/nyosegawa/speech.cpp/releases/download/v0.10.1/speech-0.10.1-linux-x64-cpu.zip",
+            "sha256": "3396d6b2ec38c2922ff0f24a760f7b45c4ac601788f53f03eb77134393bc768b"
+          },
+          "win32-x64": {
+            "url": "https://github.com/nyosegawa/speech.cpp/releases/download/v0.10.1/speech-0.10.1-windows-x64-vulkan.zip",
+            "sha256": "a8fe0e4b4f463c460e7ace9d38c363bec08b254cac5a7f764b7967af35d4fa1a",
+            "relative_path": "bin/speech.exe"
+          }
+        }
+      },
+      "notes": "speech.cpp (https://github.com/nyosegawa/speech.cpp) — MIT local TTS/ASR/VAD/diarize/enhance on ggml (Metal / Vulkan / CPU). Preferred install: `pnpm tool:setup -- --tool speech_cpp --apply` unpacks the checksum-pinned release zip into the managed env (bin/speech + libspeech). Models are fetched on first use into the OS cache (~/.cache/speech.cpp or ~/Library/Caches/speech.cpp), not into the managed env. No darwin-x64 or linux-arm64 assets in v0.10.1 (linux pin is the CPU build; use a self-built Vulkan binary via KYBERION_SPEECH_CPP_BIN when preferred). voice-actuator engine=speech_cpp and the speech_cpp STT bridge call the CLI; optional `speech serve` on loopback exposes OpenAI-compatible /v1/audio/* (KYBERION_SPEECH_CPP_URL, default http://127.0.0.1:8095)."
+    }
+  ]
+}

@@ -26,7 +26,7 @@ import {
   type VoiceSttBackend,
 } from './voice-stt.js';
 import { hasBuiltInTts } from '../media/native-tts.js';
-import { probeToolRuntime } from '../tool/tool-runtime-registry.js';
+import { findInstalledManagedBinary, probeToolRuntime } from '../tool/tool-runtime-registry.js';
 import { pathResolver } from '../path-resolver.js';
 import {
   listVoiceSttAdapters,
@@ -193,7 +193,8 @@ function resolveSttAvailability(): VoiceSttAvailability {
     server: Boolean(
       getRegisteredEnvText('VOICE_HUB_STT_BASE_URL')?.trim() ||
       getRegisteredEnvText('WHISPERKIT_BASE_URL')?.trim() ||
-      getRegisteredEnvText('MLX_AUDIO_BASE_URL')?.trim()
+      getRegisteredEnvText('MLX_AUDIO_BASE_URL')?.trim() ||
+      getRegisteredEnvText('KYBERION_SPEECH_CPP_URL')?.trim()
     ),
     fluidAudio,
     fasterWhisper,
@@ -201,6 +202,10 @@ function resolveSttAvailability(): VoiceSttAvailability {
     whisperCpp:
       safeExistsSync(pathResolver.resolve('active/shared/tmp/whisper.cpp/build/bin/whisper-cli')) &&
       safeExistsSync(pathResolver.resolve('active/shared/tmp/whisper.cpp/models/ggml-small.bin')),
+    speechCpp: Boolean(
+      findInstalledManagedBinary('speech_cpp') ||
+      getRegisteredEnvText('KYBERION_SPEECH_CPP_BIN')?.trim()
+    ),
     nativeSpeech:
       safeExistsSync(pathResolver.resolve('satellites/voice-hub/native-stt.swift')) &&
       (process.platform === 'darwin' ||

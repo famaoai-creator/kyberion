@@ -4,7 +4,12 @@ import {
   getVoiceEngineRecord,
   getVoiceEngineRegistry,
   resolveVoiceEngineForPlatform,
+  type VoiceEngineRecord,
 } from '@agent/core/voice/voice-engine-registry';
+import {
+  resolveVoiceTtsAdapter,
+  type VoiceTtsAdapterId,
+} from '@agent/core/voice/voice-provider-adapters';
 import { logger } from '@agent/core/core';
 import { pathResolver } from '@agent/core/path-resolver';
 import { resolveManagedToolPythonBin } from '@agent/core/tool/tool-runtime-registry';
@@ -1084,34 +1089,74 @@ function resolveVoiceArtifactCandidates(
   return candidates;
 }
 
-async function renderVoiceArtifactWithEngine(
-  text: string,
-  options: {
-    requestId: string;
-    voice: string;
-    rate: number;
-    language: string;
-    format: VoiceArtifactFormat;
-    outputPath?: string;
-    profile?: any;
-  },
-  engine: ReturnType<typeof getVoiceEngineRecord>
-): Promise<string> {
-  const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
-  if (engine.bridge_script) {
-    await runPythonTtsBridge(
-      engine.bridge_script,
-      text,
-      artifactPath,
-      options.language,
-      options.profile,
-      (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
-      options.voice,
-      engine.runtime_id === 'pocket_tts' ? engine.model_id : undefined
-    );
-    return artifactPath;
-  }
+type VoiceArtifactRenderOptions = {
+  requestId: string;
+  voice: string;
+  rate: number;
+  language: string;
+  format: VoiceArtifactFormat;
+  outputPath?: string;
+  profile?: any;
+};
 
+type VoiceArtifactRenderer = (input: {
+  text: string;
+  artifactPath: string;
+  options: VoiceArtifactRenderOptions;
+  engine: VoiceEngineRecord;
+}) => Promise<string>;
+
+/** Named TTS artifact renderers — register by adapter id instead of if-chains. */
+const voiceArtifactRenderers = new Map<VoiceTtsAdapterId, VoiceArtifactRenderer>();
+
+function registerVoiceArtifactRenderer(
+  adapterId: VoiceTtsAdapterId,
+  renderer: VoiceArtifactRenderer
+): () => void {
+  voiceArtifactRenderers.set(adapterId, renderer);
+  return () => {
+    if (voiceArtifactRenderers.get(adapterId) === renderer) {
+      voiceArtifactRenderers.delete(adapterId);
+    }
+  };
+}
+
+function listVoiceArtifactRendererIds(): VoiceTtsAdapterId[] {
+  return [...voiceArtifactRenderers.keys()].sort();
+}
+
+registerVoiceArtifactRenderer('speech_cpp', async ({ text, artifactPath, options, engine }) => {
+  const { synthesizeSpeechCppCli } = await import('@agent/core/voice/speech-cpp-client');
+  synthesizeSpeechCppCli({
+    text,
+    outputPath: artifactPath,
+    language: options.language,
+    voice: options.voice,
+    model: engine.model_id,
+  });
+  return artifactPath;
+});
+
+registerVoiceArtifactRenderer('python_bridge', async ({ text, artifactPath, options, engine }) => {
+  if (!engine.bridge_script) {
+    throw new Error(
+      `Voice engine ${engine.engine_id} declares python_bridge but has no bridge_script`
+    );
+  }
+  await runPythonTtsBridge(
+    engine.bridge_script,
+    text,
+    artifactPath,
+    options.language,
+    options.profile,
+    (engine.runtime_id as VoicePythonTool | undefined) || 'mlx_audio',
+    options.voice,
+    engine.runtime_id === 'pocket_tts' ? engine.model_id : undefined
+  );
+  return artifactPath;
+});
+
+registerVoiceArtifactRenderer('native_tts', async ({ text, options }) => {
   const nativeAdapter = resolveVoicePlaybackPlatformAdapter(process.platform);
   if (!nativeAdapter.renderNativeArtifact) {
     throw new Error(
@@ -1123,6 +1168,23 @@ async function renderVoiceArtifactWithEngine(
     return rendered;
   }
   throw new Error(`native voice adapter produced an invalid audio artifact: ${rendered}`);
+});
+
+async function renderVoiceArtifactWithEngine(
+  text: string,
+  options: VoiceArtifactRenderOptions,
+  engine: VoiceEngineRecord
+): Promise<string> {
+  const artifactPath = resolveArtifactPath(options.requestId, options.format, options.outputPath);
+  const adapter = resolveVoiceTtsAdapter(engine);
+  const renderer = voiceArtifactRenderers.get(adapter.adapter_id);
+  if (!renderer) {
+    throw new Error(
+      `No voice artifact renderer for TTS adapter '${adapter.adapter_id}' ` +
+        `(engine ${engine.engine_id}; registered: ${listVoiceArtifactRendererIds().join(', ') || 'none'})`
+    );
+  }
+  return renderer({ text, artifactPath, options, engine });
 }
 
 async function renderNativeArtifact(
@@ -1332,4 +1394,6 @@ export {
   resolveEspeakLanguage,
   resolveEspeakRate,
   waitForVoiceJob,
+  registerVoiceArtifactRenderer,
+  listVoiceArtifactRendererIds,
 };

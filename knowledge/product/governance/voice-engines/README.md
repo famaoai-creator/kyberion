@@ -18,6 +18,7 @@ Each file must contain exactly one `engines` entry and must match the file name:
 - `kokoro.json`
 - `pocket_tts.json`
 - `gemini_tts.json`
+- `speech_cpp.json`
 
 `voice-engine-registry.json` remains the compatibility snapshot until all consumers are migrated.
 
@@ -38,6 +39,7 @@ even when the upstream model covers more.
 | `mlx_audio_qwen3`            | `ja`, `en` | bridge receives only `ja`/`en` (upstream Qwen3-TTS covers more)           |
 | `irodori_tts`                | `ja`       | Irodori v4.1 Small bridge; complete WAV sentences (no streaming)          |
 | `qwen3_tts_06b_custom_voice` | `ja`       | 0.6B 8-bit preset voice; MLX chunked stream on macOS only                 |
+| `speech_cpp`                 | 10 langs   | speech.cpp Qwen3-TTS GGUF via managed CLI (Metal/Vulkan/CPU)              |
 | `pocket_tts`                 | `en`       | bridge rejects `ja`; no language-pack selection for fr/de/pt/it/es        |
 | `gemini_tts`                 | `en`, `ja` | only en/ja exercised here (upstream auto-detects more)                    |
 | `open_voice_clone`           | `en`       | shadow placeholder, coverage unknown                                      |

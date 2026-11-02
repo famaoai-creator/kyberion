@@ -265,6 +265,74 @@ function extractManagedBinaryTarball(toolId: string, tarballPath: string, destDi
   }
 }
 
+/**
+ * Extract a checksum-verified zip managed_binary payload into `destDir`.
+ * Lists entries first (unzip -l / PowerShell) and rejects unsafe paths before extract.
+ */
+function extractManagedBinaryZip(toolId: string, zipPath: string, destDir: string): void {
+  safeMkdir(destDir, { recursive: true });
+  if (process.platform === 'win32') {
+    const listing = safeExecResult(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-Command',
+        `Add-Type -AssemblyName System.IO.Compression.FileSystem; [IO.Compression.ZipFile]::OpenRead('${zipPath.replace(/'/g, "''")}').Entries | ForEach-Object { $_.FullName }`,
+      ],
+      { timeoutMs: 60_000, maxOutputMB: 4 }
+    );
+    if (listing.status !== 0) {
+      throw new Error(`managed_binary zip listing failed for ${toolId}: ${listing.stderr}`);
+    }
+    const entries = validateManagedBinaryArchiveEntries(toolId, listing.stdout);
+    const extract = safeExecResult(
+      'powershell.exe',
+      [
+        '-NoProfile',
+        '-Command',
+        `Expand-Archive -LiteralPath '${zipPath.replace(/'/g, "''")}' -DestinationPath '${destDir.replace(/'/g, "''")}' -Force`,
+      ],
+      { timeoutMs: 120_000, maxOutputMB: 4 }
+    );
+    if (extract.status !== 0) {
+      throw new Error(`managed_binary zip extraction failed for ${toolId}: ${extract.stderr}`);
+    }
+    for (const entry of entries) {
+      const extracted = path.join(destDir, entry);
+      try {
+        if (safeExistsSync(extracted)) safeChmodSync(extracted, 0o755);
+      } catch {
+        // best-effort
+      }
+    }
+    return;
+  }
+
+  const listing = safeExecResult('unzip', ['-Z1', zipPath], {
+    timeoutMs: 60_000,
+    maxOutputMB: 4,
+  });
+  if (listing.status !== 0) {
+    throw new Error(`managed_binary zip listing failed for ${toolId}: ${listing.stderr}`);
+  }
+  const entries = validateManagedBinaryArchiveEntries(toolId, listing.stdout);
+  const extract = safeExecResult('unzip', ['-o', zipPath, '-d', destDir], {
+    timeoutMs: 120_000,
+    maxOutputMB: 4,
+  });
+  if (extract.status !== 0) {
+    throw new Error(`managed_binary zip extraction failed for ${toolId}: ${extract.stderr}`);
+  }
+  for (const entry of entries) {
+    const extracted = path.join(destDir, entry);
+    try {
+      if (safeExistsSync(extracted)) safeChmodSync(extracted, 0o755);
+    } catch {
+      // best-effort
+    }
+  }
+}
+
 export async function installManagedBinary(toolId: string): Promise<SetupRow | null> {
   const artifact = resolveManagedBinaryArtifact(toolId);
   const target = resolveManagedBinaryPath(toolId);
@@ -312,6 +380,9 @@ export async function installManagedBinary(toolId: string): Promise<SetupRow | n
   safeWriteFile(staging, data);
   if (record.managed_binary?.archive === 'tar.gz') {
     extractManagedBinaryTarball(toolId, staging, path.dirname(target));
+    safeUnlinkSync(staging);
+  } else if (record.managed_binary?.archive === 'zip') {
+    extractManagedBinaryZip(toolId, staging, path.dirname(target));
     safeUnlinkSync(staging);
   } else {
     safeChmodSync(staging, 0o755);

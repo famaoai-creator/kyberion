@@ -18,6 +18,7 @@
         "faster_whisper",
         "mlx_whisper",
         "whisper_cpp",
+        "speech_cpp",
         "native_speech"
       ]
     },

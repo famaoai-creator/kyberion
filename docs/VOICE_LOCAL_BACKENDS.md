@@ -11,18 +11,28 @@ voice path; optional runtimes are only selected after their health probe passes.
 - `pocket_tts`: CPU streaming TTS and consent-gated voice cloning. The current
   upstream language packs are English, French, German, Portuguese, Italian,
   and Spanish; Japanese requests must use Kokoro or Apple Speech instead.
+- `speech_cpp`: MIT [speech.cpp](https://github.com/nyosegawa/speech.cpp) GGUF
+  TTS (default `qwen3-tts-0.6b`) on Metal / Vulkan / CPU — cross-platform
+  alternative to the MLX Qwen3 / Irodori Python bridges. Install the managed
+  binary, then select `engine_id=speech_cpp` (or
+  `pnpm kyberion speak --engine speech_cpp "…"`). First synthesis downloads
+  the model into the OS speech.cpp cache. Override the catalog name with
+  `KYBERION_SPEECH_CPP_TTS_MODEL`. Batch only today (`supports.streaming` is
+  false; `pnpm kyberion speak --stream` still uses the MLX Qwen path).
 
 Install and inspect all managed optional runtimes with:
 
 ```sh
 pnpm kyberion voice setup
 pnpm kyberion voice setup --apply
+pnpm tool:setup -- --tool speech_cpp --apply
 pnpm pipeline voice-health-check
 ```
 
 Select a TTS engine through the existing voice selection command/API. For a
-direct artifact smoke test, use the voice actuator with `engine_id=kokoro` or
-`engine_id=pocket_tts` after the runtime probe reports `ready`.
+direct artifact smoke test, use the voice actuator with `engine_id=kokoro`,
+`engine_id=pocket_tts`, or `engine_id=speech_cpp` after the runtime probe
+reports `ready`.
 
 ## STT / VAD
 
@@ -34,6 +44,16 @@ direct artifact smoke test, use the voice actuator with `engine_id=kokoro` or
   `KYBERION_STT_DEVICE=cuda` and `KYBERION_STT_COMPUTE_TYPE=float16` enable
   CUDA when the installed faster-whisper runtime supports it; CPU defaults to
   `int8`.
+
+- `speech_cpp`: local ASR through the same managed `speech` binary (default
+  `qwen3-asr-0.6b`). After `pnpm tool:setup -- --tool speech_cpp --apply`,
+  `installAvailableSpeechToTextBridges` registers the `speech_cpp` bridge and
+  voice-hub `auto` preference includes it when the binary is installed.
+  Persist `stt_backend=speech_cpp` in voice selection preferences, or point
+  voice-hub at an OpenAI-compatible serve with
+  `KYBERION_SPEECH_CPP_URL=http://127.0.0.1:8095` (and optionally
+  `KYBERION_SPEECH_CPP_AUTOSTART=1`). Loopback / `verify_tts_loopback` can use
+  `stt_bridge_id=speech_cpp` (buffers PCM, then one `speech asr` pass).
 
 - `fluid_audio`: a local Parakeet bridge for macOS. Set
   `KYBERION_FLUID_AUDIO_STT_COMMAND` to the bundled Swift Package bridge (or

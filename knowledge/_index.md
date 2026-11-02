@@ -189,6 +189,7 @@
 - [Work Inventory — a Discovery Stage Before the Intent Loop](./product/architecture/work-inventory-discovery-stage.md) (public | Ecosystem Architect)
 - [Workspace Isolation (Private Git Index, Session Worktrees, Ledger, Disk Budget)](./product/architecture/workspace-isolation.md) (public | Ecosystem Architect)
 - [runtime-surface-lifecycle-model](./product/architecture/runtime-surface-lifecycle-model.md) (public | runtime_governance)
+- [speech.cpp as a Local Voice Runtime — Integration](./product/architecture/speech-cpp-voice-runtime.md) (public | ecosystem_architect)
 - [テナント導入後の Runtime・Schedule・Surface・Channel スコープ調査報告](./product/architecture/tenant-scope-runtime-surface-channel-schedule-assessment-20260816.ja.md) (public | Ecosystem Architect)
 - [メモリとナレッジのコンテキスト・アダプタモデル](./product/architecture/knowledge-memory-context-model.ja.md) (public | Unknown)
 - [レビュー証跡・抽出方法の明示とプロセス復旧検証](./product/architecture/review-provenance-and-recovery-2026-10.md) (public | Unknown)
