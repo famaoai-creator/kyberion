@@ -1,0 +1,9 @@
+{
+  "role": "check_chronos_perf_baseline",
+  "description": "CE-08: weekly Chronos performance baseline (pnpm kyberion check chronos-perf, schedule ce-chronos-perf). Samples FPS and JS heap of the Chronos UI in a headless browser and writes exactly one report file; it never changes Chronos state.",
+  "default_persona": "worker",
+  "write_scopes": ["active/shared/observability/chronos/ce-08-perf-baseline.json"],
+  "scope_classes": ["observability"],
+  "allowed_actuators": [],
+  "tier_access": ["public"]
+}
