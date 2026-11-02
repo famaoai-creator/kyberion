@@ -3,11 +3,15 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import {
   declaredOperationPatterns,
+  declaredSubjectKeys,
   operationAuthorization,
   setAuthorizationOverlayProvider,
+  setSubjectAxisBridge,
+  subjectAuthorization,
   type AuthorizationOverlay,
   type EffectClass,
 } from './authorization-registry.js';
+import { missionActionCredentialRequirement } from './command-credential-policy.js';
 import { EXTERNAL_OPERATION_DELEGATION } from '../governance/external-operation-target.js';
 
 const EXTERNAL_CLASSES: readonly EffectClass[] = ['external_mutation', 'external_read'];
@@ -252,5 +256,127 @@ describe('authorization-registry boundary coverage gate', () => {
         expect(pattern in EXTERNAL_OPERATION_DELEGATION).toBe(true);
       }
     }
+  });
+});
+
+describe('subject axes', () => {
+  it('routes reserved prefixes to their axis and keeps bare ids on the operation axis', () => {
+    expect(subjectAuthorization('intent:x').axis).toBe('intent');
+    expect(subjectAuthorization('capability:x').axis).toBe('capability');
+    expect(subjectAuthorization('verb:x').axis).toBe('verb');
+    expect(subjectAuthorization('vcs:pr_merge').axis).toBe('operation');
+  });
+
+  it('fails safe per axis when undeclared', () => {
+    const intent = subjectAuthorization('intent:no-such-intent');
+    expect(intent.declared).toBe(false);
+    expect(intent.authority).toEqual({ kind: 'approval' });
+    expect(intent.effectClass).toBe('internal_decision');
+
+    const capability = subjectAuthorization('capability:no-such-cap');
+    expect(capability.declared).toBe(false);
+    expect(capability.authority).toEqual({ kind: 'binding', scope: 'tenant' });
+
+    // The verb bridge resolves via command-credential-policy; an unknown
+    // mission action is not in its table and falls to the 'required' default.
+    const verb = subjectAuthorization('verb:mission:nonsense');
+    expect(verb.declared).toBe(false);
+    expect(verb.authority).toEqual({ kind: 'binding', scope: 'task' });
+    expect(verb.detail).toEqual({
+      kind: 'credential-requirement',
+      requirement: 'required',
+    });
+  });
+
+  it('bridges resolve declared subjects with provenance and detail', () => {
+    const previous = setSubjectAxisBridge('intent', {
+      source: 'overlay',
+      resolve: (id) =>
+        id === 'known'
+          ? {
+              effectClass: 'internal_decision',
+              authority: { kind: 'approval' },
+              detail: { kind: 'approval-policy-rule', ruleId: 'r1' },
+            }
+          : undefined,
+      keys: () => ['known'],
+    });
+    try {
+      const auth = subjectAuthorization('intent:known');
+      expect(auth.declared).toBe(true);
+      expect(auth.source).toBe('overlay');
+      expect(auth.detail).toEqual({ kind: 'approval-policy-rule', ruleId: 'r1' });
+      expect(declaredSubjectKeys('intent')).toEqual(['known']);
+      // Other ids on the same axis still fail safe.
+      expect(subjectAuthorization('intent:other').declared).toBe(false);
+    } finally {
+      setSubjectAxisBridge('intent', previous);
+    }
+  });
+
+  it('verb axis resolves through the command-credential-policy bridge', () => {
+    // Importing command-credential-policy.ts registers the verb bridge.
+    for (const verb of ['help', 'create', 'memory-promote', 'list']) {
+      const auth = subjectAuthorization(`verb:mission:${verb}`);
+      expect(auth.declared).toBe(true);
+      expect(auth.source).toBe('code');
+      expect(auth.detail).toEqual({
+        kind: 'credential-requirement',
+        requirement: missionActionCredentialRequirement(verb),
+      });
+    }
+    expect(subjectAuthorization('verb:mission:help').authority).toEqual({ kind: 'free' });
+    expect(subjectAuthorization('verb:mission:memory-promote').authority).toEqual({
+      kind: 'binding',
+      scope: 'task',
+    });
+    // cli axis: readiness observations stay 'none', unknown commands 'required'.
+    expect(subjectAuthorization('verb:cli:list').detail).toEqual({
+      kind: 'credential-requirement',
+      requirement: 'none',
+    });
+    expect(subjectAuthorization('verb:cli:email:status').detail).toEqual({
+      kind: 'credential-requirement',
+      requirement: 'none',
+    });
+    expect(subjectAuthorization('verb:cli:unknown-tool').detail).toEqual({
+      kind: 'credential-requirement',
+      requirement: 'required',
+    });
+  });
+
+  it('carries reviewed protected paths folded from PROTECTED_ARGUMENTS', () => {
+    expect(operationAuthorization('vcs:pr_merge').protectedPaths).toEqual([
+      ['repository'],
+      ['baseRefName'],
+    ]);
+    expect(operationAuthorization('browser:goto').protectedPaths).toEqual([['params', 'url']]);
+    // service:* ops resolve through the governed overlay (loaded transitively
+    // via external-operation-target) — the data layer, so a plugin's own
+    // service:<provider> declarations still win.
+    const svc = operationAuthorization('service:acme:preset:anything');
+    expect(svc.declared).toBe(true);
+    expect(svc.source).toBe('overlay');
+    expect(svc.protectedPaths).toEqual([['params']]);
+    // email: prefix — the union of send/create_draft paths.
+    expect(operationAuthorization('email:send').protectedPaths).toEqual([
+      ['params', 'to'],
+      ['params', 'cc'],
+      ['params', 'from'],
+      ['account'],
+    ]);
+    // email:create_draft's exact entry narrows the prefix union (no account).
+    expect(operationAuthorization('email:create_draft').protectedPaths).toEqual([
+      ['params', 'to'],
+      ['params', 'cc'],
+      ['params', 'from'],
+    ]);
+    // An unmapped email op still falls back to the prefix union.
+    expect(operationAuthorization('email:archive').protectedPaths).toEqual([
+      ['params', 'to'],
+      ['params', 'cc'],
+      ['params', 'from'],
+      ['account'],
+    ]);
   });
 });
