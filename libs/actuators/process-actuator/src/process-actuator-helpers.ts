@@ -156,7 +156,8 @@ export async function handleAction(input: ProcessAction) {
           };
         }
         const gone =
-          record.pid !== undefined && !isRecordedProcessAlive(record.pid, record.pidStartMarker);
+          record.state === 'exited' ||
+          (record.pid !== undefined && !isRecordedProcessAlive(record.pid, record.pidStartMarker));
         // Route through the record's own cleanup so the registered process is
         // actually terminated; a failed cleanup retains ownership for retry.
         const outcome = await runtimeSupervisor.cleanup(params.resourceId, 'process:stop');

@@ -94,6 +94,18 @@ export function spawnManagedProcess(spec: ManagedProcessSpec): ManagedProcessHan
     });
   });
 
+  child.on('error', (error) => {
+    // A spawn that never started (ENOENT, EACCES): without a listener the
+    // 'error' event crashes the host process. Record the child as gone so
+    // status/stop classify it instead of reporting it 'running'.
+    logger.warn(`[MANAGED_PROCESS_SPAWN_FAILED] ${spec.resourceId}: ${error.message}`);
+    runtimeSupervisor.update(spec.resourceId, {
+      state: 'exited',
+      lastActiveAt: Date.now(),
+    });
+    managedHandles.delete(spec.resourceId);
+  });
+
   child.on('exit', () => {
     runtimeSupervisor.update(spec.resourceId, {
       state: 'exited',
