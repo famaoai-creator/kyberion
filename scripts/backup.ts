@@ -58,6 +58,7 @@ import {
   verifyWithheldCredentialMembers,
   type ManifestCredentialRead,
   type WithheldRestoreRoot,
+  manifestCredentialCount,
 } from './lib/backup-file-selection.js';
 import {
   BACKUP_PASSPHRASE_ENV,
@@ -733,7 +734,7 @@ export function buildBackupManifest(
     warnings: string[];
     excludedRoots?: string[];
     /** Guarded credential roots read under the backup admission (counts only). */
-    credentialReads?: Array<{ rule_id: string; root: string; file_count: number }>;
+    credentialReads?: ManifestCredentialRead[];
   }
 ) {
   return {
@@ -1410,8 +1411,10 @@ export function restoreBackup(
       return {
         root,
         archived_members: members.filter((member) => member.startsWith(`${root}/`)).length,
-        manifest_file_count:
-          manifest.credential_reads?.find((entry) => entry.root === root)?.file_count ?? null,
+        manifest_file_count: manifestCredentialCount(manifest.credential_reads, root),
+        ...(manifest.credential_reads?.find((entry) => entry.root === root)?.uncounted
+          ? { uncounted: true }
+          : {}),
       };
     });
     const trimmedTails = extracted.trimmedTails;

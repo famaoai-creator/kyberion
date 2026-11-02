@@ -1,0 +1,15 @@
+{
+  "$schema": "../schemas/authorization-registry.schema.json",
+  "version": "1",
+  "operations": {},
+  "prefixes": {
+    "service:": {
+      "effectClass": "external_mutation",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    }
+  }
+}

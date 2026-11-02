@@ -764,6 +764,7 @@
         "branch",
         "checkout",
         "commit",
+        "development_loop",
         "fetch",
         "pr_create",
         "pr_merge",

@@ -11,6 +11,7 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { readTextFile } from '@agent/core/foundation';
 import { safeExistsSync, safeReaddir, safeStat } from '@agent/core/secure-io';
 import { getAllFiles } from '@agent/core/fs-utils';
+import { normalizePathForPlatformCompare } from '@agent/core/platform-facts';
 import { defineScript, isDirectScript, ScriptExitError } from './lib/harness.js';
 
 import {
@@ -144,9 +145,7 @@ function pathKey(filePath: string): string {
   // while directory scans retain the on-disk spelling. Mirror the producer
   // here, or every PascalCase source false-positives as unrecorded_source
   // on macOS.
-  return process.platform === 'win32' || process.platform === 'darwin'
-    ? resolved.toLowerCase()
-    : resolved;
+  return normalizePathForPlatformCompare(resolved);
 }
 
 function fileMtime(filePath: string): number | null {

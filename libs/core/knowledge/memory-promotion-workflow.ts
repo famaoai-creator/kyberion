@@ -21,6 +21,8 @@ import {
   loadMemoryPromotionCandidate,
   listMemoryPromotionCandidates,
   type MemoryCandidate,
+  type MemoryWriteCapability,
+  assertQueueWriteCapability,
   updateMemoryPromotionCandidateStatus,
   isPublicMemoryEvidencePath,
 } from './memory-promotion-queue.js';
@@ -502,6 +504,8 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
   scope?: MemoryScopeEnvelope;
   /** KL-05: write the promoted record into this same-repository worktree. */
   targetRoot?: string;
+  /** W3: capability token threaded to the governed queue writes (asserted only when required). */
+  capability?: MemoryWriteCapability;
 }): Promise<{
   candidate: MemoryCandidate;
   promotedRef: string;
@@ -513,6 +517,10 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
   const candidate = loadMemoryPromotionCandidate(candidateId, input.scope);
   if (!candidate) throw new Error(`Memory promotion candidate not found: ${candidateId}`);
   assertReusableLearningBinding(candidate);
+  // W3: fail closed before any durable publication — the per-row queue gate
+  // below re-asserts at commit, but the capability must be proven before
+  // the distill record and promoted knowledge are written.
+  assertQueueWriteCapability(input.capability, candidate);
   if (
     input.expectedPayloadDigest !== undefined &&
     input.expectedPayloadDigest !== approvedLearningPayloadDigest(candidate)
@@ -593,6 +601,7 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
       status: 'rejected',
       ratificationNote: `Background review policy: ${reason}`,
       ...(candidate.scope ? { scope: candidate.scope } : {}),
+      ...(input.capability ? { capability: input.capability } : {}),
     });
     throw new Error(
       `[POLICY_VIOLATION] Memory promotion suppressed for ${candidate.candidate_id}: ${reason}`
@@ -614,6 +623,7 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
       status: 'approved',
       ratificationNote: `lane:${lane.lane}${lane.reason ? ` (${lane.reason})` : ''} — self-ratified by promotion-lanes policy`,
       ...(candidate.scope ? { scope: candidate.scope } : {}),
+      ...(input.capability ? { capability: input.capability } : {}),
     });
     (candidate as { status: string }).status = 'approved';
   }
@@ -669,6 +679,7 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
         ratificationNote: `Promotion suppressed: ${err.reason}`,
         promotedRef: '',
         ...(candidate.scope ? { scope: candidate.scope } : {}),
+        ...(input.capability ? { capability: input.capability } : {}),
       });
       const rejected = loadMemoryPromotionCandidate(candidateId, candidate.scope);
       if (!rejected) throw new Error(`Rejected candidate disappeared from queue: ${candidateId}`);
@@ -695,6 +706,7 @@ async function promoteMemoryCandidateToKnowledgeUnlocked(input: {
     promotedRef: promoted.logicalPath,
     ...(publication ? { learningPublication: publication } : {}),
     ...(candidate.scope ? { scope: candidate.scope } : {}),
+    ...(input.capability ? { capability: input.capability } : {}),
   });
   const updated = loadMemoryPromotionCandidate(candidateId, candidate.scope);
   if (!updated) throw new Error(`Promoted candidate disappeared from queue: ${candidateId}`);

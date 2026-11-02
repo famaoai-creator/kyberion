@@ -2,10 +2,29 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-10-26
+last_updated: 2026-11-02
 ---
 
 # Operations Hygiene Runbook
+
+## Checkout and canonical implementation drift
+
+Before changing a shared capability, record the checkout root, HEAD SHA/date,
+reviewed `origin/main` SHA and relevant existing module paths in mission evidence.
+Fetch remote references when available. If the checkout is substantially behind,
+compare the current implementation before editing; do not infer absence from an
+old tree. Preserve tracked and untracked mixed changes, then work in a dedicated
+worktree from the reviewed current base. Never reset the original checkout or
+copy its private runtime identity into the new worktree.
+
+Reconcile by capability: reuse the current charter, credential, audit and VCS
+boundaries and move only missing behavior. Test the actual default integration,
+not just injected success ports. Recheck upstream changes before review and
+regenerate derived catalogs after rebuilding the rebased source. Existing
+`pnpm check -- --changed`, registration and catalog gates validate the resulting
+diff; they do not prove that an arbitrary starting checkout was current. This
+checkout comparison is a required operational preflight, not a new claim made
+by those automated checks.
 
 ## Managed tool registration and readiness
 
@@ -215,6 +234,26 @@ A gate that times out on busy runs:
 
 ### VCS publication across Git worktrees
 
+Publication provenance must inspect every new reachable commit, including each
+parent diff of merge commits. Use the closed hardened history query with explicit
+`--diff-merges=separate`; a current-tree scan or Git's default merge display can
+miss a private artifact introduced only during merge resolution, even if a later
+commit deletes it. Keep the verified destination baseline, bounded output,
+replacement-object suppression and fail-closed classification. Enforce this with
+real divergent-parent merge fixtures for personal, confidential and public paths
+in `libs/core/vcs/git-publication-source.integration.test.ts`, plus the closed
+probe grammar tests in `libs/core/shell/git-probe-hardening.test.ts`.
+
+Development continuation must surface blocked or approval-waiting prerequisites
+instead of reporting an idle turn as progress. Let the canonical dispatcher
+reconcile approvals first, then inspect freshly read WorkItems in the same scope
+and implementation dependency chain. Return the exact approval request or blocked
+item evidence without consuming a repair attempt or publishing. Keep unrelated
+missions and scopes out of this result. Regression tests in
+`libs/core/mission/mission-development-continuation.test.ts` must cover pending,
+blocked and dispatch-resolved waits so that the diagnostic fix does not prevent
+approved work from resuming.
+
 PR readiness and Knowledge checks use the source worktree. Standalone publication
 uses the primary checkout's current approval store, installed identity, charters
 and consumption ledger only after checking Git common-directory equality. Keep
@@ -352,6 +391,20 @@ supervisor and PTC IPC tests when changing a listener.
 - **Never hand a lease over while work still runs.** If the in-flight tick did not drain in time,
   release the leader lease only immediately before exiting, never while the abandoned tick can
   still act (a second leader would double-run schedules).
+- **A tick's cost must not grow with history.** Work a daemon repeats every tick (scans of run
+  journals, mission dirs, ledgers) must skip records that cannot have changed — memoise settled
+  records by file size + mtime, as `sweepAwaitStateRuns` does — and yield to the event loop
+  (`setImmediate`) during long synchronous passes so the heartbeat refresh timer still fires. A
+  sweep that re-parsed every pipeline run journal each tick reached 180 s on a long-lived checkout
+  and kept the chronos heartbeat stale. Regression gate: `pipeline-await-resume.test.ts`.
+- **A scheduled script needs its own write grant.** Register a role for it
+  (`authority-roles/<name>.json`, the role index and `security-policy.json`) with a write scope
+  narrowed to the files it produces, and assume that role around the write with
+  `withExecutionContext`. Do not rely on the role derived from the script's file name: run as a
+  pipeline `system:shell` step, the child inherits the runner's role (`run_pipeline.bundle`).
+  Prove it with a hermetic tier-guard test (copy of the governance policies under a temp
+  `KYBERION_ROOT`; under the repo root Vitest does not load the policy) and by running the
+  schedule's pipeline once. Reference: `scripts/check_chronos_perf_baseline.test.ts`.
 - **Give every child a deadline.** Kill the child when it expires, raise an ops alert via
   `sendOpsAlert`, and forward signals to the child on shutdown.
 

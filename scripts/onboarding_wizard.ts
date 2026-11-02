@@ -1,4 +1,5 @@
 import { pickByLocale } from '@agent/core/locale-normalize';
+import { activationNextStep, prepareActivationSetup } from './onboarding_apply.js';
 import * as path from 'node:path';
 import * as readline from 'node:readline';
 import chalk from 'chalk';
@@ -1056,7 +1057,9 @@ async function runTutorialPhase(state: OnboardingState, print: Print): Promise<v
 async function runSummaryPhase(state: OnboardingState, print: Print): Promise<void> {
   const flowPolicy = resolveOnboardingFlowPolicy();
   print(`\n📊 Phase 5 — ${pt(flowPolicy.phase_titles.summary)}\n`);
-  const summary = buildSummaryMarkdown(state);
+  const ownerAuthority = activationNextStep(await prepareActivationSetup(new Date()));
+  const summary = buildSummaryMarkdown(state) + '\n\n' + ownerAuthority + '\n';
+  print(ownerAuthority);
   const runbookSkill = generateOnboardingRunbookSkill({
     profileRoot: profileRoot(),
     identityName: state.identity?.name,

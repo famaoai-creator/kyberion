@@ -26,6 +26,12 @@ import {
   type ToolRuntimeModePreference,
 } from './tool-runtime-policy.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
+import {
+  executableName,
+  getPlatformFacts,
+  locateCommandInvocation,
+  venvPythonCandidates,
+} from '../platform-facts.js';
 
 export type ToolRuntimeStatus = 'active' | 'shadow' | 'disabled';
 export type ToolRuntimePlatform = 'any' | 'darwin' | 'linux' | 'win32';
@@ -80,7 +86,7 @@ export interface ToolRuntimeManagedBinaryArtifact {
 export interface ToolRuntimeManagedBinary {
   version: string;
   relative_path: string;
-  archive?: 'tar.gz';
+  archive?: 'tar.gz' | 'zip';
   artifacts: Record<string, ToolRuntimeManagedBinaryArtifact>;
 }
 
@@ -210,8 +216,11 @@ function backendIsAvailable(
   platform: NodeJS.Platform = process.platform
 ): boolean {
   if (!backend) return false;
-  const resolver = platform === 'win32' ? 'where.exe' : 'which';
-  const result = safeExecResult(resolver, [backend.command], {
+  const [resolver, ...resolverArgs] = locateCommandInvocation(
+    backend.command,
+    getPlatformFacts(platform)
+  );
+  const result = safeExecResult(resolver, resolverArgs, {
     timeoutMs: 5_000,
     maxOutputMB: 1,
   });
@@ -239,13 +248,7 @@ function assertManagedRuntimePath(root: string, candidate: string): string {
 }
 
 function resolveManagedPythonCandidates(managedEnvPath: string): string[] {
-  if (process.platform === 'win32') {
-    return [
-      path.join(managedEnvPath, 'Scripts', 'python.exe'),
-      path.join(managedEnvPath, 'Scripts', 'python3.exe'),
-    ];
-  }
-  return [path.join(managedEnvPath, 'bin', 'python'), path.join(managedEnvPath, 'bin', 'python3')];
+  return venvPythonCandidates(managedEnvPath);
 }
 
 function normalizeToolId(toolId?: string): string {
@@ -525,7 +528,7 @@ export function probeToolRuntime(
       const binary = path.join(
         resolveManagedEnvPath(record),
         'bin',
-        platform === 'win32' ? `${entry}.exe` : entry
+        executableName(entry, getPlatformFacts(platform))
       );
       if (safeExistsSync(binary))
         selectedBackend = {

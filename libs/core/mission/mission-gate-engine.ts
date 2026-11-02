@@ -53,6 +53,9 @@ export type MissionGateCheckKind =
   | 'command_succeeds'
   | 'reviewer_approved'
   | 'human_override'
+  | 'development_reviews_verified'
+  | 'development_ci_verified'
+  | 'development_publication_verified'
   | 'deliverable_quality'
   | 'llm_review'
   | 'quality_contract_valid'
@@ -261,7 +264,7 @@ export function recordMissionGateOverride(input: MissionGateOverrideInput): stri
 
 async function evaluateGateCheck(
   check: MissionGateCheck,
-  context?: { gateId?: string }
+  context?: { gateId?: string; missionId?: string }
 ): Promise<{
   passed: boolean;
   reason?: string;
@@ -271,6 +274,19 @@ async function evaluateGateCheck(
     return parseSoftwareQualityContract(value);
   };
   switch (check.kind) {
+    case 'development_reviews_verified':
+    case 'development_ci_verified':
+    case 'development_publication_verified': {
+      if (!context?.missionId || !context.gateId)
+        return { passed: false, reason: 'Development gate requires canonical mission context' };
+      const { evaluateMissionDevelopmentGate } = await import('./mission-development-gates.js');
+      return evaluateMissionDevelopmentGate({
+        missionId: context.missionId,
+        gateId: context.gateId,
+        kind: check.kind,
+        developmentHash: check.params?.development_hash,
+      });
+    }
     case 'evidence_exists': {
       const params = check.params || {};
       const evidencePaths = toStringList(
@@ -626,7 +642,10 @@ export async function evaluateMissionGate(input: {
   const checks: MissionGateEvaluation['checks'] = [];
   const reasons: string[] = [];
   for (const check of input.gate.checks) {
-    const result = await evaluateGateCheck(check, { gateId: input.gate.id });
+    const result = await evaluateGateCheck(check, {
+      gateId: input.gate.id,
+      missionId: input.missionId,
+    });
     checks.push({
       kind: check.kind,
       passed: result.passed,

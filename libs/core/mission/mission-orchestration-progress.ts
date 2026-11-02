@@ -1,4 +1,5 @@
 import { guardSupersedeState } from './mission-next-tasks-supersede-guard.js';
+import { assertMissionBlueprintPreflight } from './mission-blueprint-preflight.js';
 import * as path from 'node:path';
 import type { PlanningPacket } from '../surface/channel-surface.js';
 import {
@@ -256,6 +257,13 @@ export function createMissionProgressController(
     if (!validation.valid || !validation.value) {
       throw new Error(`Invalid planning packet for ${missionId}: ${validation.errors.join('; ')}`);
     }
+    // W6: planner-commit preflight. This is the one honest complete-board
+    // seam — the packet's next_tasks is a fully-formed planner blueprint,
+    // unlike staged NEXT_TASKS.json writes that pass through the journal
+    // boundary in pieces. Opt-in via KYBERION_MISSION_BLUEPRINT_ENFORCE; a
+    // cycle or other blueprint error refuses here, before PLAN.md or any
+    // board artifact is written. Warnings remain advisory.
+    assertMissionBlueprintPreflight(missionId, validation.value.next_tasks);
     const planPath = safeMissionArtifactPath(missionId, 'PLAN.md');
     writeProvisionedText({
       missionId,
