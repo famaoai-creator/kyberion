@@ -116,9 +116,9 @@ merge queueとの互換のため、prepared promotionはbranch削除を同時要
 
 # PR公開準備の追加検証
 
-続くPR依頼に対し、最新の `origin/main=1bc5c0c45d764cf4e8ef75000dd46515824d4423`（#1339を含む）へ4件のfeature commitをrebaseした。機能sourceの競合はなく、`CAPABILITIES_GUIDE.md` の生成物競合は正規generatorで再生成した。main側のvoice／search追加exports、secure-io metadata制約、backup修正を保持している。rebase後の検証記録commitは `d3de996a8`。
+続くPR依頼に対し、最新の `origin/main=217be4af9924676ed686cba4e524f5046066855d`（#1340を含む）へ5件のfeature commitをrebaseした。機能sourceの競合はなく、`CAPABILITIES_GUIDE.md` の生成物競合は正規generatorで再生成した。main側のvoice／search exports、secure-io metadata、backup修正に加え、harness registryとmission stall detectionを保持している。rebase後のvalidation commitは `d3de996a8` と `35859c40a`。
 
-このbaseで `pnpm install --frozen-lockfile`、`pnpm build`、変更パスcheck 82 gates、`pnpm check -- --scope full` 90 gatesが成功した。Concierge TypeScript検証もproduction build内で成功した。対象67 test filesの再実行は1,015成功・2skip・失敗0。その後、例外表に従ったC localeの全Vitest実行では3,109 files／32,422 tests成功、21 tests失敗、2 worker errorsとなった。失敗のうち委任scope invariant、PR publication fixture、PR lifecycle fixture、tenant selection fixtureの6 filesを修正し、該当6 filesの95 testsとworker errorのあった `background-review-nudge.test.ts` 4 testsを再実行して全件成功した。修正後の全suite再実行は未実施である。独立review agentは前回baseで権限境界とexportsを確認し阻害なしとしたが、#1339取り込み後の独立reviewは未実施。
+このbaseで `pnpm install --frozen-lockfile`、`pnpm build`、`pnpm check -- --scope full` 90 gatesが成功した。Concierge TypeScript検証もproduction build内で成功した。#1339上では対象67 test filesが1,015成功・2skip・失敗0。その後のC locale全Vitest実行では3,109 files／32,422 tests成功、21 tests失敗、2 worker errorsとなった。委任scope invariant、PR publication/lifecycle fixture、tenant selection fixtureの6 filesを修正し、該当95 testsとworker errorを出した `background-review-nudge.test.ts` 4 testsを#1339上で再実行して全件成功した。#1340上ではユーザー指示により追加testを実行せず、修正後の全suite再実行も未実施である。独立review agentは#1338までのbaseで権限境界とexportsを確認し阻害なしとしたが、#1340を含む独立reviewは未実施。
 
 手動のIntent smokeも5経路すべて成功した。PR公開前にはこの記録の対象branch/headを一致させ、最新sourceに対するcanonical readinessとKnowledge検査を再実行する。
 
