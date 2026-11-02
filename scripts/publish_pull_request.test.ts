@@ -6,6 +6,7 @@ const mocks = vi.hoisted(() => ({
   safeReadFile: vi.fn(),
   checkPrKnowledgeReadiness: vi.fn(),
   ghPrCreate: vi.fn(),
+  prPublicationBodySourceForPath: vi.fn(() => 'protected_or_unknown' as const),
   explicitRequest: vi.fn(),
   writeScopedArtifact: vi.fn(),
 }));
@@ -28,6 +29,7 @@ vi.mock('@agent/core/workforce/artifact-store', async (original) => ({
 vi.mock('@agent/core/vcs/github', async (original) => ({
   ...(await original<typeof import('@agent/core/vcs/github')>()),
   ghPrCreate: mocks.ghPrCreate,
+  prPublicationBodySourceForPath: mocks.prPublicationBodySourceForPath,
 }));
 
 vi.mock('@agent/core/secure-io', async (importOriginal) => ({
