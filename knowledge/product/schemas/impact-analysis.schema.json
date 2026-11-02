@@ -13,6 +13,7 @@
     "risks",
     "size",
     "confidence",
+    "authority",
     "limitations",
     "unknowns"
   ],
@@ -38,6 +39,16 @@
     "confidence": {
       "enum": ["observed", "derived", "inferred"],
       "description": "Basis of the claims: 'observed' = direct measurement, 'derived' = computed from observed facts, 'inferred' = model or heuristic judgment."
+    },
+    "authority": {
+      "enum": [
+        "shipped-artifact",
+        "controlled-replay",
+        "historical-reference",
+        "external-service",
+        "analyst-inference"
+      ],
+      "description": "Channel the claims rest on. impact_analysis is always 'analyst-inference': reasoning-backend judgment over an observed inventory."
     },
     "limitations": {
       "type": "array",
