@@ -3,10 +3,11 @@
  * (`ps -o lstart=`), so a recycled pid is never mistaken for the process that
  * registered a workspace (or the delegated child using it).
  *
- * The marker is the raw `ps` output under `LC_ALL=C` / `TZ=UTC`, compared as
- * an opaque string: parsing it would depend on the locale and time zone of
- * whichever process reads it. Where no marker can be read (win32, a busybox
- * `ps` without `lstart`), liveness falls back to plain pid existence.
+ * The marker is the raw `ps` output under `LC_ALL=C` / `TZ=UTC` (POSIX) or the
+ * `Get-Process` StartTime in ISO-UTC (win32), compared as an opaque string:
+ * parsing it would depend on the locale and time zone of whichever process
+ * reads it. Where no marker can be read (a busybox `ps` without `lstart`, no
+ * PowerShell), liveness falls back to plain pid existence.
  */
 
 import { safeExecResult } from '../secure-io.js';
@@ -42,9 +43,23 @@ export function isProcessGroupAlive(pgid: number): boolean {
 }
 
 export function processStartMarker(pid: number): string | undefined {
-  if (!Number.isInteger(pid) || pid <= 0 || !platformFacts.processModel.hasPosixSignals)
-    return undefined;
+  if (!Number.isInteger(pid) || pid <= 0) return undefined;
   try {
+    if (platformFacts.platform === 'win32') {
+      const result = safeExecResult(
+        'powershell',
+        [
+          '-NoProfile',
+          '-NonInteractive',
+          '-Command',
+          `(Get-Process -Id ${pid}).StartTime.ToUniversalTime().ToString('o')`,
+        ],
+        { timeoutMs: 3000, maxOutputMB: 1 }
+      );
+      const marker = result.stdout.trim();
+      return result.status === 0 && marker.length > 0 ? marker : undefined;
+    }
+    if (!platformFacts.processModel.hasPosixSignals) return undefined;
     const result = safeExecResult('ps', ['-p', String(pid), '-o', 'lstart='], {
       timeoutMs: 1000,
       maxOutputMB: 1,
