@@ -63,8 +63,16 @@ export function assertCharterId(id: string): void {
   if (!CHARTER_ID_PATTERN.test(id)) throw new Error(`[charter] invalid charter id '${id}'`);
 }
 
+/**
+ * Root holding the charter store: the primary checkout in a linked worktree
+ * (one authority store per repository), an explicit `rootDir` in tests.
+ */
+function charterRoot(options: CharterPathOptions): string {
+  return options.rootDir ?? pathResolver.primaryCheckoutRootDir();
+}
+
 export function charterDir(scope: CharterScope, options: CharterPathOptions = {}): string {
-  const root = options.rootDir ?? pathResolver.rootDir();
+  const root = charterRoot(options);
   if (scope.kind === 'person') return path.join(root, 'knowledge', 'personal', 'charters');
   if (!isValidTenantSlug(scope.tenant_slug)) {
     throw new Error(`[charter] invalid tenant slug '${scope.tenant_slug}'`);
@@ -87,7 +95,7 @@ function ledgerPath(scope: CharterScope, charterId: string, options: CharterPath
 }
 
 function safePath(file: string, options: CharterPathOptions): string {
-  return assertSafeRepositoryPath(file, { allowMissingLeaf: true, rootDir: options.rootDir });
+  return assertSafeRepositoryPath(file, { allowMissingLeaf: true, rootDir: charterRoot(options) });
 }
 
 /** Narrow, synchronous I/O mediation; caller role is preserved for decisions. */
@@ -105,8 +113,7 @@ function scopedCharterIo<T>(
     publication.tenant_slug === scope.tenant_slug &&
     writes.length > 0
   ) {
-    const relative = (file: string) =>
-      path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+    const relative = (file: string) => pathResolver.storeRelativePath(file);
     return withPrPublicationStoreAccess(
       'charter-ledger-write',
       files.map(relative),
@@ -121,9 +128,7 @@ function scopedCharterIo<T>(
     (publication.kind === 'person' ||
       (scope.kind === 'organization' && publication.tenant_slug === scope.tenant_slug))
   ) {
-    const relative = files.map((file) =>
-      path.relative(pathResolver.rootDir(), file).split(path.sep).join('/')
-    );
+    const relative = files.map((file) => pathResolver.storeRelativePath(file));
     return withPrPublicationStoreAccess('charter-read', relative, [], () =>
       withExecutionContext(
         PR_PUBLICATION_STORE_ROLE,
@@ -134,8 +139,7 @@ function scopedCharterIo<T>(
     );
   }
   if (scope.kind === 'person' && currentInstalledPersonCharterRuntime()) {
-    const relative = (file: string) =>
-      path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+    const relative = (file: string) => pathResolver.storeRelativePath(file);
     return withPersonCharterStoreAccess(files.map(relative), writes.map(relative), () =>
       withExecutionContext('person_charter_store', action, 'worker')
     );
@@ -144,7 +148,7 @@ function scopedCharterIo<T>(
   if (identity.tenantSlug !== scope.tenant_slug)
     throw new Error('[CHARTER_SCOPE_DENIED] Caller tenant differs from charter tenant');
   const relative = (file: string) => {
-    const value = path.relative(pathResolver.rootDir(), file).split(path.sep).join('/');
+    const value = pathResolver.storeRelativePath(file);
     if (!value || value.startsWith('../') || path.isAbsolute(value))
       throw new Error('[CHARTER_SCOPE_DENIED] Charter resource outside repository');
     return value;

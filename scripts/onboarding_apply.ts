@@ -186,10 +186,26 @@ export function buildDelegationInput(
     ? [
         { operation_id: 'vcs:pr_create' as const, repository, ...visibility },
         { operation_id: 'vcs:pr_merge' as const, repository, branch: 'main', ...visibility },
+        // Feature branches are the everyday development surface — without a
+        // pattern grant every push and every stacked-PR merge asks again.
+        // 'main' itself stays outside the pattern: direct pushes and the
+        // exact main merge keep their own grant.
+        {
+          operation_id: 'vcs:pr_merge' as const,
+          repository,
+          branch_pattern: 'feat/*',
+          ...visibility,
+        },
         {
           operation_id: 'vcs:push' as const,
           repository,
           branch: 'agent/kyberion-development',
+          ...visibility,
+        },
+        {
+          operation_id: 'vcs:push' as const,
+          repository,
+          branch_pattern: 'feat/*',
           ...visibility,
         },
       ]
@@ -255,7 +271,7 @@ export function activationNextStep(setup?: ActivationSetup): string {
     path.dirname(setup.input_path),
     'development-reviewed.json'
   );
-  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. For Kyberion development, review ${delegation}, including its expiry, repository, read/write tiers, candidate branch agent/kyberion-development and merge target main. Run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(delegation)} --out ${shellQuoteArg(developmentReviewed)} --json\`, inspect the saved preview, then \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(developmentReviewed)} --json\`. One human approval activates the provisioned identity and grants the displayed development operations together; apply the displayed request ID. If activation without outbound delegation is intended, review ${setup.input_path} and use \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\` with the same request/approval/apply flow instead. Existing reviewed files are retained; choose a new output name when changing the plan.`;
+  return `For a newly provisioned identity, first run \`pnpm kyberion onboarding authority show --scope person --json\` and resume any existing request. For Kyberion development, review ${delegation}, including its expiry, repository, read/write tiers, candidate branch agent/kyberion-development, the feat/* branch pattern for pushes and feature-base merges, and merge target main. Run \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(delegation)} --out ${shellQuoteArg(developmentReviewed)} --json\`, inspect the saved preview, then \`pnpm kyberion onboarding authority request --file ${shellQuoteArg(developmentReviewed)} --json\`. One human approval activates the provisioned identity and grants the displayed development operations together; apply the displayed request ID. If activation without outbound delegation is intended, review ${setup.input_path} and use \`pnpm kyberion onboarding authority preview --file ${shellQuoteArg(setup.input_path)} --out ${shellQuoteArg(reviewed)} --json\` with the same request/approval/apply flow instead. Existing reviewed files are retained; choose a new output name when changing the plan.`;
 }
 
 export function ensureDir(p: string) {

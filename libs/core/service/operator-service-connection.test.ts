@@ -51,6 +51,7 @@ import {
   type OperatorServiceConnectionPrincipal,
 } from './operator-service-connection.js';
 import { loadOperatorServiceConnectionCatalog } from './operator-service-connection-catalog.js';
+import { resolveInstallationOwnerAccess } from '../surface/installation-owner-access.js';
 import {
   consumeOperatorServiceProbeAdmission,
   issueOperatorServiceProbeAdmission,
@@ -143,6 +144,36 @@ describe('local operator service connection capability', () => {
     ).rejects.toThrow('OPERATOR_SERVICE_CONNECTION_DENIED');
     expect(mocks.loadConnectionDocument).not.toHaveBeenCalled();
     expect(mocks.secureFetch).not.toHaveBeenCalled();
+  });
+
+  it('admits an issued installation-owner grant and never a copied one', async () => {
+    const issue = (mode: 'read' | 'write') =>
+      resolveInstallationOwnerAccess(
+        { mode, principal: null, trustedLoopback: true },
+        { bootstrapOpen: true, env: {} }
+      );
+    const read = issue('read');
+    const write = issue('write');
+    if (!read.allowed || !write.allowed) throw new Error('expected bootstrap grants');
+    const remote = (grant: typeof read) =>
+      ({
+        role: 'localadmin',
+        source: 'token',
+        principalId: grant.principalId,
+        loopback: false,
+        installationGrant: grant,
+      }) as OperatorServiceConnectionPrincipal;
+    expect(listOperatorServiceConnections(remote(read))).toHaveLength(2);
+    // A read grant never admits the probe; a copied grant never admits anything.
+    await expect(
+      probeOperatorServiceConnection({ principal: remote(read), serviceId: 'evil' })
+    ).rejects.toThrow('OPERATOR_SERVICE_CONNECTION_DENIED');
+    expect(
+      await probeOperatorServiceConnection({ principal: remote(write), serviceId: 'evil' })
+    ).toMatchObject({ status: 'unsupported' });
+    expect(() => listOperatorServiceConnections(remote({ ...write }))).toThrow(
+      'OPERATOR_SERVICE_CONNECTION_DENIED'
+    );
   });
 
   it('denies plugin frames even when the plugin has wildcard secrets', async () => {

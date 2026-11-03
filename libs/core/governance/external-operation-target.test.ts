@@ -306,6 +306,128 @@ describe('exact public operation target grants', () => {
       parseExternalOperationGrant({ ...merge, repository: 'ssh://git@github.com/acme/project' })
     ).toBeUndefined();
   });
+  it('parses branch_pattern grants and rejects every wildcard except a tree prefix', () => {
+    const pattern = {
+      operation_id: 'vcs:push' as const,
+      repository: 'https://github.com/acme/project',
+      branch_pattern: 'feat/*',
+    };
+    expect(parseExternalOperationGrant(pattern)).toEqual(pattern);
+    // 'feat/**' and the refs form canonicalize to the single-wildcard tree.
+    expect(parseExternalOperationGrant({ ...pattern, branch_pattern: 'feat/**' })).toEqual(pattern);
+    expect(
+      parseExternalOperationGrant({ ...pattern, branch_pattern: 'refs/heads/feat/*' })
+    ).toEqual(pattern);
+    for (const branch_pattern of [
+      '*',
+      '**',
+      'feat*', // prefix must end at a tree boundary
+      'fe*t/*',
+      'feat/*/x',
+      'feat/**/x',
+      'feat/?x*',
+      'feat/x*',
+      'feat/**/**',
+      ' feat/* ',
+      'feat/ *',
+      '*/*',
+      'x*',
+    ])
+      expect(parseExternalOperationGrant({ ...pattern, branch_pattern })).toBeUndefined();
+    // Ambiguous grants and pattern on non-branch operations are not grants.
+    expect(parseExternalOperationGrant({ ...pattern, branch: 'main' })).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({
+        operation_id: 'vcs:pr_create',
+        repository: pattern.repository,
+        branch_pattern: 'feat/*',
+      })
+    ).toBeUndefined();
+    expect(
+      parseExternalOperationGrant({ operation_id: 'vcs:push', branch_pattern: 'feat/*' })
+    ).toBeUndefined();
+  });
+  it('covers branches directionally: pattern over target, never the reverse', () => {
+    const pattern = parseExternalOperationGrant({
+      operation_id: 'vcs:push' as const,
+      repository: 'https://github.com/acme/project',
+      branch_pattern: 'feat/*',
+    })!;
+    const covered = {
+      operation_id: 'vcs:push' as const,
+      repository: 'https://github.com/acme/project',
+      branch: 'feat/login',
+    };
+    const uncovered = { ...covered, branch: 'main' };
+    expect(externalOperationGrantMatches(pattern, covered)).toBe(true);
+    expect(externalOperationGrantMatches(pattern, uncovered)).toBe(false);
+    // 'feat/*' never matches 'feat' itself or sibling trees.
+    expect(externalOperationGrantMatches(pattern, { ...covered, branch: 'feat' })).toBe(false);
+    expect(externalOperationGrantMatches(pattern, { ...covered, branch: 'feature/x' })).toBe(false);
+    // An exact grant cannot cover a pattern and a pattern cannot widen itself.
+    const exact = parseExternalOperationGrant(covered)!;
+    expect(externalOperationGrantMatches(exact, pattern)).toBe(false);
+    const narrower = parseExternalOperationGrant({
+      ...covered,
+      branch_pattern: 'feat/sub/*',
+      branch: undefined,
+    })!;
+    expect(externalOperationGrantMatches(pattern, narrower)).toBe(true);
+    expect(externalOperationGrantMatches(narrower, pattern)).toBe(false);
+    // Repository still must match exactly.
+    expect(
+      externalOperationGrantMatches(pattern, {
+        ...covered,
+        repository: 'https://github.com/acme/other',
+      })
+    ).toBe(false);
+  });
+  it('delegates push to a branch_pattern charter for covered refs only', () => {
+    const grant = parseExternalOperationGrant({
+      operation_id: 'vcs:push' as const,
+      repository: 'https://github.com/acme/project',
+      branch_pattern: 'feat/*',
+    })!;
+    const c = charter();
+    c.envelope.external_operations = [grant];
+    state.charter = c;
+    expect(
+      resolve()({
+        operationId: 'vcs:push',
+        requiresApproval: true,
+        delegable: true,
+        effect: {
+          url: grant.repository,
+          destination: 'refs/heads/feat/delegation',
+          publication_source_tier: 'public',
+        },
+      })
+    ).toMatchObject({
+      charter: {
+        action: {
+          // The audit action records the exact executed target, not the pattern.
+          external_operation: {
+            operation_id: 'vcs:push',
+            repository: grant.repository,
+            branch: 'feat/delegation',
+          },
+          reputational_class: 'A',
+        },
+      },
+    });
+    expect(
+      resolve()({
+        operationId: 'vcs:push',
+        requiresApproval: true,
+        delegable: true,
+        effect: {
+          url: grant.repository,
+          destination: 'refs/heads/main',
+          publication_source_tier: 'public',
+        },
+      })
+    ).not.toHaveProperty('charter');
+  });
   it('parses optional visibility:private grants and binds verified-private effects', () => {
     const grant = {
       operation_id: 'vcs:push' as const,

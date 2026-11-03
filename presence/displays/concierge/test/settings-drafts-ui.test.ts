@@ -4,6 +4,7 @@ import type { ProfileSectionProps } from '../src/app/settings/sections/ProfileSe
 import type { NotificationsSectionProps } from '../src/app/settings/sections/NotificationsSection';
 import type { MembersSectionProps } from '../src/app/settings/sections/MembersSection';
 import type { ServicesSectionProps } from '../src/app/settings/sections/ServicesSection';
+import type { AdvancedSectionProps } from '../src/app/settings/sections/AdvancedSection';
 import {
   installFakeDom,
   fireEvent,
@@ -15,6 +16,7 @@ const captured = vi.hoisted(() => ({
   members: null as MembersSectionProps | null,
   notifications: null as NotificationsSectionProps | null,
   services: null as ServicesSectionProps | null,
+  advanced: null as AdvancedSectionProps | null,
 }));
 vi.mock('../src/app/settings/sections/ProfileSection', () => ({
   ProfileSection: (props: ProfileSectionProps) => {
@@ -57,8 +59,12 @@ vi.mock('../src/app/settings/sections/RecordingConsentSection', () => ({
   RecordingConsentSection: () => null,
 }));
 vi.mock('../src/app/settings/sections/PluginsSection', () => ({ PluginsSection: () => null }));
+vi.mock('../src/app/settings/sections/AuthoritySection', () => ({ AuthoritySection: () => null }));
 vi.mock('../src/app/settings/sections/AdvancedSection', () => ({
-  AdvancedSection: () => null,
+  AdvancedSection: (props: AdvancedSectionProps) => {
+    captured.advanced = props;
+    return null;
+  },
 }));
 vi.mock('../src/app/settings/sections/DisplaySection', () => ({ DisplaySection: () => null }));
 vi.mock('../src/lib/use-concierge-i18n', () => ({
@@ -151,9 +157,11 @@ function serve(respond?: Respond) {
       if (url === '/api/setup') {
         if (init?.method === 'POST') {
           const body = JSON.parse(String(init.body)) as {
-            draft: { identity: typeof storedSetup.setup.profile };
+            action: string;
+            patch: { identity?: Partial<typeof storedSetup.setup.profile> };
           };
-          Object.assign(storedSetup.setup.profile, body.draft.identity);
+          expect(body.action).toBe('save_settings');
+          Object.assign(storedSetup.setup.profile, body.patch.identity);
           return json({
             ok: true,
             onboarding: { ok: true, applied_at: '2026-10-08', artifacts: [], warnings: [] },
@@ -189,6 +197,7 @@ afterEach(() => {
   captured.members = null;
   captured.notifications = null;
   captured.services = null;
+  captured.advanced = null;
   exit.registration = null;
   exit.invalidate.mockReset();
 });
@@ -225,6 +234,106 @@ describe('settings page draft preservation', () => {
     await act(async () => captured.notifications!.onSaveNotification());
     expect(captured.profile!.profile.name).toBe('Unsaved name');
     expect(captured.services!.services).toEqual(['browser']);
+  });
+});
+
+describe('settings saves send only edited fields', () => {
+  const storedServices = () => {
+    const data = setup();
+    return json({ ...data, setup: { ...data.setup, selected_services: ['browser', 'slack'] } });
+  };
+  const setupPosts = () =>
+    vi
+      .mocked(fetch)
+      .mock.calls.filter(([url, init]) => url === '/api/setup' && init?.method === 'POST')
+      .map(([, init]) => JSON.parse(String(init?.body)));
+
+  it('a profile save posts only the edited field, never page-local defaults', async () => {
+    serve((url, init) => (url === '/api/setup' && !init?.method ? storedServices() : undefined));
+    await mount();
+    await act(async () =>
+      captured.profile!.setProfile({ ...captured.profile!.profile, name: '  Renamed  ' })
+    );
+    await act(async () => captured.profile!.onSaveProfile());
+
+    expect(setupPosts()).toEqual([
+      { action: 'save_settings', patch: { identity: { name: 'Renamed' } } },
+    ]);
+    expect(captured.profile!.saveFeedback?.phase).toBe('saved');
+  });
+
+  it('a services save posts only the service selection', async () => {
+    serve((url, init) => (url === '/api/setup' && !init?.method ? storedServices() : undefined));
+    await mount();
+    await act(async () => {
+      captured.profile!.setProfile({ ...captured.profile!.profile, name: 'Unsaved name' });
+      captured.services!.setServices(['browser']);
+    });
+    await act(async () => captured.services!.onSaveConnections());
+
+    expect(setupPosts()).toEqual([
+      {
+        action: 'save_settings',
+        patch: { services: [{ service_id: 'browser', auth_mode: 'session', required: false }] },
+      },
+    ]);
+    expect(captured.profile!.profile.name).toBe('Unsaved name');
+    expect(captured.profile!.hasUnsavedChanges).toBe(true);
+  });
+
+  it('refuses a management save without a registered tenant, visibly and without a request', async () => {
+    serve();
+    await mount();
+    await act(async () => captured.advanced!.onSaveManagement());
+
+    expect(setupPosts()).toEqual([]);
+    expect(captured.advanced!.saveFeedback).toEqual({
+      section: 'advanced',
+      phase: 'rejected',
+      message: 'api.config.tenant_invalid',
+    });
+  });
+
+  it('shows the server refusal of a management save next to its button', async () => {
+    serve((url, init) => {
+      if (url === '/api/setup' && init?.method === 'POST')
+        return json({ ok: false, code: 'TENANT_SELECTION_REQUIRED', error: 'refused' }, 400);
+      if (url === '/api/setup') {
+        const data = setup();
+        const catalog = [
+          {
+            tenant_slug: 'alpha',
+            tenant_id: 'alpha',
+            display_name: 'Alpha',
+            status: 'active',
+            assigned_role: 'owner',
+          },
+        ];
+        return json({
+          ...data,
+          setup: { ...data.setup, tenant: { ...data.setup.tenant, catalog } },
+        });
+      }
+    });
+    await mount();
+    await act(async () => captured.advanced!.onSaveManagement());
+
+    const [body] = setupPosts();
+    expect(body).toMatchObject({ action: 'save_management', tenant: { slug: 'alpha' } });
+    expect(body).not.toHaveProperty('name');
+    expect(body).not.toHaveProperty('vision');
+    expect(captured.advanced!.saveFeedback).toMatchObject({
+      phase: 'rejected',
+      message: 'refused',
+    });
+  });
+
+  it('sends nothing when the section has no edits', async () => {
+    serve((url, init) => (url === '/api/setup' && !init?.method ? storedServices() : undefined));
+    await mount();
+    await act(async () => captured.services!.onSaveConnections());
+
+    expect(setupPosts()).toEqual([]);
   });
 });
 

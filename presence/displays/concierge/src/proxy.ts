@@ -6,6 +6,7 @@ import {
   peekSessionExpiry,
   resolveLoginRedirect,
 } from '@agent/core/surface/surface-session-cookie';
+import { anonymousLoopbackAllowed } from '@agent/core/surface/installation-owner-access';
 import { isLoopbackPeer } from './lib/loopback-peer';
 
 /** UX-only hint set by /signin after a pasted token is accepted. Grants nothing. */
@@ -21,9 +22,11 @@ export function isPwaAssetPath(pathname: string): boolean {
 }
 
 /**
- * Bounce unauthenticated remote browser page navigations to /login. Never an
+ * Bounce unauthenticated browser page navigations to /login. Never an
  * authorization decision: API routes (unchanged, JSON 401) verify the real
- * credential themselves, and loopback is never redirected.
+ * credential themselves. Loopback is exempt only while a credential-less
+ * loopback request is still the local operator (bootstrap open, or the
+ * KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK escape hatch).
  */
 export function proxy(req: NextRequest): NextResponse {
   const { pathname, search } = req.nextUrl;
@@ -45,7 +48,7 @@ export function proxy(req: NextRequest): NextResponse {
     pathname,
     search,
     headers: req.headers,
-    loopback: isLoopbackPeer(req),
+    loopback: !hasCredential && isLoopbackPeer(req) && anonymousLoopbackAllowed(),
     hasCredential,
   });
   if (!target) return NextResponse.next();

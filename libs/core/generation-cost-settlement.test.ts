@@ -182,3 +182,20 @@ describe('generation cost settlement', () => {
 function collectorEntries() {
   return new MetricsCollector({ metricsDir }).loadResourceUsageHistory({ scope: tenantScope });
 }
+
+describe('generation cost settlement — default repository root', () => {
+  it('lists from the repository root without a rootDir (Chronos /api/cost path)', () => {
+    // Regression: the default root was itself passed to assertSafeRepositoryPath,
+    // which only admits paths strictly inside the root, so every call threw
+    // [RESOURCE_PATH_SCOPE] and /api/cost answered 500.
+    expect(() =>
+      listGenerationCostSettlements({
+        scopeFilter: { tenant_slugs: ['tenant-default-root-probe'] },
+      })
+    ).not.toThrow();
+  });
+
+  it('still refuses a caller-chosen rootDir outside the repository', () => {
+    expect(() => listGenerationCostSettlements({ rootDir: '/' })).toThrow(/RESOURCE_PATH_SCOPE/);
+  });
+});
