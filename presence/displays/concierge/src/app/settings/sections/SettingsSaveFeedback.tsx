@@ -3,10 +3,21 @@
 import * as React from 'react';
 import { Callout } from '@agent/shared-ui';
 import type { SettingsTranslate } from './form-scope';
+import type { ConciergeMessageKey } from '../../../lib/i18n';
 
 export type SettingsSaveFeedbackState = {
-  section: 'profile' | 'services' | 'notifications';
-  phase: 'saving' | 'saved' | 'unconfirmed' | 'unavailable';
+  section: 'profile' | 'services' | 'notifications' | 'voice' | 'advanced';
+  /** `rejected`: the server refused the save; `message` carries its reason. */
+  phase: 'saving' | 'saved' | 'unconfirmed' | 'unavailable' | 'rejected';
+  message?: string;
+};
+
+const SAVED_KEY: Record<SettingsSaveFeedbackState['section'], ConciergeMessageKey> = {
+  profile: 'setup.onboarding_saved',
+  services: 'setup.onboarding_saved',
+  notifications: 'setup.notification_saved',
+  voice: 'setup.voice_registered',
+  advanced: 'setup.management_saved',
 };
 
 /** One result at the initiating control; a receipt never implies later edits were saved. */
@@ -21,19 +32,17 @@ export function SettingsSaveFeedback({
 }) {
   if (!feedback) return null;
   const { phase, section } = feedback;
-  const danger = phase === 'unconfirmed' || phase === 'unavailable';
-  const key =
+  const danger = phase === 'unconfirmed' || phase === 'unavailable' || phase === 'rejected';
+  const key: ConciergeMessageKey =
     phase === 'saving'
       ? 'setup.section_save_pending'
-      : phase === 'unconfirmed'
+      : phase === 'unconfirmed' || phase === 'rejected'
         ? 'setup.draft_save_unconfirmed'
         : phase === 'unavailable'
           ? 'setup.draft_context_unavailable'
           : hasUnsavedChanges
             ? 'setup.section_save_newer_edits'
-            : section === 'notifications'
-              ? 'setup.notification_saved'
-              : 'setup.onboarding_saved';
+            : SAVED_KEY[section];
   return (
     <div
       className="settings-row-block"
@@ -43,7 +52,7 @@ export function SettingsSaveFeedback({
     >
       <Callout
         tone={danger ? 'danger' : phase === 'saved' && !hasUnsavedChanges ? 'success' : 'info'}
-        title={t(key)}
+        title={phase === 'rejected' && feedback.message ? feedback.message : t(key)}
       />
     </div>
   );
