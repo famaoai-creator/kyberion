@@ -1,11 +1,20 @@
 import { currentResourceAccessScope } from './resource-access-scope.js';
 import { currentExecutionScope } from './execution-scope.js';
+import { subjectAuthorization } from './authorization-registry.js';
 
 /** Exact coverage checkpoint projection; observation/content and mutation have no capability. */
 export function informationAssetCoverageReadAllowed(
   relativePath: string,
   role: string | undefined
 ): boolean {
+  const entry = subjectAuthorization('information-asset:coverage:read');
+  if (
+    !entry.declared ||
+    entry.source !== 'code' ||
+    entry.effectClass !== 'local_only' ||
+    entry.authority.kind !== 'free'
+  )
+    return false;
   if (
     !['concierge_management_reader', 'chronos_operator', 'chronos_localadmin'].includes(role ?? '')
   )

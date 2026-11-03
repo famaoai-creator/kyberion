@@ -1,3 +1,5 @@
+import { subjectAuthorization } from '@agent/core/foundation/authorization-registry';
+import { approvalChannelResolution } from '@agent/core/foundation/approval-domains';
 import {
   planServiceOperation,
   createServiceExecutionReceipt,
@@ -11,6 +13,7 @@ import {
 } from '@agent/core/information-assets/work';
 import {
   getInformationAssetCollector,
+  buildReviewThreadsCaptureParams,
   readInformationAssetObservation,
   assertInformationAssetCaptureOperation,
 } from '@agent/core/information-assets/collector';
@@ -44,12 +47,38 @@ function bodyText(payload: unknown): string {
     return Buffer.from(body.data, 'base64url').toString('utf8');
   return array(p.parts).map(bodyText).find(Boolean) ?? '';
 }
+/** Resolve the actual external-operation subject; a registry declaration never replaces admission. */
+export function resolveInformationAssetEffectAuthorization(serviceId: string, action: string) {
+  return resolveInformationAssetAuthorizationSubject('service:' + serviceId + ':preset:' + action);
+}
+function resolveInformationAssetAuthorizationSubject(subject: string) {
+  const authorization = subjectAuthorization(subject);
+  if (
+    authorization.axis !== 'operation' ||
+    !authorization.declared ||
+    authorization.source !== 'code' ||
+    authorization.effectClass !== 'external_mutation' ||
+    authorization.authority.kind !== 'admission' ||
+    authorization.authority.boundary !== 'external'
+  )
+    throw new Error(
+      '[INFORMATION_WORK_AUTHORIZATION] A reviewed external-mutation subject and external admission are required'
+    );
+  const domain = authorization.approvalDomain;
+  const channel = domain ? approvalChannelResolution(domain) : undefined;
+  if (domain !== 'external-operation' || !channel?.declared || channel.kind !== 'domain')
+    throw new Error(
+      '[INFORMATION_WORK_APPROVAL_DOMAIN] Fixed service writes must use the declared external-operation approval domain'
+    );
+  return authorization;
+}
 /** Fixed compiler from admitted recipes to gated service calls. Source text has no routing authority. */
 export async function runInformationAssetWork(
   params: Record<string, unknown>,
   service: ServicePort,
   options: ServiceActionExecutionOptions = {}
 ) {
+  resolveInformationAssetAuthorizationSubject('service:information_asset_work');
   const text = (key: string): string => {
     const value = params[key];
     if (typeof value !== 'string' || !value) throw new Error('information_work_input:' + key);
@@ -158,18 +187,15 @@ export async function runInformationAssetWork(
     let after: string | undefined;
     const seen = new Set<string>();
     for (let page = 0; page < 20; page++) {
-      const result = await capture('get_review_threads', {
-        query: {
-          query:
-            'query($owner:String!,$repo:String!,$number:Int!,$after:String){repository(owner:$owner,name:$repo){pullRequest(number:$number){headRefOid reviewThreads(first:100,after:$after){nodes{id isResolved} pageInfo{hasNextPage endCursor}}}}}',
-          variables: JSON.stringify({
-            owner: location.selectors.owner,
-            repo: location.selectors.repo,
-            number,
-            ...(after ? { after } : {}),
-          }),
-        },
-      });
+      const result = await capture(
+        'get_review_threads',
+        buildReviewThreadsCaptureParams({
+          owner: location.selectors.owner,
+          repo: location.selectors.repo,
+          number,
+          after: after ?? null,
+        })
+      );
       const pull = object(object(result.repository).pullRequest);
       if (pull.headRefOid !== data.head_sha) return undefined;
       const threads = object(pull.reviewThreads);
@@ -252,6 +278,7 @@ export async function runInformationAssetWork(
         default:
           throw new Error('information_work_action_not_external');
       }
+      const authorization = resolveInformationAssetEffectAuthorization(location.service_id, action);
       const plan = planServiceOperation(location.service_id, action, request);
       const receipt = (status: 'succeeded' | 'failed' | 'approval_required', result: unknown) =>
         persistServiceExecutionReceipt(
@@ -260,6 +287,7 @@ export async function runInformationAssetWork(
               ...plan,
               inputs: {
                 work_key: b.work_key,
+                authorization_subject: authorization.subject,
                 request_sha256: informationArtifactHash(JSON.stringify(request)),
               },
             },
@@ -273,6 +301,8 @@ export async function runInformationAssetWork(
           )
         ).receipt_id;
       try {
+        // Resolve again at the last synchronous boundary before the gated host call.
+        resolveInformationAssetEffectAuthorization(location.service_id, action);
         const result = await call(action, request);
         return { status: 'applied', execution_receipt_id: receipt('succeeded', result) };
       } catch (error) {

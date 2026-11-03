@@ -1,3 +1,11 @@
+import {
+  setAuthorizationOverlayProvider,
+  type AuthorizationOverlay,
+} from '../foundation/authorization-registry.js';
+import {
+  buildReviewThreadsCaptureParams,
+  assertReadOnlyServiceCapture,
+} from './service-capture-admission.js';
 import { safeRmSync } from '../secure-io.js';
 import { registerSecretResolver, resetSecretResolver } from '../secret/secret-resolver.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -440,6 +448,114 @@ describe('exact-request catalog capture admission at the real service engine bou
       );
     });
     expect(fixture.execute).not.toHaveBeenCalled();
+  });
+  it('honors canonical stronger authority and undeclared service fallback before transport', async () => {
+    for (const entry of [
+      { effectClass: 'external_read', authority: { kind: 'approval' } },
+      { effectClass: 'external_read', authority: { kind: 'admission', boundary: 'internal' } },
+      { effectClass: 'external_mutation', authority: { kind: 'admission', boundary: 'external' } },
+      { effectClass: 'external_read', authority: { kind: 'binding', scope: 'task' } },
+    ]) {
+      const restore = setAuthorizationOverlayProvider(
+        () =>
+          [
+            {
+              source: 'overlay',
+              operations: { 'service:github:preset:list_pulls': entry },
+              prefixes: {},
+            },
+          ] as AuthorizationOverlay[]
+      );
+      try {
+        await expect(
+          scoped(() => executeInformationAssetCapture(location, request))
+        ).rejects.toThrow('canonical_authority_denied');
+      } finally {
+        setAuthorizationOverlayProvider(restore);
+      }
+    }
+    const restore = setAuthorizationOverlayProvider(() => []);
+    try {
+      await expect(scoped(() => executeInformationAssetCapture(location, request))).rejects.toThrow(
+        'canonical_authority_denied'
+      );
+    } finally {
+      setAuthorizationOverlayProvider(restore);
+    }
+    expect(fixture.execute).not.toHaveBeenCalled();
+  });
+  it('honors canonical credential authority before contacting the broker', async () => {
+    fixture.selected.auth_mode = 'secret-guard';
+    fixture.selected.secret_refs = ['GITHUB_ACCESS_TOKEN'];
+    const resolve = vi.fn(async () => 'forbidden-token');
+    registerSecretResolver({ name: 'forbidden-credential-broker', resolve });
+    const restore = setAuthorizationOverlayProvider(() => [
+      {
+        source: 'overlay',
+        operations: {
+          'service:github:preset:list_pulls': {
+            effectClass: 'external_read',
+            authority: { kind: 'admission', boundary: 'external' },
+          },
+          'credential:information_asset_capture': {
+            effectClass: 'credential_use',
+            authority: { kind: 'approval' },
+          },
+        },
+        prefixes: {},
+      },
+    ]);
+    try {
+      await expect(scoped(() => executeInformationAssetCapture(location, request))).rejects.toThrow(
+        'canonical_credential_authority_denied'
+      );
+    } finally {
+      setAuthorizationOverlayProvider(restore);
+    }
+    expect(resolve).not.toHaveBeenCalled();
+    expect(fixture.execute).not.toHaveBeenCalled();
+  });
+  it('admits only the bounded fixed GraphQL read POST and rejects an arbitrary mutation query', async () => {
+    fixture.preset.operations.get_review_threads = {
+      type: 'api',
+      method: 'POST',
+      path: 'graphql',
+      kind: 'capture',
+      risk: 'read',
+      approval_required: false,
+    };
+    fixture.selected.allowed_actions = ['get_review_threads'];
+    fixture.selected.approval_policy = { get_review_threads: 'allowed' };
+    const valid = {
+      service_id: 'github',
+      action: 'get_review_threads',
+      params: buildReviewThreadsCaptureParams({ owner: 'acme', repo: 'app', number: 1 }),
+    };
+    await scoped(() => executeInformationAssetCapture(location, valid));
+    expect(fixture.execute).toHaveBeenCalledTimes(1);
+    fixture.execute.mockClear();
+    const changed = {
+      ...valid,
+      params: {
+        body: {
+          query: 'mutation { dangerous }',
+          variables: { owner: 'acme', repo: 'app', number: 1, after: null },
+        },
+      },
+    };
+    await expect(scoped(() => executeInformationAssetCapture(location, changed))).rejects.toThrow(
+      'fixed_graphql_query_required'
+    );
+    expect(fixture.execute).not.toHaveBeenCalled();
+    expect(() =>
+      assertReadOnlyServiceCapture('github', 'list_pulls', {
+        type: 'api',
+        method: 'POST',
+        path: 'graphql',
+        kind: 'capture',
+        risk: 'read',
+      })
+    ).toThrow('method_denied');
   });
   it('sanitizes provider errors while retaining machine-readable status for expiry holds', async () => {
     fixture.execute.mockRejectedValueOnce(

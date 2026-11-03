@@ -644,11 +644,11 @@
     "get_review_threads": {
       "type": "api",
       "path": "graphql",
-      "method": "GET",
+      "method": "POST",
       "kind": "capture",
       "risk": "read",
       "approval_required": false,
-      "description": "Read scoped review-thread state via a fixed GraphQL query."
+      "description": "Fixed bounded read-only review thread query; request compiler and capture admission reject mutations or arbitrary GraphQL."
     },
     "resolve_review_thread": {
       "type": "api",

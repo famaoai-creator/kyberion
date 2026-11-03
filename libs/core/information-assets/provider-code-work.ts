@@ -1,3 +1,4 @@
+import { buildReviewThreadsCaptureParams } from '../service/service-capture-admission.js';
 import type { InformationAssetCollector, CollectorSubject } from './provider.js';
 import { object, rows, text, optionalText, jsonObject, providerRevision } from './provider.js';
 
@@ -63,18 +64,15 @@ export const githubReviewCollector: InformationAssetCollector = {
         let after: string | undefined;
         for (let detailPage = 1; ; detailPage++) {
           const response = object(
-            await call('get_review_threads', {
-              query: {
-                query:
-                  'query InformationAssetReviewThreads($owner: String!, $repo: String!, $number: Int!, $after: String) { repository(owner: $owner, name: $repo) { pullRequest(number: $number) { headRefOid reviewThreads(first: 100, after: $after) { nodes { id isResolved isOutdated } pageInfo { hasNextPage endCursor } } } } }',
-                variables: JSON.stringify({
-                  owner,
-                  repo,
-                  number: Number(id),
-                  after: after ?? null,
-                }),
-              },
-            })
+            await call(
+              'get_review_threads',
+              buildReviewThreadsCaptureParams({
+                owner,
+                repo,
+                number: Number(id),
+                after: after ?? null,
+              })
+            )
           );
           if (response.errors) throw new Error('collector_github_graphql_error');
           const pullRequest = object(object(object(response.data).repository).pullRequest);

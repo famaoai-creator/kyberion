@@ -1,4 +1,4 @@
-import { informationWorkProposalRefusal } from './dot-information-work.js';
+import { informationWorkProposalRefusal, type DotScopedProposal } from './dot-information-work.js';
 import { dotDigestActionEvidence } from './dot-digest-evidence.js';
 import { continuousDevelopmentDecisionPresentation } from '../organization/continuous-development-consent.js';
 import { dotDelegationCapacity, resumeDotCapacityActions } from './dot-admission-capacity.js';
@@ -196,16 +196,7 @@ export interface DotDispatchDeps {
     tenantSlug: string,
     diagnostic?: {
       charter: DotCharter;
-      proposal: Pick<
-        DotProposal,
-        | 'action_id'
-        | 'work_shape'
-        | 'handoff_to'
-        | 'pipeline_ref'
-        | 'front_desk_execution'
-        | 'continuous_work'
-        | 'information_asset_work'
-      >;
+      proposal: DotScopedProposal;
     }
   ) => void;
   appendInbox?: (input: DotInboxEntryInput) => void;
@@ -327,17 +318,7 @@ export type DotBoundsVerdict = { ok: true } | { ok: false; reason: string; capac
 /** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
   charter: DotCharter,
-  proposal: Pick<
-    DotProposal,
-    | 'action_id'
-    | 'work_shape'
-    | 'handoff_to'
-    | 'pipeline_ref'
-    | 'front_desk_execution'
-    | 'continuous_work'
-    | 'information_asset_work'
-    | 'mission_admission'
-  >,
+  proposal: DotScopedProposal,
   deps: DotDispatchDeps
 ): DotBoundsVerdict {
   try {

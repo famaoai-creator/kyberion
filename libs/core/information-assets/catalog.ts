@@ -17,6 +17,7 @@ import {
 import { assetProvenanceRef, findAssetBySource } from '../ingest-asset-ledger.js';
 import {
   assertInformationAssetScope,
+  assertInformationAssetCatalogAuthorization,
   assertCurrentInformationAssetScope,
   assertInformationAssetParents,
   authorizeInformationAssetManagement,
@@ -130,6 +131,7 @@ export function readInformationAssetCatalog(
   scope: InformationAssetScope,
   options: InformationAssetOptions = {}
 ): InformationAssetCatalog {
+  assertInformationAssetCatalogAuthorization();
   assertCurrentInformationAssetScope(scope);
   assertInformationAssetParents(scope, options);
   return visible(read(scope, options), scope);
@@ -230,6 +232,7 @@ async function mutate(
   const resolved = await authorizeInformationAssetManagement(auth, scope, true);
   return withOrganizationPeopleMutation(async () => {
     await verifyOrganizationPeople(resolved);
+    assertInformationAssetCatalogAuthorization(true);
     withInformationAssetResources(resolved, scope, parentResources(scope, options), false, () =>
       assertInformationAssetParents(scope, options)
     );
@@ -431,6 +434,7 @@ export function informationAssetIngestProjection(
   sourceId: string,
   options: InformationAssetOptions = {}
 ) {
+  assertInformationAssetCatalogAuthorization();
   assertCurrentInformationAssetScope(scope);
   assertInformationAssetParents(scope, options);
   const record = findAssetBySource(scope.tenant_slug, sourceSystem, sourceId, options);

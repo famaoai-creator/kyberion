@@ -1,3 +1,4 @@
+import * as authorizationRegistry from '@agent/core/foundation/authorization-registry';
 vi.mock('@agent/core/service/service-harness', () => ({
   planServiceOperation: () => ({}),
   createServiceExecutionReceipt: (_plan: unknown, _result: unknown, options: unknown) => ({
@@ -28,6 +29,9 @@ vi.mock('@agent/core/information-assets/work', async () => ({
 }));
 vi.mock('@agent/core/information-assets/collector', () => ({
   getInformationAssetCollector: () => ({ actions: ['capture'] }),
+  buildReviewThreadsCaptureParams: (variables: Record<string, unknown>) => ({
+    body: { query: 'FIXED_READ_QUERY', variables },
+  }),
   readInformationAssetObservation: () => state.observation,
   assertInformationAssetCaptureOperation: vi.fn(),
 }));
@@ -61,7 +65,10 @@ vi.mock('@agent/core/authority', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@agent/core/authority')>()),
   resolveIdentityContext: () => ({ missionId: state.mission }),
 }));
-import { runInformationAssetWork } from './information-asset-work.js';
+import {
+  runInformationAssetWork,
+  resolveInformationAssetEffectAuthorization,
+} from './information-asset-work.js';
 const input = { work_item_id: 'w', attempt_id: 'a', lease_id: 'l', dot_id: 'd', actor_id: 'dot:d' };
 const recipe = (action: string) =>
   ({
@@ -76,6 +83,7 @@ const recipe = (action: string) =>
   }) as Parameters<NonNullable<InformationAssetWorkDeps['hostApply']>>[0];
 beforeEach(() => {
   state.mission = 'mission-test';
+  vi.restoreAllMocks();
   state.capture.mockReset();
   state.binding = {
     version: 1,
@@ -266,5 +274,35 @@ describe('information work fixed service compiler', () => {
       ).status
     ).toBe('approval_required');
     expect(port).not.toHaveBeenCalled();
+  });
+  it('resolves fixed effect subjects canonically before any service write and rejects weakened policy', async () => {
+    const original = authorizationRegistry.subjectAuthorization;
+    const port = vi.fn(async () => ({ ok: true }));
+    await runInformationAssetWork(input, port);
+    vi.spyOn(authorizationRegistry, 'subjectAuthorization').mockImplementation((subject) =>
+      subject === 'service:jira:preset:answer_request_approval'
+        ? { ...original(subject), effectClass: 'local_only', authority: { kind: 'free' } }
+        : original(subject)
+    );
+    await expect(
+      state.deps!.hostApply!(recipe('approve_issue'), state.binding, {
+        kind: 'service_action',
+        params: {},
+      })
+    ).rejects.toThrow('AUTHORIZATION');
+    expect(port).not.toHaveBeenCalled();
+  });
+  it('rejects undeclared service target subjects and incompatible approval domains', () => {
+    expect(() => resolveInformationAssetEffectAuthorization('unknown', 'mutate')).toThrow(
+      'AUTHORIZATION'
+    );
+    const original = authorizationRegistry.subjectAuthorization;
+    vi.spyOn(authorizationRegistry, 'subjectAuthorization').mockImplementation((subject) => ({
+      ...original(subject),
+      approvalDomain: 'arbitrary-domain',
+    }));
+    expect(() =>
+      resolveInformationAssetEffectAuthorization('jira', 'answer_request_approval')
+    ).toThrow('APPROVAL_DOMAIN');
   });
 });

@@ -44,6 +44,12 @@ flowchart LR
 
 台帳は JSON schema 検証を通し、壊れたファイル、重複 ID、異なる tenant / organization の所在、symlink、非 regular file を空台帳として扱わず拒否する。ファイル I/O は secure-io と exact resource capability を使う。
 
+### 統合 authorization registry との対応
+
+境界は `subjectAuthorization` から code 正本の宣言を解決する。`information-asset:catalog:read`、`information-asset:coverage:read`、`chronos.information-assets.read` は local_only / free、`information-asset:catalog:write` は internal_decision / internal admission に対応する。ここで free は追加の効果 admission が不要という分類であり、所有者・viewer・tenant / organization / project・exact resource scope の検証は引き続き必須になる。書込みの internal admission は管理 facade の所有者認可と lock 内の再確認で成立する。
+
+宣言が未登録、別 source、異なる効果、または承認・binding など現在の境界が満たせない authority に変わった場合は、従来の role 判定だけで継続せず拒否する。coverage の role 許可も registry の宣言を先に確認し、その後で exact checkpoint の detail を検証する。宣言は既存の Cedar 互換 serialization に含まれる。ここで別の Cedar evaluator や別の権限ストアを追加しない。
+
 ## 利用可能性と観測の違い
 
 resolver の `available` は所在が enabled で、参照する binding の存在・所有者・service・project が整合していることを示す。外部ネットワークの疎通やデータの最新性の証明には使わない。`current` はそれに加えて coverage が complete で鮮度内の場合だけ true になる。`freshness` と `readiness` は未観測、古い観測、partial / failed / full_sync_required、無効化、binding 不整合を区別する。

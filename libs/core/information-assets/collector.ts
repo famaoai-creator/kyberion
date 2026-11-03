@@ -1,3 +1,7 @@
+export {
+  buildReviewThreadsCaptureParams,
+  INFORMATION_ASSET_REVIEW_THREADS_QUERY,
+} from '../service/service-capture-admission.js';
 import { createHash } from 'node:crypto';
 import * as path from 'node:path';
 import { safeExistsSync } from '../secure-io.js';

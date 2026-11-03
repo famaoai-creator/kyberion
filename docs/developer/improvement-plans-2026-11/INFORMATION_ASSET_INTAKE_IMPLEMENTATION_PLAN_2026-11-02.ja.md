@@ -62,10 +62,10 @@ importance: 8
 
 tenant/org/project混在、同名asset、接続取消、権限取消、CAS競合、同時収集、複数page、受理直後クラッシュ、部分失敗、同一objectの版違い、重複delivery、Gmail token期限切れ、承認待ち/取消/不明結果、外部state変更、出力lineageをfixtureで検証する。core build、actuator境界、Chronos typecheck/build、governance/catalog/op/input-contract/gate検査と独立レビューを実施する。各項目の完了状態と証拠をこの表と mission evidence に記録する。
 
-## 検証記録（PR準備中）
+## 検証記録（PR提出前）
 
 - core TypeScript と full TypeScript を実行し成功。Chronos / concierge を含むビルドが成功。並行編集後は最終世代を再ビルドする。
 - カタログの実 I/O・認可・CAS・coverage・scope拒否を fixture で検証。
 - 3 provider の実 dots admission → WorkItem → claim → 成果物照合と、新版のみの再仕事化を検証。
-- PR gate は49/51成功時点から、残るmodule依存方向とscript harness違反を修正中。最終結果で更新する。
+- 統一認可のdeclared subject、authority強化時の拒否、承認domainとCedar出力を検証した。PR readiness gateの最終結果はPR本文に記録する。
 - 実アカウントへの収集・更新は未実施。
