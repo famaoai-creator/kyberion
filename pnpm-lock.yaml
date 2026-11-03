@@ -75,6 +75,9 @@ importers:
       '@agent/core':
         specifier: workspace:*
         version: link:libs/core
+      '@agent/kernel':
+        specifier: workspace:*
+        version: link:libs/kernel
       '@agent/shared-media':
         specifier: workspace:*
         version: link:libs/shared-media
@@ -718,6 +721,9 @@ importers:
 
   libs/core:
     dependencies:
+      '@agent/kernel':
+        specifier: workspace:*
+        version: link:../kernel
       '@simplewebauthn/server':
         specifier: ^13.3.3
         version: 13.3.3
@@ -749,6 +755,15 @@ importers:
       '@types/web-push':
         specifier: ^3.6.4
         version: 3.6.4
+
+  libs/kernel:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.5
+        version: 26.6.5
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
 
   libs/shared-media:
     dependencies:

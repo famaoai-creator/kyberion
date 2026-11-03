@@ -1,5 +1,6 @@
 packages:
   - 'libs/core'
+  - 'libs/kernel'
   - 'libs/shared-*'
   - 'libs/actuators/*'
   - 'satellites/*'

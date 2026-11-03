@@ -1,22 +1,44 @@
 // Step-1 distributed-runtime acceptance: the storage-backend seam resolves the
-// governed default (local-fs), explicit selectors win, and entry-ledger runs
+// default chain (local-fs), explicit selectors win, and entry-ledger runs
 // hermetically on the memory backend — append, streaming read, malformed-line
 // policy and regular-file enforcement all without touching the filesystem.
 // Async contract: object-storage stub proves awaited durability.
+//
+// local-fs production adapter lives in @agent/core (secure-io). This suite
+// installs a minimal local-fs stand-in so default-chain assertions stay in
+// kernel without depending on core.
 import { describe, expect, it } from 'vitest';
 import { createEntryLedger } from '../entry-ledger.js';
 import {
   LOCAL_STORAGE_BACKEND_ID,
   getStorageBackend,
+  registerStorageBackend,
   resolveStorageBackend,
   toAsyncStorageBackend,
+  type SyncStorageBackend,
 } from './storage-backend.js';
-import './local-storage-backend.js';
 import { MEMORY_STORAGE_BACKEND_ID, createMemoryStorageBackend } from './memory-storage-backend.js';
 import {
   OBJECT_STORAGE_BACKEND_STUB_ID,
   createObjectStorageBackendStub,
 } from './object-storage-backend.stub.js';
+
+const localFsStub: SyncStorageBackend = {
+  id: LOCAL_STORAGE_BACKEND_ID,
+  exists: () => false,
+  stat: () => null,
+  mkdir: () => undefined,
+  append: () => undefined,
+  *readLines() {
+    /* empty */
+  },
+  list: () => [],
+};
+
+registerStorageBackend(localFsStub, {
+  provenance: 'builtin',
+  source: 'libs/kernel/src/storage/storage-backend.test.ts',
+});
 
 describe('storage-backend seam', () => {
   it('resolves the governed default to local-fs', () => {
