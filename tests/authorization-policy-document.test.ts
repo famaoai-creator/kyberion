@@ -263,8 +263,9 @@ describe('authorization policy document — declaration attributes', () => {
     expect(emailSend?.action_class).toBe('send_message_external');
     const vcsPush = doc.policies.find((p) => p.subject === 'vcs:push');
     expect(vcsPush?.delegable).toEqual({
-      fields: ['repository', 'branch'],
-      optionalFields: ['visibility'],
+      fields: ['repository'],
+      optionalFields: ['branch', 'branch_pattern', 'visibility'],
+      requiredOneOf: ['branch', 'branch_pattern'],
       reputational_class: 'A',
     });
   });

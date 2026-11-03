@@ -148,7 +148,7 @@ export interface ScopedArtifactScope {
    * another scope ref.
    */
   system?: true;
-  /** Registered tenant; `shared` is an untenanted partition sentinel only with personal tier. */
+  /** Registered tenant; `shared` is an untenanted partition sentinel only with personal/public tier. */
   tenant?: string;
   /**
    * Organization-owned artifact (digests, org-wide reports). Lands under the
@@ -506,10 +506,14 @@ function resolveScopeArtifactsRoot(
     try {
       // Personal operator evidence has no tenant. Preserve the existing shared
       // owner sentinel without treating it as a registered/confidential tenant.
+      // Public-tier artifacts are likewise untenanted: 'shared' selects the
+      // public/shared partition rather than a (nonexistent) 'shared' tenant.
       segments = storagePartitionSegments({
         kind: 'tier',
         tier,
-        ...(tier === 'personal' && scope.tenant === SHARED_TENANT ? {} : { tenant: scope.tenant }),
+        ...((tier === 'personal' || tier === 'public') && scope.tenant === SHARED_TENANT
+          ? {}
+          : { tenant: scope.tenant }),
       });
     } catch {
       throw new Error(
