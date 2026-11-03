@@ -101,6 +101,11 @@ const AUTHORITY_STORE_PATTERNS: readonly RegExp[] = [
   // channels — without it a linked worktree lists its own (empty) dir and
   // every system-partition request becomes invisible to `kyberion approvals`.
   /^active\/shared\/coordination\/channels$/,
+  // The per-channel directory itself (exact, not its contents): the first
+  // approval in a fresh primary checkout must create it there, and the
+  // missing-ancestor probe walks through it — without it both are refused
+  // as "outside the repository" from a linked worktree.
+  /^active\/shared\/(?:coordination|observability)\/channels\/[^/]+$/,
   /^active\/shared\/coordination\/channels\/[^/]+\/approvals(?:\/|$)/,
   /^active\/shared\/observability\/channels$/,
   /^active\/shared\/observability\/channels\/[^/]+\/approvals\.jsonl(?:\/|$)/,
