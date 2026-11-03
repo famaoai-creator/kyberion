@@ -146,9 +146,14 @@ export function loadStoredOidcLoginSettings(): StoredOidcLoginSettings | null {
   try {
     // Every surface's login routes read this unauthenticated, outside any
     // execution context; the document lives under the personal tier.
+    // System scope (tenant cleared): sign-in configuration is operator-wide,
+    // so a persisted `pnpm scope use` tenant must not turn this read into
+    // "tenant execution" and make every surface report SSO as unconfigured.
     doc = withExecutionContext(
       'sovereign_concierge',
-      () => secretGuard.loadConnectionDocument(OIDC_SETTINGS_DOCUMENT) as Record<string, unknown>
+      () => secretGuard.loadConnectionDocument(OIDC_SETTINGS_DOCUMENT) as Record<string, unknown>,
+      undefined,
+      ''
     );
   } catch {
     return null;
