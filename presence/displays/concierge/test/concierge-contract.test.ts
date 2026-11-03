@@ -575,7 +575,8 @@ describe('concierge surface contract', () => {
     expect(decisionRoute).toContain('requireConciergeMutationAccess');
     expect(decisionRoute).toContain('dist/scripts/mission_controller.js');
     expect(decisionRoute).toContain('safeExecResult');
-    expect(decisionRoute).toContain("buildExecutionEnv(process.env, 'mission_controller')");
+    // H1: bounded by SYSTEM_ROLE=concierge, delegating the controller role.
+    expect(decisionRoute).toContain("serverDelegatedChildEnv('mission_controller')");
     // Human-only gate: the route accepts nothing but an explicit start/cancel
     // decision from the request body, validates the mission is actually in
     // the hygiene report, and there is no scheduler or auto-invocation path.
@@ -825,7 +826,7 @@ describe('concierge surface contract', () => {
     expect(route).toContain('requireConciergeMutationAccess');
     expect(route).toContain('dist/scripts/config_mission.js');
     expect(route).toContain('safeExecResult');
-    expect(route).toContain('buildExecutionEnv');
+    expect(route).toContain('serverDelegatedChildEnv');
     expect(route).not.toContain('apply');
     expect(route).not.toMatch(/from ['"]node:fs['"]|require\(['"]node:fs['"]\)/);
     expect(route).not.toMatch(/setInterval\(|setTimeout\(/);

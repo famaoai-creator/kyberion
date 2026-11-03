@@ -1,3 +1,4 @@
+import { serverDelegatedChildEnv } from '../../../../lib/server-child-env';
 import { MEMORY_ACTION_HANDLERS } from './memory-actions';
 import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/ops/scoped-learning-approval-visibility';
 import { isScopedLearningApprovalRequest } from '@agent/core/knowledge/scoped-learning-approval-visibility';
@@ -17,7 +18,6 @@ import {
 } from '../../../../lib/ops/distill-candidate-scope';
 import { applyBrowserSessionControl } from '../../../../lib/ops/browser-session-control';
 import {
-  buildExecutionEnv,
   buildTrackGateReadinessSummaries,
   buildTrackNextWorkProposal,
   clearSurfaceOutboxMessage,
@@ -528,7 +528,7 @@ export const INTELLIGENCE_ACTION_HANDLERS: Record<string, IntelligenceActionHand
       typeof executionContract?.review_target === 'string' ? executionContract.review_target : '';
     const contractRepo =
       typeof executionContract?.repository_id === 'string' ? executionContract.repository_id : '';
-    const env = buildExecutionEnv(process.env, 'mission_controller');
+    const env = serverDelegatedChildEnv('mission_controller');
     const startArgs = [
       'dist/scripts/mission_controller.js',
       'start',

@@ -13,7 +13,11 @@ const nextConfig = {
   // Scoped to the /ops pages; API routes send their own policies (the plugin
   // view frame route sets a sandbox CSP and must not get a second one).
   async headers() {
-    const frameSameOrigin = [{ key: 'Content-Security-Policy', value: "frame-src 'self'" }];
+    // frame-src: the console frames only same-origin documents; frame-ancestors:
+    // nothing but Concierge itself may frame the console (clickjacking).
+    const frameSameOrigin = [
+      { key: 'Content-Security-Policy', value: "frame-src 'self'; frame-ancestors 'self'" },
+    ];
     return [
       { source: '/ops', headers: frameSameOrigin },
       { source: '/ops/:path*', headers: frameSameOrigin },

@@ -75,12 +75,25 @@ describe('customer-decision facade child (CD-12)', () => {
     mocks.warn.mockReset();
   });
 
-  it('binds the child to the tenant with no system role, persona, sudo or mission', () => {
+  it('binds the child to the tenant, bounded by the server role, with no sudo or mission', () => {
     const env = overviewChildEnv('acme');
-    expect(env).toMatchObject({ KYBERION_TENANT: 'acme', SYSTEM_ROLE: '' });
-    for (const key of OVERVIEW_CHILD_CLEARED_ENV) expect(env[key]).toBe('');
+    // H1: never unbounded — the child runs as SYSTEM_ROLE=concierge, a worker.
+    expect(env).toMatchObject({
+      KYBERION_TENANT: 'acme',
+      SYSTEM_ROLE: 'concierge',
+      KYBERION_PERSONA: 'worker',
+      KYBERION_DELEGATED_ROLE: '',
+    });
+    for (const key of OVERVIEW_CHILD_CLEARED_ENV)
+      if (key !== 'KYBERION_PERSONA') expect(env[key]).toBe('');
     expect(Object.keys(env).sort()).toEqual(
-      [...OVERVIEW_CHILD_CLEARED_ENV, 'SYSTEM_ROLE', 'KYBERION_TENANT', 'KYBERION_ROOT']
+      [
+        ...OVERVIEW_CHILD_CLEARED_ENV,
+        'SYSTEM_ROLE',
+        'KYBERION_DELEGATED_ROLE',
+        'KYBERION_TENANT',
+        'KYBERION_ROOT',
+      ]
         .filter((key) => key !== 'KYBERION_ROOT' || env.KYBERION_ROOT !== undefined)
         .sort()
     );
@@ -139,7 +152,7 @@ describe('customer-decision facade child (CD-12)', () => {
     expect(String(args[0]).endsWith(OVERVIEW_FACADE_SCRIPT)).toBe(true);
     expect(args.slice(1)).toEqual(facadeArgs('case', 'acme', 'case-a'));
     expect(options.env).toEqual(overviewChildEnv('acme'));
-    expect(options.env.SYSTEM_ROLE).toBe('');
+    expect(options.env.SYSTEM_ROLE).toBe('concierge');
     expect(options.env).not.toHaveProperty('PATH');
     expect(options.timeoutMs).toBeGreaterThan(0);
     expect(options.maxOutputMB).toBeGreaterThan(0);

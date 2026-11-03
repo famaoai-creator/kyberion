@@ -1,3 +1,4 @@
+import { serverChildEnv } from '../server-child-env';
 /**
  * CD-12: how Chronos reads a tenant's customer-decision overview, case
  * detail and learning view without gaining any reach into
@@ -70,16 +71,15 @@ export const OVERVIEW_CHILD_CLEARED_ENV = [
  * The env the facade child gets on top of the secure-io exec allowlist. Never
  * pass `process.env` here — that would re-add every variable.
  */
-export function overviewChildEnv(tenant: string): Record<string, string> {
+export function overviewChildEnv(tenant: string): Record<string, string | undefined> {
   const root = getRegisteredEnvText('KYBERION_ROOT');
-  return {
+  // H1: the child runs bounded by the server's role assumption policy
+  // (SYSTEM_ROLE=concierge), never unbounded without a SYSTEM_ROLE.
+  return serverChildEnv({
     ...Object.fromEntries(OVERVIEW_CHILD_CLEARED_ENV.map((key) => [key, ''])),
-    // Not Chronos's SYSTEM_ROLE (chronos_mirror_v2): secure-io drops it anyway;
-    // stated so the role-assumption analysis sees the child does not inherit it.
-    SYSTEM_ROLE: '',
     KYBERION_TENANT: tenant,
     ...(root ? { KYBERION_ROOT: root } : {}),
-  };
+  });
 }
 
 export type CustomerDecisionFacadeKind = 'overview' | 'case' | 'learning';

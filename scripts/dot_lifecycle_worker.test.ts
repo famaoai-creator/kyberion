@@ -103,3 +103,85 @@ describe('dot lifecycle worker round trip (real charter lock)', () => {
     }
   }, 60_000);
 });
+
+describe('dot lifecycle worker under its own system role (L1)', () => {
+  const ROOT = 'active/shared/tmp/dot-lifecycle-worker-role-tests';
+
+  it('activates a draft as SYSTEM_ROLE=dot_lifecycle_worker without any other role', async () => {
+    const { safeMkdir, safeRmSync, safeWriteFile } = await import('@agent/core/secure-io');
+    const { transitionDotCharterStatus } = await import('@agent/core/dot/dot-lifecycle');
+    const { findDotCharter } = await import('@agent/core/dot/dot-charter');
+    const { dotAdmissionScopeHash } = await import('@agent/core/dot/dot-admission-identity');
+    const { loadAuthorityRoleIndex } =
+      await import('@agent/core/organization/authority-role-registry');
+    safeMkdir(`${ROOT}/dots`, { recursive: true });
+    const charter = {
+      kind: 'dot-charter',
+      dot_id: 'worker-activate',
+      version: '1.0.0',
+      title: 'Worker activate',
+      purpose: 'test',
+      status: 'draft',
+      scope: { tier: 'public' },
+      goal: { statement: 'test' },
+      attention: { triggers: [{ kind: 'wake', channels: ['inbox'] }] },
+      authority: { authority_role: 'infrastructure_sentinel' },
+      notification: { deliver_to: { surface: 'surface', channel: 'inbox' } },
+      runtime: { heartbeat_id: 'dot-worker-activate' },
+    };
+    safeWriteFile(`${ROOT}/dots/worker-activate.json`, JSON.stringify(charter));
+    vi.stubEnv('SYSTEM_ROLE', 'dot_lifecycle_worker');
+    vi.stubEnv('KYBERION_PERSONA', 'worker');
+    vi.stubEnv('MISSION_ROLE', '');
+    try {
+      // The activation gate reads the canonical role registry (repo root) and
+      // lists charters, then writes under dot_lifecycle_writer — every step
+      // runs under the worker's system role, so a missing grant would throw
+      // [ROLE_ASSUMPTION_DENIED] here.
+      const registry = loadAuthorityRoleIndex();
+      expect(registry.infrastructure_sentinel).toBeDefined();
+      const transition = ((id, target, deps) =>
+        transitionDotCharterStatus(id, target, {
+          ...deps,
+          rootDir: ROOT,
+          hasRole: (role: string) => Boolean(registry[role]),
+        })) as typeof transitionDotCharterStatus;
+      const result = runDotLifecycleWorker(
+        [
+          'activate',
+          charter.dot_id,
+          '--expect-status',
+          'draft',
+          '--expect-admission-hash',
+          dotAdmissionScopeHash(charter as never),
+          '--expect-scope-json',
+          JSON.stringify(charter.scope),
+        ],
+        transition
+      );
+      expect(result.status).toBe('active');
+      expect(findDotCharter(charter.dot_id, ROOT)?.charter.status).toBe('active');
+      // The Kyberion server's own role can never perform the same write.
+      vi.stubEnv('SYSTEM_ROLE', 'concierge');
+      expect(() =>
+        runDotLifecycleWorker(
+          [
+            'pause',
+            charter.dot_id,
+            '--expect-status',
+            'active',
+            '--expect-admission-hash',
+            dotAdmissionScopeHash(charter as never),
+            '--expect-scope-json',
+            JSON.stringify(charter.scope),
+          ],
+          transition
+        )
+      ).toThrow(/ROLE_ASSUMPTION_DENIED/);
+      expect(findDotCharter(charter.dot_id, ROOT)?.charter.status).toBe('active');
+    } finally {
+      vi.unstubAllEnvs();
+      safeRmSync(ROOT, { recursive: true, force: true });
+    }
+  }, 60_000);
+});

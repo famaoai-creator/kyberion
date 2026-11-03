@@ -4,6 +4,7 @@ import { safeReadFile } from '@agent/core/secure-io';
 import {
   DOT_LIFECYCLE_WORKER_SCRIPT,
   DotLifecycleDispatchError,
+  auditDotLifecycleDenial,
   dispatchDotLifecycleWorker,
 } from './dot-lifecycle-dispatch';
 
@@ -95,5 +96,52 @@ describe('dot lifecycle worker dispatch (D3)', () => {
     expect(route).toContain('dispatchDotLifecycleWorker');
     expect(route).not.toContain('controlWorkspaceAutonomy');
     expect(route).not.toContain('@agent/core/dot/dot-lifecycle');
+  });
+});
+
+describe('dot lifecycle dispatch audit (M2)', () => {
+  it('audits a worker that cannot start and reports a timeout as unconfirmed', async () => {
+    const audits: Array<Record<string, unknown>> = [];
+    const audit = (entry: Record<string, unknown>) => audits.push(entry);
+    await expect(
+      dispatchDotLifecycleWorker(PLAN, 'human:owner', {
+        run: () => {
+          throw new Error('spawn ENOENT');
+        },
+        audit: audit as never,
+      })
+    ).rejects.toBeInstanceOf(DotLifecycleDispatchError);
+    expect(audits[0]).toMatchObject({ result: 'failed', actor: 'human:owner' });
+    await expect(
+      dispatchDotLifecycleWorker(PLAN, 'human:owner', {
+        run: async () => ({ stdout: '', stderr: '', status: null }),
+        audit: audit as never,
+      })
+    ).rejects.toThrow(/unconfirmed/);
+    expect(audits[1]).toMatchObject({ result: 'error', outcome: 'unconfirmed' });
+  });
+
+  it('audits a plan-time refusal with the viewer principal', async () => {
+    const audits: Array<Record<string, unknown>> = [];
+    await auditDotLifecycleDenial(
+      { action: 'pause', dotId: 'ops-dot', actor: 'human:reader', reason: 'denied' },
+      { audit: (entry) => audits.push(entry as never) }
+    );
+    expect(audits).toEqual([
+      {
+        action: 'pause',
+        dotId: 'ops-dot',
+        actor: 'human:reader',
+        result: 'denied',
+        reason: 'denied',
+      },
+    ]);
+    const route = String(
+      safeReadFile(
+        fileURLToPath(new URL('../../app/api/ops/workspace/autonomy/route.ts', import.meta.url)),
+        { encoding: 'utf8' }
+      )
+    );
+    expect(route).toContain('auditDotLifecycleDenial');
   });
 });

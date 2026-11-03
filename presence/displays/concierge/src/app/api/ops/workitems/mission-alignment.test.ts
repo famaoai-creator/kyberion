@@ -7,7 +7,19 @@ const h = vi.hoisted(() => ({
   exec: vi.fn(),
 }));
 vi.mock('@agent/core/authority', () => ({
-  buildExecutionEnv: () => ({ MISSION_ID: 'live', KYBERION_CUSTOMER: 'old' }),
+  buildExecutionEnv: (base: Record<string, string>, role: string) => ({
+    ...base,
+    MISSION_ROLE: role,
+    MISSION_ID: 'live',
+    KYBERION_CUSTOMER: 'old',
+  }),
+  buildSystemRoleLaunchEnv: (base: Record<string, string>, role: string) => ({
+    ...base,
+    SYSTEM_ROLE: role,
+    MISSION_ROLE: '',
+    KYBERION_DELEGATED_ROLE: '',
+    KYBERION_PERSONA: 'worker',
+  }),
   withExecutionContext: (_r: unknown, fn: () => unknown) => fn(),
 }));
 vi.mock('@agent/core/path-resolver', () => ({
@@ -91,10 +103,18 @@ describe('scoped server mission alignment adapter', () => {
       '7',
       '--json',
     ]);
-    expect(h.exec.mock.calls[0][2].env).toEqual({
+    const env = h.exec.mock.calls[0][2].env;
+    // H1: bounded by the server role, delegating the controller role, no sudo,
+    // and the stale mission / customer binding removed.
+    expect(env).toMatchObject({
+      SYSTEM_ROLE: 'concierge',
+      MISSION_ROLE: 'mission_controller',
+      KYBERION_SUDO: '',
       KYBERION_TENANT: 'tenant-a',
       KYBERION_ORGANIZATION_ID: 'org-a',
     });
+    expect(env).not.toHaveProperty('MISSION_ID');
+    expect(env).not.toHaveProperty('KYBERION_CUSTOMER');
   });
   it('reconciles a failed child only from the original exact receipt', async () => {
     h.exec.mockResolvedValue({ status: 1 });

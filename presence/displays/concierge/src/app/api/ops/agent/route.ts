@@ -1,3 +1,4 @@
+import { serverChildEnv } from '../../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
 import path from 'node:path';
 import { resolveRuntimeModelId } from '@agent/core/reasoning/reasoning-model-routing';
@@ -10,6 +11,9 @@ import { buildUserFacingError } from '../../../../lib/ops/user-facing-error';
 import {
   chronosConversationScope,
   intentResolutionA2ui,
+  opsConversationSessionId,
+  opsProposalBelongsToViewer,
+  opsViewerPrincipalKey,
   readChronosAgentBody,
   resolveChronosPipelineInputPath,
   withMissionRole,
@@ -195,6 +199,7 @@ async function ensureChronosAgent(context?: {
     getAgentManifest,
     getAgentRuntimeHandle,
     toSupervisorEnsurePayload,
+    logger,
   } = await loadChronosCore();
   const cachedHandle = g.__kyberionChronosHandle;
   const cachedStatus = cachedHandle?.getRecord?.()?.status;
@@ -229,7 +234,10 @@ async function ensureChronosAgent(context?: {
           requester_id: context?.requesterId || 'chronos-ui',
         },
       } as const;
-      console.log('[CHRONOS_DEBUG] spawnOptions:', spawnOptions);
+      // Spawn options can carry provider metadata: debug only, never on stdout.
+      logger.debug(
+        `[CHRONOS] agent runtime spawn prepared: agent=${spawnOptions.agentId} provider=${spawnOptions.provider}`
+      );
       let handle;
       try {
         const snapshot = await ensureAgentRuntimeViaDaemon(toSupervisorEnsurePayload(spawnOptions));
@@ -280,6 +288,7 @@ function getChronosMissionProposalState(
 function saveChronosMissionProposalState(
   params: {
     sessionId: string;
+    authorPrincipalKey: string;
     proposal: MissionProposal;
     sourceText?: string;
     routingDecision?: AgentRoutingDecision;
@@ -300,6 +309,7 @@ function saveChronosMissionProposalState(
           sourceText: params.sourceText,
           routingDecision: params.routingDecision,
           createdAt: nowIso(),
+          authorPrincipalKey: params.authorPrincipalKey,
         } satisfies ChronosMissionProposalState,
         null,
         2
@@ -329,6 +339,7 @@ async function tryHandleDeterministicPipelineQuery(query: string, locale: Suppor
   if (!inputPath) return null;
   const output = safeExec('node', ['dist/scripts/run_pipeline.js', '--input', inputPath], {
     cwd: PROJECT_ROOT,
+    env: serverChildEnv(),
   });
 
   logger.info(`[CHRONOS] Deterministic pipeline query executed via built script: ${match[1]}`);
@@ -450,9 +461,9 @@ async function tryHandleChronosQuickAction(
       );
     }
     case 'schedule-tick':
-      return runScheduleQuickAction('tick', locale);
+      return runScheduleQuickAction('tick', locale, {}, viewer.principalId);
     case 'schedule-list':
-      return runScheduleQuickAction('list', locale);
+      return runScheduleQuickAction('list', locale, {}, viewer.principalId);
     case 'dashboard': {
       const missions = collectActiveMissions(core);
       const runtime = core.listAgentRuntimeSnapshots();
@@ -959,8 +970,14 @@ async function tryHandleChronosQuickAction(
       };
     }
     case 'build-test': {
-      const buildOutput = core.safeExec('pnpm', ['run', 'build'], { cwd: PROJECT_ROOT });
-      const testOutput = core.safeExec('pnpm', ['test'], { cwd: PROJECT_ROOT });
+      const buildOutput = core.safeExec('pnpm', ['run', 'build'], {
+        cwd: PROJECT_ROOT,
+        env: serverChildEnv(),
+      });
+      const testOutput = core.safeExec('pnpm', ['test'], {
+        cwd: PROJECT_ROOT,
+        env: serverChildEnv(),
+      });
       return {
         status: 'ok',
         response: uxTextOr('chronos_build_test_completed', 'Build and test completed.', locale),
@@ -1038,11 +1055,17 @@ export async function POST(req: NextRequest) {
     const query =
       (rawQuery || '').trim() ||
       (action === 'approve_mission' ? '1' : action === 'reject_mission' ? '2' : '');
-    const sessionId =
-      typeof body.sessionId === 'string' && body.sessionId.trim()
-        ? body.sessionId
-        : 'chronos-default';
-    const pendingMissionProposal = getChronosMissionProposalState(sessionId, core);
+    // M1: thread history and pending proposals live in the server-resolved
+    // viewer's namespace; the client session id only selects a thread in it,
+    // and a proposal is actionable only by the principal it was proposed to.
+    const sessionId = opsConversationSessionId(resolvedViewer.context, body.sessionId);
+    const storedMissionProposal = getChronosMissionProposalState(sessionId, core);
+    const pendingMissionProposal = opsProposalBelongsToViewer(
+      storedMissionProposal,
+      resolvedViewer.context
+    )
+      ? storedMissionProposal
+      : null;
     const missionId = typeof body.missionId === 'string' ? body.missionId : undefined;
     const teamRole = typeof body.teamRole === 'string' ? body.teamRole : undefined;
 
@@ -1268,6 +1291,7 @@ export async function POST(req: NextRequest) {
       saveChronosMissionProposalState(
         {
           sessionId,
+          authorPrincipalKey: opsViewerPrincipalKey(resolvedViewer.context),
           proposal,
           sourceText: query,
           routingDecision: conversation.routingDecision,
