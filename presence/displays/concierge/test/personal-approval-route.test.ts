@@ -102,12 +102,21 @@ describe('personal owner real approval route', () => {
       )?.status
     ).toBe('approved');
   });
-  it('refuses public viewers, foreign humans and NHI principals without exposing the private request', async () => {
+  it('admits the signed-in owner even when the concierge tier mask excludes personal', () => {
+    const record = create();
+    // Admission is the installed-owner proof (member + signed human principal);
+    // the concierge tierAccess mask never lists personal for any role, so an
+    // owner session carrying the public mask must still reach their own
+    // partition. The real ceiling is the parent scope envelope — a public
+    // envelope still refuses below.
+    viewer = { ...viewer, tierAccess: ['public'] };
+    expect(server.loadConciergeApproval(viewer, 'personal-review', record.id)?.id).toBe(record.id);
+  });
+  it('refuses foreign humans and NHI principals without exposing the private request', async () => {
     const record = create();
     const digest = f.approvals.computeApprovalPresentedDigest(record);
     const owner = viewer;
     for (const candidate of [
-      { ...owner, tierAccess: ['public'] as ConciergeViewerContext['tierAccess'] },
       { ...owner, principalId: 'foreign', memberId: 'foreign' },
       {
         ...owner,
