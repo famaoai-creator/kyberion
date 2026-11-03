@@ -117,7 +117,8 @@ describe('RN-01 role assumption trace', () => {
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
       // The delegation is snapshotted: a later env write changes nothing...
-      process.env[DELEGATED_ROLE_ENV] = 'chronos_localadmin@concierge';
+      // dot_lifecycle_writer: a role the server policy never grants (D3).
+      process.env[DELEGATED_ROLE_ENV] = 'dot_lifecycle_writer@concierge';
       expect(resolveRole()).toBe('sovereign_concierge');
       // ...until a fresh process (test seam) reads the new value.
       resetRoleAssumptionPolicyCache();
@@ -138,7 +139,7 @@ describe('RN-01 role assumption trace', () => {
       }),
       expect.objectContaining({
         system_role: 'concierge',
-        assumed_role: 'chronos_localadmin',
+        assumed_role: 'dot_lifecycle_writer',
         allowed: false,
         source: 'delegation',
       }),
