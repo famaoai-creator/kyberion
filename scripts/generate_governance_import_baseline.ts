@@ -18,9 +18,10 @@
 /* eslint-disable no-restricted-imports, no-restricted-syntax -- repo-wide import scanner; see file header */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
-const rootDir = process.cwd();
+const rootDir = pathResolver.rootDir();
 const baselinePath = path.join(rootDir, 'tests', 'fixtures', 'governance-import-baseline.json');
 
 const CODE_EXTENSIONS = new Set(['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs', '.mts', '.cts']);
@@ -95,33 +96,17 @@ export function scanGovernanceImportBaseline(): {
   };
 }
 
-function main(argv = process.argv.slice(2)): number {
-  const checkOnly = argv.includes('--check');
-  const scanned = scanGovernanceImportBaseline();
-  const next = `${JSON.stringify(scanned, null, 2)}\n`;
+export const main = defineGenerator({
+  id: 'governance-import-baseline',
+  outputs: [baselinePath],
+  render() {
+    const scanned = scanGovernanceImportBaseline();
+    return [{ path: baselinePath, content: `${JSON.stringify(scanned, null, 2)}\n` }];
+  },
+});
 
-  if (checkOnly) {
-    const current = fs.existsSync(baselinePath) ? fs.readFileSync(baselinePath, 'utf8') : '';
-    if (current !== next) {
-      process.stderr.write(
-        `[governance-import-baseline] fixture out of date\n` +
-          `  fix: pnpm generate:governance-import-baseline\n`
-      );
-      return 1;
-    }
-    process.stdout.write('[governance-import-baseline] ok\n');
-    return 0;
-  }
-
-  fs.mkdirSync(path.dirname(baselinePath), { recursive: true });
-  fs.writeFileSync(baselinePath, next, 'utf8');
-  process.stdout.write(
-    `[governance-import-baseline] wrote ${path.relative(rootDir, baselinePath)} ` +
-      `(fs=${scanned.fs_imports.length}, child_process=${scanned.child_process_imports.length})\n`
-  );
-  return 0;
-}
-
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  process.exitCode = main();
-}
+if (
+  isDirectScript(import.meta.url, 'generate_governance_import_baseline.ts') ||
+  isDirectScript(import.meta.url, 'generate_governance_import_baseline.js')
+)
+  void main();
