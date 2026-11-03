@@ -4,9 +4,16 @@
   "additionalProperties": false,
   "required": ["version", "purpose", "scenarios"],
   "properties": {
-    "$schema": { "type": "string" },
-    "version": { "type": "string", "minLength": 1 },
-    "purpose": { "const": "regression-fixture" },
+    "$schema": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "purpose": {
+      "const": "regression-fixture"
+    },
     "scenarios": {
       "type": "array",
       "minItems": 1,
@@ -21,8 +28,14 @@
           "expected"
         ],
         "properties": {
-          "scenario_id": { "type": "string", "minLength": 1 },
-          "utterance": { "type": "string", "minLength": 1 },
+          "scenario_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "utterance": {
+            "type": "string",
+            "minLength": 1
+          },
           "classification_input": {
             "type": "object",
             "additionalProperties": false,
@@ -30,11 +43,33 @@
             "properties": {
               "progress_signals": {
                 "type": "array",
-                "items": { "type": "string", "minLength": 1 }
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
               },
               "artifact_paths": {
                 "type": "array",
-                "items": { "type": "string", "minLength": 1 }
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "mission_type_hint": {
+                "type": "string",
+                "minLength": 1
+              },
+              "execution_shape": {
+                "type": "string",
+                "enum": [
+                  "direct_reply",
+                  "actuator_action",
+                  "browser_session",
+                  "task_session",
+                  "pipeline",
+                  "mission",
+                  "project_bootstrap"
+                ]
               }
             }
           },
@@ -55,22 +90,57 @@
                   "project_bootstrap"
                 ]
               },
-              "artifact_estimate": { "type": "integer", "minimum": 0 },
-              "external_audience": { "type": "boolean" },
-              "regulatory_audience": { "type": "boolean" },
-              "replay_or_variant_likelihood": { "type": "boolean" },
-              "repetition_estimate": { "type": "integer", "minimum": 0 },
-              "multiple_legitimate_viewpoints": { "type": "boolean" },
-              "stakeholder_count": { "type": "integer", "minimum": 0 },
-              "approval_required": { "type": "boolean" },
-              "cross_system_mutation": { "type": "boolean" },
-              "expected_continuation_beyond_session": { "type": "boolean" },
-              "high_stakes_action": { "type": "boolean" },
-              "high_stakes_or_dogfood_evidence": { "type": "boolean" },
-              "customer_signoff": { "type": "boolean" },
-              "production_release": { "type": "boolean" },
-              "mission_handoff": { "type": "boolean" },
-              "security_sensitive_cross_system_change": { "type": "boolean" }
+              "artifact_estimate": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "external_audience": {
+                "type": "boolean"
+              },
+              "regulatory_audience": {
+                "type": "boolean"
+              },
+              "replay_or_variant_likelihood": {
+                "type": "boolean"
+              },
+              "repetition_estimate": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "multiple_legitimate_viewpoints": {
+                "type": "boolean"
+              },
+              "stakeholder_count": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "approval_required": {
+                "type": "boolean"
+              },
+              "cross_system_mutation": {
+                "type": "boolean"
+              },
+              "expected_continuation_beyond_session": {
+                "type": "boolean"
+              },
+              "high_stakes_action": {
+                "type": "boolean"
+              },
+              "high_stakes_or_dogfood_evidence": {
+                "type": "boolean"
+              },
+              "customer_signoff": {
+                "type": "boolean"
+              },
+              "production_release": {
+                "type": "boolean"
+              },
+              "mission_handoff": {
+                "type": "boolean"
+              },
+              "security_sensitive_cross_system_change": {
+                "type": "boolean"
+              }
             }
           },
           "expected": {
@@ -153,8 +223,14 @@
                   "retrospective"
                 ]
               },
-              "workflow_id": { "type": "string", "minLength": 1 },
-              "workflow_pattern": { "type": "string", "minLength": 1 },
+              "workflow_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "workflow_pattern": {
+                "type": "string",
+                "minLength": 1
+              },
               "review_mode": {
                 "type": "string",
                 "enum": ["lean", "standard", "strict"]
@@ -162,12 +238,19 @@
               "required_gate_ids": {
                 "type": "array",
                 "minItems": 1,
-                "items": { "type": "string", "minLength": 1 }
+                "items": {
+                  "type": "string",
+                  "minLength": 1
+                }
               },
-              "promotion_required": { "type": "boolean" }
+              "promotion_required": {
+                "type": "boolean"
+              }
             }
           },
-          "notes": { "type": "string" }
+          "notes": {
+            "type": "string"
+          }
         }
       }
     }

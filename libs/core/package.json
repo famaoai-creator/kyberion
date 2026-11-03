@@ -4008,6 +4008,10 @@
       "types": "./dist/mission/orchestrator-session.d.ts",
       "default": "./dist/mission/orchestrator-session.js"
     },
+    "./mission/refactoring-evidence": {
+      "types": "./dist/mission/refactoring-evidence.d.ts",
+      "default": "./dist/mission/refactoring-evidence.js"
+    },
     "./mlx-embedding-backend": {
       "types": "./dist/mlx-embedding-backend.d.ts",
       "default": "./dist/mlx-embedding-backend.js"

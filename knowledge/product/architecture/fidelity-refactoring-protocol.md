@@ -1,10 +1,17 @@
 ---
-title: 'Architecture: Fidelity Refactoring Protocol'
+title: 'Architecture: Fidelity Drift Self-Correction Protocol'
 kind: evergreen
-last_updated: 2026-10-05
+tags: [architecture, fidelity, alignment, not-code-refactoring]
+last_updated: 2026-11-03
 ---
 
-# Architecture: Fidelity Refactoring Protocol
+# Architecture: Fidelity Drift Self-Correction Protocol
+
+> **Name note**: this document is **not** about restructuring application source
+> code. For behavior-preserving code refactoring, use mission type `refactoring`
+> and [`engineering-refactoring-playbook.md`](../orchestration/engineering-refactoring-playbook.md).
+> The word "Refactoring" here means correcting the agent's execution skills so
+> they match the declared persona — a fidelity / alignment concern.
 
 ## 1. 概要 (Overview)
 
@@ -21,12 +28,12 @@ last_updated: 2026-10-05
 
 1. **Detection**: `Alignment Mirror` が証跡をスキャンし、人格の主張と実行結果の不一致（Fidelity Violation）を特定する。
 2. **Analysis**: 乖離の原因が「能力不足」か「環境の制約」かを判断する。
-3. **Refactoring (Primary Action)**: 人格（理想）を維持したまま、実行ロジック（スキル）を修正・強化し、理想を現実に変えるためのパッチを当てる。
+3. **Skill correction (Primary Action)**: 人格（理想）を維持したまま、実行ロジック（スキル）を修正・強化し、理想を現実に変えるためのパッチを当てる。
 4. **Distillation (Secondary Action)**: 物理的に不可能な理想であった場合のみ、人格側の定義を「より誠実な現状」へと更新する。
 
 ## 4. 結論
 
-誠実さ（Integrity）とは、単に失敗を認めることではない。**「自らの掲げたビジョンを実現できるよう、絶えず自己（コード）を更新し続けること」**である。
+誠実さ（Integrity）とは、単に失敗を認めることではない。**「自らの掲げたビジョンを実現できるよう、絶えず自己（コード／スキル）を更新し続けること」**である。
 
 ---
 

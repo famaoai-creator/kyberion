@@ -468,6 +468,44 @@ describe('mission-workflow-catalog', () => {
     expect(workflow.workflow_id).toBe('research-report');
   });
 
+  it('routes the refactoring mission-type hint onto code-refactoring-aidlc', () => {
+    const refactoring = resolveMissionWorkflowDesign({
+      missionClass: 'code_change',
+      deliveryShape: 'single_artifact',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      missionTypeHint: 'refactoring',
+    });
+    const byUtterance = resolveMissionWorkflowDesign({
+      missionClass: 'code_change',
+      deliveryShape: 'single_artifact',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      missionTypeHint: 'development',
+      utterance: 'このモジュールをリファクタリングして構造だけ直して',
+    });
+    const feature = resolveMissionWorkflowDesign({
+      missionClass: 'code_change',
+      deliveryShape: 'single_artifact',
+      riskProfile: 'review_required',
+      stage: 'planning',
+      executionShape: 'mission',
+      missionTypeHint: 'code_change',
+    });
+
+    expect(refactoring.workflow_id).toBe('code-refactoring-aidlc');
+    expect(byUtterance.workflow_id).toBe('code-refactoring-aidlc');
+    expect(refactoring.pattern).toBe('aidlc_code_change');
+    expect(refactoring.phases).toEqual(
+      expect.arrayContaining(['planning', 'contract_authoring', 'execution', 'test', 'self_review'])
+    );
+    expect(feature.workflow_id).toBe('code-change-aidlc');
+    const auditGate = refactoring.phase_specs?.find((phase) => phase.id === 'planning')?.exit_gate;
+    expect(auditGate?.checks.some((check) => check.kind === 'command_succeeds')).toBe(true);
+  });
+
   it('routes the operations_report mission-type hint onto the short org ops report process', () => {
     const workflow = resolveMissionWorkflowDesign({
       missionClass: 'operations_and_release',
