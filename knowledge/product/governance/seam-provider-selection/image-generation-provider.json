@@ -130,6 +130,76 @@
           }
         }
       },
+      "default_chains": {
+        "mode:local_only": [
+          "apple_playground",
+          "windows_native",
+          "local_flux",
+          "local_diffusion",
+          "comfyui"
+        ],
+        "mode:privacy_first": [
+          "apple_playground",
+          "windows_native",
+          "local_flux",
+          "local_diffusion",
+          "comfyui"
+        ],
+        "mode:fast": [
+          "gemini_fast",
+          "gemini_service",
+          "gemini_image",
+          "apple_playground",
+          "windows_native",
+          "local_flux",
+          "comfyui",
+          "llm_api",
+          "cursor_host_bridge",
+          "host_agent"
+        ],
+        "mode:artistic": [
+          "cursor_host_bridge",
+          "codex_host_bridge",
+          "agy_host_bridge",
+          "host_agent",
+          "apple_playground",
+          "windows_native",
+          "gemini_service",
+          "gemini_fast",
+          "gemini_image",
+          "llm_api",
+          "local_flux",
+          "comfyui"
+        ],
+        "mode:balanced": [
+          "cursor_host_bridge",
+          "codex_host_bridge",
+          "agy_host_bridge",
+          "host_agent",
+          "apple_playground",
+          "windows_native",
+          "local_flux",
+          "comfyui",
+          "gemini_fast",
+          "gemini_service",
+          "gemini_image",
+          "llm_api"
+        ],
+        "default": [
+          "cursor_host_bridge",
+          "codex_host_bridge",
+          "agy_host_bridge",
+          "host_agent",
+          "apple_playground",
+          "windows_native",
+          "local_flux",
+          "comfyui",
+          "gemini_fast",
+          "gemini_service",
+          "gemini_image",
+          "llm_api"
+        ]
+      },
       "purposes": {
         "quality": {
           "description": "Artistic fidelity matters most (hero images, deliverables); slower or billed providers are acceptable.",

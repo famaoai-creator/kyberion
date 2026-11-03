@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { FileSecretProvider, SecretPolicyRouter } from './secret-bridge.js';
+import { FileSecretProvider, selectSecretProvider } from './secret-bridge.js';
 
 let testRoot: string;
 let secretsDir: string;
@@ -99,13 +99,14 @@ describe('FileSecretProvider', () => {
   });
 });
 
-describe('SecretPolicyRouter file-secret opt-in', () => {
+describe('selectSecretProvider file-secret opt-in', () => {
   it('does not select file secrets without KYBERION_ALLOW_FILE_SECRETS', async () => {
     const previous = process.env.KYBERION_ALLOW_FILE_SECRETS;
     delete process.env.KYBERION_ALLOW_FILE_SECRETS;
     try {
-      const router = new SecretPolicyRouter([new FileSecretProvider(secretsFile)]);
-      await expect(router.selectProvider()).rejects.toThrow('No available Secret Provider');
+      await expect(selectSecretProvider([new FileSecretProvider(secretsFile)])).rejects.toThrow(
+        'No available Secret Provider'
+      );
     } finally {
       if (previous === undefined) delete process.env.KYBERION_ALLOW_FILE_SECRETS;
       else process.env.KYBERION_ALLOW_FILE_SECRETS = previous;
@@ -116,8 +117,7 @@ describe('SecretPolicyRouter file-secret opt-in', () => {
     const previous = process.env.KYBERION_ALLOW_FILE_SECRETS;
     process.env.KYBERION_ALLOW_FILE_SECRETS = '1';
     try {
-      const router = new SecretPolicyRouter([new FileSecretProvider(secretsFile)]);
-      const provider = await router.selectProvider();
+      const provider = await selectSecretProvider([new FileSecretProvider(secretsFile)]);
       expect(provider.id).toBe('file_secrets');
     } finally {
       if (previous === undefined) delete process.env.KYBERION_ALLOW_FILE_SECRETS;

@@ -12,6 +12,7 @@ import {
 } from '../image-reference-consent.js';
 import { isHostImageHandoffOutput } from '../../host-image-handoff.js';
 import { runExternalOperation } from '../../governance/external-operation.js';
+import { wrapAdapterEffects } from '../../governance/adapter-effect-proxy.js';
 
 const admittedImageMethods = new WeakSet<object>();
 
@@ -82,11 +83,7 @@ export function governImageProvider<T extends ImageGenerationProvider>(provider:
     );
   };
   admittedImageMethods.add(generate);
-  return new Proxy(provider, {
-    get(target, property) {
-      if (property === 'generate') return generate;
-      const value = Reflect.get(target, property, target);
-      return typeof value === 'function' ? value.bind(target) : value;
-    },
-  });
+  return wrapAdapterEffects(provider, (property) =>
+    property === 'generate' ? generate : undefined
+  );
 }

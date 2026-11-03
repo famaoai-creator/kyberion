@@ -178,13 +178,7 @@ export function normalizeScheduledPipelinePath(pipelinePath: string, rootDir?: s
   const assertRepoRelative = (candidate: string): string => {
     const resolvedRoot = path.resolve(root);
     const resolved = path.resolve(resolvedRoot, candidate);
-    const relative = path.relative(resolvedRoot, resolved);
-    if (
-      !relative ||
-      relative === '..' ||
-      relative.startsWith(`..${path.sep}`) ||
-      path.isAbsolute(relative)
-    ) {
+    if (!pathResolver.isPathInside(resolvedRoot, resolved)) {
       throw new Error(
         `pipelinePath must be repo-relative or inside the repo root (got path outside the repo: ${trimmed})`
       );
@@ -193,7 +187,7 @@ export function normalizeScheduledPipelinePath(pipelinePath: string, rootDir?: s
   };
   if (!path.isAbsolute(trimmed)) return assertRepoRelative(normalized);
   const relative = path.relative(root, trimmed);
-  if (!relative.startsWith('..') && !path.isAbsolute(relative)) {
+  if (pathResolver.isPathInsideOrEqual(root, trimmed)) {
     return assertRepoRelative(relative.replace(/\\/g, '/'));
   }
   const marker = `${path.sep}pipelines${path.sep}`;

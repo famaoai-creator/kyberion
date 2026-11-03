@@ -11,7 +11,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import * as path from 'node:path';
 import { defineCatalog } from '../foundation/governed-catalog.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
-import { knowledge, rootDir, shared } from '../path-resolver.js';
+import { isPathInside, knowledge, rootDir, shared } from '../path-resolver.js';
 import {
   assertSafeRepositoryPath,
   safeExecResult,
@@ -176,13 +176,7 @@ function lockIdOf(ledgerPath: string): string {
 }
 
 function isStrictlyInside(root: string, candidate: string): boolean {
-  const relative = path.relative(root, candidate);
-  return (
-    relative.length > 0 &&
-    relative !== '..' &&
-    !relative.startsWith(`..${path.sep}`) &&
-    !path.isAbsolute(relative)
-  );
+  return isPathInside(root, candidate);
 }
 
 /**

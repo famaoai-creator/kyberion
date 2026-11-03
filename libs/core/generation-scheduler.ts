@@ -119,8 +119,7 @@ function tenantArtifactRoot(scope: EventScope, scheduleId: string): string | nul
 }
 
 function pathWithin(root: string, target: string): boolean {
-  const relative = path.relative(path.resolve(root), path.resolve(target));
-  return relative === '' || (!relative.startsWith('..') && !path.isAbsolute(relative));
+  return pathResolver.isPathInsideOrEqual(path.resolve(root), path.resolve(target));
 }
 
 function assertTenantDeliveryPath(

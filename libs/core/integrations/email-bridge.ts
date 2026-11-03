@@ -6,6 +6,7 @@ import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
 import { EmailProvider, EmailParams, EmailResult } from './email-types.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { runExternalOperation } from '../governance/external-operation.js';
+import { wrapAdapterEffects } from '../governance/adapter-effect-proxy.js';
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { hostNodePlatform, isMacOS } from '../platform-facts.js';
@@ -356,50 +357,35 @@ export class EmailBackendRegistry {
     if (nativeSend && nativeDraft) {
       this.adapters.set(id, adapter);
     } else {
-      const methods = new Map<PropertyKey, unknown>();
       this.adapters.set(
         id,
-        new Proxy(adapter, {
-          get(target, property) {
-            if (methods.has(property)) return methods.get(property);
-            const original = Reflect.get(target, property, target);
-            if (typeof original !== 'function') return original;
-            const operation =
-              property === 'send'
-                ? 'send'
-                : property === 'createDraft'
-                  ? 'create_draft'
-                  : undefined;
-            const native = property === 'send' ? nativeSend : nativeDraft;
-            const method =
-              operation && !native
-                ? (params: EmailParams) => {
-                    const snapshot: EmailParams = {
-                      to: params.to,
-                      cc: params.cc,
-                      from: params.from,
-                      subject: params.subject,
-                      body: params.body,
-                    };
-                    return runExternalOperation(
-                      {
-                        operationId: `email:${operation}`,
-                        tenantSlug: (currentScopeEnvelope()?.identity ?? resolveScopeContext())
-                          .tenant_slug,
-                        effect: { backend: id, params: snapshot },
-                        requiresApproval: true,
-                        // A custom adapter's hidden account/defaults are not
-                        // classified by this boundary; require human review.
-                        delegable: false,
-                      },
-                      () => original.call(target, snapshot),
-                      classifyEmailOutcome
-                    );
-                  }
-                : original.bind(target);
-            methods.set(property, method);
-            return method;
-          },
+        wrapAdapterEffects(adapter, (property, original, target) => {
+          const operation =
+            property === 'send' ? 'send' : property === 'createDraft' ? 'create_draft' : undefined;
+          const native = property === 'send' ? nativeSend : nativeDraft;
+          if (!operation || native) return undefined;
+          return (params: EmailParams) => {
+            const snapshot: EmailParams = {
+              to: params.to,
+              cc: params.cc,
+              from: params.from,
+              subject: params.subject,
+              body: params.body,
+            };
+            return runExternalOperation(
+              {
+                operationId: `email:${operation}`,
+                tenantSlug: (currentScopeEnvelope()?.identity ?? resolveScopeContext()).tenant_slug,
+                effect: { backend: id, params: snapshot },
+                requiresApproval: true,
+                // A custom adapter's hidden account/defaults are not
+                // classified by this boundary; require human review.
+                delegable: false,
+              },
+              async () => Reflect.apply(original, target, [snapshot]),
+              classifyEmailOutcome
+            );
+          };
         })
       );
     }

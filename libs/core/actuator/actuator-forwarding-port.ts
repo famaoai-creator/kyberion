@@ -1,6 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import type { ContextSecurityScope } from '../context-security-scope.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 
 export type ActuatorForwardStatus = 'succeeded' | 'failed' | 'blocked';
 
@@ -41,7 +41,7 @@ const actuatorForwardingPortSeam = createSeam<ActuatorForwardingPort>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/actuator/actuator-forwarding-port.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const actuatorForwardingPortLifecycle = createSeamLifecycle(actuatorForwardingPortSeam);
 const forwardingPortStorage = new AsyncLocalStorage<ActuatorForwardingPort>();
 
 export function withActuatorForwardingPort<T>(
@@ -52,16 +52,14 @@ export function withActuatorForwardingPort<T>(
 }
 
 export function registerActuatorForwardingPort(port: ActuatorForwardingPort): () => void {
-  registeredDisposer = actuatorForwardingPortSeam.register('default', port, {
+  return actuatorForwardingPortLifecycle.register('default', port, {
     provenance: 'builtin',
     source: 'actuator-forwarding-port',
   });
-  return registeredDisposer;
 }
 
 export function resetActuatorForwardingPort(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  actuatorForwardingPortLifecycle.reset();
 }
 
 export function getActuatorForwardingPort(): ActuatorForwardingPort {

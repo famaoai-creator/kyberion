@@ -54,6 +54,15 @@ export interface SeamSelectionPolicy {
   traits: Record<string, string>;
   providers: Record<string, SeamProviderProfile>;
   purposes: Record<string, SeamSelectionPurpose>;
+  /**
+   * Baseline provider orderings keyed by a domain discriminator (e.g.
+   * "mode:accurate", "platform:apple_silicon"); 'default' is the catch-all.
+   * Used when no explicit preference, purpose, pin or rule applies —
+   * eligibility still decides membership, unlisted providers trail in
+   * registration order. This is the data-driven replacement for per-mode
+   * chains routers used to hardcode.
+   */
+  default_chains?: Record<string, string[]>;
 }
 
 export interface SeamProviderCandidate {

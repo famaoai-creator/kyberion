@@ -1,0 +1,39 @@
+{
+  "$schema": "../schemas/intake-vectors.schema.json",
+  "version": "1.0.0",
+  "description": "The four governed external data intake vectors (data-ingestion-protocol). Each vector is declared with its permitted source types, whether it requires a host-level gate (SUDO or operator action), and whether agents may write to its landing floor. Vault-mounted and manually-vaulted data are read-only for agents; active work always lands in active/ floors.",
+  "vectors": {
+    "manual_vaulting": {
+      "enabled": true,
+      "description": "Vector 1: a human copies files into knowledge/vault/ (or routes them through pnpm knowledge:ingest). Agent-visible landing is read-only vault content.",
+      "source_types": ["human_copy", "knowledge_ingest_cli"],
+      "requires_host_gate": false,
+      "agent_writable": false,
+      "landing_floor": "vault"
+    },
+    "connector_skills": {
+      "enabled": true,
+      "description": "Vector 2: connector skills pull SaaS sources through the ingest-source-walker seam (box, slack, confluence, google_drive) and land through the ingest ceremony.",
+      "source_types": ["ingest_source_walker"],
+      "requires_host_gate": true,
+      "agent_writable": false,
+      "landing_floor": "staging"
+    },
+    "agentic_web_fetch": {
+      "enabled": true,
+      "description": "Vector 3: agent-driven fetches (api-fetcher, web_fetch, browser actuator). Results land under staging and are promoted through the ingest ceremony.",
+      "source_types": ["api_fetcher", "web_fetch", "browser_actuator"],
+      "requires_host_gate": true,
+      "agent_writable": false,
+      "landing_floor": "staging"
+    },
+    "vault_mount": {
+      "enabled": true,
+      "description": "Vector 4: an operator mounts an external filesystem path under vault/mounts/ via a symlink created by the vault_mount_cli gate. Mounts are a filesystem security boundary, not a provider seam.",
+      "source_types": ["vault_mount_symlink"],
+      "requires_host_gate": true,
+      "agent_writable": false,
+      "landing_floor": "vault_mounts"
+    }
+  }
+}

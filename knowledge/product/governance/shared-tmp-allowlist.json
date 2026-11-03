@@ -84,7 +84,7 @@
       "note": "default ComfyUI output dir; generated media are deliverables"
     },
     {
-      "file": "libs/actuators/media-generation-actuator/src/video-generation-provider.ts",
+      "file": "libs/core/media/video-generation/provider-support.ts",
       "count": 1,
       "classification": "migrate-candidate",
       "note": "downloaded generated video; deliverable"
