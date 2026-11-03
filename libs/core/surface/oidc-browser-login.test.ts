@@ -695,6 +695,35 @@ describe('handleSurfaceAuthRoute', () => {
     expect(res?.body).not.toContain('evil.example');
   });
 
+  it('hops /auth/start to the callback origin so the transaction cookie lands on the IdP return host', async () => {
+    const start = await handleSurfaceAuthRoute(
+      req({
+        pathname: '/auth/start',
+        requestOrigin: 'http://127.0.0.1:3000',
+        searchParams: new URLSearchParams({ next: '/settings' }),
+      }),
+      { env: baseEnv({ KYBERION_OIDC_PUBLIC_BASE_URL: 'http://localhost:3000' }) }
+    );
+    expect(start?.status).toBe(302);
+    expect(start?.headers.Location).toBe('http://localhost:3000/auth/start?next=%2Fsettings');
+    expect(start?.setCookies).toEqual([]);
+  });
+
+  it('keeps a loopback browser on its own host (127.0.0.1 is not rewritten to localhost)', async () => {
+    const idp = makeIdp();
+    const start = await handleSurfaceAuthRoute(
+      req({ pathname: '/auth/start', requestOrigin: 'http://127.0.0.1:3000', loopback: true }),
+      {
+        env: { ...baseEnv(), KYBERION_OIDC_PUBLIC_BASE_URL: '' },
+        fetchJson: idp.fetchJson,
+      }
+    );
+    expect(start?.status).toBe(302);
+    const authorize = new URL(start!.headers.Location!);
+    expect(authorize.searchParams.get('redirect_uri')).toBe('http://127.0.0.1:3000/auth/callback');
+    expect(start!.setCookies).toHaveLength(1);
+  });
+
   it('completes the whole flow: start → callback sets an HttpOnly session cookie and redirects to next', async () => {
     seedMember({ issuer: ISSUER, subject: 'idp-subject-1' });
     const idp = makeIdp();
