@@ -33,6 +33,43 @@ reviewer は元の実装成果物を書き換えず、独立レビュー結果�
 ソースのみのタスクも実体の hash を controller 内で検証し、出力のない pipeline は
 宣言した evidence artifact を生成する。空の proof で完了しない。
 
+## 通常タスクの私有ソース作業コピー
+
+機密タスクの編集前に、owner は `mission prepare-source-workspace <MISSION_ID>
+<TASK_ID> --baseline-commit <full-commit-sha>` を使う。対象は active な private
+mission の未 dispatch タスクで、NEXT_TASKS の exact `source_edit_paths` が必要。
+呼出元の tier・tenant・organization・project は mission の正本と一致させる。
+ID や persona の文字列だけでは owner の実行権限にならない。
+
+これは既存の独立 clone エンジンを使う offline 経路であり、通常の Git worktree
+を私有 clone と呼び替えるものではない。正本 checkout に存在するレビュー済みの
+完全 SHA から作り、共有 object・alternates・remote を持たせず、fetch、push、PR、
+merge、deploy、依存 install は行わない。未追跡の identity・設定・runtime はコピーしない。
+コミット済み履歴は残るため、clone は履歴の無害化や機密解除ではない。
+baseline は正本 checkout の local `main` から到達可能であることが前提。
+存在・到達可能性は workspace 登録前にも検査する。clone／checkout が失敗した場合は
+登録をロールバックして停止する（失敗した allocate を再利用可能な workspace とは見なさない）。
+成功後に壊れた workspace の自動修復・別場所への再作成はしない。
+
+owner facade は `source_workspace` に元の exact paths と baseline を保持し、
+`source_edit_paths` を同じ scope の task 所有 workspace 内へ置換する。
+再実行は同じ baseline・task 契約・workspace を確認するだけで、変更の上書きや
+未完了 clone の自動修復はしない。準備済み clone の編集にも既存の claim・lease・
+approval・scope 検査が適用される。
+
+### テスト計画と実行を区別する
+
+exact テスト名や入力 hash の計画は実行許可でも実行証跡でもない。
+Node/Vitest の固定 argv でも、テスト・設定・依存は任意のコードを実行できる。
+協調的な secure-io や external-egress の deny だけを OS 隔離と見なさない。
+実行には、レビュー済みの不変な source／dependency／runtime snapshot と、
+network・host filesystem・子 process を実際に隔離する backend の検証が別途必要。
+`.git`、owner の identity、秘密情報、不要な private files を mount しない。
+隔離機能が利用不可／拒否されたら **未実行** とし、host shell へ fallback しない。
+この変更は安全な実行 backend を提供しない。未実行を返すだけの偽の実行ツールや、
+利用先のない計画 API は登録しない。backend と snapshot の検証が揃ってから
+既存の claim・lease・承認契約へ接続する。
+
 ## 承認と再開
 
 承認が必要な操作は既存の承認ストアに保存し、WorkItem に承認IDを残す。

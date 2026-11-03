@@ -59,7 +59,7 @@ export const SETTINGS_NAV_ONLY_SECTIONS: ReadonlySet<SettingsSectionId> = new Se
 export const SETTINGS_CARD_SECTION_ORDER: readonly SettingsSectionId[] =
   SETTINGS_SECTION_ORDER.filter((id) => !SETTINGS_NAV_ONLY_SECTIONS.has(id));
 
-const DIAGNOSTIC_SECTION: Record<string, SettingsSectionId> = {
+export const DIAGNOSTIC_SECTION: Record<string, SettingsSectionId> = {
   profile: 'profile',
   avatar: 'voice',
   voice: 'voice',

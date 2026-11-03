@@ -67,6 +67,9 @@ const allowedCoreFsImports = [
   // D9: hermetic temp KYBERION_ROOT; raw fs seeds and inspects the fixture ledgers.
   'libs/core/mission/mission-ledger-tenant-scope.test.ts',
   'libs/core/output-artifacts.test.ts',
+  // Linked-worktree fixture: builds synthetic .git/commondir entries so the
+  // authority-store primary-root remap can be exercised hermetically.
+  'libs/core/path-resolver-authority-store.test.ts',
   // AL-01 hermetic purge test: raw fs to seed/inspect a temp KYBERION_ROOT.
   'libs/core/mission/mission-maintenance.purge.test.ts',
   // AL-03 hermetic closure test: raw fs to seed/inspect a temp KYBERION_ROOT.

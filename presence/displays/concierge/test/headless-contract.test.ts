@@ -13,9 +13,12 @@ describe('Concierge headless boundary', () => {
   it('publishes a read-only home resource with an A2UI projection', () => {
     const manifest = buildConciergeHeadlessManifest();
     expect(manifest.surface).toBe('concierge');
-    expect(manifest.resources).toEqual([
-      expect.objectContaining({ resource: 'home', a2ui_path: '/api/headless/a2ui/home' }),
-    ]);
+    expect(manifest.resources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resource: 'home', a2ui_path: '/api/headless/a2ui/home' }),
+        expect.objectContaining({ resource: 'settings', a2ui_path: '/api/headless/a2ui/settings' }),
+      ])
+    );
     expect(
       manifest.operations.find((operation) => operation.operation_id.endsWith('.a2ui'))
         ?.input_schema.properties

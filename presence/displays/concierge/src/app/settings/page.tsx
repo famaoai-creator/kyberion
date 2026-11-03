@@ -45,6 +45,7 @@ import { useSettingsExitRegistration } from '../../lib/settings-exit-guard';
 import { useVoiceSelection } from '../../lib/use-voice-selection';
 import { useTrainingAssignments } from '../../lib/use-training-assignments';
 import { useRecordingConsent } from '../../lib/use-recording-consent';
+import { openServiceConsentWindow } from '../../lib/oauth-popup';
 import { ProfileSection } from './sections/ProfileSection';
 import type { SettingsSaveFeedbackState } from './sections/SettingsSaveFeedback';
 import { MembersSection, type MemberFormState } from './sections/MembersSection';
@@ -723,7 +724,7 @@ export default function SettingsPage() {
       setOauthBusyId(serviceId);
       setOauthMessage(null);
       setOauthError(false);
-      const oauthWindow = window.open('', '_blank', 'noopener');
+      const oauthWindow = openServiceConsentWindow();
       try {
         const response = await globalThis.fetch('/api/oauth/begin', {
           method: 'POST',

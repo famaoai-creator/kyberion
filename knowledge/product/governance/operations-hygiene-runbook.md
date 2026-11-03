@@ -26,6 +26,25 @@ diff; they do not prove that an arbitrary starting checkout was current. This
 checkout comparison is a required operational preflight, not a new claim made
 by those automated checks.
 
+## Private task source preparation and local test boundaries
+
+Use the owner `mission prepare-source-workspace` facade for ordinary private tasks,
+not managed-development publication and not a linked worktree. Require an active,
+same-scope mission, an undispatched task, exact declared source paths and a reviewed
+local commit. Keep the original grant in the canonical task contract, revalidate
+before rewriting it, and reject reuse when baseline or remote configuration drifts.
+An independent clone retains committed history; it does not declassify source.
+
+Exact test argv and caller-supplied hashes are planning data, not confinement or
+execution proof. Never launch repository tests on the host merely because a
+cooperative egress policy says deny. Require a verified immutable input/runtime
+snapshot and actual filesystem/network/process isolation; unsupported or denied
+isolation stays not-run without an unisolated fallback. Do not register a no-op
+diagnostic as a working test runner. Regression checks: offline clone tests,
+ordinary task workspace facade tests and task-source-workspace-grant tests.
+The bounded test executor remains unimplemented until its snapshot and isolation
+backend can be verified; do not add unused planning APIs to imply delivery.
+
 ## Managed tool registration and readiness
 
 Keep tool identities, dependency-group membership and safe healthchecks in the

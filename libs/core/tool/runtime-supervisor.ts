@@ -10,6 +10,12 @@ export interface RuntimeRegistration {
   ownerId: string;
   ownerType: string;
   pid?: number;
+  /**
+   * Opaque start marker for `pid` (see `processStartMarker` in
+   * workforce/workspace-process-identity). A live pid that no longer matches
+   * this marker was recycled and is not the registered process.
+   */
+  pidStartMarker?: string;
   idleTimeoutMs?: number;
   shutdownPolicy?: RuntimeShutdownPolicy;
   metadata?: Record<string, unknown>;
@@ -21,7 +27,20 @@ export interface RuntimeResourceRecord extends RuntimeRegistration {
   lastActiveAt: number;
   shutdownPolicy: RuntimeShutdownPolicy;
   state: RuntimeResourceState;
+  /**
+   * Set when the most recent `cleanup()` call threw: the record is retained
+   * (still owned) so the failure can be inspected and cleanup retried.
+   */
+  lastCleanupError?: { at: number; reason: string; error: string };
 }
+
+/**
+ * `'removed'` — the record was deleted (cleanup succeeded or there was no
+ * cleanup callback). `'retained'` — cleanup failed and the record is still
+ * owned; retry `cleanup()` to complete it. `'absent'` — nothing was
+ * registered under the id.
+ */
+export type RuntimeCleanupOutcome = 'removed' | 'retained' | 'absent';
 
 export interface RuntimeResourceSnapshot extends RuntimeResourceRecord {
   idleForMs: number;
@@ -109,21 +128,30 @@ class RuntimeSupervisorImpl {
     return this.resources.delete(resourceId);
   }
 
-  async cleanup(resourceId: string, reason = 'manual'): Promise<boolean> {
+  /**
+   * Run the record's cleanup and release ownership only on success. A failed
+   * cleanup keeps the record registered — ownership stays with this
+   * supervisor rather than silently dropping to an unowned/leaked state —
+   * and `lastCleanupError` reports why so the call can be retried.
+   */
+  async cleanup(resourceId: string, reason = 'manual'): Promise<RuntimeCleanupOutcome> {
     const record = this.resources.get(resourceId);
-    if (!record) return false;
+    if (!record) return 'absent';
 
     try {
       await record.cleanup?.();
     } catch (error: any) {
+      const message = String(error?.message || error);
       logger.warn(
-        `[RUNTIME_SUPERVISOR] Cleanup failed for ${resourceId} (${reason}): ${error?.message || error}`
+        `[RUNTIME_SUPERVISOR] Cleanup failed for ${resourceId} (${reason}); record retained for retry: ${message}`
       );
-    } finally {
-      this.resources.delete(resourceId);
+      record.lastCleanupError = { at: Date.now(), reason, error: message };
+      return 'retained';
     }
 
-    return true;
+    delete record.lastCleanupError;
+    this.resources.delete(resourceId);
+    return 'removed';
   }
 
   async cleanupAll(reason = 'manual'): Promise<string[]> {
@@ -137,8 +165,8 @@ class RuntimeSupervisorImpl {
     const cleaned: string[] = [];
 
     for (const resourceId of resourceIds) {
-      const didCleanup = await this.cleanup(resourceId, reason);
-      if (didCleanup) cleaned.push(resourceId);
+      const outcome = await this.cleanup(resourceId, reason);
+      if (outcome === 'removed') cleaned.push(resourceId);
     }
 
     return cleaned;
@@ -153,8 +181,8 @@ class RuntimeSupervisorImpl {
 
     const reaped: string[] = [];
     for (const record of expired) {
-      await this.cleanup(record.resourceId, 'idle_timeout');
-      reaped.push(record.resourceId);
+      const outcome = await this.cleanup(record.resourceId, 'idle_timeout');
+      if (outcome === 'removed') reaped.push(record.resourceId);
     }
 
     return reaped;

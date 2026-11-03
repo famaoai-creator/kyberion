@@ -1600,6 +1600,10 @@
       "types": "./dist/error-classifier-judgment.d.ts",
       "default": "./dist/error-classifier-judgment.js"
     },
+    "./evidence": {
+      "types": "./dist/evidence.d.ts",
+      "default": "./dist/evidence.js"
+    },
     "./event-scope": {
       "types": "./dist/event-scope.d.ts",
       "default": "./dist/event-scope.js"
@@ -3891,6 +3895,10 @@
     "./mission/mission-task-recovery": {
       "types": "./dist/mission/mission-task-recovery.d.ts",
       "default": "./dist/mission/mission-task-recovery.js"
+    },
+    "./mission/mission-task-source-workspace": {
+      "types": "./dist/mission/mission-task-source-workspace.d.ts",
+      "default": "./dist/mission/mission-task-source-workspace.js"
     },
     "./mission/mission-task-supersede-proof": {
       "types": "./dist/mission/mission-task-supersede-proof.d.ts",

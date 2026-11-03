@@ -128,6 +128,9 @@ Governance Commands:
                                  the exception separately.
 
 Maintenance Commands:
+  prepare-source-workspace <ID> <task_id> --baseline-commit <full SHA>
+                                 Prepare an offline independent private task clone before dispatch.
+                                 Requires matching controller scope; no fetch, publish or execution.
   record-task <ID> <description> Record a task intention (flight recorder)
   record-evidence <ID> <task_id> <note> [--actor-id <ID>] [--provider <ID>]
                                  Append an execution-ledger evidence entry and commit it; a task it completes gets
