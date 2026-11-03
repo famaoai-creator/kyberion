@@ -1,7 +1,7 @@
 ---
 title: 'Dev-IdP onboarding runbook — signing in to Concierge locally'
 tags: [runbook, onboarding, oidc, dev-idp, concierge, approval]
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 ---
 
 # Dev-IdP onboarding runbook
@@ -66,6 +66,13 @@ You are now a signed-in member at A2. `human_only` approval requests in the
 services → 権限と承認 / approvals panels can be decided in the browser —
 this is the only path that satisfies `decidedByType: human` without a TTY.
 
+Signed in as the owner member, you can also use the installation-scope
+settings: operator services, your profile and avatar, and personal onboarding
+authority. From another device, a change first needs a passkey confirmation.
+After the owner is bound, an unauthenticated loopback browser is sent to
+`/login`. See [installation-owner-authorization](./installation-owner-authorization.md),
+which also covers the `KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK` escape hatch.
+
 ## Guardrails / gotchas
 
 - **Issuer spelling**: `localhost` ≠ `127.0.0.1`. The issuer saved in SSO
@@ -86,9 +93,11 @@ this is the only path that satisfies `decidedByType: human` without a TTY.
 
 ## Failure triage
 
-| Symptom                                        | Cause                                                  |
-| ---------------------------------------------- | ------------------------------------------------------ |
-| `/login` 500s / no redirect                    | SSO settings missing or issuer mismatch — re-do step 2 |
-| Sign-in succeeds but viewer is still anonymous | subject not linked — step 3                            |
-| Approval cards absent / 403 on settings panels | not instance owner — `viewerIsInstanceOwner` gate      |
-| dev-idp refuses to start                       | `NODE_ENV=production` or non-loopback bind — by design |
+| Symptom                                        | Cause                                                                                                                     |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `/login` 500s / no redirect                    | SSO settings missing or issuer mismatch — re-do step 2                                                                    |
+| Sign-in succeeds but viewer is still anonymous | subject not linked — step 3                                                                                               |
+| Approval cards absent / 403 on settings panels | not instance owner — `viewerIsInstanceOwner` gate                                                                         |
+| `installation_step_up_required` on a change    | remote owner write — confirm with passkey (see [installation-owner-authorization](./installation-owner-authorization.md)) |
+| Loopback browser now lands on `/login`         | owner bound — anonymous loopback retired; sign in                                                                         |
+| dev-idp refuses to start                       | `NODE_ENV=production` or non-loopback bind — by design                                                                    |

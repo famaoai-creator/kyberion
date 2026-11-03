@@ -93,6 +93,28 @@ async function confirmWithPasskey(
   return confirmed.step_up_token;
 }
 
+/**
+ * Confirm the installation owner with a passkey before a change to settings
+ * of the whole machine from another device. The server keeps the
+ * confirmation (bound to this browser session) for a short window; nothing
+ * is returned to keep. Resolves with when it lapses.
+ */
+export async function confirmInstallationWithPasskey(): Promise<{ expiresAt: string | null }> {
+  const started = await postJson('/api/me/passkeys', {
+    action: 'step_up_options',
+    purpose: 'installation',
+  });
+  const response = await startAuthentication({
+    optionsJSON: started.options as PublicKeyCredentialRequestOptionsJSON,
+  });
+  const confirmed = await postJson('/api/me/passkeys', { action: 'step_up_verify', response });
+  if (confirmed.purpose !== 'installation') throw new Error('step-up was not confirmed');
+  return {
+    expiresAt:
+      typeof confirmed.step_up_expires_at === 'string' ? confirmed.step_up_expires_at : null,
+  };
+}
+
 export async function registerPasskey(label: string, options: { stepUp: boolean }): Promise<void> {
   const stepUpToken = options.stepUp ? await confirmWithPasskey('enroll') : undefined;
   const withToken = stepUpToken ? { step_up_token: stepUpToken } : {};

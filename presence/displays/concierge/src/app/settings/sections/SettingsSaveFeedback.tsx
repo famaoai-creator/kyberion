@@ -4,12 +4,16 @@ import * as React from 'react';
 import { Callout } from '@agent/shared-ui';
 import type { SettingsTranslate } from './form-scope';
 import type { ConciergeMessageKey } from '../../../lib/i18n';
+import type { InstallationAccessCode } from '../../../lib/installation-access-client';
+import { InstallationAccessNotice } from './InstallationAccessNotice';
 
 export type SettingsSaveFeedbackState = {
   section: 'profile' | 'services' | 'notifications' | 'voice' | 'advanced';
   /** `rejected`: the server refused the save; `message` carries its reason. */
   phase: 'saving' | 'saved' | 'unconfirmed' | 'unavailable' | 'rejected';
   message?: string;
+  /** `rejected` by the installation-owner gate: render its notice, not a failure. */
+  access?: InstallationAccessCode;
 };
 
 const SAVED_KEY: Record<SettingsSaveFeedbackState['section'], ConciergeMessageKey> = {
@@ -31,6 +35,13 @@ export function SettingsSaveFeedback({
   t: SettingsTranslate;
 }) {
   if (!feedback) return null;
+  if (feedback.phase === 'rejected' && feedback.access) {
+    return (
+      <div className="settings-row-block">
+        <InstallationAccessNotice code={feedback.access} t={t} />
+      </div>
+    );
+  }
   const { phase, section } = feedback;
   const danger = phase === 'unconfirmed' || phase === 'unavailable' || phase === 'rejected';
   const key: ConciergeMessageKey =
