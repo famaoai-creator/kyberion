@@ -20,6 +20,27 @@
   ],
   "mission_class_rules": [
     {
+      "id": "class-code-change-refactoring-hint",
+      "match": {
+        "mission_type_hints": ["refactoring", "code_change"]
+      },
+      "mission_class": "code_change"
+    },
+    {
+      "id": "class-code-change-refactoring-utterance",
+      "match": {
+        "utterance_patterns": [
+          "リファクタリング",
+          "リファクタして",
+          "リファクタしたい",
+          "refactoring",
+          "refactor this",
+          "refactor the"
+        ]
+      },
+      "mission_class": "code_change"
+    },
+    {
       "id": "class-environment-recovery",
       "match": {
         "mission_type_hints": ["incident"]

@@ -91,6 +91,7 @@ export {
 } from './tier-guard-tenant-store-partitions.js';
 import { isAllowedVaultMountPath } from './secret/vault-mount.js';
 import { currentExecutionScope } from './foundation/execution-scope.js';
+import { informationAssetCoverageReadAllowed } from './foundation/information-asset-coverage-capability.js';
 import {
   currentResourceAccessScope,
   matchesNamePrefix,
@@ -1405,7 +1406,8 @@ export function inspectReadPermission(
             (identity.role === TASK_SOURCE_WORKSPACE_ROLE &&
               taskSourceWorkspaceIoAllowed(relativePath, operation)) ||
             (identity.role === PR_PUBLICATION_STORE_ROLE &&
-              prPublicationResourceAllowed(relativePath, operation))) &&
+              prPublicationResourceAllowed(relativePath, operation)) ||
+            informationAssetCoverageReadAllowed(relativePath, identity.role)) &&
           loaded.policy.authority_role_permissions?.[identity.role]?.allow_read?.some(
             (pattern: string) => {
               const expanded = expandPolicyPath(

@@ -1,3 +1,4 @@
+import { parseInformationAssetWorkBinding } from '../information-assets/work-types.js';
 /** Durable action snapshots and bounded terminal append, independent of dot orchestration. */
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
@@ -84,6 +85,7 @@ export interface DotActionRecord {
   recovery_receipt?: FrontDeskExecutionRecoveryReceipt;
   front_desk_execution?: FrontDeskExecutionBinding;
   continuous_work?: DotProposal['continuous_work'];
+  information_asset_work?: DotProposal['information_asset_work'];
   action_ref: string;
   dot_id: string;
   actor_id: string;
@@ -125,6 +127,7 @@ export interface DotActionRecord {
 
 /** Executable evidence must be complete; absence on an inventory index is never legacy off. */
 export function assertDotActionJudgmentBinding(record: DotActionRecord): void {
+  assertDotActionInformationBinding(record);
   if (record.private_content_hash !== undefined)
     throw new Error(
       '[DOT_ACTION_CONTENT_UNAVAILABLE] shared index cannot be used as executable evidence'
@@ -162,6 +165,7 @@ export function assertDotActionJudgmentBinding(record: DotActionRecord): void {
     'mission_admission',
     'handoff_to',
     'continuous_work',
+    'information_asset_work',
     'front_desk_execution',
   ] as const) {
     const actual = record[field],
@@ -786,6 +790,7 @@ export function dotProposalHash(dotId: string, proposal: DotProposal): string {
         proposal.objective,
         ...(proposal.front_desk_execution ? [proposal.front_desk_execution] : []),
         ...(proposal.continuous_work ? [proposal.continuous_work] : []),
+        ...(proposal.information_asset_work ? [proposal.information_asset_work] : []),
         proposal.handoff_to ?? '',
         // Appended only when set, so hashes of proposals without these fields
         // (and their dedupe windows) are unchanged.
@@ -797,4 +802,37 @@ export function dotProposalHash(dotId: string, proposal: DotProposal): string {
     )
     .digest('hex')
     .slice(0, 16);
+}
+
+/** Recipe execution evidence must retain the original server-authored scope and payload. */
+export function assertDotActionInformationBinding(record: DotActionRecord): void {
+  if (record.private_content_hash !== undefined) {
+    if (record.information_asset_work)
+      throw new Error('Scoped index is not executable information work');
+    return;
+  }
+  const original = record.admission?.proposal.information_asset_work;
+  if (!record.information_asset_work && !original) return;
+  const binding = parseInformationAssetWorkBinding(record.information_asset_work);
+  const admitted = parseInformationAssetWorkBinding(original);
+  if (
+    !record.admission ||
+    !isDotAdmissionIdentity(record.admission) ||
+    recoveryEvidenceHash(binding) !== recoveryEvidenceHash(admitted) ||
+    recoveryEvidenceHash(record.admission.proposal) !== record.admission.semantic_hash ||
+    record.scope?.tenant_slug !== binding.observation.scope.tenant_slug ||
+    record.scope?.organization_id !== binding.observation.scope.organization_id ||
+    record.scope?.project_id !== binding.observation.scope.project_id
+  )
+    throw new Error('Information work immutable admission or scope differs');
+  for (const key of [
+    'action_id',
+    'work_shape',
+    'pipeline_ref',
+    'target',
+    'objective',
+    'title',
+  ] as const)
+    if (record[key] !== record.admission.proposal[key])
+      throw new Error('Information work executable field differs: ' + key);
 }

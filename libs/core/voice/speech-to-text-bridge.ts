@@ -42,14 +42,18 @@ import {
   selectPreferredLocalSttBackend,
 } from '../local-stt-discovery.js';
 import { resolveSpeechCppBin } from '../tool/tool-binary-resolvers.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
 import {
-  getSeamSelectionPolicy,
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
+import {
+  resolveSeamSelectionEntry,
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
-import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 import { runExternalOperation } from '../governance/external-operation.js';
 import {
   primaryLanguageSubtag,
@@ -135,7 +139,7 @@ const speechToTextSeam = createSeam<SpeechToTextBridge>({
         left.id.localeCompare(right.id)
     )[0]?.implementation,
 });
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(speechToTextSeam);
 let ownedFluidAudio:
   { fingerprint: string; bridge: SpeechToTextBridge; dispose: () => void } | undefined;
 function releaseOwnedFluidAudio(): void {
@@ -207,13 +211,7 @@ export function registerSpeechToTextBridge(
       );
     },
   };
-  const disposeFromSeam = speechToTextSeam.register(name, Object.freeze(guarded), metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(name) === dispose) registeredDisposers.delete(name);
-  };
-  registeredDisposers.set(name, dispose);
-  return dispose;
+  return registrations.register(name, Object.freeze(guarded), metadata);
 }
 
 export function getSpeechToTextBridge(): SpeechToTextBridge {
@@ -354,18 +352,26 @@ export function shouldSelectSpeechToTextBridges(
     bridges?: SpeechToTextBridge[];
   } = {}
 ): boolean {
-  if (String(options.purpose || '').trim()) return true;
-  if (matchSeamSelectionRule(SPEECH_TO_TEXT_SEAM, { context: selectionContext(options) })) {
-    return true;
-  }
+  const entry = {
+    seam: SPEECH_TO_TEXT_SEAM,
+    purpose: options.purpose,
+    context: selectionContext(options),
+  };
+  // Preserve the cheap opt-in path: no bridge discovery is needed for a
+  // purpose or a matching operator rule.
+  if (resolveSeamSelectionEntry(entry).kind === 'governed') return true;
   const requires = options.requires ?? {};
   const bridges = options.bridges ?? getSpeechToTextBridges();
   const priorityDefault = options.bridges
     ? highestPriorityBridge(bridges)
     : getSpeechToTextBridge();
   if (!priorityDefault) return false;
-  if (unmetSpeechToTextRequirements(priorityDefault, requires).length === 0) return false;
-  return Boolean(getSeamSelectionPolicy(SPEECH_TO_TEXT_SEAM)?.fallback_purpose);
+  return (
+    resolveSeamSelectionEntry({
+      ...entry,
+      defaultEligible: unmetSpeechToTextRequirements(priorityDefault, requires).length === 0,
+    }).kind === 'governed'
+  );
 }
 
 /**
@@ -409,8 +415,7 @@ export function selectSpeechToTextBridges(
 }
 
 export function resetSpeechToTextBridge(): void {
-  for (const dispose of registeredDisposers.values()) dispose();
-  registeredDisposers.clear();
+  registrations.reset();
   ownedFluidAudio = undefined;
 }
 

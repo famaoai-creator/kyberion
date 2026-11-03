@@ -622,6 +622,8 @@ export function buildOrganizationWorkLoopSummary(input: {
     executionShape,
     intentId: input.intentId,
     taskType: input.taskType,
+    missionTypeHint: input.missionTypeHint,
+    utterance: input.utterance,
   });
   const reviewDesign = resolveMissionReviewDesign({
     missionClass: missionClassification.mission_class,

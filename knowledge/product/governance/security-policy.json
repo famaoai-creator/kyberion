@@ -565,6 +565,7 @@
     },
     "chronos_operator": {
       "allow_read": [
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
         "active/missions/",
         "active/archive/missions/",
         "active/projects/",
@@ -590,6 +591,7 @@
     },
     "chronos_localadmin": {
       "allow_read": [
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
         "knowledge/personal/tenants/",
         "active/missions/",
         "active/archive/missions/",
@@ -893,6 +895,8 @@
     },
     "concierge_management_reader": {
       "allow_read": [
+        "active/shared/runtime/dot/confidential/${KYBERION_TENANT}/",
+        "active/shared/runtime/service-bindings/",
         "knowledge/personal/members/",
         "knowledge/personal/tenants/${KYBERION_TENANT}.json",
         "active/organizations/confidential/${KYBERION_TENANT}/",

@@ -31,6 +31,11 @@ export function assertDotExistingWorkItem(
   injected: boolean
 ): void {
   if (!existing) return;
+  if (
+    judgmentCanonicalHash(existing.metadata?.information_asset_work ?? null) !==
+    judgmentCanonicalHash(record.information_asset_work ?? null)
+  )
+    throw new Error('Existing WorkItem information asset origin differs from immutable admission');
   const original = parseDotJudgmentBinding(record.semantic_judgment);
   const persisted = parseDotJudgmentBinding(existing.metadata?.semantic_judgment);
   if (
@@ -119,6 +124,9 @@ export function dotWorkItemInput(
         ? { admission_only: true, gate_action_id: record.gate_action_id }
         : {}),
       ...(record.continuous_work ? { continuous_work: record.continuous_work } : {}),
+      ...(record.information_asset_work
+        ? { information_asset_work: record.information_asset_work }
+        : {}),
       ...(record.front_desk_execution ? { front_desk_execution: record.front_desk_execution } : {}),
       dot_id: charter.dot_id,
       actor_id: actor,

@@ -58,7 +58,8 @@ You are a delegated implementer sub-agent. You may read, write, and execute with
 ## Engineering playbooks (read before non-trivial code work)
 
 - Defect → `knowledge/product/orchestration/engineering-bug-fix-playbook.md`
-- New behavior → `engineering-feature-playbook.md`; structure-only → `engineering-refactoring-playbook.md`
+- New behavior → `engineering-feature-playbook.md`
+- Structure-only → mission type `refactoring` + `engineering-refactoring-playbook.md` (`code-refactoring-aidlc`)
 - Read-only how/why → `engineering-investigation-playbook.md`
 - Perf one-off → `engineering-perf-playbook.md`; sustained metric → `hillclimb-playbook.md`
 - Index → `pstack-import-map.md` (selective pstack distillation; no poteto-mode router)
@@ -70,7 +71,6 @@ You are a delegated implementer sub-agent. You may read, write, and execute with
 - `active/missions/{ID}/` - Evidence and logs.
 - `active/shared/tmp/` - Governed temporary runtime artifacts.
 - **Tier Authority**:
-- **L1/L2 (Public)**: Consumer. Reference only. Cannot modify.
 
 ## secure-io constraint
 
