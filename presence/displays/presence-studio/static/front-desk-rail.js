@@ -188,13 +188,11 @@ function tenantContext(nav, me) {
 function railComponents(nav, me, current) {
   const pathname = window.location.pathname;
   const actualCurrent =
-    pathname === '/work'
-      ? 'workspace'
-      : pathname === '/first-job'
-        ? 'first-job'
-        : pathname === '/help' || pathname.startsWith('/help/')
-          ? 'help'
-          : current;
+    pathname === '/first-job'
+      ? 'first-job'
+      : pathname === '/help' || pathname.startsWith('/help/')
+        ? 'help'
+        : current;
   const items = (nav.items || [])
     .filter((item) => item.allowed === true)
     .map((item) => ({

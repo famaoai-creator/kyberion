@@ -237,11 +237,15 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
     );
 
     expect(items.map((item) => item.id)).toEqual([
-      'home',
-      'ask',
       'decide',
-      'progress',
-      'workspace',
+      'ask',
+      'missions',
+      'work-items',
+      'approvals',
+      'overview',
+      'organizations',
+      'projects',
+      'actors',
       'ingest',
       'first-job',
       'help',
@@ -249,15 +253,19 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
       'settings',
     ]);
     expect(items.map((item) => item.label)).toEqual([
-      'ホーム',
-      '頼む',
-      '決める',
-      '進み具合',
-      '作業スペース',
+      '受信箱',
+      '依頼する',
+      'ミッション',
+      'ワークアイテム',
+      '承認',
+      '全体像',
+      '組織',
+      'プロジェクト',
+      '人とエージェント',
       '資料の取込',
       'はじめての仕事',
       '使い方を見る',
-      '組織',
+      '組織の編集',
       '設定',
     ]);
     // decide/settings live on concierge — the port must come from the
@@ -266,7 +274,8 @@ describe('FD-00 GET /api/front-desk/nav composition (mirrors the route in server
     expect(items.find((item) => item.id === 'settings')?.href).toBe(
       'http://127.0.0.1:4050/settings'
     );
-    expect(items.find((item) => item.id === 'home')?.external).toBe(false);
+    expect(items.find((item) => item.id === 'ask')?.external).toBe(false);
+    expect(items.find((item) => item.id === 'overview')?.href).toBe('http://127.0.0.1:4050/w');
     expect(FRONT_DESK_HELP_LINK.path).toBe('/help');
   });
 });

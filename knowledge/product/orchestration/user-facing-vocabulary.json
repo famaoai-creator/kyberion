@@ -16493,6 +16493,616 @@
         "ja": "秘書に相談する",
         "qps-ploc": "⟦Ŧȧŀķ ŧő ẏőůř şėƈřėŧȧřẏ ŀőřėɱ ï⟧"
       },
+      "ws_kind_tenant": {
+        "en": "Company",
+        "ja": "会社",
+        "qps-ploc": "⟦Ƈőɱṗȧñẏ ŀőř⟧"
+      },
+      "ws_kind_organization": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "ws_kind_project": {
+        "en": "Project",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧ ŀőř⟧"
+      },
+      "ws_kind_mission": {
+        "en": "Mission",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñ ŀőř⟧"
+      },
+      "ws_kind_task": {
+        "en": "Task",
+        "ja": "タスク",
+        "qps-ploc": "⟦Ŧȧşķ ŀőř⟧"
+      },
+      "ws_kind_work_item": {
+        "en": "Work item",
+        "ja": "ワークアイテム",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱ ŀőř⟧"
+      },
+      "ws_kind_approval": {
+        "en": "Approval",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ŀőř⟧"
+      },
+      "ws_kind_actor": {
+        "en": "Person or agent",
+        "ja": "人・エージェント",
+        "qps-ploc": "⟦Ṗėřşőñ őř ȧɠėñŧ ŀőřė⟧"
+      },
+      "ws_kinds_tenant": {
+        "en": "Companies",
+        "ja": "会社",
+        "qps-ploc": "⟦Ƈőɱṗȧñïėş ŀőř⟧"
+      },
+      "ws_kinds_organization": {
+        "en": "Organizations",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñş ŀőřė⟧"
+      },
+      "ws_kinds_project": {
+        "en": "Projects",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧş ŀőř⟧"
+      },
+      "ws_kinds_mission": {
+        "en": "Missions",
+        "ja": "ミッション",
+        "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
+      },
+      "ws_kinds_task": {
+        "en": "Tasks",
+        "ja": "タスク",
+        "qps-ploc": "⟦Ŧȧşķş ŀőř⟧"
+      },
+      "ws_kinds_work_item": {
+        "en": "Work items",
+        "ja": "ワークアイテム",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
+      },
+      "ws_kinds_approval": {
+        "en": "Approvals",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "ws_kinds_actor": {
+        "en": "People and agents",
+        "ja": "人とエージェント",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ ȧɠėñŧş ŀőřėɱ⟧"
+      },
+      "ws_about_tenant": {
+        "en": "A company keeps its own data, organizations and projects, separate from every other company.",
+        "ja": "会社ごとに、データ・組織・プロジェクトがほかの会社と分けて管理されます。",
+        "qps-ploc": "⟦Ȧ ƈőɱṗȧñẏ ķėėṗş ïŧş őẇñ ḓȧŧȧ, őřɠȧñïẑȧŧïőñş ȧñḓ ṗřőĵėƈŧş, şėṗȧřȧŧė ƒřőɱ ėṽėřẏ őŧħėř ƈőɱṗȧñẏ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "ws_about_organization": {
+        "en": "An organization is a team inside a company. It owns projects and missions.",
+        "ja": "組織は会社の中のチームです。プロジェクトやミッションを受け持ちます。",
+        "qps-ploc": "⟦Ȧñ őřɠȧñïẑȧŧïőñ ïş ȧ ŧėȧɱ ïñşïḓė ȧ ƈőɱṗȧñẏ. Ïŧ őẇñş ṗřőĵėƈŧş ȧñḓ ɱïşşïőñş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱė⟧"
+      },
+      "ws_about_project": {
+        "en": "A project is an ongoing effort. It groups the missions and work items that move it forward.",
+        "ja": "プロジェクトは継続する取り組みです。前に進めるためのミッションやワークアイテムをまとめます。",
+        "qps-ploc": "⟦Ȧ ṗřőĵėƈŧ ïş ȧñ őñɠőïñɠ ėƒƒőřŧ. Ïŧ ɠřőůṗş ŧħė ɱïşşïőñş ȧñḓ ẇőřķ ïŧėɱş ŧħȧŧ ɱőṽė ïŧ ƒőřẇȧřḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñş⟧"
+      },
+      "ws_about_mission": {
+        "en": "A mission is one piece of agreed work, from goal to result, with its tasks and the people on it.",
+        "ja": "ミッションは、目標から成果までを合意した1つの仕事です。タスクと担当者を持ちます。",
+        "qps-ploc": "⟦Ȧ ɱïşşïőñ ïş őñė ṗïėƈė őƒ ȧɠřėėḓ ẇőřķ, ƒřőɱ ɠőȧŀ ŧő řėşůŀŧ, ẇïŧħ ïŧş ŧȧşķş ȧñḓ ŧħė ṗėőṗŀė őñ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈ⟧"
+      },
+      "ws_about_task": {
+        "en": "A task is one step inside a mission.",
+        "ja": "タスクはミッションの中の1つの手順です。",
+        "qps-ploc": "⟦Ȧ ŧȧşķ ïş őñė şŧėṗ ïñşïḓė ȧ ɱïşşïőñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ws_about_work_item": {
+        "en": "A work item is work assigned to a person or an agent, inside or outside a mission.",
+        "ja": "ワークアイテムは、人やエージェントに割り当てられた作業です。ミッションの外にあることもあります。",
+        "qps-ploc": "⟦Ȧ ẇőřķ ïŧėɱ ïş ẇőřķ ȧşşïɠñėḓ ŧő ȧ ṗėřşőñ őř ȧñ ȧɠėñŧ, ïñşïḓė őř őůŧşïḓė ȧ ɱïşşïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "ws_about_approval": {
+        "en": "An approval is a decision a person makes before work continues.",
+        "ja": "承認は、仕事を先へ進める前に人が下す判断です。",
+        "qps-ploc": "⟦Ȧñ ȧṗṗřőṽȧŀ ïş ȧ ḓėƈïşïőñ ȧ ṗėřşőñ ɱȧķėş ƀėƒőřė ẇőřķ ƈőñŧïñůėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ws_about_actor": {
+        "en": "Members and AI agents, and the work each of them is involved in.",
+        "ja": "メンバーとAIエージェント、そしてそれぞれが関わる仕事です。",
+        "qps-ploc": "⟦Ɱėɱƀėřş ȧñḓ ȦÏ ȧɠėñŧş, ȧñḓ ŧħė ẇőřķ ėȧƈħ őƒ ŧħėɱ ïş ïñṽőŀṽėḓ ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ⟧"
+      },
+      "ws_hint_tenant": {
+        "en": "Companies are added in Settings.",
+        "ja": "会社は設定から追加します。",
+        "qps-ploc": "⟦Ƈőɱṗȧñïėş ȧřė ȧḓḓėḓ ïñ Şėŧŧïñɠş. ŀőřėɱ ïṗşů⟧"
+      },
+      "ws_hint_organization": {
+        "en": "Organizations are added in the organization editor.",
+        "ja": "組織は「組織の編集」から追加します。",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñş ȧřė ȧḓḓėḓ ïñ ŧħė őřɠȧñïẑȧŧïőñ ėḓïŧőř. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "ws_hint_project": {
+        "en": "Projects are added in the organization editor.",
+        "ja": "プロジェクトは「組織の編集」から追加します。",
+        "qps-ploc": "⟦Ṗřőĵėƈŧş ȧřė ȧḓḓėḓ ïñ ŧħė őřɠȧñïẑȧŧïőñ ėḓïŧőř. ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
+      "ws_hint_mission": {
+        "en": "Ask the concierge for work and a mission starts.",
+        "ja": "コンシェルジュに仕事を依頼するとミッションが始まります。",
+        "qps-ploc": "⟦Ȧşķ ŧħė ƈőñƈïėřɠė ƒőř ẇőřķ ȧñḓ ȧ ɱïşşïőñ şŧȧřŧş. ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "ws_hint_task": {
+        "en": "Tasks appear once a mission is planned.",
+        "ja": "ミッションの計画ができるとタスクが表示されます。",
+        "qps-ploc": "⟦Ŧȧşķş ȧṗṗėȧř őñƈė ȧ ɱïşşïőñ ïş ṗŀȧññėḓ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ws_hint_work_item": {
+        "en": "Work items appear when work is requested or assigned.",
+        "ja": "作業が依頼・割り当てされるとワークアイテムが表示されます。",
+        "qps-ploc": "⟦Ẇőřķ ïŧėɱş ȧṗṗėȧř ẇħėñ ẇőřķ ïş řėɋůėşŧėḓ őř ȧşşïɠñėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ws_hint_approval": {
+        "en": "When work needs a decision, it appears here and in the Inbox.",
+        "ja": "判断が必要になると、ここと受信箱に表示されます。",
+        "qps-ploc": "⟦Ẇħėñ ẇőřķ ñėėḓş ȧ ḓėƈïşïőñ, ïŧ ȧṗṗėȧřş ħėřė ȧñḓ ïñ ŧħė Ïñƀőẋ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ws_hint_actor": {
+        "en": "Members are invited in Settings; agents appear once they are registered.",
+        "ja": "メンバーは設定から招待します。エージェントは登録されると表示されます。",
+        "qps-ploc": "⟦Ɱėɱƀėřş ȧřė ïñṽïŧėḓ ïñ Şėŧŧïñɠş; ȧɠėñŧş ȧṗṗėȧř őñƈė ŧħėẏ ȧřė řėɠïşŧėřėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "ws_open_settings": {
+        "en": "Open Settings",
+        "ja": "設定を開く",
+        "qps-ploc": "⟦Őṗėñ Şėŧŧïñɠş ŀőřė⟧"
+      },
+      "ws_open_editor": {
+        "en": "Open the organization editor",
+        "ja": "組織の編集を開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė őřɠȧñïẑȧŧïőñ ėḓïŧőř ŀőřėɱ ïṗş⟧"
+      },
+      "ws_ask_for_work": {
+        "en": "Ask for work",
+        "ja": "仕事を依頼する",
+        "qps-ploc": "⟦Ȧşķ ƒőř ẇőřķ ŀőř⟧"
+      },
+      "ws_open_inbox": {
+        "en": "Open the Inbox",
+        "ja": "受信箱を開く",
+        "qps-ploc": "⟦Őṗėñ ŧħė Ïñƀőẋ ŀőřė⟧"
+      },
+      "ws_list_empty_title": {
+        "en": "No {kind} yet",
+        "ja": "{kind}はまだありません",
+        "qps-ploc": "⟦Ñő {kind} ẏėŧ ŀőřė⟧"
+      },
+      "ws_list_label": {
+        "en": "{kind} list",
+        "ja": "{kind}の一覧",
+        "qps-ploc": "⟦{kind} ŀïşŧ ŀőř⟧"
+      },
+      "ws_filtered_empty_title": {
+        "en": "Nothing matches",
+        "ja": "条件に合うものがありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ɱȧŧƈħėş ŀőřė⟧"
+      },
+      "ws_filtered_empty_body": {
+        "en": "Try another search, or clear the filters.",
+        "ja": "検索語を変えるか、条件をクリアしてください。",
+        "qps-ploc": "⟦Ŧřẏ ȧñőŧħėř şėȧřƈħ, őř ƈŀėȧř ŧħė ƒïŀŧėřş. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ws_clear_filters": {
+        "en": "Clear filters",
+        "ja": "条件をクリア",
+        "qps-ploc": "⟦Ƈŀėȧř ƒïŀŧėřş ŀőřė⟧"
+      },
+      "ws_search_label": {
+        "en": "Search",
+        "ja": "検索",
+        "qps-ploc": "⟦Şėȧřƈħ ŀőř⟧"
+      },
+      "ws_search_placeholder": {
+        "en": "Search by name, ID or status",
+        "ja": "名前・ID・状態で検索",
+        "qps-ploc": "⟦Şėȧřƈħ ƀẏ ñȧɱė, ÏḒ őř şŧȧŧůş ŀőřėɱ ïṗş⟧"
+      },
+      "ws_status_filter_label": {
+        "en": "Filter by status",
+        "ja": "状態で絞り込む",
+        "qps-ploc": "⟦Ƒïŀŧėř ƀẏ şŧȧŧůş ŀőřėɱ⟧"
+      },
+      "ws_status_all": {
+        "en": "All",
+        "ja": "すべて",
+        "qps-ploc": "⟦Ȧŀŀ ŀőř⟧"
+      },
+      "ws_scope_narrowed": {
+        "en": "Showing only what belongs to {scope}",
+        "ja": "{scope} に属するものだけを表示中",
+        "qps-ploc": "⟦Şħőẇïñɠ őñŀẏ ẇħȧŧ ƀėŀőñɠş ŧő {scope} ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ws_scope_show_all": {
+        "en": "Show everything",
+        "ja": "すべて表示",
+        "qps-ploc": "⟦Şħőẇ ėṽėřẏŧħïñɠ ŀőřė⟧"
+      },
+      "ws_result_count": {
+        "en": "{count} shown",
+        "ja": "{count} 件を表示",
+        "qps-ploc": "⟦{count} şħőẇñ ŀőřė⟧"
+      },
+      "ws_unscoped": {
+        "en": "Not tied to a company",
+        "ja": "会社に属していません",
+        "qps-ploc": "⟦Ñőŧ ŧïėḓ ŧő ȧ ƈőɱṗȧñẏ ŀőřėɱ ⟧"
+      },
+      "ws_loading": {
+        "en": "Loading…",
+        "ja": "読み込み中…",
+        "qps-ploc": "⟦Ŀőȧḓïñɠ… ŀőř⟧"
+      },
+      "ws_error_title": {
+        "en": "The workspace could not be loaded",
+        "ja": "ワークスペースを読み込めませんでした",
+        "qps-ploc": "⟦Ŧħė ẇőřķşṗȧƈė ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ws_error_body": {
+        "en": "Check your connection and try again.",
+        "ja": "接続を確認して、もう一度お試しください。",
+        "qps-ploc": "⟦Ƈħėƈķ ẏőůř ƈőññėƈŧïőñ ȧñḓ ŧřẏ ȧɠȧïñ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ws_error_signin": {
+        "en": "Sign in to see the workspace.",
+        "ja": "ワークスペースを見るにはサインインしてください。",
+        "qps-ploc": "⟦Şïɠñ ïñ ŧő şėė ŧħė ẇőřķşṗȧƈė. ŀőřėɱ ïṗş⟧"
+      },
+      "ws_error_forbidden": {
+        "en": "Your account cannot see this. Ask an owner for access.",
+        "ja": "このアカウントでは表示できません。オーナーに権限を依頼してください。",
+        "qps-ploc": "⟦Ẏőůř ȧƈƈőůñŧ ƈȧññőŧ şėė ŧħïş. Ȧşķ ȧñ őẇñėř ƒőř ȧƈƈėşş. ŀőřėɱ ïṗşůɱ ḓőŀőř ⟧"
+      },
+      "ws_signin": {
+        "en": "Sign in",
+        "ja": "サインイン",
+        "qps-ploc": "⟦Şïɠñ ïñ ŀőř⟧"
+      },
+      "ws_retry": {
+        "en": "Try again",
+        "ja": "もう一度読み込む",
+        "qps-ploc": "⟦Ŧřẏ ȧɠȧïñ ŀőř⟧"
+      },
+      "ws_degraded_title": {
+        "en": "Some information could not be loaded",
+        "ja": "一部の情報を読み込めませんでした",
+        "qps-ploc": "⟦Şőɱė ïñƒőřɱȧŧïőñ ƈőůŀḓ ñőŧ ƀė ŀőȧḓėḓ ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ws_degraded_body": {
+        "en": "What is shown is correct, but these sources are missing: {sources}",
+        "ja": "表示中の内容は正しいですが、次の情報が欠けています: {sources}",
+        "qps-ploc": "⟦Ẇħȧŧ ïş şħőẇñ ïş ƈőřřėƈŧ, ƀůŧ ŧħėşė şőůřƈėş ȧřė ɱïşşïñɠ: {sources} ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ⟧"
+      },
+      "ws_breadcrumb_label": {
+        "en": "You are here",
+        "ja": "現在地",
+        "qps-ploc": "⟦Ẏőů ȧřė ħėřė ŀőř⟧"
+      },
+      "ws_view_all": {
+        "en": "View all",
+        "ja": "すべて見る",
+        "qps-ploc": "⟦Ṽïėẇ ȧŀŀ ŀőř⟧"
+      },
+      "ws_overview_title": {
+        "en": "Overview",
+        "ja": "全体像",
+        "qps-ploc": "⟦Őṽėřṽïėẇ ŀőř⟧"
+      },
+      "ws_overview_lead": {
+        "en": "How companies, organizations, projects, missions and people connect — and what needs attention now.",
+        "ja": "会社・組織・プロジェクト・ミッション・人のつながりと、いま対応が必要なもの。",
+        "qps-ploc": "⟦Ħőẇ ƈőɱṗȧñïėş, őřɠȧñïẑȧŧïőñş, ṗřőĵėƈŧş, ɱïşşïőñş ȧñḓ ṗėőṗŀė ƈőññėƈŧ — ȧñḓ ẇħȧŧ ñėėḓş ȧŧŧėñŧïőñ ñőẇ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧ⟧"
+      },
+      "ws_attention_title": {
+        "en": "Needs attention",
+        "ja": "対応が必要",
+        "qps-ploc": "⟦Ñėėḓş ȧŧŧėñŧïőñ ŀőřė⟧"
+      },
+      "ws_attention_lead": {
+        "en": "Approvals waiting for a decision, and work that is blocked or failed.",
+        "ja": "判断を待つ承認と、止まっている・失敗した作業です。",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ẇȧïŧïñɠ ƒőř ȧ ḓėƈïşïőñ, ȧñḓ ẇőřķ ŧħȧŧ ïş ƀŀőƈķėḓ őř ƒȧïŀėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "ws_attention_empty_title": {
+        "en": "Nothing is waiting on anyone",
+        "ja": "いま対応が必要なものはありません",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ẇȧïŧïñɠ őñ ȧñẏőñė ŀőřėɱ ïṗş⟧"
+      },
+      "ws_attention_empty_body": {
+        "en": "Pending approvals and blocked work items show up here first.",
+        "ja": "承認待ちや止まっている作業があると、まずここに表示されます。",
+        "qps-ploc": "⟦Ṗėñḓïñɠ ȧṗṗřőṽȧŀş ȧñḓ ƀŀőƈķėḓ ẇőřķ ïŧėɱş şħőẇ ůṗ ħėřė ƒïřşŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ws_counts_title": {
+        "en": "At a glance",
+        "ja": "概況",
+        "qps-ploc": "⟦Ȧŧ ȧ ɠŀȧñƈė ŀőř⟧"
+      },
+      "ws_structure_title": {
+        "en": "Companies, organizations and projects",
+        "ja": "会社・組織・プロジェクト",
+        "qps-ploc": "⟦Ƈőɱṗȧñïėş, őřɠȧñïẑȧŧïőñş ȧñḓ ṗřőĵėƈŧş ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ws_structure_lead": {
+        "en": "Open any level to see what it contains and who works on it.",
+        "ja": "各階層を開くと、含まれる仕事と担当者がわかります。",
+        "qps-ploc": "⟦Őṗėñ ȧñẏ ŀėṽėŀ ŧő şėė ẇħȧŧ ïŧ ƈőñŧȧïñş ȧñḓ ẇħő ẇőřķş őñ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şï⟧"
+      },
+      "ws_structure_empty_title": {
+        "en": "No companies yet",
+        "ja": "まだ会社がありません",
+        "qps-ploc": "⟦Ñő ƈőɱṗȧñïėş ẏėŧ ŀőřėɱ⟧"
+      },
+      "ws_no_organizations": {
+        "en": "No organizations in this company yet.",
+        "ja": "この会社にはまだ組織がありません。",
+        "qps-ploc": "⟦Ñő őřɠȧñïẑȧŧïőñş ïñ ŧħïş ƈőɱṗȧñẏ ẏėŧ. ŀőřėɱ ïṗşůɱ ⟧"
+      },
+      "ws_no_projects": {
+        "en": "No projects yet.",
+        "ja": "プロジェクトはまだありません。",
+        "qps-ploc": "⟦Ñő ṗřőĵėƈŧş ẏėŧ. ŀőřėɱ⟧"
+      },
+      "ws_recent_missions_title": {
+        "en": "Recent missions",
+        "ja": "最近のミッション",
+        "qps-ploc": "⟦Řėƈėñŧ ɱïşşïőñş ŀőřė⟧"
+      },
+      "ws_goal_title": {
+        "en": "Goal",
+        "ja": "目標",
+        "qps-ploc": "⟦Ɠőȧŀ ŀőř⟧"
+      },
+      "ws_summary_title": {
+        "en": "Summary",
+        "ja": "概要",
+        "qps-ploc": "⟦Şůɱɱȧřẏ ŀőř⟧"
+      },
+      "ws_facts_title": {
+        "en": "Details",
+        "ja": "詳細",
+        "qps-ploc": "⟦Ḓėŧȧïŀş ŀőř⟧"
+      },
+      "ws_fact_id": {
+        "en": "ID",
+        "ja": "ID",
+        "qps-ploc": "⟦ÏḒ ŀőř⟧"
+      },
+      "ws_fact_status": {
+        "en": "Status",
+        "ja": "状態",
+        "qps-ploc": "⟦Şŧȧŧůş ŀőř⟧"
+      },
+      "ws_fact_tier": {
+        "en": "Data tier",
+        "ja": "データ区分",
+        "qps-ploc": "⟦Ḓȧŧȧ ŧïėř ŀőř⟧"
+      },
+      "ws_fact_updated": {
+        "en": "Last updated",
+        "ja": "最終更新",
+        "qps-ploc": "⟦Ŀȧşŧ ůṗḓȧŧėḓ ŀőř⟧"
+      },
+      "ws_fact_priority": {
+        "en": "Priority",
+        "ja": "優先度",
+        "qps-ploc": "⟦Ṗřïőřïŧẏ ŀőř⟧"
+      },
+      "ws_fact_source": {
+        "en": "Source",
+        "ja": "発生元",
+        "qps-ploc": "⟦Şőůřƈė ŀőř⟧"
+      },
+      "ws_fact_approval_kind": {
+        "en": "Approval type",
+        "ja": "承認の種類",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀ ŧẏṗė ŀőřė⟧"
+      },
+      "ws_fact_channel": {
+        "en": "Channel",
+        "ja": "チャネル",
+        "qps-ploc": "⟦Ƈħȧññėŀ ŀőř⟧"
+      },
+      "ws_fact_persona": {
+        "en": "Persona",
+        "ja": "ペルソナ",
+        "qps-ploc": "⟦Ṗėřşőñȧ ŀőř⟧"
+      },
+      "ws_fact_actor_type": {
+        "en": "Type",
+        "ja": "種別",
+        "qps-ploc": "⟦Ŧẏṗė ŀőř⟧"
+      },
+      "ws_fact_agent_kind": {
+        "en": "Agent kind",
+        "ja": "エージェントの種類",
+        "qps-ploc": "⟦Ȧɠėñŧ ķïñḓ ŀőř⟧"
+      },
+      "ws_fact_tenants": {
+        "en": "Companies",
+        "ja": "所属する会社",
+        "qps-ploc": "⟦Ƈőɱṗȧñïėş ŀőř⟧"
+      },
+      "ws_fact_roles": {
+        "en": "Roles",
+        "ja": "役割",
+        "qps-ploc": "⟦Řőŀėş ŀőř⟧"
+      },
+      "ws_fact_task_id": {
+        "en": "Task ID",
+        "ja": "タスクID",
+        "qps-ploc": "⟦Ŧȧşķ ÏḒ ŀőř⟧"
+      },
+      "ws_fact_deliverable": {
+        "en": "Deliverable",
+        "ja": "成果物",
+        "qps-ploc": "⟦Ḓėŀïṽėřȧƀŀė ŀőř⟧"
+      },
+      "ws_fact_assigned_role": {
+        "en": "Assigned role",
+        "ja": "担当ロール",
+        "qps-ploc": "⟦Ȧşşïɠñėḓ řőŀė ŀőřė⟧"
+      },
+      "ws_fact_parent_organization_id": {
+        "en": "Parent organization",
+        "ja": "親組織",
+        "qps-ploc": "⟦Ṗȧřėñŧ őřɠȧñïẑȧŧïőñ ŀőřėɱ ⟧"
+      },
+      "ws_actor_type_member": {
+        "en": "Member",
+        "ja": "メンバー",
+        "qps-ploc": "⟦Ɱėɱƀėř ŀőř⟧"
+      },
+      "ws_actor_type_agent": {
+        "en": "AI agent",
+        "ja": "AIエージェント",
+        "qps-ploc": "⟦ȦÏ ȧɠėñŧ ŀőř⟧"
+      },
+      "ws_people_title": {
+        "en": "People and agents",
+        "ja": "人とエージェント",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ ȧɠėñŧş ŀőřėɱ⟧"
+      },
+      "ws_people_lead": {
+        "en": "Who owns, works on or decides this.",
+        "ja": "担当する人・作業する人・判断する人です。",
+        "qps-ploc": "⟦Ẇħő őẇñş, ẇőřķş őñ őř ḓėƈïḓėş ŧħïş. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ws_people_empty": {
+        "en": "Nobody is assigned yet.",
+        "ja": "まだ誰も割り当てられていません。",
+        "qps-ploc": "⟦Ñőƀőḓẏ ïş ȧşşïɠñėḓ ẏėŧ. ŀőřėɱ ï⟧"
+      },
+      "ws_actor_unregistered": {
+        "en": "Not registered",
+        "ja": "未登録",
+        "qps-ploc": "⟦Ñőŧ řėɠïşŧėřėḓ ŀőřė⟧"
+      },
+      "ws_role_owner": {
+        "en": "Owner",
+        "ja": "オーナー",
+        "qps-ploc": "⟦Őẇñėř ŀőř⟧"
+      },
+      "ws_role_assignee": {
+        "en": "Assignee",
+        "ja": "担当",
+        "qps-ploc": "⟦Ȧşşïɠñėė ŀőř⟧"
+      },
+      "ws_role_claim_holder": {
+        "en": "Working on it",
+        "ja": "作業中",
+        "qps-ploc": "⟦Ẇőřķïñɠ őñ ïŧ ŀőřė⟧"
+      },
+      "ws_role_requester": {
+        "en": "Requester",
+        "ja": "依頼者",
+        "qps-ploc": "⟦Řėɋůėşŧėř ŀőř⟧"
+      },
+      "ws_role_decider": {
+        "en": "Decided by",
+        "ja": "判断者",
+        "qps-ploc": "⟦Ḓėƈïḓėḓ ƀẏ ŀőř⟧"
+      },
+      "ws_role_accountable_human": {
+        "en": "Accountable person",
+        "ja": "責任者",
+        "qps-ploc": "⟦Ȧƈƈőůñŧȧƀŀė ṗėřşőñ ŀőřėɱ⟧"
+      },
+      "ws_role_persona": {
+        "en": "Persona",
+        "ja": "ペルソナ",
+        "qps-ploc": "⟦Ṗėřşőñȧ ŀőř⟧"
+      },
+      "ws_role_affiliated": {
+        "en": "Affiliated",
+        "ja": "所属",
+        "qps-ploc": "⟦Ȧƒƒïŀïȧŧėḓ ŀőř⟧"
+      },
+      "ws_contains_title": {
+        "en": "Inside this {kind}",
+        "ja": "この{kind}に含まれるもの",
+        "qps-ploc": "⟦Ïñşïḓė ŧħïş {kind} ŀőřėɱ⟧"
+      },
+      "ws_contains_empty": {
+        "en": "Nothing is inside this {kind} yet.",
+        "ja": "この{kind}にはまだ何も含まれていません。",
+        "qps-ploc": "⟦Ñőŧħïñɠ ïş ïñşïḓė ŧħïş {kind} ẏėŧ. ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "ws_task_assigned_role": {
+        "en": "Assigned to {role}",
+        "ja": "担当: {role}",
+        "qps-ploc": "⟦Ȧşşïɠñėḓ ŧő {role} ŀőřėɱ⟧"
+      },
+      "ws_task_unassigned": {
+        "en": "Not assigned",
+        "ja": "未割り当て",
+        "qps-ploc": "⟦Ñőŧ ȧşşïɠñėḓ ŀőř⟧"
+      },
+      "ws_involvements_title": {
+        "en": "Involved in",
+        "ja": "関わっている仕事",
+        "qps-ploc": "⟦Ïñṽőŀṽėḓ ïñ ŀőř⟧"
+      },
+      "ws_involvements_empty": {
+        "en": "Not involved in any work you can see yet.",
+        "ja": "表示できる範囲では、まだ関わっている仕事はありません。",
+        "qps-ploc": "⟦Ñőŧ ïñṽőŀṽėḓ ïñ ȧñẏ ẇőřķ ẏőů ƈȧñ şėė ẏėŧ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ws_approval_pending_title": {
+        "en": "This approval is waiting for a decision",
+        "ja": "この承認は判断を待っています",
+        "qps-ploc": "⟦Ŧħïş ȧṗṗřőṽȧŀ ïş ẇȧïŧïñɠ ƒőř ȧ ḓėƈïşïőñ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "ws_approval_pending_body": {
+        "en": "Decisions are made in the Inbox, which shows the full request and what it affects.",
+        "ja": "判断は受信箱で行います。依頼の内容と影響をすべて確認できます。",
+        "qps-ploc": "⟦Ḓėƈïşïőñş ȧřė ɱȧḓė ïñ ŧħė Ïñƀőẋ, ẇħïƈħ şħőẇş ŧħė ƒůŀŀ řėɋůėşŧ ȧñḓ ẇħȧŧ ïŧ ȧƒƒėƈŧş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈ⟧"
+      },
+      "ws_approval_open_inbox": {
+        "en": "Decide in the Inbox",
+        "ja": "受信箱で判断する",
+        "qps-ploc": "⟦Ḓėƈïḓė ïñ ŧħė Ïñƀőẋ ŀőřėɱ ⟧"
+      },
+      "ws_approval_decided_body": {
+        "en": "This decision is on record. It stays here so you can trace what it affected.",
+        "ja": "この判断は記録済みです。何に影響したかをたどれるよう、ここに残っています。",
+        "qps-ploc": "⟦Ŧħïş ḓėƈïşïőñ ïş őñ řėƈőřḓ. Ïŧ şŧȧẏş ħėřė şő ẏőů ƈȧñ ŧřȧƈė ẇħȧŧ ïŧ ȧƒƒėƈŧėḓ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ⟧"
+      },
+      "ws_not_found_title": {
+        "en": "This {kind} is not available",
+        "ja": "この{kind}は表示できません",
+        "qps-ploc": "⟦Ŧħïş {kind} ïş ñőŧ ȧṽȧïŀȧƀŀė ŀőřėɱ ïṗş⟧"
+      },
+      "ws_not_found_body": {
+        "en": "It may have been removed, or it belongs to a company you cannot see.",
+        "ja": "削除されたか、あなたが見られない会社に属している可能性があります。",
+        "qps-ploc": "⟦Ïŧ ɱȧẏ ħȧṽė ƀėėñ řėɱőṽėḓ, őř ïŧ ƀėŀőñɠş ŧő ȧ ƈőɱṗȧñẏ ẏőů ƈȧññőŧ şėė. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧ⟧"
+      },
+      "ws_back_to_list": {
+        "en": "Back to {kind}",
+        "ja": "{kind}の一覧へ",
+        "qps-ploc": "⟦Ƀȧƈķ ŧő {kind} ŀőřė⟧"
+      },
+      "ws_tabs_label": {
+        "en": "Contents",
+        "ja": "内容",
+        "qps-ploc": "⟦Ƈőñŧėñŧş ŀőř⟧"
+      },
+      "ws_palette_group": {
+        "en": "Workspace",
+        "ja": "ワークスペース",
+        "qps-ploc": "⟦Ẇőřķşṗȧƈė ŀőř⟧"
+      },
       "palette.ingest": {
         "en": "Add documents",
         "ja": "資料を取り込む",
@@ -26800,7 +27410,7 @@
       },
       "nav_ask": {
         "en": "Ask",
-        "ja": "頼む",
+        "ja": "依頼する",
         "qps-ploc": "⟦Ȧşķ ŀőř⟧"
       },
       "nav_ask_sub": {
@@ -26809,14 +27419,14 @@
         "qps-ploc": "⟦Ŧȧŀķ őř ŧẏṗė ŀőř⟧"
       },
       "nav_decide": {
-        "en": "Decide",
-        "ja": "決める",
-        "qps-ploc": "⟦Ḓėƈïḓė ŀőř⟧"
+        "en": "Inbox",
+        "ja": "受信箱",
+        "qps-ploc": "⟦Ïñƀőẋ ŀőř⟧"
       },
       "nav_decide_sub": {
-        "en": "Approvals and exceptions",
-        "ja": "承認・例外",
-        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ȧñḓ ėẋƈėṗŧïőñş ŀőřėɱ ï⟧"
+        "en": "What is waiting on you",
+        "ja": "あなたの判断を待つもの",
+        "qps-ploc": "⟦Ẇħȧŧ ïş ẇȧïŧïñɠ őñ ẏőů ŀőřėɱ ï⟧"
       },
       "nav_progress": {
         "en": "Progress",
@@ -30434,19 +31044,19 @@
         "qps-ploc": "⟦Ɱïşşïőñş ŀőř⟧"
       },
       "nav_missions_sub": {
-        "en": "Inspect ongoing missions",
-        "ja": "進行中のミッションを確認",
-        "qps-ploc": "⟦Ïñşṗėƈŧ őñɠőïñɠ ɱïşşïőñş ŀőřėɱ ï⟧"
+        "en": "Goals, tasks and who is on them",
+        "ja": "目標・タスク・担当を確認",
+        "qps-ploc": "⟦Ɠőȧŀş, ŧȧşķş ȧñḓ ẇħő ïş őñ ŧħėɱ ŀőřėɱ ïṗşů⟧"
       },
       "nav_work_items": {
         "en": "Work items",
-        "ja": "作業一覧",
+        "ja": "ワークアイテム",
         "qps-ploc": "⟦Ẇőřķ ïŧėɱş ŀőř⟧"
       },
       "nav_work_items_sub": {
-        "en": "Review and organize assigned work",
-        "ja": "割り当てられた作業を確認・整理",
-        "qps-ploc": "⟦Řėṽïėẇ ȧñḓ őřɠȧñïẑė ȧşşïɠñėḓ ẇőřķ ŀőřėɱ ïṗşůɱ⟧"
+        "en": "Assigned work, in and outside missions",
+        "ja": "割り当てられた作業を確認",
+        "qps-ploc": "⟦Ȧşşïɠñėḓ ẇőřķ, ïñ ȧñḓ őůŧşïḓė ɱïşşïőñş ŀőřėɱ ïṗşůɱ ⟧"
       },
       "nav_deliverables": {
         "en": "Deliverables",
@@ -30504,9 +31114,9 @@
         "qps-ploc": "⟦Ɠůïḓėş ȧñḓ ŧřȧïñïñɠ ŀőřėɱ ⟧"
       },
       "nav_organization": {
-        "en": "Organization",
-        "ja": "組織",
-        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+        "en": "Organization editor",
+        "ja": "組織の編集",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ėḓïŧőř ŀőřėɱ ⟧"
       },
       "nav_organization_sub": {
         "en": "Services, objectives and projects",
@@ -30542,6 +31152,61 @@
         "en": "Inspect runtime diagnostics",
         "ja": "実行環境を診断",
         "qps-ploc": "⟦Ïñşṗėƈŧ řůñŧïɱė ḓïȧɠñőşŧïƈş ŀőřėɱ ïṗ⟧"
+      },
+      "nav_approvals": {
+        "en": "Approvals",
+        "ja": "承認",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ŀőř⟧"
+      },
+      "nav_approvals_sub": {
+        "en": "Requests and decisions on record",
+        "ja": "承認の依頼と判断の記録",
+        "qps-ploc": "⟦Řėɋůėşŧş ȧñḓ ḓėƈïşïőñş őñ řėƈőřḓ ŀőřėɱ ïṗşů⟧"
+      },
+      "nav_group_organization": {
+        "en": "Organization",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñ ŀőř⟧"
+      },
+      "nav_overview": {
+        "en": "Overview",
+        "ja": "全体像",
+        "qps-ploc": "⟦Őṽėřṽïėẇ ŀőř⟧"
+      },
+      "nav_overview_sub": {
+        "en": "How companies, teams and work fit together",
+        "ja": "会社・組織・仕事のつながり",
+        "qps-ploc": "⟦Ħőẇ ƈőɱṗȧñïėş, ŧėȧɱş ȧñḓ ẇőřķ ƒïŧ ŧőɠėŧħėř ŀőřėɱ ïṗşůɱ ḓő⟧"
+      },
+      "nav_org_list": {
+        "en": "Organizations",
+        "ja": "組織",
+        "qps-ploc": "⟦Őřɠȧñïẑȧŧïőñş ŀőřė⟧"
+      },
+      "nav_org_list_sub": {
+        "en": "Teams and what they own",
+        "ja": "チームと担当する仕事",
+        "qps-ploc": "⟦Ŧėȧɱş ȧñḓ ẇħȧŧ ŧħėẏ őẇñ ŀőřėɱ ï⟧"
+      },
+      "nav_projects": {
+        "en": "Projects",
+        "ja": "プロジェクト",
+        "qps-ploc": "⟦Ṗřőĵėƈŧş ŀőř⟧"
+      },
+      "nav_projects_sub": {
+        "en": "Ongoing efforts and their missions",
+        "ja": "継続する取り組みとミッション",
+        "qps-ploc": "⟦Őñɠőïñɠ ėƒƒőřŧş ȧñḓ ŧħėïř ɱïşşïőñş ŀőřėɱ ïṗşůɱ⟧"
+      },
+      "nav_actors": {
+        "en": "People and agents",
+        "ja": "人とエージェント",
+        "qps-ploc": "⟦Ṗėőṗŀė ȧñḓ ȧɠėñŧş ŀőřėɱ⟧"
+      },
+      "nav_actors_sub": {
+        "en": "Who is involved in what",
+        "ja": "誰が何に関わっているか",
+        "qps-ploc": "⟦Ẇħő ïş ïñṽőŀṽėḓ ïñ ẇħȧŧ ŀőřėɱ ï⟧"
       },
       "signout_pending_title": {
         "en": "Finishing sign-out",
