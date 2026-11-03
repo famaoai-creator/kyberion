@@ -98,6 +98,7 @@ export default defineConfig({
       // directory; include them so its surface contracts are not skipped.
       'presence/displays/concierge/test/**/*.test.ts',
       'libs/core/**/*.test.ts',
+      'libs/kernel/**/*.test.ts',
       'libs/actuators/**/*.test.ts',
       'libs/shared-*/**/*.test.ts',
       // @agent/shared-ui React components (renderToStaticMarkup, no DOM).
@@ -195,6 +196,10 @@ export default defineConfig({
     alias: [
       { find: /^@agent\/core\/(.*)$/, replacement: path.resolve(rootDir, './libs/core/$1') },
       { find: '@agent/core', replacement: path.resolve(rootDir, './libs/core/index.ts') },
+      {
+        find: /^@agent\/kernel\/(.*)$/,
+        replacement: path.resolve(rootDir, './libs/kernel/src/$1'),
+      },
       {
         find: '@agent/shared-media',
         replacement: path.resolve(rootDir, './libs/shared-media/src/index.ts'),
