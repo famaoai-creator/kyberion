@@ -177,6 +177,16 @@
             "enum": ["read", "write", "egress", "none"],
             "description": "SC-02: declared side-effect class of the op. read = observation only; write = local mutation; egress = data leaves the trust boundary; none = pure control. Undeclared defaults to write (fail-safe)."
           },
+          "selection": {
+            "type": "string",
+            "enum": ["deterministic"],
+            "description": "Provider/backend selection is fixed for this op: a fallback that would change the result's semantics is not permitted; availability is reported instead."
+          },
+          "target_authority": {
+            "type": "string",
+            "enum": ["execute", "attach", "instrument", "mutate"],
+            "description": "Authority the op exercises over its target, orthogonal to effect: execute launches code, attach binds to a live target, instrument reads internals, mutate signals or alters target state. Omit for observe-only ops."
+          },
           "effect_from": {
             "type": "string",
             "description": "Input path (e.g. \"method\" or \"params.method\") whose value refines the declared effect. GET/list/read verbs downgrade egress-capable calls to read; everything else keeps the declared effect."

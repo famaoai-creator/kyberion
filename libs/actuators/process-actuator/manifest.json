@@ -12,12 +12,14 @@
     {
       "op": "spawn",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "write"
+      "effect": "write",
+      "target_authority": "execute"
     },
     {
       "op": "stop",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "write"
+      "effect": "write",
+      "target_authority": "mutate"
     },
     {
       "op": "list",
@@ -26,6 +28,11 @@
     },
     {
       "op": "status",
+      "platforms": ["darwin", "linux", "win32"],
+      "effect": "read"
+    },
+    {
+      "op": "list-surfaces",
       "platforms": ["darwin", "linux", "win32"],
       "effect": "read"
     }

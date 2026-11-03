@@ -338,8 +338,8 @@
       "d": "Managed process lifecycle actuator backed by the runtime supervisor",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 4,
-      "ops": ["list", "spawn", "status", "stop"],
+      "capability_count": 5,
+      "ops": ["list", "list-surfaces", "spawn", "status", "stop"],
       "contract_schema": "knowledge/product/schemas/process-action.schema.json",
       "prerequisites_summary": "-"
     },

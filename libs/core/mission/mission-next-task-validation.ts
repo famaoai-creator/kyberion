@@ -4,6 +4,7 @@ import { missionClassOf } from './mission-gate-record-reader.js';
 import {
   validateTaskPipelineRefs,
   validateTaskSourcePaths,
+  validateTaskSourceWorkspace,
 } from '../foundation/task-tool-grant-validation.js';
 
 export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): PlannedNextTask[] {
@@ -64,6 +65,10 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
       task.allowed_pipelines === undefined
         ? undefined
         : validateTaskPipelineRefs(task.allowed_pipelines);
+    const sourceWorkspace =
+      task.source_workspace === undefined
+        ? undefined
+        : validateTaskSourceWorkspace(task.source_workspace);
 
     const drive = (() => {
       if (task.drive === undefined) return undefined;
@@ -143,6 +148,7 @@ export function validatePlannedNextTasks(rawTasks: unknown, missionId: string): 
     return {
       task_id: taskId,
       ...(sourceEditPaths !== undefined ? { source_edit_paths: sourceEditPaths } : {}),
+      ...(sourceWorkspace !== undefined ? { source_workspace: sourceWorkspace } : {}),
       ...(typeof task.source_edit_requires_approval === 'boolean'
         ? { source_edit_requires_approval: task.source_edit_requires_approval }
         : {}),

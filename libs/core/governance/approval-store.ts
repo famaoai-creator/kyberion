@@ -1262,6 +1262,10 @@ function schedulePipelineApprovalResume(
       const { resumePipelineRunAfterApproval } =
         await import('../pipeline/pipeline-approval-resume.js');
       const outcome = await resumePipelineRunAfterApproval(record);
+      // No suspended run was ever bound to this decision (CLI-bound requests
+      // borrow the pipeline context shape without writing a journal), so a
+      // failed apply receipt would misreport a healthy approval.
+      if (outcome.status === 'not_applicable' && outcome.resumeExpected === false) return;
       applyResult = {
         appliedAt: nowIso(),
         appliedBy: 'pipeline_approval_resume',

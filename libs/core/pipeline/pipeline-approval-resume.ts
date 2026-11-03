@@ -19,7 +19,12 @@ import {
 } from './pipeline-resume-policy-env.js';
 
 export type PipelineApprovalResumeOutcome =
-  | { status: 'not_applicable'; reason: string }
+  | {
+      status: 'not_applicable';
+      reason: string;
+      /** False when no suspended run ever awaited this decision — e.g. CLI-bound approvals that only borrow the pipeline context shape. Recording an apply failure for those is noise. */
+      resumeExpected?: boolean;
+    }
   | { status: 'already_running'; reason: string; runId: string }
   | { status: 'started'; reason: string; runId: string; resourceId: string };
 
@@ -108,12 +113,20 @@ export function resumePipelineRunAfterApproval(
     !['approved', 'rejected', 'cancelled', 'expired'].includes(record.status) ||
     record.kind !== 'mission_gate'
   ) {
-    return { status: 'not_applicable', reason: 'approval is not an approved mission gate' };
+    return {
+      status: 'not_applicable',
+      reason: 'approval is not an approved mission gate',
+      resumeExpected: false,
+    };
   }
   const context = record.requestedByContext;
   const runId = nonEmpty(context?.pipelineRunId);
   if (!runId || !isSafeRunId(runId)) {
-    return { status: 'not_applicable', reason: 'approval has no safe pipeline run binding' };
+    return {
+      status: 'not_applicable',
+      reason: 'approval has no safe pipeline run binding',
+      resumeExpected: false,
+    };
   }
   const missionId = nonEmpty(context?.missionId);
   const resourceId = `pipeline-run-resume:${runId}`;
@@ -128,15 +141,31 @@ export function resumePipelineRunAfterApproval(
   const journalScope = record.scope?.tenant_slug
     ? { tier: record.scope.tier, tenantSlug: record.scope.tenant_slug }
     : undefined;
-  const state = loadPipelineRunJournal(runId, missionId, journalScope);
+  let state: ReturnType<typeof loadPipelineRunJournal>;
+  try {
+    state = loadPipelineRunJournal(runId, missionId, journalScope);
+  } catch (error) {
+    if (error instanceof Error && error.message.startsWith('[PIPELINE_JOURNAL] run not found'))
+      return {
+        status: 'not_applicable',
+        reason: 'approval is not bound to a suspended pipeline run',
+        resumeExpected: false,
+      };
+    throw error;
+  }
   if (record.status !== 'approved' && (!journalScope || !state.started?.library_execution)) {
     return {
       status: 'not_applicable',
       reason: 'terminal denial continuation requires a scoped library journal',
+      resumeExpected: false,
     };
   }
   if (state.finished) {
-    return { status: 'not_applicable', reason: 'pipeline run is already finished' };
+    return {
+      status: 'not_applicable',
+      reason: 'pipeline run is already finished',
+      resumeExpected: false,
+    };
   }
   const mismatch = approvalBindsToSuspendedRun(record, runId, missionId, state);
   if (mismatch) return { status: 'not_applicable', reason: mismatch };
