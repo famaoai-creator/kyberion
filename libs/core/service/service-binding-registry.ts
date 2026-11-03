@@ -138,7 +138,7 @@ const serviceBindingRecordCatalog = defineCatalog<ServiceBindingRecord>({
   schema: BINDING_SCHEMA_PATH,
 });
 
-function bindingPath(bindingId: string): string {
+export function serviceBindingRecordPath(bindingId: string): string {
   const directory = path.resolve(BINDING_DIR);
   const candidate = path.resolve(directory, `${bindingId}.json`);
   const relative = path.relative(directory, candidate).replaceAll('\\', '/');
@@ -151,6 +151,7 @@ function bindingPath(bindingId: string): string {
     allowMissingLeaf: true,
   });
 }
+const bindingPath = serviceBindingRecordPath;
 
 function serviceBindingRecordCatalogAtPath(filePath: string) {
   return defineCatalog<ServiceBindingRecord>({

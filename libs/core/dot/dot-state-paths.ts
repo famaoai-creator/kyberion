@@ -487,6 +487,8 @@ export interface DotFollowupRow {
 
 /** DL-08: a normalized inbound event, as stored in `events.jsonl`. */
 export interface DotInboundEvent {
+  /** Set from trusted collector scope; never from an external payload. */
+  project_id?: string;
   event_id: string;
   source: string;
   type: string;

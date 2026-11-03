@@ -70,6 +70,7 @@ import { createLogger } from '../logger.js';
 import { withUsageAttribution } from '../usage-accounting.js';
 import {
   claimWorkItem,
+  getWorkItem,
   listWorkItems,
   reapExpiredWorkLeases,
   releaseWorkItem,
@@ -406,6 +407,18 @@ async function routeItem(
           storageChannel: result.storageChannel,
         },
       };
+    }
+    if (item.metadata?.information_asset_work) {
+      const current = getWorkItem(item.item_id, { rootDir: deps.rootDir });
+      const proof = current?.metadata?.information_asset_outcome as
+        { status?: string; summary?: string; evidence_sha256?: string } | undefined;
+      if (proof?.status !== 'completed' || !proof.evidence_sha256) {
+        return {
+          mode: 'pipeline',
+          status: proof?.status === 'unknown_effect' || !proof ? 'failed' : 'blocked',
+          summary: proof?.summary ?? 'Information work has no verified completion evidence',
+        };
+      }
     }
     // The pipeline may outlive the executor deadline. Never publish a new
     // deliverable after quarantine, or under a request revoked while it ran.
