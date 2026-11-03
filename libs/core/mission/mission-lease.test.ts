@@ -443,7 +443,7 @@ describe('LeaseBackend injection', () => {
     expect(b.getHolder('thread-shared', T0 + 10)).toBe('run-a');
   });
 
-  it('lets a peer take over after the holder releases through the shared backend', () => {
+  it('lets a contested peer take over after the holder releases through the shared backend', () => {
     const backend = createMemoryLeaseBackend();
     const a = createMissionLeaseManager({ backend });
     const b = createMissionLeaseManager({ backend });
@@ -455,12 +455,25 @@ describe('LeaseBackend injection', () => {
       now: T0,
     });
     expect(held.ok).toBe(true);
+    // Contender hydrates a local view of the live holder — this is the
+    // regression case for durable release winning over stale local state.
+    const contested = b.acquireLease({
+      resource: 'thread-shared',
+      holder: 'run-b',
+      ttlMs: TTL,
+      now: T0 + 10,
+    });
+    expect(contested.ok).toBe(false);
+    expect(codes(contested)).toContain('LEASE_SUSPENDED');
+    expect(b.getHolder('thread-shared', T0 + 20)).toBe('run-a');
+
     const released = a.releaseLease({
       leaseId: held.lease!.lease_id,
       holder: 'run-a',
       now: T0 + 100,
     });
     expect(released.ok).toBe(true);
+    expect(b.getHolder('thread-shared', T0 + 100)).toBeUndefined();
 
     const takeover = b.acquireLease({
       resource: 'thread-shared',
@@ -471,6 +484,16 @@ describe('LeaseBackend injection', () => {
     expect(takeover.ok).toBe(true);
     expect(takeover.lease?.holder).toBe('run-b');
     expect(takeover.lease?.fence).toBe(2);
+  });
+
+  it('cold getHolder sees a live durable holder without a prior local slot', () => {
+    const backend = createMemoryLeaseBackend();
+    const a = createMissionLeaseManager({ backend });
+    const b = createMissionLeaseManager({ backend });
+    expect(
+      a.acquireLease({ resource: 'thread-shared', holder: 'run-a', ttlMs: TTL, now: T0 }).ok
+    ).toBe(true);
+    expect(b.getHolder('thread-shared', T0 + 1)).toBe('run-a');
   });
 
   it('same-holder re-acquire is idempotent across managers sharing a backend', () => {
