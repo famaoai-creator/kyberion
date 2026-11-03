@@ -432,6 +432,12 @@ export function composeMissionTeamPlan(input: {
   });
   const missionType =
     input.missionType || mapMissionClassToMissionTypeTemplate(missionClassification.mission_class);
+  // Structure-only / alias types reuse the development staffing template.
+  const TEAM_TEMPLATE_ALIASES: Record<string, string> = {
+    refactoring: 'development',
+    code_change: 'development',
+  };
+  const teamTemplateKey = TEAM_TEMPLATE_ALIASES[missionType] ?? missionType;
   const templates = loadMissionTeamTemplates(organizationProfile, compositionScope);
   const teamRoles = loadTeamRoleIndex();
   const authorityRoles = loadAuthorityRoleIndex();
@@ -440,7 +446,7 @@ export function composeMissionTeamPlan(input: {
     resolveOrganizationOrgChart(organizationProfile?.organization_id || null)
   );
   const organizationDefaultTemplate = organizationProfile?.mission_defaults?.default_team_template;
-  const template = (templates[missionType] ||
+  const template = (templates[teamTemplateKey] ||
     (organizationDefaultTemplate ? templates[organizationDefaultTemplate] : undefined) ||
     templates.default) as MissionTeamTemplateRecord;
   const assignments: MissionTeamAssignment[] = [];
@@ -620,8 +626,8 @@ export function composeMissionTeamPlan(input: {
           },
         }
       : {}),
-    template: templates[missionType]
-      ? missionType
+    template: templates[teamTemplateKey]
+      ? teamTemplateKey
       : organizationDefaultTemplate && templates[organizationDefaultTemplate]
         ? organizationDefaultTemplate
         : 'default',

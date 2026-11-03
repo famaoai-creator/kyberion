@@ -47,7 +47,7 @@
 - [Apple Intelligence Native Capability Bridge](./product/architecture/apple-intelligence-native-capability-bridge.md) (public | ecosystem_architect)
 - [Architecture: Alignment Mirror & Calibration Missions](./product/architecture/alignment-mirror-calibration.md) (public | Unknown)
 - [Architecture: Event-Driven Sovereignty](./product/architecture/event-driven-sovereignty.md) (public | Unknown)
-- [Architecture: Fidelity Refactoring Protocol](./product/architecture/fidelity-refactoring-protocol.md) (public | Unknown)
+- [Architecture: Fidelity Drift Self-Correction Protocol](./product/architecture/fidelity-refactoring-protocol.md) (public | Unknown)
 - [Architecture: Intent Classifier Routing](./product/architecture/intent-classifier-routing.md) (public | Unknown)
 - [Architecture: The 5-Layer Backbone of Kyberion](./product/architecture/backbone-sovereignty.md) (public | Unknown)
 - [AuthN/AuthZ Seams — Principal Resolution and Policy Evaluation](./product/architecture/authn-authz-seams.md) (public | ecosystem_architect)

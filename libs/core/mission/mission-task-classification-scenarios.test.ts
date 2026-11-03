@@ -20,6 +20,8 @@ type ScenarioPack = {
     classification_input?: {
       progress_signals?: string[];
       artifact_paths?: string[];
+      mission_type_hint?: string;
+      execution_shape?: string;
     };
     work_scope_input?: {
       catalog_minimum_shape?: string;
@@ -136,6 +138,7 @@ describe('mission-task-classification scenarios', () => {
         taskType: packet.selected_resolution?.task_kind,
         shape: packet.selected_resolution?.shape,
         utterance,
+        missionTypeHint: scenario.classification_input?.mission_type_hint,
         progressSignals: scenario.classification_input?.progress_signals,
         artifactPaths: scenario.classification_input?.artifact_paths,
       });
@@ -160,9 +163,14 @@ describe('mission-task-classification scenarios', () => {
         deliveryShape: classification.delivery_shape,
         riskProfile: classification.risk_profile,
         stage: classification.stage,
-        executionShape: packet.selected_resolution?.shape || 'task_session',
+        executionShape:
+          scenario.classification_input?.execution_shape ||
+          packet.selected_resolution?.shape ||
+          'task_session',
         intentId: packet.selected_intent_id,
         taskType: packet.selected_resolution?.task_kind,
+        missionTypeHint: scenario.classification_input?.mission_type_hint,
+        utterance,
       });
 
       expect(workflow.workflow_id, `workflow mismatch for ${scenario.scenario_id}`).toBe(

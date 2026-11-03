@@ -3896,6 +3896,10 @@
       "types": "./dist/mission/mission-task-recovery.d.ts",
       "default": "./dist/mission/mission-task-recovery.js"
     },
+    "./mission/refactoring-evidence": {
+      "types": "./dist/mission/refactoring-evidence.d.ts",
+      "default": "./dist/mission/refactoring-evidence.js"
+    },
     "./mission/mission-task-supersede-proof": {
       "types": "./dist/mission/mission-task-supersede-proof.d.ts",
       "default": "./dist/mission/mission-task-supersede-proof.js"

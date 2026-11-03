@@ -998,6 +998,39 @@
         "promotion_required": false
       },
       "notes": "Previously resolved to chain-of-thought-planning through the generic keyword テスト. An ordinary fix request must claim no catalog intent and fall to the code_change default."
+    },
+    {
+      "scenario_id": "code-refactoring-mission-hint",
+      "utterance": "このモジュールをリファクタリングして構造だけ直して",
+      "classification_input": {
+        "progress_signals": ["plan_ready"],
+        "mission_type_hint": "refactoring",
+        "execution_shape": "mission"
+      },
+      "work_scope_input": {
+        "catalog_minimum_shape": "mission",
+        "replay_or_variant_likelihood": true,
+        "high_stakes_or_dogfood_evidence": true
+      },
+      "expected": {
+        "execution_shape": "mission",
+        "mission_class": "code_change",
+        "delivery_shape": "single_artifact",
+        "risk_profile": "review_required",
+        "stage": "planning",
+        "workflow_id": "code-refactoring-aidlc",
+        "workflow_pattern": "aidlc_code_change",
+        "review_mode": "standard",
+        "required_gate_ids": [
+          "CONTRACT_VALID",
+          "QA_READY",
+          "INTENT_DRIFT",
+          "ARTIFACT_BUNDLE",
+          "DELIVERABLE_QUALITY"
+        ],
+        "promotion_required": true
+      },
+      "notes": "Explicit mission_type=refactoring under class code_change binds code-refactoring-aidlc (audit→pin→reshape→equivalence)."
     }
   ]
 }
