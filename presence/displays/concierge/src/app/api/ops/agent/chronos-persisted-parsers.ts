@@ -19,6 +19,8 @@ export type ChronosMissionProposalState = {
   sourceText?: string;
   routingDecision?: AgentRoutingDecision;
   createdAt: string;
+  /** Server-resolved principal that received the proposal; only it may confirm or discard it. */
+  authorPrincipalKey?: string;
 };
 
 export type ChronosAuditEvent = {
@@ -178,6 +180,9 @@ export function parseChronosMissionProposalState(
   }
   const sourceText = value.sourceText === undefined ? undefined : optionalString(value.sourceText);
   if (value.sourceText !== undefined && sourceText === undefined) return null;
+  const authorPrincipalKey =
+    value.authorPrincipalKey === undefined ? undefined : optionalString(value.authorPrincipalKey);
+  if (value.authorPrincipalKey !== undefined && authorPrincipalKey === undefined) return null;
   return {
     surface: 'chronos',
     channel: 'chronos',
@@ -186,5 +191,6 @@ export function parseChronosMissionProposalState(
     ...(sourceText ? { sourceText } : {}),
     ...(routingDecision ? { routingDecision } : {}),
     createdAt,
+    ...(authorPrincipalKey ? { authorPrincipalKey } : {}),
   };
 }
