@@ -51,6 +51,7 @@ import {
 } from './protocol-to-markdown.js';
 import type { PdfDesignProtocol, PdfPage } from '../contracts/pdf-protocol.js';
 import { dropBrokenTextElements, pageNeedsRender, renderPdfPages } from './pdf-page-raster.js';
+import { loadPdfParseConstructor } from './pdf-parse-runtime.js';
 import { extractHtmlTitle, htmlToMarkdown } from '../html-to-markdown.js';
 import { extractOoxmlCoreTitle, OOXML_PLACEHOLDER_TITLES } from './ooxml-core-props.js';
 
@@ -440,7 +441,7 @@ async function readPptx(
 
 async function pdfParsePageTexts(raw: Buffer): Promise<string[] | null> {
   try {
-    const { PDFParse } = (await import('pdf-parse')) as any;
+    const PDFParse = await loadPdfParseConstructor();
     const parser = new PDFParse({ data: new Uint8Array(raw) });
     try {
       const result = await parser.getText();

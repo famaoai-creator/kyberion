@@ -10,6 +10,7 @@
  * look, so OCR and `kyberion see` can read what the text layer cannot.
  */
 import type { PdfPage } from '../contracts/pdf-protocol.js';
+import { loadPdfParseConstructor } from './pdf-parse-runtime.js';
 
 /** Control characters and replacement glyphs that a healthy text layer never carries. */
 // eslint-disable-next-line no-control-regex
@@ -71,14 +72,14 @@ export async function renderPdfPages(
   options: RenderPdfPagesOptions = {}
 ): Promise<RenderedPdfPage[]> {
   if (pageNumbers.length === 0) return [];
-  const { PDFParse } = (await import('pdf-parse')) as any;
+  const PDFParse = await loadPdfParseConstructor();
   const parser = new PDFParse({ data: new Uint8Array(raw) });
   try {
     const result = await parser.getScreenshot({
       partial: pageNumbers,
       desiredWidth: options.desiredWidth ?? DEFAULT_RENDER_WIDTH,
     });
-    return (result.pages as Array<{ pageNumber: number; data: Uint8Array }>).map((page) => ({
+    return result.pages.map((page) => ({
       pageNumber: page.pageNumber,
       png: Buffer.from(page.data),
     }));
