@@ -131,6 +131,23 @@ function isOutsideProjectRoot(relativePath: string): boolean {
   return firstSegment === '..';
 }
 
+/**
+ * Repo-relative spelling for policy checks. The process root wins first
+ * (fixtures mock rootDir()); only a genuinely outside-root path may instead
+ * name shared authority state under the primary checkout — the one store per
+ * repository — which keeps its canonical repo-relative form.
+ */
+function policyRelativePath(resolvedPath: string): string {
+  const rel = normalizePath(path.relative(projectRoot(), resolvedPath));
+  if (rel && rel !== '..' && !rel.startsWith('../')) return rel;
+  const primary = pathResolver.primaryCheckoutRootDir();
+  if (primary !== projectRoot()) {
+    const relPrimary = normalizePath(path.relative(primary, path.resolve(resolvedPath)));
+    if (pathResolver.isAuthorityStoreRelativePath(relPrimary)) return relPrimary;
+  }
+  return rel;
+}
+
 const logger = createLogger('tier-guard');
 
 type PolicyLoad = { status: 'loaded'; policy: any } | { status: 'missing' } | { status: 'corrupt' };
@@ -1129,7 +1146,7 @@ export function validateWritePermission(
 ): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
   const resourceDenial = requestResourceDenial(
-    normalizePath(path.relative(projectRoot(), resolvedPath)),
+    normalizePath(policyRelativePath(resolvedPath)),
     operation,
     content
   );
@@ -1142,7 +1159,7 @@ export function validateWritePermission(
       reason: error instanceof Error ? error.message : String(error),
     };
   }
-  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
+  const relativePath = normalizePath(policyRelativePath(resolvedPath));
   const currentMission = resolveProjectScope().missionId;
 
   if (isOutsideProjectRoot(relativePath)) {
@@ -1334,7 +1351,7 @@ export function inspectReadPermission(
   operation: 'read' | 'metadata' = 'read'
 ): ReadPermissionDecision {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
+  const relativePath = normalizePath(policyRelativePath(resolvedPath));
   const resourceDenial = requestResourceDenial(relativePath, operation);
   if (resourceDenial) return resourceDenial;
 
