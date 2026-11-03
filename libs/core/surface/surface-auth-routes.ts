@@ -251,6 +251,23 @@ export async function startSurfaceIdentityLink(
   };
 }
 
+function isLoopbackOrigin(origin: string): boolean {
+  try {
+    const host = new URL(origin).hostname.replace(/^\[|\]$/gu, '');
+    return host === 'localhost' || host === '::1' || /^127(?:\.\d{1,3}){3}$/u.test(host);
+  } catch {
+    return false;
+  }
+}
+
+function sameOrigin(a: string, b: string): boolean {
+  try {
+    return new URL(a).origin === new URL(b).origin;
+  } catch {
+    return false;
+  }
+}
+
 function startHref(next: string): string {
   return next === '/'
     ? SURFACE_AUTH_START_PATH
@@ -318,6 +335,21 @@ export async function handleSurfaceAuthRoute(
 
     case SURFACE_AUTH_START_PATH: {
       if (method !== 'GET') return notAllowed(req);
+      // The login-transaction cookie must land on the host the IdP redirects
+      // back to. When a local browser reached this surface on another
+      // loopback name than the callback (127.0.0.1 vs localhost), hop to the
+      // callback origin first; otherwise the callback never sees the cookie
+      // and every attempt ends as "sign-in attempt expired". Only loopback
+      // pairs hop: behind a TLS proxy the app sees an internal origin and a
+      // hop to the public origin would loop.
+      if (
+        publicOrigin &&
+        isLoopbackOrigin(publicOrigin) &&
+        isLoopbackOrigin(req.requestOrigin) &&
+        !sameOrigin(publicOrigin, req.requestOrigin)
+      ) {
+        return redirect(`${publicOrigin.replace(/\/+$/u, '')}${startHref(next)}`);
+      }
       const started = await startOidcLogin(
         {
           surfaceId: req.surfaceId,
