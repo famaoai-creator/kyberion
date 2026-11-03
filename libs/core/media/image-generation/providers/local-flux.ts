@@ -1,13 +1,6 @@
 import * as path from 'node:path';
 import { getRegisteredEnvText } from '../../../foundation/env.js';
-import {
-  assertSafeRepositoryPath,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../../../secure-io.js';
+import { safeExecResult, safeExistsSync, safeMkdir } from '../../../secure-io.js';
 import { resolveLocalFluxGenerationPolicy } from '../../image-generation-policy.js';
 import { probeToolRuntime } from '../../../tool/tool-runtime-registry.js';
 import {
@@ -16,14 +9,7 @@ import {
   ImageGenerationProvider,
   ImageReference,
 } from '../../image-generation-types.js';
-import {
-  assertReferenceEgressAllowed,
-  hasReferenceImages,
-  imageProviderDataEgress,
-  recordReferenceEgressReceipt,
-  referenceImageViolation,
-  resolveReferenceImagePath,
-} from '../../image-reference-consent.js';
+import { resolveReferenceImagePath } from '../../image-reference-consent.js';
 import { isAppleSilicon } from '../../../platform.js';
 import { getFallbackTargetPath } from '../provider-support.js';
 

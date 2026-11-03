@@ -1,4 +1,3 @@
-import * as path from 'node:path';
 import { logger } from '../../../core.js';
 import { executeServicePreset } from '../../../service/service-engine.js';
 import { probeServiceRuntime } from '../../../service/service-runtime-registry.js';
@@ -6,7 +5,6 @@ import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
-  ImageReference,
 } from '../../image-generation-types.js';
 import { compileComfyUiImageRequest } from '../../../visual-workflow-compiler.js';
 import { governImageProvider } from '../admission.js';

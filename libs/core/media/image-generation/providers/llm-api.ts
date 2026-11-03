@@ -1,18 +1,9 @@
-import * as path from 'node:path';
 import { getRegisteredEnvText } from '../../../foundation/env.js';
-import {
-  assertSafeRepositoryPath,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../../../secure-io.js';
+import { safeWriteFile } from '../../../secure-io.js';
 import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
-  ImageReference,
 } from '../../image-generation-types.js';
 import { resolveGeminiApiKey } from '../../../provider/gemini-api-backend.js';
 import { governImageProvider } from '../admission.js';

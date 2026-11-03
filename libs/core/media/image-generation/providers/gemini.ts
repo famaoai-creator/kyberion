@@ -2,14 +2,7 @@ import * as path from 'node:path';
 import { logger } from '../../../core.js';
 import { getRegisteredEnvText } from '../../../foundation/env.js';
 import { isRecord } from '../../../foundation/text.js';
-import {
-  assertSafeRepositoryPath,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../../../secure-io.js';
+import { safeExistsSync, safeMkdir, safeReadFile, safeWriteFile } from '../../../secure-io.js';
 import { executeServicePreset } from '../../../service/service-engine.js';
 import { resolveServiceBinding } from '../../../service/service-binding.js';
 import { parseSafeJsonObjectValue } from '../../../foundation/safe-json.js';
@@ -17,14 +10,9 @@ import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
-  ImageReference,
 } from '../../image-generation-types.js';
 import {
   assertReferenceEgressAllowed,
-  hasReferenceImages,
-  imageProviderDataEgress,
-  recordReferenceEgressReceipt,
-  referenceImageViolation,
   resolveReferenceImagePath,
 } from '../../image-reference-consent.js';
 import { resolveGeminiApiKey } from '../../../provider/gemini-api-backend.js';
