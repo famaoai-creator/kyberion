@@ -9,13 +9,43 @@ import {
 } from '../foundation/authorization-registry.js';
 
 const ROOT = process.cwd();
+const SHIPPED_CAPTURE_READS = [
+  'service:github:preset:list_pulls',
+  'service:github:preset:list_reviews',
+  'service:github:preset:get_commit_check_runs',
+  'service:github:preset:get_review_threads',
+  'service:google-workspace:preset:gmail_profile_get',
+  'service:google-workspace:preset:gmail_messages_list',
+  'service:google-workspace:preset:gmail_message_get',
+  'service:google-workspace:preset:gmail_history_list',
+  'service:google-workspace:preset:gmail_thread_get',
+  'service:jira:preset:search_issues_enhanced',
+  'service:jira:preset:get_request_approvals',
+  'service:jira:preset:get_request_approval',
+  'service:jira:preset:get_issue',
+  'service:jira:preset:get_issue_comments',
+] as const;
+const CAPTURE_READ_AUTHORIZATION = {
+  effectClass: 'external_read',
+  authority: { kind: 'admission', boundary: 'external' },
+  protectedPaths: [['params']],
+} as const;
 
 describe('authorization-overlay catalog', () => {
   it('the shipped overlay file loads through the governed-catalog pipeline', () => {
     const loaded = authorizationOverlayCatalog.load();
     expect(loaded).toEqual(expect.objectContaining({}));
-    expect(loaded.operations ?? {}).toEqual({});
-    // The data layer deliberately ships one governed fallback: `service:*`
+    expect(loaded.operations ?? {}).toEqual({
+      ...Object.fromEntries(
+        SHIPPED_CAPTURE_READS.map((subject) => [subject, CAPTURE_READ_AUTHORIZATION])
+      ),
+      'credential:information_asset_capture': {
+        effectClass: 'credential_use',
+        authority: { kind: 'binding', scope: 'tenant' },
+      },
+    });
+    // Exact capture reads retain external admission; every other service operation
+    // still uses the governed fallback: `service:*`
     // operations are external mutations requiring external admission with
     // `params` protected — kept out of the code plane so plugin/overlay
     // providers can still declare exact `service:<provider>` subjects that
@@ -94,6 +124,31 @@ describe('authorization-overlay provider (registered at import)', () => {
     expect(overlays[0].source).toBe('overlay');
     // Provider registration happened at import; lookups consult real data.
     expect(operationAuthorization('vcs:push').source).toBe('code');
+  });
+
+  it('exact shipped reads override the service mutation fallback without weakening admission', () => {
+    for (const subject of SHIPPED_CAPTURE_READS) {
+      expect(operationAuthorization(subject), subject).toEqual({
+        ...CAPTURE_READ_AUTHORIZATION,
+        declared: true,
+        source: 'overlay',
+      });
+    }
+    expect(operationAuthorization('credential:information_asset_capture')).toEqual({
+      effectClass: 'credential_use',
+      authority: { kind: 'binding', scope: 'tenant' },
+      declared: true,
+      source: 'overlay',
+    });
+    expect(
+      operationAuthorization('service:unregistered-provider:preset:unreviewed-operation')
+    ).toEqual({
+      effectClass: 'external_mutation',
+      authority: { kind: 'admission', boundary: 'external' },
+      protectedPaths: [['params']],
+      declared: true,
+      source: 'overlay',
+    });
   });
 
   it('file overlay keys cannot collide with code-owned declarations', () => {
