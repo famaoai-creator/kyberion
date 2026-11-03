@@ -1,0 +1,49 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "storage-backend",
+      "default_provider": "local-fs",
+      "fallback_purpose": "store",
+      "traits": {
+        "durability": "Writes survive process restart and host reboot (local disk > object storage > memory).",
+        "zero_config": "Works with no operator opt-in or extra configuration.",
+        "distributed": "Readable and writable from more than one runtime node."
+      },
+      "providers": {
+        "local-fs": {
+          "traits": { "durability": 0.9, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "durability": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/storage/local-storage-backend.ts (delegates to secure-io: tier/tenant/symlink/audit checks unchanged; single-node POSIX semantics)"
+          ]
+        },
+        "memory": {
+          "traits": { "durability": 0, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "durability": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/storage/memory-storage-backend.ts (in-memory key/value store; hermetic tests and dry runs only — never in the default chain)"
+          ]
+        }
+      },
+      "purposes": {
+        "store": {
+          "description": "Persist sovereign state — ledgers, inboxes, evidence — for the active runtime.",
+          "weights": { "durability": 0.6, "zero_config": 0.3, "distributed": 0.1 }
+        }
+      },
+      "default_chains": {
+        "default": ["local-fs"]
+      }
+    }
+  ]
+}

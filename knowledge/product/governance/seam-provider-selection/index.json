@@ -18,6 +18,7 @@
     "authz-policy-engine",
     "secret-provider",
     "embedding-backend",
-    "web-search-runtime"
+    "web-search-runtime",
+    "storage-backend"
   ]
 }
