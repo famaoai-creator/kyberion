@@ -1,0 +1,43 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "provider-transport",
+      "default_provider": "loopback",
+      "fallback_purpose": "invoke",
+      "traits": {
+        "safety": "Guarantee the invocation reaches exactly the named provider and the envelope error contract holds (in-process > authenticated remote > best-effort).",
+        "zero_config": "Works with no operator opt-in or extra configuration.",
+        "remote_capable": "Can reach providers outside this runtime node. Registration requires verified endpoint auth + tenant-scope handling; credentials never serialize (secrets travel by reference through secret-resolver); timeoutMs must be enforced — unbounded remote calls are a governance violation."
+      },
+      "providers": {
+        "loopback": {
+          "traits": { "safety": 1, "zero_config": 1, "remote_capable": 0 },
+          "trait_basis": {
+            "safety": "declared",
+            "zero_config": "declared",
+            "remote_capable": "declared"
+          },
+          "evidence": [
+            "libs/core/provider/loopback-transport.ts (resolves the provider on coreSeamCatalog and invokes in-process; preserves local_first)"
+          ]
+        }
+      },
+      "purposes": {
+        "invoke": {
+          "description": "Execute one capability operation on the named seam/provider and return the envelope result.",
+          "weights": { "safety": 0.6, "zero_config": 0.3, "remote_capable": 0.1 }
+        },
+        "remote_execute": {
+          "description": "Execute on a provider hosted outside this runtime node (worker pool / RPC peer).",
+          "weights": { "safety": 0.45, "zero_config": 0.05, "remote_capable": 0.5 }
+        }
+      },
+      "default_chains": {
+        "default": ["loopback"],
+        "remote_execute": []
+      }
+    }
+  ]
+}
