@@ -277,7 +277,7 @@ describe('scratch:promote', () => {
     const knowledgeRoot = `${ledgerRoot}/knowledge/confidential/${tenant}`;
     const toolDir = `${knowledgeRoot}/tools/ledger-tool`;
     const source = `${FIXTURE_REPO_DIR}/work`;
-    const ledger = () => readAssetLedger(tenant, { knowledgeRoot });
+    const ledger = async () => readAssetLedger(tenant, { knowledgeRoot });
     const ledgerFile = () => pathResolver.rootResolve(`${knowledgeRoot}/_ledger/assets.jsonl`);
 
     async function promote(extra: string[] = []): Promise<Record<string, unknown>> {
@@ -315,7 +315,7 @@ describe('scratch:promote', () => {
       const output = await promote();
       const toolJson = readTextFile(pathResolver.rootResolve(`${toolDir}/TOOL.json`));
       const assetId = deriveAssetId('scratch', source);
-      expect(ledger()).toEqual([
+      expect(await ledger()).toEqual([
         expect.objectContaining({
           asset_id: assetId,
           source_system: 'scratch',
@@ -329,7 +329,7 @@ describe('scratch:promote', () => {
           status: 'active',
         }),
       ]);
-      expect(ledger()[0].supersedes).toBeUndefined();
+      expect((await ledger())[0].supersedes).toBeUndefined();
       expect(output.asset).toEqual({
         asset_id: assetId,
         version: 1,
@@ -353,7 +353,7 @@ describe('scratch:promote', () => {
       const firstToolJson = readTextFile(pathResolver.rootResolve(`${toolDir}/TOOL.json`));
       const output = await promote(['--force']);
       expect(readTextFile(pathResolver.rootResolve(`${toolDir}/TOOL.json`))).toBe(firstToolJson);
-      expect(ledger()).toHaveLength(1);
+      expect(await ledger()).toHaveLength(1);
       expect(output.asset).toMatchObject({ version: 1, recorded: false });
     });
 
@@ -362,7 +362,7 @@ describe('scratch:promote', () => {
       seed('work/build.ts', 'console.log(2);\n');
       const output = await promote(['--force']);
       const assetId = deriveAssetId('scratch', source);
-      const records = ledger();
+      const records = await ledger();
       expect(records).toHaveLength(2);
       expect(records[1]).toMatchObject({
         asset_id: assetId,

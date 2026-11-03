@@ -2,20 +2,16 @@
  * storage-backend seam — the pluggable persistence extension point.
  *
  * Kyberion's sovereign state (ledgers, inboxes, evidence) is written through a
- * small POSIX-shaped surface. Today exactly one implementation backs it:
- * `local-fs` over @agent/core/secure-io. Distributed runtimes need the same
- * surface over object storage / KV / memory, without callers learning which
- * environment they run in.
+ * small POSIX-shaped surface. Providers register by id (`local-fs` builtin,
+ * `memory` for hermetic tests, object-storage adapters later); selection order
+ * is governed data (`seam-provider-selection/storage-backend.json`
+ * `default_chains`), never a hard-coded preference list.
  *
- * Providers register by id (`local-fs` builtin, `memory` for hermetic tests,
- * object-storage adapters later); selection order is governed data
- * (`seam-provider-selection/storage-backend.json` `default_chains`), never a
- * hard-coded preference list. Callers that need a specific backend pass its id
- * or instance explicitly — the governed default only fills the gap.
- *
- * The contract is intentionally a POSIX subset (sync, string paths): it is the
- * smallest surface entry-ledger and friends actually need, and every backend —
- * local disk, in-memory, S3-compatible — can satisfy it.
+ * The canonical seam contract is **async** (`AsyncStorageBackend`) so
+ * Promise-based object stores (S3/R2/GCS) can meet durability without a silent
+ * fire-and-forget. Sync implementations (`SyncStorageBackend`: local-fs,
+ * memory) wrap once via `toAsyncStorageBackend` before registration — callers
+ * always `await` and never drop durability.
  */
 
 import { createProviderRegistry } from '../provider-registry.js';
@@ -43,11 +39,11 @@ export interface StorageTextLine {
 }
 
 /**
- * POSIX-subset storage surface. Implementations must be synchronous — the
- * governed call sites (entry-ledger, secure-io consumers) are sync today; an
- * async backend would silently drop durability guarantees.
+ * Sync POSIX-subset surface for local disk / in-memory stores. Prefer
+ * implementing this and registering through `toAsyncStorageBackend` rather
+ * than hand-rolling Promise wrappers.
  */
-export interface StorageBackend {
+export interface SyncStorageBackend {
   readonly id: string;
   exists(path: string): boolean;
   /** lstat semantics — `null` when the path is absent. */
@@ -62,7 +58,87 @@ export interface StorageBackend {
   list(path: string): string[];
 }
 
-const storageBackendRegistry = createProviderRegistry<StorageBackend>({
+/**
+ * Canonical seam contract — every registered provider is async so remote
+ * object stores can await durability instead of being forced through a sync
+ * facade that would silently drop writes.
+ */
+export interface AsyncStorageBackend {
+  readonly id: string;
+  exists(path: string): Promise<boolean>;
+  stat(path: string): Promise<StorageStat | null>;
+  mkdir(path: string): Promise<void>;
+  append(path: string, data: string): Promise<void>;
+  readLines(path: string): AsyncIterable<StorageTextLine>;
+  list(path: string): Promise<string[]>;
+}
+
+/**
+ * @deprecated Use `AsyncStorageBackend` (seam) or `SyncStorageBackend` (local
+ * adapters). Alias kept so existing type imports keep compiling during the
+ * migration; it resolves to the async contract.
+ */
+export type StorageBackend = AsyncStorageBackend;
+
+const ASYNC_BRAND = Symbol.for('kyberion.storage.async');
+
+type BrandedAsync = AsyncStorageBackend & { readonly [ASYNC_BRAND]?: true };
+
+/** Wrap a sync backend so it satisfies the async seam without dropping awaits. */
+export function toAsyncStorageBackend(sync: SyncStorageBackend): AsyncStorageBackend {
+  const asyncBackend: BrandedAsync = {
+    id: sync.id,
+    [ASYNC_BRAND]: true,
+    async exists(filePath) {
+      return sync.exists(filePath);
+    },
+    async stat(filePath) {
+      return sync.stat(filePath);
+    },
+    async mkdir(dirPath) {
+      sync.mkdir(dirPath);
+    },
+    async append(filePath, data) {
+      sync.append(filePath, data);
+    },
+    async *readLines(filePath) {
+      for (const line of sync.readLines(filePath)) yield line;
+    },
+    async list(dirPath) {
+      return sync.list(dirPath);
+    },
+  };
+  return asyncBackend;
+}
+
+function isSyncReadLines(backend: SyncStorageBackend | AsyncStorageBackend): boolean {
+  // Sync providers return a plain Iterable / Generator; async providers and
+  // toAsync wrappers use AsyncFunction / AsyncGeneratorFunction.
+  const sample = backend.readLines;
+  return (
+    typeof sample === 'function' &&
+    sample.constructor.name !== 'AsyncFunction' &&
+    sample.constructor.name !== 'AsyncGeneratorFunction'
+  );
+}
+
+/** True when `backend` already satisfies the async seam (branded or native). */
+export function isAsyncStorageBackend(
+  backend: SyncStorageBackend | AsyncStorageBackend
+): backend is AsyncStorageBackend {
+  return (backend as BrandedAsync)[ASYNC_BRAND] === true || !isSyncReadLines(backend);
+}
+
+/** Normalize either shape to the async seam contract. */
+export function asAsyncStorageBackend(
+  backend: SyncStorageBackend | AsyncStorageBackend
+): AsyncStorageBackend {
+  if ((backend as BrandedAsync)[ASYNC_BRAND] === true) return backend as AsyncStorageBackend;
+  if (isSyncReadLines(backend)) return toAsyncStorageBackend(backend as SyncStorageBackend);
+  return backend as AsyncStorageBackend;
+}
+
+const storageBackendRegistry = createProviderRegistry<AsyncStorageBackend>({
   seam: STORAGE_BACKEND_SEAM,
   owner: 'libs/core/storage/storage-backend.ts',
   source: 'storage-backend-extension',
@@ -70,17 +146,17 @@ const storageBackendRegistry = createProviderRegistry<StorageBackend>({
 });
 
 export function registerStorageBackend(
-  backend: StorageBackend,
+  backend: AsyncStorageBackend | SyncStorageBackend,
   metadata?: SeamProviderMetadata
 ): () => void {
-  return storageBackendRegistry.register(backend, metadata);
+  return storageBackendRegistry.register(asAsyncStorageBackend(backend), metadata);
 }
 
-export function listStorageBackends(): StorageBackend[] {
+export function listStorageBackends(): AsyncStorageBackend[] {
   return storageBackendRegistry.list();
 }
 
-export function getStorageBackend(id: string): StorageBackend | undefined {
+export function getStorageBackend(id: string): AsyncStorageBackend | undefined {
   return storageBackendRegistry.get(id);
 }
 
@@ -95,7 +171,7 @@ export function resetStorageBackends(): void {
  * registered. Throws when nothing is registered — local-fs is installed by
  * importing `local-storage-backend.ts`, which entry-ledger does for callers.
  */
-export function resolveStorageBackend(selector?: string): StorageBackend {
+export function resolveStorageBackend(selector?: string): AsyncStorageBackend {
   const explicit = selector?.trim();
   if (explicit) {
     const backend = storageBackendRegistry.get(explicit);

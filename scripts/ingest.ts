@@ -392,12 +392,13 @@ export async function main(argv: string[] = [], print: Print = () => undefined):
   // Historical hashes retain the existing duplicate / --reparse semantics.
   // Do not expose the matching record: this ceremony needs only its verdict.
   const dedupCheck = {
-    duplicate: findAssetByContentHash(args.tenant, ir.meta.content_sha256, pathOptions) !== null,
+    duplicate:
+      (await findAssetByContentHash(args.tenant, ir.meta.content_sha256, pathOptions)) !== null,
     registered: false,
   };
 
   const assetId = deriveAssetId(sourceSystem, sourceId);
-  const prior = findAssetBySource(args.tenant, sourceSystem, sourceId, pathOptions);
+  const prior = await findAssetBySource(args.tenant, sourceSystem, sourceId, pathOptions);
 
   // --reparse: the raw bytes are unchanged but the reader improved. Allowed
   // only for the SAME source whose ledger head holds these exact bytes, so it
@@ -449,7 +450,7 @@ export async function main(argv: string[] = [], print: Print = () => undefined):
   }
 
   // 4. ingest:commit — the ceremony: card landing + ledger record + audit.
-  const result = commitIngest({
+  const result = await commitIngest({
     tenant_slug: args.tenant,
     normalized,
     dedup_result: dedup,
