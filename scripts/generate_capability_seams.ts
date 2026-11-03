@@ -253,6 +253,7 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/core/writer-lease.ts',
       'libs/core/lease/local-lease-backend.ts',
       'libs/core/lease/memory-lease-backend.ts',
+      'libs/core/lease/kv-lease-backend.stub.ts',
     ],
   },
   'structured-runner': {
