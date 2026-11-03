@@ -94,8 +94,7 @@
       "knowledge/confidential/heuristics/",
       "knowledge/confidential/relationships/",
       "active/organizations/personal/shared/",
-      "active/organizations/public/shared/",
-      "active/shared/runtime/tenant-approvals/personal/shared/"
+      "active/organizations/public/shared/"
     ],
     "system_registry_reads": [
       {
