@@ -175,6 +175,10 @@ const policyDirectoryOptions: RegistryDirectoryOptions = {
   schemaPath: pathResolver.knowledge('product/schemas/seam-provider-selection-policy.schema.json'),
   arrayKey: 'seams',
   idKey: 'seam_id',
+  // A checkout without governed policy data is a valid state: resolvers fall
+  // back to their builtin provider chain. Hard-failing on the missing
+  // directory would break every seam in minimal/synthetic checkouts.
+  allowEmpty: true,
 };
 
 export function listSeamSelectionPolicies(): SeamSelectionPolicy[] {
