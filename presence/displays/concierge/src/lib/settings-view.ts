@@ -18,6 +18,7 @@ export type SettingsSectionId =
   | 'voice'
   | 'notifications'
   | 'recording'
+  | 'authority'
   | 'plugins'
   | 'advanced';
 
@@ -35,6 +36,7 @@ export const SETTINGS_SECTION_ORDER: readonly SettingsSectionId[] = [
   'voice',
   'notifications',
   'recording',
+  'authority',
   'plugins',
   'advanced',
 ];

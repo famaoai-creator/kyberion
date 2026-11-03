@@ -546,6 +546,9 @@ export function onboardingAuthorityRequestStatus(
     statement: plan.statement,
     presented_digest: computeApprovalPresentedDigest(record),
     approval_channel: ONBOARDING_AUTHORITY_CHANNEL,
+    // Surfaces route the decision UX on this (A2 → session POST, A3 → passkey);
+    // records without an explicit floor read as A2 (approval-store.ts).
+    min_assurance: record.accountability?.min_assurance ?? 'A2',
     status:
       record.applyResult?.result === 'success'
         ? 'applied'

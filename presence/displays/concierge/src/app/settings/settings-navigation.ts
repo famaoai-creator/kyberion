@@ -8,6 +8,7 @@ export const SETTINGS_SECTION_ELEMENT_ID: Record<SettingsSectionId, string> = {
   voice: 'setup-media',
   notifications: 'setup-notifications',
   recording: 'settings-recording',
+  authority: 'settings-authority',
   plugins: 'setup-plugins',
   advanced: 'settings-advanced',
 };
@@ -17,7 +18,7 @@ const TARGET_SECTIONS = new Map<string, SettingsSectionId>([
     ([section, id]) => [id, section as SettingsSectionId] as const
   ),
   ['setup-management', 'advanced'],
-  ['setup-governance', 'advanced'],
+  ['setup-governance', 'authority'],
   ['setup-operations', 'advanced'],
 ]);
 

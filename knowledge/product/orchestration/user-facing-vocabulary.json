@@ -27373,6 +27373,11 @@
         "ja": "追加機能の確認・承認",
         "qps-ploc": "⟦Řėṽïėẇ ȧḓḓėḓ ƈȧṗȧƀïŀïŧïėş ŀőřėɱ ïṗ⟧"
       },
+      "settings_desc_authority": {
+        "en": "Approvals and delegated action authority",
+        "ja": "承認と操作権限の委任",
+        "qps-ploc": "⟦Ȧṗṗřőṽȧŀş ȧñḓ ḓėŀėɠȧŧėḓ ȧƈŧïőñ ȧůŧħőřïŧẏ ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
       "settings_desc_advanced": {
         "en": "Agent and system configuration",
         "ja": "エージェント・システムの管理",
@@ -27412,6 +27417,11 @@
         "en": "Extensions",
         "ja": "拡張機能",
         "qps-ploc": "⟦Ėẋŧėñşïőñş ŀőř⟧"
+      },
+      "settings_nav_authority": {
+        "en": "Authority and approvals",
+        "ja": "権限と承認",
+        "qps-ploc": "⟦Ȧůŧħőřïŧẏ ȧñḓ ȧṗṗřőṽȧŀş ŀőřėɱ ï⟧"
       },
       "settings_nav_advanced": {
         "en": "Advanced",
