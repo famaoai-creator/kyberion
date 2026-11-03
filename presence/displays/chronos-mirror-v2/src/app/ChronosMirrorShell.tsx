@@ -1,5 +1,6 @@
 'use client';
 
+import { ChronosFrontDeskRail } from '../components/ChronosFrontDeskRail';
 import { normalizeLocale } from '@agent/core/locale-normalize';
 import type { ClientMissionHistoryEntry } from '../lib/mission-history-response';
 import { DiscussionRoom } from '../components/DiscussionRoom';
@@ -277,6 +278,7 @@ export function ChronosMirrorShell({ model }: { model: ViewModel }) {
         <AppShell
           density="compact"
           role="chronos-mirror-v2"
+          nav={<ChronosFrontDeskRail locale={locale} />}
           className="chronos-shell"
           style={tenantCssVars as AppShellStyle}
         >
