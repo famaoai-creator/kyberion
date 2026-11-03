@@ -63,7 +63,7 @@ import {
   type PipelineAdfStep,
 } from '@agent/core/pipeline/pipeline-contract';
 import { validatePipelineGuardrails } from '@agent/core/pipeline/adf-guardrails';
-import { withExecutionContext } from '@agent/core/governance';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/governance';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { resolveStorageFloor } from '@agent/core/storage-layout';
 import { isBuiltinPipelineResource } from '@agent/core/trust-requiring-resources';
@@ -616,15 +616,15 @@ async function main(
       const ledgerOptions = { knowledgeRoot };
       try {
         const ingestedBy = options.ingestedBy?.trim() || resolvePromotionActor('[promote]');
-        asset = withExecutionContext(
+        asset = await withExecutionContextAsync(
           'asset_promoter',
-          () => {
+          async () => {
             const final = keepPipelinePromotedAtWhenUnchanged(
               exists ? readJsonIfPresent<unknown>(targetPath) : null,
               promoted as PromotablePipeline
             );
             const text = `${JSON.stringify(final, null, 2)}\n`;
-            const plan = planPromotionAsset(
+            const plan = await planPromotionAsset(
               {
                 tenant,
                 sourceSystem: PIPELINE_PROMOTE_SOURCE_SYSTEM,
@@ -639,7 +639,7 @@ async function main(
               ledgerOptions
             );
             writeJson(targetPath, final);
-            commitPromotionAsset(tenant, plan, ledgerOptions);
+            await commitPromotionAsset(tenant, plan, ledgerOptions);
             return promotionAssetSummary(plan);
           },
           undefined,

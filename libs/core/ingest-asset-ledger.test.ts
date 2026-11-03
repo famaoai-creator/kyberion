@@ -133,18 +133,18 @@ describe('ingest-asset-ledger (DA-05)', () => {
     );
   });
 
-  it('appends validated records and rejects malformed ones fail-closed', () => {
-    appendAssetRecord('acme-corp', makeRecord(), options);
-    expect(() =>
+  it('appends validated records and rejects malformed ones fail-closed', async () => {
+    await appendAssetRecord('acme-corp', makeRecord(), options);
+    await expect(
       appendAssetRecord('acme-corp', makeRecord({ content_sha256: 'not-a-hash' }), options)
-    ).toThrow(/content_sha256 must be a sha256/);
-    expect(() =>
+    ).rejects.toThrow(/content_sha256 must be a sha256/);
+    await expect(
       appendAssetRecord('acme-corp', makeRecord({ asset_id: 'ing-0000000000000000' }), options)
-    ).toThrow(/does not match deriveAssetId/);
-    expect(() => appendAssetRecord('acme-corp', makeRecord({ visible_to: [] }), options)).toThrow(
-      /visible_to must be a non-empty array/
-    );
-    expect(() =>
+    ).rejects.toThrow(/does not match deriveAssetId/);
+    await expect(
+      appendAssetRecord('acme-corp', makeRecord({ visible_to: [] }), options)
+    ).rejects.toThrow(/visible_to must be a non-empty array/);
+    await expect(
       appendAssetRecord(
         'acme-corp',
         makeRecord({
@@ -155,13 +155,13 @@ describe('ingest-asset-ledger (DA-05)', () => {
         }),
         options
       )
-    ).toThrow('[RESOURCE_PATH_SCOPE]');
-    expect(readAssetLedger('acme-corp', options)).toHaveLength(1);
+    ).rejects.toThrow('[RESOURCE_PATH_SCOPE]');
+    expect(await readAssetLedger('acme-corp', options)).toHaveLength(1);
   });
 
-  it('reconstructs full lineage (source → transform chain → approval) over a 3-version chain', () => {
+  it('reconstructs full lineage (source → transform chain → approval) over a 3-version chain', async () => {
     const assetId = deriveAssetId('confluence', 'PAGE-1');
-    appendAssetRecord(
+    await appendAssetRecord(
       'acme-corp',
       makeRecord({
         content_sha256: HASH_V2,
@@ -173,7 +173,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
       }),
       options
     );
-    appendAssetRecord(
+    await appendAssetRecord(
       'acme-corp',
       makeRecord({
         content_sha256: HASH_V3,
@@ -186,7 +186,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
       options
     );
 
-    const lineage = assetLineage('acme-corp', assetId, options);
+    const lineage = await assetLineage('acme-corp', assetId, options);
     expect(lineage).toHaveLength(3);
     expect(lineage.map((record) => record.version)).toEqual([1, 2, 3]);
     // Resolved statuses: everything but the newest version is superseded.
@@ -214,17 +214,17 @@ describe('ingest-asset-ledger (DA-05)', () => {
     expect((JSON.parse(rawLines[0]) as IngestAssetRecord).status).toBe('active');
   });
 
-  it('findAssetBySource returns the latest version; findAssetByContentHash matches any version', () => {
-    const latest = findAssetBySource('acme-corp', 'confluence', 'PAGE-1', options);
+  it('findAssetBySource returns the latest version; findAssetByContentHash matches any version', async () => {
+    const latest = await findAssetBySource('acme-corp', 'confluence', 'PAGE-1', options);
     expect(latest?.version).toBe(3);
     expect(latest?.content_sha256).toBe(HASH_V3);
-    expect(findAssetBySource('acme-corp', 'confluence', 'NOPE', options)).toBeNull();
-    expect(findAssetByContentHash('acme-corp', HASH_V2, options)?.version).toBe(2);
-    expect(findAssetByContentHash('acme-corp', 'f'.repeat(64), options)).toBeNull();
+    expect(await findAssetBySource('acme-corp', 'confluence', 'NOPE', options)).toBeNull();
+    expect((await findAssetByContentHash('acme-corp', HASH_V2, options))?.version).toBe(2);
+    expect(await findAssetByContentHash('acme-corp', 'f'.repeat(64), options)).toBeNull();
   });
 
-  it('listAssets returns one latest record per asset, codepoint-sorted', () => {
-    appendAssetRecord(
+  it('listAssets returns one latest record per asset, codepoint-sorted', async () => {
+    await appendAssetRecord(
       'acme-corp',
       makeRecord({
         source_id: 'PAGE-2',
@@ -234,7 +234,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
       }),
       options
     );
-    const assets = listAssets('acme-corp', options);
+    const assets = await listAssets('acme-corp', options);
     expect(assets).toHaveLength(2);
     expect(assets.map((asset) => asset.asset_id)).toEqual(
       [...assets.map((asset) => asset.asset_id)].sort()
@@ -243,13 +243,13 @@ describe('ingest-asset-ledger (DA-05)', () => {
     expect(page1?.version).toBe(3);
   });
 
-  it('formats KKP provenance refs as asset:{id}@v{n}', () => {
-    const record = findAssetBySource('acme-corp', 'confluence', 'PAGE-1', options)!;
+  it('formats KKP provenance refs as asset:{id}@v{n}', async () => {
+    const record = (await findAssetBySource('acme-corp', 'confluence', 'PAGE-1', options))!;
     expect(assetProvenanceRef(record)).toBe(`asset:${record.asset_id}@v3`);
   });
 
-  it('stalenessReport detects updated sources by hash and by source_version (acceptance 4)', () => {
-    const report = stalenessReport(
+  it('stalenessReport detects updated sources by hash and by source_version (acceptance 4)', async () => {
+    const report = await stalenessReport(
       'acme-corp',
       [
         // PAGE-1: source moved on (new hash) → stale.
@@ -273,7 +273,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
       reason: 'content_hash_mismatch',
     });
 
-    const versionOnly = stalenessReport(
+    const versionOnly = await stalenessReport(
       'acme-corp',
       [{ source_system: 'confluence', source_id: 'PAGE-2', source_version: '9' }],
       options
@@ -282,15 +282,15 @@ describe('ingest-asset-ledger (DA-05)', () => {
     expect(versionOnly.stale[0].reason).toBe('source_version_mismatch');
   });
 
-  it('stalenessReport with no observations dumps active assets deterministically', () => {
-    const report = stalenessReport('acme-corp', [], options);
+  it('stalenessReport with no observations dumps active assets deterministically', async () => {
+    const report = await stalenessReport('acme-corp', [], options);
     expect(report.tenant_slug).toBe('acme-corp');
     expect(report.stale).toEqual([]);
     expect(report.assets).toHaveLength(2);
     expect(report.assets.every((asset) => asset.status === 'active')).toBe(true);
   });
 
-  it('skips corrupt ledger lines instead of failing reads', () => {
+  it('skips corrupt ledger lines instead of failing reads', async () => {
     safeAppendFile(
       assetLedgerPath('acme-corp', options),
       [
@@ -300,17 +300,17 @@ describe('ingest-asset-ledger (DA-05)', () => {
         JSON.stringify({ ...makeRecord(), unexpected: true }),
       ].join('\n') + '\n'
     );
-    expect(readAssetLedger('acme-corp', options)).toHaveLength(4);
-    expect(listAssets('acme-corp', options)).toHaveLength(2);
+    expect(await readAssetLedger('acme-corp', options)).toHaveLength(4);
+    expect(await listAssets('acme-corp', options)).toHaveLength(2);
   });
 
-  it('skips dangerous ledger lines instead of projecting them', () => {
+  it('skips dangerous ledger lines instead of projecting them', async () => {
     const options = { rootDir: fixtureRoot };
     const ledger = assetLedgerPath('acme-corp', options);
     safeMkdir(path.dirname(ledger), { recursive: true });
     safeWriteFile(ledger, '{"nested":{"constructor":{}}}\n');
 
-    expect(readAssetLedger('acme-corp', options)).toEqual([]);
+    expect(await readAssetLedger('acme-corp', options)).toEqual([]);
   });
 
   it('normalizes only complete, tenant-contained asset records', () => {
@@ -324,7 +324,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
     ).toBeNull();
   });
 
-  it('rejects a symlinked tenant ledger directory before reading or appending', () => {
+  it('rejects a symlinked tenant ledger directory before reading or appending', async () => {
     const ledgerDir = path.join(symlinkFixtureRoot, 'knowledge/confidential/common/_ledger');
     const targetDir = path.join(symlinkFixtureRoot, 'ledger-target');
     safeMkdir(path.dirname(ledgerDir), { recursive: true });
@@ -333,10 +333,12 @@ describe('ingest-asset-ledger (DA-05)', () => {
 
     const symlinkOptions = { rootDir: symlinkFixtureRoot, env: EMPTY_ENV };
     expect(() => assetLedgerPath('common', symlinkOptions)).toThrow('[RESOURCE_PATH_SYMLINK]');
-    expect(() => readAssetLedger('common', symlinkOptions)).toThrow('[RESOURCE_PATH_SYMLINK]');
+    await expect(readAssetLedger('common', symlinkOptions)).rejects.toThrow(
+      '[RESOURCE_PATH_SYMLINK]'
+    );
   });
 
-  it('rejects a tenant ledger path that is a directory', () => {
+  it('rejects a tenant ledger path that is a directory', async () => {
     const directoryRoot = path.join(
       pathResolver.rootDir(),
       'active/shared/tmp',
@@ -344,7 +346,7 @@ describe('ingest-asset-ledger (DA-05)', () => {
     );
     const ledger = assetLedgerPath('common', { rootDir: directoryRoot });
     safeMkdir(ledger, { recursive: true });
-    expect(() => readAssetLedger('common', { rootDir: directoryRoot })).toThrow(
+    await expect(readAssetLedger('common', { rootDir: directoryRoot })).rejects.toThrow(
       /ledger must be a regular file/
     );
     safeRmSync(directoryRoot, { recursive: true, force: true });

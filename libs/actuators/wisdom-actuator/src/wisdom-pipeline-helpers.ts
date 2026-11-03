@@ -828,7 +828,7 @@ async function opApply(
         // its frontmatter provenance keys resolve to an asset-ledger record —
         // the asset:{id}@v{n} ref joins provenance[] so the KKP and the
         // information-asset ledger stay connected across tenant migration.
-        const ingestAssetRef = resolveIngestAssetProvenance({
+        const ingestAssetRef = await resolveIngestAssetProvenance({
           tenantSlug: originTenantId,
           rawData,
         });
