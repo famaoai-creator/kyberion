@@ -13,6 +13,7 @@ describe('missionActionCredentialRequirement', () => {
       'kickoff',
       'record-task',
       'record-evidence',
+      'prepare-source-workspace',
       'review-task',
       'triage',
       'scope-approve',
