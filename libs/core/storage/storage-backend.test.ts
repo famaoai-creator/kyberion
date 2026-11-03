@@ -38,6 +38,14 @@ describe('storage-backend seam', () => {
     expect(resolveStorageBackend().id).toBe(LOCAL_STORAGE_BACKEND_ID);
   });
 
+  it('keeps object-storage-stub out of the default chain (registered but never auto-selected)', () => {
+    expect(getStorageBackend(OBJECT_STORAGE_BACKEND_STUB_ID)).toBeDefined();
+    expect(resolveStorageBackend(OBJECT_STORAGE_BACKEND_STUB_ID).id).toBe(
+      OBJECT_STORAGE_BACKEND_STUB_ID
+    );
+    expect(resolveStorageBackend().id).toBe(LOCAL_STORAGE_BACKEND_ID);
+  });
+
   it('exposes async methods on the governed default', async () => {
     const backend = resolveStorageBackend();
     await expect(backend.exists('/')).resolves.toBeTypeOf('boolean');
