@@ -91,7 +91,12 @@ import {
 } from './provider-capability-registry.js';
 import { providerIdForReasoningIdentifier } from './provider-egress-gate.js';
 import { resolveClaudeCliFallbackCandidates } from './claude-cli-resolution.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 /**
  * Minimal structural shape returned by this resolver — declared
@@ -136,8 +141,10 @@ const providerBackendConstructorSeam = createSeam<ProviderBackendConstructor>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/provider/provider-backend-resolver.ts',
 });
-const providerBackendConstructorDisposers = new Map<string, () => void>();
 const backendCache = new Map<string, ProviderBackendHandle | null>();
+const registrations = createSeamLifecycle(providerBackendConstructorSeam, {
+  onChange: ({ id }) => backendCache.delete(id),
+});
 
 const BUILTIN_CONSTRUCTORS: Readonly<Record<string, ProviderBackendConstructor>> = {
   claude: (env) => {
@@ -163,17 +170,7 @@ export function registerProviderBackendConstructor(
 ): () => void {
   const id = providerId.trim();
   if (!id) throw new Error('Provider backend id is required');
-  const disposeFromSeam = providerBackendConstructorSeam.register(id, constructor, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (providerBackendConstructorDisposers.get(id) === dispose) {
-      providerBackendConstructorDisposers.delete(id);
-      backendCache.delete(id);
-    }
-  };
-  providerBackendConstructorDisposers.set(id, dispose);
-  backendCache.delete(id);
-  return dispose;
+  return registrations.register(id, constructor, metadata);
 }
 
 for (const [providerId, constructor] of Object.entries(BUILTIN_CONSTRUCTORS)) {

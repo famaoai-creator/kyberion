@@ -36,6 +36,21 @@ function bridge(
 describe('web-search-runtime seam', () => {
   afterEach(() => resetWebSearchRuntimeBridges());
 
+  it('keeps its declared default when another offline provider is installed', () => {
+    registerWebSearchRuntimeBridge(bridge('a-extension'));
+    registerWebSearchRuntimeBridge(bridge('stub'));
+    expect(resolveWebSearchRuntime().bridge_id).toBe('stub');
+  });
+
+  it('rejects ambiguous offline providers without a registered default', () => {
+    registerWebSearchRuntimeBridge(bridge('z-provider'));
+    registerWebSearchRuntimeBridge(bridge('a-provider'));
+    expect(() => resolveWebSearchRuntime()).toThrowError(
+      expect.objectContaining({ code: 'SEAM_PROVIDER_AMBIGUOUS' })
+    );
+    expect(resolveWebSearchRuntime('z-provider').bridge_id).toBe('z-provider');
+  });
+
   it('auto-selects the offline-safe provider, never a restricted one', () => {
     registerWebSearchRuntimeBridge(bridge('rustxng', RESTRICTED));
     registerWebSearchRuntimeBridge(bridge('stub'));

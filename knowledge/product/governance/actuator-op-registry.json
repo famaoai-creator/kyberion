@@ -631,7 +631,7 @@
     "service": {
       "capture": ["harness", "preset"],
       "transform": [],
-      "apply": ["api", "cli", "mcp", "oauth", "reconcile"]
+      "apply": ["api", "cli", "information_asset_work", "mcp", "oauth", "reconcile"]
     },
     "system": {
       "capture": [

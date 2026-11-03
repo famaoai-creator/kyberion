@@ -1,7 +1,127 @@
 {
   "$schema": "../schemas/authorization-registry.schema.json",
   "version": "1",
-  "operations": {},
+  "operations": {
+    "service:github:preset:list_pulls": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:github:preset:list_reviews": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:github:preset:get_commit_check_runs": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:github:preset:get_review_threads": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:google-workspace:preset:gmail_profile_get": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:google-workspace:preset:gmail_messages_list": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:google-workspace:preset:gmail_message_get": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:google-workspace:preset:gmail_history_list": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:google-workspace:preset:gmail_thread_get": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:jira:preset:search_issues_enhanced": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:jira:preset:get_request_approvals": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:jira:preset:get_request_approval": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:jira:preset:get_issue": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "service:jira:preset:get_issue_comments": {
+      "effectClass": "external_read",
+      "authority": {
+        "kind": "admission",
+        "boundary": "external"
+      },
+      "protectedPaths": [["params"]]
+    },
+    "credential:information_asset_capture": {
+      "effectClass": "credential_use",
+      "authority": {
+        "kind": "binding",
+        "scope": "tenant"
+      }
+    }
+  },
   "prefixes": {
     "service:": {
       "effectClass": "external_mutation",

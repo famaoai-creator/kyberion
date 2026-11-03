@@ -39,12 +39,13 @@ Internally, Kyberion maps each Request through:
 
 ### 3.1 Software delivery
 
-| Use case                               | Mission class             | Primary pipeline(s)                                               |
-| -------------------------------------- | ------------------------- | ----------------------------------------------------------------- |
-| Implement feature / fix bug / refactor | `code_change`             | `implementation-plan` → `execute-task-plan` → `code-review-cycle` |
-| Cut a release                          | `operations_and_release`  | `release-package` → `deploy-release`                              |
-| Review a contract / spec               | `research_and_absorption` | `contract-review`                                                 |
-| Review plain text / approval copy      | `decision_support`        | `review-text`                                                     |
+| Use case                          | Mission class                              | Primary pipeline(s)                                                                                                            |
+| --------------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| Implement feature / fix bug       | `code_change`                              | `code-change-aidlc` (`implementation-plan` → `execute-task-plan` → `code-review-cycle`)                                        |
+| Structure-only refactor           | `code_change` + mission type `refactoring` | `code-refactoring-aidlc` (audit → behavior pin → atomic reshape → equivalence); playbook `engineering-refactoring-playbook.md` |
+| Cut a release                     | `operations_and_release`                   | `release-package` → `deploy-release`                                                                                           |
+| Review a contract / spec          | `research_and_absorption`                  | `contract-review`                                                                                                              |
+| Review plain text / approval copy | `decision_support`                         | `review-text`                                                                                                                  |
 
 ### 3.2 Customer-facing requirements to delivery
 
@@ -348,6 +349,8 @@ per the source's tier.
 
 ```
 1. code_change             - default class for source modifications
+   · mission type `refactoring` (same class) binds `code-refactoring-aidlc` + engineering-refactoring-playbook
+   · feature/bugfix keep mission type `development` / `code_change` → `code-change-aidlc`
 2. product_delivery        - end-to-end product shipment
 3. operations_and_release  - operations / release
 4. customer_engagement     - customer-facing engagement / requirements

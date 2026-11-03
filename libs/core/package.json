@@ -4008,6 +4008,10 @@
       "types": "./dist/mission/orchestrator-session.d.ts",
       "default": "./dist/mission/orchestrator-session.js"
     },
+    "./mission/refactoring-evidence": {
+      "types": "./dist/mission/refactoring-evidence.d.ts",
+      "default": "./dist/mission/refactoring-evidence.js"
+    },
     "./mlx-embedding-backend": {
       "types": "./dist/mlx-embedding-backend.d.ts",
       "default": "./dist/mlx-embedding-backend.js"
@@ -8231,6 +8235,46 @@
     "./voice/engine-runtime-preferences-operator": {
       "types": "./dist/voice/engine-runtime-preferences-operator.d.ts",
       "default": "./dist/voice/engine-runtime-preferences-operator.js"
+    },
+    "./information-assets/types": {
+      "types": "./dist/information-assets/types.d.ts",
+      "default": "./dist/information-assets/types.js"
+    },
+    "./information-assets/catalog": {
+      "types": "./dist/information-assets/catalog.d.ts",
+      "default": "./dist/information-assets/catalog.js"
+    },
+    "./information-assets/access": {
+      "types": "./dist/information-assets/access.d.ts",
+      "default": "./dist/information-assets/access.js"
+    },
+    "./information-assets/collector": {
+      "types": "./dist/information-assets/collector.d.ts",
+      "default": "./dist/information-assets/collector.js"
+    },
+    "./information-assets/provider": {
+      "types": "./dist/information-assets/provider.d.ts",
+      "default": "./dist/information-assets/provider.js"
+    },
+    "./information-assets/recipes": {
+      "types": "./dist/information-assets/recipes.d.ts",
+      "default": "./dist/information-assets/recipes.js"
+    },
+    "./information-assets/work": {
+      "types": "./dist/information-assets/work.d.ts",
+      "default": "./dist/information-assets/work.js"
+    },
+    "./information-assets/work-types": {
+      "types": "./dist/information-assets/work-types.d.ts",
+      "default": "./dist/information-assets/work-types.js"
+    },
+    "./information-assets/completion": {
+      "types": "./dist/information-assets/completion.d.ts",
+      "default": "./dist/information-assets/completion.js"
+    },
+    "./information-assets/collector-capture": {
+      "types": "./dist/information-assets/collector-capture.d.ts",
+      "default": "./dist/information-assets/collector-capture.js"
     }
   },
   "dependencies": {

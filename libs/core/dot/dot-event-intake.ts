@@ -648,6 +648,8 @@ export function ingestLocalEvent(input: {
   now?: Date;
   /** Trusted caller scope only (operator ask intake); never read from the body. */
   organizationId?: string;
+  /** Trusted narrowing scope for catalog collector events. */
+  projectId?: string;
 }): IngestInboundEventResult & { event: DotInboundEvent } {
   const policy =
     input.policy ?? loadEventIntakePolicy({ tenantOverlays: true, rootDir: input.rootDir });
@@ -670,7 +672,11 @@ export function ingestLocalEvent(input: {
     now: input.now,
   });
   const event: DotInboundEvent = input.organizationId
-    ? { ...normalized, organization_id: input.organizationId }
+    ? {
+        ...normalized,
+        organization_id: input.organizationId,
+        ...(input.projectId ? { project_id: input.projectId } : {}),
+      }
     : normalized;
   return {
     ...ingestInboundEvent(event, {
@@ -780,7 +786,10 @@ export function ingestAskIntake(input: {
 /** An organization-bound event is visible only to dots of that organization. */
 export function dotEventVisibleToCharter(event: DotInboundEvent, charter: DotCharter): boolean {
   if (charter.scope.tier !== (event.tenant_slug ? 'confidential' : 'public')) return false;
-  return !event.organization_id || event.organization_id === charter.scope.organization_id;
+  return (
+    (!event.organization_id || event.organization_id === charter.scope.organization_id) &&
+    (!event.project_id || event.project_id === charter.scope.project_id)
+  );
 }
 
 // ---------------------------------------------------------------------------
