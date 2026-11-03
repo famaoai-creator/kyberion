@@ -380,13 +380,17 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 
     expect(payload.ok).toBe(true);
     expect(payload.current_surface).toBe('concierge');
-    expect(payload.items).toHaveLength(10);
+    expect(payload.items).toHaveLength(14);
     expect(payload.items.map((item) => item.id)).toEqual([
-      'home',
-      'ask',
       'decide',
-      'progress',
-      'workspace',
+      'ask',
+      'missions',
+      'work-items',
+      'approvals',
+      'overview',
+      'organizations',
+      'projects',
+      'actors',
       'ingest',
       'first-job',
       'help',
@@ -395,8 +399,9 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
     ]);
 
     const byId = Object.fromEntries(payload.items.map((item) => [item.id, item]));
-    expect(byId.home.label).toBe('ホーム');
-    expect(byId.decide.label).toBe('決める');
+    expect(byId.decide.label).toBe('受信箱');
+    expect(byId.overview.label).toBe('全体像');
+    expect(byId.overview.group_label).toBe('組織');
 
     // Decide, organization management, and settings are local Concierge destinations.
     expect(byId.decide.external).toBe(false);
@@ -407,11 +412,14 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
     expect(byId.organization.href).toBe('/management');
     expect(byId.organization.scope_query_style).toBe('camel');
 
-    // home/ask/progress are hosted on presence-studio: absolute, same-tab.
-    for (const id of ['home', 'ask', 'progress'] as const) {
-      expect(byId[id].external).toBe(true);
-      expect(byId[id].href).toBe(`http://127.0.0.1:4031${byId[id].id === 'home' ? '/' : `/${id}`}`);
+    // The workspace pages are local Concierge destinations.
+    for (const id of ['missions', 'work-items', 'approvals', 'overview', 'organizations']) {
+      expect(byId[id].external).toBe(false);
+      expect(byId[id].href.startsWith('/w')).toBe(true);
     }
+    // ask is hosted on presence-studio: absolute, same-tab.
+    expect(byId.ask.external).toBe(true);
+    expect(byId.ask.href).toBe('http://127.0.0.1:4031/ask');
 
     vi.doUnmock('@agent/core/front-desk-nav');
   });

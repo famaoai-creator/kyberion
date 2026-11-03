@@ -88,7 +88,13 @@ describe('member API sweep', () => {
       // it and check the parent has any descendant route.
       const probe = literal.replace(/\/+$/, '');
       const found =
-        routePaths.has(probe) || [...routePaths].some((route) => route.startsWith(probe + '/'));
+        routePaths.has(probe) ||
+        [...routePaths].some((route) => route.startsWith(probe + '/')) ||
+        // A catch-all route (`[...segments]`) handles every path below its parent.
+        [...routePaths].some((route) => {
+          const catchAll = route.match(/^(.*)\/\[\.\.\.[^/\]]+\]$/);
+          return catchAll !== null && probe.startsWith(catchAll[1] + '/');
+        });
       if (!found) missing.push(`${literal} (${path.relative(srcDir, file)})`);
     }
     expect(missing).toEqual([]);
