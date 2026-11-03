@@ -40,7 +40,8 @@ export function currentPrPublicationScope(): CharterScope | undefined {
 }
 
 export function withPrPublicationStoreAccess<T>(
-  kind: 'charter-read' | 'charter-ledger-write' | 'review-write' | 'reservation-write',
+  kind:
+    'charter-read' | 'charter-ledger-write' | 'review-write' | 'reservation-write' | 'body-stage',
   read: string[],
   write: string[],
   action: () => T
@@ -53,6 +54,7 @@ export function withPrPublicationStoreAccess<T>(
     : 'knowledge/personal/charters';
   const floor = tenant ? `confidential/${tenant}` : 'personal/shared';
   const artifact = `active/shared/artifacts/${floor}`;
+  const publicArtifact = 'active/shared/artifacts/public/shared';
   const valid = (value: string) =>
     value.length > 0 &&
     !value.includes('\\') &&
@@ -80,6 +82,12 @@ export function withPrPublicationStoreAccess<T>(
           `${artifact}/evidence/${binding.operationId === 'vcs:pr_create' ? 'pr-publication' : 'vcs-publication'}/${binding.invocationId}/`
         ) &&
           /^[a-f0-9]{64}\.json$/.test(value.split('/').at(-1)!))
+      );
+    if (kind === 'body-stage')
+      return (
+        value === `${publicArtifact}/artifacts-index.jsonl` ||
+        (value.startsWith(`${publicArtifact}/evidence/pr-publication/${binding.invocationId}/`) &&
+          /^body-[a-f0-9]{64}\.md$/.test(value.split('/').at(-1)!))
       );
     return new RegExp(
       `^active/shared/(?:runtime/external-operations/${floor}|tmp/${floor}/vitest-external-operations/[\\w-]+/[\\w-]+)/[a-f0-9]{64}\\.json$`

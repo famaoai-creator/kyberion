@@ -39,6 +39,15 @@ vi.mock('../foundation/execution-scope.js', async (original) => ({
   ...(await original<typeof import('../foundation/execution-scope.js')>()),
   currentExecutionScope: () => undefined,
 }));
+const writeScopedArtifact = vi.hoisted(() =>
+  vi.fn((input: { name: string }) => ({
+    repo_relative_path: `active/shared/artifacts/public/shared/evidence/${input.name}`,
+  }))
+);
+vi.mock('../workforce/artifact-store.js', async (original) => ({
+  ...(await original<typeof import('../workforce/artifact-store.js')>()),
+  writeScopedArtifact: (input: unknown) => writeScopedArtifact(input as { name: string }),
+}));
 vi.mock('../vcs/publication-host.js', () => ({ runVcsMutationWithApproval: vi.fn() }));
 import {
   publicationBodySourceTier,
@@ -117,6 +126,89 @@ describe('trusted publication body provenance', () => {
     expect(payload?.mutation.params.bodyFile).toBeUndefined();
     expect(payload?.sourceScope).toEqual({ tier: 'confidential', tenant_slug: 'acme' });
     expect(PR_GOVERNANCE_CHILD).toContain('withPrPublicationBodySource(input.bodySourceTier');
+  });
+  it('stages a scratch-floor body file into public evidence before classification', () => {
+    writeScopedArtifact.mockClear();
+    let payload:
+      | {
+          bodySourceTier: unknown;
+          mutation: { params: { body: string; bodyFile?: string } };
+        }
+      | undefined;
+    const result = runVcsMutationWithWorktreeGovernance(
+      {
+        operation: 'pr_create',
+        params: {
+          cwd: pathResolver.rootDir(),
+          title: 'test',
+          bodyFile: 'active/shared/tmp/pr-body-e2e.md',
+        },
+      },
+      'a'.repeat(64),
+      () => {},
+      {
+        governanceRoot: '/canonical-governance',
+        transport: (input) => {
+          payload = JSON.parse(input.payload);
+          return {
+            status: 0,
+            stderr: '',
+            stdout:
+              'KYBERION_PR_GOVERNANCE_RESULT:' +
+              JSON.stringify({
+                ok: true,
+                result: { status: 0, stdout: 'created', stderr: '' },
+                lines: [],
+              }),
+          };
+        },
+      }
+    );
+    expect(result.status).toBe(0);
+    expect(writeScopedArtifact).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scope: { tenant: 'shared' },
+        tier: 'public',
+        artifact_class: 'evidence',
+        name: expect.stringMatching(/^pr-publication\/[a-f0-9]{64}\/body-[a-f0-9]{64}\.md$/),
+        content: 'exact confidential bytes',
+      })
+    );
+    // The transported payload carries the staged public tier, not the
+    // unprovable scratch path — delegation can see what it is signing.
+    expect(payload?.bodySourceTier).toBe('public');
+    expect(payload?.mutation.params.body).toBe('exact confidential bytes');
+    expect(payload?.mutation.params.bodyFile).toBeUndefined();
+  });
+  it('does not restage a body file that already carries provenance', () => {
+    writeScopedArtifact.mockClear();
+    runVcsMutationWithWorktreeGovernance(
+      {
+        operation: 'pr_create',
+        params: {
+          cwd: pathResolver.rootDir(),
+          title: 'test',
+          bodyFile: 'knowledge/public/review.md',
+        },
+      },
+      'effect-unstaged',
+      () => {},
+      {
+        governanceRoot: '/canonical-governance',
+        transport: () => ({
+          status: 0,
+          stderr: '',
+          stdout:
+            'KYBERION_PR_GOVERNANCE_RESULT:' +
+            JSON.stringify({
+              ok: true,
+              result: { status: 0, stdout: 'created', stderr: '' },
+              lines: [],
+            }),
+        }),
+      }
+    );
+    expect(writeScopedArtifact).not.toHaveBeenCalled();
   });
   it('rejects malformed transported tenant marker', () => {
     expect(() =>
