@@ -386,7 +386,7 @@ async function main(
       '  5. Run: pnpm generate:op-registry — register the ops in the op registry/discovery catalog (pnpm generate:op-registry -- --check verifies drift)'
     );
     print(
-      '  6. If you import node:fs or node:child_process directly, run: pnpm generate:governance-import-baseline (do not hand-edit the fixture)'
+      '  6. If you import node:fs or node:child_process directly, run: node --import ./scripts/ts-loader.mjs scripts/generate_governance_import_baseline.ts (do not hand-edit the fixture)'
     );
   }
   return scaffold;

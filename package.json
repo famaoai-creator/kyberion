@@ -69,7 +69,6 @@
     "format": "prettier --write .",
     "generate:cli-reference": "node --import ./scripts/ts-loader.mjs scripts/generate_cli_reference.ts",
     "generate:env-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_env_registry.ts",
-    "generate:governance-import-baseline": "node --import ./scripts/ts-loader.mjs scripts/generate_governance_import_baseline.ts",
     "generate:knowledge-index": "node --import ./scripts/ts-loader.mjs scripts/generate_knowledge_index.ts",
     "generate:op-registry": "node --import ./scripts/ts-loader.mjs scripts/generate_op_registry.ts",
     "generate:pii-rules": "node --import ./scripts/ts-loader.mjs scripts/generate_pii_rules.ts",
