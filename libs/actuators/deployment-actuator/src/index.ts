@@ -42,7 +42,8 @@ export const actuator = defineActuator({
       kind: 'apply',
       input_schema: DEPLOYMENT_SCHEMA,
       validateInput: asDeploymentParams,
-      handler: async (params) => handleDeploymentAction({ action: 'deploy_release', params }),
+      handler: async (params: DeploymentParams) =>
+        handleDeploymentAction({ action: 'deploy_release', params }),
     },
   },
 });

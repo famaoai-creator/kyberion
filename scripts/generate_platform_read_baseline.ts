@@ -13,9 +13,10 @@
 /* eslint-disable no-restricted-imports, no-restricted-syntax -- repo-wide scanner; same rationale as generate_governance_import_baseline */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { pathResolver } from '@agent/core/path-resolver';
+import { defineGenerator, isDirectScript } from './lib/harness.js';
 
-const rootDir = process.cwd();
+const rootDir = pathResolver.rootDir();
 const baselinePath = path.join(rootDir, 'tests', 'fixtures', 'platform-read-baseline.json');
 
 const scanRoots = [
@@ -84,31 +85,17 @@ export function scanPlatformReadBaseline(): { allowed_raw_platform_files: string
   };
 }
 
-function main(argv = process.argv.slice(2)): number {
-  const checkOnly = argv.includes('--check');
-  const scanned = scanPlatformReadBaseline();
-  const next = `${JSON.stringify(scanned, null, 2)}\n`;
-  if (checkOnly) {
-    const current = fs.existsSync(baselinePath) ? fs.readFileSync(baselinePath, 'utf8') : '';
-    if (current !== next) {
-      process.stderr.write(
-        `[platform-read-baseline] fixture out of date\n` +
-          `  fix: pnpm generate:platform-read-baseline\n`
-      );
-      return 1;
-    }
-    process.stdout.write('[platform-read-baseline] ok\n');
-    return 0;
-  }
-  fs.mkdirSync(path.dirname(baselinePath), { recursive: true });
-  fs.writeFileSync(baselinePath, next, 'utf8');
-  process.stdout.write(
-    `[platform-read-baseline] wrote ${path.relative(rootDir, baselinePath)} ` +
-      `(${scanned.allowed_raw_platform_files.length} files)\n`
-  );
-  return 0;
-}
+export const main = defineGenerator({
+  id: 'platform-read-baseline',
+  outputs: [baselinePath],
+  render() {
+    const scanned = scanPlatformReadBaseline();
+    return [{ path: baselinePath, content: `${JSON.stringify(scanned, null, 2)}\n` }];
+  },
+});
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  process.exitCode = main();
-}
+if (
+  isDirectScript(import.meta.url, 'generate_platform_read_baseline.ts') ||
+  isDirectScript(import.meta.url, 'generate_platform_read_baseline.js')
+)
+  void main();
