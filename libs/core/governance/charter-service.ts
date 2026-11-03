@@ -342,10 +342,23 @@ export function renderAcceptanceStatement(input: {
         ? 'Unattended delivery is limited to a routine greeting for a bound customer. Attachments, personal or sensitive data, and all other content require human approval.'
         : 'Customer outbound automation is disabled.',
       recipientLine,
-      ...(form.external_operations ?? []).map(
-        (grant) =>
-          `External operation: ${grant.operation_id}; target: ${'repository' in grant ? grant.repository : 'origin' in grant ? grant.origin : `${grant.tenant_slug}/${grant.provider}`}; accountable owner: ${accountableId}; expires: ${expires}. Public execution context and public content only; protected or unknown source data requires individual approval. Browser URL queries, fragments, form submission and scripts are not delegated.`
-      ),
+      ...(form.external_operations ?? []).map((grant) => {
+        const base =
+          'repository' in grant
+            ? grant.repository
+            : 'origin' in grant
+              ? grant.origin
+              : `${grant.tenant_slug}/${grant.provider}`;
+        // The signed text must show the branch scope the human is actually
+        // granting — an exact ref or a tree pattern read very differently.
+        const branch =
+          'branch' in grant
+            ? `; branch: ${grant.branch}`
+            : 'branch_pattern' in grant
+              ? `; branches matching pattern: ${grant.branch_pattern}`
+              : '';
+        return `External operation: ${grant.operation_id}; target: ${base}${branch}; accountable owner: ${accountableId}; expires: ${expires}. Public execution context and public content only; protected or unknown source data requires individual approval. Browser URL queries, fragments, form submission and scripts are not delegated.`;
+      }),
       `Approved inference processors: ${form.approved_processors.length ? form.approved_processors.join(', ') : 'none'}. Purposes: ${form.processing_purposes.join(', ') || 'none'}. Categories: ${form.processing_categories.join(', ') || 'none'}. Training and retention remain governed by separate provider evidence.`,
       form.delegated_decisions.length > 0
         ? say('decisions_on', { decisions: decisionLabels(locale) })

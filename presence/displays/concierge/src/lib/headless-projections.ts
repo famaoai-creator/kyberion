@@ -23,6 +23,48 @@ import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-au
 
 const CONCIERGE_OPERATIONS: readonly HeadlessOperationDescriptor[] = [
   {
+    operation_id: 'concierge.settings.read',
+    resource: 'settings',
+    method: 'GET',
+    path: '/api/headless/settings',
+    description: 'Read the scoped Concierge settings projection (setup state).',
+    effect: 'read',
+    required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
+    input_schema: {
+      type: 'object',
+      properties: {
+        tenant: { type: 'string' },
+        organization_id: { type: 'string' },
+        project_id: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+    output_schema: { type: 'object', description: 'Setup/settings projection.' },
+    a2ui_projection: true,
+  },
+  {
+    operation_id: 'concierge.settings.a2ui',
+    resource: 'settings',
+    method: 'GET',
+    path: '/api/headless/a2ui/settings',
+    description: 'Read the scoped Concierge settings as kyberion-base A2UI messages.',
+    effect: 'read',
+    required_role: 'readonly',
+    required_permissions: ['surface.headless.read'],
+    input_schema: {
+      type: 'object',
+      properties: {
+        tenant: { type: 'string' },
+        organization_id: { type: 'string' },
+        project_id: { type: 'string' },
+      },
+      additionalProperties: false,
+    },
+    output_schema: { type: 'object', description: 'A2UI message list.' },
+    a2ui_projection: true,
+  },
+  {
     operation_id: 'concierge.home.read',
     resource: 'home',
     method: 'GET',
@@ -74,6 +116,12 @@ const CONCIERGE_RESOURCES: readonly HeadlessResourceDescriptor[] = [
     description: 'Briefing, intent inbox, approval queue, outcomes, and exceptions.',
     query_path: '/api/headless/home',
     a2ui_path: '/api/headless/a2ui/home',
+  },
+  {
+    resource: 'settings',
+    description: 'Setup diagnostics, service connections, tenants, and profile state.',
+    query_path: '/api/headless/settings',
+    a2ui_path: '/api/headless/a2ui/settings',
   },
 ];
 

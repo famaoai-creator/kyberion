@@ -48,7 +48,7 @@
     {
       "id": "concierge",
       "kind": "ui",
-      "description": "Concierge (\u79d8\u66f8\u5ba4) \u2014 CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
+      "description": "Concierge (秘書室) — CEO executive-secretary surface: intent inbox, approval queue, outcome feed, exception feed",
       "command": "node",
       "args": ["server/local-server.ts", "--port", "3050"],
       "cwd": "presence/displays/concierge",
@@ -56,8 +56,11 @@
       "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",
       "port": 3050,
-      "healthPath": "/api/summary",
-      "enabled": true
+      "healthPath": "/api/healthz",
+      "enabled": true,
+      "env": {
+        "KYBERION_SCOPE_ENV_PATH": "active/shared/runtime/scope-surfaces.env"
+      }
     },
     {
       "id": "customer-room",
@@ -78,7 +81,7 @@
     {
       "id": "dev-idp",
       "kind": "service",
-      "description": "Loopback-only disposable OIDC provider for local browser login. Authenticates nobody \u2014 binds 127.0.0.1, only redirects to loopback /auth/callback, and refuses NODE_ENV=production. Enable only for local setup/verification.",
+      "description": "Loopback-only disposable OIDC provider for local browser login. Authenticates nobody — binds 127.0.0.1, only redirects to loopback /auth/callback, and refuses NODE_ENV=production. Enable only for local setup/verification.",
       "command": "node",
       "args": ["--import", "./scripts/ts-loader.mjs", "scripts/dev_oidc_idp.ts"],
       "cwd": ".",
@@ -159,7 +162,7 @@
     {
       "id": "mcp-server-cowork",
       "kind": "gateway",
-      "description": "Kyberion MCP Server facade \u2014 exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
+      "description": "Kyberion MCP Server facade — exposes Kyberion capabilities to Claude Cowork and other MCP clients via stdio transport.",
       "command": "node",
       "args": ["dist/scripts/mcp_server.js"],
       "env": {

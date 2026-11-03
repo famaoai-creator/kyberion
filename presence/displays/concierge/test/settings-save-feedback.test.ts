@@ -42,4 +42,32 @@ describe('settings save feedback semantics', () => {
     expect(html).toContain('Submitted changes saved. You still have unsaved edits.');
     expect(html).toContain('data-tone="info"');
   });
+
+  it('shows the server refusal for an immediate save instead of a generic or silent result', () => {
+    const html = renderToStaticMarkup(
+      createElement(SettingsSaveFeedback, {
+        feedback: {
+          section: 'advanced',
+          phase: 'rejected',
+          message: 'Choose a registered tenant.',
+        },
+        t: (key: ConciergeMessageKey) => conciergeText(key, 'en'),
+      })
+    );
+    expect(html).toContain('Choose a registered tenant.');
+    expect(html).toContain('data-tone="danger"');
+  });
+
+  it.each([
+    ['voice', 'setup.voice_registered'],
+    ['advanced', 'setup.management_saved'],
+  ] as const)('confirms an immediate %s save with its own message', (section, key) => {
+    const html = renderToStaticMarkup(
+      createElement(SettingsSaveFeedback, {
+        feedback: { section, phase: 'saved' },
+        t: (messageKey: ConciergeMessageKey) => conciergeText(messageKey, 'en'),
+      })
+    );
+    expect(html).toContain(conciergeText(key, 'en'));
+  });
 });

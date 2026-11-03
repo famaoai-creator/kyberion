@@ -384,3 +384,128 @@ describe('browser onboarding', () => {
     ).toThrow();
   });
 });
+
+describe('settings patch (one setting changes only that setting)', () => {
+  const readJsonAt = (relative: string) =>
+    JSON.parse(String(safeReadFile(path.join(PROFILE_ROOT, relative), { encoding: 'utf8' })));
+
+  async function seedOperatorConfiguration() {
+    const { applyBrowserOnboarding } = await import('./browser-onboarding.js');
+    const samplePath = path.join(PROFILE_ROOT, 'voice', 'samples', 'my-voice', 'sample.webm');
+    safeMkdir(path.dirname(samplePath), { recursive: true });
+    safeWriteFile(samplePath, 'voice sample');
+    await applyBrowserOnboarding({
+      ...validDraft(),
+      identity: { ...validDraft().identity, language: 'en' },
+      voice: {
+        enabled: true,
+        profile_id: 'my-voice',
+        display_name: 'My Voice',
+        language: 'en',
+        engine_id: 'operator_chosen_engine',
+        sample_refs: [samplePath],
+      },
+    });
+    // Advanced → save_management stores the agent's provider/model on the same file.
+    const agent = readJsonAt('agent-identity.json');
+    safeWriteFile(
+      path.join(PROFILE_ROOT, 'agent-identity.json'),
+      JSON.stringify({ ...agent, display_name: 'Ops Agent', provider: 'claude', model_id: 'opus' })
+    );
+    return samplePath;
+  }
+
+  // What the settings page sends when only the profile name was edited.
+  async function saveProfileNameFromSettings(name: string) {
+    const { applyBrowserOnboardingSettingsPatch } = await import('./browser-onboarding.js');
+    await applyBrowserOnboardingSettingsPatch({ identity: { name } });
+  }
+
+  it('a profile name save leaves language, provider, tool, agent and voice settings untouched', async () => {
+    await seedOperatorConfiguration();
+    const before = {
+      providers: readJsonAt('onboarding/provider-preferences.json'),
+      tools: readJsonAt('onboarding/tool-runtime-policy.json'),
+      voice: readJsonAt('voice/profile-registry.json'),
+    };
+
+    await saveProfileNameFromSettings('Renamed Operator');
+
+    expect(readJsonAt('my-identity.json')).toMatchObject({
+      name: 'Renamed Operator',
+      language: 'en',
+      interaction_style: 'Senior Partner',
+    });
+    expect(readJsonAt('agent-identity.json')).toMatchObject({
+      agent_id: 'KYBERION-BROWSER',
+      display_name: 'Ops Agent',
+      provider: 'claude',
+      model_id: 'opus',
+    });
+    expect(readJsonAt('onboarding/provider-preferences.json').priority).toEqual(
+      before.providers.priority
+    );
+    expect(readJsonAt('onboarding/tool-runtime-policy.json').mode_preference).toEqual(
+      before.tools.mode_preference
+    );
+    expect(readJsonAt('voice/profile-registry.json')).toEqual(before.voice);
+  });
+
+  it('a services save changes only the service selection', async () => {
+    await seedOperatorConfiguration();
+    const identityBefore = readJsonAt('my-identity.json');
+    const agentBefore = readJsonAt('agent-identity.json');
+    const { applyBrowserOnboardingSettingsPatch, getBrowserOnboardingState } =
+      await import('./browser-onboarding.js');
+
+    const services = [{ service_id: 'slack', auth_mode: 'oauth', required: false }];
+    await applyBrowserOnboardingSettingsPatch({ services });
+
+    expect(readJsonAt('my-identity.json')).toEqual(identityBefore);
+    expect(readJsonAt('agent-identity.json')).toEqual(agentBefore);
+    expect(getBrowserOnboardingState().onboarding).toMatchObject({
+      status: 'complete',
+      services,
+      providers: { priority: ['codex', 'claude', 'gemini'] },
+    });
+  });
+
+  it('a voice registration keeps the stored engine and languages of that profile', async () => {
+    const samplePath = await seedOperatorConfiguration();
+    const { applyBrowserOnboardingSettingsPatch } = await import('./browser-onboarding.js');
+
+    await applyBrowserOnboardingSettingsPatch({
+      voice: { profile_id: 'my-voice', display_name: 'Renamed Voice', sample_refs: [samplePath] },
+    });
+
+    expect(readJsonAt('voice/profile-registry.json').profiles[0]).toMatchObject({
+      display_name: 'Renamed Voice',
+      default_engine_id: 'operator_chosen_engine',
+      languages: ['en'],
+    });
+    expect(readJsonAt('my-identity.json')).toMatchObject({ language: 'en' });
+  });
+
+  it('an agent handle change keeps the Advanced agent fields', async () => {
+    await seedOperatorConfiguration();
+    const { applyBrowserOnboardingSettingsPatch } = await import('./browser-onboarding.js');
+
+    await applyBrowserOnboardingSettingsPatch({ identity: { agent_id: 'renamed-agent' } });
+
+    expect(readJsonAt('agent-identity.json')).toMatchObject({
+      agent_id: 'renamed-agent',
+      display_name: 'Ops Agent',
+      provider: 'claude',
+      model_id: 'opus',
+    });
+  });
+
+  it('rejects an empty or unknown-field patch before writing', async () => {
+    const { applyBrowserOnboardingSettingsPatch } = await import('./browser-onboarding.js');
+    await expect(applyBrowserOnboardingSettingsPatch({})).rejects.toThrow(/names no setting/);
+    await expect(
+      applyBrowserOnboardingSettingsPatch({ identity: { language: 'ja' } })
+    ).rejects.toThrow(/Unrecognized key/);
+    expect(safeExistsSync(PROFILE_ROOT)).toBe(false);
+  });
+});
