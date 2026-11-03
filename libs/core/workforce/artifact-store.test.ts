@@ -560,6 +560,19 @@ describe('writeScopedArtifact (AL-02)', () => {
     ).toThrow(/invalid tenant reference/);
   });
 
+  it('public evidence supports the untenanted shared partition without a shared tenant', () => {
+    const result = store.writeScopedArtifact({
+      scope: { tenant: 'shared' },
+      tier: 'public',
+      artifact_class: 'evidence',
+      name: 'public-review.md',
+      content: 'publishable bytes',
+    });
+    expect(result.repo_relative_path).toBe(
+      'active/shared/artifacts/public/shared/evidence/public-review.md'
+    );
+  });
+
   it('system scope: places platform-wide artifacts under the system partition', () => {
     const result = store.writeScopedArtifact({
       scope: { system: true },
