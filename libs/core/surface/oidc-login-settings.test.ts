@@ -2,15 +2,23 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const store = vi.hoisted(() => new Map<string, Record<string, unknown>>());
 
-vi.mock('../secret/secret-guard.js', () => ({
-  secretGuard: {
-    loadConnectionDocument: (id: string) => ({ ...(store.get(id) ?? {}) }),
-    storeConnectionDocument: (id: string, patch: Record<string, unknown>) => {
-      store.set(id, { ...(store.get(id) ?? {}), ...patch });
-      return { path: id, changedKeys: Object.keys(patch) };
+vi.mock('../secret/secret-guard.js', async () => {
+  const binding = await import('../foundation/credential-binding.js');
+  return {
+    secretGuard: {
+      loadConnectionDocument: (id: string) => {
+        // Mirror the real guard: tenant execution cannot read personal docs.
+        if (binding.credentialExecutionIdentity().tenantSlug)
+          throw new Error('[CREDENTIAL_CONNECTION_DENIED] tenant execution');
+        return { ...(store.get(id) ?? {}) };
+      },
+      storeConnectionDocument: (id: string, patch: Record<string, unknown>) => {
+        store.set(id, { ...(store.get(id) ?? {}), ...patch });
+        return { path: id, changedKeys: Object.keys(patch) };
+      },
     },
-  },
-}));
+  };
+});
 
 import {
   BROWSER_SESSION_DOCUMENT,
@@ -132,6 +140,16 @@ describe('oidc-login-settings', () => {
     });
     expect(loadStoredOidcLoginSettings()?.client_secret).toBeUndefined();
     expect(store.get(OIDC_SETTINGS_DOCUMENT)?.updated_at).toEqual(expect.any(String));
+  });
+
+  it('loads stored settings even when a tenant scope is bound (persisted `scope use`)', () => {
+    clearEnv();
+    store.set(OIDC_SETTINGS_DOCUMENT, { issuer: 'https://idp.example', client_id: 'kyberion' });
+    vi.stubEnv('KYBERION_TENANT', 'tenant-a');
+    expect(loadStoredOidcLoginSettings()).toMatchObject({
+      issuer: 'https://idp.example',
+      client_id: 'kyberion',
+    });
   });
 
   it('reports environment precedence and a weak env session secret', () => {

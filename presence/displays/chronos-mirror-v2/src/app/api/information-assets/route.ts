@@ -7,12 +7,12 @@ export const dynamic = 'force-dynamic';
 export function GET(req: NextRequest) {
   const denied = guardRequest(req) ?? requireChronosAccess(req, 'readonly');
   if (denied) return denied;
-  const viewer = resolveViewerContextForRequest(req);
-  if (viewer.response) return viewer.response;
+  const resolvedViewer = resolveViewerContextForRequest(req);
+  if (resolvedViewer.response) return resolvedViewer.response;
   try {
     return NextResponse.json(
       collectInformationAssets(
-        viewer.context,
+        resolvedViewer.context,
         workspaceSelectionFromSearchParams(req.nextUrl.searchParams)
       ),
       { headers: { 'Cache-Control': 'private, no-store' } }
