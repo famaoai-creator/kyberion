@@ -11773,6 +11773,315 @@
       ]
     },
     {
+      "id": "code-refactoring-aidlc",
+      "pattern": "aidlc_code_change",
+      "description": "Structure-only refactoring under AI-DLC: audit smells, pin behavior, reshape atomically, prove equivalence. Binds engineering-refactoring-playbook.",
+      "playbook_ref": "knowledge/product/orchestration/engineering-refactoring-playbook.md",
+      "match": {
+        "mission_classes": ["code_change"],
+        "execution_shapes": ["mission"],
+        "task_types": ["refactoring"]
+      },
+      "phases": [
+        "intake",
+        "classification",
+        {
+          "id": "planning",
+          "title": "リファクタ監査・範囲",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "refactor-audit",
+              "team_role": "planner",
+              "description": "対象境界・触る smell・除外・予算(files/LOC/runs)を evidence/refactor-audit.json に固定する。監査なしの reshape は禁止",
+              "deliverable": "evidence/refactor-audit.json",
+              "acceptance_criteria": [
+                "対象境界と除外が列挙されている",
+                "smell が1件以上、予算つきで順位付けされている",
+                "公開API変更の有無が明示されている"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "M",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "REFACTOR_AUDIT_READY",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/refactor-audit.json"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "audit"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "contract_authoring",
+          "title": "挙動ピン",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "behavior-pin",
+              "team_role": "tester",
+              "description": "現状の観測可能挙動を characterization / golden / equivalence harness でピンし evidence/behavior-pin-report.md に記録する。ピン無しの reshape は禁止",
+              "deliverable": "evidence/behavior-pin-report.md",
+              "acceptance_criteria": [
+                "ピンが既存挙動(バグ含む)を固定している",
+                "ピン実行が green である",
+                "型チェック/lint だけのピンになっていない"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "BEHAVIOR_PINNED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/behavior-pin-report.md"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "pin"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "execution",
+          "title": "原子的 reshape",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "reshape",
+              "team_role": "implementer",
+              "description": "監査の1 smell に対し、テストを凍結したまま原子的な構造変更を適用し evidence/refactor-report.md に記録する。赤になったら fix-forward せず revert してより小さい一手へ",
+              "deliverable": "evidence/refactor-report.md",
+              "acceptance_criteria": [
+                "各コミットが単独で green",
+                "挙動ピンを変更していない",
+                "監査に無い変更を混ぜていない"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "L",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "RESHAPE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/refactor-report.md"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "reshape"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "test",
+          "title": "等価性検証",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "equivalence-verify",
+              "team_role": "tester",
+              "description": "ピン不変・テスト差分レビュー・必要ならトレース/プロパティ差分を evidence/equivalence-report.md にまとめ、挙動が保存されていることを証明する",
+              "deliverable": "evidence/equivalence-report.md",
+              "acceptance_criteria": [
+                "characterization が変更無しで green",
+                "テスト弱体化(assert 緩和)が無い",
+                "等価性の証跡がコマンド出力で示されている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "M",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "EQUIVALENCE_PROVEN",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/equivalence-report.md"
+                }
+              },
+              {
+                "kind": "command_succeeds",
+                "params": {
+                  "command": "node",
+                  "args": [
+                    "--import",
+                    "{REPO_ROOT}/scripts/ts-loader.mjs",
+                    "{REPO_ROOT}/scripts/check_refactoring_evidence.ts",
+                    "--mission",
+                    "{MISSION_ID}",
+                    "--stage",
+                    "equivalence"
+                  ],
+                  "cwd": "{REPO_ROOT}"
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "self_review",
+          "title": "セルフレビュー",
+          "kind": "review",
+          "default_tasks": [
+            {
+              "task_id_suffix": "refactor-review",
+              "team_role": "reviewer",
+              "description": "挙動保存・公開API影響・可読性改善・監査範囲逸脱の観点でレビューする。テスト変更は rename 以外を疑う",
+              "review_target_suffix": "reshape",
+              "acceptance_criteria": [
+                "must_fix 指摘が解消済み",
+                "公開API変更がある場合は人間の承認記録がある"
+              ],
+              "expected_output_format": "structured",
+              "estimated_scope": "S",
+              "risk": "medium"
+            }
+          ],
+          "exit_gate": {
+            "id": "REFACTOR_REVIEW_PASSED",
+            "checks": [
+              {
+                "kind": "reviewer_approved",
+                "params": {
+                  "task_id": "self_review-refactor-review"
+                }
+              }
+            ]
+          }
+        },
+        "verification",
+        {
+          "id": "delivery",
+          "title": "デリバリー",
+          "kind": "deterministic",
+          "default_tasks": [
+            {
+              "task_id_suffix": "deliver",
+              "team_role": "implementer",
+              "description": "監査 smell・ピン・等価性証跡つきで PR/リリースし evidence/delivery-report.md に記録する",
+              "deliverable": "evidence/delivery-report.md",
+              "acceptance_criteria": [
+                "リリース/PR が作成されている",
+                "監査・ピン・等価性証跡がリンクされている"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "medium",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "DELIVERY_APPROVED",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/delivery-report.md"
+                }
+              },
+              {
+                "kind": "human_override"
+              }
+            ]
+          }
+        },
+        {
+          "id": "retrospective",
+          "title": "振り返り",
+          "kind": "judgment",
+          "default_tasks": [
+            {
+              "task_id_suffix": "retrospective",
+              "team_role": "planner",
+              "description": "学びと改善点を evidence/retrospective.md に蒸留し knowledge へ昇格候補を挙げる",
+              "deliverable": "evidence/retrospective.md",
+              "acceptance_criteria": [
+                "学びが成功・失敗の両面で記録されている",
+                "知識候補がない場合は理由を記録し、ある場合は候補IDと分類・承認・昇格の処理状態を記録している"
+              ],
+              "expected_output_format": "files",
+              "estimated_scope": "S",
+              "risk": "low",
+              "deliverable_kind": "doc"
+            }
+          ],
+          "exit_gate": {
+            "id": "RETROSPECTIVE_DONE",
+            "checks": [
+              {
+                "kind": "evidence_exists",
+                "params": {
+                  "path": "evidence/retrospective.md"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
       "id": "code-change-aidlc",
       "pattern": "aidlc_code_change",
       "description": "Code-change missions follow the AI-DLC phase structure with per-phase default tasks and gates (MO-01/MO-02); each phase references its SDLC pipeline template.",

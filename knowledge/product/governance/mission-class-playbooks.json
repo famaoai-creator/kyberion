@@ -166,7 +166,8 @@
           "know_how": [
             "1変更1検証。複数の懸念事を同じ差分に混ぜない",
             "公開インターフェースを触る場合は呼び出し元を先に全件洗い出す",
-            "新挙動は engineering-feature-playbook、構造だけ変えるなら engineering-refactoring-playbook",
+            "新挙動は engineering-feature-playbook、構造だけ変えるなら mission_type=refactoring + engineering-refactoring-playbook（監査→ピン→原子 reshape→等価性）",
+            "リファクタは feature/bugfix とミッションを分ける。挙動ピン無しの reshape は計画を差し戻す",
             "設計が割れる・反対論が必要なら design-divergence-playbook（既存 devils_advocate / review-task）"
           ],
           "evidence": ["変更計画と検証手順"]

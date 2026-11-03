@@ -21,7 +21,10 @@ import { readTextFile } from '../foundation/text.js';
 import { inferMissionOutcomeContract } from '../outcome-contract.js';
 import { ensureDefaultTenantProfile, resolveTenant } from '../organization/tenant-registry.js';
 import { loadOrganizationProfile } from '../organization/organization-profile.js';
-import { resolveMissionWorkflowDesign } from './mission-workflow-catalog.js';
+import {
+  resolveEffectiveMissionType,
+  resolveMissionWorkflowDesign,
+} from './mission-workflow-catalog.js';
 import { resolveMissionReviewDesign } from './mission-review-gates.js';
 import { summarizeMissionClassPlaybook } from './mission-class-playbook.js';
 import { consumeIntentGoalHandoff } from '../intent/intent-handoff.js';
@@ -219,8 +222,17 @@ export async function createMission(args: {
   const intentHandoff = intentGoalPath ? consumeIntentGoalHandoff(intentGoalPath) : null;
   const normalizedRelationships = normalizeRelationships(relationships);
   const organizationProfile = loadOrganizationProfile(rootDir);
+  const resolvedVisionEarly = normalizeMissionVisionRef(visionRef, tenantSlug, rootDir);
+  const effectiveMissionTypeEarly =
+    resolveEffectiveMissionType({
+      missionType,
+      utterance: resolvedVisionEarly,
+    }) ?? missionType;
   const templates = loadMissionTemplateCatalog().templates;
-  const template = templates.find((entry) => entry.name === missionType) || templates[0];
+  const template =
+    templates.find((entry) => entry.name === effectiveMissionTypeEarly) ||
+    templates.find((entry) => entry.name === missionType) ||
+    templates[0];
 
   const finalTier = calculateRequiredTier(template.knowledge_injections || [], tier);
   const missionBaseDir = isEphemeral
@@ -275,13 +287,13 @@ export async function createMission(args: {
   const gitHash = getGitHash(rootDir);
   const now = nowIso();
   const owner = getRegisteredEnvText('USER') || 'famao';
-  const resolvedVision = normalizeMissionVisionRef(visionRef, tenantSlug, rootDir);
+  const resolvedVision = resolvedVisionEarly;
 
   for (const file of template.files) {
     const content = file.content_template
       .replace(/{MISSION_ID}/g, upperId)
       .replace(/{TENANT_ID}/g, tenantId)
-      .replace(/{TYPE}/g, missionType)
+      .replace(/{TYPE}/g, effectiveMissionTypeEarly)
       .replace(/{VISION_REF}/g, resolvedVision)
       .replace(/{PERSONA}/g, persona)
       .replace(/{OWNER}/g, owner)
@@ -293,11 +305,12 @@ export async function createMission(args: {
 
   const teamPlan = composeMissionTeamPlan({
     missionId: upperId,
-    missionType,
+    missionType: effectiveMissionTypeEarly,
     tier: finalTier,
     assignedPersona: persona,
     tenantSlug,
     organizationProfile,
+    utterance: resolvedVision,
   });
   writeMissionTeamPlan(missionDir, teamPlan);
   initializeMissionTeamBindings(missionDir, teamPlan);
@@ -306,6 +319,12 @@ export async function createMission(args: {
   // is the authoritative record; the selected workflow template drives the
   // process phases. Both are persisted into mission-state.json below.
   const classification = teamPlan.mission_classification;
+  const effectiveMissionType =
+    resolveEffectiveMissionType({
+      missionType: effectiveMissionTypeEarly,
+      utterance: resolvedVision,
+      matchedClassRuleId: classification?.matched_rules.mission_class_rule_id,
+    }) ?? effectiveMissionTypeEarly;
   const workflowDesign = classification
     ? resolveMissionWorkflowDesign({
         missionClass: classification.mission_class,
@@ -313,7 +332,8 @@ export async function createMission(args: {
         riskProfile: classification.risk_profile,
         stage: classification.stage,
         executionShape: 'mission',
-        missionTypeHint: missionType,
+        missionTypeHint: effectiveMissionType,
+        utterance: resolvedVision,
       })
     : undefined;
   if (classification && workflowDesign) {
@@ -433,7 +453,7 @@ export async function createMission(args: {
   const missionBranch = !isEphemeral ? getCurrentBranch(missionDir) : 'ephemeral';
   const initialState: MissionState & { is_ephemeral?: boolean } = {
     mission_id: upperId,
-    mission_type: missionType,
+    mission_type: effectiveMissionType,
     ...(classification ? { classification } : {}),
     ...(workflowDesign
       ? {
