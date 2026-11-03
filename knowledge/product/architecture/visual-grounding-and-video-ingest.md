@@ -194,8 +194,8 @@ site's terms of service.
   for a DPI-virtualised (logical-size) capture. Secondary monitors (non-zero
   origin, possibly negative) keep the rule above: pass an explicit `scale`,
   in screenshot pixels per physical pixel. The Windows path is exercised live
-  on the `windows-latest` CI job (`KYBERION_UIA_LIVE_SMOKE=1`: classic
-  Notepad must yield an unlabelled editable editor, and a WPF window must yield
+  on the `windows-latest` CI job (`KYBERION_UIA_LIVE_SMOKE=1`: a WinForms
+  window must yield an unlabelled editable editor, and a WPF window must yield
   a labelled Button, a CheckBox and an unlabelled editable TextBox).
 - Marks are stored in the session's volatile dir for 60 s, together with the
   image dHash. `system-actuator` (`target_mark`, used only when no coordinate
