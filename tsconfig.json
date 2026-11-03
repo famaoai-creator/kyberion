@@ -36,6 +36,9 @@
   "extends": "./tsconfig.base.json",
   "references": [
     {
+      "path": "./libs/kernel"
+    },
+    {
       "path": "./libs/core"
     },
     {

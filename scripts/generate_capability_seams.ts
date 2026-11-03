@@ -239,15 +239,6 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/secret/secret-resolver.ts',
     consumers: ['libs/core/service/service-secret-resolver.ts'],
   },
-  'storage-backend': {
-    declaration: 'libs/core/storage/storage-backend.ts',
-    consumers: [
-      'libs/core/entry-ledger.ts',
-      'libs/core/storage/local-storage-backend.ts',
-      'libs/core/storage/memory-storage-backend.ts',
-      'libs/core/storage/object-storage-backend.stub.ts',
-    ],
-  },
   'lease-backend': {
     declaration: 'libs/core/lease/lease-backend.ts',
     consumers: [
