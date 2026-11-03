@@ -98,6 +98,13 @@
           ]
         }
       },
+      "default_chains": {
+        "mode:accurate": ["windows_native", "llm_api", "local_vlm", "apple_vision", "tesseract"],
+        "mode:privacy_first": ["windows_native", "local_vlm", "apple_vision", "tesseract"],
+        "mode:local_only": ["windows_native", "apple_vision", "tesseract"],
+        "mode:balanced": ["windows_native", "apple_vision", "llm_api", "tesseract"],
+        "default": ["windows_native", "apple_vision", "llm_api", "tesseract"]
+      },
       "purposes": {
         "accuracy": {
           "description": "Complex or layout-heavy documents where getting the text right matters more than speed or cost.",

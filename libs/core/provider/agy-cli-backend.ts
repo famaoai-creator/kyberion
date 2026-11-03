@@ -1,5 +1,6 @@
 /* eslint-disable no-restricted-imports -- IP-08 で managed-process 経由へ移行予定 (docs/developer/improvement-plans-2026-07/IP-08_ERROR_HANDLING_DISCIPLINE.ja.md) */
 import { spawn } from 'node:child_process';
+import { isWindows } from '../platform-facts.js';
 import * as readline from 'node:readline';
 import * as path from 'node:path';
 import * as os from 'node:os';
@@ -829,7 +830,7 @@ export class AgyCliBackend implements ReasoningBackend {
     const profileHome = this.resolveProfileHome();
     if (profileHome) {
       delegationEnv.env.HOME = profileHome;
-      if (process.platform === 'win32') {
+      if (isWindows()) {
         delegationEnv.env.USERPROFILE = profileHome;
       }
       delegationEnv.env.AGY_PROFILE = this.agyProfile;

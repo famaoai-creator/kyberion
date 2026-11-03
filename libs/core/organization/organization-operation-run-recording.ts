@@ -54,7 +54,7 @@ export function resolveScopedOperationRunRef(
   const root = rootDir || pathResolver.rootDir();
   const statePath = path.join(missionDir, 'mission-state.json');
   const relative = path.relative(root, statePath).split(path.sep).join('/');
-  if (relative.startsWith('..') || path.isAbsolute(relative)) return trimmed;
+  if (!pathResolver.isPathInsideOrEqual(root, statePath)) return trimmed;
   // Keep confidential missions under the operation's tenant prefix.
   if (
     operation.tier === 'confidential' &&

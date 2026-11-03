@@ -21,6 +21,12 @@ import {
   memoizedKeychainRead,
   invalidateKeychainRead,
 } from '../foundation/secret-resolution-session.js';
+import { ProviderChainRouter } from '../provider-chain-router.js';
+import {
+  listSecretProviders,
+  registerSecretProvider,
+  SECRET_PROVIDER_SEAM,
+} from './provider-registry.js';
 
 // Resolve vault/knowledge paths lazily so importing this module (via
 // secret-guard fallthrough) does not require a fully-mocked pathResolver.
@@ -552,46 +558,67 @@ export class EnvSecretProvider implements SecretProvider {
   }
 }
 
-// Adaptive policy router
-export class SecretPolicyRouter {
-  private providers: Map<string, SecretProvider> = new Map();
+// Provider ordering runs through the shared ProviderChainRouter:
+// `isAvailable()` is the hard eligibility filter; the baseline chain comes from
+// the seam policy's `default_chains` (secret-provider.json) with this constant
+// as the hermetic fallback.
+const SECRET_BUILTIN_ORDER = [
+  'mac_keychain',
+  'windows_credential_manager',
+  'file_secrets',
+  'env_secrets',
+] as const;
 
-  constructor(providers: SecretProvider[]) {
-    for (const p of providers) {
-      this.providers.set(p.id, p);
-    }
-  }
+/**
+ * Resolve the first available provider from `providers` through the governed
+ * secret-provider chain. Exported for callers composing a custom provider set
+ * outside the global registry (tests, one-off bridges).
+ */
+export async function selectSecretProvider(
+  providers: readonly SecretProvider[]
+): Promise<SecretProvider> {
+  const router = new ProviderChainRouter<SecretProvider, Record<string, never>>(providers, {
+    seam: SECRET_PROVIDER_SEAM,
+    label: '[secret_bridge]',
+    errorTag: '[SECRET_PROVIDER_SELECTION]',
+    eligibility: async () =>
+      Promise.all(
+        providers.map(async (provider) => {
+          const eligible = await provider.isAvailable();
+          return {
+            id: provider.id,
+            eligible,
+            ...(eligible ? {} : { unmet: ['backend isAvailable() is false'] }),
+          };
+        })
+      ),
+    builtinDefaultOrder: () => SECRET_BUILTIN_ORDER,
+  });
+  const [provider] = await router.resolveProviderChain({});
+  if (!provider) throw new Error('No available Secret Provider resolved.');
+  return provider;
+}
 
-  async selectProvider(): Promise<SecretProvider> {
-    // Platform priority: native keychain on macOS, file secrets/env secrets on others
-    const chain = ['mac_keychain', 'windows_credential_manager', 'file_secrets', 'env_secrets'];
-    for (const id of chain) {
-      const provider = this.providers.get(id);
-      if (provider && (await provider.isAvailable())) {
-        return provider;
-      }
-    }
-    throw new Error('No available Secret Provider resolved.');
+let builtinProvidersRegistered = false;
+
+/** Idempotent — the builtin set self-registers on import like other seams. */
+export function registerBuiltinSecretProviders(): void {
+  if (builtinProvidersRegistered) return;
+  builtinProvidersRegistered = true;
+  for (const provider of [
+    new MacKeychainSecretProvider(),
+    new WindowsCredentialManagerSecretProvider(),
+    new FileSecretProvider(),
+    new EnvSecretProvider(),
+  ]) {
+    registerSecretProvider(provider, { provenance: 'builtin', source: 'secret-bridge' });
   }
 }
 
-let globalRouter: SecretPolicyRouter | null = null;
-
-function getRouter(): SecretPolicyRouter {
-  if (!globalRouter) {
-    globalRouter = new SecretPolicyRouter([
-      new MacKeychainSecretProvider(),
-      new WindowsCredentialManagerSecretProvider(),
-      new FileSecretProvider(),
-      new EnvSecretProvider(),
-    ]);
-  }
-  return globalRouter;
-}
+registerBuiltinSecretProviders();
 
 export async function fetchSecret(service: string, account: string): Promise<string | null> {
-  const router = getRouter();
-  const provider = await router.selectProvider();
+  const provider = await selectSecretProvider(listSecretProviders());
   return await provider.get(service, account);
 }
 
@@ -641,14 +668,12 @@ export function fetchSecretSync(service: string, account: string): string | null
 }
 
 export async function storeSecret(service: string, account: string, value: string): Promise<void> {
-  const router = getRouter();
-  const provider = await router.selectProvider();
+  const provider = await selectSecretProvider(listSecretProviders());
   await provider.set(service, account, value);
 }
 
 export async function removeSecret(service: string, account: string): Promise<void> {
-  const router = getRouter();
-  const provider = await router.selectProvider();
+  const provider = await selectSecretProvider(listSecretProviders());
   await provider.delete(service, account);
 }
 

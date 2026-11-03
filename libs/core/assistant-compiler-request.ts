@@ -629,13 +629,7 @@ export function writeAssistantCompilerResult(
 function assertAssistantCompilerResultPath(outputPath: string): string {
   const targetPath = assertSafeRepositoryPath(outputPath, { allowMissingLeaf: true });
   const resultRoot = path.resolve(pathResolver.sharedTmp('assistant-compiler-results'));
-  const relative = path.relative(resultRoot, targetPath);
-  if (
-    !relative ||
-    relative === '..' ||
-    relative.startsWith(`..${path.sep}`) ||
-    path.isAbsolute(relative)
-  ) {
+  if (!pathResolver.isPathInside(resultRoot, targetPath)) {
     throw new Error(
       '[ASSISTANT_COMPILER_RESULT_SCOPE] output path must remain inside the governed result store'
     );

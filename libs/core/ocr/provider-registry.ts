@@ -1,37 +1,28 @@
-import {
-  coreSeamCatalog,
-  createSeam,
-  createSeamLifecycle,
-  type SeamProviderMetadata,
-} from '../seam.js';
+import { createProviderRegistry } from '../provider-registry.js';
+import type { SeamProviderMetadata } from '../seam.js';
 import type { OcrProvider } from '../ocr-types.js';
 export const OCR_PROVIDER_SEAM = 'ocr-provider';
-const ocrProviderSeam = createSeam<OcrProvider>({
-  key: 'ocr-provider',
-  multiplicity: 'named',
-  catalog: coreSeamCatalog,
+const registry = createProviderRegistry<OcrProvider>({
+  seam: OCR_PROVIDER_SEAM,
   owner: 'libs/core/ocr/provider-registry.ts',
-});
-let revision = 0;
-const lifecycle = createSeamLifecycle(ocrProviderSeam, {
-  onChange: () => {
-    revision++;
-  },
+  source: 'ocr-provider-extension',
+  missingIdError: 'OcrProvider.id is required',
 });
 export function ocrProviderRevision(): number {
-  return revision;
+  return registry.revision();
 }
 export function registerOcrProvider(
   provider: OcrProvider,
-  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'ocr-provider-extension' }
+  metadata?: SeamProviderMetadata
 ): () => void {
-  const id = String(provider.id || '').trim();
-  if (!id) throw new Error('OcrProvider.id is required');
-  return lifecycle.register(id, provider, metadata);
+  return registry.register(provider, metadata);
 }
 export function listOcrProviders(): OcrProvider[] {
-  return ocrProviderSeam.list().map((record) => record.implementation);
+  return registry.list();
+}
+export function getOcrProvider(id: string): OcrProvider | undefined {
+  return registry.get(id);
 }
 export function resetOcrProviders(): void {
-  lifecycle.reset();
+  registry.reset();
 }
