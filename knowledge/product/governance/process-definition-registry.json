@@ -15,7 +15,7 @@
         "scripts/mission_controller.ts"
       ],
       "expected_counts": {
-        "templates": 79,
+        "templates": 80,
         "patterns": 8
       }
     },
@@ -46,7 +46,7 @@
         "libs/core/mission/mission-task-classification-scenarios.test.ts"
       ],
       "expected_counts": {
-        "scenarios": 33
+        "scenarios": 34
       }
     },
     {

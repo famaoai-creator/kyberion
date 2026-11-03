@@ -1,0 +1,23 @@
+[
+  {
+    "asset_type": "customer.request",
+    "title": "Customer requests",
+    "description": "Customer messages requiring triage and completion tracking.",
+    "aliases": ["mail", "email", "customer_request"],
+    "default_freshness_seconds": 3600
+  },
+  {
+    "asset_type": "code.review_request",
+    "title": "Code review requests",
+    "description": "Repository review requests requiring reviewer action.",
+    "aliases": ["review", "github_review"],
+    "default_freshness_seconds": 900
+  },
+  {
+    "asset_type": "workflow.approval_request",
+    "title": "Workflow approval requests",
+    "description": "Workflow tickets awaiting an authorized approval decision.",
+    "aliases": ["approval", "jira_approval"],
+    "default_freshness_seconds": 900
+  }
+]

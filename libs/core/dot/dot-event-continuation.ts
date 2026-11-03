@@ -330,7 +330,8 @@ export function evaluateEventContinuation(
             // An organization-bound event (operator ask) is not this dot's
             // unless it belongs to the dot's organization.
             const index =
-              event.organization_id && event.organization_id !== c.scope.organization_id
+              (event.organization_id && event.organization_id !== c.scope.organization_id) ||
+              (event.project_id && event.project_id !== c.scope.project_id)
                 ? -1
                 : triggers.findIndex((trigger) => ports.matches(event, trigger));
             if (index >= 0) {

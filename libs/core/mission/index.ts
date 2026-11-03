@@ -246,6 +246,8 @@ export * from './mission-system.js';
 export * from './mission-task-events.js';
 export * from './mission-task-recovery.js';
 export * from './mission-task-source-workspace.js';
+export * from './mission-refactoring-routing.js';
+export * from './refactoring-evidence.js';
 export * from './mission-team-binding.js';
 export * from './mission-team-brief-composer.js';
 export * from './mission-team-brief-utils.js';

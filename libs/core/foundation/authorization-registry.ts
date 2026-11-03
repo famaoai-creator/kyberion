@@ -90,6 +90,14 @@ type RegistryEntry = AuthorizationRegistryEntry;
 
 /** Exact-match declarations. */
 const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
+  // Information asset metadata surfaces retain owner/viewer/scope checks in their detail layers.
+  'information-asset:catalog:read': { effectClass: 'local_only', authority: { kind: 'free' } },
+  'information-asset:coverage:read': { effectClass: 'local_only', authority: { kind: 'free' } },
+  'chronos.information-assets.read': { effectClass: 'local_only', authority: { kind: 'free' } },
+  'information-asset:catalog:write': {
+    effectClass: 'internal_decision',
+    authority: { kind: 'admission', boundary: 'internal' },
+  },
   // --- Version control (external-vcs.ts routes these through admission) ---
   'vcs:pr_create': {
     effectClass: 'external_mutation',
@@ -185,6 +193,43 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
       ['params', 'cc'],
       ['params', 'from'],
     ],
+  },
+  // --- Admitted information-asset work and its fixed external effect targets ---
+  'service:information_asset_work': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    approvalDomain: 'external-operation',
+    protectedPaths: [['params']],
+  },
+  'service:google-workspace:preset:gmail_reply': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    approvalDomain: 'external-operation',
+    protectedPaths: [['params']],
+  },
+  'service:github:preset:resolve_review_thread': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    approvalDomain: 'external-operation',
+    protectedPaths: [['params']],
+  },
+  'service:jira:preset:answer_request_approval': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    approvalDomain: 'external-operation',
+    protectedPaths: [['params']],
+  },
+  'service:jira:preset:transition_issue': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    approvalDomain: 'external-operation',
+    protectedPaths: [['params']],
+  },
+  'service:jira:preset:add_comment': {
+    effectClass: 'external_mutation',
+    authority: { kind: 'admission', boundary: 'external' },
+    approvalDomain: 'external-operation',
+    protectedPaths: [['params']],
   },
   // --- Service execution ---
   'service:mcp': {

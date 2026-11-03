@@ -1,6 +1,6 @@
 {
   "$schema": "../schemas/knowledge-slices.schema.json",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Knowledge slice declarations (KP-03). Engineering pins (MSN-PSTACK-WIRE) plus company-ops marketing/design pins (MSN-BIZ-SKILLS). Extend from telemetry (KP-05).",
   "slices": [
     {
@@ -22,6 +22,52 @@
       },
       "pinned": ["knowledge/product/orchestration/pstack-import-map.md"],
       "search_roots": ["knowledge/product/orchestration/"]
+    },
+    {
+      "id": "refactoring-implementer-engineering",
+      "description": "Structure-only refactoring missions pin the agent refactoring playbook (audit→pin→atomic reshape→equivalence) ahead of general development pins.",
+      "match": {
+        "team_role": "implementer",
+        "mission_type": "refactoring"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/engineering-refactoring-playbook.md",
+        "knowledge/product/orchestration/pstack-import-map.md"
+      ],
+      "search_roots": ["knowledge/product/orchestration/"]
+    },
+    {
+      "id": "refactoring-planner-engineering",
+      "description": "Planners on refactoring missions pin the audit/pin contract before shaping NEXT_TASKS.",
+      "match": {
+        "team_role": "planner",
+        "mission_type": "refactoring"
+      },
+      "pinned": ["knowledge/product/orchestration/engineering-refactoring-playbook.md"]
+    },
+    {
+      "id": "refactoring-tester-equivalence",
+      "description": "Testers on refactoring missions pin characterization/equivalence guidance before reshape verification.",
+      "match": {
+        "team_role": "tester",
+        "mission_type": "refactoring"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/engineering-refactoring-playbook.md",
+        "knowledge/product/orchestration/create-verification-skill-playbook.md"
+      ]
+    },
+    {
+      "id": "refactoring-reviewer-behavior-preservation",
+      "description": "Reviewers on refactoring missions prioritize behavior-preservation and test-diff review over feature acceptance.",
+      "match": {
+        "team_role": "reviewer",
+        "mission_type": "refactoring"
+      },
+      "pinned": [
+        "knowledge/product/orchestration/engineering-refactoring-playbook.md",
+        "knowledge/product/orchestration/blast-radius-playbook.md"
+      ]
     },
     {
       "id": "tester-verification-engineering",

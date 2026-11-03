@@ -17,13 +17,13 @@ import type { AudioChunk, AudioFormat } from '../meeting/meeting-session-types.j
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { engineRuntimePreferencesReadiness } from './engine-runtime-preferences.js';
 import { executeServicePreset } from '../service/service-engine.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
+  resolveSeamSelectionEntry,
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
-import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 
 /** What a streaming TTS bridge can do; used only for governed selection. */
 export interface StreamingTtsCapabilities {
@@ -152,22 +152,16 @@ const streamingTtsSeam = createSeam<() => StreamingTextToSpeechBridge>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/voice/streaming-tts-bridge.ts',
 });
-const streamingTtsDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(streamingTtsSeam);
 
 export function registerStreamingTtsBridge(
   id: string,
   factory: () => StreamingTextToSpeechBridge
 ): () => void {
-  const seamDispose = streamingTtsSeam.register(id, factory, {
+  return registrations.register(id, factory, {
     provenance: 'builtin',
     source: 'streaming-tts-bridge',
   });
-  const dispose = () => {
-    seamDispose();
-    if (streamingTtsDisposers.get(id) === dispose) streamingTtsDisposers.delete(id);
-  };
-  streamingTtsDisposers.set(id, dispose);
-  return dispose;
 }
 
 /** Built-in bridges, registered as named seam providers like any other. */
@@ -185,7 +179,7 @@ function registerBuiltinStreamingTtsBridges(): void {
 registerBuiltinStreamingTtsBridges();
 
 export function resetStreamingTtsBridges(): void {
-  for (const dispose of [...streamingTtsDisposers.values()]) dispose();
+  registrations.reset();
   registerBuiltinStreamingTtsBridges();
 }
 
@@ -349,18 +343,22 @@ export function resolveStreamingTtsBridge(
   const savedDefault = options.purpose?.trim()
     ? undefined
     : enginePreference('streaming_tts_bridge');
-  const defaultBridge = new StubStreamingTextToSpeechBridge();
+  const defaultBridge = getStreamingTtsBridge('stub');
   const defaultUnmet = unmetStreamingTtsRequirements(defaultBridge, options.requires ?? {});
   const language = String(options.requires?.language ?? '')
     .trim()
     .toLowerCase()
     .split(/[-_]/u)[0];
   const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
-  const shouldSelect =
-    Boolean(savedDefault) ||
-    Boolean(String(options.purpose || '').trim()) ||
-    Boolean(matchSeamSelectionRule(STREAMING_TTS_SEAM, { context })) ||
-    defaultUnmet.length > 0;
-  if (!shouldSelect) return defaultBridge;
+  const entry = resolveSeamSelectionEntry({
+    seam: STREAMING_TTS_SEAM,
+    purpose: options.purpose,
+    context,
+    defaultProvider: savedDefault,
+    selectForDefault: true,
+    defaultEligible: defaultUnmet.length === 0,
+  });
+  // An unusable default must still fail closed if policy lacks a fallback.
+  if (entry.kind === 'legacy' && defaultUnmet.length === 0) return defaultBridge;
   return selectStreamingTtsBridgeWithDefault(options, savedDefault).bridge;
 }

@@ -9,7 +9,12 @@
  * dispatcher over this seam.
  */
 
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from './seam.js';
 import type { VideoRouteHealth, VideoRouteMetrics } from './video/video-route.js';
 
 export interface CameraOutputCapabilities {
@@ -58,7 +63,7 @@ const cameraOutputSeam = createSeam<CameraOutputBridge>({
   owner: 'libs/core/camera-output-bridge.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(cameraOutputSeam);
 
 export function registerCameraOutputBridge(
   bridge: CameraOutputBridge,
@@ -69,24 +74,11 @@ export function registerCameraOutputBridge(
 ): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('CameraOutputBridge.bridge_id is required');
-  const disposeFromSeam = cameraOutputSeam.register(id, bridge, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, bridge, metadata);
 }
 
 export function resetCameraOutputBridges(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
 }
 
 export function listCameraOutputBridges(): CameraOutputBridge[] {

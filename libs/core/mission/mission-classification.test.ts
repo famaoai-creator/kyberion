@@ -78,6 +78,24 @@ describe('mission-classification', () => {
     expect(document.mission_class).toBe('content_and_media');
   });
 
+  it('routes refactoring and code_change mission-type hints into code_change', () => {
+    const refactoring = resolveMissionClassification({ missionTypeHint: 'refactoring' });
+    const codeChange = resolveMissionClassification({ missionTypeHint: 'code_change' });
+    const byUtterance = resolveMissionClassification({
+      utterance: 'このモジュールをリファクタリングして構造だけ直して',
+    });
+
+    expect(refactoring.mission_class).toBe('code_change');
+    expect(refactoring.matched_rules.mission_class_rule_id).toBe(
+      'class-code-change-refactoring-hint'
+    );
+    expect(codeChange.mission_class).toBe('code_change');
+    expect(byUtterance.mission_class).toBe('code_change');
+    expect(byUtterance.matched_rules.mission_class_rule_id).toBe(
+      'class-code-change-refactoring-utterance'
+    );
+  });
+
   it('routes incident analysis hints and intents into operations_and_release (MO-01)', () => {
     const byHint = resolveMissionClassification({ missionTypeHint: 'incident_analysis' });
     const byIntent = resolveMissionClassification({ intentId: 'incident-analysis' });

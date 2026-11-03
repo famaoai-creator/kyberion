@@ -13,6 +13,11 @@ import {
   parseLocalVlmOcrResponse,
   parseOpenAiOcrResponse,
   toTesseractLanguage,
+  ocrImage,
+  registerOcrProvider,
+  listOcrProviders,
+  resetOcrProviders,
+  ensureBuiltinOcrProviders,
 } from './ocr-bridge.js';
 import { OcrProvider } from './ocr-types.js';
 
@@ -90,6 +95,79 @@ vi.mock('./secure-io.js', async () => {
 });
 
 const globalFetch = global.fetch;
+
+describe('OCR provider lifecycle through the public facade', () => {
+  beforeEach(() => {
+    resetOcrProviders();
+    ensureBuiltinOcrProviders();
+    // The lifecycle regression must not probe a real native runtime or API.
+    for (const provider of listOcrProviders()) {
+      vi.spyOn(provider, 'isAvailable').mockResolvedValue(false);
+    }
+  });
+  afterEach(() => {
+    resetOcrProviders();
+    vi.restoreAllMocks();
+  });
+
+  it('does not execute a disposed provider from a cached router, and ignores stale disposers', async () => {
+    const provider: OcrProvider = {
+      id: 'lifecycle-local',
+      dataEgress: 'none',
+      isAvailable: vi.fn().mockResolvedValue(true),
+      recognize: vi.fn().mockResolvedValue({
+        status: 'succeeded',
+        provider: 'lifecycle-local',
+        text: 'first',
+        confidence: 1,
+      }),
+    };
+    const release = registerOcrProvider(provider);
+    const request = {
+      path: 'fixture.png',
+      mode: 'local_only' as const,
+      providerPreference: [provider.id],
+    };
+    expect((await ocrImage(request)).text).toBe('first');
+    release();
+    expect(listOcrProviders().some((entry) => entry.id === provider.id)).toBe(false);
+    await expect(ocrImage(request)).rejects.toThrow('No available OCR provider');
+    expect(provider.recognize).toHaveBeenCalledTimes(1);
+
+    const replacement = {
+      ...provider,
+      recognize: vi.fn().mockResolvedValue({
+        status: 'succeeded',
+        provider: provider.id,
+        text: 'replacement',
+        confidence: 1,
+      }),
+    };
+    registerOcrProvider(replacement);
+    release();
+    expect((await ocrImage(request)).text).toBe('replacement');
+    expect(listOcrProviders().find((entry) => entry.id === provider.id)).toBe(replacement);
+  });
+
+  it('preserves an explicit provider binding while composing and recomposes after reset', () => {
+    resetOcrProviders();
+    const custom: OcrProvider = {
+      id: 'tesseract',
+      dataEgress: 'none',
+      isAvailable: vi.fn(),
+      recognize: vi.fn(),
+    };
+    registerOcrProvider(custom);
+    ensureBuiltinOcrProviders();
+    ensureBuiltinOcrProviders();
+    expect(listOcrProviders()).toHaveLength(5);
+    expect(listOcrProviders().find((provider) => provider.id === custom.id)).toBe(custom);
+    resetOcrProviders();
+    expect(listOcrProviders()).toEqual([]);
+    ensureBuiltinOcrProviders();
+    expect(listOcrProviders()).toHaveLength(5);
+  });
+});
 
 describe('AdaptivePolicyRouter', () => {
   let mockTesseract: OcrProvider;

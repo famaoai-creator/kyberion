@@ -11,6 +11,31 @@
       ]
     },
     {
+      "name": "refactoring",
+      "files": [
+        {
+          "path": "TASK_BOARD.md",
+          "content_template": "# TASK_BOARD: {MISSION_ID}\n\n## 🛡️ Governance Pre-flight\n- [ ] Branch: `{BRANCH}` (Should not be main/master)\n- [ ] Initial Hash: `{HASH}`\n- [ ] Checkpoint: Initial state recorded\n- [ ] Playbook: engineering-refactoring-playbook (behavior pin before reshape)\n\n## Vision Context\n- Tenant: {TENANT_ID}\n- Vision: {VISION_REF}\n- Mission type: refactoring (structure only; no behavior delta)\n\n## Status: Planned\n\n### 🛠️ Execution Phase\n- [ ] Step 1: Audit scope + name smells (budget + exclusions)\n- [ ] Step 2: Pin current behavior (characterization / golden)\n- [ ] Step 3: Atomic reshape under frozen tests\n- [ ] Step 4: Equivalence verify (pin + test-diff + surface proof)\n\n### 🧠 Distillation & Reflex Phase\n- [ ] Step 5: Knowledge Distillation\n- [ ] Step 6: Mission Logic\n- [ ] Step 7: Final Cleanup\n"
+        }
+      ],
+      "knowledge_injections": [
+        {
+          "tier": "public",
+          "domains": ["orchestration"],
+          "tags": ["refactoring", "verification", "playbook"]
+        }
+      ]
+    },
+    {
+      "name": "code_change",
+      "files": [
+        {
+          "path": "TASK_BOARD.md",
+          "content_template": "# TASK_BOARD: {MISSION_ID}\n\n## 🛡️ Governance Pre-flight\n- [ ] Branch: `{BRANCH}` (Should not be main/master)\n- [ ] Initial Hash: `{HASH}`\n- [ ] Checkpoint: Initial state recorded\n\n## Vision Context\n- Tenant: {TENANT_ID}\n- Vision: {VISION_REF}\n- Mission type: code_change\n\n## Status: Planned\n\n### 🛠️ Execution Phase\n- [ ] Step 1: Research and Strategy\n- [ ] Step 2: Implementation\n- [ ] Step 3: Validation\n\n### 🧠 Distillation & Reflex Phase\n- [ ] Step 4: Knowledge Distillation\n- [ ] Step 5: Mission Logic\n- [ ] Step 6: Final Cleanup\n"
+        }
+      ]
+    },
+    {
       "name": "meeting_facilitation",
       "files": [
         {

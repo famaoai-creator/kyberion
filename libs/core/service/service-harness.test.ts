@@ -61,7 +61,7 @@ describe('service harness contract', () => {
         approval_required: true,
       });
     }
-    expect(descriptor.operation_count).toBe(20);
+    expect(descriptor.operation_count).toBe(23);
   });
 
   it('exposes fixed provider authentication checks as read-only captures', () => {

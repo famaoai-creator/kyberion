@@ -23,7 +23,7 @@
  *                          unverifiable input stability). Stops — never green.
  */
 
-import { createSeam, coreSeamCatalog } from './seam.js';
+import { createSeam, coreSeamCatalog, createSeamLifecycle } from './seam.js';
 
 export type BuildReadinessState =
   'fresh' | 'stale' | 'missing' | 'building' | 'changed_during_scan' | 'unknown';
@@ -215,25 +215,17 @@ const buildReadinessSeam = createSeam<BuildReadinessInspector>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/build-readiness.ts',
 });
-const inspectorDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(buildReadinessSeam);
 
 const INSPECTOR_PROVIDER_ID = 'baseline-compiler-outputs';
 
 export function registerBuildReadinessInspector(inspector: BuildReadinessInspector): () => void {
-  const dispose = buildReadinessSeam.register(INSPECTOR_PROVIDER_ID, inspector, {
+  return registrations.register(INSPECTOR_PROVIDER_ID, inspector, {
     provenance: 'builtin',
     source: 'scripts/baseline_build_readiness.ts',
     reason:
       'canonical compiler-outputs inspection (check_stale_dist + check_dist_workspace_imports)',
   });
-  const wrapped = () => {
-    dispose();
-    if (inspectorDisposers.get(INSPECTOR_PROVIDER_ID) === wrapped) {
-      inspectorDisposers.delete(INSPECTOR_PROVIDER_ID);
-    }
-  };
-  inspectorDisposers.set(INSPECTOR_PROVIDER_ID, wrapped);
-  return wrapped;
 }
 
 export function hasBuildReadinessInspector(): boolean {
@@ -241,7 +233,7 @@ export function hasBuildReadinessInspector(): boolean {
 }
 
 export function resetBuildReadinessInspector(): void {
-  for (const dispose of [...inspectorDisposers.values()]) dispose();
+  registrations.reset();
 }
 
 /**
