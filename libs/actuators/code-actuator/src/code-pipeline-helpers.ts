@@ -38,6 +38,8 @@ import { ensureDefaultOpPreflight } from '@agent/core/pipeline/op-preflight-defa
 import { runOpPreflight } from '@agent/core/pipeline/op-preflight';
 import type { TraceContext } from '@agent/core/trace';
 import { getAllFiles } from '@agent/core/fs-utils';
+import type { EvidenceMeta } from '@agent/core/evidence';
+import { retainOversizedResult } from './retained-result.js';
 import * as path from 'node:path';
 import * as vm from 'node:vm';
 
@@ -311,12 +313,15 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'glob_files':
       return {
         ...ctx,
-        [params.export_as || 'file_list']: await retry(
-          async () =>
-            getAllFiles(resolveCodeRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
-              .filter((f) => !params.ext || f.endsWith(params.ext))
-              .map((f) => path.relative(rootDir, f)),
-          buildRetryOptions()
+        [params.export_as || 'file_list']: retainOversizedResult(
+          await retry(
+            async () =>
+              getAllFiles(resolveCodeRepositoryPath(rootDir, resolve(params.dir), 'glob_files'))
+                .filter((f) => !params.ext || f.endsWith(params.ext))
+                .map((f) => path.relative(rootDir, f)),
+            buildRetryOptions()
+          ),
+          'code-op-results'
         ),
       };
     case 'shell':
@@ -358,39 +363,67 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
     case 'semgrep_scan':
       return {
         ...ctx,
-        [params.export_as || 'semgrep_findings']: await retry(async () => {
-          const target = resolveCodeRepositoryPath(
-            rootDir,
-            resolve(params.target_dir),
-            'semgrep_scan'
-          );
-          const config = String(resolve(params.config) || 'auto');
-          const args = ['--config', config, target, '--json'];
-          const result = runGovernedCommand('semgrep', args, { maxOutputMB: 10 });
-          if (result.error) {
-            throw result.error;
-          }
-          const stdout = String(result.stdout || '');
-          if (result.status !== 0 && !stdout) {
-            throw new Error(
-              `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
+        [params.export_as || 'semgrep_findings']: retainOversizedResult(
+          await retry(async () => {
+            const target = resolveCodeRepositoryPath(
+              rootDir,
+              resolve(params.target_dir),
+              'semgrep_scan'
             );
-          }
-          try {
-            return parseSafeJsonInput(stdout, 'semgrep response');
-          } catch {
-            if (result.status === 0) {
-              throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
+            const config = String(resolve(params.config) || 'auto');
+            const args = ['--config', config, target, '--json'];
+            const result = runGovernedCommand('semgrep', args, { maxOutputMB: 10 });
+            if (result.error) {
+              throw result.error;
             }
-            try {
-              return parseSafeJsonInput(String(result.stderr || ''), 'semgrep error response');
-            } catch {
+            const stdout = String(result.stdout || '');
+            if (result.status !== 0 && !stdout) {
               throw new Error(
                 `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
               );
             }
-          }
-        }, buildRetryOptions()),
+            try {
+              const parsed = parseSafeJsonInput(stdout, 'semgrep response') as Record<
+                string,
+                unknown
+              >;
+              // semgrep reports partial-scan problems in `errors`; surface them
+              // as limitations instead of letting a degraded scan read as clean.
+              const errors = Array.isArray(parsed.errors) ? parsed.errors : [];
+              const limitations = errors
+                .slice(0, 10)
+                .map((entry) =>
+                  String(
+                    (entry as Record<string, unknown>)?.message ??
+                      (entry as Record<string, unknown>)?.type ??
+                      entry
+                  )
+                );
+              if (errors.length > limitations.length) {
+                limitations.push(`and ${errors.length - limitations.length} more semgrep errors`);
+              }
+              return {
+                ...parsed,
+                confidence: 'observed',
+                authority: 'shipped-artifact',
+                limitations,
+                unknowns: [],
+              };
+            } catch {
+              if (result.status === 0) {
+                throw new Error('[SEMGREP_ERROR] Scan succeeded but did not return valid JSON.');
+              }
+              try {
+                return parseSafeJsonInput(String(result.stderr || ''), 'semgrep error response');
+              } catch {
+                throw new Error(
+                  `[SEMGREP_ERROR] Scan failed: ${result.stderr || `exit code ${result.status}`}`
+                );
+              }
+            }
+          }, buildRetryOptions()),
+          'code-op-results'
+        ),
       };
     case 'run_tests': {
       const testPath = String(resolve(params.test_path || '')).trim();
@@ -424,14 +457,23 @@ async function opCapture(op: string, params: any, ctx: any, resolve: (value: any
       );
       return {
         ...ctx,
-        [params.export_as || 'test_execution']: {
-          test_path: relativeTestPath.replaceAll(path.sep, '/'),
-          framework: framework || 'vitest',
-          status: result.status === 0 ? 'passed' : 'failed',
-          exit_code: result.status,
-          stdout: String(result.stdout || '').trim(),
-          stderr: String(result.stderr || '').trim(),
-        },
+        [params.export_as || 'test_execution']: retainOversizedResult(
+          {
+            test_path: relativeTestPath.replaceAll(path.sep, '/'),
+            framework: framework || 'vitest',
+            status: result.status === 0 ? 'passed' : 'failed',
+            exit_code: result.status,
+            stdout: String(result.stdout || '').trim(),
+            stderr: String(result.stderr || '').trim(),
+            confidence: 'observed',
+            authority: 'controlled-replay',
+            limitations: [],
+            unknowns: [
+              'pass/fail status is derived from the exit code; the test framework did not emit machine-readable results',
+            ],
+          },
+          'code-op-results'
+        ),
       };
     }
     case 'discover_skills':
@@ -564,7 +606,7 @@ const IMPACT_CODE_EXTENSIONS = new Set([
   '.gradle',
 ]);
 
-export interface ImpactAnalysisResult {
+export interface ImpactAnalysisResult extends EvidenceMeta {
   kind: 'impact-analysis';
   generated_at: string;
   repo_path: string;
@@ -584,11 +626,34 @@ export async function impactAnalysisOp(input: {
   const rootDir = pathResolver.rootDir();
   const repoPath = resolveCodeRepositoryPath(rootDir, input.repo_path, 'impact_analysis');
   if (!safeExistsSync(repoPath)) throw new Error(`[impact_analysis] repo not found: ${repoPath}`);
-  const files = getAllFiles(repoPath)
+  const MAX_INVENTORY_FILES = 400;
+  const MAX_REQUIREMENTS_CHARS = 8000;
+  const inventoried = getAllFiles(repoPath)
     .filter((file) => IMPACT_CODE_EXTENSIONS.has(path.extname(file)))
-    .filter((file) => !/node_modules|\.git\/|dist\//.test(file))
-    .slice(0, 400)
+    .filter((file) => !/node_modules|\.git\/|dist\//.test(file));
+  const files = inventoried
+    .slice(0, MAX_INVENTORY_FILES)
     .map((file) => path.relative(repoPath, file));
+
+  const limitations: string[] = [
+    'files under node_modules/, .git/, and dist/ are not inventoried',
+    'summary, files, risks, and size are reasoning-backend judgment on the inventory — not runtime-observed behavior',
+  ];
+  if (inventoried.length > files.length) {
+    limitations.push(
+      `file inventory truncated to ${MAX_INVENTORY_FILES} of ${inventoried.length} matching files`
+    );
+  }
+  const requirementsText =
+    typeof input.requirements === 'string'
+      ? input.requirements
+      : JSON.stringify(input.requirements, null, 1);
+  if (typeof input.requirements !== 'string' && requirementsText.length > MAX_REQUIREMENTS_CHARS) {
+    limitations.push(`requirements truncated to ${MAX_REQUIREMENTS_CHARS} characters`);
+  }
+  const unknowns: string[] = [
+    'files with extensions outside the known code set are not inventoried',
+  ];
 
   const { getReasoningBackend } = await import('@agent/core/reasoning/reasoning-backend');
   const prompt = [
@@ -633,6 +698,10 @@ export async function impactAnalysisOp(input: {
       : [],
     risks: Array.isArray(parsed.risks) ? parsed.risks.map(String) : [],
     size,
+    confidence: 'inferred',
+    authority: 'analyst-inference',
+    limitations,
+    unknowns,
   };
   if (input.output_path) {
     const outPath = resolveCodeRepositoryPath(rootDir, input.output_path, 'impact_analysis');

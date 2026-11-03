@@ -81,6 +81,11 @@ export interface SurfaceRuntimeManifest {
 export interface SurfaceRuntimeStateRecord {
   id: string;
   pid: number;
+  /**
+   * Opaque start marker for `pid` (`processStartMarker`). Absent on records
+   * written before markers existed — those fall back to pid-only liveness.
+   */
+  pidStartMarker?: string;
   resourceId: string;
   kind: SurfaceRuntimeKind;
   command: string;
@@ -212,6 +217,7 @@ const SURFACE_STATE_RECORD_FIELDS = [
   'cwd',
   'logPath',
   'startedAt',
+  'pidStartMarker',
   'shutdownPolicy',
   'metadata',
 ] as const;
@@ -282,11 +288,17 @@ function parsePersistedSurfaceState(value: unknown): SurfaceRuntimeState {
       record.metadata === undefined
         ? undefined
         : parseSafeJsonObjectValue(record.metadata, `${label}.metadata`);
+    const pidStartMarker: string | undefined =
+      record.pidStartMarker === undefined ? undefined : String(record.pidStartMarker);
+    if (pidStartMarker !== undefined && typeof record.pidStartMarker !== 'string') {
+      throw new Error(`${label}.pidStartMarker must be a string when present`);
+    }
     return [
       surfaceKey,
       {
         id,
         pid,
+        ...(pidStartMarker !== undefined ? { pidStartMarker } : {}),
         resourceId,
         kind,
         command,
