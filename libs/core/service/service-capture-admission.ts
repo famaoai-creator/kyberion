@@ -1,7 +1,6 @@
 import '../governance/authorization-overlay.js';
 import { subjectAuthorization } from '../foundation/authorization-registry.js';
 /** Internal exact-request, single-use scoped read admission. No domain-layer imports belong here. */
-import { createHmac, randomBytes } from 'node:crypto';
 import { getPluginExecutionContext } from '../shell/sandbox-policy.js';
 import {
   loadServiceEndpointsCatalog,
@@ -74,21 +73,21 @@ export interface ScopedServiceCaptureTransport {
   validate?: () => void;
 }
 interface Admission {
-  requestHash: string;
-  presetHash: string;
-  endpointHash: string;
+  requestSnapshot: string;
+  presetSnapshot: string;
+  endpointSnapshot: string;
   expires: number;
   verify: () => Promise<ScopedServiceCaptureTransport>;
 }
 const admissions = new WeakMap<object, Admission>();
-// Process-local authentication tag for ephemeral admissions, never a persisted password digest.
-const admissionIntegrityKey = randomBytes(32);
-function hash(input: unknown): string {
-  return createHmac('sha256', admissionIntegrityKey).update(JSON.stringify(input)).digest('hex');
+// Snapshots remain private to the single-use, 30-second WeakMap capability.
+// Compare exact serialized values without deriving or persisting credential fingerprints.
+function snapshot(input: unknown): string {
+  return JSON.stringify(input);
 }
-function presetHash(preset: ServicePresetRecord, action: string): string {
+function presetSnapshot(preset: ServicePresetRecord, action: string): string {
   const { operations: _operations, ...configuration } = preset;
-  return hash({ configuration, operation: preset.operations[action] });
+  return snapshot({ configuration, operation: preset.operations[action] });
 }
 export function assertReadOnlyServiceCapture(
   service: string,
@@ -161,9 +160,9 @@ export async function issueScopedServiceCaptureAdmission(
   await verify();
   const capability = Object.freeze({});
   admissions.set(capability, {
-    requestHash: hash(request),
-    presetHash: presetHash(preset, request.action),
-    endpointHash: hash(config),
+    requestSnapshot: snapshot(request),
+    presetSnapshot: presetSnapshot(preset, request.action),
+    endpointSnapshot: snapshot(config),
     expires: Date.now() + 30000,
     verify,
   });
@@ -183,9 +182,10 @@ export async function consumeScopedServiceCaptureAdmission(
     !entry ||
     getPluginExecutionContext() ||
     entry.expires < Date.now() ||
-    entry.requestHash !== hash({ service_id: serviceId, action, params }) ||
-    entry.presetHash !== presetHash(preset, action) ||
-    entry.endpointHash !== hash(serviceConfig ?? loadServiceEndpointsCatalog().services[serviceId])
+    entry.requestSnapshot !== snapshot({ service_id: serviceId, action, params }) ||
+    entry.presetSnapshot !== presetSnapshot(preset, action) ||
+    entry.endpointSnapshot !==
+      snapshot(serviceConfig ?? loadServiceEndpointsCatalog().services[serviceId])
   )
     throw new Error('information_asset_capture_admission_denied');
   assertReadOnlyServiceCapture(serviceId, action, preset.operations[action]);
