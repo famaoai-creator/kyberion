@@ -176,4 +176,22 @@ describe('primary-checkout authority store resolution', () => {
       )
     ).toBe(false);
   });
+
+  it('admits the per-channel directory itself, not its other contents', async () => {
+    // A first approval in a fresh primary checkout creates
+    // `channels/<channel>/` there: the directory must be governed authority
+    // state or the mkdir / ancestor probe is refused as outside the repository.
+    const resolver = await loadResolver(worktree);
+    for (const root of ['coordination', 'observability']) {
+      expect(resolver.isAuthorityStoreRelativePath(`active/shared/${root}/channels/slack`)).toBe(
+        true
+      );
+      expect(resolver.isAuthorityStoreRelativePath(`active/shared/${root}/channels/slack/`)).toBe(
+        false
+      );
+    }
+    expect(
+      resolver.isAuthorityStoreRelativePath('active/shared/coordination/channels/slack/outbox')
+    ).toBe(false);
+  });
 });
