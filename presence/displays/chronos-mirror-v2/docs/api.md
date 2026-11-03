@@ -1,58 +1,17 @@
-# Chronos Mirror v2 — HTTP API
+# Chronos Mirror v2 — compatibility redirects
 
-Base URL (default reconcile): `http://127.0.0.1:3000`
+The operations console that Chronos served moved into Concierge
+(MSN-KYBERION-SERVER-20261104):
 
-All routes accept the same access role headers honored by `lib/api-guard`. Read-only routes default to `readonly`.
+| Old (Chronos, port 3000) | New (Concierge origin)       |
+| ------------------------ | ---------------------------- |
+| `/?section=<id>`         | `/ops?section=<id>`          |
+| `/discussion`            | `/ops/discussion`            |
+| `/api/<path>`            | `/api/ops/<path>`            |
+| `/api/healthz`           | unchanged, served by Chronos |
 
-| Route                      | Method | Purpose                                                                                                                                      | Notes                                                                                         |
-| -------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| `/api/identity`            | GET    | Sovereign / Agent identity from `knowledge/personal/{my-identity.json,agent-identity.json,my-vision.md}`.                                    | New in 2026-05-08 cleanup. Returns `onboarded: false` until Path A or Path B onboarding runs. |
-| `/api/agents`              | GET    | Live agent runtime snapshot. `?providers=true` lists discovered providers, `?manifests=true` lists manifested agent definitions.             | Empty `agents: []` on a fresh ecosystem.                                                      |
-| `/api/agents`              | POST   | Spawn / ask / a2a / logs / refresh / restart via `action` field.                                                                             | See AgentPanel.tsx for examples.                                                              |
-| `/api/agents`              | DELETE | Shutdown an agent.                                                                                                                           |                                                                                               |
-| `/api/collaboration`       | GET    | Read-only human/agent collaboration projection: overview, attention, timeline, and graph. Supports `tenant`, `mission`, and `limit` filters. |                                                                                               |
-| `/api/intelligence`        | GET    | One-shot intelligence snapshot.                                                                                                              | Used by the Mission Intelligence panel for initial render.                                    |
-| `/api/intelligence/stream` | GET    | SSE feed of incremental intelligence updates (~2s tick).                                                                                     | Sends `retry: 3000` immediately, then `data: {...}` events.                                   |
-| `/api/runtime-file`        | GET    | Read a governed file by path.                                                                                                                | Requires query params; 400 without.                                                           |
-| `/api/knowledge-ref`       | GET    | Resolve a knowledge reference by token.                                                                                                      | Requires query params; 400 without.                                                           |
-| `/api/mission-asset`       | GET    | Fetch mission-scoped asset.                                                                                                                  |                                                                                               |
-| `/api/agent`               | \*     | Legacy single-agent helper.                                                                                                                  | Prefer `/api/agents`.                                                                         |
-
-## `/api/identity` response
-
-```json
-{
-  "status": "ok",
-  "onboarded": true,
-  "sovereign": {
-    "name": "もとちゃん",
-    "language": "Japanese",
-    "interaction_style": "Senior Partner",
-    "primary_domain": "Financial Services IT Management",
-    "status": "active"
-  },
-  "agent": {
-    "agent_id": "KYBERION-PRIME",
-    "role": "Ecosystem Architect / Senior Partner",
-    "owner": "もとちゃん",
-    "trust_tier": "sovereign"
-  },
-  "vision": "..."
-}
-```
-
-When the personal tier has not been initialized, every nested object is `null` and `onboarded` is `false`. The IdentityBadge in the header switches to an amber "Onboarding required" pill in that state.
-
-## `/api/intelligence/stream` event format
-
-```
-retry: 3000
-
-data: {"ts":"...","accessRole":"readonly","recentEvents":[],...,"runtimeTopology":{...}}
-```
-
-The route only sends `data:` events when the JSON payload changes from the prior tick (debouncing). Clients should keep the connection alive; it is closed safely on client abort and never leaks `ERR_INVALID_STATE` (verified after 2026-05-08 fix).
-
-## Health probing
-
-`/api/healthz` is the canonical unauthenticated healthPath for `chronos-mirror-v2` in `knowledge/product/governance/active-surfaces.json`. A 200 response means the Next.js process serves requests; authenticated routes such as `/api/agents` still require a Chronos access role.
+The Chronos process answers every other request with a `308` to the Concierge
+origin (`resolveSurfaceBrowserUrl('concierge')`), keeping the query string,
+method and body. Authorization happens on Concierge: the `/api/ops` routes
+resolve the Concierge viewer, and localadmin writes pass the Concierge
+mutation gate (same origin or a configured operator token).

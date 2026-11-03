@@ -724,6 +724,10 @@
       "types": "./dist/bridge-error-reply.d.ts",
       "default": "./dist/bridge-error-reply.js"
     },
+    "./bridge-poll-loop": {
+      "types": "./dist/bridge-poll-loop.d.ts",
+      "default": "./dist/bridge-poll-loop.js"
+    },
     "./bridge-typing": {
       "types": "./dist/bridge-typing.d.ts",
       "default": "./dist/bridge-typing.js"
@@ -1447,6 +1451,10 @@
     "./dot/dot-action-ledger": {
       "types": "./dist/dot/dot-action-ledger.d.ts",
       "default": "./dist/dot/dot-action-ledger.js"
+    },
+    "./dot/dot-admission-identity": {
+      "types": "./dist/dot/dot-admission-identity.d.ts",
+      "default": "./dist/dot/dot-admission-identity.js"
     },
     "./dot/dot-arbitration": {
       "types": "./dist/dot/dot-arbitration.d.ts",

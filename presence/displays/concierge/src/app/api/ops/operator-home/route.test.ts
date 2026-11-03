@@ -1,0 +1,93 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mocks = vi.hoisted(() => ({
+  collectOperatorHomeSummary: vi.fn(),
+  guardOpsRequest: vi.fn((): unknown => null),
+  requireOpsAccess: vi.fn((): unknown => null),
+  strictViewerScopeTenantSlugs: vi.fn(() => 'all'),
+  strictViewerScopeOrganizationIds: vi.fn(() => 'all'),
+  strictViewerScopeProjectIds: vi.fn(() => 'all'),
+  viewerErrorResponse: vi.fn(
+    (error: unknown) => new Response(JSON.stringify({ error: String(error) }), { status: 403 })
+  ),
+}));
+
+vi.mock('@agent/core', () => ({
+  collectOperatorHomeSummary: mocks.collectOperatorHomeSummary,
+}));
+
+vi.mock('@agent/core/surface/operator-home-summary', () => ({
+  collectOperatorHomeSummary: mocks.collectOperatorHomeSummary,
+}));
+
+vi.mock('../../../../lib/ops/ops-request-guard', () => ({
+  guardOpsRequest: mocks.guardOpsRequest,
+  requireOpsAccess: mocks.requireOpsAccess,
+}));
+
+vi.mock('../../../../lib/ops/ops-viewer', () => ({
+  resolveOpsViewerForRequest: vi.fn(() => ({
+    context: { role: 'localadmin', tenantSlugs: 'all', source: 'loopback' },
+  })),
+  strictViewerScopeTenantSlugs: mocks.strictViewerScopeTenantSlugs,
+  strictViewerScopeOrganizationIds: mocks.strictViewerScopeOrganizationIds,
+  strictViewerScopeProjectIds: mocks.strictViewerScopeProjectIds,
+  viewerErrorResponse: mocks.viewerErrorResponse,
+  withViewerExecutionContext: vi.fn((_viewer: unknown, operation: () => unknown) => operation()),
+}));
+
+import { GET } from './route.js';
+
+describe('operator-home route', () => {
+  beforeEach(() => {
+    mocks.collectOperatorHomeSummary.mockReset();
+    mocks.guardOpsRequest.mockReset();
+    mocks.requireOpsAccess.mockReset();
+    mocks.guardOpsRequest.mockReturnValue(null);
+    mocks.requireOpsAccess.mockReturnValue(null);
+  });
+
+  it('returns the aggregated operator home summary', async () => {
+    mocks.collectOperatorHomeSummary.mockReturnValue({
+      generatedAt: '2026-07-06T00:00:00.000Z',
+      status: 'attention',
+      statusLabel: 'attention required',
+      statusDetail: '1 approval pending',
+      counts: {
+        activeMissions: 1,
+        blockedMissions: 0,
+        pendingApprovals: 1,
+        clarificationQuestions: 0,
+        unreadInbox: 1,
+        totalInbox: 1,
+      },
+      activeMissions: [],
+      pendingApprovals: [],
+      inboxEntries: [],
+      costSummary: {
+        totalTokens: 0,
+        totalUsd: 0,
+        entryCount: 0,
+        missionCount: 0,
+        remainingUsd: null,
+        overBudget: false,
+        missionBreakdown: [],
+      },
+      nextAction: {
+        title: 'Review the approval queue',
+        reason: 'pending review',
+        next_action_type: 'run_command',
+        suggested_command: 'pnpm scheduler',
+      },
+    });
+
+    const response = await GET(new Request('http://localhost/api/operator-home?limit=5') as any);
+
+    expect(response.status).toBe(200);
+    const payload = (await response.json()) as {
+      summary: { statusLabel: string; counts: { pendingApprovals: number } };
+    };
+    expect(payload.summary.statusLabel).toBe('attention required');
+    expect(payload.summary.counts.pendingApprovals).toBe(1);
+  });
+});

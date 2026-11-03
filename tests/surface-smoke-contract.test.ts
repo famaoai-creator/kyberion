@@ -11,12 +11,12 @@ function readJson(relativePath: string): { steps?: Array<{ op?: string; consumes
 
 describe('surface smoke contract', () => {
   it('keeps the Chronos first-run surface and operator controls in place', () => {
-    const page = read('presence/displays/chronos-mirror-v2/src/app/page.tsx');
+    const page = read('presence/displays/concierge/src/app/ops/page.tsx');
     // SX: page.tsx was split into a shell plus a static quick-action config
     // module; each label/route is asserted against the file that owns it.
-    const shell = read('presence/displays/chronos-mirror-v2/src/app/ChronosMirrorShell.tsx');
-    const pageConfig = read('presence/displays/chronos-mirror-v2/src/app/chronos-page-config.ts');
-    const banner = read('presence/displays/chronos-mirror-v2/src/components/FirstRunBanner.tsx');
+    const shell = read('presence/displays/concierge/src/app/ops/ChronosMirrorShell.tsx');
+    const pageConfig = read('presence/displays/concierge/src/app/ops/chronos-page-config.ts');
+    const banner = read('presence/displays/concierge/src/components/ops/FirstRunBanner.tsx');
 
     expect(page).toContain('FirstRunBanner');
     expect(page).toContain('IdentityBadge');

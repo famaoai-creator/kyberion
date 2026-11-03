@@ -6,7 +6,7 @@ import { safeExistsSync, safeMkdir, safeRmSync, safeWriteFile } from './secure-i
 
 /**
  * Pins the contract Chronos' customer-decision overview route relies on
- * (presence/displays/chronos-mirror-v2/src/app/api/customer-decisions/overview/route.ts):
+ * (presence/displays/concierge/src/app/api/ops/customer-decisions/overview/route.ts):
  * a tenant's company id IS its tenant slug, so the route checks the viewer's
  * organization scope against the slug without loading the company aggregate.
  * If company ids ever stop being the slug, this fails — change that route too.

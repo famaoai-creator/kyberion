@@ -14,6 +14,7 @@ import {
   isLoopbackAddress,
   stripUntrustedPeerHeaders,
 } from './local-peer.ts';
+import { stopOpsConsoleRuntime } from '../src/lib/ops/ops-runtime-shutdown.ts';
 
 export interface LocalServerOptions {
   port?: number;
@@ -132,6 +133,10 @@ export async function startLocalConcierge(
       // Next owns upgraded HMR sockets; close them before waiting for HTTP drain.
       await app.close();
       await stopped;
+      // The operations console (/api/ops) keeps its agent runtime, discussion
+      // engines, plugin host and SSE poll loops process-wide; stop them with
+      // the listener (best-effort, never throws).
+      await stopOpsConsoleRuntime();
     })());
   logger.debug('Local Concierge ready', { url: 'http://' + HOST + ':' + port, dev });
   return { server, close };
