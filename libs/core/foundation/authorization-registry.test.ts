@@ -244,6 +244,7 @@ describe('authorization-registry boundary coverage gate', () => {
         delegable: {
           fields: [...spec.fields],
           ...(spec.optionalFields ? { optionalFields: [...spec.optionalFields] } : {}),
+          ...(spec.requiredOneOf ? { requiredOneOf: [...spec.requiredOneOf] } : {}),
           reputational_class: spec.reputational_class,
         },
       });

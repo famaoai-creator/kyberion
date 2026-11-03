@@ -1,7 +1,11 @@
 import { operationAuthorization } from '../foundation/authorization-registry.js';
 import './authorization-overlay.js';
 
-/** Explicit targets signed by the accountable human; no wildcard matching. */
+/**
+ * Explicit targets signed by the accountable human. The only pattern field is
+ * `branch_pattern` — a single trailing wildcard over a literal tree prefix
+ * ('feat/*' covers every branch under feat/) — no other wildcard matching.
+ */
 export type ExternalOperationGrant =
   | {
       operation_id: 'vcs:pr_create';
@@ -13,6 +17,13 @@ export type ExternalOperationGrant =
       operation_id: 'vcs:pr_merge' | 'vcs:push';
       repository: string;
       branch: string;
+      visibility?: 'private';
+    }
+  | {
+      operation_id: 'vcs:pr_merge' | 'vcs:push';
+      repository: string;
+      /** Signed tree-prefix delegation, e.g. 'feat/*' — never matches 'main'. */
+      branch_pattern: string;
       visibility?: 'private';
     }
   | { operation_id: 'browser:goto' | 'browser:open_tab'; origin: string }
@@ -38,6 +49,8 @@ export interface DelegationTargetSpec {
   readonly fields: readonly string[];
   /** Grant fields that may be present or absent (exact-match still applies when present). */
   readonly optionalFields?: readonly string[];
+  /** Exactly one of these optional fields must be present in a valid grant. */
+  readonly requiredOneOf?: readonly string[];
   /** Normalize an effect into the raw grant object to match, or undefined. */
   readonly buildTarget: (effect: Record<string, unknown>) => unknown;
   /** Reputational class stamped on the delegated charter action. */
@@ -69,6 +82,24 @@ function normalizeBranch(raw: unknown): string | undefined {
   const branch = raw.trim().replace(/^refs\/heads\//, '');
   if (!branch || branch.includes('*') || /[\s^~:?[\]\\]/.test(branch)) return undefined;
   return branch;
+}
+
+/**
+ * One trailing wildcard over a literal tree prefix: 'feat/*' or 'feat/**'
+ * canonicalize to 'feat/*' and match any branch starting with 'feat/'.
+ * Bare '*', interior wildcards, and non-tree prefixes are rejected.
+ */
+function normalizeBranchPattern(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const canonical = raw
+    .trim()
+    .replace(/^refs\/heads\//, '')
+    .replace(/\*+$/, '*');
+  if (canonical.length < 3 || !canonical.endsWith('*')) return undefined;
+  const prefix = canonical.slice(0, -1);
+  if (!prefix.endsWith('/') || prefix.includes('*') || /[\s^~:?[\]\\]/.test(prefix))
+    return undefined;
+  return canonical;
 }
 
 export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec> = {
@@ -109,8 +140,9 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     reputational_class: 'B',
   },
   'vcs:pr_merge': {
-    fields: ['repository', 'branch'],
-    optionalFields: ['visibility'],
+    fields: ['repository'],
+    optionalFields: ['branch', 'branch_pattern', 'visibility'],
+    requiredOneOf: ['branch', 'branch_pattern'],
     buildTarget: (effect) => {
       const repository = effect.repository as
         { url?: unknown; host?: unknown; slug?: unknown } | undefined;
@@ -136,8 +168,9 @@ export const EXTERNAL_OPERATION_DELEGATION: Record<string, DelegationTargetSpec>
     reputational_class: 'A',
   },
   'vcs:push': {
-    fields: ['repository', 'branch'],
-    optionalFields: ['visibility'],
+    fields: ['repository'],
+    optionalFields: ['branch', 'branch_pattern', 'visibility'],
+    requiredOneOf: ['branch', 'branch_pattern'],
     buildTarget: (effect) => {
       if (typeof effect.url !== 'string' || typeof effect.destination !== 'string')
         return undefined;
@@ -262,10 +295,16 @@ export function parseExternalOperationGrant(raw: unknown): ExternalOperationGran
   const keys = Object.keys(value);
   if (keys.some((key) => !allowed.has(key)) || spec.fields.some((f) => !(f in value)))
     return undefined;
+  if (
+    spec.requiredOneOf &&
+    spec.requiredOneOf.filter((field) => typeof value[field] === 'string').length !== 1
+  )
+    return undefined;
   for (const field of [...spec.fields, ...(spec.optionalFields ?? [])]) {
     const v = value[field];
     if (v === undefined) continue;
-    if (typeof v !== 'string' || v.includes('*') || v !== v.trim()) return undefined;
+    if (typeof v !== 'string' || v !== v.trim()) return undefined;
+    if (field !== 'branch_pattern' && v.includes('*')) return undefined;
   }
   // URL/host-shaped fields normalize; literal claim fields (provider, plan,
   // basis, attested_by, tenant_slug, training_use) must match verbatim —
@@ -280,9 +319,11 @@ export function parseExternalOperationGrant(raw: unknown): ExternalOperationGran
         ? normalizeRepositoryUrl(raw)
         : field === 'branch'
           ? normalizeBranch(raw)
-          : field === 'origin'
-            ? normalizeOrigin(raw)
-            : raw;
+          : field === 'branch_pattern'
+            ? normalizeBranchPattern(raw)
+            : field === 'origin'
+              ? normalizeOrigin(raw)
+              : raw;
   }
   if (Object.values(normalized).some((v) => !v)) return undefined;
   if (op === 'tenant:attest_provider' && normalized.training_use !== 'none') return undefined;
@@ -299,11 +340,33 @@ export function parseExternalOperationGrants(raw: unknown): ExternalOperationGra
   return grants;
 }
 
+/**
+ * Directional coverage: does the signed `grant` cover `target`? Exact fields
+ * must equal; a `branch_pattern` grant covers an exact `branch` target under
+ * its tree prefix, and covers a narrower `branch_pattern` child whose prefix
+ * sits under it (used for parent-charter containment).
+ */
 export function externalOperationGrantMatches(
-  left: ExternalOperationGrant,
-  right: ExternalOperationGrant
+  grant: ExternalOperationGrant,
+  target: ExternalOperationGrant
 ): boolean {
-  const a = parseExternalOperationGrant(left);
-  const b = parseExternalOperationGrant(right);
-  return Boolean(a && b && JSON.stringify(a) === JSON.stringify(b));
+  const a = parseExternalOperationGrant(grant);
+  const b = parseExternalOperationGrant(target);
+  if (!a || !b || a.operation_id !== b.operation_id) return false;
+  const targetFields = b as unknown as Record<string, unknown>;
+  for (const [key, value] of Object.entries(a)) {
+    if (key === 'operation_id') continue;
+    if (key === 'branch_pattern') {
+      const prefix = String(value).slice(0, -1);
+      const covered =
+        typeof targetFields.branch === 'string'
+          ? targetFields.branch.startsWith(prefix)
+          : typeof targetFields.branch_pattern === 'string' &&
+            String(targetFields.branch_pattern).slice(0, -1).startsWith(prefix);
+      if (!covered) return false;
+      continue;
+    }
+    if (targetFields[key] !== value) return false;
+  }
+  return true;
 }
