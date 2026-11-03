@@ -3,7 +3,7 @@
 // resolve through tool-runtimes (faster_whisper / ffmpeg) and
 // media-backends; the ops themselves only orchestrate.
 
-import os from 'node:os';
+import { hostNodePlatform } from '@agent/core/platform-facts';
 import path from 'node:path';
 import { logger } from '@agent/core/core';
 import {
@@ -411,7 +411,7 @@ export async function mvCompose(params: Params): Promise<Record<string, unknown>
     width: W,
     height: H,
     backend: 'ffmpeg',
-    os: os.platform(),
+    os: hostNodePlatform(),
   };
 }
 

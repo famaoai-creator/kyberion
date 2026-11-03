@@ -42,7 +42,8 @@ import {
   type SeamProviderCandidate,
   type SeamProviderDecision,
 } from './seam-provider-selection.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from './seam.js';
+import { type SeamProviderMetadata } from './seam.js';
+import { createProviderRegistry } from './provider-registry.js';
 
 const logger = createLogger('authn-principal-resolver');
 
@@ -209,26 +210,26 @@ export interface AuthnProvider {
   resolve(request: AuthnRequest, deps?: AuthnResolveDeps): ResolvedPrincipal | null;
 }
 
-const authnProviderSeam = createSeam<AuthnProvider>({
-  key: AUTHN_SEAM_ID,
-  multiplicity: 'named',
-  catalog: coreSeamCatalog,
+const authnProviderRegistry = createProviderRegistry<AuthnProvider>({
+  seam: AUTHN_SEAM_ID,
   owner: 'libs/core/authn-principal-resolver.ts',
+  source: 'authn-provider-extension',
+  missingIdError: 'AuthnProvider must have a non-empty id',
 });
 
 export function registerAuthnProvider(
   provider: AuthnProvider,
-  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'authn-provider-extension' }
+  metadata?: SeamProviderMetadata
 ): () => void {
-  return authnProviderSeam.register(provider.id, provider, metadata);
+  return authnProviderRegistry.register(provider, metadata);
 }
 
 export function getAuthnProvider(id: string): AuthnProvider | null {
-  return authnProviderSeam.getOptional(id) ?? null;
+  return authnProviderRegistry.get(id) ?? null;
 }
 
 export function listAuthnProviders(restrictTo?: readonly string[]): AuthnProvider[] {
-  const all = authnProviderSeam.list().map((entry) => entry.implementation);
+  const all = authnProviderRegistry.list();
   return restrictTo?.length ? all.filter((p) => restrictTo.includes(p.id)) : all;
 }
 

@@ -1,4 +1,5 @@
 import os from 'node:os';
+import { hostNodePlatform } from '../platform-facts.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { clamp } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
@@ -34,7 +35,7 @@ let detectedHostAccelerators: MediaBackendAccelerator[] | undefined;
  * Result is cached per process; tests inject `hostAccelerators` instead.
  */
 export function detectHostAccelerators(
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = hostNodePlatform(),
   arch: string = process.arch
 ): MediaBackendAccelerator[] {
   if (detectedHostAccelerators) return detectedHostAccelerators;
@@ -221,7 +222,7 @@ function mergeVoiceBackends(backends: MediaBackendRecord[]): MediaBackendRecord[
 
 function resolveVoiceBackendRecord(
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = hostNodePlatform()
 ): MediaBackendRecord {
   const engine = resolveVoiceEngineForPlatform(
     backendId?.replace(/^voice\./u, '') || undefined,
@@ -429,7 +430,7 @@ async function probeMediaBackendAvailabilityUncached(
 export async function probeMediaBackendAvailability(
   backendId?: string,
   modality?: MediaBackendModality,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = hostNodePlatform(),
   options: MediaBackendProbeOptions = {}
 ): Promise<MediaBackendAvailability> {
   const backend = getMediaBackendRecord(backendId, modality);
@@ -491,7 +492,7 @@ export async function probeMediaBackendAvailability(
 export async function resolveMediaBackendWithAvailability(
   modality: MediaBackendModality,
   backendId?: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = hostNodePlatform(),
   hostMemoryGb: number = Math.round(os.totalmem() / 1024 ** 3),
   hostAccelerators: readonly MediaBackendAccelerator[] = detectHostAccelerators()
 ): Promise<{
@@ -534,7 +535,7 @@ export async function resolveMediaBackendWithAvailability(
 export function resolveMediaBackendForPlatform(
   modality: MediaBackendModality,
   backendId?: string,
-  platform: NodeJS.Platform = process.platform,
+  platform: NodeJS.Platform = hostNodePlatform(),
   hostMemoryGb: number = Math.round(os.totalmem() / 1024 ** 3),
   hostAccelerators: readonly MediaBackendAccelerator[] = detectHostAccelerators()
 ): MediaBackendRecord {
@@ -580,28 +581,28 @@ export function resolveMediaBackendForPlatform(
 
 export function resolveImageBackend(
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = hostNodePlatform()
 ): MediaBackendRecord {
   return resolveMediaBackendForPlatform('image', backendId, platform);
 }
 
 export function resolveVoiceBackend(
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = hostNodePlatform()
 ): MediaBackendRecord {
   return resolveMediaBackendForPlatform('voice', backendId, platform);
 }
 
 export function resolveVideoBackend(
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = hostNodePlatform()
 ): MediaBackendRecord {
   return resolveMediaBackendForPlatform('video', backendId, platform);
 }
 
 export function resolveMusicBackend(
   backendId?: string,
-  platform: NodeJS.Platform = process.platform
+  platform: NodeJS.Platform = hostNodePlatform()
 ): MediaBackendRecord {
   return resolveMediaBackendForPlatform('music', backendId, platform);
 }

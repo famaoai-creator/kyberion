@@ -13,22 +13,27 @@ const fixture = vi.hoisted(() => {
   return { base, rootDir: base };
 });
 
-vi.mock('./path-resolver.js', () => ({
-  pathResolver: {
-    // Schemas are repo assets, not fixture content, and several of them are
-    // resolved through knowledge() while the module initializes — so they have
-    // to point at the real tree the way rootResolve already does.
-    knowledge: (sub = '') =>
-      sub.startsWith('product/schemas/')
-        ? path.join(process.cwd(), 'knowledge', sub)
-        : path.join(fixture.rootDir, 'knowledge', sub),
-    rootResolve: (sub = '') =>
-      sub.startsWith('knowledge/product/schemas/')
-        ? path.join(process.cwd(), sub)
-        : path.join(fixture.rootDir, sub),
-    rootDir: () => fixture.rootDir,
-  },
-}));
+vi.mock('./path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+  return {
+    ...actual,
+    pathResolver: {
+      ...actual.pathResolver,
+      // Schemas are repo assets, not fixture content, and several of them are
+      // resolved through knowledge() while the module initializes — so they have
+      // to point at the real tree the way rootResolve already does.
+      knowledge: (sub = '') =>
+        sub.startsWith('product/schemas/')
+          ? path.join(process.cwd(), 'knowledge', sub)
+          : path.join(fixture.rootDir, 'knowledge', sub),
+      rootResolve: (sub = '') =>
+        sub.startsWith('knowledge/product/schemas/')
+          ? path.join(process.cwd(), sub)
+          : path.join(fixture.rootDir, sub),
+      rootDir: () => fixture.rootDir,
+    },
+  };
+});
 
 vi.mock('./secure-io.js', async () => {
   const actual = await vi.importActual<typeof import('node:fs')>('node:fs');

@@ -16,7 +16,12 @@ import { needsFixedReasoningGuard, pickRoleBackend } from './reasoning-fixed-bin
 
 import { automaticReasoningRedispatchAllowed } from './reasoning-dispatch-scope.js';
 import { logger } from '../core.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 import { assertOperationPolicy, currentDelegationDepth } from '../operation-policy-gate.js';
 import type {
   A2ATaskContract,
@@ -1481,20 +1486,14 @@ const reasoningBackendSeam = createSeam<ReasoningBackend>({
   owner: 'libs/core/reasoning/reasoning-backend.ts',
 });
 
-let registeredDisposer: (() => void) | null = null;
+const reasoningBackendLifecycle = createSeamLifecycle(reasoningBackendSeam);
 
 /** Register a real backend. Most deployments do this in a bootstrap module. */
 export function registerReasoningBackend(
   backend: ReasoningBackend,
   metadata: SeamProviderMetadata = { provenance: 'builtin', source: backend.name }
 ): () => void {
-  const rawDisposer = reasoningBackendSeam.register('active', backend, metadata);
-  const disposer = () => {
-    rawDisposer();
-    if (registeredDisposer === disposer) registeredDisposer = null;
-  };
-  registeredDisposer = disposer;
-  return disposer;
+  return reasoningBackendLifecycle.register('active', backend, metadata);
 }
 
 /** Get the active backend, falling back to the deterministic stub. */
@@ -1512,8 +1511,7 @@ export function hasRegisteredReasoningBackend(): boolean {
 
 /** Clear the registered backend. Used by tests. */
 export function resetReasoningBackend(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  reasoningBackendLifecycle.reset();
   resetStubServedOps();
 }
 

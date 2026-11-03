@@ -1592,6 +1592,10 @@
       "types": "./dist/entity-scope.d.ts",
       "default": "./dist/entity-scope.js"
     },
+    "./entry-ledger": {
+      "types": "./dist/entry-ledger.d.ts",
+      "default": "./dist/entry-ledger.js"
+    },
     "./env-validator": {
       "types": "./dist/env-validator.d.ts",
       "default": "./dist/env-validator.js"
@@ -1855,6 +1859,10 @@
     "./governance/external-operation-target": {
       "types": "./dist/governance/external-operation-target.d.ts",
       "default": "./dist/governance/external-operation-target.js"
+    },
+    "./governance/adapter-effect-proxy": {
+      "types": "./dist/governance/adapter-effect-proxy.d.ts",
+      "default": "./dist/governance/adapter-effect-proxy.js"
     },
     "./governance/external-operation": {
       "types": "./dist/governance/external-operation.d.ts",
@@ -2159,6 +2167,10 @@
     "./ingest-tier-gate": {
       "types": "./dist/ingest-tier-gate.d.ts",
       "default": "./dist/ingest-tier-gate.js"
+    },
+    "./intake-vectors": {
+      "types": "./dist/intake-vectors.d.ts",
+      "default": "./dist/intake-vectors.js"
     },
     "./ingress/providers/tailscale-funnel": {
       "types": "./dist/ingress/providers/tailscale-funnel.d.ts",
@@ -2951,6 +2963,14 @@
     "./media/music-workflow-compiler": {
       "types": "./dist/media/music-workflow-compiler.d.ts",
       "default": "./dist/media/music-workflow-compiler.js"
+    },
+    "./media/video-generation/provider": {
+      "types": "./dist/media/video-generation/provider.d.ts",
+      "default": "./dist/media/video-generation/provider.js"
+    },
+    "./media/video-generation/provider-registry": {
+      "types": "./dist/media/video-generation/provider-registry.d.ts",
+      "default": "./dist/media/video-generation/provider-registry.js"
     },
     "./media/native-docx-engine/engine": {
       "types": "./dist/media/native-docx-engine/engine.d.ts",
@@ -4031,6 +4051,10 @@
     "./mobile-profile-validators": {
       "types": "./dist/mobile-profile-validators.d.ts",
       "default": "./dist/mobile-profile-validators.js"
+    },
+    "./mobile-runtime-helpers": {
+      "types": "./dist/mobile-runtime-helpers.d.ts",
+      "default": "./dist/mobile-runtime-helpers.js"
     },
     "./model-performance-index": {
       "types": "./dist/reasoning/model-performance-index.d.ts",
@@ -5923,6 +5947,10 @@
     "./secret/secret-introduction": {
       "types": "./dist/secret/secret-introduction.d.ts",
       "default": "./dist/secret/secret-introduction.js"
+    },
+    "./secret/provider-registry": {
+      "types": "./dist/secret/provider-registry.d.ts",
+      "default": "./dist/secret/provider-registry.js"
     },
     "./secret/secret-resolver": {
       "types": "./dist/secret/secret-resolver.d.ts",

@@ -70,6 +70,14 @@
           "type": "string",
           "pattern": "^[a-z][a-z0-9_]*$",
           "description": "Purpose used to rank eligible providers when no purpose is given and the default provider cannot run the task."
+        },
+        "default_chains": {
+          "type": "object",
+          "description": "Baseline provider orderings keyed by a domain discriminator (e.g. \"mode:accurate\", \"platform:apple_silicon\"); 'default' is the catch-all. Used when no explicit preference, purpose, pin or rule applies. Eligibility still decides membership; unlisted providers trail in registration order.",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 }
+          }
         }
       },
       "required": ["seam_id", "default_provider", "traits", "providers", "purposes"]

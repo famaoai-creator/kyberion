@@ -27,7 +27,12 @@ import { sanitizeIdSegment } from '../foundation/text.js';
 import { pathResolver } from '../path-resolver.js';
 import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
 import { MobileBetaDeploymentAdapter } from './deployment-adapters/mobile-beta.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 export interface DeployInput {
   /** Semantic environment — prod / staging / canary / dr etc. */
@@ -66,7 +71,7 @@ const deploymentAdapterSeam = createSeam<DeploymentAdapter>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/actuator/deployment-adapter.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const deploymentAdapterLifecycle = createSeamLifecycle(deploymentAdapterSeam);
 
 export function registerDeploymentAdapter(
   adapter: DeploymentAdapter,
@@ -78,8 +83,7 @@ export function registerDeploymentAdapter(
   if (!adapter || typeof adapter.name !== 'string' || !adapter.name.trim()) {
     throw new TypeError('Deployment adapter must have a non-empty name');
   }
-  registeredDisposer = deploymentAdapterSeam.register(adapter.name, adapter, metadata);
-  return registeredDisposer;
+  return deploymentAdapterLifecycle.register(adapter.name, adapter, metadata);
 }
 
 export function getDeploymentAdapter(): DeploymentAdapter {
@@ -87,8 +91,7 @@ export function getDeploymentAdapter(): DeploymentAdapter {
 }
 
 export function resetDeploymentAdapter(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  deploymentAdapterLifecycle.reset();
 }
 
 export const stubDeploymentAdapter: DeploymentAdapter = {
