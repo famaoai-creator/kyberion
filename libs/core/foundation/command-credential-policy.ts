@@ -42,6 +42,8 @@ const MISSION_ACTION_REQUIREMENTS: Readonly<Record<string, CredentialRequirement
   kickoff: 'none',
   'record-task': 'none',
   'record-evidence': 'none',
+  // Offline source checkout for a private task — deterministic git work only.
+  'prepare-source-workspace': 'none',
   // Registers an already performed review; it does not run model inference.
   'review-task': 'none',
   // Journal/state-only verbs: they never delegate to a reasoning backend.

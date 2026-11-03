@@ -3896,6 +3896,10 @@
       "types": "./dist/mission/mission-task-recovery.d.ts",
       "default": "./dist/mission/mission-task-recovery.js"
     },
+    "./mission/mission-task-source-workspace": {
+      "types": "./dist/mission/mission-task-source-workspace.d.ts",
+      "default": "./dist/mission/mission-task-source-workspace.js"
+    },
     "./mission/mission-task-supersede-proof": {
       "types": "./dist/mission/mission-task-supersede-proof.d.ts",
       "default": "./dist/mission/mission-task-supersede-proof.js"
