@@ -428,7 +428,7 @@ export async function authorizeInformationAssetCapture(
   return location;
 }
 /** Only committed ingest ledger entries produce provenance; discovery never creates one. */
-export function informationAssetIngestProjection(
+export async function informationAssetIngestProjection(
   scope: InformationAssetScope,
   sourceSystem: string,
   sourceId: string,
@@ -437,7 +437,7 @@ export function informationAssetIngestProjection(
   assertInformationAssetCatalogAuthorization();
   assertCurrentInformationAssetScope(scope);
   assertInformationAssetParents(scope, options);
-  const record = findAssetBySource(scope.tenant_slug, sourceSystem, sourceId, options);
+  const record = await findAssetBySource(scope.tenant_slug, sourceSystem, sourceId, options);
   return record
     ? {
         source_system: sourceSystem,

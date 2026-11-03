@@ -1056,7 +1056,7 @@ export async function dispatchWisdomOperation(
       // delivery/usage aggregate + corpus frontmatter and overwrites
       // CURATION_REPORT.md. Candidates only (KM-03 guardrail): no file is
       // deleted, archived, or demoted here.
-      const { report, reportPath } = generateKnowledgeCurationReport();
+      const { report, reportPath } = await generateKnowledgeCurationReport();
       // Procedure success checks ride the same weekly run but land in a
       // personal-tier report, never in the public CURATION_REPORT.md. Fail
       // open: a broken procedure catalog must not cost the curation report.

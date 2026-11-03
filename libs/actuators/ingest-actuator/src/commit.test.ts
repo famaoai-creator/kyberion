@@ -110,7 +110,7 @@ afterEach(() => {
 });
 
 describe('ingest:commit fail-closed path guard (DA-05 acceptance 1)', () => {
-  it('rejects target paths outside the tenant knowledge root', () => {
+  it('rejects target paths outside the tenant knowledge root', async () => {
     const card = normalizedCard('# Card\n\nBody.');
     for (const escape of [
       'knowledge/confidential/other-co/reports/q1.md', // another tenant
@@ -119,34 +119,34 @@ describe('ingest:commit fail-closed path guard (DA-05 acceptance 1)', () => {
       'knowledge/public/q1.md', // public tier — needs a steward approval (DA-06)
       'active/shared/tmp/q1.md', // outside knowledge/
     ]) {
-      expect(() =>
+      await expect(
         commitIngest({
           tenant_slug: 'acme-corp',
           normalized: { ...card, target_path: escape },
           now: NOW,
           path_options: options,
         })
-      ).toThrow(
+      ).rejects.toThrow(
         /outside the tenant knowledge root|must be repo-relative|must not contain|requires steward_approval_id/
       );
     }
     // Nothing was written by the rejected attempts.
-    expect(readAssetLedger('acme-corp', options)).toHaveLength(0);
+    expect(await readAssetLedger('acme-corp', options)).toHaveLength(0);
   });
 
-  it('refuses an unregistered tenant (resolveTenant fail-closed)', () => {
+  it('refuses an unregistered tenant (resolveTenant fail-closed)', async () => {
     const card = normalizedCard('# Card\n\nBody.');
-    expect(() =>
+    await expect(
       commitIngest({
         tenant_slug: 'ghost-co',
         normalized: { ...card, target_path: 'knowledge/confidential/ghost-co/q1.md' },
         now: NOW,
         path_options: options,
       })
-    ).toThrow(/has no profile/);
+    ).rejects.toThrow(/has no profile/);
   });
 
-  it('rejects a tenant landing path that traverses a symlinked directory', () => {
+  it('rejects a tenant landing path that traverses a symlinked directory', async () => {
     const tenantRoot = path.join(fixtureRoot, 'knowledge/confidential/acme-corp');
     const linkedReports = path.join(tenantRoot, 'reports');
     const target = path.join(fixtureRoot, 'external-landing-target');
@@ -156,26 +156,26 @@ describe('ingest:commit fail-closed path guard (DA-05 acceptance 1)', () => {
 
     try {
       const card = normalizedCard('# Card\n\nBody.');
-      expect(() =>
+      await expect(
         commitIngest({
           tenant_slug: 'acme-corp',
           normalized: card,
           now: NOW,
           path_options: options,
         })
-      ).toThrow('[RESOURCE_PATH_SYMLINK]');
+      ).rejects.toThrow('[RESOURCE_PATH_SYMLINK]');
     } finally {
       safeRmSync(linkedReports, { force: true });
       safeRmSync(target, { recursive: true, force: true });
     }
   });
 
-  it('refuses anonymous ingests (no ingested_by and no identity context)', () => {
+  it('refuses anonymous ingests (no ingested_by and no identity context)', async () => {
     for (const key of ['KYBERION_PERSONA', 'MISSION_ROLE'] as const) delete process.env[key];
     const card = normalizedCard('# Card\n\nBody.');
-    expect(() =>
+    await expect(
       commitIngest({ tenant_slug: 'acme-corp', normalized: card, now: NOW, path_options: options })
-    ).toThrow(/ingested_by is required/);
+    ).rejects.toThrow(/ingested_by is required/);
   });
 
   it('commit is the only writer: every other apply op lands files through commitIngest', () => {
@@ -253,7 +253,7 @@ describe('ingest:commit ceremony + supersede E2E (DA-05 acceptance 3)', () => {
       target_path: normalized.target_path,
       now,
     });
-    const result = commitIngest({
+    const result = await commitIngest({
       tenant_slug: 'acme-corp',
       normalized,
       dedup_result: dedup,
@@ -290,7 +290,7 @@ describe('ingest:commit ceremony + supersede E2E (DA-05 acceptance 3)', () => {
     const { result, dedup } = await ingestOnce('# Ingest Commit Card\n\nVersion one body.', NOW);
     expect(dedup.duplicate).toBe(true);
     expect(result).toMatchObject({ committed: false, reason: 'duplicate' });
-    expect(readAssetLedger('acme-corp', options)).toHaveLength(1);
+    expect(await readAssetLedger('acme-corp', options)).toHaveLength(1);
   });
 
   it('changed content for the same source becomes a SUPERSEDE: same target_path, version 2', async () => {
@@ -313,7 +313,7 @@ describe('ingest:commit ceremony + supersede E2E (DA-05 acceptance 3)', () => {
     const landed = path.join(fixtureRoot, 'knowledge/confidential/acme-corp/reports/q1.md');
     expect(String(safeReadFile(landed, { encoding: 'utf8' }))).toContain('Version TWO body');
     // Lineage resolves: v1 superseded, v2 active.
-    const lineage = assetLineage('acme-corp', assetId, options);
+    const lineage = await assetLineage('acme-corp', assetId, options);
     expect(lineage.map((record) => record.status)).toEqual(['superseded', 'active']);
     // Dedup registry stayed consistent: one line per distinct content hash.
     const registryLines = String(safeReadFile(registryPath, { encoding: 'utf8' }))

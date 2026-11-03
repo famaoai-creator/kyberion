@@ -52,7 +52,7 @@ import {
   safeWriteFile,
 } from '@agent/core/secure-io';
 import { nowIso, readJsonIfPresent, writeJson } from '@agent/core/foundation';
-import { withExecutionContext } from '@agent/core/governance';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/governance';
 import { resolveTenant } from '@agent/core/organization/tenant-registry';
 import { loadScratchCandidateSalt, scratchCandidateId } from '@agent/core/scratch-promotion-grace';
 import {
@@ -521,6 +521,10 @@ async function main(argv: string[], print: (value: unknown) => void): Promise<vo
     tenant
       ? withExecutionContext('asset_promoter', fn, undefined, tenant)
       : withExecutionContext('public_tool_promoter', fn);
+  const asPromoterAsync = <T>(fn: () => Promise<T>): Promise<T> =>
+    tenant
+      ? withExecutionContextAsync('asset_promoter', fn, undefined, tenant)
+      : withExecutionContextAsync('public_tool_promoter', fn);
   const sourceDir = pathResolver.rootResolve(sourceRepoPath);
   const targetDir = assertSafeRepositoryPath(pathResolver.rootResolve(targetRepoDir), {
     allowMissingLeaf: true,
@@ -603,7 +607,7 @@ async function main(argv: string[], print: (value: unknown) => void): Promise<vo
     const ledgerOptions = { knowledgeRoot: tenantKnowledgeRoot };
     try {
       const ingestedBy = resolvePromotionActor('[scratch:promote]');
-      ledgerPlan = asPromoter(() =>
+      ledgerPlan = await asPromoterAsync(() =>
         planPromotionAsset(
           {
             tenant,
@@ -624,7 +628,7 @@ async function main(argv: string[], print: (value: unknown) => void): Promise<vo
     }
   }
 
-  asPromoter(() => {
+  await asPromoterAsync(async () => {
     for (const stale of replacement.remove) {
       const stalePath = nodePath.join(targetDir, ...stale.split('/'));
       if (safeExistsSync(stalePath)) safeUnlinkSync(stalePath);
@@ -639,7 +643,7 @@ async function main(argv: string[], print: (value: unknown) => void): Promise<vo
       buildToolReadme(manifest, tenant ?? 'public')
     );
     if (tenant && ledgerPlan) {
-      commitPromotionAsset(tenant, ledgerPlan, { knowledgeRoot: tenantKnowledgeRoot });
+      await commitPromotionAsset(tenant, ledgerPlan, { knowledgeRoot: tenantKnowledgeRoot });
     }
   });
   const asset = ledgerPlan ? promotionAssetSummary(ledgerPlan) : undefined;

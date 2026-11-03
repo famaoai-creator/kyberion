@@ -303,13 +303,13 @@ function assertTargetPath(record: IngestAssetRecord, options: IngestLedgerPathOp
  * ledger is append-only evidence — one bad line must not block ingestion),
  * mirroring the ingest dedup registry reader.
  */
-export function readAssetLedger(
+export async function readAssetLedger(
   tenantSlug: string,
   options: IngestLedgerPathOptions = {}
-): IngestAssetRecord[] {
+): Promise<IngestAssetRecord[]> {
   const ledgerFile = assetLedgerPath(tenantSlug, options);
   const catalog = ingestAssetCatalog(ledgerFile);
-  return createEntryLedger<IngestAssetRecord>(ledgerFile).readAll((value, lineNumber) =>
+  return await createEntryLedger<IngestAssetRecord>(ledgerFile).readAll((value, lineNumber) =>
     normalizeIngestAssetRecord(catalog.validate(value, `${ledgerFile}:${lineNumber}`), options)
   );
 }
@@ -318,16 +318,16 @@ export function readAssetLedger(
  * Appends one validated record. Append-only by construction: there is no
  * update/delete API in this module — a supersede is a new record.
  */
-export function appendAssetRecord(
+export async function appendAssetRecord(
   tenantSlug: string,
   record: IngestAssetRecord,
   options: IngestLedgerPathOptions = {}
-): IngestAssetRecord {
+): Promise<IngestAssetRecord> {
   assertTenantSlug(tenantSlug);
   assertAssetRecord(record);
   assertTargetPath(record, options);
   const ledgerFile = assetLedgerPath(tenantSlug, options);
-  createEntryLedger<IngestAssetRecord>(ledgerFile).append(
+  await createEntryLedger<IngestAssetRecord>(ledgerFile).append(
     ingestAssetCatalog(ledgerFile).validate(record, ledgerFile)
   );
   return record;
@@ -343,14 +343,14 @@ function latestPerAsset(records: IngestAssetRecord[]): Map<string, IngestAssetRe
 }
 
 /** Latest ledger record for a source (highest version), or null. */
-export function findAssetBySource(
+export async function findAssetBySource(
   tenantSlug: string,
   sourceSystem: string,
   sourceId: string,
   options: IngestLedgerPathOptions = {}
-): IngestAssetRecord | null {
+): Promise<IngestAssetRecord | null> {
   const assetId = deriveAssetId(sourceSystem, sourceId);
-  const records = readAssetLedger(tenantSlug, options).filter(
+  const records = (await readAssetLedger(tenantSlug, options)).filter(
     (record) => record.asset_id === assetId
   );
   if (records.length === 0) return null;
@@ -358,14 +358,14 @@ export function findAssetBySource(
 }
 
 /** Latest ledger record whose content_sha256 matches, or null. */
-export function findAssetByContentHash(
+export async function findAssetByContentHash(
   tenantSlug: string,
   contentSha256: string,
   options: IngestLedgerPathOptions = {}
-): IngestAssetRecord | null {
+): Promise<IngestAssetRecord | null> {
   const hash = String(contentSha256 || '').trim();
   if (!SHA256_RE.test(hash)) return null;
-  const matches = readAssetLedger(tenantSlug, options).filter(
+  const matches = (await readAssetLedger(tenantSlug, options)).filter(
     (record) => record.content_sha256 === hash
   );
   if (matches.length === 0) return null;
@@ -378,12 +378,12 @@ export function findAssetByContentHash(
  * returned here. Codepoint-sorted by asset_id (deterministic across
  * platforms — no localeCompare).
  */
-export function listAssets(
+export async function listAssets(
   tenantSlug: string,
   options: IngestLedgerPathOptions = {}
-): IngestAssetRecord[] {
-  return [...latestPerAsset(readAssetLedger(tenantSlug, options)).values()].sort((left, right) =>
-    left.asset_id < right.asset_id ? -1 : left.asset_id > right.asset_id ? 1 : 0
+): Promise<IngestAssetRecord[]> {
+  return [...latestPerAsset(await readAssetLedger(tenantSlug, options)).values()].sort(
+    (left, right) => (left.asset_id < right.asset_id ? -1 : left.asset_id > right.asset_id ? 1 : 0)
   );
 }
 
@@ -395,12 +395,12 @@ export function listAssets(
  * (源泉→変換列→承認) が復元できる" is answered: each returned record carries
  * source_*, transform_chain, approval_id and supersedes.
  */
-export function assetLineage(
+export async function assetLineage(
   tenantSlug: string,
   assetId: string,
   options: IngestLedgerPathOptions = {}
-): IngestAssetRecord[] {
-  const chain = readAssetLedger(tenantSlug, options)
+): Promise<IngestAssetRecord[]> {
+  const chain = (await readAssetLedger(tenantSlug, options))
     .filter((record) => record.asset_id === assetId)
     .sort((left, right) => left.version - right.version);
   if (chain.length === 0) return [];
@@ -445,12 +445,12 @@ export interface IngestStalenessReport {
  * whose ledger content_sha256 / source_version no longer matches. With no
  * observations it just dumps the active assets for external comparison.
  */
-export function stalenessReport(
+export async function stalenessReport(
   tenantSlug: string,
   currentSources: IngestSourceObservation[] = [],
   options: IngestLedgerPathOptions = {}
-): IngestStalenessReport {
-  const assets = listAssets(tenantSlug, options);
+): Promise<IngestStalenessReport> {
+  const assets = await listAssets(tenantSlug, options);
   const stale: IngestStalenessEntry[] = [];
   for (const asset of assets) {
     const observed = currentSources.find(
