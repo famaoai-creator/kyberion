@@ -20,6 +20,7 @@
     "embedding-backend",
     "web-search-runtime",
     "storage-backend",
-    "provider-transport"
+    "provider-transport",
+    "lease-backend"
   ]
 }
