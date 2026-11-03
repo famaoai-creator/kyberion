@@ -954,11 +954,15 @@
         "tests/service-channel-boundary.test.ts",
         "tests/runtime-surface-boundary.test.ts",
         "tests/protocol-service-boundary-contract.test.ts",
-        "tests/script-topology-contract.test.ts"
+        "tests/script-topology-contract.test.ts",
+        "libs/core/seam.test.ts",
+        "libs/core/seam-lifecycle-contract.test.ts",
+        "libs/core/provider-module-boundaries.test.ts",
+        "libs/core/ocr-bridge.test.ts"
       ],
       "timeout_ms": 300000,
       "owner": "quality",
-      "rationale": "S3: registration-ceremony ratchets in tests/ (sharedTmp allowlist, findMissionPath DIRECT_CALLERS, node:fs / child_process / managed-process allowlists, package boundary) previously failed only in CI's test job. Budget: about 30s wall alone, but each file scans libs/ and scripts/, so under the 6-gate concurrent pr run the per-test timeout is raised to 60s and the gate to 300s; tests/core-runtime-import-contract.test.ts (about 30s, needs dist) stays in the test job."
+      "rationale": "S3: registration-ceremony ratchets (storage/IO/process/package boundaries) and seam lifecycle/provider-boundary contracts, including OCR removal cache invalidation. Budget: about 30s wall alone; scanning under six concurrent gates uses a 60s test timeout and 300s gate timeout. tests/core-runtime-import-contract.test.ts stays in the test job."
     },
     {
       "id": "test-sleep-ratchet",

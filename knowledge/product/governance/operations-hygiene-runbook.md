@@ -1902,6 +1902,16 @@ submission receipt followed by poll/download/persistence failure must signal
 the same terminal verification stop through SDK envelopes; a model repair
 must not change providers and submit again.
 
+Provider registration and removal must use the shared seam lifecycle. Invalidate
+derived router caches on both events, and keep catalog/list/get/reset consistent:
+builtins are registrations, not getter exceptions. Automatic resolution requires
+a declared eligible default or a unique eligible candidate; provider ID order is
+not a preference policy. When changing a provider bridge, run the common seam
+lifecycle/auto-selection contracts and its caller regression tests in addition
+to multiplicity/AST checks. The OCR removal regression must demonstrate that an
+unregistered provider is not invoked on the next request. See the
+[seam lifecycle contract](../architecture/seam-lifecycle-contract.md).
+
 Mutations and opaque CLI/MCP calls must not retry or fall through to another
 transport after execution has started. Only proven reads may replay; a binary
 known missing before invocation may select another route. Record actual outcomes
