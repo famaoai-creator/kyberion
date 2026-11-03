@@ -1,5 +1,5 @@
 import type {
-  JsonRecord,
+  VideoGenerationJsonRecord,
   VideoGenerationProvider,
   VideoGenerationRequest,
   VideoGenerationStatus,
@@ -43,7 +43,7 @@ export class RunwayProvider implements VideoGenerationProvider {
             { uri: request.last_frame_image, position: 'last' },
           ]
         : request.first_frame_image;
-    const payload: JsonRecord = {
+    const payload: VideoGenerationJsonRecord = {
       model: request.model,
       promptText: request.prompt,
       ...(promptImage ? { promptImage } : {}),

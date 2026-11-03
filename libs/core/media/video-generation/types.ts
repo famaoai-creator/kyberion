@@ -69,9 +69,9 @@ export interface DirectVideoProviderAdapter {
   features: DirectVideoFeatures;
 }
 
-export type JsonRecord = Record<string, unknown>;
+export type VideoGenerationJsonRecord = Record<string, unknown>;
 
-export type VideoGenerationParams = JsonRecord & {
+export type VideoGenerationParams = VideoGenerationJsonRecord & {
   video_adf?: {
     prompt?: unknown;
     engine?: { backend_id?: unknown };
