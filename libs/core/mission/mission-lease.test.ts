@@ -1,4 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import {
+  createKvLeaseBackendStub,
+  createSharedKvLeaseStore,
+} from '../lease/kv-lease-backend.stub.js';
 import { createMemoryLeaseBackend } from '../lease/memory-lease-backend.js';
 import { createMissionLeaseManager, type MissionLeaseManager } from './mission-lease.js';
 
@@ -516,5 +520,92 @@ describe('LeaseBackend injection', () => {
     expect(again.ok).toBe(true);
     expect(again.lease?.fence).toBe(first.lease?.fence);
     expect(again.lease?.expires_at_ms).toBe(first.lease?.expires_at_ms);
+  });
+});
+
+describe('kv-lock-stub async surface', () => {
+  it('rejects sync acquire on a distributed backend', () => {
+    const backend = createKvLeaseBackendStub({ nodeId: 'a' });
+    const manager = createMissionLeaseManager({ backend });
+    expect(() =>
+      manager.acquireLease({ resource: 'thread-kv', holder: 'run-a', ttlMs: TTL, now: T0 })
+    ).toThrow(/sync lock unsupported/);
+  });
+
+  it('coordinates contested acquire/release across nodes via Async APIs', async () => {
+    const store = createSharedKvLeaseStore();
+    const a = createMissionLeaseManager({
+      backend: createKvLeaseBackendStub({ store, nodeId: 'a' }),
+    });
+    const b = createMissionLeaseManager({
+      backend: createKvLeaseBackendStub({ store, nodeId: 'b' }),
+    });
+
+    const held = await a.acquireLeaseAsync({
+      resource: 'thread-kv',
+      holder: 'run-a',
+      ttlMs: TTL,
+      now: T0,
+    });
+    expect(held.ok).toBe(true);
+
+    const contested = await b.acquireLeaseAsync({
+      resource: 'thread-kv',
+      holder: 'run-b',
+      ttlMs: TTL,
+      now: T0 + 10,
+    });
+    expect(contested.ok).toBe(false);
+    expect(codes(contested)).toContain('LEASE_SUSPENDED');
+    expect(await b.getHolderAsync('thread-kv', T0 + 20)).toBe('run-a');
+
+    const released = await a.releaseLeaseAsync({
+      leaseId: held.lease!.lease_id,
+      holder: 'run-a',
+      now: T0 + 100,
+    });
+    expect(released.ok).toBe(true);
+    expect(await b.getHolderAsync('thread-kv', T0 + 100)).toBeUndefined();
+
+    const takeover = await b.acquireLeaseAsync({
+      resource: 'thread-kv',
+      holder: 'run-b',
+      ttlMs: TTL,
+      now: T0 + 200,
+    });
+    expect(takeover.ok).toBe(true);
+    expect(takeover.lease?.holder).toBe('run-b');
+    expect(takeover.lease?.fence).toBe(2);
+  });
+
+  it('serializes concurrent async acquires on one shared KV store', async () => {
+    const store = createSharedKvLeaseStore();
+    const a = createMissionLeaseManager({
+      backend: createKvLeaseBackendStub({ store, nodeId: 'a', lockDelayMs: 2 }),
+    });
+    const b = createMissionLeaseManager({
+      backend: createKvLeaseBackendStub({ store, nodeId: 'b' }),
+    });
+
+    const first = a.acquireLeaseAsync({
+      resource: 'thread-race',
+      holder: 'run-a',
+      ttlMs: TTL,
+      now: T0,
+    });
+    await new Promise<void>((resolve) => setTimeout(resolve, 1));
+    const second = b.acquireLeaseAsync({
+      resource: 'thread-race',
+      holder: 'run-b',
+      ttlMs: TTL,
+      now: T0 + 1,
+    });
+    const [ra, rb] = await Promise.all([first, second]);
+    const winners = [ra, rb].filter((r) => r.ok);
+    const losers = [ra, rb].filter((r) => !r.ok);
+    expect(winners).toHaveLength(1);
+    expect(losers).toHaveLength(1);
+    expect(codes(losers[0]!)).toContain('LEASE_SUSPENDED');
+    expect(winners[0]!.lease?.fence).toBe(1);
   });
 });
