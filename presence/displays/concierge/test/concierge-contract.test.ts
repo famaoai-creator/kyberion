@@ -221,7 +221,12 @@ describe('concierge surface contract', () => {
       path.join(appDir, 'src/app/settings/sections/AdvancedSection.tsx'),
       'utf8'
     );
-    const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
+    // The setup projection assembly lives in lib/setup-state.ts (shared by
+    // the setup route and the headless settings endpoints); the route file
+    // itself is the thin viewer/dispatch wrapper.
+    const setupRoute =
+      fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8') +
+      fs.readFileSync(path.join(appDir, 'src/lib/setup-state.ts'), 'utf8');
     const messages = fs.readFileSync(
       path.join(appDir, '../../../knowledge/product/orchestration/user-facing-vocabulary.json'),
       'utf8'
@@ -460,7 +465,9 @@ describe('concierge surface contract', () => {
   });
 
   it('renders actionable setup diagnostics that jump to in-page sections (CS-03)', () => {
-    const setupRoute = fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8');
+    const setupRoute =
+      fs.readFileSync(path.join(appDir, 'src/app/api/setup/route.ts'), 'utf8') +
+      fs.readFileSync(path.join(appDir, 'src/lib/setup-state.ts'), 'utf8');
     const setupPage = fs.readFileSync(path.join(appDir, 'src/app/settings/page.tsx'), 'utf8');
     const readiness = safeReadFile(path.join(appDir, 'src/app/settings/settings-readiness.tsx'));
     const messages = fs.readFileSync(
