@@ -125,29 +125,35 @@ function mockShared(sub = ''): string {
   return path.join(base, sub);
 }
 
-vi.mock('./path-resolver.js', () => ({
-  pathResolver: {
-    // lock-utils evaluates rootDir while this mock is being hoisted, before
-    // beforeEach initializes the per-test fixture.
-    rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
-    // agent-runtime-events.ts resolves its EVENTS_DIR through
-    // `pathResolver.shared(...)` at module load time (AC-10 readers are
-    // imported by storage-janitor.ts), so the mocked `pathResolver` object
-    // needs the same `shared` the module-level named export below provides.
+vi.mock('./path-resolver.js', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('./path-resolver.js')>();
+  return {
+    ...actual,
+    pathResolver: {
+      ...actual.pathResolver,
+      // lock-utils evaluates rootDir while this mock is being hoisted, before
+      // beforeEach initializes the per-test fixture.
+      rootDir: () =>
+        pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
+      // agent-runtime-events.ts resolves its EVENTS_DIR through
+      // `pathResolver.shared(...)` at module load time (AC-10 readers are
+      // imported by storage-janitor.ts), so the mocked `pathResolver` object
+      // needs the same `shared` the module-level named export below provides.
+      shared: mockShared,
+      // owner-scope → project-registry → vocabulary-catalog resolve paths
+      // through the `pathResolver` object (not the named export).
+      knowledge: (sub = '') => path.join(pathResolverMock.repoRoot, 'knowledge', sub),
+    },
+    sharedTmp: (sub = '') => path.join(tmpDir, sub),
     shared: mockShared,
-    // owner-scope → project-registry → vocabulary-catalog resolve paths
-    // through the `pathResolver` object (not the named export).
+    sharedLogsAudit: (sub = '') => path.join(path.dirname(tmpDir), 'logs', 'audit', sub),
     knowledge: (sub = '') => path.join(pathResolverMock.repoRoot, 'knowledge', sub),
-  },
-  sharedTmp: (sub = '') => path.join(tmpDir, sub),
-  shared: mockShared,
-  sharedLogsAudit: (sub = '') => path.join(path.dirname(tmpDir), 'logs', 'audit', sub),
-  knowledge: (sub = '') => path.join(pathResolverMock.repoRoot, 'knowledge', sub),
-  // Repo root of the temp fixture: tmpDir is <root>/active/shared/tmp, so
-  // repo-relative paths ('active/shared/...', 'active/archive/.trash/...')
-  // resolve exactly as they do in the real tree.
-  rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
-}));
+    // Repo root of the temp fixture: tmpDir is <root>/active/shared/tmp, so
+    // repo-relative paths ('active/shared/...', 'active/archive/.trash/...')
+    // resolve exactly as they do in the real tree.
+    rootDir: () => pathResolverMock.rootDir || path.join(os.tmpdir(), 'kyberion-janitor-mock-root'),
+  };
+});
 
 // The status-rule sweep runs inside a system execution context; the real
 // authority module needs the full path resolver, which this suite mocks.
