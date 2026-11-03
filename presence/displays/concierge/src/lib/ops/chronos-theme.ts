@@ -54,29 +54,3 @@ export function saveStoredChronosThemeMode(mode: ChronosThemeMode): void {
     // localStorage may be denied; the choice still applies to this page view.
   }
 }
-
-/**
- * `system` follows `prefers-color-scheme` through the token stylesheet; a
- * pinned light/dark sets `data-theme` on `<html>` (`:root[data-theme]`).
- */
-export function applyChronosThemeMode(mode: ChronosThemeMode): void {
-  if (typeof document === 'undefined') return;
-  const root = document.documentElement;
-  if (mode === 'system') {
-    root.removeAttribute('data-theme');
-    root.style.removeProperty('color-scheme');
-  } else {
-    root.setAttribute('data-theme', mode);
-    root.style.colorScheme = mode;
-  }
-}
-
-/**
- * Inline `<head>` script: applies a stored light/dark choice before first
- * paint so a pinned theme never flashes the system theme.
- */
-export const CHRONOS_THEME_BOOTSTRAP_SCRIPT = `(function(){try{var s=window.localStorage;var t=s.getItem(${JSON.stringify(
-  CHRONOS_THEME_STORAGE_KEY
-)})||s.getItem(${JSON.stringify(
-  CHRONOS_LEGACY_THEME_STORAGE_KEY
-)});if(t==='light'||t==='dark'){document.documentElement.setAttribute('data-theme',t);document.documentElement.style.colorScheme=t;}}catch(e){}})();`;
