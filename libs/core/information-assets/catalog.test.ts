@@ -30,6 +30,7 @@ vi.mock('../path-resolver.js', () => ({
   },
 }));
 vi.mock('./access.js', () => ({
+  assertInformationAssetCatalogAuthorization: () => {},
   assertInformationAssetScope: () => {},
   assertCurrentInformationAssetScope: () => {},
   assertInformationAssetParents: () => {},
