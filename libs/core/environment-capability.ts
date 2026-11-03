@@ -38,7 +38,7 @@ import {
   safeWriteFile,
 } from './secure-io.js';
 import { auditChain } from './governance/audit-chain.js';
-import { coreSeamCatalog, createSeam } from './seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from './seam.js';
 
 /* ------------------------------------------------------------------ *
  * Types                                                              *
@@ -164,26 +164,20 @@ const environmentProbeSeam = createSeam<RegisteredProbe>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/environment-capability.ts',
 });
-const probeDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(environmentProbeSeam);
 
 export function registerEnvironmentCapabilityProbe(
   probe_id: string,
   probe: RegisteredProbe
 ): () => void {
-  const dispose = environmentProbeSeam.register(probe_id, probe, {
+  return registrations.register(probe_id, probe, {
     provenance: 'plugin',
     source: `environment-probe:${probe_id}`,
   });
-  const wrappedDispose = () => {
-    dispose();
-    if (probeDisposers.get(probe_id) === wrappedDispose) probeDisposers.delete(probe_id);
-  };
-  probeDisposers.set(probe_id, wrappedDispose);
-  return wrappedDispose;
 }
 
 export function resetEnvironmentCapabilityProbeRegistry(): void {
-  for (const dispose of [...probeDisposers.values()]) dispose();
+  registrations.reset();
 }
 
 export function hasEnvironmentCapabilityProbe(probe_id: string): boolean {

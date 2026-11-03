@@ -41,7 +41,12 @@
  * only move a confidence, never a branch.
  */
 
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 import { checkProviderEgress, type ProviderEgressLabel } from '../provider/provider-egress-gate.js';
 import { pathResolver } from '../path-resolver.js';
 import { readJsonIfPresent } from '../foundation/json.js';
@@ -181,7 +186,7 @@ const judgmentSeam = createSeam<JudgmentBackend>({
   owner: 'libs/core/reasoning/judgment-backend.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(judgmentSeam);
 
 export function registerJudgmentBackend(
   backend: JudgmentBackend,
@@ -197,24 +202,11 @@ export function registerJudgmentBackend(
       `JudgmentBackend '${id}' must declare egress as 'local-only' or 'external-api'`
     );
   }
-  const disposeFromSeam = judgmentSeam.register(id, backend, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, backend, metadata);
 }
 
 export function resetJudgmentBackends(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* a disposer that already ran must not block the rest */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
   calibrationCache = undefined;
 }
 

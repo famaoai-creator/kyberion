@@ -126,23 +126,11 @@ vi.mock('@agent/core/voice/voice-engine-registry', () => ({
   }),
   getVoiceEngineRegistry: () => ({ engines: [], default_engine_id: 'local_say' }),
 }));
-vi.mock('@agent/core/seam', () => ({
-  coreSeamCatalog: {},
-  createSeam: () => {
-    const providers = new Map<string, { id: string; implementation: unknown }>();
-    return {
-      register: (id: string, implementation: unknown) => {
-        providers.set(id, { id, implementation });
-        return () => {
-          providers.delete(id);
-        };
-      },
-      list: () => [...providers.values()],
-      getOptional: (id: string) => providers.get(id)?.implementation,
-      get: (id: string) => providers.get(id)?.implementation,
-    };
-  },
-}));
+// Exercise the real lifecycle contract while isolating this file's registrations.
+vi.mock('@agent/core/seam', async (original) => {
+  const actual = await original<typeof import('@agent/core/seam')>();
+  return { ...actual, coreSeamCatalog: actual.createSeamCatalog() };
+});
 
 import { enforceApprovalGate } from '@agent/core/governance/approval-gate';
 import { auditChain } from '@agent/core/governance/audit-chain';
