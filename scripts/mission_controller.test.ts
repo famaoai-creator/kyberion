@@ -1744,6 +1744,51 @@ describe('mission controller router — archive verb (AL-03)', () => {
     } as any;
   }
 
+  it('routes offline source preparation with an exact baseline argument', async () => {
+    const argv = [
+      'node',
+      'dist/scripts/mission_controller.js',
+      'prepare-source-workspace',
+      'MSN-PRIVATE',
+      'implement',
+      '--baseline-commit',
+      'a'.repeat(40),
+    ];
+    expect(extractMissionControllerPositionalArgs(argv)).toEqual([
+      'prepare-source-workspace',
+      'MSN-PRIVATE',
+      'implement',
+    ]);
+    const context = makeRoutingContext(argv, 'prepare-source-workspace');
+    context.arg1 = 'MSN-PRIVATE';
+    context.arg2 = 'implement';
+    context.prepareSourceWorkspace = vi.fn(() => ({ created: true }));
+    await missionControllerRouter.runMissionControllerAction(context);
+    expect(context.prepareSourceWorkspace).toHaveBeenCalledWith(
+      'MSN-PRIVATE',
+      'implement',
+      'a'.repeat(40)
+    );
+    expect(shouldSkipReasoningBootstrap('prepare-source-workspace')).toBe(true);
+  });
+
+  it('routes source preparation to the canonical facade without elevating a worker', async () => {
+    const argv = [
+      'prepare-source-workspace',
+      'MSN-NOT-PRESENT',
+      'implement',
+      '--baseline-commit',
+      'a'.repeat(40),
+    ];
+    const context = makeRoutingContext(argv, 'prepare-source-workspace');
+    context.arg2 = 'implement';
+    await expect(
+      withExecutionContextAsync('worker', () =>
+        missionControllerRouter.runMissionControllerAction(context)
+      )
+    ).rejects.toThrow('[TASK_WORKSPACE_OWNER]');
+  });
+
   it('routes supersede-task approval requests, dry runs and applies; flag values stay out of positionals', async () => {
     const base = [
       'node',
