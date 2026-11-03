@@ -1,21 +1,9 @@
-import * as path from 'node:path';
 import { secureFetch } from '../../network.js';
-import {
-  assertSafeRepositoryPath,
-  safeLstat,
-  safeReadFile,
-  validateFileSize,
-} from '../../secure-io.js';
+import { safeReadFile } from '../../secure-io.js';
 import { resolveRuntimeModelId } from '../../tool/runtime-model-defaults.js';
 import { getRegisteredEnvText } from '../../foundation/env.js';
 import { resolveGeminiApiKey } from '../../provider/gemini-api-backend.js';
-import {
-  OcrRequest,
-  OcrResult,
-  OcrProvider,
-  OcrDataEgress,
-  OcrRoutingMode,
-} from '../../ocr-types.js';
+import { OcrRequest, OcrResult, OcrProvider } from '../../ocr-types.js';
 import {
   getMimeType,
   resolveOcrImagePath,

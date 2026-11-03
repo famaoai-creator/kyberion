@@ -5,24 +5,19 @@ import { nowIso } from '../../../foundation/time.js';
 import { pathResolver } from '../../../path-resolver.js';
 import {
   assertSafeRepositoryPath,
-  safeExecResult,
   safeExistsSync,
   safeMkdir,
-  safeReadFile,
   safeWriteFile,
 } from '../../../secure-io.js';
 import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
-  ImageReference,
 } from '../../image-generation-types.js';
 import {
   assertReferenceEgressAllowed,
   hasReferenceImages,
-  imageProviderDataEgress,
   recordReferenceEgressReceipt,
-  referenceImageViolation,
   resolveReferenceImagePath,
 } from '../../image-reference-consent.js';
 import {

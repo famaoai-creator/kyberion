@@ -1,22 +1,10 @@
-import * as path from 'node:path';
 import { recognizeImageLocallyWithAppleVision } from '../../apple-intelligence-bridge.js';
 import { isMacOS } from '../../platform-facts.js';
 import { pathResolver } from '../../path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeLstat,
-  safeReadFile,
-  validateFileSize,
-} from '../../secure-io.js';
+import { assertSafeRepositoryPath, validateFileSize } from '../../secure-io.js';
 import { spawnManagedProcess } from '../../managed-process.js';
 import { parseSafeJsonObjectInput } from '../../foundation/safe-json.js';
-import {
-  OcrRequest,
-  OcrResult,
-  OcrProvider,
-  OcrDataEgress,
-  OcrRoutingMode,
-} from '../../ocr-types.js';
+import { OcrRequest, OcrResult, OcrProvider } from '../../ocr-types.js';
 import {
   probeWindowsNativeImageRecognition,
   recognizeTextWithWindowsNativeApi,
