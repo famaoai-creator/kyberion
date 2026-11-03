@@ -9,9 +9,13 @@
  * guarantees over Redis/DynamoDB/KV instead.
  *
  * Providers register by id (`local-file-lock` builtin, `memory` for hermetic
- * tests, kv-lock/ddb-conditional-put later); selection order is governed data
+ * tests, `kv-lock-stub` for a Redis/KV contract double, real kv-lock /
+ * ddb-conditional-put adapters later); selection order is governed data
  * (`seam-provider-selection/lease-backend.json` `default_chains`), never a
  * hard-coded preference list.
+ *
+ * Distributed backends may refuse `withLockSync` (no cross-runtime blocking
+ * mutex). Callers that need multi-node exclusion must use `withLock`.
  *
  * The contract deliberately separates the mutex from the record: callers
  * (writer-lease and friends) own acquire/renew/release policy, error codes,
