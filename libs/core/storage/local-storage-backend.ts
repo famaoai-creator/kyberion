@@ -19,7 +19,7 @@ import {
   LOCAL_STORAGE_BACKEND_ID,
   registerStorageBackend,
   type SyncStorageBackend,
-} from './storage-backend.js';
+} from '@agent/kernel/storage/storage-backend';
 
 export const localStorageBackend: SyncStorageBackend = {
   id: LOCAL_STORAGE_BACKEND_ID,
