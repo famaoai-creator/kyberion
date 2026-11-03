@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
-import { getRegisteredEnvText, nowIso } from '@agent/core/foundation';
+import { nowIso } from '@agent/core/foundation';
 import {
   applyBrowserOnboarding,
+  applyBrowserOnboardingSettingsPatch,
   saveBrowserOnboardingVoiceSample,
 } from '@agent/core/browser/browser-onboarding';
 import { readTenantProfile, writeTenantProfile } from '@agent/core/organization/tenant-registry';
@@ -143,9 +144,11 @@ export async function POST(req: NextRequest) {
           ? ['action', 'tenant', 'agent', 'vision', 'name', 'primary_domain']
           : body.action === 'apply_onboarding'
             ? ['action', 'draft']
-            : body.action === 'avatar_generate'
-              ? ['action', 'consent']
-              : ['action'];
+            : body.action === 'save_settings'
+              ? ['action', 'patch']
+              : body.action === 'avatar_generate'
+                ? ['action', 'consent']
+                : ['action'];
       requireKnownRequestKeys(body, allowedKeys);
     } catch {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });
@@ -163,12 +166,9 @@ export async function POST(req: NextRequest) {
         ['agent_id', 'display_name', 'provider', 'model_id'],
         'agent'
       );
-      const requestedSlug = optionalSetupString(tenantInput, 'slug');
-      const activeSlug = (
-        requestedSlug ||
-        getRegisteredEnvText('KYBERION_TENANT') ||
-        'default'
-      ).trim();
+      // Never fall back to an implicit tenant: saving here must not create
+      // `default` (or any other tenant) the operator did not choose.
+      const activeSlug = (optionalSetupString(tenantInput, 'slug') || '').trim();
       const displayNameInput = optionalSetupString(tenantInput, 'display_name');
       const assignedRoleInput = optionalSetupString(tenantInput, 'assigned_role');
       const statusInput = optionalSetupString(tenantInput, 'status');
@@ -182,6 +182,21 @@ export async function POST(req: NextRequest) {
       const agentDisplayNameInput = optionalSetupString(agentInput, 'display_name');
       const providerInput = optionalSetupString(agentInput, 'provider');
       const modelIdInput = optionalSetupString(agentInput, 'model_id');
+      const selectedTenant = activeSlug
+        ? withExecutionContext('sovereign_concierge', () =>
+            secureIo.withSensitivePathMediation(() => readTenantProfile(activeSlug))
+          )
+        : null;
+      if (!selectedTenant) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: 'TENANT_SELECTION_REQUIRED',
+            error: t('api.config.tenant_invalid'),
+          },
+          { status: 400 }
+        );
+      }
       const profileRoot = resolveActiveProfileRoot();
       const identityPath = path.join(profileRoot, 'my-identity.json');
       const visionPath = path.join(profileRoot, 'my-vision.md');
@@ -192,13 +207,7 @@ export async function POST(req: NextRequest) {
           const currentIdentity = safeIdentityPath
             ? loadPersonalIdentityAtPath(safeIdentityPath) || {}
             : {};
-          const currentTenant = readTenantProfile(activeSlug) || {
-            tenant_slug: activeSlug,
-            tenant_id: activeSlug,
-            display_name: activeSlug,
-            status: 'active' as const,
-            assigned_role: 'owner',
-          };
+          const currentTenant = selectedTenant;
           const safeAgentPath = resolveExistingProfileFile(agentPath);
           const currentAgent = safeAgentPath
             ? loadPersonalAgentIdentityAtPath(safeAgentPath) || {}
@@ -269,6 +278,35 @@ export async function POST(req: NextRequest) {
       return body.action === 'avatar_generate'
         ? startAvatarGenerateAction(body, viewer.context, t)
         : useGeneratedAvatarAction(viewer.context, t);
+    }
+    if (body?.action === 'save_settings') {
+      // Settings sections send only edited fields; the writer merges them
+      // onto the stored profile instead of re-submitting the onboarding draft.
+      const patch = structuredClone(requireSetupObject(body.patch, 'patch')) as SetupInputObject;
+      const voicePatch = optionalSetupObject(patch, 'voice');
+      const patchSampleRefs = voicePatch
+        ? optionalSetupStringArray(voicePatch, 'sample_refs')
+        : undefined;
+      if (voicePatch && patchSampleRefs) {
+        voicePatch.sample_refs = patchSampleRefs.map((value) =>
+          path.isAbsolute(value) ? value : pathResolver.rootResolve(value)
+        );
+      }
+      try {
+        const result = await secureIo.withSensitivePathMediation(() =>
+          applyBrowserOnboardingSettingsPatch(patch)
+        );
+        return NextResponse.json({ ok: true, onboarding: result });
+      } catch (error) {
+        // A malformed patch is the caller's input, not a server fault.
+        if (error instanceof Error && error.name === 'ZodError') {
+          return NextResponse.json(
+            { ok: false, error: t('api.onboarding_input') },
+            { status: 400 }
+          );
+        }
+        throw error;
+      }
     }
     if (body?.action !== 'apply_onboarding' || !body?.draft) {
       return NextResponse.json({ ok: false, error: t('api.onboarding_input') }, { status: 400 });

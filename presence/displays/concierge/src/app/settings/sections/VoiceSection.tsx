@@ -17,6 +17,7 @@ import type { Setup, VoiceSelection } from '../../../lib/settings-types';
 import type { VoiceInputDevice } from '../../../lib/voice-types';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
 import { AvatarGenerationPanel } from './AvatarGenerationPanel';
+import { SettingsSaveFeedback, type SettingsSaveFeedbackState } from './SettingsSaveFeedback';
 
 /** FD-06 写真・音声 pane (`#setup-media`) — avatar + voice sample
  * recording + voice runtime. Extracted from settings/page.tsx; the recorder
@@ -45,6 +46,8 @@ export type VoiceSectionProps = {
   onStopVoiceRecording: () => void;
   onVoiceSampleFileChange: (file: File) => void;
   onSaveVoice: () => void;
+  /** Result of the immediate voice registration, shown next to its button. */
+  saveFeedback?: SettingsSaveFeedbackState | null;
   /** 声と話し方: TTS engine / STT backend / input device (HT plan §2.3). Null
    * while /api/voice/selection is still loading or voice-hub is down. */
   voiceSelection: VoiceSelection | null;
@@ -68,6 +71,7 @@ export function VoiceSection({
   onStopVoiceRecording,
   onVoiceSampleFileChange,
   onSaveVoice,
+  saveFeedback,
   voiceSelection,
   voiceDevices,
   voiceSelectionBusy,
@@ -188,6 +192,7 @@ export function VoiceSection({
               action={{ id: 'voice.sample.add' }}
             />
           </div>
+          <SettingsSaveFeedback feedback={saveFeedback} t={t} />
           <div className="settings-row-actions">
             <Button
               label={t('setup.save_voice')}
