@@ -6,8 +6,9 @@ import { createHash, randomBytes } from 'node:crypto';
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
- * TR-01: Chronos runs under SYSTEM_ROLE=chronos_mirror_v2, which cannot read
- * the personal tier. The chronos-access token registry is read through the
+ * TR-01: the operations console (served by Concierge since
+ * MSN-KYBERION-SERVER-20261104) runs under SYSTEM_ROLE=concierge, which cannot
+ * read the personal tier. The chronos-access token registry is read through the
  * dedicated `chronos_token_registry_reader` role, whose only grant is that one
  * file. These tests run the real secure-io / tier-guard / secret-guard stack
  * against a hermetic KYBERION_ROOT with a copy of the checked-in governance
@@ -110,15 +111,15 @@ describe('TR-01 chronos_token_registry_reader', () => {
     for (const key of ENV_KEYS) {
       if (key !== 'KYBERION_ROOT') delete process.env[key];
     }
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    process.env.SYSTEM_ROLE = 'concierge';
   });
 
-  it('cannot read the registry under the ambient chronos_mirror_v2 role', async () => {
+  it('cannot read the registry under the ambient concierge role', async () => {
     const { registry } = await loadModules();
     expect(() => registry.readChronosTokenRegistrations()).toThrow();
   });
 
-  it('reads the registry under SYSTEM_ROLE=chronos_mirror_v2 through the reader role', async () => {
+  it('reads the registry under SYSTEM_ROLE=concierge through the reader role', async () => {
     const { authority, registry } = await loadModules();
     const registrations = authority.withExecutionContext(
       registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE,
@@ -162,7 +163,7 @@ describe('TR-01 chronos_token_registry_reader', () => {
 
   it('may be assumed only by the surfaces that read the registry', async () => {
     const { authority, registry } = await loadModules();
-    for (const systemRole of ['chronos_mirror_v2', 'concierge']) {
+    for (const systemRole of ['concierge']) {
       expect(
         authority.isRoleAssumptionAllowed(systemRole, registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE),
         systemRole
@@ -170,7 +171,13 @@ describe('TR-01 chronos_token_registry_reader', () => {
     }
     // computer_surface / presence_studio pass `registrations: null` to the
     // authn seam and never read the registry.
-    for (const systemRole of ['computer_surface', 'presence_studio', 'slack_bridge']) {
+    // The Chronos compatibility app only redirects to Concierge.
+    for (const systemRole of [
+      'chronos_mirror_v2',
+      'computer_surface',
+      'presence_studio',
+      'slack_bridge',
+    ]) {
       expect(
         authority.isRoleAssumptionAllowed(systemRole, registry.CHRONOS_TOKEN_REGISTRY_READER_ROLE),
         systemRole

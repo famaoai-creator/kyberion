@@ -81,7 +81,7 @@ describe('pipeline approval resume', () => {
         mission_id: 'MSN-1',
         step_ids: ['approval-step'],
         execution_authority: {
-          system_role: 'chronos_mirror_v2',
+          system_role: 'concierge',
           mission_role: 'chronos_operator',
           persona: '',
           scope: {
@@ -131,7 +131,7 @@ describe('pipeline approval resume', () => {
         expect.objectContaining({
           spawnOptions: expect.objectContaining({
             env: expect.objectContaining({
-              SYSTEM_ROLE: 'chronos_mirror_v2',
+              SYSTEM_ROLE: 'concierge',
               MISSION_ROLE: 'chronos_operator',
               KYBERION_DELEGATED_ROLE: '',
               KYBERION_PERSONA: '',
