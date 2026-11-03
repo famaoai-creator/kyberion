@@ -22,11 +22,16 @@ export function browserSessionKey(deps?: AuthnResolveDeps): Buffer | null {
   try {
     // Connection documents live under the personal tier: surfaces call this
     // from unauthenticated login routes, outside any execution context.
+    // System scope (tenant cleared), like the chronos token registry reader:
+    // the session key is operator-wide, and a persisted tenant binding would
+    // otherwise deny the read and break sign-in on every surface.
     const doc = withExecutionContext(
       'sovereign_concierge',
       () =>
         secretGuard.loadConnectionDocument('kyberion-browser-session') as
-          { hmac_key?: string } | undefined
+          { hmac_key?: string } | undefined,
+      undefined,
+      ''
     );
     return strong(doc?.hmac_key?.trim());
   } catch {

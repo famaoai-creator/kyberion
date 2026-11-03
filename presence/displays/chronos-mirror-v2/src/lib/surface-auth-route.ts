@@ -7,6 +7,12 @@ import { resolveAuthClientKey } from '@agent/core/surface/surface-session-cookie
 export const CHRONOS_SURFACE_ID = 'chronos-mirror-v2';
 export const CHRONOS_SURFACE_LABEL = 'Chronos';
 
+function browserRequestOrigin(req: NextRequest): string {
+  const host = req.headers.get('host')?.trim();
+  if (!host || !/^[A-Za-z0-9.\-[\]:]+$/u.test(host)) return req.nextUrl.origin;
+  return `${req.nextUrl.protocol}//${host}`;
+}
+
 /** Adapt a NextRequest to the shared browser-OIDC route handler. */
 export async function handleChronosAuthRoute(req: NextRequest): Promise<Response> {
   const result = await handleSurfaceAuthRoute({
@@ -17,7 +23,10 @@ export async function handleChronosAuthRoute(req: NextRequest): Promise<Response
     searchParams: req.nextUrl.searchParams,
     cookieHeader: req.headers.get('cookie'),
     acceptLanguage: req.headers.get('accept-language'),
-    requestOrigin: req.nextUrl.origin,
+    // The origin the browser actually used. `nextUrl` normalizes loopback
+    // hosts (127.0.0.1 -> localhost), which sent the IdP callback to a host
+    // that never received the login-transaction cookie.
+    requestOrigin: browserRequestOrigin(req),
     loopback: isChronosLoopbackRequest(req),
     clientKey: resolveAuthClientKey({
       ip: (req as { ip?: string }).ip,
