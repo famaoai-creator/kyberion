@@ -111,12 +111,30 @@ export function readWorkspaceAutonomy(
   return { dots, pauseMeaning: 'future_wakeups_only', blockedReasons };
 }
 
-export function controlWorkspaceAutonomy(
+export interface WorkspaceAutonomyControlPlan {
+  dot_id: string;
+  action: 'pause' | 'resume' | 'activate';
+  target: 'paused' | 'active';
+  /** Optimistic controls the writer re-validates inside the charter lock. */
+  expectedStatus: DotCharter['status'];
+  expectedScope: DotCharter['scope'];
+  expectedAdmissionScopeHash: string;
+}
+
+/**
+ * Every check of {@link controlWorkspaceAutonomy}, read-only: the operator
+ * role, exact workplace ownership, viewer visibility and the status the
+ * action starts from. A process that must not hold the lifecycle writer (the
+ * Kyberion server) plans here and hands the plan to a governed worker, which
+ * passes the expectations to `transitionDotCharterStatus` so a charter that
+ * changed in between fails closed.
+ */
+export function planWorkspaceAutonomyControl(
   selection: ResolvedWorkspaceSelection,
   viewer: SurfaceViewerScope,
   input: { dot_id: string; action: 'pause' | 'resume' | 'activate' },
-  deps: WorkspaceAutonomyDeps = {}
-): DotCharter {
+  deps: Pick<WorkspaceAutonomyDeps, 'charters' | 'rootDir'> = {}
+): WorkspaceAutonomyControlPlan {
   if (viewer.role !== 'localadmin')
     throw new SurfaceViewerScopeError(403, 'Autonomy control requires an authorized operator.');
   const charter = (
@@ -135,14 +153,27 @@ export function controlWorkspaceAutonomy(
     (input.action === 'activate' && charter.status !== 'draft')
   )
     throw new Error('Autonomy changed; refresh the workplace before retrying.');
-  return (deps.transition ?? transitionDotCharterStatus)(
-    charter.dot_id,
-    input.action === 'pause' ? 'paused' : 'active',
-    {
-      ...deps,
-      expectedScope: charter.scope,
-      expectedStatus: charter.status,
-      expectedAdmissionScopeHash: dotAdmissionScopeHash(charter),
-    }
-  );
+  return {
+    dot_id: charter.dot_id,
+    action: input.action,
+    target: input.action === 'pause' ? 'paused' : 'active',
+    expectedStatus: charter.status,
+    expectedScope: charter.scope,
+    expectedAdmissionScopeHash: dotAdmissionScopeHash(charter),
+  };
+}
+
+export function controlWorkspaceAutonomy(
+  selection: ResolvedWorkspaceSelection,
+  viewer: SurfaceViewerScope,
+  input: { dot_id: string; action: 'pause' | 'resume' | 'activate' },
+  deps: WorkspaceAutonomyDeps = {}
+): DotCharter {
+  const plan = planWorkspaceAutonomyControl(selection, viewer, input, deps);
+  return (deps.transition ?? transitionDotCharterStatus)(plan.dot_id, plan.target, {
+    ...deps,
+    expectedScope: plan.expectedScope,
+    expectedStatus: plan.expectedStatus,
+    expectedAdmissionScopeHash: plan.expectedAdmissionScopeHash,
+  });
 }

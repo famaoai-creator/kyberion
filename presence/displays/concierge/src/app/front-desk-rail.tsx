@@ -95,7 +95,11 @@ interface FrontDeskMeResponse {
  */
 
 /** Settings subpages share its current marker; first-run bootstrap remains outside feature navigation. */
-export function currentItemId(pathname: string | null): FrontDeskNavItemPayload['id'] | null {
+export function currentItemId(
+  pathname: string | null,
+  section?: string | null
+): FrontDeskNavItemPayload['id'] | null {
+  if (pathname === '/ops' || pathname?.startsWith('/ops/')) return opsItemId(pathname, section);
   if (pathname === '/') return 'decide';
   if (pathname === '/ingest') return 'ingest';
   if (pathname === '/management') return 'organization';
@@ -103,6 +107,20 @@ export function currentItemId(pathname: string | null): FrontDeskNavItemPayload[
   if (pathname === '/setup' || pathname?.startsWith('/setup/') || pathname === '/settings')
     return 'settings';
   return workspaceItemId(pathname);
+}
+
+/** Operations console sections (`/ops?section=…`, the former Chronos surface) on the rail. */
+const OPS_RAIL_SECTIONS = new Set([
+  'deliverables',
+  'knowledge',
+  'discussion',
+  'operations',
+  'surface-control',
+  'diagnostics',
+]);
+function opsItemId(pathname: string, section?: string | null): string | null {
+  if (pathname === '/ops/discussion') return 'discussion';
+  return section && OPS_RAIL_SECTIONS.has(section) ? section : null;
 }
 
 /** `/w/<kind>[/<id>]` marks the rail entry for that kind; tasks belong to missions. */
@@ -135,7 +153,7 @@ function FrontDeskRailContent() {
   const pathname = usePathname();
   // Management changes hierarchy with native replaceState on the same path.
   // Subscribe to Next's query context so rail hrefs follow those selections.
-  useSearchParams();
+  const searchParams = useSearchParams();
   const [nav, setNav] = React.useState<FrontDeskNavResponse | null>(null);
   const [me, setMe] = React.useState<FrontDeskMeResponse | null>(null);
   const selectionGeneration = React.useRef(0);
@@ -327,7 +345,7 @@ function FrontDeskRailContent() {
     [nav, me, destinationId, requestLeave]
   );
 
-  const current = currentItemId(pathname);
+  const current = currentItemId(pathname, searchParams?.get('section'));
   const roleLabel = (role: FrontDeskTenantView['role'] | undefined) =>
     role && nav ? nav.role_labels[role] : '';
 

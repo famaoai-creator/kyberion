@@ -7,7 +7,7 @@ import { coerceLocale, createBrowserVocabularyResolver } from '@agent/core/local
  * vocabulary catalog under the `concierge` domain — the same single source
  * chronos uses — instead of a package-local messages.json. The JSON import
  * is client-safe (no node modules execute), mirroring
- * chronos-mirror-v2/src/lib/ux-vocabulary.ts and its rationale for not
+ * concierge/src/lib/ops/ux-vocabulary.ts and its rationale for not
  * importing `@agent/core/locale` here.
  */
 export type ConciergeLocale = 'en' | 'ja';

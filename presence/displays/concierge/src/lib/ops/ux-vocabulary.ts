@@ -1,0 +1,192 @@
+import vocabularyCatalog from '../../../../../../knowledge/product/orchestration/user-facing-vocabulary.json';
+import {
+  createBrowserVocabularyResolver,
+  type BrowserVocabularyEntry,
+} from '@agent/core/locale-normalize';
+import {
+  localeToBcp47,
+  normalizeLocale,
+  nextSupportedLocale,
+  type SupportedLocale,
+} from '@agent/core/locale-normalize';
+import { renderMessage } from '@agent/core/message-format';
+
+/**
+ * I18N-01: the canonical `SupportedLocale` type and normalization rules come
+ * from `@agent/core/locale-normalize`, which is import-free precisely so it
+ * is safe to pull into a `'use client'` browser bundle. (`@agent/core/locale`
+ * itself is NOT safe here — it reads the identity file via `node:path` +
+ * secure-io at module scope, and ESM executes the whole imported graph
+ * regardless of which exports are used.)
+ */
+export type { SupportedLocale };
+
+const browserVocabulary = createBrowserVocabularyResolver(vocabularyCatalog);
+
+// I18N-02: the catalog moved from a single flat `domains.ux` to namespaced
+// domains (`chronos`, `cli`, `status`, `error`, `question`, `common`, plus
+// empty `bridge`/`concierge`/`onboarding` slots for I18N-04). chronos code
+// still calls uxLabel/uxText with the bare (unqualified) key names, so this
+// module keeps resolving them across every namespace — the same
+// backward-compat lookup `@agent/core`'s `t()` implements, minimized here to
+// stay import-free of secure-io. An ambiguous bare key (present in more than
+// one namespace) throws rather than silently picking one, matching the core
+// resolver's contract.
+function lookupVocabularyEntry(key: string): BrowserVocabularyEntry | null {
+  return browserVocabulary.resolveEntry(key)?.entry ?? null;
+}
+
+/**
+ * Chronos-side entry point for steps 2/5/6 of the master precedence chain in
+ * `@agent/core/locale` (surface preference → browser language → catalog
+ * default). The identity/env steps are Node-only and do not apply in the
+ * browser. The normalization rule itself is the shared one — not a copy.
+ */
+export function normalizeChronosLocale(value: unknown): SupportedLocale {
+  return normalizeLocale(value) ?? normalizeLocale(browserVocabulary.defaultLocale()) ?? 'en';
+}
+
+// UX-03 Task 5: an explicit operator choice (header toggle) persists in
+// localStorage and wins over the browser language.
+// UI-07: the key is shared with the front desk (`kyberion.ui.locale`, see
+// concierge-theme.ts); the former Chronos-only key is still read so an
+// existing choice survives the rename.
+export const CHRONOS_LOCALE_STORAGE_KEY = 'kyberion.ui.locale';
+export const CHRONOS_LEGACY_LOCALE_STORAGE_KEY = 'kyberion.chronos.locale';
+export const CHRONOS_LOCALE_EVENT = 'kyberion-chronos-locale';
+
+export function readStoredChronosLocale(): SupportedLocale | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const value =
+      window.localStorage.getItem(CHRONOS_LOCALE_STORAGE_KEY) ??
+      window.localStorage.getItem(CHRONOS_LEGACY_LOCALE_STORAGE_KEY);
+    // I18N-07 finding: this compared against the hardcoded pair `'ja'`/`'en'`
+    // instead of the data-driven `SUPPORTED_LOCALES` set (via `normalizeLocale`,
+    // already imported below), so a stored `qps-ploc` preference was silently
+    // discarded even though every other resolution path accepted it. One-line
+    // data-driven fix — reuses the existing normalizer rather than adding a
+    // third literal.
+    return normalizeLocale(value);
+  } catch {
+    /* storage unavailable (private mode etc.): fall back to navigator */
+    return null;
+  }
+}
+
+export function setChronosLocalePreference(locale: SupportedLocale): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(CHRONOS_LOCALE_STORAGE_KEY, locale);
+  } catch {
+    /* storage unavailable: the event below still updates this session */
+  }
+  window.dispatchEvent(new CustomEvent(CHRONOS_LOCALE_EVENT, { detail: locale }));
+}
+
+export function nextChronosLocale(locale: SupportedLocale): SupportedLocale {
+  return nextSupportedLocale(locale);
+}
+
+/**
+ * I18N-01: the browser-safe subset of `libs/core/locale.ts`'s
+ * `resolveLocale` precedence chain — steps 2 (surface preference, here the
+ * localStorage-persisted header-toggle choice), 5 (`navigator.language`),
+ * and 6 (catalog `default_locale`). Steps 1 (explicit arg), 3 (onboarding
+ * identity), and 4 (`KYBERION_LOCALE`/`KYBERION_UI_LOCALE` env) are
+ * Node-only and do not apply in the browser.
+ */
+export function resolveChronosLocale(): SupportedLocale {
+  if (typeof window !== 'undefined') {
+    const stored = readStoredChronosLocale();
+    if (stored) return stored;
+    return normalizeChronosLocale(window.navigator.language);
+  }
+  return normalizeChronosLocale(browserVocabulary.defaultLocale());
+}
+
+export function chronosSpeechLocale(locale = resolveChronosLocale()): string {
+  return localeToBcp47(locale);
+}
+
+/**
+ * Browser-safe, explicit date/time formatting for Chronos surfaces.
+ * Keep this here instead of importing the Node-oriented @agent/core index
+ * into a client component; that index also exposes server-only actuators.
+ */
+export function formatChronosDateTime(
+  value: Date | string | number,
+  locale = resolveChronosLocale()
+): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat(chronosSpeechLocale(locale), {
+    timeZone: 'Asia/Tokyo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date);
+}
+
+export function selectChronosLocaleText(
+  locale: SupportedLocale,
+  variants: Partial<Record<SupportedLocale, string>> & { en: string }
+): string {
+  return (
+    variants[locale] ||
+    variants[browserVocabulary.defaultLocale() as SupportedLocale] ||
+    variants.en
+  );
+}
+
+export function uxLabel(key: string, locale = resolveChronosLocale()): string {
+  const entry = lookupVocabularyEntry(key);
+  if (!entry) return key;
+  return entry[locale] || entry[browserVocabulary.defaultLocale()] || key;
+}
+
+// UX-03 Task 5.3: no per-call fallback — the catalog is the single source
+// of truth. A missing key renders as the key itself (loud, greppable) and
+// tests/chronos-ux-vocabulary-contract.test.ts fails CI before that ships.
+export function uxText(key: string, locale = resolveChronosLocale()): string {
+  const entry = lookupVocabularyEntry(key);
+  if (!entry) return key;
+  return entry[locale] || entry[browserVocabulary.defaultLocale()] || key;
+}
+
+/**
+ * Fallback-carrying variant for DYNAMIC keys only (computed at runtime, so
+ * the contract test cannot verify them). Static keys must use uxText.
+ */
+export function uxTextOr(key: string, fallback: string, locale = resolveChronosLocale()): string {
+  const entry = lookupVocabularyEntry(key);
+  if (!entry) return fallback;
+  return entry[locale] || entry[browserVocabulary.defaultLocale()] || fallback;
+}
+
+/**
+ * Interpolating variant — for messages that carry runtime values.
+ *
+ * `uxTextOr` alone is a trap for these: the catalog entry replaces the
+ * template, so any `${...}` the caller baked into its fallback silently
+ * disappears the moment the key resolves. "Dashboard を更新しました。
+ * missions=3、agent runtimes=5" becomes "Dashboard を更新しました。" — the
+ * message still reads as a sentence, so nothing looks broken, but every
+ * number the operator needed is gone.
+ *
+ * Catalog entries here use ICU-lite `{name}` placeholders, rendered by the
+ * shared `@agent/core/message-format` (import-free, hence browser-bundle
+ * safe — the same reason `locale-normalize` is split out).
+ */
+export function uxMessage(
+  key: string,
+  params: Record<string, string | number>,
+  fallback: string,
+  locale = resolveChronosLocale()
+): string {
+  const entry = lookupVocabularyEntry(key);
+  const template = entry ? entry[locale] || entry[browserVocabulary.defaultLocale()] : undefined;
+  return renderMessage(template ?? fallback, params);
+}

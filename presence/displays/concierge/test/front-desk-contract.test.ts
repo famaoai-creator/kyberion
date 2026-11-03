@@ -380,7 +380,7 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
 
     expect(payload.ok).toBe(true);
     expect(payload.current_surface).toBe('concierge');
-    expect(payload.items).toHaveLength(14);
+    expect(payload.items).toHaveLength(20);
     expect(payload.items.map((item) => item.id)).toEqual([
       'decide',
       'ask',
@@ -391,12 +391,23 @@ describe('FD-00c buildFrontDeskNavPayload (unit)', () => {
       'organizations',
       'projects',
       'actors',
+      'deliverables',
       'ingest',
+      'knowledge',
+      'discussion',
       'first-job',
       'help',
       'organization',
+      'operations',
+      'surface-control',
+      'diagnostics',
       'settings',
     ]);
+    // The operations console (former Chronos) is a local /ops destination.
+    for (const id of ['deliverables', 'knowledge', 'discussion', 'operations', 'diagnostics']) {
+      expect(payload.items.find((item) => item.id === id)?.href).toBe(`/ops?section=${id}`);
+      expect(payload.items.find((item) => item.id === id)?.external).toBe(false);
+    }
 
     const byId = Object.fromEntries(payload.items.map((item) => [item.id, item]));
     expect(byId.decide.label).toBe('受信箱');

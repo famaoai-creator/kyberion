@@ -14,6 +14,7 @@ import {
   surfaceDecisionBinding,
 } from './approval-store.js';
 import { auditChain } from './audit-chain.js';
+import { HUMAN_DECISION_SURFACE_SYSTEM_ROLES } from './approval-human-decision.js';
 import { surfaceDecisionAuthMethod } from './approval-assurance.js';
 import { pathResolver } from '../path-resolver.js';
 import { safeExistsSync, safeReadFile, safeRmSync } from '../secure-io.js';
@@ -428,8 +429,19 @@ describe('store-level refusal of agent processes', () => {
     expect(() => decide(record.id)).toThrow(/\[APPROVAL_HUMAN_PROOF_REQUIRED\]/);
   });
 
-  it('refuses an agent principal even on a human-decision surface server', () => {
+  it('does not exempt the Chronos compatibility app, which only redirects', () => {
+    expect(HUMAN_DECISION_SURFACE_SYSTEM_ROLES.has('chronos_mirror_v2')).toBe(false);
+    const record = humanOnly('chronos-redirect-server');
+    vi.stubEnv('CLAUDECODE', '1');
     vi.stubEnv('SYSTEM_ROLE', 'chronos_mirror_v2');
+    // Refused either way: no human-decision exemption and no role to decide with.
+    expect(() => decide(record.id)).toThrow(
+      /\[APPROVAL_HUMAN_PROOF_REQUIRED\]|\[ROLE_ASSUMPTION_DENIED\]/
+    );
+  });
+
+  it('refuses an agent principal even on a human-decision surface server', () => {
+    vi.stubEnv('SYSTEM_ROLE', 'concierge');
     const record = humanOnly('agent-principal');
     expect(() =>
       decide(record.id, {
