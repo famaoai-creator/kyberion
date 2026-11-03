@@ -24,7 +24,7 @@ function diffMessage(kind: string, expected: string[], actual: string[]): string
     `${kind} baseline changed.`,
     added.length ? `Added:\n${added.join('\n')}` : 'Added:\n(none)',
     removed.length ? `Removed:\n${removed.join('\n')}` : 'Removed:\n(none)',
-    'If intentional, run `pnpm generate:governance-import-baseline` and commit the fixture.',
+    'If intentional, run `node --import ./scripts/ts-loader.mjs scripts/generate_governance_import_baseline.ts` and commit the fixture.',
   ].join('\n\n');
 }
 

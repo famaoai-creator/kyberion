@@ -5,7 +5,7 @@
  * Prefer this over hand-editing the fixture when a change intentionally adds
  * a direct `node:fs` / `node:child_process` import:
  *
- *   pnpm generate:governance-import-baseline
+ *   node --import ./scripts/ts-loader.mjs scripts/generate_governance_import_baseline.ts
  *
  * Use `--check` in CI-adjacent flows to fail when the fixture drifts without
  * rewriting it.
@@ -18,7 +18,7 @@
 /* eslint-disable no-restricted-imports, no-restricted-syntax -- repo-wide import scanner; see file header */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { defineScript, isDirectScript } from './lib/harness.js';
 
 const rootDir = process.cwd();
 const baselinePath = path.join(rootDir, 'tests', 'fixtures', 'governance-import-baseline.json');
@@ -95,7 +95,7 @@ export function scanGovernanceImportBaseline(): {
   };
 }
 
-function main(argv = process.argv.slice(2)): number {
+function main(argv: readonly string[]): number {
   const checkOnly = argv.includes('--check');
   const scanned = scanGovernanceImportBaseline();
   const next = `${JSON.stringify(scanned, null, 2)}\n`;
@@ -105,7 +105,7 @@ function main(argv = process.argv.slice(2)): number {
     if (current !== next) {
       process.stderr.write(
         `[governance-import-baseline] fixture out of date\n` +
-          `  fix: pnpm generate:governance-import-baseline\n`
+          `  fix: node --import ./scripts/ts-loader.mjs scripts/generate_governance_import_baseline.ts\n`
       );
       return 1;
     }
@@ -122,6 +122,18 @@ function main(argv = process.argv.slice(2)): number {
   return 0;
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
-  process.exitCode = main();
-}
+export const generateGovernanceImportBaselineScript = defineScript({
+  name: 'generate-governance-import-baseline',
+  flags: [],
+  run(context) {
+    const exitCode = main(context.argv);
+    process.exitCode = exitCode;
+    return exitCode;
+  },
+});
+
+if (
+  isDirectScript(import.meta.url, 'generate_governance_import_baseline.ts') ||
+  isDirectScript(import.meta.url, 'generate_governance_import_baseline.js')
+)
+  void generateGovernanceImportBaselineScript();
