@@ -593,7 +593,8 @@ describe('kv-lock-stub async surface', () => {
       ttlMs: TTL,
       now: T0,
     });
-    await new Promise<void>((resolve) => setTimeout(resolve, 1));
+    // Yield once so A's withLock is queued before B starts (0ms is exempt from sleep ratchet).
+    await new Promise<void>((resolve) => setTimeout(resolve, 0));
     const second = b.acquireLeaseAsync({
       resource: 'thread-race',
       holder: 'run-b',
