@@ -16,6 +16,8 @@
     "compute-execution-provider",
     "authn-principal-resolver",
     "authz-policy-engine",
+    "secret-provider",
+    "embedding-backend",
     "web-search-runtime"
   ]
 }

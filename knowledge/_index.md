@@ -118,6 +118,7 @@
 - [MCP Facade Model (Inbound Tools, Skills, Actuators)](./product/architecture/mcp-facade-model.md) (public | Ecosystem Architect)
 - [Management Control Plane](./product/architecture/management-control-plane.md) (public | Ecosystem Architect)
 - [Marketing And Video Workload](./product/architecture/marketing-video-workload.md) (public | Unknown)
+- [Media & Voice Extension Mechanism](./product/architecture/media-voice-extension-mechanism.md) (public | Unknown)
 - [Media Document Generation Boundary](./product/architecture/media-document-generation-boundary.md) (public | Unknown)
 - [Media Execution Backend Abstraction](./product/architecture/media-execution-backend-abstraction.md) (public | Unknown)
 - [Microservices Design Patterns](./product/architecture/microservices-patterns.md) (public | Ecosystem Architect)

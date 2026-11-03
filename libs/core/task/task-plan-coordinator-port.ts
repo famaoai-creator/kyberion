@@ -1,5 +1,5 @@
 import type { AgentExecutionPort } from '../agent/agent-execution-port.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 
 export type TaskExecutionStatus =
   'pending' | 'running' | 'succeeded' | 'failed' | 'skipped_upstream_failed';
@@ -50,19 +50,17 @@ const taskPlanCoordinatorSeam = createSeam<TaskPlanCoordinatorPort>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/task/task-plan-coordinator-port.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const taskPlanCoordinatorLifecycle = createSeamLifecycle(taskPlanCoordinatorSeam);
 
 export function registerTaskPlanCoordinator(port: TaskPlanCoordinatorPort): () => void {
-  registeredDisposer = taskPlanCoordinatorSeam.register('default', port, {
+  return taskPlanCoordinatorLifecycle.register('default', port, {
     provenance: 'builtin',
     source: 'task-plan-coordinator',
   });
-  return registeredDisposer;
 }
 
 export function resetTaskPlanCoordinator(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  taskPlanCoordinatorLifecycle.reset();
 }
 
 export function getTaskPlanCoordinator(): TaskPlanCoordinatorPort {

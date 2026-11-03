@@ -12,7 +12,7 @@ import {
 } from '../context-security-scope.js';
 import type { EventScopeInput } from '../event-scope.js';
 import { nowIso } from '../foundation/time.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import { getWorkItem, listActiveWorkLeases } from '../workforce/work-coordination.js';
 import { resolveDelegationCapabilityProfile } from '../subagent-capability-profiles.js';
 
@@ -183,19 +183,17 @@ const agentExecutionPortSeam = createSeam<AgentExecutionPort>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/agent/agent-execution-port.ts',
 });
-let registeredDisposer: (() => void) | null = null;
+const agentExecutionPortLifecycle = createSeamLifecycle(agentExecutionPortSeam);
 
 export function registerAgentExecutionPort(port: AgentExecutionPort): () => void {
-  registeredDisposer = agentExecutionPortSeam.register('default', port, {
+  return agentExecutionPortLifecycle.register('default', port, {
     provenance: 'builtin',
     source: 'agent-execution-port',
   });
-  return registeredDisposer;
 }
 
 export function resetAgentExecutionPort(): void {
-  registeredDisposer?.();
-  registeredDisposer = null;
+  agentExecutionPortLifecycle.reset();
 }
 
 export function getAgentExecutionPort(): AgentExecutionPort {
