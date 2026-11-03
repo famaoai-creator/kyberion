@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createMemoryLeaseBackend } from '../lease/memory-lease-backend.js';
 import { createMissionLeaseManager, type MissionLeaseManager } from './mission-lease.js';
 
 // Deterministic injected clock: all times are plain ms numbers chosen per step.
@@ -413,5 +414,84 @@ describe('review fixes', () => {
     });
     expect(res.ok).toBe(false);
     expect(codes(res)).toContain('LEASE_INVALID_ARGUMENT');
+  });
+});
+
+describe('LeaseBackend injection', () => {
+  it('coordinates acquire across managers that share one memory backend', () => {
+    const backend = createMemoryLeaseBackend();
+    const a = createMissionLeaseManager({ backend });
+    const b = createMissionLeaseManager({ backend });
+
+    const first = a.acquireLease({
+      resource: 'thread-shared',
+      holder: 'run-a',
+      ttlMs: TTL,
+      now: T0,
+    });
+    expect(first.ok).toBe(true);
+
+    const contested = b.acquireLease({
+      resource: 'thread-shared',
+      holder: 'run-b',
+      ttlMs: TTL,
+      now: T0 + 10,
+    });
+    expect(contested.ok).toBe(false);
+    expect(codes(contested)).toContain('LEASE_SUSPENDED');
+    expect(contested.lease?.holder).toBe('run-a');
+    expect(b.getHolder('thread-shared', T0 + 10)).toBe('run-a');
+  });
+
+  it('lets a peer take over after the holder releases through the shared backend', () => {
+    const backend = createMemoryLeaseBackend();
+    const a = createMissionLeaseManager({ backend });
+    const b = createMissionLeaseManager({ backend });
+
+    const held = a.acquireLease({
+      resource: 'thread-shared',
+      holder: 'run-a',
+      ttlMs: TTL,
+      now: T0,
+    });
+    expect(held.ok).toBe(true);
+    const released = a.releaseLease({
+      leaseId: held.lease!.lease_id,
+      holder: 'run-a',
+      now: T0 + 100,
+    });
+    expect(released.ok).toBe(true);
+
+    const takeover = b.acquireLease({
+      resource: 'thread-shared',
+      holder: 'run-b',
+      ttlMs: TTL,
+      now: T0 + 200,
+    });
+    expect(takeover.ok).toBe(true);
+    expect(takeover.lease?.holder).toBe('run-b');
+    expect(takeover.lease?.fence).toBe(2);
+  });
+
+  it('same-holder re-acquire is idempotent across managers sharing a backend', () => {
+    const backend = createMemoryLeaseBackend();
+    const a = createMissionLeaseManager({ backend });
+    const b = createMissionLeaseManager({ backend });
+
+    const first = a.acquireLease({
+      resource: 'thread-shared',
+      holder: 'run-a',
+      ttlMs: TTL,
+      now: T0,
+    });
+    const again = b.acquireLease({
+      resource: 'thread-shared',
+      holder: 'run-a',
+      ttlMs: TTL,
+      now: T0 + 50,
+    });
+    expect(again.ok).toBe(true);
+    expect(again.lease?.fence).toBe(first.lease?.fence);
+    expect(again.lease?.expires_at_ms).toBe(first.lease?.expires_at_ms);
   });
 });
