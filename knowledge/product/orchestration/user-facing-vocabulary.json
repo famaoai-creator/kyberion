@@ -9535,6 +9535,16 @@
         "ja": "環境変数レジストリを再生成",
         "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ėñṽïřőñɱėñŧ ṽȧřïȧƀŀė řėɠïşŧřẏ ŀőřėɱ ïṗşůɱ ḓő⟧"
       },
+      "cli_cmd_script_generate_governance_import_baseline": {
+        "en": "Regenerate the governance import baseline fixture",
+        "ja": "ガバナンスインポートのベースラインフィクスチャを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ɠőṽėřñȧñƈė ïɱṗőřŧ ƀȧşėŀïñė ƒïẋŧůřė ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "cli_cmd_script_generate_platform_read_baseline": {
+        "en": "Regenerate the platform-read baseline fixture",
+        "ja": "プラットフォーム読み取りのベースラインフィクスチャを再生成",
+        "qps-ploc": "⟦Řėɠėñėřȧŧė ŧħė ṗŀȧŧƒőřɱ-řėȧḓ ƀȧşėŀïñė ƒïẋŧůřė ŀőřėɱ ïṗşůɱ ḓőŀ⟧"
+      },
       "cli_cmd_script_config_report": {
         "en": "Report operational configuration",
         "ja": "運用設定を報告",
