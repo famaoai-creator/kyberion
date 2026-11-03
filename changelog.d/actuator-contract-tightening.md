@@ -1,0 +1,5 @@
+---
+category: Changed
+---
+
+- Tighten all 27 `system` op input contracts from `inferred-legacy` (`additionalProperties: true`) to authored strict schemas audited against the real handlers — boundary validation now rejects unknown keys and missing required params at both the pipeline and actuator-SDK layers; fix the `system:shell` contract which required `command` while the handler reads `cmd` (masked by the open schema); share `PIPELINE_EXECUTION_METADATA_PROPERTIES` between the pipeline validator and the SDK so governed fields pass; remove the now-unused `defineLegacyPipelineActuator` compatibility shim and the bootstrap legacy dispatch fallback (all governed actuators export the SDK ABI); repair three pipeline definitions the strict contracts newly exposed — `github-issue-ingest` passed `issues` to `system:shell` with no `cmd`, `incident-post-mortem` passed dead `kind`/`title` keys to `system:write_artifact`, and `learnpasskeys-demo-flow` used `duration` where the wait handler reads `ms`/`duration_ms` (all previously accepted silently by the open schemas).
