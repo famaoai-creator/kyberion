@@ -2684,6 +2684,18 @@
       "types": "./dist/media/native-pptx-engine/layout-primitives.d.ts",
       "default": "./dist/media/native-pptx-engine/layout-primitives.js"
     },
+    "./lease/lease-backend": {
+      "types": "./dist/lease/lease-backend.d.ts",
+      "default": "./dist/lease/lease-backend.js"
+    },
+    "./lease/local-lease-backend": {
+      "types": "./dist/lease/local-lease-backend.d.ts",
+      "default": "./dist/lease/local-lease-backend.js"
+    },
+    "./lease/memory-lease-backend": {
+      "types": "./dist/lease/memory-lease-backend.d.ts",
+      "default": "./dist/lease/memory-lease-backend.js"
+    },
     "./ledger": {
       "types": "./dist/ledger.d.ts",
       "default": "./dist/ledger.js"
