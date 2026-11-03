@@ -13,6 +13,15 @@ const mocks = vi.hoisted(() => ({
   authorize: vi.fn(),
   workspace: vi.fn(),
   scope: vi.fn(),
+  registryAuthority: 'free',
+}));
+vi.mock('@agent/core/foundation/authorization-registry', () => ({
+  subjectAuthorization: () => ({
+    declared: true,
+    source: 'code',
+    effectClass: 'local_only',
+    authority: { kind: mocks.registryAuthority },
+  }),
 }));
 vi.mock('@agent/core/authority', () => ({
   withExecutionContext: (
@@ -63,6 +72,7 @@ const selection = {
   tier: 'confidential',
 } as const;
 beforeEach(() => {
+  mocks.registryAuthority = 'free';
   vi.clearAllMocks();
   mocks.workspace.mockReturnValue({
     selection,
@@ -92,6 +102,12 @@ beforeEach(() => {
   });
 });
 describe('information source viewer projection', () => {
+  it('does not bypass a strengthened registry authority with readonly surface permission', () => {
+    mocks.registryAuthority = 'approval';
+    expect(() => collectInformationAssets(viewer, selection)).toThrow('declared authority');
+    expect(mocks.catalog).not.toHaveBeenCalled();
+    expect(mocks.workspace).not.toHaveBeenCalled();
+  });
   it('binds the server-authorized entity scope and omits connection selectors and bindings', () => {
     const result = collectInformationAssets(viewer, selection);
     expect(mocks.catalog).toHaveBeenCalledWith({

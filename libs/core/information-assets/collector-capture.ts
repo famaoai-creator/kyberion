@@ -1,3 +1,4 @@
+import { subjectAuthorization } from '../foundation/authorization-registry.js';
 import * as path from 'node:path';
 import { dotStatePath } from '../dot/dot-state-paths.js';
 import { pathResolver } from '../path-resolver.js';
@@ -28,6 +29,17 @@ import { parseSafeJsonObjectInput } from '../foundation/json.js';
 import type { ServiceBinding } from '../service/service-binding.js';
 import type { InformationAssetLocation, InformationAssetServiceRequest } from './types.js';
 
+function assertCredentialCaptureAuthority(): void {
+  const auth = subjectAuthorization('credential:information_asset_capture');
+  if (
+    !auth.declared ||
+    auth.effectClass !== 'credential_use' ||
+    auth.authority.kind !== 'binding' ||
+    auth.authority.scope !== 'tenant' ||
+    auth.approvalDomain !== undefined
+  )
+    throw new Error('information_asset_capture_canonical_credential_authority_denied');
+}
 function record(input: unknown): Record<string, unknown> {
   return input && typeof input === 'object' && !Array.isArray(input)
     ? (input as Record<string, unknown>)
@@ -39,6 +51,7 @@ function assertTarget(
   target: string
 ): void {
   const vars = record(request.params.vars);
+  const bodyVars = record(record(request.params.body).variables);
   if (location.service_id === 'github') {
     const expected = String(location.selectors.owner) + '/' + String(location.selectors.repo);
     if (target !== expected) throw new Error('information_asset_binding_target_mismatch');
@@ -46,7 +59,9 @@ function assertTarget(
     const values =
       typeof query.variables === 'string'
         ? (parseSafeJsonObjectInput(query.variables, 'capture GraphQL variables') ?? {})
-        : vars;
+        : Object.keys(bodyVars).length
+          ? bodyVars
+          : vars;
     if (values.owner !== location.selectors.owner || values.repo !== location.selectors.repo)
       throw new Error('information_asset_request_target_mismatch');
   } else if (location.service_id === 'jira') {
@@ -68,6 +83,7 @@ async function captureTransport(
   request: InformationAssetServiceRequest,
   rootDir?: string
 ): Promise<ScopedServiceCaptureTransport> {
+  assertCredentialCaptureAuthority();
   const current = await authorizeInformationAssetCapture(
     location.scope,
     location.location_id,
@@ -187,6 +203,7 @@ async function captureTransport(
     connection: {},
     providerEnvironment,
     validate: () => {
+      assertCredentialCaptureAuthority();
       assertCurrentInformationAssetScope(location.scope);
       assertInformationAssetBinding(location, request.action);
       if (
@@ -225,6 +242,7 @@ async function withCaptureBrokerCredentials<T>(
   run: () => Promise<T>,
   rootDir?: string
 ): Promise<T> {
+  assertCredentialCaptureAuthority();
   if (hasTaskCredentialBinding()) return run();
   const current = await authorizeInformationAssetCapture(
     location.scope,
@@ -257,6 +275,7 @@ async function withCaptureBrokerCredentials<T>(
     throw new Error('information_asset_capture_secret_ref_unsupported');
   const selectedBytes = JSON.stringify(selected);
   const validate = () => {
+    assertCredentialCaptureAuthority();
     assertCurrentInformationAssetScope(location.scope);
     assertInformationAssetBinding(location, request.action);
     if (JSON.stringify(loadServiceBindingRecord(location.binding_id)) !== selectedBytes)
@@ -297,7 +316,7 @@ async function withCaptureBrokerCredentials<T>(
       ledgerPath: path.join(
         rootDir ?? pathResolver.rootDir(),
         dotStatePath(
-          { scope: { ...location.scope, tier: 'confidential' } },
+          { scope: { ...location.scope, tier: location.tier } },
           'information-assets',
           'credential-workspaces.json'
         )

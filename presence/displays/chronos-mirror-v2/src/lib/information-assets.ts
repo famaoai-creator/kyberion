@@ -11,6 +11,7 @@ import {
   loadInformationAssetDefinitions,
 } from '@agent/core/information-assets/catalog';
 import { authorizeSurfaceContextOperation } from '@agent/core/surface/surface-authn';
+import { subjectAuthorization } from '@agent/core/foundation/authorization-registry';
 import type { WorkspaceSelection } from '@agent/core/surface/workspace-scope';
 import { resolveChronosWorkspace } from './workspace-scope';
 import {
@@ -21,6 +22,17 @@ import {
 
 /** Resolve viewer scope before reading or counting any catalog entries. */
 export function collectInformationAssets(viewer: ViewerContext, requested: WorkspaceSelection) {
+  const declaration = subjectAuthorization('chronos.information-assets.read');
+  if (
+    !declaration.declared ||
+    declaration.source !== 'code' ||
+    declaration.effectClass !== 'local_only' ||
+    declaration.authority.kind !== 'free'
+  )
+    throw new ViewerContextError(
+      403,
+      'Information source viewer requires its declared authority path.'
+    );
   const workspace = resolveChronosWorkspace(viewer, requested);
   const s = workspace.selection;
   if (!s.tenant_slug || !s.organization_id || s.tier !== 'confidential')

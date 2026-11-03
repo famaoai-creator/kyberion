@@ -15,6 +15,28 @@ import { safeLstat, assertSafeRepositoryPath } from '../secure-io.js';
 import { runInResourceAccessScope } from '../foundation/resource-access-scope.js';
 import { withExecutionContext } from '../authority.js';
 import type { InformationAssetScope, InformationAssetLocation } from './types.js';
+import { subjectAuthorization } from '../foundation/authorization-registry.js';
+
+/** The registry selects the supported authority path; owner/scope checks supply its detail. */
+export function assertInformationAssetCatalogAuthorization(mutation = false): void {
+  const entry = subjectAuthorization(
+    mutation ? 'information-asset:catalog:write' : 'information-asset:catalog:read'
+  );
+  const supported =
+    entry.declared &&
+    entry.source === 'code' &&
+    (mutation
+      ? entry.effectClass === 'internal_decision' &&
+        entry.authority.kind === 'admission' &&
+        entry.authority.boundary === 'internal'
+      : entry.effectClass === 'local_only' && entry.authority.kind === 'free');
+  if (!supported)
+    fail(
+      'authorization_required',
+      403,
+      'Information asset catalog requires its declared authority path.'
+    );
+}
 
 export interface InformationAssetOptions {
   rootDir?: string;
@@ -87,6 +109,7 @@ export async function authorizeInformationAssetManagement(
 ) {
   assertInformationAssetScope(scope);
   const resolved = await authorizeOrganizationPeople(auth, scope.organization_id, mutation);
+  assertInformationAssetCatalogAuthorization(mutation);
   if (resolved.tenantSlug !== scope.tenant_slug)
     fail('forbidden', 403, 'Information asset tenant mismatch.');
   if (scope.project_id) requireGrant(resolved.allowedProjectIds, scope.project_id);
