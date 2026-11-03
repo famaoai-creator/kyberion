@@ -1,0 +1,32 @@
+{
+  "name": "@agent/kernel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Storage nucleus and append-only entry-ledger mechanics — no dependency on @agent/core.",
+  "scripts": {
+    "build": "tsc -b tsconfig.json"
+  },
+  "exports": {
+    "./storage/storage-backend": {
+      "types": "./dist/storage/storage-backend.d.ts",
+      "default": "./dist/storage/storage-backend.js"
+    },
+    "./storage/memory-storage-backend": {
+      "types": "./dist/storage/memory-storage-backend.d.ts",
+      "default": "./dist/storage/memory-storage-backend.js"
+    },
+    "./storage/object-storage-backend.stub": {
+      "types": "./dist/storage/object-storage-backend.stub.d.ts",
+      "default": "./dist/storage/object-storage-backend.stub.js"
+    },
+    "./entry-ledger": {
+      "types": "./dist/entry-ledger.d.ts",
+      "default": "./dist/entry-ledger.js"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^5.9.3"
+  }
+}
