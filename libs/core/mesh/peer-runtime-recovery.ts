@@ -105,8 +105,7 @@ function parseQuarantineManifest(
     const resolved = assertSafeRepositoryPath(pathResolver.resolve(entry), {
       allowMissingLeaf: true,
     });
-    const relative = path.relative(quarantineRoot, resolved);
-    if (!relative || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
+    if (!pathResolver.isPathInside(quarantineRoot, resolved)) {
       throw new Error(`peer_recovery_quarantine_manifest_invalid:moved[${index}]`);
     }
     return path.relative(pathResolver.rootDir(), resolved).split(path.sep).join('/');

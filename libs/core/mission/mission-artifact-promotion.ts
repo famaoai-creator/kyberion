@@ -105,8 +105,7 @@ function promotedName(missionId: string, entry: ScopedArtifactIndexEntry): strin
  */
 function confinedSource(missionDir: string, entryPath: string): string {
   const source = pathResolver.rootResolve(entryPath);
-  const relative = path.relative(path.join(missionDir, 'artifacts'), source);
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
+  if (!pathResolver.isPathInside(path.join(missionDir, 'artifacts'), source)) {
     throw new Error(`deliverable is outside the mission artifacts tree: ${entryPath}`);
   }
   const safe = assertSafeRepositoryPath(source);

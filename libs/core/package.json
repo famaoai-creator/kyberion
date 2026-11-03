@@ -1580,6 +1580,10 @@
       "types": "./dist/entity-scope.d.ts",
       "default": "./dist/entity-scope.js"
     },
+    "./entry-ledger": {
+      "types": "./dist/entry-ledger.d.ts",
+      "default": "./dist/entry-ledger.js"
+    },
     "./env-validator": {
       "types": "./dist/env-validator.d.ts",
       "default": "./dist/env-validator.js"
@@ -2151,6 +2155,10 @@
     "./ingest-tier-gate": {
       "types": "./dist/ingest-tier-gate.d.ts",
       "default": "./dist/ingest-tier-gate.js"
+    },
+    "./intake-vectors": {
+      "types": "./dist/intake-vectors.d.ts",
+      "default": "./dist/intake-vectors.js"
     },
     "./ingress/providers/tailscale-funnel": {
       "types": "./dist/ingress/providers/tailscale-funnel.d.ts",

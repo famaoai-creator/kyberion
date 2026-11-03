@@ -1,4 +1,4 @@
-import { appendJsonLine, readJsonLines } from './foundation/json.js';
+import { createEntryLedger } from './entry-ledger.js';
 import { isRecord } from './foundation/text.js';
 /**
  * DA-05 Hybrid Sovereign Ledger — per-tenant information-asset ledger.
@@ -28,7 +28,7 @@ import * as pathResolver from './path-resolver.js';
 import { defineCatalog, type GovernedCatalog } from './foundation/governed-catalog.js';
 import { resolveTenant, type TenantRegistryPathOptions } from './organization/tenant-registry.js';
 import { isValidTenantSlug } from './entity-scope.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat, safeMkdir } from './secure-io.js';
+import { assertSafeRepositoryPath } from './secure-io.js';
 
 const SHA256_RE = /^[a-f0-9]{64}$/;
 
@@ -79,12 +79,6 @@ function ingestAssetCatalog(filePath: string): GovernedCatalog<IngestAssetRecord
     path: filePath,
     schema: INGEST_ASSET_SCHEMA_PATH,
   });
-}
-
-function ensureRegularAssetLedgerFile(filePath: string): void {
-  if (safeExistsSync(filePath) && !safeLstat(filePath).isFile()) {
-    throw new Error(`[ingest-asset-ledger] ledger must be a regular file: ${filePath}`);
-  }
 }
 
 /**
@@ -314,14 +308,10 @@ export function readAssetLedger(
   options: IngestLedgerPathOptions = {}
 ): IngestAssetRecord[] {
   const ledgerFile = assetLedgerPath(tenantSlug, options);
-  if (!safeExistsSync(ledgerFile)) return [];
-  ensureRegularAssetLedgerFile(ledgerFile);
   const catalog = ingestAssetCatalog(ledgerFile);
-  return readJsonLines<IngestAssetRecord | null>(ledgerFile, {
-    onMalformed: 'skip',
-    map: (value, lineNumber) =>
-      normalizeIngestAssetRecord(catalog.validate(value, `${ledgerFile}:${lineNumber}`), options),
-  }).filter((record): record is IngestAssetRecord => record !== null);
+  return createEntryLedger<IngestAssetRecord>(ledgerFile).readAll((value, lineNumber) =>
+    normalizeIngestAssetRecord(catalog.validate(value, `${ledgerFile}:${lineNumber}`), options)
+  );
 }
 
 /**
@@ -337,9 +327,9 @@ export function appendAssetRecord(
   assertAssetRecord(record);
   assertTargetPath(record, options);
   const ledgerFile = assetLedgerPath(tenantSlug, options);
-  safeMkdir(path.dirname(ledgerFile), { recursive: true });
-  ensureRegularAssetLedgerFile(ledgerFile);
-  appendJsonLine(ledgerFile, ingestAssetCatalog(ledgerFile).validate(record, ledgerFile));
+  createEntryLedger<IngestAssetRecord>(ledgerFile).append(
+    ingestAssetCatalog(ledgerFile).validate(record, ledgerFile)
+  );
   return record;
 }
 
