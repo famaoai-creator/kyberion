@@ -18,7 +18,12 @@ import type {
   VirtualDeviceInventory,
   VirtualDeviceInventoryBridge,
 } from './virtual-device-inventory-bridge.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 export const VIRTUAL_CAMERA_BRIDGE_ID = 'virtual-camera-bridge' as const;
 
@@ -66,7 +71,7 @@ const virtualCameraCaptureSeam = createSeam<VirtualCameraCaptureBackend>({
   owner: 'libs/core/virtual/virtual-camera-bridge.ts',
 });
 
-const virtualCameraCaptureDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(virtualCameraCaptureSeam);
 let virtualCameraCaptureBuiltinsRegistered = false;
 
 export function registerVirtualCameraCaptureBackend(
@@ -78,15 +83,7 @@ export function registerVirtualCameraCaptureBackend(
 ): () => void {
   const id = String(backend.backend_id || '').trim();
   if (!id) throw new Error('VirtualCameraCaptureBackend.backend_id is required');
-  const disposeFromSeam = virtualCameraCaptureSeam.register(id, backend, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (virtualCameraCaptureDisposers.get(id) === dispose) {
-      virtualCameraCaptureDisposers.delete(id);
-    }
-  };
-  virtualCameraCaptureDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, backend, metadata);
 }
 
 export function listVirtualCameraCaptureBackends(): VirtualCameraCaptureBackend[] {
@@ -94,14 +91,7 @@ export function listVirtualCameraCaptureBackends(): VirtualCameraCaptureBackend[
 }
 
 export function resetVirtualCameraCaptureBackends(): void {
-  for (const dispose of virtualCameraCaptureDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  virtualCameraCaptureDisposers.clear();
+  registrations.reset();
   virtualCameraCaptureBuiltinsRegistered = false;
 }
 

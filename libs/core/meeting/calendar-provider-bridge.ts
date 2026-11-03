@@ -8,7 +8,12 @@
 import { executeServicePreset } from '../service/service-engine.js';
 import { readGwsAuthStatus } from '../integrations/email-workflow.js';
 import { isRecord } from '../foundation/text.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 export interface CalendarEventSummary {
   end: string;
@@ -124,7 +129,7 @@ const calendarProviderSeam = createSeam<CalendarProviderBridge>({
   owner: 'libs/core/meeting/calendar-provider-bridge.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(calendarProviderSeam);
 let builtinsRegistered = false;
 
 export function registerCalendarProvider(
@@ -136,13 +141,7 @@ export function registerCalendarProvider(
 ): () => void {
   const id = String(bridge.provider_id || '').trim();
   if (!id) throw new Error('CalendarProviderBridge.provider_id is required');
-  const disposeFromSeam = calendarProviderSeam.register(id, bridge, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, bridge, metadata);
 }
 
 export function listCalendarProviders(): CalendarProviderBridge[] {
@@ -151,14 +150,7 @@ export function listCalendarProviders(): CalendarProviderBridge[] {
 }
 
 export function resetCalendarProviders(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
   builtinsRegistered = false;
 }
 

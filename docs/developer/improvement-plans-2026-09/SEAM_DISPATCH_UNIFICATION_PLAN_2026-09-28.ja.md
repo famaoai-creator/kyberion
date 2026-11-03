@@ -7,6 +7,9 @@ status: active
 
 # if 連鎖の seam / adapter / facade 移行計画(DS-01〜DS-09)
 
+> 2026-11-03 追補: 登録後の lifecycle と解決対象の一致、選択入口、具体 provider の分離は
+> [seam 共通化の調査と実装対応](../SEAM_LIFECYCLE_CONSOLIDATION_2026-11-03.ja.md) (SC-01〜SC-06) で扱う。
+
 > 優先度: P1〜P2 / 規模: L(段階実装) / 親計画: [SIMPLICITY_ABSTRACTION_PLAN](../improvement-plans-2026-08/SIMPLICITY_ABSTRACTION_PLAN_2026-08-25.ja.md)(SX-05, SX-10, SX-12) / 関連: [REGISTRY_SPLIT_PLAN](../REGISTRY_SPLIT_PLAN.md), [module-layer-boundaries.json](../../../knowledge/product/governance/module-layer-boundaries.json)
 > **起票日**: 2026-09-28
 > **状態**: DRAFT(alignment 済み・未着手)

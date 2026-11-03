@@ -18,13 +18,13 @@
 import { EnergyVad, type VoiceActivityDetector } from './voice-activity-detector.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { getAdapterDefault } from '../actuator/adapter-default-preferences.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
+  resolveSeamSelectionEntry,
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
-import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 
 export const VAD_BACKEND_SEAM = 'voice.vad-backend';
 
@@ -58,21 +58,13 @@ const vadBackendSeam = createSeam<VadBackend>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/voice/vad-registry.ts',
 });
-const registrations = new Map<string, () => void>();
+const registrations = createSeamLifecycle(vadBackendSeam);
 
 export function registerVadBackend(backend: VadBackend): () => void {
-  const dispose = vadBackendSeam.register(backend.backend_id, backend, {
+  return registrations.register(backend.backend_id, backend, {
     provenance: backend.backend_id === 'energy' ? 'builtin' : 'plugin',
     source: `vad:${backend.backend_id}`,
   });
-  const wrappedDispose = () => {
-    dispose();
-    if (registrations.get(backend.backend_id) === wrappedDispose) {
-      registrations.delete(backend.backend_id);
-    }
-  };
-  registrations.set(backend.backend_id, wrappedDispose);
-  return wrappedDispose;
 }
 
 registerVadBackend(ENERGY_VAD_BACKEND);
@@ -106,8 +98,13 @@ export interface ResolveVadBackendOptions {
  * Otherwise 'energy' stays the default.
  */
 export function shouldSelectVadBackend(options: ResolveVadBackendOptions = {}): boolean {
-  if (options.purpose?.trim()) return true;
-  return Boolean(matchSeamSelectionRule(VAD_BACKEND_SEAM, { context: options.context }));
+  return (
+    resolveSeamSelectionEntry({
+      seam: VAD_BACKEND_SEAM,
+      purpose: options.purpose,
+      context: options.context,
+    }).kind === 'governed'
+  );
 }
 
 function selectVadBackend(options: ResolveVadBackendOptions): ResolvedVadBackend {
@@ -189,6 +186,6 @@ export function resolveVadBackend(
 
 /** Test hook: drop everything except the built-in energy backend. */
 export function resetVadBackendRegistry(): void {
-  for (const dispose of [...registrations.values()]) dispose();
+  registrations.reset();
   registerVadBackend(ENERGY_VAD_BACKEND);
 }

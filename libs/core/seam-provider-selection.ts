@@ -111,6 +111,55 @@ export interface ResolveSeamProviderOptions {
   ignoreOperatorOverlay?: boolean;
 }
 
+export interface SeamSelectionEntryOptions {
+  seam: string;
+  explicitProvider?: string;
+  purpose?: string;
+  context?: Record<string, string>;
+  defaultProvider?: string;
+  /** Domain eligibility, evaluated by the caller rather than inferred from policy. */
+  defaultEligible?: boolean;
+  /** Saved operator defaults may opt into governed selection without a purpose. */
+  selectForDefault?: boolean;
+  decisionKey?: string;
+}
+
+export type SeamSelectionEntry =
+  | { kind: 'explicit'; providerId: string }
+  | { kind: 'legacy' }
+  | { kind: 'governed'; request: Omit<ResolveSeamProviderOptions, 'candidates'> };
+
+/**
+ * Shared compatibility boundary for selection. Explicit choices never read
+ * policy or operator rules; domain filters still decide whether execution is
+ * permitted. Unmatched rules do not change the caller's existing default path.
+ */
+export function resolveSeamSelectionEntry(options: SeamSelectionEntryOptions): SeamSelectionEntry {
+  const explicit = options.explicitProvider?.trim();
+  if (explicit && explicit !== 'auto') return { kind: 'explicit', providerId: explicit };
+  const purpose = options.purpose?.trim() || undefined;
+  const context =
+    options.context && Object.keys(options.context).length ? options.context : undefined;
+  const defaultProvider = purpose ? undefined : options.defaultProvider?.trim() || undefined;
+  const select =
+    Boolean(purpose) ||
+    Boolean(options.selectForDefault && defaultProvider) ||
+    Boolean(matchSeamSelectionRule(options.seam, { purpose, context })) ||
+    (options.defaultEligible === false &&
+      Boolean(getSeamSelectionPolicy(options.seam)?.fallback_purpose));
+  if (!select) return { kind: 'legacy' };
+  return {
+    kind: 'governed',
+    request: {
+      seam: options.seam,
+      ...(purpose ? { purpose } : {}),
+      ...(context ? { context } : {}),
+      ...(defaultProvider ? { defaultProvider } : {}),
+      decisionKey: options.decisionKey?.trim() || purpose || 'default',
+    },
+  };
+}
+
 const policyDirectoryOptions: RegistryDirectoryOptions = {
   id: 'seam-provider-selection-policy',
   dirPath: pathResolver.knowledge('product/governance/seam-provider-selection'),

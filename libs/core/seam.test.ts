@@ -1,5 +1,129 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createSeam, createSeamCatalog, defineSeam, SeamError } from './seam.js';
+import {
+  createSeam,
+  createSeamCatalog,
+  createSeamLifecycle,
+  defineSeam,
+  resolveSeamAutoProvider,
+  SeamError,
+} from './seam.js';
+
+describe('seam lifecycle contract', () => {
+  it('honors reset requested by a synchronous registration observer', () => {
+    const seam = createSeam<string>({ key: 'reentrant-reset', multiplicity: 'named' });
+    const lifecycle = createSeamLifecycle(seam);
+    const unsubscribe = seam.on('added', () => lifecycle.reset());
+    const stale = lifecycle.register('provider', 'cancelled', { provenance: 'plugin' });
+    expect(seam.list()).toEqual([]);
+    unsubscribe();
+    lifecycle.register('provider', 'replacement', { provenance: 'plugin' });
+    stale();
+    expect(seam.get('provider')).toBe('replacement');
+    lifecycle.reset();
+    expect(seam.list()).toEqual([]);
+  });
+
+  it('rolls back registration when a change listener throws, without orphaning the provider', () => {
+    const seam = createSeam<string>({ key: 'register-failure', multiplicity: 'named' });
+    const changed = vi.fn().mockImplementationOnce(() => {
+      throw new Error('observer failed');
+    });
+    const lifecycle = createSeamLifecycle(seam, { onChange: changed });
+    expect(() => lifecycle.register('provider', 'orphan', { provenance: 'plugin' })).toThrow(
+      'observer failed'
+    );
+    expect(seam.list()).toEqual([]);
+    const dispose = lifecycle.register('provider', 'valid', { provenance: 'plugin' });
+    expect(seam.get('provider')).toBe('valid');
+    dispose();
+    expect(seam.list()).toEqual([]);
+  });
+
+  it('notifies on both mutations, resets owned providers, and ignores stale disposers', () => {
+    const seam = createSeam<string>({ key: 'lifecycle', multiplicity: 'named' });
+    const changed = vi.fn();
+    const lifecycle = createSeamLifecycle(seam, { onChange: changed });
+    const stale = lifecycle.register('provider', 'first', { provenance: 'plugin' });
+    expect(changed).toHaveBeenCalledTimes(1);
+    stale();
+    expect(seam.getOptional('provider')).toBeUndefined();
+    expect(changed).toHaveBeenCalledTimes(2);
+    lifecycle.register('provider', 'second', { provenance: 'plugin' });
+    stale();
+    expect(seam.get('provider')).toBe('second');
+    expect(changed).toHaveBeenCalledTimes(3);
+    lifecycle.reset();
+    lifecycle.reset();
+    expect(seam.list()).toEqual([]);
+    expect(changed).toHaveBeenCalledTimes(4);
+  });
+
+  it('keeps independent owners isolated and preserves duplicate checks', () => {
+    const seam = createSeam<string>({ key: 'ownership', multiplicity: 'named' });
+    const left = createSeamLifecycle(seam);
+    const right = createSeamLifecycle(seam);
+    left.register('left', 'L', { provenance: 'builtin' });
+    right.register('right', 'R', { provenance: 'plugin' });
+    expect(() => right.register('left', 'duplicate', { provenance: 'plugin' })).toThrow(SeamError);
+    left.reset();
+    expect(seam.list().map((provider) => provider.id)).toEqual(['right']);
+    right.reset();
+  });
+
+  it('attempts every removal before reporting a failing change listener', () => {
+    const seam = createSeam<string>({ key: 'cleanup', multiplicity: 'named' });
+    const lifecycle = createSeamLifecycle(seam);
+    lifecycle.register('a', 'A', { provenance: 'plugin' });
+    lifecycle.register('b', 'B', { provenance: 'plugin' });
+    seam.on('removed', () => {
+      throw new Error('observer failed');
+    });
+    const observed = vi.fn();
+    seam.on('removed', observed);
+    expect(() => lifecycle.reset()).toThrow(AggregateError);
+    expect(seam.list()).toEqual([]);
+    expect(observed).toHaveBeenCalledTimes(2);
+    expect(() => lifecycle.reset()).not.toThrow();
+  });
+
+  it('keeps the registry clean when both added and rollback observers fail', () => {
+    const seam = createSeam<string>({ key: 'rollback-failure', multiplicity: 'named' });
+    const lifecycle = createSeamLifecycle(seam, {
+      onChange: () => {
+        throw new Error('observer failed');
+      },
+    });
+    expect(() => lifecycle.register('provider', 'orphan', { provenance: 'plugin' })).toThrow(
+      AggregateError
+    );
+    expect(seam.list()).toEqual([]);
+    expect(() => lifecycle.reset()).not.toThrow();
+  });
+});
+
+describe('seam auto selection contract', () => {
+  const eligible = (value: { available: boolean }) => value.available;
+  it('requires a declared eligible default when multiple candidates qualify', () => {
+    const seam = createSeam<{ available: boolean }>({ key: 'auto', multiplicity: 'named' });
+    seam.register('z-default', { available: true }, { provenance: 'builtin' });
+    seam.register('a-extension', { available: true }, { provenance: 'plugin' });
+    expect(() => resolveSeamAutoProvider(seam, { eligible })).toThrowError(
+      expect.objectContaining({ code: 'SEAM_PROVIDER_AMBIGUOUS' })
+    );
+    expect(resolveSeamAutoProvider(seam, { eligible, defaultProvider: 'z-default' })).toBe(
+      seam.get('z-default')
+    );
+  });
+  it('filters the default before selecting and handles zero or one eligible provider', () => {
+    const seam = createSeam<{ available: boolean }>({ key: 'eligible', multiplicity: 'named' });
+    seam.register('default', { available: false }, { provenance: 'builtin' });
+    expect(resolveSeamAutoProvider(seam, { eligible, defaultProvider: 'default' })).toBeUndefined();
+    seam.register('extension', { available: true }, { provenance: 'plugin' });
+    expect(resolveSeamAutoProvider(seam, { eligible, defaultProvider: 'default' })).toBe(
+      seam.get('extension')
+    );
+  });
+});
 
 describe('defineSeam', () => {
   it('supports the canonical createSeam constructor', () => {
