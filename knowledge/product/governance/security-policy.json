@@ -619,6 +619,21 @@
       "allow_read": ["knowledge/personal/connections/chronos-access.json"],
       "allow_write": []
     },
+    "workspace_graph_reader": {
+      "allow_read": [
+        "active/missions/",
+        "active/archive/missions/",
+        "active/projects/",
+        "active/organizations/",
+        "active/shared/runtime/work-coordination/",
+        "active/shared/coordination/channels/",
+        "active/shared/coordination/identity/",
+        "knowledge/personal/tenants/",
+        "knowledge/personal/members/",
+        "knowledge/personal/missions/"
+      ],
+      "allow_write": []
+    },
     "scope_locale_reader": {
       "allow_read": ["knowledge/confidential/${KYBERION_TENANT}/locale.json"],
       "allow_write": []

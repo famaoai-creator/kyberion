@@ -6656,6 +6656,14 @@
       "types": "./dist/surface/surface-artifact-store.d.ts",
       "default": "./dist/surface/surface-artifact-store.js"
     },
+    "./surface/surface-operation-registry": {
+      "types": "./dist/surface/surface-operation-registry.d.ts",
+      "default": "./dist/surface/surface-operation-registry.js"
+    },
+    "./surface/workspace-graph": {
+      "types": "./dist/surface/workspace-graph.d.ts",
+      "default": "./dist/surface/workspace-graph.js"
+    },
     "./surface/surface-auth-routes": {
       "types": "./dist/surface/surface-auth-routes.d.ts",
       "default": "./dist/surface/surface-auth-routes.js"

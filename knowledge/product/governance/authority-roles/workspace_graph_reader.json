@@ -1,0 +1,9 @@
+{
+  "role": "workspace_graph_reader",
+  "description": "Workspace graph read model (MSN-SURFACE-UNIFY-20261103): read-only join of missions, projects, organizations, work items, approvals, agent identities, tenant profiles and member profiles for libs/core/surface/workspace-graph.ts. It is never tenant-bound: rows are filtered afterwards by the caller's server-resolved SurfaceAuthorizationContext (viewerAdmitsNode), so a client tenant can only narrow. No write grant; persona worker.",
+  "default_persona": "worker",
+  "write_scopes": [],
+  "scope_classes": [],
+  "allowed_actuators": [],
+  "tier_access": ["personal", "confidential", "public"]
+}

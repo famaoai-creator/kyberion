@@ -102,6 +102,9 @@
     "chronos_token_registry_reader": {
       "allow": []
     },
+    "workspace_graph_reader": {
+      "allow": []
+    },
     "scope_locale_reader": {
       "allow": []
     },
