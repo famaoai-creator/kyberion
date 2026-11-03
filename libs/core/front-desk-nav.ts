@@ -249,7 +249,7 @@ export const FRONT_DESK_LINKED_DESTINATIONS: readonly FrontDeskMenuItem[] = [
     label_key: 'front_desk:nav_home',
     sublabel_key: 'front_desk:nav_home_sub',
     surface: 'presence-studio',
-    path: '/',
+    path: '/home',
     min_role: 'viewer',
     group_key: 'front_desk:nav_group_work',
     icon: 'home',
@@ -324,7 +324,8 @@ export function frontDeskRoleFromViewer(input: {
  * never over-shows privileged items.
  */
 export interface FrontDeskMenuResolveInput {
-  currentSurface: FrontDeskPrimarySurfaceId;
+  /** The surface rendering the rail; its own items get same-origin relative paths. */
+  currentSurface: FrontDeskSurfaceId;
   availableSurfaces?: FrontDeskAvailableSurfaces;
   ports?: Partial<FrontDeskSurfacePorts>;
   urls?: Partial<Record<FrontDeskSurfaceId, string>>;
@@ -365,13 +366,18 @@ function resolveItems(
   const role = input.role ?? 'viewer';
   return catalog
     .filter(
-      (item) => !isOptionalSurface(item.surface) || Boolean(input.availableSurfaces?.[item.surface])
+      (item) =>
+        !isOptionalSurface(item.surface) ||
+        item.surface === input.currentSurface ||
+        Boolean(input.availableSurfaces?.[item.surface])
     )
     .map((item) => {
       const external = item.surface !== input.currentSurface;
-      const base = isOptionalSurface(item.surface)
-        ? input.availableSurfaces![item.surface]!
-        : (input.urls?.[item.surface] ?? `http://127.0.0.1:${ports[item.surface]}`);
+      const base = !external
+        ? ''
+        : isOptionalSurface(item.surface)
+          ? input.availableSurfaces![item.surface]!
+          : (input.urls?.[item.surface] ?? `http://127.0.0.1:${ports[item.surface]}`);
       const href = external ? base.replace(/\/+$/, '') + item.path : item.path;
       return {
         ...item,
