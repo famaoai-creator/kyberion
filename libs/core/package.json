@@ -8228,6 +8228,18 @@
       "types": "./dist/vcs/cwd-scope.d.ts",
       "default": "./dist/vcs/cwd-scope.js"
     },
+    "./vcs/vcs-backend": {
+      "types": "./dist/vcs/vcs-backend.d.ts",
+      "default": "./dist/vcs/vcs-backend.js"
+    },
+    "./vcs/local-git-backend": {
+      "types": "./dist/vcs/local-git-backend.d.ts",
+      "default": "./dist/vcs/local-git-backend.js"
+    },
+    "./vcs/memory-vcs-backend": {
+      "types": "./dist/vcs/memory-vcs-backend.d.ts",
+      "default": "./dist/vcs/memory-vcs-backend.js"
+    },
     "./governance/authenticated-personal-approvals": {
       "types": "./dist/governance/authenticated-personal-approvals.d.ts",
       "default": "./dist/governance/authenticated-personal-approvals.js"
