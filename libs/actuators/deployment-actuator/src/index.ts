@@ -42,7 +42,10 @@ export const actuator = defineActuator({
       kind: 'apply',
       input_schema: DEPLOYMENT_SCHEMA,
       validateInput: asDeploymentParams,
-      handler: async (params) => handleDeploymentAction({ action: 'deploy_release', params }),
+      // defineActuator types each op's input as `unknown`; narrow through the
+      // same validator the SDK already applied instead of relying on inference.
+      handler: async (params) =>
+        handleDeploymentAction({ action: 'deploy_release', params: asDeploymentParams(params) }),
     },
   },
 });
