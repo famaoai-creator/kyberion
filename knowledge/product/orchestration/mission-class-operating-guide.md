@@ -4,7 +4,7 @@ category: Orchestration
 tags: [mission, classification, playbook, organization, evaluation]
 importance: 9
 author: Ecosystem Architect
-last_updated: 2026-10-07
+last_updated: 2026-11-03
 runtime_stages: [alignment, planning, execution, verification, delivery]
 ---
 
@@ -25,6 +25,20 @@ classify が決める「ミッションクラス」ごとに、**AI がどう進
 | 既存(進め方を拡充) | `code_change` `product_delivery` `research_and_absorption` `content_and_media` `operations_and_release` `environment_and_recovery` … | コード変更・提供・調査・制作・運用・復旧・意思決定・顧客・導入 | 多くは `execute_within_guardrails`(承認範囲の内側で実行まで担う) |
 
 組織機能クラスを分けた理由: これらは従来 `operations_and_release` / `decision_support` に混在し、**給与計算が `code_change` 扱いでソフトウェア開発ワークフローに流れる**、契約レビューに交渉リハーサル用ゲートが付く、といった誤りが起きていた。統制の型(お金・人・法・方向・供給)が違えば、必要なチーム・レビューゲート・AI の任せ方が違う。
+
+### 1.1 `code_change` の specialization: mission type `refactoring`
+
+`refactoring` は **新しい MissionClass ではない**。class は `code_change` のまま、mission type / task type だけを分けて専用ワークフローに載せる。
+
+| 項目           | feature / bug fix                  | refactoring                                                                 |
+| -------------- | ---------------------------------- | --------------------------------------------------------------------------- |
+| mission type   | `development` / `code_change`      | `refactoring`                                                               |
+| workflow       | `code-change-aidlc`                | `code-refactoring-aidlc`                                                    |
+| playbook       | engineering-feature / bug-fix      | [`engineering-refactoring-playbook`](./engineering-refactoring-playbook.md) |
+| 不変条件       | 新挙動・修正が受け入れ条件を満たす | **観測可能挙動を変えない**（ピン＋等価性）                                  |
+| チームテンプレ | `development`                      | `development`（alias）                                                      |
+
+発話に「リファクタリング」「refactor this」などが含まれる場合も mission type を `refactoring` に昇格する。feature と混ぜない。
 
 ## 2. 共通原則
 
