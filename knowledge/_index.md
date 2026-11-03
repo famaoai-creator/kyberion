@@ -291,6 +291,7 @@
 - [外部入出力 actuator の統合と自律運用](./product/governance/external-actuator-governance.md) (public | Unknown)
 - [情報資産の所在登録・取得・完了確認の運用](./product/governance/information-assets-runbook.md) (public | Unknown)
 - [文脈の経済 — 長いセッションでトークンを無駄にしない](./product/governance/agent-context-economy.md) (public | Unknown)
+- [日本語の校正で変えてよいことと、変えてはいけないこと](./product/governance/japanese-prose-proofreading.md) (public | Unknown)
 
 ## 📁 product/governance/authority-roles
 - [Authority Roles](./product/governance/authority-roles/README.md) (public | Unknown)

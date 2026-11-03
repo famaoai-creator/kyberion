@@ -107,6 +107,16 @@ template task is recorded while the work happens**. Verified end to end on 2026-
    (read-only; values on stdout only, the audit records ids; refused unless bound to a
    registered, active tenant). Never copy the values into public evidence or notes.
 
+   Two customer-decision holds are counted apart, and one case can show both.
+   `unresolvable` is a question whose agenda was closed, withdrawn or lost with no
+   confirmed answer: the task stays inside `held`, and the lock still accepts a
+   re-ask or a task replacement. `frozen` is a lock carrying a `superseded` mark the
+   mission does not prove: the task stays shown as live, and every later write to
+   that lock fails. The Chronos case detail keeps both counts and, when a count is
+   above zero, its next-step string (`unresolvable_next`, `frozen_locks_next`). A
+   count an older facade omits is read as 0. Only `frozen_locks` is an attention
+   reason (first on the list); `unresolvable` stays a task count.
+
    A task that can never complete (e.g. its customer decision is unresolvable) is not
    edited in NEXT_TASKS: re-ask the question (`pnpm kyberion customer-decision draft --tenant <t> --case <c> --from-tasks --reask <tp-id> --by user:<member>`)
    or replace it with another task of the mission through
