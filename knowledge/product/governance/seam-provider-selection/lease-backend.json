@@ -33,6 +33,17 @@
           "evidence": [
             "libs/core/lease/memory-lease-backend.ts (single-process mutex + in-memory records; hermetic tests only — never in the default chain)"
           ]
+        },
+        "kv-lock-stub": {
+          "traits": { "safety": 0.7, "zero_config": 1, "distributed": 1 },
+          "trait_basis": {
+            "safety": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/lease/kv-lease-backend.stub.ts (shared-store async mutex simulating Redis/KV exclusion across nodes; withLockSync unsupported — never in the default chain)"
+          ]
         }
       },
       "purposes": {

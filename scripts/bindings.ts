@@ -47,6 +47,7 @@ import '@agent/core/storage/object-storage-backend.stub';
 import '@agent/core/lease/lease-backend';
 import '@agent/core/lease/local-lease-backend';
 import '@agent/core/lease/memory-lease-backend';
+import '@agent/core/lease/kv-lease-backend.stub';
 import '@agent/core/search/web-search-runtime-bridge';
 import '@agent/core/voice/audio-playback';
 import '@agent/core/provider/provider-backend-resolver';
