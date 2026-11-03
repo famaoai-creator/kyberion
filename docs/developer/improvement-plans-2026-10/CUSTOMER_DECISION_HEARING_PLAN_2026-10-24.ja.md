@@ -1,7 +1,7 @@
 ---
 title: '顧客との調整事項ヒアリングと決定の計画 (CD-01〜13)'
 tags: [customer, hearing, decision, ai-dlc, agile, deal, invitation, plan]
-last_updated: 2026-10-24
+last_updated: 2026-10-28
 status: active
 ---
 
@@ -335,6 +335,8 @@ pnpm kyberion customer-decision send --tenant <t> --case <case> --agenda <id> --
 pnpm kyberion customer-decision status --tenant <t> --case <case> --agenda <id>
 pnpm kyberion customer-decision status --tenant <t> --case <case>   # タスクの提案と判断待ちのタスク（CD-09）
 pnpm kyberion customer-decision draft --tenant <t> --case <case> --from-tasks --customer <c>
+pnpm kyberion customer-decision draft --tenant <t> --case <case> --from-tasks --reask <tp-id,...> --customer <c> --by user:<member>   # 解決できない問いの聞き直し（ロックはまだ書ける）
+pnpm mission supersede-task <MISSION_ID> <TASK_ID> --by <NEW_TASK_ID> --reason <text> --request-approval   # タスクの置き換え。人の承認のあと --approval-request-id
 pnpm kyberion customer-decision bolt-review --tenant <t> --case <case> --mission <MSN> --customer <c> --summary-file <path> [--attach <png>]... [--preview-url <https URL>]   # CD-10
 pnpm kyberion customer-decision confirm --tenant <t> --case <case> --agenda <id> --entry <entry_id> --by user:<member>
 pnpm kyberion customer-decision close --tenant <t> --case <case> --agenda <id> --by user:<member>
@@ -365,7 +367,7 @@ KYBERION_CUSTOMER_ROOM_TENANT=<t> node dist/presence/displays/customer-room/serv
 - CD-10 の残り: 却下の受信箱への記録は `surface_runtime` で書く（`addInboxEntry` 1 回だけ）。`surface_runtime` は `active/shared/runtime/` にも書けるので、受信箱だけに絞った役割を用意する。
   - **対応済み**（ブランチ `fix/customer-decision-hardening-20261025`）: `deliverable_inbox_writer`（共有の core 役割）を用意した。CD-10 の却下と、CD-11 の引き継ぎ・手動リマインドの受信箱への記録は、この役割で書く。guard が書き込みを `active/shared/inbox/entries.jsonl` と、受信箱自身のロックファイルだけに絞る。
 - CD-10 の残り: 画像 1 枚ごとに facade の子プロセスを 1 つ起動し、API 全体の回数制限（60 回/分）を使う。公開 ingress の背後では全顧客で共有になるため、画像の取得には別の制限か同時実行の上限を設ける。（対応済み、ブランチ `fix/customer-decision-hardening-20261025`: `/api/attachment` は API 全体の回数制限を使わず、接続元ごとの固定窓（120 回/分、`libs/core/foundation/rate-limit.ts` の `fixedWindowLimiter`、表が満杯なら新しい接続元を断り、制限中の接続元を追い出さない）と、facade の子プロセスの同時実行の上限（4）を持つ）
-- CD-09 の残り（再開時の値の受け渡しのレビューで判明）: 解除の後に顧客が答えを変え、運用者が確認しないまま調整セットを閉じると、確認済みの決定が台帳にない場合はその問いを解決できない（`customer_decision_unresolvable`）。集めた提案は別の調整セットで聞き直せず（`draft --from-tasks` は未収集の提案だけを集め、guard は収集済みの提案の変更を拒む）、`requires_customer` の項目はこちらの決定を持たない。今は NEXT_TASKS で新しい task id のタスクに置き換えてから `pnpm mission resume` するしかない。古いタスクは record-evidence で閉じられず（判断待ちのまま）、タスクを外す governed な動詞もないため、`pnpm mission finish` が「Pending tasks remain」で止まる。聞き直しの動詞（または `draft --from-tasks` の聞き直しの指定）と guard の変更、あるいはタスクを置き換え済みとして閉じる `mission_controller` の動詞（終端の状態 `superseded`）を用意する。
+- CD-09 の残り（再開時の値の受け渡しのレビューで判明）: 解除の後に顧客が答えを変え、運用者が確認しないまま調整セットを閉じると、確認済みの決定が台帳にない場合はその問いを解決できない（`customer_decision_unresolvable`）。集めた提案は別の調整セットで聞き直せず（`draft --from-tasks` は未収集の提案だけを集め、guard は収集済みの提案の変更を拒む）、`requires_customer` の項目はこちらの決定を持たない。今は NEXT_TASKS で新しい task id のタスクに置き換えてから `pnpm mission resume` するしかない。古いタスクは record-evidence で閉じられず（判断待ちのまま）、タスクを外す governed な動詞もないため、`pnpm mission finish` が「Pending tasks remain」で止まる。聞き直しの動詞（または `draft --from-tasks` の聞き直しの指定）と guard の変更、あるいはタスクを置き換え済みとして閉じる `mission_controller` の動詞（終端の状態 `superseded`）を用意する。（対応済み。聞き直しとタスクの置き換えはブランチ `feat/customer-decision-lifecycle-followups-20261026`: `draft --from-tasks --reask`、人の承認のあとの `pnpm mission supersede-task`。これはロックがまだ書けるときの話である。証明できない `superseded` の印で以後の書き込みが拒否される状態は別で、ブランチ `fix/lock-mark-detect-20261028` が `frozen_locks` として数える。印を戻して `mission resume` するか、正式に置き換えて凍結のまま数える。Chronos の案件詳細は両方の件数と、件数があるときの次の手順（`unresolvable_next`、`frozen_locks_next`）を残す。古い facade が件数を欠くときは 0 として読む。注意リストの先頭に出るのは `frozen_locks` だけで、`unresolvable` は判断待ちの内数のまま）
 - CD-10 の残り: 招待の置き場の tier ディレクトリができた後は、未登録のテナントも自分の招待ディレクトリを作れる。テナントの登録をそこでも求めるかは、ガバナンスの判断として決める。（対応済み、ブランチ `feat/customer-decision-cd09-invite-20261025`: 招待の置き場には、テナントの登録（`knowledge/personal/tenants/<t>.json` の `status` が `active`）を求める。guard が `customer_decision_invite_store` の書き込みで登録を確かめ、有効でないテナントには取り消し（`revoked_at` と `revoked_reason` を足すだけの書き込み）しか認めない。`send` は招待を作る前に断り、顧客の画面は登録の状態を見せずに「使えない」と答える。テナントのオフボーディングは招待の置き場も書き出して消す）
 - ハードニングの残り: 承認の置き場をテナントごとに物理的に分ける（今は id だけの要約とスコープの絞り込みで守っている）。（対応済み、ブランチ `fix/approval-store-tenant-partition-20261025`: テナントのスコープを持つ承認依頼は、`active/shared/runtime/tenant-approvals/<personal|confidential>/<tenant>/<channel>/` に置く（依頼、パスキーのチャレンジ、イベントログ）。まだ有効になっていないテナントの有効化の依頼と、テナントのない依頼はシステムの置き場に残る。読み書きはその依頼のテナントに縛った `tenant_approval_store` 役割で行い、別のテナントに束縛されたプロセスからは見つからない。API は `(storageChannel, id)` のまま。以前にシステムの置き場に書かれたテナントの依頼は、`node dist/scripts/approval_store_hygiene.js --migrate-tenant-partitions`（既定は dry-run、`--apply` で移す。記録のロックの中で書き込み・読み戻し・元の削除・監査）でテナントの置き場に移す。古いイベントログの行は履歴として残す。テナントのオフボーディングは `tenant_approvals` として書き出して消す）
 - E2E の残り: 終わった bolt の状態は `mission_controller` を 1 ファイルの capability の中で借りて読む。読み取り専用の、アーカイブ済みミッションの状態だけを読む役割を用意する。
