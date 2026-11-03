@@ -200,7 +200,7 @@
       "d": "Managed process lifecycle actuator backed by the runtime supervisor",
       "s": "implemented",
       "version": "1.0.0",
-      "capability_count": 4
+      "capability_count": 5
     },
     {
       "n": "scheduler-actuator",

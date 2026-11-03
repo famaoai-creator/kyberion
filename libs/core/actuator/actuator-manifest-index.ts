@@ -42,6 +42,18 @@ export interface ActuatorManifestCapability {
   implemented?: boolean;
   /** Declared side-effect class; absent means 'write' (fail-safe). */
   effect?: ActuatorEffect;
+  /**
+   * 'deterministic' = provider/backend selection is fixed; a fallback that
+   * would change result semantics is not permitted — report availability
+   * instead (REA-derived contract).
+   */
+  selection?: 'deterministic';
+  /**
+   * Authority exercised over the target, orthogonal to `effect`:
+   * execute launches code, attach binds to a live target, instrument reads
+   * internals, mutate signals or alters target state. Omit for observe-only ops.
+   */
+  target_authority?: 'execute' | 'attach' | 'instrument' | 'mutate';
   /** Input path (e.g. "method", "params.method") refining the effect per call. */
   effect_from?: string;
   /** Input path resolving the governed resource ref for intro/observation stages. */
