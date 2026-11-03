@@ -161,6 +161,11 @@ export interface MissionControllerRoutingContext {
   pauseMission: (id: string, note?: string, decidedBy?: HumanDecidedBy) => Awaitable<void>;
   cancelMission: (id: string, note?: string, decidedBy?: HumanDecidedBy) => Awaitable<void>;
   repairLegacyMissionState: (id: string, note?: string) => Awaitable<void>;
+  prepareSourceWorkspace?: (
+    missionId: string,
+    taskId: string,
+    baselineCommit: string
+  ) => Awaitable<unknown>;
   recordRoutingDecisionInMissionState: (
     missionId: string,
     routingDecision: Record<string, unknown> | null,
@@ -1153,6 +1158,21 @@ export async function runMissionControllerAction(
     case 'record-task':
       await context.recordTask(arg1!, arg2!, parseJsonRecord(context.arg3, 'record-task details'));
       break;
+    case 'prepare-source-workspace': {
+      const baseline = getValue('--baseline-commit', context.argv);
+      if (!arg1 || !arg2 || !baseline)
+        throw new Error(
+          'prepare-source-workspace requires <mission> <task> --baseline-commit <full SHA>'
+        );
+      // The canonical CLI role is inferred from its entrypoint, not assumed here.
+      const prepare =
+        context.prepareSourceWorkspace ??
+        (await import('@agent/core/mission/mission-task-source-workspace'))
+          .prepareMissionTaskSourceWorkspace;
+      const result = await prepare(arg1, arg2, baseline);
+      context.print?.(result);
+      break;
+    }
     case 'record-evidence':
       await context.recordEvidence(
         arg1!,
