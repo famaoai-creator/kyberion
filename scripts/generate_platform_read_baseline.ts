@@ -32,7 +32,16 @@ const scanRoots = [
 const codeFileRe = /\.(ts|tsx|mts|mjs|cts|cjs|js|jsx)$/;
 const testFileRe = /(\.test\.|\.spec\.|__tests__|\.live\.test\.)/;
 const rawPlatformReadRe = /\bprocess\.platform\b|\bos\.platform\s*\(/;
-const IGNORED_DIR_PARTS = ['/node_modules/', '/dist/', '/.worktrees/', '/retired/', '/.git/'];
+const IGNORED_DIR_PARTS = [
+  '/node_modules/',
+  '/dist/',
+  '/.next/',
+  '/.turbo/',
+  '/coverage/',
+  '/.worktrees/',
+  '/retired/',
+  '/.git/',
+];
 
 function normalize(relPath: string): string {
   return relPath.split(path.sep).join('/');

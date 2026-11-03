@@ -159,7 +159,9 @@ export interface SuspendFollowersResult {
 export interface MissionLeaseManagerOptions {
   /**
    * Persistence/exclusion backend. Defaults to a fresh memory backend so each
-   * manager is hermetic; inject `resolveLeaseBackend()` for governed providers.
+   * manager is hermetic; inject `resolveLeaseBackend()` (or `local-file-lock` /
+   * `memory`) for governed providers. Mutations use `withLockSync` only —
+   * async-only providers such as `kv-lock-stub` are not supported yet.
    */
   backend?: LeaseBackend;
   /**
@@ -287,17 +289,6 @@ export class MissionLeaseManager {
     return this.backend.withLockSync(lockNamespace(resource), fn);
   }
 
-  private syncFenceFromDurable(
-    state: ResourceLeaseSlot,
-    resource: string
-  ): FencedLeaseRecord | undefined {
-    const durable = this.backend.read(this.leaseKeyFor(resource));
-    if (durable && durable.fence > state.fence) {
-      state.fence = durable.fence;
-    }
-    return durable;
-  }
-
   private hydrateFromDurable(
     state: ResourceLeaseSlot,
     durable: FencedLeaseRecord,
@@ -327,11 +318,30 @@ export class MissionLeaseManager {
     resource: string,
     now: number
   ): StoredLease | undefined {
-    if (!state) return undefined;
-    const durable = this.syncFenceFromDurable(state, resource);
+    const durable = this.backend.read(this.leaseKeyFor(resource));
+    // Durable live record is authoritative across managers/processes.
     if (durable && durable.expires_at_ms > now) {
-      return this.hydrateFromDurable(state, durable, now);
+      const slot = state ?? this.slot(resource, true)!;
+      if (durable.fence > slot.fence) slot.fence = durable.fence;
+      return this.hydrateFromDurable(slot, durable, now);
     }
+    // Durable free/released: invalidate any stale local "active" row for this
+    // or an older generation so a contested follower cannot keep seeing a
+    // peer-released holder as live.
+    if (durable && state) {
+      if (durable.fence > state.fence) state.fence = durable.fence;
+      const lease = state.lease_id ? this.leases.get(state.lease_id) : undefined;
+      if (lease && lease.status === 'active' && lease.fence <= durable.fence) {
+        lease.expires_at_ms = Math.min(lease.expires_at_ms, durable.expires_at_ms);
+        if (durable.expires_at_ms === 0) {
+          lease.status = 'released';
+          lease.released_at_ms = lease.released_at_ms ?? now;
+        }
+      }
+      return undefined;
+    }
+    // No durable record — fall back to process-local state only.
+    if (!state) return undefined;
     const lease = state.lease_id ? this.leases.get(state.lease_id) : undefined;
     return isLive(lease, now) ? lease : undefined;
   }
