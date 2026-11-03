@@ -130,6 +130,8 @@ export interface SerializedAuthorizationPolicy {
   readonly delegable?: {
     readonly fields: readonly string[];
     readonly optionalFields?: readonly string[];
+    /** Exactly one of these optional fields must appear in a valid grant. */
+    readonly requiredOneOf?: readonly string[];
     readonly reputational_class: 'A' | 'B';
   };
   /** Declaration-level lineage marker (Dogwood `when temporal` analogue):
