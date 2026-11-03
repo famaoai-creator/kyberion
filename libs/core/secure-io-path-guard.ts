@@ -60,6 +60,8 @@ export function entryExists(p: string): boolean {
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else if (candidate.startsWith(physicalRoot + path.sep))
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
+    else if (insidePrimaryAuthority(candidate) !== undefined)
+      stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
   } catch (error) {
     if (errnoCode(error) === 'ENOTDIR') return false;
@@ -252,6 +254,7 @@ function onDiskLeaf(realDir: string, leaf: string): string {
   let candidate: string | undefined;
   if (joined.startsWith(path.resolve(pathResolver.rootDir()) + path.sep)) candidate = joined;
   else if (joined.startsWith(realRoot().real + path.sep)) candidate = joined;
+  else if (insidePrimaryAuthority(joined) !== undefined) candidate = joined;
   if (candidate === undefined) return leaf;
   let stat: fs.Stats | undefined;
   try {
@@ -883,7 +886,12 @@ function recentlyChanged(held: fs.Stats): boolean {
 function settleDirectory(dir: string): boolean {
   const target = path.resolve(dir);
   const physicalRoot = realRoot().real;
-  if (target !== physicalRoot && !target.startsWith(physicalRoot + path.sep)) return true;
+  if (
+    target !== physicalRoot &&
+    !target.startsWith(physicalRoot + path.sep) &&
+    insidePrimaryAuthority(target) === undefined
+  )
+    return true;
   try {
     const handle = fs.opendirSync(target, { bufferSize: 1 });
     try {
