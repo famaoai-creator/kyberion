@@ -1,0 +1,53 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "vcs-backend",
+      "default_provider": "local-git",
+      "fallback_purpose": "execute",
+      "traits": {
+        "fidelity": "Results byte-identical to the local git CLI (argv semantics, exit codes, stdout/stderr).",
+        "zero_config": "Works with no operator opt-in or extra configuration.",
+        "distributed": "Executes repository operations for more than one runtime node / workspace."
+      },
+      "providers": {
+        "local-git": {
+          "traits": { "fidelity": 1, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "fidelity": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/vcs/local-git-backend.ts (delegates to governed safeExecResult — identical argv semantics; cwd-scope + external-operation governance stay in the typed-verb layer)"
+          ]
+        },
+        "memory": {
+          "traits": { "fidelity": 0, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "fidelity": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/vcs/memory-vcs-backend.ts (recording/fixture runner; hermetic tests and dry runs only — never in the default chain)"
+          ]
+        }
+      },
+      "purposes": {
+        "execute": {
+          "description": "Run shared-surface git verbs for the active runtime's working checkout.",
+          "weights": { "fidelity": 0.6, "zero_config": 0.3, "distributed": 0.1 }
+        },
+        "remote_execute": {
+          "description": "Run the same verbs against a workspace owned by another node (VCS host API or remote executor).",
+          "weights": { "fidelity": 0.2, "zero_config": 0.1, "distributed": 0.7 }
+        }
+      },
+      "default_chains": {
+        "default": ["local-git"]
+      }
+    }
+  ]
+}

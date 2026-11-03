@@ -254,6 +254,14 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/event/event-bus.ts',
     consumers: ['libs/core/event/local-event-bus.ts', 'libs/core/event/memory-event-bus.ts'],
   },
+  'vcs-backend': {
+    declaration: 'libs/core/vcs/vcs-backend.ts',
+    consumers: [
+      'libs/core/vcs/git.ts',
+      'libs/core/vcs/local-git-backend.ts',
+      'libs/core/vcs/memory-vcs-backend.ts',
+    ],
+  },
   'structured-runner': {
     declaration: 'libs/core/mission/mission-llm.ts',
     consumers: ['libs/core/mission/mission-llm.ts'],
