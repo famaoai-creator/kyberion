@@ -11,6 +11,11 @@ import { getServicePresetRecord } from './service-preset-registry.js';
 import { resolveServiceBinding } from './service-binding.js';
 import { executeServicePreset } from './service-engine.js';
 import {
+  isIssuedInstallationOwnerGrant,
+  type InstallationAccessMode,
+  type InstallationOwnerGrant,
+} from '../surface/installation-owner-access.js';
+import {
   loadOperatorServiceConnectionCatalog,
   type OperatorServiceConnectionCatalogEntry,
 } from './operator-service-connection-catalog.js';
@@ -26,6 +31,13 @@ export interface OperatorServiceConnectionPrincipal {
   principalId?: string;
   /** A trusted transport adapter proved a direct loopback peer; never a request parameter. */
   loopback: boolean;
+  /**
+   * The installation-owner grant the surface adapter obtained for this
+   * request (surface/installation-owner-access.ts). Only a grant issued in
+   * this process counts; it lets the installation owner act from a
+   * non-loopback session (a write needs its passkey step-up).
+   */
+  installationGrant?: InstallationOwnerGrant;
 }
 
 export interface OperatorServiceConnectionDescriptor {
@@ -52,10 +64,25 @@ export interface OperatorServiceConnectionProbeResult {
   checkedAt: string;
 }
 
-function assertLocalOperator(principal: OperatorServiceConnectionPrincipal): void {
+function assertLocalOperator(
+  principal: OperatorServiceConnectionPrincipal,
+  mode: InstallationAccessMode = 'read'
+): void {
+  if (getPluginExecutionContext() || !principal) {
+    throw new Error('[OPERATOR_SERVICE_CONNECTION_DENIED]');
+  }
+  if (principal.installationGrant !== undefined) {
+    // The grant is the whole proof: only resolveInstallationOwnerAccess can
+    // put an object into the issued-grant set, so a copied or hand-built
+    // grant fails here. (The adapter derives principalId FROM the grant, so
+    // comparing the two would prove nothing.)
+    if (!isIssuedInstallationOwnerGrant(principal.installationGrant, mode)) {
+      throw new Error('[OPERATOR_SERVICE_CONNECTION_DENIED]');
+    }
+    return;
+  }
+  // Legacy in-process contract: a proven loopback localadmin principal.
   if (
-    getPluginExecutionContext() ||
-    !principal ||
     principal.loopback !== true ||
     principal.role !== 'localadmin' ||
     principal.source !== 'loopback' ||
@@ -163,7 +190,7 @@ export async function probeOperatorServiceConnection(input: {
   principal: OperatorServiceConnectionPrincipal;
   serviceId: string;
 }): Promise<OperatorServiceConnectionProbeResult> {
-  assertLocalOperator(input.principal);
+  assertLocalOperator(input.principal, 'write');
   const response = (
     status: OperatorServiceConnectionStatus
   ): OperatorServiceConnectionProbeResult => ({

@@ -1,5 +1,16 @@
 import { NextRequest } from 'next/server';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+const bootstrap = vi.hoisted(() => ({ open: true }));
+vi.mock('@agent/core/surface/first-run-setup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/surface/first-run-setup')>()),
+  readFirstRunStatus: () => ({
+    state: bootstrap.open ? 'unclaimed' : 'claimed',
+    code_active: false,
+  }),
+}));
+
+import { resetInstallationBootstrapCache } from '@agent/core/surface/installation-owner-access';
 import { proxy as middleware, config } from './proxy';
 import { withLocalPeerRequest } from '../test/local-peer-fixture';
 
@@ -20,6 +31,9 @@ function run(path: string, headers: Record<string, string> = {}, loopback = fals
 describe('concierge middleware', () => {
   afterEach(() => {
     delete process.env.KYBERION_TRUST_PROXY;
+    vi.unstubAllEnvs();
+    bootstrap.open = true;
+    resetInstallationBootstrapCache();
   });
 
   it('redirects an unauthenticated remote page navigation to /login?next', () => {
@@ -44,7 +58,27 @@ describe('concierge middleware', () => {
     expect(run('/iconsx/a.png', NAV).status).toBe(302);
   });
 
-  it('never redirects loopback', () => {
+  it('never redirects loopback while bootstrap is open', () => {
+    expect(run('/', NAV, true).headers.get('location')).toBeNull();
+  });
+
+  it('sends a credential-less loopback navigation to /login once an owner is bound', () => {
+    bootstrap.open = false;
+    resetInstallationBootstrapCache();
+    const res = run('/settings', NAV, true);
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe(
+      'https://app.example/login?next=' + encodeURIComponent('/settings')
+    );
+    // First-run setup and the login flow stay reachable.
+    expect(run('/setup/first-run', NAV, true).headers.get('location')).toBeNull();
+    expect(run('/login', NAV, true).headers.get('location')).toBeNull();
+  });
+
+  it('keeps loopback unredirected with the anonymous-loopback escape hatch', () => {
+    bootstrap.open = false;
+    resetInstallationBootstrapCache();
+    vi.stubEnv('KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK', '1');
     expect(run('/', NAV, true).headers.get('location')).toBeNull();
   });
 

@@ -17,10 +17,15 @@ import {
   type OperatorServiceDescriptor,
 } from '../operator-services-api';
 import { FormScope, type SettingsTranslate } from './form-scope';
+import { InstallationAccessNotice } from './InstallationAccessNotice';
+import { isInstallationAccessCode } from '../../../lib/installation-access-client';
 import type { ConciergeMessageKey } from '../../../lib/i18n';
 
 const errorKeys: Record<OperatorError, ConciergeMessageKey> = {
   local_operator_required: 'settings.operator_local_required',
+  authentication_required: 'settings.installation_sign_in_required',
+  installation_owner_required: 'settings.installation_owner_only',
+  installation_step_up_required: 'settings.installation_step_up_title',
   invalid_request: 'settings.operator_invalid_request',
   approval_required: 'settings.operator_approval_required',
   recovery_required: 'settings.operator_recovery_required',
@@ -63,7 +68,15 @@ export function OperatorServiceRegistrationPanel({ t }: { t: SettingsTranslate }
           <p className="kb-text kb-text--muted">{t('settings.operator_independent')}</p>
           <p className="kb-text kb-text--caption">{t('settings.operator_unsupported_providers')}</p>
         </div>
-        {error ? (
+        {error && isInstallationAccessCode(error) ? (
+          <div className="settings-row-block">
+            <InstallationAccessNotice
+              code={error}
+              t={t}
+              onConfirmed={() => setRevision((value) => value + 1)}
+            />
+          </div>
+        ) : error ? (
           <div className="settings-row-block">
             <Callout tone="warning" title={t(errorKeys[error])} />
             <Button
@@ -347,7 +360,11 @@ function OperatorServiceCard({
             {t('settings.operator_checked_at', { time: probe.checkedAt })}
           </p>
         ) : null}
-        {error ? <Callout tone="danger" title={t(errorKeys[error])} /> : null}
+        {error && isInstallationAccessCode(error) ? (
+          <InstallationAccessNotice code={error} t={t} onConfirmed={() => setError(null)} />
+        ) : error ? (
+          <Callout tone="danger" title={t(errorKeys[error])} />
+        ) : null}
         {authenticated ? (
           <div className="settings-row-block">
             <p className="kb-text kb-text--muted">

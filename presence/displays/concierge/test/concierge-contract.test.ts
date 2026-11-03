@@ -76,7 +76,7 @@ describe('concierge surface contract', () => {
     }
   });
 
-  it('keeps all global credential paths behind stricter local-operator admission', () => {
+  it('keeps all global credential paths behind installation-owner admission', () => {
     for (const route of [
       'src/app/api/secrets/introduce/route.ts',
       'src/app/api/secrets/apply/route.ts',
@@ -90,9 +90,10 @@ describe('concierge surface contract', () => {
     const guard = safeReadFile(path.join(appDir, 'src/lib/operator-service-access.ts'));
     expect(guard).toContain('requireConciergeMutationAccess(req)');
     expect(guard).toContain('resolveConciergeViewer(req)');
-    expect(guard).toContain('isLoopbackPeer(req)');
-    expect(guard).toContain("viewer.source !== 'loopback'");
-    expect(guard).toMatch(/viewer\.memberId\s*\|\|\s*viewer\.registrationLabel/);
+    // Identity + assurance, not transport: the central installation-owner
+    // decision (loopback is only a factor of it) gates reads and writes.
+    expect(guard).toContain('resolveConciergeInstallationAccess(viewer, mode, req)');
+    expect(guard).toContain('auditConciergeInstallationWrite(');
   });
 
   it('gates every decide-effect route on owner/approver membership role', () => {
@@ -939,8 +940,13 @@ describe('concierge surface contract', () => {
     );
     const surface = manifest.surfaces.find((entry: { id: string }) => entry.id === 'concierge');
     expect(surface).toBeTruthy();
-    expect(surface.healthPath).toBe('/api/summary');
-    expect(fs.existsSync(path.join(appDir, 'src/app/api/summary/route.ts'))).toBe(true);
+    // The probe is credential-less loopback: once anonymous loopback stops
+    // being the local operator it must hit the public, data-free liveness
+    // route, never a viewer-scoped one like /api/summary.
+    expect(surface.healthPath).toBe('/api/healthz');
+    const health = fs.readFileSync(path.join(appDir, 'src/app/api/healthz/route.ts'), 'utf8');
+    expect(health).not.toContain('resolveConciergeViewer');
+    expect(health).toContain('NextResponse.json({ ok: true }');
     const rootPackage = JSON.parse(
       fs.readFileSync(path.join(appDir, '../../../package.json'), 'utf8')
     );

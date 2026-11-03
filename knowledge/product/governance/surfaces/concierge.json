@@ -12,7 +12,7 @@
       "startupMode": "workspace-app",
       "ownerType": "surface-runtime-manifest",
       "port": 3050,
-      "healthPath": "/api/summary",
+      "healthPath": "/api/healthz",
       "enabled": true,
       "env": {
         "KYBERION_SCOPE_ENV_PATH": "active/shared/runtime/scope-surfaces.env"

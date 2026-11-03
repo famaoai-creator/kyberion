@@ -1,3 +1,4 @@
+import { requireConciergeInstallationAccess } from '../../../../lib/installation-access';
 import { scopedLearningApprovalVisibleToViewer } from '../../../../lib/scoped-learning-approval-visibility';
 import { onboardingApprovalMember } from '../../../../lib/onboarding-authority-server';
 import {
@@ -82,6 +83,18 @@ export async function POST(req: NextRequest, context: { params: Promise<{ id: st
     const onboardingMember = onboardingApprovalMember(resolved.context, record);
     if (onboardingMember === null)
       return NextResponse.json({ ok: false, error: 'approval request not found' }, { status: 404 });
+    // Deciding a personal-scope onboarding-authority card changes what this
+    // installation's agent may do: the installation write gate applies
+    // (loopback, or a passkey step-up from this session).
+    if (onboardingMember && !record.scope?.tenant_slug) {
+      const gate = requireConciergeInstallationAccess(
+        resolved.context,
+        'write',
+        req,
+        'onboarding_authority decide'
+      );
+      if (gate.response) return gate.response;
+    }
     const decisionDenied = onboardingMember
       ? null
       : conciergeDecisionDenied(resolved.context, resourceTenant);

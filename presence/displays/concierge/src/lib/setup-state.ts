@@ -19,6 +19,7 @@ import type { ConciergeMessageKey } from './i18n';
 import { visibleConnections } from './connection-view';
 import { resolveConciergeDecidedBy } from './front-desk-member';
 import type { ConciergeViewerContext } from './viewer-context';
+import { resolveConciergeInstallationAccess } from './installation-access';
 
 export type SetupTranslator = (
   key: ConciergeMessageKey,
@@ -55,7 +56,13 @@ export function buildConciergeSetupState(
   }
   const onboarding = getBrowserOnboardingState();
   const profileRoot = resolveActiveProfileRoot();
-  const identity = (onboarding.identity || {}) as Record<string, unknown>;
+  // The personal profile is the installation owner's: anyone else sees the
+  // settings structure without the owner's identity, vision or voice data.
+  const installation = resolveConciergeInstallationAccess(viewer, 'read');
+  const identity = (installation.allowed ? onboarding.identity || {} : {}) as Record<
+    string,
+    unknown
+  >;
   const avatarPath = path.join(profileRoot, 'avatar.png');
   const activeVoiceSampleRoot = path.resolve(profileRoot, 'voice', 'samples');
   const activeTenantSlug = String(
@@ -171,6 +178,9 @@ export function buildConciergeSetupState(
   ];
 
   return {
+    installation_access: installation.allowed
+      ? { owner: true }
+      : { owner: false, error_code: installation.code },
     surface_roles: roles.roles,
     active_surfaces: surfaces.surfaces.map((entry) => ({
       id: entry.id,
@@ -189,32 +199,33 @@ export function buildConciergeSetupState(
       interaction_style: String(identity.interaction_style || 'Concierge'),
       primary_domain: String(identity.primary_domain || ''),
       tenant_slug: activeTenantSlug,
-      vision: String(identity.vision || onboarding.vision || ''),
+      vision: String(identity.vision || (installation.allowed ? onboarding.vision : '') || ''),
       agent_id: String(
         (onboarding.agent_identity as Record<string, unknown> | null)?.agent_id || 'sovereign-agent'
       ),
       onboarding_complete: onboardingComplete,
       avatar_registered: avatarRegistered,
       avatar_source: String(identity.avatar_source || ''),
-      voice_profiles: Array.isArray(onboarding.voice_profiles)
-        ? onboarding.voice_profiles.map((voice) => ({
-            profile_id: String((voice as Record<string, unknown>).profile_id || ''),
-            display_name: String((voice as Record<string, unknown>).display_name || ''),
-            sample_count: Array.isArray((voice as Record<string, unknown>).sample_refs)
-              ? ((voice as Record<string, unknown>).sample_refs as unknown[]).length
-              : 0,
-            sample_refs: Array.isArray((voice as Record<string, unknown>).sample_refs)
-              ? ((voice as Record<string, unknown>).sample_refs as unknown[])
-                  .map((sampleRef) => path.resolve(String(sampleRef)))
-                  .filter(
-                    (sampleRef) =>
-                      sampleRef === activeVoiceSampleRoot ||
-                      sampleRef.startsWith(`${activeVoiceSampleRoot}${path.sep}`)
-                  )
-                  .map((sampleRef) => pathResolver.toRepoRelative(sampleRef))
-              : [],
-          }))
-        : [],
+      voice_profiles:
+        installation.allowed && Array.isArray(onboarding.voice_profiles)
+          ? onboarding.voice_profiles.map((voice) => ({
+              profile_id: String((voice as Record<string, unknown>).profile_id || ''),
+              display_name: String((voice as Record<string, unknown>).display_name || ''),
+              sample_count: Array.isArray((voice as Record<string, unknown>).sample_refs)
+                ? ((voice as Record<string, unknown>).sample_refs as unknown[]).length
+                : 0,
+              sample_refs: Array.isArray((voice as Record<string, unknown>).sample_refs)
+                ? ((voice as Record<string, unknown>).sample_refs as unknown[])
+                    .map((sampleRef) => path.resolve(String(sampleRef)))
+                    .filter(
+                      (sampleRef) =>
+                        sampleRef === activeVoiceSampleRoot ||
+                        sampleRef.startsWith(`${activeVoiceSampleRoot}${path.sep}`)
+                    )
+                    .map((sampleRef) => pathResolver.toRepoRelative(sampleRef))
+                : [],
+            }))
+          : [],
     },
     tenant: {
       active_slug: activeTenantSlug,

@@ -22,6 +22,10 @@ import { buildConciergeSetupState, resolveExistingProfileFile } from '../../../l
 import { conciergeErrorResponse, resolveConciergeViewer } from '../../../lib/viewer-context';
 import { conciergeText, resolveConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
 import {
+  requireConciergeInstallationAccess,
+  resolveConciergeInstallationAccess,
+} from '../../../lib/installation-access';
+import {
   optionalSetupBoolean,
   optionalSetupObject,
   optionalSetupString,
@@ -42,7 +46,16 @@ export function GET(req: NextRequest) {
     const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
     const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>
       conciergeText(key, locale, params);
-    return NextResponse.json({ ok: true, setup: buildConciergeSetupState(resolved.context, t) });
+    const setup = buildConciergeSetupState(resolved.context, t);
+    // Whether this session may change installation settings right now (a
+    // remote owner needs a passkey step-up first). Never a secret value.
+    const write = resolveConciergeInstallationAccess(resolved.context, 'write', req);
+    setup.installation_access = {
+      ...(setup.installation_access as Record<string, unknown>),
+      can_write: write.allowed,
+      ...(write.allowed ? {} : { write_error_code: write.code }),
+    };
+    return NextResponse.json({ ok: true, setup });
   } catch (error) {
     return conciergeErrorResponse(error, 500);
   }
@@ -51,6 +64,17 @@ export function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const denied = requireConciergeMutationAccess(req);
   if (denied) return denied;
+  // Every setup write changes the installation owner's personal profile,
+  // installation tenants, or the onboarding state of this machine.
+  const viewerForWrite = resolveConciergeViewer(req);
+  if (viewerForWrite.response) return viewerForWrite.response;
+  const gate = requireConciergeInstallationAccess(
+    viewerForWrite.context,
+    'write',
+    req,
+    `setup ${(req.headers.get('content-type') || '').includes('multipart/form-data') ? 'upload' : 'update'}`
+  );
+  if (gate.response) return gate.response;
 
   const locale = resolveConciergeLocale(req.headers.get('accept-language') || undefined);
   const t = (key: ConciergeMessageKey, params?: Record<string, string | number>) =>

@@ -16,6 +16,9 @@ const mocks = vi.hoisted(() => ({
   rp: vi.fn(),
   rateLimited: vi.fn(),
   viewer: vi.fn(),
+  installation: vi.fn(),
+  loopback: vi.fn(),
+  recordInstallationStepUp: vi.fn(),
 }));
 
 vi.mock('../../../../lib/api-guard', () => ({
@@ -55,6 +58,20 @@ vi.mock('@agent/core/authn/passkey-credential-store', () => ({
 }));
 vi.mock('@agent/core/authn/passkey-step-up', () => ({
   passkeyStepUpRequired: mocks.passkeyStepUpRequired,
+}));
+vi.mock('../../../../lib/installation-access', async () => {
+  const actual = await vi.importActual<typeof import('../../../../lib/installation-access')>(
+    '../../../../lib/installation-access'
+  );
+  return {
+    ...actual,
+    resolveConciergeInstallationAccess: mocks.installation,
+    conciergeSessionBinding: () => 'session-binding',
+  };
+});
+vi.mock('../../../../lib/loopback-peer', () => ({ isLoopbackPeer: mocks.loopback }));
+vi.mock('@agent/core/authn/installation-step-up', () => ({
+  recordInstallationStepUp: mocks.recordInstallationStepUp,
 }));
 vi.mock('@agent/core/governance/audit-chain', () => ({
   auditChain: { record: mocks.auditRecord },
@@ -107,6 +124,7 @@ describe('concierge /api/me/passkeys (HA-07)', () => {
     mocks.rateLimited.mockReturnValue(null);
     mocks.notifyOperator.mockResolvedValue(true);
     mocks.passkeyStepUpRequired.mockReturnValue(false);
+    mocks.loopback.mockReturnValue(false);
   });
 
   afterEach(() => {
@@ -380,5 +398,96 @@ describe('concierge /api/me/passkeys (HA-07)', () => {
     mocks.rateLimited.mockReturnValue(new Response('{}', { status: 429 }));
     expect((await POST(request({ action: 'options' }))).status).toBe(429);
     expect(mocks.createPasskeyRegistrationOptions).not.toHaveBeenCalled();
+  });
+
+  it('enrolls the installation owner’s first passkey only from a trusted loopback peer', async () => {
+    mocks.member.mockReturnValue({
+      memberId: 'owner',
+      displayName: 'Owner',
+      decidedBy: 'user:owner',
+    });
+    mocks.createPasskeyRegistrationOptions.mockResolvedValue({ challenge: 'c' });
+    const remote = await POST(request({ action: 'options' }));
+    expect(remote.status).toBe(403);
+    expect(await remote.json()).toMatchObject({
+      error: 'installation_owner_first_passkey_loopback_required',
+    });
+    expect((await POST(request({ action: 'verify', response: { id: 'x' } }))).status).toBe(403);
+    expect(mocks.createPasskeyRegistrationOptions).not.toHaveBeenCalled();
+    expect(mocks.verifyPasskeyRegistration).not.toHaveBeenCalled();
+    // At the machine it is allowed; with a usable passkey, a remote enrollment
+    // goes through the normal step-up path instead.
+    mocks.loopback.mockReturnValue(true);
+    expect((await POST(request({ action: 'options' }))).status).toBe(200);
+    mocks.loopback.mockReturnValue(false);
+    mocks.passkeyStepUpRequired.mockReturnValue(true);
+    expect((await POST(request({ action: 'options', step_up_token: 't' }))).status).toBe(200);
+    // Other members are unaffected.
+    mocks.member.mockReturnValue({
+      memberId: 'carol',
+      displayName: 'Carol',
+      decidedBy: 'user:carol',
+    });
+    mocks.passkeyStepUpRequired.mockReturnValue(false);
+    expect((await POST(request({ action: 'options' }))).status).toBe(200);
+  });
+
+  it('refuses an installation step-up to anyone but the installation owner', async () => {
+    mocks.installation.mockReturnValue({
+      allowed: false,
+      mode: 'read',
+      status: 403,
+      code: 'installation_owner_required',
+      reason: 'x',
+      transport: 'remote',
+    });
+    const refused = await POST(request({ action: 'step_up_options', purpose: 'installation' }));
+    expect(refused.status).toBe(403);
+    expect(await refused.json()).toMatchObject({ error: 'installation_owner_required' });
+    expect(mocks.createPasskeyStepUpOptions).not.toHaveBeenCalled();
+  });
+
+  it('records a verified installation step-up server-side, bound to the session', async () => {
+    mocks.installation.mockReturnValue({ allowed: true, mode: 'read' });
+    mocks.member.mockReturnValue({
+      memberId: 'owner',
+      displayName: 'Owner',
+      decidedBy: 'user:owner',
+    });
+    mocks.createPasskeyStepUpOptions.mockResolvedValue({ challenge: 'c' });
+    const started = await POST(request({ action: 'step_up_options', purpose: 'installation' }));
+    expect(started.status).toBe(200);
+    expect(mocks.createPasskeyStepUpOptions).toHaveBeenCalledWith(
+      expect.objectContaining({ memberId: 'owner', purpose: 'installation' })
+    );
+    mocks.verifyPasskeyStepUp.mockResolvedValue({
+      purpose: 'installation',
+      credentialId: 'cred-1',
+      stepUpToken: 'single-use-token',
+    });
+    mocks.recordInstallationStepUp.mockReturnValue({
+      verifiedAt: '2026-11-04T00:00:00.000Z',
+      expiresAt: '2026-11-04T00:05:00.000Z',
+      credentialId: 'cred-1',
+    });
+    const confirmed = await POST(request({ action: 'step_up_verify', response: { id: 'cred-1' } }));
+    const body = await confirmed.json();
+    expect(body).toEqual({
+      ok: true,
+      purpose: 'installation',
+      step_up_expires_at: '2026-11-04T00:05:00.000Z',
+    });
+    expect(JSON.stringify(body)).not.toContain('single-use-token');
+    expect(mocks.recordInstallationStepUp).toHaveBeenCalledWith('owner', {
+      sessionBinding: 'session-binding',
+      stepUpToken: 'single-use-token',
+    });
+    expect(mocks.auditRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ agentId: 'user:owner', operation: 'installation_step_up' })
+    );
+    expect(mocks.notifyOperator).toHaveBeenCalledWith(
+      'ops_alert',
+      expect.objectContaining({ title: 'Installation settings unlocked' })
+    );
   });
 });

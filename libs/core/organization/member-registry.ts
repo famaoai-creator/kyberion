@@ -32,6 +32,7 @@ import {
   assertSafeRepositoryPath,
 } from '../secure-io.js';
 import { isValidMemberId } from './member-id-grammar.js';
+import { signalInstallationBootstrapChange } from '../surface/installation-bootstrap-signal.js';
 
 export { isValidMemberId };
 
@@ -287,6 +288,8 @@ export function writeMemberProfile(
   const file = memberProfilePath(profile.member_id, options);
   safeMkdir(path.dirname(file), { recursive: true });
   safeWriteFile(file, JSON.stringify(profile, null, 2) + '\n', { encoding: 'utf8' });
+  // A new credential on a member can close installation bootstrap.
+  signalInstallationBootstrapChange();
   return profile;
 }
 

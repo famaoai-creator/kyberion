@@ -17828,6 +17828,61 @@
         "ja": "自分の PC でリポジトリのルートから pnpm --dir presence/displays/concierge local:start を実行し、ローカル操作用 Web 画面を開いてください。この画面からのリモート登録はできません。",
         "qps-ploc": "⟦Őṗėñ ŧħė ŀőƈȧŀ őṗėřȧŧőř Ẇėƀ şƈřėėñ őñ ẏőůř őẇñ ṖƇ: ƒřőɱ ŧħė řėṗőşïŧőřẏ řőőŧ, řůñ ṗñṗɱ --ḓïř ṗřėşėñƈė/ḓïşṗŀȧẏş/ƈőñƈïėřɠė ŀőƈȧŀ:şŧȧřŧ. Ŧħïş şƈřėėñ ḓőėş ñőŧ ȧŀŀőẇ řėɱőŧė řėɠïşŧřȧŧïőñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ⟧"
       },
+      "settings.installation_owner_only": {
+        "en": "Only the installation owner can change this setting.",
+        "ja": "この設定はインストールの所有者だけが変更できます。",
+        "qps-ploc": "⟦Őñŀẏ ŧħė ïñşŧȧŀŀȧŧïőñ őẇñėř ƈȧñ ƈħȧñɠė ŧħïş şėŧŧïñɠ. ŀőřėɱ ïṗşůɱ ḓőŀőř⟧"
+      },
+      "settings.installation_owner_only_detail": {
+        "en": "It applies to this whole machine. Ask the owner of this Kyberion installation if it needs to change. If the owner cannot sign in, they can link their sign-in from a terminal on this machine (pnpm organization member link-identity owner).",
+        "ja": "このマシン全体に適用される設定です。変更が必要な場合は、この Kyberion をインストールした所有者に依頼してください。所有者がサインインできない場合は、このマシンのターミナルで所有者のサインインを紐付けられます(pnpm organization member link-identity owner)。",
+        "qps-ploc": "⟦Ïŧ ȧṗṗŀïėş ŧő ŧħïş ẇħőŀė ɱȧƈħïñė. Ȧşķ ŧħė őẇñėř őƒ ŧħïş Ķẏƀėřïőñ ïñşŧȧŀŀȧŧïőñ ïƒ ïŧ ñėėḓş ŧő ƈħȧñɠė. Ïƒ ŧħė őẇñėř ƈȧññőŧ şïɠñ ïñ, ŧħėẏ ƈȧñ ŀïñķ ŧħėïř şïɠñ-ïñ ƒřőɱ ȧ ŧėřɱïñȧŀ őñ ŧħïş ɱȧƈħïñė (ṗñṗɱ őřɠȧñïẑȧŧïőñ ɱėɱƀėř ŀïñķ-ïḓėñŧïŧẏ őẇñėř). ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "settings.installation_sign_in_required": {
+        "en": "Sign in as the installation owner to see this setting. If the owner has no way to sign in yet, link the owner's sign-in from a terminal on this machine (pnpm organization member link-identity owner), then sign in.",
+        "ja": "この設定を表示するには、インストールの所有者としてサインインしてください。所有者がまだサインインできない場合は、このマシンのターミナルで所有者のサインインを紐付けてから(pnpm organization member link-identity owner)サインインしてください。",
+        "qps-ploc": "⟦Şïɠñ ïñ ȧş ŧħė ïñşŧȧŀŀȧŧïőñ őẇñėř ŧő şėė ŧħïş şėŧŧïñɠ. Ïƒ ŧħė őẇñėř ħȧş ñő ẇȧẏ ŧő şïɠñ ïñ ẏėŧ, ŀïñķ ŧħė őẇñėř'ş şïɠñ-ïñ ƒřőɱ ȧ ŧėřɱïñȧŀ őñ ŧħïş ɱȧƈħïñė (ṗñṗɱ őřɠȧñïẑȧŧïőñ ɱėɱƀėř ŀïñķ-ïḓėñŧïŧẏ őẇñėř), ŧħėñ şïɠñ ïñ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱ⟧"
+      },
+      "settings.installation_first_passkey_local": {
+        "en": "Register the installation owner's first passkey on the machine where Kyberion is installed. After that, more passkeys can be added from other devices by confirming with it.",
+        "ja": "インストールの所有者の最初のパスキーは、Kyberion をインストールしたマシンで登録してください。その後は、そのパスキーで確認して他の端末からも追加できます。",
+        "qps-ploc": "⟦Řėɠïşŧėř ŧħė ïñşŧȧŀŀȧŧïőñ őẇñėř'ş ƒïřşŧ ṗȧşşķėẏ őñ ŧħė ɱȧƈħïñė ẇħėřė Ķẏƀėřïőñ ïş ïñşŧȧŀŀėḓ. Ȧƒŧėř ŧħȧŧ, ɱőřė ṗȧşşķėẏş ƈȧñ ƀė ȧḓḓėḓ ƒřőɱ őŧħėř ḓėṽïƈėş ƀẏ ƈőñƒïřɱïñɠ ẇïŧħ ïŧ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ŀőřėɱ ïṗş⟧"
+      },
+      "settings.installation_step_up_title": {
+        "en": "Confirm with your passkey to change this setting",
+        "ja": "この設定を変更するにはパスキーで確認してください",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ẇïŧħ ẏőůř ṗȧşşķėẏ ŧő ƈħȧñɠė ŧħïş şėŧŧïñɠ ŀőřėɱ ïṗşůɱ ḓőŀő⟧"
+      },
+      "settings.installation_step_up_detail": {
+        "en": "You are signed in from another device. Changes that apply to this whole machine need a fresh passkey confirmation, which stays valid for 5 minutes.",
+        "ja": "別の端末からサインインしています。このマシン全体に適用される変更には、パスキーでの確認が必要です(確認は 5 分間有効です)。",
+        "qps-ploc": "⟦Ẏőů ȧřė şïɠñėḓ ïñ ƒřőɱ ȧñőŧħėř ḓėṽïƈė. Ƈħȧñɠėş ŧħȧŧ ȧṗṗŀẏ ŧő ŧħïş ẇħőŀė ɱȧƈħïñė ñėėḓ ȧ ƒřėşħ ṗȧşşķėẏ ƈőñƒïřɱȧŧïőñ, ẇħïƈħ şŧȧẏş ṽȧŀïḓ ƒőř 5 ɱïñůŧėş. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧůř ȧḓïṗïşƈïñɠ ⟧"
+      },
+      "settings.installation_step_up_action": {
+        "en": "Confirm with passkey",
+        "ja": "パスキーで確認",
+        "qps-ploc": "⟦Ƈőñƒïřɱ ẇïŧħ ṗȧşşķėẏ ŀőřėɱ ⟧"
+      },
+      "settings.installation_step_up_pending": {
+        "en": "Waiting for your passkey…",
+        "ja": "パスキーの確認を待っています…",
+        "qps-ploc": "⟦Ẇȧïŧïñɠ ƒőř ẏőůř ṗȧşşķėẏ… ŀőřėɱ ïṗ⟧"
+      },
+      "settings.installation_step_up_done": {
+        "en": "Confirmed. You can make the change now.",
+        "ja": "確認しました。変更できます。",
+        "qps-ploc": "⟦Ƈőñƒïřɱėḓ. Ẏőů ƈȧñ ɱȧķė ŧħė ƈħȧñɠė ñőẇ. ŀőřėɱ ïṗşůɱ ḓ⟧"
+      },
+      "settings.installation_step_up_failed": {
+        "en": "The passkey confirmation did not complete. Try again, or make the change on the machine itself.",
+        "ja": "パスキーの確認が完了しませんでした。もう一度試すか、Kyberion をインストールしたマシンで直接変更してください。",
+        "qps-ploc": "⟦Ŧħė ṗȧşşķėẏ ƈőñƒïřɱȧŧïőñ ḓïḓ ñőŧ ƈőɱṗŀėŧė. Ŧřẏ ȧɠȧïñ, őř ɱȧķė ŧħė ƈħȧñɠė őñ ŧħė ɱȧƈħïñė ïŧşėŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşė⟧"
+      },
+      "settings.installation_step_up_unsupported": {
+        "en": "This browser cannot use passkeys. Register a passkey in Settings, or make the change on the machine itself.",
+        "ja": "このブラウザではパスキーを使えません。設定でパスキーを登録するか、Kyberion をインストールしたマシンで直接変更してください。",
+        "qps-ploc": "⟦Ŧħïş ƀřőẇşėř ƈȧññőŧ ůşė ṗȧşşķėẏş. Řėɠïşŧėř ȧ ṗȧşşķėẏ ïñ Şėŧŧïñɠş, őř ɱȧķė ŧħė ƈħȧñɠė őñ ŧħė ɱȧƈħïñė ïŧşėŀƒ. ŀőřėɱ ïṗşůɱ ḓőŀőř şïŧ ȧɱėŧ ƈőñşėƈŧėŧ⟧"
+      },
       "settings.operator_invalid_request": {
         "en": "The registration request was not accepted. Prepare a new request and try again.",
         "ja": "登録リクエストを受け付けられませんでした。新しいリクエストを準備してやり直してください。",
