@@ -53,6 +53,26 @@ function asOwner<T>(owner: string, run: () => T): T {
     authority.withExecutionContext('mission_controller', run)
   );
 }
+/** A bound-tenant host process holding an untenanted personal-owner scope. */
+function asBoundOwner<T>(owner: string, tenant: string, run: () => T): T {
+  const envelope = envelopes.mintScopeEnvelope({
+    identity: { tier: 'personal', nhi_id: owner, session_id: 'personal-store-fixture' },
+    policy: {
+      read_tiers: ['public', 'personal'],
+      write_tier: 'personal',
+      purpose: 'Synthetic owner approval IO',
+    },
+    env: { ...process.env, KYBERION_TIER: 'personal' },
+  });
+  return envelopes.withScopeEnvelope(envelope, () => {
+    vi.stubEnv('KYBERION_TENANT', tenant);
+    try {
+      return authority.withExecutionContext('mission_controller', run);
+    } finally {
+      vi.stubEnv('KYBERION_TENANT', '');
+    }
+  });
+}
 describe('actual personal owner approval partition', () => {
   it('stores privately by actual owner, rejects public/other-owner reads and mutations, and keeps hashes intact', () => {
     const owner = 'personal-owner-a';
@@ -118,6 +138,46 @@ describe('actual personal owner approval partition', () => {
     expect(() =>
       authority.withExecutionContext('personal_approval_store', () => undefined)
     ).toThrow('PERSONAL_APPROVAL_SCOPE_REQUIRED');
+  });
+  it('serves the owner partition to a tenant-bound host (the shared segment is not a tenant)', () => {
+    const owner = 'personal-bound-owner';
+    const channel = 'personal-bound-source';
+    const record = asBoundOwner(owner, 'acme', () =>
+      store.createApprovalRequest('mission_controller', {
+        channel,
+        requestedBy: owner,
+        threadTs: '1',
+        correlationId: 'personal-bound-store',
+        scope: { scope_kind: 'system', tier: 'personal', nhi_id: owner },
+        draft: { title: 'Bound host approval', summary: 'bound fixture bytes' },
+        accountability: {
+          finalDecision: 'human_only',
+          payloadHash: 'b'.repeat(64),
+          effectBinding: 'personal-bound-fixture',
+        },
+      })
+    );
+    expect(
+      asBoundOwner(owner, 'acme', () => store.loadApprovalRequest(channel, record.id))?.summary
+    ).toBe('bound fixture bytes');
+    expect(
+      asBoundOwner(owner, 'acme', () =>
+        store.listApprovalRequests({ storageChannels: [channel] })
+      ).map((request) => request.id)
+    ).toContain(record.id);
+    expect(
+      asBoundOwner(owner, 'acme', () => location.locateApprovalRequest(channel, record.id))
+        ?.partition
+    ).toEqual({
+      kind: 'personal',
+      tier: 'personal',
+      owner_hash: createHash('sha256').update(owner).digest('hex'),
+    });
+    expect(
+      asBoundOwner('foreign-bound-owner', 'acme', () =>
+        store.loadApprovalRequest(channel, record.id)
+      )
+    ).toBeNull();
   });
   it('fences legacy system personal visibility and cached seed scope after leaving its owner', () => {
     const owner = 'legacy-personal-owner';

@@ -7,6 +7,11 @@
       "file": "libs/core/media/native-pdf-engine/parser.ts",
       "reason": "Classic xref / page / text / image distill still collocated; outline-annot-AcroForm slice already moved to structure.ts",
       "target": "Continue extracting image and text-operator helpers into dedicated modules until under 1500 non-empty lines"
+    },
+    {
+      "file": "libs/core/tier-guard.ts",
+      "reason": "Tier, tenant-scope, and dedicated-store capability admission still collocated in one policy evaluator",
+      "target": "Extract the dedicated-store capability admission table and tenant-scope helpers into dedicated modules until under 1500 non-empty lines"
     }
   ]
 }
