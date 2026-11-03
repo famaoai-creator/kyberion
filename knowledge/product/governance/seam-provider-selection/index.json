@@ -19,6 +19,7 @@
     "secret-provider",
     "embedding-backend",
     "web-search-runtime",
-    "storage-backend"
+    "storage-backend",
+    "provider-transport"
   ]
 }
