@@ -57,6 +57,7 @@ vi.mock('../src/app/settings/sections/RecordingConsentSection', () => ({
   RecordingConsentSection: () => null,
 }));
 vi.mock('../src/app/settings/sections/PluginsSection', () => ({ PluginsSection: () => null }));
+vi.mock('../src/app/settings/sections/AuthoritySection', () => ({ AuthoritySection: () => null }));
 vi.mock('../src/app/settings/sections/AdvancedSection', () => ({
   AdvancedSection: () => null,
 }));
