@@ -1,0 +1,49 @@
+{
+  "$schema": "../../schemas/seam-provider-selection-policy.schema.json",
+  "version": "1.0.0",
+  "seams": [
+    {
+      "seam_id": "event-bus",
+      "default_provider": "local-process",
+      "fallback_purpose": "notify",
+      "traits": {
+        "reliability": "Strength of delivery guarantees within the chosen topology (in-process sync > best-effort distributed).",
+        "zero_config": "Works with no operator opt-in or extra configuration.",
+        "distributed": "Can notify subscribers on more than one runtime node."
+      },
+      "providers": {
+        "local-process": {
+          "traits": { "reliability": 0.8, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "reliability": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/event/local-event-bus.ts (in-process memory bus registered as the governed default id)"
+          ]
+        },
+        "memory": {
+          "traits": { "reliability": 0.5, "zero_config": 1, "distributed": 0 },
+          "trait_basis": {
+            "reliability": "declared",
+            "zero_config": "declared",
+            "distributed": "declared"
+          },
+          "evidence": [
+            "libs/core/event/memory-event-bus.ts (isolated in-process bus; hermetic tests only — never in the default chain)"
+          ]
+        }
+      },
+      "purposes": {
+        "notify": {
+          "description": "Deliver a topic message to subscribers for event-driven mission coordination.",
+          "weights": { "reliability": 0.5, "zero_config": 0.4, "distributed": 0.1 }
+        }
+      },
+      "default_chains": {
+        "default": ["local-process"]
+      }
+    }
+  ]
+}

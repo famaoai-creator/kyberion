@@ -1616,6 +1616,18 @@
       "types": "./dist/event-scope.d.ts",
       "default": "./dist/event-scope.js"
     },
+    "./event/event-bus": {
+      "types": "./dist/event/event-bus.d.ts",
+      "default": "./dist/event/event-bus.js"
+    },
+    "./event/local-event-bus": {
+      "types": "./dist/event/local-event-bus.d.ts",
+      "default": "./dist/event/local-event-bus.js"
+    },
+    "./event/memory-event-bus": {
+      "types": "./dist/event/memory-event-bus.d.ts",
+      "default": "./dist/event/memory-event-bus.js"
+    },
     "./execution-bounds": {
       "types": "./dist/execution-bounds.d.ts",
       "default": "./dist/execution-bounds.js"
