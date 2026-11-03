@@ -1,3 +1,4 @@
+import { consumeScopedServiceCaptureAdmission } from './service-capture-admission.js';
 import { createLogger } from '../logger.js';
 import {
   currentHumanExecutionAuthorization,
@@ -110,7 +111,8 @@ export async function executeServicePreset(
   auth: 'none' | 'secret-guard' = 'none',
   cacheOpts?: ServicePresetCacheOptions,
   tenantBindingCapability?: object,
-  operatorProbeCapability?: object
+  operatorProbeCapability?: object,
+  informationAssetCaptureCapability?: object
 ): Promise<any> {
   const probe = operatorProbeCapability
     ? consumeOperatorServiceProbeAdmission(operatorProbeCapability, serviceId, action)
@@ -127,7 +129,24 @@ export async function executeServicePreset(
   const op = preset.operations[action];
   if (!op) throw new Error(`Operation "${action}" not found in presets for ${serviceId}`);
 
-  enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
+  let captureTransport:
+    Awaited<ReturnType<typeof consumeScopedServiceCaptureAdmission>> | undefined;
+  if (informationAssetCaptureCapability) {
+    if (tenantBindingCapability || operatorProbeCapability)
+      throw new Error(
+        '[POLICY_VIOLATION] Capture admission cannot be combined with another authority'
+      );
+    captureTransport = await consumeScopedServiceCaptureAdmission(
+      informationAssetCaptureCapability,
+      serviceId,
+      action,
+      params,
+      preset,
+      serviceConfig
+    );
+  } else {
+    enforceTenantBindingContract(serviceId, action, preset, tenantBindingCapability);
+  }
   const activeDelegation = currentDelegatedExecution(`service:preset:${serviceId}:${action}`, {
     request: params,
     auth,
@@ -163,7 +182,8 @@ export async function executeServicePreset(
   const alternatives = op.alternatives || [{ ...op, type: op.type || 'api' }];
   const envelope = resolveRequestEnvelope(params);
   // A probe must not load or template the rest of a global connection document.
-  const connection = probe ? {} : loadConnectionWithFallback(serviceId);
+  const connection =
+    captureTransport?.connection ?? (probe ? {} : loadConnectionWithFallback(serviceId));
   const mergedParams = {
     ...mergeParamsWithConnection(
       {
@@ -177,7 +197,8 @@ export async function executeServicePreset(
   };
 
   // Auth resolution
-  const binding = probe?.binding || resolveServiceBinding(serviceId, auth);
+  const binding =
+    captureTransport?.binding ?? probe?.binding ?? resolveServiceBinding(serviceId, auth);
   const executionTenant = activeDelegation?.target.tenantSlug ?? activeHuman?.target.tenantSlug;
   const effectConfigurationHash = executionTenant
     ? hashDelegatedServiceConfiguration({
@@ -207,9 +228,32 @@ export async function executeServicePreset(
         authSelector: auth,
         effectConfigurationHash,
         operatorProbe: Boolean(probe),
+        captureProviderEnvironment: captureTransport?.providerEnvironment,
+        captureAuthority: captureTransport?.validate,
       });
       if (resolved) return resolved.result;
     } catch (err: any) {
+      if (informationAssetCaptureCapability) {
+        const candidate =
+          err instanceof SecureFetchError
+            ? err.httpStatus
+            : (err?.status ?? err?.statusCode ?? err?.httpStatus);
+        const status =
+          typeof candidate === 'number' &&
+          Number.isInteger(candidate) &&
+          candidate >= 400 &&
+          candidate <= 599
+            ? candidate
+            : serviceId === 'google-workspace' &&
+                action === 'gmail_history_list' &&
+                /\b404\b/.test(String(err))
+              ? 404
+              : undefined;
+        throw Object.assign(
+          new Error('information_asset_capture_failed'),
+          status ? { status } : {}
+        );
+      }
       if (err instanceof ServiceEffectOutcomeUnknownError) throw err;
       if (probe) {
         // Neither provider errors nor request headers may reach logs or the Web result.

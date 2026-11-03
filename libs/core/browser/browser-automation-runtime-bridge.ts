@@ -5,7 +5,13 @@
  * provider from the browser-actuator package so core never imports Playwright.
  */
 
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  resolveSeamAutoProvider,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 export interface BrowserAutomationLaunchPersistentContextOptions {
   channel?: string;
@@ -67,7 +73,7 @@ const browserAutomationRuntimeSeam = createSeam<BrowserAutomationRuntimeBridge>(
   owner: 'libs/core/browser/browser-automation-runtime-bridge.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(browserAutomationRuntimeSeam);
 
 export function registerBrowserAutomationRuntimeBridge(
   bridge: BrowserAutomationRuntimeBridge,
@@ -78,13 +84,7 @@ export function registerBrowserAutomationRuntimeBridge(
 ): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('BrowserAutomationRuntimeBridge.bridge_id is required');
-  const disposeFromSeam = browserAutomationRuntimeSeam.register(id, bridge, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, bridge, metadata);
 }
 
 export function listBrowserAutomationRuntimeBridges(): BrowserAutomationRuntimeBridge[] {
@@ -92,14 +92,7 @@ export function listBrowserAutomationRuntimeBridges(): BrowserAutomationRuntimeB
 }
 
 export function resetBrowserAutomationRuntimeBridges(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
 }
 
 export function resolveBrowserAutomationRuntime(
@@ -128,7 +121,10 @@ export function resolveBrowserAutomationRuntime(
   }
   // Capability-restricted providers (e.g. lightpanda) are opt-in only: 'auto'
   // never silently downgrades a session, whatever the registration order.
-  const full = bridges.find((bridge) => !bridge.capabilities);
+  const full = resolveSeamAutoProvider(browserAutomationRuntimeSeam, {
+    eligible: (bridge) => !bridge.capabilities,
+    defaultProvider: 'playwright-chromium',
+  });
   if (!full) {
     throw new Error(
       '[browser-automation-runtime] no full-capability provider is registered; ' +

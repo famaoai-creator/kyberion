@@ -16,7 +16,10 @@
           "pattern": "^\\s*\\S+(\\s+\\S+){4}\\s*$",
           "description": "Five-field cron; the cadence runs once per occurrence (the latest missed occurrence is caught up once)."
         },
-        "timezone": { "type": "string", "minLength": 1 }
+        "timezone": {
+          "type": "string",
+          "minLength": 1
+        }
       }
     },
     "stateProbe": {
@@ -26,10 +29,19 @@
           "additionalProperties": false,
           "required": ["type", "path", "expect"],
           "properties": {
-            "type": { "const": "file" },
-            "path": { "type": "string", "minLength": 1 },
-            "expect": { "enum": ["exists", "changed", "matches"] },
-            "regex": { "type": "string" }
+            "type": {
+              "const": "file"
+            },
+            "path": {
+              "type": "string",
+              "minLength": 1
+            },
+            "expect": {
+              "enum": ["exists", "changed", "matches"]
+            },
+            "regex": {
+              "type": "string"
+            }
           }
         },
         {
@@ -37,18 +49,32 @@
           "additionalProperties": false,
           "required": ["type", "service_id", "action"],
           "properties": {
-            "type": { "const": "service_preset" },
-            "service_id": { "type": "string", "minLength": 1 },
-            "action": { "type": "string", "minLength": 1 },
-            "params": { "type": "object" },
+            "type": {
+              "const": "service_preset"
+            },
+            "service_id": {
+              "type": "string",
+              "minLength": 1
+            },
+            "action": {
+              "type": "string",
+              "minLength": 1
+            },
+            "params": {
+              "type": "object"
+            },
             "expect": {
               "type": "object",
               "additionalProperties": false,
               "properties": {
-                "json_path": { "type": "string" },
+                "json_path": {
+                  "type": "string"
+                },
                 "equals": {},
                 "not_equals": {},
-                "changed": { "type": "boolean" }
+                "changed": {
+                  "type": "boolean"
+                }
               }
             }
           }
@@ -60,8 +86,16 @@
       "additionalProperties": false,
       "required": ["kr_id", "title", "metric", "target", "direction"],
       "properties": {
-        "kr_id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$", "maxLength": 64 },
-        "title": { "type": "string", "minLength": 1, "maxLength": 300 },
+        "kr_id": {
+          "type": "string",
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "maxLength": 64
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        },
         "metric": {
           "oneOf": [
             {
@@ -69,9 +103,15 @@
               "additionalProperties": false,
               "required": ["source", "probe"],
               "properties": {
-                "source": { "const": "probe" },
-                "probe": { "$ref": "#/definitions/stateProbe" },
-                "aggregate": { "enum": ["value", "count"] }
+                "source": {
+                  "const": "probe"
+                },
+                "probe": {
+                  "$ref": "#/definitions/stateProbe"
+                },
+                "aggregate": {
+                  "enum": ["value", "count"]
+                }
               }
             },
             {
@@ -79,10 +119,20 @@
               "additionalProperties": false,
               "required": ["source", "path", "json_path"],
               "properties": {
-                "source": { "const": "file" },
-                "path": { "type": "string", "minLength": 1 },
-                "json_path": { "type": "string", "minLength": 1 },
-                "aggregate": { "enum": ["value", "count"] }
+                "source": {
+                  "const": "file"
+                },
+                "path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "json_path": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "aggregate": {
+                  "enum": ["value", "count"]
+                }
               }
             },
             {
@@ -90,9 +140,19 @@
               "additionalProperties": false,
               "required": ["source", "signal"],
               "properties": {
-                "source": { "const": "signal_ratio" },
-                "signal": { "type": "string", "minLength": 1, "maxLength": 300 },
-                "window_hours": { "type": "number", "exclusiveMinimum": 0, "maximum": 720 }
+                "source": {
+                  "const": "signal_ratio"
+                },
+                "signal": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 300
+                },
+                "window_hours": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 720
+                }
               }
             },
             {
@@ -100,7 +160,9 @@
               "additionalProperties": false,
               "required": ["source", "metric"],
               "properties": {
-                "source": { "const": "org_metric" },
+                "source": {
+                  "const": "org_metric"
+                },
                 "metric": {
                   "enum": [
                     "overdue_operations",
@@ -113,13 +175,32 @@
             }
           ]
         },
-        "target": { "type": "number" },
-        "direction": { "enum": ["increase", "decrease", "maintain"] },
-        "baseline": { "type": "number" },
-        "unit": { "type": "string", "maxLength": 40 },
-        "weight": { "type": "number", "exclusiveMinimum": 0 },
-        "every_s": { "type": "integer", "minimum": 60 },
-        "settle_minutes": { "type": "integer", "minimum": 0, "maximum": 10080 }
+        "target": {
+          "type": "number"
+        },
+        "direction": {
+          "enum": ["increase", "decrease", "maintain"]
+        },
+        "baseline": {
+          "type": "number"
+        },
+        "unit": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "weight": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "every_s": {
+          "type": "integer",
+          "minimum": 60
+        },
+        "settle_minutes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10080
+        }
       }
     }
   },
@@ -138,27 +219,41 @@
     "runtime"
   ],
   "properties": {
-    "kind": { "const": "dot-charter" },
+    "kind": {
+      "const": "dot-charter"
+    },
     "dot_id": {
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$",
       "minLength": 2,
       "maxLength": 64
     },
-    "version": { "type": "string", "minLength": 1 },
-    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
     "purpose": {
       "type": "string",
       "minLength": 1,
       "description": "The standing responsibility this dot owns, in one or two sentences."
     },
-    "status": { "enum": ["draft", "active", "paused", "retired"] },
+    "status": {
+      "enum": ["draft", "active", "paused", "retired"]
+    },
     "work_binding": {
       "type": "object",
       "additionalProperties": false,
       "required": ["operation_id"],
       "properties": {
-        "operation_id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" }
+        "operation_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+        }
       }
     },
     "scope": {
@@ -166,16 +261,35 @@
       "additionalProperties": false,
       "required": ["tier"],
       "properties": {
-        "tier": { "enum": ["public", "confidential", "personal"] },
-        "tenant_slug": { "type": "string" },
-        "organization_id": { "type": "string" },
-        "project_id": { "type": "string" },
-        "owner_nhi": { "type": "string", "minLength": 1 }
+        "tier": {
+          "enum": ["public", "confidential", "personal"]
+        },
+        "tenant_slug": {
+          "type": "string"
+        },
+        "organization_id": {
+          "type": "string"
+        },
+        "project_id": {
+          "type": "string"
+        },
+        "owner_nhi": {
+          "type": "string",
+          "minLength": 1
+        }
       },
       "allOf": [
         {
-          "if": { "properties": { "tier": { "const": "personal" } } },
-          "then": { "required": ["owner_nhi"] }
+          "if": {
+            "properties": {
+              "tier": {
+                "const": "personal"
+              }
+            }
+          },
+          "then": {
+            "required": ["owner_nhi"]
+          }
         }
       ]
     },
@@ -191,7 +305,9 @@
         },
         "success_signals": {
           "type": "array",
-          "items": { "type": "string" },
+          "items": {
+            "type": "string"
+          },
           "description": "Observable conditions that mean the responsibility is healthy."
         },
         "signal_probes": {
@@ -203,9 +319,18 @@
             "additionalProperties": false,
             "required": ["signal", "probe"],
             "properties": {
-              "signal": { "type": "string", "minLength": 1, "maxLength": 300 },
-              "probe": { "$ref": "#/definitions/stateProbe" },
-              "every_s": { "type": "integer", "minimum": 60 }
+              "signal": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "probe": {
+                "$ref": "#/definitions/stateProbe"
+              },
+              "every_s": {
+                "type": "integer",
+                "minimum": 60
+              }
             }
           }
         },
@@ -213,15 +338,26 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "max_turns_per_wake": { "type": "integer", "minimum": 1 },
-            "wall_clock_ms_per_wake": { "type": "integer", "minimum": 1000 },
-            "token_cap_per_day": { "type": "integer", "minimum": 1 }
+            "max_turns_per_wake": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "wall_clock_ms_per_wake": {
+              "type": "integer",
+              "minimum": 1000
+            },
+            "token_cap_per_day": {
+              "type": "integer",
+              "minimum": 1
+            }
           }
         },
         "key_results": {
           "type": "array",
           "maxItems": 10,
-          "items": { "$ref": "#/definitions/keyResult" },
+          "items": {
+            "$ref": "#/definitions/keyResult"
+          },
           "description": "Quantified key results (metric, target, direction) measured by the resident sweep; drives goal-gap prompts and outcome checks."
         },
         "outcome_settle_minutes": {
@@ -242,8 +378,13 @@
           "additionalProperties": false,
           "required": ["mode", "activation_id"],
           "properties": {
-            "mode": { "const": "durable" },
-            "activation_id": { "type": "string", "pattern": "^[a-f0-9-]{36}$" }
+            "mode": {
+              "const": "durable"
+            },
+            "activation_id": {
+              "type": "string",
+              "pattern": "^[a-f0-9-]{36}$"
+            }
           }
         },
         "triggers": {
@@ -255,9 +396,16 @@
                 "additionalProperties": false,
                 "required": ["kind", "cron"],
                 "properties": {
-                  "kind": { "const": "cron" },
-                  "cron": { "type": "string", "minLength": 9 },
-                  "timezone": { "type": "string" }
+                  "kind": {
+                    "const": "cron"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 9
+                  },
+                  "timezone": {
+                    "type": "string"
+                  }
                 }
               },
               {
@@ -265,11 +413,16 @@
                 "additionalProperties": false,
                 "required": ["kind", "paths"],
                 "properties": {
-                  "kind": { "const": "watch" },
+                  "kind": {
+                    "const": "watch"
+                  },
                   "paths": {
                     "type": "array",
                     "minItems": 1,
-                    "items": { "type": "string", "minLength": 1 }
+                    "items": {
+                      "type": "string",
+                      "minLength": 1
+                    }
                   }
                 }
               },
@@ -278,7 +431,9 @@
                 "additionalProperties": false,
                 "required": ["kind", "channels"],
                 "properties": {
-                  "kind": { "const": "wake" },
+                  "kind": {
+                    "const": "wake"
+                  },
                   "channels": {
                     "type": "array",
                     "minItems": 1,
@@ -293,9 +448,16 @@
                 "additionalProperties": false,
                 "required": ["kind", "probe"],
                 "properties": {
-                  "kind": { "const": "probe" },
-                  "probe": { "$ref": "#/definitions/stateProbe" },
-                  "every_s": { "type": "integer", "minimum": 10 }
+                  "kind": {
+                    "const": "probe"
+                  },
+                  "probe": {
+                    "$ref": "#/definitions/stateProbe"
+                  },
+                  "every_s": {
+                    "type": "integer",
+                    "minimum": 10
+                  }
                 }
               },
               {
@@ -303,19 +465,84 @@
                 "additionalProperties": false,
                 "required": ["kind", "source", "service_id", "action"],
                 "properties": {
-                  "kind": { "const": "feed" },
-                  "source": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" },
-                  "service_id": { "type": "string", "minLength": 1 },
-                  "action": { "type": "string", "minLength": 1 },
-                  "params": { "type": "object" },
-                  "items_path": { "type": "string", "minLength": 1 },
-                  "item_id_path": { "type": "string", "minLength": 1 },
-                  "cursor_path": { "type": "string", "minLength": 1 },
-                  "event_type": { "type": "string", "minLength": 1, "maxLength": 200 },
-                  "every_s": { "type": "integer", "minimum": 30 },
-                  "max_items": { "type": "integer", "minimum": 1, "maximum": 200 },
-                  "on_first_poll": { "enum": ["baseline", "emit"] },
-                  "overlap_s": { "type": "integer", "minimum": 0, "maximum": 3600 }
+                  "kind": {
+                    "const": "feed"
+                  },
+                  "collector": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["location_id"],
+                    "properties": {
+                      "location_id": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                      },
+                      "max_pages": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100
+                      },
+                      "max_requests": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 10000
+                      },
+                      "wall_clock_ms": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 300000
+                      }
+                    }
+                  },
+                  "source": {
+                    "type": "string",
+                    "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                  },
+                  "service_id": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "action": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "params": {
+                    "type": "object"
+                  },
+                  "items_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "item_id_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "cursor_path": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "event_type": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "every_s": {
+                    "type": "integer",
+                    "minimum": 30
+                  },
+                  "max_items": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 200
+                  },
+                  "on_first_poll": {
+                    "enum": ["baseline", "emit"]
+                  },
+                  "overlap_s": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 3600
+                  }
                 }
               },
               {
@@ -323,26 +550,41 @@
                 "additionalProperties": false,
                 "required": ["kind", "sources"],
                 "properties": {
-                  "kind": { "const": "event" },
+                  "kind": {
+                    "const": "event"
+                  },
                   "sources": {
                     "type": "array",
                     "minItems": 1,
                     "maxItems": 20,
-                    "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_-]*$" }
+                    "items": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9_-]*$"
+                    }
                   },
                   "types": {
                     "type": "array",
                     "maxItems": 50,
-                    "items": { "type": "string", "minLength": 1, "maxLength": 200 }
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
                   },
                   "match": {
                     "type": "object",
                     "additionalProperties": false,
                     "required": ["json_path"],
                     "properties": {
-                      "json_path": { "type": "string", "minLength": 1 },
+                      "json_path": {
+                        "type": "string",
+                        "minLength": 1
+                      },
                       "equals": {},
-                      "in": { "type": "array", "maxItems": 50 }
+                      "in": {
+                        "type": "array",
+                        "maxItems": 50
+                      }
                     }
                   }
                 }
@@ -359,7 +601,9 @@
       "properties": {
         "authority_role": {
           "type": "string",
-          "not": { "const": "dot_result_writer" },
+          "not": {
+            "const": "dot_result_writer"
+          },
           "description": "Must be a role declared in security-policy.json authority_role_permissions."
         },
         "accountability_charter_ref": {
@@ -368,20 +612,32 @@
         },
         "allowed_work_shapes": {
           "type": "array",
-          "items": { "enum": ["mission", "task_session", "pipeline", "direct_reply"] },
+          "items": {
+            "enum": ["mission", "task_session", "pipeline", "direct_reply"]
+          },
           "description": "Work shapes the dot may dispatch. The dot itself never writes outside its authority role's scopes; substantive work is delegated as WorkItems."
         },
-        "max_concurrent_delegations": { "type": "integer", "minimum": 1 },
+        "max_concurrent_delegations": {
+          "type": "integer",
+          "minimum": 1
+        },
         "mission_mandate_refs": {
           "type": "array",
           "uniqueItems": true,
           "maxItems": 50,
-          "items": { "type": "string", "minLength": 1 }
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
         },
         "allowed_pipelines": {
           "type": "array",
           "maxItems": 50,
-          "items": { "type": "string", "minLength": 1, "maxLength": 300 },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
           "description": "Repo-relative pipeline files the dot executor may run for pipeline-shaped work. Empty/absent means no pipeline execution."
         }
       }
@@ -394,7 +650,10 @@
           "enum": ["auto", "notify", "approve"],
           "description": "Floor for autonomous-ops-gate outcomes: an action scoring 'auto' may be raised to this level, never lowered."
         },
-        "veto_window_minutes": { "type": "integer", "minimum": 0 },
+        "veto_window_minutes": {
+          "type": "integer",
+          "minimum": 0
+        },
         "decision_expiry_minutes": {
           "type": "integer",
           "minimum": 10,
@@ -417,10 +676,23 @@
           "additionalProperties": false,
           "required": ["surface", "channel"],
           "properties": {
-            "surface": { "enum": ["slack", "telegram", "discord", "imessage", "surface"] },
-            "channel": { "type": "string", "minLength": 1, "maxLength": 500 },
-            "thread_ts": { "type": "string", "maxLength": 500 },
-            "template": { "type": "string", "minLength": 1, "maxLength": 8000 }
+            "surface": {
+              "enum": ["slack", "telegram", "discord", "imessage", "surface"]
+            },
+            "channel": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 500
+            },
+            "thread_ts": {
+              "type": "string",
+              "maxLength": 500
+            },
+            "template": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 8000
+            }
           }
         },
         "digest_cron": {
@@ -432,9 +704,17 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "start": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
-            "end": { "type": "string", "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$" },
-            "timezone": { "type": "string" }
+            "start": {
+              "type": "string",
+              "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "end": {
+              "type": "string",
+              "pattern": "^([01][0-9]|2[0-3]):[0-5][0-9]$"
+            },
+            "timezone": {
+              "type": "string"
+            }
           }
         },
         "delivery_mode": {
@@ -450,25 +730,44 @@
         "responsibilities": {
           "type": "array",
           "maxItems": 20,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9_.:-]*$", "maxLength": 100 },
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9_.:-]*$",
+            "maxLength": 100
+          },
           "description": "Exclusive responsibility keys. Activation is refused while another active dot holds the same key."
         },
         "accepts_handoffs_from": {
           "type": "array",
           "maxItems": 20,
-          "items": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" },
+          "items": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9-]*$"
+          },
           "description": "dot_ids allowed to hand work to this dot; a handoff wakes this dot through the dot inbox."
         },
         "goal_ref": {
           "oneOf": [
-            { "type": "string", "minLength": 1, "maxLength": 200 },
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
             {
               "type": "object",
               "additionalProperties": false,
               "required": ["objective_id"],
               "properties": {
-                "organization_id": { "type": "string", "minLength": 1, "maxLength": 200 },
-                "objective_id": { "type": "string", "minLength": 1, "maxLength": 200 }
+                "organization_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "objective_id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
               }
             }
           ],
@@ -477,7 +776,11 @@
         "owns": {
           "type": "array",
           "maxItems": 50,
-          "items": { "type": "string", "minLength": 1, "maxLength": 200 },
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
           "description": "Target patterns (path:<glob>, service:<id>, ...) this dot owns; the sole owner wins arbitration."
         },
         "priority": {
@@ -512,7 +815,9 @@
           "additionalProperties": false,
           "required": ["mode"],
           "properties": {
-            "mode": { "enum": ["off", "shadow"] }
+            "mode": {
+              "enum": ["off", "shadow"]
+            }
           },
           "description": "Absent means off. Advisory shadow grants no execution or effect approval. No production shared-budget/provider adapter is supplied; without explicit injected fixture ports it performs no inference."
         },
@@ -537,24 +842,42 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "enabled": { "type": "boolean" },
-        "max_bytes": { "type": "integer", "minimum": 1024, "maximum": 65536 }
+        "enabled": {
+          "type": "boolean"
+        },
+        "max_bytes": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 65536
+        }
       },
       "description": "Per-dot working memory (notes, open items, hypotheses)."
     },
     "followups": {
       "type": "object",
       "additionalProperties": false,
-      "properties": { "max_pending": { "type": "integer", "minimum": 0, "maximum": 20 } },
+      "properties": {
+        "max_pending": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
       "description": "Self-scheduled follow-up wakes."
     },
     "autonomy": {
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "initial_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] },
-        "max_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] },
-        "min_level": { "enum": ["L0", "L1", "L2", "L3", "L4"] }
+        "initial_level": {
+          "enum": ["L0", "L1", "L2", "L3", "L4"]
+        },
+        "max_level": {
+          "enum": ["L0", "L1", "L2", "L3", "L4"]
+        },
+        "min_level": {
+          "enum": ["L0", "L1", "L2", "L3", "L4"]
+        }
       },
       "description": "Autonomy ladder bounds (L0 shadow .. L4 autonomous)."
     },
@@ -568,19 +891,33 @@
           "maximum": 1440,
           "description": "Minutes between organization operation ticks (default 15)."
         },
-        "standup": { "$ref": "#/definitions/cadenceCron" },
-        "retro": { "$ref": "#/definitions/cadenceCron" }
+        "standup": {
+          "$ref": "#/definitions/cadenceCron"
+        },
+        "retro": {
+          "$ref": "#/definitions/cadenceCron"
+        }
       },
       "description": "Opt-in organization cadences (operation tick, standup, retro) the resident-dot supervisor runs for this charter's own organization scope. Requires scope.organization_id and authority.authority_role organization_operator (the role that may write the organization's state)."
     }
   },
-  "if": { "required": ["operations_cadence"] },
+  "if": {
+    "required": ["operations_cadence"]
+  },
   "then": {
     "properties": {
-      "scope": { "type": "object", "required": ["tier", "organization_id"] },
+      "scope": {
+        "type": "object",
+        "required": ["tier", "organization_id"]
+      },
       "authority": {
         "type": "object",
-        "properties": { "authority_role": { "type": "string", "const": "organization_operator" } }
+        "properties": {
+          "authority_role": {
+            "type": "string",
+            "const": "organization_operator"
+          }
+        }
       }
     }
   },
@@ -591,7 +928,11 @@
           "runtime": {
             "type": "object",
             "required": ["execution_mode"],
-            "properties": { "execution_mode": { "const": "front_desk_diagnostic" } }
+            "properties": {
+              "execution_mode": {
+                "const": "front_desk_diagnostic"
+              }
+            }
           }
         }
       },
@@ -599,7 +940,12 @@
         "properties": {
           "attention": {
             "type": "object",
-            "properties": { "triggers": { "type": "array", "maxItems": 0 } }
+            "properties": {
+              "triggers": {
+                "type": "array",
+                "maxItems": 0
+              }
+            }
           }
         }
       },
@@ -607,7 +953,12 @@
         "properties": {
           "attention": {
             "type": "object",
-            "properties": { "triggers": { "type": "array", "minItems": 1 } }
+            "properties": {
+              "triggers": {
+                "type": "array",
+                "minItems": 1
+              }
+            }
           }
         }
       }

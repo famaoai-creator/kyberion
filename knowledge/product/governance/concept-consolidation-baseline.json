@@ -524,12 +524,19 @@
     "libs/core/marketing-workload.ts": {
       "exported_type_name_duplication_budget": 1
     },
-    "libs/core/media/image-generation-bridge.ts": {
-      "json_state_write_budget": 3,
-      "rate_limiter_impl_budget": 1,
+    "libs/core/media/image-generation/provider-support.ts": {
+      "rate_limiter_impl_budget": 1
+    },
+    "libs/core/media/image-generation/providers/host-bridge.ts": {
+      "json_state_write_budget": 1
+    },
+    "libs/core/media/image-generation/providers/llm-api.ts": {
+      "json_state_write_budget": 2
+    },
+    "libs/core/media/image-generation/providers/local-flux.ts": {
       "bespoke_cli_parser_budget": 2
     },
-    "libs/core/media/music-generation-bridge.ts": {
+    "libs/core/media/music-generation/providers/musicgen-mlx.ts": {
       "bespoke_cli_parser_budget": 1
     },
     "libs/core/media/native-tts.ts": {

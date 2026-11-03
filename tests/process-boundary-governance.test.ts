@@ -14,7 +14,7 @@ const allowedManagedProcessConsumers = [
   'scripts/continuous_owner_process.test.ts',
   'libs/actuators/process-actuator/src/process-actuator-helpers.ts',
   'libs/actuators/video-composition-actuator/src/video-composition-action-helpers.ts',
-  'libs/core/ocr-bridge.ts',
+  'libs/core/ocr/providers/native.ts',
   // Apple Intelligence bridge: short-lived afm CLI calls, supervised so a
   // hung on-device inference can never outlive its timeout.
   'libs/core/apple-intelligence-bridge.ts',

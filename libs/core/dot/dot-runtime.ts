@@ -1,3 +1,4 @@
+import { buildTrustedInformationAssetWakeProposals } from '../information-assets/collector-wake.js';
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import {
   assertEventContinuationOutput,
@@ -1520,6 +1521,35 @@ async function runDotWakeBaseline(
       const reason = `token_cap_per_day ${current.goal.budget?.token_cap_per_day} reached`;
       recordDotWakeOutcome(current, deps.trigger, 'skipped', { ...deps, reason });
       return { dot_id: current.dot_id, outcome: 'skipped', reason };
+    }
+
+    try {
+      const typedProposals = await buildTrustedInformationAssetWakeProposals(
+        current,
+        deps.trigger,
+        deps.rootDir
+      );
+      if (typedProposals !== undefined) {
+        const attemptId = claimEventContinuation(current, deps.trigger, deps);
+        if (attemptId) deps = { ...deps, eventAttemptId: attemptId };
+        const actions = governProposals(current, typedProposals, deps, capture);
+        recordDotWakeOutcome(current, deps.trigger, 'delivered', {
+          ...deps,
+          reason: 'trusted information asset recipes',
+          turns_run: 0,
+          tokens_used: 0,
+        });
+        return {
+          dot_id: current.dot_id,
+          outcome: 'delivered',
+          actions,
+          reason: 'trusted information asset recipes',
+        };
+      }
+    } catch (error) {
+      const reason = 'information asset wake refused: ' + String(error);
+      recordDotWakeFailure(current, deps.trigger, DOT_WAKE_FAILURE_CATEGORY.charter, reason, deps);
+      return { dot_id: current.dot_id, outcome: 'failed', reason };
     }
 
     const budget = current.goal.budget;

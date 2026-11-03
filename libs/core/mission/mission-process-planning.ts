@@ -536,5 +536,13 @@ function resolveDesignForState(
     stage: classification?.stage ?? ('planning' as MissionStage),
     executionShape: 'mission',
     missionTypeHint: state.mission_type,
+    utterance: [
+      state.intent?.source_text,
+      state.intent?.goal_summary,
+      state.vision_ref,
+      state.mission_type,
+    ]
+      .filter((entry): entry is string => typeof entry === 'string' && entry.trim().length > 0)
+      .join('\n'),
   });
 }

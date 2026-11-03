@@ -198,6 +198,19 @@ export function defineSeam<T>(definition: SeamDefinition<T>): Seam<T> {
     added: new Set<(provider: SeamProviderRecord<T>) => void>(),
     removed: new Set<(provider: SeamProviderRecord<T>) => void>(),
   };
+  const notify = (event: 'added' | 'removed', provider: SeamProviderRecord<T>): void => {
+    const errors: unknown[] = [];
+    for (const listener of listeners[event]) {
+      try {
+        listener(provider);
+      } catch (error) {
+        errors.push(error);
+      }
+    }
+    if (errors.length === 1) throw errors[0];
+    if (errors.length > 1)
+      throw new AggregateError(errors, `Failed to notify seam ${definition.key} ${event}`);
+  };
 
   const resolve = (selector?: string): T | undefined => {
     const available = canonicalProviders(providers);
@@ -261,15 +274,28 @@ export function defineSeam<T>(definition: SeamDefinition<T>): Seam<T> {
 
       const provider = { id, implementation, metadata };
       providers.set(id, provider);
-      for (const listener of listeners.added) listener(provider);
       let active = true;
-      return () => {
+      const dispose = () => {
         if (!active) return;
         active = false;
         if (providers.get(id) !== provider) return;
         providers.delete(id);
-        for (const listener of listeners.removed) listener(provider);
+        notify('removed', provider);
       };
+      try {
+        notify('added', provider);
+      } catch (error) {
+        try {
+          dispose();
+        } catch (cleanupError) {
+          throw new AggregateError(
+            [error, cleanupError],
+            `Failed to register seam provider ${definition.key}/${id}`
+          );
+        }
+        throw error;
+      }
+      return dispose;
     },
     get,
     getOptional(selector) {
@@ -299,4 +325,68 @@ export function defineSeam<T>(definition: SeamDefinition<T>): Seam<T> {
  */
 export function createSeam<T>(definition: SeamDefinition<T>): Seam<T> {
   return defineSeam(definition);
+}
+
+/** Own registrations without duplicating disposer/reset bookkeeping in every bridge. */
+export function createSeamLifecycle<T>(
+  seam: Seam<T>,
+  options: { onChange?: (provider: SeamProviderRecord<T>) => void } = {}
+): {
+  register(id: string, implementation: T, metadata: SeamProviderMetadata): () => void;
+  reset(): void;
+} {
+  const disposers = new Map<string, () => void>();
+  let resetGeneration = 0;
+  if (options.onChange) {
+    seam.on('added', options.onChange);
+    seam.on('removed', options.onChange);
+  }
+  return {
+    register(id, implementation, metadata) {
+      const generation = resetGeneration;
+      const release = seam.register(id, implementation, metadata);
+      const dispose = () => {
+        try {
+          release();
+        } finally {
+          if (disposers.get(id) === dispose) disposers.delete(id);
+        }
+      };
+      // Registration notifies observers synchronously. A reset requested by
+      // an observer also owns this in-flight registration, before its release
+      // function has returned from the seam.
+      if (generation !== resetGeneration) dispose();
+      else disposers.set(id, dispose);
+      return dispose;
+    },
+    reset() {
+      resetGeneration++;
+      const errors: unknown[] = [];
+      for (const dispose of [...disposers.values()]) {
+        try {
+          dispose();
+        } catch (error) {
+          errors.push(error);
+        }
+      }
+      if (errors.length) throw new AggregateError(errors, `Failed to reset seam ${seam.key}`);
+    },
+  };
+}
+
+/** Auto selection needs an eligible declared default or exactly one candidate. */
+export function resolveSeamAutoProvider<T>(
+  seam: Seam<T>,
+  options: { eligible: (implementation: T) => boolean; defaultProvider?: string }
+): T | undefined {
+  const candidates = seam.list().filter((provider) => options.eligible(provider.implementation));
+  const preferred = candidates.find((provider) => provider.id === options.defaultProvider);
+  if (preferred) return preferred.implementation;
+  if (candidates.length <= 1) return candidates[0]?.implementation;
+  throw new SeamError(
+    'SEAM_PROVIDER_AMBIGUOUS',
+    seam.key,
+    `Provider selection is ambiguous for seam ${seam.key}; choose one of: ${candidates.map((provider) => provider.id).join(', ')}`,
+    candidates.map((provider) => provider.id)
+  );
 }

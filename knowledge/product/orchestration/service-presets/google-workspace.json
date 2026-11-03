@@ -18,7 +18,10 @@
       "args": ["schema", "{{method}}"],
       "description": "Inspect the request/response schema for a Google Workspace discovery method.",
       "parameters": {
-        "method": { "required": true, "type": "string" }
+        "method": {
+          "required": true,
+          "type": "string"
+        }
       }
     },
     "drive_files_list": {
@@ -27,7 +30,10 @@
       "args": ["drive", "files", "list", "--params", "{{params}}", "--page-all"],
       "description": "List Google Drive files using the discovery-backed CLI.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "drive_file_download": {
@@ -37,7 +43,10 @@
       "description": "Download Google Drive file content via the discovery method drive.files.get; pass params like {\"fileId\": \"...\", \"alt\": \"media\"}.",
       "note": "Declared from the Drive discovery method drive.files.get with alt=media. Requires CLI verification: confirm the installed gws CLI honors alt=media (binary content) before production ingest use.",
       "parameters": {
-        "params": { "required": true, "type": "object" }
+        "params": {
+          "required": true,
+          "type": "object"
+        }
       }
     },
     "drive_file_export": {
@@ -47,39 +56,52 @@
       "description": "Export a Google-native document (Docs/Sheets/Slides) via the discovery method drive.files.export; pass params like {\"fileId\": \"...\", \"mimeType\": \"text/plain\"}.",
       "note": "Declared from the Drive discovery method drive.files.export. Requires CLI verification: confirm the installed gws CLI exposes the export method and streams the exported bytes.",
       "parameters": {
-        "params": { "required": true, "type": "object" }
+        "params": {
+          "required": true,
+          "type": "object"
+        }
       }
     },
     "gmail_triage": {
       "type": "cli",
       "command": "gws",
       "args": ["gmail", "+triage"],
-      "description": "Summarize unread Gmail inbox items."
+      "description": "Summarize unread Gmail inbox items.",
+      "kind": "capture",
+      "risk": "read"
     },
     "gmail_messages_list": {
       "type": "cli",
       "command": "gws",
       "args": ["gmail", "users", "messages", "list", "--params", "{{params}}"],
-      "description": "List Gmail messages with the discovery-backed Gmail API."
+      "description": "List Gmail messages with the discovery-backed Gmail API.",
+      "kind": "capture",
+      "risk": "read"
     },
     "gmail_message_get": {
       "type": "cli",
       "command": "gws",
       "args": ["gmail", "users", "messages", "get", "--params", "{{params}}"],
-      "description": "Get a Gmail message with metadata headers."
+      "description": "Get a Gmail message with metadata headers.",
+      "kind": "capture",
+      "risk": "read"
     },
     "gmail_attachment_get": {
       "type": "cli",
       "command": "gws",
       "args": ["gmail", "users", "messages", "attachments", "get", "--params", "{{params}}"],
       "description": "Fetch a Gmail message attachment body via the discovery method users.messages.attachments.get; pass params like {\"messageId\": \"...\", \"id\": \"<attachmentId>\"}.",
-      "note": "Declared from the Gmail discovery method users.messages.attachments.get, mirroring gmail_message_get. Requires CLI verification: confirm the installed gws CLI exposes the attachments subresource."
+      "note": "Declared from the Gmail discovery method users.messages.attachments.get, mirroring gmail_message_get. Requires CLI verification: confirm the installed gws CLI exposes the attachments subresource.",
+      "kind": "capture",
+      "risk": "read"
     },
     "gmail_filters_list": {
       "type": "cli",
       "command": "gws",
       "args": ["gmail", "users", "settings", "filters", "list", "--params", "{{params}}"],
-      "description": "List Gmail filters for the authenticated user."
+      "description": "List Gmail filters for the authenticated user.",
+      "kind": "capture",
+      "risk": "read"
     },
     "gmail_filters_create": {
       "type": "cli",
@@ -147,7 +169,10 @@
       "type": "cli",
       "command": "gws",
       "args": ["gmail", "+reply", "--message-id", "{{message_id}}", "--body", "{{body}}"],
-      "description": "Reply to a Gmail message."
+      "description": "Reply to a Gmail message.",
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true
     },
     "gmail_reply_draft": {
       "type": "cli",
@@ -195,7 +220,10 @@
       "args": ["calendar", "calendarList", "list", "--params", "{{params}}"],
       "description": "List the authenticated user's calendars.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "calendar_events_list": {
@@ -204,7 +232,10 @@
       "args": ["calendar", "events", "list", "--params", "{{params}}"],
       "description": "List Google Calendar events for a calendar.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "calendar_freebusy_query": {
@@ -213,7 +244,10 @@
       "args": ["calendar", "freebusy", "query", "--json", "{{body}}"],
       "description": "Query free/busy windows for one or more calendars.",
       "parameters": {
-        "body": { "required": true, "type": "object" }
+        "body": {
+          "required": true,
+          "type": "object"
+        }
       }
     },
     "calendar_events_insert": {
@@ -222,8 +256,14 @@
       "args": ["calendar", "events", "insert", "--params", "{{params}}", "--json", "{{body}}"],
       "description": "Create a Google Calendar event, optionally with Google Meet.",
       "parameters": {
-        "params": { "required": true, "type": "object" },
-        "body": { "required": true, "type": "object" }
+        "params": {
+          "required": true,
+          "type": "object"
+        },
+        "body": {
+          "required": true,
+          "type": "object"
+        }
       }
     },
     "calendar_events_patch": {
@@ -232,8 +272,14 @@
       "args": ["calendar", "events", "patch", "--params", "{{params}}", "--json", "{{body}}"],
       "description": "Update a Google Calendar event.",
       "parameters": {
-        "params": { "required": true, "type": "object" },
-        "body": { "required": true, "type": "object" }
+        "params": {
+          "required": true,
+          "type": "object"
+        },
+        "body": {
+          "required": true,
+          "type": "object"
+        }
       }
     },
     "calendar_events_delete": {
@@ -242,7 +288,10 @@
       "args": ["calendar", "events", "delete", "--params", "{{params}}"],
       "description": "Delete a Google Calendar event.",
       "parameters": {
-        "params": { "required": true, "type": "object" }
+        "params": {
+          "required": true,
+          "type": "object"
+        }
       }
     },
     "meet_spaces_create": {
@@ -251,7 +300,10 @@
       "args": ["meet", "spaces", "create", "--json", "{{params}}"],
       "description": "Create a Google Meet space using the authenticated Google account.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "meet_spaces_get": {
@@ -260,7 +312,10 @@
       "args": ["meet", "spaces", "get", "--params", "{{params}}"],
       "description": "Fetch a Google Meet space by name or resource identifier.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "meet_spaces_patch": {
@@ -269,7 +324,10 @@
       "args": ["meet", "spaces", "patch", "--params", "{{params}}", "--json", "{{params}}"],
       "description": "Update a Google Meet space using the authenticated Google account.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "meet_spaces_end_active_conference": {
@@ -278,7 +336,10 @@
       "args": ["meet", "spaces", "endActiveConference", "--params", "{{params}}"],
       "description": "End the active conference attached to a Google Meet space.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "meet_conference_records_list": {
@@ -287,7 +348,10 @@
       "args": ["meet", "conferenceRecords", "list", "--params", "{{params}}"],
       "description": "List Google Meet conference records.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
     },
     "meet_conference_records_get": {
@@ -296,8 +360,50 @@
       "args": ["meet", "conferenceRecords", "get", "--params", "{{params}}"],
       "description": "Fetch a Google Meet conference record by name.",
       "parameters": {
-        "params": { "required": false, "type": "object" }
+        "params": {
+          "required": false,
+          "type": "object"
+        }
       }
+    },
+    "gmail_history_list": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "history", "list", "--params", "{{params}}"],
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read Gmail incremental history; an expired startHistoryId requires explicit full synchronization.",
+      "parameters": {
+        "params": {
+          "required": true,
+          "type": "object"
+        }
+      }
+    },
+    "gmail_profile_get": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "getProfile", "--params", "{{params}}"],
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read mailbox profile and its current opaque historyId.",
+      "parameters": {
+        "params": {
+          "required": true,
+          "type": "object"
+        }
+      }
+    },
+    "gmail_thread_get": {
+      "type": "cli",
+      "command": "gws",
+      "args": ["gmail", "users", "threads", "get", "--params", "{{params}}"],
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read a Gmail thread for independent sent-reply verification."
     }
   }
 }

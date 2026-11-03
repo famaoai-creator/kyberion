@@ -90,8 +90,8 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     ],
   },
   'ocr-provider': {
-    declaration: 'libs/core/ocr-bridge.ts',
-    consumers: ['libs/core/ocr-bridge.ts'],
+    declaration: 'libs/core/ocr/provider-registry.ts',
+    consumers: ['libs/core/ocr/router.ts', 'libs/core/ocr-bridge.ts'],
   },
   'public-ingress-provider': {
     declaration: 'libs/core/ingress/public-ingress-seam.ts',
@@ -101,8 +101,18 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     ],
   },
   'image-generation-provider': {
-    declaration: 'libs/core/media/image-generation-bridge.ts',
-    consumers: ['libs/core/media/image-generation-bridge.ts'],
+    declaration: 'libs/core/media/image-generation/provider-registry.ts',
+    consumers: [
+      'libs/core/media/image-generation/router.ts',
+      'libs/core/media/image-generation-bridge.ts',
+    ],
+  },
+  'music-generation-provider': {
+    declaration: 'libs/core/media/music-generation/provider-registry.ts',
+    consumers: [
+      'libs/core/media/music-generation/router.ts',
+      'libs/core/media/music-generation-bridge.ts',
+    ],
   },
   'risky-approval-override': {
     declaration: 'libs/core/risky-op-approval-port.ts',

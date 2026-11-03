@@ -3,7 +3,12 @@ import { ocrImage } from '../ocr-bridge.js';
 import type { OcrRequest, OcrResult, OcrRoutingMode } from '../ocr-types.js';
 import { OsAccessibilityDetector } from '../virtual/os-accessibility-detector.js';
 import { PixelRegionDetector } from '../pixel-region-detector.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 import {
   resolveSeamProviderDecision,
   type SeamProviderCandidate,
@@ -97,7 +102,7 @@ const uiElementDetectorSeam = createSeam<UiElementDetector>({
   owner: 'libs/core/surface/ui-element-detector.ts',
 });
 
-const detectorDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(uiElementDetectorSeam);
 let builtinsRegistered = false;
 
 export function registerUiElementDetector(
@@ -109,13 +114,7 @@ export function registerUiElementDetector(
 ): () => void {
   const id = String(detector.id || '').trim();
   if (!id) throw new Error('UiElementDetector.id is required');
-  const disposeFromSeam = uiElementDetectorSeam.register(id, detector, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (detectorDisposers.get(id) === dispose) detectorDisposers.delete(id);
-  };
-  detectorDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, detector, metadata);
 }
 
 export function listUiElementDetectors(): UiElementDetector[] {
@@ -123,14 +122,7 @@ export function listUiElementDetectors(): UiElementDetector[] {
 }
 
 export function resetUiElementDetectors(): void {
-  for (const dispose of detectorDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  detectorDisposers.clear();
+  registrations.reset();
   builtinsRegistered = false;
 }
 
