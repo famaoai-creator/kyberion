@@ -1,26 +1,9 @@
 import * as path from 'node:path';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeExecResult,
-  safeMkdir,
-  safeWriteFile,
-} from '../../../secure-io.js';
+import { safeExistsSync, safeExecResult, safeMkdir, safeWriteFile } from '../../../secure-io.js';
 import { commandLocatorAdapter } from '../../../platform-command-adapters.js';
 import { probeToolRuntime } from '../../../tool/tool-runtime-registry.js';
 import { isAppleSilicon } from '../../../platform.js';
-import {
-  MUSAUDIOGEN_REQUIRED_FILES,
-  MUSAUDIOGEN_VARIANT_HF_REPO,
-  clampMlAudioGenDurationSec,
-  clampMusicGenDurationSec,
-  clampStableAudioDurationSec,
-  resolveChatMusicianGenerationPolicy,
-  resolveLocalMusicGenMlxGenerationPolicy,
-  resolveLocalStableAudioGenerationPolicy,
-  resolveMlAudioGenGenerationPolicy,
-  resolveMlAudioGenVariant,
-} from '../../music-generation-policy.js';
+import { resolveChatMusicianGenerationPolicy } from '../../music-generation-policy.js';
 import type {
   MusicGenerationProvider,
   MusicGenerationRequest,

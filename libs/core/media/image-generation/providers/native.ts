@@ -1,12 +1,5 @@
 import * as path from 'node:path';
-import {
-  assertSafeRepositoryPath,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../../../secure-io.js';
+import { safeExistsSync, safeMkdir } from '../../../secure-io.js';
 import {
   generateImageLocallyWithApplePlayground,
   probeAppleImageGeneration,
@@ -15,7 +8,6 @@ import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
-  ImageReference,
 } from '../../image-generation-types.js';
 import {
   generateImageWithWindowsNativeApi,

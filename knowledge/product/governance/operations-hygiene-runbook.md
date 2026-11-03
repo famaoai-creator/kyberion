@@ -1917,6 +1917,13 @@ to multiplicity/AST checks. The OCR removal regression must demonstrate that an
 unregistered provider is not invoked on the next request. See the
 [seam lifecycle contract](../architecture/seam-lifecycle-contract.md).
 
+After splitting provider modules, remove inherited unused imports with
+`scripts/refactor/prune_unused_imports.ts` scoped to the extracted directories
+(`--root <directory> --dry-run`, then `--write`), and run `pnpm lint` before
+publication. Typecheck and PR gates do not replace the full ESLint scan enforced
+by the `static-checks` CI job. Pre-commit linting covers staged files only, so it
+cannot establish cleanliness for new files that were not staged when it ran.
+
 Mutations and opaque CLI/MCP calls must not retry or fall through to another
 transport after execution has started. Only proven reads may replay; a binary
 known missing before invocation may select another route. Record actual outcomes

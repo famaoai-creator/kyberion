@@ -1,17 +1,7 @@
 import * as path from 'node:path';
 import { pathResolver } from '../../path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeExecResult,
-  safeMkdir,
-  safeWriteFile,
-} from '../../secure-io.js';
-import type {
-  MusicGenerationProvider,
-  MusicGenerationRequest,
-  MusicGenerationResult,
-} from '../music-generation-types.js';
+import { assertSafeRepositoryPath } from '../../secure-io.js';
+import type { MusicGenerationRequest } from '../music-generation-types.js';
 
 export function getFallbackTargetPath(request: MusicGenerationRequest): string {
   const filename = `generated-music-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.wav`;

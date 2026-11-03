@@ -1,20 +1,8 @@
 import { isRecord } from '../../foundation/text.js';
 import { pathResolver } from '../../path-resolver.js';
-import {
-  assertSafeRepositoryPath,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../../secure-io.js';
+import { assertSafeRepositoryPath } from '../../secure-io.js';
 import { parseSafeJsonObjectValue } from '../../foundation/safe-json.js';
-import {
-  ImageGenerationRequest,
-  ImageGenerationResult,
-  ImageGenerationProvider,
-  ImageReference,
-} from '../image-generation-types.js';
+import { ImageGenerationRequest } from '../image-generation-types.js';
 
 export function getFallbackTargetPath(request: ImageGenerationRequest): string {
   const filename = `generated-${Date.now()}-${Math.random().toString(36).substring(2, 7)}.jpg`;

@@ -4,15 +4,12 @@ import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
-  ImageReference,
 } from '../image-generation-types.js';
 import {
   assertReferenceEgressAllowed,
   hasReferenceImages,
-  imageProviderDataEgress,
   recordReferenceEgressReceipt,
   referenceImageViolation,
-  resolveReferenceImagePath,
 } from '../image-reference-consent.js';
 import {
   explainSeamProviderDecision,

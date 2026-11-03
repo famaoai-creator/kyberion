@@ -1,23 +1,9 @@
 import * as path from 'node:path';
-import {
-  assertSafeRepositoryPath,
-  safeExistsSync,
-  safeExecResult,
-  safeMkdir,
-  safeWriteFile,
-} from '../../../secure-io.js';
+import { safeExistsSync, safeExecResult, safeMkdir } from '../../../secure-io.js';
 import { probeToolRuntime } from '../../../tool/tool-runtime-registry.js';
 import {
-  MUSAUDIOGEN_REQUIRED_FILES,
-  MUSAUDIOGEN_VARIANT_HF_REPO,
-  clampMlAudioGenDurationSec,
-  clampMusicGenDurationSec,
   clampStableAudioDurationSec,
-  resolveChatMusicianGenerationPolicy,
-  resolveLocalMusicGenMlxGenerationPolicy,
   resolveLocalStableAudioGenerationPolicy,
-  resolveMlAudioGenGenerationPolicy,
-  resolveMlAudioGenVariant,
 } from '../../music-generation-policy.js';
 import type {
   MusicGenerationProvider,

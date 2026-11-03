@@ -1,11 +1,5 @@
-import * as path from 'node:path';
 import { logger } from '../core.js';
-import {
-  assertSafeRepositoryPath,
-  safeLstat,
-  safeReadFile,
-  validateFileSize,
-} from '../secure-io.js';
+import { validateFileSize } from '../secure-io.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from '../ocr-types.js';
 import {
   resolveSeamProviderDecision,

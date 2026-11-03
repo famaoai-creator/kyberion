@@ -8,11 +8,7 @@ import {
   type ResolveSeamProviderOptions,
   type SeamProviderCandidate,
 } from '../../seam-provider-selection.js';
-import type {
-  MusicGenerationProvider,
-  MusicGenerationRequest,
-  MusicGenerationResult,
-} from '../music-generation-types.js';
+import type { MusicGenerationRequest, MusicGenerationResult } from '../music-generation-types.js';
 import {
   MUSIC_GENERATION_PROVIDER_SEAM,
   listMusicGenerationProviders,

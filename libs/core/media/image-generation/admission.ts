@@ -1,31 +1,16 @@
-import * as path from 'node:path';
 import { createHash } from 'node:crypto';
-import {
-  assertSafeRepositoryPath,
-  safeExecResult,
-  safeExistsSync,
-  safeMkdir,
-  safeReadFile,
-  safeWriteFile,
-} from '../../secure-io.js';
+import { safeReadFile } from '../../secure-io.js';
 import {
   ImageGenerationRequest,
   ImageGenerationResult,
   ImageGenerationProvider,
-  ImageReference,
 } from '../image-generation-types.js';
 import {
   assertReferenceEgressAllowed,
-  hasReferenceImages,
   imageProviderDataEgress,
-  recordReferenceEgressReceipt,
-  referenceImageViolation,
   resolveReferenceImagePath,
 } from '../image-reference-consent.js';
-import {
-  isHostImageHandoffOutput,
-  recordHostImageHandoffRequest,
-} from '../../host-image-handoff.js';
+import { isHostImageHandoffOutput } from '../../host-image-handoff.js';
 import { runExternalOperation } from '../../governance/external-operation.js';
 
 const admittedImageMethods = new WeakSet<object>();
