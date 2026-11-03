@@ -55,6 +55,7 @@ import { NotificationsSection } from './sections/NotificationsSection';
 import { RecordingConsentSection } from './sections/RecordingConsentSection';
 import { PluginsSection, type PluginConfirmState } from './sections/PluginsSection';
 import { AdvancedSection, type ManagementState } from './sections/AdvancedSection';
+import { AuthoritySection } from './sections/AuthoritySection';
 import { DisplaySection } from './sections/DisplaySection';
 import { PasskeyPane } from './sections/PasskeyPane';
 import { FormScope } from './sections/form-scope';
@@ -65,7 +66,7 @@ import {
   readSelectedTenant,
   readTenantSelection,
 } from '../../lib/tenant-context';
-import { createSettingsNavigation } from './settings-navigation';
+import { createSettingsNavigation, resolveSettingsTarget } from './settings-navigation';
 import './settings.css';
 import { SettingsReadiness } from './settings-readiness';
 import { createSettingsMenu } from './settings-menu';
@@ -643,6 +644,16 @@ export default function SettingsPage() {
       settingsNavigation.current = null;
     };
   }, [settingsReady]);
+  // The section becomes visible only after `activeSection` commits, so
+  // scrollIntoView inside the navigation helper hits a display:none element.
+  // Reveal the hash target (or the content top) once it is laid out.
+  React.useLayoutEffect(() => {
+    if (!settingsReady) return;
+    const target = resolveSettingsTarget(window.location?.hash ?? '');
+    const element = target ? document.getElementById(target.id) : null;
+    if (element) element.scrollIntoView({ block: 'start', behavior: 'auto' });
+    else window.scrollTo?.({ top: 0, behavior: 'auto' });
+  }, [activeSection, settingsReady]);
 
   const saveNotification = React.useCallback(
     async (grouped = false): Promise<boolean> => {
@@ -1211,8 +1222,6 @@ export default function SettingsPage() {
             t={t}
             setup={setup}
             services={services}
-            authorityTenants={meTenants.filter((tenant) => tenant.status === 'active')}
-            selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
             setServices={setServices}
             busy={busy}
             oauthOperation={oauthOperation}
@@ -1269,6 +1278,18 @@ export default function SettingsPage() {
             hasUnsavedChanges={notifDirty}
             onSaveNotification={() => void saveNotification()}
             sectionRef={setSectionRef('notifications')}
+          />
+        );
+
+      case 'authority':
+        return (
+          <AuthoritySection
+            key="authority"
+            locale={locale}
+            t={t}
+            authorityTenants={meTenants.filter((tenant) => tenant.status === 'active')}
+            selectedTenant={meViewing?.tenant_slug || readSelectedTenant() || undefined}
+            sectionRef={setSectionRef('authority')}
           />
         );
 
@@ -1375,7 +1396,15 @@ export default function SettingsPage() {
             {settingsNav}
           </Disclosure>
         </div>
-        <div className="settings-content">{sectionOrder.map((id) => renderSection(id))}</div>
+        <div className="settings-content">
+          {/* Sections stay mounted so in-progress panel state survives a
+              switch; only the active section is visible. */}
+          {sectionOrder.map((id) => (
+            <div key={id} hidden={id !== activeSection}>
+              {renderSection(id)}
+            </div>
+          ))}
+        </div>
       </div>
 
       {saveBarState !== 'clean' ? (
