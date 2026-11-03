@@ -55,6 +55,7 @@ import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js'
 import { parseSafeJsonObjectInput, parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
+import { policyRelativePath } from './policy-relative-path.js';
 import { rawExistsSync, rawReadTextFile, rawRealpathSync } from './fs-primitives.js';
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
@@ -129,23 +130,6 @@ function isOutsideProjectRoot(relativePath: string): boolean {
   if (!relativePath) return false;
   const firstSegment = normalizePath(relativePath).split('/')[0];
   return firstSegment === '..';
-}
-
-/**
- * Repo-relative spelling for policy checks. The process root wins first
- * (fixtures mock rootDir()); only a genuinely outside-root path may instead
- * name shared authority state under the primary checkout — the one store per
- * repository — which keeps its canonical repo-relative form.
- */
-function policyRelativePath(resolvedPath: string): string {
-  const rel = normalizePath(path.relative(projectRoot(), resolvedPath));
-  if (rel && rel !== '..' && !rel.startsWith('../')) return rel;
-  const primary = pathResolver.primaryCheckoutRootDir();
-  if (primary !== projectRoot()) {
-    const relPrimary = normalizePath(path.relative(primary, path.resolve(resolvedPath)));
-    if (pathResolver.isAuthorityStoreRelativePath(relPrimary)) return relPrimary;
-  }
-  return rel;
 }
 
 const logger = createLogger('tier-guard');
