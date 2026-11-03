@@ -29,6 +29,21 @@ const RESTRICTED = {
 describe('browser-automation-runtime bridge', () => {
   afterEach(() => resetBrowserAutomationRuntimeBridges());
 
+  it('keeps the declared builtin default rather than choosing the alphabetically first extension', () => {
+    registerBrowserAutomationRuntimeBridge(bridge('a-extension'));
+    registerBrowserAutomationRuntimeBridge(bridge('playwright-chromium'));
+    expect(resolveBrowserAutomationRuntime().bridge_id).toBe('playwright-chromium');
+  });
+
+  it('rejects multiple full providers without the declared default', () => {
+    registerBrowserAutomationRuntimeBridge(bridge('z-provider'));
+    registerBrowserAutomationRuntimeBridge(bridge('a-provider'));
+    expect(() => resolveBrowserAutomationRuntime()).toThrowError(
+      expect.objectContaining({ code: 'SEAM_PROVIDER_AMBIGUOUS' })
+    );
+    expect(resolveBrowserAutomationRuntime('z-provider').bridge_id).toBe('z-provider');
+  });
+
   it('never auto-selects a capability-restricted provider', () => {
     registerBrowserAutomationRuntimeBridge(bridge('a-restricted', RESTRICTED));
     registerBrowserAutomationRuntimeBridge(bridge('z-full'));

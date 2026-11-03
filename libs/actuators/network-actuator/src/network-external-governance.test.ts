@@ -41,23 +41,11 @@ vi.mock('@agent/core/async-utils', async (original) => ({
   ...(await original<typeof import('@agent/core/async-utils')>()),
   retry: vi.fn(async (execute: () => Promise<unknown>) => execute()),
 }));
-// The transport extension registry is an in-memory seam in this boundary test;
-// production seam registration telemetry must not write into live observability.
-vi.mock('@agent/core/seam', () => ({
-  coreSeamCatalog: {},
-  createSeam: () => {
-    const providers = new Map<string, unknown>();
-    return {
-      register: (id: string, implementation: unknown) => {
-        providers.set(id, { id, implementation });
-        return () => {
-          providers.delete(id);
-        };
-      },
-      list: () => [...providers.values()],
-    };
-  },
-}));
+// Keep real seam behavior and helper exports; isolate only registration state.
+vi.mock('@agent/core/seam', async (original) => {
+  const actual = await original<typeof import('@agent/core/seam')>();
+  return { ...actual, coreSeamCatalog: actual.createSeamCatalog() };
+});
 
 import { secureFetch } from '@agent/core/network';
 import { safeExec } from '@agent/core/secure-io';

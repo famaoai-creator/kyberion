@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-02
+last_updated: 2026-11-03
 ---
 
 # Operations Hygiene Runbook
@@ -544,6 +544,11 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
 - Tests never write live `active/` state. CI runs the leak guard in strict mode
   (`KYBERION_TEST_LEAK_STRICT=1`, forwarded to the Vitest child by `pnpm test`). Any created or
   grown file outside the sandbox roots fails the job.
+- Shared seam mechanisms must remain real in boundary tests. Use a partial mock
+  with `createSeamCatalog()` to isolate registration state, rather than copying
+  the seam API into a hand-written mock that omits new lifecycle helpers or
+  bypasses duplicate/removal semantics. The PR `registration-tests` gate includes
+  voice/network external-governance consumers to enforce this compatibility.
 - Tests that need a host binary (sqlite3 with FTS5, a CJK font, poppler, LibreOffice) skip when it is
   absent. Gate them with the owning module's probe (`probeHistorySearchBackend()`,
   `pickCjkFontSource()`, `detectRasterCapabilities()`), and make sure the CI workflows install the
@@ -1894,6 +1899,23 @@ nonempty supported recording artifact, not exit code zero alone. A provider
 submission receipt followed by poll/download/persistence failure must signal
 the same terminal verification stop through SDK envelopes; a model repair
 must not change providers and submit again.
+
+Provider registration and removal must use the shared seam lifecycle. Invalidate
+derived router caches on both events, and keep catalog/list/get/reset consistent:
+builtins are registrations, not getter exceptions. Automatic resolution requires
+a declared eligible default or a unique eligible candidate; provider ID order is
+not a preference policy. When changing a provider bridge, run the common seam
+lifecycle/auto-selection contracts and its caller regression tests in addition
+to multiplicity/AST checks. The OCR removal regression must demonstrate that an
+unregistered provider is not invoked on the next request. See the
+[seam lifecycle contract](../architecture/seam-lifecycle-contract.md).
+
+After splitting provider modules, remove inherited unused imports with
+`scripts/refactor/prune_unused_imports.ts` scoped to the extracted directories
+(`--root <directory> --dry-run`, then `--write`), and run `pnpm lint` before
+publication. Typecheck and PR gates do not replace the full ESLint scan enforced
+by the `static-checks` CI job. Pre-commit linting covers staged files only, so it
+cannot establish cleanliness for new files that were not staged when it ran.
 
 Mutations and opaque CLI/MCP calls must not retry or fall through to another
 transport after execution has started. Only proven reads may replay; a binary

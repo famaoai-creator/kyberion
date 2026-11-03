@@ -12,7 +12,12 @@
 import type { AgentAdapter } from './agent-adapter.js';
 import { getRegisteredEnvText } from '../foundation/env.js';
 import { engineRuntimePreferencesReadiness } from '../voice/engine-runtime-preferences.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 /** Saved operator default; only consulted on the live environment, never on injected test envs. */
 function engineRuntimePreference(
@@ -56,7 +61,7 @@ const paneRuntimeSeam = createSeam<AgentPaneRuntimeBridge>({
   owner: 'libs/core/agent/agent-pane-runtime-bridge.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(paneRuntimeSeam);
 
 export function registerAgentPaneRuntimeBridge(
   bridge: AgentPaneRuntimeBridge,
@@ -67,24 +72,11 @@ export function registerAgentPaneRuntimeBridge(
 ): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('AgentPaneRuntimeBridge.bridge_id is required');
-  const disposeFromSeam = paneRuntimeSeam.register(id, bridge, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, bridge, metadata);
 }
 
 export function resetAgentPaneRuntimeBridges(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
 }
 
 export function listAgentPaneRuntimeBridges(): AgentPaneRuntimeBridge[] {

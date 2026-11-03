@@ -1,4 +1,9 @@
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 import type { KnowledgeContext } from './knowledge-context.js';
 
 export interface KnowledgeRecord {
@@ -47,7 +52,7 @@ const knowledgeAdapterSeam = createSeam<KnowledgeAdapter>({
   owner: 'libs/core/knowledge/knowledge-adapter.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(knowledgeAdapterSeam);
 
 export function registerKnowledgeAdapter(
   adapter: KnowledgeAdapter,
@@ -58,16 +63,7 @@ export function registerKnowledgeAdapter(
 ): () => void {
   const id = adapter.id.trim();
   if (!id) throw new Error('KnowledgeAdapter.id is required');
-  const disposeFromSeam = knowledgeAdapterSeam.register(id, adapter, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return () => {
-    dispose();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
+  return registrations.register(id, adapter, metadata);
 }
 
 export function resolveKnowledgeAdapter(id?: string): KnowledgeAdapter {

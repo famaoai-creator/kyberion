@@ -4,7 +4,12 @@
  * provider modules on demand and registers them here; callers never import a
  * provider module directly.
  */
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 import type { PublicIngressProvider } from './public-ingress-contract.js';
 
 const publicIngressProviderSeam = createSeam<PublicIngressProvider>({
@@ -14,7 +19,7 @@ const publicIngressProviderSeam = createSeam<PublicIngressProvider>({
   owner: 'libs/core/ingress/public-ingress-seam.ts',
 });
 
-const disposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(publicIngressProviderSeam);
 
 export function registerPublicIngressProvider(
   provider: PublicIngressProvider,
@@ -22,13 +27,7 @@ export function registerPublicIngressProvider(
 ): () => void {
   const id = String(provider.id || '').trim();
   if (!id) throw new Error('PublicIngressProvider.id is required');
-  const dispose = publicIngressProviderSeam.register(id, provider, metadata);
-  const wrapped = () => {
-    dispose();
-    if (disposers.get(id) === wrapped) disposers.delete(id);
-  };
-  disposers.set(id, wrapped);
-  return wrapped;
+  return registrations.register(id, provider, metadata);
 }
 
 export function getRegisteredPublicIngressProvider(id: string): PublicIngressProvider | undefined {
@@ -41,6 +40,5 @@ export function listRegisteredPublicIngressProviderIds(): string[] {
 
 /** Test helper: drop every registered provider. */
 export function resetPublicIngressProviders(): void {
-  for (const dispose of [...disposers.values()]) dispose();
-  disposers.clear();
+  registrations.reset();
 }
