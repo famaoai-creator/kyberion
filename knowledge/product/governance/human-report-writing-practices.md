@@ -1,7 +1,7 @@
 ---
 title: 人が読む報告資料の書き方
-tags: [governance, documentation, reporting, writing, review-feedback]
-last_updated: 2026-08-18
+tags: [governance, documentation, reporting, writing, proofreading, review-feedback, 校正]
+last_updated: 2026-11-02
 role_affinity: [mission_controller, analyst, reporter, worker]
 phase_affinity: [execution, review]
 ---
@@ -136,6 +136,7 @@ phase_affinity: [execution, review]
 
 ## 関連
 
+- [日本語の校正で変えてよいことと、変えてはいけないこと](./japanese-prose-proofreading.md) — 校正で確度・主体・出典の主語を動かさない規則
 - [working-philosophy](./working-philosophy.md) — 作業そのものの規律（読んでから書く、一変更一検証）
 - [media-style-policy.json](./media-style-policy.json) — スライド・メディア出力の様式
 - `scripts/report-review/` — HTMLレポートにレビュー層（編集・コメント）を注入する仕組み。

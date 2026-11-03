@@ -17,9 +17,9 @@
       "No unacknowledged ops-alert older than 24h"
     ],
     "budget": {
-      "max_turns_per_wake": 6,
-      "wall_clock_ms_per_wake": 900000,
-      "token_cap_per_day": 200000
+      "max_turns_per_wake": 10,
+      "wall_clock_ms_per_wake": 1800000,
+      "token_cap_per_day": 1000000
     }
   },
   "attention": {

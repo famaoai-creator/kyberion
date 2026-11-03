@@ -200,14 +200,24 @@ export interface CustomerDecisionCaseDetailView {
   generated_at: string;
   today: string;
   draft_only: boolean;
+  /**
+   * Both stuck-task signals. `unresolvable` is a question with nowhere left to
+   * go (the lock still accepts a re-ask). `frozen_locks` is a lock an unproven
+   * `superseded` mark has closed to writes. A count an older facade omits reads
+   * as 0. The matching `*_next` string is kept when the facade sent one.
+   */
   task_counts: {
     pending_proposals: number;
     held: number;
     ready_to_resume: number;
     /** Held tasks nothing can release (re-ask or replace them). */
     unresolvable: number;
+    /** Present when `unresolvable` > 0: how to clear them (no ids, no values). */
+    unresolvable_next?: string;
     /** Tasks whose lock an unproven superseded mark froze (0 from an older facade). */
     frozen_locks: number;
+    /** Present when `frozen_locks` > 0: how to repair them (no ids, no values). */
+    frozen_locks_next?: string;
   };
   attention: OverviewAttentionItemView[];
   agendas: CaseAgendaView[];
@@ -452,7 +462,13 @@ export function parseCustomerDecisionCaseDetail(
         held: count(taskCounts, 'held'),
         ready_to_resume: count(taskCounts, 'ready_to_resume'),
         unresolvable: taskCounts.unresolvable === undefined ? 0 : count(taskCounts, 'unresolvable'),
+        ...(typeof taskCounts.unresolvable_next === 'string'
+          ? { unresolvable_next: taskCounts.unresolvable_next }
+          : {}),
         frozen_locks: taskCounts.frozen_locks === undefined ? 0 : count(taskCounts, 'frozen_locks'),
+        ...(typeof taskCounts.frozen_locks_next === 'string'
+          ? { frozen_locks_next: taskCounts.frozen_locks_next }
+          : {}),
       },
       attention: list(source.attention, parseOverviewAttentionItem, CASE_DETAIL_LIMITS.attention),
       agendas,

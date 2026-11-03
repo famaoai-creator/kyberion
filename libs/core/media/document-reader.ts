@@ -50,6 +50,7 @@ import {
   xlsxToMarkdown,
 } from './protocol-to-markdown.js';
 import type { PdfDesignProtocol, PdfPage } from '../contracts/pdf-protocol.js';
+import { dropBrokenTextElements, pageNeedsRender, renderPdfPages } from './pdf-page-raster.js';
 import { extractHtmlTitle, htmlToMarkdown } from '../html-to-markdown.js';
 import { extractOoxmlCoreTitle, OOXML_PLACEHOLDER_TITLES } from './ooxml-core-props.js';
 
@@ -580,6 +581,73 @@ export async function ocrPdfDesignImages(
   }
 }
 
+/**
+ * Pages whose text layer is unusable (broken font mapping) or that are pure
+ * vector drawings have nothing for the text extractor or the embedded-image OCR
+ * to read. Draw them with pdf.js (no external binary), drop the garbage text,
+ * and — when asked — export the page image (`--images`) and OCR it (`--ocr`).
+ * Returns the warnings the reader must surface.
+ */
+async function renderUnreadablePdfPages(
+  raw: Buffer,
+  pages: PdfPage[],
+  workDir: string,
+  options: ReadDocumentOptions,
+  exporter?: ImageExporter
+): Promise<string[]> {
+  // Garbage glyphs must not reach the Markdown, nor feed the table detector.
+  for (const page of pages) dropBrokenTextElements(page);
+  const flagged = pages.filter((page) =>
+    pageNeedsRender(page, selectPdfOcrImages(page).length > 0)
+  );
+  if (flagged.length === 0) return [];
+  const labels = flagged.map((page) => page.pageNumber).join(', ');
+  for (const page of flagged) page.text = '';
+  if (!options.ocr && !exporter) {
+    return [
+      `page ${labels}: text layer is unreadable (broken font mapping or vector drawing) — ` +
+        'pass --ocr to OCR a rendered copy and --images <dir> to save the page image for `kyberion see`',
+    ];
+  }
+  let rendered: Awaited<ReturnType<typeof renderPdfPages>>;
+  try {
+    rendered = await renderPdfPages(
+      raw,
+      flagged.map((page) => page.pageNumber)
+    );
+  } catch (error) {
+    return [
+      `page ${labels}: unreadable text layer and page rendering failed (${(error as Error).message})`,
+    ];
+  }
+  const warnings: string[] = [];
+  for (const { pageNumber, png } of rendered) {
+    const page = flagged.find((candidate) => candidate.pageNumber === pageNumber);
+    if (!page) continue;
+    const name = `page-${pageNumber}-render.png`;
+    exporter?.write(`page ${pageNumber}`, name, png);
+    if (!options.ocr) continue;
+    const staged = path.join(workDir, name);
+    safeWriteFile(staged, png);
+    const outcome = await ocrStagedImage(staged, workDir, `page ${pageNumber}`, options);
+    if (outcome.text) {
+      page.imageOcr = [...(page.imageOcr ?? []), { imagePath: staged, text: outcome.text }];
+    } else if (outcome.unreadable) {
+      page.imageOcrSkipped = [
+        ...(page.imageOcrSkipped ?? []),
+        { imagePath: staged, reason: outcome.unreadable },
+      ];
+    }
+  }
+  warnings.push(
+    options.ocr
+      ? `page ${labels}: text layer was unreadable, read from a rendered image instead. ` +
+          'OCR loses diagram structure — save the images with --images <dir> and look at them with `kyberion see`'
+      : `page ${labels}: text layer is unreadable — rendered page image saved with --images; look at it with \`kyberion see\` (add --ocr for text)`
+  );
+  return warnings;
+}
+
 async function readPdf(
   raw: Buffer,
   options: ReadDocumentOptions,
@@ -622,6 +690,7 @@ async function readPdf(
         rasterUnavailable = recovery.unavailable_reason;
       }
       if (options.ocr) await ocrPdfDesignImages(design, options);
+      const renderWarnings = await renderUnreadablePdfPages(raw, pages, workDir, options, exporter);
       if (exporter) {
         for (const page of pages) {
           for (const image of page.images ?? []) {
@@ -640,7 +709,7 @@ async function readPdf(
       const title = pickDocumentTitle(design.metadata?.title);
       const body = pdfToMarkdown({ ...design, metadata: undefined } as PdfDesignProtocol);
       const headed = withLeadingTitle(body, title);
-      const warnings: string[] = [];
+      const warnings: string[] = [...renderWarnings];
       const skipped = pages.reduce((sum, page) => sum + (page.imageOcrSkipped?.length ?? 0), 0);
       if (skipped) warnings.push(`${skipped} page image(s) could not be OCR’d`);
       if (ocrRecovered > 0) {

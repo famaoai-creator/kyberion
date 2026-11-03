@@ -210,7 +210,6 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
   pptx_slide_text: ['path'],
   xlsx_extract: ['path'],
   apply_pattern: ['pattern_path'],
-  deck_from_html: ['html'],
   pptx_diff: ['before', 'after'],
   pptx_filter_slides: ['path', 'keep_indices'],
   pptx_patch: ['path', 'replacements'],
@@ -219,12 +218,21 @@ const MEDIA_REQUIRED_INPUTS: Record<string, string[]> = {
   save_brand_to_confidential: ['brand_name', 'tenant_slug'],
   write_file: ['path', 'content'],
 };
+// deck_from_html は HTML をインライン(html)・ファイル(path)・ctx チャネル(from) のいずれかで受ける。
+const MEDIA_ANY_OF_INPUTS: Record<string, string[]> = {
+  deck_from_html: ['html', 'path', 'from'],
+};
 const MEDIA_EXTRA_CONTRACTS: Record<string, InputSchema> = Object.fromEntries(
   MEDIA_EXTRA_OPS.map((op) => [
     op,
     MEDIA_REQUIRED_INPUTS[op]
       ? { ...MEDIA_MIGRATION_SCHEMA, required: MEDIA_REQUIRED_INPUTS[op] }
-      : MEDIA_MIGRATION_SCHEMA,
+      : MEDIA_ANY_OF_INPUTS[op]
+        ? {
+            ...MEDIA_MIGRATION_SCHEMA,
+            anyOf: MEDIA_ANY_OF_INPUTS[op].map((key) => ({ required: [key] })),
+          }
+        : MEDIA_MIGRATION_SCHEMA,
   ])
 );
 const MEDIA_EXTRA_EXAMPLES: Record<string, Array<Record<string, unknown>>> = {
