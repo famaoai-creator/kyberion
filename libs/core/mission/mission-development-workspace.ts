@@ -2,7 +2,14 @@
 import * as path from 'node:path';
 import { createHash } from 'node:crypto';
 import { pathResolver } from '../path-resolver.js';
-import { assertSafeRepositoryPath, safeExistsSync, safeLstat } from '../secure-io.js';
+import {
+  assertSafeRepositoryPath,
+  safeExistsSync,
+  safeLstat,
+  safeExecResult,
+} from '../secure-io.js';
+import { hardenedLocalWorkspaceGitOptions } from '../shell/git-probe-hardening.js';
+import { assertVcsCwdScope } from '../vcs/cwd-scope.js';
 import {
   TASK_SOURCE_ROOTS,
   validateTaskSourcePaths,
@@ -16,7 +23,11 @@ import {
   gitRun,
   type VcsCommandRunner,
 } from '../vcs/git.js';
-import { listWorkspaces, registerWorkspace } from '../workforce/workspace-ledger.js';
+import {
+  deleteRegisteredWorkspace,
+  listWorkspaces,
+  registerWorkspace,
+} from '../workforce/workspace-ledger.js';
 import { checkWorkspaceBudget } from '../workforce/workspace-budget.js';
 import { runtimeStatePath } from '../foundation/runtime-state-roots.js';
 import { storagePartitionSegments } from '../storage-layout.js';
@@ -24,6 +35,7 @@ import type { MissionState } from './mission-types.js';
 import {
   createDevelopmentWorkspaceGitRunner,
   cloneIsolatedDevelopmentRepository,
+  assertReviewedLocalDevelopmentBaseline,
 } from './mission-development-git.js';
 import { normalizeRepositoryTarget } from '../governance/external-operation-target.js';
 
@@ -33,8 +45,14 @@ export function ensureMissionDevelopmentSourceWorkspace(
   taskId: string,
   sourcePaths: string[],
   assertCurrent: () => void,
-  options: { create?: boolean; repositoryUrl?: string } = {}
+  options: { create?: boolean; repositoryUrl?: string; localBaselineCommit?: string } = {}
 ): { cwd: string; sourcePaths: string[]; created: boolean } | undefined {
+  if (
+    options.localBaselineCommit !== undefined &&
+    !/^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(options.localBaselineCommit)
+  )
+    throw new Error('Offline clone requires an exact reviewed immutable commit');
+  if (options.localBaselineCommit !== undefined) assertCurrent();
   const namespace = storagePartitionSegments({
     kind: 'tier',
     tier: state.tier,
@@ -65,30 +83,72 @@ export function ensureMissionDevelopmentSourceWorkspace(
   } else {
     if (options.create === false)
       throw new Error('Terminal mission has no private development workspace evidence');
+    if (options.localBaselineCommit !== undefined)
+      assertReviewedLocalDevelopmentBaseline(
+        pathResolver.rootDir(),
+        options.localBaselineCommit,
+        assertCurrent
+      );
     if (
-      !options.repositoryUrl ||
-      normalizeRepositoryTarget(options.repositoryUrl) !== options.repositoryUrl
+      options.localBaselineCommit === undefined &&
+      (!options.repositoryUrl ||
+        normalizeRepositoryTarget(options.repositoryUrl) !== options.repositoryUrl)
     )
       throw new Error('Private clone requires the exact reviewed repository URL');
     assertCurrent();
     assertMissionOwnerPath('allocate the isolated private development repository');
     const budget = checkWorkspaceBudget(cwd, 0, { allowedRoots: [parent] });
     if (!budget.allowed) throw new Error('Private development workspace budget denied');
-    registerWorkspace(
+    // Register before clone so concurrent allocators collide on the ledger path,
+    // but roll the ledger entry back if clone/checkout fails — residue without a
+    // usable checkout is not a reusable workspace.
+    const registered = registerWorkspace(
       { path: cwd, kind: 'scratch-dir', owner: { mission_id: state.mission_id, task_id: taskId } },
       { allowedRoots: [parent] }
     );
-    cloneIsolatedDevelopmentRepository(
-      pathResolver.rootDir(),
-      cwd,
-      options.repositoryUrl,
-      assertCurrent
-    );
+    try {
+      cloneIsolatedDevelopmentRepository(
+        pathResolver.rootDir(),
+        cwd,
+        options.repositoryUrl ?? '',
+        assertCurrent,
+        { localBaselineCommit: options.localBaselineCommit }
+      );
+    } catch (error) {
+      try {
+        deleteRegisteredWorkspace(registered.id, { allowedRoots: [parent] });
+      } catch {
+        // Prefer the original clone failure; owner can still see leftover disk.
+      }
+      throw error;
+    }
     assertCurrent();
     created = true;
   }
+  const read = (args: string[]) => {
+    assertCurrent();
+    assertMissionOwnerPath('verify the offline task source workspace');
+    assertVcsCwdScope(cwd);
+    const result = safeExecResult(
+      'git',
+      args,
+      hardenedLocalWorkspaceGitOptions({
+        cwd,
+        timeoutMs: 10_000,
+        maxOutputMB: 1,
+        env: { GIT_NO_REPLACE_OBJECTS: '1' },
+      })
+    );
+    assertCurrent();
+    if (result.status !== 0 || result.error)
+      throw new Error('Offline task source workspace verification failed');
+    return result;
+  };
   const gitDir = assertSafeRepositoryPath(path.join(cwd, '.git'));
-  const common = gitRun(['rev-parse', '--git-common-dir'], cwd);
+  const common =
+    options.localBaselineCommit !== undefined
+      ? read(['rev-parse', '--git-common-dir'])
+      : gitRun(['rev-parse', '--git-common-dir'], cwd);
   if (
     !safeLstat(gitDir).isDirectory() ||
     common.status !== 0 ||
@@ -99,6 +159,14 @@ export function ensureMissionDevelopmentSourceWorkspace(
     throw new Error(
       'Private development repository shares Git objects or metadata outside its workspace'
     );
+  if (options.localBaselineCommit !== undefined) {
+    if (
+      read(['rev-parse', '--verify', 'HEAD']).stdout.trim() !== options.localBaselineCommit ||
+      read(['remote']).stdout.trim()
+    )
+      throw new Error('Offline task source workspace baseline or remote configuration changed');
+  }
+  if (options.localBaselineCommit !== undefined) assertCurrent();
   const prefix = pathResolver.toRepoRelative(cwd).replace(/\\/gu, '/');
   return { cwd, sourcePaths: sourcePaths.map((source) => `${prefix}/${source}`), created };
 }

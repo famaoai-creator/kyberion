@@ -6,6 +6,8 @@ describe('mission template catalog', () => {
     const catalog = loadMissionTemplateCatalog();
     expect(catalog.templates.map((template) => template.name)).toEqual([
       'development',
+      'refactoring',
+      'code_change',
       'meeting_facilitation',
       'operations',
       'operations_report',
