@@ -7,41 +7,117 @@
       "type": "object",
       "required": ["service_id", "mode", "action", "params"],
       "properties": {
-        "service_id": { "type": "string" },
-        "mode": { "enum": ["API", "CLI", "RECONCILE", "PRESET", "OAUTH", "MCP", "HARNESS"] },
-        "action": { "type": "string" },
-        "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
-        "params": { "type": "object" },
-        "auth": { "enum": ["none", "secret-guard", "session"] },
-        "context": { "type": "object" }
+        "service_id": {
+          "type": "string"
+        },
+        "mode": {
+          "enum": ["API", "CLI", "RECONCILE", "PRESET", "OAUTH", "MCP", "HARNESS"]
+        },
+        "action": {
+          "type": "string"
+        },
+        "method": {
+          "enum": ["GET", "POST", "PUT", "DELETE"]
+        },
+        "params": {
+          "type": "object"
+        },
+        "auth": {
+          "enum": ["none", "secret-guard", "session"]
+        },
+        "context": {
+          "type": "object"
+        }
       }
     },
     {
       "type": "object",
       "required": ["action", "steps"],
       "properties": {
-        "action": { "const": "pipeline" },
-        "context": { "type": "object" },
+        "action": {
+          "const": "pipeline"
+        },
+        "context": {
+          "type": "object"
+        },
         "steps": {
           "type": "array",
           "items": {
             "type": "object",
             "required": ["op", "params"],
             "properties": {
-              "op": { "enum": ["api", "cli", "reconcile", "preset", "oauth", "mcp", "harness"] },
+              "op": {
+                "enum": [
+                  "api",
+                  "cli",
+                  "reconcile",
+                  "preset",
+                  "oauth",
+                  "mcp",
+                  "harness",
+                  "information_asset_work"
+                ]
+              },
               "params": {
-                "type": "object",
-                "required": ["service_id", "action", "params"],
-                "properties": {
-                  "service_id": { "type": "string" },
-                  "action": { "type": "string" },
-                  "params": { "type": "object" },
-                  "auth": { "enum": ["none", "secret-guard", "session"] },
-                  "method": { "enum": ["GET", "POST", "PUT", "DELETE"] },
-                  "context": { "type": "object" },
-                  "export_as": { "type": "string" },
-                  "retry": { "type": "object" }
-                }
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": ["service_id", "action", "params"],
+                    "properties": {
+                      "service_id": {
+                        "type": "string"
+                      },
+                      "action": {
+                        "type": "string"
+                      },
+                      "params": {
+                        "type": "object"
+                      },
+                      "auth": {
+                        "enum": ["none", "secret-guard", "session"]
+                      },
+                      "method": {
+                        "enum": ["GET", "POST", "PUT", "DELETE"]
+                      },
+                      "context": {
+                        "type": "object"
+                      },
+                      "export_as": {
+                        "type": "string"
+                      },
+                      "retry": {
+                        "type": "object"
+                      }
+                    }
+                  },
+                  {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["work_item_id", "attempt_id", "lease_id", "dot_id", "actor_id"],
+                    "properties": {
+                      "work_item_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "attempt_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "lease_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "dot_id": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "actor_id": {
+                        "type": "string",
+                        "minLength": 1
+                      }
+                    }
+                  }
+                ]
               }
             }
           }

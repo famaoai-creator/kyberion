@@ -31038,6 +31038,46 @@
       "source": "describeOps",
       "ops": [
         {
+          "op": "information_asset_work",
+          "kind": "apply",
+          "input_schema": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["work_item_id", "attempt_id", "lease_id", "dot_id", "actor_id"],
+            "properties": {
+              "work_item_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "attempt_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "lease_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "dot_id": {
+                "type": "string",
+                "minLength": 1
+              },
+              "actor_id": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          },
+          "examples": [
+            {
+              "work_item_id": "work-example",
+              "attempt_id": "attempt-example",
+              "lease_id": "lease-example",
+              "dot_id": "inbox-dot",
+              "actor_id": "dot:inbox-dot"
+            }
+          ]
+        },
+        {
           "op": "preset",
           "kind": "capture",
           "input_schema": {

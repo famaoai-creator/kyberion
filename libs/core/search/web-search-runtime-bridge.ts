@@ -7,7 +7,13 @@
  * never silently picks a service-backed engine (same rule as lightpanda).
  */
 
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  resolveSeamAutoProvider,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 export interface WebSearchHit {
   title: string;
@@ -65,7 +71,7 @@ const webSearchRuntimeSeam = createSeam<WebSearchRuntimeBridge>({
   owner: 'libs/core/search/web-search-runtime-bridge.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(webSearchRuntimeSeam);
 
 export function registerWebSearchRuntimeBridge(
   bridge: WebSearchRuntimeBridge,
@@ -76,13 +82,7 @@ export function registerWebSearchRuntimeBridge(
 ): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('WebSearchRuntimeBridge.bridge_id is required');
-  const disposeFromSeam = webSearchRuntimeSeam.register(id, bridge, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, bridge, metadata);
 }
 
 export function listWebSearchRuntimeBridges(): WebSearchRuntimeBridge[] {
@@ -90,14 +90,7 @@ export function listWebSearchRuntimeBridges(): WebSearchRuntimeBridge[] {
 }
 
 export function resetWebSearchRuntimeBridges(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
 }
 
 /**
@@ -125,7 +118,10 @@ export function resolveWebSearchRuntime(preference?: string): WebSearchRuntimeBr
   if (bridges.length === 0) {
     throw new Error('[web-search-runtime] no web search runtime providers registered');
   }
-  const offline = bridges.find((bridge) => !bridge.capabilities);
+  const offline = resolveSeamAutoProvider(webSearchRuntimeSeam, {
+    eligible: (bridge) => !bridge.capabilities,
+    defaultProvider: STUB_WEB_SEARCH_RUNTIME_ID,
+  });
   if (!offline) {
     throw new Error(
       '[web-search-runtime] no offline-safe provider is registered; ' +

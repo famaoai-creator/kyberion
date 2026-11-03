@@ -24,6 +24,7 @@ import '@agent/core/embedding-backend';
 import '@agent/core/integrations/email-account-catalog';
 import '@agent/core/knowledge/knowledge-adapter';
 import '@agent/core/media/image-generation-bridge';
+import '@agent/core/media/music-generation-bridge';
 import '@agent/core/intent/intent-extractor';
 import '@agent/core/question-resolver';
 import '@agent/core/surface/surface-runtime-helpers';

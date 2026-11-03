@@ -1,4 +1,9 @@
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 import { runExternalOperation } from '../governance/external-operation.js';
 
 export const VIDEO_FILTER_TYPES = ['color_correction', 'chroma_key', 'crop'] as const;
@@ -193,7 +198,7 @@ const videoFilterSeam = createSeam<VideoFilterProvider>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/video/video-filter.ts',
 });
-const disposers = new Set<() => void>();
+const registrations = createSeamLifecycle(videoFilterSeam);
 
 export function registerVideoFilterProvider(
   provider: VideoFilterProvider,
@@ -207,17 +212,11 @@ export function registerVideoFilterProvider(
     typeof provider.capabilities.local_only !== 'boolean'
   )
     throw new Error('[VIDEO_FILTER_PROVIDER_INVALID] Invalid provider capabilities');
-  const remove = videoFilterSeam.register(provider.provider_id, provider, metadata);
-  const dispose = () => {
-    remove();
-    disposers.delete(dispose);
-  };
-  disposers.add(dispose);
-  return dispose;
+  return registrations.register(provider.provider_id, provider, metadata);
 }
 
 export function resetVideoFilterProviders(): void {
-  for (const dispose of [...disposers]) dispose();
+  registrations.reset();
 }
 export function listVideoFilterProviders(): VideoFilterProvider[] {
   return videoFilterSeam.list().map((entry) => entry.implementation);
