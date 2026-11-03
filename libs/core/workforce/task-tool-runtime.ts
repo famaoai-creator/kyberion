@@ -23,6 +23,7 @@ import { writeScopedArtifact } from './artifact-store.js';
 import { loadMissionStateAtPath } from '../mission/mission-state-reader.js';
 import type { MissionState } from '../mission/mission-types.js';
 import { loadMissionNextTaskObjectsAtPath } from '../mission/mission-next-task-reader.js';
+import { validateTaskSourceWorkspace } from '../foundation/task-tool-grant-validation.js';
 import type { ToolDefinition, ReasoningBackend } from '../reasoning/reasoning-backend.js';
 import type { RunGoalDrivenLoopOptions } from './worker-goal-driver.js';
 import { executeTaskGoalLoop } from './task-execution-port.js';
@@ -194,6 +195,7 @@ export function createRuntimeForTask(
       deliverable: entry.deliverable,
       target_path: entry.target_path,
       source_edit_paths: entry.source_edit_paths,
+      source_workspace: entry.source_workspace,
       source_edit_requires_approval: entry.source_edit_requires_approval,
       allowed_pipelines: entry.allowed_pipelines,
       assigned_to: entry.assigned_to,
@@ -218,11 +220,21 @@ export function createRuntimeForTask(
   )
     throw new Error('[TASK_SOURCE_GRANT_INVALID] source_edit_requires_approval must be boolean');
   const target = typeof task.target_path === 'string' ? task.target_path : undefined;
-  const sourceTarget =
+  const sourceWorkspace =
+    task.source_workspace === undefined
+      ? undefined
+      : validateTaskSourceWorkspace(task.source_workspace);
+  const publicSourceTarget =
     target &&
     ['libs/', 'scripts/', 'tests/', 'docs/', 'pipelines/', 'knowledge/product/'].some((prefix) =>
       target.startsWith(prefix)
-    )
+    );
+  if (sourceWorkspace && publicSourceTarget)
+    throw new Error(
+      '[TASK_SOURCE_GRANT_INVALID] Prepared workspace target must retain its private exact source binding'
+    );
+  const sourceTarget =
+    target && (publicSourceTarget || (sourceWorkspace && sourcePaths.includes(target)))
       ? target
       : undefined;
   if (sourceTarget && profileName === 'implementer' && !sourcePaths.includes(sourceTarget))

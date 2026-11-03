@@ -81,7 +81,6 @@ You are a delegated implementer sub-agent. You may read, write, and execute with
 - `active/missions/{ID}/` - Evidence and logs.
 - `active/shared/tmp/` - Governed temporary runtime artifacts.
 - **Tier Authority**:
-- **L1/L2 (Public)**: Consumer. Reference only. Cannot modify.
 
 ## secure-io constraint
 
