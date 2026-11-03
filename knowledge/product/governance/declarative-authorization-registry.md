@@ -1,12 +1,12 @@
 ---
-title: Declarative Authorization Registry (3-layer model)
+title: Declarative Authorization Registry (3-layer model, 4 subject axes)
 tags: [governance, authorization, registry, effect-class, approval, plugin]
 last_updated: 2026-11-02
 ---
 
 # Declarative authorization registry
 
-Single source for "which operation needs which authority". Three layers,
+Single source for "which subject needs which authority". Three layers,
 merged with a code-always-wins rule:
 
 | layer   | source                                                                                     | trust                              |
@@ -14,6 +14,36 @@ merged with a code-always-wins rule:
 | code    | `libs/core/foundation/authorization-registry.ts`                                           | reviewed with the repo             |
 | overlay | `knowledge/product/governance/authorization-registry.json` (customer override: `policy/…`) | governed-catalog, schema-validated |
 | plugin  | managed-plugin manifest `authorizations` block                                             | activation-gated, digest-bound     |
+
+## Subject axes (MSN-ADMISSION-UNIFY-20261102)
+
+`subjectAuthorization(subject)` resolves four axes — `operation` (bare id;
+exact + prefix), `intent:<id>`, `capability:<id>`, `verb:<id>` (exact keys from
+axis bridges). Axis detail layers stay authoritative and are bridged, not
+flattened:
+
+| axis       | detail layer                   | resolution                                 |
+| ---------- | ------------------------------ | ------------------------------------------ |
+| intent     | `approval-policy.json`         | strongest matching rule wins (fail-closed) |
+| capability | `grant-capability-policy.json` | capability rule                            |
+| verb       | `command-credential-policy.ts` | none / degrading / required → binding      |
+
+Every axis fails toward MORE authority when undeclared: op → external
+admission, intent → approval required, capability → tenant binding,
+verb → task binding. Empty axis-local ids never match a declaration.
+
+## Declaration attributes beyond authority
+
+- `approvalDomain` — storage partition for approval routing. Call
+  `createApprovalRequest`/`admitInternalDecision` with `subject`, never a
+  `storageChannel` literal; implicit derivation is ONLY `admission{external}`
+  → `external-operation` (other domains need the explicit attribute), and
+  undeclared subjects never derive (no silent repartition).
+- `protectedPaths` — argument-effect protection; `operation-protection`
+  consults the registry before its fallback table.
+- `delegable` — DelegationSpec; serializes as `requires_lineage` in the policy
+  document (`authorization-policy-document.ts`).
+- `actionClass`, `detail` — carried through serialization unchanged.
 
 ## Invariants
 

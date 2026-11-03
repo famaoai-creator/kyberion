@@ -243,7 +243,7 @@
 - [CLI 信頼性ゲート — CI レーンマップ](./product/governance/cli-reliability-gates.ja.md) (public | Unknown)
 - [Claude に聞く効率チェック質問リスト](./product/governance/agent-efficiency-questions.md) (public | Unknown)
 - [Config Protocol: The Sovereign Rule of System State](./product/governance/config-protocol.md) (public | Ecosystem Architect)
-- [Declarative Authorization Registry (3-layer model)](./product/governance/declarative-authorization-registry.md) (public | Unknown)
+- [Declarative Authorization Registry (3-layer model, 4 subject axes)](./product/governance/declarative-authorization-registry.md) (public | Unknown)
 - [Delegated Agent Operations Runbook](./product/governance/delegated-agent-operations-runbook.md) (public | Unknown)
 - [Dependency Placement Policy](./product/governance/dependency-placement-policy.md) (public | Unknown)
 - [Dot の委任枠と満杯時の待機運用](./product/governance/dot-capacity-operations.ja.md) (public | Unknown)
