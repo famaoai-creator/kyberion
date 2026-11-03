@@ -194,6 +194,7 @@
 - [メモリとナレッジのコンテキスト・アダプタモデル](./product/architecture/knowledge-memory-context-model.ja.md) (public | Unknown)
 - [レビュー証跡・抽出方法の明示とプロセス復旧検証](./product/architecture/review-provenance-and-recovery-2026-10.md) (public | Unknown)
 - [分散システム ＆ アーキテクチャパターン](./product/architecture/distributed-systems.md) (public | Ecosystem Architect)
+- [情報資産の所在・観測・作業化の接続](./product/architecture/information-assets.md) (public | Unknown)
 - [時間コンテキストとカレンダーワークフローモデル](./product/architecture/temporal-context-model.ja.md) (public | Unknown)
 - [検討報告：マルチテナント・ナレッジガバナンスの最適化案](./product/architecture/analysis-multi-tenant-governance-20260304.md) (public | Ecosystem Architect)
 - [音声・リアルタイム映像の技術再評価 2026-10](./product/architecture/realtime-av-technology-review-2026-10.md) (public | Unknown)
@@ -283,6 +284,7 @@
 - [共通概念の採用と安全な更新](./product/governance/concept-consolidation-operations.md) (public | Unknown)
 - [受信と実行権限を分離する自律ループ](./product/governance/delegated-autonomous-loop.md) (public | Unknown)
 - [外部入出力 actuator の統合と自律運用](./product/governance/external-actuator-governance.md) (public | Unknown)
+- [情報資産の所在登録・取得・完了確認の運用](./product/governance/information-assets-runbook.md) (public | Unknown)
 - [文脈の経済 — 長いセッションでトークンを無駄にしない](./product/governance/agent-context-economy.md) (public | Unknown)
 
 ## 📁 product/governance/authority-roles
@@ -543,6 +545,7 @@
 - [動画素材からの字幕付き短縮編集](./product/orchestration/video-recut-production-playbook.md) (public | Unknown)
 - [同一ディレクトリ複数CLI共存プレイブック](./product/orchestration/same-checkout-coexecution-playbook.ja.md) (public | Unknown)
 - [外部操作の接続と権限委任オンボーディング](./product/orchestration/onboarding-action-authority.md) (public | Unknown)
+- [情報資産の外部操作を承認済み mission で実行する](./product/orchestration/information-asset-mission-work.md) (public | Unknown)
 - [手順の成功チェック プレイブック（golden シナリオ）](./product/orchestration/procedure-success-check-playbook.ja.md) (public | Unknown)
 - [残留データ（残骸）運用プレイブック — 実測スナップショットと掃除・運用の虎の巻](./product/orchestration/storage-residue-operations-playbook.ja.md) (public | Unknown)
 - [知覚プレイブック（read / see / listen / watch — 感覚ごとに入口はひとつ）](./product/orchestration/perception-playbook.ja.md) (public | Ecosystem Architect)

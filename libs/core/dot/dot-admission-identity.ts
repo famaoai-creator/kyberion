@@ -131,6 +131,7 @@ export function admissionForDotRecord(
     'intent',
     'handoff_to',
     'continuous_work',
+    'information_asset_work',
   ] as const) {
     if (row[key] !== undefined) Object.assign(proposal, { [key]: row[key] });
   }

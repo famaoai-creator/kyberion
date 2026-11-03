@@ -1,3 +1,4 @@
+import { runInformationAssetWork } from './information-asset-work.js';
 import {
   appendJsonLine,
   defineCatalog,
@@ -397,6 +398,12 @@ export async function handleAction(
     );
     for (const [stepIndex, step] of steps.entries()) {
       logger.info(`🔌 [SERVICE] Executing step: ${step.op}`);
+      if (step.op === 'information_asset_work') {
+        const result = await runInformationAssetWork(step.params, handleAction, options);
+        ctx[step.params.export_as || 'information_asset_result'] = result;
+        results.push({ op: step.op, status: 'success' });
+        continue;
+      }
       const stepResult = await withExternalOperationOccurrence(
         `service-substep:${stepIndex}:${step.op}`,
         async () => {

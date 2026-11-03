@@ -1,3 +1,4 @@
+import { informationWorkProposalRefusal, type DotScopedProposal } from './dot-information-work.js';
 import { dotDigestActionEvidence } from './dot-digest-evidence.js';
 import { continuousDevelopmentDecisionPresentation } from '../organization/continuous-development-consent.js';
 import { dotDelegationCapacity, resumeDotCapacityActions } from './dot-admission-capacity.js';
@@ -195,15 +196,7 @@ export interface DotDispatchDeps {
     tenantSlug: string,
     diagnostic?: {
       charter: DotCharter;
-      proposal: Pick<
-        DotProposal,
-        | 'action_id'
-        | 'work_shape'
-        | 'handoff_to'
-        | 'pipeline_ref'
-        | 'front_desk_execution'
-        | 'continuous_work'
-      >;
+      proposal: DotScopedProposal;
     }
   ) => void;
   appendInbox?: (input: DotInboxEntryInput) => void;
@@ -325,16 +318,7 @@ export type DotBoundsVerdict = { ok: true } | { ok: false; reason: string; capac
 /** What the proposal may be at all: action, shape, handoff target. Re-checked at settlement. */
 function checkDotProposalScope(
   charter: DotCharter,
-  proposal: Pick<
-    DotProposal,
-    | 'action_id'
-    | 'work_shape'
-    | 'handoff_to'
-    | 'pipeline_ref'
-    | 'front_desk_execution'
-    | 'continuous_work'
-    | 'mission_admission'
-  >,
+  proposal: DotScopedProposal,
   deps: DotDispatchDeps
 ): DotBoundsVerdict {
   try {
@@ -344,6 +328,8 @@ function checkDotProposalScope(
   }
   const missionRefusal = dotMissionAdmissionRefusal(charter, proposal, deps.now?.());
   if (missionRefusal) return { ok: false, reason: missionRefusal };
+  const informationRefusal = informationWorkProposalRefusal(charter, proposal);
+  if (informationRefusal) return informationRefusal;
   if (proposal.continuous_work) {
     try {
       parseContinuousWorkPlan(proposal.continuous_work);
@@ -1067,6 +1053,9 @@ function dispatchDotProposalsUnlocked(
       ...(proposal.rationale ? { rationale: proposal.rationale } : {}),
       ...(proposal.pipeline_ref ? { pipeline_ref: proposal.pipeline_ref } : {}),
       ...(proposal.continuous_work ? { continuous_work: proposal.continuous_work } : {}),
+      ...(proposal.information_asset_work
+        ? { information_asset_work: proposal.information_asset_work }
+        : {}),
       ...(proposal.mission_admission ? { mission_admission: proposal.mission_admission } : {}),
       ...(proposal.expected_effect ? { expected_effect: proposal.expected_effect } : {}),
       ...(proposal.target ? { target: proposal.target } : {}),

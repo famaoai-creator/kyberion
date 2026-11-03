@@ -85,6 +85,13 @@ export type DotTrigger =
  * the waking. A feed never wakes a dot by itself.
  */
 export interface DotFeedTrigger {
+  /** Scoped catalog reference. Typed collectors emit the initial backlog and own durable pagination. */
+  collector?: {
+    location_id: string;
+    max_pages?: number;
+    max_requests?: number;
+    wall_clock_ms?: number;
+  };
   kind: 'feed';
   /** Declared intake source the items are ingested under (tenant binding comes from the policy). */
   source: string;

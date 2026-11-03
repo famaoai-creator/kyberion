@@ -39,6 +39,19 @@ import {
 import { dotStatePath, DOT_FEED_DIR } from './dot-state-paths.js';
 import type { DotRuntimeDeps } from './dot-runtime.js';
 
+import { executeInformationAssetCapture } from '../information-assets/collector-capture.js';
+import type { InformationAssetServiceCall } from '../information-assets/types.js';
+import { recordInformationAssetWakeReference } from '../information-assets/collector-wake.js';
+import {
+  collectInformationAsset,
+  getInformationAssetCollector,
+} from '../information-assets/collector.js';
+import {
+  readInformationAssetCatalog,
+  authorizeInformationAssetCapture,
+} from '../information-assets/catalog.js';
+import type { InformationAssetCoverage } from '../information-assets/types.js';
+
 const logger = createLogger('dot-feed-source');
 
 /** Default poll cadence; a feed is a watch, not a stream. */
@@ -59,6 +72,7 @@ const DETAIL_MAX = 300;
 
 /** One poll's durable cursor/seen bookkeeping. One file per feed spec. */
 export interface DotFeedState {
+  collection?: InformationAssetCoverage;
   spec_id: string;
   source: string;
   service_id: string;
@@ -81,6 +95,8 @@ export interface DotFeedState {
 }
 
 export interface DotFeedDeps extends DotRuntimeDeps {
+  /** Hermetic fixture port; production collectors use exact-request capture admission. */
+  collectorServiceCall?: InformationAssetServiceCall;
   /** Governed service-preset port; absent → the feed fails closed without a poll. */
   serviceCall?: (input: {
     service_id: string;
@@ -106,6 +122,7 @@ export type DotFeedPoll = {
 };
 
 export interface DotFeedCoverage {
+  collection?: InformationAssetCoverage;
   spec_id: string;
   source: string;
   service_id: string;
@@ -144,6 +161,7 @@ export function feedSpecId(trigger: DotFeedTrigger): string {
     source: trigger.source,
     service_id: trigger.service_id,
     action: trigger.action,
+    ...(trigger.collector ? { collector: trigger.collector } : {}),
     params: trigger.params ?? {},
     items_path: trigger.items_path ?? null,
     item_id_path: trigger.item_id_path ?? 'id',
@@ -212,6 +230,9 @@ export function readFeedState(
       ingested: typeof raw.ingested === 'number' ? raw.ingested : 0,
       duplicates: typeof raw.duplicates === 'number' ? raw.duplicates : 0,
       capped_polls: typeof raw.capped_polls === 'number' ? raw.capped_polls : 0,
+      ...(raw.collection && typeof raw.collection === 'object'
+        ? { collection: raw.collection as unknown as InformationAssetCoverage }
+        : {}),
     };
   } catch (error) {
     logger.warn(
@@ -462,7 +483,7 @@ export async function evaluateDotFeedTriggers(
       });
       continue;
     }
-    if (!deps.serviceCall) {
+    if (!deps.serviceCall && !trigger.collector) {
       const error = 'no service port available for this feed';
       state = recordFailure(charter, trigger, state, now, error);
       writeFeedState(charter, state, deps);
@@ -476,6 +497,131 @@ export async function evaluateDotFeedTriggers(
         truncated: false,
         error,
       });
+      continue;
+    }
+
+    if (trigger.collector) {
+      let ingested = 0,
+        duplicate = 0;
+      try {
+        if (
+          charter.scope.tier !== 'confidential' ||
+          !charter.scope.tenant_slug ||
+          !charter.scope.organization_id
+        )
+          throw new Error('collector feed requires confidential tenant organization scope');
+        const scope = {
+          tenant_slug: charter.scope.tenant_slug,
+          organization_id: charter.scope.organization_id,
+          ...(charter.scope.project_id ? { project_id: charter.scope.project_id } : {}),
+        };
+        const location = readInformationAssetCatalog(scope, {
+          rootDir: deps.rootDir,
+        }).locations.find((item) => item.location_id === trigger.collector!.location_id);
+        if (
+          !location ||
+          location.scope.tenant_slug !== scope.tenant_slug ||
+          location.scope.organization_id !== scope.organization_id ||
+          location.scope.project_id !== scope.project_id
+        )
+          throw new Error('collector location is not registered in this exact scope');
+        const adapter = getInformationAssetCollector(location.collector_id);
+        if (trigger.service_id !== location.service_id || trigger.action !== adapter.actions[0])
+          throw new Error('collector feed service/action declaration mismatch');
+        const collection = await collectInformationAsset(location, {
+          rootDir: deps.rootDir,
+          now: () => now,
+          maxPages: trigger.collector.max_pages,
+          maxRequests: trigger.collector.max_requests,
+          wallClockMs: trigger.collector.wall_clock_ms,
+          serviceCall:
+            deps.collectorServiceCall ??
+            ((request) =>
+              executeInformationAssetCapture(location, request, { rootDir: deps.rootDir })),
+          authorize: (loc, operation) =>
+            authorizeInformationAssetCapture(loc.scope, loc.location_id, operation, {
+              rootDir: deps.rootDir,
+            }),
+          publish: (observation) => {
+            const result = ingest({
+              source: trigger.source,
+              body: {
+                information_asset_ref: {
+                  location_id: observation.location_id,
+                  event_id: observation.event_id,
+                },
+                subject_id: observation.subject_id,
+                event_type: observation.event_type,
+              },
+              organizationId: location.scope.organization_id,
+              projectId: location.scope.project_id,
+              type: trigger.event_type ?? 'feed',
+              deliveryId: 'information:' + observation.event_id,
+              policy,
+              rootDir: deps.rootDir,
+              now,
+            });
+            if (result.status === 'accepted') ingested++;
+            else if (result.status === 'duplicate') duplicate++;
+            else throw new Error('collector event acceptance failed');
+            recordInformationAssetWakeReference(
+              charter,
+              trigger.source,
+              result.event_id,
+              observation,
+              deps.rootDir
+            );
+          },
+        });
+        state.collection = collection;
+        state.last_poll_at = now.toISOString();
+        state.ingested += ingested;
+        state.duplicates += duplicate;
+        if (collection.status === 'failed' || collection.status === 'full_sync_required') {
+          state = recordFailure(
+            charter,
+            trigger,
+            state,
+            now,
+            collection.reason ?? collection.status
+          );
+        } else {
+          state.seeded_at ??= now.toISOString();
+          state.last_success_at = now.toISOString();
+          state.consecutive_failures = 0;
+          delete state.last_error;
+          delete state.stalled_since;
+          if (collection.status === 'partial') state.capped_polls++;
+        }
+        writeFeedState(charter, state, deps);
+        polls.push({
+          ...base,
+          status:
+            collection.status === 'failed' || collection.status === 'full_sync_required'
+              ? 'failed'
+              : 'polled',
+          observed: collection.accepted_count,
+          ingested,
+          duplicate,
+          below_cursor: 0,
+          truncated: collection.status === 'partial',
+          ...(collection.reason ? { error: collection.reason } : {}),
+        });
+      } catch (error) {
+        const message = boundedError(error);
+        state = recordFailure(charter, trigger, state, now, message);
+        writeFeedState(charter, state, deps);
+        polls.push({
+          ...base,
+          status: 'failed',
+          observed: 0,
+          ingested,
+          duplicate,
+          below_cursor: 0,
+          truncated: false,
+          error: message,
+        });
+      }
       continue;
     }
 
@@ -722,6 +868,7 @@ export function readDotFeedCoverage(
               ? 'baseline established; waiting for new items'
               : `last success ${state.last_success_at}${state.cursor ? ` at cursor ${state.cursor}` : ''}`;
     return {
+      ...(state.collection ? { collection: state.collection } : {}),
       spec_id: state.spec_id,
       source: trigger.source,
       service_id: trigger.service_id,

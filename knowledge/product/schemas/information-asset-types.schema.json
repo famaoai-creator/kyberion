@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["asset_type", "title", "description", "aliases", "default_freshness_seconds"],
+    "properties": {
+      "asset_type": { "type": "string", "minLength": 1 },
+      "title": { "type": "string", "minLength": 1 },
+      "description": { "type": "string", "minLength": 1 },
+      "aliases": {
+        "type": "array",
+        "uniqueItems": true,
+        "items": { "type": "string", "minLength": 1 }
+      },
+      "schema_ref": { "type": "string", "minLength": 1 },
+      "default_freshness_seconds": { "type": "integer", "minimum": 1 }
+    }
+  }
+}
