@@ -1,7 +1,7 @@
 # Kyberion Capabilities Guide
 
 Total Actuators: 37
-Last updated: 2026-11-02
+Last updated: 2026-11-03
 
 This guide is generated from `libs/actuators/*/manifest.json` (actuator table) and `knowledge/product/orchestration/actuator-op-discovery.json` (op tables, sourced from each actuator describeOps). Human-readable counterpart to `global_actuator_index.json`.
 

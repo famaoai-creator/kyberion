@@ -28,11 +28,9 @@ afterAll(() => {
 
 describe('system:shell capture op', () => {
   it("runs the command as a login-shell script in the operator's $SHELL", async () => {
-    // The op-input schema requires `command` while the handler reads `cmd`
-    // (pre-existing), so both are supplied here.
     const result = await opCapture(
       'shell',
-      { command: 'echo hi', cmd: 'echo hi', env: { FOO: 'bar' }, export_as: 'out' },
+      { cmd: 'echo hi', env: { FOO: 'bar' }, export_as: 'out' },
       {},
       (value) => value
     );
