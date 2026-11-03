@@ -91,10 +91,12 @@ function normalizeBranch(raw: unknown): string | undefined {
  */
 function normalizeBranchPattern(raw: unknown): string | undefined {
   if (typeof raw !== 'string') return undefined;
-  const canonical = raw
-    .trim()
-    .replace(/^refs\/heads\//, '')
-    .replace(/\*+$/, '*');
+  let canonical = raw.trim().replace(/^refs\/heads\//, '');
+  // Collapse a trailing wildcard run to one '*' with a linear scan —
+  // a regex quantifier here backtracks on attacker-controlled input.
+  let lastNonWildcard = canonical.length;
+  while (lastNonWildcard > 0 && canonical.charAt(lastNonWildcard - 1) === '*') lastNonWildcard--;
+  if (lastNonWildcard < canonical.length) canonical = `${canonical.slice(0, lastNonWildcard)}*`;
   if (canonical.length < 3 || !canonical.endsWith('*')) return undefined;
   const prefix = canonical.slice(0, -1);
   if (!prefix.endsWith('/') || prefix.includes('*') || /[\s^~:?[\]\\]/.test(prefix))
