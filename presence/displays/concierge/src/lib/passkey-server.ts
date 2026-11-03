@@ -189,6 +189,31 @@ export function reportPasskeyChange(
   }).catch(() => undefined);
 }
 
+/**
+ * Audit and tell the operator that the installation owner confirmed with a
+ * passkey: for five minutes this browser session may change settings of the
+ * whole machine from another device.
+ */
+export function reportInstallationStepUp(
+  member: { decidedBy: string; displayName: string },
+  stepUp: { credentialId: string; expiresAt: string }
+): void {
+  auditChain.record({
+    agentId: member.decidedBy,
+    action: 'passkey',
+    operation: 'installation_step_up',
+    result: 'allowed',
+    reason: 'installation owner confirmed with a passkey for installation-scope changes',
+    metadata: { credentialId: stepUp.credentialId, expiresAt: stepUp.expiresAt },
+  });
+  void notifyOperator('ops_alert', {
+    title: 'Installation settings unlocked',
+    body: `${member.displayName} confirmed with a passkey to change settings of this machine from another device, until ${stepUp.expiresAt}. If this was not you, revoke the passkey in Concierge settings and sign out other sessions.`,
+    link_hint: '/settings',
+    correlation_id: `installation-step-up-${stepUp.credentialId}-${stepUp.expiresAt}`,
+  }).catch(() => undefined);
+}
+
 /** The tenant an approval decision lands on (the member gate checks that membership). */
 export function approvalResourceTenant(record: ApprovalRequestRecord): string | undefined {
   const requesterContext = record.requestedByContext as

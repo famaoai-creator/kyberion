@@ -10,6 +10,9 @@ export interface OperatorServiceDescriptor {
 }
 export type OperatorError =
   | 'local_operator_required'
+  | 'authentication_required'
+  | 'installation_owner_required'
+  | 'installation_step_up_required'
   | 'invalid_request'
   | 'approval_required'
   | 'recovery_required'
@@ -28,6 +31,9 @@ export type OperatorProbe = { serviceId: string; status: OperatorProbeStatus; ch
 const endpoint = '/api/services/operator';
 const errors: readonly string[] = [
   'local_operator_required',
+  'authentication_required',
+  'installation_owner_required',
+  'installation_step_up_required',
   'invalid_request',
   'approval_required',
   'recovery_required',

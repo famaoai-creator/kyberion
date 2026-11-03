@@ -1032,6 +1032,15 @@
       "documented": true
     },
     {
+      "name": "KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK",
+      "category": "flag",
+      "type": "boolean",
+      "required": false,
+      "description": "Default off. Escape hatch for headless automation: keep a credential-less loopback request to Concierge acting as the local operator (localadmin, installation-scope access) even after an installation owner is bound. Any local process or OS user then reaches installation settings without signing in; a warning is logged while it is on. See knowledge/product/governance/installation-owner-authorization.md.",
+      "documented": true,
+      "subsystem": "surfaces"
+    },
+    {
       "name": "KYBERION_CONFIDENTIAL_OPERATOR_LEARNING_DISPATCH_REGISTRY_PATH",
       "category": "path",
       "type": "path",

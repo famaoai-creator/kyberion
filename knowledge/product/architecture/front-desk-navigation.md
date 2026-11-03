@@ -1,7 +1,7 @@
 ---
 title: 'Existing front-desk navigation'
 tags: [surface, navigation, authorization, user-experience]
-last_updated: 2026-10-12
+last_updated: 2026-11-04
 role_affinity: [ecosystem_architect]
 ---
 
@@ -11,32 +11,36 @@ The shared catalog in [front-desk-nav.ts](../../../libs/core/front-desk-nav.ts) 
 
 ## Destination inventory
 
-| Group                  | Destination       | Existing route                    | Minimum navigation role |
-| ---------------------- | ----------------- | --------------------------------- | ----------------------- |
-| Work                   | Home              | Presence Studio /                 | viewer                  |
-| Work                   | Ask               | Presence Studio /ask              | approver                |
-| Work                   | Decisions         | Concierge /                       | approver                |
-| Work                   | Progress          | Presence Studio /progress         | viewer                  |
-| Work                   | Workspace         | Presence Studio /work             | viewer                  |
-| Work                   | Missions          | Chronos /?section=missions        | viewer                  |
-| Work                   | Work items        | Chronos /?section=work-items      | operator                |
-| Materials and learning | Deliverables      | Chronos /?section=deliverables    | viewer                  |
-| Materials and learning | Import materials  | Concierge /ingest                 | operator                |
-| Materials and learning | Knowledge         | Chronos /?section=knowledge       | viewer                  |
-| Materials and learning | Discussion        | Chronos /?section=discussion      | viewer                  |
-| Materials and learning | First job         | Presence Studio /first-job        | approver                |
-| Materials and learning | Help and training | Presence Studio /help             | viewer                  |
-| Management             | Organization      | Chronos /?section=organization    | owner                   |
-| Management             | Agent operations  | Chronos /?section=operations      | owner                   |
-| Management             | Surface controls  | Chronos /?section=surface-control | owner                   |
-| Management             | Diagnostics       | Chronos /?section=diagnostics     | owner                   |
-| Management             | Settings          | Concierge /settings               | owner                   |
+| Group                  | Destination         | Existing route                    | Minimum navigation role |
+| ---------------------- | ------------------- | --------------------------------- | ----------------------- |
+| Work                   | Inbox               | Concierge /                       | approver                |
+| Work                   | Ask                 | Presence Studio /ask              | approver                |
+| Work                   | Missions            | Concierge /w/mission              | viewer                  |
+| Work                   | Work items          | Concierge /w/work_item            | viewer                  |
+| Work                   | Approvals           | Concierge /w/approval             | viewer                  |
+| Organization           | Overview            | Concierge /w                      | viewer                  |
+| Organization           | Organizations       | Concierge /w/organization         | viewer                  |
+| Organization           | Projects            | Concierge /w/project              | viewer                  |
+| Organization           | People and agents   | Concierge /w/actor                | viewer                  |
+| Materials and learning | Deliverables        | Chronos /?section=deliverables    | viewer                  |
+| Materials and learning | Import materials    | Concierge /ingest                 | operator                |
+| Materials and learning | Knowledge           | Chronos /?section=knowledge       | viewer                  |
+| Materials and learning | Discussion          | Chronos /?section=discussion      | viewer                  |
+| Materials and learning | First job           | Presence Studio /first-job        | approver                |
+| Materials and learning | Help and training   | Presence Studio /help             | viewer                  |
+| Management             | Organization editor | Concierge /management             | owner                   |
+| Management             | Agent operations    | Chronos /?section=operations      | owner                   |
+| Management             | Surface controls    | Chronos /?section=surface-control | owner                   |
+| Management             | Diagnostics         | Chronos /?section=diagnostics     | owner                   |
+| Management             | Settings            | Concierge /settings               | owner                   |
+
+The Concierge workspace pages (`/w`, `/w/<kind>`, `/w/<kind>/<id>`) read the one workspace graph (`libs/core/surface/workspace-graph.ts`) through `/api/v1/workspace/*`, so every entity shows its lineage (company › organization › project › mission), its contents and the people and agents on it. Presence Studio Home (`/`), Progress (`/progress`) and the legacy `/work` page still exist but are no longer rail entries; Home and Progress stay resolvable for deep links through `FRONT_DESK_LINKED_DESTINATIONS` / `resolveFrontDeskDestination`.
 
 Settings retains its nine existing sections: profile, display, members, services, voice, notifications, recording consent, plugins and advanced settings. Service registration remains under Services. The workspace retains its existing conversation, voice, mail, notification, outcome and browser panels. Contextual mission/detail links stay contextual; redirects, sign-in/join flows and internal API endpoints are not separate feature menu entries.
 
 ## Availability is not authorization
 
-The nine Chronos entries require an enabled registry definition, a valid matching local browser origin and a successful bounded health request to that exact origin. Redirects, missing configuration, timeouts and unknown health omit those optional links. No service is started to assemble a menu. Remote-only deployments are conservatively omitted because local health is not evidence that a remote browser URL is reachable.
+The Chronos entries require an enabled registry definition, a valid matching local browser origin and a successful bounded health request to that exact origin. Redirects, missing configuration, timeouts and unknown health omit those optional links. No service is started to assemble a menu. Remote-only deployments are conservatively omitted because local health is not evidence that a remote browser URL is reachable.
 
 The Operator surface is deliberately not linked from this tenant-scoped menu: its current UI reads a process-bound tenant, not the selected tenant URL parameter. Its existing standalone navigation is unchanged. A future shortcut must first provide an explicit scope-preserving destination.
 

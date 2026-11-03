@@ -130,7 +130,6 @@ function harness(
 }
 describe('shipped grouped front-desk rail client', () => {
   it.each([
-    ['/work', 'workspace'],
     ['/first-job', 'first-job'],
     ['/help/owner', 'help'],
   ])('marks %s from the route rather than a stale home hint', async (path, id) => {
@@ -142,7 +141,8 @@ describe('shipped grouped front-desk rail client', () => {
     expect(
       items.every((item) => item.group_label && item.icon && item.href.includes('tenant=alpha'))
     ).toBe(true);
-    expect(items.find((item) => item.id === 'missions').href).toContain('section=missions');
+    expect(items.find((item) => item.id === 'deliverables').href).toContain('section=deliverables');
+    expect(items.find((item) => item.id === 'missions').href).toContain('/w/mission');
   });
   it('fails closed for denied and unknown allowed values, without duplicate help', async () => {
     const h = harness('/work');
@@ -150,7 +150,7 @@ describe('shipped grouped front-desk rail client', () => {
     (h.menu[1] as { allowed?: boolean }).allowed = undefined;
     await h.mount();
     const items = h.rendered.at(-1)!.components[0].props.items;
-    expect(items.some((item) => item.id === 'home' || item.id === 'ask')).toBe(false);
+    expect(items.some((item) => item.id === 'decide' || item.id === 'ask')).toBe(false);
     expect(items.filter((item) => item.id === 'help')).toHaveLength(1);
     expect(h.rendered.at(-1)!.components[0].props.footer_items).toBeUndefined();
   });

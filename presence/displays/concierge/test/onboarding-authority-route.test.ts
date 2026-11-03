@@ -4,10 +4,14 @@ import * as path from 'node:path';
 import { safeReadFile, safeWriteFile } from '@agent/core/secure-io';
 import { useOnboardingAuthorityFixture } from '../../../../tests/helpers/onboarding-authority-fixture.js';
 import type { ConciergeViewerContext } from '../src/lib/viewer-context';
-const transport = vi.hoisted(() => ({ resolve: vi.fn() }));
+import { humanActor } from '@agent/core/actor';
+const transport = vi.hoisted(() => ({ resolve: vi.fn(), loopback: true }));
 // Authentication transport/CSRF only. Actual profiles, owner adapter, facade,
 // approval signatures, separation of duties and charter persistence are retained.
 vi.mock('../src/lib/api-guard', () => ({ requireConciergeMutationAccess: () => null }));
+// The adapter-attested transport: the owner is at the machine unless a test
+// says otherwise (a remote owner write then needs a passkey step-up).
+vi.mock('../src/lib/loopback-peer', () => ({ isLoopbackPeer: () => transport.loopback }));
 vi.mock('../src/lib/viewer-context', () => ({
   resolveConciergeViewer: transport.resolve,
   conciergeErrorResponse: (error: unknown, status = 500) =>
@@ -22,6 +26,7 @@ beforeAll(async () => {
   decisions = await import('../src/app/api/approvals/[id]/route');
 }, 60000);
 beforeEach(() => {
+  transport.loopback = true;
   viewer = { ...f.viewer.scope, principal: f.viewer.principal };
   transport.resolve.mockImplementation(() => ({ context: viewer }));
 });
@@ -154,9 +159,42 @@ describe('onboarding authority HTTP owner contract with actual stores', () => {
       ).status
     ).not.toBe(200);
   });
-  it('denies readonly and unrelated tenant viewers and unknown approval fields', async () => {
-    viewer = { ...viewer, role: 'readonly' };
-    expect((await posted({ ...f.input(), action: 'preview' })).response.status).toBe(403);
+  it('needs a passkey step-up for a remote owner to request or apply, not to review', async () => {
+    const id = await create();
+    transport.loopback = false;
+    expect(
+      (await posted({ action: 'status', scope_kind: 'person', request_id: id })).response.status
+    ).toBe(200);
+    expect((await posted({ ...f.input(), action: 'preview' })).response.status).toBe(200);
+    const remote = await posted({ action: 'apply', scope_kind: 'person', request_id: id });
+    expect(remote.response.status).toBe(403);
+    expect(remote.body).toMatchObject({ ok: false, error: 'installation_step_up_required' });
+    // Deciding the personal-scope card is an installation write as well.
+    const status = await posted({ action: 'status', scope_kind: 'person', request_id: id });
+    const decided = await decisions.POST(
+      request({
+        decision: 'approved',
+        channel: 'onboarding-authority',
+        storageChannel: 'onboarding-authority',
+        presentedDigest: status.body.presented_digest,
+      }),
+      { params: Promise.resolve({ id }) }
+    );
+    expect(decided.status).toBe(403);
+    expect(await decided.json()).toMatchObject({ error: 'installation_step_up_required' });
+  });
+  it('denies another member and unrelated tenant viewers and unknown approval fields', async () => {
+    // Personal scope is the installation owner's identity, not a role: an
+    // approver member (even a localadmin one) is refused with a stable code.
+    viewer = {
+      ...viewer,
+      memberId: 'approver-a',
+      principal: { ...viewer.principal!, actor: humanActor('approver-a'), memberId: 'approver-a' },
+    };
+    const other = await posted({ ...f.input(), action: 'preview' });
+    expect(other.response.status).toBe(403);
+    expect(other.body).toMatchObject({ error: 'installation_owner_required' });
+    viewer = { ...f.viewer.scope, principal: f.viewer.principal };
     viewer = { ...viewer, role: 'localadmin', tenantSlugs: ['unrelated'] };
     expect(
       (

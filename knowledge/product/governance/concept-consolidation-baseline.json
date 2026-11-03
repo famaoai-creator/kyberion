@@ -1194,6 +1194,9 @@
     "presence/displays/concierge/src/lib/scim-server.ts": {
       "rate_limiter_impl_budget": 1
     },
+    "presence/displays/concierge/src/lib/setup-state.ts": {
+      "env_direct_read_budget": 2
+    },
     "presence/displays/concierge/src/lib/viewer-context.ts": {
       "env_direct_read_budget": 1,
       "rate_limiter_impl_budget": 2

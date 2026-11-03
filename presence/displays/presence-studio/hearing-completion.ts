@@ -9,7 +9,7 @@ import {
   loadWorkInventoryEntry,
   workInventoryScopeKey,
 } from '@agent/core/workforce/work-inventory';
-import { resolveFrontDeskMenu, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
+import { resolveFrontDeskDestination, readFrontDeskSurfaceUrls } from '@agent/core/front-desk-nav';
 import {
   presenceStudioRecordInScope,
   toFrontDeskViewerScope,
@@ -51,11 +51,11 @@ function completionHref(
   kind: HearingCompletion['kind'],
   viewer: PresenceStudioViewerContext
 ): string | undefined {
-  const item = resolveFrontDeskMenu({
+  const item = resolveFrontDeskDestination(kind === 'mission' ? 'decide' : 'progress', {
     currentSurface: 'presence-studio',
     urls: readFrontDeskSurfaceUrls(),
     role: frontDeskRoleFromViewerScope(toFrontDeskViewerScope(viewer)),
-  }).find((candidate) => candidate.id === (kind === 'mission' ? 'decide' : 'progress'));
+  });
   if (!item?.allowed) return undefined;
 
   const scope = toFrontDeskViewerScope(viewer);

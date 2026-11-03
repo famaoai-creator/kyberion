@@ -60,7 +60,11 @@ export interface PasskeyPendingRegistration {
   step_up_token_hash?: string;
 }
 
-export type PasskeyStepUpPurpose = 'enroll' | 'revoke';
+/**
+ * `installation`: confirm the installation owner for a change to settings of
+ * the whole machine from a non-loopback browser (installation-step-up.ts).
+ */
+export type PasskeyStepUpPurpose = 'enroll' | 'revoke' | 'installation';
 
 /** A step-up assertion in progress: one purpose, one member, single use. */
 export interface PasskeyPendingStepUp {
@@ -77,6 +81,19 @@ export interface PasskeyPendingStepUp {
   token_hash?: string;
 }
 
+/**
+ * The member's most recent verified `installation` step-up, bound to the
+ * browser session that ran it (installation-step-up.ts). One record: a new
+ * confirmation replaces the previous one.
+ */
+export interface PasskeyInstallationStepUp {
+  /** sha256 (base64url) of the session binding the confirming browser presented. */
+  session_hash: string;
+  verified_at: string;
+  /** The usable passkey that confirmed it. */
+  credential_id: string;
+}
+
 export interface PasskeyCredentialFile {
   version: 1;
   member_id: string;
@@ -85,6 +102,7 @@ export interface PasskeyCredentialFile {
   credentials: PasskeyCredential[];
   pending_registration?: PasskeyPendingRegistration;
   pending_step_up?: PasskeyPendingStepUp;
+  installation_step_up?: PasskeyInstallationStepUp;
 }
 
 /** What a listing shows — never the public key. */
@@ -142,7 +160,9 @@ function isCredential(value: unknown): value is PasskeyCredential {
 function isPendingStepUp(value: unknown): boolean {
   return (
     isRecord(value) &&
-    (value.purpose === 'enroll' || value.purpose === 'revoke') &&
+    (value.purpose === 'enroll' ||
+      value.purpose === 'revoke' ||
+      value.purpose === 'installation') &&
     (value.target === undefined || typeof value.target === 'string') &&
     typeof value.nonce === 'string' &&
     typeof value.challenge === 'string' &&
@@ -154,6 +174,7 @@ function isPendingStepUp(value: unknown): boolean {
 function assertFileShape(value: unknown, memberId: string): asserts value is PasskeyCredentialFile {
   const pending = isRecord(value) ? value.pending_registration : undefined;
   const stepUp = isRecord(value) ? value.pending_step_up : undefined;
+  const installation = isRecord(value) ? value.installation_step_up : undefined;
   const ok =
     isRecord(value) &&
     value.version === 1 &&
@@ -166,7 +187,12 @@ function assertFileShape(value: unknown, memberId: string): asserts value is Pas
       (isRecord(pending) &&
         typeof pending.challenge === 'string' &&
         typeof pending.expires_at === 'string')) &&
-    (stepUp === undefined || isPendingStepUp(stepUp));
+    (stepUp === undefined || isPendingStepUp(stepUp)) &&
+    (installation === undefined ||
+      (isRecord(installation) &&
+        typeof installation.session_hash === 'string' &&
+        typeof installation.verified_at === 'string' &&
+        typeof installation.credential_id === 'string'));
   if (!ok) throw new Error(`[passkey-store] passkey file for member '${memberId}' is malformed`);
 }
 

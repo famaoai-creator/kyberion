@@ -14,11 +14,15 @@ import {
   onboardingAuthorityPrincipal,
 } from '../../../lib/onboarding-authority-server';
 import { readRequestObject } from '../../../lib/request-input';
+import { requireConciergeInstallationAccess } from '../../../lib/installation-access';
 export const dynamic = 'force-dynamic';
 const response = (value: unknown, status = 200) =>
   NextResponse.json(value, { status, headers: { 'Cache-Control': 'no-store' } });
 function failure(error: unknown) {
   const message = error instanceof Error ? error.message : 'onboarding_authority_unavailable';
+  if (message === 'authentication_required') return response({ ok: false, error: message }, 401);
+  if (message === 'installation_owner_required' || message === 'installation_step_up_required')
+    return response({ ok: false, error: message, error_code: message }, 403);
   const requiredAt = message.indexOf('required');
   const denied =
     ['owner', 'outside', 'member'].some((part) => message.includes(part)) ||
@@ -64,6 +68,17 @@ export async function POST(req: NextRequest) {
     const { action, digest, base_hash, request_id, ...input } = parsed.body;
     const scope = onboardingAuthorityScope(input);
     const principal = onboardingAuthorityPrincipal(resolved.context, scope);
+    // The personal scope is installation scope: requesting or applying a
+    // change needs the installation write gate (loopback or passkey step-up).
+    if (scope.kind === 'person' && (action === 'request' || action === 'apply')) {
+      const gate = requireConciergeInstallationAccess(
+        resolved.context,
+        'write',
+        req,
+        `onboarding_authority ${action}`
+      );
+      if (gate.response) return gate.response;
+    }
     const result = asOnboardingOwner(() => {
       if (action === 'preview') return previewOnboardingAuthority(principal, input);
       if (action === 'request') {

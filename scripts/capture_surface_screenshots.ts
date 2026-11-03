@@ -23,6 +23,10 @@
  * knowledge/product/governance/active-surfaces.json for how each one is
  * normally launched). Concierge must use its local:start/local:dev adapter;
  * its real loopback peer is proven server-side, without supplied IP headers.
+ * Once an installation owner is bound, credential-less loopback is no longer
+ * Concierge's local operator: start Concierge with
+ * KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK=1 for the capture run (see
+ * knowledge/product/governance/installation-owner-authorization.md).
  * Other legacy surfaces that gate on loopback-only access currently require:
  *   - env KYBERION_TRUST_PROXY=1 on the surface process
  *   - the `x-real-ip: 127.0.0.1` header (set below only for those surfaces)

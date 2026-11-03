@@ -102,7 +102,23 @@ export function currentItemId(pathname: string | null): FrontDeskNavItemPayload[
   if (pathname === '/setup/first-run') return null;
   if (pathname === '/setup' || pathname?.startsWith('/setup/') || pathname === '/settings')
     return 'settings';
-  return null;
+  return workspaceItemId(pathname);
+}
+
+/** `/w/<kind>[/<id>]` marks the rail entry for that kind; tasks belong to missions. */
+const WORKSPACE_RAIL_IDS: Record<string, string> = {
+  organization: 'organizations',
+  project: 'projects',
+  mission: 'missions',
+  task: 'missions',
+  work_item: 'work-items',
+  approval: 'approvals',
+  actor: 'actors',
+};
+function workspaceItemId(pathname: string | null): string | null {
+  if (pathname !== '/w' && !pathname?.startsWith('/w/')) return null;
+  const kind = pathname.split('/')[2];
+  return kind ? (WORKSPACE_RAIL_IDS[kind] ?? 'overview') : 'overview';
 }
 
 export function FrontDeskRail() {

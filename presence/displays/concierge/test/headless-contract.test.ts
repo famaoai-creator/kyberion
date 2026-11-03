@@ -1,5 +1,15 @@
 import { describe, expect, it, vi, afterEach } from 'vitest';
 import { NextRequest } from 'next/server';
+
+const bootstrap = vi.hoisted(() => ({ open: true }));
+vi.mock('@agent/core/surface/first-run-setup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/surface/first-run-setup')>()),
+  readFirstRunStatus: () => ({
+    state: bootstrap.open ? 'unclaimed' : 'claimed',
+    code_active: false,
+  }),
+}));
+import { resetInstallationBootstrapCache } from '@agent/core/surface/installation-owner-access';
 import {
   buildConciergeHeadlessManifest,
   buildConciergeHomeA2UI,
@@ -8,14 +18,21 @@ import { resolveConciergeViewerContext } from '../src/lib/viewer-context';
 import { withLocalPeerRequest } from './local-peer-fixture';
 
 describe('Concierge headless boundary', () => {
-  afterEach(() => vi.unstubAllEnvs());
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    bootstrap.open = true;
+    resetInstallationBootstrapCache();
+  });
 
   it('publishes a read-only home resource with an A2UI projection', () => {
     const manifest = buildConciergeHeadlessManifest();
     expect(manifest.surface).toBe('concierge');
-    expect(manifest.resources).toEqual([
-      expect.objectContaining({ resource: 'home', a2ui_path: '/api/headless/a2ui/home' }),
-    ]);
+    expect(manifest.resources).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ resource: 'home', a2ui_path: '/api/headless/a2ui/home' }),
+        expect.objectContaining({ resource: 'settings', a2ui_path: '/api/headless/a2ui/settings' }),
+      ])
+    );
     expect(
       manifest.operations.find((operation) => operation.operation_id.endsWith('.a2ui'))
         ?.input_schema.properties
@@ -49,6 +66,24 @@ describe('Concierge headless boundary', () => {
       resolveConciergeViewerContext
     );
     expect(local).toMatchObject({ role: 'localadmin', source: 'loopback', tenantSlugs: 'all' });
+
+    // Once an owner is bound, a credential-less loopback client must sign in
+    // (headless automation authenticates, or opts into the escape hatch).
+    bootstrap.open = false;
+    resetInstallationBootstrapCache();
+    expect(() =>
+      withLocalPeerRequest(
+        new NextRequest('http://localhost:3033/api/headless/manifest'),
+        resolveConciergeViewerContext
+      )
+    ).toThrow(/viewer principal/);
+    vi.stubEnv('KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK', '1');
+    expect(
+      withLocalPeerRequest(
+        new NextRequest('http://localhost:3033/api/headless/manifest'),
+        resolveConciergeViewerContext
+      )
+    ).toMatchObject({ role: 'localadmin', source: 'loopback' });
 
     expect(() =>
       resolveConciergeViewerContext(

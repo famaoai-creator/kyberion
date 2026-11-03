@@ -426,6 +426,182 @@ export async function applyBrowserOnboarding(input: unknown): Promise<{
   );
 }
 
+/**
+ * A settings save carries only the fields the operator edited. Everything not
+ * named here (language, interaction style, provider priority, tool policy,
+ * reasoning, adapter defaults, the agent's provider/model, a voice profile's
+ * engine) is left exactly as stored — unlike `applyBrowserOnboarding`, which
+ * replaces the whole onboarding draft and is reserved for the onboarding flow.
+ */
+const settingsPatchSchema = z
+  .object({
+    identity: z
+      .object({
+        name: identitySchema.shape.name.optional(),
+        primary_domain: z.string().trim().max(200).optional(),
+        vision: z.string().trim().max(4000).optional(),
+        agent_id: identitySchema.shape.agent_id.optional(),
+      })
+      .strict()
+      .optional(),
+    services: z.array(serviceSchema).max(16).optional(),
+    voice: z
+      .object({
+        profile_id: z
+          .string()
+          .trim()
+          .regex(/^[a-z][a-z0-9-]{2,63}$/),
+        display_name: z.string().trim().min(1).max(120),
+        sample_refs: z.array(z.string().trim().min(1)).min(1).max(3),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (!value.identity && !value.services && !value.voice) {
+      context.addIssue({ code: 'custom', message: 'settings patch names no setting' });
+    }
+    if (
+      value.services &&
+      new Set(value.services.map((entry) => entry.service_id)).size !== value.services.length
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['services'],
+        message: 'services contain duplicates',
+      });
+    }
+  });
+
+export type BrowserOnboardingSettingsPatch = z.infer<typeof settingsPatchSchema>;
+
+const DEFAULT_AGENT_ID = 'sovereign-agent';
+const DEFAULT_VOICE_ENGINE_ID = 'mlx_audio_qwen3';
+
+/** Merge an edited-fields-only settings patch onto the currently stored profile. */
+export async function applyBrowserOnboardingSettingsPatch(input: unknown): Promise<{
+  ok: true;
+  applied_at: string;
+  artifacts: string[];
+  warnings: string[];
+}> {
+  const patch = settingsPatchSchema.parse(input);
+  if (patch.voice) assertVoiceSampleRefs(patch.voice.sample_refs);
+
+  return withLock('browser-onboarding-apply', async () =>
+    withExecutionContext(
+      'sovereign_concierge',
+      () => {
+        const now = nowIso();
+        const artifacts: string[] = [];
+        const { agent_id: agentIdPatch, ...profileFields } = patch.identity ?? {};
+
+        const identityPath = path.join(profileRoot(), 'my-identity.json');
+        const existingIdentity = loadPersonalIdentityAtPath(identityPath) || {};
+        const identity: Record<string, unknown> = { ...existingIdentity, ...profileFields };
+        if (Object.keys(profileFields).length) {
+          writePersonalIdentityAtPath(identityPath, { ...identity, updated_at: now });
+          artifacts.push(identityPath);
+        }
+        if (profileFields.vision !== undefined) {
+          const visionPath = assertSafeRepositoryPath(path.join(profileRoot(), 'my-vision.md'), {
+            allowMissingLeaf: true,
+          });
+          safeWriteFile(visionPath, `# Sovereign Vision\n\n${profileFields.vision}\n`);
+          artifacts.push(visionPath);
+        }
+
+        // The agent record also carries Advanced-settings fields (display
+        // name, provider, model); only the handle itself is patched here. A
+        // first save creates the record with the handle the page displays.
+        const agentPath = path.join(profileRoot(), 'agent-identity.json');
+        const existingAgent = loadPersonalAgentIdentityAtPath(agentPath);
+        const agentId = agentIdPatch ?? String(existingAgent?.agent_id || DEFAULT_AGENT_ID);
+        if (!existingAgent || existingAgent.agent_id !== agentId) {
+          const tenantSlug =
+            typeof identity.tenant_slug === 'string' ? identity.tenant_slug : undefined;
+          const ensuredAgent = ensureAgentIdentityBestEffort({
+            ...onboardingAgentIdentityParameters(agentId, ownerAccountableHumanId()),
+            displayName: String(identity.name || agentId),
+            accountableHumanId: ownerAccountableHumanId(),
+            ...(tenantSlug ? { affiliation: { tenant_slug: tenantSlug } } : {}),
+          });
+          if (
+            ensuredAgent.record &&
+            ensuredAgent.record.accountable_human_id !== ownerAccountableHumanId()
+          )
+            throw new Error('Installed agent accountability mismatch.');
+          // A new handle must not keep the previous handle's durable NHI link.
+          const { nhi_id: _previousNhiId, ...keptAgent } = existingAgent || {};
+          writePersonalAgentIdentityAtPath(agentPath, {
+            version: '1.0.0',
+            role: 'Ecosystem Architect / Senior Partner',
+            owner: String(identity.name || 'user'),
+            trust_tier: 'sovereign',
+            created_at: now,
+            ...keptAgent,
+            agent_id: agentId,
+            ...(ensuredAgent.nhi_id ? { nhi_id: ensuredAgent.nhi_id } : {}),
+            updated_at: now,
+          });
+          artifacts.push(agentPath);
+        }
+
+        if (patch.voice) {
+          const voicePath = path.join(profileRoot(), 'voice', 'profile-registry.json');
+          const current: VoiceProfileRegistry = safeExistsSync(voicePath)
+            ? loadVoiceProfileRegistryAtPath(voicePath, { allowEmpty: true })
+            : { version: '1.0.0', default_profile_id: '', profiles: [] };
+          const profiles = new Map(
+            current.profiles.map((profile) => [profile.profile_id, profile])
+          );
+          // An existing profile keeps its engine, languages and tier.
+          profiles.set(patch.voice.profile_id, {
+            tier: 'personal',
+            languages: [String(identity.language || 'ja')],
+            default_engine_id: DEFAULT_VOICE_ENGINE_ID,
+            notes: 'Registered through Browser Onboarding Studio',
+            ...profiles.get(patch.voice.profile_id),
+            profile_id: patch.voice.profile_id,
+            display_name: patch.voice.display_name,
+            sample_refs: patch.voice.sample_refs,
+            status: 'active',
+          });
+          writeVoiceProfileRegistry(
+            {
+              ...current,
+              default_profile_id: patch.voice.profile_id,
+              profiles: [...profiles.values()],
+            },
+            voicePath
+          );
+          resetVoiceProfileRegistryCache();
+          artifacts.push(voicePath);
+        }
+
+        // The receipt keeps every projection it already held; only the
+        // patched ones move. A settings save also completes onboarding.
+        const statePath = onboardingPath('browser-onboarding-state.json');
+        const currentState = loadBrowserOnboardingStateAtPath(statePath);
+        writeBrowserOnboardingStateAtPath(statePath, {
+          ...currentState,
+          version: '1.0.0',
+          status: 'complete',
+          applied_at: now,
+          identity: { ...(currentState?.identity || {}), ...profileFields, agent_id: agentId },
+          services: patch.services ?? currentState?.services ?? [],
+          ...(patch.voice ? { voice_profile_id: patch.voice.profile_id } : {}),
+          artifacts: [...artifacts],
+        });
+        artifacts.push(statePath);
+        return { ok: true as const, applied_at: now, artifacts, warnings: [] };
+      },
+      'sovereign'
+    )
+  );
+}
+
 export function saveBrowserOnboardingVoiceSample(input: {
   profileId: string;
   contentType: string;
