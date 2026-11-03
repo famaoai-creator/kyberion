@@ -51,16 +51,25 @@ export function entryExists(p: string): boolean {
   const candidate = path.resolve(p);
   const logicalRoot = path.resolve(pathResolver.rootDir());
   const physicalRoot = realRoot().real;
+  const primaryLogical = path.resolve(pathResolver.primaryCheckoutRootDir());
+  const primaryReal = realPrimaryRoot().real;
   let stat: fs.Stats | undefined;
   try {
     // Each probe sits behind its own containment check on the probed value.
+    // The primary-authority branch keeps the startsWith prefix literal in
+    // the guard (CodeQL sanitizer shape) and adds the authority-subtree
+    // restriction as a second conjunct.
     if (candidate === logicalRoot) stat = fs.lstatSync(logicalRoot);
     else if (candidate === physicalRoot) stat = fs.lstatSync(physicalRoot);
     else if (candidate.startsWith(logicalRoot + path.sep))
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else if (candidate.startsWith(physicalRoot + path.sep))
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
-    else if (insidePrimaryAuthority(candidate) !== undefined)
+    else if (
+      (candidate.startsWith(primaryLogical + path.sep) ||
+        candidate.startsWith(primaryReal + path.sep)) &&
+      insidePrimaryAuthority(candidate) !== undefined
+    )
       stat = fs.lstatSync(candidate, { throwIfNoEntry: false });
     else throw Object.assign(new Error('path is outside the repository'), { code: 'EOUTSIDE' });
   } catch (error) {
@@ -254,7 +263,12 @@ function onDiskLeaf(realDir: string, leaf: string): string {
   let candidate: string | undefined;
   if (joined.startsWith(path.resolve(pathResolver.rootDir()) + path.sep)) candidate = joined;
   else if (joined.startsWith(realRoot().real + path.sep)) candidate = joined;
-  else if (insidePrimaryAuthority(joined) !== undefined) candidate = joined;
+  else if (
+    (joined.startsWith(path.resolve(pathResolver.primaryCheckoutRootDir()) + path.sep) ||
+      joined.startsWith(realPrimaryRoot().real + path.sep)) &&
+    insidePrimaryAuthority(joined) !== undefined
+  )
+    candidate = joined;
   if (candidate === undefined) return leaf;
   let stat: fs.Stats | undefined;
   try {
@@ -325,7 +339,12 @@ function physicalPath(absPath: string, hops = 0): string {
     let linkText: string;
     if (link.startsWith(logicalRoot + path.sep)) linkText = fs.readlinkSync(link);
     else if (link.startsWith(physicalRoot + path.sep)) linkText = fs.readlinkSync(link);
-    else if (insidePrimaryAuthority(link) !== undefined) linkText = fs.readlinkSync(link);
+    else if (
+      (link.startsWith(path.resolve(pathResolver.primaryCheckoutRootDir()) + path.sep) ||
+        link.startsWith(realPrimaryRoot().real + path.sep)) &&
+      insidePrimaryAuthority(link) !== undefined
+    )
+      linkText = fs.readlinkSync(link);
     else
       throw Object.assign(new Error('dangling link outside the repository'), { code: 'EOUTSIDE' });
     const parentReal = fs.realpathSync.native(path.dirname(link));
