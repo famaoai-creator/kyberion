@@ -29,6 +29,9 @@
       "json_state_write_budget": 3,
       "exported_type_name_duplication_budget": 1
     },
+    "libs/actuators/code-actuator/src/retained-result.ts": {
+      "json_state_write_budget": 1
+    },
     "libs/actuators/compute-actuator/src/colab-compute-driver.ts": {
       "json_state_write_budget": 1
     },

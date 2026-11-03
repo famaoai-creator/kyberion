@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   safeExec: vi.fn().mockReturnValue(''),
   logger: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn(), success: vi.fn() },
   rootDir: vi.fn().mockReturnValue('/mock/root'),
+  runGovernedCommand: vi.fn(),
   // Real secure-io's `safeReadFile` calls `pathResolver.resolve(filePath)`
   // unconditionally, including for paths this test has already resolved to
   // absolute (e.g. via `resolveCodeRepositoryPath`/`assertSafeRepositoryPath`
@@ -113,6 +114,11 @@ vi.mock('@agent/core/path-resolver', async (importOriginal) => {
 vi.mock('@agent/core/fs-utils', () => ({
   getAllFiles: vi.fn().mockReturnValue([]),
 }));
+
+vi.mock('@agent/core/command-runner', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@agent/core/command-runner')>();
+  return { ...actual, runGovernedCommand: mocks.runGovernedCommand };
+});
 
 describe('code-actuator', () => {
   beforeEach(async () => {
@@ -506,6 +512,128 @@ describe('code-actuator', () => {
           expect(prompt).toHaveBeenCalledWith(expect.stringContaining('Add a flag'));
         } finally {
           vi.doUnmock('@agent/core/reasoning/reasoning-backend');
+        }
+      });
+
+      it('impact_analysis reports confidence, limitations, and unknowns', async () => {
+        const { safeExistsSync } = await import('@agent/core/secure-io');
+        const { getAllFiles } = await import('@agent/core/fs-utils');
+        vi.mocked(safeExistsSync).mockReturnValue(true);
+        vi.mocked(getAllFiles).mockReturnValue(
+          Array.from({ length: 405 }, (_, i) => `/mock/root/repo/src/f${i}.ts`)
+        );
+        vi.doMock('@agent/core/reasoning/reasoning-backend', () => ({
+          getReasoningBackend: () => ({
+            prompt: vi.fn(async () => '{"summary":"s","files":[],"risks":[],"size":"S"}'),
+          }),
+        }));
+        try {
+          const result = await handleAction({
+            action: 'pipeline',
+            steps: [
+              {
+                type: 'transform',
+                op: 'impact_analysis',
+                params: { repo_path: 'active/shared/tmp/repo', requirements: 'r' },
+              },
+            ],
+          });
+          expect(result.status).toBe('succeeded');
+          const analysis = result.context.impact_analysis as Record<string, unknown>;
+          expect(analysis.confidence).toBe('inferred');
+          expect(analysis.authority).toBe('analyst-inference');
+          expect(analysis.limitations).toEqual(
+            expect.arrayContaining([
+              expect.stringContaining('truncated to 400 of 405'),
+              expect.stringContaining('reasoning-backend'),
+            ])
+          );
+          expect(analysis.unknowns.length).toBeGreaterThan(0);
+        } finally {
+          vi.doUnmock('@agent/core/reasoning/reasoning-backend');
+          vi.mocked(getAllFiles).mockReturnValue([]);
+        }
+      });
+
+      it('semgrep_scan reports observed confidence and surfaces scan errors as limitations', async () => {
+        const { safeExistsSync } = await import('@agent/core/secure-io');
+        vi.mocked(safeExistsSync).mockReturnValue(true);
+        mocks.runGovernedCommand.mockReturnValue({
+          status: 0,
+          stdout: JSON.stringify({
+            results: [{ check_id: 'rule-1', path: 'src/a.ts' }],
+            errors: [{ message: 'partial parse failure in src/b.ts' }],
+          }),
+          stderr: '',
+        });
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [
+            {
+              type: 'capture',
+              op: 'semgrep_scan',
+              params: { target_dir: 'libs', config: 'p/security-audit' },
+            },
+          ],
+        });
+        expect(result.status).toBe('succeeded');
+        const findings = result.context.semgrep_findings as Record<string, unknown>;
+        expect(findings.confidence).toBe('observed');
+        expect(findings.authority).toBe('shipped-artifact');
+        expect(findings.results).toEqual([{ check_id: 'rule-1', path: 'src/a.ts' }]);
+        expect(findings.limitations).toEqual(
+          expect.arrayContaining([expect.stringContaining('partial parse failure')])
+        );
+        expect(findings.unknowns).toEqual([]);
+      });
+
+      it('run_tests reports observed evidence with exit-code-derived status as an unknown', async () => {
+        const { safeExistsSync } = await import('@agent/core/secure-io');
+        vi.mocked(safeExistsSync).mockReturnValue(true);
+        mocks.runGovernedCommand.mockReturnValue({
+          status: 0,
+          stdout: '1 test passed',
+          stderr: '',
+        });
+        const result = await handleAction({
+          action: 'pipeline',
+          steps: [{ type: 'capture', op: 'run_tests', params: { test_path: 'src/a.test.ts' } }],
+        });
+        expect(result.status).toBe('succeeded');
+        const execution = result.context.test_execution as Record<string, unknown>;
+        expect(execution.status).toBe('passed');
+        expect(execution.confidence).toBe('observed');
+        expect(execution.authority).toBe('controlled-replay');
+        expect(execution.unknowns).toEqual(
+          expect.arrayContaining([expect.stringContaining('exit code')])
+        );
+      });
+
+      it('glob_files retains oversized results and returns a reference + preview', async () => {
+        const { getAllFiles } = await import('@agent/core/fs-utils');
+        vi.mocked(getAllFiles).mockReturnValue(
+          Array.from(
+            { length: 2000 },
+            (_, i) => `/mock/root/src/dir-with-a-long-name/file-${String(i).padStart(5, '0')}.ts`
+          )
+        );
+        try {
+          const result = await handleAction({
+            action: 'pipeline',
+            steps: [{ type: 'capture', op: 'glob_files', params: { dir: 'src' } }],
+          });
+          expect(result.status).toBe('succeeded');
+          const listing = result.context.file_list as Record<string, unknown>;
+          expect(listing.retained).toBe(true);
+          expect(listing.item_count).toBe(2000);
+          expect(listing.preview).toHaveLength(50);
+          expect(listing.result_ref).toContain('code-op-results');
+          expect(mocks.safeWriteFile).toHaveBeenCalledWith(
+            expect.stringContaining('code-op-results'),
+            expect.any(String)
+          );
+        } finally {
+          vi.mocked(getAllFiles).mockReturnValue([]);
         }
       });
     });

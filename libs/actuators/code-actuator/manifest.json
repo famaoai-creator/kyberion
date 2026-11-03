@@ -26,7 +26,8 @@
           "linux": "python -m pip install semgrep"
         }
       },
-      "effect": "read"
+      "effect": "read",
+      "selection": "deterministic"
     },
     {
       "op": "reconcile",
@@ -37,7 +38,8 @@
       "op": "impact_analysis",
       "schema_ref": "knowledge/product/schemas/impact-analysis.schema.json",
       "platforms": ["darwin", "linux", "win32"],
-      "effect": "read"
+      "effect": "read",
+      "selection": "deterministic"
     }
   ]
 }
