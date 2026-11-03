@@ -172,7 +172,7 @@ describe('settings browser navigation', () => {
       id: 'settings-display',
       section: 'display',
     });
-    expect(resolveSettingsTarget('#setup-governance')?.section).toBe('advanced');
+    expect(resolveSettingsTarget('#setup-governance')?.section).toBe('authority');
     expect(resolveSettingsTarget('#%E0%A4%A')).toBeNull();
     expect(resolveSettingsTarget('#unknown')).toBeNull();
     expect(resolveSettingsTarget('https://example.com')).toBeNull();
@@ -228,14 +228,14 @@ describe('settings browser navigation', () => {
     nav.dispose();
     expect([...h.callbacks.values()].every((set) => set.size === 0)).toBe(true);
   });
-  it('reveals legacy advanced subsections and ignores malformed or unknown links', () => {
+  it('reveals legacy governance subsection and ignores malformed or unknown links', () => {
     const h = harness();
     const target = h.elements.get('setup-governance')!;
     target.details = { open: false, parentElement: null };
     const nav = h.mount();
     nav.navigate('#setup-governance');
     expect(target.details.open).toBe(true);
-    expect(h.current).toHaveBeenLastCalledWith('advanced');
+    expect(h.current).toHaveBeenLastCalledWith('authority');
     const count = h.view.history.pushState.mock.calls.length;
     nav.navigate('#bad');
     h.replay('/settings#%E0%A4%A', 'hashchange');

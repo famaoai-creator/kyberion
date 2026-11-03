@@ -19,6 +19,8 @@ const MEMBER_PATHS = [
   '/api/training',
   '/api/voice',
   '/api/work-inventory',
+  '/api/service-catalog',
+  '/api/llm-selection',
   '/api/message',
   '/api/summary',
   '/api/personal-summary',
