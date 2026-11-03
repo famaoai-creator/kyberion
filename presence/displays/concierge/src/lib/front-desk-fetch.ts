@@ -30,6 +30,7 @@ const MEMBER_PATHS = [
   '/api/approvals',
   '/api/outcomes',
   '/api/v1',
+  '/api/tenant-attestation',
 ] as const;
 export function isFrontDeskMemberApiPath(path: string): boolean {
   if (!path.startsWith('/api/') || /[\\\x00-\x20\x7f#]/.test(path)) return false;
