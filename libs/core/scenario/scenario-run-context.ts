@@ -88,8 +88,7 @@ function assertContainedUnderRoot(runRoot: string, relativePath: string): string
     throw new Error(`[SCENARIO_RUN_CONTEXT] seed file path escapes the run root: ${relativePath}`);
   }
   const resolved = path.resolve(runRoot, relativePath);
-  const relativeToRoot = path.relative(runRoot, resolved);
-  if (relativeToRoot.startsWith('..') || path.isAbsolute(relativeToRoot)) {
+  if (!pathResolver.isPathInsideOrEqual(runRoot, resolved)) {
     throw new Error(`[SCENARIO_RUN_CONTEXT] seed file path escapes the run root: ${relativePath}`);
   }
   return resolved;

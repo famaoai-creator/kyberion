@@ -8,6 +8,7 @@
 
 import * as path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { isPathInsideOrEqual } from '../path-resolver.js';
 import type { PluginPermissionGrant } from '../plugin/plugin-permissions.js';
 
 export type SandboxMode = 'read-only' | 'workspace-write' | 'danger-full-access';
@@ -53,11 +54,7 @@ export function withSandboxPolicy<T>(policy: SandboxPolicy, fn: () => T): T {
 }
 
 function isPathWithin(candidate: string, root: string): boolean {
-  const relative = path.relative(path.resolve(root), path.resolve(candidate));
-  return (
-    relative === '' ||
-    (!path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`))
-  );
+  return isPathInsideOrEqual(path.resolve(root), path.resolve(candidate));
 }
 
 /** Apply the active policy to a local filesystem mutation. */
