@@ -167,7 +167,8 @@
     "voice:upgrade": "node scripts/run_built.mjs dist/scripts/voice_upgrade.js",
     "work": "node --import ./scripts/ts-loader.mjs scripts/work_coordination.ts",
     "work:inventory": "node --import ./scripts/ts-loader.mjs scripts/work_inventory.ts",
-    "terminal": "pnpm exec tsx scripts/terminal_session_cli.ts"
+    "terminal": "pnpm exec tsx scripts/terminal_session_cli.ts",
+    "generate:platform-read-baseline": "node --import ./scripts/ts-loader.mjs scripts/generate_platform_read_baseline.ts"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs}": [
