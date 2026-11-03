@@ -16,7 +16,18 @@ const writes = vi.hoisted(() => ({
 }));
 
 vi.mock('../../../lib/api-guard', () => ({ requireConciergeMutationAccess: guard }));
-vi.mock('../../../lib/viewer-context', () => ({ resolveConciergeViewer: vi.fn() }));
+const installation = vi.hoisted(() => ({
+  gate: vi.fn((): { grant?: unknown; response?: Response } => ({
+    grant: { allowed: true, mode: 'write' },
+  })),
+}));
+vi.mock('../../../lib/viewer-context', () => ({
+  resolveConciergeViewer: vi.fn(() => ({ context: { role: 'localadmin', source: 'token' } })),
+}));
+vi.mock('../../../lib/installation-access', () => ({
+  requireConciergeInstallationAccess: installation.gate,
+  resolveConciergeInstallationAccess: vi.fn(() => ({ allowed: true })),
+}));
 vi.mock('../../../lib/front-desk-member', () => ({ resolveConciergeDecidedBy: vi.fn(() => null) }));
 vi.mock('../../../lib/i18n', () => ({
   conciergeText: vi.fn((key: string) => key),
@@ -108,6 +119,33 @@ describe('concierge setup input contract', () => {
     expect(writes.safeWriteFile).not.toHaveBeenCalled();
     expect(writes.writeTenantProfile).not.toHaveBeenCalled();
     expect(writes.applyBrowserOnboarding).not.toHaveBeenCalled();
+    expect(writes.applyBrowserOnboardingSettingsPatch).not.toHaveBeenCalled();
+  });
+});
+
+describe('concierge setup installation write gate', () => {
+  it('refuses a non-owner or un-stepped-up write before reading the body', async () => {
+    installation.gate.mockReturnValueOnce({
+      response: new Response(
+        JSON.stringify({ ok: false, error: 'installation_step_up_required' }),
+        {
+          status: 403,
+        }
+      ),
+    });
+    const json = vi.fn(async () => ({ action: 'save_settings', patch: {} }));
+    const response = await POST({
+      headers: new Headers({ 'content-type': 'application/json' }),
+      json,
+    } as unknown as NextRequest);
+    expect(response.status).toBe(403);
+    expect(json).not.toHaveBeenCalled();
+    expect(installation.gate).toHaveBeenLastCalledWith(
+      expect.anything(),
+      'write',
+      expect.anything(),
+      'setup update'
+    );
     expect(writes.applyBrowserOnboardingSettingsPatch).not.toHaveBeenCalled();
   });
 });

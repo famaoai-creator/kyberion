@@ -5,6 +5,13 @@ import { pathResolver } from '@agent/core/path-resolver';
 import { safeMkdir, safeReadFile, safeRmSync, safeWriteFile } from '@agent/core/secure-io';
 
 const fixture = vi.hoisted(() => ({ root: '', viewer: undefined as unknown }));
+// The owner works at the machine during bootstrap: an attested loopback peer
+// and no owner bound yet, so the credential-less operator may still write.
+vi.mock('../../../../lib/loopback-peer', () => ({ isLoopbackPeer: () => true }));
+vi.mock('@agent/core/surface/first-run-setup', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@agent/core/surface/first-run-setup')>()),
+  readFirstRunStatus: () => ({ state: 'unclaimed', code_active: false }),
+}));
 vi.mock('@agent/core/profile-root', () => ({ resolveActiveProfileRoot: () => fixture.root }));
 vi.mock('../../../../lib/api-guard', () => ({ requireConciergeMutationAccess: vi.fn(() => null) }));
 vi.mock('../../../../lib/viewer-context', async () => {

@@ -3,6 +3,11 @@
 import * as React from 'react';
 import { Button, Callout, Dialog, SettingRow, StatusPill, TalkingAvatar } from '@agent/shared-ui';
 import { FormScope, type SettingsTranslate } from './form-scope';
+import { InstallationAccessNotice } from './InstallationAccessNotice';
+import {
+  installationAccessCodeOf,
+  type InstallationAccessCode,
+} from '../../../lib/installation-access-client';
 
 /**
  * PA-10 "create an avatar from this photo" (settings → 写真・音声). Flow:
@@ -77,12 +82,19 @@ export function AvatarGenerationPanel({
   const [dialogOpen, setDialogOpen] = React.useState(false);
   const [job, setJob] = React.useState<Job | null>(null);
   const [notice, setNotice] = React.useState<{ text: string; error?: boolean } | null>(null);
+  // Installation scope: another member sees a read-only notice; the owner on
+  // another device confirms with a passkey before a change.
+  const [access, setAccess] = React.useState<InstallationAccessCode | null>(null);
 
   const load = React.useCallback(async () => {
     try {
       const response = await fetch('/api/setup/avatar-generation', { cache: 'no-store' });
       const body = await readJson(response);
-      if (!response.ok || !body) return;
+      if (!response.ok || !body) {
+        setAccess(installationAccessCodeOf(body));
+        return;
+      }
+      setAccess(null);
       setOverview({
         photo_available: body.photo_available === true,
         plan: (body.plan as Plan | null) ?? null,
@@ -172,6 +184,12 @@ export function AvatarGenerationPanel({
       const body = await readJson(response);
       const started = body?.job as Job | undefined;
       if (started) setJob(started);
+      const denied = response.ok ? null : installationAccessCodeOf(body);
+      if (denied) {
+        setNotice(null);
+        setAccess(denied);
+        return;
+      }
       if (!response.ok) {
         setNotice({
           text: typeof body?.error === 'string' ? body.error : t('setup.avatar_generate_failed'),
@@ -190,7 +208,14 @@ export function AvatarGenerationPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'avatar_use' }),
       });
-      if (!response.ok) throw new Error('avatar_use failed');
+      if (!response.ok) {
+        const denied = installationAccessCodeOf(await readJson(response));
+        if (denied) {
+          setAccess(denied);
+          return;
+        }
+        throw new Error('avatar_use failed');
+      }
       setNotice({ text: t('setup.avatar_used') });
       await load();
     } catch {
@@ -217,6 +242,14 @@ export function AvatarGenerationPanel({
       ? t('setup.avatar_generate_no_provider')
       : t('setup.avatar_generate_description');
 
+  if (access && access !== 'installation_step_up_required') {
+    return (
+      <SettingRow label={t('setup.avatar_generate_title')}>
+        <InstallationAccessNotice code={access} t={t} />
+      </SettingRow>
+    );
+  }
+
   return (
     <FormScope
       actions={{
@@ -232,6 +265,11 @@ export function AvatarGenerationPanel({
           onClick={() => setDialogOpen(true)}
         />
       </SettingRow>
+      {access === 'installation_step_up_required' ? (
+        <div className="settings-row-block">
+          <InstallationAccessNotice code={access} t={t} onConfirmed={() => setAccess(null)} />
+        </div>
+      ) : null}
       {notice ? (
         <div className="settings-row-block" role="status" aria-live="polite">
           <Callout tone={notice.error ? 'danger' : 'info'} title={notice.text} />

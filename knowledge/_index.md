@@ -257,6 +257,7 @@
 - [Gateway Onboarding Protocol](./product/governance/gateway-onboarding-protocol.md) (public | Kyberion Ecosystem Architect)
 - [Governance: Tiered Consensus & Experimental Branches](./product/governance/tiered-consensus-and-experimental-branches.md) (public | Unknown)
 - [Independent Validation Evidence Package](./product/governance/independent-validation-evidence-package.md) (public | Unknown)
+- [Installation-owner authorization — who may change settings of the whole machine](./product/governance/installation-owner-authorization.md) (public | Unknown)
 - [Knowledge Curation Report](./product/governance/CURATION_REPORT.md) (public | Unknown)
 - [Kyberion Development Practices — Hard-Won Rules for Changing This Repo](./product/governance/kyberion-development-practices.md) (public | Unknown)
 - [LLM Invocation Rubric — どのポイントで LLM に頼むか](./product/governance/llm-invocation-rubric.md) (public | Unknown)

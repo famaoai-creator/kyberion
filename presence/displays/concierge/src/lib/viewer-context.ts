@@ -20,6 +20,7 @@ import {
   type SurfaceCredentialSource,
 } from '@agent/core/surface/surface-session-cookie';
 import { resolveAuthnSurfaceViewerScope } from '@agent/core/surface/surface-authn';
+import { anonymousLoopbackAllowed } from '@agent/core/surface/installation-owner-access';
 import type { ResolvedPrincipal } from '@agent/core/authn-principal-resolver';
 import type { EventScopeInput } from '@agent/core/event-scope';
 import { withExecutionContext } from '@agent/core/authority';
@@ -224,9 +225,17 @@ export function resolveTierAccess(
   }
 }
 
+/**
+ * A credential-less loopback request is the local operator (localadmin) only
+ * while bootstrap is open — first-run setup unclaimed and no owner able to
+ * sign in — or with the default-off KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK
+ * escape hatch. Once an owner is bound, other OS users and local processes
+ * must sign in like anyone else: the request resolves to 401.
+ */
 export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewerContext {
   const local = isLoopbackPeer(req);
   const token = bearerToken(req);
+  const allowLoopback = local && (token !== null || anonymousLoopbackAllowed());
   const registry = token ? registrations() : null;
   const apiToken = getRegisteredEnvText('KYBERION_API_TOKEN');
   const localadminToken = getRegisteredEnvText('KYBERION_LOCALADMIN_TOKEN');
@@ -238,7 +247,7 @@ export function resolveConciergeViewerContext(req: NextRequest): ConciergeViewer
       registrations: registry,
       apiToken,
       localadminToken,
-      allowLoopback: true,
+      allowLoopback,
       loopbackRole: 'localadmin',
       loopbackUsesServerTenant: true,
       allowPersonalTier: false,

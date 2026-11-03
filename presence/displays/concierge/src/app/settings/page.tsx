@@ -48,6 +48,7 @@ import { useRecordingConsent } from '../../lib/use-recording-consent';
 import { openServiceConsentWindow } from '../../lib/oauth-popup';
 import { ProfileSection } from './sections/ProfileSection';
 import type { SettingsSaveFeedbackState } from './sections/SettingsSaveFeedback';
+import { installationAccessCodeOf } from '../../lib/installation-access-client';
 import { MembersSection, type MemberFormState } from './sections/MembersSection';
 import { ServicesSection } from './sections/ServicesSection';
 import { VoiceSection } from './sections/VoiceSection';
@@ -823,6 +824,13 @@ export default function SettingsPage() {
         if (!draftSession.current(epoch) || !draftSession.inspect(response)) return false;
         const receipt = await response.json().catch(() => null);
         if (!draftSession.current(epoch)) return false;
+        const denied = response.ok ? null : installationAccessCodeOf(receipt);
+        if (denied && section) {
+          // Installation scope: another member, or the owner on another
+          // device before a passkey confirmation — not a failed save.
+          setSaveFeedback({ section, phase: 'rejected', access: denied });
+          return false;
+        }
         if (!response.ok || !isOnboardingSaveReceipt(receipt))
           throw new Error('Unconfirmed settings save');
         if (!(await draftSession.check(epoch))) return false;
