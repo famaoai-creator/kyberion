@@ -41,13 +41,13 @@ Canonical helpers live in `libs/core/secret/secret-identity.ts`.
 
 `applySecretIntroduction` always:
 
-1. `storeSecret(service, account, value)` via secret-bridge (OS keychain / file vault).
+1. `storeSecret(service, account, value)` via secret-bridge (macOS Keychain, Windows Credential Manager, or the explicitly enabled file vault).
 2. `storeConnectionDocument(serviceId, { [field]: value })` so secret-guard consumers resolve immediately.
 3. Records approval apply result (fingerprint only — never the value).
 
 `secret-guard.getSecret` also falls through to `fetchSecretSync` for keychain-only legacy entries.
 
-Declared identities resolve their governed connection lazily before the OS keychain.
+Declared identities resolve their governed connection lazily before the platform's OS-native secret manager.
 Imports skip encrypted connection decryption. Explicit CLI operations memoize
 Keychain reads, including refusal, within the operation; decrypt never creates a
 replacement encryption master. macOS Keychain writes attach an access list that trusts

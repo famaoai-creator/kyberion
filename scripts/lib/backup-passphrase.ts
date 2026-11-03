@@ -7,7 +7,7 @@
  * account `passphrase`, per libs/core/secret/secret-identity.ts).
  *
  * The secret must live outside the repository — an external secret resolver
- * or the OS keychain — because `vault/` and `knowledge/personal/` ride inside
+ * or the OS-native secret manager — because `vault/` and `knowledge/personal/` ride inside
  * the archive the passphrase protects. A copy held only in an in-repo store is
  * refused with [BACKUP_PASSPHRASE_IN_BACKUP_SCOPE]; the connection document
  * `secret introduce` dual-writes is excluded from every archive
@@ -20,7 +20,8 @@ import { BACKUP_PASSPHRASE_CONNECTION_FILES } from './backup-file-selection.js';
 import { logger } from '@agent/core/core';
 import { resolveExecutionPersona } from '@agent/core/authority';
 import { auditChain } from '@agent/core/governance/audit-chain';
-import { fetchOsKeychainSecretSync } from '@agent/core/secret/secret-bridge';
+import { readNativeSecretSync } from '@agent/core/secret/secret-bridge';
+import { isWindows } from '@agent/core/platform-facts';
 import { getSecretForIdentity, loadConnectionDocument } from '@agent/core/secret/secret-guard';
 import { resolveSecretIdentity, type SecretIdentity } from '@agent/core/secret/secret-identity';
 import { getSecretResolver, resolveSecretSync } from '@agent/core/secret/secret-resolver';
@@ -38,7 +39,7 @@ export function backupPassphraseIdentity(): SecretIdentity {
 
 /** Secret stores the passphrase may be read from, and in-repo ones it may not. */
 export interface BackupPassphraseSecretBackend {
-  /** Out-of-repo stores only (external resolver, OS keychain); `backend` names the store. */
+  /** Out-of-repo stores only (external resolver, OS-native secret manager); `backend` names the store. */
   lookupOutsideBackupScope(identity: SecretIdentity): { value: string; backend: string } | null;
   /** Names (never values) of in-repo stores holding the identity — they are archived. */
   inBackupScopeStores(identity: SecretIdentity): string[];
@@ -72,8 +73,8 @@ export const governedBackupPassphraseBackend: BackupPassphraseSecretBackend = {
       const upstream = resolveSecretSync({ key: identity.envName, operation: 'backup' });
       if (upstream) return { value: upstream, backend: 'external_resolver' };
     }
-    const keychain = fetchOsKeychainSecretSync(identity.keychainService, identity.keychainAccount);
-    if (keychain) return { value: keychain, backend: 'os_keychain' };
+    const nativeSecret = readNativeSecretSync(identity.keychainService, identity.keychainAccount);
+    if (nativeSecret) return nativeSecret;
     return null;
   },
   inBackupScopeStores(identity) {
@@ -114,15 +115,35 @@ function defaultAudit(record: BackupPassphraseAuditRecord): void {
   }
 }
 
-export function missingPassphraseMessage(envName: string, explicit: boolean): string {
+function baseMissingPassphraseMessage(envName: string, explicit: boolean): string {
   if (explicit) {
     return `[BACKUP_PASSPHRASE_MISSING] Missing ${envName} — --passphrase-env names that variable explicitly, so neither ${BACKUP_PASSPHRASE_ENV} nor the secret store is consulted | next: export ${envName} in the process environment, or drop --passphrase-env to use the passphrase stored with ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND} | evidence: ${envName} is unset or empty`;
   }
   return `[BACKUP_PASSPHRASE_MISSING] No backup passphrase — encrypted backups and restores read it from ${envName} or the OS keychain / external secret resolver (identity ${BACKUP_PASSPHRASE_SERVICE_ID}/${BACKUP_PASSPHRASE_SECRET_KEY}), and neither holds it | next: store it once with ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND} (hidden prompt; a launchd agent in your GUI session reads the login keychain) and keep an offline copy in your password manager; for a one-off override export ${envName}=... or name another variable with --passphrase-env; never put it in a plist, the env registry, the archive or a repo file | evidence: ${envName} is unset or empty and keychain service ${BACKUP_PASSPHRASE_SERVICE_ID} account passphrase was not found`;
 }
 
-export function inBackupScopeMessage(stores: string[]): string {
+export function missingPassphraseMessage(envName: string, explicit: boolean): string {
+  const message = baseMissingPassphraseMessage(envName, explicit);
+  if (!isWindows()) return message;
+  return message
+    .replace(
+      'the OS keychain / external secret resolver',
+      'Windows Credential Manager / external secret resolver'
+    )
+    .replace(
+      '(hidden prompt; a launchd agent in your GUI session reads the login keychain)',
+      "(hidden prompt; the scheduled task reads this account's Windows Credential Manager)"
+    )
+    .replace('keychain service', 'native secret service');
+}
+
+function baseInBackupScopeMessage(stores: string[]): string {
   return `[BACKUP_PASSPHRASE_IN_BACKUP_SCOPE] The backup passphrase was found only in an in-repository store — those paths are archived, so the key would travel inside the archive it protects; refusing to use it | next: store it in the OS keychain with ${BACKUP_PASSPHRASE_INTRODUCE_COMMAND} (or configure KYBERION_SECRET_RESOLVER_COMMAND for an external manager), or export ${BACKUP_PASSPHRASE_ENV} for this run, then remove the in-repo copy | evidence: ${stores.join(', ')}`;
+}
+
+export function inBackupScopeMessage(stores: string[]): string {
+  const message = baseInBackupScopeMessage(stores);
+  return isWindows() ? message.replace('the OS keychain', 'Windows Credential Manager') : message;
 }
 
 type Resolution =
@@ -168,7 +189,7 @@ export function resolveBackupPassphrase(
 export interface BackupPassphraseAvailability {
   available: boolean;
   source: 'env' | 'secret' | null;
-  /** Store name when source is 'secret' (os_keychain | external_resolver). */
+  /** Store name when source is 'secret' (os_keychain | windows_credential_manager | external_resolver). */
   backend?: string;
   /** Diagnostic when unavailable ([BACKUP_PASSPHRASE_MISSING] / [..._IN_BACKUP_SCOPE] ...). */
   reason?: string;
