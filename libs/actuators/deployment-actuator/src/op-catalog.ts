@@ -1,7 +1,7 @@
 import type { PipelineStepType } from '@agent/core/actuator/actuator-op-registry';
 import type { ActuatorOpDescription } from '@agent/core/actuator/actuator-sdk';
 
-const DEPLOYMENT_SCHEMA = {
+export const DEPLOYMENT_SCHEMA = {
   type: 'object',
   properties: {
     environment: { type: 'string' },
