@@ -20,7 +20,7 @@ import type {
 import { abortableAudioChunks } from './meeting-session-types.js';
 import { nowIso } from '../foundation/time.js';
 import type { AudioBus } from '../voice/audio-bus.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
   findMeetingPlatform,
   matchMeetingPlatformHost,
@@ -151,21 +151,13 @@ const meetingJoinDriverSeam = createSeam<MeetingJoinDriver>({
   catalog: coreSeamCatalog,
   owner: 'libs/core/meeting/meeting-join-driver.ts',
 });
-const meetingJoinDriverDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(meetingJoinDriverSeam);
 
 export function registerMeetingJoinDriver(driver: MeetingJoinDriver): () => void {
-  const seamDispose = meetingJoinDriverSeam.register(driver.driver_id, driver, {
+  return registrations.register(driver.driver_id, driver, {
     provenance: 'builtin',
     source: 'meeting-join-driver',
   });
-  const dispose = () => {
-    seamDispose();
-    if (meetingJoinDriverDisposers.get(driver.driver_id) === dispose) {
-      meetingJoinDriverDisposers.delete(driver.driver_id);
-    }
-  };
-  meetingJoinDriverDisposers.set(driver.driver_id, dispose);
-  return dispose;
 }
 
 export function getMeetingJoinDriver(driver_id: string): MeetingJoinDriver | undefined {
@@ -187,7 +179,7 @@ export function listMeetingJoinDriversFor(platform: MeetingPlatform): MeetingJoi
 }
 
 export function resetMeetingJoinDriverRegistry(): void {
-  for (const dispose of [...meetingJoinDriverDisposers.values()]) dispose();
+  registrations.reset();
 }
 
 /* ------------------------------------------------------------------ *

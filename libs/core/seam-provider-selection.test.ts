@@ -47,7 +47,7 @@ vi.mock('./provider/provider-pins-store.js', () => ({
   },
 }));
 
-const { listSeamSelectionPurposes, resolveSeamProviderDecision } =
+const { listSeamSelectionPurposes, resolveSeamProviderDecision, resolveSeamSelectionEntry } =
   await import('./seam-provider-selection.js');
 
 const SEAM = 'browser-automation-runtime';
@@ -65,6 +65,64 @@ describe('seam provider selection', () => {
     vi.stubEnv('MISSION_ID', '');
   });
   afterEach(() => vi.unstubAllEnvs());
+
+  it('normalizes explicit choices before considering purpose, rules or fallback', () => {
+    expect(
+      resolveSeamSelectionEntry({
+        seam: 'unknown-seam',
+        explicitProvider: ' provider-a ',
+        purpose: 'unknown-purpose',
+        defaultEligible: false,
+      })
+    ).toEqual({ kind: 'explicit', providerId: 'provider-a' });
+    expect(record).not.toHaveBeenCalled();
+    expect(pins.size).toBe(0);
+  });
+
+  it('keeps legacy routing when rules do not match this request', () => {
+    overlay.rules = [rule({ when: { context: { language: 'ja' } }, prefer: ['lightpanda'] })];
+    expect(
+      resolveSeamSelectionEntry({
+        seam: SEAM,
+        explicitProvider: 'auto',
+        context: { language: 'en' },
+      })
+    ).toEqual({ kind: 'legacy' });
+    expect(resolveSeamSelectionEntry({ seam: SEAM, context: { language: 'ja' } })).toMatchObject({
+      kind: 'governed',
+      request: { seam: SEAM, decisionKey: 'default', context: { language: 'ja' } },
+    });
+  });
+
+  it('opts in through purpose, saved defaults, or an eligible policy fallback', () => {
+    expect(
+      resolveSeamSelectionEntry({
+        seam: SEAM,
+        purpose: ' evidence ',
+        defaultProvider: 'lightpanda',
+      })
+    ).toEqual({
+      kind: 'governed',
+      request: { seam: SEAM, purpose: 'evidence', decisionKey: 'evidence' },
+    });
+    expect(
+      resolveSeamSelectionEntry({
+        seam: SEAM,
+        defaultProvider: ' lightpanda ',
+        selectForDefault: true,
+      })
+    ).toEqual({
+      kind: 'governed',
+      request: { seam: SEAM, defaultProvider: 'lightpanda', decisionKey: 'default' },
+    });
+    expect(resolveSeamSelectionEntry({ seam: SEAM, defaultEligible: false }).kind).toBe('governed');
+    expect(resolveSeamSelectionEntry({ seam: 'unknown-seam', defaultEligible: false }).kind).toBe(
+      'legacy'
+    );
+    expect(resolveSeamSelectionEntry({ seam: SEAM, defaultProvider: 'lightpanda' }).kind).toBe(
+      'legacy'
+    );
+  });
 
   it('exposes the governed purposes for the browser runtime seam', () => {
     expect(listSeamSelectionPurposes(SEAM)).toEqual(['authenticated', 'evidence', 'throughput']);
