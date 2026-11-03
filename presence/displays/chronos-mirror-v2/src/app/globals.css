@@ -1698,6 +1698,14 @@ body {
   grid-template-areas: 'main';
 }
 
+/* With the shared front-desk rail mounted, keep the standard nav | main
+ * grid; the single-area override above pushed the rail into an implicit
+ * cell at the bottom right. */
+.chronos-shell.kb-app-shell:has(> .kb-app-shell__nav) {
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas: 'nav main';
+}
+
 .chronos-shell .kb-app-shell__main {
   width: 100%;
   max-width: 1440px;
