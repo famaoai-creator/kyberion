@@ -208,7 +208,7 @@ describe('raw template files are never served unrendered', () => {
       PAGES.map((page) => `/${page}`).sort()
     );
     expect(frontDeskTemplateRedirect('/engine-config.html')).toBe('/engine-config');
-    expect(frontDeskTemplateRedirect('/home.html')).toBe('/');
+    expect(frontDeskTemplateRedirect('/home.html')).toBe('/home');
     expect(frontDeskTemplateRedirect('/progress.html?tenant=acme#x')).toBe(
       '/progress?tenant=acme#x'
     );
@@ -281,7 +281,7 @@ describe('raw template files are never served unrendered', () => {
     for (const key of FIRST_JOB_VOCABULARY_KEYS)
       expect(PRESENCE_STUDIO_VOCABULARY_KEYS).toContain(key);
     const home = fakeRes();
-    routes.get('/')!({ headers: { 'accept-language': 'ja' } }, home);
+    routes.get('/home')!({ headers: { 'accept-language': 'ja' } }, home);
     expect(String(home.sent)).toContain('<html lang="ja"');
     expect(String(home.sent)).not.toMatch(/\{\{(t|partial|locale)[:}]/);
   });

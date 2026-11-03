@@ -55,6 +55,7 @@ import { getRegisteredEnvBool, getRegisteredEnvText } from './foundation/env.js'
 import { parseSafeJsonObjectInput, parseSafeJsonInput } from './foundation/safe-json.js';
 import { isRecord } from './foundation/text.js';
 import { pathResolver } from './path-resolver.js';
+import { policyRelativePath } from './policy-relative-path.js';
 import { rawExistsSync, rawReadTextFile, rawRealpathSync } from './fs-primitives.js';
 import { resolveProjectScope, resolveProjectScopeId } from './foundation/project-scope-env.js';
 import { resolvePolicyIdentityContext } from './identity-context-bridge.js';
@@ -1130,7 +1131,7 @@ export function validateWritePermission(
 ): { allowed: boolean; reason?: string } {
   const resolvedPath = path.resolve(filePath);
   const resourceDenial = requestResourceDenial(
-    normalizePath(path.relative(projectRoot(), resolvedPath)),
+    normalizePath(policyRelativePath(resolvedPath)),
     operation,
     content
   );
@@ -1143,7 +1144,7 @@ export function validateWritePermission(
       reason: error instanceof Error ? error.message : String(error),
     };
   }
-  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
+  const relativePath = normalizePath(policyRelativePath(resolvedPath));
   const currentMission = resolveProjectScope().missionId;
 
   if (isOutsideProjectRoot(relativePath)) {
@@ -1335,7 +1336,7 @@ export function inspectReadPermission(
   operation: 'read' | 'metadata' = 'read'
 ): ReadPermissionDecision {
   const resolvedPath = path.resolve(filePath);
-  const relativePath = normalizePath(path.relative(projectRoot(), resolvedPath));
+  const relativePath = normalizePath(policyRelativePath(resolvedPath));
   const resourceDenial = requestResourceDenial(relativePath, operation);
   if (resourceDenial) return resourceDenial;
 

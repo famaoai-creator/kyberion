@@ -49,6 +49,119 @@ const CODE_REPOSITORY_ROOT = (() => {
     return '';
   }
 })();
+
+/**
+ * The checkout that owns shared authority state. Delegated authority
+ * (charters, approval decisions) is state about the person/tenant — one store
+ * per repository, or a grant made through one surface silently stops applying
+ * to governed commands run from a linked worktree. A linked worktree's `.git`
+ * is a *file* (`gitdir: <main>/.git/worktrees/<name>`); the primary checkout
+ * root is the parent of the `.git` dir named by that entry's `commondir`
+ * (falling back to two levels up). Reading `.git` as a file throws EISDIR on
+ * a real checkout and ENOENT on fixture roots — both mean "already primary",
+ * so this is a no-op anywhere but a linked worktree.
+ */
+function detectPrimaryCheckoutRoot(root: string): string {
+  try {
+    const marker = rawReadTextFile(path.join(root, '.git'));
+    const gitdirLine = /^gitdir:\s*(.+?)\s*$/m.exec(marker);
+    if (!gitdirLine) return root;
+    const worktreeGitDir = path.resolve(root, gitdirLine[1]);
+    const commondirFile = path.join(worktreeGitDir, 'commondir');
+    const common = rawExistsSync(commondirFile)
+      ? path.resolve(worktreeGitDir, rawReadTextFile(commondirFile).trim())
+      : path.resolve(worktreeGitDir, '..', '..');
+    if (path.basename(common) !== '.git' || !rawExistsSync(common)) return root;
+    const primary = path.dirname(common);
+    return primary === root ? root : primary;
+  } catch {
+    return root;
+  }
+}
+
+const PRIMARY_CHECKOUT_ROOT_DIR = detectPrimaryCheckoutRoot(PROJECT_ROOT_DIR);
+
+/** The checkout holding the shared authority store — the primary checkout in
+ * a linked worktree, otherwise the process root itself. */
+export function primaryCheckoutRootDir(): string {
+  return PRIMARY_CHECKOUT_ROOT_DIR;
+}
+
+/**
+ * Repo-relative subtrees that are authority state about the person/tenant
+ * rather than checkout content: delegated charters, approval request records,
+ * passkey challenges, the approval event log, and tenant approval partitions.
+ * In a linked worktree they resolve under the primary checkout so authority
+ * is one store per repository.
+ */
+const AUTHORITY_STORE_PATTERNS: readonly RegExp[] = [
+  /^knowledge\/personal\/charters(?:\/|$)/,
+  /^knowledge\/confidential\/[^/]+\/charters(?:\/|$)/,
+  // The channels root itself is the enumeration point for approval storage
+  // channels — without it a linked worktree lists its own (empty) dir and
+  // every system-partition request becomes invisible to `kyberion approvals`.
+  /^active\/shared\/coordination\/channels$/,
+  // The per-channel directory itself (exact, not its contents): the first
+  // approval in a fresh primary checkout must create it there, and the
+  // missing-ancestor probe walks through it — without it both are refused
+  // as "outside the repository" from a linked worktree.
+  /^active\/shared\/(?:coordination|observability)\/channels\/[^/]+$/,
+  /^active\/shared\/coordination\/channels\/[^/]+\/approvals(?:\/|$)/,
+  /^active\/shared\/observability\/channels$/,
+  /^active\/shared\/observability\/channels\/[^/]+\/approvals\.jsonl(?:\/|$)/,
+  /^active\/shared\/runtime\/tenant-approvals(?:\/|$)/,
+];
+
+/** True when a repo-relative path names shared authority state. */
+export function isAuthorityStoreRelativePath(repoRelative: string): boolean {
+  const rel = repoRelative.split(path.sep).join('/');
+  return AUTHORITY_STORE_PATTERNS.some((pattern) => pattern.test(rel));
+}
+
+/**
+ * Redirect a resolved absolute path to the primary checkout when it names
+ * shared authority state. Applied AFTER vitestLivePath() so test sandboxing
+ * wins (its output is a `vitest-live/` path that matches no authority
+ * prefix); skipped entirely under Vitest so authority writes in tests stay
+ * checkout-local exactly as they did before the remap existed.
+ */
+function authorityStoreResolved(absolutePath: string): string {
+  if (PRIMARY_CHECKOUT_ROOT_DIR === PROJECT_ROOT_DIR) return absolutePath;
+  if (getProcessEnv('VITEST')) return absolutePath;
+  const rel = path.relative(PROJECT_ROOT_DIR, absolutePath).split(path.sep).join('/');
+  if (isAuthorityStoreRelativePath(rel)) return path.join(PRIMARY_CHECKOUT_ROOT_DIR, rel);
+  return absolutePath;
+}
+
+/**
+ * Repo-relative spelling of an absolute path for policy/scope checks.
+ * Authority-store paths under the primary checkout keep their canonical
+ * repo-relative form; every other path stays process-root-relative (outside
+ * the root it still relativizes to `../…` = denied, as before).
+ */
+export function storeRelativePath(absolutePath: string): string {
+  const abs = path.resolve(absolutePath);
+  if (PRIMARY_CHECKOUT_ROOT_DIR !== PROJECT_ROOT_DIR) {
+    const relPrimary = path.relative(PRIMARY_CHECKOUT_ROOT_DIR, abs).split(path.sep).join('/');
+    if (isAuthorityStoreRelativePath(relPrimary)) return relPrimary;
+  }
+  return path.relative(PROJECT_ROOT_DIR, abs).split(path.sep).join('/');
+}
+
+/**
+ * True when an absolute path is governed by this process's policy model:
+ * inside the process root, or an authority-store path under the primary
+ * checkout. Used by the secure-io boundary where "inside root" previously
+ * meant exactly one root.
+ */
+export function isWithinGovernedRoots(absolutePath: string): boolean {
+  const abs = path.resolve(absolutePath);
+  const rel = path.relative(PROJECT_ROOT_DIR, abs).split(path.sep).join('/');
+  if (rel && rel !== '..' && !rel.startsWith('../') && !path.isAbsolute(rel)) return true;
+  if (PRIMARY_CHECKOUT_ROOT_DIR === PROJECT_ROOT_DIR) return false;
+  const relPrimary = path.relative(PRIMARY_CHECKOUT_ROOT_DIR, abs).split(path.sep).join('/');
+  return isAuthorityStoreRelativePath(relPrimary);
+}
 const ACTIVE_ROOT = path.join(PROJECT_ROOT_DIR, 'active');
 const ACTIVE_SHARED_ROOT = path.join(ACTIVE_ROOT, 'shared');
 const KNOWLEDGE_ROOT = path.join(PROJECT_ROOT_DIR, 'knowledge');
@@ -69,10 +182,21 @@ export function assertSafeRepositoryPath(
     rootDir?: string;
   } = {}
 ): string {
-  return assertRepositoryPath(filePath, {
-    ...options,
-    rootDir: options.rootDir ?? PROJECT_ROOT_DIR,
-  });
+  let rootDir = options.rootDir ?? PROJECT_ROOT_DIR;
+  if (
+    !options.rootDir &&
+    PRIMARY_CHECKOUT_ROOT_DIR !== PROJECT_ROOT_DIR &&
+    path.isAbsolute(filePath)
+  ) {
+    // Authority-store paths live under the primary checkout; they are judged
+    // against that root instead of failing the single-root containment check.
+    const relPrimary = path
+      .relative(PRIMARY_CHECKOUT_ROOT_DIR, path.resolve(filePath))
+      .split(path.sep)
+      .join('/');
+    if (isAuthorityStoreRelativePath(relPrimary)) rootDir = PRIMARY_CHECKOUT_ROOT_DIR;
+  }
+  return assertRepositoryPath(filePath, { ...options, rootDir });
 }
 
 /**
@@ -119,10 +243,10 @@ export function rootDir() {
  * secure-io (which imports policy-engine during secure-io bootstrap).
  */
 export function knowledge(subPath = '') {
-  return path.join(KNOWLEDGE_ROOT, subPath);
+  return authorityStoreResolved(path.join(KNOWLEDGE_ROOT, subPath));
 }
 export function active(subPath = '') {
-  return path.join(ACTIVE_ROOT, subPath);
+  return authorityStoreResolved(path.join(ACTIVE_ROOT, subPath));
 }
 export function scripts(subPath = '') {
   return path.join(SCRIPTS_ROOT, subPath);
@@ -274,7 +398,7 @@ export function vitestLivePath(absolutePath: string): string {
 }
 
 export function shared(subPath = '') {
-  return vitestLivePath(path.join(ACTIVE_SHARED_ROOT, subPath));
+  return authorityStoreResolved(vitestLivePath(path.join(ACTIVE_SHARED_ROOT, subPath)));
 }
 export function sharedTmp(subPath = '') {
   const base = path.join(ACTIVE_SHARED_ROOT, 'tmp');
@@ -896,14 +1020,18 @@ export function resolve(logicalPath: string) {
   if (logicalPath.startsWith('active/shared/')) {
     return shared(logicalPath.replace('active/shared/', ''));
   }
-  return vitestLivePath(
-    path.isAbsolute(logicalPath) ? logicalPath : path.resolve(PROJECT_ROOT_DIR, logicalPath)
+  return authorityStoreResolved(
+    vitestLivePath(
+      path.isAbsolute(logicalPath) ? logicalPath : path.resolve(PROJECT_ROOT_DIR, logicalPath)
+    )
   );
 }
 
 export function rootResolve(relativePath: string) {
-  return vitestLivePath(
-    path.isAbsolute(relativePath) ? relativePath : path.join(PROJECT_ROOT_DIR, relativePath)
+  return authorityStoreResolved(
+    vitestLivePath(
+      path.isAbsolute(relativePath) ? relativePath : path.join(PROJECT_ROOT_DIR, relativePath)
+    )
   );
 }
 
@@ -916,7 +1044,12 @@ export function rootResolve(relativePath: string) {
 export function toRepoRelative(targetPath: string): string {
   if (!targetPath || !path.isAbsolute(targetPath)) return targetPath;
   const rel = path.relative(PROJECT_ROOT_DIR, targetPath);
-  return rel && !rel.startsWith('..') && !path.isAbsolute(rel) ? rel : targetPath;
+  if (rel && !rel.startsWith('..') && !path.isAbsolute(rel)) return rel;
+  // An authority-store path under the primary checkout is repository state,
+  // not a foreign absolute path: persist its canonical repo-relative form.
+  const relPrimary = path.relative(PRIMARY_CHECKOUT_ROOT_DIR, targetPath).split(path.sep).join('/');
+  if (isAuthorityStoreRelativePath(relPrimary)) return relPrimary;
+  return targetPath;
 }
 
 /**
@@ -989,4 +1122,8 @@ export const pathResolver = {
   toRepoRelative,
   normalizeStoredPath,
   isPathInside,
+  primaryCheckoutRootDir,
+  isAuthorityStoreRelativePath,
+  storeRelativePath,
+  isWithinGovernedRoots,
 };

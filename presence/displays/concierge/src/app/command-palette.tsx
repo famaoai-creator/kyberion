@@ -15,6 +15,7 @@ import {
   readSelectedTenant,
   withSelectedTenant,
 } from '../lib/tenant-context';
+import { entityHref, type GraphNode } from '../lib/workspace-view';
 
 /** The rail and palette share the server's role-gated, manifest-resolved catalog. */
 type PaletteEntry = {
@@ -29,6 +30,21 @@ type PaletteEntry = {
   event?: string;
 };
 type NavItem = PaletteEntry & { allowed: boolean; href: string };
+
+/** Entities from `/api/v1/workspace/search` (viewer-scoped server-side); tasks have no page. */
+function workspaceHits(payload: unknown): GraphNode[] {
+  const items = (payload as { data?: { items?: unknown } } | null)?.data?.items;
+  return Array.isArray(items)
+    ? items.filter(
+        (node): node is GraphNode =>
+          !!node &&
+          typeof node.kind === 'string' &&
+          node.kind !== 'task' &&
+          typeof node.id === 'string' &&
+          typeof node.label === 'string'
+      )
+    : [];
+}
 
 const SETTINGS_SHORTCUTS: Array<{ anchor: string; labelKey: FrontDeskMessageKey }> = [
   { anchor: 'setup-profile', labelKey: 'settings_nav_profile' },
@@ -72,6 +88,7 @@ export function CommandPalette() {
     tenant: string | null;
     items: NavItem[];
   } | null>(null);
+  const [hits, setHits] = React.useState<{ q: string; items: GraphNode[] } | null>(null);
   const generation = React.useRef(0);
   const openRef = React.useRef(false);
   const inputRef = React.useRef<HTMLInputElement | null>(null);
@@ -82,6 +99,7 @@ export function CommandPalette() {
     openRef.current = false;
     generation.current += 1;
     setCatalog(null);
+    setHits(null);
     setOpen(false);
     setQuery('');
     setActiveIndex(0);
@@ -151,6 +169,29 @@ export function CommandPalette() {
     return () => controller.abort();
   }, [open, locale, tenant]);
 
+  // Entity search: typing two or more characters also finds tenants,
+  // organizations, projects, missions, work items, approvals and actors.
+  React.useEffect(() => {
+    const needle = query.trim();
+    if (!open || needle.length < 2) return;
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      fetch('/api/v1/workspace/search?limit=8&q=' + encodeURIComponent(needle), {
+        signal: controller.signal,
+      })
+        .then((response) => (response.ok ? response.json() : null))
+        .then((payload: unknown) => {
+          if (!controller.signal.aborted && openRef.current)
+            setHits({ q: needle, items: workspaceHits(payload) });
+        })
+        .catch(() => undefined);
+    }, 200);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [open, query]);
+
   const entries = React.useMemo(() => {
     const nav = catalog?.locale === locale && catalog.tenant === tenant ? catalog.items : [];
     const settings = nav.find((item) => item.id === 'settings');
@@ -167,14 +208,31 @@ export function CommandPalette() {
       ...shortcuts,
     ];
     const needle = query.trim().toLowerCase();
-    return all
-      .filter((entry) =>
+    const found: PaletteEntry[] =
+      hits && hits.q === query.trim()
+        ? hits.items.map((node) => ({
+            id: `ws-${node.kind}-${node.id}`,
+            label: node.label,
+            sublabel: t(`ws_kind_${node.kind}`),
+            group_label: t('ws_palette_group'),
+            href: entityHref(node.kind, node.id),
+          }))
+        : [];
+    return [
+      ...all.filter((entry) =>
         [entry.label, entry.sublabel, entry.group_label].some(
           (text) => typeof text === 'string' && text.toLowerCase().includes(needle)
         )
-      )
-      .map((entry) => ({ entry, label: entry.label }));
-  }, [catalog, locale, tenant, query, t]);
+      ),
+      ...found,
+    ].map((entry) => ({
+      entry,
+      label:
+        entry.sublabel && entry.id.startsWith('ws-')
+          ? `${entry.sublabel} · ${entry.label}`
+          : entry.label,
+    }));
+  }, [catalog, locale, tenant, query, t, hits]);
 
   const run = React.useCallback(
     (entry: PaletteEntry) => {

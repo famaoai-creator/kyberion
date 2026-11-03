@@ -7,6 +7,7 @@ import { frontDeskText } from '../../../lib/i18n';
 import type { ConciergeLocale, ConciergeMessageKey } from '../../../lib/i18n';
 import type { ConfigMissionItem, ConfigPreset, Setup } from '../../../lib/settings-types';
 import { FormScope, asText, type SettingsTranslate } from './form-scope';
+import { SettingsSaveFeedback, type SettingsSaveFeedbackState } from './SettingsSaveFeedback';
 
 /** FD-06 詳細設定 pane (`#settings-advanced`) — the 3 collapsed sub-panes
  * (管理情報 / ガバナンス設定 / 運用オプション), each keeping its own legacy
@@ -50,6 +51,8 @@ export type AdvancedSectionProps = {
   management: ManagementState;
   setManagement: (management: ManagementState) => void;
   onSaveManagement: () => void;
+  /** Result of the immediate management save, shown next to its button. */
+  saveFeedback?: SettingsSaveFeedbackState | null;
 
   // ガバナンス設定 (#setup-governance)
   configPresets: ConfigPreset[];
@@ -79,6 +82,7 @@ export function AdvancedSection({
   management,
   setManagement,
   onSaveManagement,
+  saveFeedback,
   configPresets,
   configTenants,
   configTenant,
@@ -202,6 +206,7 @@ export function AdvancedSection({
                   count: setup.agent_management.durable_identities.length,
                 })}
               </p>
+              <SettingsSaveFeedback feedback={saveFeedback} t={t} />
               <div className="settings-inline-actions">
                 <Button
                   label={t('setup.save_management')}

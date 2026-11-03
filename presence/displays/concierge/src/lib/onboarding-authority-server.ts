@@ -13,16 +13,30 @@ import {
 import type { CharterScope } from '@agent/core/governance/accountability-charter';
 import type { ApprovalRequestRecord } from '@agent/core/governance/approval-store';
 import type { ConciergeViewerContext } from './viewer-context';
+import { resolveConciergeInstallationAccess } from './installation-access';
 
 export function asOnboardingOwner<T>(body: () => T): T {
   return withExecutionContext('sovereign_concierge', () => withSensitivePathMediation(body));
 }
+/**
+ * The onboarding-authority principal for the viewer. The personal scope is
+ * installation scope: it is the installation owner's (installation-access.ts,
+ * identity on any transport); a write additionally passes the route's
+ * installation write gate. The organization scope stays tenant-owner bound.
+ */
 export function onboardingAuthorityPrincipal(
   viewer: ConciergeViewerContext,
   scope: CharterScope
 ): OnboardingAuthorityPrincipal {
+  const installation = resolveConciergeInstallationAccess(viewer, 'read');
   return asOnboardingOwner(() => {
-    if (!viewer.principalId || viewer.role !== 'localadmin') throw new Error('owner_required');
+    if (!viewer.principalId) throw new Error('owner_required');
+    if (scope.kind === 'person' && !installation.allowed) {
+      throw new Error(installation.code);
+    }
+    if (scope.kind === 'organization' && viewer.role !== 'localadmin') {
+      throw new Error('owner_required');
+    }
     if (viewer.source === 'loopback') ensureOwnerMember();
     const member = resolveMemberByPrincipal({
       source: viewer.source,
@@ -31,12 +45,8 @@ export function onboardingAuthorityPrincipal(
       registrationLabel: viewer.registrationLabel,
     });
     if (!member || member.status !== 'active') throw new Error('active_owner_member_required');
-    const personalOwner =
-      member.member_id === 'owner' &&
-      (viewer.source === 'loopback' ||
-        (viewer.principal?.actor.kind === 'human' &&
-          ['browser-session', 'oidc-jwt', 'registry-token'].includes(viewer.principal.provider)));
-    if (scope.kind === 'person' && !personalOwner) throw new Error('personal_owner_required');
+    const personalOwner = installation.allowed && member.member_id === 'owner';
+    if (scope.kind === 'person' && !personalOwner) throw new Error('installation_owner_required');
     if (
       scope.kind === 'organization' &&
       ((viewer.tenantSlugs !== 'all' && !viewer.tenantSlugs.includes(scope.tenant_slug)) ||

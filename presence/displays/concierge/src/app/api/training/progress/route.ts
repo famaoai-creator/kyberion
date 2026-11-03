@@ -42,6 +42,15 @@ export function GET(req: NextRequest) {
       ? withExecutionContext('sovereign_concierge', () => listTenantProfileSlugs())
       : resolved.context.tenantSlugs
   ).filter((tenant) => conciergeFrontDeskRoleForTenant(resolved.context, tenant) === 'owner');
+  // The personal view selects no tenant at all: that is "pick a tenant", not
+  // "you are not an owner" — answer with an empty overview instead of a 403
+  // that tells an owner they lack ownership.
+  if (resolved.context.tenantSlugs !== 'all' && resolved.context.tenantSlugs.length === 0) {
+    return NextResponse.json(
+      { ok: true, overview: [], tenant_selection_required: true },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
   if (tenants.length === 0) {
     return NextResponse.json(
       { ok: false, error: frontDeskText('settings_member_owner_only', locale) },

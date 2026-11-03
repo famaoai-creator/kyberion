@@ -12,14 +12,17 @@ export function withConciergePersonalApprovals<T>(
   viewer: ConciergeViewerContext,
   run: () => T
 ): T | null {
-  if (!viewer.tierAccess?.includes('personal')) return null;
-  let principal: ReturnType<typeof onboardingAuthorityPrincipal>;
+  // Admission is the signed-in installed owner proof below: viewer tierAccess
+  // never lists personal (the mask applies to every concierge role), so gating
+  // on it here would dead-lock the member-session approval path the principal
+  // contract explicitly supports (browser-session / oidc-jwt / registry-token).
   try {
-    principal = onboardingAuthorityPrincipal(viewer, { kind: 'person' });
+    const principal = onboardingAuthorityPrincipal(viewer, { kind: 'person' });
+    return asOnboardingOwner(() => withAuthenticatedPersonalApprovals(principal, run));
   } catch {
+    // No provable installed-owner context → the personal partition stays closed.
     return null;
   }
-  return asOnboardingOwner(() => withAuthenticatedPersonalApprovals(principal, run));
 }
 
 export function loadConciergeApproval(viewer: ConciergeViewerContext, channel: string, id: string) {

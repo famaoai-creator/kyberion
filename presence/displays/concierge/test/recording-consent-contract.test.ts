@@ -29,8 +29,8 @@ describe('concierge recording-consent settings contract', () => {
     )
   ) as { domains: Record<string, Record<string, Record<string, string>>> };
 
-  it('registers the recording section after notifications, before plugins', () => {
-    expect(settingsView).toMatch(/'notifications',\s*\n\s*'recording',\s*\n\s*'plugins'/);
+  it('registers the recording section after notifications, before the authority section', () => {
+    expect(settingsView).toMatch(/'notifications',\s*\n\s*'recording',\s*\n\s*'authority'/);
   });
 
   it('wires the section into the settings page render switch and nav label', () => {

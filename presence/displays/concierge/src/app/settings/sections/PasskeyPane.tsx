@@ -56,10 +56,12 @@ export function PasskeyPane({ locale, t }: { locale: ConciergeLocale; t: Setting
       setMessage({ text: done });
       await load();
     } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
       setMessage({
-        text: t('setup.passkey_err', {
-          detail: error instanceof Error ? error.message : String(error),
-        }),
+        text:
+          detail === 'installation_owner_first_passkey_loopback_required'
+            ? t('settings.installation_first_passkey_local')
+            : t('setup.passkey_err', { detail }),
         error: true,
       });
     } finally {

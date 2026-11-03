@@ -4,6 +4,8 @@ import * as React from 'react';
 import { decideWithPasskey } from '../../../lib/passkey-client';
 import { frontDeskFetch as fetch } from '../../../lib/front-desk-fetch';
 import { conciergeText, type ConciergeLocale, type ConciergeMessageKey } from '../../../lib/i18n';
+import { InstallationAccessNotice } from './InstallationAccessNotice';
+import { isInstallationAccessCode } from '../../../lib/installation-access-client';
 
 type Grant =
   | { operation_id: 'vcs:pr_create'; repository: string; visibility?: 'private' }
@@ -490,7 +492,11 @@ export function OnboardingAuthorityPanel({
         {t('authority.refresh')}
       </button>
       {busy ? <p role="status">{t('authority.pending')}</p> : null}
-      {error ? <p role="alert">{error}</p> : null}
+      {error && isInstallationAccessCode(error) ? (
+        <InstallationAccessNotice code={error} t={t} onConfirmed={() => setError(null)} />
+      ) : error ? (
+        <p role="alert">{error}</p>
+      ) : null}
       {!overview && !error && (kind === 'person' || tenant) ? (
         <p role="status">{t('authority.loading')}</p>
       ) : null}
@@ -655,11 +661,7 @@ export function OnboardingAuthorityPanel({
             {operation === 'vcs:development' ? (
               <label>
                 {t('authority.merge_base')}
-                <input
-                  type="text"
-                  value={mergeBase}
-                  readOnly
-                />
+                <input type="text" value={mergeBase} readOnly />
               </label>
             ) : null}
             <label>
