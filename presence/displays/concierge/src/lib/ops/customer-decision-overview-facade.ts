@@ -13,8 +13,8 @@ import { serverChildEnv } from '../server-child-env';
  * persona, sudo and mission keys blanked and KYBERION_TENANT set to the one
  * tenant the viewer resolved to. The facade assumes its own narrow
  * tenant-bound roles and refuses a `--tenant` other than the bound one, so a
- * child for tenant A can never print tenant B. No role assumption is added
- * for chronos_mirror_v2.
+ * child for tenant A can never print tenant B. The child is bounded by the
+ * server's own role (SYSTEM_ROLE=concierge, lib/server-child-env.ts).
  *
  * Responses are bounded: a timeout and an output cap on the child, a short
  * per-view cache (`kind:tenant:arg`) plus in-flight sharing so polling cards

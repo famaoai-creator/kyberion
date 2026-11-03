@@ -27,7 +27,8 @@ beforeAll(async () => {
       );
   });
   vi.stubEnv('KYBERION_ROOT', root);
-  vi.stubEnv('SYSTEM_ROLE', 'chronos_mirror_v2');
+  // The operations console (chronos_operator reads) runs inside Concierge.
+  vi.stubEnv('SYSTEM_ROLE', 'concierge');
   vi.stubEnv('KYBERION_ALLOW_TEST_NOTIFICATIONS', '0');
   vi.resetModules();
   registry = await import('./accountability-charter-registry.js');

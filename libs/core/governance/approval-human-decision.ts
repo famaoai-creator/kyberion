@@ -59,8 +59,8 @@ export function refuseHumanOnlyDecisionOnAgentPath(
  * nothing about the decider; the principal the route resolved does. Agent-facing
  * surfaces (MCP, terminal-bridge, nexus-daemon, …) are deliberately absent.
  */
+// The Chronos compatibility app only redirects to Concierge (/ops) and decides nothing.
 export const HUMAN_DECISION_SURFACE_SYSTEM_ROLES: ReadonlySet<string> = new Set([
-  'chronos_mirror_v2',
   'concierge',
   'presence_studio',
   'operator_surface',

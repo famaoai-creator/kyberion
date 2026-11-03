@@ -19,7 +19,7 @@ function probeChild(env: NodeJS.ProcessEnv): {
   const script = [
     `const a = await import(${JSON.stringify(authorityUrl)});`,
     'let bounded = false;',
-    "try { a.withExecutionContext('chronos_localadmin', () => undefined); } catch { bounded = true; }",
+    "try { a.withExecutionContext('dot_lifecycle_writer', () => undefined); } catch { bounded = true; }",
     'console.log("PROBE " + JSON.stringify({ role: a.resolveRole(), persona: a.resolveIdentityContext().persona, bounded }));',
   ].join('\n');
   const result = safeExecResult(
