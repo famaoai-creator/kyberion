@@ -23,13 +23,14 @@
  * `CoSessionPathLease` active|released|expired).
  *
  * Persistence/exclusion rides the `lease-backend` seam (same contract as
- * writer-lease): mutex via `withLockSync`, live holder projection via
- * `FencedLeaseRecord` read/write. Rich local state (lease ids, renew_count,
+ * writer-lease): mutex via `withLock` / `withLockSync`, live holder projection
+ * via `FencedLeaseRecord` read/write. Rich local state (lease ids, renew_count,
  * follower registry, released tombstones) stays in-process; the durable
  * record is the cross-manager source of truth for who holds a resource.
  * Default backend is a fresh memory provider so tests stay hermetic; inject
  * `resolveLeaseBackend()` (and a repo-safe `leaseKeyFor`) for durable local
- * or distributed providers.
+ * providers. Distributed backends such as `kv-lock-stub` only expose async
+ * `withLock` — use the `*Async` methods on this manager.
  *
  * No timers (time is an injected `now` in ms). Expiry is lazy: evaluated from
  * `expires_at_ms <= now` at each call. Validation is collect-all: every op
@@ -160,8 +161,8 @@ export interface MissionLeaseManagerOptions {
   /**
    * Persistence/exclusion backend. Defaults to a fresh memory backend so each
    * manager is hermetic; inject `resolveLeaseBackend()` (or `local-file-lock` /
-   * `memory`) for governed providers. Mutations use `withLockSync` only —
-   * async-only providers such as `kv-lock-stub` are not supported yet.
+   * `memory`) for sync callers. Distributed providers such as `kv-lock-stub`
+   * refuse `withLockSync` — use the manager's `*Async` methods with those.
    */
   backend?: LeaseBackend;
   /**
@@ -285,8 +286,12 @@ export class MissionLeaseManager {
     return state;
   }
 
-  private underLock<T>(resource: string, fn: () => T): T {
+  private underLockSync<T>(resource: string, fn: () => T): T {
     return this.backend.withLockSync(lockNamespace(resource), fn);
+  }
+
+  private underLockAsync<T>(resource: string, fn: () => T): Promise<T> {
+    return this.backend.withLock(lockNamespace(resource), async () => fn());
   }
 
   private hydrateFromDurable(
@@ -396,7 +401,7 @@ export class MissionLeaseManager {
     }
     if (issues.length) return { ok: false, issues };
 
-    return this.underLock(resource, () => {
+    return this.underLockSync(resource, () => {
       const state = this.slot(resource, true)!;
       const live = this.liveLeaseOf(state, resource, input.now);
       if (live && live.holder !== holder) {
@@ -484,7 +489,7 @@ export class MissionLeaseManager {
       };
     }
 
-    return this.underLock(resource, () => {
+    return this.underLockSync(resource, () => {
       const renewIssues: MissionLeaseIssue[] = [];
       const stored = this.leases.get(leaseId);
       if (!stored) {
@@ -557,7 +562,7 @@ export class MissionLeaseManager {
       };
     }
 
-    return this.underLock(resource, () => {
+    return this.underLockSync(resource, () => {
       const releaseIssues: MissionLeaseIssue[] = [];
       const stored = this.leases.get(leaseId);
       if (!stored) {
@@ -612,7 +617,7 @@ export class MissionLeaseManager {
     }
     if (issues.length) return { ok: false, suspended: [], issues };
 
-    return this.underLock(resource, () => {
+    return this.underLockSync(resource, () => {
       const state = this.slot(resource);
       const live = this.liveLeaseOf(state, resource, input.now);
       if (!state || !live) {
@@ -648,7 +653,7 @@ export class MissionLeaseManager {
 
   /** Latest lease for a resource (the surviving tombstone), lazily evaluated. */
   getResourceLease(resource: string, now: number): MissionLease | undefined {
-    return this.underLock(resource, () => {
+    return this.underLockSync(resource, () => {
       const state = this.slot(resource);
       const live = this.liveLeaseOf(state, resource, now);
       if (live) return toPublic(live, now);
@@ -659,7 +664,7 @@ export class MissionLeaseManager {
 
   /** Mastra `getLeaseOwner` parity: live holder, or undefined when free. */
   getHolder(resource: string, now: number): string | undefined {
-    return this.underLock(
+    return this.underLockSync(
       resource,
       () => this.liveLeaseOf(this.slot(resource), resource, now)?.holder
     );
@@ -672,7 +677,7 @@ export class MissionLeaseManager {
    * so a later takeover re-suspends them under the new holder).
    */
   listFollowers(resource: string, now: number): MissionLeaseFollower[] {
-    return this.underLock(resource, () => {
+    return this.underLockSync(resource, () => {
       const state = this.slot(resource);
       if (!state) return [];
       const live = this.liveLeaseOf(state, resource, now);
@@ -689,6 +694,298 @@ export class MissionLeaseManager {
   /** Whether `holder` is a suspended follower on `resource` at `now`. */
   isSuspended(resource: string, holder: string, now: number): boolean {
     return this.listFollowers(resource, now).some(
+      (follower) => follower.holder === holder && follower.status === 'suspended'
+    );
+  }
+
+  // --- async surface (required for distributed backends without withLockSync) ---
+
+  /**
+   * Async acquire — same semantics as {@link acquireLease}, serialized through
+   * `backend.withLock` so `kv-lock-stub` and future Redis/KV providers work.
+   */
+  async acquireLeaseAsync(input: AcquireMissionLeaseInput): Promise<AcquireMissionLeaseResult> {
+    const issues: MissionLeaseIssue[] = [];
+    const resource = typeof input.resource === 'string' ? input.resource.trim() : '';
+    const holder = typeof input.holder === 'string' ? input.holder.trim() : '';
+    if (!resource) issues.push(issue('LEASE_INVALID_ARGUMENT', 'resource is required'));
+    if (!holder) issues.push(issue('LEASE_INVALID_ARGUMENT', 'holder is required'));
+    if (!Number.isFinite(input.ttlMs) || input.ttlMs <= 0) {
+      issues.push(issue('LEASE_INVALID_ARGUMENT', 'ttlMs must be a positive finite number'));
+    }
+    if (!Number.isFinite(input.now)) {
+      issues.push(issue('LEASE_INVALID_ARGUMENT', 'now must be a finite millisecond timestamp'));
+    }
+    if (Number.isFinite(input.now) && Number.isFinite(input.ttlMs)) {
+      const deadline = input.now + input.ttlMs;
+      if (!Number.isFinite(deadline) || deadline <= input.now) {
+        issues.push(
+          issue('LEASE_INVALID_ARGUMENT', 'computed expiry must be a finite instant after now')
+        );
+      }
+    }
+    if (issues.length) return { ok: false, issues };
+
+    return this.underLockAsync(resource, () => {
+      const state = this.slot(resource, true)!;
+      const live = this.liveLeaseOf(state, resource, input.now);
+      if (live && live.holder !== holder) {
+        if (!state.contenders.has(holder)) state.contenders.set(holder, input.now);
+        return {
+          ok: false,
+          lease: toPublic(live, input.now),
+          issues: [
+            issue(
+              'LEASE_SUSPENDED',
+              `resource '${resource}' is leased by '${live.holder}' until ${live.expires_at_ms}ms; contender '${holder}' suspended`
+            ),
+          ],
+        };
+      }
+      if (live) {
+        return { ok: true, lease: toPublic(live, input.now), issues: [] };
+      }
+
+      const durable = this.backend.read(this.leaseKeyFor(resource));
+      const nextFence = Math.max(state.fence, durable?.fence ?? 0) + 1;
+      state.fence = nextFence;
+      const stored: StoredLease = {
+        lease_id: leaseIdFor(resource, nextFence),
+        resource_id: resource,
+        holder,
+        fence: nextFence,
+        status: 'active',
+        acquired_at_ms: input.now,
+        expires_at_ms: input.now + input.ttlMs,
+        renewed_at_ms: input.now,
+        renew_count: 0,
+      };
+      this.leases.set(stored.lease_id, stored);
+      state.lease_id = stored.lease_id;
+      state.contenders.delete(holder);
+      this.persistLive(stored);
+      return {
+        ok: true,
+        lease: toPublic(stored, input.now),
+        suspended_followers: this.suspendedUnder(state, stored),
+        issues: [],
+      };
+    });
+  }
+
+  /** Async renew — see {@link renewLease}. */
+  async renewLeaseAsync(input: RenewMissionLeaseInput): Promise<RenewMissionLeaseResult> {
+    const issues: MissionLeaseIssue[] = [];
+    const leaseId = typeof input.leaseId === 'string' ? input.leaseId.trim() : '';
+    const holder = typeof input.holder === 'string' ? input.holder.trim() : '';
+    if (!leaseId) issues.push(issue('LEASE_INVALID_ARGUMENT', 'leaseId is required'));
+    if (!holder) issues.push(issue('LEASE_INVALID_ARGUMENT', 'holder is required'));
+    if (!Number.isFinite(input.extendMs) || input.extendMs <= 0) {
+      issues.push(issue('LEASE_INVALID_ARGUMENT', 'extendMs must be a positive finite number'));
+    }
+    if (!Number.isFinite(input.now)) {
+      issues.push(issue('LEASE_INVALID_ARGUMENT', 'now must be a finite millisecond timestamp'));
+    }
+    if (Number.isFinite(input.now) && Number.isFinite(input.extendMs)) {
+      const deadline = input.now + input.extendMs;
+      if (!Number.isFinite(deadline) || deadline <= input.now) {
+        issues.push(
+          issue('LEASE_INVALID_ARGUMENT', 'computed expiry must be a finite instant after now')
+        );
+      }
+    }
+    if (issues.length) return { ok: false, issues };
+
+    const storedPeek = this.leases.get(leaseId);
+    const resource = storedPeek?.resource_id;
+    if (!resource) {
+      return {
+        ok: false,
+        issues: [issue('LEASE_NOT_FOUND', `unknown lease_id '${leaseId}'`)],
+      };
+    }
+
+    return this.underLockAsync(resource, () => {
+      const renewIssues: MissionLeaseIssue[] = [];
+      const stored = this.leases.get(leaseId);
+      if (!stored) {
+        return {
+          ok: false,
+          issues: [issue('LEASE_NOT_FOUND', `unknown lease_id '${leaseId}'`)],
+        };
+      }
+      this.liveLeaseOf(this.slot(stored.resource_id), stored.resource_id, input.now);
+      if (this.slot(stored.resource_id)?.lease_id !== leaseId) {
+        renewIssues.push(
+          issue(
+            'LEASE_SUPERSEDED',
+            `lease '${leaseId}' is no longer the current generation for '${stored.resource_id}'`
+          )
+        );
+      }
+      if (stored.status === 'released') {
+        renewIssues.push(issue('LEASE_RELEASED', `lease '${leaseId}' was released`));
+      } else if (stored.expires_at_ms <= input.now) {
+        renewIssues.push(
+          issue(
+            'LEASE_EXPIRED',
+            `lease '${leaseId}' expired at ${stored.expires_at_ms}ms (now=${input.now}ms)`
+          )
+        );
+      }
+      if (stored.holder !== holder) {
+        renewIssues.push(
+          issue(
+            'LEASE_NOT_HOLDER',
+            `lease '${leaseId}' is held by '${stored.holder}', not '${holder}'`
+          )
+        );
+      }
+      if (renewIssues.length)
+        return { ok: false, lease: toPublic(stored, input.now), issues: renewIssues };
+
+      stored.expires_at_ms = input.now + input.extendMs;
+      stored.renewed_at_ms = input.now;
+      stored.renew_count += 1;
+      this.persistLive(stored);
+      return { ok: true, lease: toPublic(stored, input.now), issues: [] };
+    });
+  }
+
+  /** Async release — see {@link releaseLease}. */
+  async releaseLeaseAsync(input: ReleaseMissionLeaseInput): Promise<ReleaseMissionLeaseResult> {
+    const issues: MissionLeaseIssue[] = [];
+    const leaseId = typeof input.leaseId === 'string' ? input.leaseId.trim() : '';
+    const holder = typeof input.holder === 'string' ? input.holder.trim() : '';
+    if (!leaseId) issues.push(issue('LEASE_INVALID_ARGUMENT', 'leaseId is required'));
+    if (!holder) issues.push(issue('LEASE_INVALID_ARGUMENT', 'holder is required'));
+    if (!Number.isFinite(input.now)) {
+      issues.push(issue('LEASE_INVALID_ARGUMENT', 'now must be a finite millisecond timestamp'));
+    }
+    if (issues.length) return { ok: false, issues };
+
+    const storedPeek = this.leases.get(leaseId);
+    const resource = storedPeek?.resource_id;
+    if (!resource) {
+      return {
+        ok: false,
+        issues: [issue('LEASE_NOT_FOUND', `unknown lease_id '${leaseId}'`)],
+      };
+    }
+
+    return this.underLockAsync(resource, () => {
+      const releaseIssues: MissionLeaseIssue[] = [];
+      const stored = this.leases.get(leaseId);
+      if (!stored) {
+        return {
+          ok: false,
+          issues: [issue('LEASE_NOT_FOUND', `unknown lease_id '${leaseId}'`)],
+        };
+      }
+      if (stored.status === 'released') {
+        releaseIssues.push(issue('LEASE_RELEASED', `lease '${leaseId}' was already released`));
+      }
+      if (stored.holder !== holder) {
+        releaseIssues.push(
+          issue(
+            'LEASE_NOT_HOLDER',
+            `lease '${leaseId}' is held by '${stored.holder}', not '${holder}'`
+          )
+        );
+      }
+      if (releaseIssues.length)
+        return { ok: false, lease: toPublic(stored, input.now), issues: releaseIssues };
+
+      if (stored.status === 'active') {
+        stored.status = 'released';
+        stored.released_at_ms = input.now;
+        this.persistReleased(stored);
+      }
+      return { ok: true, lease: toPublic(stored, input.now), issues: [] };
+    });
+  }
+
+  /** Async suspendFollowers — see {@link suspendFollowers}. */
+  async suspendFollowersAsync(input: SuspendFollowersInput): Promise<SuspendFollowersResult> {
+    const issues: MissionLeaseIssue[] = [];
+    const resource = typeof input.resource === 'string' ? input.resource.trim() : '';
+    if (!resource) issues.push(issue('LEASE_INVALID_ARGUMENT', 'resource is required'));
+    if (!Number.isFinite(input.now)) {
+      issues.push(issue('LEASE_INVALID_ARGUMENT', 'now must be a finite millisecond timestamp'));
+    }
+    const followers = input.followers ?? [];
+    for (const follower of followers) {
+      if (typeof follower !== 'string' || !follower.trim()) {
+        issues.push(issue('LEASE_INVALID_ARGUMENT', 'followers must be non-empty holder ids'));
+        break;
+      }
+    }
+    if (issues.length) return { ok: false, suspended: [], issues };
+
+    return this.underLockAsync(resource, () => {
+      const state = this.slot(resource);
+      const live = this.liveLeaseOf(state, resource, input.now);
+      if (!state || !live) {
+        return {
+          ok: false,
+          suspended: [],
+          issues: [
+            issue(
+              'LEASE_NOT_FOUND',
+              `no live lease on resource '${resource}'; no holder to suspend followers under`
+            ),
+          ],
+        };
+      }
+      for (const follower of followers) {
+        const id = follower.trim();
+        if (id !== live.holder && !state.contenders.has(id)) {
+          state.contenders.set(id, input.now);
+        }
+      }
+      return { ok: true, suspended: this.suspendedUnder(state, live), issues: [] };
+    });
+  }
+
+  /** Async getResourceLease — see {@link getResourceLease}. */
+  async getResourceLeaseAsync(resource: string, now: number): Promise<MissionLease | undefined> {
+    return this.underLockAsync(resource, () => {
+      const state = this.slot(resource);
+      const live = this.liveLeaseOf(state, resource, now);
+      if (live) return toPublic(live, now);
+      const stored = state?.lease_id ? this.leases.get(state.lease_id) : undefined;
+      return stored ? toPublic(stored, now) : undefined;
+    });
+  }
+
+  /** Async getHolder — see {@link getHolder}. */
+  async getHolderAsync(resource: string, now: number): Promise<string | undefined> {
+    return this.underLockAsync(
+      resource,
+      () => this.liveLeaseOf(this.slot(resource), resource, now)?.holder
+    );
+  }
+
+  /** Async listFollowers — see {@link listFollowers}. */
+  async listFollowersAsync(resource: string, now: number): Promise<MissionLeaseFollower[]> {
+    return this.underLockAsync(resource, () => {
+      const state = this.slot(resource);
+      if (!state) return [];
+      const live = this.liveLeaseOf(state, resource, now);
+      return [...state.contenders.entries()]
+        .filter(([holder]) => holder !== live?.holder)
+        .map(([holder, contended_at_ms]) => ({
+          holder,
+          status: (live ? 'suspended' : 'unsuspended') as MissionFollowerStatus,
+          contended_at_ms,
+        }));
+    });
+  }
+
+  /** Async isSuspended — see {@link isSuspended}. */
+  async isSuspendedAsync(resource: string, holder: string, now: number): Promise<boolean> {
+    const followers = await this.listFollowersAsync(resource, now);
+    return followers.some(
       (follower) => follower.holder === holder && follower.status === 'suspended'
     );
   }
