@@ -21,7 +21,18 @@ import {
   type PrBodySourceTier,
 } from './github.js';
 import { runVcsMutationWithApproval, type VcsHostMutation } from './publication-host.js';
+import { computeApprovalPayloadHash } from '../governance/approval-store.js';
+import { withExecutionContext } from '../authority.js';
+import {
+  PR_PUBLICATION_STORE_ROLE,
+  withPrPublicationRuntime,
+  withPrPublicationStoreAccess,
+} from '../governance/pr-publication-runtime.js';
+import { writeScopedArtifact } from '../workforce/artifact-store.js';
+import { createLogger } from '../logger.js';
 import type { VcsCommandResult } from './git.js';
+
+const logger = createLogger('vcs-governance-host');
 
 const git: GitRunner = (args, cwd) => safeExecResult('git', args, { cwd });
 export function resolveInstallationGovernanceRoot(
@@ -93,12 +104,71 @@ export interface VcsGovernanceHostOptions {
   bodySourceTier?: PrBodySourceTier;
 }
 
+/**
+ * A `--body-file` on the scratch floor classifies as `protected_or_unknown`,
+ * which makes the pr_create target unbuildable and forces human_only on every
+ * run — including bases a repository-scoped charter already covers. Stage the
+ * exact bytes into the public evidence floor so the provenance is provable;
+ * the body is published verbatim either way.
+ */
+function stageUnprovablePrBodyFile(
+  mutation: VcsHostMutation,
+  invocationId: string
+): VcsHostMutation {
+  if (mutation.operation !== 'pr_create' || !mutation.params.bodyFile) return mutation;
+  if (prPublicationBodySourceForPath(mutation.params.bodyFile) !== 'protected_or_unknown')
+    return mutation;
+  try {
+    const content = String(safeReadFile(mutation.params.bodyFile, { encoding: 'utf8' }));
+    const scope = currentScopeEnvelope()?.identity ?? resolveScopeContext();
+    const standingScope = scope.tenant_slug
+      ? { kind: 'organization' as const, tenant_slug: scope.tenant_slug }
+      : { kind: 'person' as const };
+    const name = `pr-publication/${invocationId}/body-${computeApprovalPayloadHash({ body: content })}.md`;
+    const artifactPath = `active/shared/artifacts/public/shared/evidence/${name}`;
+    const indexPath = 'active/shared/artifacts/public/shared/artifacts-index.jsonl';
+    const artifact = withPrPublicationRuntime(
+      standingScope,
+      invocationId,
+      () =>
+        withPrPublicationStoreAccess('body-stage', [], [artifactPath, indexPath], () =>
+          withExecutionContext(
+            PR_PUBLICATION_STORE_ROLE,
+            () =>
+              writeScopedArtifact({
+                // Public shared floor — the body is published verbatim to the PR
+                // either way; staging under the acting tenant blurs provenance.
+                scope: { tenant: 'shared' },
+                tier: 'public',
+                artifact_class: 'evidence',
+                name,
+                content,
+              }),
+            'worker',
+            scope.tenant_slug
+          )
+        ),
+      'vcs:pr_create'
+    );
+    // Staging only widens delegation; without an artifact the unprovable
+    // bodyFile still resolves to human_only downstream — fail closed.
+    if (!artifact?.repo_relative_path) return mutation;
+    return { ...mutation, params: { ...mutation.params, bodyFile: artifact.repo_relative_path } };
+  } catch (error) {
+    logger.warn(
+      `pr body staging failed — continuing with unprovable bodyFile (human_only) | next: none | evidence: ${error instanceof Error ? error.message : String(error)}`
+    );
+    return mutation;
+  }
+}
+
 export function runVcsMutationWithWorktreeGovernance(
   mutation: VcsHostMutation,
   invocationId: string,
   print: (value: unknown) => void,
   options: VcsGovernanceHostOptions = {}
 ): VcsCommandResult {
+  mutation = stageUnprovablePrBodyFile(mutation, invocationId);
   const source =
     mutation.operation === 'pr_create' && mutation.params.bodyFile
       ? publicationBodySourceTier(mutation.params.bodyFile)
