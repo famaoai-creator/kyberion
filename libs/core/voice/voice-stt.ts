@@ -4,6 +4,7 @@ import {
   explainSeamProviderDecision,
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
+  resolveSeamSelectionEntry,
 } from '../seam-provider-selection.js';
 import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 import { trimEndChars } from '../foundation/text.js';
@@ -144,10 +145,13 @@ function selectVoiceSttBackendOrder(
   availability: VoiceSttAvailability,
   options: VoiceSttOrderOptions
 ): ConcreteVoiceSttBackend[] | null {
-  const purpose = options.purpose?.trim() || undefined;
-  if (!purpose && !matchSeamSelectionRule(VOICE_HUB_STT_SEAM, { context: options.context })) {
-    return null;
-  }
+  const entry = resolveSeamSelectionEntry({
+    seam: VOICE_HUB_STT_SEAM,
+    purpose: options.purpose,
+    context: options.context,
+  });
+  if (entry.kind !== 'governed') return null;
+  const purpose = entry.request.purpose;
   const ids = Array.from(
     new Set([...baseOrder, ...listVoiceSttAdapters().map((adapter) => adapter.backend)])
   ).filter((backend): backend is ConcreteVoiceSttBackend => backend !== 'auto');
@@ -157,13 +161,8 @@ function selectVoiceSttBackendOrder(
       : { id, eligible: false, unmet: ['not available (needs setup)'] }
   );
   const request = {
-    seam: VOICE_HUB_STT_SEAM,
+    ...entry.request,
     candidates,
-    ...(purpose ? { purpose } : {}),
-    ...(options.context && Object.keys(options.context).length > 0
-      ? { context: options.context }
-      : {}),
-    decisionKey: purpose || 'default',
   };
   const decision =
     options.record === false

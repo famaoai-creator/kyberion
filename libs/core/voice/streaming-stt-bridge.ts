@@ -17,14 +17,13 @@ import { engineRuntimePreferencesReadiness } from './engine-runtime-preferences.
 import { nowIso } from '../foundation/time.js';
 
 import type { AudioChunk, TranscriptChunk } from '../meeting/meeting-session-types.js';
-import { coreSeamCatalog, createSeam } from '../seam.js';
+import { coreSeamCatalog, createSeam, createSeamLifecycle } from '../seam.js';
 import {
-  getSeamSelectionPolicy,
   listSeamSelectionPurposes,
   resolveSeamProviderDecision,
+  resolveSeamSelectionEntry,
   type SeamProviderDecision,
 } from '../seam-provider-selection.js';
-import { matchSeamSelectionRule } from '../seam-selection-rules.js';
 import {
   primaryLanguageSubtag,
   supportsSpeechLanguage,
@@ -106,50 +105,58 @@ const KNOWN_STREAMING_STT_CAPABILITIES: Record<string, StreamingSttCapabilities>
   speech_cpp: { local_only: true },
 };
 
-const streamingSttSeam = createSeam<() => StreamingSpeechToTextBridge>({
+type StreamingSttFactory = (() => StreamingSpeechToTextBridge) & {
+  readonly capabilities: StreamingSttCapabilities;
+};
+
+const streamingSttSeam = createSeam<StreamingSttFactory>({
   key: 'streaming-stt-bridge',
   multiplicity: 'named',
   catalog: coreSeamCatalog,
   owner: 'libs/core/voice/streaming-stt-bridge.ts',
 });
-const streamingSttDisposers = new Map<string, () => void>();
-const streamingSttCapabilities = new Map<string, StreamingSttCapabilities>();
+const registrations = createSeamLifecycle(streamingSttSeam);
 
 export function registerStreamingSttBridge(
   id: string,
   factory: () => StreamingSpeechToTextBridge,
   capabilities?: StreamingSttCapabilities
 ): () => void {
-  const seamDispose = streamingSttSeam.register(id, factory, {
+  const implementation = Object.assign(() => factory(), {
+    capabilities: Object.freeze({
+      ...(capabilities ?? KNOWN_STREAMING_STT_CAPABILITIES[id] ?? {}),
+    }),
+  });
+  return registrations.register(id, implementation, {
     provenance: 'builtin',
     source: 'streaming-stt-bridge',
   });
-  if (capabilities) streamingSttCapabilities.set(id, capabilities);
-  else streamingSttCapabilities.delete(id);
-  const dispose = () => {
-    seamDispose();
-    if (streamingSttDisposers.get(id) === dispose) {
-      streamingSttDisposers.delete(id);
-      streamingSttCapabilities.delete(id);
-    }
-  };
-  streamingSttDisposers.set(id, dispose);
-  return dispose;
 }
+
+function registerBuiltinStreamingSttBridges(): void {
+  registerStreamingSttBridge('stub', () => new StubStreamingSpeechToTextBridge());
+}
+
+registerBuiltinStreamingSttBridges();
 
 /** Declared capabilities of a bridge id (registration first, then known ids). */
 export function getStreamingSttBridgeCapabilities(id: string): StreamingSttCapabilities {
-  return streamingSttCapabilities.get(id) ?? KNOWN_STREAMING_STT_CAPABILITIES[id] ?? {};
+  return (
+    streamingSttSeam.getOptional(id)?.capabilities ?? KNOWN_STREAMING_STT_CAPABILITIES[id] ?? {}
+  );
 }
 
-/** Every bridge id getStreamingSttBridge() can return: the stub plus registered ones. */
+/** The builtin default leads, followed by the other registered bridge ids. */
 export function listStreamingSttBridges(): string[] {
   const ids = streamingSttSeam.list().map((provider) => provider.id);
-  return ['stub', ...ids.filter((id) => id !== 'stub').sort()];
+  return ids.sort(
+    (left, right) => Number(right === 'stub') - Number(left === 'stub') || left.localeCompare(right)
+  );
 }
 
 export function resetStreamingSttBridges(): void {
-  for (const dispose of [...streamingSttDisposers.values()]) dispose();
+  registrations.reset();
+  registerBuiltinStreamingSttBridges();
 }
 
 function enginePreference(key: 'streaming_stt_bridge'): string | undefined {
@@ -162,7 +169,6 @@ export function getStreamingSttBridge(
     enginePreference('streaming_stt_bridge') ??
     'stub'
 ): StreamingSpeechToTextBridge {
-  if (id === 'stub') return new StubStreamingSpeechToTextBridge();
   const factory = streamingSttSeam.getOptional(id);
   if (!factory) throw new Error(`[streaming-stt] unknown bridge id '${id}'`);
   return factory();
@@ -235,8 +241,18 @@ export function selectStreamingSttBridge(
 ): StreamingSttSelection {
   const explicit =
     options.bridgeId?.trim() || getRegisteredEnvText('KYBERION_STREAMING_STT_BRIDGE')?.trim();
-  if (explicit) {
-    return { bridge_id: explicit, bridge: getStreamingSttBridge(explicit), source: 'explicit' };
+  if (explicit && explicit !== 'auto') {
+    const entry = resolveSeamSelectionEntry({
+      seam: STREAMING_STT_SEAM,
+      explicitProvider: explicit,
+    });
+    if (entry.kind === 'explicit') {
+      return {
+        bridge_id: entry.providerId,
+        bridge: getStreamingSttBridge(entry.providerId),
+        source: 'explicit',
+      };
+    }
   }
   const purpose = options.purpose?.trim() || undefined;
   const savedDefault = purpose ? undefined : enginePreference('streaming_stt_bridge');
@@ -244,22 +260,29 @@ export function selectStreamingSttBridge(
   const language = primaryLanguageSubtag(requires.language);
   const context = { ...(language ? { language } : {}), ...(options.context ?? {}) };
   const stubUnusable = unmetStreamingSttRequirements('stub', requires).length > 0;
-  const shouldSelect =
-    Boolean(savedDefault) ||
-    Boolean(purpose) ||
-    Boolean(matchSeamSelectionRule(STREAMING_STT_SEAM, { context })) ||
-    (stubUnusable && Boolean(getSeamSelectionPolicy(STREAMING_STT_SEAM)?.fallback_purpose));
-  if (!shouldSelect) {
+  const entry = resolveSeamSelectionEntry({
+    seam: STREAMING_STT_SEAM,
+    explicitProvider: explicit,
+    purpose,
+    context,
+    defaultProvider: savedDefault,
+    selectForDefault: true,
+    defaultEligible: !stubUnusable,
+  });
+  if (entry.kind === 'explicit') {
+    return {
+      bridge_id: entry.providerId,
+      bridge: getStreamingSttBridge(entry.providerId),
+      source: 'explicit',
+    };
+  }
+  if (entry.kind === 'legacy') {
     return { bridge_id: 'stub', bridge: getStreamingSttBridge('stub'), source: 'default' };
   }
   const candidates = listStreamingSttCandidates(requires);
   const decision = resolveSeamProviderDecision({
-    seam: STREAMING_STT_SEAM,
+    ...entry.request,
     candidates,
-    ...(savedDefault ? { defaultProvider: savedDefault } : {}),
-    ...(purpose ? { purpose } : {}),
-    ...(Object.keys(context).length > 0 ? { context } : {}),
-    decisionKey: purpose || 'default',
   });
   if (decision.strategy === 'unresolved' || !decision.provider_id) {
     const known = listSeamSelectionPurposes(STREAMING_STT_SEAM);

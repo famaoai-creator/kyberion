@@ -6,7 +6,12 @@
  */
 
 import type { AgentAdapter } from './agent-adapter.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 import type { TaskToolRuntime } from '../workforce/task-tool-runtime.js';
 import type { EventScopeInput } from '../event-scope.js';
 
@@ -45,7 +50,7 @@ const execAdapterSeam = createSeam<AgentExecAdapterBridge>({
   owner: 'libs/core/agent/agent-exec-adapter-bridge.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(execAdapterSeam);
 
 export function registerAgentExecAdapterBridge(
   bridge: AgentExecAdapterBridge,
@@ -56,24 +61,11 @@ export function registerAgentExecAdapterBridge(
 ): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('AgentExecAdapterBridge.bridge_id is required');
-  const disposeFromSeam = execAdapterSeam.register(id, bridge, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, bridge, metadata);
 }
 
 export function resetAgentExecAdapterBridges(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
 }
 
 export function listAgentExecAdapterBridges(): AgentExecAdapterBridge[] {

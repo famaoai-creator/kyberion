@@ -7,7 +7,12 @@
 import type { AudioBus } from './audio-bus.js';
 import { StubAudioBus } from './audio-bus.js';
 import { getRegisteredEnv } from '../foundation/env.js';
-import { coreSeamCatalog, createSeam, type SeamProviderMetadata } from '../seam.js';
+import {
+  coreSeamCatalog,
+  createSeam,
+  createSeamLifecycle,
+  type SeamProviderMetadata,
+} from '../seam.js';
 
 export type AudioBusId = 'stub' | 'blackhole' | 'pulseaudio' | (string & {});
 
@@ -32,7 +37,7 @@ const audioBusSeam = createSeam<AudioBusBridge>({
   owner: 'libs/core/voice/audio-bus-bridge.ts',
 });
 
-const registeredDisposers = new Map<string, () => void>();
+const registrations = createSeamLifecycle(audioBusSeam);
 
 export function registerAudioBusBridge(
   bridge: AudioBusBridge,
@@ -43,24 +48,11 @@ export function registerAudioBusBridge(
 ): () => void {
   const id = String(bridge.bridge_id || '').trim();
   if (!id) throw new Error('AudioBusBridge.bridge_id is required');
-  const disposeFromSeam = audioBusSeam.register(id, bridge, metadata);
-  const dispose = () => {
-    disposeFromSeam();
-    if (registeredDisposers.get(id) === dispose) registeredDisposers.delete(id);
-  };
-  registeredDisposers.set(id, dispose);
-  return dispose;
+  return registrations.register(id, bridge, metadata);
 }
 
 export function resetAudioBusBridges(): void {
-  for (const dispose of registeredDisposers.values()) {
-    try {
-      dispose();
-    } catch {
-      /* noop */
-    }
-  }
-  registeredDisposers.clear();
+  registrations.reset();
 }
 
 export function listAudioBusBridges(): AudioBusBridge[] {
