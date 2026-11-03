@@ -42,13 +42,13 @@ describe('wire error boundary checker', () => {
     expect(
       findWireErrorBoundaryViolations(
         'return NextResponse.json({ error: error.message }, { status: 500 });',
-        'presence/displays/chronos-mirror-v2/src/app/api/example/route.ts'
+        'presence/displays/concierge/src/app/api/ops/example/route.ts'
       )
     ).toEqual([expect.stringContaining('raw exception message')]);
     expect(
       findWireErrorBoundaryViolations(
         'return NextResponse.json({ error: error?.message }, { status: 500 });',
-        'presence/displays/chronos-mirror-v2/src/app/api/example/route.ts'
+        'presence/displays/concierge/src/app/api/ops/example/route.ts'
       )
     ).toEqual([expect.stringContaining('raw exception message')]);
   });
@@ -57,7 +57,7 @@ describe('wire error boundary checker', () => {
     expect(
       findWireErrorBoundaryViolations(
         'return NextResponse.json({ error: error instanceof Error ? error.message : "bad", debugStack: error.stack });',
-        'presence/displays/chronos-mirror-v2/src/app/api/example/route.ts'
+        'presence/displays/concierge/src/app/api/ops/example/route.ts'
       )
     ).toEqual([
       expect.stringContaining('raw exception message'),

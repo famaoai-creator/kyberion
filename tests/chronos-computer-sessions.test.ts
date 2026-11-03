@@ -71,7 +71,7 @@ vi.mock('@agent/core/shell/pty-engine', () => ({
 describe('Chronos computer sessions', () => {
   it('collects governed system sessions alongside browser and terminal sessions', async () => {
     const { collectComputerSessions } =
-      await import('../presence/displays/chronos-mirror-v2/src/lib/computer-sessions');
+      await import('../presence/displays/concierge/src/lib/ops/computer-sessions');
     const sessions = collectComputerSessions();
 
     expect(sessions.find((session) => session.id === 'system-1')).toMatchObject({

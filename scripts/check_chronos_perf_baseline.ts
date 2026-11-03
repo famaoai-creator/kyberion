@@ -66,15 +66,15 @@ function arg(argv: string[], name: string, fallback: string): string {
 }
 
 function startServer(port: string): ChildProcess {
-  return spawn('pnpm', ['--dir', 'presence/displays/chronos-mirror-v2', 'start', '--port', port], {
+  // The operations console (former Chronos) is served by Concierge under /ops;
+  // the local-operator listener attests loopback and the escape hatch admits
+  // this headless browser without a sign-in, for this measurement only.
+  return spawn('pnpm', ['--dir', 'presence/displays/concierge', 'local:start', '--port', port], {
     stdio: 'ignore',
     env: {
       ...process.env,
       NODE_ENV: 'production',
-      HOSTNAME: '127.0.0.1',
-      // The server binds loopback only; TRUST_PROXY lets Next 15+ (no NextRequest.ip)
-      // treat this local browser as loopback instead of redirecting it to /login.
-      KYBERION_TRUST_PROXY: '1',
+      KYBERION_CONCIERGE_ALLOW_ANONYMOUS_LOOPBACK: '1',
     },
   });
 }
@@ -105,7 +105,7 @@ export async function runChronosPerfBaseline(argv: string[] = []): Promise<Chron
     const browser = await chromium.launch({ headless: true });
     try {
       const page = await browser.newPage({ reducedMotion: 'reduce' });
-      const paths = ['/', '/?view=agents', '/?view=deliverables'];
+      const paths = ['/ops', '/ops?section=operations', '/ops?section=deliverables'];
       const samples = [] as ChronosPerfSample[];
       for (const pathname of paths)
         samples.push(await sampleChronosPage(page, `${baseUrl}${pathname}`));

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * PE-02: end-to-end proof of the Chronos in-process plugin host with a real
+ * PE-02: end-to-end proof of the operations console's in-process plugin host
+ * (served by Concierge under /ops since MSN-KYBERION-SERVER-20261104) with a real
  * third-party plugin in a real browser.
  *
  *   1. builds a hermetic Kyberion root under active/shared/tmp/ (package.json,
@@ -13,11 +14,11 @@
  *      pseudo-terminal, typing back its terminal challenge code (HA-04: run
  *      the check from a plain terminal — from an agent harness the CLI
  *      refuses by design);
- *   3. starts the built Chronos (`next start`) on a free loopback port with
+ *   3. starts the built Concierge (`next start`) on a free loopback port with
  *      the plugin host enabled for that tenant and a random localadmin token —
  *      once directly and once with the environment surface_runtime gives every
- *      surface (`SYSTEM_ROLE=chronos_mirror_v2`, RA-03), because a SYSTEM_ROLE
- *      launch used to silently ignore Chronos's in-process role assumptions;
+ *      surface (`SYSTEM_ROLE=concierge`, RA-03), because a SYSTEM_ROLE
+ *      launch used to silently ignore the console's in-process role assumptions;
  *      Before the launch it seeds the viewer token registry
  *      (knowledge/personal/connections/chronos-access.json) through the
  *      governed issuance helper with a runtime-generated token, and one request
@@ -26,14 +27,14 @@
  *   4. drives Playwright Chromium: plugin-views listing -> iframe view ->
  *      click inside the iframe -> host confirmation -> agent action
  *      dispatched; human action -> approval request -> CLI approval ->
- *      Execute in Chronos -> executed once, a second execution refused;
+ *      Execute in the console -> executed once, a second execution refused;
  *   5. asserts on data only: the listing, the frame response headers, what
  *      the sandboxed document observed (opaque origin, blocked network), the
  *      approval records and the audit chain of the hermetic root.
  *
  * The browser, the server and the hermetic root are always cleaned up (also
  * on failure and on the overall timeout). Needs `pnpm build` (dist scripts
- * and the Chronos production build) and Playwright Chromium.
+ * and the Concierge production build) and Playwright Chromium.
  *
  *   pnpm kyberion check plugin-views-e2e [--keep-root] [--timeout-ms 100000]
  *     [--launch-mode direct|surface-runtime|both]   (default: both, sequentially)
@@ -69,11 +70,11 @@ export const PLUGIN_ID = 'plugin-view-e2e-fixture';
 export const VIEW_ID = 'panel';
 export const TENANT_SLUG = 'e2e-tenant';
 const FIXTURE_SOURCE = `plugins/fixtures/${PLUGIN_ID}`;
-const CHRONOS_DIR = 'presence/displays/chronos-mirror-v2';
+const CHRONOS_DIR = 'presence/displays/concierge';
 const REGISTRY_RELATIVE_PATH = 'knowledge/personal/connections/chronos-access.json';
-const VIEWS_ROUTE = '/api/headless/a2ui/plugin-views';
-/** Chronos page that renders the plugin-views workspace. */
-const VIEWS_PAGE = '/?section=surface';
+const VIEWS_ROUTE = '/api/ops/headless/a2ui/plugin-views';
+/** Console page (Concierge /ops) that renders the plugin-views workspace. */
+const VIEWS_PAGE = '/ops?section=surface';
 const DEFAULT_TIMEOUT_MS = 100_000;
 const STEP_TIMEOUT_MS = 30_000;
 const SERVER_LOG_TAIL_BYTES = 8 * 1024;
@@ -117,9 +118,15 @@ export interface PluginViewsE2eReport {
  */
 export function surfaceRuntimeLaunchEnv(): Record<string, string> {
   // DR-01: the launcher's own MISSION_ROLE / delegated role never reach a surface.
-  return buildSystemRoleLaunchEnv({ AUTHORIZED_SCOPE: 'chronos-mirror-v2' }, 'chronos_mirror_v2', {
-    persona: 'worker',
-  }) as Record<string, string>;
+  // Includes the manifest's own env (surfaces/concierge.json), as surface_runtime does.
+  const manifest = readJson<{ surfaces?: Array<{ env?: Record<string, string> }> }>(
+    pathResolver.rootResolve('knowledge/product/governance/surfaces/concierge.json')
+  );
+  return buildSystemRoleLaunchEnv(
+    { AUTHORIZED_SCOPE: 'concierge', ...(manifest.surfaces?.[0]?.env ?? {}) },
+    'concierge',
+    { persona: 'worker' }
+  ) as Record<string, string>;
 }
 
 /**
@@ -686,10 +693,10 @@ async function scenario(
       const port = await freeLoopbackPort();
       run.assertActive();
       const started = await run.adoptServer(startChronos(root, port, token, launchMode));
-      const state = await waitFor('Chronos /api/healthz', async () => {
+      const state = await waitFor('Concierge /api/ops/healthz', async () => {
         if (started.exited()) return 'exited';
         // Bounded: a port taken by another listener may accept and never answer.
-        const response = await fetch(`${started.baseUrl}/api/healthz`, {
+        const response = await fetch(`${started.baseUrl}/api/ops/healthz`, {
           signal: AbortSignal.timeout(2_000),
         }).catch(() => null);
         return response?.ok ? 'ready' : null;
@@ -735,16 +742,10 @@ async function scenario(
     run.adoptBrowser(await chromium.launch({ headless: true }))
   );
   const context = await browser.newContext({ locale: 'en-US' });
-  await context.addCookies([
-    {
-      name: 'kyberion_token',
-      value: token,
-      domain: '127.0.0.1',
-      path: '/',
-      httpOnly: true,
-      sameSite: 'Strict',
-    },
-  ]);
+  // Concierge reads a bearer header or the OIDC session cookie (never the
+  // legacy kyberion_token cookie): the browser sends the localadmin token as
+  // a header on every request, which the Concierge mutation gate also admits.
+  await context.setExtraHTTPHeaders({ authorization: `Bearer ${token}` });
 
   const view = await step('list-plugin-views', async () => {
     const listing = await waitFor('the plugin host to activate the fixture', async () => {

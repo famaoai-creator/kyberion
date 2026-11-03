@@ -4,7 +4,21 @@ const nextConfig = {
   // package so it resolves via node_modules (workspace symlink → dist/) at
   // runtime rather than being bundled into the client.
   reactStrictMode: true,
-  serverExternalPackages: ['@agent/core'],
+  // The operations console routes (/api/ops, the former Chronos API) reach
+  // the agent runtime: node-pty is a native addon and the ACP SDK is a
+  // runtime dependency of @agent/core, so neither is bundled.
+  serverExternalPackages: ['@agent/core', 'node-pty', '@agentclientprotocol/sdk'],
+  // PH-02 (carried over from Chronos): operations console pages may frame
+  // only same-origin documents (plugin iframe views, deliverable previews).
+  // Scoped to the /ops pages; API routes send their own policies (the plugin
+  // view frame route sets a sandbox CSP and must not get a second one).
+  async headers() {
+    const frameSameOrigin = [{ key: 'Content-Security-Policy', value: "frame-src 'self'" }];
+    return [
+      { source: '/ops', headers: frameSameOrigin },
+      { source: '/ops/:path*', headers: frameSameOrigin },
+    ];
+  },
 };
 
 export default nextConfig;
