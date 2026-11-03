@@ -60,6 +60,8 @@ export type AuthorityRequirement =
 export interface DelegationSpec {
   readonly fields: readonly string[];
   readonly optionalFields?: readonly string[];
+  /** Exactly one of these optional fields must appear in a valid grant. */
+  readonly requiredOneOf?: readonly string[];
   readonly reputational_class: 'A' | 'B';
 }
 
@@ -113,8 +115,9 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     delegable: {
-      fields: ['repository', 'branch'],
-      optionalFields: ['visibility'],
+      fields: ['repository'],
+      optionalFields: ['branch', 'branch_pattern', 'visibility'],
+      requiredOneOf: ['branch', 'branch_pattern'],
       reputational_class: 'A',
     },
     protectedPaths: [['repository'], ['baseRefName']],
@@ -123,8 +126,9 @@ const OPERATIONS: Readonly<Record<string, RegistryEntry>> = {
     effectClass: 'external_mutation',
     authority: { kind: 'admission', boundary: 'external' },
     delegable: {
-      fields: ['repository', 'branch'],
-      optionalFields: ['visibility'],
+      fields: ['repository'],
+      optionalFields: ['branch', 'branch_pattern', 'visibility'],
+      requiredOneOf: ['branch', 'branch_pattern'],
       reputational_class: 'A',
     },
     protectedPaths: [['url'], ['destination']],
