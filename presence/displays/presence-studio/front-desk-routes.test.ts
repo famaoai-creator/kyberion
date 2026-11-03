@@ -423,7 +423,7 @@ describe('FD-05 progress page routing (Deliverable 4)', () => {
 });
 
 describe('FD-02 home page routing (Deliverable 3)', () => {
-  it('serves home.html at / and the pre-FD-02 workbench (index.html) at /work, registered ahead of express.static', () => {
+  it('redirects / to the unified shell overview, serves home.html at /home and the workbench (index.html) at /work, registered ahead of express.static', () => {
     const runtimeSource = readRepoFile(
       'presence/displays/presence-studio/presence-studio-runtime-data.ts'
     );
@@ -442,7 +442,9 @@ describe('FD-02 home page routing (Deliverable 3)', () => {
     expect(workRouteStart).toBeGreaterThan(-1);
     expect(rootRouteStart).toBeLessThan(workRouteStart);
 
-    expect(pagesSource.slice(rootRouteStart, workRouteStart)).toContain("'home.html'");
+    const rootRoute = pagesSource.slice(rootRouteStart, workRouteStart);
+    expect(rootRoute).toContain("readFrontDeskSurfaceUrls().concierge + '/w'");
+    expect(rootRoute.slice(rootRoute.indexOf("app.get('/home'"))).toContain("'home.html'");
     expect(pagesSource.slice(workRouteStart, workRouteStart + 200)).toContain("'index.html'");
   });
 });
