@@ -543,7 +543,11 @@ function scanMarkdownDocs(
  * nothing — pair with `writeCurationReport` (or use
  * `generateKnowledgeCurationReport`) to persist it.
  */
-export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCurationReport {
+export async function computeCurationReport(
+  options: {
+    now?: Date;
+  } = {}
+): Promise<KnowledgeCurationReport> {
   const now = options.now || new Date();
   const config = loadCurationSloConfig();
 
@@ -638,7 +642,7 @@ export function computeCurationReport(options: { now?: Date } = {}): KnowledgeCu
   // weekly report the rest of the corpus depends on.
   let tenantIngest: TenantIngestCurationSection[] = [];
   try {
-    tenantIngest = computeTenantIngestCuration({ config, now });
+    tenantIngest = await computeTenantIngestCuration({ config, now });
   } catch {
     tenantIngest = [];
   }
@@ -803,12 +807,12 @@ export function writeCurationReport(report: KnowledgeCurationReport): { reportPa
  * weekly pipeline behind it) uses. `curation_report` in
  * `wisdom-actuator/src/decision-ops.ts` wraps this 1:1.
  */
-export function generateKnowledgeCurationReport(options: { now?: Date } = {}): {
+export async function generateKnowledgeCurationReport(options: { now?: Date } = {}): Promise<{
   report: KnowledgeCurationReport;
   reportPath: string;
-} {
+}> {
   const now = options.now || new Date();
-  const report = computeCurationReport({ now });
+  const report = await computeCurationReport({ now });
   const observedAdvisories = observeArchiveHistory(report, now);
   const reportWithAdvisories: KnowledgeCurationReport = {
     ...report,

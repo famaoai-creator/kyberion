@@ -149,7 +149,7 @@ async function executeOp(
         current_sources?: IngestSourceObservation[];
         path_options?: { rootDir?: string; env?: NodeJS.ProcessEnv };
       };
-      const report = stalenessReport(
+      const report = await stalenessReport(
         input.tenant_slug,
         input.current_sources ?? [],
         input.path_options ?? {}
@@ -159,7 +159,7 @@ async function executeOp(
     }
     case 'commit': {
       logger.info('[INGEST] Executing explicit ingest ceremony (DA-05)');
-      const result = commitIngest(params as unknown as IngestCommitInput);
+      const result = await commitIngest(params as unknown as IngestCommitInput);
       const exportAs = typeof params.export_as === 'string' ? params.export_as : 'commit';
       return { ...ctx, [exportAs]: result };
     }

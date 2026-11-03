@@ -98,13 +98,13 @@ function resolvePathOptions(options?: IngestLedgerPathOptions): IngestLedgerPath
  * tenant has ingested anything. Codepoint-sorted (tenants, then asset ids) —
  * deterministic across platforms.
  */
-export function computeTenantIngestCuration(input: {
+export async function computeTenantIngestCuration(input: {
   config: CurationSloConfig;
   now?: Date;
   /** Explicit tenant list (tests); defaults to registered profiles + 'common'. */
   tenants?: string[];
   pathOptions?: IngestLedgerPathOptions;
-}): TenantIngestCurationSection[] {
+}): Promise<TenantIngestCurationSection[]> {
   const now = input.now ?? new Date();
   const config = input.config;
   const pathOptions = resolvePathOptions(input.pathOptions);
@@ -127,7 +127,7 @@ export function computeTenantIngestCuration(input: {
   for (const tenant of tenants) {
     let assets;
     try {
-      assets = listAssets(tenant, pathOptions).filter((asset) => asset.status === 'active');
+      assets = (await listAssets(tenant, pathOptions)).filter((asset) => asset.status === 'active');
     } catch {
       continue; // broken profile/ledger: advisory report, never fatal
     }

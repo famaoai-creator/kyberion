@@ -3,7 +3,8 @@
  *
  * Every operation delegates to the secure-io primitives callers used before
  * the seam existed, so tier, tenant, symlink and audit checks are unchanged.
- * Importing this module installs `local-fs` on the storage-backend seam.
+ * Importing this module installs `local-fs` on the storage-backend seam
+ * (wrapped to the async contract via `toAsyncStorageBackend`).
  */
 
 import {
@@ -17,10 +18,10 @@ import { streamTextLines } from '../jsonl-read.js';
 import {
   LOCAL_STORAGE_BACKEND_ID,
   registerStorageBackend,
-  type StorageBackend,
+  type SyncStorageBackend,
 } from './storage-backend.js';
 
-export const localStorageBackend: StorageBackend = {
+export const localStorageBackend: SyncStorageBackend = {
   id: LOCAL_STORAGE_BACKEND_ID,
   exists(filePath) {
     return safeExistsSync(filePath);

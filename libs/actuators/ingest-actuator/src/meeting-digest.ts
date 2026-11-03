@@ -663,7 +663,7 @@ async function runJob(
       landed.push({ date: candidate.date, summary, status });
       continue;
     }
-    const committed: IngestCommitResult = commitIngest({
+    const committed: IngestCommitResult = await commitIngest({
       tenant_slug: tenantSlug,
       normalized: {
         target_path: targetPath,
@@ -761,7 +761,7 @@ async function runJob(
   }
   const doc = parseMarkdownDoc(readme);
   const readmeBody = doc.body.replace(/^\n+/, '').replace(/\s+$/, '');
-  commitIngest({
+  await commitIngest({
     tenant_slug: tenantSlug,
     normalized: {
       target_path: readmePath,

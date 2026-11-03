@@ -38,7 +38,7 @@ describe('resolveIngestAssetProvenance (DA-05 KKP connection)', () => {
       '',
     ].join('\n');
 
-  beforeAll(() => {
+  beforeAll(async () => {
     fixtureRoot = path.join(
       pathResolver.rootDir(),
       'active',
@@ -63,7 +63,7 @@ describe('resolveIngestAssetProvenance (DA-05 KKP connection)', () => {
       )
     );
     assetId = deriveAssetId('confluence', 'PAGE-7');
-    appendAssetRecord(
+    await appendAssetRecord(
       'acme-corp',
       {
         asset_id: assetId,
@@ -88,9 +88,9 @@ describe('resolveIngestAssetProvenance (DA-05 KKP connection)', () => {
     delete process.env.KYBERION_A2A_SECRET;
   });
 
-  it('resolves asset:{id}@v{n} from the frontmatter content_sha256', () => {
+  it('resolves asset:{id}@v{n} from the frontmatter content_sha256', async () => {
     expect(
-      resolveIngestAssetProvenance({
+      await resolveIngestAssetProvenance({
         tenantSlug: 'acme-corp',
         rawData: cardRawData(CONTENT_SHA),
         pathOptions: options,
@@ -98,9 +98,9 @@ describe('resolveIngestAssetProvenance (DA-05 KKP connection)', () => {
     ).toBe(`asset:${assetId}@v1`);
   });
 
-  it('falls back to source_system + source_id when the hash does not match', () => {
+  it('falls back to source_system + source_id when the hash does not match', async () => {
     expect(
-      resolveIngestAssetProvenance({
+      await resolveIngestAssetProvenance({
         tenantSlug: 'acme-corp',
         rawData: cardRawData('2'.repeat(64)),
         pathOptions: options,
@@ -108,16 +108,16 @@ describe('resolveIngestAssetProvenance (DA-05 KKP connection)', () => {
     ).toBe(`asset:${assetId}@v1`);
   });
 
-  it('returns null for non-ingested files and unregistered tenants (best-effort hook)', () => {
+  it('returns null for non-ingested files and unregistered tenants (best-effort hook)', async () => {
     expect(
-      resolveIngestAssetProvenance({
+      await resolveIngestAssetProvenance({
         tenantSlug: 'acme-corp',
         rawData: '# No frontmatter here',
         pathOptions: options,
       })
     ).toBeNull();
     expect(
-      resolveIngestAssetProvenance({
+      await resolveIngestAssetProvenance({
         tenantSlug: 'ghost-co',
         rawData: cardRawData(CONTENT_SHA),
         pathOptions: options,
@@ -125,16 +125,16 @@ describe('resolveIngestAssetProvenance (DA-05 KKP connection)', () => {
     ).toBeNull();
   });
 
-  it('KKP provenance[] accepts the asset ref alongside the file path', () => {
+  it('KKP provenance[] accepts the asset ref alongside the file path', async () => {
     // First (and only) sign in this fork — the secret cache is still cold,
     // so setting the env here is sufficient (no reset needed).
     process.env.KYBERION_A2A_SECRET = 'knowledge-package-test-secret';
     const rawData = cardRawData(CONTENT_SHA);
-    const ref = resolveIngestAssetProvenance({
+    const ref = (await resolveIngestAssetProvenance({
       tenantSlug: 'acme-corp',
       rawData,
       pathOptions: options,
-    })!;
+    }))!;
     const pkg = createKnowledgePackage({
       packageId: 'KKP-asset-ref-1',
       originAgentId: 'agent-test',
