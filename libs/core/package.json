@@ -6424,6 +6424,18 @@
       "types": "./dist/storage-layout.d.ts",
       "default": "./dist/storage-layout.js"
     },
+    "./storage/storage-backend": {
+      "types": "./dist/storage/storage-backend.d.ts",
+      "default": "./dist/storage/storage-backend.js"
+    },
+    "./storage/local-storage-backend": {
+      "types": "./dist/storage/local-storage-backend.d.ts",
+      "default": "./dist/storage/local-storage-backend.js"
+    },
+    "./storage/memory-storage-backend": {
+      "types": "./dist/storage/memory-storage-backend.d.ts",
+      "default": "./dist/storage/memory-storage-backend.js"
+    },
     "./streaming-stt-bridge": {
       "types": "./dist/voice/streaming-stt-bridge.d.ts",
       "default": "./dist/voice/streaming-stt-bridge.js"
