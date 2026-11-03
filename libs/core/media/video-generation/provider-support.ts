@@ -4,17 +4,19 @@ import { pathResolver } from '../../path-resolver.js';
 import { assertSafeRepositoryPath, safeMkdir, safeWriteFile } from '../../secure-io.js';
 import * as path from 'node:path';
 import type {
-  JsonRecord,
+  VideoGenerationJsonRecord,
   VideoGenerationArtifact,
   VideoGenerationRequest,
   VideoProviderStatus,
 } from './types.js';
 
-export function asRecord(value: unknown): JsonRecord {
-  return value && typeof value === 'object' && !Array.isArray(value) ? (value as JsonRecord) : {};
+export function asRecord(value: unknown): VideoGenerationJsonRecord {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? (value as VideoGenerationJsonRecord)
+    : {};
 }
 
-export function isJsonRecord(value: unknown): value is JsonRecord {
+export function isJsonRecord(value: unknown): value is VideoGenerationJsonRecord {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
 
@@ -51,7 +53,7 @@ export async function jsonRequest(
     params?: Record<string, string | number>;
     request?: VideoGenerationRequest;
   }
-): Promise<JsonRecord> {
+): Promise<VideoGenerationJsonRecord> {
   const response: unknown = await secureFetch({
     url,
     method,
@@ -94,7 +96,7 @@ export function statusFrom(value: unknown): VideoProviderStatus {
   return 'submitted';
 }
 
-export function outputUrl(value: JsonRecord): string | undefined {
+export function outputUrl(value: VideoGenerationJsonRecord): string | undefined {
   const candidates = [
     value.output_url,
     value.download_url,

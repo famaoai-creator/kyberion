@@ -27,7 +27,7 @@ import { getDirectVideoProviderAdapter } from './builtin-adapters.js';
 import { isJsonRecord, writeArtifact } from './provider-support.js';
 import type {
   DirectVideoFeatures,
-  JsonRecord,
+  VideoGenerationJsonRecord,
   VideoGenerationArtifact,
   VideoGenerationParams,
   VideoGenerationProvider,
@@ -257,7 +257,7 @@ export async function collectDirectVideoArtifactForJob(
   };
 }
 
-function textParam(params: JsonRecord, key: string): string | undefined {
+function textParam(params: VideoGenerationJsonRecord, key: string): string | undefined {
   const value = params[key];
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }

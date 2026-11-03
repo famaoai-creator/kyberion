@@ -1,5 +1,5 @@
 import type {
-  JsonRecord,
+  VideoGenerationJsonRecord,
   VideoGenerationProvider,
   VideoGenerationRequest,
   VideoGenerationStatus,
@@ -33,7 +33,7 @@ export class MiniMaxHailuoProvider implements VideoGenerationProvider {
   }
 
   async submit(request: VideoGenerationRequest): Promise<VideoGenerationSubmission> {
-    const payload: JsonRecord = {
+    const payload: VideoGenerationJsonRecord = {
       model: request.model,
       prompt: request.prompt,
       ...(request.duration_seconds ? { duration: request.duration_seconds } : {}),
