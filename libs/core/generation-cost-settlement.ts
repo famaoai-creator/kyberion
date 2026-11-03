@@ -75,17 +75,26 @@ function generationCostSettlementCatalogAtPath(filePath: string) {
   });
 }
 
-function settlementFile(
-  jobId: string,
-  scope: EventScope,
-  rootDir = pathResolver.rootDir()
-): string {
+/**
+ * The settlement base directory. The repository root itself is the default and
+ * is never passed through `assertSafeRepositoryPath`, which only admits paths
+ * strictly *inside* the root — doing so made every default-root read and write
+ * throw `[RESOURCE_PATH_SCOPE]` (Chronos /api/cost answered 500). A caller-chosen
+ * `rootDir` (tests) is still validated.
+ */
+function settlementBase(rootDir?: string): string {
+  const repositoryRoot = pathResolver.rootDir();
+  if (!rootDir || path.resolve(rootDir) === path.resolve(repositoryRoot)) return repositoryRoot;
+  return assertSafeRepositoryPath(rootDir, { allowMissingLeaf: true });
+}
+
+function settlementFile(jobId: string, scope: EventScope, rootDir?: string): string {
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u.test(jobId)) {
     throw new Error(`[GENERATION_COST_JOB_ID_INVALID] invalid job_id '${jobId}'`);
   }
   return assertSafeRepositoryPath(
     path.join(
-      assertSafeRepositoryPath(rootDir, { allowMissingLeaf: true }),
+      settlementBase(rootDir),
       physicalScopedPath(GENERATION_COST_SETTLEMENT_ROOT, scope, `${jobId}.json`)
     ),
     { allowMissingLeaf: true }
@@ -326,12 +335,7 @@ export function listGenerationCostSettlements(
   } = {}
 ): GenerationCostSettlement[] {
   const root = assertSafeRepositoryPath(
-    path.join(
-      assertSafeRepositoryPath(options.rootDir || pathResolver.rootDir(), {
-        allowMissingLeaf: true,
-      }),
-      GENERATION_COST_SETTLEMENT_ROOT
-    ),
+    path.join(settlementBase(options.rootDir), GENERATION_COST_SETTLEMENT_ROOT),
     { allowMissingLeaf: true }
   );
   const seen = new Map<string, GenerationCostSettlement>();
