@@ -5064,6 +5064,10 @@
       "types": "./dist/provider/provider-pins-store.d.ts",
       "default": "./dist/provider/provider-pins-store.js"
     },
+    "./provider-transport": {
+      "types": "./dist/provider-transport.d.ts",
+      "default": "./dist/provider-transport.js"
+    },
     "./provider/agy-cli-backend": {
       "types": "./dist/provider/agy-cli-backend.d.ts",
       "default": "./dist/provider/agy-cli-backend.js"
@@ -5288,6 +5292,10 @@
       "types": "./dist/provider/grok-cli-voice-bridge.d.ts",
       "default": "./dist/provider/grok-cli-voice-bridge.js"
     },
+    "./provider/loopback-transport": {
+      "types": "./dist/provider/loopback-transport.d.ts",
+      "default": "./dist/provider/loopback-transport.js"
+    },
     "./provider/openai-compatible-backend": {
       "types": "./dist/provider/openai-compatible-backend.d.ts",
       "default": "./dist/provider/openai-compatible-backend.js"
@@ -5363,6 +5371,10 @@
     "./provider/provider-spawn-env": {
       "types": "./dist/provider/provider-spawn-env.d.ts",
       "default": "./dist/provider/provider-spawn-env.js"
+    },
+    "./provider/remote-provider-facade": {
+      "types": "./dist/provider/remote-provider-facade.d.ts",
+      "default": "./dist/provider/remote-provider-facade.js"
     },
     "./pty-engine": {
       "types": "./dist/shell/pty-engine.d.ts",

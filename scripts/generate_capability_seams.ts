@@ -58,6 +58,13 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
     declaration: 'libs/core/provider/provider-backend-resolver.ts',
     consumers: ['libs/core/provider/provider-backend-resolver.ts'],
   },
+  'provider-transport': {
+    declaration: 'libs/core/provider-transport.ts',
+    consumers: [
+      'libs/core/provider/loopback-transport.ts',
+      'libs/core/provider/remote-provider-facade.ts',
+    ],
+  },
   'actuator.capability-probe': {
     declaration: 'libs/core/actuator/actuator-capability.ts',
     consumers: ['libs/core/actuator/actuator-capability.ts'],
