@@ -7,7 +7,12 @@
  */
 
 import * as path from 'node:path';
-import type { AsyncStorageBackend, StorageStat, StorageTextLine } from './storage-backend.js';
+import {
+  registerStorageBackend,
+  type AsyncStorageBackend,
+  type StorageStat,
+  type StorageTextLine,
+} from './storage-backend.js';
 
 export const OBJECT_STORAGE_BACKEND_STUB_ID = 'object-storage-stub';
 
@@ -17,8 +22,9 @@ export interface ObjectStorageStubOptions {
 }
 
 /**
- * In-memory async backend with optional append delay. Not registered on the
- * governed seam — tests construct it explicitly.
+ * In-memory async backend with optional append delay. Prefer injecting via
+ * `createEntryLedger(path, { backend })`; the builtin registration lets
+ * `resolveStorageBackend('object-storage-stub')` work but never auto-selects.
  */
 export function createObjectStorageBackendStub(
   options: ObjectStorageStubOptions = {}
@@ -119,3 +125,9 @@ export function createObjectStorageBackendStub(
     },
   };
 }
+
+/** Shared builtin for `resolveStorageBackend('object-storage-stub')` — never auto-selected. */
+registerStorageBackend(createObjectStorageBackendStub({ appendDelayMs: 0 }), {
+  provenance: 'builtin',
+  source: 'libs/core/storage/object-storage-backend.stub.ts',
+});
