@@ -12,6 +12,7 @@
  *   ```dot-proposals``` JSON array.
  */
 
+import type { InformationAssetWorkBinding } from '../information-assets/work-types.js';
 import { createHash } from 'node:crypto';
 import type { FrontDeskExecutionBinding } from '../surface/front-desk-execution-contract.js';
 import type { ContinuousWorkPlan } from '../organization/continuous-work-plan.js';
@@ -32,6 +33,8 @@ import {
 } from '../governance/mandate-shadow.js';
 
 export interface DotProposal {
+  /** Trusted recipe origin; rejected on all model-authored inputs. */
+  information_asset_work?: InformationAssetWorkBinding;
   /** Server-authored synthetic reference; the model parser always rejects this reserved field. */
   semantic_judgment?: DotJudgmentBinding;
   /** Proposed internal admission facts; never tool authority. */
@@ -208,6 +211,8 @@ export function normalizeDotProposal(value: unknown): DotProposal {
   const raw = value as Record<string, unknown>;
   if (Object.hasOwn(raw, 'semantic_judgment'))
     throw new Error('semantic_judgment is reserved for server-authored synthetic references');
+  if (Object.hasOwn(raw, 'information_asset_work'))
+    throw new Error('information_asset_work is reserved for server-authored recipes');
   const missionAdmission = parseMissionAdmissionRequest(raw.mission_admission);
   if (missionAdmission && (raw.work_shape !== 'mission' || raw.handoff_to))
     throw new Error('mission_admission requires direct mission work');
@@ -345,7 +350,10 @@ export function dotProposalInstructions(mode: 'tool' | 'fence'): string {
  * deliberately excluded.
  */
 export function proposalActionIdentity(
-  proposal: Pick<DotProposal, 'action_id' | 'target' | 'pipeline_ref' | 'continuous_work'>
+  proposal: Pick<
+    DotProposal,
+    'action_id' | 'target' | 'pipeline_ref' | 'continuous_work' | 'information_asset_work'
+  >
 ): string {
   const discriminator = proposal.target ?? proposal.pipeline_ref ?? '';
   // Managed-work proposals share action_id and pipeline_ref, so without a plan
@@ -359,7 +367,11 @@ export function proposalActionIdentity(
         .digest('hex')
         .slice(0, 12)}`
     : '';
+  const assetDigest = proposal.information_asset_work
+    ? '#asset:' +
+      createHash('sha256').update(JSON.stringify(proposal.information_asset_work)).digest('hex')
+    : '';
   return discriminator
-    ? `${proposal.action_id}#${discriminator}${planDigest}`
-    : `${proposal.action_id}${planDigest}`;
+    ? `${proposal.action_id}#${discriminator}${planDigest}${assetDigest}`
+    : `${proposal.action_id}${planDigest}${assetDigest}`;
 }

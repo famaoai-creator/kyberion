@@ -14,6 +14,12 @@ export async function main(
   args: string[] = currentProcessArgv().slice(2),
   print: (value: unknown) => void = () => undefined
 ): Promise<void> {
+  if (args[0] === 'information-assets') {
+    const { runOrganizationInformationAssets } =
+      await import('./organization_information_assets.js');
+    await runOrganizationInformationAssets(args.slice(1), print);
+    return;
+  }
   if (args[0] === 'continuous' && args[1] === 'run') {
     await import('./run_pipeline.js');
     const { runOrganizationContinuousOperations } =

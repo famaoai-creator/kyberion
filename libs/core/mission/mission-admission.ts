@@ -1,3 +1,4 @@
+import { buildInformationAssetMissionExecutionPlan } from '../information-assets/work-types.js';
 /** Internal Dot -> mission admission. No business effect permission is issued. */
 import * as path from 'node:path';
 import { AsyncLocalStorage } from 'node:async_hooks';
@@ -347,7 +348,14 @@ export function buildMissionAdmissionBrief(
   return {
     missionId,
     title: item.title,
-    intent: item.description,
+    intent: item.metadata?.information_asset_work
+      ? item.description +
+        '\n\nApproved information-asset execution plan: ' +
+        JSON.stringify(buildInformationAssetMissionExecutionPlan(item, missionId)) +
+        '\nAfter canonical mission activation, the mission owner runs: pnpm exec tsx scripts/information_asset_work.ts --work-item ' +
+        item.item_id +
+        '. The same WorkItem is claimed again; service approval and independent readback remain required.'
+      : item.description,
     tier: 'confidential',
     scope: { in: admission.mandate_facts.paths },
     gate: { riskLevel: admission.mandate_facts.risk_level, approvalRequired: true },

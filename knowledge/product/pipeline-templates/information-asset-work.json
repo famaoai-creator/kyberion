@@ -1,0 +1,24 @@
+{
+  "action": "pipeline",
+  "name": "Governed information asset work",
+  "version": "1.0.0",
+  "description": "Executes admitted source work under its current WorkItem lease; completion requires verified evidence.",
+  "steps": [
+    {
+      "id": "execute_information_work",
+      "role": "sink",
+      "op": "service:information_asset_work",
+      "produces": {
+        "channel": "information_asset_result",
+        "type": "InformationAssetWorkOutcome"
+      },
+      "params": {
+        "work_item_id": "{{work_item_id}}",
+        "attempt_id": "{{attempt_id}}",
+        "lease_id": "{{lease_id}}",
+        "dot_id": "{{dot_id}}",
+        "actor_id": "{{actor_id}}"
+      }
+    }
+  ]
+}

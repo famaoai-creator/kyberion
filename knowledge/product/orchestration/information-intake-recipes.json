@@ -1,0 +1,125 @@
+{
+  "version": 1,
+  "recipes": [
+    {
+      "recipe_id": "email.morning_triage",
+      "version": 1,
+      "title": "Morning email classification",
+      "asset_type": "customer.request",
+      "event_types": ["message.observed"],
+      "action": "classify",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "email.reply_preparation",
+      "version": 1,
+      "title": "Prepare email reply",
+      "asset_type": "customer.request",
+      "event_types": ["message.observed"],
+      "action": "prepare_reply",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "email.action_extraction",
+      "version": 1,
+      "title": "Extract email action items",
+      "asset_type": "customer.request",
+      "event_types": ["message.observed"],
+      "action": "extract_actions",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "email.overdue_reply",
+      "version": 1,
+      "title": "Follow up overdue email",
+      "asset_type": "customer.request",
+      "event_types": ["message.overdue", "message.observed"],
+      "action": "follow_up",
+      "completion": "external_readback",
+      "requires_approval": true
+    },
+    {
+      "recipe_id": "github.review_request",
+      "version": 1,
+      "title": "Handle requested code review",
+      "asset_type": "code.review_request",
+      "event_types": ["review.requested", "review.observed"],
+      "action": "review",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "github.review_update",
+      "version": 1,
+      "title": "Review additional commits",
+      "asset_type": "code.review_request",
+      "event_types": ["review.updated", "review.observed"],
+      "action": "review_update",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "github.unresolved_review",
+      "version": 1,
+      "title": "Resolve outstanding review comments",
+      "asset_type": "code.review_request",
+      "event_types": ["review.unresolved", "review.observed"],
+      "action": "resolve_review",
+      "completion": "external_readback",
+      "requires_approval": true
+    },
+    {
+      "recipe_id": "github.ci_failure",
+      "version": 1,
+      "title": "Investigate failed CI",
+      "asset_type": "code.review_request",
+      "event_types": ["ci.failed", "review.observed"],
+      "action": "investigate_ci",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "jira.assignment",
+      "version": 1,
+      "title": "Triage assigned issue",
+      "asset_type": "workflow.approval_request",
+      "event_types": ["issue.assigned", "issue.observed"],
+      "action": "triage_issue",
+      "completion": "artifact_hash",
+      "requires_approval": false
+    },
+    {
+      "recipe_id": "jira.approval_pending",
+      "version": 1,
+      "title": "Process issue approval",
+      "asset_type": "workflow.approval_request",
+      "event_types": ["approval.pending", "approval.observed"],
+      "action": "approve_issue",
+      "completion": "external_readback",
+      "requires_approval": true
+    },
+    {
+      "recipe_id": "jira.overdue",
+      "version": 1,
+      "title": "Resolve overdue issue",
+      "asset_type": "workflow.approval_request",
+      "event_types": ["issue.overdue", "issue.observed"],
+      "action": "resolve_overdue",
+      "completion": "external_readback",
+      "requires_approval": true
+    },
+    {
+      "recipe_id": "jira.waiting_information",
+      "version": 1,
+      "title": "Request missing issue information",
+      "asset_type": "workflow.approval_request",
+      "event_types": ["issue.waiting_information", "issue.observed"],
+      "action": "request_information",
+      "completion": "external_readback",
+      "requires_approval": true
+    }
+  ]
+}

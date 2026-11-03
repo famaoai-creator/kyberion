@@ -381,9 +381,18 @@
       "path": "libs/actuators/service-actuator",
       "d": "Unified External SaaS/API/MCP Reachability Layer",
       "s": "implemented",
-      "version": "1.3.0",
-      "capability_count": 7,
-      "ops": ["api", "cli", "mcp", "oauth", "pipeline", "preset", "reconcile"],
+      "version": "1.4.0",
+      "capability_count": 8,
+      "ops": [
+        "api",
+        "cli",
+        "information_asset_work",
+        "mcp",
+        "oauth",
+        "pipeline",
+        "preset",
+        "reconcile"
+      ],
       "contract_schema": "knowledge/product/schemas/service-action.schema.json",
       "prerequisites_summary": "-"
     },

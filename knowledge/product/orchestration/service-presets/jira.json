@@ -35,23 +35,40 @@
       "method": "GET",
       "description": "Search issues using JQL.",
       "parameters": {
-        "jql": { "required": true, "type": "string" },
-        "startAt": { "type": "number", "default": 0 },
-        "maxResults": { "type": "number", "default": 50 },
-        "fields": { "type": "array", "default": ["summary", "status", "assignee"] }
+        "jql": {
+          "required": true,
+          "type": "string"
+        },
+        "startAt": {
+          "type": "number",
+          "default": 0
+        },
+        "maxResults": {
+          "type": "number",
+          "default": 50
+        },
+        "fields": {
+          "type": "array",
+          "default": ["summary", "status", "assignee"]
+        }
       }
     },
     "get_issue": {
       "path": "issue/{{issue_key}}",
       "method": "GET",
-      "description": "Get issue details."
+      "description": "Get issue details.",
+      "kind": "capture",
+      "risk": "read"
     },
     "get_transitions": {
       "path": "issue/{{issue_key}}/transitions",
       "method": "GET",
       "description": "Get available transitions for an issue.",
       "parameters": {
-        "issue_key": { "required": true, "type": "string" }
+        "issue_key": {
+          "required": true,
+          "type": "string"
+        }
       }
     },
     "create_issue": {
@@ -59,23 +76,42 @@
       "method": "POST",
       "description": "Create a new issue.",
       "parameters": {
-        "project_key": { "required": true, "type": "string" },
-        "summary": { "required": true, "type": "string" },
-        "description": { "type": "string" },
-        "issue_type": { "default": "Task" }
+        "project_key": {
+          "required": true,
+          "type": "string"
+        },
+        "summary": {
+          "required": true,
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "issue_type": {
+          "default": "Task"
+        }
       },
       "payload_template": {
         "fields": {
-          "project": { "key": "{{project_key}}" },
+          "project": {
+            "key": "{{project_key}}"
+          },
           "summary": "{{summary}}",
-          "issuetype": { "name": "{{issue_type}}" },
+          "issuetype": {
+            "name": "{{issue_type}}"
+          },
           "description": {
             "type": "doc",
             "version": 1,
             "content": [
               {
                 "type": "paragraph",
-                "content": [{ "type": "text", "text": "{{description}}" }]
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{{description}}"
+                  }
+                ]
               }
             ]
           }
@@ -87,8 +123,12 @@
       "method": "PUT",
       "description": "Update an issue.",
       "parameters": {
-        "summary": { "type": "string" },
-        "description": { "type": "string" }
+        "summary": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
       },
       "payload_template": {
         "fields": {
@@ -99,7 +139,12 @@
             "content": [
               {
                 "type": "paragraph",
-                "content": [{ "type": "text", "text": "{{description}}" }]
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "{{description}}"
+                  }
+                ]
               }
             ]
           }
@@ -111,7 +156,10 @@
       "method": "POST",
       "description": "Add a comment to an issue.",
       "parameters": {
-        "body": { "required": true, "type": "string" }
+        "body": {
+          "required": true,
+          "type": "string"
+        }
       },
       "payload_template": {
         "body": {
@@ -120,22 +168,161 @@
           "content": [
             {
               "type": "paragraph",
-              "content": [{ "type": "text", "text": "{{body}}" }]
+              "content": [
+                {
+                  "type": "text",
+                  "text": "{{body}}"
+                }
+              ]
             }
           ]
         }
-      }
+      },
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true
     },
     "transition_issue": {
       "path": "issue/{{issue_key}}/transitions",
       "method": "POST",
       "description": "Transition an issue status.",
       "parameters": {
-        "transition_id": { "required": true, "type": "string" }
+        "transition_id": {
+          "required": true,
+          "type": "string"
+        }
       },
       "payload_template": {
-        "transition": { "id": "{{transition_id}}" }
+        "transition": {
+          "id": "{{transition_id}}"
+        }
+      },
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true
+    },
+    "search_issues_enhanced": {
+      "type": "api",
+      "path": "search/jql",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Search issues with enhanced JQL and opaque nextPageToken pagination.",
+      "parameters": {
+        "domain": {
+          "required": true,
+          "type": "string"
+        },
+        "jql": {
+          "required": true,
+          "type": "string"
+        },
+        "nextPageToken": {
+          "type": "string"
+        },
+        "maxResults": {
+          "type": "number",
+          "default": 100
+        },
+        "fields": {
+          "type": "string",
+          "default": "*all"
+        }
       }
+    },
+    "get_request_approvals": {
+      "type": "api",
+      "base_url": "https://{{domain}}.atlassian.net/rest/servicedeskapi",
+      "path": "request/{{issue_key}}/approval",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read Jira Service Management request approvals using the dedicated service desk API.",
+      "parameters": {
+        "domain": {
+          "required": true,
+          "type": "string"
+        },
+        "issue_key": {
+          "required": true,
+          "type": "string"
+        },
+        "start": {
+          "type": "number",
+          "default": 0
+        },
+        "limit": {
+          "type": "number",
+          "default": 100
+        }
+      }
+    },
+    "get_request_approval": {
+      "type": "api",
+      "base_url": "https://{{domain}}.atlassian.net/rest/servicedeskapi",
+      "path": "request/{{issue_key}}/approval/{{approval_id}}",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read a specific Jira Service Management approval for independent completion verification.",
+      "parameters": {
+        "domain": {
+          "required": true,
+          "type": "string"
+        },
+        "issue_key": {
+          "required": true,
+          "type": "string"
+        },
+        "approval_id": {
+          "required": true,
+          "type": "string"
+        }
+      }
+    },
+    "answer_request_approval": {
+      "type": "api",
+      "base_url": "https://{{domain}}.atlassian.net/rest/servicedeskapi",
+      "path": "request/{{issue_key}}/approval/{{approval_id}}",
+      "method": "POST",
+      "kind": "apply",
+      "risk": "write",
+      "approval_required": true,
+      "description": "Answer the exact captured JSM request approval after governed approval.",
+      "parameters": {
+        "domain": {
+          "required": true,
+          "type": "string"
+        },
+        "issue_key": {
+          "required": true,
+          "type": "string"
+        },
+        "approval_id": {
+          "required": true,
+          "type": "string"
+        },
+        "decision": {
+          "required": true,
+          "type": "string",
+          "enum": ["approve", "decline"]
+        }
+      },
+      "payload_template": {
+        "decision": "{{decision}}"
+      }
+    },
+    "get_issue_comments": {
+      "type": "api",
+      "path": "issue/{{issue_key}}/comment",
+      "method": "GET",
+      "kind": "capture",
+      "risk": "read",
+      "approval_required": false,
+      "description": "Read issue comments for independent expected-content verification."
     }
   }
 }
