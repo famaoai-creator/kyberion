@@ -7,7 +7,7 @@ Kyberion がデータに対して何をして、何をしないか。
 - **デフォルトでテレメトリ無し**。明示的に opt-in しない限り、何もマシン外に出ない。
 - **データはあなたのディスクに残る**。設定・ミッション・trace はローカル fs（または customer/ overlay）に保存。
 - **外部 AI 呼び出しは明示的**。LLM (Anthropic / OpenAI / Gemini / Claude CLI) を使う時、リクエストはそのプロバイダに直送 — §3 参照。
-- **秘密は OS keychain に**。Kyberion は `secret-actuator` 経由で OS keychain から読む。コミットされるファイルには載らない。
+- **秘密は OS の資格情報ストアに**。Kyberion は `secret-actuator` 経由で macOS Keychain または Windows Credential Manager から読む。コミットされるファイルには載らない。
 
 ## 1. ローカルに保存されるもの
 
