@@ -247,6 +247,14 @@ const SEAM_ROLES: Record<string, SeamRoleEntry> = {
       'libs/core/storage/memory-storage-backend.ts',
     ],
   },
+  'lease-backend': {
+    declaration: 'libs/core/lease/lease-backend.ts',
+    consumers: [
+      'libs/core/writer-lease.ts',
+      'libs/core/lease/local-lease-backend.ts',
+      'libs/core/lease/memory-lease-backend.ts',
+    ],
+  },
   'structured-runner': {
     declaration: 'libs/core/mission/mission-llm.ts',
     consumers: ['libs/core/mission/mission-llm.ts'],
