@@ -2,7 +2,7 @@
 title: 'Operations Hygiene Runbook: keeping fixed operational gaps fixed'
 tags:
   [governance, operations, ci, retention, daemons, tests, recurrence-prevention, secure-io, symlink]
-last_updated: 2026-11-02
+last_updated: 2026-11-03
 ---
 
 # Operations Hygiene Runbook
@@ -551,6 +551,11 @@ this contract; a faster Linux run alone is not evidence that macOS CI passed.
 - Tests never write live `active/` state. CI runs the leak guard in strict mode
   (`KYBERION_TEST_LEAK_STRICT=1`, forwarded to the Vitest child by `pnpm test`). Any created or
   grown file outside the sandbox roots fails the job.
+- Shared seam mechanisms must remain real in boundary tests. Use a partial mock
+  with `createSeamCatalog()` to isolate registration state, rather than copying
+  the seam API into a hand-written mock that omits new lifecycle helpers or
+  bypasses duplicate/removal semantics. The PR `registration-tests` gate includes
+  voice/network external-governance consumers to enforce this compatibility.
 - Tests that need a host binary (sqlite3 with FTS5, a CJK font, poppler, LibreOffice) skip when it is
   absent. Gate them with the owning module's probe (`probeHistorySearchBackend()`,
   `pickCjkFontSource()`, `detectRasterCapabilities()`), and make sure the CI workflows install the

@@ -958,7 +958,9 @@
         "libs/core/seam.test.ts",
         "libs/core/seam-lifecycle-contract.test.ts",
         "libs/core/provider-module-boundaries.test.ts",
-        "libs/core/ocr-bridge.test.ts"
+        "libs/core/ocr-bridge.test.ts",
+        "libs/actuators/voice-actuator/src/voice-external-governance.test.ts",
+        "libs/actuators/network-actuator/src/network-external-governance.test.ts"
       ],
       "timeout_ms": 300000,
       "owner": "quality",
