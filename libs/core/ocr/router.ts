@@ -1,22 +1,39 @@
 import { logger } from '../core.js';
 import { validateFileSize } from '../secure-io.js';
 import { OcrRequest, OcrResult, OcrProvider, OcrDataEgress, OcrRoutingMode } from '../ocr-types.js';
-import {
-  resolveSeamProviderDecision,
-  resolveSeamSelectionEntry,
-  type ResolveSeamProviderOptions,
-  type SeamProviderCandidate,
-} from '../seam-provider-selection.js';
+import { ProviderChainRouter } from '../provider-chain-router.js';
+import { type SeamProviderCandidate } from '../seam-provider-selection.js';
 import { withEgressPayloadContext } from '../egress-policy.js';
 import { providerDataPolicy, resolveOcrImagePath } from './provider-support.js';
+import { OCR_PROVIDER_SEAM } from './provider-registry.js';
 
-export class AdaptivePolicyRouter {
-  private providers: Map<string, OcrProvider> = new Map();
+/**
+ * Hermetic fallback for `default_chains` in the ocr-provider selection
+ * policy — used only when the policy directory is unavailable (isolated
+ * unit-test environments). The policy file is the source of truth.
+ */
+const OCR_BUILTIN_DEFAULT_CHAINS: Record<string, readonly string[]> = {
+  accurate: ['windows_native', 'llm_api', 'local_vlm', 'apple_vision', 'tesseract'],
+  privacy_first: ['windows_native', 'local_vlm', 'apple_vision', 'tesseract'],
+  local_only: ['windows_native', 'apple_vision', 'tesseract'],
+  balanced: ['windows_native', 'apple_vision', 'llm_api', 'tesseract'],
+};
 
+export class AdaptivePolicyRouter extends ProviderChainRouter<OcrProvider, OcrRequest> {
   constructor(providers: OcrProvider[]) {
-    for (const p of providers) {
-      this.providers.set(p.id, p);
-    }
+    super(providers, {
+      seam: OCR_PROVIDER_SEAM,
+      label: '[ocr_bridge]',
+      errorTag: '[OCR_PROVIDER_SELECTION]',
+      eligibility: (request) => this.eligibleCandidates(request),
+      explicitPreference: (request) => request.providerPreference,
+      purpose: (request) => request.purpose,
+      context: (request) => (request.language ? { language: request.language } : undefined),
+      defaultOrderKey: (request) => `mode:${request.mode || 'balanced'}`,
+      builtinDefaultOrder: (request) =>
+        OCR_BUILTIN_DEFAULT_CHAINS[request.mode || 'balanced'] ??
+        OCR_BUILTIN_DEFAULT_CHAINS.balanced,
+    });
   }
 
   /**
@@ -43,40 +60,14 @@ export class AdaptivePolicyRouter {
     }
   }
 
-  private getProviderIds(request: OcrRequest): string[] {
-    const preferred =
-      request.providerPreference && request.providerPreference.length > 0
-        ? request.providerPreference
-        : [];
-    const mode = request.mode || 'balanced';
-
-    // Ordering preference only. Membership is decided by the egress filter in
-    // resolveCandidates(), derived from what each provider declares about itself.
-    const defaultChain =
-      mode === 'accurate'
-        ? ['windows_native', 'llm_api', 'local_vlm', 'apple_vision', 'tesseract']
-        : mode === 'privacy_first'
-          ? ['windows_native', 'local_vlm', 'apple_vision', 'tesseract']
-          : mode === 'local_only'
-            ? ['windows_native', 'apple_vision', 'tesseract']
-            : ['windows_native', 'apple_vision', 'llm_api', 'tesseract'];
-
-    const merged = [...preferred, ...defaultChain, ...this.providers.keys()];
-    const seen = new Set<string>();
-    return merged.filter((id) => {
-      if (seen.has(id)) return false;
-      seen.add(id);
-      return true;
-    });
-  }
-
   /**
    * Hard-eligible providers for `request.mode`: allowed by the egress filter
-   * and available right now. This is the same eligibility test resolveCandidates
-   * uses by default; purpose-driven selection reuses it instead of a second
-   * notion of "can run this task". Public so the 'ocr-provider' seam
-   * calibration adapter (scripts/lib/seam-calibration/ocr-provider.ts) can
-   * reuse it instead of re-deriving eligibility.
+   * and available right now. This is the same eligibility test the chain
+   * router applies to every candidate; purpose-driven selection reuses it
+   * instead of a second notion of "can run this task". Public so the
+   * 'ocr-provider' seam calibration adapter
+   * (scripts/lib/seam-calibration/ocr-provider.ts) can reuse it instead of
+   * re-deriving eligibility.
    */
   async eligibleCandidates(request: OcrRequest): Promise<SeamProviderCandidate[]> {
     const mode = request.mode || 'balanced';
@@ -114,56 +105,12 @@ export class AdaptivePolicyRouter {
   }
 
   /**
-   * Purpose-driven order: hard mode/availability eligibility (above) filters,
-   * then the governed ocr-provider selection policy ranks who runs the task.
-   * Used when the caller asked for a purpose, or (with no purpose) when an
-   * operator rule matches this request (decisionKey 'default'). Request language,
-   * when set, is passed as selection context so a rule can match on it.
-   * Only used when the caller did not already pin an explicit
-   * providerPreference — an explicit choice always wins.
+   * Providers to try, in order. Explicit provider chains retain their order;
+   * purpose/rule-driven requests use the governed seam selection; the rest
+   * follow the mode's `default_chains` entry in the seam selection policy.
    */
-  private async resolvePurposeChain(
-    request: OcrRequest,
-    selection: Omit<ResolveSeamProviderOptions, 'candidates'>
-  ): Promise<OcrProvider[]> {
-    const candidates = await this.eligibleCandidates(request);
-    const decision = resolveSeamProviderDecision({ ...selection, candidates });
-    if (decision.strategy === 'unresolved') {
-      throw new Error(`[OCR_PROVIDER_SELECTION] ${decision.rationale}`);
-    }
-    logger.info(
-      `[ocr_bridge] ${selection.purpose ? `purpose '${selection.purpose}'` : 'rule-driven'} provider chain (${decision.strategy}): ${decision.ranked.join(' > ')} — ${decision.rationale}`
-    );
-    return decision.ranked
-      .map((id) => this.providers.get(id))
-      .filter((provider): provider is OcrProvider => Boolean(provider));
-  }
-
   async resolveCandidates(request: OcrRequest): Promise<OcrProvider[]> {
-    const hasProviderPreference = Boolean(
-      request.providerPreference && request.providerPreference.length > 0
-    );
-    // Explicit provider chains retain their order. Every other request uses
-    // the same normalized selection entry as the other provider seams.
-    if (!hasProviderPreference) {
-      const entry = resolveSeamSelectionEntry({
-        seam: 'ocr-provider',
-        purpose: request.purpose,
-        ...(request.language ? { context: { language: request.language } } : {}),
-      });
-      if (entry.kind === 'governed') return this.resolvePurposeChain(request, entry.request);
-    }
-
-    // Eligibility is identical for legacy and purpose/rule-driven routing;
-    // this path changes order only, never the admitted provider set.
-    const eligible = new Set(
-      (await this.eligibleCandidates(request))
-        .filter((candidate) => candidate.eligible)
-        .map((candidate) => candidate.id)
-    );
-    return this.getProviderIds(request)
-      .filter((id) => eligible.has(id))
-      .map((id) => this.providers.get(id)!);
+    return this.resolveProviderChain(request);
   }
 
   async selectProvider(request: OcrRequest): Promise<OcrProvider> {

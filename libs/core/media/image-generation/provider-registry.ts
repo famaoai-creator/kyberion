@@ -1,38 +1,30 @@
-import {
-  coreSeamCatalog,
-  createSeam,
-  createSeamLifecycle,
-  type SeamProviderMetadata,
-} from '../../seam.js';
+import { createProviderRegistry } from '../../provider-registry.js';
+import type { SeamProviderMetadata } from '../../seam.js';
 import type { ImageGenerationProvider } from '../image-generation-types.js';
 import { governImageProvider } from './admission.js';
 export const IMAGE_GENERATION_PROVIDER_SEAM = 'image-generation-provider';
-const imageGenerationProviderSeam = createSeam<ImageGenerationProvider>({
-  key: 'image-generation-provider',
-  multiplicity: 'named',
-  catalog: coreSeamCatalog,
+const registry = createProviderRegistry<ImageGenerationProvider>({
+  seam: IMAGE_GENERATION_PROVIDER_SEAM,
   owner: 'libs/core/media/image-generation/provider-registry.ts',
-});
-let revision = 0;
-const lifecycle = createSeamLifecycle(imageGenerationProviderSeam, {
-  onChange: () => {
-    revision++;
-  },
+  source: 'image-generation-extension',
+  govern: governImageProvider,
+  missingIdError: 'ImageGenerationProvider.id is required',
 });
 export function imageGenerationProviderRevision(): number {
-  return revision;
+  return registry.revision();
 }
 export function registerImageGenerationProvider(
   provider: ImageGenerationProvider,
-  metadata: SeamProviderMetadata = { provenance: 'plugin', source: 'image-generation-extension' }
+  metadata?: SeamProviderMetadata
 ): () => void {
-  const id = String(provider.id || '').trim();
-  if (!id) throw new Error('ImageGenerationProvider.id is required');
-  return lifecycle.register(id, governImageProvider(provider), metadata);
+  return registry.register(provider, metadata);
 }
 export function listImageGenerationProviders(): ImageGenerationProvider[] {
-  return imageGenerationProviderSeam.list().map((record) => record.implementation);
+  return registry.list();
+}
+export function getImageGenerationProvider(id: string): ImageGenerationProvider | undefined {
+  return registry.get(id);
 }
 export function resetImageGenerationProviders(): void {
-  lifecycle.reset();
+  registry.reset();
 }
