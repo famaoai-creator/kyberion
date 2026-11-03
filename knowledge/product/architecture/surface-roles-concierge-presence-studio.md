@@ -1,7 +1,7 @@
 ---
 title: 'Surface roles: Concierge vs Presence Studio (and Chronos Mirror)'
 tags: [surfaces, architecture, concierge, presence-studio, roles]
-last_updated: 2026-11-03
+last_updated: 2026-11-04
 ---
 
 # Surface roles: Concierge vs Presence Studio (and Chronos Mirror)
@@ -64,3 +64,12 @@ second operator surface in practice, not a caption overlay.
 4. **Chronos Mirror** stays a display surface; its value is the A2UI
    component library, which should feed the shared component host rather
    than live only inside chronos-mirror-v2.
+
+## Update — unified shell (MSN-SURFACE-UNIFY-20261103)
+
+The recommendations above were carried out as follows:
+
+- **One shell, three processes.** Concierge hosts the workspace shell (`/w` overview, `/w/<kind>` lists, `/w/<kind>/<id>` detail with lineage and actors). Presence Studio stays the realtime voice/hearing process, and its root redirects to the shell. Chronos keeps operations, surface control, diagnostics, deliverables and knowledge, and renders the shared rail, so every page links back.
+- **One read API.** `libs/core/surface/surface-operation-registry.ts` declares each operation once. Concierge serves it at `/api/v1/<domain>/<verb>` and the MCP server as `kyberion.<id>`. The read model is `libs/core/surface/workspace-graph.ts`, run as the read-only role `workspace_graph_reader`.
+- **One sign-in.** The `kyberion_session` cookie is shared across ports on the same host, and all three surfaces read the operator-wide OIDC settings in system scope.
+- **Installation-scope settings** are authorized by owner identity and assurance; see [installation-owner-authorization](../governance/installation-owner-authorization.md).
