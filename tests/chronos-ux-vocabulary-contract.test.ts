@@ -10,7 +10,10 @@ import { createBrowserVocabularyResolver } from '@agent/core/locale-normalize';
 // (the old failure mode was silent drift between dead fallback strings and
 // what actually rendered).
 
-const CHRONOS_SRC = path.join(process.cwd(), 'presence/displays/chronos-mirror-v2/src');
+// The console moved into Concierge (MSN-KYBERION-SERVER-20261104).
+const CHRONOS_SRC_DIRS = ['app/ops', 'app/api/ops', 'components/ops', 'lib/ops'].map((dir) =>
+  path.join(process.cwd(), 'presence/displays/concierge/src', dir)
+);
 
 // Use the same resolver as the browser: qualified names must stay in their
 // named namespace, and ambiguous bare names are refused rather than flattened.
@@ -32,7 +35,7 @@ describe('chronos ux vocabulary contract (UX-03)', () => {
     const missing: string[] = [];
     let referenced = 0;
 
-    for (const file of walkFiles(CHRONOS_SRC)) {
+    for (const file of CHRONOS_SRC_DIRS.flatMap((dir) => [...walkFiles(dir)])) {
       const source = safeReadFile(file, { encoding: 'utf8' }) as string;
       for (const match of source.matchAll(/ux(?:Text|Label)\(\s*'([^']+)'/g)) {
         referenced += 1;
@@ -55,7 +58,7 @@ describe('chronos ux vocabulary contract (UX-03)', () => {
     const missing: string[] = [];
     let referenced = 0;
 
-    for (const file of walkFiles(CHRONOS_SRC)) {
+    for (const file of CHRONOS_SRC_DIRS.flatMap((dir) => [...walkFiles(dir)])) {
       const source = safeReadFile(file, { encoding: 'utf8' }) as string;
       for (const match of source.matchAll(/\b(?:uxTextOr|mt)\(\s*'([^']+)'/g)) {
         referenced += 1;
@@ -79,7 +82,7 @@ describe('chronos ux vocabulary contract (UX-03)', () => {
 
   it('uxText no longer accepts inline fallback strings', () => {
     const offenders: string[] = [];
-    for (const file of walkFiles(CHRONOS_SRC)) {
+    for (const file of CHRONOS_SRC_DIRS.flatMap((dir) => [...walkFiles(dir)])) {
       const source = safeReadFile(file, { encoding: 'utf8' }) as string;
       for (const match of source.matchAll(/uxText\(\s*'[^']+'\s*,\s*'/g)) {
         offenders.push(`${path.relative(process.cwd(), file)}: ${match[0]}`);

@@ -63,10 +63,10 @@ describe('RA-01 scoped role assumption', () => {
   });
 
   it('lets an assumed role outrank SYSTEM_ROLE, then falls back to SYSTEM_ROLE', () => {
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    process.env.SYSTEM_ROLE = 'concierge';
     process.env.MISSION_ROLE = 'mission_controller';
 
-    expect(resolveRole()).toBe('chronos_mirror_v2');
+    expect(resolveRole()).toBe('concierge');
     const inside = withExecutionContext('chronos_localadmin', () => ({
       role: resolveRole(),
       identityRole: resolveIdentityContext().role,
@@ -77,7 +77,7 @@ describe('RA-01 scoped role assumption', () => {
       identityRole: 'chronos_localadmin',
       persona: 'worker',
     });
-    expect(resolveRole()).toBe('chronos_mirror_v2');
+    expect(resolveRole()).toBe('concierge');
   });
 
   it('keeps SYSTEM_ROLE above MISSION_ROLE when nothing is assumed', () => {
@@ -89,13 +89,13 @@ describe('RA-01 scoped role assumption', () => {
 
   it('never reads the assumed role from an inherited environment variable', () => {
     process.env.MISSION_ROLE = 'mission_controller';
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    process.env.SYSTEM_ROLE = 'concierge';
     expect(resolveAssumedRole()).toBeUndefined();
-    expect(resolveRole()).toBe('chronos_mirror_v2');
+    expect(resolveRole()).toBe('concierge');
   });
 
   it('grants the assumed role its tier-guard permissions under SYSTEM_ROLE', () => {
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    process.env.SYSTEM_ROLE = 'concierge';
     const tenantRegistryPath = 'knowledge/personal/tenants/acme.json';
 
     expect(validateReadPermission(tenantRegistryPath).allowed).toBe(false);
@@ -106,7 +106,7 @@ describe('RA-01 scoped role assumption', () => {
   });
 
   it('isolates concurrent async contexts assuming different roles', async () => {
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    process.env.SYSTEM_ROLE = 'concierge';
     const aEntered = deferred();
     const bEntered = deferred();
 
@@ -132,7 +132,7 @@ describe('RA-01 scoped role assumption', () => {
       role: 'mission_controller',
       persona: 'ecosystem_architect',
     });
-    expect(resolveRole()).toBe('chronos_mirror_v2');
+    expect(resolveRole()).toBe('concierge');
   });
 
   it('restores nested contexts across awaits', async () => {
@@ -384,18 +384,24 @@ describe('RA-02 role assumption policy', () => {
   });
 
   it('allows listed and shared core roles', () => {
-    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_localadmin')).toBe(true);
-    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_operator')).toBe(true);
-    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'mission_controller')).toBe(true);
+    // The operations console (former Chronos) runs inside Concierge.
+    expect(isRoleAssumptionAllowed('concierge', 'chronos_localadmin')).toBe(true);
+    expect(isRoleAssumptionAllowed('concierge', 'chronos_operator')).toBe(true);
+    expect(isRoleAssumptionAllowed('concierge', 'mission_controller')).toBe(true);
     expect(isRoleAssumptionAllowed('concierge', 'concierge_localadmin')).toBe(true);
+    // The Chronos compatibility app only redirects and assumes nothing.
+    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'chronos_localadmin')).toBe(false);
+    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'mission_controller')).toBe(false);
+    // D3: the server never holds the high-privilege writers.
+    expect(isRoleAssumptionAllowed('concierge', 'dot_lifecycle_writer')).toBe(false);
+    expect(isRoleAssumptionAllowed('concierge', 'generation_scheduler')).toBe(false);
     expect(isRoleAssumptionAllowed('system_configurator', 'mission_controller')).toBe(true);
     expect(isRoleAssumptionAllowed('slack_bridge', 'chronos_localadmin')).toBe(false);
     expect(isRoleAssumptionAllowed('not_listed_system_role', 'chronos_gateway')).toBe(false);
-    expect(isRoleAssumptionAllowed('concierge', 'chronos_localadmin')).toBe(false);
   });
 
   it('limits the NHI member-status reader to surfaces that display the operator ledger', () => {
-    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'nhi_accountability_reader')).toBe(true);
+    expect(isRoleAssumptionAllowed('chronos_mirror_v2', 'nhi_accountability_reader')).toBe(false);
     expect(isRoleAssumptionAllowed('concierge', 'nhi_accountability_reader')).toBe(true);
     expect(isRoleAssumptionAllowed('terminal_hud', 'nhi_accountability_reader')).toBe(true);
     expect(isRoleAssumptionAllowed('slack_bridge', 'nhi_accountability_reader')).toBe(false);
@@ -469,7 +475,7 @@ describe('S1 scope integrity', () => {
   });
 
   it('still honours a directly run scope whose role the policy allows', () => {
-    process.env.SYSTEM_ROLE = 'chronos_mirror_v2';
+    process.env.SYSTEM_ROLE = 'concierge';
     const role = rawStorage().run({ tenantBound: false, assumedRole: 'chronos_localadmin' }, () =>
       resolveRole()
     );
@@ -561,7 +567,7 @@ describe('DR-01 delegated child role', () => {
   it('keeps the RA-02 bounds of SYSTEM_ROLE inside a delegated child', () => {
     becomeChild(buildExecutionEnv({ SYSTEM_ROLE: 'concierge' }, 'sovereign_concierge'));
     // Bounds stay those of SYSTEM_ROLE, not of the delegated role.
-    expect(() => withExecutionContext('chronos_localadmin', () => undefined)).toThrow(
+    expect(() => withExecutionContext('dot_lifecycle_writer', () => undefined)).toThrow(
       '[ROLE_ASSUMPTION_DENIED]'
     );
     expect(withExecutionContext('ingest_commit', () => resolveRole())).toBe('ingest_commit');
@@ -653,7 +659,7 @@ describe('DR-01 delegated child role', () => {
     ].storage;
     const warn = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     try {
-      const role = storage.run({ tenantBound: false, assumedRole: 'chronos_localadmin' }, () =>
+      const role = storage.run({ tenantBound: false, assumedRole: 'dot_lifecycle_writer' }, () =>
         resolveRole()
       );
       expect(role).toBe('sovereign_concierge');

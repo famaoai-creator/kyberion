@@ -1,11 +1,8 @@
+import { serverDelegatedChildEnv } from '../../../lib/server-child-env';
 import { NextRequest, NextResponse } from 'next/server';
 import * as path from 'node:path';
 import { randomUUID } from 'node:crypto';
-import {
-  buildExecutionEnv,
-  withExecutionContext,
-  withExecutionContextAsync,
-} from '@agent/core/authority';
+import { withExecutionContext, withExecutionContextAsync } from '@agent/core/authority';
 import { resolveWorkspaceScope, WorkspaceScopeError } from '@agent/core/surface/workspace-scope';
 import { ingestScopedWorkspaceDocument } from '@agent/core/surface/scoped-workspace-ingest';
 import { listTenantProfileSlugs } from '@agent/core/organization/tenant-registry';
@@ -237,7 +234,7 @@ export async function POST(req: NextRequest) {
     // buildExecutionEnv is its subprocess counterpart — the tenant profile
     // lives in the personal tier and is unreadable without it).
     const result = safeExecResult(process.execPath, args, {
-      env: buildExecutionEnv(process.env, 'sovereign_concierge'),
+      env: serverDelegatedChildEnv('sovereign_concierge'),
       cwd: pathResolver.rootDir(),
       timeoutMs: INGEST_TIMEOUT_MS,
       maxOutputMB: 5,

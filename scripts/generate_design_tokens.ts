@@ -18,7 +18,7 @@ import {
 } from './design-token-utils.js';
 
 const ROOT = pathResolver.rootDir();
-const GLOBALS_CSS_PATH = path.join(ROOT, 'presence/displays/chronos-mirror-v2/src/app/globals.css');
+const GLOBALS_CSS_PATH = path.join(ROOT, 'presence/displays/concierge/src/app/ops/globals.css');
 const OPERATOR_GLOBALS_CSS_PATH = path.join(
   ROOT,
   'presence/displays/operator-surface/src/app/globals.css'
@@ -47,7 +47,6 @@ export const CUSTOMER_ROOM_UI_TOKENS_CSS_PATH = path.join(
 );
 /** Every surface gets the component stylesheet next to its token file. */
 export const KB_UI_STYLESHEET_PATHS = [
-  'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css',
   'presence/displays/operator-surface/src/app/kyberion-ui.css',
   'presence/displays/presence-studio/static/kyberion-ui.css',
   'presence/displays/computer-surface/static/kyberion-ui.css',
@@ -55,10 +54,7 @@ export const KB_UI_STYLESHEET_PATHS = [
   'scripts/lib/pad-ui/kyberion-ui.css',
   'presence/displays/customer-room/static/kyberion-ui.css',
 ].map((relativePath) => path.join(ROOT, relativePath));
-const TAILWIND_CONFIG_PATH = path.join(
-  ROOT,
-  'presence/displays/chronos-mirror-v2/tailwind.config.cjs'
-);
+const TAILWIND_CONFIG_PATH = path.join(ROOT, 'presence/displays/concierge/tailwind.config.cjs');
 const THEMES_JSON_PATH = path.join(
   ROOT,
   'knowledge/public/design-patterns/media-templates/themes.json'

@@ -93,7 +93,7 @@ it('resolves a granted tenant under the actual readonly surface role without exp
   const authority = await import('../authority.js');
   const { readTenantProfile } = await import('../organization/tenant-registry.js');
   const secure = await import('../secure-io.js');
-  vi.stubEnv('SYSTEM_ROLE', 'chronos_mirror_v2');
+  vi.stubEnv('SYSTEM_ROLE', 'concierge');
   try {
     authority.withExecutionContext('chronos_operator', () => {
       expect(() => readTenantProfile('workspace-tenant')).toThrow();

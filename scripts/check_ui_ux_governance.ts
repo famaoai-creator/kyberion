@@ -70,7 +70,7 @@ const UI_COMPONENT_STYLESHEET_REQUIREMENTS = [
 ];
 /** Generated design-token outputs and the markers each must contain. */
 const GENERATED_TOKEN_FILES: Record<string, readonly string[]> = {
-  'presence/displays/chronos-mirror-v2/src/app/globals.css': [
+  'presence/displays/concierge/src/app/ops/globals.css': [
     ...REQUIRED_SEMANTIC_TOKENS,
     ...REQUIRED_UI_TOKENS,
   ],
@@ -87,8 +87,6 @@ const GENERATED_TOKEN_FILES: Record<string, readonly string[]> = {
     ...REQUIRED_UI_TOKENS,
   ],
   'presence/displays/concierge/src/app/kyberion-ui-tokens.css': REQUIRED_UI_TOKENS,
-  'presence/displays/chronos-mirror-v2/src/app/kyberion-ui.css':
-    UI_COMPONENT_STYLESHEET_REQUIREMENTS,
   'presence/displays/operator-surface/src/app/kyberion-ui.css':
     UI_COMPONENT_STYLESHEET_REQUIREMENTS,
   'presence/displays/presence-studio/static/kyberion-ui.css': UI_COMPONENT_STYLESHEET_REQUIREMENTS,
