@@ -1,4 +1,3 @@
-import { safeExecResult, type SafeExecOptions } from '../secure-io.js';
 import { governVcsCommand } from './external-vcs.js';
 import { computeApprovalPayloadHash } from '../governance/approval-store.js';
 import { assertNotFlagLike } from './git-arguments.js';
@@ -13,37 +12,29 @@ import { normalizeRepositoryTarget } from '../governance/external-operation-targ
 import { currentScopeEnvelope } from '../scope-envelope.js';
 import { resolveScopeContext } from '../scope-context.js';
 import { assertVcsCwdScope } from './cwd-scope.js';
+import { vcsDefaultRunner, type VcsCommandResult, type VcsCommandRunner } from './vcs-backend.js';
+
+export type { VcsCommandResult, VcsCommandRunner } from './vcs-backend.js';
 
 /**
- * Typed git verbs over the governed safeExecResult boundary — the single
+ * Typed git verbs over the governed vcs-backend seam — the single
  * implementation behind `vcs-actuator` and the scripts that used to embed
  * raw `safeExec('git', …)` argv. Per-mission-repo plumbing
  * (libs/core/mission/mission-git.ts & friends) intentionally stays direct:
  * those repos are the mission-owner-only contract, not this shared surface.
  *
- * Every helper takes an injectable `run` seam (default safeExecResult) so
- * callers with their own command-runner dependency (e.g. system-actuator's
- * PR lifecycle) keep their testability. Callers check `status` themselves —
- * `gh pr checks` legitimately exits non-zero while pending.
+ * Every helper takes an injectable `run` seam (default `vcsDefaultRunner`,
+ * which resolves the governed `vcs-backend` provider — local-git delegates
+ * to safeExecResult) so callers with their own command-runner dependency
+ * (e.g. system-actuator's PR lifecycle) keep their testability. Callers
+ * check `status` themselves — `gh pr checks` legitimately exits non-zero
+ * while pending.
  */
-
-export interface VcsCommandResult {
-  stdout: string;
-  stderr: string;
-  status: number | null;
-  error?: Error;
-}
-
-export type VcsCommandRunner = (
-  command: string,
-  args: string[],
-  options?: SafeExecOptions
-) => VcsCommandResult;
 
 export function gitRun(
   args: string[],
   cwd: string,
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   assertVcsCwdScope(cwd);
   // Generic execution is local-only. Git global flags, aliases and additional
@@ -73,7 +64,7 @@ export function gitRun(
 export function gitStatus(
   cwd: string,
   options: { short?: boolean; untracked?: boolean } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   const args = ['status'];
   if (options.short) args.push('--short');
@@ -90,7 +81,7 @@ export function gitDiff(
     nameOnly?: boolean;
     diffFilter?: string;
   } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   const args = ['diff'];
   if (options.stat) args.push('--stat');
@@ -108,7 +99,7 @@ export function gitDiff(
 export function gitDiffChangedPaths(
   cwd: string,
   options: { cached?: boolean; diffFilter?: string } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): { paths: string[]; result: VcsCommandResult } {
   const args = ['diff', '--name-only', '-z'];
   if (options.cached) args.push('--cached');
@@ -122,7 +113,7 @@ export function gitDiffChangedPaths(
 export function gitLog(
   cwd: string,
   options: { limit?: number; oneline?: boolean } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   const args = ['log'];
   if (options.oneline) args.push('--oneline');
@@ -136,7 +127,7 @@ export function gitBranch(
   cwd: string,
   action: 'list' | 'create' | 'delete',
   name?: string,
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   if (action === 'list') return gitRun(['branch', '--list'], cwd, run);
   if (!name?.trim()) throw new Error(`[VCS_GIT_INVALID] branch ${action} requires a name`);
@@ -152,7 +143,7 @@ export function gitCheckout(
   cwd: string,
   ref: string,
   options: { createBranch?: boolean } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   assertNotFlagLike(ref, 'checkout ref');
   const args = ['checkout'];
@@ -164,7 +155,7 @@ export function gitCheckout(
 export function gitAdd(
   cwd: string,
   paths: string[],
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult[] {
   // One `git add -- <path>` per path: keeps the call shape identical to the
   // historical callers (NUL-delimited filenames with spaces/newlines stay
@@ -172,14 +163,14 @@ export function gitAdd(
   return paths.map((p) => gitRun(['add', '--', p], cwd, run));
 }
 
-export function gitAddAll(cwd: string, run: VcsCommandRunner = safeExecResult): VcsCommandResult {
+export function gitAddAll(cwd: string, run: VcsCommandRunner = vcsDefaultRunner): VcsCommandResult {
   return gitRun(['add', '-A'], cwd, run);
 }
 
 export function gitCommit(
   cwd: string,
   message: string,
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   if (!message.trim()) throw new Error('[VCS_GIT_INVALID] commit requires a message');
   return gitRun(['commit', '-m', message.trim()], cwd, run);
@@ -192,7 +183,7 @@ export function gitPush(
     ref?: string;
     setUpstream?: boolean;
   } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   assertVcsCwdScope(cwd);
   if (options.remote !== undefined) assertNotFlagLike(options.remote, 'remote');
@@ -298,7 +289,7 @@ export function gitPush(
 export function gitFetch(
   cwd: string,
   options: { remote?: string; ref?: string } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   assertVcsCwdScope(cwd);
   const remote = options.remote?.trim() || 'origin';
@@ -326,7 +317,7 @@ export function gitFetch(
 export function gitPull(
   cwd: string,
   options: { remote?: string; ref?: string; ffOnly?: boolean } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   assertVcsCwdScope(cwd);
   const remote = options.remote?.trim() || 'origin';
@@ -354,7 +345,7 @@ export function gitWorktree(
   cwd: string,
   action: GitWorktreeAction,
   options: { path?: string; ref?: string } = {},
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   const args = ['worktree', action];
   if (action === 'add' || action === 'remove') {
@@ -376,7 +367,7 @@ export function gitWorktree(
 export function gitCheckRefFormat(
   cwd: string,
   branchName: string,
-  run: VcsCommandRunner = safeExecResult
+  run: VcsCommandRunner = vcsDefaultRunner
 ): VcsCommandResult {
   return gitRun(['check-ref-format', '--branch', branchName], cwd, run);
 }
